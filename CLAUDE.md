@@ -1,0 +1,102 @@
+# CLAUDE.md — rrb-jarvisOS
+
+Desktop app **local-first** (Electron + React + TypeScript) com dois espaços de usuário — **NOA** (pessoal) e **JARVIS OS** (profissional/operacional) — sobre uma plataforma compartilhada (**Desenvolvimento**). Sync/auth via Supabase Cloud como espelho, nunca como fonte de verdade operacional. Base: `docs/DECISIONS.md` (ADR-001).
+
+## Documentos que você deve ler (ordem)
+
+| Doc | O que é |
+|---|---|
+| `docs/DEVELOPMENT.md` | **Sua ordem de execução e status por item (você é o dono; atualize a cada entrega junto com STATUS.md)** |
+| `docs/ARCHITECTURE.md` | Desenho, módulos, dados, resiliência |
+| `docs/DECISIONS.md` | ADRs (ler antes de propor mudança estrutural) |
+| `docs/CONVENTION.md` | Contrato do processo (labels `proplan:*`) e contrato de dados das entidades |
+| `docs/STATUS.md` | Kanban/roadmap deste projeto (mantenha atualizado ao concluir fatias) |
+| `docs/LANDSCAPE.md` | Mapa do território: domínios, módulos e onde cada documento mora |
+| `docs/spec/` | Specs por fatia — só implemente fatia com spec `aprovada-pi` |
+| `docs/mvp/` | MVPs (épicos) com checklist das fatias previstas |
+
+## Papéis e governança
+
+- **Rodrigo Reis (PI)** — decide escopo, prioridades e trade-offs; aprova specs e aceita entregas.
+- **Claude Cowork (planejamento)** — especifica e mantém `docs/` e as specs em `docs/specs/`. Antes de finalizar qualquer spec, apresenta as perguntas abertas e dúvidas ao PI — spec só vira `aprovada-pi` com todas resolvidas (evitar retrabalho). Quando a spec vira `aprovada-pi`, **cria a issue-fatia no board** (coluna Backlog, assignee PI). **Nunca implementa código** — implementação é exclusiva do Claude Code.
+- **Claude Code (você)** — planeja, codifica, testa (código, UX e UI — pode usar as skills do impeccable), atualiza a documentação e **sempre commita todos os documentos de `docs/`** junto da entrega. Implementa a partir deste arquivo + `docs/` + spec da feature em `docs/specs/`. **Não cria a issue** (é do Cowork) — pega o card, move pelo fluxo e entrega com PR. Pode criticar arquitetura, **não escopo**. Sem spec para a tarefa, ou spec ambígua → perguntar ao PI antes de codificar, nunca assumir. Deve apontar problemas técnicos da spec — a correção passa pelo PI.
+
+### Hierarquia: MVP (épico) → fatia
+
+Duas granularidades de issue, e só duas:
+
+- **MVP** = issue-épico (`proplan:mvp`). É um **container**, não uma fatia — **não tem spec própria**. Nasce com um **checklist no corpo** listando as fatias previstas (texto, ainda não são issues). É o **último a fechar**: quando todas as fatias-filhas fecham, o PI fecha o MVP.
+- **Fatia** = issue-filha (sub-issue do MVP). Nasce **lazy**: só vira issue real **quando sua spec vira `aprovada-pi`** — nunca antes. Enquanto isso, existe apenas como item do checklist do MVP.
+
+Isso preserva o gate: nenhuma issue de fatia existe sem spec aprovada.
+
+> **Compatibilidade com o ProPlan:** a projeção do board é `issue → coluna` por **label + open/closed**. Se o ProPlan ainda **não lê relação pai/filho de sub-issue**, o épico aparece como card solto — decisão do PI sobre como exibi-lo; até lá, a ligação vive no checklist do corpo do MVP.
+
+### Ciclo de vida
+
+Convenção de processo do trio, executada à mão pelo Code via GitHub MCP. O board vive nas **GitHub Issues**.
+
+| momento | quem | ação |
+|---|---|---|
+| MVP definido | **Cowork** | cria issue `proplan:mvp`; corpo = checklist das fatias previstas. **Sem spec.** |
+| spec vira `aprovada-pi` | **Cowork** | cria a issue-filha (sub-issue do MVP) em **Backlog** (`proplan:backlog`), corpo com link pro arquivo da spec, assignee = **PI** |
+| vai começar | **Code** | move **uma** filha pra **A Fazer** (`proplan:todo`) → **Em Andamento** (`proplan:doing`) ao iniciar, e se atribui. Uma fatia por vez (WIP) — nunca move o lote |
+| entrega | **Code** | abre PR com **`refs #N`** no corpo. **NUNCA `closes #N`** — fecharia a issue no merge e **forjaria o aceite do PI**. Só **depois do merge**, aplica `proplan:done` → **Feito**, com o link do PR no corpo da issue |
+| aceite da fatia | **PI** | **só o PI** fecha a issue-filha e aplica `proplan:finalizado` |
+| MVP entregue | **PI** | quando **todas as filhas** estão fechadas, o PI fecha o MVP |
+
+**A issue só fecha quando o trabalho realmente acabou.** Fechar é ato deliberado do PI, nunca efeito colateral de merge. O Code **nunca** fecha issue nem move card para Finalizado. Declarar "terminei" **sem PR mergeado** é o "fechamento frágil" que este processo existe para impedir.
+
+**`card = fatia`** (o MVP é a única exceção, como container) — uma issue por fatia, **nunca por passo da spec**. Os passos vivem no `docs/DEVELOPMENT.md` (com checkmarks). As Issues respondem *"qual fatia está em qual coluna"*; o `docs/DEVELOPMENT.md` responde *"onde estou dentro da fatia"*. Granularidades diferentes ⇒ nenhum fato mora nos dois lugares.
+
+### Durabilidade do trabalho (Git)
+
+O medo legítimo é perder trabalho. O que protege contra isso é **push para o remoto**, não o merge — código commitado e "pushado" num branch de feature está tão seguro quanto na `main`. O que faz trabalho sumir é ficar só no working tree local. Portanto:
+
+- **Commite cedo e frequente** e **faça push do branch para o remoto** ao fim de cada passo relevante da fatia — inclui os docs de `docs/`. Nunca deixe entrega só no disco local.
+- **Um branch por fatia** (`feat/<slug-da-fatia>`); **nunca commit direto na `main`**. O branch é o que preserva o gate de review/CI antes de a `main` ser tocada.
+- **Entrega = PR com `refs #N`.** Com `dev/test/lint` verdes, o Code faz o **merge do PR na `main`** (modo solo: pode auto-mergear após os checks). Assim o trabalho **sempre aterrissa na `main`**, sem burlar o processo.
+- **Nunca `closes #N`** no merge — a issue permanece aberta para o aceite do PI. Merge integra código; **não** é aceite. Após o merge, aplica `proplan:done` (regra do ciclo de vida acima).
+
+Trocar isto por commit direto na `main` sem PR (trunk-based) é mudança estrutural — exige ADR, não edição avulsa.
+
+### Colunas do board (mapeamento Issues → Kanban)
+
+- **Backlog / A Fazer / Em Andamento** = `open` + `proplan:backlog` \| `proplan:todo` \| `proplan:doing`
+- **Feito** = `open` + `proplan:done` — *entregue (PR mergeado), aguardando aceite*
+- **Finalizado** = `closed` + `proplan:finalizado` — *aceito pelo dono*
+- **Descartado** = `closed` + `proplan:descartado`
+
+Fechar é ato deliberado do dono, nunca efeito colateral de merge. Issue nunca é deletada. **`closes #N` é proibido** (forjaria aceite); usar sempre `refs #N`. Mover para Finalizado/Descartado posta comentário de carimbo na issue.
+
+### Fatia exige spec. Correção de bug documentado, não.
+
+A regra *"sem spec `aprovada-pi` → não codificar"* existe para impedir **escopo assumido** — o Code inventando o que fazer. Ela **não se aplica** quando não há escopo a assumir:
+
+| tipo | precisa de spec? | por quê |
+|---|---|---|
+| **MVP / épico** (container de fatias) | **Não** | não tem escopo próprio a decidir; o escopo mora nas fatias-filhas |
+| **Fatia** (escopo novo, comportamento novo) | **Sim** | há decisões de produto a tomar — são do PI |
+| **Correção de bug já documentado** (o comportamento correto está escrito num ADR, no `ARCHITECTURE.md` ou numa spec existente) | **Não** | não há o que decidir: o certo já está definido |
+| **Bug sem comportamento correto definido** | **Sim** — ou pelo menos perguntar ao PI | se o certo ainda não foi decidido, decidir é do PI |
+
+## Regras técnicas invioláveis (resumo — detalhe no ARCHITECTURE.md)
+
+- Renderer **nunca** acessa Node, segredo ou executa comando direto. IPC mínimo e tipado via preload; `contextIsolation` on, `nodeIntegration` off.
+- Toda entidade persistida carrega escopo: `user_id`, `workspace_id` (+ `organization_id`, `visibility`, `sensitivity` quando aplicável).
+- `Desenvolvimento` não é workspace de usuário. `Agentic OS` é área interna do JARVIS OS, nunca um quarto workspace.
+- Policy Engine é **fail closed**: ação não reconhecida = bloqueada. Ação sensível gera `AuditEvent` antes e depois.
+- Local é fonte de verdade operacional; Supabase Cloud é espelho de sync/auth/auditoria (ADR-001).
+
+## Diretrizes de implementação (Code)
+
+Priorizam cautela sobre velocidade; em tarefa trivial, bom senso.
+
+- **Pense antes de codificar.** Não presuma: declare suposições, exponha interpretações alternativas, aponte a abordagem mais simples. Em dúvida, pare e pergunte ao PI (já é regra: sem spec → perguntar).
+- **Simplicidade primeiro.** Código mínimo que resolve. Sem abstração de uso único, sem flexibilidade não pedida, sem tratar cenário impossível.
+- **Alterações cirúrgicas.** Cada linha alterada rastreável ao pedido. Não refatore o que não quebrou; mantenha o estilo existente; código morto não relacionado se aponta, não se apaga. **Exceção:** atualizar `docs/` é escopo obrigatório da entrega, não "melhoria adjacente".
+- **Execução verificável.** Traduza tarefa em critério checável ("adicionar validação" → "teste para entrada inválida passa"). `dev`, `test`, `lint` verdes é o piso.
+
+## Comandos
+
+`npm run dev` · `npm run test` · `npm run lint` — os três devem passar em toda entrega. adicionar no !README.md instrução para subir o projeto local.
