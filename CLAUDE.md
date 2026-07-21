@@ -12,6 +12,7 @@ Desktop app **local-first** (Electron + React + TypeScript) com dois espaços de
 | `docs/CONVENTION.md` | Contrato do processo (labels `proplan:*`) e contrato de dados das entidades |
 | `docs/STATUS.md` | Kanban/roadmap deste projeto (mantenha atualizado ao concluir fatias) |
 | `docs/LANDSCAPE.md` | Mapa do território: domínios, módulos e onde cada documento mora |
+| `docs/TESTING.md` | processo de test, QA, relatório |
 | `docs/spec/` | Specs por fatia — só implemente fatia com spec `aprovada-pi` |
 | `docs/mvp/` | MVPs (épicos) com checklist das fatias previstas |
 
@@ -60,6 +61,46 @@ O medo legítimo é perder trabalho. O que protege contra isso é **push para o 
 
 Trocar isto por commit direto na `main` sem PR (trunk-based) é mudança estrutural — exige ADR, não edição avulsa.
 
+### Padrão de título de issue
+
+Todo título de card **começa** com tokens em colchetes, **nesta ordem**, seguidos de um espaço e o título livre. Motivo: olhando o board, dá pra ler **qual MVP** e **qual SPEC** — não só a fatia. Reforça a regra do `STATUS.md`: *nunca o número nu, sempre o par*.
+
+**Forma:** `[MVP<n>][SPEC-<nnn>][<fatia|tipo>] <título livre>`
+
+- **`[MVP<n>]`** — `[MVP1]`/`[MVP2]`/`[MVP3]`, quando a fatia pertence a um MVP conhecido.
+- **`[SPEC-<nnn>]`** — 3 dígitos (`[SPEC-024]`), quando há spec. **Permanece** em correção que conserta comportamento definido numa spec.
+- **`[F<n>]`** — a fatia (`[F18]`). Para card que **não é fatia**, entra no lugar um **token de tipo**: `[FIX]` (correção de bug) ou `[INFRA]` (processo/infra).
+
+**Regra de ouro:** só entra token que é **verdade** — nunca inventar SPEC ou fatia. Card carrega os tokens que existem, na ordem; os que não existem, omite.
+
+Exemplos:
+
+- Fatia com spec → `[MVP2][SPEC-024][F18] Épicos: hierarquia MVP→fatia no board`
+- Correção ligada a uma spec → `[MVP2][SPEC-022][FIX] reinstall re-liga o Tenant`
+- Correção ligada só a ADR/doc (sem spec) → `[MVP1][FIX] Kanban atualiza sem F5`
+- Processo/infra sem MVP/SPEC → `[INFRA] CI: relatório de testes por SPEC/issue`
+
+O par MVP↔SPEC↔Fatia deriva do **Índice Fatia ↔ SPEC** do `docs/STATUS.md` (fonte única). Card de teste/descartável leva `[TEST]` no lugar do tipo.
+
+### Fatia exige spec. Correção de bug documentado, não.
+
+A regra *"sem spec `aprovada-pi` → não codificar"* existe para impedir **escopo assumido** — o Code inventando o que fazer. Ela **não se aplica** quando não há escopo a assumir:
+
+| tipo | precisa de spec? | por quê |
+|---|---|---|
+| **Fatia** (escopo novo, comportamento novo) | **Sim** | há decisões de produto a tomar — são do PI |
+| **Correção de bug já documentado** (o comportamento correto está escrito num ADR, no `ARCHITECTURE.md` ou numa spec existente) | **Não** | não há o que decidir: o certo já está definido. Basta o item no `STATUS.md` + a regra escrita |
+| **Bug sem comportamento correto definido** | **Sim** — ou pelo menos perguntar ao PI | se o certo ainda não foi decidido, decidir é do PI |
+
+Exemplo vivo: **sync SHA-aware** (elimina o `noop` falso) — não tem spec e **não precisa**. A regra está no `ARCHITECTURE.md` → Resiliência, com os call sites e o que é proibido. Implementar direto.
+
+## Regras de trabalho
+
+- **Idioma**: documentação, specs, commits e comunicação sempre em português (pt-BR); código e identificadores em inglês.
+- **Sem hardcode e sem mock** — dado local de desenvolvimento entra via seed (`prisma/seed.ts`), criado na primeira fatia que precisar.
+- **Ambiente 100% local até o fim do MVP** (docker-compose; sem deploy em nuvem).
+- **Portas**: web `5180` (strictPort — se ocupada, falha em vez de trocar), API `3311` (era 3000; remapeada por colisão com outros stacks locais — configurável via `API_PORT`). Postgres host `5433`, Redis host `6380` (host bindings remapeados; rede interna do compose segue 5432/6379).
+
 ### Colunas do board (mapeamento Issues → Kanban)
 
 - **Backlog / A Fazer / Em Andamento** = `open` + `proplan:backlog` \| `proplan:todo` \| `proplan:doing`
@@ -95,7 +136,15 @@ Priorizam cautela sobre velocidade; em tarefa trivial, bom senso.
 - **Pense antes de codificar.** Não presuma: declare suposições, exponha interpretações alternativas, aponte a abordagem mais simples. Em dúvida, pare e pergunte ao PI (já é regra: sem spec → perguntar).
 - **Simplicidade primeiro.** Código mínimo que resolve. Sem abstração de uso único, sem flexibilidade não pedida, sem tratar cenário impossível.
 - **Alterações cirúrgicas.** Cada linha alterada rastreável ao pedido. Não refatore o que não quebrou; mantenha o estilo existente; código morto não relacionado se aponta, não se apaga. **Exceção:** atualizar `docs/` é escopo obrigatório da entrega, não "melhoria adjacente".
-- **Execução verificável.** Traduza tarefa em critério checável ("adicionar validação" → "teste para entrada inválida passa"). `dev`, `test`, `lint` verdes é o piso.
+- **Execução verificável.** Traduza tarefa em critério checkável ("adicionar validação" → "teste para entrada inválida passa"). `dev`, `test`, `lint` verdes é o piso.
+
+## Grafo de conhecimento (graphify)
+
+O repo tem um grafo de conhecimento persistente em `graphify-out/` (gerado pela skill `/graphify` — https://github.com/Graphify-Labs/graphify). Ele indexa código + docs (1.9k nós, 192 comunidades) e responde perguntas sobre o codebase gastando muito menos tokens que ler arquivos.
+
+- **Antes de explorar o codebase** para entender arquitetura, fluxos ou "quem chama o quê": consulte o grafo primeiro — `/graphify query "<pergunta>"` (ou `graphify query` via CLI). Só leia arquivos direto quando precisar do conteúdo exato.
+- **Ao final de cada entrega** (junto com STATUS.md/DEVELOPMENT.md): rode `/graphify . --update` — incremental, re-extrai só arquivos novos/alterados via manifest. Não recrie o grafo do zero.
+- `graphify-out/` é artefato local (cache), não entra em commit.
 
 ## Comandos
 
