@@ -145,3 +145,4 @@ O repo tem um grafo de conhecimento persistente em `graphify-out/` (gerado pela 
 - **Antes de explorar o codebase** para entender arquitetura, fluxos ou "quem chama o quê": consulte o grafo primeiro — `/graphify query "<pergunta>"` (ou `graphify query` via CLI). Só leia arquivos direto quando precisar do conteúdo exato.
 - **Ao final de cada entrega** (junto com STATUS.md/DEVELOPMENT.md): rode `/graphify . --update` — incremental, re-extrai só arquivos novos/alterados via manifest. Não recrie o grafo do zero.
 - `graphify-out/` é artefato local (cache), não entra em commit.
+
