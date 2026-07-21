@@ -1,7 +1,7 @@
 # MVP-001 — Fundação
 
 - Tipo: épico (`proplan:mvp`). Container de fatias — **sem spec própria**.
-- Status: definido; issue do épico ainda não criada no GitHub.
+- Status: **issue-épico criada** ([#1](https://github.com/RodReis/rrb-jarvisOS/issues/1)); as 5 specs viraram `aprovada-pi` (2026-07-21) e as 5 fatias-filhas estão em Backlog (#2–#6).
 - Base: `docs/adr/adr-001-arquitetura-local-first.md`, `docs/plan/plano-especificacao-fundacao.md`.
 - Dono do aceite: PI. O MVP só fecha quando **todas** as fatias abaixo forem fechadas pelo PI.
 
@@ -11,13 +11,13 @@ Entregar o esqueleto real e verificável: um desktop app que abre, autentica de 
 
 ## Checklist de fatias previstas
 
-Cada item vira issue-filha **somente** quando sua spec estiver `aprovada-pi`.
+Cada item vira issue-filha **somente** quando sua spec estiver `aprovada-pi`. Todas aprovadas em 2026-07-21; issues criadas.
 
-- [ ] **Fatia 01 — Bootstrap e estrutura** → `docs/spec/spec-fundacao-01-bootstrap.md`
-- [ ] **Fatia 02 — AppShell e WorkspaceSwitcher** → `docs/spec/spec-fundacao-02-appshell-workspaces.md`
-- [ ] **Fatia 03 — Autenticação Google local-first** → `docs/spec/spec-fundacao-03-auth-google.md`
-- [ ] **Fatia 04 — Modelo de dados mínimo + AuditEvent stub** → `docs/spec/spec-fundacao-04-dados-audit.md`
-- [ ] **Fatia 05 — Settings mínimo** → `docs/spec/spec-fundacao-05-settings.md`
+- [ ] **Fatia 01 — Bootstrap e estrutura** (#2) → `docs/spec/spec-fundacao-01-bootstrap.md`
+- [ ] **Fatia 02 — AppShell e WorkspaceSwitcher** (#3) → `docs/spec/spec-fundacao-02-appshell-workspaces.md`
+- [ ] **Fatia 03 — Autenticação Google local-first** (#4) → `docs/spec/spec-fundacao-03-auth-google.md`
+- [ ] **Fatia 04 — Modelo de dados mínimo + AuditEvent stub** (#5) → `docs/spec/spec-fundacao-04-dados-audit.md`
+- [ ] **Fatia 05 — Settings mínimo** (#6) → `docs/spec/spec-fundacao-05-settings.md`
 
 ## Ordem e dependências
 

@@ -1,34 +1,38 @@
 # STATUS.md — Kanban / Roadmap
 
-Atualizado em: **2026-07-19**. Mantido pelo Code a cada entrega (junto com `DEVELOPMENT.md`). Este arquivo espelha o board das GitHub Issues (`proplan:*`) — se divergirem, as **Issues vencem** e este arquivo deve ser corrigido.
+Atualizado em: **2026-07-21**. Mantido pelo Code a cada entrega (junto com `DEVELOPMENT.md`). Este arquivo espelha o board das GitHub Issues (`proplan:*`) — se divergirem, as **Issues vencem** e este arquivo deve ser corrigido.
 
 ## Board
 
-### Pré-backlog (spec em rascunho — ainda não são issues)
+### Backlog (`proplan:backlog` — spec `aprovada-pi`, aguardando fila)
 
-| Fatia | MVP | Spec | Bloqueio |
-|---|---|---|---|
-| 01 Bootstrap e estrutura | MVP-001 | `spec-fundacao-01-bootstrap.md` | 2 perguntas abertas ao PI |
-| 02 AppShell e WorkspaceSwitcher | MVP-001 | `spec-fundacao-02-appshell-workspaces.md` | 2 perguntas abertas ao PI |
-| 03 Auth Google local-first | MVP-001 | `spec-fundacao-03-auth-google.md` | 2 perguntas abertas ao PI (incl. duração da sessão offline) |
-| 04 Dados mínimos + AuditEvent | MVP-001 | `spec-fundacao-04-dados-audit.md` | 2 perguntas abertas ao PI (incl. SQLite vs JSON) |
-| 05 Settings mínimo | MVP-001 | `spec-fundacao-05-settings.md` | 1 pergunta aberta ao PI (i18n) |
+| Issue | Fatia | MVP | Spec | Índice |
+|---|---|---|---|---|
+| [#2](https://github.com/RodReis/rrb-jarvisOS/issues/2) | 01 Bootstrap e estrutura | MVP-001 (#1) | `spec-fundacao-01-bootstrap.md` | F01 |
+| [#3](https://github.com/RodReis/rrb-jarvisOS/issues/3) | 02 AppShell e WorkspaceSwitcher | MVP-001 (#1) | `spec-fundacao-02-appshell-workspaces.md` | F02 |
+| [#4](https://github.com/RodReis/rrb-jarvisOS/issues/4) | 03 Auth Google local-first | MVP-001 (#1) | `spec-fundacao-03-auth-google.md` | F03 |
+| [#5](https://github.com/RodReis/rrb-jarvisOS/issues/5) | 04 Dados mínimos + AuditEvent | MVP-001 (#1) | `spec-fundacao-04-dados-audit.md` | F04 |
+| [#6](https://github.com/RodReis/rrb-jarvisOS/issues/6) | 05 Settings mínimo | MVP-001 (#1) | `spec-fundacao-05-settings.md` | F05 |
 
-### Backlog · A Fazer · Em Andamento · Feito · Finalizado
+### A Fazer · Em Andamento · Feito · Finalizado
 
-*(vazios — nenhuma issue de fatia criada ainda; nenhuma spec `aprovada-pi`)*
+*(vazios — nenhuma fatia iniciada ainda)*
+
+### Índice Fatia ↔ SPEC (fonte única do par MVP↔SPEC↔Fatia)
+
+Não há catálogo numérico `SPEC-nnn` para o MVP-001: as specs são identificadas por slug (`SPEC-Fundacao-01..05`) e mapeiam 1:1 para a fatia (F01↔spec-01, …). Por isso os títulos das issues usam `[MVP1][Fnn]` sem token `[SPEC-nnn]` (regra de ouro: não inventar número). **Pendência ao PI:** decidir se o projeto adota numeração `SPEC-nnn` — se sim, atribuir os números aqui e ajustar os títulos.
 
 ## MVPs
 
-| MVP | Estado | Fatias fechadas |
-|---|---|---|
-| MVP-001 Fundação | definido; issue-épico ainda não criada no GitHub | 0 / 5 |
+| MVP | Issue | Estado | Fatias fechadas |
+|---|---|---|---|
+| MVP-001 Fundação | [#1](https://github.com/RodReis/rrb-jarvisOS/issues/1) | épico criado (`proplan:mvp`); 5 fatias em Backlog | 0 / 5 |
 
 ## Próximas ações
 
-1. **PI**: responder as perguntas abertas das specs 01–05 (começar pela 01 — destrava tudo).
-2. **Cowork**: ao aprovar cada spec (`aprovada-pi`), criar issue-épico do MVP-001 (se ainda não existir) e a issue-filha da fatia em Backlog.
-3. **Code**: iniciar Fatia 01 quando a issue existir; WIP = 1.
+1. **Code**: mover a Fatia 01 (#2) para A Fazer → Em Andamento e iniciar; WIP = 1.
+2. **PI**: (opcional) decidir a adoção de numeração `SPEC-nnn`.
+3. **PI**: aceitar cada fatia (fechar issue + `proplan:finalizado`) só após PR mergeado.
 
 ## Roadmap macro
 

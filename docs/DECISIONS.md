@@ -8,6 +8,7 @@
 |---|---|---|---|
 | [ADR-001](adr/adr-001-arquitetura-local-first.md) | Arquitetura local-first com sync cloud | Aceito | Local é fonte de verdade operacional; Supabase Cloud é espelho de sync/auth/auditoria. Multiusuário por conta, não multi-tenant server-side. Agentes rodam com app ativo (inclusive tray); não sobrevivem a logout/reboot. Corrige decisões #3, #4 e #10 do PRD de design system. RF-020 fora do MVP. |
 | [ADR-002](adr/adr-002-supabase-dev-nuvem-oauth.md) | Projeto Supabase de dev na nuvem para OAuth | Aceito | OAuth Google em dev usa projeto Supabase na nuvem (só auth). Supabase local Docker entra na fase de persistência/RLS. |
+| [ADR-003](adr/adr-003-relatorio-testes-evidencia.md) | Relatório de evidência de testes gerado por máquina | Aceito (metodologia; código na Fatia 01) | Números só do `--json` dos runners (Vitest/Playwright), nunca à mão. `reports/TESTS.md` incremental append-only, 3 categorias (Banco/Regras/Tela), guarda anti-drift no CI com baseline no git da base do PR + self-check. Cobertura report-only. Adaptado do `rrb-proplan` à stack Electron. Ver `docs/TESTING.md`. |
 
 ## Decisões de processo (não-ADR, registradas aqui)
 
@@ -20,5 +21,5 @@
 ## Questões abertas (herdam do ADR-001; resolver antes das fatias que dependem delas)
 
 1. **BudgetPolicy com BYOK**: estimativa + alerta vs. proxy para bloqueio real. Bloqueia: Corte 3 (providers reais).
-2. **Duração da sessão offline**: proposta de 30 dias na SPEC-Fundacao-03 — pendente de aprovação do PI. Bloqueia: aprovação da SPEC-03.
+2. ~~**Duração da sessão offline**: proposta de 30 dias na SPEC-Fundacao-03 — pendente de aprovação do PI.~~ **Resolvida (2026-07-21, PI): 30 dias** (registrada no ADR-001 §Questões abertas 2; aplicada na SPEC-Fundacao-03).
 3. **Conflitos de sync multi-dispositivo**: last-write-wins vs. merge por entidade. Bloqueia: sync bidirecional (Corte 3+).

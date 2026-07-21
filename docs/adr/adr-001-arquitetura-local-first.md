@@ -71,6 +71,8 @@ Custos e limites aceitos:
 
 1. BudgetPolicy com BYOK: aceitar como estimativa + alerta, ou proxyar chamadas para
    bloqueio real? (Proxy adiciona infra e latência; contradiz "chave só no cofre do SO".)
-2. Duração e renovação da sessão offline: quanto tempo o app opera sem reautenticar?
+2. ~~Duração e renovação da sessão offline: quanto tempo o app opera sem reautenticar?~~
+   **Resolvida (2026-07-21, PI):** sessão cacheada válida por **30 dias** sem revalidação
+   online; após isso, exige reautenticação. Aplicada na `spec-fundacao-03-auth-google`.
 3. Sync de conflitos: estratégia quando o mesmo registro muda offline em dois
    dispositivos (last-write-wins vs. merge por entidade).

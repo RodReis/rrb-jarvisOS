@@ -1,7 +1,7 @@
 # SPEC-Fundacao-01 — Bootstrap e estrutura
 
 - MVP: `docs/mvp/mvp-001-fundacao.md` (Fatia 01)
-- Status: **rascunho** — vira `aprovada-pi` quando as perguntas abertas estiverem resolvidas.
+- Status: **aprovada-pi** (2026-07-21) — todas as perguntas abertas resolvidas pelo PI.
 - Dependências: nenhuma (primeira fatia do projeto).
 
 ## Objetivo
@@ -37,7 +37,7 @@ Fixar a base técnica: app Electron + React + TypeScript + Vite que abre uma jan
 - Estilo: **Tailwind** adotado desde o bootstrap (decisão do plano de fundação — Tailwind + Radix ad-hoc, sem design system formal).
 - Testes UI/e2e (Playwright) ficam **fora** desta fatia; entram quando houver fluxo real para testar (Fatia 03).
 
-## Perguntas abertas ao PI
+## Perguntas resolvidas pelo PI (2026-07-21)
 
-1. Electron via `electron-vite` (template integrado, menos config manual) ou config Vite manual + electron-builder? Proposta do Cowork: `electron-vite`.
-2. Versão mínima de Node/Electron a fixar no `engines`? Proposta: Node 22 LTS + Electron mais recente estável.
+1. Scaffold: **`electron-vite`** (template integrado, menos config manual). — aprovado.
+2. Versão mínima no `engines`: **Node 22 LTS + Electron estável mais recente**. — aprovado.
