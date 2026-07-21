@@ -1,7 +1,7 @@
 # SPEC-Fundacao-03 — Autenticação Google local-first
 
 - MVP: `docs/mvp/mvp-001-fundacao.md` (Fatia 03)
-- Status: **rascunho** — vira `aprovada-pi` quando as perguntas abertas estiverem resolvidas.
+- Status: **aprovada-pi** (2026-07-21) — todas as perguntas abertas resolvidas pelo PI (duração da sessão offline registrada no ADR-001).
 - Dependências: Fatia 01 entregue. Consome contratos da Fatia 04 (`UserProfile`, `Session`, `AuditEvent`).
 - Decisões que sustentam esta spec: ADR-001 (local-first) e **ADR-002** (OAuth dev via projeto Supabase de desenvolvimento na nuvem).
 
@@ -35,7 +35,7 @@ Login Google real via Supabase Auth, com sessão persistida localmente para uso 
 6. Estados de erro têm mensagem clara (sem stack trace na UI).
 7. `npm run test` e `npm run lint` passam; fluxo principal coberto por teste (mock do Supabase nos unitários; e2e feliz com Playwright se viável nesta fatia).
 
-## Perguntas abertas ao PI (bloqueiam aprovação)
+## Perguntas resolvidas pelo PI (2026-07-21)
 
-1. **Duração da sessão offline** (questão aberta 2 do ADR-001): quanto tempo o app aceita operar com sessão cacheada sem conseguir revalidar online? Proposta do Cowork: 30 dias, depois exige reautenticação.
-2. Retorno do OAuth: deep link (`jarvisos://auth`) ou servidor loopback local temporário? Proposta: loopback (mais confiável no Windows em dev).
+1. **Duração da sessão offline** (questão aberta 2 do ADR-001): **30 dias** com sessão cacheada sem revalidação online; após isso, exige reautenticação. — aprovado; decisão estrutural registrada no ADR-001.
+2. Retorno do OAuth: **servidor loopback local temporário** (mais confiável no Windows em dev). — aprovado.

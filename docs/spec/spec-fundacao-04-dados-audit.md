@@ -1,7 +1,7 @@
 # SPEC-Fundacao-04 — Modelo de dados mínimo + AuditEvent stub
 
 - MVP: `docs/mvp/mvp-001-fundacao.md` (Fatia 04)
-- Status: **rascunho** — vira `aprovada-pi` quando as perguntas abertas estiverem resolvidas.
+- Status: **aprovada-pi** (2026-07-21) — todas as perguntas abertas resolvidas pelo PI.
 - Dependências: Fatia 01 entregue. Sustenta as fatias 02 e 03.
 
 ## Objetivo
@@ -36,7 +36,7 @@ Tipar e persistir localmente as quatro entidades mínimas da fundação — `Use
 5. Renderer não lê o storage direto — só via IPC tipado.
 6. `npm run test` e `npm run lint` passam.
 
-## Perguntas abertas ao PI
+## Perguntas resolvidas pelo PI (2026-07-21)
 
-1. Storage local da fundação: JSON assinado em `userData` (simples, suficiente para 4 entidades) ou já SQLite (`better-sqlite3`)? Proposta do Cowork: **SQLite desde já** — evita migração dupla, e o custo é baixo.
-2. Visualização dos AuditEvents na UI fica para fatia futura ou um painel dev mínimo já nesta fatia? Proposta: fora — auditar por consulta em dev tools/teste.
+1. Storage local da fundação: **SQLite (`better-sqlite3`) desde já** — evita migração dupla; custo inicial baixo. — aprovado.
+2. Visualização dos AuditEvents na UI: **fora** desta fatia — auditar por consulta em dev tools/teste. — aprovado.

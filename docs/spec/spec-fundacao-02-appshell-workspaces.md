@@ -1,7 +1,7 @@
 # SPEC-Fundacao-02 — AppShell e WorkspaceSwitcher
 
 - MVP: `docs/mvp/mvp-001-fundacao.md` (Fatia 02)
-- Status: **rascunho** — vira `aprovada-pi` quando as perguntas abertas estiverem resolvidas.
+- Status: **aprovada-pi** (2026-07-21) — todas as perguntas abertas resolvidas pelo PI.
 - Dependências: Fatia 01 entregue. Contratos de dados da Fatia 04 podem ser detalhados em paralelo (esta spec consome `Workspace`).
 
 ## Objetivo
@@ -34,7 +34,7 @@ Shell visual do app com sidebar, área de conteúdo e alternância NOA ⇄ JARVI
 5. `Desenvolvimento` não é selecionável nem visível como workspace.
 6. `npm run test` e `npm run lint` passam.
 
-## Perguntas abertas ao PI
+## Perguntas resolvidas pelo PI (2026-07-21)
 
-1. Ao abrir o app, qual workspace inicia ativo: o último usado ou sempre JARVIS OS?
-2. Fechar no "X" da janela: minimizar para tray (proposta) ou perguntar ao usuário na primeira vez?
+1. Workspace ativo ao abrir: **sempre JARVIS OS** (comportamento determinístico; ignora último estado). — aprovado.
+2. Fechar no "X" da janela: **minimizar para tray** (comportamento padrão, sem prompt). — aprovado.
