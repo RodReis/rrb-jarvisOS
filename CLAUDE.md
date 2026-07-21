@@ -136,7 +136,7 @@ Priorizam cautela sobre velocidade; em tarefa trivial, bom senso.
 - **Pense antes de codificar.** Não presuma: declare suposições, exponha interpretações alternativas, aponte a abordagem mais simples. Em dúvida, pare e pergunte ao PI (já é regra: sem spec → perguntar).
 - **Simplicidade primeiro.** Código mínimo que resolve. Sem abstração de uso único, sem flexibilidade não pedida, sem tratar cenário impossível.
 - **Alterações cirúrgicas.** Cada linha alterada rastreável ao pedido. Não refatore o que não quebrou; mantenha o estilo existente; código morto não relacionado se aponta, não se apaga. **Exceção:** atualizar `docs/` é escopo obrigatório da entrega, não "melhoria adjacente".
-- **Execução verificável.** Traduza tarefa em critério checkável ("adicionar validação" → "teste para entrada inválida passa"). `dev`, `test`, `lint` verdes é o piso.
+- **Execução verificável.** Traduza tarefa em critério checável ("adicionar validação" → "teste para entrada inválida passa"). `dev`, `test`, `lint` verdes é o piso.
 
 ## Grafo de conhecimento (graphify)
 
