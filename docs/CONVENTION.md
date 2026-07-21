@@ -1,6 +1,6 @@
 # CONVENTION.md — rrb-jarvisOS
 
-Dois contratos vivem aqui: (1) a convenção de processo que o board ProPlan lê nas GitHub Issues deste repo; (2) o contrato de dados das entidades do produto. Mudar qualquer um dos dois é mudança estrutural → ler `docs/DECISIONS.md` antes.
+Três contratos vivem aqui: (1) a convenção de processo que o board ProPlan lê nas GitHub Issues deste repo; (2) o contrato de dados das entidades do produto; (3) o contrato de logging (observabilidade). Mudar qualquer um é mudança estrutural → ler `docs/DECISIONS.md` antes.
 
 ## 1. Contrato de processo (labels `proplan:*`)
 
@@ -55,6 +55,18 @@ Regras:
 - JARVIS OS nunca acessa `personal`, `financial` ou `health` sem aprovação explícita do usuário.
 - Compartilhamento NOA ↔ JARVIS OS é bloqueado no MVP.
 - Índices derivados (textual, vetorial, grafo) herdam autorização/RLS da fonte; revogar a fonte remove dos índices.
-- `AuditEvent` é imutável, append-only: `id`, `user_id`, `workspace_id?`, `type`, `payload`, `created_at`.
+- `AuditEvent` é imutável, append-only e **à prova de adulteração** (ADR-004): `id`, `user_id`, `workspace_id?`, `type`, `payload`, `created_at`, mais os campos de integridade `seq` (monotônico por `user_id`), `prev_hash` e `hash` (HMAC-SHA-256 do conteúdo canônico + `prev_hash`, chave no `safeStorage`/DPAPI). Imutabilidade garantida por trigger SQLite (bloqueia UPDATE/DELETE) + repositório sem alteração; integridade verificável por `verifyChain()`.
 - Desenvolvimento usa dados fake/seeds — nunca dados reais como fixture.
 - Contratos TypeScript vivem em `src/shared/domain/` e `src/shared/contracts/`; a UI consome contrato, nunca objeto solto.
+
+## 3. Contrato de logging (observabilidade)
+
+Governado pelo **ADR-005** e detalhado na `SPEC-Fundacao-06`. Vale para NOA e JARVIS OS.
+
+- **Todo método relevante loga.** Fluxo normal → `info`; degradação recuperável → `warn`; falha → `error`. Silêncio não é opção em caminho de auth, storage, IPC, integração, AI ou agente.
+- **Mensagem (`msg`) em pt-BR**, curta e descritiva, **sem stack trace e sem segredo**. O detalhe técnico vai em `ctx` (stack em `ctx.stack`).
+- **Registro estruturado (JSON)** com no mínimo: `ts`, `level`, `category`, `direction?` (`in`|`out`), `workspace` (`noa`|`jarvis`|`sistema`), `msg`, `ctx`, `correlationId`, `pid`, `source` (`main`|`renderer`).
+- **Categorias:** `integracao`, `ai`, `agent`, `db`, `auth`, `ipc`, `ui`, `sistema`. Fluxos externos e de AI/agente logam **entrada e saída** (`direction`), casados por `correlationId`.
+- **Redaction é obrigatória.** `token`/`password`/`secret`/`authorization`/`accessToken`/`refreshToken`/`apiKey` e campos `sensitivity: credential|secret` **nunca** são gravados; `personal|financial|health` mascarados (JARVIS não loga esses sem aprovação — §2). Todo log é `sensitivity: internal` no mínimo.
+- **Escritor único:** o renderer captura via `electron-log` e encaminha por IPC; o **main** grava via `winston` (nunca o renderer em disco). Retenção por nível (info 3d/warn 7d/error 10d), zipada, em `userData/logs/`.
+- **Log ≠ AuditEvent.** Log é observabilidade efêmera (rotaciona/apaga); `AuditEvent` é evidência permanente e à prova de adulteração (§2, ADR-004). Um evento pode gerar os dois; um nunca substitui o outro. Auditoria não vai para arquivo de log; log não vai para o SQLite de auditoria.

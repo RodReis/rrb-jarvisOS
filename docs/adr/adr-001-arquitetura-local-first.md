@@ -63,14 +63,22 @@ Custos e limites aceitos:
 
 - Sem execução verdadeiramente 24/7. Crons dependem do app rodando (em tray).
 - BYOK continua válido, mas "BudgetPolicy impede gasto" vira **estimativa e alerta**,
-  não bloqueio garantido — o provider cobra o usuário direto. Ver questão aberta 1.
+  não bloqueio garantido — o provider cobra o usuário direto. Resolvido na questão aberta 1.
 - Primeiro login exige internet (OAuth Google); sessão é cacheada para uso offline
   posterior. Ver questão aberta 2.
 
 ## Questões abertas
 
-1. BudgetPolicy com BYOK: aceitar como estimativa + alerta, ou proxyar chamadas para
-   bloqueio real? (Proxy adiciona infra e latência; contradiz "chave só no cofre do SO".)
-2. Duração e renovação da sessão offline: quanto tempo o app opera sem reautenticar?
+1. ~~BudgetPolicy com BYOK: aceitar como estimativa + alerta, ou proxyar chamadas para
+   bloqueio real?~~ **Resolvida (2026-07-21, PI): estimativa + alerta com bloqueio no ponto único
+   de chamada.** O adapter de provider estima o custo e **recusa novas chamadas** ao bater o
+   limite. Como o app é o **único caller** (BYOK, chave no cofre do SO), esse teto é
+   *efetivamente rígido* sem proxy — que só valeria se houvesse chamadas fora do controle do app
+   (não há), e ainda faria outro componente manusear a chave. **Caveat honesto:** não é garantia
+   contra gasto se o adapter for burlado; o provider cobra direto. A BudgetPolicy **mora no MVP de
+   providers (Corte 3)**, onde existe gasto real a medir — não no MVP-003.
+2. ~~Duração e renovação da sessão offline: quanto tempo o app opera sem reautenticar?~~
+   **Resolvida (2026-07-21, PI):** sessão cacheada válida por **30 dias** sem revalidação
+   online; após isso, exige reautenticação. Aplicada na `spec-fundacao-03-auth-google`.
 3. Sync de conflitos: estratégia quando o mesmo registro muda offline em dois
    dispositivos (last-write-wins vs. merge por entidade).

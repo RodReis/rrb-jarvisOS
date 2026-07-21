@@ -2,69 +2,145 @@
 
 **Dono: Claude Code.** Atualize este arquivo a cada entrega, junto com `STATUS.md`. Aqui vive o *"onde estou dentro da fatia"* (passos com checkmarks); o *"qual fatia está em qual coluna"* vive nas GitHub Issues / `STATUS.md`. Nenhum fato mora nos dois lugares.
 
-Regra de trabalho: **uma fatia por vez (WIP = 1)**, na ordem abaixo. Só iniciar fatia com spec `aprovada-pi` e issue criada.
+Regra de trabalho: **uma fatia por vez (WIP = 1)**. Só iniciar fatia com spec `aprovada-pi` e issue criada.
+
+**Ordem de execução:** 01 → **06 (logging, infra transversal)** → 02 e 04 (em paralelo) → 03 → 05. A Fatia 06 roda logo após a 01 porque 02–05 devem logar desde o início (as seções abaixo estão em ordem numérica; a 06 aparece após a 01 por ser quando ela executa).
 
 ## MVP-001 — Fundação
 
 ### Fatia 01 — Bootstrap e estrutura (`docs/spec/spec-fundacao-01-bootstrap.md`)
 
-Status: **aguardando aprovação da spec** (2 perguntas abertas ao PI).
+Status: **pronta para iniciar** — spec `aprovada-pi` (2026-07-21); issue #2 em Backlog. WIP = 1: próxima a iniciar.
 
-- [ ] Scaffold Electron + React + TS + Vite (decisão electron-vite pendente)
+- [ ] Scaffold Electron + React + TS + Vite via **electron-vite** (Node 22 LTS + Electron estável)
 - [ ] Estrutura `src/main` / `src/renderer` / `src/shared` com READMEs
 - [ ] IPC seguro: contextIsolation on, nodeIntegration off, sandbox on, preload tipado
 - [ ] Scripts dev/build/lint/test configurados
+- [ ] Rotina de relatório de testes (ADR-003): gerador+selfcheck portados do proplan, `test-report.config.json`, `reports/TESTS.md`, CI; categorias Regras+Tela(componente) — Banco (F04) e E2E Playwright (F03) entram depois
 - [ ] Tailwind configurado
 - [ ] Teste de fumaça: janela abre; renderer sem acesso a Node
 - [ ] Entrega: PR com `refs #N`; docs/ commitados
 
+### Fatia 06 — Observabilidade e Logging (`docs/spec/spec-fundacao-06-observabilidade-logging.md`)
+
+Status: spec `aprovada-pi` (2026-07-21); issue **#8** em Backlog. **Roda após a 01, antes de 02–05** (infra transversal — ADR-005).
+
+- [ ] `electron-log` no renderer (captura + IPC) + `winston`/`daily-rotate-file` no main como **escritor único**; ponte roteando renderer→winston
+- [ ] Registro JSON estruturado (`ts/level/category/direction/workspace/msg/ctx/correlationId/…`) com `msg` em pt-BR e redaction obrigatória
+- [ ] Retenção por nível zipada e local: info 3d / warn 7d / error 10d (verificar poda dos `.gz`)
+- [ ] Categorias `integracao/ai/agent/db/auth/ipc/ui/sistema`; contrato in/out definido mesmo sem fluxo p/ ai/agent/integração
+- [ ] Regra "todo método loga" aplicada a auth/workspace-switch/db/ipc; tag `workspace` (NOA/JARVIS)
+- [ ] Fronteira log ≠ AuditEvent respeitada; testes de retenção-poda e redaction
+- [ ] Entrega: PR `refs #N`; docs/ commitados
+
 ### Fatia 02 — AppShell e WorkspaceSwitcher (`docs/spec/spec-fundacao-02-appshell-workspaces.md`)
 
-Status: aguardando aprovação da spec (2 perguntas abertas). Depende da Fatia 01.
+Status: spec `aprovada-pi` (2026-07-21); issue #3 em Backlog. Depende da Fatia 01.
 
 - [ ] Layout AppShell (sidebar, header, conteúdo)
-- [ ] WorkspaceSwitcher NOA ⇄ JARVIS com identidade visual por espaço
-- [ ] Isolamento de navegação/estado por workspace + teste
-- [ ] Tray: minimizar persiste, restaurar, menu Abrir/Sair
+- [ ] WorkspaceSwitcher NOA ⇄ JARVIS com identidade visual por espaço; ativo ao abrir = **sempre JARVIS OS**
+- [ ] Isolamento de navegação/estado por workspace com **rota preservada por espaço** (A→B→A restaura A; B nunca vaza) + teste
+- [ ] Tray: fechar no "X" = minimizar; restaurar, menu Abrir/Sair
+- [ ] **Single-instance lock**: reabrir foca a janela existente (não cria 2ª); ações de janela via IPC tipado
 - [ ] Entrega: PR `refs #N`; docs/ commitados
 
 ### Fatia 03 — Autenticação Google local-first (`docs/spec/spec-fundacao-03-auth-google.md`)
 
-Status: aguardando aprovação da spec (2 perguntas abertas, incl. duração da sessão offline). Depende da Fatia 01; consome contratos da 04.
+Status: spec `aprovada-pi` (2026-07-21); issue #4 em Backlog. Depende da Fatia 01; consome contratos da 04.
 
 - [ ] Projeto Supabase dev na nuvem configurado (ADR-002); env local sem segredo commitado
-- [ ] Fluxo OAuth no navegador do sistema + retorno (loopback/deep link — decisão pendente)
-- [ ] Persistência de sessão no main process; renderer só vê snapshot de perfil
+- [ ] Fluxo OAuth no navegador do sistema + retorno via **loopback local**
+- [ ] Sessão offline válida por **30 dias** antes de exigir reautenticação (ADR-001)
+- [ ] Persistência de sessão no main process **cifrada via `safeStorage`/DPAPI** (token nunca em claro no disco); renderer só vê snapshot de perfil
 - [ ] Estados: deslogado / autenticando / ativo / erro / sessão-expirada
 - [ ] Relançamento offline reusa sessão; logout limpa estado sensível
 - [ ] AuditEvents de login/logout/login-offline-reuse
-- [ ] Testes do fluxo (unit com mock; e2e feliz se viável)
+- [ ] Testes do fluxo (unit com mock) **+ E2E Playwright-Electron do login feliz** (firmado — alimenta a categoria E2E do relatório, ADR-003)
 - [ ] Entrega: PR `refs #N`; docs/ commitados
 
 ### Fatia 04 — Modelo de dados mínimo + AuditEvent stub (`docs/spec/spec-fundacao-04-dados-audit.md`)
 
-Status: aguardando aprovação da spec (2 perguntas abertas, incl. SQLite vs JSON). Sustenta 02 e 03 — contratos podem ser detalhados em paralelo à 02.
+Status: spec `aprovada-pi` (2026-07-21); issue #5 em Backlog. Sustenta 02 e 03 — contratos podem ser detalhados em paralelo à 02.
 
-- [ ] Contratos `UserProfile`, `Workspace`, `Session`, `AuditEvent` em `src/shared`
-- [ ] Persistência local no main process (storage: decisão pendente)
-- [ ] AuditEvent append-only (sem update/delete)
+- [ ] Contratos `UserProfile`, `Workspace`, `Session` (metadados — **token não entra no SQLite**), `AuditEvent` em `src/shared`
+- [ ] Persistência local no main process via **SQLite (`better-sqlite3`)**; migrations que **preservam dado** desde o dia 1 (`user_version`)
+- [ ] AuditEvent **à prova de adulteração (ADR-004)**: trigger bloqueia UPDATE/DELETE + hash-chain HMAC (`seq`/`prev_hash`/`hash`, chave no `safeStorage`) + `verifyChain()`
 - [ ] Registro de workspace-switch + eventos de auth
-- [ ] Testes de isolamento por `user_id` e `workspace_id`
+- [ ] Testes de isolamento por `user_id` e `workspace_id`; teste de forja → `verifyChain` acusa
 - [ ] Entrega: PR `refs #N`; docs/ commitados
 
 ### Fatia 05 — Settings mínimo (`docs/spec/spec-fundacao-05-settings.md`)
 
-Status: aguardando aprovação da spec (1 pergunta aberta: i18n). Depende de 01–04.
+Status: spec `aprovada-pi` (2026-07-21); issue #6 em Backlog. Depende de 01–04.
 
 - [ ] Tela Settings acessível nos dois espaços
-- [ ] Idioma pt-BR/en-US com troca a quente; infra i18n mínima
+- [ ] Idioma pt-BR/en-US com troca a quente; infra i18n via **i18next**
 - [ ] Tema claro/escuro/sistema com persistência por usuário
 - [ ] Testes de persistência de preferências
 - [ ] Entrega: PR `refs #N`; docs/ commitados
 
-## Após o MVP-001
+## MVP-002 — Execução local controlada (fundação de execução)
 
-Próximo MVP provável: **Execução local controlada** (Supabase local Docker + RLS, Policy Engine, terminal allowlisted, BudgetPolicy) — Cowork especifica quando o PI priorizar. Ordem macro em `docs/LANDSCAPE.md` § Roadmap.
+Épico [#9](https://github.com/RodReis/rrb-jarvisOS/issues/9). **As 5 fatias têm spec `aprovada-pi`** (issues #11–#15). Roda **após o MVP-001**. Ordem sugerida dentro do MVP: 01 (ambiente, independente) e 02 (Policy Engine) cedo → 03 (allowlist) → 04 (registro) → 05 (execução simulada, junta tudo).
+
+### Fatia 01 — Supabase local + ambiente de sync (`docs/spec/spec-execucao-local-01-supabase-local.md`)
+
+Status: spec `aprovada-pi` (2026-07-21); issue [#15](https://github.com/RodReis/rrb-jarvisOS/issues/15) em Backlog. **Ambiente, roda independente.** Só o alvo de sync — o sync em si é Corte 3.
+
+- [ ] `supabase` CLI: stack local via Docker; `supabase/` versionado (config+migrations+seed); README (subir/derrubar, portas); `supabase db reset` reproduzível
+- [ ] Migrations starter: `UserProfile`, `Workspace`, `AuditEvent` com campos de escopo
+- [ ] **RLS comprovada** com role de aplicação **não-owner** (só enxerga o próprio user_id/workspace_id)
+- [ ] **Nenhum segredo no schema cloud** (sem coluna de token/`Session`); SQLite segue fonte de verdade; nada escreve no Supabase ainda
+- [ ] Entrega: PR `refs #N`; docs/ commitados
+
+### Fatia 02 — Policy Engine mínimo (classificação) (`docs/spec/spec-execucao-local-02-policy-engine.md`)
+
+Status: spec `aprovada-pi` (2026-07-21); issue [#11](https://github.com/RodReis/rrb-jarvisOS/issues/11) em Backlog. **Modo report** — classifica e audita, não bloqueia; enforcement fail-closed liga no MVP-003.
+
+- [ ] Núcleo avaliador puro `evaluate(action, context) → { tier, outcome, reason }` em `src/shared/policies/`
+- [ ] Taxonomia de risco (baixo/médio/alto/bloqueado) como **seed** a partir dos requisitos — sem hardcode
+- [ ] Classificação sensível ao contexto (JARVIS + personal/financial/health ⇒ alto); não reconhecida ⇒ `bloqueado`
+- [ ] Toda decisão gera `AuditEvent` encadeado (ADR-004); `verifyChain` passa
+- [ ] Modo report: runtime recebe a decisão e **não bloqueia**; UI só vê resultado via IPC tipado
+- [ ] Entrega: PR `refs #N`; docs/ commitados
+
+### Fatia 03 — Diretórios permitidos (allowlist) (`docs/spec/spec-execucao-local-03-allowlist-diretorios.md`)
+
+Status: spec `aprovada-pi` (2026-07-21); issue [#12](https://github.com/RodReis/rrb-jarvisOS/issues/12) em Backlog. Depende da Fatia 02. Nesta fatia a allowlist é **dado + checagem**, não gating real de FS (isso é MVP-003).
+
+- [ ] Allowlist persistida (SQLite), escopada por `user_id`; **default = só o diretório do app** (`userData`)
+- [ ] `isPathAllowed` com canonicalização (`..`/symlink) + matching recursivo; path que resolve pra fora ⇒ `false`
+- [ ] Add/remove de diretório gera `AuditEvent` encadeado (ADR-004)
+- [ ] Integra com o Policy Engine (F02): path fora do permitido eleva o tier
+- [ ] Renderer não lê/edita FS nem a allowlist direto — só IPC tipado; checagem no main
+- [ ] Entrega: PR `refs #N`; docs/ commitados
+
+### Fatia 04 — Registro de workflows + automações (`docs/spec/spec-execucao-local-04-registro-workflows.md`)
+
+Status: spec `aprovada-pi` (2026-07-21); issue [#13](https://github.com/RodReis/rrb-jarvisOS/issues/13) em Backlog. Depende da Fatia 02. **Só registro/catálogo, sem execução** (executar é a Fatia 05).
+
+- [ ] Workflow com **schema pleno RF-006** (etapas seq/paralelo, agenteId?/skillId? nullable, entradas/saídas, critérios de sucesso, `requiresApproval`, status, agenda); nasce `disabled`
+- [ ] Trigger Registry registra `manual|cron|evento|webhook` como dado; **nenhum dispara** (só manual acionável, via F05)
+- [ ] Automação RF-007: gatilho (manual acionável; demais schema), alvo, squadId?/skillId? nullable, estado/retentativa
+- [ ] CRUD completo; **nenhuma execução** ocorre; criar/alterar/ativar-desativar auditado (ADR-004) + classificado (F02)
+- [ ] Etapas = descritores de ação compatíveis com a taxonomia do Policy Engine (p/ a F05 classificar/simular)
+- [ ] Entrega: PR `refs #N`; docs/ commitados
+
+### Fatia 05 — Motor de execução simulado (`docs/spec/spec-execucao-local-05-execucao-simulada.md`)
+
+Status: spec `aprovada-pi` (2026-07-21); issue [#14](https://github.com/RodReis/rrb-jarvisOS/issues/14) em Backlog. **Headline do MVP** — junta F02+F03+F04. **Zero efeito colateral** (execução real é MVP-003).
+
+- [ ] Motor no main: lê workflow (F04), percorre etapas (seq/paralelo) por gatilho manual
+- [ ] Por etapa: classifica (F02, report) → checa allowlist se há path (F03) → **simula** sem efeito real
+- [ ] `ExecutionRun` persistido com máquina de estados RF (`planejado→em execução→concluído|falhou|cancelado`; `aguardando aprovação` auto-continua) + trace por etapa
+- [ ] Simulação determinística (sucesso por padrão; falha declarável p/ testar `falhou`/retentativa)
+- [ ] Início/fim + etapas geram `AuditEvent` encadeado (ADR-004, `verifyChain` passa); run logado (ADR-005) com `correlationId`
+- [ ] **Zero efeito colateral** (teste: etapa "gravar arquivo" não cria arquivo); renderer dispara via IPC tipado
+- [ ] Entrega: PR `refs #N`; docs/ commitados
+
+## Após o MVP-002
+
+Ordem: MVP-002 (fundação de execução) → **MVP-003** ([#10](https://github.com/RodReis/rrb-jarvisOS/issues/10), execução real + terminal) → MVP de providers (Corte 3, com BudgetPolicy). Ordem macro em `docs/LANDSCAPE.md` § Roadmap.
 
 ## Registro de entregas
 

@@ -1,7 +1,7 @@
 # SPEC-Fundacao-05 — Settings mínimo
 
 - MVP: `docs/mvp/mvp-001-fundacao.md` (Fatia 05)
-- Status: **rascunho** — vira `aprovada-pi` quando as perguntas abertas estiverem resolvidas.
+- Status: **aprovada-pi** (2026-07-21) — todas as perguntas abertas resolvidas pelo PI.
 - Dependências: Fatias 01–04 entregues (persiste preferências no `UserProfile` da Fatia 04).
 
 ## Objetivo
@@ -13,9 +13,9 @@ Tela de configurações mínima: idioma e tema. Fecha o MVP Fundação.
 ### Dentro
 
 - Tela Settings acessível nos dois workspaces (capacidade compartilhada; preferências salvas por usuário).
-- **Idioma**: `pt-BR` (padrão) e `en-US`. Troca aplica na UI sem reiniciar. Infra de i18n mínima (chaves de tradução para o shell e telas existentes — não traduzir docs internos).
+- **Idioma**: `pt-BR` (padrão) e `en-US`. Troca aplica na UI sem reiniciar. Infra de i18n via **`i18next`** (chaves de tradução para o shell e telas existentes — não traduzir docs internos).
 - **Tema**: claro/escuro seguindo preferência do SO por padrão, com override manual (claro | escuro | sistema).
-- Persistência das preferências no `UserProfile` local (Fatia 04); mudança gera evento comum, **não** exige aprovação (ação de baixo risco).
+- Persistência das preferências no `UserProfile` local (Fatia 04); ação de baixo risco, **não** exige aprovação e **não** entra no `AuditEvent` — o escopo de auditoria da fundação fica em auth + workspace-switch (SPEC-04). Trocar preferência é evento comum de app, não evento de auditoria.
 
 ### Fora
 
@@ -28,6 +28,6 @@ Tela de configurações mínima: idioma e tema. Fecha o MVP Fundação.
 3. Preferências são por usuário: logout/login de outro usuário não herda as do anterior.
 4. `npm run test` e `npm run lint` passam.
 
-## Perguntas abertas ao PI
+## Perguntas resolvidas pelo PI (2026-07-21)
 
-1. Biblioteca de i18n: `i18next` (padrão de mercado, mais peso) ou dicionário próprio mínimo (2 idiomas, shell pequeno)? Proposta do Cowork: dicionário próprio nesta fatia; migrar para i18next quando o volume de telas justificar.
+1. Biblioteca de i18n: **`i18next` desde já** (padrão de mercado; evita migração futura). Substitui a proposta original do Cowork (dicionário próprio). — aprovado.
