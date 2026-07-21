@@ -21,5 +21,5 @@
 ## Questões abertas (herdam do ADR-001; resolver antes das fatias que dependem delas)
 
 1. **BudgetPolicy com BYOK**: estimativa + alerta vs. proxy para bloqueio real. Bloqueia: Corte 3 (providers reais).
-2. **Duração da sessão offline**: proposta de 30 dias na SPEC-Fundacao-03 — pendente de aprovação do PI. Bloqueia: aprovação da SPEC-03.
+2. ~~**Duração da sessão offline**: proposta de 30 dias na SPEC-Fundacao-03 — pendente de aprovação do PI.~~ **Resolvida (2026-07-21, PI): 30 dias** (registrada no ADR-001 §Questões abertas 2; aplicada na SPEC-Fundacao-03).
 3. **Conflitos de sync multi-dispositivo**: last-write-wins vs. merge por entidade. Bloqueia: sync bidirecional (Corte 3+).
