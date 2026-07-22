@@ -160,11 +160,16 @@ jobs:
         run: |
           sudo apt-get install -y gnome-keyring libsecret-tools
           echo "XDG_CURRENT_DESKTOP=GNOME" >> "$GITHUB_ENV"
-          # O Chromium grava na collection *default*; sem o alias apontando para o
-          # keyring `login`, o gnome-keyring tenta CRIAR uma collection — o que abre o
-          # SystemPrompter (GUI) e morre no runner. Semear o alias no disco evita o prompt.
+          # O Chromium grava na collection *default*. Criar keyring/collection em
+          # runtime exige o SystemPrompter (GUI), que morre no runner — e o --login com
+          # senha vazia não materializa o arquivo. Então o keyring inteiro é semeado no
+          # disco: sem hash de senha o formato é texto claro e nasce DESTRAVADO — para
+          # segredo descartável de CI, é exatamente o que se quer.
           mkdir -p "$HOME/.local/share/keyrings"
-          printf login > "$HOME/.local/share/keyrings/default"
+          printf '%s\n' '[keyring]' 'display-name=Default keyring' 'ctime=0' 'mtime=0' \
+            'lock-on-idle=false' 'lock-after=false' \
+            > "$HOME/.local/share/keyrings/Default_keyring.keyring"
+          printf Default_keyring > "$HOME/.local/share/keyrings/default"
 
       # DIAGNÓSTICO TEMPORÁRIO — remover quando o E2E estiver verde.
       # O chmod acima derrubou o FATAL do SUID sandbox, mas o `firstWindow()` segue
@@ -175,7 +180,6 @@ jobs:
         run: |
           npm run build
           dbus-run-session -- bash -c '
-            eval "$(echo -n "" | gnome-keyring-daemon --login)" || echo "login FALHOU: $?"
             eval "$(gnome-keyring-daemon --components=secrets --start)" || echo "start FALHOU: $?"
             echo -n teste | secret-tool store --label=sonda sonda ci \
               && secret-tool lookup sonda ci \
@@ -195,7 +199,6 @@ jobs:
           REPORT_BASE_REF: origin/${{ github.base_ref }}
         run: |
           dbus-run-session -- bash -c '
-            eval "$(echo -n "" | gnome-keyring-daemon --login)"
             eval "$(gnome-keyring-daemon --components=secrets --start)"
             exec xvfb-run --auto-servernum npm run test:report:check
           '
@@ -208,7 +211,6 @@ jobs:
         if: env.REQUIRE_ENTRY == '1'
         run: |
           dbus-run-session -- bash -c '
-            eval "$(echo -n "" | gnome-keyring-daemon --login)"
             eval "$(gnome-keyring-daemon --components=secrets --start)"
             exec xvfb-run --auto-servernum npm run test:report:check -- --require-entry
           '
