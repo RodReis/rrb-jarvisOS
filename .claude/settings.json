@@ -21,18 +21,6 @@
           }
         ]
       }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node .claude/hooks/enforce-git-push-authority.cjs",
-            "timeout": 10
-          }
-        ]
-      }
     ]
   },
   "language": "portuguese"
