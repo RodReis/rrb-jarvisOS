@@ -4,9 +4,12 @@ import {
   IPC_CHANNELS,
   IPC_SEND_CHANNELS,
   type AppInfo,
-  type JarvisBridge
+  type AuditVerification,
+  type JarvisBridge,
+  type WorkspaceSwitchResult
 } from '@shared/contracts/ipc'
 import type { LogInput } from '@shared/contracts/logging'
+import type { AuditEvent, AuditEventType, WorkspaceId } from '@shared/domain/entities'
 
 /**
  * Preload — a ponte tipada e o único ponto de contato do renderer com o main.
@@ -19,7 +22,17 @@ const bridge: JarvisBridge = {
   getAppInfo: (): Promise<AppInfo> => ipcRenderer.invoke(IPC_CHANNELS.appInfo),
   // `send`, não `invoke`: o renderer não espera confirmação de gravação (ADR-005 — quem
   // escreve é o main). Aguardar o disco para logar prenderia a UI ao IO.
-  sendLog: (record: LogInput): void => ipcRenderer.send(IPC_SEND_CHANNELS.log, record)
+  sendLog: (record: LogInput): void => ipcRenderer.send(IPC_SEND_CHANNELS.log, record),
+
+  listAuditEvents: (type?: AuditEventType): Promise<readonly AuditEvent[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.auditList, type),
+  verifyAuditChain: (): Promise<AuditVerification> => ipcRenderer.invoke(IPC_CHANNELS.auditVerify),
+
+  getWorkspace: (): Promise<WorkspaceId> => ipcRenderer.invoke(IPC_CHANNELS.workspaceGet),
+  switchWorkspace: (workspace: WorkspaceId): Promise<WorkspaceSwitchResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.workspaceSwitch, workspace),
+
+  minimizeToTray: (): void => ipcRenderer.send(IPC_SEND_CHANNELS.windowMinimizeToTray)
 }
 
 if (process.contextIsolated) {

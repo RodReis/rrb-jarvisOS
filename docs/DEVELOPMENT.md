@@ -4,7 +4,9 @@
 
 Regra de trabalho: **uma fatia por vez (WIP = 1)**. Só iniciar fatia com spec `aprovada-pi` e issue criada.
 
-**Ordem de execução:** 01 → **06 (logging, infra transversal)** → 04 → 02 → 03 → 05. A Fatia 06 roda logo após a 01 porque 02–05 devem logar desde o início; a 04 vem antes da 02 porque 02/03 consomem seus contratos tipados (decisão de 2026-07-22). As seções abaixo estão em ordem numérica; a 06 aparece após a 01 por ser quando ela executa.
+**Ordem de execução:** 01 → **06 (logging, infra transversal)** → **04 + 02 (entregues juntas)** → 03 → 05. A Fatia 06 roda logo após a 01 porque 02–05 devem logar desde o início; a 04 vem antes da 02 porque 02/03 consomem seus contratos tipados (decisão de 2026-07-22). As seções abaixo estão em ordem numérica; a 06 aparece após a 01 por ser quando ela executa.
+
+> **04 e 02 saíram no mesmo PR (#28), por decisão do PI de 2026-07-22.** O critério 4 da SPEC-04 exige `AuditEvent` de `workspace-switch`, cujo fluxo nasce na F02 — entregá-las juntas evitou stub provisório que a F02 jogaria fora. A **F03 ficou de fora do bloco** por falta de credenciais (ver a seção dela).
 
 ## MVP-001 — Fundação
 
@@ -55,16 +57,28 @@ Status: **finalizada** — aceita pelo PI em 2026-07-22 (issue **#8** fechada, `
 
 Status: spec `aprovada-pi` (2026-07-21); issue #3 em Backlog. Depende da Fatia 01.
 
-- [ ] Layout AppShell (sidebar, header, conteúdo)
-- [ ] WorkspaceSwitcher NOA ⇄ JARVIS com identidade visual por espaço; ativo ao abrir = **sempre JARVIS OS**
-- [ ] Isolamento de navegação/estado por workspace com **rota preservada por espaço** (A→B→A restaura A; B nunca vaza) + teste
-- [ ] Tray: fechar no "X" = minimizar; restaurar, menu Abrir/Sair
-- [ ] **Single-instance lock**: reabrir foca a janela existente (não cria 2ª); ações de janela via IPC tipado
-- [ ] Entrega: PR `refs #N`; docs/ commitados
+- [x] Layout AppShell (sidebar, header, conteúdo)
+- [x] WorkspaceSwitcher NOA ⇄ JARVIS com identidade visual por espaço; ativo ao abrir = **sempre JARVIS OS**
+- [x] Isolamento de navegação/estado por workspace com **rota preservada por espaço** (A→B→A restaura A; B nunca vaza) + teste — provado em unidade (`navegacao.spec.ts`) e pela UI real (`AppShell.test.tsx`)
+- [x] Tray: fechar no "X" = minimizar; restaurar, menu Abrir/Sair
+- [x] **Single-instance lock**: reabrir foca a janela existente (não cria 2ª); ações de janela via IPC tipado
+- [x] Instrumenta o logger: troca de espaço emite `info` na categoria `ipc` com o destino em `ctx` (critério 7)
+- [x] Entrega: PR [#28](https://github.com/RodReis/rrb-jarvisOS/pull/28) (`refs #3`); docs/ commitados
+
+**Decisões técnicas desta fatia:**
+
+1. **Rota por espaço é um mapa, não uma variável** — uma `rotaAtual` única vazaria de um espaço para o outro, que é o que o critério 1 proíbe. O estado (`workspace → rota`) vive em `navegacao.ts` como função pura, testável sem renderizar; a UI só a consome. Rota que não pertence ao espaço é **ignorada na escrita**, não só na leitura — mesma defesa, do lado de entrada.
+2. **Espaço ativo mora no main** — a troca gera `AuditEvent` (ADR-004) e etiqueta o logger (ADR-005), e nenhum dos dois é acessível do renderer. A UI pede a troca e reflete o que o main devolveu; ela não muda o espaço por conta própria.
+3. **A troca audita antes de efetivar** — se a gravação do `AuditEvent` falhar, o espaço não muda. Auditoria que pode ser pulada quando o disco falha não é evidência. Há teste derrubando a tabela para provar.
+4. **A flag `encerrando`** — sem ela o "Sair" do tray seria interceptado pelo próprio handler de `close` da janela, e o app nunca fecharia (o clássico "não consigo mais sair do programa").
+5. **`Tray` em referência de módulo** — sem manter a referência viva, o GC coleta o objeto e o ícone some da bandeja após alguns segundos. Sintoma clássico e difícil de diagnosticar.
+6. **Botões de espaço são `radiogroup`** — são opções mutuamente exclusivas; uma barra de botões independentes não anunciaria ao leitor de tela qual está ativa.
 
 ### Fatia 03 — Autenticação Google local-first (`docs/spec/spec-fundacao-03-auth-google.md`)
 
-Status: spec `aprovada-pi` (2026-07-21); issue #4 em Backlog. Depende da Fatia 01; consome contratos da 04.
+Status: spec `aprovada-pi` (2026-07-21); issue #4 em Backlog. **BLOQUEADA — aguarda o PI.** Depende da Fatia 01; consome contratos da 04 (já entregues).
+
+> **O que falta para desbloquear (só o PI pode fazer):** criar o projeto Supabase de desenvolvimento e o cliente OAuth no Google Cloud, e preencher o `.env` local. O `.env.example` na raiz lista as quatro variáveis e onde obter cada uma. Enquanto isso não existe, os critérios 1 (login real), 2 (relançamento offline), 7 (token cifrado) e 9 (E2E do login) são inverificáveis — não há o que testar sem um provedor de identidade. A infra que a fatia consome (`Session`, `UserProfile`, `AuditEvent`, tipos `login`/`logout`/`login-offline-reuse`) **já está entregue** na F04.
 
 - [ ] Projeto Supabase dev na nuvem configurado (ADR-002); env local sem segredo commitado
 - [ ] Fluxo OAuth no navegador do sistema + retorno via **loopback local**
@@ -78,14 +92,25 @@ Status: spec `aprovada-pi` (2026-07-21); issue #4 em Backlog. Depende da Fatia 0
 
 ### Fatia 04 — Modelo de dados mínimo + AuditEvent stub (`docs/spec/spec-fundacao-04-dados-audit.md`)
 
-Status: spec `aprovada-pi` (2026-07-21); issue #5 em Backlog. Sustenta 02 e 03 — contratos podem ser detalhados em paralelo à 02.
+Status: **entregue** — spec `aprovada-pi` (2026-07-21, emendada em 2026-07-22); issue #5; PR [#28](https://github.com/RodReis/rrb-jarvisOS/pull/28). Sustenta 02 (entregue junto) e 03 (bloqueada).
 
-- [ ] Contratos `UserProfile`, `Workspace`, `Session` (metadados — **token não entra no SQLite**), `AuditEvent` em `src/shared`
-- [ ] Persistência local no main process via **SQLite (`better-sqlite3`)**; migrations que **preservam dado** desde o dia 1 (`user_version`)
-- [ ] AuditEvent **à prova de adulteração (ADR-004)**: trigger bloqueia UPDATE/DELETE + hash-chain HMAC (`seq`/`prev_hash`/`hash`, chave no `safeStorage`) + `verifyChain()`
-- [ ] Registro de workspace-switch + eventos de auth
-- [ ] Testes de isolamento por `user_id` e `workspace_id`; teste de forja → `verifyChain` acusa
-- [ ] Entrega: PR `refs #N`; docs/ commitados
+- [x] Contratos `UserProfile`, `Workspace`, `Session` (metadados — **token não entra no SQLite**), `AuditEvent` em `src/shared/domain`
+- [x] Persistência local no main process via **SQLite (`better-sqlite3`)**; migrations que **preservam dado** desde o dia 1 (`user_version`)
+- [x] AuditEvent **à prova de adulteração (ADR-004)**: trigger bloqueia UPDATE/DELETE + hash-chain HMAC (`seq`/`prev_hash`/`hash`, chave no `safeStorage`) + `verifyChain()`
+- [x] Registro de workspace-switch — **eventos de auth ficam para a F03** (o tipo está no contrato; o fluxo nasce com o login)
+- [x] Testes de isolamento por `user_id` e `workspace_id`; teste de forja → `verifyChain` acusa
+- [x] Instrumenta o logger: operações de storage emitem `info`/`error` na categoria `db` com `ctx.op`/`ctx.table` (critério 7)
+- [x] Entrega: PR [#28](https://github.com/RodReis/rrb-jarvisOS/pull/28) (`refs #5`); docs/ commitados
+
+**Decisões técnicas desta fatia:**
+
+1. **A chave HMAC entra por parâmetro, não é lida do `safeStorage` dentro da cadeia** — é o que mantém o critério 3 (forja ao vivo → `verifyChain` acusa) exercitável em teste sem subir o Electron. O `safeStorage` fica isolado em `audit-key.ts`, que **falha alto** se a cifra do SO não estiver disponível: chave HMAC em claro daria uma garantia que não existe.
+2. **`audit-chain.ts` mora em `src/main`, não em `src/shared`** — usa `node:crypto`, e `src/shared` é compilado também para o renderer, que não tem Node. O typecheck pegou isso. O tipo `AuditEvent` fica em shared, onde a UI o consome; a criptografia fica no main, onde pode existir.
+3. **Migration roda em transação junto com o bump do `user_version`** — falha no meio volta ao estado anterior em vez de deixar o banco meio-migrado, que é onde "preserva dado" se perderia na prática.
+4. **`UNIQUE(user_id, seq)` no schema** — o `seq` monotônico é garantido pelo storage, não só pelo código: duas gravações concorrentes falham em vez de criar dois ramos da cadeia.
+5. **Auditoria pela ponte IPC é só leitura** — não existe canal de gravação, e há teste provando. Gravar evento é ato do main disparado por um fluxo real; um canal de escrita deixaria a UI fabricar evidência.
+6. **`local-user.ts` nomeia a identidade pré-login** — a auditoria é escopada por `user_id` desde o dia 1 (CONVENTION §2), mas o auth só nasce na F03. Sem nome, esse id viraria string solta pelos call sites — o "hardcode" que o CLAUDE.md proíbe.
+7. **`@electron/rebuild` configurado aqui** — a spec dizia que o rebuild do módulo nativo viria da Fatia 01, mas a SPEC-01 não o menciona e nada estava configurado. Sem ele o `better-sqlite3` não carrega no Electron 43 (ABI diferente do Node).
 
 ### Fatia 05 — Settings mínimo (`docs/spec/spec-fundacao-05-settings.md`)
 
@@ -166,3 +191,4 @@ Ordem: MVP-002 (fundação de execução) → **MVP-003** ([#10](https://github.
 |---|---|---|---|
 | 2026-07-22 | MVP-001 · F01 Bootstrap e estrutura (#2) | [#25](https://github.com/RodReis/rrb-jarvisOS/pull/25) | CI verde na 1ª execução. Relatório ADR-003 ativo: selfcheck 10/10, guarda anti-drift verificada nos dois sentidos. Regras 14 (85%), Tela 4 (100%), Banco 0 (F04). |
 | 2026-07-22 | MVP-001 · F06 Observabilidade e Logging (#8) | [#27](https://github.com/RodReis/rrb-jarvisOS/pull/27) | Regras 49 (87.2%), **Banco 8 (85.5%)**, Tela 13 (97.6%). A categoria **Banco deixa de estar vazia antes da F04**: os testes de integração do logger tocam disco real (arquivo temporário, teardown por teste), que é exatamente o que a categoria mede — o `TESTING.md` §8 previa SQLite como primeiro caso, mas a régua é "integração com storage local", não "SQLite". Verificado também no app real: os três arquivos nascem em `userData/logs` e o registro do renderer chega ao disco. |
+| 2026-07-22 | MVP-001 · F04 Dados + AuditEvent (#5) **e** F02 AppShell/workspaces (#3) | [#28](https://github.com/RodReis/rrb-jarvisOS/pull/28) | Regras 78 (86.6%), Banco 32 (89.5%), Tela 16 (98.5%). Duas fatias no mesmo PR por decisão do PI: o critério 4 da SPEC-04 exige `AuditEvent` de `workspace-switch`, cujo fluxo nasce na F02. Carimbo pela issue do primeiro `refs` (#5), como o CI extrai. Verificado no app real: schema v1, 2 triggers ativos, chave de auditoria cifrada por DPAPI no disco. **F03 não entrou** — bloqueada por credenciais (ver a seção da fatia). |
