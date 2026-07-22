@@ -42,6 +42,13 @@ test.beforeEach(async () => {
       SUPABASE_PUBLISHABLE_KEY: ''
     }
   })
+
+  // O reporter engole o stderr do processo principal, e todo erro de boot no CI
+  // (sandbox, keyring, display) aparece como um mudo "timeout esperando window".
+  // Ecoar aqui é o que transforma esses timeouts em erro legível no log.
+  app.process().stderr?.on('data', (chunk: Buffer) => {
+    console.error(`[electron stderr] ${chunk.toString().trimEnd()}`)
+  })
 })
 
 test.afterEach(async () => {
