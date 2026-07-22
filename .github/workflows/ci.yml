@@ -126,6 +126,18 @@ jobs:
             echo "PR não altera teste — carimbo dispensado."
           fi
 
+      # DIAGNÓSTICO TEMPORÁRIO: sobe o app fora do Playwright e mostra o stderr cru.
+      # O `firstWindow()` só reporta "timeout esperando window" — o motivo real de o
+      # processo não abrir janela fica no stderr, que o reporter do Playwright engole.
+      # Remover assim que a causa estiver identificada.
+      - name: Diagnóstico — subir o Electron e capturar stderr
+        continue-on-error: true
+        run: |
+          set -x
+          ls -la out/main/index.js out/preload/index.cjs out/renderer/index.html
+          timeout 30 xvfb-run --auto-servernum \
+            node_modules/.bin/electron . --user-data-dir=/tmp/diag 2>&1 | head -60 || true
+
       # `xvfb-run`: o orquestrador roda o E2E, e o Electron abre janela — sem display
       # virtual o launch falha no Linux do CI (docs/TESTING.md §3.1).
       - name: Rodar testes + guarda anti-drift
