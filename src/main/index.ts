@@ -3,6 +3,7 @@ import { app, BrowserWindow } from 'electron'
 import { registerIpcHandlers } from './ipc/handlers'
 import { closeLogger, initLogger, log } from './logging/logger'
 import { initRendererLogBridge } from './logging/renderer-bridge'
+import { closeStorage, initStorage } from './storage'
 import { createMainWindow } from './window'
 
 app.whenReady().then(() => {
@@ -18,6 +19,10 @@ app.whenReady().then(() => {
     electron: process.versions.electron,
     plataforma: process.platform
   })
+
+  // Storage depois do logger (para uma falha de abertura aparecer no arquivo) e antes dos
+  // handlers, que já podem consultá-lo. O banco fica no `userData`, junto dos logs.
+  initStorage(app.getPath('userData'))
 
   registerIpcHandlers()
   createMainWindow()
@@ -39,6 +44,9 @@ app.on('window-all-closed', () => {
 // Fecha os transports antes de sair; sem isso o último registro pode não chegar ao disco.
 app.on('will-quit', () => {
   log.sistema.info('Aplicação encerrada')
+  // Banco antes do logger: fechar o SQLite ainda pode gerar registro, e o logger
+  // precisa estar vivo para recebê-lo.
+  closeStorage()
   closeLogger()
 })
 
