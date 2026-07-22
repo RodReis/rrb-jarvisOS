@@ -1,0 +1,10 @@
+# Normaliza quebras de linha: o repo guarda LF, o checkout Windows fica a cargo do core.autocrlf.
+# A guarda anti-drift do relatório de testes (ADR-003, docs/TESTING.md §5) compara blocos
+# gerados com blocos commitados — CRLF inconsistente vira falso positivo.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff binary
+*.woff2 binary

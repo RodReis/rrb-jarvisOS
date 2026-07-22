@@ -1,0 +1,21 @@
+out
+dist
+coverage
+node_modules
+reports/.raw
+package-lock.json
+
+# Markdown é documentação humana (pt-BR, tabelas alinhadas à mão): o formatador
+# do código não opina sobre ela.
+*.md
+
+# Protótipo visual (referência do MVP-003) e ferramental instalado no repo:
+# fora do escopo de formatação do app.
+docs
+.aiox-core
+.aiox
+.claude
+.codex
+.gemini
+.antigravity
+graphify-out

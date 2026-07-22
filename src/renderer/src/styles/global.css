@@ -1,0 +1,24 @@
+@import 'tailwindcss';
+
+/* Tokens de tema entram no MVP-003 (Design System). Aqui só o mínimo do bootstrap. */
+@theme {
+  --color-surface: oklch(17% 0.02 265);
+  --color-surface-raised: oklch(22% 0.025 265);
+  --color-accent: oklch(72% 0.15 235);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-surface);
+  font-family:
+    'Segoe UI',
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
