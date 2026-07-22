@@ -20,20 +20,15 @@ Atualizado em: **2026-07-22**. Mantido pelo Code a cada entrega (junto com `DEVE
 
 > A Fatia 06 saiu como **#8** (o número 7 já estava ocupado). Sub-issue do épico #1; assignee PI.
 
-### Em Andamento (`proplan:doing`)
-
-| Issue | Fatia | MVP | Spec | Índice | PR |
-|---|---|---|---|---|---|
-| [#5](https://github.com/RodReis/rrb-jarvisOS/issues/5) | 04 Dados mínimos + AuditEvent | MVP-001 (#1) | `spec-fundacao-04-dados-audit.md` | F04 | [#28](https://github.com/RodReis/rrb-jarvisOS/pull/28) |
-| [#3](https://github.com/RodReis/rrb-jarvisOS/issues/3) | 02 AppShell e WorkspaceSwitcher | MVP-001 (#1) | `spec-fundacao-02-appshell-workspaces.md` | F02 | [#28](https://github.com/RodReis/rrb-jarvisOS/pull/28) |
-
-> **04 e 02 no mesmo PR**, por decisão do PI (2026-07-22): o critério 4 da SPEC-04 exige `AuditEvent` de `workspace-switch`, cujo fluxo nasce na F02 — separá-las exigiria um stub que a F02 jogaria fora.
-
 ### Feito (`proplan:done` — entregue, aguardando aceite do PI)
 
 | Issue | Fatia | MVP | Spec | Índice | PR |
 |---|---|---|---|---|---|
 | [#2](https://github.com/RodReis/rrb-jarvisOS/issues/2) | 01 Bootstrap e estrutura | MVP-001 (#1) | `spec-fundacao-01-bootstrap.md` | F01 | [#25](https://github.com/RodReis/rrb-jarvisOS/pull/25) |
+| [#5](https://github.com/RodReis/rrb-jarvisOS/issues/5) | 04 Dados mínimos + AuditEvent | MVP-001 (#1) | `spec-fundacao-04-dados-audit.md` | F04 | [#28](https://github.com/RodReis/rrb-jarvisOS/pull/28) |
+| [#3](https://github.com/RodReis/rrb-jarvisOS/issues/3) | 02 AppShell e WorkspaceSwitcher | MVP-001 (#1) | `spec-fundacao-02-appshell-workspaces.md` | F02 | [#28](https://github.com/RodReis/rrb-jarvisOS/pull/28) |
+
+> **04 e 02 saíram no mesmo PR**, por decisão do PI (2026-07-22): o critério 4 da SPEC-04 exige `AuditEvent` de `workspace-switch`, cujo fluxo nasce na F02 — separá-las exigiria um stub que a F02 jogaria fora. O critério 4 fica **parcialmente atendido**: `workspace-switch` está provado ponta a ponta; `login`/`logout`/`login-offline-reuse` têm o tipo no contrato e o fluxo nasce na F03.
 
 ### Finalizado (`closed` + `proplan:finalizado` — aceito pelo PI)
 
@@ -70,7 +65,7 @@ Não há catálogo numérico `SPEC-nnn` para o MVP-001: as specs são identifica
 
 | MVP | Issue | Estado | Fatias fechadas |
 |---|---|---|---|
-| MVP-001 Fundação | [#1](https://github.com/RodReis/rrb-jarvisOS/issues/1) | épico criado (`proplan:mvp`); **F06 aceita** (#8 `proplan:finalizado`), F01 entregue aguardando aceite (#2 `proplan:done`), 4 em Backlog (#3–#6) | **1 / 6** |
+| MVP-001 Fundação | [#1](https://github.com/RodReis/rrb-jarvisOS/issues/1) | épico criado (`proplan:mvp`); **F06 aceita** (#8 `proplan:finalizado`); **F01, F04 e F02 entregues** aguardando aceite (#2, #5, #3 em `proplan:done`); **F03 (#4) bloqueada** por credenciais; F05 (#6) é a cabeça da fila | **1 / 6** *(aceitas)* · 4 / 6 entregues |
 | MVP-002 Execução local controlada (fundação) | [#9](https://github.com/RodReis/rrb-jarvisOS/issues/9) | épico criado; 5 fatias com spec **`aprovada-pi`** em Backlog (#11–#15) | 0 / 5 |
 | MVP-003 Design System da Plataforma (base única, 2 identidades) | [#16](https://github.com/RodReis/rrb-jarvisOS/issues/16) | épico criado; **8 fatias** em Backlog (#17–#24), todas com spec `aprovada-pi` | 0 / 8 |
 | MVP-004 Execução real (terminal + execução allowlisted) | [#10](https://github.com/RodReis/rrb-jarvisOS/issues/10) | renumerado de MVP-003 (título/rótulo atualizados + carimbo); 2 fatias lazy | 0 / 2 |
