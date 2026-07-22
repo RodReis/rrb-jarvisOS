@@ -16,8 +16,10 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    # Sem services: a categoria "Banco" testa o storage local (SQLite em arquivo
-    # temporário, a partir da Fatia 04), que não é serviço (docs/TESTING.md §6).
+    # Sem `services:`: a maior parte da categoria "Banco" testa o storage local (SQLite em
+    # arquivo temporário), que não é serviço (docs/TESTING.md §6). A exceção é o Supabase
+    # local, que sobe abaixo pela CLI — `services:` não serviria, porque não é um container
+    # só, e sim a stack inteira que a CLI orquestra.
     env:
       REPORT_PR: '#${{ github.event.pull_request.number }}'
       # O GitHub já tem a URL pronta — o gerador não precisa saber montar link
@@ -77,6 +79,20 @@ jobs:
         run: |
           npm run lint
           npm run typecheck
+
+      # SPEC-Execucao-01, critério 6: o int-spec de RLS exercita a stack real, então o CI
+      # a sobe. Sem este step o arquivo **passaria pulando** — os testes se pulam quando a
+      # stack não responde (para não punir quem clona sem Docker), e o CI ficaria verde
+      # exatamente onde deveria provar o isolamento. Falso verde é pior que teste ausente:
+      # o relatório contaria RLS como coberta.
+      #
+      # `supabase start` já aplica migrations e seed do diretório versionado.
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Subir o Supabase local (RLS do int-spec)
+        run: supabase start
 
       # O append-only é verificado contra a BASE do PR, não contra HEAD: aqui
       # HEAD é o merge commit, cujo TESTS.md é a versão do próprio PR — a guarda

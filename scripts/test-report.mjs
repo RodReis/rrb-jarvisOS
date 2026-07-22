@@ -59,7 +59,12 @@ function runVitestProject(project, rawName, coverageDir) {
     `--coverage.reportsDirectory=coverage/${coverageDir}`,
     '--reporter=json',
     '--outputFile',
-    resolve(RAW, rawName)
+    resolve(RAW, rawName),
+    // Segundo reporter, para o terminal. O `--reporter=json` escreve só no arquivo:
+    // sem isto, teste que falha **no CI** não aparece em lugar nenhum do log — a
+    // única pista fica sendo a divergência de números que a guarda acusa depois,
+    // que diz *que* houve falha e não *qual*. Custou uma rodada de CI às cegas.
+    '--reporter=default'
   ])
 }
 
