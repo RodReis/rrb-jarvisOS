@@ -49,6 +49,11 @@ test.beforeEach(async () => {
   app.process().stderr?.on('data', (chunk: Buffer) => {
     console.error(`[electron stderr] ${chunk.toString().trimEnd()}`)
   })
+  // O logger do app (winston, console ligado fora de produção) escreve no stdout —
+  // é onde a promise rejeitada do boot aparece.
+  app.process().stdout?.on('data', (chunk: Buffer) => {
+    console.error(`[electron stdout] ${chunk.toString().trimEnd()}`)
+  })
 })
 
 test.afterEach(async () => {
