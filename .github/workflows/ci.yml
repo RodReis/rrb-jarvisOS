@@ -1,0 +1,105 @@
+name: CI — testes + relatório de evidência
+
+# ADR-003: evidência de teste gerada por máquina e verificada, nunca narrada.
+# Roda em todo PR: executa os runners, gera reports/TESTS.md a partir do --json,
+# publica no job summary + comentário fixo do PR, e barra o merge se o relatório
+# commitado divergir de uma execução limpa (guarda anti-drift).
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    # Sem services: a categoria "Banco" testa o storage local (SQLite em arquivo
+    # temporário, a partir da Fatia 04), que não é serviço (docs/TESTING.md §6).
+    env:
+      REPORT_PR: '#${{ github.event.pull_request.number }}'
+      # O GitHub já tem a URL pronta — o gerador não precisa saber montar link
+      # de GitHub (segue repo-agnóstico, docs/TESTING.md §7).
+      REPORT_PR_URL: ${{ github.event.pull_request.html_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # A ISSUE da fatia sai do `refs #N` do corpo do PR — NÃO é o número do PR
+      # (`closes #N` é proibido pelo CLAUDE.md, então `refs #N` é o elo canônico
+      # PR→issue). Sem `refs #N` no corpo → '—', e o gerador segue verdadeiro
+      # nos números. A SPEC sai do link para docs/spec/spec-*.md, quando há.
+      - name: Metadados da entrega (issue, spec, data)
+        env:
+          # Via env, nunca interpolado no script: o corpo do PR é texto de
+          # usuário e ${{ }} direto no `run` seria injeção de shell.
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_UPDATED_AT: ${{ github.event.pull_request.updated_at }}
+        run: |
+          issue=$(printf '%s' "$PR_BODY" | grep -oiE 'refs #[0-9]+' | head -1 | grep -oE '[0-9]+' || true)
+          spec=$(printf '%s' "$PR_BODY" | grep -oE 'spec-[a-z-]+-[0-9]{2}[a-z]?-[a-z-]+' | head -1 || true)
+          echo "REPORT_ISSUE=${issue:+#$issue}" >> "$GITHUB_ENV"
+          echo "REPORT_SPEC=${spec:-}" >> "$GITHUB_ENV"
+          echo "REPORT_DATE=$(date -u -d "$PR_UPDATED_AT" +%Y-%m-%d)" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Lint e typecheck
+        run: |
+          npm run lint
+          npm run typecheck
+
+      # O append-only é verificado contra a BASE do PR, não contra HEAD: aqui
+      # HEAD é o merge commit, cujo TESTS.md é a versão do próprio PR — a guarda
+      # estaria conferindo o arquivo contra si mesmo. Fetch raso só dessa ref.
+      - name: Buscar a base do PR (baseline do append-only)
+        run: git fetch --depth=1 origin "${{ github.base_ref }}"
+
+      # Self-check do gerador: prova que a própria guarda funciona (append-only,
+      # CRLF, histórico zerado). Sem isto, um bug no gerador desliga a guarda em
+      # silêncio — foi assim que o registro de uma spec inteira sumiu no proplan
+      # sob CI verde.
+      - name: Self-check do gerador de relatório
+        run: npm run test:report:selfcheck
+
+      # Guarda anti-drift: roda os runners e compara os números frescos com o
+      # reports/TESTS.md COMMITADO no PR. Se alguém editou um número à mão (ou
+      # esqueceu de rodar `npm run test:report` e commitar), diverge → falha aqui.
+      # NÃO reescreve o arquivo — senão nunca pegaria a forja do commit.
+      - name: Rodar testes + guarda anti-drift
+        env:
+          REPORT_BASE_REF: origin/${{ github.base_ref }}
+        run: npm run test:report:check
+
+      - name: Publicar tabela no job summary
+        if: always()
+        run: |
+          {
+            echo "## Relatório de testes (ADR-003)"
+            echo ""
+            sed -n '/## Estado atual/,/## Histórico/p' reports/TESTS.md | sed '/## Histórico/d'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comentário fixo no PR
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          BODY=$(sed -n '/## Estado atual/,/## Histórico/p' reports/TESTS.md | sed '/## Histórico/d')
+          MARKER="<!-- test-report-sticky -->"
+          COMMENT="$MARKER"$'\n'"$BODY"
+          ID=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --jq \
+            ".[] | select(.body | contains(\"$MARKER\")) | .id" | head -1)
+          if [ -n "$ID" ]; then
+            gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$ID" -f body="$COMMENT"
+          else
+            gh api -X POST "repos/${{ github.repository }}/issues/$PR/comments" -f body="$COMMENT"
+          fi

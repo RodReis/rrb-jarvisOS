@@ -1,0 +1,26 @@
+{
+  "$comment": "Mapa categoria→origem para o gerador (ADR-003, docs/TESTING.md §3). Único arquivo que muda por projeto — gen-test-report.mjs é repo-agnóstico. Sufixos são convenção, não hardcode.",
+  "reportPath": "reports/TESTS.md",
+  "repoUrl": "https://github.com/RodReis/rrb-jarvisOS",
+  "categories": [
+    {
+      "name": "Regras de Negócio",
+      "runner": "vitest",
+      "resultsJson": "reports/.raw/regras.json",
+      "coverageSummary": "coverage/regras/coverage-summary.json"
+    },
+    {
+      "name": "Banco",
+      "runner": "vitest",
+      "resultsJson": "reports/.raw/banco.json",
+      "coverageSummary": "coverage/banco/coverage-summary.json"
+    },
+    {
+      "name": "Tela",
+      "runner": "vitest+playwright",
+      "resultsJson": "reports/.raw/tela-vitest.json",
+      "playwrightJson": "reports/.raw/tela-playwright.json",
+      "coverageSummary": "coverage/tela/coverage-summary.json"
+    }
+  ]
+}
