@@ -151,12 +151,14 @@ jobs:
       # provar a garantia. Os daemons sobrevivem ao fim do step; os steps seguintes só
       # precisam do endereço do bus e do desktop declarado — sem XDG_CURRENT_DESKTOP o
       # Chromium nem tenta o libsecret e volta ao basic_text.
+      # O daemon precisa viver NO MESMO comando que roda os testes: sessão D-Bus e
+      # keyring iniciados num step anterior não são confiáveis aqui (o primeiro run com
+      # eval $(dbus-launch) + GITHUB_ENV chegou com o bus certo e o safeStorage seguiu
+      # indisponível). `dbus-run-session` cria o bus, o unlock com senha vazia cria e
+      # destrava o keyring "login", e o processo de teste herda tudo por descendência.
       - name: Keyring real para o safeStorage (ADR-004)
         run: |
-          sudo apt-get install -y gnome-keyring dbus-x11
-          eval "$(dbus-launch --sh-syntax)"
-          echo -n '' | gnome-keyring-daemon --unlock --components=secrets
-          echo "DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS" >> "$GITHUB_ENV"
+          sudo apt-get install -y gnome-keyring
           echo "XDG_CURRENT_DESKTOP=GNOME" >> "$GITHUB_ENV"
 
       # DIAGNÓSTICO TEMPORÁRIO — remover quando o E2E estiver verde.
@@ -166,17 +168,26 @@ jobs:
       - name: Diagnóstico — subir o Electron e capturar stderr
         continue-on-error: true
         run: |
-          ls -l node_modules/electron/dist/chrome-sandbox
           npm run build
-          timeout 40 xvfb-run --auto-servernum \
-            node_modules/.bin/electron . --user-data-dir=/tmp/diag 2>&1 | head -80 || true
+          dbus-run-session -- bash -c '
+            echo -n "" | gnome-keyring-daemon --unlock --components=secrets || echo "keyring FALHOU: $?"
+            dbus-send --session --print-reply --dest=org.freedesktop.DBus \
+              /org/freedesktop/DBus org.freedesktop.DBus.ListNames \
+              | grep -i secret || echo "SEM org.freedesktop.secrets no bus"
+            timeout 40 xvfb-run --auto-servernum \
+              node_modules/.bin/electron . --user-data-dir=/tmp/diag 2>&1 | head -60
+          ' || true
 
       # `xvfb-run`: o orquestrador roda o E2E, e o Electron abre janela — sem display
       # virtual o launch falha no Linux do CI (docs/TESTING.md §3.1).
       - name: Rodar testes + guarda anti-drift
         env:
           REPORT_BASE_REF: origin/${{ github.base_ref }}
-        run: xvfb-run --auto-servernum npm run test:report:check
+        run: |
+          dbus-run-session -- bash -c '
+            echo -n "" | gnome-keyring-daemon --unlock --components=secrets
+            exec xvfb-run --auto-servernum npm run test:report:check
+          '
 
       # Terceira guarda: números certos + histórico íntegro ainda deixavam
       # passar uma entrega SEM linha no histórico — no repo de origem duas
@@ -184,7 +195,11 @@ jobs:
       # depois do --check para que a falha de números apareça antes.
       - name: Guarda — a entrega está carimbada no histórico?
         if: env.REQUIRE_ENTRY == '1'
-        run: xvfb-run --auto-servernum npm run test:report:check -- --require-entry
+        run: |
+          dbus-run-session -- bash -c '
+            echo -n "" | gnome-keyring-daemon --unlock --components=secrets
+            exec xvfb-run --auto-servernum npm run test:report:check -- --require-entry
+          '
 
       - name: Publicar tabela no job summary
         if: always()
