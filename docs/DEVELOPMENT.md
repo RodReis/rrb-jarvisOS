@@ -10,16 +10,25 @@ Regra de trabalho: **uma fatia por vez (WIP = 1)**. Só iniciar fatia com spec `
 
 ### Fatia 01 — Bootstrap e estrutura (`docs/spec/spec-fundacao-01-bootstrap.md`)
 
-Status: **pronta para iniciar** — spec `aprovada-pi` (2026-07-21); issue #2 em Backlog. WIP = 1: próxima a iniciar.
+Status: **em andamento** — spec `aprovada-pi` (2026-07-21); issue #2 em `proplan:doing`. Branch `feat/bootstrap`.
 
-- [ ] Scaffold Electron + React + TS + Vite via **electron-vite** (Node 22 LTS + Electron estável)
-- [ ] Estrutura `src/main` / `src/renderer` / `src/shared` com READMEs
-- [ ] IPC seguro: contextIsolation on, nodeIntegration off, sandbox on, preload tipado
-- [ ] Scripts dev/build/lint/test configurados
-- [ ] Rotina de relatório de testes (ADR-003): gerador+selfcheck portados do proplan, `test-report.config.json`, `reports/TESTS.md`, CI; categorias Regras+Tela(componente) — Banco (F04) e E2E Playwright (F03) entram depois
-- [ ] Tailwind configurado
-- [ ] Teste de fumaça: janela abre; renderer sem acesso a Node
+- [x] Scaffold Electron + React + TS + Vite via **electron-vite** (Electron 43, Vite 7, React 19, Vitest 4; `engines.node >= 22`)
+- [x] Estrutura `src/main` / `src/renderer` / `src/shared` com READMEs
+- [x] IPC seguro: contextIsolation on, nodeIntegration off, sandbox on, preload tipado
+- [x] Scripts dev/build/lint/test configurados
+- [x] Rotina de relatório de testes (ADR-003): gerador+selfcheck portados do proplan, `test-report.config.json`, `reports/TESTS.md`, CI; categorias Regras+Tela(componente) — Banco (F04) e E2E Playwright (F03) entram depois
+- [x] Tailwind configurado (v4, via `@tailwindcss/vite`)
+- [x] Teste de fumaça: janela abre; renderer sem acesso a Node
 - [ ] Entrega: PR com `refs #N`; docs/ commitados
+
+**Decisões técnicas desta fatia** (nenhuma altera escopo; registradas para não serem re-litigadas):
+
+1. **Vite 7, não 8** — `electron-vite@5` declara peer `vite@^5||^6||^7`. Vite 8 quebraria a resolução; não foi forçado com `--legacy-peer-deps` (mascararia incompatibilidade real).
+2. **Preload em CommonJS (`index.cjs`)** — o Electron exige preload *unsandboxed* para ESM (`.mjs`). Como `sandbox: true` é critério de aceite, o preload sai CJS e o main segue ESM nativo. Segurança venceu o formato do módulo.
+3. **`@electron-toolkit/utils` removido** — o pacote lê `app.isPackaged` no topo do módulo e quebra no Electron 43. Substituído por `app.isPackaged` e `app.setAppUserModelId` nativos (2 linhas).
+4. **`RENDERER_SECURITY` mora em `src/shared/contracts/security.ts`** — é contrato, não comportamento: precisa ser testável sem carregar o Electron. `src/main/window.spec.ts` prova que a janela aplica esses valores, fechando as duas pontas.
+
+> **Ambiente (armadilha conhecida):** a variável `ELECTRON_RUN_AS_NODE=1` está setada no shell de desenvolvimento do PI e faz o binário do Electron rodar como Node puro — `require('electron')` devolve a *string* do caminho e o app falha com `TypeError: Cannot read properties of undefined (reading 'whenReady')`. O sintoma se disfarça de erro de bundle ESM/CJS. Para rodar o app: `env -u ELECTRON_RUN_AS_NODE npm run dev`.
 
 ### Fatia 06 — Observabilidade e Logging (`docs/spec/spec-fundacao-06-observabilidade-logging.md`)
 
