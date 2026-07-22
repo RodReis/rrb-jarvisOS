@@ -171,28 +171,6 @@ jobs:
             > "$HOME/.local/share/keyrings/Default_keyring.keyring"
           printf Default_keyring > "$HOME/.local/share/keyrings/default"
 
-      # DIAGNÓSTICO TEMPORÁRIO — remover quando o E2E estiver verde.
-      # O chmod acima derrubou o FATAL do SUID sandbox, mas o `firstWindow()` segue
-      # estourando: sobra outra barreira no boot. O reporter do Playwright engole o
-      # stderr do processo, então subimos o app fora dele para ler o erro cru.
-      - name: Diagnóstico — subir o Electron e capturar stderr
-        continue-on-error: true
-        run: |
-          npm run build
-          dbus-run-session -- bash -c '
-            rm -rf "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/keyring"
-            eval "$(gnome-keyring-daemon --components=secrets --daemonize)" || echo "daemon FALHOU: $?"
-            echo -n teste | secret-tool store --label=sonda sonda ci \
-              && secret-tool lookup sonda ci \
-              && echo "secret-tool OK — caminho libsecret funciona" \
-              || echo "secret-tool FALHOU — o Chromium também vai falhar"
-            dbus-send --session --print-reply --dest=org.freedesktop.DBus \
-              /org/freedesktop/DBus org.freedesktop.DBus.ListNames \
-              | grep -i secret || echo "SEM org.freedesktop.secrets no bus"
-            timeout 40 xvfb-run --auto-servernum \
-              node_modules/.bin/electron . --user-data-dir=/tmp/diag 2>&1 | head -60
-          ' || true
-
       # `xvfb-run`: o orquestrador roda o E2E, e o Electron abre janela — sem display
       # virtual o launch falha no Linux do CI (docs/TESTING.md §3.1).
       - name: Rodar testes + guarda anti-drift
