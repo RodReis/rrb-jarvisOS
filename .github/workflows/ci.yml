@@ -35,10 +35,19 @@ jobs:
           # Via env, nunca interpolado no script: o corpo do PR é texto de
           # usuário e ${{ }} direto no `run` seria injeção de shell.
           PR_BODY: ${{ github.event.pull_request.body }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
           PR_UPDATED_AT: ${{ github.event.pull_request.updated_at }}
         run: |
           issue=$(printf '%s' "$PR_BODY" | grep -oiE 'refs #[0-9]+' | head -1 | grep -oE '[0-9]+' || true)
-          spec=$(printf '%s' "$PR_BODY" | grep -oE 'spec-[a-z-]+-[0-9]{2}[a-z]?-[a-z-]+' | head -1 || true)
+          # A SPEC sai do TÍTULO, não do corpo: o corpo cita outras specs em
+          # prosa (contexto, comparação) e o `head -1` pegava a primeira menção,
+          # não a da entrega. Fallback para o corpo mantém os PRs antigos
+          # funcionando; sem nenhuma das duas, fica '—' e o relatório segue
+          # verdadeiro nos números.
+          spec=$(printf '%s' "$PR_TITLE" | grep -oE 'spec-[a-z-]+-[0-9]{2}[a-z]?-[a-z-]+' | head -1 || true)
+          if [ -z "$spec" ]; then
+            spec=$(printf '%s' "$PR_BODY" | grep -oE 'spec-[a-z-]+-[0-9]{2}[a-z]?-[a-z-]+' | head -1 || true)
+          fi
           echo "REPORT_ISSUE=${issue:+#$issue}" >> "$GITHUB_ENV"
           echo "REPORT_SPEC=${spec:-}" >> "$GITHUB_ENV"
           echo "REPORT_DATE=$(date -u -d "$PR_UPDATED_AT" +%Y-%m-%d)" >> "$GITHUB_ENV"
@@ -73,10 +82,43 @@ jobs:
       # reports/TESTS.md COMMITADO no PR. Se alguém editou um número à mão (ou
       # esqueceu de rodar `npm run test:report` e commitar), diverge → falha aqui.
       # NÃO reescreve o arquivo — senão nunca pegaria a forja do commit.
+      # O carimbo (linha no histórico) só é exigido de PR que MEXE em teste —
+      # PR só de docs não deve ser barrado. Globs = a convenção deste repo
+      # (vitest.config.ts): `*.spec.ts` (regras), `*.int-spec.ts` (banco),
+      # `*.test.tsx` (tela). `*.selfcheck.mjs` entra porque é o teste do próprio
+      # gerador e não casa os outros — sem ele, um PR que só mexe na guarda se
+      # dispensaria da própria regra.
+      - name: O PR altera testes?
+        run: |
+          set -euo pipefail
+          # Diff de DOIS pontos: `...` (três) precisa do ancestral comum, que o
+          # fetch raso (--depth=1) não traz — daria "fatal: no merge base",
+          # variável vazia e a guarda se dispensando sozinha, em verde. Guarda
+          # que falha ABERTA é pior que guarda nenhuma. `--diff-filter=d` ignora
+          # arquivo removido: apagar um spec não cria entrega a carimbar.
+          changed=$(git diff --name-only --diff-filter=d \
+            "origin/${{ github.base_ref }}..HEAD" \
+            -- '*.spec.ts' '*.int-spec.ts' '*.test.ts' '*.test.tsx' '*.selfcheck.mjs')
+          if [ -n "$changed" ]; then
+            echo "REQUIRE_ENTRY=1" >> "$GITHUB_ENV"
+            echo "PR altera testes — o carimbo no histórico será exigido:"
+            printf '%s\n' "$changed"
+          else
+            echo "PR não altera teste — carimbo dispensado."
+          fi
+
       - name: Rodar testes + guarda anti-drift
         env:
           REPORT_BASE_REF: origin/${{ github.base_ref }}
         run: npm run test:report:check
+
+      # Terceira guarda: números certos + histórico íntegro ainda deixavam
+      # passar uma entrega SEM linha no histórico — no repo de origem duas
+      # entregas mergearam com a tabela sugerindo que não tiveram teste. Roda
+      # depois do --check para que a falha de números apareça antes.
+      - name: Guarda — a entrega está carimbada no histórico?
+        if: env.REQUIRE_ENTRY == '1'
+        run: npm run test:report:check -- --require-entry
 
       - name: Publicar tabela no job summary
         if: always()

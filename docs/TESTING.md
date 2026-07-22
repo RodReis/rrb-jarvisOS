@@ -130,8 +130,21 @@ conserto**, não precisa reviver o bug):
   que foi entregue nem por qual PR). Rodar local atualiza só o `Estado atual`, que é regenerado
   por contrato.
 
+> **Como carimbar a entrega (o comando que fecha a fatia).** Os metadados da linha vêm de
+> variáveis de ambiente — o CI as extrai do PR, mas numa execução **local** elas não existem, e
+> sem elas o gerador (corretamente) só atualiza o `Estado atual`. Para deixar a linha no
+> histórico, rode na raiz:
+>
+> ```bash
+> REPORT_ISSUE=#2 REPORT_SPEC=spec-fundacao-01-bootstrap REPORT_PR=#25 npm run test:report
+> ```
+>
+> `REPORT_DATE` e `REPORT_PR_URL` são opcionais. **Esquecer isso não é mais silencioso** — ver a
+> prova 3 abaixo.
+
 **Guarda anti-drift (o que torna o arquivo confiável):** no PR, o CI roda o gerador em
-**`--check`**, que faz **duas provas independentes** — são duas formas distintas de forjar:
+**`--check`**, que faz **três provas independentes** — são três formas distintas de a evidência
+mentir:
 
 1. **Números** — recomputa os totais numa execução limpa e compara com a seção `## Estado atual`
    commitada. Divergiu → **CI falha**. O número só "cola" se sobreviver a uma reexecução
@@ -140,6 +153,26 @@ conserto**, não precisa reviver o bug):
 2. **Histórico (append-only)** — prova que **toda linha da baseline continua no arquivo**.
    Append-only é verificável por **continência de conjunto**, não por igualdade: o histórico novo
    pode ter linhas a mais (a entrega atual), nunca a menos.
+3. **Carimbo da entrega** (`--require-entry`, desde 2026-07-22) — prova que a entrega **deixou
+   linha** no histórico. Só é exigida de PR que **altera arquivo de teste** (PR só de `docs/` não
+   é barrado) e cobra pela issue do `refs #N`. Sem linha → **CI falha**, com o comando exato na
+   mensagem.
+
+> **Por que a prova 3 existe — e por que ela já era necessária aqui.** As provas 1 e 2 cobrem
+> *número forjado* e *histórico apagado*; nenhuma cobre **histórico que nunca foi escrito**. No
+> `rrb-proplan` duas entregas mergearam com CI verde e o histórico mudo, e a tabela passou a
+> sugerir que não tiveram teste — havia centenas de testes verdes.
+>
+> **O mesmo já tinha acontecido neste repo**: a **Fatia 01** (issue #2, PR #25) foi entregue com
+> 18 testes passando e o commit `a995be4` diz *"registra entrega da Fatia 01"* — mas o histórico
+> estava **vazio**. A linha foi acrescentada retroativamente em 2026-07-22, junto com esta guarda.
+> Os números registrados são os da execução do dia, não os do instante do merge: registro
+> retroativo não reconstrói contagem passada.
+>
+> **Por que o CI não commita a linha sozinho** (alternativa rejeitada no repo de origem): o
+> `--check` **não reescreve** o arquivo de propósito — se reescrevesse, um número editado à mão
+> seria silenciosamente sobrescrito em vez de barrado, e a prova 1 morreria. Guarda que corrige
+> não é guarda. O CI **barra**, e quem carimba continua sendo quem entrega.
 
 Três restrições de projeto que a guarda **precisa** respeitar (lições herdadas do proplan, todas
 registradas no código de referência da §10):

@@ -7,6 +7,9 @@
  *   node scripts/test-report.mjs --check     # roda tudo + falha se divergir
  *   node scripts/test-report.mjs --no-run    # só gera do que já existe em reports/.raw
  *   node scripts/test-report.mjs --selfcheck # só prova o gerador (não roda runners)
+ *   node scripts/test-report.mjs --check --require-entry
+ *                                            # + exige linha da entrega no histórico
+ *                                            # (CI, em PR que altera teste)
  *
  * Esta é a peça que **muda por stack** (docs/TESTING.md §10.4): no lugar do
  * `jest --selectProjects` do proplan, roda uma execução Vitest por categoria
@@ -74,4 +77,8 @@ if (!noRun) {
 const entry = selfcheck ? 'scripts/gen-test-report.selfcheck.mjs' : 'scripts/gen-test-report.mjs'
 const genArgs = [resolve(ROOT, entry)]
 if (check) genArgs.push('--check')
+// Repasse explícito: o wrapper filtra as flags que conhece, então uma flag nova
+// do gerador seria descartada em silêncio — e uma guarda que nunca roda é pior
+// que guarda nenhuma, porque parece estar protegendo.
+if (process.argv.includes('--require-entry')) genArgs.push('--require-entry')
 process.exit(run(process.execPath, genArgs))
