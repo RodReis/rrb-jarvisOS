@@ -1,6 +1,7 @@
 import { join } from 'node:path'
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, nativeTheme } from 'electron'
 import { registerIpcHandlers } from './ipc/handlers'
+import { PreferencesService } from './preferences/preferences-service'
 import { closeLogger, initLogger, log } from './logging/logger'
 import { initRendererLogBridge } from './logging/renderer-bridge'
 import { LOCAL_USER_ID, LOCAL_USER_PROFILE } from './storage/local-user'
@@ -47,10 +48,16 @@ if (!app.requestSingleInstanceLock()) {
     storage.profiles.save(LOCAL_USER_PROFILE)
 
     const workspaces = new WorkspaceService(storage.audit, LOCAL_USER_ID)
+    // `nativeTheme` é a única fonte confiável do tema do SO; entra por injeção para o
+    // serviço seguir testável sem Electron.
+    const preferences = new PreferencesService(storage.profiles, LOCAL_USER_ID, () =>
+      nativeTheme.shouldUseDarkColors ? 'escuro' : 'claro'
+    )
 
     registerIpcHandlers({
       audit: storage.audit,
       workspaces,
+      preferences,
       userId: LOCAL_USER_ID,
       minimizeToTray: () => janela?.hide()
     })

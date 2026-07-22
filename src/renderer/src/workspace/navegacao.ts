@@ -11,10 +11,17 @@
 
 import type { WorkspaceId } from '@shared/domain/entities'
 
-/** Itens de navegação por espaço. Placeholders — os módulos reais vêm em fatias futuras. */
+/**
+ * Itens de navegação por espaço. Placeholders — os módulos reais vêm em fatias futuras.
+ *
+ * `settings` aparece nos **dois** espaços de propósito (SPEC-05): é capacidade
+ * compartilhada, e a preferência é do usuário, não do espaço. Ainda assim ela é uma rota
+ * *de cada* espaço, não uma exceção fora do mapa — do contrário a regra de isolamento
+ * teria um caso especial, e caso especial é onde vazamento se esconde.
+ */
 export const ROTAS_POR_WORKSPACE: Readonly<Record<WorkspaceId, readonly string[]>> = {
-  noa: ['inicio', 'notas', 'agenda'],
-  jarvis: ['inicio', 'operacoes', 'agentes']
+  noa: ['inicio', 'notas', 'agenda', 'settings'],
+  jarvis: ['inicio', 'operacoes', 'agentes', 'settings']
 }
 
 /** Rota inicial de cada espaço, usada na primeira visita. */

@@ -45,6 +45,27 @@ describe('migrations', () => {
     expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION)
   })
 
+  it('preserva a auditoria ao migrar de um schema antigo (v1 → v2)', () => {
+    // A regra central do runner: migration NUNCA zera evidência. Simula um banco parado
+    // na v1 — sem a coluna `theme` — e verifica que a cadeia sobrevive à migração e
+    // continua verificável.
+    db.close()
+    const caminho = join(dir, 'antigo.db')
+    const antigo = openDatabase(caminho)
+    new AuditRepository(antigo, CHAVE).append({ user_id: 'u-1', type: 'login' })
+    // Volta o schema para a v1: derruba a coluna nova e o marcador de versão.
+    antigo.exec('ALTER TABLE user_profile DROP COLUMN theme')
+    antigo.pragma('user_version = 1')
+    antigo.close()
+
+    const migrado = openDatabase(caminho)
+
+    expect(migrado.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION)
+    expect(new AuditRepository(migrado, CHAVE).verify('u-1')).toEqual({ ok: true, checked: 1 })
+    migrado.close()
+    db = openDatabase(join(dir, 'teste.db'))
+  })
+
   it('é idempotente e preserva o dado já gravado', () => {
     // A regra da spec: migration nunca zera auditoria. Reabrir o banco não pode
     // reaplicar nada nem perder evento.
@@ -209,7 +230,8 @@ describe('perfil de usuário', () => {
       id: 'u-1',
       name: 'Rodrigo',
       email: 'rod@example.com',
-      locale: 'pt-BR' as const
+      locale: 'pt-BR' as const,
+      theme: 'sistema' as const
     }
 
     profiles.save(perfil)
@@ -217,6 +239,25 @@ describe('perfil de usuário', () => {
 
     expect(profiles.findById('u-1')?.name).toBe('Rodrigo Reis')
     expect(db.prepare('SELECT COUNT(*) c FROM user_profile').get()).toEqual({ c: 1 })
+  })
+
+  it('não sobrescreve preferências ao regravar o perfil (SPEC-05, critério 1)', () => {
+    // O main chama `save` a cada boot com o perfil padrão. Se o upsert sobrescrevesse
+    // `locale`/`theme`, a escolha do usuário sumiria a cada reinício.
+    const profiles = new UserProfileRepository(db)
+    const padrao = {
+      id: 'u-1',
+      name: 'Usuário local',
+      email: '',
+      locale: 'pt-BR' as const,
+      theme: 'sistema' as const
+    }
+
+    profiles.save(padrao)
+    profiles.savePreferences('u-1', { locale: 'en-US', theme: 'escuro' })
+    profiles.save(padrao) // simula o boot seguinte
+
+    expect(profiles.findById('u-1')).toMatchObject({ locale: 'en-US', theme: 'escuro' })
   })
 })
 
@@ -236,7 +277,9 @@ describe('instrumentação do logger (critério de aceite 7)', () => {
     const profiles = new UserProfileRepository(db)
     db.exec('DROP TABLE user_profile')
 
-    expect(() => profiles.save({ id: 'u-1', name: 'x', email: 'x@y.z', locale: 'pt-BR' })).toThrow()
+    expect(() =>
+      profiles.save({ id: 'u-1', name: 'x', email: 'x@y.z', locale: 'pt-BR', theme: 'sistema' })
+    ).toThrow()
     expect(logDb.error).toHaveBeenCalledWith(
       'Falha ao gravar perfil de usuário',
       expect.objectContaining({ op: 'upsert', table: 'user_profile' })

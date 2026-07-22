@@ -29,12 +29,39 @@ export const LOCALES = ['pt-BR', 'en-US'] as const
 
 export type Locale = (typeof LOCALES)[number]
 
+export function isLocale(value: unknown): value is Locale {
+  return typeof value === 'string' && (LOCALES as readonly string[]).includes(value)
+}
+
+/**
+ * Preferência de tema. `sistema` é o padrão (SPEC-05) — segue o SO até o usuário decidir
+ * o contrário. É a preferência, não o tema resolvido: `sistema` vira claro ou escuro na
+ * hora de pintar, conforme o que o SO responde naquele momento.
+ */
+export const THEME_PREFERENCES = ['claro', 'escuro', 'sistema'] as const
+
+export type ThemePreference = (typeof THEME_PREFERENCES)[number]
+
+export function isThemePreference(value: unknown): value is ThemePreference {
+  return typeof value === 'string' && (THEME_PREFERENCES as readonly string[]).includes(value)
+}
+
+/** O tema efetivamente aplicado, depois de resolver `sistema`. */
+export type ResolvedTheme = 'claro' | 'escuro'
+
 /** Perfil do usuário. Sem segredo: o que o renderer pode ver por inteiro. */
 export interface UserProfile {
   readonly id: string
   readonly name: string
   readonly email: string
   readonly locale: Locale
+  readonly theme: ThemePreference
+}
+
+/** O que a tela de Settings altera. Ambos opcionais: a UI muda um de cada vez. */
+export interface UserPreferences {
+  readonly locale?: Locale
+  readonly theme?: ThemePreference
 }
 
 /**

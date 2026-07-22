@@ -8,6 +8,8 @@ const sendLog = vi.fn()
 const minimizeToTray = vi.fn()
 const switchWorkspace = vi.fn()
 const getWorkspace = vi.fn()
+const getPreferences = vi.fn()
+const savePreferences = vi.fn()
 
 function mockarPonte(): void {
   Object.defineProperty(window, 'jarvis', {
@@ -17,6 +19,8 @@ function mockarPonte(): void {
       minimizeToTray,
       switchWorkspace,
       getWorkspace,
+      getPreferences,
+      savePreferences,
       listAuditEvents: vi.fn(),
       verifyAuditChain: vi.fn()
     },
@@ -36,10 +40,23 @@ async function trocarPara(nome: string): Promise<void> {
 beforeEach(() => {
   sendLog.mockClear()
   minimizeToTray.mockClear()
+  savePreferences.mockClear()
   // O main é a fonte do espaço ativo; o mock reflete a troca, como ele faria.
   getWorkspace.mockResolvedValue('jarvis' as WorkspaceId)
   switchWorkspace.mockImplementation((w: WorkspaceId) =>
     Promise.resolve({ workspace: w, auditSeq: 1 })
+  )
+  getPreferences.mockResolvedValue({
+    locale: 'pt-BR',
+    theme: 'sistema',
+    resolvedTheme: 'escuro'
+  })
+  savePreferences.mockImplementation((p: Record<string, unknown>) =>
+    Promise.resolve({
+      locale: p['locale'] ?? 'pt-BR',
+      theme: p['theme'] ?? 'sistema',
+      resolvedTheme: p['theme'] === 'claro' ? 'claro' : 'escuro'
+    })
   )
   mockarPonte()
 })
@@ -145,5 +162,79 @@ describe('AppShell', () => {
 
     expect(janela.require).toBeUndefined()
     expect(janela.module).toBeUndefined()
+  })
+})
+
+describe('Settings (SPEC-05)', () => {
+  /** Entra na tela de Settings do espaço ativo. */
+  async function abrirSettings(): Promise<void> {
+    await screen.findByRole('heading', { level: 1 })
+    await userEvent.click(screen.getByRole('button', { name: 'Configurações' }))
+  }
+
+  it('é acessível nos dois workspaces', async () => {
+    render(<App />)
+    await abrirSettings()
+    expect(screen.getByLabelText('Idioma')).toBeInTheDocument()
+
+    // Troca de espaço e confirma que a tela continua alcançável.
+    await trocarPara('NOA')
+    await userEvent.click(screen.getByRole('button', { name: 'Configurações' }))
+    expect(screen.getByLabelText('Idioma')).toBeInTheDocument()
+  })
+
+  it('troca o idioma e a UI muda na hora, sem reiniciar (critério 1)', async () => {
+    render(<App />)
+    await abrirSettings()
+
+    await userEvent.selectOptions(screen.getByLabelText('Idioma'), 'en-US')
+
+    // A prova da troca a quente: o próprio rótulo da tela muda de idioma.
+    expect(await screen.findByLabelText('Language')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument()
+    expect(savePreferences).toHaveBeenCalledWith({ locale: 'en-US' })
+  })
+
+  it('aplica o tema escolhido no documento (critério 2)', async () => {
+    render(<App />)
+    await abrirSettings()
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Claro' }))
+
+    await waitFor(() => expect(document.documentElement.dataset.tema).toBe('claro'))
+    expect(savePreferences).toHaveBeenCalledWith({ theme: 'claro' })
+  })
+
+  it('aplica o tema resolvido pelo main quando a preferência é `sistema`', async () => {
+    // `sistema` não pinta nada por si: quem resolve para claro/escuro é o main, via
+    // `nativeTheme`. A UI aplica o resultado.
+    render(<App />)
+    await abrirSettings()
+
+    await waitFor(() => expect(document.documentElement.dataset.tema).toBe('escuro'))
+    expect(screen.getByRole('radio', { name: 'Sistema' })).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('mostra erro quando o main recusa a gravação', async () => {
+    savePreferences.mockRejectedValueOnce(new Error('disco cheio'))
+    render(<App />)
+    await abrirSettings()
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Escuro' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/não foi possível salvar/i)
+  })
+
+  it('a rota de Settings também é preservada por espaço', async () => {
+    // Settings é rota dos dois espaços, não uma exceção fora do mapa — então segue a
+    // mesma regra de isolamento (SPEC-02, critério 1).
+    render(<App />)
+    await abrirSettings()
+
+    await trocarPara('NOA')
+    expect(screen.queryByLabelText('Idioma')).not.toBeInTheDocument()
+
+    await trocarPara('JARVIS OS')
+    expect(screen.getByLabelText('Idioma')).toBeInTheDocument()
   })
 })

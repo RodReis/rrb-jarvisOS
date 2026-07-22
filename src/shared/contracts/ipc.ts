@@ -7,7 +7,15 @@
  * canal nesta lista e um handler correspondente no main.
  */
 
-import type { AuditEvent, AuditEventType, WorkspaceId } from '../domain/entities'
+import type {
+  AuditEvent,
+  AuditEventType,
+  Locale,
+  ResolvedTheme,
+  ThemePreference,
+  UserPreferences,
+  WorkspaceId
+} from '../domain/entities'
 import type { LogInput } from './logging'
 
 /** Canais de request/response (renderer → main → renderer). */
@@ -25,7 +33,11 @@ export const IPC_CHANNELS = {
   /** Espaço ativo. Ao abrir é sempre JARVIS OS (decisão do PI na SPEC-02). */
   workspaceGet: 'workspace:get',
   /** Troca o espaço ativo; o main audita e loga a transição. */
-  workspaceSwitch: 'workspace:switch'
+  workspaceSwitch: 'workspace:switch',
+  /** Preferências do usuário corrente + o tema já resolvido (SPEC-05). */
+  preferencesGet: 'preferences:get',
+  /** Grava idioma e/ou tema. Ação de baixo risco: **não** gera AuditEvent (SPEC-05). */
+  preferencesSave: 'preferences:save'
 } as const
 
 /**
@@ -83,6 +95,19 @@ export interface WorkspaceSwitchResult {
 }
 
 /**
+ * Preferências do usuário, com o tema **já resolvido** pelo main.
+ *
+ * `theme` é a preferência (`claro`/`escuro`/`sistema`); `resolvedTheme` é o que pintar
+ * agora. A resolução acontece no main porque é ele quem enxerga o `nativeTheme` do SO —
+ * o renderer não deve consultar o sistema por conta própria.
+ */
+export interface PreferencesSnapshot {
+  readonly locale: Locale
+  readonly theme: ThemePreference
+  readonly resolvedTheme: ResolvedTheme
+}
+
+/**
  * A ponte exposta em `window.jarvis`. É o contrato completo: o que não está aqui,
  * o renderer não alcança.
  */
@@ -95,6 +120,9 @@ export interface JarvisBridge {
   verifyAuditChain(): Promise<AuditVerification>
   getWorkspace(): Promise<WorkspaceId>
   switchWorkspace(workspace: WorkspaceId): Promise<WorkspaceSwitchResult>
+  getPreferences(): Promise<PreferencesSnapshot>
+  /** Grava e devolve o estado resultante, já com o tema resolvido. */
+  savePreferences(preferences: UserPreferences): Promise<PreferencesSnapshot>
   /** Pede ao main para minimizar a janela para o tray. */
   minimizeToTray(): void
 }

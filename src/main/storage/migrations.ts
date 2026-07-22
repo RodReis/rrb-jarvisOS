@@ -61,6 +61,15 @@ const MIGRATIONS: readonly string[] = [
   BEGIN
     SELECT RAISE(ABORT, 'audit_event é append-only: DELETE bloqueado (ADR-004)');
   END;
+  `,
+
+  // 2 — preferência de tema (SPEC-Fundacao-05).
+  //
+  // `ALTER TABLE ADD COLUMN`, e não recriar a tabela: bancos já existentes preservam o
+  // perfil e — mais importante — a cadeia de auditoria intacta. O DEFAULT preenche as
+  // linhas antigas, então `theme` pode ser NOT NULL sem quebrar quem já tem dado.
+  `
+  ALTER TABLE user_profile ADD COLUMN theme TEXT NOT NULL DEFAULT 'sistema';
   `
 ]
 

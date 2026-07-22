@@ -53,9 +53,19 @@ const workspaces = {
 
 const minimizeToTray = vi.fn()
 
+const preferences = {
+  atual: vi.fn(() => ({ locale: 'pt-BR', theme: 'sistema', resolvedTheme: 'escuro' })),
+  salvar: vi.fn((p: Record<string, unknown>) => ({
+    locale: p['locale'] ?? 'pt-BR',
+    theme: p['theme'] ?? 'sistema',
+    resolvedTheme: 'escuro'
+  }))
+}
+
 const deps = {
   audit,
   workspaces,
+  preferences,
   userId: 'local',
   minimizeToTray
 } as unknown as IpcDependencies
@@ -221,6 +231,32 @@ describe('canais de workspace (SPEC-02)', () => {
       expect(workspaces.trocar).not.toHaveBeenCalled()
     }
   )
+})
+
+describe('canais de preferências (SPEC-05)', () => {
+  it('devolve as preferências com o tema já resolvido', () => {
+    expect(invocar(IPC_CHANNELS.preferencesGet)).toEqual({
+      locale: 'pt-BR',
+      theme: 'sistema',
+      resolvedTheme: 'escuro'
+    })
+  })
+
+  it('grava a mudança e devolve o estado resultante', () => {
+    expect(invocar(IPC_CHANNELS.preferencesSave, { theme: 'claro' })).toMatchObject({
+      theme: 'claro'
+    })
+  })
+
+  it.each([
+    ['string', 'claro'],
+    ['null', null],
+    ['número', 7]
+  ])('trata payload não-objeto (%s) sem quebrar', (_caso, payload) => {
+    // O serviço já descarta campo fora do enum; o handler só garante que chega objeto.
+    expect(() => invocar(IPC_CHANNELS.preferencesSave, payload)).not.toThrow()
+    expect(preferences.salvar).toHaveBeenCalledWith({})
+  })
 })
 
 describe('canal de janela', () => {

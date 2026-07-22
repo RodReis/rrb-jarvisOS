@@ -43,9 +43,11 @@ describe('ponte do preload', () => {
     // deixaria o renderer alcançar qualquer handler do main.
     expect(Object.keys(bridge).sort()).toEqual([
       'getAppInfo',
+      'getPreferences',
       'getWorkspace',
       'listAuditEvents',
       'minimizeToTray',
+      'savePreferences',
       'sendLog',
       'switchWorkspace',
       'verifyAuditChain'

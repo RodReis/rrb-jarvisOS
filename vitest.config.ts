@@ -46,7 +46,7 @@ export default defineConfig({
           name: 'tela',
           environment: 'jsdom',
           globals: true,
-          setupFiles: ['./tests/setup-tela.ts'],
+          setupFiles: ['./src/renderer/tests/setup-tela.ts'],
           include: ['src/renderer/**/*.test.tsx']
         }
       }
