@@ -158,8 +158,13 @@ jobs:
       # destrava o keyring "login", e o processo de teste herda tudo por descendência.
       - name: Keyring real para o safeStorage (ADR-004)
         run: |
-          sudo apt-get install -y gnome-keyring
+          sudo apt-get install -y gnome-keyring libsecret-tools
           echo "XDG_CURRENT_DESKTOP=GNOME" >> "$GITHUB_ENV"
+          # O Chromium grava na collection *default*; sem o alias apontando para o
+          # keyring `login`, o gnome-keyring tenta CRIAR uma collection — o que abre o
+          # SystemPrompter (GUI) e morre no runner. Semear o alias no disco evita o prompt.
+          mkdir -p "$HOME/.local/share/keyrings"
+          printf login > "$HOME/.local/share/keyrings/default"
 
       # DIAGNÓSTICO TEMPORÁRIO — remover quando o E2E estiver verde.
       # O chmod acima derrubou o FATAL do SUID sandbox, mas o `firstWindow()` segue
@@ -172,6 +177,10 @@ jobs:
           dbus-run-session -- bash -c '
             eval "$(echo -n "" | gnome-keyring-daemon --login)" || echo "login FALHOU: $?"
             eval "$(gnome-keyring-daemon --components=secrets --start)" || echo "start FALHOU: $?"
+            echo -n teste | secret-tool store --label=sonda sonda ci \
+              && secret-tool lookup sonda ci \
+              && echo "secret-tool OK — caminho libsecret funciona" \
+              || echo "secret-tool FALHOU — o Chromium também vai falhar"
             dbus-send --session --print-reply --dest=org.freedesktop.DBus \
               /org/freedesktop/DBus org.freedesktop.DBus.ListNames \
               | grep -i secret || echo "SEM org.freedesktop.secrets no bus"
