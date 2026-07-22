@@ -180,7 +180,8 @@ jobs:
         run: |
           npm run build
           dbus-run-session -- bash -c '
-            eval "$(gnome-keyring-daemon --components=secrets --start)" || echo "start FALHOU: $?"
+            rm -rf "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/keyring"
+            eval "$(gnome-keyring-daemon --components=secrets --daemonize)" || echo "daemon FALHOU: $?"
             echo -n teste | secret-tool store --label=sonda sonda ci \
               && secret-tool lookup sonda ci \
               && echo "secret-tool OK — caminho libsecret funciona" \
@@ -199,7 +200,10 @@ jobs:
           REPORT_BASE_REF: origin/${{ github.base_ref }}
         run: |
           dbus-run-session -- bash -c '
-            eval "$(gnome-keyring-daemon --components=secrets --start)"
+            rm -rf "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/keyring"
+            eval "$(gnome-keyring-daemon --components=secrets --daemonize)"
+            echo -n teste | secret-tool store --label=sonda sonda ci \
+              && echo "secret-tool OK" || echo "secret-tool FALHOU — Electron vai falhar"
             exec xvfb-run --auto-servernum npm run test:report:check
           '
 
@@ -211,7 +215,8 @@ jobs:
         if: env.REQUIRE_ENTRY == '1'
         run: |
           dbus-run-session -- bash -c '
-            eval "$(gnome-keyring-daemon --components=secrets --start)"
+            rm -rf "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/keyring"
+            eval "$(gnome-keyring-daemon --components=secrets --daemonize)"
             exec xvfb-run --auto-servernum npm run test:report:check -- --require-entry
           '
 
