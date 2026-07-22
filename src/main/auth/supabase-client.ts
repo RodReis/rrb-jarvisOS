@@ -27,7 +27,9 @@ export interface SupabaseConfig {
  * sem elas o app roda normalmente e só o login fica indisponível (`.env.example`), que é
  * o comportamento esperado por quem clona o repo sem projeto Supabase.
  */
-export function readSupabaseConfig(env: NodeJS.ProcessEnv = process.env): SupabaseConfig | undefined {
+export function readSupabaseConfig(
+  env: NodeJS.ProcessEnv = process.env
+): SupabaseConfig | undefined {
   const url = env.SUPABASE_URL?.trim()
   const publishableKey = env.SUPABASE_PUBLISHABLE_KEY?.trim()
 

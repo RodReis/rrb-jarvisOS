@@ -163,8 +163,7 @@ export class SessionRepository {
    */
   findMostRecent(): Session | undefined {
     return this.db.prepare('SELECT * FROM session ORDER BY created_at DESC LIMIT 1').get() as
-      | Session
-      | undefined
+      Session | undefined
   }
 
   /** Logout apaga os metadados da sessão. Sessão não é auditoria — pode ser removida. */

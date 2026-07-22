@@ -128,17 +128,15 @@ describe('ponte do preload', () => {
 
     // A superfície é fechada por nome: um `getToken`/`getSession`/`refreshToken` aqui
     // seria o caminho tipado até a credencial que a SPEC-03 proíbe existir.
-    expect(
-      Object.keys(bridge).some((k) => /token|secret|credential|session/i.test(k))
-    ).toBe(false)
+    expect(Object.keys(bridge).some((k) => /token|secret|credential|session/i.test(k))).toBe(false)
   })
 
   it('onAuthChanged devolve um cancelador e não vaza o evento do Electron', async () => {
     const bridge = await carregarPonte()
     const recebidos: unknown[][] = []
 
-    const cancelar = (bridge.onAuthChanged as (l: (s: unknown) => void) => () => void)(
-      (...args) => recebidos.push(args)
+    const cancelar = (bridge.onAuthChanged as (l: (s: unknown) => void) => () => void)((...args) =>
+      recebidos.push(args)
     )
 
     // O preload registrou no canal de push e devolveu como desassinar — sem isso, o
