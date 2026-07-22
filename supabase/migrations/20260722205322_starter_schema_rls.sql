@@ -97,6 +97,26 @@ create trigger audit_event_sem_delete
   for each row execute function public.audit_event_append_only ();
 
 -- ---------------------------------------------------------------------------------------
+-- GRANTs explícitos — **permissão de tabela é uma camada anterior à RLS.**
+--
+-- Sem isto o Postgres recusa a consulta com `42501 insufficient_privilege` antes de sequer
+-- avaliar uma policy: RLS decide *quais linhas* alguém alcança, o GRANT decide *se ele pode
+-- tocar a tabela*. Negar aqui não é o isolamento funcionando — é o cliente não conseguindo
+-- chegar ao ponto em que o isolamento é testado.
+--
+-- Escrito à mão, e não deixado para o `ALTER DEFAULT PRIVILEGES` que a stack do Supabase
+-- configura: aquilo só concede quando a tabela é criada pelo role que detém o default, e
+-- um banco recriado do zero (CI) não reproduz o que um banco de desenvolvimento já herdou.
+-- Foi exatamente essa diferença que deixou 5 testes verdes na máquina local e vermelhos no
+-- CI. Grant explícito na migration faz o schema valer o mesmo nos dois lugares.
+--
+-- `delete` só onde há policy de delete (`workspace`): `audit_event` é append-only (ADR-004),
+-- e conceder o verbo aqui contradiria a ausência deliberada da policy logo abaixo.
+grant select, insert, update on public.user_profile to authenticated;
+grant select, insert, delete on public.workspace    to authenticated;
+grant select, insert          on public.audit_event  to authenticated;
+
+-- ---------------------------------------------------------------------------------------
 -- RLS — o isolamento por usuário.
 --
 -- Policies separadas por verbo (não um `for all`) para que a de `audit_event` possa omitir
