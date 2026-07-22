@@ -15,6 +15,9 @@ import { _electron as electron, expect, test, type ElectronApplication } from '@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+// O pacote `electron` exporta o caminho do binário; o .d.ts descreve a API do runtime,
+// daí o duplo cast — em Node, o valor É uma string.
+import electronPath from 'electron'
 
 let app: ElectronApplication
 let userData: string
@@ -31,7 +34,22 @@ test.beforeEach(async () => {
   const ambiente = { ...process.env }
   delete ambiente.ELECTRON_RUN_AS_NODE
 
+  /**
+   * `executablePath` explícito NÃO é cosmético — é o que desativa o loader que o
+   * Playwright injeta (`-r loader.js`) quando resolve o Electron sozinho. Esse loader
+   * aplica os switches de teste do Chromium ao main process, entre eles
+   * `--password-store=basic`: no Linux isso força o os_crypt pro backend `basic_text`,
+   * `safeStorage.isEncryptionAvailable()` responde false, e o boot falha alto por
+   * desenho (ADR-004) — a janela nunca nasce e o E2E morre em "timeout esperando
+   * window", com o keyring do CI perfeitamente funcional ao lado.
+   *
+   * `chromiumSandbox: true` impede o `--no-sandbox` que o launcher acrescenta por
+   * padrão no Linux — o sandbox do renderer é critério de aceite da SPEC-Fundacao-03,
+   * e um E2E que o desliga passaria exatamente onde deveria provar a fronteira.
+   */
   app = await electron.launch({
+    executablePath: electronPath as unknown as string,
+    chromiumSandbox: true,
     args: ['.', `--user-data-dir=${userData}`],
     env: {
       ...ambiente,
