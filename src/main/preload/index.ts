@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import {
   BRIDGE_KEY,
   IPC_CHANNELS,
+  IPC_EVENT_CHANNELS,
   IPC_SEND_CHANNELS,
   type AppInfo,
   type AuditVerification,
@@ -9,6 +10,7 @@ import {
   type PreferencesSnapshot,
   type WorkspaceSwitchResult
 } from '@shared/contracts/ipc'
+import type { AuthSnapshot } from '@shared/contracts/auth'
 import type { LogInput } from '@shared/contracts/logging'
 import type {
   AuditEvent,
@@ -42,6 +44,20 @@ const bridge: JarvisBridge = {
     ipcRenderer.invoke(IPC_CHANNELS.preferencesGet),
   savePreferences: (preferences: UserPreferences): Promise<PreferencesSnapshot> =>
     ipcRenderer.invoke(IPC_CHANNELS.preferencesSave, preferences),
+
+  getAuth: (): Promise<AuthSnapshot> => ipcRenderer.invoke(IPC_CHANNELS.authGet),
+  login: (): Promise<AuthSnapshot> => ipcRenderer.invoke(IPC_CHANNELS.authLogin),
+  logout: (): Promise<AuthSnapshot> => ipcRenderer.invoke(IPC_CHANNELS.authLogout),
+
+  onAuthChanged: (listener: (snapshot: AuthSnapshot) => void): (() => void) => {
+    // O `IpcRendererEvent` fica de fora da chamada: ele carrega `sender`, um objeto do
+    // Electron que não pode vazar para o renderer. O listener recebe só o snapshot.
+    const wrapped = (_event: unknown, snapshot: AuthSnapshot): void => listener(snapshot)
+
+    ipcRenderer.on(IPC_EVENT_CHANNELS.authChanged, wrapped)
+
+    return () => ipcRenderer.removeListener(IPC_EVENT_CHANNELS.authChanged, wrapped)
+  },
 
   minimizeToTray: (): void => ipcRenderer.send(IPC_SEND_CHANNELS.windowMinimizeToTray)
 }

@@ -6,8 +6,10 @@ import {
   type AuditVerification,
   type WorkspaceSwitchResult
 } from '@shared/contracts/ipc'
+import { AUTH_MENSAGENS, type AuthSnapshot } from '@shared/contracts/auth'
 import { parseLogInput } from '@shared/contracts/logging-input'
 import { isWorkspaceId, type AuditEvent, type AuditEventType } from '@shared/domain/entities'
+import type { AuthService } from '../auth/auth-service'
 import { log, writeLog } from '../logging/logger'
 import type { PreferencesService } from '../preferences/preferences-service'
 import type { AuditRepository } from '../storage/audit-repository'
@@ -31,7 +33,16 @@ export interface IpcDependencies {
   readonly audit: AuditRepository
   readonly workspaces: WorkspaceService
   readonly preferences: PreferencesService
-  readonly userId: string
+  /**
+   * Dono da auditoria consultada pelo canal `audit:list`.
+   *
+   * É função e não string desde a F03: o usuário deixa de ser fixo — antes do login é o
+   * usuário local, depois é o da sessão. Capturar o valor no registro dos handlers
+   * congelaria o id do boot e faria a UI listar a auditoria de quem não está logado.
+   */
+  readonly userId: () => string
+  /** Ausente quando as credenciais não estão configuradas — o app roda sem login. */
+  readonly auth?: AuthService
   /** Minimizar para o tray. Injetado porque a janela nasce depois dos handlers. */
   readonly minimizeToTray: () => void
 }
@@ -64,7 +75,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
   // Auditoria: leitura apenas. O renderer não abre o SQLite (SPEC-04, critério 6), e
   // gravar evento é ato do main disparado por um fluxo real — nunca a pedido da UI.
   ipcMain.handle(IPC_CHANNELS.auditList, (_event, type?: unknown): readonly AuditEvent[] => {
-    const eventos = deps.audit.list(deps.userId)
+    const eventos = deps.audit.list(deps.userId())
     // Filtro de tipo aplicado aqui, e não numa query montada com string vinda do
     // renderer: o canal aceita um valor externo e ele não vira SQL em hipótese alguma.
     const filtrados =
@@ -82,7 +93,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
   })
 
   ipcMain.handle(IPC_CHANNELS.auditVerify, (): AuditVerification => {
-    const resultado = deps.audit.verify(deps.userId) as AuditVerification
+    const resultado = deps.audit.verify(deps.userId()) as AuditVerification
 
     if (!resultado.ok) {
       log.ipc.warn('Verificação da cadeia de auditoria acusou quebra', {
@@ -143,6 +154,55 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       })
       throw error
     }
+  })
+
+  /**
+   * Canais de auth (SPEC-03). Os três devolvem `AuthSnapshot` e nada além — o token não
+   * atravessa a ponte (critério 4). Sem `auth` configurado, respondem o estado de
+   * credenciais ausentes em vez de estourar: o app roda sem login (`.env.example`).
+   */
+  const semCredenciais: AuthSnapshot = {
+    state: 'erro',
+    mensagem: AUTH_MENSAGENS['credenciais-ausentes']
+  }
+
+  ipcMain.handle(IPC_CHANNELS.authGet, (): AuthSnapshot => {
+    return deps.auth?.atual() ?? semCredenciais
+  })
+
+  ipcMain.handle(IPC_CHANNELS.authLogin, async (): Promise<AuthSnapshot> => {
+    log.auth.info('Login solicitado pela interface', {
+      canal: IPC_CHANNELS.authLogin,
+      direction: 'in'
+    })
+
+    if (!deps.auth) {
+      log.auth.warn('Login indisponível: credenciais do Supabase não configuradas')
+      return semCredenciais
+    }
+
+    // O `AuthService` já converte falha em snapshot de erro (critério 6); o catch aqui
+    // cobre só o imprevisto, para o canal nunca rejeitar e deixar a UI pendurada.
+    try {
+      return await deps.auth.login()
+    } catch (error) {
+      log.auth.error('Falha inesperada no canal de login', {
+        canal: IPC_CHANNELS.authLogin,
+        error
+      })
+      return { state: 'erro', mensagem: AUTH_MENSAGENS['falha-no-provedor'] }
+    }
+  })
+
+  ipcMain.handle(IPC_CHANNELS.authLogout, async (): Promise<AuthSnapshot> => {
+    log.auth.info('Logout solicitado pela interface', {
+      canal: IPC_CHANNELS.authLogout,
+      direction: 'in'
+    })
+
+    if (!deps.auth) return semCredenciais
+
+    return await deps.auth.logout()
   })
 
   // Só de ida: o renderer manda o registro, o main grava. Sem resposta de propósito —

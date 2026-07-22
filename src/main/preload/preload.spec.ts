@@ -1,9 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { BRIDGE_KEY, IPC_CHANNELS, IPC_SEND_CHANNELS } from '@shared/contracts/ipc'
+import {
+  BRIDGE_KEY,
+  IPC_CHANNELS,
+  IPC_EVENT_CHANNELS,
+  IPC_SEND_CHANNELS
+} from '@shared/contracts/ipc'
 
 const exposeInMainWorld = vi.fn()
 const invoke = vi.fn().mockResolvedValue({})
 const send = vi.fn()
+const on = vi.fn()
+const removeListener = vi.fn()
 
 vi.mock('electron', () => ({
   contextBridge: {
@@ -11,7 +18,9 @@ vi.mock('electron', () => ({
   },
   ipcRenderer: {
     invoke: (...args: unknown[]) => invoke(...args),
-    send: (...args: unknown[]) => send(...args)
+    send: (...args: unknown[]) => send(...args),
+    on: (...args: unknown[]) => on(...args),
+    removeListener: (...args: unknown[]) => removeListener(...args)
   }
 }))
 
@@ -27,6 +36,8 @@ describe('ponte do preload', () => {
   beforeEach(() => {
     exposeInMainWorld.mockClear()
     invoke.mockClear()
+    on.mockClear()
+    removeListener.mockClear()
     // O preload só expõe a ponte quando o contexto está isolado.
     Object.defineProperty(process, 'contextIsolated', { value: true, configurable: true })
   })
@@ -43,10 +54,14 @@ describe('ponte do preload', () => {
     // deixaria o renderer alcançar qualquer handler do main.
     expect(Object.keys(bridge).sort()).toEqual([
       'getAppInfo',
+      'getAuth',
       'getPreferences',
       'getWorkspace',
       'listAuditEvents',
+      'login',
+      'logout',
       'minimizeToTray',
+      'onAuthChanged',
       'savePreferences',
       'sendLog',
       'switchWorkspace',
@@ -93,6 +108,56 @@ describe('ponte do preload', () => {
     expect(send).toHaveBeenCalledWith(IPC_SEND_CHANNELS.log, registro)
     expect(invoke).not.toHaveBeenCalled()
     expect(retorno).toBeUndefined()
+  })
+
+  it('roteia os canais de auth pelos nomes do contrato', async () => {
+    const bridge = await carregarPonte()
+
+    await (bridge.getAuth as () => Promise<unknown>)()
+    expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.authGet)
+
+    await (bridge.login as () => Promise<unknown>)()
+    expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.authLogin)
+
+    await (bridge.logout as () => Promise<unknown>)()
+    expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.authLogout)
+  })
+
+  it('não expõe nada que entregue token ao renderer (critério 4)', async () => {
+    const bridge = await carregarPonte()
+
+    // A superfície é fechada por nome: um `getToken`/`getSession`/`refreshToken` aqui
+    // seria o caminho tipado até a credencial que a SPEC-03 proíbe existir.
+    expect(
+      Object.keys(bridge).some((k) => /token|secret|credential|session/i.test(k))
+    ).toBe(false)
+  })
+
+  it('onAuthChanged devolve um cancelador e não vaza o evento do Electron', async () => {
+    const bridge = await carregarPonte()
+    const recebidos: unknown[][] = []
+
+    const cancelar = (bridge.onAuthChanged as (l: (s: unknown) => void) => () => void)(
+      (...args) => recebidos.push(args)
+    )
+
+    // O preload registrou no canal de push e devolveu como desassinar — sem isso, o
+    // listener sobreviveria ao componente e vazaria a cada remontagem.
+    expect(on).toHaveBeenCalledWith(IPC_EVENT_CHANNELS.authChanged, expect.any(Function))
+    expect(typeof cancelar).toBe('function')
+
+    // Simula o main empurrando: o listener recebe só o snapshot, nunca o
+    // `IpcRendererEvent` — que carrega `sender` e daria ao renderer um objeto do Electron.
+    const registrado = on.mock.calls.at(-1)?.[1] as (e: unknown, s: unknown) => void
+    registrado({ sender: 'objeto-do-electron' }, { state: 'ativo' })
+
+    expect(recebidos).toEqual([[{ state: 'ativo' }]])
+
+    cancelar()
+    expect(removeListener).toHaveBeenCalledWith(
+      IPC_EVENT_CHANNELS.authChanged,
+      expect.any(Function)
+    )
   })
 
   it('recusa expor a ponte quando contextIsolation está desligado', async () => {

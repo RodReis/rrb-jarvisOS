@@ -1,5 +1,9 @@
 import { join } from 'node:path'
-import { app, BrowserWindow, nativeTheme } from 'electron'
+import { app, BrowserWindow, nativeTheme, shell } from 'electron'
+import { IPC_EVENT_CHANNELS } from '@shared/contracts/ipc'
+import { AuthService } from './auth/auth-service'
+import { createSupabaseClient, readSupabaseConfig } from './auth/supabase-client'
+import { SafeStorageTokenVault } from './auth/token-vault'
 import { registerIpcHandlers } from './ipc/handlers'
 import { PreferencesService } from './preferences/preferences-service'
 import { closeLogger, initLogger, log } from './logging/logger'
@@ -44,10 +48,21 @@ if (!app.requestSingleInstanceLock()) {
 
     // Storage depois do logger, antes dos handlers — que já podem consultá-lo.
     const storage = initStorage(app.getPath('userData'))
-    // Usuário local da fundação; a F03 substitui pelo da sessão real.
+    // Usuário local da fundação: continua sendo a identidade de quem ainda não entrou.
+    // Com a F03, ele deixa de ser o único — o usuário da sessão o substitui após o login.
     storage.profiles.save(LOCAL_USER_PROFILE)
 
-    const workspaces = new WorkspaceService(storage.audit, LOCAL_USER_ID)
+    const auth = criarAuthService(app.getPath('userData'), storage, () => janela)
+
+    /**
+     * Identidade corrente: o usuário da sessão quando há login, o local caso contrário.
+     *
+     * É função porque o valor muda em runtime — capturar a string no boot congelaria o
+     * escopo da auditoria no usuário local para sempre.
+     */
+    const userIdAtual = (): string => auth?.usuarioAtual()?.id ?? LOCAL_USER_ID
+
+    const workspaces = new WorkspaceService(storage.audit, userIdAtual)
     // `nativeTheme` é a única fonte confiável do tema do SO; entra por injeção para o
     // serviço seguir testável sem Electron.
     const preferences = new PreferencesService(storage.profiles, LOCAL_USER_ID, () =>
@@ -58,12 +73,17 @@ if (!app.requestSingleInstanceLock()) {
       audit: storage.audit,
       workspaces,
       preferences,
-      userId: LOCAL_USER_ID,
+      userId: userIdAtual,
+      auth,
       minimizeToTray: () => janela?.hide()
     })
 
     janela = createMainWindow()
     createTray(janela)
+
+    // Restaura a sessão do cofre depois da janela existir: a transição é empurrada ao
+    // renderer, e sem janela o `webContents.send` cairia no vazio.
+    void auth?.restaurar()
 
     // macOS: recriar a janela ao clicar no dock sem janelas abertas.
     app.on('activate', () => {
@@ -74,6 +94,47 @@ if (!app.requestSingleInstanceLock()) {
         revelarJanela(janela)
       }
     })
+  })
+}
+
+/**
+ * Monta o `AuthService`, ou devolve `undefined` quando não há credenciais.
+ *
+ * Ausência de credencial **não** é erro fatal: o app roda com o usuário local e só o login
+ * fica indisponível (documentado no `.env.example`). Derrubar o boot por falta de um
+ * projeto Supabase impediria qualquer um de clonar o repo e rodar.
+ */
+function criarAuthService(
+  userDataDir: string,
+  storage: ReturnType<typeof initStorage>,
+  janelaAtual: () => BrowserWindow | undefined
+): AuthService | undefined {
+  const config = readSupabaseConfig()
+
+  if (!config) {
+    log.auth.warn(
+      'Credenciais do Supabase ausentes: login indisponível. ' +
+        'Preencha SUPABASE_URL e SUPABASE_PUBLISHABLE_KEY no .env (ver .env.example).'
+    )
+    return undefined
+  }
+
+  const vault = new SafeStorageTokenVault(join(userDataDir, 'session.vault'))
+
+  return new AuthService({
+    supabase: createSupabaseClient(config, vault),
+    vault,
+    audit: storage.audit,
+    profiles: storage.profiles,
+    sessions: storage.sessions,
+    openExternal: (url) => shell.openExternal(url),
+    onChange: (snapshot) => {
+      // `isDestroyed` evita erro na corrida entre o fim do login e o fechamento da janela.
+      const alvo = janelaAtual()
+      if (alvo && !alvo.isDestroyed()) {
+        alvo.webContents.send(IPC_EVENT_CHANNELS.authChanged, snapshot)
+      }
+    }
   })
 }
 

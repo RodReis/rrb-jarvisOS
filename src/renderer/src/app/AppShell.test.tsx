@@ -10,6 +10,22 @@ const switchWorkspace = vi.fn()
 const getWorkspace = vi.fn()
 const getPreferences = vi.fn()
 const savePreferences = vi.fn()
+const getAuth = vi.fn()
+const login = vi.fn()
+const logout = vi.fn()
+
+/**
+ * Perfil da sessão usada nestes testes. O `App` só monta o AppShell quando a auth está
+ * `ativo` (SPEC-03), então a suíte do shell precisa partir de um usuário logado — o que
+ * ela investiga é espaço e preferências, não o gate de entrada.
+ */
+const PERFIL_LOGADO = {
+  id: 'u-1',
+  name: 'Rodrigo Reis',
+  email: 'rodrigo@example.com',
+  locale: 'pt-BR' as const,
+  theme: 'sistema' as const
+}
 
 function mockarPonte(): void {
   Object.defineProperty(window, 'jarvis', {
@@ -22,7 +38,13 @@ function mockarPonte(): void {
       getPreferences,
       savePreferences,
       listAuditEvents: vi.fn(),
-      verifyAuditChain: vi.fn()
+      verifyAuditChain: vi.fn(),
+      getAuth,
+      login,
+      logout,
+      // Devolve a função de cancelamento, como a ponte real: sem isso o `useEffect`
+      // tentaria chamar `undefined` na desmontagem e o cleanup estouraria.
+      onAuthChanged: vi.fn(() => () => undefined)
     },
     configurable: true,
     writable: true
@@ -41,6 +63,7 @@ beforeEach(() => {
   sendLog.mockClear()
   minimizeToTray.mockClear()
   savePreferences.mockClear()
+  getAuth.mockResolvedValue({ state: 'ativo', profile: PERFIL_LOGADO })
   // O main é a fonte do espaço ativo; o mock reflete a troca, como ele faria.
   getWorkspace.mockResolvedValue('jarvis' as WorkspaceId)
   switchWorkspace.mockImplementation((w: WorkspaceId) =>
