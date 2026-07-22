@@ -32,7 +32,7 @@ Status: **entregue** (`proplan:done`, aguardando aceite do PI) — spec `aprovad
 
 ### Fatia 06 — Observabilidade e Logging (`docs/spec/spec-fundacao-06-observabilidade-logging.md`)
 
-Status: **em andamento** (`proplan:doing`) — spec `aprovada-pi` (2026-07-21, emendada em 2026-07-22); issue **#8**; branch `feat/observabilidade-logging`. **Roda após a 01, antes de 02–05** (infra transversal — ADR-005).
+Status: **finalizada** — aceita pelo PI em 2026-07-22 (issue **#8** fechada, `proplan:finalizado`); spec `aprovada-pi` (2026-07-21, emendada em 2026-07-22); PR [#27](https://github.com/RodReis/rrb-jarvisOS/pull/27) mergeado. **Rodou após a 01, antes de 02–05** (infra transversal — ADR-005).
 
 - [x] `electron-log` no renderer (captura + IPC) + `winston`/`daily-rotate-file` no main como **escritor único**; ponte roteando renderer→winston
 - [x] Registro JSON estruturado (`ts/level/category/direction/workspace/msg/ctx/correlationId/…`) com `msg` em pt-BR e redaction obrigatória

@@ -27,9 +27,14 @@ Atualizado em: **2026-07-22**. Mantido pelo Code a cada entrega (junto com `DEVE
 | Issue | Fatia | MVP | Spec | Índice | PR |
 |---|---|---|---|---|---|
 | [#2](https://github.com/RodReis/rrb-jarvisOS/issues/2) | 01 Bootstrap e estrutura | MVP-001 (#1) | `spec-fundacao-01-bootstrap.md` | F01 | [#25](https://github.com/RodReis/rrb-jarvisOS/pull/25) |
-| [#8](https://github.com/RodReis/rrb-jarvisOS/issues/8) | 06 Observabilidade e Logging | MVP-001 (#1) | `spec-fundacao-06-observabilidade-logging.md` | F06 | [#27](https://github.com/RodReis/rrb-jarvisOS/pull/27) |
 
-### A Fazer · Em Andamento · Finalizado
+### Finalizado (`closed` + `proplan:finalizado` — aceito pelo PI)
+
+| Issue | Fatia | MVP | Spec | Índice | PR | Aceite |
+|---|---|---|---|---|---|---|
+| [#8](https://github.com/RodReis/rrb-jarvisOS/issues/8) | 06 Observabilidade e Logging | MVP-001 (#1) | `spec-fundacao-06-observabilidade-logging.md` | F06 | [#27](https://github.com/RodReis/rrb-jarvisOS/pull/27) | 2026-07-22 |
+
+### A Fazer · Em Andamento
 
 *(vazios)*
 
@@ -58,7 +63,7 @@ Não há catálogo numérico `SPEC-nnn` para o MVP-001: as specs são identifica
 
 | MVP | Issue | Estado | Fatias fechadas |
 |---|---|---|---|
-| MVP-001 Fundação | [#1](https://github.com/RodReis/rrb-jarvisOS/issues/1) | épico criado (`proplan:mvp`); **2 fatias entregues** (#2, #8 em `proplan:done`), 4 em Backlog (#3–#6) | 0 / 6 *(fechadas pelo PI)* |
+| MVP-001 Fundação | [#1](https://github.com/RodReis/rrb-jarvisOS/issues/1) | épico criado (`proplan:mvp`); **F06 aceita** (#8 `proplan:finalizado`), F01 entregue aguardando aceite (#2 `proplan:done`), 4 em Backlog (#3–#6) | **1 / 6** |
 | MVP-002 Execução local controlada (fundação) | [#9](https://github.com/RodReis/rrb-jarvisOS/issues/9) | épico criado; 5 fatias com spec **`aprovada-pi`** em Backlog (#11–#15) | 0 / 5 |
 | MVP-003 Design System da Plataforma (base única, 2 identidades) | [#16](https://github.com/RodReis/rrb-jarvisOS/issues/16) | épico criado; **8 fatias** em Backlog (#17–#24), todas com spec `aprovada-pi` | 0 / 8 |
 | MVP-004 Execução real (terminal + execução allowlisted) | [#10](https://github.com/RodReis/rrb-jarvisOS/issues/10) | renumerado de MVP-003 (título/rótulo atualizados + carimbo); 2 fatias lazy | 0 / 2 |
@@ -68,7 +73,7 @@ Não há catálogo numérico `SPEC-nnn` para o MVP-001: as specs são identifica
 
 ## Próximas ações
 
-1. **Fila do MVP-001** (2026-07-22): F01 (#2) e **F06 (#8) entregues** (`proplan:done`, aguardando aceite). Cabeça da fila marcada com `proplan:next` = **F04 (#5)**, a próxima a puxar. Ordem: **01 → 06 → 04 (#5) → 02 (#3) → 03 (#4) → 05 (#6)** — F04 antes de F02 porque 02/03 consomem seus contratos tipados (decisão do PI delegada ao Cowork, 2026-07-22).
+1. **Fila do MVP-001** (2026-07-22): **F06 (#8) aceita e finalizada**; F01 (#2) entregue aguardando aceite. Cabeça da fila marcada com `proplan:next` = **F04 (#5)**, a próxima a puxar. Ordem: **01 → 06 → 04 (#5) → 02 (#3) → 03 (#4) → 05 (#6)** — F04 antes de F02 porque 02/03 consomem seus contratos tipados (decisão do PI delegada ao Cowork, 2026-07-22).
 2. ~~Resolver as "Perguntas ao PI" das specs do MVP-003~~ — **feito** (2026-07-21): as 8 specs estão `aprovada-pi`.
 3. ~~Renumerar #10 → MVP-004 e criar o épico MVP-003 + issues~~ — **feito** (2026-07-21): #10 retitulada MVP-004 (carimbo), épico **#16** criado, 8 filhas **#17–#24** em Backlog e vinculadas.
 4. **Code**: quando MVP-001/002 estiverem entregues, iniciar o MVP-003 pela F01 (#17); WIP = 1, na ordem F01 → F02 → (F03a/F03b/F05) → F04a → F04b → F06.
