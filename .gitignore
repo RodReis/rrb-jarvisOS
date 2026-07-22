@@ -1,0 +1,17 @@
+node_modules
+out
+dist
+coverage
+*.log
+.DS_Store
+
+# Artefatos brutos dos runners: o relatório versionado é reports/TESTS.md (ADR-003).
+reports/.raw
+
+# Cache local do grafo de conhecimento (CLAUDE.md § graphify).
+graphify-out
+
+# Segredos nunca entram no repo.
+.env
+.env.*
+!.env.example
