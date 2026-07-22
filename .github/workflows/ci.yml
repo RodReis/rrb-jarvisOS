@@ -73,16 +73,10 @@ jobs:
       - name: Baixar o binário do Electron
         run: node node_modules/electron/install.js
 
-      # `npm run build` = typecheck + `electron-vite build`. O build é o que produz
-      # `out/main/index.js`, o `main` do package.json — e `out/` é gitignored, então
-      # no runner ele só existe se for construído aqui. Sem este passo o Electron sobe
-      # apontando para um arquivo inexistente, o processo morre e o `firstWindow()` do
-      # E2E espera a janela até estourar 30s. O sintoma engana igual ao do binário
-      # acima: timeout de janela, nenhum erro de módulo no log.
-      - name: Lint e build (typecheck + bundle do Electron)
+      - name: Lint e typecheck
         run: |
           npm run lint
-          npm run build
+          npm run typecheck
 
       # O append-only é verificado contra a BASE do PR, não contra HEAD: aqui
       # HEAD é o merge commit, cujo TESTS.md é a versão do próprio PR — a guarda
@@ -126,17 +120,24 @@ jobs:
             echo "PR não altera teste — carimbo dispensado."
           fi
 
-      # DIAGNÓSTICO TEMPORÁRIO: sobe o app fora do Playwright e mostra o stderr cru.
-      # O `firstWindow()` só reporta "timeout esperando window" — o motivo real de o
-      # processo não abrir janela fica no stderr, que o reporter do Playwright engole.
-      # Remover assim que a causa estiver identificada.
-      - name: Diagnóstico — subir o Electron e capturar stderr
-        continue-on-error: true
+      # O `chrome-sandbox` que vem no pacote npm não tem as permissões que o Chromium
+      # exige no Linux (dono root, modo 4755) — o npm não preserva setuid. Sem isto o
+      # processo aborta no boot, ANTES de criar janela:
+      #
+      #   FATAL:setuid_sandbox_host.cc:166] The SUID sandbox helper binary was found,
+      #   but is not configured correctly. (…) exited with signal SIGTRAP
+      #
+      # O sintoma engana: o E2E só mostra "timeout esperando o evento window", porque
+      # o stderr do processo não chega ao reporter do Playwright.
+      #
+      # A alternativa seria subir com `--no-sandbox`, e ela está DESCARTADA: o sandbox
+      # do renderer é critério de aceite da SPEC-Fundacao-03 (a mesma razão que mantém
+      # o preload em .cjs). Desligá-lo no CI faria a suíte passar exatamente onde ela
+      # deveria provar a fronteira — teste verde sobre a garantia ausente.
+      - name: Ajustar permissões do chrome-sandbox (setuid)
         run: |
-          set -x
-          ls -la out/main/index.js out/preload/index.cjs out/renderer/index.html
-          timeout 30 xvfb-run --auto-servernum \
-            node_modules/.bin/electron . --user-data-dir=/tmp/diag 2>&1 | head -60 || true
+          sudo chown root:root node_modules/electron/dist/chrome-sandbox
+          sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
 
       # `xvfb-run`: o orquestrador roda o E2E, e o Electron abre janela — sem display
       # virtual o launch falha no Linux do CI (docs/TESTING.md §3.1).
