@@ -66,12 +66,20 @@ function runVitestProject(project, rawName, coverageDir) {
 if (!noRun) {
   mkdirSync(RAW, { recursive: true })
 
-  // As 3 categorias do ADR-003. `banco` nasce vazia (SQLite entra na Fatia 04) e
-  // a parte Playwright de `tela` entra na Fatia 03 — ambas contam 0 sem invalidar
-  // o relatório (docs/TESTING.md §8).
+  // As 3 categorias do ADR-003. A parte Playwright de `tela` passou a existir na
+  // Fatia 03 (SPEC-Fundacao-03, critério 9) — antes contava 0 sem invalidar o
+  // relatório (docs/TESTING.md §8).
   runVitestProject('regras', 'regras.json', 'regras')
   runVitestProject('banco', 'banco.json', 'banco')
   runVitestProject('tela', 'tela-vitest.json', 'tela')
+
+  // E2E Electron. Exige o build (`out/`) — o Playwright sobe o app empacotado, não o
+  // servidor de dev, então rodá-lo sem build testaria a versão anterior do código.
+  run('npm', ['run', 'build'])
+  // O reporter JSON e o caminho de saída vêm do `playwright.config.ts`, que já grava
+  // em `reports/.raw/tela-playwright.json` — o mesmo caminho que o
+  // `test-report.config.json` declara para a categoria Tela.
+  run('npx', ['playwright', 'test'])
 }
 
 const entry = selfcheck ? 'scripts/gen-test-report.selfcheck.mjs' : 'scripts/gen-test-report.mjs'

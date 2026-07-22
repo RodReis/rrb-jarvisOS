@@ -60,6 +60,12 @@ jobs:
       - name: Instalar dependências
         run: npm ci
 
+      # O E2E sobe o Electron de verdade (SPEC-Fundacao-03, critério 9), e no Linux
+      # do CI isso exige as libs de sistema que o Playwright instala. `--with-deps`
+      # cobre exatamente esse caso.
+      - name: Instalar dependências de sistema do Playwright
+        run: npx playwright install-deps
+
       - name: Lint e typecheck
         run: |
           npm run lint
@@ -98,7 +104,7 @@ jobs:
           # arquivo removido: apagar um spec não cria entrega a carimbar.
           changed=$(git diff --name-only --diff-filter=d \
             "origin/${{ github.base_ref }}..HEAD" \
-            -- '*.spec.ts' '*.int-spec.ts' '*.test.ts' '*.test.tsx' '*.selfcheck.mjs')
+            -- '*.spec.ts' '*.int-spec.ts' '*.test.ts' '*.test.tsx' '*.e2e.ts' '*.selfcheck.mjs')
           if [ -n "$changed" ]; then
             echo "REQUIRE_ENTRY=1" >> "$GITHUB_ENV"
             echo "PR altera testes — o carimbo no histórico será exigido:"
@@ -107,10 +113,12 @@ jobs:
             echo "PR não altera teste — carimbo dispensado."
           fi
 
+      # `xvfb-run`: o orquestrador roda o E2E, e o Electron abre janela — sem display
+      # virtual o launch falha no Linux do CI (docs/TESTING.md §3.1).
       - name: Rodar testes + guarda anti-drift
         env:
           REPORT_BASE_REF: origin/${{ github.base_ref }}
-        run: npm run test:report:check
+        run: xvfb-run --auto-servernum npm run test:report:check
 
       # Terceira guarda: números certos + histórico íntegro ainda deixavam
       # passar uma entrega SEM linha no histórico — no repo de origem duas
@@ -118,7 +126,7 @@ jobs:
       # depois do --check para que a falha de números apareça antes.
       - name: Guarda — a entrega está carimbada no histórico?
         if: env.REQUIRE_ENTRY == '1'
-        run: npm run test:report:check -- --require-entry
+        run: xvfb-run --auto-servernum npm run test:report:check -- --require-entry
 
       - name: Publicar tabela no job summary
         if: always()
