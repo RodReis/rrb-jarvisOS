@@ -6,6 +6,19 @@ import { RENDERER_SECURITY } from '@shared/contracts/security'
 // O main é bundlado como ESM (Electron 28+): `__dirname` não existe nesse escopo.
 const currentDir = dirname(fileURLToPath(import.meta.url))
 
+/**
+ * Sinaliza que o app está encerrando de verdade.
+ *
+ * Sem isto o handler de `close` minimizaria para o tray também no "Sair", e o app nunca
+ * fecharia — o clássico "não consigo mais sair do programa". Quem sai de verdade chama
+ * `permitirEncerramento()` antes de `app.quit()`.
+ */
+let encerrando = false
+
+export function permitirEncerramento(): void {
+  encerrando = true
+}
+
 export function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow({
     width: 1280,
@@ -23,6 +36,14 @@ export function createMainWindow(): BrowserWindow {
 
   // Evita o flash de janela em branco: mostra só quando o conteúdo está pronto.
   window.on('ready-to-show', () => window.show())
+
+  // Fechar no "X" = minimizar para o tray (SPEC-02, decisão do PI: sem prompt). O app
+  // segue rodando; só o "Sair" do tray encerra, e ele levanta a flag antes.
+  window.on('close', (event) => {
+    if (encerrando) return
+    event.preventDefault()
+    window.hide()
+  })
 
   // Link externo abre no navegador do sistema, nunca numa janela Electron.
   window.webContents.setWindowOpenHandler(({ url }) => {

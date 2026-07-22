@@ -41,7 +41,31 @@ describe('ponte do preload', () => {
     const bridge = await carregarPonte()
     // Critério de aceite 4: a superfície é fechada. Um `invoke`/`send`/`on` cru aqui
     // deixaria o renderer alcançar qualquer handler do main.
-    expect(Object.keys(bridge).sort()).toEqual(['getAppInfo', 'sendLog'])
+    expect(Object.keys(bridge).sort()).toEqual([
+      'getAppInfo',
+      'getWorkspace',
+      'listAuditEvents',
+      'minimizeToTray',
+      'sendLog',
+      'switchWorkspace',
+      'verifyAuditChain'
+    ])
+  })
+
+  it('não expõe nada que grave auditoria — a UI não fabrica evidência', async () => {
+    const bridge = await carregarPonte()
+
+    expect(Object.keys(bridge).some((k) => /append|insert|write.*audit/i.test(k))).toBe(false)
+  })
+
+  it('roteia os canais de auditoria e workspace pelos nomes do contrato', async () => {
+    const bridge = await carregarPonte()
+
+    await (bridge.verifyAuditChain as () => Promise<unknown>)()
+    expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.auditVerify)
+
+    await (bridge.switchWorkspace as (w: string) => Promise<unknown>)('noa')
+    expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.workspaceSwitch, 'noa')
   })
 
   it('não expõe ipcRenderer nem primitivas de canal arbitrário', async () => {

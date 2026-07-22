@@ -7,12 +7,25 @@
  * canal nesta lista e um handler correspondente no main.
  */
 
+import type { AuditEvent, AuditEventType, WorkspaceId } from '../domain/entities'
 import type { LogInput } from './logging'
 
 /** Canais de request/response (renderer → main → renderer). */
 export const IPC_CHANNELS = {
   /** Metadados do app (nome, versão, ambiente). Sem segredo, sem caminho de disco. */
-  appInfo: 'app:info'
+  appInfo: 'app:info',
+  /**
+   * Auditoria do usuário corrente (SPEC-04, critério 6). O renderer **não** abre o
+   * SQLite: pede por aqui e o main consulta. Só leitura — gravar auditoria é ato do
+   * main, disparado por um fluxo real, nunca por pedido da UI.
+   */
+  auditList: 'audit:list',
+  /** Recomputa a cadeia e devolve o veredito (ADR-004, camada 3). */
+  auditVerify: 'audit:verify',
+  /** Espaço ativo. Ao abrir é sempre JARVIS OS (decisão do PI na SPEC-02). */
+  workspaceGet: 'workspace:get',
+  /** Troca o espaço ativo; o main audita e loga a transição. */
+  workspaceSwitch: 'workspace:switch'
 } as const
 
 /**
@@ -27,7 +40,9 @@ export const IPC_SEND_CHANNELS = {
    * Registro de log vindo do renderer. O renderer nunca escreve em disco (ADR-005): ele
    * captura e encaminha; quem grava é o winston do main, escritor único.
    */
-  log: 'log:record'
+  log: 'log:record',
+  /** Minimiza para o tray. Ação de janela vive no main; o renderer só pede (SPEC-02). */
+  windowMinimizeToTray: 'window:minimizar-tray'
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]
@@ -44,6 +59,30 @@ export interface AppInfo {
 }
 
 /**
+ * Veredito da verificação da cadeia de auditoria, na forma que o renderer vê.
+ *
+ * Espelha o `ChainVerification` do main sem importá-lo: aquele módulo usa `node:crypto`
+ * e não pode ser compilado para o renderer. Duplicar a *forma* aqui é o preço de manter
+ * a fronteira; o teste de contrato prova que as duas não divergem.
+ */
+export type AuditVerification =
+  | { readonly ok: true; readonly checked: number }
+  | {
+      readonly ok: false
+      readonly checked: number
+      readonly brokenAt: number
+      readonly reason: 'hash-invalido' | 'prev-hash-nao-encadeia' | 'seq-fora-de-ordem'
+      readonly detail: string
+    }
+
+/** Resultado de uma troca de espaço, já auditada pelo main. */
+export interface WorkspaceSwitchResult {
+  readonly workspace: WorkspaceId
+  /** `seq` do `AuditEvent` gerado — deixa a UI provar que a troca foi registrada. */
+  readonly auditSeq: number
+}
+
+/**
  * A ponte exposta em `window.jarvis`. É o contrato completo: o que não está aqui,
  * o renderer não alcança.
  */
@@ -51,6 +90,13 @@ export interface JarvisBridge {
   getAppInfo(): Promise<AppInfo>
   /** Encaminha um registro de log ao main, que grava. Não devolve nada de propósito. */
   sendLog(record: LogInput): void
+  /** Auditoria do usuário corrente. Leitura apenas — a UI nunca grava evento. */
+  listAuditEvents(type?: AuditEventType): Promise<readonly AuditEvent[]>
+  verifyAuditChain(): Promise<AuditVerification>
+  getWorkspace(): Promise<WorkspaceId>
+  switchWorkspace(workspace: WorkspaceId): Promise<WorkspaceSwitchResult>
+  /** Pede ao main para minimizar a janela para o tray. */
+  minimizeToTray(): void
 }
 
 /** Nome da propriedade exposta via contextBridge no renderer. */
