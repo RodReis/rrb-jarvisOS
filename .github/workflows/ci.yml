@@ -73,10 +73,16 @@ jobs:
       - name: Baixar o binário do Electron
         run: node node_modules/electron/install.js
 
-      - name: Lint e typecheck
+      # `npm run build` = typecheck + `electron-vite build`. O build é o que produz
+      # `out/main/index.js`, o `main` do package.json — e `out/` é gitignored, então
+      # no runner ele só existe se for construído aqui. Sem este passo o Electron sobe
+      # apontando para um arquivo inexistente, o processo morre e o `firstWindow()` do
+      # E2E espera a janela até estourar 30s. O sintoma engana igual ao do binário
+      # acima: timeout de janela, nenhum erro de módulo no log.
+      - name: Lint e build (typecheck + bundle do Electron)
         run: |
           npm run lint
-          npm run typecheck
+          npm run build
 
       # O append-only é verificado contra a BASE do PR, não contra HEAD: aqui
       # HEAD é o merge commit, cujo TESTS.md é a versão do próprio PR — a guarda
