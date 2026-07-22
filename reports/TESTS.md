@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 83 | 83 | 0 | 84.0 | — | — |
-| — | — | — | Banco | 45 | 45 | 0 | 89.6 | — | — |
-| — | — | — | Tela | 22 | 22 | 0 | 95.5 | — | — |
+| — | — | — | Regras de Negócio | 92 | 92 | 0 | 79.6 | — | — |
+| — | — | — | Banco | 60 | 60 | 0 | 87.0 | — | — |
+| — | — | — | Tela | 33 | 33 | 0 | 93.5 | — | — |
 
 ## Histórico por entrega
 
@@ -34,3 +34,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-07-22 | #6 | spec-fundacao-05-settings | Regras de Negócio | 83 | 83 | 0 | 84.0 | #29 | [#29](https://github.com/RodReis/rrb-jarvisOS/pull/29) |
 | 2026-07-22 | #6 | spec-fundacao-05-settings | Banco | 45 | 45 | 0 | 89.6 | #29 | [#29](https://github.com/RodReis/rrb-jarvisOS/pull/29) |
 | 2026-07-22 | #6 | spec-fundacao-05-settings | Tela | 22 | 22 | 0 | 95.5 | #29 | [#29](https://github.com/RodReis/rrb-jarvisOS/pull/29) |
+| 2026-07-22 | #4 | spec-fundacao-03-auth-google | Regras de Negócio | 92 | 92 | 0 | 79.6 | #30 | [#30](https://github.com/RodReis/rrb-jarvisOS/pull/30) |
+| 2026-07-22 | #4 | spec-fundacao-03-auth-google | Banco | 60 | 60 | 0 | 87.0 | #30 | [#30](https://github.com/RodReis/rrb-jarvisOS/pull/30) |
+| 2026-07-22 | #4 | spec-fundacao-03-auth-google | Tela | 33 | 33 | 0 | 93.5 | #30 | [#30](https://github.com/RodReis/rrb-jarvisOS/pull/30) |

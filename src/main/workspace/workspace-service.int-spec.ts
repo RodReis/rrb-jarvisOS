@@ -34,7 +34,7 @@ beforeEach(() => {
   audit = new AuditRepository(db, 'chave-de-teste')
   logCat.info.mockClear()
   setCurrentWorkspace.mockClear()
-  service = new WorkspaceService(audit, 'u-1')
+  service = new WorkspaceService(audit, () => 'u-1')
 })
 
 afterEach(() => {

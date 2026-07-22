@@ -47,6 +47,21 @@ export const RECURSOS = {
         temaSistema: 'Sistema',
         salvo: 'Preferências salvas.'
       },
+      auth: {
+        titulo: 'JARVIS OS',
+        subtitulo: 'Entre com sua conta Google para começar.',
+        entrar: 'Entrar com o Google',
+        entrando: 'Aguardando o navegador…',
+        entrandoDescricao:
+          'Concluímos o login na aba que abrimos no seu navegador. Volte aqui quando terminar.',
+        sair: 'Sair',
+        sessaoExpirada: 'Sessão expirada',
+        // A mensagem de erro vem pronta do main (critério 6) e é exibida como veio;
+        // esta chave é só o rótulo da região que a apresenta.
+        falha: 'Não foi possível entrar',
+        tentarNovamente: 'Tentar novamente',
+        conta: 'Conta conectada'
+      },
       erro: {
         espaco: 'Não foi possível carregar o espaço de trabalho.',
         trocaEspaco: 'Não foi possível alternar o espaço de trabalho.',
@@ -92,6 +107,19 @@ export const RECURSOS = {
         temaEscuro: 'Dark',
         temaSistema: 'System',
         salvo: 'Preferences saved.'
+      },
+      auth: {
+        titulo: 'JARVIS OS',
+        subtitulo: 'Sign in with your Google account to get started.',
+        entrar: 'Sign in with Google',
+        entrando: 'Waiting for the browser…',
+        entrandoDescricao:
+          'We opened a tab in your browser to finish signing in. Come back here when you are done.',
+        sair: 'Sign out',
+        sessaoExpirada: 'Session expired',
+        falha: 'Could not sign in',
+        tentarNovamente: 'Try again',
+        conta: 'Connected account'
       },
       erro: {
         espaco: 'Could not load the workspace.',

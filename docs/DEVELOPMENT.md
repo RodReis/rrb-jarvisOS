@@ -76,19 +76,25 @@ Status: spec `aprovada-pi` (2026-07-21); issue #3 em Backlog. Depende da Fatia 0
 
 ### Fatia 03 — Autenticação Google local-first (`docs/spec/spec-fundacao-03-auth-google.md`)
 
-Status: spec `aprovada-pi` (2026-07-21); issue #4 em Backlog. **BLOQUEADA — aguarda o PI.** Depende da Fatia 01; consome contratos da 04 (já entregues).
+Status: **entregue** — spec `aprovada-pi` (2026-07-21, emendada em 2026-07-22); issue #4; PR [#30](https://github.com/RodReis/rrb-jarvisOS/pull/30). Desbloqueada em 2026-07-22, quando o PI criou o projeto Supabase e o cliente OAuth e preencheu o `.env`. Fecha o MVP-001.
 
-> **O que falta para desbloquear (só o PI pode fazer):** criar o projeto Supabase de desenvolvimento e o cliente OAuth no Google Cloud, e preencher o `.env` local. O `.env.example` na raiz lista as quatro variáveis e onde obter cada uma. Enquanto isso não existe, os critérios 1 (login real), 2 (relançamento offline), 7 (token cifrado) e 9 (E2E do login) são inverificáveis — não há o que testar sem um provedor de identidade. A infra que a fatia consome (`Session`, `UserProfile`, `AuditEvent`, tipos `login`/`logout`/`login-offline-reuse`) **já está entregue** na F04.
+- [x] Projeto Supabase dev na nuvem configurado (ADR-002); env local sem segredo commitado (`.env` no `.gitignore`, verificado)
+- [x] Fluxo OAuth **PKCE** no navegador do sistema + retorno via **loopback local** efêmero (`127.0.0.1`, porta do SO, morre após uma requisição)
+- [x] Sessão offline válida por **30 dias** antes de exigir reautenticação (ADR-001); testado nos dois limites da janela
+- [x] Persistência de sessão no main process **cifrada via `safeStorage`/DPAPI**; o teste lê os bytes do arquivo para provar que o token não está em claro
+- [x] Estados: deslogado / autenticando / ativo / erro / sessão-expirada, com mensagens de enum fechado (sem `error.message` cru na UI)
+- [x] Relançamento offline reusa sessão sem tocar a rede; logout revoga quando online e **sempre** limpa o local
+- [x] AuditEvents de login/logout/login-offline-reuse
+- [x] Instrumenta o logger na categoria `auth` (emenda do PI de 2026-07-22) com **redaction comprovada** — teste varre todos os registros atrás de access/refresh token
+- [x] Testes do fluxo (unit com Supabase dublado) **+ E2E Playwright-Electron** — a categoria E2E do relatório passa a ter contagem real (ADR-003)
+- [x] Entrega: PR [#30](https://github.com/RodReis/rrb-jarvisOS/pull/30) (`refs #4`); docs/ commitados
 
-- [ ] Projeto Supabase dev na nuvem configurado (ADR-002); env local sem segredo commitado
-- [ ] Fluxo OAuth no navegador do sistema + retorno via **loopback local**
-- [ ] Sessão offline válida por **30 dias** antes de exigir reautenticação (ADR-001)
-- [ ] Persistência de sessão no main process **cifrada via `safeStorage`/DPAPI** (token nunca em claro no disco); renderer só vê snapshot de perfil
-- [ ] Estados: deslogado / autenticando / ativo / erro / sessão-expirada
-- [ ] Relançamento offline reusa sessão; logout limpa estado sensível
-- [ ] AuditEvents de login/logout/login-offline-reuse
-- [ ] Testes do fluxo (unit com mock) **+ E2E Playwright-Electron do login feliz** (firmado — alimenta a categoria E2E do relatório, ADR-003)
-- [ ] Entrega: PR `refs #N`; docs/ commitados
+**Decisões e achados desta fatia:**
+
+1. **O `GOOGLE_OAUTH_CLIENT_SECRET` do `.env` não é usado pelo app** — e não deve ser. No desenho do ADR-002 quem fala com o Google é o Supabase; o secret vive no painel dele (Authentication → Providers → Google). Um secret embarcado em app desktop distribuído não é segredo: qualquer usuário o extrai do binário. Decisão do PI (2026-07-22): manter a variável no `.env` sem uso, em vez de removê-la.
+2. **`findMostRecent()` é a única consulta sem escopo de `user_id`** — exceção deliberada, documentada no próprio método. No boot o app precisa descobrir *de quem* é a sessão do cofre, e perguntar isso já sabendo o `user_id` seria circular. O isolamento se mantém porque o login apaga as sessões anteriores: existe no máximo uma linha. A alternativa (decodificar o JWT) faria o app confiar no conteúdo de um token que quem valida é o Supabase.
+3. **`userId` virou função em `WorkspaceService` e nos handlers IPC** — a identidade deixou de ser fixa (local antes do login, sessão depois). Capturar a string no boot congelaria o escopo da auditoria no usuário local para sempre.
+4. **Teardown do E2E usa `app.exit()`, não `close()` nem `quit()`** — os dois travam, por comportamento correto do produto: o app vive no tray (`window-all-closed` vazio, SPEC-02) e os timers de rotação do `winston-daily-rotate-file` seguram o event loop no `will-quit`. Registrado em `docs/TESTING.md`.
 
 ### Fatia 04 — Modelo de dados mínimo + AuditEvent stub (`docs/spec/spec-fundacao-04-dados-audit.md`)
 
@@ -203,3 +209,4 @@ Ordem: MVP-002 (fundação de execução) → **MVP-003** ([#10](https://github.
 | 2026-07-22 | MVP-001 · F06 Observabilidade e Logging (#8) | [#27](https://github.com/RodReis/rrb-jarvisOS/pull/27) | Regras 49 (87.2%), **Banco 8 (85.5%)**, Tela 13 (97.6%). A categoria **Banco deixa de estar vazia antes da F04**: os testes de integração do logger tocam disco real (arquivo temporário, teardown por teste), que é exatamente o que a categoria mede — o `TESTING.md` §8 previa SQLite como primeiro caso, mas a régua é "integração com storage local", não "SQLite". Verificado também no app real: os três arquivos nascem em `userData/logs` e o registro do renderer chega ao disco. |
 | 2026-07-22 | MVP-001 · F04 Dados + AuditEvent (#5) **e** F02 AppShell/workspaces (#3) | [#28](https://github.com/RodReis/rrb-jarvisOS/pull/28) | Regras 78 (86.6%), Banco 32 (89.5%), Tela 16 (98.5%). Duas fatias no mesmo PR por decisão do PI: o critério 4 da SPEC-04 exige `AuditEvent` de `workspace-switch`, cujo fluxo nasce na F02. Carimbo pela issue do primeiro `refs` (#5), como o CI extrai. Verificado no app real: schema v1, 2 triggers ativos, chave de auditoria cifrada por DPAPI no disco. **F03 não entrou** — bloqueada por credenciais (ver a seção da fatia). |
 | 2026-07-22 | MVP-001 · F05 Settings mínimo (#6) | [#29](https://github.com/RodReis/rrb-jarvisOS/pull/29) | Regras 83 (84.0%), Banco 45 (89.6%), Tela 22 (95.5%). Fecha o MVP-001 **exceto a F03**. Primeira migration incremental do projeto (v1 → v2) exercitada sobre banco real com dado gravado — o log registrou `Migrations aplicadas {"quantidade":1}` e o perfil sobreviveu. Corrigiu um bug latente da F04: o upsert do perfil sobrescrevia `locale`/`theme` a cada boot. |
+| 2026-07-22 | MVP-001 · F03 Autenticação Google local-first (#4) | [#30](https://github.com/RodReis/rrb-jarvisOS/pull/30) | Regras 92 (79.6%), Banco 60 (87.0%), Tela 33 (93.5%) — **185 testes** contando os 3 E2E. **Fecha o MVP-001 (6/6 entregues).** Desbloqueada no mesmo dia, quando o PI criou as credenciais. A **categoria E2E deixa de contar 0**: o Playwright-Electron sobe o app empacotado e prova, com preload e IPC reais, que o shell não monta sem sessão e que a ponte não expõe caminho até o token. Dois achados de ambiente custaram tempo e ficaram registrados: `ELECTRON_RUN_AS_NODE` herdado do shell faz o Electron subir como Node puro (erro se disfarça de falha de bundle), e `close()`/`quit()` travam o teardown — o app vive no tray e os timers do `winston-daily-rotate-file` seguram o event loop. |

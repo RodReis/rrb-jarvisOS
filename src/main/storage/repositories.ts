@@ -151,6 +151,21 @@ export class SessionRepository {
       .get(userId) as Session | undefined
   }
 
+  /**
+   * A sessão mais recente do banco, sem escopo de usuário.
+   *
+   * Exceção deliberada à regra "toda consulta é escopada", e a única aqui: no boot o app
+   * precisa descobrir **de quem** é a sessão guardada, e perguntar isso já sabendo o
+   * `user_id` seria circular. O isolamento não é violado porque o login apaga as sessões
+   * anteriores (`deleteForUser` em `concluirLogin`) — existe no máximo uma linha por vez.
+   * Alternativa descartada: decodificar o JWT do cofre, que faria o app confiar no
+   * conteúdo de um token que quem valida é o Supabase.
+   */
+  findMostRecent(): Session | undefined {
+    return this.db.prepare('SELECT * FROM session ORDER BY created_at DESC LIMIT 1').get() as
+      Session | undefined
+  }
+
   /** Logout apaga os metadados da sessão. Sessão não é auditoria — pode ser removida. */
   deleteForUser(userId: string): number {
     try {

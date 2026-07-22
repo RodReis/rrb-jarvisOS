@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { WorkspaceId } from '@shared/domain/entities'
+import type { UserProfile, WorkspaceId } from '@shared/domain/entities'
 import { log } from '../lib/log'
 import { usePreferences } from '../preferences/usePreferences'
 import {
@@ -26,7 +26,13 @@ const ACENTO: Readonly<Record<WorkspaceId, { texto: string; borda: string }>> = 
   jarvis: { texto: 'text-sky-600 dark:text-sky-300', borda: 'border-sky-500/70 bg-sky-500/10' }
 }
 
-export function AppShell(): React.JSX.Element {
+interface AppShellProps {
+  /** Usuário da sessão. Opcional só para o app seguir montável sem login configurado. */
+  readonly perfil?: UserProfile
+  readonly onSair?: () => void
+}
+
+export function AppShell({ perfil, onSair }: AppShellProps = {}): React.JSX.Element {
   const { t } = useTranslation()
   const { preferencias, erro: erroPreferencias, salvar } = usePreferences()
 
@@ -137,13 +143,34 @@ export function AppShell(): React.JSX.Element {
             <h1 className={`text-lg font-semibold ${acento.texto}`}>{nomeEspaco}</h1>
             <p className="text-xs opacity-60">{t(`navegacao.${rotaAtiva}`)}</p>
           </div>
-          <button
-            type="button"
-            onClick={() => window.jarvis.minimizeToTray()}
-            className="rounded-md border border-current/20 px-3 py-1.5 text-xs opacity-70 transition hover:bg-current/5"
-          >
-            {t('janela.minimizar')}
-          </button>
+          <div className="flex items-center gap-3">
+            {/* Nome e e-mail visíveis fecham o critério 1 da SPEC-03: a prova de que o
+                login completou é o app mostrar de quem é a sessão. */}
+            {perfil && (
+              <div aria-label={t('auth.conta')} className="text-right">
+                <p className="text-xs font-medium">{perfil.name}</p>
+                <p className="text-xs opacity-60">{perfil.email}</p>
+              </div>
+            )}
+
+            {onSair && (
+              <button
+                type="button"
+                onClick={onSair}
+                className="rounded-md border border-current/20 px-3 py-1.5 text-xs opacity-70 transition hover:bg-current/5"
+              >
+                {t('auth.sair')}
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => window.jarvis.minimizeToTray()}
+              className="rounded-md border border-current/20 px-3 py-1.5 text-xs opacity-70 transition hover:bg-current/5"
+            >
+              {t('janela.minimizar')}
+            </button>
+          </div>
         </header>
 
         <main className="min-h-0 flex-1 overflow-auto p-6">

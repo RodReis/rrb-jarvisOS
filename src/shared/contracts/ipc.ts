@@ -16,6 +16,7 @@ import type {
   UserPreferences,
   WorkspaceId
 } from '../domain/entities'
+import type { AuthSnapshot } from './auth'
 import type { LogInput } from './logging'
 
 /** Canais de request/response (renderer → main → renderer). */
@@ -37,7 +38,17 @@ export const IPC_CHANNELS = {
   /** Preferências do usuário corrente + o tema já resolvido (SPEC-05). */
   preferencesGet: 'preferences:get',
   /** Grava idioma e/ou tema. Ação de baixo risco: **não** gera AuditEvent (SPEC-05). */
-  preferencesSave: 'preferences:save'
+  preferencesSave: 'preferences:save',
+  /** Estado corrente da autenticação. Nunca devolve token (SPEC-03, critério 4). */
+  authGet: 'auth:get',
+  /**
+   * Inicia o login Google. O fluxo abre no **navegador do sistema** e retorna por um
+   * servidor loopback local (decisão do PI na SPEC-03) — nunca em webview do Electron,
+   * onde o app enxergaria as credenciais digitadas pelo usuário.
+   */
+  authLogin: 'auth:login',
+  /** Revoga a sessão, apaga os tokens e volta para `deslogado` (critério 3). */
+  authLogout: 'auth:logout'
 } as const
 
 /**
@@ -57,9 +68,23 @@ export const IPC_SEND_CHANNELS = {
   windowMinimizeToTray: 'window:minimizar-tray'
 } as const
 
+/**
+ * Canais de push (main → renderer). O renderer assina; não pede.
+ *
+ * Existe porque o login não é request/response: o usuário sai para o navegador e volta
+ * minutos depois, e a sessão pode expirar sozinha durante o uso. Sem push, a UI teria de
+ * ficar consultando `auth:get` em intervalo — polling que gasta e ainda chega atrasado.
+ */
+export const IPC_EVENT_CHANNELS = {
+  /** Novo `AuthSnapshot` a cada transição de estado. Nunca carrega token. */
+  authChanged: 'auth:changed'
+} as const
+
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]
 
 export type IpcSendChannel = (typeof IPC_SEND_CHANNELS)[keyof typeof IPC_SEND_CHANNELS]
+
+export type IpcEventChannel = (typeof IPC_EVENT_CHANNELS)[keyof typeof IPC_EVENT_CHANNELS]
 
 /** Informação pública do app exposta ao renderer. */
 export interface AppInfo {
@@ -123,6 +148,18 @@ export interface JarvisBridge {
   getPreferences(): Promise<PreferencesSnapshot>
   /** Grava e devolve o estado resultante, já com o tema resolvido. */
   savePreferences(preferences: UserPreferences): Promise<PreferencesSnapshot>
+
+  /** Estado corrente da auth. Só estado e perfil — token não atravessa a ponte. */
+  getAuth(): Promise<AuthSnapshot>
+  /** Dispara o login; o resultado chega pelo `onAuthChanged`, não pelo retorno. */
+  login(): Promise<AuthSnapshot>
+  logout(): Promise<AuthSnapshot>
+  /**
+   * Assina as transições de auth. Devolve a função que cancela a assinatura — sem ela o
+   * listener sobreviveria ao componente que o registrou e vazaria a cada remontagem.
+   */
+  onAuthChanged(listener: (snapshot: AuthSnapshot) => void): () => void
+
   /** Pede ao main para minimizar a janela para o tray. */
   minimizeToTray(): void
 }

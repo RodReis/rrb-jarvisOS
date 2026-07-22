@@ -66,13 +66,71 @@ constante embutida no gerador.
 - `banco`  → `src/main/**/*.int-spec.ts` **+** `tests/**/*.int-spec.ts` — integração com o storage
   local (SQLite) num arquivo temporário, com teardown por teste.
 
-**Renderer (`src/renderer`, `e2e`):**
+**Renderer (`src/renderer`, `tests/e2e`):**
 
 - Componente → Vitest + Testing Library (jsdom): `src/renderer/**/*.test.tsx`.
-- E2E → Playwright-Electron: `e2e/**/*.spec.ts`.
+- E2E → Playwright-Electron: `tests/e2e/**/*.e2e.ts` (config em `playwright.config.ts`).
+  O sufixo é `.e2e.ts` e não `.spec.ts` — este último já pertence à categoria *regras* no
+  `include` do Vitest, e a mesma extensão nas duas faria o Vitest tentar rodar o E2E.
 
 O mapeamento categoria→origem mora em **`test-report.config.json`** (raiz), não no código do
 gerador — assim o mesmo tooling cai em outro projeto só ajustando o mapa (reutilização, §7).
+
+### 3.1 E2E Electron: armadilhas de ambiente (achados da Fatia 03)
+
+Custaram tempo real de diagnóstico e **não são bugs do app** — são consequências de
+comportamentos corretos dele. Quem for escrever ou depurar E2E aqui deve ler antes:
+
+1. **Encerre com `app.exit(0)`, nunca com `close()` ou `quit()`.** Os dois travam o teardown
+   e deixam a janela aberta na tela de quem roda a suíte. `close()` espera o processo morrer,
+   mas o app **vive no tray** (`window-all-closed` é deliberadamente vazio, SPEC-02); `quit()`
+   dispara `will-quit`, que fecha o logger, e os timers de rotação do
+   `winston-daily-rotate-file` seguram o event loop. `exit()` ignora handles pendentes e
+   encerra em ~200ms. É seguro porque o `userData` do teste é temporário e descartável.
+2. **`ELECTRON_RUN_AS_NODE` herdado do shell quebra o launch.** Com a variável setada, o
+   Electron sobe como Node puro e o erro aparece como `does not provide an export named
+   BrowserWindow` — parece falha de bundle e não é. O `beforeEach` do E2E remove a variável
+   do ambiente do processo filho, para o teste não depender de quem o executa.
+3. **Processos `electron.exe` remanescentes fazem o launch falhar em silêncio.** O
+   `requestSingleInstanceLock()` (SPEC-02) derruba cada nova instância no boot, e o Playwright
+   reporta `Target page, context or browser has been closed` — que parece erro de conexão, mas
+   é a instância única funcionando. Ao investigar falha de launch, limpe primeiro:
+   `taskkill //F //IM electron.exe`.
+
+4. **No CI, baixe o binário do Electron antes dos testes.** O `postinstall` do projeto é
+   `electron-rebuild` (compila o `better-sqlite3`) e **não** baixa o binário. Sem um passo
+   explícito, o download de ~100 MB acontece dentro do primeiro teste e estoura os 30s do
+   `firstWindow()`. O sintoma engana de novo: `Timeout exceeded while waiting for event
+   "window"`, sem erro de biblioteca — a única pista é um `Downloading Electron binary...`
+   perdido no meio da saída. O `ci.yml` roda `node node_modules/electron/install.js`
+   (idempotente) logo após o `npm ci`.
+
+5. **No CI Linux, o `chrome-sandbox` do pacote npm não tem setuid.** O npm não preserva
+   permissões: o binário precisa de dono `root` e modo `4755`, senão o processo aborta no
+   boot com `FATAL:setuid_sandbox_host.cc` + `SIGTRAP` — que o Playwright reporta como
+   timeout de `firstWindow()`, porque o stderr do processo não chega ao reporter. Subir com
+   `--no-sandbox` está descartado: o sandbox é critério de aceite da SPEC-Fundacao-03. O
+   `ci.yml` faz `chown root:root` + `chmod 4755` antes dos testes.
+
+6. **No CI Linux, `safeStorage` não existe sem keyring.** O runner não tem D-Bus de sessão
+   nem secret service; o backend de senha do Chromium cai em `basic_text` e
+   `isEncryptionAvailable()` responde false. O boot então falha alto por desenho (ADR-004:
+   chave de auditoria nunca em claro no disco) e a janela não nasce — de novo, o E2E só vê
+   timeout de `firstWindow()`. O `ci.yml` instala `gnome-keyring` + `dbus-x11`, sobe um
+   D-Bus de sessão, destrava o keyring com senha vazia e exporta
+   `DBUS_SESSION_BUS_ADDRESS` + `XDG_CURRENT_DESKTOP=GNOME` (sem o desktop declarado o
+   Chromium nem tenta o libsecret). Afrouxar o código para o teste passaria exatamente
+   onde ele deveria provar a garantia.
+
+**O E2E exige build.** O Playwright sobe o app empacotado (`out/`), não o servidor de dev —
+rodá-lo sem `npm run build` testaria a versão anterior do código. O orquestrador
+(`scripts/test-report.mjs`) já faz o build antes de chamar o Playwright.
+
+**Padrão das armadilhas:** nenhuma se apresenta como o que é. Falha de launch do
+Electron no CI quase sempre reporta timeout ou "browser has been closed" — mensagens que
+apontam para o Playwright quando a causa está no ambiente. Antes de mexer no teste, confira
+binário, display, sandbox, keyring e processos remanescentes — e leia o stderr cru do
+processo principal (subindo o app fora do Playwright), porque o reporter o engole.
 
 > **Por que Vitest único, e não Jest+projects como no proplan.** O jarvis é Vite-nativo; Vitest é
 > o runner natural (mesma config, mesmo transform). O relatório `--json` do Vitest é
@@ -201,10 +259,11 @@ Dispara em **todo pull request** para `main`. Job `test`:
 - **Passos:**
   1. `npm ci`.
   2. **Domínio/main:** `vitest run` das categorias `regras` e `banco` com `--coverage --reporter=json`.
-  3. **Renderer (componente):** `vitest run` (jsdom) com `--coverage --reporter=json`. **O E2E
-     Playwright-Electron entra na Fatia 03** — a SPEC-Fundacao-01 deixa Playwright fora do
-     bootstrap. Quando entrar: `playwright install --with-deps chromium` → `xvfb-run playwright
-     test --reporter=json` (Electron abre janela; no Linux do CI precisa de display virtual).
+  3. **Renderer (componente):** `vitest run` (jsdom) com `--coverage --reporter=json`.
+  3b. **E2E:** ativo desde a **Fatia 03** (entregue em 2026-07-22). `npm run build` →
+     `xvfb-run playwright test` (o Electron abre janela: no Linux do CI precisa de display
+     virtual). O reporter JSON e o caminho de saída vivem no `playwright.config.ts`. Ver §3.1
+     para as armadilhas de ambiente antes de depurar falha de launch no CI.
   4. `npm run test:report` → escreve a tabela em **`$GITHUB_STEP_SUMMARY`** (aba do run) **e**
      publica/atualiza um **comentário fixo no PR** (sticky comment).
   5. `npm run test:report:check` → **falha se `reports/TESTS.md` divergir** de uma execução limpa.
@@ -246,9 +305,9 @@ Para o Code implementar **na Fatia 01** e o PI conferir:
       blob da base do PR como baseline — nunca o próprio arquivo.
 - [ ] O gerador tem self-check próprio no CI (`npm run test:report:selfcheck`), incluindo o caso CRLF.
 - [ ] Cobertura é **reportada**, não barra merge.
-- [ ] **Fatia 01:** `src/renderer` tem **Vitest + Testing Library**; a categoria "Tela"
-      (componente) não fica vazia. **Playwright-Electron (E2E) entra na Fatia 03**; **Banco**
-      (SQLite) na Fatia 04 — até lá essas categorias podem ter contagem 0 sem invalidar o relatório.
+- [x] **Fatia 01:** `src/renderer` tem **Vitest + Testing Library**; a categoria "Tela"
+      (componente) não fica vazia. **Banco** (SQLite) entrou na F04 e o **Playwright-Electron
+      (E2E) na F03** (2026-07-22) — nenhuma das três categorias conta 0 desde então.
 - [ ] `reports/TESTS.md` **não** está sob `docs/`.
 - [ ] A decisão está registrada como **ADR-003** (`docs/adr/adr-003-relatorio-testes-evidencia.md`).
 
@@ -257,9 +316,10 @@ Para o Code implementar **na Fatia 01** e o PI conferir:
 - **Gerenciador/comando:** `npm run test:report` (a **SPEC-Fundacao-01 fixou npm**; o `pnpm` do
   proplan não se aplica — o `electron-vite` é single-package, sem monorepo).
 - **Runner:** **Vitest** (unidade + componente) e **Playwright-Electron** (E2E). Sem Jest.
-- **Playwright no CI:** **a partir da Fatia 03** (quando o E2E entra), roda **sempre** enquanto a
-  suíte for pequena; com `xvfb-run` (Electron precisa de display). Reavaliar (label/condicional) se
-  o tempo de CI incomodar.
+- **Playwright no CI:** **ativo desde a Fatia 03** (2026-07-22). Roda **sempre** enquanto a suíte
+  for pequena (3 testes, ~2s local); com `xvfb-run` (Electron precisa de display). Reavaliar
+  (label/condicional) se o tempo de CI incomodar. `workers: 1` é obrigatório, não preferência: o
+  `requestSingleInstanceLock()` (SPEC-02) faz instâncias paralelas se derrubarem entre si.
 - **Storage do "Banco":** o setup concreto (arquivo temp, migrations de teste) **finaliza quando a
   SPEC-Fundacao-04 decidir SQLite vs JSON**. A metodologia (3 categorias, evidência de máquina,
   anti-drift) independe dessa escolha.

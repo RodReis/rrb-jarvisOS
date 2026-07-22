@@ -60,6 +60,19 @@ jobs:
       - name: Instalar dependências
         run: npm ci
 
+      # O E2E sobe o Electron de verdade (SPEC-Fundacao-03, critério 9), e no Linux
+      # do CI isso exige as libs de sistema que o Playwright instala.
+      - name: Instalar dependências de sistema do Playwright
+        run: npx playwright install-deps
+
+      # Baixa o binário do Electron ANTES dos testes. O `postinstall` do projeto é
+      # `electron-rebuild` (compila o better-sqlite3), que **não** baixa o binário — e o
+      # download de ~100 MB acontecia dentro do primeiro teste, estourando os 30s do
+      # `firstWindow()`. O sintoma engana: o processo sobe e a janela nunca abre, sem
+      # erro de biblioteca no log. Fora do teste, o tempo de download não conta no timeout.
+      - name: Baixar o binário do Electron
+        run: node node_modules/electron/install.js
+
       - name: Lint e typecheck
         run: |
           npm run lint
@@ -98,7 +111,7 @@ jobs:
           # arquivo removido: apagar um spec não cria entrega a carimbar.
           changed=$(git diff --name-only --diff-filter=d \
             "origin/${{ github.base_ref }}..HEAD" \
-            -- '*.spec.ts' '*.int-spec.ts' '*.test.ts' '*.test.tsx' '*.selfcheck.mjs')
+            -- '*.spec.ts' '*.int-spec.ts' '*.test.ts' '*.test.tsx' '*.e2e.ts' '*.selfcheck.mjs')
           if [ -n "$changed" ]; then
             echo "REQUIRE_ENTRY=1" >> "$GITHUB_ENV"
             echo "PR altera testes — o carimbo no histórico será exigido:"
@@ -107,10 +120,70 @@ jobs:
             echo "PR não altera teste — carimbo dispensado."
           fi
 
+      # O `chrome-sandbox` que vem no pacote npm não tem as permissões que o Chromium
+      # exige no Linux (dono root, modo 4755) — o npm não preserva setuid. Sem isto o
+      # processo aborta no boot, ANTES de criar janela:
+      #
+      #   FATAL:setuid_sandbox_host.cc:166] The SUID sandbox helper binary was found,
+      #   but is not configured correctly. (…) exited with signal SIGTRAP
+      #
+      # O sintoma engana: o E2E só mostra "timeout esperando o evento window", porque
+      # o stderr do processo não chega ao reporter do Playwright.
+      #
+      # A alternativa seria subir com `--no-sandbox`, e ela está DESCARTADA: o sandbox
+      # do renderer é critério de aceite da SPEC-Fundacao-03 (a mesma razão que mantém
+      # o preload em .cjs). Desligá-lo no CI faria a suíte passar exatamente onde ela
+      # deveria provar a fronteira — teste verde sobre a garantia ausente.
+      - name: Ajustar permissões do chrome-sandbox (setuid)
+        run: |
+          sudo chown root:root node_modules/electron/dist/chrome-sandbox
+          sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+
+      # O runner não tem D-Bus de sessão nem keyring, então o backend de senha do
+      # Chromium cai em `basic_text` e `safeStorage.isEncryptionAvailable()` responde
+      # false. O boot então falha ALTO por desenho (ADR-004: a chave de auditoria nunca
+      # vai ao disco em claro) e a janela não nasce — o E2E vê só "timeout esperando
+      # window"; o erro real só aparece no stderr do processo principal.
+      #
+      # A saída é dar ao CI um keyring REAL: gnome-keyring destravado sobre um D-Bus de
+      # sessão. Afrouxar o código (gravar em claro sob flag de teste) está DESCARTADO
+      # pela mesma razão do sandbox acima: a suíte passaria exatamente onde deveria
+      # provar a garantia. Os daemons sobrevivem ao fim do step; os steps seguintes só
+      # precisam do endereço do bus e do desktop declarado — sem XDG_CURRENT_DESKTOP o
+      # Chromium nem tenta o libsecret e volta ao basic_text.
+      # O daemon precisa viver NO MESMO comando que roda os testes: sessão D-Bus e
+      # keyring iniciados num step anterior não são confiáveis aqui (o primeiro run com
+      # eval $(dbus-launch) + GITHUB_ENV chegou com o bus certo e o safeStorage seguiu
+      # indisponível). `dbus-run-session` cria o bus, o unlock com senha vazia cria e
+      # destrava o keyring "login", e o processo de teste herda tudo por descendência.
+      - name: Keyring real para o safeStorage (ADR-004)
+        run: |
+          sudo apt-get install -y gnome-keyring libsecret-tools
+          echo "XDG_CURRENT_DESKTOP=GNOME" >> "$GITHUB_ENV"
+          # O Chromium grava na collection *default*. Criar keyring/collection em
+          # runtime exige o SystemPrompter (GUI), que morre no runner — e o --login com
+          # senha vazia não materializa o arquivo. Então o keyring inteiro é semeado no
+          # disco: sem hash de senha o formato é texto claro e nasce DESTRAVADO — para
+          # segredo descartável de CI, é exatamente o que se quer.
+          mkdir -p "$HOME/.local/share/keyrings"
+          printf '%s\n' '[keyring]' 'display-name=Default keyring' 'ctime=0' 'mtime=0' \
+            'lock-on-idle=false' 'lock-after=false' \
+            > "$HOME/.local/share/keyrings/Default_keyring.keyring"
+          printf Default_keyring > "$HOME/.local/share/keyrings/default"
+
+      # `xvfb-run`: o orquestrador roda o E2E, e o Electron abre janela — sem display
+      # virtual o launch falha no Linux do CI (docs/TESTING.md §3.1).
       - name: Rodar testes + guarda anti-drift
         env:
           REPORT_BASE_REF: origin/${{ github.base_ref }}
-        run: npm run test:report:check
+        run: |
+          dbus-run-session -- bash -c '
+            rm -rf "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/keyring"
+            eval "$(gnome-keyring-daemon --components=secrets --daemonize)"
+            echo -n teste | secret-tool store --label=sonda sonda ci \
+              && echo "secret-tool OK" || echo "secret-tool FALHOU — Electron vai falhar"
+            exec xvfb-run --auto-servernum npm run test:report:check
+          '
 
       # Terceira guarda: números certos + histórico íntegro ainda deixavam
       # passar uma entrega SEM linha no histórico — no repo de origem duas
@@ -118,7 +191,12 @@ jobs:
       # depois do --check para que a falha de números apareça antes.
       - name: Guarda — a entrega está carimbada no histórico?
         if: env.REQUIRE_ENTRY == '1'
-        run: npm run test:report:check -- --require-entry
+        run: |
+          dbus-run-session -- bash -c '
+            rm -rf "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/keyring"
+            eval "$(gnome-keyring-daemon --components=secrets --daemonize)"
+            exec xvfb-run --auto-servernum npm run test:report:check -- --require-entry
+          '
 
       - name: Publicar tabela no job summary
         if: always()

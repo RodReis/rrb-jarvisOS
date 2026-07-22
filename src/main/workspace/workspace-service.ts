@@ -23,10 +23,13 @@ export class WorkspaceService {
   constructor(
     private readonly audit: AuditRepository,
     /**
-     * Dono da auditoria. Enquanto a F03 (auth) não existe, o app roda com um usuário
-     * local fixo; quando o login entrar, quem chama passa o `user_id` real da sessão.
+     * Dono da auditoria, resolvido **a cada troca**.
+     *
+     * Virou função na F03: o usuário deixou de ser fixo — é o local antes do login e o da
+     * sessão depois. Guardar a string recebida no construtor congelaria o valor do boot,
+     * e toda troca de espaço feita após o login seria auditada no usuário errado.
      */
-    private readonly userId: string
+    private readonly userId: () => string
   ) {
     setCurrentWorkspace(this.ativo)
   }
@@ -46,7 +49,7 @@ export class WorkspaceService {
     const origem = this.ativo
 
     const evento = this.audit.append({
-      user_id: this.userId,
+      user_id: this.userId(),
       workspace_id: destino,
       type: 'workspace-switch',
       payload: { de: origem, para: destino }

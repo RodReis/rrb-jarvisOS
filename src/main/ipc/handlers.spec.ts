@@ -66,7 +66,9 @@ const deps = {
   audit,
   workspaces,
   preferences,
-  userId: 'local',
+  // Função desde a F03: a identidade muda em runtime (local antes do login, usuário da
+  // sessão depois), então os handlers a resolvem a cada chamada em vez de capturá-la.
+  userId: () => 'local',
   minimizeToTray
 } as unknown as IpcDependencies
 

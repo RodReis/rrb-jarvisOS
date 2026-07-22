@@ -19,3 +19,7 @@ docs
 .gemini
 .antigravity
 graphify-out
+
+# Artefatos do Playwright (E2E).
+test-results
+playwright-report
