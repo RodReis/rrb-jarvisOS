@@ -12,7 +12,12 @@
  */
 import { strict as assert } from 'node:assert'
 
-import { droppedHistory, hasHistoryEntry, keepHistory } from './gen-test-report.mjs'
+import {
+  droppedHistory,
+  hasHistoryEntry,
+  keepHistory,
+  shouldRequireEntry
+} from './gen-test-report.mjs'
 
 const LINHA_A =
   '| 2026-07-16 | #3 | SPEC-016 | Regras de Negócio | 501 | 501 | 0 | 76.7 | #65 | [#65](https://x/pull/65) |'
@@ -146,4 +151,25 @@ run('linha do Estado atual não é confundida com carimbo', () => {
   assert.equal(hasHistoryEntry(doc([], [estado]), '#3'), false)
 })
 
-console.log('[selfcheck] OK — 17 checks')
+// --- quando a cobrança se aplica -------------------------------------------
+// `hasHistoryEntry` responde "está carimbado?". Estes respondem "cabe cobrar?",
+// que é uma decisão separada — e foi onde a guarda nasceu quebrada: no PR #26
+// ela cobrou carimbo de um PR de infra sem `refs #N`, exigindo uma linha que o
+// gerador se recusa a escrever ("sem issue não acrescenta"). Guarda impossível
+// de satisfazer é guarda que alguém desliga.
+
+run('cobra o carimbo quando há issue e o CI pediu', () => {
+  assert.equal(shouldRequireEntry(true, '#8'), true)
+})
+
+run('não cobra fora do CI, mesmo com issue', () => {
+  assert.equal(shouldRequireEntry(false, '#8'), false)
+})
+
+run('não cobra PR de infra, sem `refs #N` (o furo do #26)', () => {
+  assert.equal(shouldRequireEntry(true, '—'), false)
+  assert.equal(shouldRequireEntry(true, ''), false)
+  assert.equal(shouldRequireEntry(true, undefined), false)
+})
+
+console.log('[selfcheck] OK — 20 checks')

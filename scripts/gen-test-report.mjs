@@ -299,6 +299,23 @@ function reportAtBase(cfg) {
  * Não substitui o `--check`: aquele prova que os NÚMEROS não foram forjados;
  * este prova que a ENTREGA foi carimbada. Formas diferentes de mentir.
  */
+/**
+ * A cobrança do carimbo se aplica a este PR?
+ *
+ * Duas condições. `--require-entry` já limita ao CI (rodando local não há `refs
+ * #N`, e o CI só passa a flag quando o PR mexe em arquivo de teste). Falta a
+ * segunda: **é preciso haver uma issue**.
+ *
+ * Sem issue a cobrança é impossível de satisfazer — e por contrato, não por
+ * acidente: o gerador se recusa a acrescentar linha quando `meta.issue === '—'`
+ * (regra "sem issue não acrescenta", TESTING.md §5), então exigir a linha pediria
+ * exatamente o que ele não escreve. É o caso do PR de infra que altera os próprios
+ * scripts de teste sem pertencer a uma fatia: não é entrega, não há o que carimbar.
+ */
+export function shouldRequireEntry(requireEntry, issue) {
+  return requireEntry && Boolean(issue) && issue !== '—'
+}
+
 export function hasHistoryEntry(docRaw, issue) {
   if (!issue || issue === '—') return false
   // A issue é a 2ª coluna: `| data | #N | SPEC | categoria | …`. Casar a célula
@@ -355,7 +372,11 @@ function main() {
     // 3. CARIMBO — a entrega tem linha no histórico? Só quando o CI pede
     //    (`--require-entry`), porque exige uma issue conhecida: rodando local,
     //    sem PR, não há `refs #N` e a cobrança seria impossível de satisfazer.
-    if (requireEntry && !hasHistoryEntry(existing, meta.issue)) {
+    //
+    //    O caso sem issue está em `shouldRequireEntry` (ver o porquê lá).
+    const carimbavel = shouldRequireEntry(requireEntry, meta.issue)
+
+    if (carimbavel && !hasHistoryEntry(existing, meta.issue)) {
       console.error(
         `[gen-test-report] ENTREGA SEM CARIMBO: ${cfg.reportPath} não tem linha de histórico para a issue ${meta.issue}.\n` +
           'Este PR altera testes, então a entrega precisa de evidência datada (ADR-003, TESTING.md §4).\n' +
@@ -366,9 +387,16 @@ function main() {
       process.exit(1)
     }
 
+    let carimbo = ''
+    if (carimbavel) {
+      carimbo = ` Entrega ${meta.issue} carimbada no histórico.`
+    } else if (requireEntry) {
+      carimbo = ' PR sem `refs #N` (infra, não é entrega de fatia): nada a carimbar.'
+    }
+
     console.log(
       '[gen-test-report] --check OK: os números batem com a execução limpa e o histórico está íntegro.' +
-        (requireEntry ? ` Entrega ${meta.issue} carimbada no histórico.` : '')
+        carimbo
     )
     return
   }
