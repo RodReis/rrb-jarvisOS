@@ -8,9 +8,7 @@ Atualizado em: **2026-07-22**. Mantido pelo Code a cada entrega (junto com `DEVE
 
 | Issue | Fatia | MVP | Spec | Índice |
 |---|---|---|---|---|
-| [#3](https://github.com/RodReis/rrb-jarvisOS/issues/3) | 02 AppShell e WorkspaceSwitcher | MVP-001 (#1) | `spec-fundacao-02-appshell-workspaces.md` | F02 |
 | [#4](https://github.com/RodReis/rrb-jarvisOS/issues/4) | 03 Auth Google local-first | MVP-001 (#1) | `spec-fundacao-03-auth-google.md` | F03 |
-| [#5](https://github.com/RodReis/rrb-jarvisOS/issues/5) | 04 Dados mínimos + AuditEvent | MVP-001 (#1) | `spec-fundacao-04-dados-audit.md` | F04 |
 | [#6](https://github.com/RodReis/rrb-jarvisOS/issues/6) | 05 Settings mínimo | MVP-001 (#1) | `spec-fundacao-05-settings.md` | F05 |
 | [#11](https://github.com/RodReis/rrb-jarvisOS/issues/11) | 02 Policy Engine mínimo (classificação) | MVP-002 (#9) | `spec-execucao-local-02-policy-engine.md` | M2-F02 |
 | [#12](https://github.com/RodReis/rrb-jarvisOS/issues/12) | 03 Diretórios permitidos (allowlist) | MVP-002 (#9) | `spec-execucao-local-03-allowlist-diretorios.md` | M2-F03 |
@@ -18,9 +16,18 @@ Atualizado em: **2026-07-22**. Mantido pelo Code a cada entrega (junto com `DEVE
 | [#14](https://github.com/RodReis/rrb-jarvisOS/issues/14) | 05 Motor de execução simulado | MVP-002 (#9) | `spec-execucao-local-05-execucao-simulada.md` | M2-F05 |
 | [#15](https://github.com/RodReis/rrb-jarvisOS/issues/15) | 01 Supabase local + ambiente de sync | MVP-002 (#9) | `spec-execucao-local-01-supabase-local.md` | M2-F01 |
 
-> **`proplan:next`** (cabeça da fila) está em **[#5](https://github.com/RodReis/rrb-jarvisOS/issues/5) — F04**, não na #3: 02/03 consomem os contratos tipados da 04 (decisão de 2026-07-22, `DECISIONS.md`).
+> **[#4](https://github.com/RodReis/rrb-jarvisOS/issues/4) — F03 está BLOQUEADA**, não apenas na fila: depende de credenciais que só o PI pode criar (projeto Supabase de dev + cliente OAuth do Google Cloud). O `.env.example` na raiz lista as variáveis e onde obter cada uma. Sem elas, os critérios de login real, relançamento offline, token cifrado e E2E são inverificáveis. A infra que ela consome já está entregue na F04.
 
 > A Fatia 06 saiu como **#8** (o número 7 já estava ocupado). Sub-issue do épico #1; assignee PI.
+
+### Em Andamento (`proplan:doing`)
+
+| Issue | Fatia | MVP | Spec | Índice | PR |
+|---|---|---|---|---|---|
+| [#5](https://github.com/RodReis/rrb-jarvisOS/issues/5) | 04 Dados mínimos + AuditEvent | MVP-001 (#1) | `spec-fundacao-04-dados-audit.md` | F04 | [#28](https://github.com/RodReis/rrb-jarvisOS/pull/28) |
+| [#3](https://github.com/RodReis/rrb-jarvisOS/issues/3) | 02 AppShell e WorkspaceSwitcher | MVP-001 (#1) | `spec-fundacao-02-appshell-workspaces.md` | F02 | [#28](https://github.com/RodReis/rrb-jarvisOS/pull/28) |
+
+> **04 e 02 no mesmo PR**, por decisão do PI (2026-07-22): o critério 4 da SPEC-04 exige `AuditEvent` de `workspace-switch`, cujo fluxo nasce na F02 — separá-las exigiria um stub que a F02 jogaria fora.
 
 ### Feito (`proplan:done` — entregue, aguardando aceite do PI)
 
@@ -73,12 +80,13 @@ Não há catálogo numérico `SPEC-nnn` para o MVP-001: as specs são identifica
 
 ## Próximas ações
 
-1. **Fila do MVP-001** (2026-07-22): **F06 (#8) aceita e finalizada**; F01 (#2) entregue aguardando aceite. Cabeça da fila marcada com `proplan:next` = **F04 (#5)**, a próxima a puxar. Ordem: **01 → 06 → 04 (#5) → 02 (#3) → 03 (#4) → 05 (#6)** — F04 antes de F02 porque 02/03 consomem seus contratos tipados (decisão do PI delegada ao Cowork, 2026-07-22).
+1. **Fila do MVP-001** (2026-07-22): **F06 (#8) aceita e finalizada**; F01 (#2) entregue aguardando aceite; **F04 (#5) e F02 (#3) entregues juntas** no PR [#28](https://github.com/RodReis/rrb-jarvisOS/pull/28). Cabeça da fila (`proplan:next`) = **F05 (#6)** — e não a F03 (#4), que está **bloqueada** por falta de credenciais Supabase/Google (só o PI pode criá-las). Ordem executada: **01 → 06 → 04+02 → 05 → 03 (quando desbloquear)**.
 2. ~~Resolver as "Perguntas ao PI" das specs do MVP-003~~ — **feito** (2026-07-21): as 8 specs estão `aprovada-pi`.
 3. ~~Renumerar #10 → MVP-004 e criar o épico MVP-003 + issues~~ — **feito** (2026-07-21): #10 retitulada MVP-004 (carimbo), épico **#16** criado, 8 filhas **#17–#24** em Backlog e vinculadas.
 4. **Code**: quando MVP-001/002 estiverem entregues, iniciar o MVP-003 pela F01 (#17); WIP = 1, na ordem F01 → F02 → (F03a/F03b/F05) → F04a → F04b → F06.
-5. **PI**: (opcional) decidir a adoção de numeração `SPEC-nnn`.
-6. **PI**: aceitar cada fatia (fechar issue + `proplan:finalizado`) só após PR mergeado.
+5. **PI — desbloqueia a F03 (#4):** criar o projeto **Supabase de desenvolvimento** na nuvem (ADR-002) e o **cliente OAuth do Google Cloud** (tipo *Aplicativo para computador*, exigido pelo retorno via loopback), registrar o cliente no Supabase em Authentication → Providers → Google, e preencher o `.env` local. As quatro variáveis e onde obter cada uma estão no **`.env.example`** da raiz. Enquanto isso não existe, a F03 fica fora da fila — os critérios dela são inverificáveis sem um provedor de identidade real.
+6. **PI**: (opcional) decidir a adoção de numeração `SPEC-nnn`.
+7. **PI**: aceitar cada fatia (fechar issue + `proplan:finalizado`) só após PR mergeado.
 
 ## Roadmap macro
 
