@@ -76,7 +76,7 @@ constante embutida no gerador.
 O mapeamento categoria→origem mora em **`test-report.config.json`** (raiz), não no código do
 gerador — assim o mesmo tooling cai em outro projeto só ajustando o mapa (reutilização, §7).
 
-### 3.1 E2E Electron: três armadilhas de ambiente (achados da Fatia 03)
+### 3.1 E2E Electron: armadilhas de ambiente (achados da Fatia 03)
 
 Custaram tempo real de diagnóstico e **não são bugs do app** — são consequências de
 comportamentos corretos dele. Quem for escrever ou depurar E2E aqui deve ler antes:
@@ -105,14 +105,32 @@ comportamentos corretos dele. Quem for escrever ou depurar E2E aqui deve ler ant
    perdido no meio da saída. O `ci.yml` roda `node node_modules/electron/install.js`
    (idempotente) logo após o `npm ci`.
 
+5. **No CI Linux, o `chrome-sandbox` do pacote npm não tem setuid.** O npm não preserva
+   permissões: o binário precisa de dono `root` e modo `4755`, senão o processo aborta no
+   boot com `FATAL:setuid_sandbox_host.cc` + `SIGTRAP` — que o Playwright reporta como
+   timeout de `firstWindow()`, porque o stderr do processo não chega ao reporter. Subir com
+   `--no-sandbox` está descartado: o sandbox é critério de aceite da SPEC-Fundacao-03. O
+   `ci.yml` faz `chown root:root` + `chmod 4755` antes dos testes.
+
+6. **No CI Linux, `safeStorage` não existe sem keyring.** O runner não tem D-Bus de sessão
+   nem secret service; o backend de senha do Chromium cai em `basic_text` e
+   `isEncryptionAvailable()` responde false. O boot então falha alto por desenho (ADR-004:
+   chave de auditoria nunca em claro no disco) e a janela não nasce — de novo, o E2E só vê
+   timeout de `firstWindow()`. O `ci.yml` instala `gnome-keyring` + `dbus-x11`, sobe um
+   D-Bus de sessão, destrava o keyring com senha vazia e exporta
+   `DBUS_SESSION_BUS_ADDRESS` + `XDG_CURRENT_DESKTOP=GNOME` (sem o desktop declarado o
+   Chromium nem tenta o libsecret). Afrouxar o código para o teste passaria exatamente
+   onde ele deveria provar a garantia.
+
 **O E2E exige build.** O Playwright sobe o app empacotado (`out/`), não o servidor de dev —
 rodá-lo sem `npm run build` testaria a versão anterior do código. O orquestrador
 (`scripts/test-report.mjs`) já faz o build antes de chamar o Playwright.
 
-**Padrão das quatro armadilhas:** nenhuma se apresenta como o que é. Falha de launch do
+**Padrão das armadilhas:** nenhuma se apresenta como o que é. Falha de launch do
 Electron no CI quase sempre reporta timeout ou "browser has been closed" — mensagens que
 apontam para o Playwright quando a causa está no ambiente. Antes de mexer no teste, confira
-binário, display e processos remanescentes.
+binário, display, sandbox, keyring e processos remanescentes — e leia o stderr cru do
+processo principal (subindo o app fora do Playwright), porque o reporter o engole.
 
 > **Por que Vitest único, e não Jest+projects como no proplan.** O jarvis é Vite-nativo; Vitest é
 > o runner natural (mesma config, mesmo transform). O relatório `--json` do Vitest é

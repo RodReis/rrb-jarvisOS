@@ -139,6 +139,26 @@ jobs:
           sudo chown root:root node_modules/electron/dist/chrome-sandbox
           sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
 
+      # O runner não tem D-Bus de sessão nem keyring, então o backend de senha do
+      # Chromium cai em `basic_text` e `safeStorage.isEncryptionAvailable()` responde
+      # false. O boot então falha ALTO por desenho (ADR-004: a chave de auditoria nunca
+      # vai ao disco em claro) e a janela não nasce — o E2E vê só "timeout esperando
+      # window"; o erro real só aparece no stderr do processo principal.
+      #
+      # A saída é dar ao CI um keyring REAL: gnome-keyring destravado sobre um D-Bus de
+      # sessão. Afrouxar o código (gravar em claro sob flag de teste) está DESCARTADO
+      # pela mesma razão do sandbox acima: a suíte passaria exatamente onde deveria
+      # provar a garantia. Os daemons sobrevivem ao fim do step; os steps seguintes só
+      # precisam do endereço do bus e do desktop declarado — sem XDG_CURRENT_DESKTOP o
+      # Chromium nem tenta o libsecret e volta ao basic_text.
+      - name: Keyring real para o safeStorage (ADR-004)
+        run: |
+          sudo apt-get install -y gnome-keyring dbus-x11
+          eval "$(dbus-launch --sh-syntax)"
+          echo -n '' | gnome-keyring-daemon --unlock --components=secrets
+          echo "DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS" >> "$GITHUB_ENV"
+          echo "XDG_CURRENT_DESKTOP=GNOME" >> "$GITHUB_ENV"
+
       # DIAGNÓSTICO TEMPORÁRIO — remover quando o E2E estiver verde.
       # O chmod acima derrubou o FATAL do SUID sandbox, mas o `firstWindow()` segue
       # estourando: sobra outra barreira no boot. O reporter do Playwright engole o
