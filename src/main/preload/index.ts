@@ -12,6 +12,7 @@ import {
 } from '@shared/contracts/ipc'
 import type { AuthSnapshot } from '@shared/contracts/auth'
 import type { LogInput } from '@shared/contracts/logging'
+import type { PolicyContext, PolicyDecision } from '@shared/policies'
 import type {
   AuditEvent,
   AuditEventType,
@@ -59,7 +60,10 @@ const bridge: JarvisBridge = {
     return () => ipcRenderer.removeListener(IPC_EVENT_CHANNELS.authChanged, wrapped)
   },
 
-  minimizeToTray: (): void => ipcRenderer.send(IPC_SEND_CHANNELS.windowMinimizeToTray)
+  minimizeToTray: (): void => ipcRenderer.send(IPC_SEND_CHANNELS.windowMinimizeToTray),
+
+  classifyAction: (action: string, context: PolicyContext): Promise<PolicyDecision> =>
+    ipcRenderer.invoke(IPC_CHANNELS.policyClassify, action, context)
 }
 
 if (process.contextIsolated) {

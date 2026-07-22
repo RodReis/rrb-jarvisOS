@@ -122,6 +122,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
   })
 
   expect(superficie.metodos).toEqual([
+    'classifyAction',
     'getAppInfo',
     'getAuth',
     'getPreferences',

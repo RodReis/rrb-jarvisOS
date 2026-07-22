@@ -84,7 +84,9 @@ export const AUDIT_EVENT_TYPES = [
   'login',
   'logout',
   'login-offline-reuse',
-  'workspace-switch'
+  'workspace-switch',
+  // SPEC-Execucao-02: toda decisão do Policy Engine gera um evento deste tipo.
+  'policy-decision'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]
