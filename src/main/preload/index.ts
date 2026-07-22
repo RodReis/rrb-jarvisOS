@@ -1,5 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { BRIDGE_KEY, IPC_CHANNELS, type AppInfo, type JarvisBridge } from '@shared/contracts/ipc'
+import {
+  BRIDGE_KEY,
+  IPC_CHANNELS,
+  IPC_SEND_CHANNELS,
+  type AppInfo,
+  type JarvisBridge
+} from '@shared/contracts/ipc'
+import type { LogInput } from '@shared/contracts/logging'
 
 /**
  * Preload — a ponte tipada e o único ponto de contato do renderer com o main.
@@ -9,7 +16,10 @@ import { BRIDGE_KEY, IPC_CHANNELS, type AppInfo, type JarvisBridge } from '@shar
  * anularia a fronteira de segurança (docs/ARCHITECTURE.md).
  */
 const bridge: JarvisBridge = {
-  getAppInfo: (): Promise<AppInfo> => ipcRenderer.invoke(IPC_CHANNELS.appInfo)
+  getAppInfo: (): Promise<AppInfo> => ipcRenderer.invoke(IPC_CHANNELS.appInfo),
+  // `send`, não `invoke`: o renderer não espera confirmação de gravação (ADR-005 — quem
+  // escreve é o main). Aguardar o disco para logar prenderia a UI ao IO.
+  sendLog: (record: LogInput): void => ipcRenderer.send(IPC_SEND_CHANNELS.log, record)
 }
 
 if (process.contextIsolated) {

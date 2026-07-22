@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { AppInfo } from '@shared/contracts/ipc'
+import { log } from '../lib/log'
 
 /**
  * Tela placeholder do bootstrap (Fatia 01). Sem backend real: só prova que o
@@ -12,8 +13,14 @@ export function App(): React.JSX.Element {
   useEffect(() => {
     window.jarvis
       .getAppInfo()
-      .then(setAppInfo)
-      .catch(() => setErro('Não foi possível carregar as informações do app.'))
+      .then((info) => {
+        setAppInfo(info)
+        log.ui.info('Tela inicial carregada', { ambiente: info.environment })
+      })
+      .catch((error: unknown) => {
+        setErro('Não foi possível carregar as informações do app.')
+        log.ui.error('Falha ao carregar informações do app pela ponte', { error })
+      })
   }, [])
 
   return (

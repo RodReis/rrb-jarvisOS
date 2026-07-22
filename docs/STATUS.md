@@ -66,7 +66,7 @@ Não há catálogo numérico `SPEC-nnn` para o MVP-001: as specs são identifica
 
 ## Próximas ações
 
-1. ~~**Code**: mover a Fatia 01 (#2) para A Fazer → Em Andamento e iniciar~~ — **em andamento** (2026-07-22): #2 em `proplan:doing`, branch `feat/bootstrap`, critérios de aceite verificados, PR aberto. Próxima da fila: Fatia 06 (#8). Ordem: 01 → 06 (#8) → 02/04 → 03 → 05.
+1. **Fila do MVP-001** (2026-07-22): F01 (#2) entregue → **F06 (#8) em andamento** (`proplan:doing`). Cabeça da fila marcada com `proplan:next` = **F04 (#5)**. Ordem: **01 → 06 (#8) → 04 (#5) → 02 (#3) → 03 (#4) → 05 (#6)** — F04 antes de F02 porque 02/03 consomem seus contratos tipados (decisão do PI delegada ao Cowork, 2026-07-22).
 2. ~~Resolver as "Perguntas ao PI" das specs do MVP-003~~ — **feito** (2026-07-21): as 8 specs estão `aprovada-pi`.
 3. ~~Renumerar #10 → MVP-004 e criar o épico MVP-003 + issues~~ — **feito** (2026-07-21): #10 retitulada MVP-004 (carimbo), épico **#16** criado, 8 filhas **#17–#24** em Backlog e vinculadas.
 4. **Code**: quando MVP-001/002 estiverem entregues, iniciar o MVP-003 pela F01 (#17); WIP = 1, na ordem F01 → F02 → (F03a/F03b/F05) → F04a → F04b → F06.

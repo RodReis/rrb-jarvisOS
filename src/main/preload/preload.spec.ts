@@ -1,15 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { BRIDGE_KEY, IPC_CHANNELS } from '@shared/contracts/ipc'
+import { BRIDGE_KEY, IPC_CHANNELS, IPC_SEND_CHANNELS } from '@shared/contracts/ipc'
 
 const exposeInMainWorld = vi.fn()
 const invoke = vi.fn().mockResolvedValue({})
+const send = vi.fn()
 
 vi.mock('electron', () => ({
   contextBridge: {
     exposeInMainWorld: (...args: unknown[]) => exposeInMainWorld(...args)
   },
   ipcRenderer: {
-    invoke: (...args: unknown[]) => invoke(...args)
+    invoke: (...args: unknown[]) => invoke(...args),
+    send: (...args: unknown[]) => send(...args)
   }
 }))
 
@@ -39,7 +41,7 @@ describe('ponte do preload', () => {
     const bridge = await carregarPonte()
     // Critério de aceite 4: a superfície é fechada. Um `invoke`/`send`/`on` cru aqui
     // deixaria o renderer alcançar qualquer handler do main.
-    expect(Object.keys(bridge).sort()).toEqual(['getAppInfo'])
+    expect(Object.keys(bridge).sort()).toEqual(['getAppInfo', 'sendLog'])
   })
 
   it('não expõe ipcRenderer nem primitivas de canal arbitrário', async () => {
@@ -53,6 +55,18 @@ describe('ponte do preload', () => {
     const bridge = await carregarPonte()
     await (bridge.getAppInfo as () => Promise<unknown>)()
     expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.appInfo)
+  })
+
+  it('roteia sendLog pelo canal de ida, sem esperar resposta', async () => {
+    // `send`, não `invoke`: o renderer não pode ficar esperando o disco para logar.
+    const bridge = await carregarPonte()
+    const registro = { level: 'info', category: 'ui', msg: 'Tela carregada' }
+
+    const retorno = (bridge.sendLog as (r: unknown) => unknown)(registro)
+
+    expect(send).toHaveBeenCalledWith(IPC_SEND_CHANNELS.log, registro)
+    expect(invoke).not.toHaveBeenCalled()
+    expect(retorno).toBeUndefined()
   })
 
   it('recusa expor a ponte quando contextIsolation está desligado', async () => {
