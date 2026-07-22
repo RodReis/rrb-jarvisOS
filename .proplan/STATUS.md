@@ -9,10 +9,9 @@ updated: 2026-07-22
 
 ### [MVP2] Execução local controlada — fundação de execução (permissões, allowlist, execução simulada) (#9)
 
-- [MVP2][F02] Policy Engine mínimo (classificação, fail-closed) (#11)
+- [MVP2][F03] Diretórios permitidos (allowlist) (#12)
 - [MVP2][F05] Motor de execução em modo simulado (#14)
 - [MVP2][F04] Registro de workflows + automações manuais (#13)
-- [MVP2][F03] Diretórios permitidos (allowlist) (#12)
 
 ### [MVP3] Design System da Plataforma — base única, 2 identidades (#16)
 
@@ -45,9 +44,10 @@ _(vazio)_
 
 ### [MVP2] Execução local controlada — fundação de execução (permissões, allowlist, execução simulada) (#9)
 
+- [MVP2][F02] Policy Engine mínimo (classificação, fail-closed) (#11, finalizado em: 2026-07-22)
 - [MVP2][F01] Supabase local (Docker) + ambiente de sync (dev) (#15, finalizado em: 2026-07-22)
 
-### [MVP1] Fundação — esqueleto local-first (Electron + auth + workspaces) (#1)
+### #1 (#1)
 
 - [MVP1][F03] Autenticação Google local-first (#4, finalizado em: 2026-07-22)
 - [MVP1][F05] Settings mínimo (#6, finalizado em: 2026-07-22)
