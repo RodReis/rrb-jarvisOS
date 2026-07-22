@@ -40,7 +40,7 @@ Status: **em andamento** (`proplan:doing`) — spec `aprovada-pi` (2026-07-21, e
 - [x] Categorias `integracao/ai/agent/db/auth/ipc/ui/sistema`; contrato in/out definido mesmo sem fluxo p/ ai/agent/integração
 - [x] Regra "todo método loga" aplicada aos fluxos que já existem (`ipc`, `sistema`, `ui`); tag `workspace` (NOA/JARVIS/sistema). `auth` (F03), `db` (F04) e workspace-switch (F02) instrumentam nas próprias fatias — **emenda do PI de 2026-07-22**
 - [x] Fronteira log ≠ AuditEvent respeitada (stores separados; AuditEvent nasce na F04); testes de retenção-poda e redaction
-- [ ] Entrega: PR `refs #8`; docs/ commitados
+- [x] Entrega: PR [#27](https://github.com/RodReis/rrb-jarvisOS/pull/27) (`refs #8`); docs/ commitados; relatório carimbado (Regras 49, Banco 8, Tela 13)
 
 **Decisões técnicas desta fatia** (nenhuma altera escopo; registradas para não serem re-litigadas):
 
@@ -165,3 +165,4 @@ Ordem: MVP-002 (fundação de execução) → **MVP-003** ([#10](https://github.
 | Data | Fatia | PR | Observação |
 |---|---|---|---|
 | 2026-07-22 | MVP-001 · F01 Bootstrap e estrutura (#2) | [#25](https://github.com/RodReis/rrb-jarvisOS/pull/25) | CI verde na 1ª execução. Relatório ADR-003 ativo: selfcheck 10/10, guarda anti-drift verificada nos dois sentidos. Regras 14 (85%), Tela 4 (100%), Banco 0 (F04). |
+| 2026-07-22 | MVP-001 · F06 Observabilidade e Logging (#8) | [#27](https://github.com/RodReis/rrb-jarvisOS/pull/27) | Regras 49 (87.2%), **Banco 8 (85.5%)**, Tela 13 (97.6%). A categoria **Banco deixa de estar vazia antes da F04**: os testes de integração do logger tocam disco real (arquivo temporário, teardown por teste), que é exatamente o que a categoria mede — o `TESTING.md` §8 previa SQLite como primeiro caso, mas a régua é "integração com storage local", não "SQLite". Verificado também no app real: os três arquivos nascem em `userData/logs` e o registro do renderer chega ao disco. |
