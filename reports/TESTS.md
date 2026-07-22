@@ -37,6 +37,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-07-22 | #4 | spec-fundacao-03-auth-google | Regras de Negócio | 92 | 92 | 0 | 79.6 | #30 | [#30](https://github.com/RodReis/rrb-jarvisOS/pull/30) |
 | 2026-07-22 | #4 | spec-fundacao-03-auth-google | Banco | 60 | 60 | 0 | 87.0 | #30 | [#30](https://github.com/RodReis/rrb-jarvisOS/pull/30) |
 | 2026-07-22 | #4 | spec-fundacao-03-auth-google | Tela | 33 | 33 | 0 | 93.5 | #30 | [#30](https://github.com/RodReis/rrb-jarvisOS/pull/30) |
-| 2026-07-22 | #15 | spec-execucao-local-01-supabase-local | Regras de Negócio | 92 | 92 | 0 | 79.6 | #31 | [#31](https://github.com/RodReis/rrb-jarvisOS/pull/31) |
-| 2026-07-22 | #15 | spec-execucao-local-01-supabase-local | Banco | 68 | 68 | 0 | 87.0 | #31 | [#31](https://github.com/RodReis/rrb-jarvisOS/pull/31) |
-| 2026-07-22 | #15 | spec-execucao-local-01-supabase-local | Tela | 33 | 33 | 0 | 93.5 | #31 | [#31](https://github.com/RodReis/rrb-jarvisOS/pull/31) |
+| 2026-07-22 | #15 | spec-execucao-local-01-supabase-local | Regras de Negócio | 92 | 92 | 0 | 79.6 | #32 | [#32](https://github.com/RodReis/rrb-jarvisOS/pull/32) |
+| 2026-07-22 | #15 | spec-execucao-local-01-supabase-local | Banco | 68 | 68 | 0 | 87.0 | #32 | [#32](https://github.com/RodReis/rrb-jarvisOS/pull/32) |
+| 2026-07-22 | #15 | spec-execucao-local-01-supabase-local | Tela | 33 | 33 | 0 | 93.5 | #32 | [#32](https://github.com/RodReis/rrb-jarvisOS/pull/32) |
