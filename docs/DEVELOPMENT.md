@@ -10,7 +10,7 @@ Regra de trabalho: **uma fatia por vez (WIP = 1)**. Só iniciar fatia com spec `
 
 ### Fatia 01 — Bootstrap e estrutura (`docs/spec/spec-fundacao-01-bootstrap.md`)
 
-Status: **em andamento** — spec `aprovada-pi` (2026-07-21); issue #2 em `proplan:doing`. Branch `feat/bootstrap`.
+Status: **entregue** (`proplan:done`, aguardando aceite do PI) — spec `aprovada-pi` (2026-07-21); issue #2; PR [#25](https://github.com/RodReis/rrb-jarvisOS/pull/25) mergeado em 2026-07-22 com CI verde.
 
 - [x] Scaffold Electron + React + TS + Vite via **electron-vite** (Electron 43, Vite 7, React 19, Vitest 4; `engines.node >= 22`)
 - [x] Estrutura `src/main` / `src/renderer` / `src/shared` com READMEs
@@ -19,7 +19,7 @@ Status: **em andamento** — spec `aprovada-pi` (2026-07-21); issue #2 em `propl
 - [x] Rotina de relatório de testes (ADR-003): gerador+selfcheck portados do proplan, `test-report.config.json`, `reports/TESTS.md`, CI; categorias Regras+Tela(componente) — Banco (F04) e E2E Playwright (F03) entram depois
 - [x] Tailwind configurado (v4, via `@tailwindcss/vite`)
 - [x] Teste de fumaça: janela abre; renderer sem acesso a Node
-- [ ] Entrega: PR com `refs #N`; docs/ commitados
+- [x] Entrega: PR [#25](https://github.com/RodReis/rrb-jarvisOS/pull/25) (`refs #2`) mergeado em 2026-07-22; docs/ commitados
 
 **Decisões técnicas desta fatia** (nenhuma altera escopo; registradas para não serem re-litigadas):
 
@@ -155,4 +155,4 @@ Ordem: MVP-002 (fundação de execução) → **MVP-003** ([#10](https://github.
 
 | Data | Fatia | PR | Observação |
 |---|---|---|---|
-| — | — | — | nenhuma entrega ainda |
+| 2026-07-22 | MVP-001 · F01 Bootstrap e estrutura (#2) | [#25](https://github.com/RodReis/rrb-jarvisOS/pull/25) | CI verde na 1ª execução. Relatório ADR-003 ativo: selfcheck 10/10, guarda anti-drift verificada nos dois sentidos. Regras 14 (85%), Tela 4 (100%), Banco 0 (F04). |

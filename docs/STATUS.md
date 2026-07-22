@@ -21,15 +21,13 @@ Atualizado em: **2026-07-22**. Mantido pelo Code a cada entrega (junto com `DEVE
 
 > A Fatia 06 saiu como **#8** (o número 7 já estava ocupado). Sub-issue do épico #1; label `proplan:backlog`, assignee PI.
 
-### Em Andamento (`proplan:doing`)
+### Feito (`proplan:done` — entregue, aguardando aceite do PI)
 
-| Issue | Fatia | MVP | Spec | Índice |
-|---|---|---|---|---|
-| [#2](https://github.com/RodReis/rrb-jarvisOS/issues/2) | 01 Bootstrap e estrutura | MVP-001 (#1) | `spec-fundacao-01-bootstrap.md` | F01 |
+| Issue | Fatia | MVP | Spec | Índice | PR |
+|---|---|---|---|---|---|
+| [#2](https://github.com/RodReis/rrb-jarvisOS/issues/2) | 01 Bootstrap e estrutura | MVP-001 (#1) | `spec-fundacao-01-bootstrap.md` | F01 | [#25](https://github.com/RodReis/rrb-jarvisOS/pull/25) |
 
-Branch `feat/bootstrap`. Todos os critérios de aceite verificados; aguardando merge do PR para virar `proplan:done`.
-
-### A Fazer · Feito · Finalizado
+### A Fazer · Em Andamento · Finalizado
 
 *(vazios)*
 
