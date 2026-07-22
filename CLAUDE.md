@@ -41,7 +41,7 @@ Convenção de processo do trio, executada à mão pelo Code via GitHub MCP. O b
 |---|---|---|
 | MVP definido | **Cowork** | cria issue `proplan:mvp`; corpo = checklist das fatias previstas. **Sem spec.** |
 | spec vira `aprovada-pi` | **Cowork** | cria a issue-filha (sub-issue do MVP) em **Backlog** (`proplan:backlog`), corpo com link pro arquivo da spec, assignee = **PI** |
-| vai começar | **Code** | move **uma** filha pra **A Fazer** (`proplan:todo`) → **Em Andamento** (`proplan:doing`) ao iniciar, e se atribui. Uma fatia por vez (WIP) — nunca move o lote |
+| vai começar | **Code** | puxa o card marcado `proplan:next` (topo da fila) pra **A Fazer** (`proplan:todo`) → **Em Andamento** (`proplan:doing`), se atribui, e **avança `proplan:next`** pro próximo item da fila do `docs/STATUS.md`. Uma fatia por vez (WIP) — nunca move o lote |
 | entrega | **Code** | abre PR com **`refs #N`** no corpo. **NUNCA `closes #N`** — fecharia a issue no merge e **forjaria o aceite do PI**. Só **depois do merge**, aplica `proplan:done` → **Feito**, com o link do PR no corpo da issue |
 | aceite da fatia | **PI** | **só o PI** fecha a issue-filha e aplica `proplan:finalizado` |
 | MVP entregue | **PI** | quando **todas as filhas** estão fechadas, o PI fecha o MVP |
@@ -107,6 +107,7 @@ Exemplo vivo: **sync SHA-aware** (elimina o `noop` falso) — não tem spec e **
 - **Feito** = `open` + `proplan:done` — *entregue (PR mergeado), aguardando aceite*
 - **Finalizado** = `closed` + `proplan:finalizado` — *aceito pelo dono*
 - **Descartado** = `closed` + `proplan:descartado`
+- **`proplan:next`** = **marcador (não coluna)** no card do topo do Backlog = a cabeça da fila do `docs/STATUS.md`. No máximo um entre as issues abertas; coexiste com `proplan:backlog`. A ordem completa vive **só** no STATUS.md — `next` projeta a cabeça dela no board, nunca uma segunda fonte da fila.
 
 Fechar é ato deliberado do dono, nunca efeito colateral de merge. Issue nunca é deletada. **`closes #N` é proibido** (forjaria aceite); usar sempre `refs #N`. Mover para Finalizado/Descartado posta comentário de carimbo na issue.
 
@@ -120,6 +121,27 @@ A regra *"sem spec `aprovada-pi` → não codificar"* existe para impedir **esco
 | **Fatia** (escopo novo, comportamento novo) | **Sim** | há decisões de produto a tomar — são do PI |
 | **Correção de bug já documentado** (o comportamento correto está escrito num ADR, no `ARCHITECTURE.md` ou numa spec existente) | **Não** | não há o que decidir: o certo já está definido |
 | **Bug sem comportamento correto definido** | **Sim** — ou pelo menos perguntar ao PI | se o certo ainda não foi decidido, decidir é do PI |
+
+#### Correção: o Code cria a própria issue
+
+Para bug de comportamento documentado, **o próprio Code cria o card `[FIX]`**
+(Backlog) e segue o fluxo normal — não espera outro papel criar nem pegar.
+**Motivo:** criar issue ≠ fechar issue. O aceite continua sendo só do dono,
+então nada da garantia se perde; o Code só ganha o ato de abrir o trabalho.
+
+**Duas condições, ambas obrigatórias:**
+1. O comportamento correto **já está escrito** num ADR, na `ARCHITECTURE.md`, numa
+   spec existente ou como item de `STATUS.md`.
+2. O corpo da issue **cita essa fonte**.
+
+Se o Code precisa **decidir** qual é o comportamento correto, não é correção —
+é **fatia**: volta pro planejamento + dono (decisão de produto). O risco que
+estas condições fecham não é *quem cria*, é a **reclassificação**: rotular de
+`[FIX]` uma fatia para escapar da spec e do aval. A citação obrigatória é o que
+mantém honesto — sem parágrafo que define o certo, não é bug.
+
+Fluxo do FIX auto-criado: cria em Backlog → todo/doing → PR com `refs #N`
+(nunca `closes`) → done após o merge. **Só o dono** fecha e aceita.
 
 ## Regras técnicas invioláveis (resumo — detalhe no ARCHITECTURE.md)
 
@@ -140,9 +162,11 @@ Priorizam cautela sobre velocidade; em tarefa trivial, bom senso.
 
 ## Grafo de conhecimento (graphify)
 
-O repo tem um grafo de conhecimento persistente em `graphify-out/` (gerado pela skill `/graphify` — https://github.com/Graphify-Labs/graphify). Ele indexa código + docs (1.9k nós, 192 comunidades) e responde perguntas sobre o codebase gastando muito menos tokens que ler arquivos.
+O repo tem um grafo de conhecimento persistente em `graphify-out/` (gerado pela skill `/graphify` — https://github.com/Graphify-Labs/graphify). Ele indexa `src/` + `docs/` + `scripts/` (414 nós, 26 comunidades) e responde perguntas sobre o codebase gastando muito menos tokens que ler arquivos. O escopo exclui `.aiox-core/` e as imagens de `docs/design/` — framework de terceiros e mockups não entram no grafo.
 
 - **Antes de explorar o codebase** para entender arquitetura, fluxos ou "quem chama o quê": consulte o grafo primeiro — `/graphify query "<pergunta>"` (ou `graphify query` via CLI). Só leia arquivos direto quando precisar do conteúdo exato.
+- **Achar no grafo, afirmar pelo arquivo.** A topologia localiza; ela não prova. Antes de qualquer afirmação quantitativa ou de unicidade ("é a única aresta", "só existe em X", "as cópias divergiram"), conte todas as arestas relevantes e confirme no disco (`md5sum`, `diff`, ler o trecho). Cite a granularidade que o dado tem: se o grafo guarda `source_location: "§Seção"`, não invente número de linha.
+- **Por que:** a extração é não-determinística. Dois arquivos byte-idênticos (`docs/design/uploads/prd-design-system-plataforma.md` e `docs/iniciais/prd-design-system-plataforma.md`, mesmo MD5) geraram 10 nós em 2 comunidades versus 17 nós em 6 — e só uma das cópias recebeu a aresta de correção do ADR-001. Qual cópia recebe qual aresta é artefato de qual subagente processou o chunk, não fato sobre os documentos.
 - **Ao final de cada entrega** (junto com STATUS.md/DEVELOPMENT.md): rode `/graphify . --update` — incremental, re-extrai só arquivos novos/alterados via manifest. Não recrie o grafo do zero.
 - `graphify-out/` é artefato local (cache), não entra em commit.
 

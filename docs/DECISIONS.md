@@ -16,6 +16,8 @@
 
 | Data | Decisão | Decisor |
 |---|---|---|
+| 2026-07-22 | **Prioridade no board via marcador único `proplan:next`** (Opção A). A ordem completa da fila vive só no `docs/STATUS.md` (fonte única); `next` projeta a cabeça dela no board. Marcador, não coluna — coexiste com `proplan:backlog`, no máximo um aberto. Rejeitada a ordenação ordinal no título/label (viraria segunda fonte da fila → drift). Registrado em CONVENTION §1. | PI |
+| 2026-07-22 | **SPEC-Fundacao-06 emendada:** critério 5 e nota de escopo corrigidos — instrumentação de `auth`/`workspace-switch`/`db` migra para F03/F02/F04 (cada uma com critério de aceite de logging dedicado), porque esse código não existe quando o F06 executa. O F06 entrega infra + contrato (CONVENTION §3) e instrumenta só `ipc`/`sistema`. | PI |
 | 2026-07-19 | MVP-001 Fundação estruturado como épico com **5 fatias** (uma por spec), substituindo a "fatia única com 5 specs" do plano original | PI |
 | 2026-07-19 | `CONVENTION.md` cobre processo (labels `proplan:*`) **e** contrato de dados das entidades | PI |
 | 2026-07-18 | Processo de design system formal do PRD **suspenso** para time solo + IA (Tailwind + Radix ad-hoc, tokens mínimos) | PI (via plano de fundação) |

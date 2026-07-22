@@ -22,4 +22,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-
+| 2026-07-21 | #2 | spec-fundacao-01-bootstrap | Regras de Negócio | 14 | 14 | 0 | 85.0 | #25 | [#25](https://github.com/RodReis/rrb-jarvisOS/pull/25) |
+| 2026-07-21 | #2 | spec-fundacao-01-bootstrap | Banco | 0 | 0 | 0 | — | #25 | [#25](https://github.com/RodReis/rrb-jarvisOS/pull/25) |
+| 2026-07-21 | #2 | spec-fundacao-01-bootstrap | Tela | 4 | 4 | 0 | 100.0 | #25 | [#25](https://github.com/RodReis/rrb-jarvisOS/pull/25) |

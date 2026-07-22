@@ -1,7 +1,7 @@
 # SPEC-Fundacao-03 — Autenticação Google local-first
 
 - MVP: `docs/mvp/mvp-001-fundacao.md` (Fatia 03)
-- Status: **aprovada-pi** (2026-07-21) — todas as perguntas abertas resolvidas pelo PI (duração da sessão offline registrada no ADR-001).
+- Status: **aprovada-pi** (2026-07-21) — todas as perguntas abertas resolvidas pelo PI (duração da sessão offline registrada no ADR-001). **Emenda 2026-07-22 (PI):** +critério de aceite de logging (F06 / CONVENTION §3) — a instrumentação de `auth` vive aqui, não no F06.
 - Dependências: Fatia 01 entregue. Consome contratos da Fatia 04 (`UserProfile`, `Session`, `AuditEvent`).
 - Decisões que sustentam esta spec: ADR-001 (local-first) e **ADR-002** (OAuth dev via projeto Supabase de desenvolvimento na nuvem).
 
@@ -34,7 +34,8 @@ Login Google real via Supabase Auth, com sessão persistida localmente para uso 
 5. Cada transição de auth gera `AuditEvent` com timestamp e user_id.
 6. Estados de erro têm mensagem clara (sem stack trace na UI).
 7. Tokens gravados em disco estão **cifrados** (`safeStorage`/DPAPI) — verificável: o arquivo de sessão não contém o token em claro.
-8. `npm run test` e `npm run lint` passam; fluxo principal coberto por teste (mock do Supabase nos unitários) **e o fluxo feliz de login coberto por E2E Playwright-Electron** — a categoria E2E do `reports/TESTS.md` passa a ter contagem real (ADR-003).
+8. **Instrumenta o logger** (F06 / CONVENTION §3): cada transição de auth (`login`, `logout`, `login-offline-reuse`, erro) emite log na categoria `auth` — `info` no fluxo feliz, `error` na falha — **com redaction comprovada**: teste verifica que o log de login não contém o token nem o refresh token.
+9. `npm run test` e `npm run lint` passam; fluxo principal coberto por teste (mock do Supabase nos unitários) **e o fluxo feliz de login coberto por E2E Playwright-Electron** — a categoria E2E do `reports/TESTS.md` passa a ter contagem real (ADR-003).
 
 ## Perguntas resolvidas pelo PI (2026-07-21)
 
