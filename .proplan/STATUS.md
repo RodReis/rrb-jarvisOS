@@ -9,7 +9,6 @@ updated: 2026-07-22
 
 ### [MVP1] Fundação — esqueleto local-first (Electron + auth + workspaces) (#1)
 
-- [MVP1][F05] Settings mínimo (#6)
 - [MVP1][F03] Autenticação Google local-first (#4)
 
 ### [MVP3] Design System da Plataforma — base única, 2 identidades (#16)
@@ -51,6 +50,7 @@ _(vazio)_
 
 ### [MVP1] Fundação — esqueleto local-first (Electron + auth + workspaces) (#1)
 
+- [MVP1][F05] Settings mínimo (#6, finalizado em: 2026-07-22)
 - [MVP1][F04] Modelo de dados mínimo + AuditEvent stub (#5, finalizado em: 2026-07-22)
 - [MVP1][F02] AppShell e WorkspaceSwitcher (#3, finalizado em: 2026-07-22)
 - [MVP1][F06] Observabilidade e Logging (#8, finalizado em: 2026-07-22)
