@@ -5,6 +5,7 @@ import { AuthService } from './auth/auth-service'
 import { createSupabaseClient, readSupabaseConfig } from './auth/supabase-client'
 import { SafeStorageTokenVault } from './auth/token-vault'
 import { registerIpcHandlers } from './ipc/handlers'
+import { PolicyService } from './policy/policy-service'
 import { PreferencesService } from './preferences/preferences-service'
 import { closeLogger, initLogger, log } from './logging/logger'
 import { initRendererLogBridge } from './logging/renderer-bridge'
@@ -68,11 +69,15 @@ if (!app.requestSingleInstanceLock()) {
     const preferences = new PreferencesService(storage.profiles, LOCAL_USER_ID, () =>
       nativeTheme.shouldUseDarkColors ? 'escuro' : 'claro'
     )
+    // Policy Engine (SPEC-Execucao-02): classifica e audita a decisão. Modo report — não
+    // bloqueia nesta fatia. Compartilha o mesmo `userIdAtual` para a auditoria ser escopada.
+    const policy = new PolicyService(storage.audit, userIdAtual)
 
     registerIpcHandlers({
       audit: storage.audit,
       workspaces,
       preferences,
+      policy,
       userId: userIdAtual,
       auth,
       minimizeToTray: () => janela?.hide()

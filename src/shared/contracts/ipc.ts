@@ -18,6 +18,7 @@ import type {
 } from '../domain/entities'
 import type { AuthSnapshot } from './auth'
 import type { LogInput } from './logging'
+import type { PolicyContext, PolicyDecision } from '../policies/contracts'
 
 /** Canais de request/response (renderer → main → renderer). */
 export const IPC_CHANNELS = {
@@ -48,7 +49,13 @@ export const IPC_CHANNELS = {
    */
   authLogin: 'auth:login',
   /** Revoga a sessão, apaga os tokens e volta para `deslogado` (critério 3). */
-  authLogout: 'auth:logout'
+  authLogout: 'auth:logout',
+  /**
+   * Classifica uma ação pelo Policy Engine e devolve a `PolicyDecision` (SPEC-Execucao-02,
+   * critério 7). O `evaluate` roda no **main** — o renderer nunca avalia política, só lê o
+   * resultado. Modo report: a decisão é auditada, mas nada é barrado nesta fatia.
+   */
+  policyClassify: 'policy:classify'
 } as const
 
 /**
@@ -162,6 +169,13 @@ export interface JarvisBridge {
 
   /** Pede ao main para minimizar a janela para o tray. */
   minimizeToTray(): void
+
+  /**
+   * Classifica uma ação pelo Policy Engine (SPEC-Execucao-02, critério 7). O `evaluate`
+   * roda no main; a UI só lê a `PolicyDecision`. Nesta fatia a decisão é auditada e
+   * devolvida, **nunca** barra a execução (modo report).
+   */
+  classifyAction(action: string, context: PolicyContext): Promise<PolicyDecision>
 }
 
 /** Nome da propriedade exposta via contextBridge no renderer. */

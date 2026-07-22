@@ -12,8 +12,8 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 92 | 92 | 0 | 79.6 | — | — |
-| — | — | — | Banco | 68 | 68 | 0 | 87.0 | — | — |
+| — | — | — | Regras de Negócio | 107 | 107 | 0 | 77.0 | — | — |
+| — | — | — | Banco | 74 | 74 | 0 | 87.0 | — | — |
 | — | — | — | Tela | 33 | 33 | 0 | 93.5 | — | — |
 
 ## Histórico por entrega
@@ -40,3 +40,9 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-07-22 | #15 | spec-execucao-local-01-supabase-local | Regras de Negócio | 92 | 92 | 0 | 79.6 | #32 | [#32](https://github.com/RodReis/rrb-jarvisOS/pull/32) |
 | 2026-07-22 | #15 | spec-execucao-local-01-supabase-local | Banco | 68 | 68 | 0 | 87.0 | #32 | [#32](https://github.com/RodReis/rrb-jarvisOS/pull/32) |
 | 2026-07-22 | #15 | spec-execucao-local-01-supabase-local | Tela | 33 | 33 | 0 | 93.5 | #32 | [#32](https://github.com/RodReis/rrb-jarvisOS/pull/32) |
+| 2026-07-22 | #11 | spec-execucao-local-02-policy-engine | Regras de Negócio | 107 | 107 | 0 | 77.0 | #33 | [#33](https://github.com/RodReis/rrb-jarvisOS/pull/33) |
+| 2026-07-22 | #11 | spec-execucao-local-02-policy-engine | Banco | 74 | 74 | 0 | 87.0 | #33 | [#33](https://github.com/RodReis/rrb-jarvisOS/pull/33) |
+| 2026-07-22 | #11 | spec-execucao-local-02-policy-engine | Tela | 33 | 32 | 1 | 93.5 | #33 | [#33](https://github.com/RodReis/rrb-jarvisOS/pull/33) |
+| 2026-07-22 | #11 | spec-execucao-local-02-policy-engine | Regras de Negócio | 107 | 107 | 0 | 77.0 | #33 | [#33](https://github.com/RodReis/rrb-jarvisOS/pull/33) |
+| 2026-07-22 | #11 | spec-execucao-local-02-policy-engine | Banco | 74 | 74 | 0 | 87.0 | #33 | [#33](https://github.com/RodReis/rrb-jarvisOS/pull/33) |
+| 2026-07-22 | #11 | spec-execucao-local-02-policy-engine | Tela | 33 | 33 | 0 | 93.5 | #33 | [#33](https://github.com/RodReis/rrb-jarvisOS/pull/33) |
