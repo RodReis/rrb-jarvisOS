@@ -1,7 +1,7 @@
 # SPEC-Fundacao-04 — Modelo de dados mínimo + AuditEvent stub
 
 - MVP: `docs/mvp/mvp-001-fundacao.md` (Fatia 04)
-- Status: **aprovada-pi** (2026-07-21) — todas as perguntas abertas resolvidas pelo PI.
+- Status: **aprovada-pi** (2026-07-21) — todas as perguntas abertas resolvidas pelo PI. **Emenda 2026-07-22 (PI):** +critério de aceite de logging (F06 / CONVENTION §3) — a instrumentação de `db` vive aqui, não no F06.
 - Dependências: Fatia 01 entregue. Sustenta as fatias 02 e 03.
 
 ## Objetivo
@@ -36,7 +36,8 @@ Tipar e persistir localmente as quatro entidades mínimas da fundação — `Use
 4. Login, logout e troca de workspace geram `AuditEvent` correto e encadeado (integração com fatias 02/03).
 5. Teste de isolamento por `workspace_id` e por `user_id` passa.
 6. Renderer não lê o storage direto — só via IPC tipado; nenhum token no contrato do renderer nem no SQLite.
-7. `npm run test` e `npm run lint` passam.
+7. **Instrumenta o logger** (F06 / CONVENTION §3): as operações de storage/DB emitem log na categoria `db` — `info` na gravação bem-sucedida, `error` na falha (com `ctx.op`/`ctx.table`, sem valor sensível) — teste verifica que uma falha de gravação emite `error` na categoria `db`.
+8. `npm run test` e `npm run lint` passam.
 
 ## Perguntas resolvidas pelo PI (2026-07-21)
 

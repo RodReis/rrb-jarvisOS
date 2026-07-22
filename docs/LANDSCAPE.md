@@ -46,3 +46,5 @@ Orientação rápida: o que existe, onde vive, e quem manda em quê. Detalhe té
 5. Evolução offline e multiplataforma — voz offline, macOS/Linux, roteamento local.
 
 Detalhe por corte: `docs/iniciais/requisitos-agent-os.md` § MVP Proposto; fases técnicas: `docs/iniciais/plano-implementacao-agent-os.md`.
+
+> **Remapeamento de MVPs (2026-07-21).** Por decisão do PI, o slot **MVP-003** foi redefinido para **Design System da Plataforma** (`docs/mvp/mvp-003-design-system-plataforma.md`) e a "Execução real (terminal + allowlisted)" foi renumerada para **MVP-004** (`docs/mvp/mvp-004-execucao-real.md`). O Design System adota **peso leve solo+IA** — coerente com a suspensão registrada acima (Storybook, regressão visual e governança de 9 passos seguem **fora**); o protótipo `docs/design/design-system/` entra como **referência visual** e a direção do PRD como **implementação tipada** (claro/escuro, WCAG 2.2 AA). Board: renumeração da issue #10 pendente (ver `STATUS.md`).

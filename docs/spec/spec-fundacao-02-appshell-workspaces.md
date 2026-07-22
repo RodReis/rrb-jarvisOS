@@ -1,7 +1,7 @@
 # SPEC-Fundacao-02 — AppShell e WorkspaceSwitcher
 
 - MVP: `docs/mvp/mvp-001-fundacao.md` (Fatia 02)
-- Status: **aprovada-pi** (2026-07-21) — todas as perguntas abertas resolvidas pelo PI.
+- Status: **aprovada-pi** (2026-07-21) — todas as perguntas abertas resolvidas pelo PI. **Emenda 2026-07-22 (PI):** +critério de aceite de logging (F06 / CONVENTION §3) — a instrumentação do `workspace-switch` vive aqui, não no F06.
 - Dependências: Fatia 01 entregue. Contratos de dados da Fatia 04 podem ser detalhados em paralelo (esta spec consome `Workspace`).
 
 ## Objetivo
@@ -34,7 +34,8 @@ Shell visual do app com sidebar, área de conteúdo e alternância NOA ⇄ JARVI
 4. "Sair" no tray encerra o processo por completo.
 5. `Desenvolvimento` não é selecionável nem visível como workspace.
 6. Abrir o app com uma instância já rodando **foca a janela existente** (restaura do tray se preciso), não cria uma segunda.
-7. `npm run test` e `npm run lint` passam.
+7. **Instrumenta o logger** (F06 / CONVENTION §3): a troca de workspace e as ações de janela/tray emitem `info` no fluxo normal e `warn`/`error` na degradação/falha, na categoria `ipc`, com `workspace` correto — teste verifica que a troca NOA⇄JARVIS emite `info` com o espaço destino em `ctx`.
+8. `npm run test` e `npm run lint` passam.
 
 ## Perguntas resolvidas pelo PI (2026-07-21)
 

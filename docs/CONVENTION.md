@@ -12,6 +12,7 @@ O board é uma **projeção** das GitHub Issues: `issue → coluna` por **label 
 |---|---|---|---|
 | `proplan:mvp` | — (épico) | open até o PI fechar | Container de fatias; corpo = checklist |
 | `proplan:backlog` | Backlog | open | Spec `aprovada-pi`, aguardando fila |
+| `proplan:next` | — (marcador, fica no card do topo do Backlog) | open | Cabeça da fila do `docs/STATUS.md` — o próximo card a puxar. Não é coluna |
 | `proplan:todo` | A Fazer | open | Próxima fatia; Code se atribuiu |
 | `proplan:doing` | Em Andamento | open | Em implementação (WIP = 1) |
 | `proplan:done` | Feito | open | PR **mergeado**, aguardando aceite do PI |
@@ -21,6 +22,8 @@ O board é uma **projeção** das GitHub Issues: `issue → coluna` por **label 
 ### Regras invariantes
 
 - Uma issue de fatia tem **exatamente um** label `proplan:*` de coluna por vez; a transição troca o label, nunca acumula.
+- `proplan:next` é **marcador, não coluna**: coexiste com `proplan:backlog` (fica no card do topo da fila) e **não** viola a regra acima. No máximo **um** `proplan:next` entre as issues abertas — zero quando a fila esvazia.
+- A **ordem da fila** é decisão do PI e vive **só** no `docs/STATUS.md`. `proplan:next` é a projeção da **cabeça** dessa fila no board, nunca uma segunda fonte da ordem completa. O **Cowork** marca `next` na cabeça ao montar/reordenar o Backlog; o **Code**, ao puxar o card `next` para A Fazer, **avança o marcador** para o próximo item da fila do STATUS.md — ação mecânica que segue a ordem, não decide prioridade.
 - **`closes #N` é proibido** em PR/commit — forjaria o aceite. Sempre `refs #N`.
 - Issue nunca é deletada; descarte = `closed` + `proplan:descartado`.
 - Mover para Finalizado/Descartado posta comentário de carimbo na issue.
