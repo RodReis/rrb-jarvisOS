@@ -35,7 +35,7 @@ Postgres; o "banco" é a persistência local, ver ADR-001 e a SPEC-Fundacao-04):
 | Categoria | Camada | O que prova | Stack | Velocidade |
 |---|---|---|---|---|
 | **Regras de Negócio** | Unidade (base) | Lógica de domínio pura: uma função/regra/policy faz o que deve, isolada de storage, IPC e rede | Vitest — `src/shared/**/*.spec.ts` e `src/main/**/*.spec.ts` | rápida (ms) |
-| **Banco** | Integração (meio) | Persistência local real: o adapter de storage (**SQLite** — proposta SPEC-04) contra um arquivo temporário; round-trip IPC↔runtime↔storage | Vitest — `src/main/**/*.int-spec.ts` e `tests/**/*.int-spec.ts`, SQLite temp | média (s) |
+| **Banco** | Integração (meio) | Storage real, não dublê: **SQLite** (`better-sqlite3`) contra arquivo temporário, round-trip IPC↔runtime↔storage — e, desde a M2-F01, a **RLS do Supabase local** contra a stack Docker | Vitest — `src/main/**/*.int-spec.ts` e `tests/**/*.int-spec.ts` | média (s) |
 | **Tela** | Componente + E2E (topo) | UI: componente renderiza/reage certo (Vitest + Testing Library + jsdom) e fluxo crítico funciona no app real (Playwright-Electron) | Vitest — `src/renderer/**/*.test.tsx`; Playwright — `e2e/**/*.spec.ts` | componente rápida / e2e lenta |
 
 Notas de aprendizado:
@@ -253,9 +253,21 @@ registradas no código de referência da §10):
 
 Dispara em **todo pull request** para `main`. Job `test`:
 
-- **Services:** **nenhum por padrão.** O "Banco" testa o storage local (SQLite em arquivo temp),
-  que não é serviço. (Se um dia a fase de persistência Docker/Supabase local exigir Postgres real
-  em algum int-spec, o serviço entra aqui — até lá, não.)
+- **Services:** **nenhum** no sentido do `services:` do Actions. A maior parte do "Banco" testa o
+  storage local (SQLite em arquivo temp), que não é serviço. Desde a **M2-F01** (entregue em
+  2026-07-22) há uma exceção: o int-spec de RLS exige o **Supabase local**, que sobe pela CLI
+  (`supabase/setup-cli` + `supabase start`) e não por `services:` — não é um container só, e sim a
+  stack que a CLI orquestra (Postgres + PostgREST + Auth), com migrations e seed aplicados no start.
+  - **Pular, no CI, é falha.** Esses testes se pulam quando a stack não responde, para não punir
+    quem clona o repo sem Docker. No CI a stack sobe de propósito, então o `beforeAll` **lança**
+    quando `process.env.CI` está setado. Sem isso, uma stack que não subisse deixaria o CI verde
+    sobre RLS jamais exercitada — o relatório contaria a categoria como coberta. Falso verde é
+    pior que teste ausente: ele *afirma* a garantia que não foi medida.
+  - **Role não-owner, sempre.** O Postgres pula RLS para superuser e para o dono da tabela. Todo
+    teste de isolamento fala pelo PostgREST com JWT de usuário final; usar a conexão do owner
+    faria as asserções passarem sem tocar em política nenhuma. A única exceção deliberada é o
+    teste do trigger append-only, que **precisa** do owner justamente para provar a camada que
+    protege contra quem escapa da RLS.
 - **Passos:**
   1. `npm ci`.
   2. **Domínio/main:** `vitest run` das categorias `regras` e `banco` com `--coverage --reporter=json`.
@@ -320,9 +332,11 @@ Para o Code implementar **na Fatia 01** e o PI conferir:
   for pequena (3 testes, ~2s local); com `xvfb-run` (Electron precisa de display). Reavaliar
   (label/condicional) se o tempo de CI incomodar. `workers: 1` é obrigatório, não preferência: o
   `requestSingleInstanceLock()` (SPEC-02) faz instâncias paralelas se derrubarem entre si.
-- **Storage do "Banco":** o setup concreto (arquivo temp, migrations de teste) **finaliza quando a
-  SPEC-Fundacao-04 decidir SQLite vs JSON**. A metodologia (3 categorias, evidência de máquina,
-  anti-drift) independe dessa escolha.
+- **Storage do "Banco":** decidido na **SPEC-Fundacao-04** — **SQLite** (`better-sqlite3`) contra
+  arquivo temporário, com as migrations reais e teardown por teste. Desde a **M2-F01** a categoria
+  cobre também o **Supabase local** (RLS, ver §6): a régua da categoria é *"integração com storage
+  real"*, não *"SQLite"*. `fileParallelism: false` continua obrigatório — integração toca disco e
+  singletons de processo (o logger é um), e em paralelo um arquivo derruba o outro.
 
 Governadas pelo **ADR-003** (`docs/DECISIONS.md`).
 
