@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppInfo } from '@shared/contracts/ipc'
 import { App } from './App'
 
@@ -10,9 +10,11 @@ const appInfo: AppInfo = {
   environment: 'development'
 }
 
+const sendLog = vi.fn()
+
 function mockarPonte(getAppInfo: () => Promise<AppInfo>): void {
   Object.defineProperty(window, 'jarvis', {
-    value: { getAppInfo },
+    value: { getAppInfo, sendLog },
     configurable: true,
     writable: true
   })
@@ -20,6 +22,7 @@ function mockarPonte(getAppInfo: () => Promise<AppInfo>): void {
 
 describe('App', () => {
   beforeEach(() => {
+    sendLog.mockClear()
     mockarPonte(() => Promise.resolve(appInfo))
   })
 
@@ -47,6 +50,25 @@ describe('App', () => {
     render(<App />)
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Não foi possível carregar as informações do app.'
+    )
+  })
+
+  it('loga o carregamento da tela (regra "todo método loga")', async () => {
+    render(<App />)
+    await screen.findByText('43.2.0')
+
+    expect(sendLog).toHaveBeenCalledWith(
+      expect.objectContaining({ level: 'info', category: 'ui', msg: 'Tela inicial carregada' })
+    )
+  })
+
+  it('loga como error a falha da ponte, além de mostrá-la', async () => {
+    mockarPonte(() => Promise.reject(new Error('falhou')))
+    render(<App />)
+    await screen.findByRole('alert')
+
+    expect(sendLog).toHaveBeenCalledWith(
+      expect.objectContaining({ level: 'error', category: 'ui' })
     )
   })
 })

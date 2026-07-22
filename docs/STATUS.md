@@ -12,14 +12,21 @@ Atualizado em: **2026-07-22**. Mantido pelo Code a cada entrega (junto com `DEVE
 | [#4](https://github.com/RodReis/rrb-jarvisOS/issues/4) | 03 Auth Google local-first | MVP-001 (#1) | `spec-fundacao-03-auth-google.md` | F03 |
 | [#5](https://github.com/RodReis/rrb-jarvisOS/issues/5) | 04 Dados mínimos + AuditEvent | MVP-001 (#1) | `spec-fundacao-04-dados-audit.md` | F04 |
 | [#6](https://github.com/RodReis/rrb-jarvisOS/issues/6) | 05 Settings mínimo | MVP-001 (#1) | `spec-fundacao-05-settings.md` | F05 |
-| [#8](https://github.com/RodReis/rrb-jarvisOS/issues/8) | 06 Observabilidade e Logging | MVP-001 (#1) | `spec-fundacao-06-observabilidade-logging.md` | F06 |
 | [#11](https://github.com/RodReis/rrb-jarvisOS/issues/11) | 02 Policy Engine mínimo (classificação) | MVP-002 (#9) | `spec-execucao-local-02-policy-engine.md` | M2-F02 |
 | [#12](https://github.com/RodReis/rrb-jarvisOS/issues/12) | 03 Diretórios permitidos (allowlist) | MVP-002 (#9) | `spec-execucao-local-03-allowlist-diretorios.md` | M2-F03 |
 | [#13](https://github.com/RodReis/rrb-jarvisOS/issues/13) | 04 Registro de workflows + automações | MVP-002 (#9) | `spec-execucao-local-04-registro-workflows.md` | M2-F04 |
 | [#14](https://github.com/RodReis/rrb-jarvisOS/issues/14) | 05 Motor de execução simulado | MVP-002 (#9) | `spec-execucao-local-05-execucao-simulada.md` | M2-F05 |
 | [#15](https://github.com/RodReis/rrb-jarvisOS/issues/15) | 01 Supabase local + ambiente de sync | MVP-002 (#9) | `spec-execucao-local-01-supabase-local.md` | M2-F01 |
 
-> A Fatia 06 saiu como **#8** (o número 7 já estava ocupado). Sub-issue do épico #1; label `proplan:backlog`, assignee PI.
+> **`proplan:next`** (cabeça da fila) está em **[#5](https://github.com/RodReis/rrb-jarvisOS/issues/5) — F04**, não na #3: 02/03 consomem os contratos tipados da 04 (decisão de 2026-07-22, `DECISIONS.md`).
+
+### Em Andamento (`proplan:doing`)
+
+| Issue | Fatia | MVP | Spec | Índice | Branch |
+|---|---|---|---|---|---|
+| [#8](https://github.com/RodReis/rrb-jarvisOS/issues/8) | 06 Observabilidade e Logging | MVP-001 (#1) | `spec-fundacao-06-observabilidade-logging.md` | F06 | `feat/observabilidade-logging` |
+
+> A Fatia 06 saiu como **#8** (o número 7 já estava ocupado). Sub-issue do épico #1; assignee PI.
 
 ### Feito (`proplan:done` — entregue, aguardando aceite do PI)
 
@@ -27,7 +34,7 @@ Atualizado em: **2026-07-22**. Mantido pelo Code a cada entrega (junto com `DEVE
 |---|---|---|---|---|---|
 | [#2](https://github.com/RodReis/rrb-jarvisOS/issues/2) | 01 Bootstrap e estrutura | MVP-001 (#1) | `spec-fundacao-01-bootstrap.md` | F01 | [#25](https://github.com/RodReis/rrb-jarvisOS/pull/25) |
 
-### A Fazer · Em Andamento · Finalizado
+### A Fazer · Finalizado
 
 *(vazios)*
 
@@ -66,7 +73,7 @@ Não há catálogo numérico `SPEC-nnn` para o MVP-001: as specs são identifica
 
 ## Próximas ações
 
-1. ~~**Code**: mover a Fatia 01 (#2) para A Fazer → Em Andamento e iniciar~~ — **em andamento** (2026-07-22): #2 em `proplan:doing`, branch `feat/bootstrap`, critérios de aceite verificados, PR aberto. Próxima da fila: Fatia 06 (#8). Ordem: 01 → 06 (#8) → 02/04 → 03 → 05.
+1. **Fila do MVP-001** (2026-07-22): F01 (#2) entregue → **F06 (#8) em andamento** (`proplan:doing`). Cabeça da fila marcada com `proplan:next` = **F04 (#5)**. Ordem: **01 → 06 (#8) → 04 (#5) → 02 (#3) → 03 (#4) → 05 (#6)** — F04 antes de F02 porque 02/03 consomem seus contratos tipados (decisão do PI delegada ao Cowork, 2026-07-22).
 2. ~~Resolver as "Perguntas ao PI" das specs do MVP-003~~ — **feito** (2026-07-21): as 8 specs estão `aprovada-pi`.
 3. ~~Renumerar #10 → MVP-004 e criar o épico MVP-003 + issues~~ — **feito** (2026-07-21): #10 retitulada MVP-004 (carimbo), épico **#16** criado, 8 filhas **#17–#24** em Backlog e vinculadas.
 4. **Code**: quando MVP-001/002 estiverem entregues, iniciar o MVP-003 pela F01 (#17); WIP = 1, na ordem F01 → F02 → (F03a/F03b/F05) → F04a → F04b → F06.

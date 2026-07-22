@@ -33,7 +33,10 @@ export default defineConfig({
         test: {
           name: 'banco',
           environment: 'node',
-          include: ['src/main/**/*.int-spec.ts', 'tests/**/*.int-spec.ts']
+          include: ['src/main/**/*.int-spec.ts', 'tests/**/*.int-spec.ts'],
+          // Integração toca disco e singletons de processo (o logger é um): em paralelo,
+          // um arquivo derruba o outro. Serial é o que torna a categoria determinística.
+          fileParallelism: false
         }
       },
       {

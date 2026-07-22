@@ -4,7 +4,7 @@
 
 Regra de trabalho: **uma fatia por vez (WIP = 1)**. Só iniciar fatia com spec `aprovada-pi` e issue criada.
 
-**Ordem de execução:** 01 → **06 (logging, infra transversal)** → 02 e 04 (em paralelo) → 03 → 05. A Fatia 06 roda logo após a 01 porque 02–05 devem logar desde o início (as seções abaixo estão em ordem numérica; a 06 aparece após a 01 por ser quando ela executa).
+**Ordem de execução:** 01 → **06 (logging, infra transversal)** → 04 → 02 → 03 → 05. A Fatia 06 roda logo após a 01 porque 02–05 devem logar desde o início; a 04 vem antes da 02 porque 02/03 consomem seus contratos tipados (decisão de 2026-07-22). As seções abaixo estão em ordem numérica; a 06 aparece após a 01 por ser quando ela executa.
 
 ## MVP-001 — Fundação
 
@@ -32,15 +32,24 @@ Status: **entregue** (`proplan:done`, aguardando aceite do PI) — spec `aprovad
 
 ### Fatia 06 — Observabilidade e Logging (`docs/spec/spec-fundacao-06-observabilidade-logging.md`)
 
-Status: spec `aprovada-pi` (2026-07-21); issue **#8** em Backlog. **Roda após a 01, antes de 02–05** (infra transversal — ADR-005).
+Status: **em andamento** (`proplan:doing`) — spec `aprovada-pi` (2026-07-21, emendada em 2026-07-22); issue **#8**; branch `feat/observabilidade-logging`. **Roda após a 01, antes de 02–05** (infra transversal — ADR-005).
 
-- [ ] `electron-log` no renderer (captura + IPC) + `winston`/`daily-rotate-file` no main como **escritor único**; ponte roteando renderer→winston
-- [ ] Registro JSON estruturado (`ts/level/category/direction/workspace/msg/ctx/correlationId/…`) com `msg` em pt-BR e redaction obrigatória
-- [ ] Retenção por nível zipada e local: info 3d / warn 7d / error 10d (verificar poda dos `.gz`)
-- [ ] Categorias `integracao/ai/agent/db/auth/ipc/ui/sistema`; contrato in/out definido mesmo sem fluxo p/ ai/agent/integração
-- [ ] Regra "todo método loga" aplicada a auth/workspace-switch/db/ipc; tag `workspace` (NOA/JARVIS)
-- [ ] Fronteira log ≠ AuditEvent respeitada; testes de retenção-poda e redaction
-- [ ] Entrega: PR `refs #N`; docs/ commitados
+- [x] `electron-log` no renderer (captura + IPC) + `winston`/`daily-rotate-file` no main como **escritor único**; ponte roteando renderer→winston
+- [x] Registro JSON estruturado (`ts/level/category/direction/workspace/msg/ctx/correlationId/…`) com `msg` em pt-BR e redaction obrigatória
+- [x] Retenção por nível zipada e local: info 3d / warn 7d / error 10d (poda dos `.gz` verificada — ver decisão 3 abaixo)
+- [x] Categorias `integracao/ai/agent/db/auth/ipc/ui/sistema`; contrato in/out definido mesmo sem fluxo p/ ai/agent/integração
+- [x] Regra "todo método loga" aplicada aos fluxos que já existem (`ipc`, `sistema`, `ui`); tag `workspace` (NOA/JARVIS/sistema). `auth` (F03), `db` (F04) e workspace-switch (F02) instrumentam nas próprias fatias — **emenda do PI de 2026-07-22**
+- [x] Fronteira log ≠ AuditEvent respeitada (stores separados; AuditEvent nasce na F04); testes de retenção-poda e redaction
+- [x] Entrega: PR [#27](https://github.com/RodReis/rrb-jarvisOS/pull/27) (`refs #8`); docs/ commitados; relatório carimbado (Regras 49, Banco 8, Tela 13)
+
+**Decisões técnicas desta fatia** (nenhuma altera escopo; registradas para não serem re-litigadas):
+
+1. **Um arquivo por nível, com filtro de nível exato** — `level: 'info'` num transport do winston significa "info **e tudo mais severo**". Um transport por nível sem filtro colocaria os `error` também no arquivo de info, e eles seriam podados em **3 dias em vez de 10** — a retenção por nível deixaria de valer. O filtro `exactLevel` é o que faz a decisão do PI (info 3d / warn 7d / error 10d) ser verdade no disco.
+2. **Redaction em `src/shared`, aplicada nos dois lados** — é regra pura (sem Electron, sem IO), então mora junto do contrato e é testável direto. Roda no renderer (para o segredo não chegar a trafegar no IPC) e de novo no main antes de gravar. Objeto que se declara `sensitivity: credential|secret|personal|financial|health` é redigido **inteiro**: redigir só o campo `sensitivity` deixaria o valor rotulado passar.
+3. **O gotcha do `.gz` não se aplica a esta versão** — a spec (§ Observações) alerta que `winston-daily-rotate-file` poderia não podar os `.gz`, porque a poda do `file-stream-rotator` apaga `file.name`, o nome **sem** extensão de compactação. Verificado no código da versão instalada (**5.0.0**): o evento `logRemoved` apaga `params.name + '.gz'`. Há teste que prova isso na versão instalada, em vez de confiar na leitura.
+4. **Payload do IPC é validado antes de gravar** — o renderer é fronteira de confiança mesmo sendo nosso código. `parseLogInput` descarta registro que não casa com o contrato (categoria inventada, nível fora da lista) e **não** deixa o renderer forjar `source`. Descartar é deliberado: gravar registro malformado polui a evidência.
+5. **Console de dev decidido por `app.isPackaged`, não `NODE_ENV`** — no app empacotado a variável costuma vir vazia, e o console ficaria ligado em produção. Mesma lição da decisão 3 da Fatia 01. O sinal entra como parâmetro de `initLogger`, o que mantém o módulo testável sem carregar o Electron.
+6. **`fileParallelism: false` na categoria Banco** — testes de integração tocam disco e o logger é um singleton de processo; em paralelo, um arquivo derruba o outro. Serial é o que torna a categoria determinística.
 
 ### Fatia 02 — AppShell e WorkspaceSwitcher (`docs/spec/spec-fundacao-02-appshell-workspaces.md`)
 
@@ -156,3 +165,4 @@ Ordem: MVP-002 (fundação de execução) → **MVP-003** ([#10](https://github.
 | Data | Fatia | PR | Observação |
 |---|---|---|---|
 | 2026-07-22 | MVP-001 · F01 Bootstrap e estrutura (#2) | [#25](https://github.com/RodReis/rrb-jarvisOS/pull/25) | CI verde na 1ª execução. Relatório ADR-003 ativo: selfcheck 10/10, guarda anti-drift verificada nos dois sentidos. Regras 14 (85%), Tela 4 (100%), Banco 0 (F04). |
+| 2026-07-22 | MVP-001 · F06 Observabilidade e Logging (#8) | [#27](https://github.com/RodReis/rrb-jarvisOS/pull/27) | Regras 49 (87.2%), **Banco 8 (85.5%)**, Tela 13 (97.6%). A categoria **Banco deixa de estar vazia antes da F04**: os testes de integração do logger tocam disco real (arquivo temporário, teardown por teste), que é exatamente o que a categoria mede — o `TESTING.md` §8 previa SQLite como primeiro caso, mas a régua é "integração com storage local", não "SQLite". Verificado também no app real: os três arquivos nascem em `userData/logs` e o registro do renderer chega ao disco. |
