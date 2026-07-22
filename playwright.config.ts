@@ -23,6 +23,12 @@ export default defineConfig({
   // falha real — que reprova nas duas tentativas.
   retries: process.env.CI ? 1 : 0,
   timeout: 60_000,
+  expect: {
+    // O runner do CI é mais lento que a máquina de dev no primeiro boot do Electron
+    // (cold start, disco compartilhado). 15s evita falso vermelho sem esconder trava
+    // real — o timeout do teste (60s) continua sendo o limite que importa.
+    timeout: 15_000
+  },
   reporter: [
     ['list'],
     // Caminho que o `test-report.config.json` já declara para a categoria Tela.

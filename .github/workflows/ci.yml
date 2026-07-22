@@ -61,10 +61,17 @@ jobs:
         run: npm ci
 
       # O E2E sobe o Electron de verdade (SPEC-Fundacao-03, critério 9), e no Linux
-      # do CI isso exige as libs de sistema que o Playwright instala. `--with-deps`
-      # cobre exatamente esse caso.
+      # do CI isso exige as libs de sistema que o Playwright instala.
       - name: Instalar dependências de sistema do Playwright
         run: npx playwright install-deps
+
+      # Baixa o binário do Electron ANTES dos testes. O `postinstall` do projeto é
+      # `electron-rebuild` (compila o better-sqlite3), que **não** baixa o binário — e o
+      # download de ~100 MB acontecia dentro do primeiro teste, estourando os 30s do
+      # `firstWindow()`. O sintoma engana: o processo sobe e a janela nunca abre, sem
+      # erro de biblioteca no log. Fora do teste, o tempo de download não conta no timeout.
+      - name: Baixar o binário do Electron
+        run: node node_modules/electron/install.js
 
       - name: Lint e typecheck
         run: |

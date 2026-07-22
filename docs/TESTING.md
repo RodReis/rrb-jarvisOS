@@ -97,9 +97,22 @@ comportamentos corretos dele. Quem for escrever ou depurar E2E aqui deve ler ant
    é a instância única funcionando. Ao investigar falha de launch, limpe primeiro:
    `taskkill //F //IM electron.exe`.
 
+4. **No CI, baixe o binário do Electron antes dos testes.** O `postinstall` do projeto é
+   `electron-rebuild` (compila o `better-sqlite3`) e **não** baixa o binário. Sem um passo
+   explícito, o download de ~100 MB acontece dentro do primeiro teste e estoura os 30s do
+   `firstWindow()`. O sintoma engana de novo: `Timeout exceeded while waiting for event
+   "window"`, sem erro de biblioteca — a única pista é um `Downloading Electron binary...`
+   perdido no meio da saída. O `ci.yml` roda `node node_modules/electron/install.js`
+   (idempotente) logo após o `npm ci`.
+
 **O E2E exige build.** O Playwright sobe o app empacotado (`out/`), não o servidor de dev —
 rodá-lo sem `npm run build` testaria a versão anterior do código. O orquestrador
 (`scripts/test-report.mjs`) já faz o build antes de chamar o Playwright.
+
+**Padrão das quatro armadilhas:** nenhuma se apresenta como o que é. Falha de launch do
+Electron no CI quase sempre reporta timeout ou "browser has been closed" — mensagens que
+apontam para o Playwright quando a causa está no ambiente. Antes de mexer no teste, confira
+binário, display e processos remanescentes.
 
 > **Por que Vitest único, e não Jest+projects como no proplan.** O jarvis é Vite-nativo; Vitest é
 > o runner natural (mesma config, mesmo transform). O relatório `--json` do Vitest é
