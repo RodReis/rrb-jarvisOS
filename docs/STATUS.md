@@ -9,7 +9,6 @@ Atualizado em: **2026-07-22**. Mantido pelo Code a cada entrega (junto com `DEVE
 | Issue | Fatia | MVP | Spec | Índice |
 |---|---|---|---|---|
 | [#4](https://github.com/RodReis/rrb-jarvisOS/issues/4) | 03 Auth Google local-first | MVP-001 (#1) | `spec-fundacao-03-auth-google.md` | F03 |
-| [#6](https://github.com/RodReis/rrb-jarvisOS/issues/6) | 05 Settings mínimo | MVP-001 (#1) | `spec-fundacao-05-settings.md` | F05 |
 | [#11](https://github.com/RodReis/rrb-jarvisOS/issues/11) | 02 Policy Engine mínimo (classificação) | MVP-002 (#9) | `spec-execucao-local-02-policy-engine.md` | M2-F02 |
 | [#12](https://github.com/RodReis/rrb-jarvisOS/issues/12) | 03 Diretórios permitidos (allowlist) | MVP-002 (#9) | `spec-execucao-local-03-allowlist-diretorios.md` | M2-F03 |
 | [#13](https://github.com/RodReis/rrb-jarvisOS/issues/13) | 04 Registro de workflows + automações | MVP-002 (#9) | `spec-execucao-local-04-registro-workflows.md` | M2-F04 |
@@ -27,6 +26,7 @@ Atualizado em: **2026-07-22**. Mantido pelo Code a cada entrega (junto com `DEVE
 | [#2](https://github.com/RodReis/rrb-jarvisOS/issues/2) | 01 Bootstrap e estrutura | MVP-001 (#1) | `spec-fundacao-01-bootstrap.md` | F01 | [#25](https://github.com/RodReis/rrb-jarvisOS/pull/25) |
 | [#5](https://github.com/RodReis/rrb-jarvisOS/issues/5) | 04 Dados mínimos + AuditEvent | MVP-001 (#1) | `spec-fundacao-04-dados-audit.md` | F04 | [#28](https://github.com/RodReis/rrb-jarvisOS/pull/28) |
 | [#3](https://github.com/RodReis/rrb-jarvisOS/issues/3) | 02 AppShell e WorkspaceSwitcher | MVP-001 (#1) | `spec-fundacao-02-appshell-workspaces.md` | F02 | [#28](https://github.com/RodReis/rrb-jarvisOS/pull/28) |
+| [#6](https://github.com/RodReis/rrb-jarvisOS/issues/6) | 05 Settings mínimo | MVP-001 (#1) | `spec-fundacao-05-settings.md` | F05 | [#29](https://github.com/RodReis/rrb-jarvisOS/pull/29) |
 
 > **04 e 02 saíram no mesmo PR**, por decisão do PI (2026-07-22): o critério 4 da SPEC-04 exige `AuditEvent` de `workspace-switch`, cujo fluxo nasce na F02 — separá-las exigiria um stub que a F02 jogaria fora. O critério 4 fica **parcialmente atendido**: `workspace-switch` está provado ponta a ponta; `login`/`logout`/`login-offline-reuse` têm o tipo no contrato e o fluxo nasce na F03.
 
@@ -65,7 +65,7 @@ Não há catálogo numérico `SPEC-nnn` para o MVP-001: as specs são identifica
 
 | MVP | Issue | Estado | Fatias fechadas |
 |---|---|---|---|
-| MVP-001 Fundação | [#1](https://github.com/RodReis/rrb-jarvisOS/issues/1) | épico criado (`proplan:mvp`); **F06 aceita** (#8 `proplan:finalizado`); **F01, F04 e F02 entregues** aguardando aceite (#2, #5, #3 em `proplan:done`); **F03 (#4) bloqueada** por credenciais; F05 (#6) é a cabeça da fila | **1 / 6** *(aceitas)* · 4 / 6 entregues |
+| MVP-001 Fundação | [#1](https://github.com/RodReis/rrb-jarvisOS/issues/1) | **5 das 6 fatias entregues** (#2, #3, #5, #6, #8). Resta só a **F03 (#4), bloqueada** por credenciais Supabase/Google — quando ela entrar, o épico fecha | 4 / 6 *(aceitas)* · **5 / 6 entregues** |
 | MVP-002 Execução local controlada (fundação) | [#9](https://github.com/RodReis/rrb-jarvisOS/issues/9) | épico criado; 5 fatias com spec **`aprovada-pi`** em Backlog (#11–#15) | 0 / 5 |
 | MVP-003 Design System da Plataforma (base única, 2 identidades) | [#16](https://github.com/RodReis/rrb-jarvisOS/issues/16) | épico criado; **8 fatias** em Backlog (#17–#24), todas com spec `aprovada-pi` | 0 / 8 |
 | MVP-004 Execução real (terminal + execução allowlisted) | [#10](https://github.com/RodReis/rrb-jarvisOS/issues/10) | renumerado de MVP-003 (título/rótulo atualizados + carimbo); 2 fatias lazy | 0 / 2 |
@@ -75,7 +75,7 @@ Não há catálogo numérico `SPEC-nnn` para o MVP-001: as specs são identifica
 
 ## Próximas ações
 
-1. **Fila do MVP-001** (2026-07-22): **F06 (#8) aceita e finalizada**; F01 (#2) entregue aguardando aceite; **F04 (#5) e F02 (#3) entregues juntas** no PR [#28](https://github.com/RodReis/rrb-jarvisOS/pull/28). Cabeça da fila (`proplan:next`) = **F05 (#6)** — e não a F03 (#4), que está **bloqueada** por falta de credenciais Supabase/Google (só o PI pode criá-las). Ordem executada: **01 → 06 → 04+02 → 05 → 03 (quando desbloquear)**.
+1. **MVP-001 quase fechado** (2026-07-22): **5 das 6 fatias entregues** — F01 (#2), F06 (#8), F04 (#5), F02 (#3) e F05 (#6). Ordem executada: **01 → 06 → 04+02 → 05**. Resta a **F03 (#4)**, marcada com `proplan:next` mas **bloqueada**: depende de credenciais Supabase/Google que só o PI pode criar (ver ação 5). Enquanto isso, a fila do MVP-001 está vazia — o próximo trabalho desbloqueado é o **MVP-002** (#9), cuja F01 (#15) é independente das demais.
 2. ~~Resolver as "Perguntas ao PI" das specs do MVP-003~~ — **feito** (2026-07-21): as 8 specs estão `aprovada-pi`.
 3. ~~Renumerar #10 → MVP-004 e criar o épico MVP-003 + issues~~ — **feito** (2026-07-21): #10 retitulada MVP-004 (carimbo), épico **#16** criado, 8 filhas **#17–#24** em Backlog e vinculadas.
 4. **Code**: quando MVP-001/002 estiverem entregues, iniciar o MVP-003 pela F01 (#17); WIP = 1, na ordem F01 → F02 → (F03a/F03b/F05) → F04a → F04b → F06.

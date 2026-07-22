@@ -9,6 +9,7 @@ import {
 import { parseLogInput } from '@shared/contracts/logging-input'
 import { isWorkspaceId, type AuditEvent, type AuditEventType } from '@shared/domain/entities'
 import { log, writeLog } from '../logging/logger'
+import type { PreferencesService } from '../preferences/preferences-service'
 import type { AuditRepository } from '../storage/audit-repository'
 import type { WorkspaceService } from '../workspace/workspace-service'
 
@@ -29,6 +30,7 @@ export function buildAppInfo(): AppInfo {
 export interface IpcDependencies {
   readonly audit: AuditRepository
   readonly workspaces: WorkspaceService
+  readonly preferences: PreferencesService
   readonly userId: string
   /** Minimizar para o tray. Injetado porque a janela nasce depois dos handlers. */
   readonly minimizeToTray: () => void
@@ -118,6 +120,30 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       }
     }
   )
+
+  ipcMain.handle(IPC_CHANNELS.preferencesGet, () => deps.preferences.atual())
+
+  ipcMain.handle(IPC_CHANNELS.preferencesSave, (_event, payload: unknown) => {
+    // O serviço descarta campo fora do enum; aqui basta garantir que é objeto.
+    const pedido = typeof payload === 'object' && payload !== null ? payload : {}
+
+    try {
+      const resultado = deps.preferences.salvar(pedido)
+      log.ipc.info('Preferências atualizadas', {
+        canal: IPC_CHANNELS.preferencesSave,
+        direction: 'out',
+        idioma: resultado.locale,
+        tema: resultado.theme
+      })
+      return resultado
+    } catch (error) {
+      log.ipc.error('Falha ao gravar preferências', {
+        canal: IPC_CHANNELS.preferencesSave,
+        error
+      })
+      throw error
+    }
+  })
 
   // Só de ida: o renderer manda o registro, o main grava. Sem resposta de propósito —
   // esperar confirmação de log tornaria a UI refém do disco.

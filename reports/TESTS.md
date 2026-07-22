@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 78 | 78 | 0 | 86.6 | — | — |
-| — | — | — | Banco | 32 | 32 | 0 | 89.5 | — | — |
-| — | — | — | Tela | 16 | 16 | 0 | 98.5 | — | — |
+| — | — | — | Regras de Negócio | 83 | 83 | 0 | 84.0 | — | — |
+| — | — | — | Banco | 45 | 45 | 0 | 89.6 | — | — |
+| — | — | — | Tela | 22 | 22 | 0 | 95.5 | — | — |
 
 ## Histórico por entrega
 
@@ -31,3 +31,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-07-22 | #5 | spec-fundacao-04-dados-audit | Regras de Negócio | 78 | 78 | 0 | 86.6 | #28 | [#28](https://github.com/RodReis/rrb-jarvisOS/pull/28) |
 | 2026-07-22 | #5 | spec-fundacao-04-dados-audit | Banco | 32 | 32 | 0 | 89.5 | #28 | [#28](https://github.com/RodReis/rrb-jarvisOS/pull/28) |
 | 2026-07-22 | #5 | spec-fundacao-04-dados-audit | Tela | 16 | 16 | 0 | 98.5 | #28 | [#28](https://github.com/RodReis/rrb-jarvisOS/pull/28) |
+| 2026-07-22 | #6 | spec-fundacao-05-settings | Regras de Negócio | 83 | 83 | 0 | 84.0 | #29 | [#29](https://github.com/RodReis/rrb-jarvisOS/pull/29) |
+| 2026-07-22 | #6 | spec-fundacao-05-settings | Banco | 45 | 45 | 0 | 89.6 | #29 | [#29](https://github.com/RodReis/rrb-jarvisOS/pull/29) |
+| 2026-07-22 | #6 | spec-fundacao-05-settings | Tela | 22 | 22 | 0 | 95.5 | #29 | [#29](https://github.com/RodReis/rrb-jarvisOS/pull/29) |

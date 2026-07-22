@@ -6,10 +6,16 @@ import {
   type AppInfo,
   type AuditVerification,
   type JarvisBridge,
+  type PreferencesSnapshot,
   type WorkspaceSwitchResult
 } from '@shared/contracts/ipc'
 import type { LogInput } from '@shared/contracts/logging'
-import type { AuditEvent, AuditEventType, WorkspaceId } from '@shared/domain/entities'
+import type {
+  AuditEvent,
+  AuditEventType,
+  UserPreferences,
+  WorkspaceId
+} from '@shared/domain/entities'
 
 /**
  * Preload — a ponte tipada e o único ponto de contato do renderer com o main.
@@ -31,6 +37,11 @@ const bridge: JarvisBridge = {
   getWorkspace: (): Promise<WorkspaceId> => ipcRenderer.invoke(IPC_CHANNELS.workspaceGet),
   switchWorkspace: (workspace: WorkspaceId): Promise<WorkspaceSwitchResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.workspaceSwitch, workspace),
+
+  getPreferences: (): Promise<PreferencesSnapshot> =>
+    ipcRenderer.invoke(IPC_CHANNELS.preferencesGet),
+  savePreferences: (preferences: UserPreferences): Promise<PreferencesSnapshot> =>
+    ipcRenderer.invoke(IPC_CHANNELS.preferencesSave, preferences),
 
   minimizeToTray: (): void => ipcRenderer.send(IPC_SEND_CHANNELS.windowMinimizeToTray)
 }

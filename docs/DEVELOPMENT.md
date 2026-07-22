@@ -114,13 +114,23 @@ Status: **entregue** — spec `aprovada-pi` (2026-07-21, emendada em 2026-07-22)
 
 ### Fatia 05 — Settings mínimo (`docs/spec/spec-fundacao-05-settings.md`)
 
-Status: spec `aprovada-pi` (2026-07-21); issue #6 em Backlog. Depende de 01–04.
+Status: **entregue** — spec `aprovada-pi` (2026-07-21); issue #6; PR [#29](https://github.com/RodReis/rrb-jarvisOS/pull/29). Dependia de 01–04, todas entregues.
 
-- [ ] Tela Settings acessível nos dois espaços
-- [ ] Idioma pt-BR/en-US com troca a quente; infra i18n via **i18next**
-- [ ] Tema claro/escuro/sistema com persistência por usuário
-- [ ] Testes de persistência de preferências
-- [ ] Entrega: PR `refs #N`; docs/ commitados
+- [x] Tela Settings acessível nos dois espaços (rota de ambos, não exceção fora do mapa)
+- [x] Idioma pt-BR/en-US com troca a quente; infra i18n via **i18next**
+- [x] Tema claro/escuro/sistema com persistência por usuário
+- [x] Testes de persistência de preferências + isolamento por usuário (critério 3)
+- [x] Entrega: PR [#29](https://github.com/RodReis/rrb-jarvisOS/pull/29) (`refs #6`); docs/ commitados
+
+**Decisões técnicas desta fatia:**
+
+1. **Recursos de tradução inline, não carregados por HTTP** — o app é local-first e empacotado; buscar tradução pela rede seria uma dependência gratuita que quebraria offline.
+2. **`sistema` é preferência, não valor** — quem resolve para claro/escuro é o main, via `nativeTheme`, porque é ele que enxerga o SO. E resolve **na leitura**: cachear no boot deixaria a UI presa no valor antigo se o usuário trocasse o tema do sistema com o app aberto.
+3. **A variante `dark:` aponta para `data-tema`, não para `prefers-color-scheme`** — a escolha do usuário precisa poder **sobrepor** o SO (critério 2). O `@media` cobre só o intervalo antes de o main responder, evitando flash de tela clara para quem usa o sistema no escuro.
+4. **Migration 2 é `ALTER TABLE ADD COLUMN`**, não recriação — bancos existentes preservam perfil e cadeia de auditoria; o `DEFAULT` preenche as linhas antigas, permitindo `NOT NULL` sem quebrar quem já tem dado. Verificado no app real (v1 → v2 sobre banco existente) e por teste que simula um banco v1 com auditoria.
+5. **Bug corrigido: o `save` do perfil sobrescrevia as preferências.** O main o chama a cada boot com o perfil padrão, então a escolha do usuário sumiria a cada reinício — o oposto do critério 1. Agora o upsert atualiza só a identidade; preferência muda por `savePreferences`, a via explícita.
+6. **Settings é rota dos dois espaços, não exceção fora do mapa** — do contrário a regra de isolamento da F02 teria um caso especial, e caso especial é onde vazamento se esconde. Há teste provando que a rota dela também é preservada por espaço.
+7. **`setup-tela.ts` mudou para `src/renderer/tests/`** — ele importa o i18n do renderer, e `tests/` na raiz pertence ao `tsconfig.node.json`, que não compila o renderer. O typecheck pegou.
 
 ## MVP-002 — Execução local controlada (fundação de execução)
 
@@ -192,3 +202,4 @@ Ordem: MVP-002 (fundação de execução) → **MVP-003** ([#10](https://github.
 | 2026-07-22 | MVP-001 · F01 Bootstrap e estrutura (#2) | [#25](https://github.com/RodReis/rrb-jarvisOS/pull/25) | CI verde na 1ª execução. Relatório ADR-003 ativo: selfcheck 10/10, guarda anti-drift verificada nos dois sentidos. Regras 14 (85%), Tela 4 (100%), Banco 0 (F04). |
 | 2026-07-22 | MVP-001 · F06 Observabilidade e Logging (#8) | [#27](https://github.com/RodReis/rrb-jarvisOS/pull/27) | Regras 49 (87.2%), **Banco 8 (85.5%)**, Tela 13 (97.6%). A categoria **Banco deixa de estar vazia antes da F04**: os testes de integração do logger tocam disco real (arquivo temporário, teardown por teste), que é exatamente o que a categoria mede — o `TESTING.md` §8 previa SQLite como primeiro caso, mas a régua é "integração com storage local", não "SQLite". Verificado também no app real: os três arquivos nascem em `userData/logs` e o registro do renderer chega ao disco. |
 | 2026-07-22 | MVP-001 · F04 Dados + AuditEvent (#5) **e** F02 AppShell/workspaces (#3) | [#28](https://github.com/RodReis/rrb-jarvisOS/pull/28) | Regras 78 (86.6%), Banco 32 (89.5%), Tela 16 (98.5%). Duas fatias no mesmo PR por decisão do PI: o critério 4 da SPEC-04 exige `AuditEvent` de `workspace-switch`, cujo fluxo nasce na F02. Carimbo pela issue do primeiro `refs` (#5), como o CI extrai. Verificado no app real: schema v1, 2 triggers ativos, chave de auditoria cifrada por DPAPI no disco. **F03 não entrou** — bloqueada por credenciais (ver a seção da fatia). |
+| 2026-07-22 | MVP-001 · F05 Settings mínimo (#6) | [#29](https://github.com/RodReis/rrb-jarvisOS/pull/29) | Regras 83 (84.0%), Banco 45 (89.6%), Tela 22 (95.5%). Fecha o MVP-001 **exceto a F03**. Primeira migration incremental do projeto (v1 → v2) exercitada sobre banco real com dado gravado — o log registrou `Migrations aplicadas {"quantidade":1}` e o perfil sobreviveu. Corrigiu um bug latente da F04: o upsert do perfil sobrescrevia `locale`/`theme` a cada boot. |

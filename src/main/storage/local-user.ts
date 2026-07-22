@@ -21,5 +21,6 @@ export const LOCAL_USER_PROFILE: UserProfile = {
   id: LOCAL_USER_ID,
   name: 'Usuário local',
   email: '',
-  locale: 'pt-BR'
+  locale: 'pt-BR',
+  theme: 'sistema'
 }
