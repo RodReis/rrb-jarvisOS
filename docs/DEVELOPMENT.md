@@ -144,7 +144,7 @@ Status: **entregue** — spec `aprovada-pi` (2026-07-21); issue #6; PR [#29](htt
 
 ### Fatia 01 — Supabase local + ambiente de sync (`docs/spec/spec-execucao-local-01-supabase-local.md`)
 
-Status: **entregue** — spec `aprovada-pi` (2026-07-21); issue [#15](https://github.com/RodReis/rrb-jarvisOS/issues/15); PR [#32](https://github.com/RodReis/rrb-jarvisOS/pull/32). **Ambiente, roda independente.** Só o alvo de sync — o sync em si é Corte 3.
+Status: **finalizada** — aceita pelo PI em 2026-07-22 (issue [#15](https://github.com/RodReis/rrb-jarvisOS/issues/15) fechada, `proplan:finalizado`); spec `aprovada-pi` (2026-07-21); PR [#32](https://github.com/RodReis/rrb-jarvisOS/pull/32) mergeado. **Ambiente, roda independente.** Só o alvo de sync — o sync em si é Corte 3.
 
 - [x] `supabase` CLI: stack local via Docker; `supabase/` versionado (config+migrations+seed); [README](../supabase/README.md) (subir/derrubar, portas); `supabase db reset` reproduzível
 - [x] Migrations starter: `user_profile`, `workspace`, `audit_event` com campos de escopo (`user_id`/`workspace_id`)
