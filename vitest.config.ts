@@ -7,13 +7,16 @@ import react from '@vitejs/plugin-react'
  * `include` distinto. O orquestrador (scripts/test-report.mjs) roda um project por vez
  * para produzir um `--json` e um coverage por categoria.
  *
- * - regras → unidade pura (src/shared, src/main), sem storage/IPC/rede
- * - banco  → integração com storage local; nasce vazia (Fatia 04 traz o SQLite)
- * - tela   → componente React em jsdom (E2E Playwright entra na Fatia 03)
+ * - regras → unidade pura (src/shared, src/main, src/design/tokens), sem storage/IPC/rede
+ * - banco  → integração com storage local (e com ferramental que toca disco, como o teste
+ *            da fronteira ESLint do design system)
+ * - tela   → componente React em jsdom (src/renderer e src/design/{ui,patterns});
+ *            E2E Playwright entra pelo relatório, não por este arquivo
  */
 const alias = {
   '@shared': resolve(__dirname, 'src/shared'),
-  '@renderer': resolve(__dirname, 'src/renderer/src')
+  '@renderer': resolve(__dirname, 'src/renderer/src'),
+  '@design': resolve(__dirname, 'src/design')
 }
 
 export default defineConfig({
@@ -25,7 +28,10 @@ export default defineConfig({
         test: {
           name: 'regras',
           environment: 'node',
-          include: ['src/{shared,main}/**/*.spec.ts']
+          // `src/design/tokens` entra aqui (e não em `tela`) porque é regra pura: a camada
+          // não depende de React, e o ambiente `node` é o que **prova** isso — um teste em
+          // jsdom passaria mesmo se o token importasse React por engano.
+          include: ['src/{shared,main,design}/**/*.spec.ts']
         }
       },
       {
@@ -47,7 +53,7 @@ export default defineConfig({
           environment: 'jsdom',
           globals: true,
           setupFiles: ['./src/renderer/tests/setup-tela.ts'],
-          include: ['src/renderer/**/*.test.tsx']
+          include: ['src/{renderer,design}/**/*.test.tsx']
         }
       }
     ]

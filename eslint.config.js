@@ -41,6 +41,43 @@ export default tseslint.config(
     }
   },
   {
+    // Fronteira do design system (SPEC-DesignSystem-01, critério 2; PRD §8.1).
+    //
+    // O DS é reutilizável em NOA e JARVIS justamente por não conhecer domínio nem
+    // infraestrutura. Escrever a regra na spec não a torna verificável — esta regra
+    // **quebra o lint** quando um arquivo de `src/design/` importa caminho proibido,
+    // que é o que a transforma de intenção em garantia.
+    files: ['src/design/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                // Domínio/produto e a ponte IPC: o DS recebe dado por props, nunca o busca.
+                '@shared/*',
+                '@renderer/*',
+                '**/src/shared/*',
+                '**/src/renderer/*',
+                // Main process, Node e Electron: o DS roda no renderer sandboxed.
+                '**/src/main/*',
+                'electron',
+                'node:*',
+                // Espelho de sync — nem em tipo: seria dependência de infraestrutura.
+                '@supabase/*',
+                // Relativo que escapa de src/design/ (o `..` de dentro do DS é legítimo).
+                '../../*'
+              ],
+              message:
+                'Fronteira do design system (SPEC-DesignSystem-01): src/design/ não importa domínio, renderer, main, Electron/Node nem Supabase. Dados entram por props tipadas.'
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
     rules: {
       // A fronteira renderer↔main é tipada: `any` a dissolveria em silêncio.
       '@typescript-eslint/no-explicit-any': 'error',

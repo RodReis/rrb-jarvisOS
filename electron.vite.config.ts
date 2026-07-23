@@ -43,7 +43,10 @@ export default defineConfig({
     resolve: {
       alias: {
         '@renderer': resolve(__dirname, 'src/renderer'),
-        '@shared': resolve(__dirname, 'src/shared')
+        '@shared': resolve(__dirname, 'src/shared'),
+        // Só o renderer resolve `@design`: main e preload não têm o que fazer com o design
+        // system, e é a mesma fronteira que a regra de lint guarda do outro lado.
+        '@design': resolve(__dirname, 'src/design')
       }
     }
   }
