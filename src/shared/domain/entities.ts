@@ -86,7 +86,11 @@ export const AUDIT_EVENT_TYPES = [
   'login-offline-reuse',
   'workspace-switch',
   // SPEC-Execucao-02: toda decisão do Policy Engine gera um evento deste tipo.
-  'policy-decision'
+  'policy-decision',
+  // SPEC-Execucao-03: adicionar/remover diretório da allowlist é ação sensível (RF-019).
+  // Tipo próprio, não `policy-decision`: editar a allowlist é uma mudança de configuração,
+  // não a classificação de uma ação — misturar os dois sob um tipo confundiria a auditoria.
+  'allowlist-change'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]

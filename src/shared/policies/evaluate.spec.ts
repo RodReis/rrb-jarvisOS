@@ -82,6 +82,56 @@ describe('evaluate — sensibilidade no JARVIS (critério 2)', () => {
   })
 })
 
+describe('evaluate — path fora da allowlist eleva o tier (SPEC-Execucao-03, critério 4)', () => {
+  it('ação com path FORA do permitido sobe um nível a partir do seed', () => {
+    // `fs.list-allowed` é baixo no seed; fora da allowlist vira médio.
+    const d = evaluate('fs.list-allowed', { workspace: 'noa', pathAllowed: false })
+    expect(d.tier).toBe('medio')
+    expect(d.reason).toBe('elevada-por-path-fora-da-allowlist')
+  })
+
+  it('ação com path DENTRO do permitido fica no tier do seed', () => {
+    const d = evaluate('fs.list-allowed', { workspace: 'noa', pathAllowed: true })
+    expect(d.tier).toBe('baixo')
+    expect(d.reason).toBe('classificada-pelo-seed')
+  })
+
+  it('ação SEM path (pathAllowed undefined) não é elevada', () => {
+    const d = evaluate('fs.list-allowed', { workspace: 'noa' })
+    expect(d.tier).toBe('baixo')
+  })
+
+  it('mesma ação, dentro vs fora: fora é classificada em tier maior (critério 4)', () => {
+    const dentro = evaluate('fs.write-allowed', { workspace: 'noa', pathAllowed: true })
+    const fora = evaluate('fs.write-allowed', { workspace: 'noa', pathAllowed: false })
+    const escala = ['baixo', 'medio', 'alto', 'bloqueado']
+    expect(escala.indexOf(fora.tier)).toBeGreaterThan(escala.indexOf(dentro.tier))
+  })
+
+  it('a elevação satura em alto — não vira bloqueado', () => {
+    // Ação já alta no seed + path fora continua alto, nunca bloqueado (reservado ao fail-closed).
+    const d = evaluate('secrets.change', { workspace: 'noa', pathAllowed: false })
+    expect(d.tier).toBe('alto')
+  })
+
+  it('sensibilidade no JARVIS precede path-fora: vai a alto direto', () => {
+    // Precedência: dado protegido no JARVIS é alto, mesmo com path dentro do permitido.
+    const d = evaluate('fs.list-allowed', {
+      workspace: 'jarvis',
+      sensitivity: 'financial',
+      pathAllowed: true
+    })
+    expect(d.tier).toBe('alto')
+    expect(d.reason).toBe('elevada-por-sensibilidade-no-jarvis')
+  })
+
+  it('fail-closed precede path-fora: ação desconhecida com path fora ⇒ bloqueado', () => {
+    const d = evaluate('acao.inexistente', { workspace: 'noa', pathAllowed: false })
+    expect(d.tier).toBe('bloqueado')
+    expect(d.reason).toBe('acao-desconhecida-fail-closed')
+  })
+})
+
 describe('evaluate — a decisão vem do seed, não de constante embutida (critério 4)', () => {
   it('toda entrada do seed classifica no próprio tier', () => {
     for (const [id, entrada] of RISK_TAXONOMY) {

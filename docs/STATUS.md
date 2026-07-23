@@ -8,11 +8,12 @@ Atualizado em: **2026-07-22**. Mantido pelo Code a cada entrega (junto com `DEVE
 
 | Issue | Fatia | MVP | Spec | Índice |
 |---|---|---|---|---|
-| [#12](https://github.com/RodReis/rrb-jarvisOS/issues/12) | 03 Diretórios permitidos (allowlist) | MVP-002 (#9) | `spec-execucao-local-03-allowlist-diretorios.md` | M2-F03 |
 | [#13](https://github.com/RodReis/rrb-jarvisOS/issues/13) | 04 Registro de workflows + automações | MVP-002 (#9) | `spec-execucao-local-04-registro-workflows.md` | M2-F04 |
 | [#14](https://github.com/RodReis/rrb-jarvisOS/issues/14) | 05 Motor de execução simulado | MVP-002 (#9) | `spec-execucao-local-05-execucao-simulada.md` | M2-F05 |
 
-> **`proplan:next` = [#12](https://github.com/RodReis/rrb-jarvisOS/issues/12)** (M2-F03, allowlist): o marcador avançou em 2026-07-22, quando a F02 (#11) foi entregue. A F03 depende da F02 (allowlist eleva o tier no Policy Engine). Ordem restante do MVP-002: 03 → 04 → 05 (a 05 depende de 02+03+04).
+> **`proplan:next` = [#13](https://github.com/RodReis/rrb-jarvisOS/issues/13)** (M2-F04, registro de workflows): o marcador avançou em 2026-07-22, quando a F03 (#12) foi entregue. A F04 depende da F02. Ordem restante do MVP-002: 04 → 05 (a 05 depende de 02+03+04).
+
+> Card **[#34](https://github.com/RodReis/rrb-jarvisOS/issues/34)** (`[INFRA]`, Backlog): separar o E2E em job de CI próprio, condicional por paths. Criado pelo Code durante a F03 — o cache do Electron (parte fácil) já saiu no PR #35; a separação do E2E do relatório é infra maior e vai em PR dedicado.
 
 > A Fatia 06 saiu como **#8** (o número 7 já estava ocupado). Sub-issue do épico #1; assignee PI.
 
@@ -21,6 +22,7 @@ Atualizado em: **2026-07-22**. Mantido pelo Code a cada entrega (junto com `DEVE
 | Issue | Fatia | MVP | Spec | Índice | PR |
 |---|---|---|---|---|---|
 | [#11](https://github.com/RodReis/rrb-jarvisOS/issues/11) | 02 Policy Engine mínimo (classificação) | MVP-002 (#9) | `spec-execucao-local-02-policy-engine.md` | M2-F02 | [#33](https://github.com/RodReis/rrb-jarvisOS/pull/33) |
+| [#12](https://github.com/RodReis/rrb-jarvisOS/issues/12) | 03 Diretórios permitidos (allowlist) | MVP-002 (#9) | `spec-execucao-local-03-allowlist-diretorios.md` | M2-F03 | [#35](https://github.com/RodReis/rrb-jarvisOS/pull/35) |
 
 > **04 e 02 saíram no mesmo PR**, por decisão do PI (2026-07-22): o critério 4 da SPEC-04 exige `AuditEvent` de `workspace-switch`, cujo fluxo nasce na F02 — separá-las exigiria um stub que a F02 jogaria fora. O critério 4 fica **parcialmente atendido**: `workspace-switch` está provado ponta a ponta; `login`/`logout`/`login-offline-reuse` têm o tipo no contrato e o fluxo nasce na F03.
 
@@ -66,7 +68,7 @@ Não há catálogo numérico `SPEC-nnn` para o MVP-001: as specs são identifica
 | MVP | Issue | Estado | Fatias fechadas |
 |---|---|---|---|
 | MVP-001 Fundação | [#1](https://github.com/RodReis/rrb-jarvisOS/issues/1) | **fechado** — épico aceito pelo PI em 2026-07-22; todas as 6 filhas `proplan:finalizado` (#2, #3, #4, #5, #6, #8) | **6 / 6** |
-| MVP-002 Execução local controlada (fundação) | [#9](https://github.com/RodReis/rrb-jarvisOS/issues/9) | **em execução**: F01 (#15) aceita; F02 (#11) entregue (aguardando aceite); 3 fatias em Backlog (#12–#14), todas com spec `aprovada-pi` | 1 aceita · **2 / 5 entregues** |
+| MVP-002 Execução local controlada (fundação) | [#9](https://github.com/RodReis/rrb-jarvisOS/issues/9) | **em execução**: F01 (#15) aceita; F02 (#11) e F03 (#12) entregues (aguardando aceite); 2 fatias em Backlog (#13, #14), com spec `aprovada-pi` | 1 aceita · **3 / 5 entregues** |
 | MVP-003 Design System da Plataforma (base única, 2 identidades) | [#16](https://github.com/RodReis/rrb-jarvisOS/issues/16) | épico criado; **8 fatias** em Backlog (#17–#24), todas com spec `aprovada-pi` | 0 / 8 |
 | MVP-004 Execução real (terminal + execução allowlisted) | [#10](https://github.com/RodReis/rrb-jarvisOS/issues/10) | renumerado de MVP-003 (título/rótulo atualizados + carimbo); 2 fatias lazy | 0 / 2 |
 | MVP-providers (Corte 3) | — | planejado; incluirá **BudgetPolicy** (modelo decidido no ADR-001 #1) + providers/conectores/RAG | — |
@@ -80,9 +82,9 @@ Não há catálogo numérico `SPEC-nnn` para o MVP-001: as specs são identifica
 3. ~~Renumerar #10 → MVP-004 e criar o épico MVP-003 + issues~~ — **feito** (2026-07-21): #10 retitulada MVP-004 (carimbo), épico **#16** criado, 8 filhas **#17–#24** em Backlog e vinculadas.
 4. **Code**: quando MVP-001/002 estiverem entregues, iniciar o MVP-003 pela F01 (#17); WIP = 1, na ordem F01 → F02 → (F03a/F03b/F05) → F04a → F04b → F06.
 5. ~~**PI — desbloqueia a F03 (#4)**~~ — **feito** (2026-07-22): projeto Supabase de dev criado, cliente OAuth do Google Cloud registrado e `.env` preenchido. A fatia foi entregue no mesmo dia ([#30](https://github.com/RodReis/rrb-jarvisOS/pull/30)). *Nota:* o `GOOGLE_OAUTH_CLIENT_SECRET` do `.env` **não é consumido pelo app** — no desenho do ADR-002 quem fala com o Google é o Supabase, e o secret vive no painel dele. Decisão do PI: manter a variável sem uso.
-6. ~~**Code**: MVP-002 F01 (#15) e F02 (#11)~~ — **feitos** (2026-07-22): F01 no PR [#32](https://github.com/RodReis/rrb-jarvisOS/pull/32), F02 no PR [#33](https://github.com/RodReis/rrb-jarvisOS/pull/33). O Policy Engine classifica em modo report (fail-closed no desconhecido), audita cada decisão e não bloqueia. Próxima: **F03 (#12)**, allowlist de diretórios — já marcada `proplan:next`. Ordem restante: 03 → 04 → 05 (a 05 depende de 02+03+04).
+6. ~~**Code**: MVP-002 F01 (#15), F02 (#11), F03 (#12)~~ — **feitos** (2026-07-22): F01 [#32](https://github.com/RodReis/rrb-jarvisOS/pull/32), F02 [#33](https://github.com/RodReis/rrb-jarvisOS/pull/33), F03 [#35](https://github.com/RodReis/rrb-jarvisOS/pull/35). A allowlist é dado + checagem consultável (anti-escape com symlink), integrada ao Policy Engine (path fora eleva o tier). Próxima: **F04 (#13)**, registro de workflows — já marcada `proplan:next`. Ordem restante: 04 → 05 (a 05 depende de 02+03+04).
 7. **PI**: (opcional) decidir a adoção de numeração `SPEC-nnn`.
-8. ~~**PI**: aceitar as fatias do MVP-001 e fechar o épico #1~~ — **feito** (2026-07-22): as 6 filhas aceitas (`proplan:finalizado`) e o épico **#1 fechado**. **#15** (MVP-002 · F01) também aceita. **Pendente de aceite:** **#11** (MVP-002 · F02, Policy Engine) — entregue no PR [#33](https://github.com/RodReis/rrb-jarvisOS/pull/33), aguardando o PI.
+8. ~~**PI**: aceitar as fatias do MVP-001 e fechar o épico #1~~ — **feito** (2026-07-22): as 6 filhas aceitas (`proplan:finalizado`) e o épico **#1 fechado**. **#15** (MVP-002 · F01) também aceita. **Pendentes de aceite:** **#11** (F02, Policy Engine — PR [#33](https://github.com/RodReis/rrb-jarvisOS/pull/33)) e **#12** (F03, allowlist — PR [#35](https://github.com/RodReis/rrb-jarvisOS/pull/35)), aguardando o PI.
 
 ## Roadmap macro
 

@@ -55,7 +55,15 @@ export const IPC_CHANNELS = {
    * critério 7). O `evaluate` roda no **main** — o renderer nunca avalia política, só lê o
    * resultado. Modo report: a decisão é auditada, mas nada é barrado nesta fatia.
    */
-  policyClassify: 'policy:classify'
+  policyClassify: 'policy:classify',
+  /**
+   * Allowlist de diretórios permitidos (SPEC-Execucao-03, critério 5). O renderer **não**
+   * lê/edita FS nem a allowlist direto — vê e edita via estes canais; a checagem e a
+   * persistência vivem no main. `add`/`remove` auditam (ADR-004).
+   */
+  allowlistList: 'allowlist:list',
+  allowlistAdd: 'allowlist:add',
+  allowlistRemove: 'allowlist:remove'
 } as const
 
 /**
@@ -176,6 +184,15 @@ export interface JarvisBridge {
    * devolvida, **nunca** barra a execução (modo report).
    */
   classifyAction(action: string, context: PolicyContext): Promise<PolicyDecision>
+
+  /**
+   * Allowlist de diretórios (SPEC-Execucao-03, critério 5). O renderer vê e edita a lista
+   * por aqui; a checagem de FS e a persistência ficam no main. `add`/`remove` auditam.
+   * Devolvem a lista atualizada de paths canônicos permitidos.
+   */
+  listAllowedDirectories(): Promise<readonly string[]>
+  addAllowedDirectory(path: string): Promise<readonly string[]>
+  removeAllowedDirectory(path: string): Promise<readonly string[]>
 }
 
 /** Nome da propriedade exposta via contextBridge no renderer. */

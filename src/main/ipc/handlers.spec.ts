@@ -51,6 +51,21 @@ const workspaces = {
   trocar: vi.fn((destino: string) => ({ workspace: destino, auditSeq: 3 }))
 }
 
+const policy = {
+  classify: vi.fn((action: string) => ({
+    action,
+    tier: 'baixo',
+    outcome: 'allow',
+    reason: 'classificada-pelo-seed'
+  }))
+}
+
+const allowlist = {
+  list: vi.fn(() => ['/app/userData']),
+  add: vi.fn(() => ({ path: '/app/userData/x', added: true })),
+  remove: vi.fn(() => ({ path: '/app/userData/x', removed: true }))
+}
+
 const minimizeToTray = vi.fn()
 
 const preferences = {
@@ -66,6 +81,8 @@ const deps = {
   audit,
   workspaces,
   preferences,
+  policy,
+  allowlist,
   // Função desde a F03: a identidade muda em runtime (local antes do login, usuário da
   // sessão depois), então os handlers a resolvem a cada chamada em vez de capturá-la.
   userId: () => 'local',
@@ -99,6 +116,10 @@ beforeEach(() => {
   minimizeToTray.mockClear()
   audit.list.mockClear()
   workspaces.trocar.mockClear()
+  allowlist.list.mockClear()
+  allowlist.add.mockClear()
+  allowlist.remove.mockClear()
+  policy.classify.mockClear()
   logIpc.info.mockClear()
   logIpc.warn.mockClear()
   logIpc.error.mockClear()
@@ -266,5 +287,27 @@ describe('canal de janela', () => {
     emitir(IPC_SEND_CHANNELS.windowMinimizeToTray)
 
     expect(minimizeToTray).toHaveBeenCalled()
+  })
+})
+
+describe('canais da allowlist (SPEC-Execucao-03)', () => {
+  it('lista devolve os diretórios permitidos do usuário', () => {
+    expect(invocar(IPC_CHANNELS.allowlistList)).toEqual(['/app/userData'])
+    expect(allowlist.list).toHaveBeenCalledWith('local')
+  })
+
+  it('add encaminha o path e devolve a lista atualizada', () => {
+    invocar(IPC_CHANNELS.allowlistAdd, '/home/user/projeto')
+    expect(allowlist.add).toHaveBeenCalledWith('local', '/home/user/projeto')
+  })
+
+  it('remove encaminha o path e devolve a lista atualizada', () => {
+    invocar(IPC_CHANNELS.allowlistRemove, '/home/user/projeto')
+    expect(allowlist.remove).toHaveBeenCalledWith('local', '/home/user/projeto')
+  })
+
+  it('path não-string no add não chama o repositório (fronteira de confiança)', () => {
+    invocar(IPC_CHANNELS.allowlistAdd, { malicioso: true })
+    expect(allowlist.add).not.toHaveBeenCalled()
   })
 })

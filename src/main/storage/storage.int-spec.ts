@@ -53,8 +53,11 @@ describe('migrations', () => {
     const caminho = join(dir, 'antigo.db')
     const antigo = openDatabase(caminho)
     new AuditRepository(antigo, CHAVE).append({ user_id: 'u-1', type: 'login' })
-    // Volta o schema para a v1: derruba a coluna nova e o marcador de versão.
+    // Volta o schema para a v1: desfaz tudo que as migrations posteriores criam e recua o
+    // marcador de versão. Cada migration nova precisa ser desfeita aqui — senão a migração
+    // tenta recriar um objeto que já existe. A v2 adicionou `theme`; a v3, `allowed_directory`.
     antigo.exec('ALTER TABLE user_profile DROP COLUMN theme')
+    antigo.exec('DROP TABLE allowed_directory')
     antigo.pragma('user_version = 1')
     antigo.close()
 

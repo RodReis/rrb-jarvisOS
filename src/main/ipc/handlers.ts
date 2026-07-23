@@ -12,6 +12,7 @@ import { isSensitivity, type PolicyContext, type PolicyDecision } from '@shared/
 import { isWorkspaceId, type AuditEvent, type AuditEventType } from '@shared/domain/entities'
 import type { AuthService } from '../auth/auth-service'
 import { log, writeLog } from '../logging/logger'
+import type { AllowlistRepository } from '../policy/allowlist-repository'
 import type { PolicyService } from '../policy/policy-service'
 import type { PreferencesService } from '../preferences/preferences-service'
 import type { AuditRepository } from '../storage/audit-repository'
@@ -71,6 +72,8 @@ export interface IpcDependencies {
   readonly userId: () => string
   /** Policy Engine (SPEC-Execucao-02): classifica e audita a decisão, não bloqueia. */
   readonly policy: PolicyService
+  /** Allowlist de diretórios (SPEC-Execucao-03): edição auditada, checagem no main. */
+  readonly allowlist: AllowlistRepository
   /** Ausente quando as credenciais não estão configuradas — o app roda sem login. */
   readonly auth?: AuthService
   /** Minimizar para o tray. Injetado porque a janela nasce depois dos handlers. */
@@ -255,6 +258,27 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       return deps.policy.classify(acao, ctx)
     }
   )
+
+  // Allowlist de diretórios (SPEC-Execucao-03, critério 5). O renderer nunca toca o FS nem
+  // a tabela: lê e edita por aqui, e a checagem/persistência ficam no main. Os três
+  // devolvem a lista atualizada, para a UI refletir sem um segundo round-trip.
+  ipcMain.handle(IPC_CHANNELS.allowlistList, (): readonly string[] => {
+    return deps.allowlist.list(deps.userId())
+  })
+
+  ipcMain.handle(IPC_CHANNELS.allowlistAdd, (_event, path: unknown): readonly string[] => {
+    // `path` vem do renderer (fronteira de confiança). String vazia/não-string não vira
+    // erro: o repositório canoniza e a checagem downstream barra o que resolver pra fora.
+    const alvo = typeof path === 'string' ? path : ''
+    if (alvo) deps.allowlist.add(deps.userId(), alvo)
+    return deps.allowlist.list(deps.userId())
+  })
+
+  ipcMain.handle(IPC_CHANNELS.allowlistRemove, (_event, path: unknown): readonly string[] => {
+    const alvo = typeof path === 'string' ? path : ''
+    if (alvo) deps.allowlist.remove(deps.userId(), alvo)
+    return deps.allowlist.list(deps.userId())
+  })
 
   // Só de ida: o renderer manda o registro, o main grava. Sem resposta de propósito —
   // esperar confirmação de log tornaria a UI refém do disco.
