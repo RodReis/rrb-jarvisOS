@@ -70,6 +70,23 @@ const MIGRATIONS: readonly string[] = [
   // linhas antigas, então `theme` pode ser NOT NULL sem quebrar quem já tem dado.
   `
   ALTER TABLE user_profile ADD COLUMN theme TEXT NOT NULL DEFAULT 'sistema';
+  `,
+
+  // 3 — allowlist de diretórios permitidos (SPEC-Execucao-03).
+  //
+  // `path` guarda o diretório **canônico** (o main canoniza antes de gravar). Escopo por
+  // `user_id` (CONVENTION §2): a allowlist de um usuário nunca é a de outro. `UNIQUE
+  // (user_id, path)` torna "adicionar duas vezes o mesmo diretório" um no-op no storage,
+  // não uma segunda linha — a allowlist é um conjunto, não uma lista.
+  `
+  CREATE TABLE allowed_directory (
+    id         TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL,
+    path       TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (user_id, path)
+  );
+  CREATE INDEX idx_allowed_dir_user ON allowed_directory(user_id);
   `
 ]
 

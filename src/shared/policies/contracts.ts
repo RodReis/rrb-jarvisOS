@@ -56,6 +56,16 @@ export interface PolicyContext {
   readonly workspace: 'noa' | 'jarvis'
   /** Sensibilidade do dado tocado, quando aplicável. */
   readonly sensitivity?: Sensitivity
+  /**
+   * A ação toca um path, e ele está na allowlist? (SPEC-Execucao-03, critério 4)
+   *
+   * Booleano **já resolvido pelo main**, não o path cru: a canonicalização com symlink exige
+   * `node:fs`, que não existe aqui (`src/shared` compila para o renderer). O main canoniza,
+   * chama `isPathAllowed`, e passa o resultado. `undefined` = a ação não toca path (a regra
+   * de allowlist não se aplica); `false` = toca um path **fora** do permitido, o que eleva o
+   * tier.
+   */
+  readonly pathAllowed?: boolean
   /** Metadados livres da ação (caminho, alvo…). **Redigido antes de auditar** (ADR-005). */
   readonly detail?: Readonly<Record<string, unknown>>
 }
@@ -75,6 +85,7 @@ export interface PolicyDecision {
 export const POLICY_REASONS = [
   'classificada-pelo-seed',
   'elevada-por-sensibilidade-no-jarvis',
+  'elevada-por-path-fora-da-allowlist',
   'acao-desconhecida-fail-closed'
 ] as const
 

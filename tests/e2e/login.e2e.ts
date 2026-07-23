@@ -122,16 +122,19 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
   })
 
   expect(superficie.metodos).toEqual([
+    'addAllowedDirectory',
     'classifyAction',
     'getAppInfo',
     'getAuth',
     'getPreferences',
     'getWorkspace',
+    'listAllowedDirectories',
     'listAuditEvents',
     'login',
     'logout',
     'minimizeToTray',
     'onAuthChanged',
+    'removeAllowedDirectory',
     'savePreferences',
     'sendLog',
     'switchWorkspace',

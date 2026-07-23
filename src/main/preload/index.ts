@@ -63,7 +63,14 @@ const bridge: JarvisBridge = {
   minimizeToTray: (): void => ipcRenderer.send(IPC_SEND_CHANNELS.windowMinimizeToTray),
 
   classifyAction: (action: string, context: PolicyContext): Promise<PolicyDecision> =>
-    ipcRenderer.invoke(IPC_CHANNELS.policyClassify, action, context)
+    ipcRenderer.invoke(IPC_CHANNELS.policyClassify, action, context),
+
+  listAllowedDirectories: (): Promise<readonly string[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.allowlistList),
+  addAllowedDirectory: (path: string): Promise<readonly string[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.allowlistAdd, path),
+  removeAllowedDirectory: (path: string): Promise<readonly string[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.allowlistRemove, path)
 }
 
 if (process.contextIsolated) {

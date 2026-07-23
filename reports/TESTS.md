@@ -12,8 +12,8 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 107 | 107 | 0 | 77.0 | — | — |
-| — | — | — | Banco | 74 | 74 | 0 | 87.0 | — | — |
+| — | — | — | Regras de Negócio | 129 | 129 | 0 | 78.2 | — | — |
+| — | — | — | Banco | 87 | 87 | 0 | 86.8 | — | — |
 | — | — | — | Tela | 33 | 33 | 0 | 93.5 | — | — |
 
 ## Histórico por entrega
@@ -46,3 +46,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-07-22 | #11 | spec-execucao-local-02-policy-engine | Regras de Negócio | 107 | 107 | 0 | 77.0 | #33 | [#33](https://github.com/RodReis/rrb-jarvisOS/pull/33) |
 | 2026-07-22 | #11 | spec-execucao-local-02-policy-engine | Banco | 74 | 74 | 0 | 87.0 | #33 | [#33](https://github.com/RodReis/rrb-jarvisOS/pull/33) |
 | 2026-07-22 | #11 | spec-execucao-local-02-policy-engine | Tela | 33 | 33 | 0 | 93.5 | #33 | [#33](https://github.com/RodReis/rrb-jarvisOS/pull/33) |
+| 2026-07-22 | #12 | spec-execucao-local-03-allowlist-diretorios | Regras de Negócio | 129 | 129 | 0 | 78.2 | #35 | [#35](https://github.com/RodReis/rrb-jarvisOS/pull/35) |
+| 2026-07-22 | #12 | spec-execucao-local-03-allowlist-diretorios | Banco | 87 | 87 | 0 | 86.8 | #35 | [#35](https://github.com/RodReis/rrb-jarvisOS/pull/35) |
+| 2026-07-22 | #12 | spec-execucao-local-03-allowlist-diretorios | Tela | 33 | 33 | 0 | 93.5 | #35 | [#35](https://github.com/RodReis/rrb-jarvisOS/pull/35) |

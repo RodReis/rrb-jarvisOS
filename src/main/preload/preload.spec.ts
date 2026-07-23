@@ -53,16 +53,19 @@ describe('ponte do preload', () => {
     // Critério de aceite 4: a superfície é fechada. Um `invoke`/`send`/`on` cru aqui
     // deixaria o renderer alcançar qualquer handler do main.
     expect(Object.keys(bridge).sort()).toEqual([
+      'addAllowedDirectory',
       'classifyAction',
       'getAppInfo',
       'getAuth',
       'getPreferences',
       'getWorkspace',
+      'listAllowedDirectories',
       'listAuditEvents',
       'login',
       'logout',
       'minimizeToTray',
       'onAuthChanged',
+      'removeAllowedDirectory',
       'savePreferences',
       'sendLog',
       'switchWorkspace',
