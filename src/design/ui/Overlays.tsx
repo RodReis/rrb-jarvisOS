@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import * as RadixDialog from '@radix-ui/react-dialog'
 import * as RadixAlertDialog from '@radix-ui/react-alert-dialog'
 import * as RadixPopover from '@radix-ui/react-popover'
@@ -34,6 +35,33 @@ const PAINEL_MODAL = cx(
   'data-[state=open]:animate-[surgir_var(--jos-duracao-media)_ease-out]'
 )
 
+/**
+ * Devolve o foco a quem abriu o overlay.
+ *
+ * O Radix já faz isso **quando ele é dono do gatilho** (`Trigger`), como em Popover e
+ * DropdownMenu. Dialog, AlertDialog e Drawer aqui são controlados por prop (`aberto`) e não têm
+ * `Trigger` — o Radix não tem como saber para onde voltar, e no fechamento o foco cai no
+ * `<body>`. Quem navega por teclado volta ao topo do documento a cada modal fechado.
+ *
+ * Então guardamos o elemento focado no instante da abertura e o restauramos no fechamento. A
+ * guarda `isConnected` cobre o caso de o gatilho ter saído do DOM enquanto o modal estava aberto
+ * (uma linha de lista que o próprio modal excluiu): focar um nó órfão não faz nada, e insistir
+ * seria pior que deixar o foco cair no body.
+ */
+function useRetornoDeFoco(aberto: boolean): void {
+  const origem = useRef<HTMLElement | null>(null)
+
+  useEffect(() => {
+    if (aberto) {
+      origem.current = document.activeElement as HTMLElement | null
+      return
+    }
+    const alvo = origem.current
+    origem.current = null
+    if (alvo !== null && alvo.isConnected) alvo.focus()
+  }, [aberto])
+}
+
 interface DialogProps {
   readonly aberto: boolean
   readonly onFechar: () => void
@@ -57,6 +85,8 @@ export function Dialog({
   children,
   rodape
 }: DialogProps): React.JSX.Element {
+  useRetornoDeFoco(aberto)
+
   return (
     <RadixDialog.Root open={aberto} onOpenChange={(o) => !o && onFechar()}>
       <RadixDialog.Portal>
@@ -134,6 +164,8 @@ export function AlertDialog({
   verboConfirmar,
   destrutivo = true
 }: AlertDialogProps): React.JSX.Element {
+  useRetornoDeFoco(aberto)
+
   return (
     <RadixAlertDialog.Root open={aberto} onOpenChange={(o) => !o && onFechar()}>
       <RadixAlertDialog.Portal>
@@ -278,6 +310,8 @@ export function Drawer({
   children,
   lado = 'direita'
 }: DrawerProps): React.JSX.Element {
+  useRetornoDeFoco(aberto)
+
   return (
     <RadixDialog.Root open={aberto} onOpenChange={(o) => !o && onFechar()}>
       <RadixDialog.Portal>

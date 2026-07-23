@@ -336,6 +336,37 @@ Status: **entregue** — spec `aprovada-pi` (2026-07-21); issue [#19](https://gi
 - **`:active` não existe em nenhum dos 16** — nenhum controle dá feedback de pressão. Anotado para a F06 (hardening).
 - Card **[#41](https://github.com/RodReis/rrb-jarvisOS/issues/41)**: o renderer sobe em porta variável, contra o `strictPort` do CLAUDE.md. Achado ao subir o app para inspeção; não misturado na fatia.
 
+### Fatia 03b — Componentes: dados + overlays + feedback (`docs/spec/spec-design-system-03b-componentes-dados-overlays.md`)
+
+Status: **em andamento** — spec `aprovada-pi` (2026-07-21); issue [#20](https://github.com/RodReis/rrb-jarvisOS/issues/20). Depende da F01 (Radix + fronteira) e da F02 (tokens). Paralela à 03a.
+
+- [x] **Exibição de dados** (PRD §11.4): `Card`, `Panel`, `Badge`, `Tag`, `Avatar`, `Table`, `Tree`, `Separator`, `Tooltip`, `Progress`, `Meter`, `Skeleton`, `Spinner`, `EmptyState`
+- [x] **Overlays** (PRD §11.5, Radix): `Dialog`, `AlertDialog`, `Popover`, `DropdownMenu`, `Drawer`
+- [x] **Feedback** (PRD §11.5): `InlineAlert`, `ErrorState`, `LoadingState`
+- [x] **Toast unificado** fiel ao protótipo (README §5): 5 simultâneos, 4200 ms, glass + barra lateral + progresso, `stamp` HH:MM:SS, sempre escuro
+- [x] **Notificações** (PRD §12.6): `ToastViewport`, `NotificationCenter`, `NotificationItem`, `UnreadIndicator` — lista por props
+- [x] Critério 1 — focus-trap, `Escape` e **retorno de foco** provados nos 5 overlays (`overlays.test.tsx`)
+- [x] Critério 2 — Toast: variante, pausa em hover **e** foco, máx. 5, dedupe e permanência escura no tema claro (`toast/toast.test.tsx`)
+- [x] Critério 3 — `AlertDialog` é o caminho do destrutivo: verbo específico, clique fora inerte, Escape cancela e nunca confirma
+- [x] Critério 4 — estado sem cor em `Badge`/`Progress`/`Meter`/`InlineAlert`/`EmptyState`/`ErrorState`/notificações (`dados-feedback.test.tsx`)
+- [x] Critérios 5 e 6 — só tokens; fronteira da F01 verde
+- [x] Critério 7 — `test` 461 ✓, `lint` ✓, `typecheck` ✓ (**+50 testes**)
+- [ ] Entrega: PR com `refs #20`; docs/ commitados
+
+**Decisões técnicas desta fatia:**
+
+1. **O teste achou dois defeitos reais de a11y que a leitura do código não pegou.** Ambos em componentes que *pareciam* corretos e cujo comentário afirmava a garantia que eles não davam.
+   - **Retorno de foco em `Dialog`/`AlertDialog`/`Drawer`.** O cabeçalho do arquivo afirmava "o Radix entrega os três de fábrica". Entrega — **quando ele é dono do gatilho**. Estes três são controlados por prop (`aberto`) e não têm `Trigger`: o Radix não tem para onde voltar, e o foco caía no `<body>`. Quem navega por teclado voltava ao topo do documento a cada modal fechado. Corrigido com `useRetornoDeFoco`, que guarda `document.activeElement` na abertura e restaura no fechamento (com guarda `isConnected`, para o caso de o gatilho ter sido removido *pelo próprio* modal).
+   - **`Panel` não era uma região.** Um `<section>` sem nome acessível não vira `role="region"` — ele some da lista de marcos do leitor de tela, e o `sr-only` do tom fica órfão no DOM: o texto "erro:" existia, mas não era lido ao pousar no painel. O `sr-only` migrou para dentro do `<h3>`, que agora é referenciado por `aria-labelledby` — o nome da região carrega **tom + título** juntos.
+   
+   Os dois foram verificados por mutação: removendo `useRetornoDeFoco` e o `aria-labelledby`, 4 testes ficam vermelhos.
+2. **O critério 4 não se prova medindo cor — prova-se afirmando o sinal não-cromático.** Uma asserção sobre cor computada em jsdom mediria a string que o próprio componente escreveu. O que sobrevive ao daltonismo, ao alto contraste e ao leitor de tela é **texto e papel ARIA**, e é sobre isso que as asserções falam: o `82%` escrito ao lado do `Meter`, o `"erro:"` no `InlineAlert`, o `"não lida"` no `NotificationItem`, o `aria-valuenow` ausente no `Progress` indeterminado (um `0` seria pior que a ausência — diria "nada foi feito").
+3. **O toast escuro é asserção estrutural, pelo mesmo motivo.** O critério pede que ele **não inverta** sob `uiTheme='light'`. Em jsdom a prova possível é que o card referencia `--jos-toast-*` (superfície de marca) e **nunca** `--jos-cor-superficie*`, que inverte. Junto vai a asserção de que o provider de fato pintou `data-modo="light"` — sem ela, o teste passaria mesmo se o `uiTheme` fosse ignorado, medindo o default escuro.
+4. **`fireEvent` no teste de Toast, `userEvent` em todo o resto.** Não é preferência: sob `vi.useFakeTimers()` as esperas internas do `userEvent` nunca resolvem, e todo clique estoura o timeout. O alvo ali é o **motor** (fila, timers, dedupe), não a fidelidade da sequência do ponteiro. E os timers falsos são o que permite afirmar sobre o **resto** do timer na pausa — hover aos 4000 ms, avança 10 s, sai, e 200 ms bastam para fechar. Um teste que só verificasse "pausou" não distinguiria pausa de reinício da duração cheia.
+5. **A recusa do `userEvent` virou a evidência do clique-fora.** O `AlertDialog` marca o conteúdo de trás com `pointer-events: none` **e** `aria-hidden`. O `userEvent` se recusa a clicar num elemento inerte — essa recusa é a prova de que o clique não chega a lugar nenhum. Forçar por `fireEvent` furaria a barreira e mediria outra coisa. O `aria-hidden` entra na mesma asserção: `getByRole` não acha o botão de fora, só `getByTestId`.
+6. **Uma suposição minha sobre o `AlertDialog` estava errada, e o teste corrigiu.** Escrevi que Escape não deveria fechá-lo. O Radix fecha — e está certo: o critério 1 exige "Escape fecha" para *todos* os overlays, e bloquear a tecla deixaria o usuário de teclado preso num diálogo sem saída. A assimetria correta é clique fora (distração) bloqueado, Escape (tecla deliberada) permitido. O que Escape nunca faz é **confirmar**: o teste afirma `onConfirmar` não chamado.
+7. **A fronteira da F01 mordeu de novo, e de novo cedeu o import, não a regra.** O teste do Toast importava `../../tokens/provider`; a regra bane `../../*` porque é a forma como um import escaparia de `src/design/`. Trocado pelo alias `@design`, que diz a mesma coisa sem depender da profundidade do arquivo. Mesma decisão da F02.
+
 ## Após o MVP-003
 
 Ordem: **MVP-004** ([#10](https://github.com/RodReis/rrb-jarvisOS/issues/10), execução real + terminal) → MVP de providers (Corte 3, com BudgetPolicy). Ordem macro em `docs/LANDSCAPE.md` § Roadmap.

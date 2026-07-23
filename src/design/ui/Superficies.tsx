@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import * as RadixSeparator from '@radix-ui/react-separator'
 import { cx, BORDA, SUPERFICIE, TRANSICAO } from './base'
 import type { TomSemantico } from './semantica'
@@ -93,9 +94,14 @@ interface PanelProps {
  */
 export function Panel({ children, titulo, tom, acoes }: PanelProps): React.JSX.Element {
   const Icone = tom !== undefined ? ICONE_SEMANTICO[tom] : null
+  // `<section>` só vira marco navegável (`role="region"`) quando tem nome acessível. Sem isto,
+  // o painel some da lista de regiões do leitor de tela e o `sr-only` do tom fica órfão: o texto
+  // "erro:" existe no DOM, mas não é lido junto do título ao pousar no painel.
+  const idTitulo = useId()
 
   return (
     <section
+      aria-labelledby={titulo !== undefined ? idTitulo : undefined}
       className={cx(
         'flex flex-col gap-3 rounded-[var(--jos-raio-card)] p-4',
         'border',
@@ -108,17 +114,19 @@ export function Panel({ children, titulo, tom, acoes }: PanelProps): React.JSX.E
       {titulo !== undefined && (
         <header className="flex items-center gap-2">
           {Icone !== null && tom !== undefined && (
-            <>
-              <Icone
-                aria-hidden="true"
-                className={cx('size-[var(--jos-tamanho-icone)]', CLASSE_TEXTO_SEMANTICO[tom])}
-              />
-              {/* O ícone é decorativo; quem informa o estado por voz é este texto. Sem ele, um
-                  painel de erro seria anunciado como um painel qualquer. */}
-              <span className="sr-only">{NOME_DO_TOM[tom]}:</span>
-            </>
+            <Icone
+              aria-hidden="true"
+              className={cx('size-[var(--jos-tamanho-icone)]', CLASSE_TEXTO_SEMANTICO[tom])}
+            />
           )}
-          <h3 className="font-[var(--jos-peso-forte)] text-[length:var(--jos-texto-realce)]">
+          {/* O `id` cobre tom + título juntos, porque é ele que nomeia a região: pousar no
+              painel precisa anunciar "erro: execução bloqueada", não só o título. O ícone é
+              decorativo; quem informa o estado por voz é o `sr-only`. */}
+          <h3
+            id={idTitulo}
+            className="font-[var(--jos-peso-forte)] text-[length:var(--jos-texto-realce)]"
+          >
+            {tom !== undefined && <span className="sr-only">{NOME_DO_TOM[tom]}: </span>}
             {titulo}
           </h3>
         </header>
