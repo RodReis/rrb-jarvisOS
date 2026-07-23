@@ -177,6 +177,79 @@
   }
 }
 
+/*
+ * Mascote (SPEC-DesignSystem-05; README §6 tabela de animações, `JARVISOS.md §3.2`).
+ *
+ * Loops ambientais, na faixa de 2–30s do README §6 — não são feedback de ação, e por isso são
+ * lentos: um loop rápido no canto da tela vira distração permanente. Todos animam só `transform`
+ * e `opacity`; o bloco de `prefers-reduced-motion` abaixo os zera junto com o resto.
+ *
+ * `spin`/`spinr` giram os dois anéis em sentidos opostos — é o que dá a leitura de "sistema
+ * ativo" sem indicar progresso, que seria mentira: o mascote não sabe quanto falta de nada.
+ */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes spinr {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+/* Glow do núcleo — respira. Opacidade só, para não deslocar nada em volta. */
+@keyframes corepulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.75;
+  }
+}
+
+/* Flutuação vertical do mascote. Amplitude pequena de propósito: presença, não salto. */
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+/*
+ * Boca falando (`talk`) e olhos.
+ *
+ * O `animation-play-state` é que segue o estado `speaking` (protótipo `JARVISOS.md §3.2`): a
+ * animação existe sempre e é **pausada** quando calado, em vez de montada/desmontada. Trocar o
+ * play-state não recomeça o ciclo — remontar faria a boca saltar para o quadro zero a cada
+ * palavra.
+ */
+@keyframes talk {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes eyeblink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  96% {
+    transform: scaleY(0.1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   :root {
     --jos-duracao-rapida: 0.01ms;
