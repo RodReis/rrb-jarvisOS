@@ -142,6 +142,18 @@ interface AlertDialogProps {
    */
   readonly verboConfirmar: string
   readonly destrutivo?: boolean
+  /**
+   * Conteúdo entre a descrição e os botões (SPEC-DesignSystem-04b, critério 1).
+   *
+   * Opcional e acrescentado na F04b: o `ApprovalDialog` precisa exibir o **resumo da ação
+   * sensível** — solicitante, escopo, risco, custo — antes da confirmação, e o critério exige
+   * que esses campos estejam na tela no momento da decisão.
+   *
+   * Estender aqui, em vez de criar um segundo diálogo em `patterns`, mantém uma só implementação
+   * do contrato do destrutivo (clique fora inerte, Escape cancela sem confirmar, foco inicial no
+   * botão seguro). Duas cópias divergiriam, e a que divergisse seria a usada em produção.
+   */
+  readonly children?: React.ReactNode
 }
 
 /**
@@ -162,7 +174,8 @@ export function AlertDialog({
   titulo,
   descricao,
   verboConfirmar,
-  destrutivo = true
+  destrutivo = true,
+  children
 }: AlertDialogProps): React.JSX.Element {
   useRetornoDeFoco(aberto)
 
@@ -177,6 +190,7 @@ export function AlertDialog({
           <RadixAlertDialog.Description className="text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto-secundario)]">
             {descricao}
           </RadixAlertDialog.Description>
+          {children}
           <footer className="flex justify-end gap-3 pt-1">
             {/* Cancelar recebe o foco inicial (o Radix o faz por padrão no primeiro tabbable, e a
                 ordem aqui o coloca antes). O usuário confirma por escolha, não por reflexo. */}
