@@ -12,7 +12,7 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 203 | 203 | 0 | 77.5 | — | — |
+| — | — | — | Regras de Negócio | 212 | 212 | 0 | 78.0 | — | — |
 | — | — | — | Banco | 132 | 132 | 0 | 85.5 | — | — |
 | — | — | — | Tela | 169 | 168 | 0 | 90.7 | — | — |
 
@@ -73,3 +73,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-07-23 | #23 | spec-design-system-05-identidades | Regras de Negócio | 203 | 203 | 0 | 77.5 | #46 | [#46](https://github.com/RodReis/rrb-jarvisOS/pull/46) |
 | 2026-07-23 | #23 | spec-design-system-05-identidades | Banco | 132 | 132 | 0 | 85.5 | #46 | [#46](https://github.com/RodReis/rrb-jarvisOS/pull/46) |
 | 2026-07-23 | #23 | spec-design-system-05-identidades | Tela | 169 | 168 | 0 | 90.7 | #46 | [#46](https://github.com/RodReis/rrb-jarvisOS/pull/46) |
+| 2026-07-23 | #47 | — | Regras de Negócio | 212 | 212 | 0 | 78.0 | #48 | [#48](https://github.com/RodReis/rrb-jarvisOS/pull/48) |
+| 2026-07-23 | #47 | — | Banco | 132 | 132 | 0 | 85.5 | #48 | [#48](https://github.com/RodReis/rrb-jarvisOS/pull/48) |
+| 2026-07-23 | #47 | — | Tela | 169 | 168 | 0 | 90.7 | #48 | [#48](https://github.com/RodReis/rrb-jarvisOS/pull/48) |
