@@ -1,6 +1,17 @@
 import { createContext, useContext, useMemo } from 'react'
 import { ACENTO_PADRAO, acentoParaLeitura, type CorAcento } from './acento'
-import { CAMADA, CURVA, DURACAO, ESPACO, FONTE, RAIO, SOMBRA } from './base'
+import {
+  CAMADA,
+  CURVA,
+  DURACAO,
+  ESPACAMENTO_LETRA,
+  ESPACO,
+  FONTE,
+  RAIO,
+  SOMBRA,
+  TAMANHO,
+  TEXTO
+} from './base'
 import {
   bordaRgb,
   modoEfetivo,
@@ -116,6 +127,23 @@ export function variaveisDoTema({
     '--jos-fonte-display': FONTE.display,
     '--jos-fonte-corpo': FONTE.corpo,
     '--jos-fonte-mono': FONTE.mono,
+
+    // Escala tipográfica e de caixa (Fatia 03a). Como variáveis, e não só como constantes TS,
+    // porque componente e CSS precisam do mesmo valor — e um `text-[14px]` digitado à mão em
+    // sete arquivos é onde a escala se desfaz sem ninguém perceber.
+    '--jos-texto-micro': TEXTO.micro,
+    '--jos-texto-mini': TEXTO.mini,
+    '--jos-texto-acao': TEXTO.acao,
+    '--jos-texto-corpo': TEXTO.corpo,
+    '--jos-texto-realce': TEXTO.realce,
+    '--jos-texto-secao': TEXTO.secao,
+    '--jos-texto-tela': TEXTO.tela,
+    '--jos-tamanho-controle': TAMANHO.controle,
+    '--jos-tamanho-marcador': TAMANHO.marcador,
+    '--jos-tamanho-icone': TAMANHO.icone,
+    '--jos-tamanho-icone-mini': TAMANHO.iconeMini,
+    '--jos-tracking-label': ESPACAMENTO_LETRA.label,
+    '--jos-tracking-acao': ESPACAMENTO_LETRA.titulo,
     '--jos-camada-overlay': String(CAMADA.overlay),
     '--jos-camada-modal': String(CAMADA.modal),
     '--jos-camada-toast': String(CAMADA.toast)

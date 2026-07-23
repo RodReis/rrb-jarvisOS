@@ -18,7 +18,7 @@ import { cx, DESABILITADO, FOCO, LABEL_MONO, SUPERFICIE, TRANSICAO } from './bas
  */
 
 const CAIXA = cx(
-  'flex size-[20px] shrink-0 items-center justify-center rounded-[5px] border',
+  'flex size-[var(--jos-tamanho-marcador)] shrink-0 items-center justify-center rounded-[var(--jos-raio-chip)] border',
   'border-[rgba(var(--jos-borda-rgb),0.24)]',
   SUPERFICIE,
   // Marcado: fundo no acento **e** o ícone de check. O ícone é o que sobrevive ao alto
@@ -70,7 +70,7 @@ export function Checkbox({
       <label
         htmlFor={id}
         className={cx(
-          'cursor-pointer text-[14px] text-[var(--jos-cor-texto)]',
+          'cursor-pointer text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto)]',
           desabilitado && 'cursor-not-allowed opacity-45'
         )}
       >
@@ -139,7 +139,7 @@ function ItemRadio({
         value={opcao.valor}
         disabled={opcao.desabilitada}
         className={cx(
-          'flex size-[20px] shrink-0 items-center justify-center rounded-full border',
+          'flex size-[var(--jos-tamanho-marcador)] shrink-0 items-center justify-center rounded-full border',
           'border-[rgba(var(--jos-borda-rgb),0.24)]',
           SUPERFICIE,
           'data-[state=checked]:border-[var(--jos-cor-acento)]',
@@ -154,7 +154,7 @@ function ItemRadio({
       <label
         htmlFor={id}
         className={cx(
-          'cursor-pointer text-[14px] text-[var(--jos-cor-texto)]',
+          'cursor-pointer text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto)]',
           inativo && 'cursor-not-allowed opacity-45'
         )}
       >

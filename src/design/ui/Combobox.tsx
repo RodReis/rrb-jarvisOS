@@ -124,7 +124,7 @@ export function Combobox({
           disabled={desabilitado}
           style={{ height: ALTURA_CONTROLE }}
           className={cx(
-            'w-full rounded-[var(--jos-raio-card)] pl-10 pr-10 text-[14px]',
+            'w-full rounded-[var(--jos-raio-card)] pl-10 pr-10 text-[length:var(--jos-texto-corpo)]',
             'font-[family-name:var(--jos-fonte-corpo)] text-[var(--jos-cor-texto)]',
             BORDA,
             SUPERFICIE,
@@ -154,7 +154,7 @@ export function Combobox({
           )}
         >
           {filtradas.length === 0 ? (
-            <li className="px-3 py-2 text-[13px] text-[var(--jos-cor-texto-suave)]">
+            <li className="px-3 py-2 text-[length:var(--jos-texto-acao)] text-[var(--jos-cor-texto-suave)]">
               {semResultado}
             </li>
           ) : (
@@ -176,7 +176,7 @@ export function Combobox({
                   onMouseEnter={() => setIndiceAtivo(i)}
                   className={cx(
                     'flex cursor-default items-center gap-2 rounded-[var(--jos-raio-chip)]',
-                    'py-2 pl-8 pr-3 text-[14px] text-[var(--jos-cor-texto)]',
+                    'py-2 pl-8 pr-3 text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto)]',
                     'relative',
                     i === indiceAtivo &&
                       'bg-[color-mix(in_srgb,var(--jos-cor-acento)_14%,transparent)]',

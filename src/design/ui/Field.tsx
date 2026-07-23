@@ -109,7 +109,7 @@ export function FormMessage({ mensagem, tom, id }: FormMessageProps): React.JSX.
       id={id}
       role={erro ? 'alert' : undefined}
       className={cx(
-        'flex items-start gap-1.5 text-[12px] leading-snug',
+        'flex items-start gap-1.5 text-[length:var(--jos-texto-mini)] leading-snug',
         erro ? 'text-[var(--jos-cor-err)]' : 'text-[var(--jos-cor-texto-suave)]'
       )}
     >

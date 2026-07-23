@@ -35,7 +35,9 @@ export {
   PESO,
   RAIO,
   SOMBRA,
-  sombraComGlow
+  sombraComGlow,
+  TAMANHO,
+  TEXTO
 } from './base'
 
 export {

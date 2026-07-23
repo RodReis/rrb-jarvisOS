@@ -14,7 +14,7 @@ import { ALTURA_CONTROLE, BORDA, cx, DESABILITADO, FOCO, SUPERFICIE, TRANSICAO }
  */
 
 const CLASSES_CAMPO = cx(
-  'w-full rounded-[var(--jos-raio-card)] px-3.5 text-[14px]',
+  'w-full rounded-[var(--jos-raio-card)] px-3.5 text-[length:var(--jos-texto-corpo)]',
   'font-[family-name:var(--jos-fonte-corpo)] text-[var(--jos-cor-texto)]',
   BORDA,
   SUPERFICIE,

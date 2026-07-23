@@ -34,7 +34,7 @@ export function Link({ href, children, externo = false }: LinkProps): React.JSX.
         'inline-flex items-center gap-1 underline underline-offset-4',
         'text-[var(--jos-cor-acento-leitura)] decoration-[rgba(var(--jos-borda-rgb),0.4)]',
         'hover:decoration-[var(--jos-cor-acento)]',
-        'outline-none focus-visible:rounded-[4px] focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-[var(--jos-cor-acento)]',
+        'outline-none focus-visible:rounded-[var(--jos-raio-chip)] focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-[var(--jos-cor-acento)]',
         TRANSICAO
       )}
     >

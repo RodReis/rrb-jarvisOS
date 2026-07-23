@@ -45,7 +45,7 @@ export function Select({
         style={{ height: ALTURA_CONTROLE }}
         className={cx(
           'inline-flex w-full items-center justify-between gap-2 rounded-[var(--jos-raio-card)] px-3.5',
-          'text-[14px] font-[family-name:var(--jos-fonte-corpo)] text-[var(--jos-cor-texto)]',
+          'text-[length:var(--jos-texto-corpo)] font-[family-name:var(--jos-fonte-corpo)] text-[var(--jos-cor-texto)]',
           BORDA,
           SUPERFICIE,
           'data-[placeholder]:text-[var(--jos-cor-texto-suave)]',
@@ -80,7 +80,7 @@ export function Select({
                 disabled={o.desabilitada}
                 className={cx(
                   'relative flex cursor-default select-none items-center gap-2 rounded-[var(--jos-raio-chip)]',
-                  'py-2 pl-8 pr-3 text-[14px] text-[var(--jos-cor-texto)] outline-none',
+                  'py-2 pl-8 pr-3 text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto)] outline-none',
                   'data-[highlighted]:bg-[color-mix(in_srgb,var(--jos-cor-acento)_14%,transparent)]',
                   'data-[disabled]:opacity-45'
                 )}

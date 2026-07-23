@@ -60,7 +60,7 @@ export const DESABILITADO = 'disabled:opacity-45 disabled:cursor-not-allowed'
 
 /** Label pequena — README §3: mono UPPERCASE com tracking. */
 export const LABEL_MONO =
-  'font-[family-name:var(--jos-fonte-mono)] uppercase tracking-[1.5px] text-[11px] text-[var(--jos-cor-texto-suave)]'
+  'font-[family-name:var(--jos-fonte-mono)] uppercase tracking-[var(--jos-tracking-label)] text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-suave)]'
 
 /** Junta classes ignorando vazios — evita `class=" a  b"` com espaços duplos. */
 export function cx(...partes: ReadonlyArray<string | false | null | undefined>): string {

@@ -77,7 +77,7 @@ export function Button({
         // Rótulo em mono UPPERCASE: é a assinatura do botão no protótipo. Diverge do
         // "sem display font em label" do register product — fidelidade ao protótipo é a regra
         // da spec, e a escolha está registrada em PRODUCT.md.
-        'font-[family-name:var(--jos-fonte-mono)] text-[13px] uppercase tracking-[2px]',
+        'font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-acao)] uppercase tracking-[var(--jos-tracking-acao)]',
         larguraTotal && 'w-full',
         POR_VARIANTE[variante],
         FOCO,
