@@ -96,8 +96,27 @@ export function Combobox({
 
   const idOpcaoAtiva = aberto && filtradas.length > 0 ? `${base}-opcao-${indiceAtivo}` : undefined
 
+  /**
+   * Fecha quando o foco sai do componente inteiro.
+   *
+   * A primeira versão usava `onBlur` com um `setTimeout(…, 120)` para dar tempo de o
+   * `mousedown` da opção registrar antes de a lista sumir. Três problemas: o timer nunca era
+   * limpo (dispara após o unmount), os 120ms eram calibrados contra o handler em vez de
+   * derivados de algo, e num quadro lento a lista fechava antes do clique — o usuário via um
+   * clique que não fez nada.
+   *
+   * `focusout` com `relatedTarget` responde a pergunta certa — "o foco foi para fora daqui?" —
+   * sem constante de tempo para calibrar e sem timer para vazar.
+   */
+  function aoSairODoFoco(e: React.FocusEvent<HTMLDivElement>): void {
+    const destino = e.relatedTarget
+    if (destino instanceof Node && e.currentTarget.contains(destino)) return
+    setAberto(false)
+    setBusca('')
+  }
+
   return (
-    <div className="relative">
+    <div className="relative" onBlur={aoSairODoFoco}>
       <div className="relative flex items-center">
         <Search
           aria-hidden="true"
@@ -118,7 +137,6 @@ export function Combobox({
             setIndiceAtivo(0)
           }}
           onFocus={abrir}
-          onBlur={() => window.setTimeout(() => setAberto(false), 120)}
           onKeyDown={aoTeclar}
           placeholder={placeholder}
           disabled={desabilitado}

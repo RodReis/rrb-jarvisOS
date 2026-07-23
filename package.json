@@ -21,6 +21,7 @@
     "postinstall": "electron-rebuild -f -w better-sqlite3",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:prova": "playwright test --config playwright.prova.config.ts",
     "test:report": "node scripts/test-report.mjs",
     "test:report:check": "node scripts/test-report.mjs --check",
     "test:report:selfcheck": "node scripts/test-report.mjs --selfcheck"

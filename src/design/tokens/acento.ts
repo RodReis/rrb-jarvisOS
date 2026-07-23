@@ -143,6 +143,39 @@ export function acentoParaLeitura(acento: string, fundo: string): string {
 }
 
 /**
+ * Cor de texto legível **sobre** uma cor de preenchimento.
+ *
+ * Diferente de `acentoParaLeitura`, que ajusta o acento para ser lido *sobre o fundo da tela*:
+ * aqui o acento **é** o fundo (botão primário sólido), e o que se escolhe é o rótulo. Preto ou
+ * branco, o que der mais contraste — não há terceira opção que ajude, e inventar um cinza
+ * intermediário só reduziria a legibilidade.
+ *
+ * Nasceu da correção do colapso da ação primária (`/impeccable critique`, F03a): com fundo
+ * sólido no acento, o rótulo não pode mais herdar a cor de texto da tela.
+ */
+export function contrasteSobre(fundo: string): '#000000' | '#ffffff' {
+  return contraste('#000000', fundo) >= contraste('#ffffff', fundo) ? '#000000' : '#ffffff'
+}
+
+/**
+ * Variante de **leitura** de uma cor semântica.
+ *
+ * As semânticas (`ok/warn/err/info/violet`) são cores de marca do protótipo e não invertem com
+ * o modo (PRD §15) — mas foram desenhadas para fundo escuro. Como **texto no modo claro** todas
+ * as cinco falham a régua de 4.5:1: `err` 2.53:1, `violet` 2.52:1, `warn` 1.99:1, `ok` 1.78:1,
+ * `info` 1.54:1. Medido no `/impeccable critique` da F03a; o PRODUCT.md exige contraste nos
+ * **dois** modos ("o claro é canônico, não uma cortesia").
+ *
+ * A solução é a mesma que o acento já usava: preservar a cor como identidade em borda, glow e
+ * preenchimento, e ajustar **só a luminância** onde ela renderiza texto. O que muda é que agora
+ * as semânticas também passam por isso — antes só o acento passava, e o teste afirmava a cor
+ * literal sem nunca medir o contraste.
+ */
+export function semanticaParaLeitura(cor: string, fundo: string): string {
+  return acentoParaLeitura(cor, fundo)
+}
+
+/**
  * Ajuste pré-calculado para as 8 cores × 2 modos.
  *
  * A paleta é fechada e conhecida (README §2.4), então o resultado é determinístico e cabe numa

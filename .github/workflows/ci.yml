@@ -92,6 +92,22 @@ jobs:
           npm run lint
           npm run typecheck
 
+      # Prova visual dos controles (SPEC-DesignSystem-03a): sobe a galeria num Chromium de
+      # verdade e mede o que jsdom não mede — altura real dos controles, contraste computado,
+      # fontes carregadas, anel de foco pintado.
+      #
+      # Roda **antes** da bateria pesada porque é barata (~5s) e pega classe de defeito que
+      # nenhum teste de papel pega: na própria 03a encontrou o CSS dos componentes não sendo
+      # gerado e o card do NOA invertido, com os 91 testes de componente verdes nos dois casos.
+      #
+      # `--with-deps chromium` e não o browser inteiro: só o Chromium é usado aqui, e o
+      # Electron do E2E já tem as libs de sistema instaladas no step acima.
+      - name: Instalar o Chromium do Playwright (galeria de prova)
+        run: npx playwright install --with-deps chromium
+
+      - name: Prova visual dos controles
+        run: npm run test:prova
+
       # SPEC-Execucao-01, critério 6: o int-spec de RLS exercita a stack real, então o CI
       # a sobe. Sem este step o arquivo **passaria pulando** — os testes se pulam quando a
       # stack não responde (para não punir quem clona sem Docker), e o CI ficaria verde

@@ -110,7 +110,9 @@ export function FormMessage({ mensagem, tom, id }: FormMessageProps): React.JSX.
       role={erro ? 'alert' : undefined}
       className={cx(
         'flex items-start gap-1.5 text-[length:var(--jos-texto-mini)] leading-snug',
-        erro ? 'text-[var(--jos-cor-err)]' : 'text-[var(--jos-cor-texto-suave)]'
+        // Texto lê a variante **de leitura**: a cor de marca #ff6b81 mede 2.53:1 no modo claro.
+        // Borda e ícone continuam usando a cor de marca — só o texto precisa da régua de 4.5:1.
+        erro ? 'text-[var(--jos-cor-err-leitura)]' : 'text-[var(--jos-cor-texto-suave)]'
       )}
     >
       <Icone aria-hidden="true" className="mt-px size-3.5 shrink-0" />

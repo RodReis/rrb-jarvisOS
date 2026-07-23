@@ -122,8 +122,22 @@ export function papeis(modulo: Modulo, modo: ModoUi) {
     surfaceRaised: t[CARD_POR_MODULO[modulo]],
     textPrimary: modo === 'dark' ? '#eef1f5' : '#111316',
     textSecondary: modo === 'dark' ? '#9aa3b2' : '#27292d',
-    /** Label mono / caption. */
-    textMuted: modo === 'dark' ? '#6b7382' : '#44464b',
+    /**
+     * Label mono, caption, placeholder.
+     *
+     * No escuro, **`#757d8c` em vez do `#6b7382` do protótipo**. O valor original mede 4.12:1
+     * sobre o fundo do JARVIS e 4.08:1 sobre o do NOA — abaixo da régua de 4.5:1, e este token
+     * não é decorativo: carrega os placeholders de todos os campos, **todas as labels de
+     * formulário** (via `LABEL_MONO`) e o texto de apoio. Como as labels renderizam em
+     * `--jos-texto-micro` com uppercase e tracking, valem como texto pequeno — sem isenção de
+     * texto grande.
+     *
+     * Medido no `/impeccable critique` da F03a. O desvio é o mínimo que atinge a régua
+     * (4.75:1 / 4.70:1): clarear mais afastaria da hierarquia do protótipo sem ganho de
+     * leitura. Fidelidade cede à legibilidade — é o princípio 1 do PRODUCT.md ("clareza antes
+     * de efeito visual") e o PRD §14 exige contraste mínimo nos dois modos.
+     */
+    textMuted: modo === 'dark' ? '#757d8c' : '#44464b',
     /** RGB base da borda — o alfa é aplicado por uso (`borda(...)`). */
     borderRgb: bordaRgb(modulo, modo)
   } as const

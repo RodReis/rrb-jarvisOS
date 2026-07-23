@@ -122,6 +122,14 @@ export const TEXTO = {
 export const TAMANHO = {
   /** Altura de campo, botão, select — toda a família alinha aqui. */
   controle: '44px',
+  /**
+   * Alvo mínimo de ponteiro — WCAG 2.2 SC 2.5.8, nível **AA**.
+   *
+   * Vale para todo controle que não tenha rótulo clicável ampliando a área. O checkbox e o
+   * radio ficam abaixo disto na caixa desenhada (`marcador`) porque o `<label>` associado faz
+   * parte do alvo; a alça do slider não tem nada adjacente, então usa esta medida.
+   */
+  alvoMinimo: '24px',
   /** Caixa de checkbox e radio. O alvo real é maior: o rótulo também é clicável. */
   marcador: '20px',
   /** Ícone dentro de controle. */

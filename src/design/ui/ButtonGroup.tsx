@@ -1,37 +1,30 @@
-import { cx } from './base'
-
 /**
  * Agrupamento de ações relacionadas (SPEC-DesignSystem-03a, PRD §11.1).
  *
- * Dois papéis distintos, e é por isso que `papel` existe em vez de o grupo ser só um `div` com
- * `gap`:
+ * Só um papel: `role="group"` para botões independentes lado a lado (Cancelar / Salvar). É
+ * agrupamento visual e semântico, sem estado de seleção.
  *
- * - `acoes` — botões independentes lado a lado (Cancelar / Salvar). Semanticamente é só um
- *   agrupamento visual, então recebe `role="group"`.
- * - `segmentado` — opções **mutuamente exclusivas** (uma vista de cada vez). Isso é um
- *   `radiogroup`, não uma fileira de botões: sem esse papel, o leitor de tela anuncia três
- *   botões soltos e não diz qual está ativo. É a mesma lição registrada na F02 do MVP-001
- *   (os botões de espaço viraram `radiogroup` pelo mesmo motivo).
+ * **Havia uma variante `segmentado`** que aplicava `role="radiogroup"` para opções mutuamente
+ * exclusivas. Foi removida: `radiogroup` exige filhos com `role="radio"` e `aria-checked`, e os
+ * filhos aqui são `<button>` comuns — o leitor de tela anunciaria um grupo de rádio **sem
+ * rádios dentro**, que é pior que a fileira de botões que a variante tentava corrigir. A
+ * promessa estava na assinatura, não na árvore.
+ *
+ * Achado pelo `/impeccable critique` da F03a. Um controle segmentado de verdade precisa de
+ * componente próprio, com estado e teclado (setas navegam, não Tab) — isso é escopo da F04a
+ * (AppShell + navegação), onde há tela que o use. Entregar a casca agora seria oferecer
+ * acessibilidade que não existe.
  */
 
 interface ButtonGroupProps {
   readonly children: React.ReactNode
-  /** Nome acessível do grupo — obrigatório em `segmentado`, recomendado em `acoes`. */
+  /** Nome acessível do grupo — o leitor anuncia "grupo, <rótulo>" ao entrar. */
   readonly rotulo?: string
-  readonly papel?: 'acoes' | 'segmentado'
 }
 
-export function ButtonGroup({
-  children,
-  rotulo,
-  papel = 'acoes'
-}: ButtonGroupProps): React.JSX.Element {
+export function ButtonGroup({ children, rotulo }: ButtonGroupProps): React.JSX.Element {
   return (
-    <div
-      role={papel === 'segmentado' ? 'radiogroup' : 'group'}
-      aria-label={rotulo}
-      className={cx('inline-flex items-center', papel === 'segmentado' ? 'gap-1' : 'gap-3')}
-    >
+    <div role="group" aria-label={rotulo} className="inline-flex items-center gap-3">
       {children}
     </div>
   )

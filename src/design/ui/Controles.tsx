@@ -4,7 +4,7 @@ import * as RadixRadioGroup from '@radix-ui/react-radio-group'
 import * as RadixSlider from '@radix-ui/react-slider'
 import { Check, Minus } from 'lucide-react'
 import type { AtributosDoControle } from './Field'
-import { cx, DESABILITADO, FOCO, LABEL_MONO, SUPERFICIE, TRANSICAO } from './base'
+import { cx, DESABILITADO, FOCO, SUPERFICIE, TRANSICAO } from './base'
 
 /**
  * Controles de escolha e faixa (SPEC-DesignSystem-03a, PRD §11.2; critério 3).
@@ -13,13 +13,15 @@ import { cx, DESABILITADO, FOCO, LABEL_MONO, SUPERFICIE, TRANSICAO } from './bas
  * `@radix-ui/*` nem compõe `Root`/`Item`/`Indicator`. O que ele passa é dado (`opcoes`,
  * `valor`) e callbacks tipados.
  *
- * O alvo de toque respeita WCAG 2.2 (2.5.8): a caixa desenhada tem 18–20px, mas a área
- * clicável inclui o rótulo, que é o que o `label` envolvente garante.
+ * O alvo de toque respeita a WCAG 2.2 SC 2.5.8 (AA, 24px): a caixa desenhada do checkbox e do
+ * radio tem 20px, mas o alvo real inclui o **rótulo clicável** (`htmlFor` + `useId`), que o
+ * estende bem além do mínimo. A alça do slider não tem rótulo adjacente e por isso usa os 24px
+ * cheios (`--jos-tamanho-alvo-minimo`).
  */
 
 const CAIXA = cx(
   'flex size-[var(--jos-tamanho-marcador)] shrink-0 items-center justify-center rounded-[var(--jos-raio-chip)] border',
-  'border-[rgba(var(--jos-borda-rgb),0.24)]',
+  'border-[rgba(var(--jos-borda-rgb),0.48)]',
   SUPERFICIE,
   // Marcado: fundo no acento **e** o ícone de check. O ícone é o que sobrevive ao alto
   // contraste e ao daltonismo — cor sozinha não comunica estado (critério 2).
@@ -140,7 +142,7 @@ function ItemRadio({
         disabled={opcao.desabilitada}
         className={cx(
           'flex size-[var(--jos-tamanho-marcador)] shrink-0 items-center justify-center rounded-full border',
-          'border-[rgba(var(--jos-borda-rgb),0.24)]',
+          'border-[rgba(var(--jos-borda-rgb),0.48)]',
           SUPERFICIE,
           'data-[state=checked]:border-[var(--jos-cor-acento)]',
           FOCO,
@@ -205,7 +207,9 @@ export function Slider({
         step={passo}
         disabled={desabilitado}
         className={cx(
-          'relative flex h-5 w-full flex-1 touch-none select-none items-center',
+          // A linha acomoda a alça de 24px: com h-5 (20px) a alça vazaria o container e a área
+          // clicável ficaria cortada em cima e embaixo.
+          'relative flex h-6 w-full flex-1 touch-none select-none items-center',
           desabilitado && 'opacity-45'
         )}
       >
@@ -217,21 +221,34 @@ export function Slider({
           o Thumb, e é nele que o leitor de tela procura `aria-label`/`aria-valuetext`. Pôr no
           Root deixa a faixa anônima — foi o que os testes pegaram.
         */}
+        {/*
+          Alça de 24px — o mínimo da WCAG 2.2 SC 2.5.8 (AA) para alvo de ponteiro. A primeira
+          versão usava 16px: diferente do checkbox, que amplia o alvo pelo rótulo clicável, a
+          alça não tem nada adjacente que a estenda. Era o único alvo abaixo da régua.
+        */}
         <RadixSlider.Thumb
           aria-label={rotulo}
           aria-valuetext={formatar(valor)}
           className={cx(
-            'block size-4 rounded-full border-2 border-[var(--jos-cor-acento)]',
-            'bg-[var(--jos-cor-superficie-elevada)]',
+            'block size-[var(--jos-tamanho-alvo-minimo)] rounded-full border-2',
+            'border-[var(--jos-cor-acento)] bg-[var(--jos-cor-superficie-elevada)]',
             FOCO,
             TRANSICAO
           )}
         />
       </RadixSlider.Root>
+      {/*
+        O valor é **valor**, não label: fonte mono e tabular para não dançar a cada tick, mas no
+        tamanho e na cor do corpo. Usar `LABEL_MONO` aqui vestia um dado com roupa de rótulo —
+        uppercase, cor apagada — e depois sobrescrevia a cor de volta.
+        `min-w` e não `w`: `formatar` é API pública e sua saída não tem tamanho contratado
+        (`1200ms`, `R$ 1.500`); largura fixa clipava em vez de crescer.
+      */}
       <span
         className={cx(
-          LABEL_MONO,
-          'w-12 shrink-0 text-right text-[var(--jos-cor-texto)] [font-variant-numeric:tabular-nums]'
+          'min-w-14 shrink-0 text-right',
+          'font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-corpo)]',
+          'text-[var(--jos-cor-texto)] [font-variant-numeric:tabular-nums]'
         )}
       >
         {formatar(valor)}

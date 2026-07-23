@@ -45,13 +45,17 @@ describe('Button', () => {
   })
 
   describe('carregando (critério 2 — estado nunca só por cor)', () => {
-    it('anuncia por aria-busy e por texto, não só pelo spinner', () => {
+    it('anuncia por aria-busy e **preserva o rótulo** da ação', () => {
       render(<Button carregando>Salvar</Button>)
 
       const botao = screen.getByRole('button')
       expect(botao).toHaveAttribute('aria-busy', 'true')
-      // O texto é o canal que chega a quem não vê o spinner girar.
-      expect(botao).toHaveTextContent(/aguarde/i)
+      // A primeira versão trocava o texto por "Aguarde": num console com várias ações em voo,
+      // o usuário deixava de saber *qual* estava rodando, e a largura do botão saltava.
+      // `aria-busy` já leva o estado à tecnologia assistiva — a palavra nunca foi o que
+      // informava. Achado do `/impeccable critique` da F03a.
+      expect(botao).toHaveAccessibleName('Salvar')
+      expect(botao).not.toHaveTextContent(/aguarde/i)
     })
 
     it('não aceita segundo clique enquanto carrega', async () => {
@@ -119,16 +123,19 @@ describe('ButtonGroup', () => {
     expect(screen.getByRole('group', { name: 'Ações do registro' })).toBeInTheDocument()
   })
 
-  it('opções exclusivas viram radiogroup, não fileira de botões', () => {
-    // Uma barra de botões independentes não anunciaria qual está ativo — mesma lição da F02 do
-    // MVP-001, onde os botões de espaço viraram radiogroup pelo mesmo motivo.
+  it('não promete radiogroup — os filhos são botões, não rádios', () => {
+    // A variante `segmentado` aplicava `role="radiogroup"` sobre filhos `<button>`: o leitor de
+    // tela anunciaria um grupo de rádio **sem rádios dentro**, pior que a fileira de botões que
+    // ela tentava corrigir. Removida na F03a (achado do `/impeccable critique`); o controle
+    // segmentado de verdade — com estado e navegação por setas — é escopo da F04a.
     render(
-      <ButtonGroup papel="segmentado" rotulo="Modo de exibição">
+      <ButtonGroup rotulo="Modo de exibição">
         <Button>Lista</Button>
         <Button>Grade</Button>
       </ButtonGroup>
     )
-    expect(screen.getByRole('radiogroup', { name: 'Modo de exibição' })).toBeInTheDocument()
+    expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Modo de exibição' })).toBeInTheDocument()
   })
 })
 

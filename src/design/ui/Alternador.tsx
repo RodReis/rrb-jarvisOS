@@ -36,7 +36,7 @@ export function Alternador({
       disabled={desabilitado}
       className={cx(
         'inline-flex h-6 w-11 shrink-0 items-center rounded-full border p-0.5',
-        'border-[rgba(var(--jos-borda-rgb),0.24)] bg-[var(--jos-cor-superficie)]',
+        'border-[rgba(var(--jos-borda-rgb),0.48)] bg-[var(--jos-cor-superficie)]',
         // Ligado: fundo no acento **e** a alça desloca. A posição da alça é o que sobrevive ao
         // alto contraste e ao daltonismo — cor sozinha não comunica estado (critério 2).
         'data-[state=checked]:border-[var(--jos-cor-acento)]',

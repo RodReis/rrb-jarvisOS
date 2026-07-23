@@ -62,9 +62,11 @@ export {
   acentoParaLeitura,
   contraste,
   CONTRASTE_MINIMO,
+  contrasteSobre,
   hexA,
   luminancia,
   PALETA_ACENTO,
+  semanticaParaLeitura,
   tabelaLeitura,
   type CorAcento
 } from './acento'

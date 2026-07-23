@@ -14,7 +14,8 @@
 /**
  * Altura única dos controles.
  *
- * 44px é o alvo de toque do WCAG 2.2 (AAA em 2.5.8) e é a altura do campo e do botão no
+ * 44px é o alvo de toque do WCAG 2.2 SC 2.5.5 (AAA) — bem acima do mínimo AA de 24px
+ * (SC 2.5.8) — e é a altura do campo e do botão no
  * protótipo. As densidades `comfortable`/`compact` foram **cortadas do MVP** (decisão do PI na
  * F02) — por isso uma constante, não uma escala: uma escala aqui seria a densidade voltando
  * pela porta lateral.

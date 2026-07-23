@@ -1,5 +1,11 @@
 import { createContext, useContext, useMemo } from 'react'
-import { ACENTO_PADRAO, acentoParaLeitura, type CorAcento } from './acento'
+import {
+  ACENTO_PADRAO,
+  acentoParaLeitura,
+  contrasteSobre,
+  semanticaParaLeitura,
+  type CorAcento
+} from './acento'
 import {
   CAMADA,
   CURVA,
@@ -7,6 +13,7 @@ import {
   ESPACAMENTO_LETRA,
   ESPACO,
   FONTE,
+  PESO,
   RAIO,
   SOMBRA,
   TAMANHO,
@@ -95,7 +102,10 @@ export function variaveisDoTema({
     '--jos-cor-texto': p.textPrimary,
     '--jos-cor-texto-secundario': p.textSecondary,
     '--jos-cor-texto-suave': p.textMuted,
-    '--jos-borda-rgb': bordaRgb(modulo, uiTheme),
+    // `modo`, não `uiTheme`: numa superfície de marca com `uiTheme='light'` a borda tem de vir
+    // do escuro, como todo o resto. Passar a preferência crua aqui daria a uma tela de marca a
+    // borda clara sobre fundo escuro — invisível.
+    '--jos-borda-rgb': bordaRgb(modulo, modo),
 
     // Acento do usuário. Duas variáveis, de propósito: a de marca **preserva** o tom escolhido
     // (borda, glow, fill, dot) e a de leitura tem só a luminância ajustada quando o contraste
@@ -103,13 +113,27 @@ export function variaveisDoTema({
     // PI (2026-07-21) é ter as duas.
     '--jos-cor-acento': acento,
     '--jos-cor-acento-leitura': acentoParaLeitura(acento, p.surface),
+    // Rótulo sobre preenchimento sólido no acento (botão primário): calculado contra o próprio
+    // acento, não contra o fundo da tela. Sem isto, o botão primário sólido herdaria a cor de
+    // texto da tela e ficaria ilegível com acento claro.
+    '--jos-cor-acento-contraste': contrasteSobre(acento),
 
-    // Semânticas — não invertem, não são retematizáveis (PRD §15).
+    // Semânticas — a **cor de marca** não inverte nem é retematizável (PRD §15).
     '--jos-cor-ok': STATUS.ok,
     '--jos-cor-warn': STATUS.warn,
     '--jos-cor-err': STATUS.err,
     '--jos-cor-info': STATUS.info,
     '--jos-cor-violet': STATUS.violet,
+
+    // …mas como **texto** elas foram desenhadas para fundo escuro: no claro, as cinco falham
+    // 4.5:1 (`info` chega a 1.54:1). Estas variantes ajustam só a luminância, preservando o
+    // matiz — a mesma solução que o acento já usava. Borda, glow e preenchimento continuam
+    // usando a cor de marca acima; só o texto lê daqui.
+    '--jos-cor-ok-leitura': semanticaParaLeitura(STATUS.ok, p.surface),
+    '--jos-cor-warn-leitura': semanticaParaLeitura(STATUS.warn, p.surface),
+    '--jos-cor-err-leitura': semanticaParaLeitura(STATUS.err, p.surface),
+    '--jos-cor-info-leitura': semanticaParaLeitura(STATUS.info, p.surface),
+    '--jos-cor-violet-leitura': semanticaParaLeitura(STATUS.violet, p.surface),
 
     // Primitivos que não dependem do modo.
     '--jos-raio-rail': RAIO.rail,
@@ -139,11 +163,16 @@ export function variaveisDoTema({
     '--jos-texto-secao': TEXTO.secao,
     '--jos-texto-tela': TEXTO.tela,
     '--jos-tamanho-controle': TAMANHO.controle,
+    '--jos-tamanho-alvo-minimo': TAMANHO.alvoMinimo,
     '--jos-tamanho-marcador': TAMANHO.marcador,
     '--jos-tamanho-icone': TAMANHO.icone,
     '--jos-tamanho-icone-mini': TAMANHO.iconeMini,
     '--jos-tracking-label': ESPACAMENTO_LETRA.label,
     '--jos-tracking-acao': ESPACAMENTO_LETRA.titulo,
+    // O peso participa da hierarquia de ação (F03a): primária e perigo são mais pesadas que
+    // secundária, e peso sobrevive a qualquer acento — cor sozinha não sobrevive.
+    '--jos-peso-medio': PESO.medio,
+    '--jos-peso-forte': PESO.forte,
     '--jos-camada-overlay': String(CAMADA.overlay),
     '--jos-camada-modal': String(CAMADA.modal),
     '--jos-camada-toast': String(CAMADA.toast)
