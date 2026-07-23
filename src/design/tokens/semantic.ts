@@ -1,0 +1,109 @@
+/**
+ * Tokens semânticos (SPEC-DesignSystem-02, PRD §9.1; README §2.2/§2.3).
+ *
+ * Duas famílias, com regras opostas de mutabilidade:
+ *
+ * - **`STATUS` / `RISCO`** — cores do protótipo, **fixas**. Não invertem no claro e o usuário
+ *   **não** as retematiza (PRD §15). O motivo é semântico, não estético: se "erro" pudesse ser
+ *   verde porque alguém escolheu o acento verde, a cor pararia de significar erro.
+ * - **`papeis()`** — os papéis de superfície/texto/borda, que **derivam** dos 71 tokens do
+ *   protótipo conforme o modo. Aqui é onde o nome opaco (`jt16`) vira nome legível
+ *   (`surfaceRaised`): componentes das fatias seguintes consomem só isto, nunca o `jt*` cru.
+ */
+
+import temaPrototipo from './tema-prototipo.json'
+
+/** Semânticas de estado — README §2.3. Idênticas nos dois módulos e nos dois modos. */
+export const STATUS = {
+  ok: '#34d399',
+  warn: '#f59e0b',
+  err: '#ff6b81',
+  info: '#7dd3fc',
+  /** Memória / skills / knowledge. */
+  violet: '#a78bfa'
+} as const
+
+/**
+ * Níveis de risco do Policy Engine (MVP-002 F02).
+ *
+ * Mapeiam para as semânticas em vez de introduzir cores novas — risco *é* um estado, e duas
+ * paletas para a mesma ideia divergiriam com o tempo.
+ */
+export const RISCO = {
+  baixo: STATUS.ok,
+  medio: STATUS.warn,
+  alto: STATUS.err,
+  bloqueado: STATUS.err
+} as const
+
+export type ModoUi = 'dark' | 'light'
+export type Modulo = 'jarvis' | 'noa'
+
+interface MapaTema {
+  readonly [token: string]: string
+}
+
+const TEMA: Readonly<Record<ModoUi, MapaTema>> = temaPrototipo
+
+/**
+ * Papéis de superfície/texto/borda por módulo e modo.
+ *
+ * O mapa `jt*`/`nt*` → papel foi lido do protótipo e do README §2.6 (tabela de pares). Só os
+ * papéis que a tabela nomeia entram aqui; os demais tokens do protótipo continuam disponíveis
+ * como dado bruto (`tokenDeTema`) para as fatias que forem portar telas específicas — inventar
+ * papel para 71 tokens seria decidir escopo que não é meu.
+ */
+export function papeis(modulo: Modulo, modo: ModoUi) {
+  const t = TEMA[modo]
+  const p = modulo === 'jarvis' ? 'jt' : 'nt'
+
+  return {
+    /** Fundo do app — README §2.6, linha "fundo app". */
+    surface:
+      modulo === 'jarvis'
+        ? modo === 'dark'
+          ? '#0a0b0e'
+          : '#f5f6f8'
+        : modo === 'dark'
+          ? '#0b0d0d'
+          : '#f2f4f2',
+    /** Card — `jt16`/`nt` correspondente. */
+    surfaceRaised: t[`${p}16`] ?? t[`${p}0`],
+    textPrimary: modo === 'dark' ? '#eef1f5' : '#111316',
+    textSecondary: modo === 'dark' ? '#9aa3b2' : '#27292d',
+    /** Label mono / caption. */
+    textMuted: modo === 'dark' ? '#6b7382' : '#44464b',
+    /** RGB base da borda — o alfa é aplicado por uso (`borda(...)`). */
+    borderRgb: bordaRgb(modulo, modo)
+  } as const
+}
+
+/**
+ * RGB base da borda — README §2.6: "o RGB base vira token preservando o alfa de cada uso".
+ *
+ * A borda é RGB e não cor pronta porque cada uso aplica um alfa diferente (`.08`–`.12` nas
+ * divisórias, mais forte em foco). Congelar um alfa aqui obrigaria um token por opacidade.
+ */
+export function bordaRgb(modulo: Modulo, modo: ModoUi): string {
+  if (modulo === 'jarvis') return modo === 'dark' ? '200,204,212' : '30,35,46'
+  return modo === 'dark' ? '200,212,206' : '34,44,38'
+}
+
+/** Monta a cor de borda com o alfa do uso. */
+export function borda(modulo: Modulo, modo: ModoUi, alfa: number): string {
+  return `rgba(${bordaRgb(modulo, modo)},${alfa})`
+}
+
+/**
+ * Acesso ao token bruto do protótipo, para as fatias que portarem telas específicas.
+ *
+ * Lança quando o token não existe: um `jt99` inventado devolveria `undefined`, e o CSS engole
+ * valor indefinido em silêncio — a tela ficaria sutilmente errada sem nada falhar.
+ */
+export function tokenDeTema(token: string, modo: ModoUi): string {
+  const valor = TEMA[modo][token]
+  if (valor === undefined) {
+    throw new Error(`Token de tema desconhecido: ${token} (modo ${modo}).`)
+  }
+  return valor
+}

@@ -1,0 +1,104 @@
+/*
+ * Tipografia do design system (SPEC-DesignSystem-02, critério 5; README §3).
+ *
+ * As três famílias do protótipo, **servidas localmente**. O README §3 as importa do Google
+ * Fonts por CDN, mas duas regras do projeto barram isso: o app é local-first e tem de abrir
+ * offline com a fonte certa (CLAUDE.md), e a CSP do renderer declara `font-src 'self' data:`
+ * — sem host remoto (critério de aceite da SPEC-Fundacao-01). Um `@import` de CDN falharia
+ * silenciosamente e a UI cairia na fonte de sistema sem nada avisar.
+ *
+ * Só o subset **latin**: o app é pt-BR e os subsets devanagari/latin-ext do Rajdhani
+ * triplicariam o peso sem uso. Michroma e Share Tech Mono, SIL Open Font License 1.1;
+ * Rajdhani, SIL OFL 1.1 — redistribuição permitida.
+ */
+
+@font-face {
+  font-family: 'Michroma';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../../renderer/assets/fonts/michroma-latin.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Rajdhani';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('../../renderer/assets/fonts/rajdhani-500-latin.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Rajdhani';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../../renderer/assets/fonts/rajdhani-600-latin.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Rajdhani';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../../renderer/assets/fonts/rajdhani-700-latin.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Share Tech Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../../renderer/assets/fonts/sharetechmono-latin.woff2') format('woff2');
+}
+
+/*
+ * Algarismos tabulares (critério 5).
+ *
+ * Custo, tokens e duração mudam a cada tick; com algarismos proporcionais o número "dança"
+ * horizontalmente a cada atualização. Tabular trava a largura do dígito — é legibilidade em
+ * dado que muda, não preciosismo tipográfico.
+ */
+.jos-numero {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+/*
+ * Label pequena — README §3: "toda label pequena e caption é Share Tech Mono em UPPERCASE com
+ * letter-spacing 1.5–3px e cor --tx-dim".
+ */
+.jos-label {
+  font-family: var(--jos-fonte-mono);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--jos-cor-texto-suave);
+}
+
+/*
+ * `prefers-reduced-motion` (critério 6; PRD §14.2).
+ *
+ * Zera as durações **no token**, não em cada animação: quem anima lê `--jos-duracao-*`, então
+ * anular a variável desliga o movimento em toda a árvore de uma vez. Caçar `animation` por
+ * componente deixaria passar o próximo componente que alguém escrever.
+ *
+ * `0.01ms` em vez de `0`: duração zero cancela o evento `transitionend`, e componente que
+ * espera esse evento para limpar estado ficaria travado. É a diferença entre "instantâneo" e
+ * "nunca aconteceu".
+ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --jos-duracao-rapida: 0.01ms;
+    --jos-duracao-media: 0.01ms;
+    --jos-duracao-lenta: 0.01ms;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
