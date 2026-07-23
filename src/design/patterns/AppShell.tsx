@@ -15,7 +15,7 @@
 import { ProvedorDeTema, FundoDaIdentidade } from '../tokens/provider'
 import type { CorAcento } from '../tokens/acento'
 import type { ModoUi, Modulo } from '../tokens/semantic'
-import { cx } from '../ui/base'
+import { cx, FOCO } from '../ui/base'
 
 /** Medidas do grid — protótipo JARVISOS §2 e NOA §2, idênticas nos dois espaços. */
 export const GRID = {
@@ -67,7 +67,7 @@ export function NavigationGroup({
             'relative rounded-[var(--jos-raio-chip-largo)] px-3 py-2 text-left',
             'text-[length:var(--jos-texto-corpo)]',
             'transition-[background-color,color] duration-[var(--jos-duracao-rapida)]',
-            'outline-none focus-visible:ring-1 focus-visible:ring-[var(--jos-cor-acento)]',
+            FOCO,
             item.ativo === true
               ? 'font-[var(--jos-peso-medio)] text-[var(--jos-cor-texto)] before:absolute before:left-0 before:top-1/2 before:h-4 before:w-0.5 before:-translate-y-1/2 before:rounded-full before:bg-[var(--jos-cor-acento)]'
               : 'text-[var(--jos-cor-texto-secundario)] hover:bg-[rgba(var(--jos-borda-rgb),0.06)]'
@@ -119,7 +119,7 @@ export function Rail({
       className={cx(
         'grid size-10 place-items-center rounded-[var(--jos-raio-chip-largo)] border',
         'transition-[background-color,border-color,color] duration-[var(--jos-duracao-rapida)]',
-        'outline-none focus-visible:ring-1 focus-visible:ring-[var(--jos-cor-acento)]',
+        FOCO,
         item.ativo === true
           ? 'border-[var(--jos-cor-acento)] bg-[rgba(var(--jos-borda-rgb),0.10)] text-[var(--jos-cor-acento-leitura)]'
           : 'border-transparent text-[var(--jos-cor-texto-secundario)] hover:bg-[rgba(var(--jos-borda-rgb),0.06)]'
@@ -180,7 +180,7 @@ export function WorkspaceSwitcher({
               'rounded-[var(--jos-raio-chip-largo)] border px-3 py-2 text-left',
               'text-[length:var(--jos-texto-corpo)]',
               'transition-[background-color,border-color] duration-[var(--jos-duracao-rapida)]',
-              'outline-none focus-visible:ring-1 focus-visible:ring-[var(--jos-cor-acento)]',
+              FOCO,
               selecionado
                 ? 'border-[var(--jos-cor-acento)] bg-[rgba(var(--jos-borda-rgb),0.10)] font-[var(--jos-peso-medio)] text-[var(--jos-cor-texto)]'
                 : 'border-transparent text-[var(--jos-cor-texto-secundario)] hover:bg-[rgba(var(--jos-borda-rgb),0.06)]'
@@ -274,7 +274,7 @@ export function TopBar({
             'grid size-9 place-items-center rounded-[var(--jos-raio-chip-largo)] border',
             'border-[rgba(var(--jos-borda-rgb),0.18)] text-[var(--jos-cor-texto-secundario)]',
             'transition-[background-color,color] duration-[var(--jos-duracao-rapida)]',
-            'outline-none focus-visible:ring-1 focus-visible:ring-[var(--jos-cor-acento)]',
+            FOCO,
             'hover:bg-[rgba(var(--jos-borda-rgb),0.08)]'
           )}
         >

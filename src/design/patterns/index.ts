@@ -23,6 +23,9 @@ export {
   type ItemDoRail
 } from './AppShell'
 
+// Seletor de acento da CHOICE (SPEC-DesignSystem-06) — F06
+export { AccentSwatchSelector } from './AccentSwatchSelector'
+
 // Padrões operacionais (SPEC-DesignSystem-04b) — F04b
 export { redigirLinhas, redigirTexto, REDIGIDO } from './redigir'
 

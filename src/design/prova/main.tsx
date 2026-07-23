@@ -5,6 +5,7 @@ import { GaleriaDeDados, type Cena } from './GaleriaDeDados'
 import { GaleriaDeIdentidades } from './GaleriaDeIdentidades'
 import { GaleriaDeShell } from './GaleriaDeShell'
 import { GaleriaDeOperacionais, type CenaOperacional } from './GaleriaDeOperacionais'
+import { Jornada, type TelaDaJornada } from './jornada/Jornada'
 import type { ModoUi, Modulo } from '../tokens/semantic'
 import type { CorAcento } from '../tokens/acento'
 import './prova.css'
@@ -38,7 +39,9 @@ const acento = params.get('acento') as CorAcento | null
  */
 const CENAS_POR_GALERIA: Readonly<Record<string, readonly string[]>> = {
   dados: ['estatica', 'dialog', 'alert', 'drawer', 'toasts'],
-  operacionais: ['estatica', 'aprovacao', 'remocao']
+  operacionais: ['estatica', 'aprovacao', 'remocao'],
+  // A jornada da F06: cada 'cena' é uma tela do percurso.
+  jornada: ['choice', 'noa', 'jarvis']
 }
 
 const cenaBruta = params.get('cena')
@@ -77,6 +80,7 @@ const GALERIAS = {
       cena={(cenaBruta ?? 'estatica') as CenaOperacional}
     />
   ),
+  jornada: () => <Jornada telaInicial={(cenaBruta ?? 'choice') as TelaDaJornada} uiTheme={modo} />,
   controles: () => <GaleriaDeControles modo={modo} modulo={modulo} acento={acento ?? undefined} />
 } as const
 
