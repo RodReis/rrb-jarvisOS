@@ -14,6 +14,7 @@ import { WorkflowRepository } from './workflows/workflow-repository'
 import { AutomationRepository } from './workflows/automation-repository'
 import { SimulationEngine } from './execution/simulation-engine'
 import { ExecutionRepository } from './execution/execution-repository'
+import { carregarEnv } from './env'
 import { closeLogger, initLogger, log } from './logging/logger'
 import { initRendererLogBridge } from './logging/renderer-bridge'
 import { LOCAL_USER_ID, LOCAL_USER_PROFILE } from './storage/local-user'
@@ -53,6 +54,21 @@ if (!app.requestSingleInstanceLock()) {
       electron: process.versions.electron,
       plataforma: process.platform
     })
+
+    /*
+     * Carga do `.env` (FIX #43), depois do logger e **antes** de `criarAuthService`, que é o
+     * primeiro a ler `process.env`. Depois do logger de propósito: `writeLog` engole a linha
+     * enquanto o logger não existe, e "o arquivo foi lido?" foi exatamente a pergunta que este
+     * bug deixou sem resposta por uma fatia inteira — o sinal precisa chegar ao disco.
+     *
+     * Só fora do empacotado: um app instalado lê configuração do sistema, não um arquivo de
+     * desenvolvimento ao lado do binário. Vão para o log os **nomes** das chaves, nunca os
+     * valores, que são credenciais.
+     */
+    if (!app.isPackaged) {
+      const aplicadas = carregarEnv(join(app.getAppPath(), '.env'))
+      log.sistema.info('Carga do .env concluída', { chaves: aplicadas })
+    }
 
     // Storage depois do logger, antes dos handlers — que já podem consultá-lo.
     const storage = initStorage(app.getPath('userData'))

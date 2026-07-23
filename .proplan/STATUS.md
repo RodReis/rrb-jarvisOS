@@ -9,15 +9,14 @@ updated: 2026-07-23
 
 ### [MVP3] Design System da Plataforma — base única, 2 identidades (#16)
 
-- [MVP3][F03a] Componentes: ações + formulários (#19)
-- [MVP3][F06] Adoção & hardening (#24)
 - [MVP3][F05] Identidades NOA e JARVIS (#23)
+- [MVP3][F06] Adoção & hardening (#24)
 - [MVP3][F04b] Padrões operacionais (#22)
 - [MVP3][F04a] AppShell + navegação (#21)
-- [MVP3][F03b] Componentes: dados + overlays + feedback (#20)
 
 ### Sem épico
 
+- [MVP1][FIX] Renderer sobe em porta variável — `strictPort` não aplicado (#41)
 - [INFRA] CI: separar E2E em job próprio, condicional por paths (#34)
 - [MVP4] Execução real — terminal controlado + execução allowlisted (#10)
 
@@ -27,7 +26,9 @@ _(vazio)_
 
 ## Em Andamento
 
-_(vazio)_
+### [MVP3] Design System da Plataforma — base única, 2 identidades (#16)
+
+- [MVP3][F03b] Componentes: dados + overlays + feedback (#20)
 
 ## Feito
 
@@ -37,6 +38,7 @@ _(vazio)_
 
 ### [MVP3] Design System da Plataforma — base única, 2 identidades (#16)
 
+- [MVP3][F03a] Componentes: ações + formulários (#19, finalizado em: 2026-07-23)
 - [MVP3][F01] Infra do design system (#17, finalizado em: 2026-07-23)
 - [MVP3][F02] Foundations + ponte com o protótipo (#18, finalizado em: 2026-07-23)
 
