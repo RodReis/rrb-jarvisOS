@@ -110,6 +110,22 @@ test.describe('critério 4 — foco visível e alcançável em tela real', () =>
     expect(sombra).not.toBe('')
   })
 
+  test('o swatch tem o tamanho declarado — a camada `patterns` é varrida pelo Tailwind', async ({
+    page
+  }) => {
+    await abrir(page, 'cena=choice&modo=dark', '[data-jornada="choice"]')
+
+    // `size-7` = 28px. Renderizava a **2px** porque o `@source '../patterns'` faltava no
+    // `prova.css` — a camada nasceu na F04a, depois daquele bloco. Nenhum teste de papel
+    // acusaria: `getByRole('radio')` acha um botão de 2px tão bem quanto um de 28px.
+    //
+    // Esta asserção existe menos pelo swatch e mais pela **camada**: se alguém acrescentar uma
+    // quinta pasta ao DS e esquecer o `@source`, é aqui que aparece.
+    const box = await page.locator('[data-jos-swatches] button').first().boundingBox()
+    expect(box?.width).toBe(28)
+    expect(box?.height).toBe(28)
+  })
+
   test('os swatches são alcançáveis por Tab', async ({ page }) => {
     await abrir(page, 'cena=choice&modo=dark', '[data-jornada="choice"]')
 
