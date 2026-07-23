@@ -17,6 +17,7 @@ import {
   RAIO,
   SOMBRA,
   TAMANHO,
+  TOAST,
   TEXTO
 } from './base'
 import {
@@ -117,6 +118,23 @@ export function variaveisDoTema({
     // acento, não contra o fundo da tela. Sem isto, o botão primário sólido herdaria a cor de
     // texto da tela e ficaria ilegível com acento claro.
     '--jos-cor-acento-contraste': contrasteSobre(acento),
+    // Véu por trás de modal/gaveta. Preto translúcido, igual nos dois modos: o overlay escurece
+    // o conteúdo para focar no modal, e um véu que clareasse no modo claro não separaria nada.
+    '--jos-cor-backdrop': 'color-mix(in srgb, #000 60%, transparent)',
+    // Cores do Toast — **sempre escuras**, não invertem no modo claro (README §2.6, o toast é
+    // superfície de marca como Login/Choice). Ficam aqui como tokens em vez de soltas no
+    // componente para a régua do critério 5 valer também para a marca. O gradiente é o card
+    // glass do README §5.2.
+    '--jos-toast-fundo': 'linear-gradient(135deg,rgba(14,16,20,.92),rgba(8,9,12,.94))',
+    '--jos-toast-texto': '#eef1f5',
+    '--jos-toast-texto-suave': '#9aa3b2',
+    '--jos-toast-sombra': '0 20px 46px -18px rgba(0,0,0,1), inset 0 1px 0 rgba(255,255,255,.05)',
+    '--jos-toast-topo': TOAST.topo,
+    '--jos-toast-direita': TOAST.direita,
+    '--jos-toast-largura': TOAST.largura,
+    '--jos-toast-icone': TOAST.icone,
+    '--jos-toast-barra-lateral': TOAST.barraLateral,
+    '--jos-toast-barra-progresso': TOAST.barraProgresso,
 
     // Semânticas — a **cor de marca** não inverte nem é retematizável (PRD §15).
     '--jos-cor-ok': STATUS.ok,
@@ -139,6 +157,8 @@ export function variaveisDoTema({
     '--jos-raio-rail': RAIO.rail,
     '--jos-raio-card': RAIO.card,
     '--jos-raio-modal': RAIO.modal,
+    '--jos-raio-toast': RAIO.toast,
+    '--jos-raio-chip-largo': RAIO.chipLargo,
     '--jos-raio-pill': RAIO.pill,
     '--jos-espaco-lista': ESPACO.lista,
     '--jos-espaco-form': ESPACO.form,

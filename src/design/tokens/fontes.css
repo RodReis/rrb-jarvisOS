@@ -86,6 +86,97 @@
  * espera esse evento para limpar estado ficaria travado. É a diferença entre "instantâneo" e
  * "nunca aconteceu".
  */
+/*
+ * Faixa deslizante do Progress indeterminado (SPEC-DesignSystem-03b).
+ *
+ * Uma barra sem valor conhecido não pode mostrar largura fixa — a faixa varre a trilha para
+ * dizer "algo está acontecendo, sem previsão de fim". `transform` e não `left`: propriedade de
+ * compositor, não de layout.
+ */
+@keyframes deslizar {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+/*
+ * Entradas dos overlays (SPEC-DesignSystem-03b).
+ *
+ * `surgir` para modais e popovers (fade + leve escala); `entrar-direita`/`entrar-esquerda` para
+ * a gaveta. Todos usam só `opacity` e `transform` — propriedades de compositor. Reveladas por
+ * `data-[state=open]`, então o conteúdo já está no DOM quando a animação corre: a animação é
+ * enfeite da entrada, nunca gate da visibilidade (headless render e aba oculta não a executam,
+ * e o overlay tem de aparecer mesmo assim).
+ */
+@keyframes aparecer {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes surgir {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes entrar-direita {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes entrar-esquerda {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/*
+ * Toast (SPEC-DesignSystem-03b, README §5.2).
+ *
+ * `toast-in`: entrada por slide-x + escala. `toast-barra`: a barra de progresso inferior encolhe
+ * de 100% a 0 no tempo do toast, dando ao usuário a pista visual de quanto falta para fechar. As
+ * duas usam só `transform` — a barra escala em X em vez de animar `width` (compositor, não
+ * layout). O sheen diagonal do protótipo é `toast-sheen`, e fica sob `motion-safe` no componente.
+ */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes toast-barra {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   :root {
     --jos-duracao-rapida: 0.01ms;
