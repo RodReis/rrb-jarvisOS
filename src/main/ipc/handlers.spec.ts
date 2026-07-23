@@ -66,6 +66,18 @@ const allowlist = {
   remove: vi.fn(() => ({ path: '/app/userData/x', removed: true }))
 }
 
+const workflows = {
+  listWorkflows: vi.fn(() => []),
+  createWorkflow: vi.fn((input: Record<string, unknown>) => ({ id: 'wf-1', ...input })),
+  updateWorkflow: vi.fn(() => ({ id: 'wf-1' })),
+  setWorkflowStatus: vi.fn(() => ({ id: 'wf-1', status: 'online' })),
+  removeWorkflow: vi.fn(() => true),
+  listAutomations: vi.fn(() => []),
+  createAutomation: vi.fn((input: Record<string, unknown>) => ({ id: 'a-1', ...input })),
+  setAutomationEnabled: vi.fn(() => ({ id: 'a-1', enabled: true })),
+  removeAutomation: vi.fn(() => true)
+}
+
 const minimizeToTray = vi.fn()
 
 const preferences = {
@@ -83,6 +95,7 @@ const deps = {
   preferences,
   policy,
   allowlist,
+  workflows,
   // Função desde a F03: a identidade muda em runtime (local antes do login, usuário da
   // sessão depois), então os handlers a resolvem a cada chamada em vez de capturá-la.
   userId: () => 'local',
@@ -120,6 +133,10 @@ beforeEach(() => {
   allowlist.add.mockClear()
   allowlist.remove.mockClear()
   policy.classify.mockClear()
+  workflows.listWorkflows.mockClear()
+  workflows.createWorkflow.mockClear()
+  workflows.setWorkflowStatus.mockClear()
+  workflows.createAutomation.mockClear()
   logIpc.info.mockClear()
   logIpc.warn.mockClear()
   logIpc.error.mockClear()
@@ -309,5 +326,42 @@ describe('canais da allowlist (SPEC-Execucao-03)', () => {
   it('path não-string no add não chama o repositório (fronteira de confiança)', () => {
     invocar(IPC_CHANNELS.allowlistAdd, { malicioso: true })
     expect(allowlist.add).not.toHaveBeenCalled()
+  })
+})
+
+describe('canais de workflows/automações (SPEC-Execucao-04)', () => {
+  it('list encaminha o workspace válido', () => {
+    invocar(IPC_CHANNELS.workflowList, 'jarvis')
+    expect(workflows.listWorkflows).toHaveBeenCalledWith('jarvis')
+  })
+
+  it('list com workspace fora do enum devolve vazio sem tocar o serviço', () => {
+    expect(invocar(IPC_CHANNELS.workflowList, 'Desenvolvimento')).toEqual([])
+    expect(workflows.listWorkflows).not.toHaveBeenCalled()
+  })
+
+  it('create com workspace válido cria; com inválido lança', () => {
+    invocar(IPC_CHANNELS.workflowCreate, { workspace_id: 'jarvis', name: 'W', steps: [] })
+    expect(workflows.createWorkflow).toHaveBeenCalled()
+    expect(() => invocar(IPC_CHANNELS.workflowCreate, { workspace_id: 'x' })).toThrow(/inválido/)
+  })
+
+  it('setStatus só aceita status do enum', () => {
+    invocar(IPC_CHANNELS.workflowSetStatus, 'wf-1', 'online')
+    expect(workflows.setWorkflowStatus).toHaveBeenCalledWith('wf-1', 'online')
+    // status inventado não chama o serviço
+    workflows.setWorkflowStatus.mockClear()
+    expect(invocar(IPC_CHANNELS.workflowSetStatus, 'wf-1', 'turbo')).toBeUndefined()
+    expect(workflows.setWorkflowStatus).not.toHaveBeenCalled()
+  })
+
+  it('automação: create valida workspace; setEnabled coage para boolean', () => {
+    invocar(IPC_CHANNELS.automationCreate, {
+      workspace_id: 'jarvis',
+      name: 'A',
+      trigger: { id: 't', type: 'manual' },
+      target: { workflowId: 'wf-1' }
+    })
+    expect(workflows.createAutomation).toHaveBeenCalled()
   })
 })

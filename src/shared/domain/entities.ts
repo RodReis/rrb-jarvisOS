@@ -90,7 +90,12 @@ export const AUDIT_EVENT_TYPES = [
   // SPEC-Execucao-03: adicionar/remover diretório da allowlist é ação sensível (RF-019).
   // Tipo próprio, não `policy-decision`: editar a allowlist é uma mudança de configuração,
   // não a classificação de uma ação — misturar os dois sob um tipo confundiria a auditoria.
-  'allowlist-change'
+  'allowlist-change',
+  // SPEC-Execucao-04: criar/alterar/ativar-desativar workflow ou automação (RF-006/007).
+  // Cada um seu tipo, pela mesma razão de `allowlist-change`: são mudanças de catálogo
+  // distintas, e a auditoria deve poder distingui-las sem parsear o payload.
+  'workflow-change',
+  'automation-change'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]

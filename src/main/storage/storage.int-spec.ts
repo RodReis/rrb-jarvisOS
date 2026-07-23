@@ -58,6 +58,8 @@ describe('migrations', () => {
     // tenta recriar um objeto que já existe. A v2 adicionou `theme`; a v3, `allowed_directory`.
     antigo.exec('ALTER TABLE user_profile DROP COLUMN theme')
     antigo.exec('DROP TABLE allowed_directory')
+    antigo.exec('DROP TABLE workflow')
+    antigo.exec('DROP TABLE automation')
     antigo.pragma('user_version = 1')
     antigo.close()
 
