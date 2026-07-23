@@ -18,9 +18,9 @@ Atualizado em: **2026-07-23**. Mantido pelo Code a cada entrega (junto com `DEVE
 
 ### Feito (`proplan:done` — entregue, aguardando aceite do PI)
 
-| Issue | Fatia | MVP | Spec | Índice | PR |
-|---|---|---|---|---|---|
-| [#17](https://github.com/RodReis/rrb-jarvisOS/issues/17) | 01 Infra do design system | MVP-003 (#16) | `spec-design-system-01-infra.md` | M3-F01 | [#38](https://github.com/RodReis/rrb-jarvisOS/pull/38) |
+| Issue | Fatia | MVP | Spec | Índice | PR | Mergeado |
+|---|---|---|---|---|---|---|
+| [#17](https://github.com/RodReis/rrb-jarvisOS/issues/17) | 01 Infra do design system | MVP-003 (#16) | `spec-design-system-01-infra.md` | M3-F01 | [#38](https://github.com/RodReis/rrb-jarvisOS/pull/38) | 2026-07-23 |
 
 > **04 e 02 saíram no mesmo PR**, por decisão do PI (2026-07-22): o critério 4 da SPEC-04 exige `AuditEvent` de `workspace-switch`, cujo fluxo nasce na F02 — separá-las exigiria um stub que a F02 jogaria fora. O critério 4 fica **parcialmente atendido**: `workspace-switch` está provado ponta a ponta; `login`/`logout`/`login-offline-reuse` têm o tipo no contrato e o fluxo nasce na F03.
 
