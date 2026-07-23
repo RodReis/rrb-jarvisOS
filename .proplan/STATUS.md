@@ -29,9 +29,7 @@ _(vazio)_
 
 ## Em Andamento
 
-### [MVP2] Execução local controlada — fundação de execução (permissões, allowlist, execução simulada) (#9)
-
-- [MVP2][F05] Motor de execução em modo simulado (#14)
+_(vazio)_
 
 ## Feito
 
@@ -41,6 +39,7 @@ _(vazio)_
 
 ### [MVP2] Execução local controlada — fundação de execução (permissões, allowlist, execução simulada) (#9)
 
+- [MVP2][F05] Motor de execução em modo simulado (#14, finalizado em: 2026-07-23)
 - [MVP2][F03] Diretórios permitidos (allowlist) (#12, finalizado em: 2026-07-23)
 - [MVP2][F04] Registro de workflows + automações manuais (#13, finalizado em: 2026-07-23)
 - [MVP2][F02] Policy Engine mínimo (classificação, fail-closed) (#11, finalizado em: 2026-07-22)
