@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { FolderOpen } from 'lucide-react'
 import { ProvedorDeTema } from '../tokens/provider'
 import type { CorAcento } from '../tokens/acento'
@@ -56,7 +56,7 @@ interface GaleriaProps {
 
 export type Cena = 'estatica' | 'dialog' | 'alert' | 'drawer' | 'toasts'
 
-const TONS: readonly TomSemantico[] = ['ok', 'info', 'warn', 'err', 'violet']
+const TONS: readonly TomSemantico[] = ['ok', 'info', 'warn', 'err']
 
 interface Execucao {
   readonly id: string
@@ -203,7 +203,7 @@ function SecaoSuperficies(): React.JSX.Element {
         <Tag>Somente leitura</Tag>
         <Avatar nome="Rodrigo Reis" />
         <Avatar nome="Noa" tamanho="pequeno" />
-        <Tooltip conteudo="Detalhe que não cabe no rótulo">
+        <Tooltip texto="Detalhe que não cabe no rótulo">
           <Button variante="secundaria">Com tooltip</Button>
         </Tooltip>
       </div>
@@ -353,10 +353,27 @@ function SecaoVazios(): React.JSX.Element {
 function Overlays({ cena }: { readonly cena: Cena }): React.JSX.Element | null {
   const nada = (): void => {}
 
+  /*
+   * Abre por **transição** `false → true`, não montado já aberto.
+   *
+   * Não é detalhe de estilo: o Radix move o foco inicial quando o `open` **muda**, e um overlay
+   * que nasce aberto no primeiro render nunca dispara essa mudança — o foco fica no `<body>`.
+   * Montar já aberto capturaria uma tela em que o foco inicial não existe, e a prova visual
+   * afirmaria sobre um estado que o usuário nunca vê (ele sempre chega por um clique).
+   *
+   * Descoberto por este teste: a asserção do foco no botão seguro falhava, e a investigação
+   * mostrou que o focus-trap funcionava — Tab de dentro circulava certo. Era a cena que estava
+   * errada, não o componente.
+   */
+  const [aberto, setAberto] = useState(false)
+  useEffect(() => {
+    setAberto(true)
+  }, [])
+
   if (cena === 'dialog') {
     return (
       <Dialog
-        aberto
+        aberto={aberto}
         onFechar={nada}
         titulo="Editar workflow"
         descricao="As alterações valem a partir da próxima execução."
@@ -378,7 +395,7 @@ function Overlays({ cena }: { readonly cena: Cena }): React.JSX.Element | null {
   if (cena === 'alert') {
     return (
       <AlertDialog
-        aberto
+        aberto={aberto}
         onFechar={nada}
         onConfirmar={nada}
         titulo="Excluir 3 workflows?"
@@ -390,7 +407,7 @@ function Overlays({ cena }: { readonly cena: Cena }): React.JSX.Element | null {
 
   if (cena === 'drawer') {
     return (
-      <Drawer aberto onFechar={nada} titulo="Detalhes da execução">
+      <Drawer aberto={aberto} onFechar={nada} titulo="Detalhes da execução">
         <Panel titulo="Etapas" tom="info">
           <p className="text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto-secundario)]">
             3 de 5 concluídas.

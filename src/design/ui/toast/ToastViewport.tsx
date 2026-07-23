@@ -35,6 +35,10 @@ export function ToastViewport(): React.JSX.Element {
 
   return (
     <div
+      // Marcador do container. `role="status"` é papel comum — o `Spinner` da página também o
+      // usa —, então buscar toast por papel encontra o primeiro `status` do DOM, que pode não
+      // ser um toast. A prova visual da F03b tropeçou exatamente nisso.
+      data-jos-toasts=""
       // `pointer-events-none` no container, `auto` em cada card: cliques passam pelo espaço
       // vazio entre toasts para o conteúdo atrás (README §5.2).
       className="pointer-events-none fixed right-[var(--jos-toast-direita)] top-[var(--jos-toast-topo)] z-[var(--jos-camada-toast)] flex w-[var(--jos-toast-largura)] max-w-[calc(100vw-44px)] flex-col gap-3"

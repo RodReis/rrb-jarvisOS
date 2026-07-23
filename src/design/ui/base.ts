@@ -67,3 +67,40 @@ export const LABEL_MONO =
 export function cx(...partes: ReadonlyArray<string | false | null | undefined>): string {
   return partes.filter(Boolean).join(' ')
 }
+
+/**
+ * Props que os primitivos Radix injetam ao compor com `asChild`.
+ *
+ * `asChild` **clona** o filho e injeta `ref`, handlers e atributos de estado nele. Um componente
+ * que declara props à mão e descarta o resto joga tudo isso fora em silêncio: o primitivo fica
+ * sem referência ao elemento, o foco inicial nunca acontece e os handlers não chegam ao DOM.
+ *
+ * O efeito real, encontrado na prova visual da F03b: o `AlertDialog` nunca focava o botão seguro
+ * (quem navega por teclado entrava num diálogo destrutivo sem foco), e um `Tooltip` com `Button`
+ * dentro **não abria** nem emitia `aria-describedby`. `Dialog` e `Drawer` funcionavam só porque
+ * usam `<button>` nativo no `Close asChild`.
+ *
+ * A decisão 4 da F03a — "o wrapper declara props à mão" — continua valendo no que ela protegia:
+ * **não** herdamos a superfície do primitivo por `extends SwitchProps`, e o consumidor segue sem
+ * acesso à API do Radix. O que se abre aqui é só o contrato de composição do DOM. Lista fechada,
+ * e não `...rest` aberto — um spread livre reabriria a porta que a F03a fechou de propósito.
+ */
+export interface PropsDeComposicao {
+  readonly ref?: React.Ref<HTMLButtonElement>
+  /** Handlers que os primitivos injetam no gatilho (Tooltip, Popover, Dropdown, AlertDialog). */
+  readonly onPointerDown?: React.PointerEventHandler<HTMLButtonElement>
+  readonly onPointerEnter?: React.PointerEventHandler<HTMLButtonElement>
+  readonly onPointerLeave?: React.PointerEventHandler<HTMLButtonElement>
+  readonly onPointerMove?: React.PointerEventHandler<HTMLButtonElement>
+  readonly onFocus?: React.FocusEventHandler<HTMLButtonElement>
+  readonly onBlur?: React.FocusEventHandler<HTMLButtonElement>
+  readonly onKeyDown?: React.KeyboardEventHandler<HTMLButtonElement>
+  readonly onMouseDown?: React.MouseEventHandler<HTMLButtonElement>
+  /** Atributos ARIA e de estado que o primitivo controla — nunca escritos à mão pelo consumidor. */
+  readonly id?: string
+  readonly 'aria-expanded'?: boolean
+  readonly 'aria-controls'?: string
+  readonly 'aria-describedby'?: string
+  readonly 'aria-haspopup'?: React.AriaAttributes['aria-haspopup']
+  readonly 'data-state'?: string
+}

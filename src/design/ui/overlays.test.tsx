@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
-import { AlertDialog, Dialog, DropdownMenu, Drawer, Popover } from './index'
+import { AlertDialog, Button, Dialog, DropdownMenu, Drawer, IconButton, Popover } from './index'
 
 /**
  * Overlays (SPEC-DesignSystem-03b, critérios 1 e 3; PRD §11.5).
@@ -177,6 +177,75 @@ describe('DropdownMenu (critério 1)', () => {
 
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
     expect(onSelecionar).not.toHaveBeenCalled()
+  })
+})
+
+describe('composição com `asChild` (correção da F03b)', () => {
+  /*
+   * O `asChild` do Radix **clona** o filho e injeta `ref`, handlers e atributos de estado nele.
+   * O `Button` e o `IconButton` da F03a declaravam props à mão e descartavam o resto — o que
+   * jogava tudo isso fora em silêncio.
+   *
+   * O efeito era invisível em jsdom e só apareceu na prova visual: o `AlertDialog` nunca focava
+   * o botão seguro, e um `Tooltip` com `Button` dentro **não abria**. O que denuncia o defeito
+   * sem navegador é o atributo de estado — se ele chega ao DOM, o clone funcionou.
+   */
+  it('o gatilho recebe os atributos que o primitivo injeta', async () => {
+    const user = userEvent.setup()
+    render(
+      <DropdownMenu
+        gatilho={<Button variante="secundaria">Ações</Button>}
+        itens={[{ rotulo: 'Arquivar', onSelecionar: vi.fn() }]}
+      />
+    )
+
+    const gatilho = screen.getByRole('button', { name: 'Ações' })
+    // `aria-haspopup` e `aria-expanded` vêm do Radix, não do nosso código. Se o `Button` os
+    // descartasse, o leitor de tela anunciaria um botão comum — sem dizer que abre um menu.
+    expect(gatilho).toHaveAttribute('aria-haspopup', 'menu')
+    expect(gatilho).toHaveAttribute('aria-expanded', 'false')
+
+    await user.click(gatilho)
+    expect(await screen.findByRole('menu')).toBeInTheDocument()
+    expect(gatilho).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('o IconButton também compõe — é o gatilho natural do menu de ações', async () => {
+    const user = userEvent.setup()
+    render(
+      <DropdownMenu
+        gatilho={<IconButton rotulo="Mais ações">⋯</IconButton>}
+        itens={[{ rotulo: 'Arquivar', onSelecionar: vi.fn() }]}
+      />
+    )
+
+    const gatilho = screen.getByRole('button', { name: 'Mais ações' })
+    expect(gatilho).toHaveAttribute('aria-haspopup', 'menu')
+
+    await user.click(gatilho)
+    expect(await screen.findByRole('menu')).toBeInTheDocument()
+  })
+
+  it('o AlertDialog aciona pelo handler que o primitivo injeta, não só pelo nosso onClick', async () => {
+    const user = userEvent.setup()
+    const onFechar = vi.fn()
+    render(
+      <AlertDialog
+        aberto
+        onFechar={onFechar}
+        onConfirmar={vi.fn()}
+        titulo="Excluir?"
+        descricao="Permanente."
+        verboConfirmar="Excluir"
+      />
+    )
+
+    // `Cancelar` **não** recebe `onClick` nosso: quem fecha é o handler que o `Cancel` injeta
+    // via `asChild`. É a asserção que distingue "o botão funciona" de "o clone funcionou" —
+    // o teste do critério 3 passava mesmo com o `asChild` quebrado, porque o `onConfirmar`
+    // chega por prop explícita.
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(onFechar).toHaveBeenCalledTimes(1)
   })
 })
 
