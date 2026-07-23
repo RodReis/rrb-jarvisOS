@@ -231,15 +231,26 @@ Status: **entregue** — spec `aprovada-pi` (2026-07-21); issue [#13](https://gi
 
 ### Fatia 05 — Motor de execução simulado (`docs/spec/spec-execucao-local-05-execucao-simulada.md`)
 
-Status: spec `aprovada-pi` (2026-07-21); issue [#14](https://github.com/RodReis/rrb-jarvisOS/issues/14) em Backlog. **Headline do MVP** — junta F02+F03+F04. **Zero efeito colateral** (execução real é MVP-003).
+Status: **entregue** — spec `aprovada-pi` (2026-07-21); issue [#14](https://github.com/RodReis/rrb-jarvisOS/issues/14); PR [#37](https://github.com/RodReis/rrb-jarvisOS/pull/37). **Headline do MVP** — junta F02+F03+F04. **Zero efeito colateral** (execução real é MVP-003).
 
-- [ ] Motor no main: lê workflow (F04), percorre etapas (seq/paralelo) por gatilho manual
-- [ ] Por etapa: classifica (F02, report) → checa allowlist se há path (F03) → **simula** sem efeito real
-- [ ] `ExecutionRun` persistido com máquina de estados RF (`planejado→em execução→concluído|falhou|cancelado`; `aguardando aprovação` auto-continua) + trace por etapa
-- [ ] Simulação determinística (sucesso por padrão; falha declarável p/ testar `falhou`/retentativa)
-- [ ] Início/fim + etapas geram `AuditEvent` encadeado (ADR-004, `verifyChain` passa); run logado (ADR-005) com `correlationId`
-- [ ] **Zero efeito colateral** (teste: etapa "gravar arquivo" não cria arquivo); renderer dispara via IPC tipado
-- [ ] Entrega: PR `refs #N`; docs/ commitados
+- [x] Motor no main (`SimulationEngine`): lê workflow (F04), percorre etapas por gatilho manual
+- [x] Por etapa: checa allowlist se há path (F03) → classifica (F02, report, recebendo `pathAllowed`) → **simula** sem efeito real
+- [x] `ExecutionRun` persistido (migration 5) com máquina de estados RF; trace por etapa (ação, decisão, allowlist, resultado, timing)
+- [x] Simulação determinística: sucesso por padrão; falha declarável via `params.simulateFailure` (decisão do PI)
+- [x] Início/fim + cada etapa geram `AuditEvent` encadeado (`execution-run`/`execution-step`); `verifyChain` passa; run logado com `correlationId`
+- [x] **Zero efeito colateral provado**: etapa "gravar arquivo" não cria arquivo; listagem do diretório idêntica antes/depois
+- [x] Renderer dispara via IPC tipado (`execution:run`/`execution:list`); motor no main
+- [x] Entrega: PR [#37](https://github.com/RodReis/rrb-jarvisOS/pull/37) (`refs #14`); docs/ commitados
+
+**Decisões técnicas desta fatia:**
+
+1. **O invariante é a ausência.** `simulation-engine.ts` **não importa** `node:fs`, `node:child_process` nem nada de rede — por desenho, não por esquecimento. "Simular" é produzir o veredito e a nota que a ação *teria*, nunca executá-la. Dois testes provam pelo efeito: o arquivo alvo não existe depois do run, e a listagem do diretório é idêntica antes/depois.
+2. **Falha declarável via `params.simulateFailure`** (decisão do PI), não campo no `WorkflowStep`. Fica no dado do workflow e some naturalmente quando a execução for real (MVP-003), sem deixar campo morto no schema da F04.
+3. **A ordem dentro da etapa é allowlist → política.** A F03 roda primeiro porque seu resultado (`pathAllowed`) é **insumo** da classificação da F02 — é o elo 03→02 desta fatia. Inverter perderia a elevação de tier por path fora.
+4. **Modo report ponta a ponta:** uma etapa classificada `bloqueado` (ação fora da taxonomia, fail-closed) **não barra** o run — ele conclui. Há teste afirmando isso. Barrar é enforcement, e enforcement é MVP-003.
+5. **Falha encerra o run; aprovação não.** Etapa que falha para o run em `falhou` e as seguintes não rodam (teste prova). `requiresApproval` vira **marco** e o run auto-continua — o fluxo de aprovação é MVP-003.
+6. **Workflow inexistente ⇒ run `cancelado`, registrado.** Um gatilho para um id que não existe é um fato a auditar, não um erro a engolir: o run nasce, é gravado com `workflowId: null` e estado `cancelado`.
+7. **Tipos de auditoria próprios** (`execution-run` para os marcos de início/fim, `execution-step` por etapa) — mesma linha de `allowlist-change`/`workflow-change`: a auditoria distingue sem parsear payload.
 
 ## Após o MVP-002
 
@@ -253,6 +264,7 @@ Ordem: MVP-002 (fundação de execução) → **MVP-003** ([#10](https://github.
 | 2026-07-22 | MVP-001 · F06 Observabilidade e Logging (#8) | [#27](https://github.com/RodReis/rrb-jarvisOS/pull/27) | Regras 49 (87.2%), **Banco 8 (85.5%)**, Tela 13 (97.6%). A categoria **Banco deixa de estar vazia antes da F04**: os testes de integração do logger tocam disco real (arquivo temporário, teardown por teste), que é exatamente o que a categoria mede — o `TESTING.md` §8 previa SQLite como primeiro caso, mas a régua é "integração com storage local", não "SQLite". Verificado também no app real: os três arquivos nascem em `userData/logs` e o registro do renderer chega ao disco. |
 | 2026-07-22 | MVP-001 · F04 Dados + AuditEvent (#5) **e** F02 AppShell/workspaces (#3) | [#28](https://github.com/RodReis/rrb-jarvisOS/pull/28) | Regras 78 (86.6%), Banco 32 (89.5%), Tela 16 (98.5%). Duas fatias no mesmo PR por decisão do PI: o critério 4 da SPEC-04 exige `AuditEvent` de `workspace-switch`, cujo fluxo nasce na F02. Carimbo pela issue do primeiro `refs` (#5), como o CI extrai. Verificado no app real: schema v1, 2 triggers ativos, chave de auditoria cifrada por DPAPI no disco. **F03 não entrou** — bloqueada por credenciais (ver a seção da fatia). |
 | 2026-07-22 | MVP-001 · F05 Settings mínimo (#6) | [#29](https://github.com/RodReis/rrb-jarvisOS/pull/29) | Regras 83 (84.0%), Banco 45 (89.6%), Tela 22 (95.5%). Fecha o MVP-001 **exceto a F03**. Primeira migration incremental do projeto (v1 → v2) exercitada sobre banco real com dado gravado — o log registrou `Migrations aplicadas {"quantidade":1}` e o perfil sobreviveu. Corrigiu um bug latente da F04: o upsert do perfil sobrescrevia `locale`/`theme` a cada boot. |
+| 2026-07-22 | MVP-002 · F05 Motor de execução simulado (#14) | [#37](https://github.com/RodReis/rrb-jarvisOS/pull/37) | Regras 137 (74.8%), Banco 109 (87.5%), Tela 33 (93.5%) — **+16 testes**. **Fecha o MVP-002 (5/5 entregues).** A headline: junta F02 (classifica), F03 (allowlist) e F04 (definições) num motor que percorre etapas **sem tocar recurso real**. O invariante foi provado pelo efeito, não pela intenção: a etapa "gravar arquivo" roda e o arquivo não existe; a listagem do diretório é idêntica antes/depois. Modo report ponta a ponta — etapa `bloqueado` não barra o run. |
 | 2026-07-22 | MVP-002 · F04 Registro de workflows + automações (#13) | [#36](https://github.com/RodReis/rrb-jarvisOS/pull/36) | Regras 134 (74.7%), Banco 96 (85.3%), Tela 33 (93.5%) — **+14 testes**. Catálogo RF-006/007 (schema pleno), migration 4 (`workflow`/`automation`, etapas em JSON). Nada executa: ativar muda status, não roda etapa; cron registra sem agendar. Edição classificada (F02) + auditada (`workflow-change`/`automation-change`). Elo 04→02→05 provado: etapa carrega `ActionId` da taxonomia. 9 canais IPC novos — as listas da ponte (preload.spec, E2E) pegaram todos. |
 | 2026-07-22 | MVP-002 · F03 Diretórios permitidos (allowlist) (#12) | [#35](https://github.com/RodReis/rrb-jarvisOS/pull/35) | Regras 129 (78.2%), Banco 87 (86.8%), Tela 33 (93.5%) — **+35 testes**. Checagem dividida: `isPathAllowed` pura (Regras) + canonicalização com symlink no main (Banco). Anti-escape provado com symlink real apontando pra fora. Default de fábrica = só o `userData`, invariante. Add/remove auditado (`allowlist-change`). Integração F02: `pathAllowed:false` eleva o tier, `evaluate` segue puro. Junto: **[INFRA] cache do binário do Electron** (commit `c37a5f0`, ~2-3 min a menos no CI) e o card **#34** para separar o E2E em job próprio. |
 | 2026-07-22 | MVP-002 · F02 Policy Engine (classificação) (#11) | [#33](https://github.com/RodReis/rrb-jarvisOS/pull/33) | Regras 107 (77.0%), Banco 74 (87.0%), Tela 33 (93.5%) — **+21 testes**. Backbone das fatias 03/05 do MVP-002. Núcleo `evaluate` puro (Regras) + `PolicyService` que audita cada decisão (Banco). Taxonomia como seed dos requisitos § Ações Possíveis — dado, não hardcode. Fail-closed na classificação: desconhecido ⇒ `bloqueado`. Modo report: nada barra (mesmo `bloqueado` volta ao chamador). Canal `policy:classify` provou a fronteira — o E2E e o `preload.spec` que listam a superfície da ponte pegaram o método novo, como esperado. |

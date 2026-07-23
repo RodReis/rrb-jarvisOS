@@ -12,8 +12,8 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 134 | 134 | 0 | 74.7 | — | — |
-| — | — | — | Banco | 96 | 96 | 0 | 85.3 | — | — |
+| — | — | — | Regras de Negócio | 137 | 137 | 0 | 74.8 | — | — |
+| — | — | — | Banco | 109 | 109 | 0 | 87.5 | — | — |
 | — | — | — | Tela | 33 | 33 | 0 | 93.5 | — | — |
 
 ## Histórico por entrega
@@ -52,3 +52,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-07-22 | #13 | spec-execucao-local-04-registro-workflows | Regras de Negócio | 134 | 134 | 0 | 74.7 | #36 | [#36](https://github.com/RodReis/rrb-jarvisOS/pull/36) |
 | 2026-07-22 | #13 | spec-execucao-local-04-registro-workflows | Banco | 96 | 96 | 0 | 85.3 | #36 | [#36](https://github.com/RodReis/rrb-jarvisOS/pull/36) |
 | 2026-07-22 | #13 | spec-execucao-local-04-registro-workflows | Tela | 33 | 33 | 0 | 93.5 | #36 | [#36](https://github.com/RodReis/rrb-jarvisOS/pull/36) |
+| 2026-07-22 | #14 | spec-execucao-local-05-execucao-simulada | Regras de Negócio | 137 | 137 | 0 | 74.8 | #37 | [#37](https://github.com/RodReis/rrb-jarvisOS/pull/37) |
+| 2026-07-22 | #14 | spec-execucao-local-05-execucao-simulada | Banco | 109 | 109 | 0 | 87.5 | #37 | [#37](https://github.com/RodReis/rrb-jarvisOS/pull/37) |
+| 2026-07-22 | #14 | spec-execucao-local-05-execucao-simulada | Tela | 33 | 33 | 0 | 93.5 | #37 | [#37](https://github.com/RodReis/rrb-jarvisOS/pull/37) |

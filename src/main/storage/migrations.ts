@@ -129,6 +129,28 @@ const MIGRATIONS: readonly string[] = [
     updated_at   TEXT NOT NULL
   );
   CREATE INDEX idx_automation_user ON automation(user_id, workspace_id);
+  `,
+
+  // 5 — execução simulada (SPEC-Execucao-05, RF-006).
+  //
+  // `execution_run` é o rastro de percorrer um workflow em modo simulado. `trace` é JSON
+  // (mesma decisão do workflow: o run não é consultado por etapa isolada). Escopo
+  // `user_id`/`workspace_id`. `workflow_id` pode ser NULL — um run pode vir de um descritor
+  // de ação avulso, não só de um workflow.
+  `
+  CREATE TABLE execution_run (
+    id             TEXT PRIMARY KEY,
+    user_id        TEXT NOT NULL,
+    workspace_id   TEXT NOT NULL,
+    workflow_id    TEXT,
+    state          TEXT NOT NULL,
+    trace          TEXT NOT NULL,   -- JSON: StepTrace[]
+    correlation_id TEXT NOT NULL,
+    started_at     TEXT NOT NULL,
+    finished_at    TEXT NOT NULL,
+    created_at     TEXT NOT NULL
+  );
+  CREATE INDEX idx_execution_run_user ON execution_run(user_id, workspace_id);
   `
 ]
 

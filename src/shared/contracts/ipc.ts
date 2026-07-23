@@ -26,6 +26,7 @@ import type {
   WorkflowInput,
   WorkflowStatus
 } from '../domain/workflows'
+import type { ExecutionRun } from '../domain/execution'
 
 /** Canais de request/response (renderer → main → renderer). */
 export const IPC_CHANNELS = {
@@ -84,7 +85,14 @@ export const IPC_CHANNELS = {
   automationList: 'automation:list',
   automationCreate: 'automation:create',
   automationSetEnabled: 'automation:set-enabled',
-  automationRemove: 'automation:remove'
+  automationRemove: 'automation:remove',
+  /**
+   * Execução simulada (SPEC-Execucao-05, critério 7). O renderer **dispara** o run por
+   * gatilho manual e lê o `ExecutionRun`/trace; o motor roda no **main**. Zero efeito
+   * colateral — nada toca FS, rede, terminal ou provider.
+   */
+  executionRun: 'execution:run',
+  executionList: 'execution:list'
 } as const
 
 /**
@@ -234,6 +242,14 @@ export interface JarvisBridge {
   createAutomation(input: Omit<AutomationInput, 'user_id'>): Promise<Automation>
   setAutomationEnabled(id: string, enabled: boolean): Promise<Automation | undefined>
   removeAutomation(id: string, workspace: WorkspaceId): Promise<boolean>
+
+  /**
+   * Dispara um workflow em **modo simulado** (SPEC-Execucao-05) e devolve o `ExecutionRun`
+   * com o trace por etapa. Gatilho manual — nada é agendado. **Zero efeito colateral:** o
+   * motor não toca FS, rede, terminal nem provider.
+   */
+  runWorkflowSimulated(workflowId: string, workspace: WorkspaceId): Promise<ExecutionRun>
+  listExecutionRuns(workspace: WorkspaceId): Promise<readonly ExecutionRun[]>
 }
 
 /** Nome da propriedade exposta via contextBridge no renderer. */

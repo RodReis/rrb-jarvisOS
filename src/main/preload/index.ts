@@ -20,6 +20,7 @@ import type {
   WorkflowInput,
   WorkflowStatus
 } from '@shared/domain/workflows'
+import type { ExecutionRun } from '@shared/domain/execution'
 import type {
   AuditEvent,
   AuditEventType,
@@ -99,7 +100,12 @@ const bridge: JarvisBridge = {
   setAutomationEnabled: (id: string, enabled: boolean): Promise<Automation | undefined> =>
     ipcRenderer.invoke(IPC_CHANNELS.automationSetEnabled, id, enabled),
   removeAutomation: (id: string, workspace: WorkspaceId): Promise<boolean> =>
-    ipcRenderer.invoke(IPC_CHANNELS.automationRemove, id, workspace)
+    ipcRenderer.invoke(IPC_CHANNELS.automationRemove, id, workspace),
+
+  runWorkflowSimulated: (workflowId: string, workspace: WorkspaceId): Promise<ExecutionRun> =>
+    ipcRenderer.invoke(IPC_CHANNELS.executionRun, workflowId, workspace),
+  listExecutionRuns: (workspace: WorkspaceId): Promise<readonly ExecutionRun[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.executionList, workspace)
 }
 
 if (process.contextIsolated) {

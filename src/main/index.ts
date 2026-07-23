@@ -12,6 +12,8 @@ import { PreferencesService } from './preferences/preferences-service'
 import { WorkflowService } from './workflows/workflow-service'
 import { WorkflowRepository } from './workflows/workflow-repository'
 import { AutomationRepository } from './workflows/automation-repository'
+import { SimulationEngine } from './execution/simulation-engine'
+import { ExecutionRepository } from './execution/execution-repository'
 import { closeLogger, initLogger, log } from './logging/logger'
 import { initRendererLogBridge } from './logging/renderer-bridge'
 import { LOCAL_USER_ID, LOCAL_USER_PROFILE } from './storage/local-user'
@@ -86,10 +88,22 @@ if (!app.requestSingleInstanceLock()) {
     )
     // Registro de workflows/automações (SPEC-Execucao-04). Catálogo — nada executa. Compartilha
     // policy/audit/userId para a edição ser classificada e auditada no escopo do usuário.
+    const workflowRepo = new WorkflowRepository(storage.db)
     const workflowsService = new WorkflowService(
-      new WorkflowRepository(storage.db),
+      workflowRepo,
       new AutomationRepository(storage.db),
       policy,
+      storage.audit,
+      userIdAtual
+    )
+    // Motor de execução simulada (SPEC-Execucao-05): junta F02 (classifica), F03 (allowlist)
+    // e F04 (definições). **Zero efeito colateral** — nada toca FS, rede ou terminal.
+    const runs = new ExecutionRepository(storage.db)
+    const execution = new SimulationEngine(
+      workflowRepo,
+      policy,
+      allowlist,
+      runs,
       storage.audit,
       userIdAtual
     )
@@ -101,6 +115,8 @@ if (!app.requestSingleInstanceLock()) {
       policy,
       allowlist,
       workflows: workflowsService,
+      execution,
+      runs,
       userId: userIdAtual,
       auth,
       minimizeToTray: () => janela?.hide()

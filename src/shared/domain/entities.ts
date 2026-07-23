@@ -95,7 +95,11 @@ export const AUDIT_EVENT_TYPES = [
   // Cada um seu tipo, pela mesma razão de `allowlist-change`: são mudanças de catálogo
   // distintas, e a auditoria deve poder distingui-las sem parsear o payload.
   'workflow-change',
-  'automation-change'
+  'automation-change',
+  // SPEC-Execucao-05: rastro de execução simulada (RF-006 "cada execução gera rastreio
+  // auditável"). `execution-run` marca início/fim; `execution-step` marca cada etapa.
+  'execution-run',
+  'execution-step'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]
