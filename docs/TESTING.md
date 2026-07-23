@@ -263,6 +263,15 @@ Dispara em **todo pull request** para `main`. Job `test`:
     quando `process.env.CI` está setado. Sem isso, uma stack que não subisse deixaria o CI verde
     sobre RLS jamais exercitada — o relatório contaria a categoria como coberta. Falso verde é
     pior que teste ausente: ele *afirma* a garantia que não foi medida.
+  - **Localmente, pular envenena o relatório — suba a stack antes de gerá-lo.** O outro lado da
+    mesma moeda, custou uma rodada de CI vermelha na **M3-F01** (2026-07-23). Com o Docker parado,
+    `npm run test:report` roda até o fim e escreve um número que *parece* válido: os 7 testes de
+    RLS simplesmente somem da contagem (`Banco 110 pass` em vez de `117`). Nada falha, nada avisa.
+    Quem pega é a guarda anti-drift, que compara o arquivo commitado com uma execução limpa — mas
+    só no CI, depois do push. **Antes de `npm run test:report`, confirme a stack no ar**
+    (`npx supabase status`); se estiver parada, `npx supabase start`. Vale a mesma regra do ADR-003
+    vista de perto: número de relatório é evidência de execução limpa, não da máquina de quem
+    commitou.
   - **Role não-owner, sempre.** O Postgres pula RLS para superuser e para o dono da tabela. Todo
     teste de isolamento fala pelo PostgREST com JWT de usuário final; usar a conexão do owner
     faria as asserções passarem sem tocar em política nenhuma. A única exceção deliberada é o
