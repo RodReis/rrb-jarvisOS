@@ -375,6 +375,35 @@ Status: **entregue** — spec `aprovada-pi` (2026-07-21); issue [#20](https://gi
 6. **Uma suposição minha sobre o `AlertDialog` estava errada, e o teste corrigiu.** Escrevi que Escape não deveria fechá-lo. O Radix fecha — e está certo: o critério 1 exige "Escape fecha" para *todos* os overlays, e bloquear a tecla deixaria o usuário de teclado preso num diálogo sem saída. A assimetria correta é clique fora (distração) bloqueado, Escape (tecla deliberada) permitido. O que Escape nunca faz é **confirmar**: o teste afirma `onConfirmar` não chamado.
 7. **A fronteira da F01 mordeu de novo, e de novo cedeu o import, não a regra.** O teste do Toast importava `../../tokens/provider`; a regra bane `../../*` porque é a forma como um import escaparia de `src/design/`. Trocado pelo alias `@design`, que diz a mesma coisa sem depender da profundidade do arquivo. Mesma decisão da F02.
 
+### Fatia 05 — Identidades NOA e JARVIS (`docs/spec/spec-design-system-05-identidades.md`)
+
+Status: **em andamento** — spec `aprovada-pi` (2026-07-21); issue [#23](https://github.com/RodReis/rrb-jarvisOS/issues/23). Depende da F02 (tokens/tema/acento). Era a paralela da F03b.
+
+- [x] **Contrato de identidade** (`tokens/identidade.ts`): tom, acento padrão, mascote, nome e `vozPadrao` por módulo, como dado
+- [x] **Glow radial do JARVIS** (critério 4): `--jos-atmosfera` + `FundoDaIdentidade` que a pinta; no NOA lê `none`
+- [x] **VoiceMascot** (critérios 6 e 7): um componente para as duas identidades, anéis/glow/bob/boca/olhos, tile sempre escuro
+- [x] **Sem motor de voz**: `falando`/`ouvindo` são reflexo por prop; no NOA são **recusados**, não só omitidos
+- [x] Critérios 1–3 e 5 — mesmo componente nos dois módulos, acento sem vazamento, par escuro/claro, `uiTheme` global, semânticas idênticas
+- [x] **Galeria de identidades** + 11 asserções em navegador real (as duas colunas lado a lado)
+- [x] `test` 500 ✓, `lint` ✓, `typecheck` ✓, prova visual 40 ✓ (**+21 testes**)
+- [ ] Entrega: PR com `refs #23`; docs/ commitados
+
+**Decisões técnicas desta fatia:**
+
+1. **A F02 já tinha entregue metade da identidade — o delta era menor do que a spec sugere.** `papeis()` (fundos por módulo e modo), `bordaRgb()` (hairlines) e `ACENTO_PADRAO` já carregavam o par escuro/claro e o acento de fábrica; `uiTheme` já era global e `data-modulo` já ia ao DOM. O que faltava era **atmosfera, mascote e tom** — e testes que afirmassem os critérios *como identidade*, não como tema. Reescrever o que existia para "ficar tudo junto na fatia" seria refatorar o que não quebrou; o `identidade.ts` **acrescenta** e não duplica.
+2. **O teste do critério 5 achou um defeito de contraste real.** A variante de leitura das semânticas era ajustada contra `p.surface` — a superfície do **módulo ativo**. Como os fundos claros diferem (`#f5f6f8` no JARVIS, `#f2f4f2` no NOA) e o ajuste para no primeiro passo que cruza 4.5:1, a mesma semântica rendia cores diferentes nos dois espaços. Só o `violet` divergia, porque as outras quatro têm folga — e não era cosmético: o `#7a4ff5` do JARVIS media **4.45:1 sobre o fundo do NOA**, abaixo da régua. Uma semântica "compartilhada" legível em apenas um dos espaços não está compartilhada. Corrigido com `fundoDeReferencia()`, que ajusta contra o **mais exigente** dos dois fundos — o valor que serve ao pior caso serve aos dois, e sobra nos dois lados (violet: 5.10 / 4.98). Provado por mutação: voltando a `p.surface`, 2 testes ficam vermelhos.
+3. **A igualdade sozinha não provava nada, e por isso há duas asserções.** "As duas identidades produzem a mesma cor" passaria com duas cores igualmente ilegíveis. A asserção que fecha o critério é a segunda: a cor de leitura atinge 4.5:1 **sobre os fundos das duas identidades**. Foi a diferença entre detectar o sintoma (valores divergentes) e o defeito (um deles reprovado).
+4. **A prova visual achou um buraco que os 21 testes verdes não pegaram.** As nove asserções de navegador falharam achando **zero** elementos: `FundoDaIdentidade` aceitava só `children`/`className`, e o `data-prova-identidade` da galeria era descartado em silêncio. O componente de teste estava certo; o de produção é que não repassava o atributo. Corrigido na raiz (prop declarada na lista fechada, no padrão de `PropsDeComposicao` da F03a) em vez de contornar no seletor — contornar teria deixado o DS sem forma de recortar identidade para inspeção.
+5. **Três critérios só são verificáveis no navegador, e não por preferência de ferramenta.** Em jsdom, `background-image` devolve a string que o componente escreveu: um `var(--jos-atmosfera)` apontando para variável inexistente passaria no teste de componente e pintaria nada. `getComputedStyle` resolve a variável — se ela não existe, vem `none` e a asserção quebra. O mesmo vale para `mix-blend-mode` (critério 7), que nenhum DOM virtual compõe, e para comparar a **cor pintada** das semânticas nos dois espaços (critério 5), que é a comparação que o olho do usuário faz.
+6. **O guardrail anti-duplicação virou asserção, não recomendação.** Há um teste que varre a superfície de exportação do DS e falha se algum componente tiver `noa` ou `jarvis` no nome. Sem ele, "não duplicar componente" seria uma promessa no comentário — e a fatia seguinte (F04a) é justamente a que teria a tentação de criar um `AppShellJarvis`.
+7. **Os assets do mascote moram dentro do DS, e isso corrigiu um atalho da F02.** O primeiro impulso foi pô-los em `src/renderer/assets/`, ao lado das fontes. O ESLint barrou: a regra de fronteira da F01 bane `**/src/renderer/*`. As fontes escapam porque são alcançadas por `url()` no CSS, que o ESLint não inspeciona — mas a razão da regra vale igual. O mascote **é** parte do design system, não algo que ele busca no renderer; copiar o arquivo para `src/design/assets/` custa 2 MB no repo e mantém a camada fechada.
+
+**Registrado, não silenciado:**
+
+- **Os mascotes estão muito maiores que o uso**: `jarvis-cabeca.jpg` é 2048×2048 (824 KB) e `noa-cabeca.png` é 1024×1024 (1,2 MB), para renderizar num círculo de ~120px. Redimensionar exige ferramenta de imagem e é otimização, não critério de aceite — candidato para a F06 (hardening).
+- **`falaAutomatica` não foi implementada.** A spec a chama de "prop reservada" e o motor de voz é Corte 4. Uma prop que não faz nada seria pior que a ausência: sugeriria comportamento que não existe.
+- A galeria de identidades cobre **1 de 8** acentos da paleta (o default de cada módulo), mais um segundo acento na asserção do glow. Ampliar a matriz é o mesmo candidato da F03a para a F06.
+
 ## Após o MVP-003
 
 Ordem: **MVP-004** ([#10](https://github.com/RodReis/rrb-jarvisOS/issues/10), execução real + terminal) → MVP de providers (Corte 3, com BudgetPolicy). Ordem macro em `docs/LANDSCAPE.md` § Roadmap.
