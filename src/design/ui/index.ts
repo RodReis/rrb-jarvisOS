@@ -56,3 +56,6 @@ export {
   UnreadIndicator,
   type Notificacao
 } from './Notificacoes'
+
+// Identidades NOA e JARVIS (SPEC-DesignSystem-05) — F05
+export { VoiceMascot, type VoiceMascotProps } from './VoiceMascot'

@@ -162,11 +162,11 @@ Priorizam cautela sobre velocidade; em tarefa trivial, bom senso.
 
 ## Grafo de conhecimento (graphify)
 
-O repo tem um grafo de conhecimento persistente em `graphify-out/` (gerado pela skill `/graphify` — https://github.com/Graphify-Labs/graphify). Ele indexa `src/` + `docs/` + `scripts/` (414 nós, 26 comunidades) e responde perguntas sobre o codebase gastando muito menos tokens que ler arquivos. O escopo exclui `.aiox-core/` e as imagens de `docs/design/` — framework de terceiros e mockups não entram no grafo.
+O repo tem um grafo de conhecimento persistente em `graphify-out/` (gerado pela skill `/graphify` — https://github.com/Graphify-Labs/graphify). Ele indexa `src/` + `docs/` + `scripts/` (1596 nós, 133 comunidades — atualizado em 2026-07-23, após a F03b) e responde perguntas sobre o codebase gastando muito menos tokens que ler arquivos. O escopo exclui `.aiox-core/` e as imagens de `docs/design/` — framework de terceiros e mockups não entram no grafo.
 
 - **Antes de explorar o codebase** para entender arquitetura, fluxos ou "quem chama o quê": consulte o grafo primeiro — `/graphify query "<pergunta>"` (ou `graphify query` via CLI). Só leia arquivos direto quando precisar do conteúdo exato.
 - **Achar no grafo, afirmar pelo arquivo.** A topologia localiza; ela não prova. Antes de qualquer afirmação quantitativa ou de unicidade ("é a única aresta", "só existe em X", "as cópias divergiram"), conte todas as arestas relevantes e confirme no disco (`md5sum`, `diff`, ler o trecho). Cite a granularidade que o dado tem: se o grafo guarda `source_location: "§Seção"`, não invente número de linha.
 - **Por que:** a extração é não-determinística. Dois arquivos byte-idênticos (`docs/design/uploads/prd-design-system-plataforma.md` e `docs/iniciais/prd-design-system-plataforma.md`, mesmo MD5) geraram 10 nós em 2 comunidades versus 17 nós em 6 — e só uma das cópias recebeu a aresta de correção do ADR-001. Qual cópia recebe qual aresta é artefato de qual subagente processou o chunk, não fato sobre os documentos.
-- **Ao final de cada entrega** (junto com STATUS.md/DEVELOPMENT.md): rode `/graphify . --update` — incremental, re-extrai só arquivos novos/alterados via manifest. Não recrie o grafo do zero.
+- **Ao final de cada entrega** (junto com STATUS.md/DEVELOPMENT.md): Sempre me pergunta se pode ou não fazer o comando `/graphify . --update` — incremental, re-extrai só arquivos novos/alterados via manifest. Não recrie o grafo do zero.
 - `graphify-out/` é artefato local (cache), não entra em commit.
 

@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { GaleriaDeControles } from './GaleriaDeControles'
 import { GaleriaDeDados, type Cena } from './GaleriaDeDados'
+import { GaleriaDeIdentidades } from './GaleriaDeIdentidades'
 import type { ModoUi, Modulo } from '../tokens/semantic'
 import type { CorAcento } from '../tokens/acento'
 import './prova.css'
@@ -36,9 +37,15 @@ const cena = (cenaBruta ?? 'estatica') as Cena
 const raiz = document.getElementById('root')
 if (raiz === null) throw new Error('Elemento #root não encontrado.')
 
+const qual = params.get('galeria')
 const galeria =
-  params.get('galeria') === 'dados' ? (
+  qual === 'dados' ? (
     <GaleriaDeDados modo={modo} modulo={modulo} acento={acento ?? undefined} cena={cena} />
+  ) : qual === 'identidades' ? (
+    // A galeria de identidades monta **as duas** colunas ao mesmo tempo, então ignora `modulo`:
+    // o que ela prova é a comparação lado a lado, e um parâmetro de módulo aqui sugeriria uma
+    // captura por identidade — que é exatamente o que ela não é.
+    <GaleriaDeIdentidades modo={modo} acento={acento ?? undefined} />
   ) : (
     <GaleriaDeControles modo={modo} modulo={modulo} acento={acento ?? undefined} />
   )

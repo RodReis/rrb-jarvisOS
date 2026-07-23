@@ -20,6 +20,7 @@ import {
   TOAST,
   TEXTO
 } from './base'
+import { atmosfera, fundoDeReferencia } from './identidade'
 import {
   bordaRgb,
   modoEfetivo,
@@ -118,6 +119,11 @@ export function variaveisDoTema({
     // acento, não contra o fundo da tela. Sem isto, o botão primário sólido herdaria a cor de
     // texto da tela e ficaria ilegível com acento claro.
     '--jos-cor-acento-contraste': contrasteSobre(acento),
+    // Atmosfera de fundo da identidade (SPEC-DesignSystem-05, critério 4). Só o JARVIS tem — o
+    // glow radial do acento no topo do conteúdo, mantido do protótipo por decisão do PI. No NOA
+    // vale `none`, que é a forma de o CSS dizer "sem imagem de fundo": o tom calmo do NOA é
+    // fundo chapado por identidade, não por funcionalidade faltando.
+    '--jos-atmosfera': atmosfera(modulo) ?? 'none',
     // Véu por trás de modal/gaveta. Preto translúcido, igual nos dois modos: o overlay escurece
     // o conteúdo para focar no modal, e um véu que clareasse no modo claro não separaria nada.
     '--jos-cor-backdrop': 'color-mix(in srgb, #000 60%, transparent)',
@@ -147,11 +153,25 @@ export function variaveisDoTema({
     // 4.5:1 (`info` chega a 1.54:1). Estas variantes ajustam só a luminância, preservando o
     // matiz — a mesma solução que o acento já usava. Borda, glow e preenchimento continuam
     // usando a cor de marca acima; só o texto lê daqui.
-    '--jos-cor-ok-leitura': semanticaParaLeitura(STATUS.ok, p.surface),
-    '--jos-cor-warn-leitura': semanticaParaLeitura(STATUS.warn, p.surface),
-    '--jos-cor-err-leitura': semanticaParaLeitura(STATUS.err, p.surface),
-    '--jos-cor-info-leitura': semanticaParaLeitura(STATUS.info, p.surface),
-    '--jos-cor-violet-leitura': semanticaParaLeitura(STATUS.violet, p.surface),
+    //
+    // O ajuste é contra `fundoDeReferencia(cor, modo)` — o **mais exigente** dos dois fundos de
+    // identidade — e não contra `p.surface`. Usar a superfície do módulo ativo fazia a mesma
+    // semântica render cores diferentes no NOA e no JARVIS, e o `violet` do JARVIS caía a
+    // 4.45:1 quando lido sobre o fundo do NOA. Ver `fundoDeReferencia` (SPEC-05, critério 5).
+    '--jos-cor-ok-leitura': semanticaParaLeitura(STATUS.ok, fundoDeReferencia(STATUS.ok, modo)),
+    '--jos-cor-warn-leitura': semanticaParaLeitura(
+      STATUS.warn,
+      fundoDeReferencia(STATUS.warn, modo)
+    ),
+    '--jos-cor-err-leitura': semanticaParaLeitura(STATUS.err, fundoDeReferencia(STATUS.err, modo)),
+    '--jos-cor-info-leitura': semanticaParaLeitura(
+      STATUS.info,
+      fundoDeReferencia(STATUS.info, modo)
+    ),
+    '--jos-cor-violet-leitura': semanticaParaLeitura(
+      STATUS.violet,
+      fundoDeReferencia(STATUS.violet, modo)
+    ),
 
     // Primitivos que não dependem do modo.
     '--jos-raio-rail': RAIO.rail,
@@ -241,5 +261,51 @@ export function ProvedorDeTema({
         {children}
       </div>
     </TemaContexto.Provider>
+  )
+}
+
+/**
+ * Fundo do conteúdo com a atmosfera da identidade (SPEC-DesignSystem-05, critério 4).
+ *
+ * Existe separado do `ProvedorDeTema` porque o provider só **declara** as variáveis — ele não
+ * sabe (nem deve saber) se está envolvendo a tela inteira ou um pedaço dela. Um provider que
+ * pintasse fundo faria toda subárvore montada com tema ganhar um glow, inclusive dentro de um
+ * modal ou de um card.
+ *
+ * Quem monta o shell (Fatia 04a) usa isto na região de conteúdo. No NOA a variável vale `none`
+ * e o elemento fica visualmente idêntico a um `div` comum — o componente não precisa saber qual
+ * identidade está ativa, que é justamente o ponto do guardrail anti-duplicação.
+ */
+export function FundoDaIdentidade({
+  children,
+  className,
+  'data-prova-identidade': provaIdentidade
+}: {
+  readonly children?: React.ReactNode
+  readonly className?: string
+  /**
+   * Marcador de recorte para a prova visual.
+   *
+   * Declarado na lista fechada de props em vez de um `...rest` aberto: o DS não repassa
+   * atributos arbitrários (mesma decisão da F03a sobre `PropsDeComposicao`). Existe porque a
+   * prova precisa isolar cada coluna da galeria — sem ele o Playwright não tem como perguntar
+   * "qual o fundo computado **desta** identidade", e o critério 4 ficaria sem verificação de
+   * navegador. Descobri o buraco pelo próprio teste: as nove asserções falharam achando zero
+   * elementos, porque o atributo era descartado em silêncio.
+   */
+  readonly 'data-prova-identidade'?: string
+}): React.JSX.Element {
+  return (
+    <div
+      data-atmosfera
+      data-prova-identidade={provaIdentidade}
+      className={className}
+      style={{
+        backgroundColor: 'var(--jos-cor-superficie)',
+        backgroundImage: 'var(--jos-atmosfera)'
+      }}
+    >
+      {children}
+    </div>
   )
 }

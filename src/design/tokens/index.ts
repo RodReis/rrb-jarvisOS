@@ -58,6 +58,17 @@ export {
 } from './semantic'
 
 export {
+  atmosfera,
+  identidade,
+  IDENTIDADES,
+  MASCARA_MASCOTE,
+  TILE_MASCOTE,
+  type Atmosfera,
+  type Identidade,
+  type TomDeIdentidade
+} from './identidade'
+
+export {
   ACENTO_PADRAO,
   acentoParaLeitura,
   contraste,
