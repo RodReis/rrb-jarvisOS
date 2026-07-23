@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { GaleriaDeControles } from './GaleriaDeControles'
 import { GaleriaDeDados, type Cena } from './GaleriaDeDados'
 import { GaleriaDeIdentidades } from './GaleriaDeIdentidades'
+import { GaleriaDeShell } from './GaleriaDeShell'
 import type { ModoUi, Modulo } from '../tokens/semantic'
 import type { CorAcento } from '../tokens/acento'
 import './prova.css'
@@ -37,17 +38,34 @@ const cena = (cenaBruta ?? 'estatica') as Cena
 const raiz = document.getElementById('root')
 if (raiz === null) throw new Error('Elemento #root não encontrado.')
 
-const qual = params.get('galeria')
-const galeria =
-  qual === 'dados' ? (
+/**
+ * As galerias, por nome de query.
+ *
+ * Mapa e não cadeia de ternários: com quatro fatias tendo galeria, o encadeamento já tinha três
+ * níveis e o próximo `else if` seria onde o default se perde de vista. O `controles` continua
+ * sendo o default por compatibilidade — as URLs do `controles.prova.ts` foram escritas sem o
+ * parâmetro `galeria`.
+ *
+ * A galeria de **identidades** ignora `modulo` de propósito: ela monta as duas colunas ao mesmo
+ * tempo, e um parâmetro de módulo ali sugeriria uma captura por identidade, que é justamente o
+ * que ela não é.
+ */
+const GALERIAS = {
+  dados: () => (
     <GaleriaDeDados modo={modo} modulo={modulo} acento={acento ?? undefined} cena={cena} />
-  ) : qual === 'identidades' ? (
-    // A galeria de identidades monta **as duas** colunas ao mesmo tempo, então ignora `modulo`:
-    // o que ela prova é a comparação lado a lado, e um parâmetro de módulo aqui sugeriria uma
-    // captura por identidade — que é exatamente o que ela não é.
-    <GaleriaDeIdentidades modo={modo} acento={acento ?? undefined} />
-  ) : (
-    <GaleriaDeControles modo={modo} modulo={modulo} acento={acento ?? undefined} />
-  )
+  ),
+  identidades: () => <GaleriaDeIdentidades modo={modo} acento={acento ?? undefined} />,
+  shell: () => <GaleriaDeShell modo={modo} modulo={modulo} acento={acento ?? undefined} />,
+  controles: () => <GaleriaDeControles modo={modo} modulo={modulo} acento={acento ?? undefined} />
+} as const
+
+const qual = params.get('galeria') ?? 'controles'
+if (!(qual in GALERIAS)) {
+  // Mesma disciplina da `cena`: galeria desconhecida cairia no default e a captura mentiria em
+  // silêncio — o arquivo teria o nome da galeria pedida e o conteúdo de outra.
+  throw new Error(`Galeria desconhecida: ${qual}. Use uma de: ${Object.keys(GALERIAS).join(', ')}.`)
+}
+
+const galeria = GALERIAS[qual as keyof typeof GALERIAS]()
 
 createRoot(raiz).render(<StrictMode>{galeria}</StrictMode>)
