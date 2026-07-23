@@ -1,17 +1,11 @@
 ---
 proplan: v1
-updated: 2026-07-22
+updated: 2026-07-23
 ---
 <!-- gerado pelo ProPlan a partir das Issues — não edite à mão -->
 # Status
 
 ## Backlog
-
-### [MVP2] Execução local controlada — fundação de execução (permissões, allowlist, execução simulada) (#9)
-
-- [MVP2][F03] Diretórios permitidos (allowlist) (#12)
-- [MVP2][F05] Motor de execução em modo simulado (#14)
-- [MVP2][F04] Registro de workflows + automações manuais (#13)
 
 ### [MVP3] Design System da Plataforma — base única, 2 identidades (#16)
 
@@ -26,6 +20,7 @@ updated: 2026-07-22
 
 ### Sem épico
 
+- [INFRA] CI: separar E2E em job próprio, condicional por paths (#34)
 - [MVP4] Execução real — terminal controlado + execução allowlisted (#10)
 
 ## A Fazer
@@ -34,7 +29,9 @@ _(vazio)_
 
 ## Em Andamento
 
-_(vazio)_
+### [MVP2] Execução local controlada — fundação de execução (permissões, allowlist, execução simulada) (#9)
+
+- [MVP2][F05] Motor de execução em modo simulado (#14)
 
 ## Feito
 
@@ -44,6 +41,8 @@ _(vazio)_
 
 ### [MVP2] Execução local controlada — fundação de execução (permissões, allowlist, execução simulada) (#9)
 
+- [MVP2][F03] Diretórios permitidos (allowlist) (#12, finalizado em: 2026-07-23)
+- [MVP2][F04] Registro de workflows + automações manuais (#13, finalizado em: 2026-07-23)
 - [MVP2][F02] Policy Engine mínimo (classificação, fail-closed) (#11, finalizado em: 2026-07-22)
 - [MVP2][F01] Supabase local (Docker) + ambiente de sync (dev) (#15, finalizado em: 2026-07-22)
 
