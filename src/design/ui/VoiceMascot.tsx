@@ -20,6 +20,11 @@ import { cx } from './base'
  * Imagens do bundle. `import` e não caminho em string: o bundler resolve e versiona o arquivo,
  * e um asset que não existe vira erro de build em vez de imagem quebrada em runtime.
  *
+ * **512×512 e JPEG nos dois** (F06, hardening): os originais eram 2048²/1024² e somavam 2 MB —
+ * três vezes o bundle de JS — para renderizar num círculo de no máximo 160px. O PNG do NOA não
+ * tinha canal alfa (o recorte é feito por `mask-image` no CSS), então o formato sem perdas não
+ * comprava nada: 304 KB viraram 32 KB. Total: 2043 KB → 77 KB.
+ *
  * Moram em `src/design/assets/` — **dentro** do DS. As fontes da F02 vivem em
  * `src/renderer/assets/` e são alcançadas por `url()` no CSS, que o ESLint não inspeciona; o
  * mesmo caminho aqui seria um `import` barrado pela regra de fronteira da F01, e com razão: o
@@ -27,7 +32,7 @@ import { cx } from './base'
  * arquivo custa 2 MB no repo e mantém a camada fechada.
  */
 import jarvisCabeca from '../assets/jarvis-cabeca.jpg'
-import noaCabeca from '../assets/noa-cabeca.png'
+import noaCabeca from '../assets/noa-cabeca.jpg'
 
 const IMAGEM: Readonly<Record<Modulo, string>> = {
   jarvis: jarvisCabeca,

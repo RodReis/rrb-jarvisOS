@@ -22,6 +22,20 @@
  */
 @source '../ui';
 @source '../tokens';
+/*
+ * `../patterns` faltava — a camada nasceu na F04a, depois deste bloco, e ninguém a acrescentou.
+ *
+ * O efeito: todos os componentes de `patterns/` renderizavam **sem as classes utilitárias** desde
+ * então. O AppShell sobrevivia porque quase tudo nele é classe com `var(--jos-*)` entre colchetes,
+ * que o Tailwind gera sob demanda a partir do arquivo onde aparece — mas `size-7`, `size-10` e
+ * afins são utilitárias da escala, e essas só entram no CSS se o arquivo for varrido.
+ *
+ * Achado na F06 pela captura da CHOICE: os swatches, declarados `size-7` (28px), renderizavam a
+ * **2px** — pontinhos. Nenhum teste de papel acusaria: `getByRole('radio')` acha um botão de 2px
+ * tão bem quanto um de 28px. É o mesmo defeito que motivou este bloco na F03a, repetido numa
+ * camada nova — e a lição é que `@source` é uma lista que precisa crescer junto com as camadas.
+ */
+@source '../patterns';
 
 body {
   margin: 0;

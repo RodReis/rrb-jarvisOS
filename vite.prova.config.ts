@@ -22,6 +22,19 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   root: resolve(__dirname, 'src/design/prova'),
   plugins: [react(), tailwindcss()],
+  /**
+   * O alias `@design`, que os outros três configs (`electron.vite.config.ts`, `tsconfig.web.json`,
+   * `vitest.config.ts`) já declaravam e este não.
+   *
+   * A ausência só apareceu na F06, quando as telas da jornada — um nível mais fundo, em
+   * `prova/jornada/` — passaram a usar o alias porque `../../` bate na regra de fronteira da F01.
+   * O `typecheck` e o `vitest` continuaram verdes: **cada ferramenta tem o seu próprio mapa de
+   * alias**, e três deles concordavam. Quem discordava era justamente o que serve a galeria — e o
+   * sintoma foi a prova visual inteira falhando de uma vez, com a página sem carregar.
+   */
+  resolve: {
+    alias: { '@design': resolve(__dirname, 'src/design') }
+  },
   server: {
     port: 5181,
     strictPort: true,
