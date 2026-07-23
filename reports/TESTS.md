@@ -14,7 +14,7 @@ Totais da última execução (regenerado, não acumulado):
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
 | — | — | — | Regras de Negócio | 203 | 203 | 0 | 78.2 | — | — |
 | — | — | — | Banco | 132 | 132 | 0 | 85.5 | — | — |
-| — | — | — | Tela | 95 | 94 | 0 | 89.6 | — | — |
+| — | — | — | Tela | 148 | 147 | 0 | 90.4 | — | — |
 
 ## Histórico por entrega
 
@@ -67,3 +67,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-07-23 | #43 | — | Regras de Negócio | 203 | 203 | 0 | 78.2 | #44 | [#44](https://github.com/RodReis/rrb-jarvisOS/pull/44) |
 | 2026-07-23 | #43 | — | Banco | 132 | 132 | 0 | 85.5 | #44 | [#44](https://github.com/RodReis/rrb-jarvisOS/pull/44) |
 | 2026-07-23 | #43 | — | Tela | 95 | 94 | 0 | 89.6 | #44 | [#44](https://github.com/RodReis/rrb-jarvisOS/pull/44) |
+| 2026-07-23 | #20 | spec-design-system-03b-componentes-dados-overlays | Regras de Negócio | 203 | 203 | 0 | 78.2 | #45 | [#45](https://github.com/RodReis/rrb-jarvisOS/pull/45) |
+| 2026-07-23 | #20 | spec-design-system-03b-componentes-dados-overlays | Banco | 132 | 132 | 0 | 85.5 | #45 | [#45](https://github.com/RodReis/rrb-jarvisOS/pull/45) |
+| 2026-07-23 | #20 | spec-design-system-03b-componentes-dados-overlays | Tela | 148 | 147 | 0 | 90.4 | #45 | [#45](https://github.com/RodReis/rrb-jarvisOS/pull/45) |

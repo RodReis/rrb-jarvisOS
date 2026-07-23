@@ -1,4 +1,13 @@
-import { ALTURA_CONTROLE, BORDA, cx, DESABILITADO, FOCO, SUPERFICIE, TRANSICAO } from './base'
+import {
+  ALTURA_CONTROLE,
+  BORDA,
+  cx,
+  DESABILITADO,
+  FOCO,
+  SUPERFICIE,
+  TRANSICAO,
+  type PropsDeComposicao
+} from './base'
 
 /**
  * Ações (SPEC-DesignSystem-03a, PRD §11.1).
@@ -11,10 +20,10 @@ import { ALTURA_CONTROLE, BORDA, cx, DESABILITADO, FOCO, SUPERFICIE, TRANSICAO }
 
 type VarianteBotao = 'primaria' | 'secundaria' | 'perigo'
 
-interface ButtonProps {
+interface ButtonProps extends PropsDeComposicao {
   readonly children: React.ReactNode
   readonly variante?: VarianteBotao
-  readonly onClick?: () => void
+  readonly onClick?: React.MouseEventHandler<HTMLButtonElement>
   readonly desabilitado?: boolean
   /**
    * Estado de carregamento.
@@ -84,10 +93,14 @@ export function Button({
   tipo = 'button',
   larguraTotal = false,
   iconeFinal,
-  iconeInicial
+  iconeInicial,
+  // A composição é desestruturada em bloco e repassada inteira: nomeá-la separada do resto
+  // deixa explícito, na leitura, o que é API do design system e o que é contrato do DOM.
+  ...composicao
 }: ButtonProps): React.JSX.Element {
   return (
     <button
+      {...composicao}
       type={tipo}
       onClick={onClick}
       disabled={desabilitado || carregando}

@@ -21,8 +21,26 @@ export const RAIO = {
   cardLargo: '12px',
   modal: '13px',
   modalLargo: '16px',
+  /** Toast — README §5.2, raio 13px. */
+  toast: '13px',
   /** Pill totalmente arredondada. */
   pill: '99px'
+} as const
+
+/**
+ * Medidas fixas do Toast (SPEC-DesignSystem-03b, README §5.2).
+ *
+ * O protótipo fixa a geometria do toast ao pixel: container `top:64px right:22px width:360px`,
+ * ícone 34px, barra lateral 3px, barra de progresso 2px. Ficam como tokens — e não literais no
+ * componente — para a régua do critério 5 valer também aqui.
+ */
+export const TOAST = {
+  topo: '64px',
+  direita: '22px',
+  largura: '360px',
+  icone: '34px',
+  barraLateral: '3px',
+  barraProgresso: '2px'
 } as const
 
 /** Espaçamento — README §2.5 ("gaps"). */

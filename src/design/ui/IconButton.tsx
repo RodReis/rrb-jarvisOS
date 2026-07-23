@@ -1,4 +1,13 @@
-import { ALTURA_CONTROLE, BORDA, cx, DESABILITADO, FOCO, SUPERFICIE, TRANSICAO } from './base'
+import {
+  ALTURA_CONTROLE,
+  BORDA,
+  cx,
+  DESABILITADO,
+  FOCO,
+  SUPERFICIE,
+  TRANSICAO,
+  type PropsDeComposicao
+} from './base'
 
 /**
  * Botão só de ícone (SPEC-DesignSystem-03a, PRD §11.1).
@@ -8,11 +17,11 @@ import { ALTURA_CONTROLE, BORDA, cx, DESABILITADO, FOCO, SUPERFICIE, TRANSICAO }
  * transforma essa regra em erro de compilação em vez de achado de auditoria.
  */
 
-interface IconButtonProps {
+interface IconButtonProps extends PropsDeComposicao {
   /** Nome acessível — o que o leitor de tela anuncia. Obrigatório por desenho. */
   readonly rotulo: string
   readonly children: React.ReactNode
-  readonly onClick?: () => void
+  readonly onClick?: React.MouseEventHandler<HTMLButtonElement>
   readonly desabilitado?: boolean
   /** Marca o botão como ativo (`aria-pressed`) — para toggles de barra de ferramentas. */
   readonly ativo?: boolean
@@ -25,10 +34,14 @@ export function IconButton({
   onClick,
   desabilitado = false,
   ativo,
-  tipo = 'button'
+  tipo = 'button',
+  // Mesmo contrato do `Button`: o `IconButton` é o gatilho natural de Popover e
+  // DropdownMenu (o `⋯` de menu), e sem repassar a composição o menu não abriria.
+  ...composicao
 }: IconButtonProps): React.JSX.Element {
   return (
     <button
+      {...composicao}
       type={tipo}
       onClick={onClick}
       disabled={desabilitado}

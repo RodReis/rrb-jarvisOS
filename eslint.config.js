@@ -103,6 +103,20 @@ export default tseslint.config(
           selector: 'Literal[value=/-\\[[0-9]+(\\.[0-9]+)?(px|rem|em|ms|s)\\]/]',
           message:
             'Critério 5 (SPEC-DesignSystem-03a): medida literal em classe. Use um token — var(--jos-texto-*), var(--jos-raio-*), var(--jos-tamanho-*), var(--jos-duracao-*).'
+        },
+        {
+          // Classe Tailwind montada por interpolação: `` `border-[var(--jos-cor-${tom})]` ``.
+          //
+          // O Tailwind descobre classes **varrendo o texto do código-fonte** — uma classe que só
+          // existe em runtime nunca chega ao CSS gerado. Achado na F03b: a versão interpolada
+          // produzia **zero** ocorrências no bundle, contra 53 das escritas por extenso, e o
+          // painel com tom semântico renderizava sem borda colorida.
+          //
+          // Mesma classe de defeito do `@source` faltando (F03a): CSS que não existe não quebra
+          // nada — só não pinta. Use um mapa literal (ver `ui/semantica.ts`).
+          selector: 'TemplateLiteral[quasis.0.value.raw=/(bg|text|border|shadow|ring|fill)-\\[/]',
+          message:
+            'Classe Tailwind interpolada não é gerada — o Tailwind varre o código-fonte, não o runtime. Use um mapa literal (ex.: CLASSE_BORDA_SEMANTICA em ui/semantica.ts).'
         }
       ]
     }

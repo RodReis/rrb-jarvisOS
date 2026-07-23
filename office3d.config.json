@@ -27,7 +27,21 @@
         "skin": "#e8b98f",
         "hair": "#3b2a5e"
       },
-      "toolPatterns": ["Task", "Agent", "TodoWrite", "TodoRead", "exit_plan_mode", "Skill"]
+      "toolPatterns": [
+        "Task",
+        "Agent",
+        "TodoWrite",
+        "TodoRead",
+        "exit_plan_mode",
+        "Skill",
+        "AskUserQuestion",
+        "ExitPlanMode",
+        "EnterPlanMode",
+        "SlashCommand",
+        "Workflow",
+        "ScheduleWakeup",
+        "StructuredOutput"
+      ]
     },
     {
       "id": "scout",
@@ -57,7 +71,7 @@
         "skin": "#c98a5e",
         "hair": "#2b1410"
       },
-      "toolPatterns": ["Bash", "Computer", "WebSearch", "WebFetch"]
+      "toolPatterns": ["Bash", "Computer", "WebSearch", "WebFetch", "PowerShell"]
     },
     {
       "id": "dev",
@@ -87,7 +101,7 @@
         "skin": "#f1c9a5",
         "hair": "#0a3a44"
       },
-      "toolPatterns": []
+      "toolPatterns": ["Monitor", "ReportFindings"]
     },
     {
       "id": "finn",
@@ -102,7 +116,7 @@
         "skin": "#c98a5e",
         "hair": "#3b2e08"
       },
-      "toolPatterns": []
+      "toolPatterns": ["Artifact"]
     },
     {
       "id": "aurora",
