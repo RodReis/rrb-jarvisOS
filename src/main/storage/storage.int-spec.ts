@@ -60,6 +60,7 @@ describe('migrations', () => {
     antigo.exec('DROP TABLE allowed_directory')
     antigo.exec('DROP TABLE workflow')
     antigo.exec('DROP TABLE automation')
+    antigo.exec('DROP TABLE execution_run')
     antigo.pragma('user_version = 1')
     antigo.close()
 

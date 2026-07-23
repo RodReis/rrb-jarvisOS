@@ -78,6 +78,15 @@ const workflows = {
   removeAutomation: vi.fn(() => true)
 }
 
+const execution = {
+  runWorkflow: vi.fn((workflowId: string) => ({ id: 'run-1', workflowId, state: 'concluido' }))
+}
+
+const runs = {
+  list: vi.fn(() => []),
+  findById: vi.fn(() => undefined)
+}
+
 const minimizeToTray = vi.fn()
 
 const preferences = {
@@ -96,6 +105,8 @@ const deps = {
   policy,
   allowlist,
   workflows,
+  execution,
+  runs,
   // Função desde a F03: a identidade muda em runtime (local antes do login, usuário da
   // sessão depois), então os handlers a resolvem a cada chamada em vez de capturá-la.
   userId: () => 'local',
@@ -137,6 +148,8 @@ beforeEach(() => {
   workflows.createWorkflow.mockClear()
   workflows.setWorkflowStatus.mockClear()
   workflows.createAutomation.mockClear()
+  execution.runWorkflow.mockClear()
+  runs.list.mockClear()
   logIpc.info.mockClear()
   logIpc.warn.mockClear()
   logIpc.error.mockClear()
@@ -363,5 +376,23 @@ describe('canais de workflows/automações (SPEC-Execucao-04)', () => {
       target: { workflowId: 'wf-1' }
     })
     expect(workflows.createAutomation).toHaveBeenCalled()
+  })
+})
+
+describe('canais de execução simulada (SPEC-Execucao-05)', () => {
+  it('dispara o run com workflowId + workspace válidos', () => {
+    invocar(IPC_CHANNELS.executionRun, 'wf-1', 'jarvis')
+    expect(execution.runWorkflow).toHaveBeenCalledWith('wf-1', 'jarvis')
+  })
+
+  it('recusa parâmetros inválidos sem tocar o motor', () => {
+    expect(() => invocar(IPC_CHANNELS.executionRun, 123, 'jarvis')).toThrow(/inválidos/)
+    expect(() => invocar(IPC_CHANNELS.executionRun, 'wf-1', 'Desenvolvimento')).toThrow(/inválidos/)
+    expect(execution.runWorkflow).not.toHaveBeenCalled()
+  })
+
+  it('lista runs escopada ao usuário corrente', () => {
+    invocar(IPC_CHANNELS.executionList, 'jarvis')
+    expect(runs.list).toHaveBeenCalledWith('local', 'jarvis')
   })
 })

@@ -15,6 +15,9 @@ import { log, writeLog } from '../logging/logger'
 import type { AllowlistRepository } from '../policy/allowlist-repository'
 import type { PolicyService } from '../policy/policy-service'
 import type { WorkflowService } from '../workflows/workflow-service'
+import type { SimulationEngine } from '../execution/simulation-engine'
+import type { ExecutionRepository } from '../execution/execution-repository'
+import type { ExecutionRun } from '@shared/domain/execution'
 import { isWorkflowStatus } from '@shared/domain/workflows'
 import type { Automation, AutomationInput, Workflow, WorkflowInput } from '@shared/domain/workflows'
 import type { PreferencesService } from '../preferences/preferences-service'
@@ -79,6 +82,10 @@ export interface IpcDependencies {
   readonly allowlist: AllowlistRepository
   /** Registro de workflows/automações (SPEC-Execucao-04): CRUD classificado + auditado. */
   readonly workflows: WorkflowService
+  /** Motor de execução simulada (SPEC-Execucao-05): zero efeito colateral. */
+  readonly execution: SimulationEngine
+  /** Runs persistidos, para a UI listar o histórico. */
+  readonly runs: ExecutionRepository
   /** Ausente quando as credenciais não estão configuradas — o app roda sem login. */
   readonly auth?: AuthService
   /** Minimizar para o tray. Injetado porque a janela nasce depois dos handlers. */
@@ -356,6 +363,31 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     (_event, id: unknown, workspace: unknown): boolean => {
       if (typeof id !== 'string' || !isWorkspaceId(workspace)) return false
       return deps.workflows.removeAutomation(id, workspace)
+    }
+  )
+
+  // Execução simulada (SPEC-Execucao-05, critério 7). O renderer só dispara e lê; o motor
+  // roda no main e não toca recurso real. Gatilho manual — nada é agendado.
+  ipcMain.handle(
+    IPC_CHANNELS.executionRun,
+    (_event, workflowId: unknown, workspace: unknown): ExecutionRun => {
+      if (typeof workflowId !== 'string' || !isWorkspaceId(workspace)) {
+        throw new Error('Parâmetros inválidos para execução simulada.')
+      }
+      log.agent.info('Execução simulada solicitada pela interface', {
+        canal: IPC_CHANNELS.executionRun,
+        direction: 'in',
+        workflowId
+      })
+      return deps.execution.runWorkflow(workflowId, workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.executionList,
+    (_event, workspace: unknown): readonly ExecutionRun[] => {
+      if (!isWorkspaceId(workspace)) return []
+      return deps.runs.list(deps.userId(), workspace)
     }
   )
 
