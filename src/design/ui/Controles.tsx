@@ -204,8 +204,6 @@ export function Slider({
         max={maximo}
         step={passo}
         disabled={desabilitado}
-        aria-label={rotulo}
-        aria-valuetext={formatar(valor)}
         className={cx(
           'relative flex h-5 w-full flex-1 touch-none select-none items-center',
           desabilitado && 'opacity-45'
@@ -214,7 +212,14 @@ export function Slider({
         <RadixSlider.Track className="relative h-1 w-full grow rounded-full bg-[rgba(var(--jos-borda-rgb),0.16)]">
           <RadixSlider.Range className="absolute h-full rounded-full bg-[var(--jos-cor-acento)]" />
         </RadixSlider.Track>
+        {/*
+          O nome e o valor legível vão na **alça**, não na raiz: quem carrega `role="slider"` é
+          o Thumb, e é nele que o leitor de tela procura `aria-label`/`aria-valuetext`. Pôr no
+          Root deixa a faixa anônima — foi o que os testes pegaram.
+        */}
         <RadixSlider.Thumb
+          aria-label={rotulo}
+          aria-valuetext={formatar(valor)}
           className={cx(
             'block size-4 rounded-full border-2 border-[var(--jos-cor-acento)]',
             'bg-[var(--jos-cor-superficie-elevada)]',
