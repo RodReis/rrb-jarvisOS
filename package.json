@@ -58,6 +58,11 @@
     "vitest": "^4.1.10"
   },
   "dependencies": {
+    "@radix-ui/react-checkbox": "^1.3.9",
+    "@radix-ui/react-label": "^2.1.13",
+    "@radix-ui/react-radio-group": "^1.4.5",
+    "@radix-ui/react-select": "^2.3.5",
+    "@radix-ui/react-slider": "^1.4.5",
     "@radix-ui/react-switch": "^1.3.5",
     "@supabase/supabase-js": "^2.110.8",
     "better-sqlite3": "^13.0.1",

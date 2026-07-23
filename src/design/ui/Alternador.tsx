@@ -1,16 +1,17 @@
 import * as RadixSwitch from '@radix-ui/react-switch'
-import { tokenCss } from '../tokens'
+import { cx, DESABILITADO, FOCO, TRANSICAO } from './base'
 
 /**
- * Alternador liga/desliga — primeiro componente da camada `ui` (SPEC-DesignSystem-01).
+ * Alternador liga/desliga (Switch) — nasceu na SPEC-DesignSystem-01 como primeiro componente
+ * da camada `ui`; alinhado ao vocabulário de controles na 03a.
  *
  * Encapsula o `Switch` do Radix: o consumidor importa daqui e **nunca** do
- * `@radix-ui/react-switch` (PRD §24 "Radix exposto"). O motivo não é estético — é que a
- * API do Radix vira contrato público do DS no dia em que um `patterns` a importa direto,
- * e trocar de primitivo passa a exigir tocar em todo consumidor.
+ * `@radix-ui/react-switch` (PRD §24 "Radix exposto"). O motivo não é estético — é que a API do
+ * Radix vira contrato público do DS no dia em que um `patterns` a importa direto, e trocar de
+ * primitivo passa a exigir tocar em todo consumidor.
  *
- * Por isso as props abaixo são uma lista fechada, escrita à mão: `extends
- * RadixSwitch.SwitchProps` reabriria a superfície inteira por herança.
+ * Por isso as props são uma lista fechada, escrita à mão: `extends RadixSwitch.SwitchProps`
+ * reabriria a superfície inteira por herança, e um `{...rest}` faria o mesmo em runtime.
  */
 
 interface AlternadorProps {
@@ -33,11 +34,25 @@ export function Alternador({
       checked={ligado}
       onCheckedChange={onMudar}
       disabled={desabilitado}
-      // Cor por token: o tema troca a variável, o componente não conhece a cor.
-      style={{ backgroundColor: ligado ? tokenCss('cor-acento') : tokenCss('cor-superficie') }}
-      className="inline-flex h-6 w-10 items-center rounded-full border border-current/20 transition disabled:opacity-50"
+      className={cx(
+        'inline-flex h-6 w-11 shrink-0 items-center rounded-full border p-0.5',
+        'border-[rgba(var(--jos-borda-rgb),0.24)] bg-[var(--jos-cor-superficie)]',
+        // Ligado: fundo no acento **e** a alça desloca. A posição da alça é o que sobrevive ao
+        // alto contraste e ao daltonismo — cor sozinha não comunica estado (critério 2).
+        'data-[state=checked]:border-[var(--jos-cor-acento)]',
+        'data-[state=checked]:bg-[color-mix(in_srgb,var(--jos-cor-acento)_40%,transparent)]',
+        FOCO,
+        TRANSICAO,
+        DESABILITADO
+      )}
     >
-      <RadixSwitch.Thumb className="block size-4 translate-x-1 rounded-full bg-current transition data-[state=checked]:translate-x-5" />
+      <RadixSwitch.Thumb
+        className={cx(
+          'block size-4 rounded-full bg-[var(--jos-cor-texto)]',
+          'transition-transform duration-[var(--jos-duracao-rapida)] ease-[var(--jos-curva-padrao)]',
+          'data-[state=checked]:translate-x-5 data-[state=checked]:bg-[var(--jos-cor-acento)]'
+        )}
+      />
     </RadixSwitch.Root>
   )
 }
