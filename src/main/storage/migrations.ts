@@ -87,6 +87,48 @@ const MIGRATIONS: readonly string[] = [
     UNIQUE (user_id, path)
   );
   CREATE INDEX idx_allowed_dir_user ON allowed_directory(user_id);
+  `,
+
+  // 4 — registro de workflows e automações (SPEC-Execucao-04, RF-006/RF-007).
+  //
+  // `steps`/`triggers`/`target` são JSON numa coluna, não tabelas normalizadas: por decisão
+  // do PI, o catálogo não consulta etapa isoladamente nesta fatia (nada roda), então
+  // normalizar seria custo sem retorno até a execução real (MVP-003). A validação da forma
+  // vive no contrato TS, aplicada na leitura. Escopo `user_id`/`workspace_id` (CONVENTION §2).
+  `
+  CREATE TABLE workflow (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    name         TEXT NOT NULL,
+    status       TEXT NOT NULL,
+    steps        TEXT NOT NULL,   -- JSON: WorkflowStep[]
+    triggers     TEXT NOT NULL,   -- JSON: Trigger[]
+    schedule     TEXT,
+    last_run     TEXT,
+    next_run     TEXT,
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL
+  );
+  CREATE INDEX idx_workflow_user ON workflow(user_id, workspace_id);
+
+  CREATE TABLE automation (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    name         TEXT NOT NULL,
+    trigger      TEXT NOT NULL,   -- JSON: Trigger
+    target       TEXT NOT NULL,   -- JSON: { workflowId } | { descriptor }
+    squad_id     TEXT,
+    skill_id     TEXT,
+    enabled      INTEGER NOT NULL DEFAULT 0,   -- SQLite não tem boolean: 0/1
+    last_run     TEXT,
+    next_run     TEXT,
+    retry_count  INTEGER NOT NULL DEFAULT 0,
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL
+  );
+  CREATE INDEX idx_automation_user ON automation(user_id, workspace_id);
   `
 ]
 

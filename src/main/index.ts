@@ -9,6 +9,9 @@ import { AllowlistRepository } from './policy/allowlist-repository'
 import { canonicalize } from './policy/allowlist-canon'
 import { PolicyService } from './policy/policy-service'
 import { PreferencesService } from './preferences/preferences-service'
+import { WorkflowService } from './workflows/workflow-service'
+import { WorkflowRepository } from './workflows/workflow-repository'
+import { AutomationRepository } from './workflows/automation-repository'
 import { closeLogger, initLogger, log } from './logging/logger'
 import { initRendererLogBridge } from './logging/renderer-bridge'
 import { LOCAL_USER_ID, LOCAL_USER_PROFILE } from './storage/local-user'
@@ -81,6 +84,15 @@ if (!app.requestSingleInstanceLock()) {
       storage.audit,
       canonicalize(app.getPath('userData'))
     )
+    // Registro de workflows/automações (SPEC-Execucao-04). Catálogo — nada executa. Compartilha
+    // policy/audit/userId para a edição ser classificada e auditada no escopo do usuário.
+    const workflowsService = new WorkflowService(
+      new WorkflowRepository(storage.db),
+      new AutomationRepository(storage.db),
+      policy,
+      storage.audit,
+      userIdAtual
+    )
 
     registerIpcHandlers({
       audit: storage.audit,
@@ -88,6 +100,7 @@ if (!app.requestSingleInstanceLock()) {
       preferences,
       policy,
       allowlist,
+      workflows: workflowsService,
       userId: userIdAtual,
       auth,
       minimizeToTray: () => janela?.hide()

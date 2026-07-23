@@ -19,6 +19,13 @@ import type {
 import type { AuthSnapshot } from './auth'
 import type { LogInput } from './logging'
 import type { PolicyContext, PolicyDecision } from '../policies/contracts'
+import type {
+  Automation,
+  AutomationInput,
+  Workflow,
+  WorkflowInput,
+  WorkflowStatus
+} from '../domain/workflows'
 
 /** Canais de request/response (renderer → main → renderer). */
 export const IPC_CHANNELS = {
@@ -63,7 +70,21 @@ export const IPC_CHANNELS = {
    */
   allowlistList: 'allowlist:list',
   allowlistAdd: 'allowlist:add',
-  allowlistRemove: 'allowlist:remove'
+  allowlistRemove: 'allowlist:remove',
+  /**
+   * Registro de workflows e automações (SPEC-Execucao-04, critério 7). CRUD de **definições**
+   * — nada executa. O renderer nunca toca o storage: vê e edita por aqui, e criar/alterar/
+   * toggle é classificado (F02) + auditado no main.
+   */
+  workflowList: 'workflow:list',
+  workflowCreate: 'workflow:create',
+  workflowUpdate: 'workflow:update',
+  workflowSetStatus: 'workflow:set-status',
+  workflowRemove: 'workflow:remove',
+  automationList: 'automation:list',
+  automationCreate: 'automation:create',
+  automationSetEnabled: 'automation:set-enabled',
+  automationRemove: 'automation:remove'
 } as const
 
 /**
@@ -193,6 +214,26 @@ export interface JarvisBridge {
   listAllowedDirectories(): Promise<readonly string[]>
   addAllowedDirectory(path: string): Promise<readonly string[]>
   removeAllowedDirectory(path: string): Promise<readonly string[]>
+
+  /**
+   * Registro de workflows e automações (SPEC-Execucao-04, critério 7). CRUD de definições;
+   * nada executa. `create`/`update`/`setStatus`/`setEnabled`/`remove` classificam (F02) e
+   * auditam no main. O `WorkflowInput`/`AutomationInput` da UI não traz `user_id` — o main o
+   * resolve pela sessão corrente.
+   */
+  listWorkflows(workspace: WorkspaceId): Promise<readonly Workflow[]>
+  createWorkflow(input: Omit<WorkflowInput, 'user_id'>): Promise<Workflow>
+  updateWorkflow(
+    id: string,
+    patch: Partial<Pick<Workflow, 'name' | 'steps' | 'triggers' | 'schedule'>>
+  ): Promise<Workflow | undefined>
+  setWorkflowStatus(id: string, status: WorkflowStatus): Promise<Workflow | undefined>
+  removeWorkflow(id: string, workspace: WorkspaceId): Promise<boolean>
+
+  listAutomations(workspace: WorkspaceId): Promise<readonly Automation[]>
+  createAutomation(input: Omit<AutomationInput, 'user_id'>): Promise<Automation>
+  setAutomationEnabled(id: string, enabled: boolean): Promise<Automation | undefined>
+  removeAutomation(id: string, workspace: WorkspaceId): Promise<boolean>
 }
 
 /** Nome da propriedade exposta via contextBridge no renderer. */
