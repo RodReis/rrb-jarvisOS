@@ -4,7 +4,7 @@
 
 Regra de trabalho: **uma fatia por vez (WIP = 1)**. Só iniciar fatia com spec `aprovada-pi` e issue criada.
 
-**Ordem de execução:** 01 → **06 (logging, infra transversal)** → **04 + 02 (entregues juntas)** → 03 → 05. A Fatia 06 roda logo após a 01 porque 02–05 devem logar desde o início; a 04 vem antes da 02 porque 02/03 consomem seus contratos tipados (decisão de 2026-07-22). As seções abaixo estão em ordem numérica; a 06 aparece após a 01 por ser quando ela executa.
+**Ordem de execução (MVP-001):** 01 → **06 (logging, infra transversal)** → **04 + 02 (entregues juntas)** → 03 → 05. A Fatia 06 roda logo após a 01 porque 02–05 devem logar desde o início; a 04 vem antes da 02 porque 02/03 consomem seus contratos tipados (decisão de 2026-07-22). As seções abaixo estão em ordem numérica; a 06 aparece após a 01 por ser quando ela executa.
 
 > **04 e 02 saíram no mesmo PR (#28), por decisão do PI de 2026-07-22.** O critério 4 da SPEC-04 exige `AuditEvent` de `workspace-switch`, cujo fluxo nasce na F02 — entregá-las juntas evitou stub provisório que a F02 jogaria fora. A **F03 ficou de fora do bloco** por falta de credenciais (ver a seção dela).
 
@@ -252,14 +252,42 @@ Status: **entregue** — spec `aprovada-pi` (2026-07-21); issue [#14](https://gi
 6. **Workflow inexistente ⇒ run `cancelado`, registrado.** Um gatilho para um id que não existe é um fato a auditar, não um erro a engolir: o run nasce, é gravado com `workflowId: null` e estado `cancelado`.
 7. **Tipos de auditoria próprios** (`execution-run` para os marcos de início/fim, `execution-step` por etapa) — mesma linha de `allowlist-change`/`workflow-change`: a auditoria distingue sem parsear payload.
 
-## Após o MVP-002
+## MVP-003 — Design System da Plataforma
 
-Ordem: MVP-002 (fundação de execução) → **MVP-003** ([#10](https://github.com/RodReis/rrb-jarvisOS/issues/10), execução real + terminal) → MVP de providers (Corte 3, com BudgetPolicy). Ordem macro em `docs/LANDSCAPE.md` § Roadmap.
+Épico [#16](https://github.com/RodReis/rrb-jarvisOS/issues/16). **As 8 fatias têm spec `aprovada-pi`** (issues #17–#24). Base técnica: **Radix + Tailwind v4 + Lucide**. Ordem: F01 → F02 → (F03a, F03b, F05 ‖) → F04a → F04b → F06.
+
+### Fatia 01 — Infra do design system (`docs/spec/spec-design-system-01-infra.md`)
+
+Status: **entregue** — spec `aprovada-pi` (2026-07-21); issue [#17](https://github.com/RodReis/rrb-jarvisOS/issues/17); PR [#38](https://github.com/RodReis/rrb-jarvisOS/pull/38). Abre o MVP-003. **Só esqueleto** — nenhum token, cor ou componente de produto (Fatias 02+).
+
+- [x] Três camadas em `src/design/{tokens,ui,patterns}` com export de exemplo por camada, importadas na ordem permitida (`patterns` → `ui` → `tokens`)
+- [x] `tokens` sem React — provado na categoria **Regras** (ambiente `node`), não em jsdom
+- [x] `ui/Alternador` encapsula o Radix Switch com **lista fechada de props**; consumidor não importa Radix direto (PRD §24)
+- [x] `patterns/LinhaDeAjuste` compõe `ui` + ícone Lucide (import individual); recebe dados só por props tipadas
+- [x] **Fronteira via ESLint** (`no-restricted-imports` escopada a `src/design/**`): quebra o `lint` ao importar domínio/renderer/main/Electron/Node/Supabase
+- [x] Alias `@design` no renderer, no Vitest e no `tsconfig.web` — main e preload **não** o resolvem
+- [x] `README` em `src/design/` (camadas, base técnica, regra de dependência, onde cada teste cai)
+- [x] Entrega: PR [#38](https://github.com/RodReis/rrb-jarvisOS/pull/38) (`refs #17`); docs/ commitados
+
+**Decisões técnicas desta fatia:**
+
+1. **A fronteira é lint, não convenção — e o lint é exercitado.** Uma regra `no-restricted-imports` mal escopada (`files:` errado, `group:` incompleto) fica silenciosamente inerte, e o `lint` verde passa a dizer que a fronteira existe quando ela não existe. Por isso `tests/design/fronteira.int-spec.ts` roda o **ESLint real** sobre a config real, nos dois sentidos que o critério 2 pede. Verificado por **mutação**: removendo o bloco da regra, os 6 casos de violação ficam vermelhos.
+2. **O teste também guarda o *escopo* da regra, não só sua existência.** Há uma asserção sobre um arquivo do renderer: ele importa `@shared` e isso **tem** de continuar passando. Sem ela, alargar o `files:` por engano (de `src/design/**` para `src/**`) quebraria o app inteiro e o teste da fronteira seguiria verde — falharia o lint em outro lugar, longe da causa.
+3. **`tokens` é testado em `node`, não em jsdom.** O critério 3 é "importável sem React"; sob jsdom o teste passaria mesmo se a camada importasse React por engano, porque o ambiente fornece o DOM. O ambiente é a prova, não a asserção — por isso `src/design/**/*.spec.ts` entrou na categoria **Regras** e não na **Tela**.
+4. **O wrapper do Radix declara props à mão.** `extends RadixSwitch.SwitchProps` ou um `{...rest}` no `Root` reabririam a superfície inteira do primitivo por herança: o tipo pareceria fechado, mas qualquer prop do Radix passaria em runtime, e trocar de primitivo passaria a quebrar consumidor. Há asserção contra `...rest`/`...props` no corpo do componente — também verificada por mutação.
+5. **`@design` não é resolvido por main e preload.** O alias existe só no bloco `renderer` do `electron.vite.config.ts`. É a mesma fronteira do lint, vista do outro lado: um import do DS no main falharia no bundle, não só no lint.
+6. **O teste da fronteira caiu na categoria Banco.** Ele escreve arquivos temporários dentro de `src/design/` (a regra é escopada por caminho — o arquivo precisa morar lá para ser avaliado). Toca disco, logo é integração. A régua da categoria é "integração com storage local", como já registrado na F06 do MVP-001.
+7. **Achado de processo: o relatório de entrega precisa ser gerado no ambiente do CI.** Custou **duas** rodadas de CI vermelhas nesta fatia, por duas guardas diferentes e a mesma causa de fundo — `npm run test:report` rodado sem as condições que o CI impõe. (a) **Stack parada:** com o Docker desligado o gerador roda até o fim e escreve `Banco 110 pass` em vez de `117` — os 7 testes de RLS se pulam (comportamento correto: não punir quem clona sem Docker) e somem da contagem. (b) **Sem as variáveis `REPORT_*`:** o gerador escreve o "Estado atual" mas **não** a linha de histórico da entrega, e a guarda `--require-entry` barra. Nos dois casos nada falha e nada avisa localmente: o arquivo parece válido. Quem pegou foram as guardas do ADR-003 — que é o que elas existem para fazer, e a prova de que a rotina de relatório não é decorativa. O desperdício não foi a falha, foi descobrir no CI o que dava para ver antes do push. Registrado em `docs/TESTING.md` §7 (*"Gerar o relatório de entrega: reproduza o ambiente do CI"*) com o comando exato, incluindo rodar a guarda idêntica à do CI antes de empurrar.
+
+## Após o MVP-003
+
+Ordem: **MVP-004** ([#10](https://github.com/RodReis/rrb-jarvisOS/issues/10), execução real + terminal) → MVP de providers (Corte 3, com BudgetPolicy). Ordem macro em `docs/LANDSCAPE.md` § Roadmap.
 
 ## Registro de entregas
 
 | Data | Fatia | PR | Observação |
 |---|---|---|---|
+| 2026-07-23 | MVP-003 · F01 Infra do design system (#17) | [#38](https://github.com/RodReis/rrb-jarvisOS/pull/38) | Regras 139 (75.0%), Banco 117 (87.5%), Tela 39 (93.6%) — **+16 testes**. **Abre o MVP-003.** Só esqueleto: três camadas, toolchain e fronteira, sem nenhum token ou componente de produto. O que a fatia realmente entrega é a **fronteira verificável** — `no-restricted-imports` escopada a `src/design/**` que quebra o `lint`, exercitada pelo ESLint real nos dois sentidos e provada por mutação (sem o bloco da regra, 6 casos ficam vermelhos). O teste guarda também o *escopo*: alargar o `files:` por engano quebraria o renderer, então há asserção de que um arquivo fora do DS continua livre para importar `@shared`. `tokens` é testado em `node` e não em jsdom — o ambiente é o que prova "sem React". |
 | 2026-07-22 | MVP-001 · F01 Bootstrap e estrutura (#2) | [#25](https://github.com/RodReis/rrb-jarvisOS/pull/25) | CI verde na 1ª execução. Relatório ADR-003 ativo: selfcheck 10/10, guarda anti-drift verificada nos dois sentidos. Regras 14 (85%), Tela 4 (100%), Banco 0 (F04). |
 | 2026-07-22 | MVP-001 · F06 Observabilidade e Logging (#8) | [#27](https://github.com/RodReis/rrb-jarvisOS/pull/27) | Regras 49 (87.2%), **Banco 8 (85.5%)**, Tela 13 (97.6%). A categoria **Banco deixa de estar vazia antes da F04**: os testes de integração do logger tocam disco real (arquivo temporário, teardown por teste), que é exatamente o que a categoria mede — o `TESTING.md` §8 previa SQLite como primeiro caso, mas a régua é "integração com storage local", não "SQLite". Verificado também no app real: os três arquivos nascem em `userData/logs` e o registro do renderer chega ao disco. |
 | 2026-07-22 | MVP-001 · F04 Dados + AuditEvent (#5) **e** F02 AppShell/workspaces (#3) | [#28](https://github.com/RodReis/rrb-jarvisOS/pull/28) | Regras 78 (86.6%), Banco 32 (89.5%), Tela 16 (98.5%). Duas fatias no mesmo PR por decisão do PI: o critério 4 da SPEC-04 exige `AuditEvent` de `workspace-switch`, cujo fluxo nasce na F02. Carimbo pela issue do primeiro `refs` (#5), como o CI extrai. Verificado no app real: schema v1, 2 triggers ativos, chave de auditoria cifrada por DPAPI no disco. **F03 não entrou** — bloqueada por credenciais (ver a seção da fatia). |
