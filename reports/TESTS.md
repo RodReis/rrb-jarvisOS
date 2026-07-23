@@ -13,7 +13,7 @@ Totais da última execução (regenerado, não acumulado):
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
 | — | — | — | Regras de Negócio | 203 | 203 | 0 | 78.2 | — | — |
-| — | — | — | Banco | 117 | 117 | 0 | 87.5 | — | — |
+| — | — | — | Banco | 132 | 132 | 0 | 85.5 | — | — |
 | — | — | — | Tela | 95 | 94 | 0 | 89.6 | — | — |
 
 ## Histórico por entrega
@@ -64,3 +64,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-07-23 | #19 | spec-design-system-03a-componentes-acoes-forms | Regras de Negócio | 203 | 203 | 0 | 78.2 | #42 | [#42](https://github.com/RodReis/rrb-jarvisOS/pull/42) |
 | 2026-07-23 | #19 | spec-design-system-03a-componentes-acoes-forms | Banco | 117 | 117 | 0 | 87.5 | #42 | [#42](https://github.com/RodReis/rrb-jarvisOS/pull/42) |
 | 2026-07-23 | #19 | spec-design-system-03a-componentes-acoes-forms | Tela | 95 | 94 | 0 | 89.6 | #42 | [#42](https://github.com/RodReis/rrb-jarvisOS/pull/42) |
+| 2026-07-23 | #43 | — | Regras de Negócio | 203 | 203 | 0 | 78.2 | #44 | [#44](https://github.com/RodReis/rrb-jarvisOS/pull/44) |
+| 2026-07-23 | #43 | — | Banco | 132 | 132 | 0 | 85.5 | #44 | [#44](https://github.com/RodReis/rrb-jarvisOS/pull/44) |
+| 2026-07-23 | #43 | — | Tela | 95 | 94 | 0 | 89.6 | #44 | [#44](https://github.com/RodReis/rrb-jarvisOS/pull/44) |
