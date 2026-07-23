@@ -304,6 +304,38 @@ Status: **entregue** — spec `aprovada-pi` (2026-07-21); issue [#18](https://gi
 6. **`reduced-motion` zera a duração no token**, não em cada animação — quem anima lê `--jos-duracao-*`, então anular a variável desliga a árvore toda. Caçar `animation` por componente deixaria passar o próximo que alguém escrever. `0.01ms` e não `0`: duração zero cancela `transitionend` e travaria componente que espera esse evento.
 7. **A fronteira da F01 pegou o teste desta fatia.** `node:fs` importado em `src/design/` — o lint barrou. Corrigido importando o JSON como módulo, não abrindo exceção: se a regra cedesse para teste, viraria "vale exceto quando incomoda". A regra da fatia anterior mordendo o autor dela é o melhor sinal de que é real.
 
+### Fatia 03a — Componentes: ações + formulários (`docs/spec/spec-design-system-03a-componentes-acoes-forms.md`)
+
+Status: **entregue** — spec `aprovada-pi` (2026-07-21); issue [#19](https://github.com/RodReis/rrb-jarvisOS/issues/19); PR [#42](https://github.com/RodReis/rrb-jarvisOS/pull/42). Depende da F01 (Radix + fronteira) e da F02 (tokens). Pode andar em paralelo com a 03b.
+
+- [x] **Ações** (PRD §11.1): `Button` (primária/secundária/perigo), `IconButton`, `ButtonGroup`, `Link`
+- [x] **Campos** (PRD §11.2): `Field`, `FormMessage`, `Input`, `PasswordInput`, `Textarea`
+- [x] **Radix encapsulado**: `Select`, `Checkbox`, `RadioGroup`, `Slider`, `Alternador` (Switch)
+- [x] **`Combobox` próprio** — padrão ARIA completo; o Radix não publica um
+- [x] `ui/base.ts`: altura única (44px), foco, borda, transição, estado desabilitado
+- [x] Estado nunca só por cor — inclusive **entre variantes** (correção do critique)
+- [x] Regra de lint do critério 5: componentes consomem só tokens
+- [x] **Galeria de prova visual** + 8 asserções num navegador real
+- [x] Entrega: PR [#42](https://github.com/RodReis/rrb-jarvisOS/pull/42) (`refs #19`); docs/ commitados
+
+**Decisões técnicas desta fatia:**
+
+1. **A gramática visual foi derivada do protótipo, não inventada.** Só **3 dos 16** componentes têm tela de referência (Input, Button primário e secundário, da tela de login); as outras 41 telas são de exibição. Decisão do PI: extrair o vocabulário do que existe — 44px, raio de card, borda de baixo alfa, label mono UPPERCASE, foco no acento — e concentrá-lo em `ui/base.ts`. Inventar estética a cada arquivo produziria 16 dialetos.
+2. **A hierarquia de ação é preenchimento, não matiz.** A primeira versão distinguia as variantes só por cor. Com `#C4C4C4` (default do NOA) ou `#FFFFE3` — ambos na paleta de 8 que o usuário escolhe —, primária, carregando e desabilitado renderizavam como o **mesmo botão cinza**. O sistema aplicava "estado nunca só por cor" dentro de cada componente (check, alça, ponto) e violava a regra uma camada acima. Agora primária é sólida e pesada; perigo, contornada e pesada — peso e preenchimento sobrevivem a qualquer acento.
+3. **As semânticas ganharam variante de leitura.** Como texto no modo claro, as cinco falhavam a régua: `err` 2.53:1, `violet` 2.52, `warn` 1.99, `ok` 1.78, `info` 1.54. Foram desenhadas para fundo escuro. A cor de marca segue intacta em borda, ícone e preenchimento; só o texto lê da variante ajustada — o mesmo mecanismo que o acento já usava desde a F02.
+4. **`textMuted` corrigido, e fidelidade cedeu à legibilidade.** `#6b7382` media 4.08–4.12:1 no escuro, e o token não é decorativo: carrega placeholders, texto de apoio e **todas as labels** (via `LABEL_MONO`, em `--jos-texto-micro` com uppercase — texto pequeno, sem isenção). `#757d8c` é o desvio mínimo que atinge 4.5:1. É o princípio 1 do PRODUCT.md ("clareza antes de efeito visual") decidindo contra o protótipo.
+5. **`Field` devolve os atributos ARIA por render prop.** Cada componente montar o próprio `aria-describedby` é a via para um esquecer. O erro precede a descrição na ordem de leitura: quem acabou de errar precisa ouvir o problema antes da instrução genérica.
+6. **`ButtonGroup papel="segmentado"` foi removido, não remendado.** Prometia `role="radiogroup"` sobre filhos `<button>` — o leitor de tela anunciaria um grupo de rádio **sem rádios dentro**, pior que a fileira de botões que a variante tentava corrigir. Um controle segmentado de verdade precisa de estado e navegação por setas; é escopo da F04a, onde há tela que o use. Entregar a casca seria oferecer acessibilidade inexistente.
+7. **`Combobox` fecha por `focusout`, não por timer.** A versão inicial usava `setTimeout(…, 120)` para o `mousedown` da opção registrar antes do fechamento: o timer nunca era limpo (disparava após o unmount) e, sob quadro lento, a lista fechava antes do clique. `relatedTarget` responde a pergunta certa — "o foco saiu daqui?" — sem constante para calibrar.
+8. **Três camadas de verificação, cada uma pegando o que a anterior não pega.** Os 91 testes de papel acharam o `aria-label` no `Root` do slider em vez do `Thumb` (a faixa ficava anônima). A **prova visual** achou dois defeitos com esses 91 verdes: o CSS dos componentes não estava sendo gerado (o Tailwind v4 varre a partir da `root` do Vite, e `../ui` ficava fora) e o card do NOA estava invertido (`nt16` é cor de **texto** — os índices `jt`/`nt` são independentes, não numerações paralelas). O **`/impeccable critique`** achou os 10 itens de contraste e hierarquia. Cada correção deixou teste que a trava, verificado por mutação.
+
+**Registrado, não silenciado:**
+
+- `RadioGroup` por setas **não é verificável em jsdom** (roving tabindex do Radix depende de foco real). `it.todo` com a razão escrita, em vez de um teste que passa medindo outra coisa — cobre-se no E2E da F04a.
+- A galeria cobre **4 de 32** combinações de acento. Os dois defeitos apareceram nos defaults; ampliar a matriz é candidato para a F06.
+- **`:active` não existe em nenhum dos 16** — nenhum controle dá feedback de pressão. Anotado para a F06 (hardening).
+- Card **[#41](https://github.com/RodReis/rrb-jarvisOS/issues/41)**: o renderer sobe em porta variável, contra o `strictPort` do CLAUDE.md. Achado ao subir o app para inspeção; não misturado na fatia.
+
 ## Após o MVP-003
 
 Ordem: **MVP-004** ([#10](https://github.com/RodReis/rrb-jarvisOS/issues/10), execução real + terminal) → MVP de providers (Corte 3, com BudgetPolicy). Ordem macro em `docs/LANDSCAPE.md` § Roadmap.
@@ -312,6 +344,7 @@ Ordem: **MVP-004** ([#10](https://github.com/RodReis/rrb-jarvisOS/issues/10), ex
 
 | Data | Fatia | PR | Observação |
 |---|---|---|---|
+| 2026-07-23 | MVP-003 · F03a Componentes: ações + formulários (#19) | [#42](https://github.com/RodReis/rrb-jarvisOS/pull/42) | Regras 203 (78.2%), Banco 117 (87.5%), Tela 95 (89.6%) — **+85 testes**. Os 16 componentes de ação e formulário. A fatia introduziu **três camadas de verificação**, e cada uma pegou o que a anterior não pegava: os testes de papel acharam o `aria-label` no lugar errado do slider; a **prova visual** achou o CSS não sendo gerado e o card do NOA invertido, **com os 91 testes de papel verdes**; o **`/impeccable critique`** achou 10 itens de contraste e hierarquia — incluindo a ação primária colapsando com a desabilitada em 2 dos 8 acentos da paleta. A lição que fica é sobre método: o rigor de contraste existia só no caminho do acento (a cor que o *usuário* escolhe) e não nos papéis que *nós* escolhemos. Agora são 41 asserções sobre todos os papéis × 2 módulos × 2 modos. |
 | 2026-07-23 | MVP-003 · F02 Foundations + ponte com o protótipo (#18) | [#40](https://github.com/RodReis/rrb-jarvisOS/pull/40) | Regras 158 (77.9%), Banco 117 (87.5%), Tela 55 (91.2%) — **+42 testes**. A ponte protótipo→código: 71 tokens × 2 modos **extraídos** (determinístico), não transcritos — 142 valores de cor à mão é onde o typo silencioso mora. Duas provas por mutação: sem a exceção da marca, 6 testes vermelhos; sem a regra de fronteira (F01), 6 vermelhos. As 8 cores da paleta × 2 fundos atingem 4.5:1 — paleta fechada permite afirmar sobre **todas**, não amostrar. Fontes baixadas e versionadas (78 KB) porque a CSP do renderer não aceita CDN e falharia em silêncio. Junto: `PRODUCT.md` (contexto de design via `/impeccable init`, a pedido do PI) documentando as **três camadas** — Desenvolvimento não é espaço de usuário. |
 | 2026-07-23 | MVP-003 · F01 Infra do design system (#17) | [#38](https://github.com/RodReis/rrb-jarvisOS/pull/38) | Regras 139 (75.0%), Banco 117 (87.5%), Tela 39 (93.6%) — **+16 testes**. **Abre o MVP-003.** Só esqueleto: três camadas, toolchain e fronteira, sem nenhum token ou componente de produto. O que a fatia realmente entrega é a **fronteira verificável** — `no-restricted-imports` escopada a `src/design/**` que quebra o `lint`, exercitada pelo ESLint real nos dois sentidos e provada por mutação (sem o bloco da regra, 6 casos ficam vermelhos). O teste guarda também o *escopo*: alargar o `files:` por engano quebraria o renderer, então há asserção de que um arquivo fora do DS continua livre para importar `@shared`. `tokens` é testado em `node` e não em jsdom — o ambiente é o que prova "sem React". |
 | 2026-07-22 | MVP-001 · F01 Bootstrap e estrutura (#2) | [#25](https://github.com/RodReis/rrb-jarvisOS/pull/25) | CI verde na 1ª execução. Relatório ADR-003 ativo: selfcheck 10/10, guarda anti-drift verificada nos dois sentidos. Regras 14 (85%), Tela 4 (100%), Banco 0 (F04). |
