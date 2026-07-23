@@ -9,14 +9,12 @@ updated: 2026-07-23
 
 ### [MVP3] Design System da Plataforma — base única, 2 identidades (#16)
 
+- [MVP3][F03a] Componentes: ações + formulários (#19)
 - [MVP3][F06] Adoção & hardening (#24)
 - [MVP3][F05] Identidades NOA e JARVIS (#23)
 - [MVP3][F04b] Padrões operacionais (#22)
 - [MVP3][F04a] AppShell + navegação (#21)
 - [MVP3][F03b] Componentes: dados + overlays + feedback (#20)
-- [MVP3][F03a] Componentes: ações + formulários (#19)
-- [MVP3][F02] Foundations + ponte com o protótipo (#18)
-- [MVP3][F01] Infra do design system (#17)
 
 ### Sem épico
 
@@ -37,7 +35,12 @@ _(vazio)_
 
 ## Finalizado
 
-### [MVP2] Execução local controlada — fundação de execução (permissões, allowlist, execução simulada) (#9)
+### [MVP3] Design System da Plataforma — base única, 2 identidades (#16)
+
+- [MVP3][F01] Infra do design system (#17, finalizado em: 2026-07-23)
+- [MVP3][F02] Foundations + ponte com o protótipo (#18, finalizado em: 2026-07-23)
+
+### #9 (#9)
 
 - [MVP2][F05] Motor de execução em modo simulado (#14, finalizado em: 2026-07-23)
 - [MVP2][F03] Diretórios permitidos (allowlist) (#12, finalizado em: 2026-07-23)
