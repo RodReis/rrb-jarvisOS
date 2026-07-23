@@ -264,14 +264,47 @@ Dispara em **todo pull request** para `main`. Job `test`:
     sobre RLS jamais exercitada — o relatório contaria a categoria como coberta. Falso verde é
     pior que teste ausente: ele *afirma* a garantia que não foi medida.
   - **Localmente, pular envenena o relatório — suba a stack antes de gerá-lo.** O outro lado da
-    mesma moeda, custou uma rodada de CI vermelha na **M3-F01** (2026-07-23). Com o Docker parado,
-    `npm run test:report` roda até o fim e escreve um número que *parece* válido: os 7 testes de
-    RLS simplesmente somem da contagem (`Banco 110 pass` em vez de `117`). Nada falha, nada avisa.
-    Quem pega é a guarda anti-drift, que compara o arquivo commitado com uma execução limpa — mas
-    só no CI, depois do push. **Antes de `npm run test:report`, confirme a stack no ar**
-    (`npx supabase status`); se estiver parada, `npx supabase start`. Vale a mesma regra do ADR-003
-    vista de perto: número de relatório é evidência de execução limpa, não da máquina de quem
-    commitou.
+    mesma moeda. Com o Docker parado, `npm run test:report` roda até o fim e escreve um número que
+    *parece* válido: os 7 testes de RLS simplesmente somem da contagem (`Banco 110 pass` em vez de
+    `117`). Nada falha, nada avisa. Quem pega é a guarda anti-drift, que compara o arquivo
+    commitado com uma execução limpa — mas só no CI, depois do push. **Antes de
+    `npm run test:report`, confirme a stack no ar** (`npx supabase status`); se estiver parada,
+    `npx supabase start`. Vale a mesma regra do ADR-003 vista de perto: número de relatório é
+    evidência de execução limpa, não da máquina de quem commitou.
+
+### Gerar o relatório de entrega: reproduza o ambiente do CI
+
+Duas rodadas de CI vermelhas na **M3-F01** (2026-07-23), por duas guardas diferentes, com a mesma
+causa de fundo: `npm run test:report` rodado sem as condições que o CI impõe. As guardas fizeram o
+trabalho delas — o desperdício foi descobrir no CI o que dava para ver antes do push.
+
+| Guarda | O que cobra | Como falha em silêncio localmente |
+|---|---|---|
+| anti-drift (`--check`) | números batem com execução limpa | stack parada ⇒ testes pulados somem da contagem |
+| `--require-entry` | linha da entrega no **Histórico** | sem as variáveis `REPORT_*`, só o "Estado atual" é escrito |
+
+O carimbo do histórico nasce das variáveis que o CI injeta (`REPORT_ISSUE` extraída do `refs #N` do
+PR, `REPORT_SPEC` do corpo, `REPORT_PR`/`REPORT_PR_URL`/`REPORT_DATE`). Sem elas o gerador escreve
+um relatório válido — só que **sem a linha de histórico**, e `--require-entry` barra.
+
+Antes de commitar o relatório de uma entrega, rode o equivalente ao CI:
+
+```bash
+npx supabase status                      # stack no ar? se não: npx supabase start
+
+REPORT_PR='#<PR>' \
+REPORT_PR_URL='https://github.com/RodReis/rrb-jarvisOS/pull/<PR>' \
+REPORT_ISSUE='#<issue>' \
+REPORT_SPEC='<slug-da-spec>' \
+REPORT_DATE='<YYYY-MM-DD>' \
+npm run test:report
+
+# e a guarda idêntica à do CI, que é o que realmente prova:
+REPORT_ISSUE='#<issue>' REQUIRE_ENTRY=1 npm run test:report:check -- --require-entry
+```
+
+O número do PR só existe depois de abri-lo — então a ordem é **abrir o PR, carimbar, empurrar**.
+Rodar a guarda local antes do push é o passo que fecha o ciclo: se ela passa aqui, passa lá.
   - **Role não-owner, sempre.** O Postgres pula RLS para superuser e para o dono da tabela. Todo
     teste de isolamento fala pelo PostgREST com JWT de usuário final; usar a conexão do owner
     faria as asserções passarem sem tocar em política nenhuma. A única exceção deliberada é o
