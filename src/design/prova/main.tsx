@@ -4,6 +4,7 @@ import { GaleriaDeControles } from './GaleriaDeControles'
 import { GaleriaDeDados, type Cena } from './GaleriaDeDados'
 import { GaleriaDeIdentidades } from './GaleriaDeIdentidades'
 import { GaleriaDeShell } from './GaleriaDeShell'
+import { GaleriaDeOperacionais, type CenaOperacional } from './GaleriaDeOperacionais'
 import type { ModoUi, Modulo } from '../tokens/semantic'
 import type { CorAcento } from '../tokens/acento'
 import './prova.css'
@@ -27,13 +28,20 @@ const modo = (params.get('modo') === 'light' ? 'light' : 'dark') satisfies ModoU
 const modulo = (params.get('modulo') === 'noa' ? 'noa' : 'jarvis') satisfies Modulo
 const acento = params.get('acento') as CorAcento | null
 
-/** Lista fechada: uma cena desconhecida cairia na estática e a captura mentiria em silêncio. */
-const CENAS: readonly Cena[] = ['estatica', 'dialog', 'alert', 'drawer', 'toasts']
-const cenaBruta = params.get('cena')
-if (cenaBruta !== null && !CENAS.includes(cenaBruta as Cena)) {
-  throw new Error(`Cena desconhecida: ${cenaBruta}. Use uma de: ${CENAS.join(', ')}.`)
+/**
+ * Cenas válidas **por galeria**.
+ *
+ * Listas fechadas: uma cena desconhecida cairia na estática e a captura mentiria em silêncio.
+ * Separadas por galeria porque `toasts` não existe na de operacionais e `aprovacao` não existe na
+ * de dados — uma lista global aceitaria a combinação errada e devolveria a cena estática com o
+ * nome de outra.
+ */
+const CENAS_POR_GALERIA: Readonly<Record<string, readonly string[]>> = {
+  dados: ['estatica', 'dialog', 'alert', 'drawer', 'toasts'],
+  operacionais: ['estatica', 'aprovacao', 'remocao']
 }
-const cena = (cenaBruta ?? 'estatica') as Cena
+
+const cenaBruta = params.get('cena')
 
 const raiz = document.getElementById('root')
 if (raiz === null) throw new Error('Elemento #root não encontrado.')
@@ -52,10 +60,23 @@ if (raiz === null) throw new Error('Elemento #root não encontrado.')
  */
 const GALERIAS = {
   dados: () => (
-    <GaleriaDeDados modo={modo} modulo={modulo} acento={acento ?? undefined} cena={cena} />
+    <GaleriaDeDados
+      modo={modo}
+      modulo={modulo}
+      acento={acento ?? undefined}
+      cena={(cenaBruta ?? 'estatica') as Cena}
+    />
   ),
   identidades: () => <GaleriaDeIdentidades modo={modo} acento={acento ?? undefined} />,
   shell: () => <GaleriaDeShell modo={modo} modulo={modulo} acento={acento ?? undefined} />,
+  operacionais: () => (
+    <GaleriaDeOperacionais
+      modo={modo}
+      modulo={modulo}
+      acento={acento ?? undefined}
+      cena={(cenaBruta ?? 'estatica') as CenaOperacional}
+    />
+  ),
   controles: () => <GaleriaDeControles modo={modo} modulo={modulo} acento={acento ?? undefined} />
 } as const
 
@@ -64,6 +85,20 @@ if (!(qual in GALERIAS)) {
   // Mesma disciplina da `cena`: galeria desconhecida cairia no default e a captura mentiria em
   // silêncio — o arquivo teria o nome da galeria pedida e o conteúdo de outra.
   throw new Error(`Galeria desconhecida: ${qual}. Use uma de: ${Object.keys(GALERIAS).join(', ')}.`)
+}
+
+// A cena só pode ser validada depois de conhecida a galeria — cada uma tem as suas. Pedir uma
+// cena a quem não as tem também é erro: significa que a URL da prova está errada.
+const cenasValidas = CENAS_POR_GALERIA[qual]
+if (cenaBruta !== null) {
+  if (cenasValidas === undefined) {
+    throw new Error(`A galeria "${qual}" não aceita cenas, mas recebeu "${cenaBruta}".`)
+  }
+  if (!cenasValidas.includes(cenaBruta)) {
+    throw new Error(
+      `Cena desconhecida: ${cenaBruta}. Para "${qual}", use uma de: ${cenasValidas.join(', ')}.`
+    )
+  }
 }
 
 const galeria = GALERIAS[qual as keyof typeof GALERIAS]()
