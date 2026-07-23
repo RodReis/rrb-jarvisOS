@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 203 | 203 | 0 | 78.2 | — | — |
+| — | — | — | Regras de Negócio | 203 | 203 | 0 | 77.5 | — | — |
 | — | — | — | Banco | 132 | 132 | 0 | 85.5 | — | — |
-| — | — | — | Tela | 148 | 147 | 0 | 90.4 | — | — |
+| — | — | — | Tela | 169 | 168 | 0 | 90.7 | — | — |
 
 ## Histórico por entrega
 
@@ -70,3 +70,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-07-23 | #20 | spec-design-system-03b-componentes-dados-overlays | Regras de Negócio | 203 | 203 | 0 | 78.2 | #45 | [#45](https://github.com/RodReis/rrb-jarvisOS/pull/45) |
 | 2026-07-23 | #20 | spec-design-system-03b-componentes-dados-overlays | Banco | 132 | 132 | 0 | 85.5 | #45 | [#45](https://github.com/RodReis/rrb-jarvisOS/pull/45) |
 | 2026-07-23 | #20 | spec-design-system-03b-componentes-dados-overlays | Tela | 148 | 147 | 0 | 90.4 | #45 | [#45](https://github.com/RodReis/rrb-jarvisOS/pull/45) |
+| 2026-07-23 | #23 | spec-design-system-05-identidades | Regras de Negócio | 203 | 203 | 0 | 77.5 | #46 | [#46](https://github.com/RodReis/rrb-jarvisOS/pull/46) |
+| 2026-07-23 | #23 | spec-design-system-05-identidades | Banco | 132 | 132 | 0 | 85.5 | #46 | [#46](https://github.com/RodReis/rrb-jarvisOS/pull/46) |
+| 2026-07-23 | #23 | spec-design-system-05-identidades | Tela | 169 | 168 | 0 | 90.7 | #46 | [#46](https://github.com/RodReis/rrb-jarvisOS/pull/46) |
