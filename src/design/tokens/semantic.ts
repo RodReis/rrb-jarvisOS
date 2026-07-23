@@ -89,9 +89,24 @@ const TEMA: Readonly<Record<ModoUi, MapaTema>> = temaPrototipo
  * como dado bruto (`tokenDeTema`) para as fatias que forem portar telas específicas — inventar
  * papel para 71 tokens seria decidir escopo que não é meu.
  */
+/**
+ * Token de card por módulo.
+ *
+ * **Os índices de `jt*` e `nt*` são independentes** — não são duas numerações paralelas do
+ * mesmo papel. `jt16` é o card do JARVIS (`rgba(24,27,33,.7)`), mas `nt16` é uma cor de
+ * **texto** (`#c8d4ce`); o card do NOA é `nt2` (`rgba(22,27,25,.7)`).
+ *
+ * Derivar o nome por interpolação (`${prefixo}16`) parecia elegante e produzia campo com fundo
+ * claro sobre página escura no NOA — texto ilegível, e nenhum teste de papel acusaria. O mapa
+ * explícito é feio de propósito: ele obriga a conferir o token no dado em vez de supor.
+ */
+const CARD_POR_MODULO: Readonly<Record<Modulo, string>> = {
+  jarvis: 'jt16',
+  noa: 'nt2'
+}
+
 export function papeis(modulo: Modulo, modo: ModoUi) {
   const t = TEMA[modo]
-  const p = modulo === 'jarvis' ? 'jt' : 'nt'
 
   return {
     /** Fundo do app — README §2.6, linha "fundo app". */
@@ -103,8 +118,8 @@ export function papeis(modulo: Modulo, modo: ModoUi) {
         : modo === 'dark'
           ? '#0b0d0d'
           : '#f2f4f2',
-    /** Card — `jt16`/`nt` correspondente. */
-    surfaceRaised: t[`${p}16`] ?? t[`${p}0`],
+    /** Card — o token de cada módulo, do mapa explícito acima. */
+    surfaceRaised: t[CARD_POR_MODULO[modulo]],
     textPrimary: modo === 'dark' ? '#eef1f5' : '#111316',
     textSecondary: modo === 'dark' ? '#9aa3b2' : '#27292d',
     /** Label mono / caption. */

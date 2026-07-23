@@ -100,6 +100,41 @@ describe('papéis por módulo e modo (critério 3)', () => {
     expect(papeis('jarvis', 'dark').textPrimary).toBe('#eef1f5')
     expect(papeis('jarvis', 'light').textPrimary).toBe('#111316')
   })
+
+  describe('a superfície elevada acompanha o modo, nos dois módulos', () => {
+    /**
+     * Este teste nasceu de um defeito real, achado só pelo screenshot da F03a: `surfaceRaised`
+     * derivava o token por interpolação (`${prefixo}16`), presumindo que `nt16` fosse o card do
+     * NOA como `jt16` é o do JARVIS. Mas os índices são independentes — `nt16` é cor de
+     * **texto**, e o campo do NOA escuro ficava com fundo claro, ilegível.
+     *
+     * A asserção é sobre a **luminância**, não sobre o valor: fixar `rgba(22,27,25,.7)` travaria
+     * a cor exata e não pegaria a próxima troca de token errada. O que não pode acontecer é
+     * superfície clara no escuro.
+     */
+    const luminanciaAproximada = (cor: string): number => {
+      const canais = cor.match(/\d+(\.\d+)?/g)
+      if (canais === null) throw new Error(`Cor não interpretável: ${cor}`)
+      const [r, g, b] = canais.slice(0, 3).map(Number)
+      return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+    }
+
+    const hexParaRgb = (valor: string): string => {
+      if (!valor.startsWith('#')) return valor
+      const n = Number.parseInt(valor.slice(1), 16)
+      return `rgb(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255})`
+    }
+
+    it.each(['jarvis', 'noa'] as const)('no escuro, a superfície de %s é escura', (modulo) => {
+      const cor = hexParaRgb(papeis(modulo, 'dark').surfaceRaised)
+      expect(luminanciaAproximada(cor)).toBeLessThan(0.3)
+    })
+
+    it.each(['jarvis', 'noa'] as const)('no claro, a superfície de %s é clara', (modulo) => {
+      const cor = hexParaRgb(papeis(modulo, 'light').surfaceRaised)
+      expect(luminanciaAproximada(cor)).toBeGreaterThan(0.7)
+    })
+  })
 })
 
 describe('semânticas não são retematizáveis (critério 3; PRD §15)', () => {

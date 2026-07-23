@@ -1,0 +1,28 @@
+@import 'tailwindcss';
+
+/*
+ * Estilos da galeria de prova (SPEC-DesignSystem-03a).
+ *
+ * Importa as fontes locais do DS — a captura tem de mostrar a tipografia real, não a fonte de
+ * sistema. É justamente o que uma verificação por screenshot existe para pegar: se o
+ * `@font-face` estivesse quebrado, o teste em jsdom nunca acusaria.
+ */
+
+@import '../tokens/fontes.css';
+
+/*
+ * Fonte de classes explícita.
+ *
+ * O Tailwind v4 descobre as classes varrendo a partir da `root` do Vite, que aqui é
+ * `src/design/prova/`. Os componentes moram em `../ui/` — **fora** dessa raiz —, então nenhuma
+ * classe deles entrava no CSS gerado: a galeria renderizava texto sem estilo nenhum.
+ *
+ * Foi o primeiro defeito que a captura pegou, e exatamente do tipo que só um navegador revela:
+ * os testes em jsdom continuavam verdes, porque consultam papel ARIA e não pintura.
+ */
+@source '../ui';
+@source '../tokens';
+
+body {
+  margin: 0;
+}

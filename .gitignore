@@ -1,6 +1,11 @@
 node_modules
 out
 dist
+# Capturas da galeria de prova (SPEC-DesignSystem-03a): artefato regerável por
+# `npx playwright test --config playwright.prova.config.ts`, como o coverage. Versioná-las
+# faria o repo carregar PNG que muda a cada ajuste de pixel, sem ninguém revisar o diff.
+reports/prova/
+
 coverage
 *.log
 *.tsbuildinfo
