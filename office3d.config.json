@@ -27,14 +27,7 @@
         "skin": "#e8b98f",
         "hair": "#3b2a5e"
       },
-      "toolPatterns": [
-        "Task",
-        "Agent",
-        "TodoWrite",
-        "TodoRead",
-        "exit_plan_mode",
-        "Skill"
-      ]
+      "toolPatterns": ["Task", "Agent", "TodoWrite", "TodoRead", "exit_plan_mode", "Skill"]
     },
     {
       "id": "scout",
@@ -49,12 +42,7 @@
         "skin": "#f1c9a5",
         "hair": "#6e3d12"
       },
-      "toolPatterns": [
-        "Read",
-        "Grep",
-        "Glob",
-        "LS"
-      ]
+      "toolPatterns": ["Read", "Grep", "Glob", "LS"]
     },
     {
       "id": "runner",
@@ -69,12 +57,7 @@
         "skin": "#c98a5e",
         "hair": "#2b1410"
       },
-      "toolPatterns": [
-        "Bash",
-        "Computer",
-        "WebSearch",
-        "WebFetch"
-      ]
+      "toolPatterns": ["Bash", "Computer", "WebSearch", "WebFetch"]
     },
     {
       "id": "dev",
@@ -89,12 +72,7 @@
         "skin": "#e8b98f",
         "hair": "#10331c"
       },
-      "toolPatterns": [
-        "Edit",
-        "Write",
-        "MultiEdit",
-        "NotebookEdit"
-      ]
+      "toolPatterns": ["Edit", "Write", "MultiEdit", "NotebookEdit"]
     },
     {
       "id": "byte",
@@ -157,10 +135,7 @@
         "skin": "#e8b98f",
         "hair": "#57606a"
       },
-      "toolPatterns": [
-        "mcp__github__*",
-        "mcp__*github*"
-      ]
+      "toolPatterns": ["mcp__github__*", "mcp__*github*"]
     }
   ],
   "_mcpAgentsExamples": [
@@ -177,9 +152,7 @@
         "skin": "#c98a5e",
         "hair": "#2b2b2b"
       },
-      "toolPatterns": [
-        "mcp__supabase__*"
-      ]
+      "toolPatterns": ["mcp__supabase__*"]
     },
     {
       "id": "postgres",
@@ -194,10 +167,7 @@
         "skin": "#e8b98f",
         "hair": "#1f3d57"
       },
-      "toolPatterns": [
-        "mcp__postgres__*",
-        "mcp__*sql*"
-      ]
+      "toolPatterns": ["mcp__postgres__*", "mcp__*sql*"]
     },
     {
       "id": "figma",
@@ -212,9 +182,7 @@
         "skin": "#f1c9a5",
         "hair": "#3b1a0e"
       },
-      "toolPatterns": [
-        "mcp__figma__*"
-      ]
+      "toolPatterns": ["mcp__figma__*"]
     }
   ],
   "_fallbackAgentId": "(§9.1) Agente que recebe tools sem mapeamento. Nada e descartado; o backend loga `[agents] tool sem mapeamento: <nome>` para voce criar o mapeamento depois.",
