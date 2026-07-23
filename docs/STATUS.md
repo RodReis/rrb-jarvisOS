@@ -9,8 +9,9 @@ Atualizado em: **2026-07-23**. Mantido pelo Code a cada entrega (junto com `DEVE
 | Issue | Fatia | MVP | Spec | Índice |
 |---|---|---|---|---|
 | [#34](https://github.com/RodReis/rrb-jarvisOS/issues/34) | — (`[INFRA]`) | — | *(sem spec — infra)* | — |
+| [#41](https://github.com/RodReis/rrb-jarvisOS/issues/41) | — (`[FIX]`) | MVP-001 | *(sem spec — bug documentado)* | — |
 
-> **`proplan:next` = [#19](https://github.com/RodReis/rrb-jarvisOS/issues/19)** (MVP-003 · F03a Componentes: ações + formulários). O MVP-003 começou em 2026-07-23; **F01 (#17)** e **F02 (#18)** entregues no mesmo dia. Pela ordem do épico, F03a/F03b/F05 podem correr em paralelo — o marcador fica na F03a.
+> **`proplan:next` = [#20](https://github.com/RodReis/rrb-jarvisOS/issues/20)** (MVP-003 · F03b Componentes: dados + overlays + feedback). F01, F02 e F03a entregues em 2026-07-23. Pela ordem do épico, F03b e F05 podem correr em paralelo.
 
 > Card **[#34](https://github.com/RodReis/rrb-jarvisOS/issues/34)** (`[INFRA]`, Backlog): separar o E2E em job de CI próprio, condicional por paths. Criado pelo Code durante a F03 — o cache do Electron (parte fácil) já saiu no PR #35; a separação do E2E do relatório é infra maior e vai em PR dedicado.
 
@@ -21,7 +22,8 @@ Atualizado em: **2026-07-23**. Mantido pelo Code a cada entrega (junto com `DEVE
 | Issue | Fatia | MVP | Spec | Índice | PR | Mergeado |
 |---|---|---|---|---|---|---|
 | [#17](https://github.com/RodReis/rrb-jarvisOS/issues/17) | 01 Infra do design system | MVP-003 (#16) | `spec-design-system-01-infra.md` | M3-F01 | [#38](https://github.com/RodReis/rrb-jarvisOS/pull/38) | 2026-07-23 |
-| [#18](https://github.com/RodReis/rrb-jarvisOS/issues/18) | 02 Foundations + ponte com o protótipo | MVP-003 (#16) | `spec-design-system-02-foundations.md` | M3-F02 | [#40](https://github.com/RodReis/rrb-jarvisOS/pull/40) | *(aguardando)* |
+| [#18](https://github.com/RodReis/rrb-jarvisOS/issues/18) | 02 Foundations + ponte com o protótipo | MVP-003 (#16) | `spec-design-system-02-foundations.md` | M3-F02 | [#40](https://github.com/RodReis/rrb-jarvisOS/pull/40) | 2026-07-23 |
+| [#19](https://github.com/RodReis/rrb-jarvisOS/issues/19) | 03a Componentes: ações + formulários | MVP-003 (#16) | `spec-design-system-03a-componentes-acoes-forms.md` | M3-F03a | [#42](https://github.com/RodReis/rrb-jarvisOS/pull/42) | *(aguardando)* |
 
 > **04 e 02 saíram no mesmo PR**, por decisão do PI (2026-07-22): o critério 4 da SPEC-04 exige `AuditEvent` de `workspace-switch`, cujo fluxo nasce na F02 — separá-las exigiria um stub que a F02 jogaria fora. O critério 4 fica **parcialmente atendido**: `workspace-switch` está provado ponta a ponta; `login`/`logout`/`login-offline-reuse` têm o tipo no contrato e o fluxo nasce na F03.
 
@@ -53,8 +55,8 @@ Atualizado em: **2026-07-23**. Mantido pelo Code a cada entrega (junto com `DEVE
 |---|---|---|---|---|
 | [#17](https://github.com/RodReis/rrb-jarvisOS/issues/17) | 01 Infra do design system | M3-F01 | `spec-design-system-01-infra.md` | **Feito** (PR [#38](https://github.com/RodReis/rrb-jarvisOS/pull/38)) |
 | [#18](https://github.com/RodReis/rrb-jarvisOS/issues/18) | 02 Foundations + ponte com o protótipo | M3-F02 | `spec-design-system-02-foundations.md` | **Feito** (PR [#40](https://github.com/RodReis/rrb-jarvisOS/pull/40)) |
-| [#19](https://github.com/RodReis/rrb-jarvisOS/issues/19) | 03a Componentes: ações + formulários | M3-F03a | `spec-design-system-03a-componentes-acoes-forms.md` | Backlog · **`next`** |
-| [#20](https://github.com/RodReis/rrb-jarvisOS/issues/20) | 03b Componentes: dados + overlays + feedback | M3-F03b | `spec-design-system-03b-componentes-dados-overlays.md` | Backlog |
+| [#19](https://github.com/RodReis/rrb-jarvisOS/issues/19) | 03a Componentes: ações + formulários | M3-F03a | `spec-design-system-03a-componentes-acoes-forms.md` | **Feito** (PR [#42](https://github.com/RodReis/rrb-jarvisOS/pull/42)) |
+| [#20](https://github.com/RodReis/rrb-jarvisOS/issues/20) | 03b Componentes: dados + overlays + feedback | M3-F03b | `spec-design-system-03b-componentes-dados-overlays.md` | Backlog · **`next`** |
 | [#21](https://github.com/RodReis/rrb-jarvisOS/issues/21) | 04a AppShell + navegação | M3-F04a | `spec-design-system-04a-appshell-navegacao.md` | Backlog |
 | [#22](https://github.com/RodReis/rrb-jarvisOS/issues/22) | 04b Padrões operacionais | M3-F04b | `spec-design-system-04b-padroes-operacionais.md` | Backlog |
 | [#23](https://github.com/RodReis/rrb-jarvisOS/issues/23) | 05 Identidades NOA e JARVIS | M3-F05 | `spec-design-system-05-identidades.md` | Backlog |
@@ -72,7 +74,7 @@ Não há catálogo numérico `SPEC-nnn` para o MVP-001: as specs são identifica
 |---|---|---|---|
 | MVP-001 Fundação | [#1](https://github.com/RodReis/rrb-jarvisOS/issues/1) | **fechado** — épico aceito pelo PI em 2026-07-22; todas as 6 filhas `proplan:finalizado` (#2, #3, #4, #5, #6, #8) | **6 / 6** |
 | MVP-002 Execução local controlada (fundação) | [#9](https://github.com/RodReis/rrb-jarvisOS/issues/9) | **fechado** — épico aceito pelo PI em 2026-07-23; todas as 5 filhas `proplan:finalizado` (#15, #11, #12, #13, #14) | **5 / 5** |
-| MVP-003 Design System da Plataforma (base única, 2 identidades) | [#16](https://github.com/RodReis/rrb-jarvisOS/issues/16) | **em andamento** desde 2026-07-23; F01 (#17) e F02 (#18) entregues, aguardando aceite; `next` na F03a (#19) | 0 / 8 *(2 entregues)* |
+| MVP-003 Design System da Plataforma (base única, 2 identidades) | [#16](https://github.com/RodReis/rrb-jarvisOS/issues/16) | **em andamento** desde 2026-07-23; F01, F02 e F03a entregues, aguardando aceite; `next` na F03b (#20) | 0 / 8 *(3 entregues)* |
 | MVP-004 Execução real (terminal + execução allowlisted) | [#10](https://github.com/RodReis/rrb-jarvisOS/issues/10) | renumerado de MVP-003 (título/rótulo atualizados + carimbo); 2 fatias lazy | 0 / 2 |
 | MVP-providers (Corte 3) | — | planejado; incluirá **BudgetPolicy** (modelo decidido no ADR-001 #1) + providers/conectores/RAG | — |
 
@@ -83,11 +85,11 @@ Não há catálogo numérico `SPEC-nnn` para o MVP-001: as specs são identifica
 1. **MVP-001 entregue por inteiro** (2026-07-22): **6 das 6 fatias** — F01 (#2), F06 (#8), F04 (#5), F02 (#3), F05 (#6) e F03 (#4). Ordem executada: **01 → 06 → 04+02 → 05 → 03**. A F03 destravou quando o PI criou as credenciais e saiu no mesmo dia. O `proplan:next` avançou para o **MVP-002** (#9), começando pela F01 (#15), que é independente das demais.
 2. ~~Resolver as "Perguntas ao PI" das specs do MVP-003~~ — **feito** (2026-07-21): as 8 specs estão `aprovada-pi`.
 3. ~~Renumerar #10 → MVP-004 e criar o épico MVP-003 + issues~~ — **feito** (2026-07-21): #10 retitulada MVP-004 (carimbo), épico **#16** criado, 8 filhas **#17–#24** em Backlog e vinculadas.
-4. ~~**Code**: iniciar o MVP-003 pela F01 (#17)~~ — **feito** (2026-07-23): F01 no PR [#38](https://github.com/RodReis/rrb-jarvisOS/pull/38) e **F02 no PR [#40](https://github.com/RodReis/rrb-jarvisOS/pull/40)**, ambas no mesmo dia. Segue com WIP = 1, na ordem (F03a/F03b/F05) → F04a → F04b → F06. **Próxima: F03a (#19)**, marcada `proplan:next`. A partir daqui as fatias são de UI: por decisão do PI (2026-07-23), a skill **impeccable** entra para construir, verificar e polir — sem substituir o piso de `dev`/`test`/`lint` verdes.
+4. ~~**Code**: iniciar o MVP-003 pela F01 (#17)~~ — **feito** (2026-07-23): F01 no PR [#38](https://github.com/RodReis/rrb-jarvisOS/pull/38) e **F02 no PR [#40](https://github.com/RodReis/rrb-jarvisOS/pull/40)**, ambas no mesmo dia. Segue com WIP = 1, na ordem (F03a/F03b/F05) → F04a → F04b → F06. **F03a (#19) entregue** no PR [#42](https://github.com/RodReis/rrb-jarvisOS/pull/42); **próxima: F03b (#20)**. A partir daqui as fatias são de UI: por decisão do PI (2026-07-23), a skill **impeccable** entra para construir, verificar e polir — sem substituir o piso de `dev`/`test`/`lint` verdes.
 5. ~~**PI — desbloqueia a F03 (#4)**~~ — **feito** (2026-07-22): projeto Supabase de dev criado, cliente OAuth do Google Cloud registrado e `.env` preenchido. A fatia foi entregue no mesmo dia ([#30](https://github.com/RodReis/rrb-jarvisOS/pull/30)). *Nota:* o `GOOGLE_OAUTH_CLIENT_SECRET` do `.env` **não é consumido pelo app** — no desenho do ADR-002 quem fala com o Google é o Supabase, e o secret vive no painel dele. Decisão do PI: manter a variável sem uso.
 6. ~~**Code**: MVP-002 F01–F05~~ — **MVP-002 entregue por inteiro** (2026-07-22): F01 [#32](https://github.com/RodReis/rrb-jarvisOS/pull/32), F02 [#33](https://github.com/RodReis/rrb-jarvisOS/pull/33), F03 [#35](https://github.com/RodReis/rrb-jarvisOS/pull/35), F04 [#36](https://github.com/RodReis/rrb-jarvisOS/pull/36), F05 [#37](https://github.com/RodReis/rrb-jarvisOS/pull/37). A F05 fecha o corte: o motor percorre um workflow classificando (F02) e checando allowlist (F03) **sem tocar recurso real** — invariante provado pelo efeito (arquivo não criado, diretório idêntico).
 9. ~~**PI**: decidir a próxima frente~~ — **decidido** (2026-07-23): **MVP-003 Design System** (#16). O card `[INFRA]` **#34** (separar o E2E em job próprio) segue em Backlog e independe do MVP.
-10. **PI**: aceitar a **F01 (#17)** — PR [#38](https://github.com/RodReis/rrb-jarvisOS/pull/38) — e a **F02 (#18)** — PR [#40](https://github.com/RodReis/rrb-jarvisOS/pull/40). Ambas em `proplan:done`, aguardando `proplan:finalizado`.
+10. **PI**: aceitar as fatias entregues do MVP-003 — **F01 (#17)** PR [#38](https://github.com/RodReis/rrb-jarvisOS/pull/38), **F02 (#18)** PR [#40](https://github.com/RodReis/rrb-jarvisOS/pull/40) e **F03a (#19)** PR [#42](https://github.com/RodReis/rrb-jarvisOS/pull/42). Todas em `proplan:done`. O PI pediu (2026-07-23) para **fechar o MVP-003 inteiro antes de testar**, então o aceite pode vir em bloco no fim.
 7. **PI**: (opcional) decidir a adoção de numeração `SPEC-nnn`.
 8. ~~**PI**: aceitar as fatias do MVP-001 e fechar o épico #1~~ — **feito** (2026-07-22): as 6 filhas aceitas (`proplan:finalizado`) e o épico **#1 fechado**. **#15** (MVP-002 · F01) também aceita. **MVP-002 aceito por inteiro** (2026-07-22/23): as 5 filhas `proplan:finalizado` e o épico **#9 fechado**. Dos MVPs 001/002, **nada pendente** — o aceite em aberto agora é a **F01 do MVP-003** (#17), item 10 abaixo.
 

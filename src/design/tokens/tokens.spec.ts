@@ -17,9 +17,11 @@ import {
   CONTRASTE_MINIMO,
   hexA,
   PALETA_ACENTO,
+  contrasteSobre,
   papeis,
   PREFIXO_TOKEN,
   RISCO,
+  semanticaParaLeitura,
   sombraComGlow,
   STATUS,
   tokenCss,
@@ -99,6 +101,112 @@ describe('papéis por módulo e modo (critério 3)', () => {
   it('texto inverte entre os modos', () => {
     expect(papeis('jarvis', 'dark').textPrimary).toBe('#eef1f5')
     expect(papeis('jarvis', 'light').textPrimary).toBe('#111316')
+  })
+
+  describe('a superfície elevada acompanha o modo, nos dois módulos', () => {
+    /**
+     * Este teste nasceu de um defeito real, achado só pelo screenshot da F03a: `surfaceRaised`
+     * derivava o token por interpolação (`${prefixo}16`), presumindo que `nt16` fosse o card do
+     * NOA como `jt16` é o do JARVIS. Mas os índices são independentes — `nt16` é cor de
+     * **texto**, e o campo do NOA escuro ficava com fundo claro, ilegível.
+     *
+     * A asserção é sobre a **luminância**, não sobre o valor: fixar `rgba(22,27,25,.7)` travaria
+     * a cor exata e não pegaria a próxima troca de token errada. O que não pode acontecer é
+     * superfície clara no escuro.
+     */
+    const luminanciaAproximada = (cor: string): number => {
+      const canais = cor.match(/\d+(\.\d+)?/g)
+      if (canais === null) throw new Error(`Cor não interpretável: ${cor}`)
+      const [r, g, b] = canais.slice(0, 3).map(Number)
+      return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+    }
+
+    const hexParaRgb = (valor: string): string => {
+      if (!valor.startsWith('#')) return valor
+      const n = Number.parseInt(valor.slice(1), 16)
+      return `rgb(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255})`
+    }
+
+    it.each(['jarvis', 'noa'] as const)('no escuro, a superfície de %s é escura', (modulo) => {
+      const cor = hexParaRgb(papeis(modulo, 'dark').surfaceRaised)
+      expect(luminanciaAproximada(cor)).toBeLessThan(0.3)
+    })
+
+    it.each(['jarvis', 'noa'] as const)('no claro, a superfície de %s é clara', (modulo) => {
+      const cor = hexParaRgb(papeis(modulo, 'light').surfaceRaised)
+      expect(luminanciaAproximada(cor)).toBeGreaterThan(0.7)
+    })
+  })
+})
+
+/**
+ * Contraste de **todos** os papéis de texto (PRD §14; PRODUCT.md § Acessibilidade).
+ *
+ * Estes testes nasceram do `/impeccable critique` da F03a, que mediu o que a suíte não media:
+ * a régua de 4.5:1 era exercitada só no caminho do **acento**, e os papéis embutidos passavam
+ * livres. Achados reais:
+ *
+ * - `textMuted` no escuro: 4.12:1 (jarvis) e 4.08:1 (noa) — e ele carrega placeholders, **todas
+ *   as labels de formulário** e o texto de apoio.
+ * - As cinco semânticas como texto no claro: `err` 2.53:1, `violet` 2.52:1, `warn` 1.99:1,
+ *   `ok` 1.78:1, `info` 1.54:1.
+ *
+ * A lição é sobre método, não sobre cor: o rigor aplicado à cor que o **usuário** escolhe não
+ * tinha sido estendido à cor que **nós** escolhemos.
+ */
+describe('contraste dos papéis de texto (PRD §14)', () => {
+  const MODULOS = ['jarvis', 'noa'] as const
+  const MODOS = ['dark', 'light'] as const
+
+  for (const modulo of MODULOS) {
+    for (const modo of MODOS) {
+      const p = papeis(modulo, modo)
+
+      it(`textPrimary atinge 4.5:1 — ${modulo}/${modo}`, () => {
+        expect(contraste(p.textPrimary, p.surface)).toBeGreaterThanOrEqual(CONTRASTE_MINIMO)
+      })
+
+      it(`textSecondary atinge 4.5:1 — ${modulo}/${modo}`, () => {
+        expect(contraste(p.textSecondary, p.surface)).toBeGreaterThanOrEqual(CONTRASTE_MINIMO)
+      })
+
+      it(`textMuted atinge 4.5:1 — ${modulo}/${modo}`, () => {
+        // Não é texto decorativo: são os placeholders e todas as labels, em `--jos-texto-micro`
+        // com uppercase — texto pequeno, sem isenção de texto grande.
+        expect(contraste(p.textMuted, p.surface)).toBeGreaterThanOrEqual(CONTRASTE_MINIMO)
+      })
+    }
+  }
+
+  describe('semânticas como texto', () => {
+    for (const modulo of MODULOS) {
+      for (const modo of MODOS) {
+        const fundo = papeis(modulo, modo).surface
+
+        it.each(Object.entries(STATUS))(
+          `%s tem variante de leitura legível — ${modulo}/${modo}`,
+          (_nome, cor) => {
+            const leitura = semanticaParaLeitura(cor, fundo)
+            expect(contraste(leitura, fundo)).toBeGreaterThanOrEqual(CONTRASTE_MINIMO)
+          }
+        )
+      }
+    }
+
+    it('a cor de marca é preservada — só a leitura muda', () => {
+      // A identidade da semântica não pode ser reescrita: borda, ícone e preenchimento seguem
+      // usando `STATUS.err`. O ajuste vale só onde ela vira texto.
+      expect(STATUS.err).toBe('#ff6b81')
+    })
+  })
+
+  describe('rótulo sobre preenchimento sólido no acento', () => {
+    it.each(PALETA_ACENTO)('%s recebe rótulo legível', (acento) => {
+      // O botão primário passou a ser sólido no acento (correção do colapso primária/desabilitado).
+      // Com fundo sólido, o rótulo não pode herdar a cor de texto da tela.
+      const rotulo = contrasteSobre(acento)
+      expect(contraste(rotulo, acento)).toBeGreaterThanOrEqual(CONTRASTE_MINIMO)
+    })
   })
 })
 

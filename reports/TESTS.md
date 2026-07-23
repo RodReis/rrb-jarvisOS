@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 158 | 158 | 0 | 77.9 | — | — |
+| — | — | — | Regras de Negócio | 203 | 203 | 0 | 78.2 | — | — |
 | — | — | — | Banco | 117 | 117 | 0 | 87.5 | — | — |
-| — | — | — | Tela | 55 | 55 | 0 | 91.2 | — | — |
+| — | — | — | Tela | 95 | 94 | 0 | 89.6 | — | — |
 
 ## Histórico por entrega
 
@@ -61,3 +61,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-07-23 | #18 | spec-design-system-02-foundations | Regras de Negócio | 158 | 158 | 0 | 77.9 | #40 | [#40](https://github.com/RodReis/rrb-jarvisOS/pull/40) |
 | 2026-07-23 | #18 | spec-design-system-02-foundations | Banco | 117 | 117 | 0 | 87.5 | #40 | [#40](https://github.com/RodReis/rrb-jarvisOS/pull/40) |
 | 2026-07-23 | #18 | spec-design-system-02-foundations | Tela | 55 | 55 | 0 | 91.2 | #40 | [#40](https://github.com/RodReis/rrb-jarvisOS/pull/40) |
+| 2026-07-23 | #19 | spec-design-system-03a-componentes-acoes-forms | Regras de Negócio | 203 | 203 | 0 | 78.2 | #42 | [#42](https://github.com/RodReis/rrb-jarvisOS/pull/42) |
+| 2026-07-23 | #19 | spec-design-system-03a-componentes-acoes-forms | Banco | 117 | 117 | 0 | 87.5 | #42 | [#42](https://github.com/RodReis/rrb-jarvisOS/pull/42) |
+| 2026-07-23 | #19 | spec-design-system-03a-componentes-acoes-forms | Tela | 95 | 94 | 0 | 89.6 | #42 | [#42](https://github.com/RodReis/rrb-jarvisOS/pull/42) |
