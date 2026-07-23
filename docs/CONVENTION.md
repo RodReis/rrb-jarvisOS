@@ -25,6 +25,11 @@ O board é uma **projeção** das GitHub Issues: `issue → coluna` por **label 
 - `proplan:next` é **marcador, não coluna**: coexiste com `proplan:backlog` (fica no card do topo da fila) e **não** viola a regra acima. No máximo **um** `proplan:next` entre as issues abertas — zero quando a fila esvazia.
 - A **ordem da fila** é decisão do PI e vive **só** no `docs/STATUS.md`. `proplan:next` é a projeção da **cabeça** dessa fila no board, nunca uma segunda fonte da ordem completa. O **Cowork** marca `next` na cabeça ao montar/reordenar o Backlog; o **Code**, ao puxar o card `next` para A Fazer, **avança o marcador** para o próximo item da fila do STATUS.md — ação mecânica que segue a ordem, não decide prioridade.
 - **`closes #N` é proibido** em PR/commit — forjaria o aceite. Sempre `refs #N`.
+- **`refs #N` no corpo não basta: o squash concatena todas as mensagens do PR.** Se **qualquer** commit contiver `fix #N`, `fixes #N`, `closes #N` ou `resolve #N` — em qualquer posição, inclusive no título — o GitHub fecha a issue no merge, mesmo que todos os outros commits usem `refs`.
+
+  Aconteceu no PR [#44](https://github.com/RodReis/rrb-jarvisOS/pull/44) (2026-07-23): os três commits usavam só `refs #43`, mas um deles se chamava `docs: registra o FIX #43 (...)`. O GitHub leu `FIX #43` como palavra-chave e fechou a issue — exatamente o fechamento frágil que o processo existe para impedir. A issue foi reaberta e o carimbo `proplan:done` aplicado à mão.
+
+  A armadilha é nossa: **`[FIX]` é o nosso token de tipo de card**, então a palavra aparece naturalmente ao falar de um card de correção. Ao citar um card `[FIX]` numa mensagem de commit, separe o número da palavra — `o FIX do card #43`, `FIX-43` — ou escreva sem `#` (`card 43`). Só o `refs #N` deliberado leva `#`.
 - Issue nunca é deletada; descarte = `closed` + `proplan:descartado`.
 - Mover para Finalizado/Descartado posta comentário de carimbo na issue.
 - Fatia só vira issue quando a spec correspondente em `docs/spec/` está `aprovada-pi`, com link para o arquivo da spec no corpo e assignee = PI.
