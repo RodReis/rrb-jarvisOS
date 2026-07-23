@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { describe, expect, it } from 'vitest'
 import { ACENTO_PADRAO } from './acento'
 import { ProvedorDeTema, useTema, variaveisDoTema } from './provider'
-import { papeis, type ModoUi } from './semantic'
+import { modoEfetivo, papeis, SUPERFICIES_DE_MARCA, TELAS_INTERNAS, type ModoUi } from './semantic'
 
 /**
  * Provider de tema (SPEC-DesignSystem-02, critérios 1, 2 e 3).
@@ -78,13 +78,15 @@ describe('variáveis do tema', () => {
       uiTheme: 'dark',
       accentJarvis: ACENTO_PADRAO.jarvis,
       accentNoa: ACENTO_PADRAO.noa,
-      modulo: 'jarvis'
+      modulo: 'jarvis',
+      superficie: 'jarvis'
     })
     const claro = variaveisDoTema({
       uiTheme: 'light',
       accentJarvis: ACENTO_PADRAO.jarvis,
       accentNoa: ACENTO_PADRAO.noa,
-      modulo: 'jarvis'
+      modulo: 'jarvis',
+      superficie: 'jarvis'
     })
 
     expect(escuro['--jos-cor-superficie']).toBe(papeis('jarvis', 'dark').surface)
@@ -98,13 +100,15 @@ describe('variáveis do tema', () => {
       uiTheme: 'dark',
       accentJarvis: ACENTO_PADRAO.jarvis,
       accentNoa: ACENTO_PADRAO.noa,
-      modulo: 'jarvis'
+      modulo: 'jarvis',
+      superficie: 'jarvis'
     })
     const claro = variaveisDoTema({
       uiTheme: 'light',
       accentJarvis: ACENTO_PADRAO.jarvis,
       accentNoa: ACENTO_PADRAO.noa,
-      modulo: 'jarvis'
+      modulo: 'jarvis',
+      superficie: 'jarvis'
     })
 
     for (const chave of chaves) {
@@ -120,13 +124,15 @@ describe('variáveis do tema', () => {
       uiTheme: 'dark',
       accentJarvis: acento,
       accentNoa: ACENTO_PADRAO.noa,
-      modulo: 'jarvis'
+      modulo: 'jarvis',
+      superficie: 'jarvis'
     })
     const claro = variaveisDoTema({
       uiTheme: 'light',
       accentJarvis: acento,
       accentNoa: ACENTO_PADRAO.noa,
-      modulo: 'jarvis'
+      modulo: 'jarvis',
+      superficie: 'jarvis'
     })
 
     expect(escuro['--jos-cor-acento']).toBe(acento)
@@ -139,7 +145,8 @@ describe('variáveis do tema', () => {
       uiTheme: 'light',
       accentJarvis: '#FFFFE3',
       accentNoa: ACENTO_PADRAO.noa,
-      modulo: 'jarvis'
+      modulo: 'jarvis',
+      superficie: 'jarvis'
     })
 
     expect(claro['--jos-cor-acento']).toBe('#FFFFE3')
@@ -151,8 +158,56 @@ describe('variáveis do tema', () => {
       uiTheme: 'dark',
       accentJarvis: '#FF5C00',
       accentNoa: '#2323FF',
-      modulo: 'noa'
+      modulo: 'noa',
+      superficie: 'noa'
     })
     expect(noa['--jos-cor-acento']).toBe('#2323FF')
+  })
+})
+
+describe('superfícies de marca não invertem (critério 2)', () => {
+  const base = {
+    accentJarvis: ACENTO_PADRAO.jarvis,
+    accentNoa: ACENTO_PADRAO.noa,
+    modulo: 'jarvis' as const
+  }
+
+  it.each(SUPERFICIES_DE_MARCA)('`%s` fica escura mesmo com uiTheme=light', (superficie) => {
+    // README §2.6: "Login, Choice, overlay de transição e Toasts permanecem sempre escuros
+    // (identidade de marca)". A prova é o **valor**: as variáveis têm de ser as do escuro,
+    // não apenas o provider ter sido omitido nessas telas.
+    const comClaro = variaveisDoTema({ ...base, uiTheme: 'light', superficie })
+    const escuroReferencia = variaveisDoTema({ ...base, uiTheme: 'dark', superficie: 'jarvis' })
+
+    expect(comClaro['--jos-cor-superficie']).toBe(escuroReferencia['--jos-cor-superficie'])
+    expect(comClaro['--jos-cor-texto']).toBe(escuroReferencia['--jos-cor-texto'])
+  })
+
+  it('as telas internas — e só elas — respondem ao uiTheme', () => {
+    for (const superficie of TELAS_INTERNAS) {
+      const claro = variaveisDoTema({ ...base, uiTheme: 'light', superficie })
+      const escuro = variaveisDoTema({ ...base, uiTheme: 'dark', superficie })
+      expect(claro['--jos-cor-superficie']).not.toBe(escuro['--jos-cor-superficie'])
+    }
+  })
+
+  it('`modoEfetivo` é o ponto único onde a exceção mora', () => {
+    // Cada tela lembrar de aplicar a exceção seria a via para uma esquecer.
+    expect(modoEfetivo('login', 'light')).toBe('dark')
+    expect(modoEfetivo('toast', 'light')).toBe('dark')
+    expect(modoEfetivo('jarvis', 'light')).toBe('light')
+    expect(modoEfetivo('noa', 'dark')).toBe('dark')
+  })
+
+  it('o DOM carrega o modo efetivo, não a preferência', () => {
+    // Se `data-modo` expusesse a preferência, CSS e teste discordariam do que está pintado.
+    const { container } = render(
+      <ProvedorDeTema uiTheme="light" superficie="login">
+        <Sonda />
+      </ProvedorDeTema>
+    )
+    const raiz = container.querySelector('[data-modo]')
+    expect(raiz).toHaveAttribute('data-modo', 'dark')
+    expect(raiz).toHaveAttribute('data-superficie', 'login')
   })
 })

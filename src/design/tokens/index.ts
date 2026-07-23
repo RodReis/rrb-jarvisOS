@@ -41,12 +41,18 @@ export {
 export {
   borda,
   bordaRgb,
+  modoEfetivo,
   papeis,
   RISCO,
   STATUS,
+  SUPERFICIES_DE_MARCA,
+  superficieDeMarca,
+  TELAS_INTERNAS,
   tokenDeTema,
   type ModoUi,
-  type Modulo
+  type Modulo,
+  type Superficie,
+  type SuperficieDeMarca
 } from './semantic'
 
 export {

@@ -1,7 +1,15 @@
 import { createContext, useContext, useMemo } from 'react'
 import { ACENTO_PADRAO, acentoParaLeitura, type CorAcento } from './acento'
 import { CAMADA, CURVA, DURACAO, ESPACO, FONTE, RAIO, SOMBRA } from './base'
-import { bordaRgb, papeis, STATUS, type ModoUi, type Modulo } from './semantic'
+import {
+  bordaRgb,
+  modoEfetivo,
+  papeis,
+  STATUS,
+  type ModoUi,
+  type Modulo,
+  type Superficie
+} from './semantic'
 
 /**
  * Provider de tema (SPEC-DesignSystem-02, § Contrato de aplicação).
@@ -16,13 +24,22 @@ import { bordaRgb, papeis, STATUS, type ModoUi, type Modulo } from './semantic'
  * do tema — o navegador recalcula as variáveis.
  */
 
-/** Módulos que têm tela interna com claro/escuro. Login/Choice ficam sempre escuros. */
 export interface TemaProps {
+  /** A preferência do usuário. Só as telas internas a respeitam — ver `superficie`. */
   readonly uiTheme: ModoUi
   readonly accentJarvis: CorAcento
   readonly accentNoa: CorAcento
   /** Qual identidade está ativa — decide se valem os tokens `jt*` ou `nt*`. */
   readonly modulo: Modulo
+  /**
+   * Onde este tema está sendo aplicado (critério 2).
+   *
+   * Login, Choice, transição e Toast são **superfícies de marca**: ficam escuras mesmo com
+   * `uiTheme='light'`. Declarar a superfície — em vez de simplesmente não montar o provider —
+   * é o que torna a exceção verificável: a marca continua recebendo tokens, só que sempre os
+   * escuros, e um teste pode afirmar isso.
+   */
+  readonly superficie: Superficie
 }
 
 const TemaContexto = createContext<TemaProps | null>(null)
@@ -52,9 +69,12 @@ export function variaveisDoTema({
   uiTheme,
   accentJarvis,
   accentNoa,
-  modulo
+  modulo,
+  superficie
 }: TemaProps): Record<string, string> {
-  const p = papeis(modulo, uiTheme)
+  // Superfície de marca ignora a preferência do usuário e lê sempre o escuro (critério 2).
+  const modo = modoEfetivo(superficie, uiTheme)
+  const p = papeis(modulo, modo)
   const acento = modulo === 'jarvis' ? accentJarvis : accentNoa
 
   return {
@@ -118,18 +138,29 @@ export function ProvedorDeTema({
   accentJarvis = ACENTO_PADRAO.jarvis,
   accentNoa = ACENTO_PADRAO.noa,
   modulo = 'jarvis',
+  superficie = 'jarvis',
   children
 }: ProvedorDeTemaProps): React.JSX.Element {
   const tema = useMemo<TemaProps>(
-    () => ({ uiTheme, accentJarvis, accentNoa, modulo }),
-    [uiTheme, accentJarvis, accentNoa, modulo]
+    () => ({ uiTheme, accentJarvis, accentNoa, modulo, superficie }),
+    [uiTheme, accentJarvis, accentNoa, modulo, superficie]
   )
 
   const variaveis = useMemo(() => variaveisDoTema(tema), [tema])
 
+  // `data-modo` carrega o modo **efetivo**, não a preferência: numa superfície de marca com
+  // `uiTheme='light'` ele lê `dark`, que é o que de fato está pintado. Expor a preferência aqui
+  // faria o CSS e o teste discordarem da tela.
+  const modo = modoEfetivo(superficie, uiTheme)
+
   return (
     <TemaContexto.Provider value={tema}>
-      <div data-modo={uiTheme} data-modulo={modulo} style={variaveis as React.CSSProperties}>
+      <div
+        data-modo={modo}
+        data-modulo={modulo}
+        data-superficie={superficie}
+        style={variaveis as React.CSSProperties}
+      >
         {children}
       </div>
     </TemaContexto.Provider>

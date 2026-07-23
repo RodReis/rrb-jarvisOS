@@ -39,6 +39,42 @@ export const RISCO = {
 export type ModoUi = 'dark' | 'light'
 export type Modulo = 'jarvis' | 'noa'
 
+/**
+ * Superfícies que **nunca invertem** — README §2.6, critério 2 da spec.
+ *
+ * Login, Choice, overlay de transição e Toasts permanecem sempre escuros: são identidade de
+ * marca, não tela de trabalho. O claro/escuro se aplica **só** às telas internas.
+ *
+ * Isto é dado, não convenção implícita, porque a alternativa seria confiar em que ninguém
+ * montaria o provider por engano em volta do Login. `superficieDeMarca()` é a checagem que
+ * torna a regra verificável — e é a razão de a lista morar aqui, ao lado dos papéis, e não
+ * espalhada em comentários das telas que ainda nem existem (F03b/F04a).
+ */
+export const SUPERFICIES_DE_MARCA = ['login', 'choice', 'transicao', 'toast'] as const
+
+export type SuperficieDeMarca = (typeof SUPERFICIES_DE_MARCA)[number]
+
+/** Telas internas — as únicas que respondem ao `uiTheme`. */
+export const TELAS_INTERNAS = ['jarvis', 'noa'] as const
+
+export type Superficie = SuperficieDeMarca | (typeof TELAS_INTERNAS)[number]
+
+/** Uma superfície de marca ignora o `uiTheme` e lê sempre os valores escuros. */
+export function superficieDeMarca(superficie: Superficie): boolean {
+  return (SUPERFICIES_DE_MARCA as readonly string[]).includes(superficie)
+}
+
+/**
+ * O modo **efetivo** de uma superfície.
+ *
+ * Telas internas seguem o `uiTheme` do usuário; superfícies de marca ficam em `dark` mesmo com
+ * `uiTheme='light'`. Toda leitura de tema deveria passar por aqui — é o ponto único onde a
+ * exceção da marca é aplicada, em vez de cada tela lembrar de aplicá-la.
+ */
+export function modoEfetivo(superficie: Superficie, uiTheme: ModoUi): ModoUi {
+  return superficieDeMarca(superficie) ? 'dark' : uiTheme
+}
+
 interface MapaTema {
   readonly [token: string]: string
 }
