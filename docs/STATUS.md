@@ -10,10 +10,13 @@ Atualizado em: **2026-07-23**. Mantido pelo Code a cada entrega (junto com `DEVE
 |---|---|---|---|---|
 | [#34](https://github.com/RodReis/rrb-jarvisOS/issues/34) | — (`[INFRA]`) | — | *(sem spec — infra)* | — |
 | [#41](https://github.com/RodReis/rrb-jarvisOS/issues/41) | — (`[FIX]`) | MVP-001 | *(sem spec — bug documentado)* | — |
+| [#43](https://github.com/RodReis/rrb-jarvisOS/issues/43) | — (`[FIX]`) | MVP-001 | *(sem spec — fonte: `.env.example` §1-8 + SPEC-Fundacao-03)* | — |
 
 > **`proplan:next` = [#20](https://github.com/RodReis/rrb-jarvisOS/issues/20)** (MVP-003 · F03b Componentes: dados + overlays + feedback). F01, F02 e F03a entregues em 2026-07-23. Pela ordem do épico, F03b e F05 podem correr em paralelo.
 
 > Card **[#34](https://github.com/RodReis/rrb-jarvisOS/issues/34)** (`[INFRA]`, Backlog): separar o E2E em job de CI próprio, condicional por paths. Criado pelo Code durante a F03 — o cache do Electron (parte fácil) já saiu no PR #35; a separação do E2E do relatório é infra maior e vai em PR dedicado.
+
+> Card **[#43](https://github.com/RodReis/rrb-jarvisOS/issues/43)** (`[FIX]`, 2026-07-23): **o app nunca lia o arquivo `.env`** — `dotenv` não existia no repo e `readSupabaseConfig()` consulta `process.env` cru. O login da SPEC-Fundacao-03 só funcionava com as variáveis exportadas no shell; a partir do repo, dava "credenciais ausentes" com o arquivo preenchido. Achado ao subir o app durante a F03b; corrigido em branch próprio (`fix/carregar-env-no-main`), **sem misturar na fatia**. Provado no app real com o shell limpo: login concluído, tokens cifrados no cofre, sessão de 30 dias. Detalhe no `DEVELOPMENT.md` § Fatia 03.
 
 > A Fatia 06 saiu como **#8** (o número 7 já estava ocupado). Sub-issue do épico #1; assignee PI.
 

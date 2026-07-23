@@ -96,6 +96,14 @@ Status: **entregue** — spec `aprovada-pi` (2026-07-21, emendada em 2026-07-22)
 3. **`userId` virou função em `WorkspaceService` e nos handlers IPC** — a identidade deixou de ser fixa (local antes do login, sessão depois). Capturar a string no boot congelaria o escopo da auditoria no usuário local para sempre.
 4. **Teardown do E2E usa `app.exit()`, não `close()` nem `quit()`** — os dois travam, por comportamento correto do produto: o app vive no tray (`window-all-closed` vazio, SPEC-02) e os timers de rotação do `winston-daily-rotate-file` seguram o event loop no `will-quit`. Registrado em `docs/TESTING.md`.
 
+**Correção posterior — [#43](https://github.com/RodReis/rrb-jarvisOS/issues/43) (2026-07-23): o `.env` nunca era lido.**
+
+A fatia foi dada como entregue com o login funcionando, mas o app **não carregava o arquivo `.env`**: `readSupabaseConfig()` lê `process.env` cru e `dotenv` não existia no repo. O login funcionou no dia da entrega porque as variáveis estavam exportadas no shell daquela sessão — o arquivo em disco nunca foi exercitado. Quem clonasse o repo e seguisse o `.env.example` receberia "credenciais ausentes" com o arquivo corretamente preenchido, sem nenhum sinal de que ele fora ignorado.
+
+A lição não é sobre `dotenv`. É que **"funcionou na minha máquina" e "funciona a partir do repo" eram estados indistinguíveis** — nenhum teste cobria o caminho do arquivo, e o comportamento correto de degradação graciosa (sem credencial ⇒ só o login indisponível) mascarava o defeito: o app exibia exatamente a mesma tela de quem nunca configurou nada. Um defeito que se disfarça do estado esperado não aparece sozinho; só aparece quando alguém roda o caminho limpo. Corrigido em `src/main/env.ts` com precedência **ambiente vence arquivo** (o CI segue injetando os próprios valores) e provado no app real com as quatro variáveis removidas do shell.
+
+Junto dele, dois fatos da fatia foram vistos rodando pela primeira vez fora do teste: os tokens gravados cifrados no cofre (DPAPI) e a sessão de 30 dias (`expiresAt` a 30 dias do login, ADR-001 §2).
+
 ### Fatia 04 — Modelo de dados mínimo + AuditEvent stub (`docs/spec/spec-fundacao-04-dados-audit.md`)
 
 Status: **entregue** — spec `aprovada-pi` (2026-07-21, emendada em 2026-07-22); issue #5; PR [#28](https://github.com/RodReis/rrb-jarvisOS/pull/28). Sustenta 02 (entregue junto) e 03 (bloqueada).
