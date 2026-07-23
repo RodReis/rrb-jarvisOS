@@ -34,12 +34,23 @@ Postgres; o "banco" é a persistência local, ver ADR-001 e a SPEC-Fundacao-04):
 
 | Categoria | Camada | O que prova | Stack | Velocidade |
 |---|---|---|---|---|
-| **Regras de Negócio** | Unidade (base) | Lógica de domínio pura: uma função/regra/policy faz o que deve, isolada de storage, IPC e rede | Vitest — `src/shared/**/*.spec.ts` e `src/main/**/*.spec.ts` | rápida (ms) |
+| **Regras de Negócio** | Unidade (base) | Lógica de domínio pura: uma função/regra/policy faz o que deve, isolada de storage, IPC e rede | Vitest — `src/{shared,main,design,renderer}/**/*.spec.ts` | rápida (ms) |
 | **Banco** | Integração (meio) | Storage real, não dublê: **SQLite** (`better-sqlite3`) contra arquivo temporário, round-trip IPC↔runtime↔storage — e, desde a M2-F01, a **RLS do Supabase local** contra a stack Docker | Vitest — `src/main/**/*.int-spec.ts` e `tests/**/*.int-spec.ts` | média (s) |
 | **Tela** | Componente + E2E (topo) | UI: componente renderiza/reage certo (Vitest + Testing Library + jsdom) e fluxo crítico funciona no app real (Playwright-Electron) | Vitest — `src/renderer/**/*.test.tsx`; Playwright — `e2e/**/*.spec.ts` | componente rápida / e2e lenta |
 
 Notas de aprendizado:
 
+- **A categoria é definida pelo que o teste prova, não pela pasta onde ele mora.** A extensão é
+  que separa: `*.spec.ts` é unidade pura, `*.int-spec.ts` toca storage, `*.test.tsx` renderiza
+  componente. O `include` de **Regras** cobre `src/{shared,main,design,renderer}` — inclusive o
+  renderer, porque lógica pura pode morar ao lado da UI que a consome (`workspace/navegacao.ts` é
+  estado sem React). Componente React continua fora de Regras pela extensão, não pelo caminho.
+  Isto é registro de um bug real: o padrão original omitia `src/renderer`, e
+  `workspace/navegacao.spec.ts` **nunca rodou** — 75 linhas cobrindo o isolamento de rota por
+  espaço (SPEC-Fundacao-02, critérios 1 e 5) ficaram fora de toda categoria por três MVPs, sem
+  nada falhar. Corrigido no card [#47](https://github.com/RodReis/rrb-jarvisOS/issues/47).
+  **Um teste que não roda é indistinguível de um teste que não existe** — e é pior, porque a
+  tabela do relatório sugere cobertura que não há.
 - **Clientes externos são mockados no boundary.** Supabase (auth/sync) e Google OAuth **nunca**
   são chamados de verdade num teste. Casa com a regra de arquitetura "renderer nunca acessa Node,
   segredo ou rede direto" e com o fail-closed do Policy Engine — no teste, mock. Testa-se *o nosso

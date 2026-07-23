@@ -31,7 +31,15 @@ export default defineConfig({
           // `src/design/tokens` entra aqui (e não em `tela`) porque é regra pura: a camada
           // não depende de React, e o ambiente `node` é o que **prova** isso — um teste em
           // jsdom passaria mesmo se o token importasse React por engano.
-          include: ['src/{shared,main,design}/**/*.spec.ts']
+          //
+          // `src/renderer` também entra, e a omissão dele era um **bug**: o padrão anterior
+          // (`src/{shared,main,design}`) deixava `workspace/navegacao.spec.ts` fora de toda
+          // categoria — 75 linhas de teste do isolamento de rota por espaço (SPEC-Fundacao-02,
+          // critérios 1 e 5) que nunca rodaram desde que foram escritas. A regra da categoria é
+          // *"unidade pura"*, não *"não fica no renderer"*: `navegacao.ts` é estado sem React,
+          // exatamente o que `regras` mede. Componente React continua fora — ele é `.test.tsx`,
+          // que este padrão não alcança. Ver o card [FIX] correspondente.
+          include: ['src/{shared,main,design,renderer}/**/*.spec.ts']
         }
       },
       {
