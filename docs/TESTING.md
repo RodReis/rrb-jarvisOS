@@ -380,6 +380,15 @@ Para o Code implementar **na Fatia 01** e o PI conferir:
   real"*, não *"SQLite"*. `fileParallelism: false` continua obrigatório — integração toca disco e
   singletons de processo (o logger é um), e em paralelo um arquivo derruba o outro.
 
+- **Conflito de merge no `reports/TESTS.md`:** é **esperado** sempre que dois branches entregam em
+  paralelo — o bloco "Estado atual" é regenerado por inteiro a cada entrega, então duas fatias
+  sempre reescrevem as mesmas linhas. **Não resolva à mão** (o cabeçalho do arquivo diz `NÃO EDITAR
+  À MÃO`, e escolher números na marra produziria um relatório que não corresponde a execução
+  nenhuma — exatamente o que o `--check` existe para barrar). A resolução é mecânica:
+  `git checkout --theirs reports/TESTS.md`, fechar o merge e rodar `npm run test:report` — os
+  números saem da suíte combinada, que é o único estado que passa a valer. Visto na **M3-F03b**,
+  quando o merge da `main` trouxe o FIX #43 (+15 em Banco).
+
 Governadas pelo **ADR-003** (`docs/DECISIONS.md`).
 
 ## 10. Implementação de referência (o "code que faz o relatório")
