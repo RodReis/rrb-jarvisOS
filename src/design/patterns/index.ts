@@ -6,3 +6,19 @@
  */
 
 export { LinhaDeAjuste } from './LinhaDeAjuste'
+
+// AppShell e navegação (SPEC-DesignSystem-04a) — F04a
+export {
+  AppShell,
+  GRID,
+  NavigationGroup,
+  Rail,
+  ShellFooter,
+  Sidebar,
+  TopBar,
+  WorkspaceSwitcher,
+  type AppShellProps,
+  type GrupoDeNavegacao,
+  type ItemDeNavegacao,
+  type ItemDoRail
+} from './AppShell'

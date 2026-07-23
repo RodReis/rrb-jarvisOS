@@ -279,26 +279,30 @@ export function ProvedorDeTema({
 export function FundoDaIdentidade({
   children,
   className,
-  'data-prova-identidade': provaIdentidade
+  'data-prova-identidade': provaIdentidade,
+  'data-jos-appshell': appShell
 }: {
   readonly children?: React.ReactNode
   readonly className?: string
   /**
-   * Marcador de recorte para a prova visual.
+   * Marcadores de recorte, para prova visual e teste.
    *
-   * Declarado na lista fechada de props em vez de um `...rest` aberto: o DS não repassa
-   * atributos arbitrários (mesma decisão da F03a sobre `PropsDeComposicao`). Existe porque a
-   * prova precisa isolar cada coluna da galeria — sem ele o Playwright não tem como perguntar
-   * "qual o fundo computado **desta** identidade", e o critério 4 ficaria sem verificação de
-   * navegador. Descobri o buraco pelo próprio teste: as nove asserções falharam achando zero
-   * elementos, porque o atributo era descartado em silêncio.
+   * Declarados **um a um** em vez de um `...rest` aberto — mesma decisão da F03a sobre
+   * `PropsDeComposicao`: o DS não repassa atributo arbitrário, senão o consumidor injeta
+   * `onClick`, `style` ou `role` por aqui e a superfície fechada deixa de ser fechada.
+   *
+   * `data-prova-identidade` nasceu na F05: as nove asserções de navegador falharam achando zero
+   * elementos porque o atributo era descartado em silêncio. `data-jos-appshell` é o mesmo na
+   * F04a — sem ele o teste não tem como perguntar "qual identidade este shell está pintando".
    */
   readonly 'data-prova-identidade'?: string
+  readonly 'data-jos-appshell'?: string
 }): React.JSX.Element {
   return (
     <div
       data-atmosfera
       data-prova-identidade={provaIdentidade}
+      data-jos-appshell={appShell}
       className={className}
       style={{
         backgroundColor: 'var(--jos-cor-superficie)',

@@ -32,6 +32,19 @@ export const RECURSOS = {
       janela: {
         minimizar: 'Minimizar para a bandeja'
       },
+      // Shell do design system (SPEC-DesignSystem-04a).
+      shell: {
+        alternarTema: 'Alternar entre tema claro e escuro',
+        // Sub-módulos do JARVIS — protótipo JARVISOS §2 (rail dual).
+        commandCenter: 'Command Center',
+        agentsOs: 'Agents OS',
+        irPara: 'Ir para {{espaco}}',
+        // Cabeçalhos da sidebar, que mudam com o sub-módulo ativo.
+        jarvisOps: 'Professional Ops',
+        jarvisAgents: 'Harnesses · Teams · Skills',
+        noaPessoal: 'Pessoal',
+        rodape: '© RRB Trading'
+      },
       conteudo: {
         de: 'Conteúdo de {{rota}}',
         placeholder: 'Conteúdo placeholder — os módulos entram em fatias futuras.'
@@ -92,6 +105,16 @@ export const RECURSOS = {
       },
       janela: {
         minimizar: 'Minimize to tray'
+      },
+      shell: {
+        alternarTema: 'Toggle light and dark theme',
+        commandCenter: 'Command Center',
+        agentsOs: 'Agents OS',
+        irPara: 'Go to {{espaco}}',
+        jarvisOps: 'Professional Ops',
+        jarvisAgents: 'Harnesses · Teams · Skills',
+        noaPessoal: 'Personal',
+        rodape: '© RRB Trading'
       },
       conteudo: {
         de: '{{rota}} content',

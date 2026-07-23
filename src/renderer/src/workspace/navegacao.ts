@@ -62,3 +62,47 @@ export function rotaDoWorkspace(atual: RotasPorWorkspace, workspace: WorkspaceId
   const rota = atual[workspace]
   return rotaPertenceAoWorkspace(workspace, rota) ? rota : ROTA_INICIAL
 }
+
+/**
+ * Sub-módulos do JARVIS — o **rail dual** do protótipo (JARVISOS §2, critério 3 da SPEC-04a).
+ *
+ * `command` é o Professional Ops; `agents` é o Agents OS. Não são workspaces: o CLAUDE.md é
+ * explícito em que `Agentic OS` é **área interna** do JARVIS OS, nunca um quarto espaço. Por
+ * isso vivem aqui como dimensão da navegação do JARVIS, e não em `WorkspaceId` — pôr `agents`
+ * ao lado de `noa`/`jarvis` seria criar por acidente o espaço que a arquitetura proíbe.
+ *
+ * O NOA não tem sub-módulo. O rail dele é atalho de view (NOA §2), e é por isso que
+ * `subModuloDoWorkspace` devolve `null` — ausência declarada, não valor default que a UI
+ * precisaria adivinhar se é real.
+ */
+export const SUB_MODULOS_JARVIS = ['command', 'agents'] as const
+
+export type SubModuloJarvis = (typeof SUB_MODULOS_JARVIS)[number]
+
+export const SUB_MODULO_INICIAL: SubModuloJarvis = 'command'
+
+/** Rotas por sub-módulo do JARVIS — protótipo JARVISOS §2 (`navJDef` / `navADef`). */
+export const ROTAS_POR_SUB_MODULO: Readonly<Record<SubModuloJarvis, readonly string[]>> = {
+  command: ['inicio', 'operacoes', 'settings'],
+  agents: ['agentes']
+}
+
+/**
+ * O sub-módulo a que uma rota do JARVIS pertence.
+ *
+ * Existe porque o rail e a sidebar têm de concordar: entrar em `agentes` precisa acender o
+ * Agents OS no rail, senão o usuário vê a navegação de um sub-módulo com o outro marcado como
+ * ativo. Devolve `null` para rota que não é do JARVIS — quem chama decide o que fazer, em vez
+ * de receber um `'command'` que pareceria resposta legítima.
+ */
+export function subModuloDaRota(rota: string): SubModuloJarvis | null {
+  const achado = SUB_MODULOS_JARVIS.find((sub) => ROTAS_POR_SUB_MODULO[sub].includes(rota))
+  return achado ?? null
+}
+
+/** A rota inicial de um sub-módulo — a primeira da lista dele. */
+export function rotaInicialDoSubModulo(sub: SubModuloJarvis): string {
+  const primeira = ROTAS_POR_SUB_MODULO[sub][0]
+  if (primeira === undefined) throw new Error(`Sub-módulo sem rotas: ${sub}`)
+  return primeira
+}

@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 212 | 212 | 0 | 78.0 | — | — |
+| — | — | — | Regras de Negócio | 217 | 217 | 0 | 78.3 | — | — |
 | — | — | — | Banco | 132 | 132 | 0 | 85.5 | — | — |
-| — | — | — | Tela | 169 | 168 | 0 | 90.7 | — | — |
+| — | — | — | Tela | 177 | 176 | 0 | 91.0 | — | — |
 
 ## Histórico por entrega
 
@@ -76,3 +76,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-07-23 | #47 | — | Regras de Negócio | 212 | 212 | 0 | 78.0 | #48 | [#48](https://github.com/RodReis/rrb-jarvisOS/pull/48) |
 | 2026-07-23 | #47 | — | Banco | 132 | 132 | 0 | 85.5 | #48 | [#48](https://github.com/RodReis/rrb-jarvisOS/pull/48) |
 | 2026-07-23 | #47 | — | Tela | 169 | 168 | 0 | 90.7 | #48 | [#48](https://github.com/RodReis/rrb-jarvisOS/pull/48) |
+| 2026-07-23 | #21 | spec-design-system-04a-appshell-navegacao | Regras de Negócio | 217 | 217 | 0 | 78.3 | #49 | [#49](https://github.com/RodReis/rrb-jarvisOS/pull/49) |
+| 2026-07-23 | #21 | spec-design-system-04a-appshell-navegacao | Banco | 132 | 132 | 0 | 85.5 | #49 | [#49](https://github.com/RodReis/rrb-jarvisOS/pull/49) |
+| 2026-07-23 | #21 | spec-design-system-04a-appshell-navegacao | Tela | 177 | 176 | 0 | 91.0 | #49 | [#49](https://github.com/RodReis/rrb-jarvisOS/pull/49) |
