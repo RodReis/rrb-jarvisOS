@@ -14,7 +14,7 @@ Totais da última execução (regenerado, não acumulado):
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
 | — | — | — | Regras de Negócio | 230 | 230 | 0 | 78.9 | — | — |
 | — | — | — | Banco | 132 | 132 | 0 | 85.5 | — | — |
-| — | — | — | Tela | 194 | 193 | 0 | 91.2 | — | — |
+| — | — | — | Tela | 210 | 209 | 0 | 92.0 | — | — |
 
 ## Histórico por entrega
 
@@ -82,3 +82,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-07-23 | #22 | spec-design-system-04b-padroes-operacionais | Regras de Negócio | 230 | 230 | 0 | 78.9 | #50 | [#50](https://github.com/RodReis/rrb-jarvisOS/pull/50) |
 | 2026-07-23 | #22 | spec-design-system-04b-padroes-operacionais | Banco | 132 | 132 | 0 | 85.5 | #50 | [#50](https://github.com/RodReis/rrb-jarvisOS/pull/50) |
 | 2026-07-23 | #22 | spec-design-system-04b-padroes-operacionais | Tela | 194 | 193 | 0 | 91.2 | #50 | [#50](https://github.com/RodReis/rrb-jarvisOS/pull/50) |
+| 2026-07-23 | #24 | spec-design-system-06-adocao-hardening | Regras de Negócio | 230 | 230 | 0 | 78.9 | #51 | [#51](https://github.com/RodReis/rrb-jarvisOS/pull/51) |
+| 2026-07-23 | #24 | spec-design-system-06-adocao-hardening | Banco | 132 | 132 | 0 | 85.5 | #51 | [#51](https://github.com/RodReis/rrb-jarvisOS/pull/51) |
+| 2026-07-23 | #24 | spec-design-system-06-adocao-hardening | Tela | 210 | 209 | 0 | 92.0 | #51 | [#51](https://github.com/RodReis/rrb-jarvisOS/pull/51) |
