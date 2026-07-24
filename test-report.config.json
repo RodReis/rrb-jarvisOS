@@ -16,10 +16,10 @@
       "coverageSummary": "coverage/banco/coverage-summary.json"
     },
     {
+      "$comment_tela": "Só vitest-componente (jsdom). O E2E Playwright-Electron saiu do relatório no card #34 — virou job de CI condicional por paths, fora desta contagem. Ver docs/TESTING.md §3 e §6.",
       "name": "Tela",
-      "runner": "vitest+playwright",
+      "runner": "vitest",
       "resultsJson": "reports/.raw/tela-vitest.json",
-      "playwrightJson": "reports/.raw/tela-playwright.json",
       "coverageSummary": "coverage/tela/coverage-summary.json"
     }
   ]

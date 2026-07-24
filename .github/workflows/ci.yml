@@ -1,9 +1,23 @@
 name: CI — testes + relatório de evidência
 
 # ADR-003: evidência de teste gerada por máquina e verificada, nunca narrada.
-# Roda em todo PR: executa os runners, gera reports/TESTS.md a partir do --json,
-# publica no job summary + comentário fixo do PR, e barra o merge se o relatório
-# commitado divergir de uma execução limpa (guarda anti-drift).
+#
+# Três jobs (card #34):
+#   test — roda em TODO PR: runners unitários/integração (regras/banco/tela-componente),
+#          gera reports/TESTS.md a partir do --json e barra o merge se o relatório
+#          commitado divergir de uma execução limpa (guarda anti-drift). NÃO roda E2E.
+#   e2e  — sobe o app Electron de verdade (build + xvfb + keyring + Playwright). Custa
+#          ~15 min e prova a fronteira preload/IPC/janela, que muda raramente. Só EXECUTA
+#          quando o PR toca essa fronteira (ver o job `changes`); nos demais é no-op verde.
+#   gate — required check único. Sempre roda; agrega `test` e `e2e`. Falha se `test` falhou
+#          ou se o `e2e` rodou e falhou; passa quando o E2E foi legitimamente pulado. É ele,
+#          não `e2e`, que a branch protection exige — assim o E2E condicional nunca fica
+#          "pending eterno" bloqueando o merge (a armadilha do required check pulado).
+#
+# GARANTIA (card #34): o E2E completo tem de rodar no caminho para a `main`. O filtro por
+# paths abaixo cobre toda a fronteira que o E2E prova — preload, entrada do main, janela e a
+# própria suíte. PR que mexe nela roda o E2E e é barrado se falhar; PR que não mexe não pode
+# introduzir regressão de fronteira. Falso verde é pior que teste ausente.
 
 on:
   pull_request:
@@ -14,6 +28,41 @@ permissions:
   pull-requests: write
 
 jobs:
+  # Detecta se o PR toca a fronteira que o E2E prova. Job leve (só git), sem action de
+  # terceiros: `paths:` no evento `pull_request` cancelaria o workflow inteiro (não um job),
+  # então o filtro vive aqui, num step, e vira output que o `e2e` consulta no seu `if:`.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      frontier: ${{ steps.filter.outputs.frontier }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: filter
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin "$BASE_REF"
+          # A fronteira preload/IPC/janela + a própria suíte E2E. Qualquer alteração aqui
+          # exige o E2E completo. Mudar esta lista é mudar o que a garantia cobre — mantê-la
+          # em sincronia com o que o E2E realmente prova é parte do contrato do card #34.
+          changed=$(git diff --name-only "origin/$BASE_REF...HEAD" -- \
+            'src/main/preload/**' \
+            'src/main/index.ts' \
+            'src/main/window.ts' \
+            'tests/e2e/**' \
+            'playwright.config.ts' || true)
+          if [ -n "$changed" ]; then
+            echo "frontier=true" >> "$GITHUB_OUTPUT"
+            echo "PR toca a fronteira do E2E — o job e2e vai rodar:"
+            printf '%s\n' "$changed"
+          else
+            echo "frontier=false" >> "$GITHUB_OUTPUT"
+            echo "PR não toca a fronteira do E2E — job e2e pulado (no-op verde no gate)."
+          fi
+
   test:
     runs-on: ubuntu-latest
     # Sem `services:`: a maior parte da categoria "Banco" testa o storage local (SQLite em
@@ -62,31 +111,6 @@ jobs:
       - name: Instalar dependências
         run: npm ci
 
-      # O E2E sobe o Electron de verdade (SPEC-Fundacao-03, critério 9), e no Linux
-      # do CI isso exige as libs de sistema que o Playwright instala.
-      - name: Instalar dependências de sistema do Playwright
-        run: npx playwright install-deps
-
-      # Cache do binário do Electron (~100 MB). O download acontece a cada run porque o
-      # `postinstall` é `electron-rebuild` (compila o better-sqlite3), que não baixa o
-      # binário — quem baixa é o step abaixo. A chave inclui a versão do Electron do
-      # lockfile: subir o Electron invalida o cache sozinho, sem chave manual a manter.
-      # `restore-keys` reaproveita um cache de versão anterior enquanto o novo não existe.
-      - name: Cache do binário do Electron
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/electron
-          key: electron-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            electron-${{ runner.os }}-
-
-      # Baixa o binário do Electron ANTES dos testes (no-op quando o cache acima acerta).
-      # Sem isto o download de ~100 MB acontecia dentro do primeiro teste, estourando os
-      # 30s do `firstWindow()`. O sintoma engana: o processo sobe e a janela nunca abre,
-      # sem erro de biblioteca no log. Fora do teste, o tempo de download não conta no timeout.
-      - name: Baixar o binário do Electron
-        run: node node_modules/electron/install.js
-
       - name: Lint e typecheck
         run: |
           npm run lint
@@ -94,14 +118,11 @@ jobs:
 
       # Prova visual dos controles (SPEC-DesignSystem-03a): sobe a galeria num Chromium de
       # verdade e mede o que jsdom não mede — altura real dos controles, contraste computado,
-      # fontes carregadas, anel de foco pintado.
+      # fontes carregadas, anel de foco pintado. Barata (~5s) e pega classe de defeito que
+      # nenhum teste de papel pega. É Chromium headless, não o Electron: fica no job `test`,
+      # não no `e2e` (que sobe o app empacotado). Ver docs/TESTING.md.
       #
-      # Roda **antes** da bateria pesada porque é barata (~5s) e pega classe de defeito que
-      # nenhum teste de papel pega: na própria 03a encontrou o CSS dos componentes não sendo
-      # gerado e o card do NOA invertido, com os 91 testes de componente verdes nos dois casos.
-      #
-      # `--with-deps chromium` e não o browser inteiro: só o Chromium é usado aqui, e o
-      # Electron do E2E já tem as libs de sistema instaladas no step acima.
+      # `--with-deps chromium` e não o browser inteiro: só o Chromium é usado aqui.
       - name: Instalar o Chromium do Playwright (galeria de prova)
         run: npx playwright install --with-deps chromium
 
@@ -144,7 +165,8 @@ jobs:
       # (vitest.config.ts): `*.spec.ts` (regras), `*.int-spec.ts` (banco),
       # `*.test.tsx` (tela). `*.selfcheck.mjs` entra porque é o teste do próprio
       # gerador e não casa os outros — sem ele, um PR que só mexe na guarda se
-      # dispensaria da própria regra.
+      # dispensaria da própria regra. `*.e2e.ts` entra porque alterar a suíte E2E
+      # é alterar teste, mesmo que o E2E rode noutro job.
       - name: O PR altera testes?
         run: |
           set -euo pipefail
@@ -163,6 +185,91 @@ jobs:
           else
             echo "PR não altera teste — carimbo dispensado."
           fi
+
+      # A categoria "Tela" do relatório é só vitest-componente (jsdom) — o E2E saiu daqui
+      # (card #34, vive no job `e2e`). O relatório não precisa mais de xvfb, keyring,
+      # setuid nem do build do app: tudo isso migrou para o job `e2e`.
+      - name: Rodar testes + guarda anti-drift
+        env:
+          REPORT_BASE_REF: origin/${{ github.base_ref }}
+        run: npm run test:report:check
+
+      # Terceira guarda: números certos + histórico íntegro ainda deixavam
+      # passar uma entrega SEM linha no histórico — no repo de origem duas
+      # entregas mergearam com a tabela sugerindo que não tiveram teste. Roda
+      # depois do --check para que a falha de números apareça antes.
+      - name: Guarda — a entrega está carimbada no histórico?
+        if: env.REQUIRE_ENTRY == '1'
+        run: npm run test:report:check -- --require-entry
+
+      - name: Publicar tabela no job summary
+        if: always()
+        run: |
+          {
+            echo "## Relatório de testes (ADR-003)"
+            echo ""
+            sed -n '/## Estado atual/,/## Histórico/p' reports/TESTS.md | sed '/## Histórico/d'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comentário fixo no PR
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          BODY=$(sed -n '/## Estado atual/,/## Histórico/p' reports/TESTS.md | sed '/## Histórico/d')
+          MARKER="<!-- test-report-sticky -->"
+          COMMENT="$MARKER"$'\n'"$BODY"
+          ID=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --jq \
+            ".[] | select(.body | contains(\"$MARKER\")) | .id" | head -1)
+          if [ -n "$ID" ]; then
+            gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$ID" -f body="$COMMENT"
+          else
+            gh api -X POST "repos/${{ github.repository }}/issues/$PR/comments" -f body="$COMMENT"
+          fi
+
+  # E2E Electron completo. Só executa quando o PR toca a fronteira (job `changes`). Todos os
+  # steps de ambiente que antes viviam no job único migraram para cá — são o que o E2E, e só
+  # o E2E, exige. As armadilhas de cada um estão em docs/TESTING.md §3.1.
+  e2e:
+    needs: changes
+    if: needs.changes.outputs.frontier == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      # O E2E sobe o Electron de verdade (SPEC-Fundacao-03, critério 9), e no Linux
+      # do CI isso exige as libs de sistema que o Playwright instala.
+      - name: Instalar dependências de sistema do Playwright
+        run: npx playwright install-deps
+
+      # Cache do binário do Electron (~100 MB). O download acontece a cada run porque o
+      # `postinstall` é `electron-rebuild` (compila o better-sqlite3), que não baixa o
+      # binário — quem baixa é o step abaixo. A chave inclui a versão do Electron do
+      # lockfile: subir o Electron invalida o cache sozinho, sem chave manual a manter.
+      # `restore-keys` reaproveita um cache de versão anterior enquanto o novo não existe.
+      - name: Cache do binário do Electron
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/electron
+          key: electron-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            electron-${{ runner.os }}-
+
+      # Baixa o binário do Electron ANTES dos testes (no-op quando o cache acima acerta).
+      # Sem isto o download de ~100 MB acontecia dentro do primeiro teste, estourando os
+      # 30s do `firstWindow()`. O sintoma engana: o processo sobe e a janela nunca abre,
+      # sem erro de biblioteca no log. Fora do teste, o tempo de download não conta no timeout.
+      - name: Baixar o binário do Electron
+        run: node node_modules/electron/install.js
 
       # O `chrome-sandbox` que vem no pacote npm não tem as permissões que o Chromium
       # exige no Linux (dono root, modo 4755) — o npm não preserva setuid. Sem isto o
@@ -215,55 +322,50 @@ jobs:
             > "$HOME/.local/share/keyrings/Default_keyring.keyring"
           printf Default_keyring > "$HOME/.local/share/keyrings/default"
 
-      # `xvfb-run`: o orquestrador roda o E2E, e o Electron abre janela — sem display
-      # virtual o launch falha no Linux do CI (docs/TESTING.md §3.1).
-      - name: Rodar testes + guarda anti-drift
-        env:
-          REPORT_BASE_REF: origin/${{ github.base_ref }}
+      # O E2E sobe o app EMPACOTADO (`out/`), não o servidor de dev — sem build, testaria
+      # a versão anterior do código.
+      - name: Build do app
+        run: npm run build
+
+      # `xvfb-run`: o Electron abre janela — sem display virtual o launch falha no Linux
+      # do CI (docs/TESTING.md §3.1). O keyring destravado vive no mesmo comando que roda
+      # os testes (ver o step do keyring acima).
+      - name: Rodar E2E Electron
         run: |
           dbus-run-session -- bash -c '
             rm -rf "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/keyring"
             eval "$(gnome-keyring-daemon --components=secrets --daemonize)"
             echo -n teste | secret-tool store --label=sonda sonda ci \
               && echo "secret-tool OK" || echo "secret-tool FALHOU — Electron vai falhar"
-            exec xvfb-run --auto-servernum npm run test:report:check
+            exec xvfb-run --auto-servernum npx playwright test
           '
 
-      # Terceira guarda: números certos + histórico íntegro ainda deixavam
-      # passar uma entrega SEM linha no histórico — no repo de origem duas
-      # entregas mergearam com a tabela sugerindo que não tiveram teste. Roda
-      # depois do --check para que a falha de números apareça antes.
-      - name: Guarda — a entrega está carimbada no histórico?
-        if: env.REQUIRE_ENTRY == '1'
-        run: |
-          dbus-run-session -- bash -c '
-            rm -rf "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/keyring"
-            eval "$(gnome-keyring-daemon --components=secrets --daemonize)"
-            exec xvfb-run --auto-servernum npm run test:report:check -- --require-entry
-          '
-
-      - name: Publicar tabela no job summary
-        if: always()
-        run: |
-          {
-            echo "## Relatório de testes (ADR-003)"
-            echo ""
-            sed -n '/## Estado atual/,/## Histórico/p' reports/TESTS.md | sed '/## Histórico/d'
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Comentário fixo no PR
-        if: always()
+  # Required check único (branch protection exige `gate`, não `e2e`). Sempre roda —
+  # `if: always()` — e agrega os resultados: falha se `test` falhou, ou se `e2e` RODOU e
+  # falhou. Passa quando `e2e` foi legitimamente pulado (`result == 'skipped'`), que é o
+  # que impede o E2E condicional de bloquear o merge em "pending eterno". Um E2E que falha
+  # de verdade tem `result == 'failure'` e derruba o gate — a garantia do card #34 fica de pé.
+  gate:
+    needs: [test, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Agregar resultados
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR: ${{ github.event.pull_request.number }}
+          TEST_RESULT: ${{ needs.test.result }}
+          E2E_RESULT: ${{ needs.e2e.result }}
         run: |
-          BODY=$(sed -n '/## Estado atual/,/## Histórico/p' reports/TESTS.md | sed '/## Histórico/d')
-          MARKER="<!-- test-report-sticky -->"
-          COMMENT="$MARKER"$'\n'"$BODY"
-          ID=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --jq \
-            ".[] | select(.body | contains(\"$MARKER\")) | .id" | head -1)
-          if [ -n "$ID" ]; then
-            gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$ID" -f body="$COMMENT"
-          else
-            gh api -X POST "repos/${{ github.repository }}/issues/$PR/comments" -f body="$COMMENT"
+          set -euo pipefail
+          echo "test = $TEST_RESULT"
+          echo "e2e  = $E2E_RESULT"
+          if [ "$TEST_RESULT" != "success" ]; then
+            echo "::error::O job test nao passou ($TEST_RESULT)."
+            exit 1
           fi
+          # `e2e` é aceitável em success (rodou e passou) ou skipped (PR não toca a fronteira).
+          # Qualquer outra coisa — failure, cancelled — barra o merge.
+          if [ "$E2E_RESULT" != "success" ] && [ "$E2E_RESULT" != "skipped" ]; then
+            echo "::error::O job e2e rodou e nao passou ($E2E_RESULT)."
+            exit 1
+          fi
+          echo "Gate verde: test OK; e2e $E2E_RESULT (aceitável)."

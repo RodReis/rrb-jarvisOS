@@ -8,10 +8,9 @@ Atualizado em: **2026-07-24**. Mantido pelo Code a cada entrega (junto com `DEVE
 
 | Issue | Fatia | MVP | Spec | Índice |
 |---|---|---|---|---|
-| [#34](https://github.com/RodReis/rrb-jarvisOS/issues/34) | — (`[INFRA]`) | — | *(sem spec — infra)* | — |
 | [#41](https://github.com/RodReis/rrb-jarvisOS/issues/41) | — (`[FIX]`) | MVP-001 | *(sem spec — bug documentado)* | — |
 
-> **`proplan:next` = [#34](https://github.com/RodReis/rrb-jarvisOS/issues/34)** (`[INFRA]` — separar o E2E em job de CI próprio).
+> **`proplan:next` sem sucessor definido.** O #34 (que era o `next`) saiu para **Em Andamento** em 2026-07-24. A cabeça da fila agora é decisão do PI (item 11 abaixo): o `[FIX]` **#41** (renderer em porta variável × `strictPort`) ou o **MVP-004** ([#10](https://github.com/RodReis/rrb-jarvisOS/issues/10)). Enquanto o PI não marca, nenhum card abaixo carrega `proplan:next`.
 
 > ✅ **MVP-003 aceito pelo PI em 2026-07-23.** As 8 fatias (#17–#24) estão `closed` + `proplan:finalizado` e o épico **[#16](https://github.com/RodReis/rrb-jarvisOS/issues/16) foi fechado**. Os três `[FIX]` que nasceram durante o corte (#43, #47, #52) seguem em `proplan:done`, aguardando aceite à parte.
 
@@ -23,7 +22,7 @@ Atualizado em: **2026-07-24**. Mantido pelo Code a cada entrega (junto com `DEVE
 
 > Card **[#47](https://github.com/RodReis/rrb-jarvisOS/issues/47)** (`[FIX]`, 2026-07-23): **`navegacao.spec.ts` nunca rodou** — o `include` da categoria Regras não alcançava `src/renderer`, e 75 linhas cobrindo o isolamento de rota por espaço (SPEC-Fundacao-02, critérios 1 e 5) ficaram fora de toda categoria desde o PR #28. Achado de raspão durante a F04a: o teste novo do rail dual não rodava, e os antigos também não. Corrigido em branch próprio, **sem misturar na fatia**. **Mergeado** (PR [#48](https://github.com/RodReis/rrb-jarvisOS/pull/48)), aguardando aceite. Regras 203 → 212.
 
-> Card **[#34](https://github.com/RodReis/rrb-jarvisOS/issues/34)** (`[INFRA]`, Backlog): separar o E2E em job de CI próprio, condicional por paths. Criado pelo Code durante a F03 — o cache do Electron (parte fácil) já saiu no PR #35; a separação do E2E do relatório é infra maior e vai em PR dedicado.
+> Card **[#34](https://github.com/RodReis/rrb-jarvisOS/issues/34)** (`[INFRA]`, **Em Andamento** desde 2026-07-24): separar o E2E em job de CI próprio, condicional por paths. Criado pelo Code durante a F03 — o cache do Electron (parte fácil) já saiu no PR #35; a separação do E2E do relatório é a infra maior, em PR dedicado (ver a seção **A Fazer · Em Andamento**).
 
 > Card **[#43](https://github.com/RodReis/rrb-jarvisOS/issues/43)** (`[FIX]`, 2026-07-23): **o app nunca lia o arquivo `.env`** — `dotenv` não existia no repo e `readSupabaseConfig()` consulta `process.env` cru. O login da SPEC-Fundacao-03 só funcionava com as variáveis exportadas no shell; a partir do repo, dava "credenciais ausentes" com o arquivo preenchido. Achado ao subir o app durante a F03b; corrigido em branch próprio (`fix/carregar-env-no-main`), **sem misturar na fatia**. Provado no app real com o shell limpo: login concluído, tokens cifrados no cofre, sessão de 30 dias. **Mergeado** (PR [#44](https://github.com/RodReis/rrb-jarvisOS/pull/44)), aguardando aceite. Detalhe no `DEVELOPMENT.md` § Fatia 03.
 
@@ -70,7 +69,11 @@ Atualizado em: **2026-07-24**. Mantido pelo Code a cada entrega (junto com `DEVE
 
 ### A Fazer · Em Andamento
 
-*(vazios)*
+| Issue | Fatia | MVP | Spec | Coluna |
+|---|---|---|---|---|
+| [#34](https://github.com/RodReis/rrb-jarvisOS/issues/34) | — (`[INFRA]`) | — | *(sem spec — infra)* | Em Andamento (`proplan:doing`) |
+
+> **#34 em andamento** (Code, 2026-07-24) — separar o E2E do CI em job próprio, condicional por `paths`. Branch `feat/ci-e2e-job-condicional`. Três jobs no `ci.yml`: `test` (relatório, sem E2E), `e2e` (build+xvfb+keyring+Playwright, só quando o PR toca a fronteira preload/IPC/janela) e `gate` (required check, agrega os dois). Categoria "Tela" do relatório passou a contar **só vitest-componente** (215, era 218 com E2E). Fonte da decisão: PI (2026-07-22) + ADR-003. **Ao mergear:** trocar o required check de `test` → `gate` na branch protection.
 
 > **#69 CHOICE entregue** (Code, 2026-07-24) — PR [#70](https://github.com/RodReis/rrb-jarvisOS/pull/70) **mergeado** (squash `0d4e42d`), CI verde. Os **11 critérios** entregues num PR só (os dois PRs planejados viraram dois commits na mesma branch). `TelaChoice` fiel ao protótipo, acento persistido no `UserProfile` (migration 6), Settings com o mesmo seletor. Rail e `WorkspaceSwitcher` **intactos** (opção A). Aguarda **aceite do PI** (`proplan:done`). O `proplan:next` volta ao #34 (INFRA), a cabeça da fila.
 

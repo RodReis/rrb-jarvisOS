@@ -52,7 +52,15 @@ function readRunnerJson(path) {
   }
 }
 
-/** Lê o JSON do Playwright (formato próprio: suites/specs com stats). */
+/**
+ * Lê o JSON do Playwright (formato próprio: suites/specs com stats).
+ *
+ * Sem chamador ativo desde o card #34: nenhuma categoria do config declara
+ * `playwrightJson` (o E2E virou check de CI à parte, fora do relatório). Mantido
+ * de propósito — o gerador é repo-agnóstico (porta verbatim, TESTING.md §7) e
+ * outra stack pode voltar a somar Playwright a uma categoria só declarando o
+ * caminho. `buildRows` já o chama condicionalmente (`cat.playwrightJson ? …`).
+ */
 function readPlaywrightJson(path) {
   const abs = resolve(ROOT, path)
   if (!existsSync(abs)) return { total: 0, passed: 0, failed: 0 }
