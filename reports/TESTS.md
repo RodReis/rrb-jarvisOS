@@ -13,7 +13,7 @@ Totais da última execução (regenerado, não acumulado):
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
 | — | — | — | Regras de Negócio | 231 | 231 | 0 | 78.8 | — | — |
-| — | — | — | Banco | 137 | 130 | 0 | 85.7 | — | — |
+| — | — | — | Banco | 137 | 137 | 0 | 85.7 | — | — |
 | — | — | — | Tela | 218 | 217 | 0 | 92.8 | — | — |
 
 ## Histórico por entrega
@@ -94,3 +94,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-07-24 | #57 | — | Regras de Negócio | 230 | 230 | 0 | 78.9 | #63 | [#63](https://github.com/RodReis/rrb-jarvisOS/pull/63) |
 | 2026-07-24 | #57 | — | Banco | 132 | 132 | 0 | 85.5 | #63 | [#63](https://github.com/RodReis/rrb-jarvisOS/pull/63) |
 | 2026-07-24 | #57 | — | Tela | 211 | 210 | 0 | 92.2 | #63 | [#63](https://github.com/RodReis/rrb-jarvisOS/pull/63) |
+| 2026-07-24 | #69 | — | Regras de Negócio | 231 | 231 | 0 | 78.8 | #70 | [#70](https://github.com/RodReis/rrb-jarvisOS/pull/70) |
+| 2026-07-24 | #69 | — | Banco | 137 | 137 | 0 | 85.7 | #70 | [#70](https://github.com/RodReis/rrb-jarvisOS/pull/70) |
+| 2026-07-24 | #69 | — | Tela | 218 | 217 | 0 | 92.8 | #70 | [#70](https://github.com/RodReis/rrb-jarvisOS/pull/70) |
