@@ -62,6 +62,8 @@ interface MeterProps {
    */
   readonly faixas?: ReadonlyArray<{ ate: number; tom: TomSemantico }>
   readonly formatar?: (valor: number) => string
+  /** Mostra o rótulo **ao lado da barra**. Ver o comentário no corpo do componente (F06). */
+  readonly rotuloVisivel?: boolean
 }
 
 /**
@@ -76,7 +78,8 @@ export function Meter({
   maximo = 100,
   rotulo,
   faixas,
-  formatar = (v) => String(v)
+  formatar = (v) => String(v),
+  rotuloVisivel = false
 }: MeterProps): React.JSX.Element {
   const proporcao = Math.min(1, Math.max(0, (valor - minimo) / (maximo - minimo)))
 
@@ -86,6 +89,23 @@ export function Meter({
 
   return (
     <div className="flex items-center gap-3">
+      {/*
+       * Rótulo **visível**, opcional (F06).
+       *
+       * Até a F06 o rótulo vivia só em `aria-label`: acessível a quem usa leitor de tela e
+       * invisível para quem enxerga. A captura do JARVIS HUD mostrou quatro barras com números à
+       * direita e nenhuma forma de saber qual era CPU, RAM, GPU ou DISK — o inverso exato do
+       * critério "estado nunca só por cor": informação essencial ausente da tela.
+       *
+       * É opcional porque nem todo uso precisa: no `Panel` "Passos hoje" do NOA, o título do
+       * painel já nomeia a medida, e repetir o rótulo ao lado da barra seria ruído. Quem sabe se
+       * o nome já está no contexto é quem monta a tela.
+       */}
+      {rotuloVisivel && (
+        <span className="w-16 shrink-0 font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] uppercase tracking-[var(--jos-tracking-label)] text-[var(--jos-cor-texto-suave)]">
+          {rotulo}
+        </span>
+      )}
       <div
         role="meter"
         aria-label={rotulo}

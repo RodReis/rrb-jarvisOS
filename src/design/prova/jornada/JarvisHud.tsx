@@ -85,6 +85,8 @@ export function JarvisHud({
                   maximo={100}
                   rotulo={item.nome}
                   faixas={FAIXAS_DE_RECURSO}
+                  // Quatro barras sem nome sao quatro numeros sem medida.
+                  rotuloVisivel
                 />
               ))}
             </div>
