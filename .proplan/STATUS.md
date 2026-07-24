@@ -27,8 +27,6 @@ _(vazio)_
 
 ### [MVP3] Design System da Plataforma — base única, 2 identidades (#16)
 
-- [MVP3][F04a] AppShell + navegação (#21)
-- [MVP3][F05] Identidades NOA e JARVIS (#23)
 - [MVP3][F03b] Componentes: dados + overlays + feedback (#20)
 
 ### Sem épico
@@ -39,6 +37,8 @@ _(vazio)_
 
 ### [MVP3] Design System da Plataforma — base única, 2 identidades (#16)
 
+- [MVP3][F05] Identidades NOA e JARVIS (#23, finalizado em: 2026-07-24)
+- [MVP3][F04a] AppShell + navegação (#21, finalizado em: 2026-07-24)
 - [MVP3][F04b] Padrões operacionais (#22, finalizado em: 2026-07-24)
 - [MVP3][F06] Adoção & hardening (#24, finalizado em: 2026-07-24)
 - [MVP3][F03a] Componentes: ações + formulários (#19, finalizado em: 2026-07-23)
