@@ -498,6 +498,16 @@ Status: **entregue** — spec `aprovada-pi` (2026-07-21); issue [#24](https://gi
 - O roteiro **manual** de teclado que a spec menciona (§Escopo) não foi executado por mim — só o automatizado. É verificação do PI no aceite.
 - A jornada usa dados mock por props, como a spec determina: é prova de composição, não a entrega das telas de produto (Corte 3+).
 
+## MVP-003 — aceito e fechado
+
+**Aceito pelo PI em 2026-07-23.** As 8 fatias (#17–#24) estão `closed` + `proplan:finalizado`; o épico **[#16](https://github.com/RodReis/rrb-jarvisOS/issues/16)** foi fechado. O corte inteiro saiu em um dia.
+
+O que o MVP-003 deixa: **569 testes** (Regras 230 · Banco 132 · Tela 211, cobertura 92%) e **77 provas visuais** em navegador real. A tese que o motivou — *base única, duas identidades* — está provada na jornada da F06: NOA e JARVIS lado a lado na CHOICE, saídos dos mesmos componentes, diferentes só por token.
+
+**A lição de método do corte** foi sobre camadas de verificação, e ela se repetiu em quase toda fatia: os testes de papel provam contrato, a **prova visual em navegador prova pintura**, e as duas não se substituem. O que só a captura pegou, com os testes verdes: o CSS que não era gerado (F03a), o card do NOA invertido (F03a), o `data-attribute` descartado em silêncio (F05), o alias que quebrou a galeria inteira com `test`/`lint`/`typecheck` verdes (F06), a camada `patterns` sem CSS utilitário desde a F04a (F06) e o `Meter` que escondia o rótulo (#52, achado ao revisar a captura **para o aceite**).
+
+Três `[FIX]` nasceram durante o corte e seguem em `proplan:done`, aguardando aceite à parte: **#43**, **#47** e **#52**.
+
 ## Após o MVP-003
 
 Ordem: **MVP-004** ([#10](https://github.com/RodReis/rrb-jarvisOS/issues/10), execução real + terminal) → MVP de providers (Corte 3, com BudgetPolicy). Ordem macro em `docs/LANDSCAPE.md` § Roadmap.

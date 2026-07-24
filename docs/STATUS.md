@@ -11,7 +11,11 @@ Atualizado em: **2026-07-23**. Mantido pelo Code a cada entrega (junto com `DEVE
 | [#34](https://github.com/RodReis/rrb-jarvisOS/issues/34) | — (`[INFRA]`) | — | *(sem spec — infra)* | — |
 | [#41](https://github.com/RodReis/rrb-jarvisOS/issues/41) | — (`[FIX]`) | MVP-001 | *(sem spec — bug documentado)* | — |
 
-> **`proplan:next` = [#34](https://github.com/RodReis/rrb-jarvisOS/issues/34)** (`[INFRA]` — separar o E2E em job de CI próprio). **O MVP-003 está entregue por inteiro: 8 das 8 fatias**, em 2026-07-23. O aceite das 8 é do PI; o épico #16 só fecha quando todas as filhas fecharem.
+> **`proplan:next` = [#34](https://github.com/RodReis/rrb-jarvisOS/issues/34)** (`[INFRA]` — separar o E2E em job de CI próprio).
+
+> ✅ **MVP-003 aceito pelo PI em 2026-07-23.** As 8 fatias (#17–#24) estão `closed` + `proplan:finalizado` e o épico **[#16](https://github.com/RodReis/rrb-jarvisOS/issues/16) foi fechado**. Os três `[FIX]` que nasceram durante o corte (#43, #47, #52) seguem em `proplan:done`, aguardando aceite à parte.
+
+> Card **[#52](https://github.com/RodReis/rrb-jarvisOS/issues/52)** (`[FIX]`, 2026-07-23): **o `Meter` escondia o rótulo em `aria-label`** — acessível a quem usa leitor de tela, invisível para quem enxerga. Achado ao **revisar a captura do JARVIS HUD para o aceite**: quatro barras de telemetria com números à direita e nenhuma forma de saber qual era CPU, RAM, GPU ou DISK. É o inverso do critério 5 (F06): informação essencial ausente da tela. Corrigido no componente (prop `rotuloVisivel`), não no uso. **Mergeado** (PR [#53](https://github.com/RodReis/rrb-jarvisOS/pull/53)), aguardando aceite.
 
 > Card **[#47](https://github.com/RodReis/rrb-jarvisOS/issues/47)** (`[FIX]`, 2026-07-23): **`navegacao.spec.ts` nunca rodou** — o `include` da categoria Regras não alcançava `src/renderer`, e 75 linhas cobrindo o isolamento de rota por espaço (SPEC-Fundacao-02, critérios 1 e 5) ficaram fora de toda categoria desde o PR #28. Achado de raspão durante a F04a: o teste novo do rail dual não rodava, e os antigos também não. Corrigido em branch próprio, **sem misturar na fatia**. **Mergeado** (PR [#48](https://github.com/RodReis/rrb-jarvisOS/pull/48)), aguardando aceite. Regras 203 → 212.
 
@@ -27,16 +31,9 @@ Atualizado em: **2026-07-23**. Mantido pelo Code a cada entrega (junto com `DEVE
 
 | Issue | Fatia | MVP | Spec | Índice | PR | Mergeado |
 |---|---|---|---|---|---|---|
-| [#17](https://github.com/RodReis/rrb-jarvisOS/issues/17) | 01 Infra do design system | MVP-003 (#16) | `spec-design-system-01-infra.md` | M3-F01 | [#38](https://github.com/RodReis/rrb-jarvisOS/pull/38) | 2026-07-23 |
-| [#18](https://github.com/RodReis/rrb-jarvisOS/issues/18) | 02 Foundations + ponte com o protótipo | MVP-003 (#16) | `spec-design-system-02-foundations.md` | M3-F02 | [#40](https://github.com/RodReis/rrb-jarvisOS/pull/40) | 2026-07-23 |
-| [#19](https://github.com/RodReis/rrb-jarvisOS/issues/19) | 03a Componentes: ações + formulários | MVP-003 (#16) | `spec-design-system-03a-componentes-acoes-forms.md` | M3-F03a | [#42](https://github.com/RodReis/rrb-jarvisOS/pull/42) | *(aguardando)* |
 | [#43](https://github.com/RodReis/rrb-jarvisOS/issues/43) | — (`[FIX]`) | MVP-001 | *(sem spec — fonte: `.env.example` §1-8)* | — | [#44](https://github.com/RodReis/rrb-jarvisOS/pull/44) | 2026-07-23 |
-| [#20](https://github.com/RodReis/rrb-jarvisOS/issues/20) | 03b Componentes: dados + overlays + feedback | MVP-003 (#16) | `spec-design-system-03b-componentes-dados-overlays.md` | M3-F03b | [#45](https://github.com/RodReis/rrb-jarvisOS/pull/45) | 2026-07-23 |
-| [#23](https://github.com/RodReis/rrb-jarvisOS/issues/23) | 05 Identidades NOA e JARVIS | MVP-003 (#16) | `spec-design-system-05-identidades.md` | M3-F05 | [#46](https://github.com/RodReis/rrb-jarvisOS/pull/46) | 2026-07-23 |
 | [#47](https://github.com/RodReis/rrb-jarvisOS/issues/47) | — (`[FIX]`) | MVP-001 | *(sem spec — fonte: `TESTING.md` §2/§3, ADR-003)* | — | [#48](https://github.com/RodReis/rrb-jarvisOS/pull/48) | 2026-07-23 |
-| [#21](https://github.com/RodReis/rrb-jarvisOS/issues/21) | 04a AppShell + navegação | MVP-003 (#16) | `spec-design-system-04a-appshell-navegacao.md` | M3-F04a | [#49](https://github.com/RodReis/rrb-jarvisOS/pull/49) | 2026-07-23 |
-| [#22](https://github.com/RodReis/rrb-jarvisOS/issues/22) | 04b Padrões operacionais | MVP-003 (#16) | `spec-design-system-04b-padroes-operacionais.md` | M3-F04b | [#50](https://github.com/RodReis/rrb-jarvisOS/pull/50) | 2026-07-23 |
-| [#24](https://github.com/RodReis/rrb-jarvisOS/issues/24) | 06 Adoção & hardening | MVP-003 (#16) | `spec-design-system-06-adocao-hardening.md` | M3-F06 | [#51](https://github.com/RodReis/rrb-jarvisOS/pull/51) | *(aguardando)* |
+| [#52](https://github.com/RodReis/rrb-jarvisOS/issues/52) | — (`[FIX]`) | MVP-003 | *(sem spec — fonte: SPEC-DS-03b crit. 4, SPEC-DS-06 crit. 5)* | — | [#53](https://github.com/RodReis/rrb-jarvisOS/pull/53) | 2026-07-23 |
 
 > **04 e 02 saíram no mesmo PR**, por decisão do PI (2026-07-22): o critério 4 da SPEC-04 exige `AuditEvent` de `workspace-switch`, cujo fluxo nasce na F02 — separá-las exigiria um stub que a F02 jogaria fora. O critério 4 fica **parcialmente atendido**: `workspace-switch` está provado ponta a ponta; `login`/`logout`/`login-offline-reuse` têm o tipo no contrato e o fluxo nasce na F03.
 
@@ -55,6 +52,14 @@ Atualizado em: **2026-07-23**. Mantido pelo Code a cada entrega (junto com `DEVE
 | [#12](https://github.com/RodReis/rrb-jarvisOS/issues/12) | 03 Diretórios permitidos (allowlist) | MVP-002 (#9) | `spec-execucao-local-03-allowlist-diretorios.md` | M2-F03 | [#35](https://github.com/RodReis/rrb-jarvisOS/pull/35) | 2026-07-22 |
 | [#13](https://github.com/RodReis/rrb-jarvisOS/issues/13) | 04 Registro de workflows + automações | MVP-002 (#9) | `spec-execucao-local-04-registro-workflows.md` | M2-F04 | [#36](https://github.com/RodReis/rrb-jarvisOS/pull/36) | 2026-07-22 |
 | [#14](https://github.com/RodReis/rrb-jarvisOS/issues/14) | 05 Motor de execução simulado | MVP-002 (#9) | `spec-execucao-local-05-execucao-simulada.md` | M2-F05 | [#37](https://github.com/RodReis/rrb-jarvisOS/pull/37) | 2026-07-23 |
+| [#17](https://github.com/RodReis/rrb-jarvisOS/issues/17) | 01 Infra do design system | MVP-003 (#16) | `spec-design-system-01-infra.md` | M3-F01 | [#38](https://github.com/RodReis/rrb-jarvisOS/pull/38) | 2026-07-23 |
+| [#18](https://github.com/RodReis/rrb-jarvisOS/issues/18) | 02 Foundations + ponte com o protótipo | MVP-003 (#16) | `spec-design-system-02-foundations.md` | M3-F02 | [#40](https://github.com/RodReis/rrb-jarvisOS/pull/40) | 2026-07-23 |
+| [#19](https://github.com/RodReis/rrb-jarvisOS/issues/19) | 03a Componentes: ações + formulários | MVP-003 (#16) | `spec-design-system-03a-componentes-acoes-forms.md` | M3-F03a | [#42](https://github.com/RodReis/rrb-jarvisOS/pull/42) | 2026-07-23 |
+| [#20](https://github.com/RodReis/rrb-jarvisOS/issues/20) | 03b Componentes: dados + overlays + feedback | MVP-003 (#16) | `spec-design-system-03b-componentes-dados-overlays.md` | M3-F03b | [#45](https://github.com/RodReis/rrb-jarvisOS/pull/45) | 2026-07-23 |
+| [#23](https://github.com/RodReis/rrb-jarvisOS/issues/23) | 05 Identidades NOA e JARVIS | MVP-003 (#16) | `spec-design-system-05-identidades.md` | M3-F05 | [#46](https://github.com/RodReis/rrb-jarvisOS/pull/46) | 2026-07-23 |
+| [#21](https://github.com/RodReis/rrb-jarvisOS/issues/21) | 04a AppShell + navegação | MVP-003 (#16) | `spec-design-system-04a-appshell-navegacao.md` | M3-F04a | [#49](https://github.com/RodReis/rrb-jarvisOS/pull/49) | 2026-07-23 |
+| [#22](https://github.com/RodReis/rrb-jarvisOS/issues/22) | 04b Padrões operacionais | MVP-003 (#16) | `spec-design-system-04b-padroes-operacionais.md` | M3-F04b | [#50](https://github.com/RodReis/rrb-jarvisOS/pull/50) | 2026-07-23 |
+| [#24](https://github.com/RodReis/rrb-jarvisOS/issues/24) | 06 Adoção & hardening | MVP-003 (#16) | `spec-design-system-06-adocao-hardening.md` | M3-F06 | [#51](https://github.com/RodReis/rrb-jarvisOS/pull/51) | 2026-07-23 |
 
 ### A Fazer · Em Andamento
 
@@ -66,14 +71,6 @@ Atualizado em: **2026-07-23**. Mantido pelo Code a cada entrega (junto com `DEVE
 
 | Issue | Fatia | Índice | Spec | Coluna |
 |---|---|---|---|---|
-| [#17](https://github.com/RodReis/rrb-jarvisOS/issues/17) | 01 Infra do design system | M3-F01 | `spec-design-system-01-infra.md` | **Feito** (PR [#38](https://github.com/RodReis/rrb-jarvisOS/pull/38)) |
-| [#18](https://github.com/RodReis/rrb-jarvisOS/issues/18) | 02 Foundations + ponte com o protótipo | M3-F02 | `spec-design-system-02-foundations.md` | **Feito** (PR [#40](https://github.com/RodReis/rrb-jarvisOS/pull/40)) |
-| [#19](https://github.com/RodReis/rrb-jarvisOS/issues/19) | 03a Componentes: ações + formulários | M3-F03a | `spec-design-system-03a-componentes-acoes-forms.md` | **Feito** (PR [#42](https://github.com/RodReis/rrb-jarvisOS/pull/42)) |
-| [#20](https://github.com/RodReis/rrb-jarvisOS/issues/20) | 03b Componentes: dados + overlays + feedback | M3-F03b | `spec-design-system-03b-componentes-dados-overlays.md` | **Feito** (PR [#45](https://github.com/RodReis/rrb-jarvisOS/pull/45)) |
-| [#21](https://github.com/RodReis/rrb-jarvisOS/issues/21) | 04a AppShell + navegação | M3-F04a | `spec-design-system-04a-appshell-navegacao.md` | **Feito** (PR [#49](https://github.com/RodReis/rrb-jarvisOS/pull/49)) |
-| [#22](https://github.com/RodReis/rrb-jarvisOS/issues/22) | 04b Padrões operacionais | M3-F04b | `spec-design-system-04b-padroes-operacionais.md` | **Feito** (PR [#50](https://github.com/RodReis/rrb-jarvisOS/pull/50)) |
-| [#23](https://github.com/RodReis/rrb-jarvisOS/issues/23) | 05 Identidades NOA e JARVIS | M3-F05 | `spec-design-system-05-identidades.md` | **Feito** (PR [#46](https://github.com/RodReis/rrb-jarvisOS/pull/46)) |
-| [#24](https://github.com/RodReis/rrb-jarvisOS/issues/24) | 06 Adoção & hardening | M3-F06 | `spec-design-system-06-adocao-hardening.md` | **Feito** (PR [#51](https://github.com/RodReis/rrb-jarvisOS/pull/51)) |
 
 > Base técnica (Fatia 01): **Radix + Tailwind v4 + Lucide**. Specs `03`/`04` originais viraram stubs *superseded* (divididas em a/b).
 
@@ -87,7 +84,7 @@ Não há catálogo numérico `SPEC-nnn` para o MVP-001: as specs são identifica
 |---|---|---|---|
 | MVP-001 Fundação | [#1](https://github.com/RodReis/rrb-jarvisOS/issues/1) | **fechado** — épico aceito pelo PI em 2026-07-22; todas as 6 filhas `proplan:finalizado` (#2, #3, #4, #5, #6, #8) | **6 / 6** |
 | MVP-002 Execução local controlada (fundação) | [#9](https://github.com/RodReis/rrb-jarvisOS/issues/9) | **fechado** — épico aceito pelo PI em 2026-07-23; todas as 5 filhas `proplan:finalizado` (#15, #11, #12, #13, #14) | **5 / 5** |
-| MVP-003 Design System da Plataforma (base única, 2 identidades) | [#16](https://github.com/RodReis/rrb-jarvisOS/issues/16) | **entregue por inteiro** em 2026-07-23 — as 8 fatias em `proplan:done`, aguardando aceite do PI. O épico fecha quando todas as filhas fecharem | 0 / 8 *(8 entregues)* |
+| MVP-003 Design System da Plataforma (base única, 2 identidades) | [#16](https://github.com/RodReis/rrb-jarvisOS/issues/16) | **fechado** — épico aceito pelo PI em 2026-07-23; todas as 8 filhas `proplan:finalizado` (#17–#24) | **8 / 8** |
 | MVP-004 Execução real (terminal + execução allowlisted) | [#10](https://github.com/RodReis/rrb-jarvisOS/issues/10) | renumerado de MVP-003 (título/rótulo atualizados + carimbo); 2 fatias lazy | 0 / 2 |
 | MVP-providers (Corte 3) | — | planejado; incluirá **BudgetPolicy** (modelo decidido no ADR-001 #1) + providers/conectores/RAG | — |
 
@@ -102,10 +99,11 @@ Não há catálogo numérico `SPEC-nnn` para o MVP-001: as specs são identifica
 5. ~~**PI — desbloqueia a F03 (#4)**~~ — **feito** (2026-07-22): projeto Supabase de dev criado, cliente OAuth do Google Cloud registrado e `.env` preenchido. A fatia foi entregue no mesmo dia ([#30](https://github.com/RodReis/rrb-jarvisOS/pull/30)). *Nota:* o `GOOGLE_OAUTH_CLIENT_SECRET` do `.env` **não é consumido pelo app** — no desenho do ADR-002 quem fala com o Google é o Supabase, e o secret vive no painel dele. Decisão do PI: manter a variável sem uso.
 6. ~~**Code**: MVP-002 F01–F05~~ — **MVP-002 entregue por inteiro** (2026-07-22): F01 [#32](https://github.com/RodReis/rrb-jarvisOS/pull/32), F02 [#33](https://github.com/RodReis/rrb-jarvisOS/pull/33), F03 [#35](https://github.com/RodReis/rrb-jarvisOS/pull/35), F04 [#36](https://github.com/RodReis/rrb-jarvisOS/pull/36), F05 [#37](https://github.com/RodReis/rrb-jarvisOS/pull/37). A F05 fecha o corte: o motor percorre um workflow classificando (F02) e checando allowlist (F03) **sem tocar recurso real** — invariante provado pelo efeito (arquivo não criado, diretório idêntico).
 9. ~~**PI**: decidir a próxima frente~~ — **decidido** (2026-07-23): **MVP-003 Design System** (#16). O card `[INFRA]` **#34** (separar o E2E em job próprio) segue em Backlog e independe do MVP.
-10. **PI**: aceitar as fatias entregues do MVP-003 — **F01 (#17)** PR [#38](https://github.com/RodReis/rrb-jarvisOS/pull/38), **F02 (#18)** PR [#40](https://github.com/RodReis/rrb-jarvisOS/pull/40), **F03a (#19)** PR [#42](https://github.com/RodReis/rrb-jarvisOS/pull/42), **F03b (#20)** PR [#45](https://github.com/RodReis/rrb-jarvisOS/pull/45), **F05 (#23)** PR [#46](https://github.com/RodReis/rrb-jarvisOS/pull/46) **F04a (#21)** PR [#49](https://github.com/RodReis/rrb-jarvisOS/pull/49) **F04b (#22)** PR [#50](https://github.com/RodReis/rrb-jarvisOS/pull/50) e **F06 (#24)** PR [#51](https://github.com/RodReis/rrb-jarvisOS/pull/51). Mais o `[FIX]` **#47** (PR [#48](https://github.com/RodReis/rrb-jarvisOS/pull/48)). Todas em `proplan:done`. O PI pediu (2026-07-23) para **fechar o MVP-003 inteiro antes de testar**, então o aceite pode vir em bloco no fim.
+10. ~~**PI**: aceitar as fatias entregues do MVP-003~~ — **feito** (2026-07-23): **as 8 fatias aceitas** (`proplan:finalizado`) e o épico **[#16](https://github.com/RodReis/rrb-jarvisOS/issues/16) fechado**. O corte inteiro — F01 a F06 — saiu em um dia. Segue em aberto o aceite dos três `[FIX]` que nasceram durante ele: **#43** (o app nunca lia o `.env`), **#47** (`navegacao.spec.ts` nunca rodou) e **#52** (o `Meter` escondia o rótulo), todos em `proplan:done`.
+11. **PI — decidir a próxima frente**: o card `[INFRA]` **#34** (separar o E2E em job de CI próprio, hoje o `next`), o `[FIX]` **#41** (renderer sobe em porta variável, contra o `strictPort` do CLAUDE.md) ou o **MVP-004** ([#10](https://github.com/RodReis/rrb-jarvisOS/issues/10), execução real + terminal).
 7. **PI**: (opcional) decidir a adoção de numeração `SPEC-nnn`.
 8. ~~**PI**: aceitar as fatias do MVP-001 e fechar o épico #1~~ — **feito** (2026-07-22): as 6 filhas aceitas (`proplan:finalizado`) e o épico **#1 fechado**. **#15** (MVP-002 · F01) também aceita. **MVP-002 aceito por inteiro** (2026-07-22/23): as 5 filhas `proplan:finalizado` e o épico **#9 fechado**. Dos MVPs 001/002, **nada pendente** — o aceite em aberto agora é a **F01 do MVP-003** (#17), item 10 abaixo.
 
 ## Roadmap macro
 
-MVP-001 Fundação → Execução local controlada → **Design System** → Execução real (terminal) → Integrações reais → Voz e automação → Offline/multiplataforma. Detalhe em `docs/LANDSCAPE.md`.
+MVP-001 Fundação ✅ → Execução local controlada ✅ → Design System ✅ → **Execução real (terminal)** → Integrações reais → Voz e automação → Offline/multiplataforma. Detalhe em `docs/LANDSCAPE.md`.
