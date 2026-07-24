@@ -1,23 +1,16 @@
 ---
 proplan: v1
-updated: 2026-07-23
+updated: 2026-07-24
 ---
 <!-- gerado pelo ProPlan a partir das Issues — não edite à mão -->
 # Status
 
 ## Backlog
 
-### [MVP3] Design System da Plataforma — base única, 2 identidades (#16)
-
-- [MVP3][F05] Identidades NOA e JARVIS (#23)
-- [MVP3][F06] Adoção & hardening (#24)
-- [MVP3][F04b] Padrões operacionais (#22)
-- [MVP3][F04a] AppShell + navegação (#21)
-
 ### Sem épico
 
-- [MVP1][FIX] Renderer sobe em porta variável — `strictPort` não aplicado (#41)
 - [INFRA] CI: separar E2E em job próprio, condicional por paths (#34)
+- [MVP1][FIX] Renderer sobe em porta variável — `strictPort` não aplicado (#41)
 - [MVP4] Execução real — terminal controlado + execução allowlisted (#10)
 
 ## A Fazer
@@ -26,18 +19,28 @@ _(vazio)_
 
 ## Em Andamento
 
-### [MVP3] Design System da Plataforma — base única, 2 identidades (#16)
+### Sem épico
 
-- [MVP3][F03b] Componentes: dados + overlays + feedback (#20)
+- [MVP3][SPEC-DesignSystem-03b][FIX] Meter esconde o rótulo em aria-label (#52)
 
 ## Feito
 
-_(vazio)_
+### [MVP3] Design System da Plataforma — base única, 2 identidades (#16)
+
+- [MVP3][F04a] AppShell + navegação (#21)
+- [MVP3][F05] Identidades NOA e JARVIS (#23)
+- [MVP3][F03b] Componentes: dados + overlays + feedback (#20)
+
+### Sem épico
+
+- [MVP1][INFRA][FIX] navegacao.spec.ts nunca rodou — fora do include de toda categoria (#47)
 
 ## Finalizado
 
 ### [MVP3] Design System da Plataforma — base única, 2 identidades (#16)
 
+- [MVP3][F04b] Padrões operacionais (#22, finalizado em: 2026-07-24)
+- [MVP3][F06] Adoção & hardening (#24, finalizado em: 2026-07-24)
 - [MVP3][F03a] Componentes: ações + formulários (#19, finalizado em: 2026-07-23)
 - [MVP3][F01] Infra do design system (#17, finalizado em: 2026-07-23)
 - [MVP3][F02] Foundations + ponte com o protótipo (#18, finalizado em: 2026-07-23)
@@ -58,6 +61,10 @@ _(vazio)_
 - [MVP1][F02] AppShell e WorkspaceSwitcher (#3, finalizado em: 2026-07-22)
 - [MVP1][F06] Observabilidade e Logging (#8, finalizado em: 2026-07-22)
 - [MVP1][F01] Bootstrap e estrutura (#2, finalizado em: 2026-07-22)
+
+### Sem épico
+
+- [MVP1][SPEC-Fundacao-03][FIX] O app nunca lê o arquivo .env — login sempre indisponível (#43, finalizado em: 2026-07-23)
 
 ## Descartado
 
