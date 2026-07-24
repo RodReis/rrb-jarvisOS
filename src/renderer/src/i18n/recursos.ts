@@ -73,7 +73,14 @@ export const RECURSOS = {
         // esta chave é só o rótulo da região que a apresenta.
         falha: 'Não foi possível entrar',
         tentarNovamente: 'Tentar novamente',
-        conta: 'Conta conectada'
+        conta: 'Conta conectada',
+        // Rodapé institucional do protótipo. O ano é literal e não `new Date()`: o aviso de
+        // copyright é texto legal, e um ano que muda sozinho na virada tornaria a tela
+        // dependente do relógio da máquina para dizer algo que não é sobre a máquina.
+        copyright: '© 2026 RRB Trading — Todos os direitos reservados',
+        privacidade: 'Política de Privacidade',
+        termos: 'Termos de Uso',
+        local: 'GOIÂNIA · BRASIL'
       },
       erro: {
         espaco: 'Não foi possível carregar o espaço de trabalho.',
@@ -142,7 +149,12 @@ export const RECURSOS = {
         sessaoExpirada: 'Session expired',
         falha: 'Could not sign in',
         tentarNovamente: 'Try again',
-        conta: 'Connected account'
+        conta: 'Connected account',
+        copyright: '© 2026 RRB Trading — All rights reserved',
+        privacidade: 'Privacy Policy',
+        termos: 'Terms of Use',
+        // Não traduzido: é o nome próprio da cidade e do país, não uma string de UI.
+        local: 'GOIÂNIA · BRAZIL'
       },
       erro: {
         espaco: 'Could not load the workspace.',
