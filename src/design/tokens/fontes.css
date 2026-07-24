@@ -250,6 +250,65 @@
   }
 }
 
+/*
+ * Atmosfera do Login (protótipo, `data-screen-label="Login"`; README §6 tabela de animações).
+ *
+ * Quatro loops ambientais que dão à tela de entrada a leitura de "sistema vivo, ainda não
+ * aberto". Todos na faixa de 2–30s do README §6 — a tela de login é onde o usuário *espera*, e
+ * um loop rápido aqui vira ansiedade, não presença. Como o resto do arquivo, animam só
+ * `transform` e `opacity`; o bloco de `prefers-reduced-motion` abaixo os zera junto.
+ *
+ * O card e o rodapé usam `riseIn` **uma vez** (`both`), não em loop: é entrada, não ambiente.
+ */
+
+/* Ken Burns do fundo carbono — zoom+pan de 28s em `alternate`, sem corte de volta ao início. */
+@keyframes kb {
+  0% {
+    transform: scale(1) translate(0, 0);
+  }
+  100% {
+    transform: scale(1.12) translate(-1.5%, 1.5%);
+  }
+}
+
+/*
+ * Brilho diagonal varrendo a tela. Sai de fora e volta a sair — os 45% restantes do ciclo são
+ * a pausa: sem ela o brilho passaria de novo antes de o olho esquecer o anterior, e o efeito
+ * viraria estroboscópio.
+ */
+@keyframes sheen {
+  0% {
+    transform: translateX(-140%) skewX(-18deg);
+  }
+  55%,
+  100% {
+    transform: translateX(240%) skewX(-18deg);
+  }
+}
+
+/* Pontos de status respirando. Só opacidade — um ponto que mudasse de tamanho pediria atenção. */
+@keyframes dotpulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* Entrada do card e do rodapé: sobem e aparecem. Executa uma vez (`both` preserva o estado). */
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   :root {
     --jos-duracao-rapida: 0.01ms;
