@@ -75,19 +75,7 @@ export function TelaLogin({ auth, onEntrar }: TelaLoginProps): React.JSX.Element
             boxShadow: '0 30px 80px -30px rgba(0,0,0,.9), 0 0 60px -30px var(--jos-cor-acento)'
           }}
         >
-          {/*
-           * O mascote do DS, não uma imagem solta: ele já traz os dois anéis girando, o glow
-           * pulsante e o `bob` do protótipo — e o texto de estado para leitor de tela. `voz`
-           * fica em `false` porque não há motor de voz nesta tela; um mascote "ouvindo" antes
-           * do login seria estado falso.
-           *
-           * `medio` (96px) e não `grande` (160px): o protótipo desenha o mascote a 112px, e o
-           * `grande` ocupava metade da altura do card — o rosto passava a ser a tela, em vez de
-           * anunciá-la. Dos dois tamanhos que o DS oferece, `medio` é o que fica na medida do
-           * protótipo; introduzir um terceiro tamanho só para esta tela seria alargar a API do
-           * design system para acomodar um consumidor.
-           */}
-          <VoiceMascot modulo="jarvis" tamanho="medio" voz={false} />
+          <Emblema />
 
           {/*
            * O título é visualmente redundante com o mascote — o protótipo não desenha texto
@@ -160,6 +148,52 @@ export function TelaLogin({ auth, onEntrar }: TelaLoginProps): React.JSX.Element
 }
 
 /**
+ * O emblema do login — 112px, a medida do protótipo.
+ *
+ * **Por que não é o `VoiceMascot` puro.** O protótipo monta o emblema em três camadas
+ * *irmãs*: um anel tracejado de 112px girando, um glow, e por dentro um tile de 94px com a
+ * imagem. O `VoiceMascot` é uma peça só, com `overflow-hidden` e os anéis em `inset-0` —
+ * colados na borda da imagem. É o desenho certo para o rail e para o card do Choice, onde o
+ * mascote é um avatar; não é o do login, onde ele é a marca e o anel precisa de ar em volta.
+ *
+ * Então a **moldura** (o anel externo com folga) mora aqui, e o mascote continua sendo o
+ * componente do DS lá dentro — sem prop nova, sem tamanho novo, sem `overflow` afrouxado. O
+ * DS segue dono do rosto, dos estados e do texto para leitor de tela; a tela é dona do
+ * enquadramento, que é decisão de composição desta tela.
+ *
+ * A alternativa seria dar ao `VoiceMascot` um tamanho `emblema` e um modo sem `overflow` —
+ * duas props para um único consumidor, exatamente o que a decisão 4 da F03a evita.
+ */
+function Emblema(): React.JSX.Element {
+  return (
+    <div className="relative grid size-[112px] shrink-0 place-items-center">
+      {/*
+       * O anel externo do protótipo: tracejado, no acento, girando em 20s. Fica **fora** do
+       * tile — é a folga que o `VoiceMascot` sozinho não tem. `aria-hidden` porque o mascote
+       * lá dentro já carrega o nome e o estado para tecnologia assistiva; anunciar a moldura
+       * seria repetir.
+       */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-0 rounded-full border border-dashed border-[color-mix(in_srgb,var(--jos-cor-acento)_35%,transparent)] motion-safe:animate-[spin_20s_linear_infinite]"
+      />
+      {/*
+       * **Sem glow próprio aqui.** A primeira versão somava um `box-shadow` pulsante ao que o
+       * `VoiceMascot` já tem por dentro (`corepulse` + `0 0 34px -8px`), e os dois juntos
+       * viravam um halo laranja sólido: o brilho competia com o rosto em vez de emoldurá-lo.
+       * Visto na captura do app real. O glow do DS sozinho é o do protótipo — o que faltava
+       * era só a folga do anel, e é isso que este wrapper acrescenta.
+       */}
+      {/*
+       * `voz={false}`: não há motor de voz nesta tela, e um mascote "ouvindo" antes do login
+       * seria estado falso — o componente recusa o estado em vez de confiar em quem o chama.
+       */}
+      <VoiceMascot modulo="jarvis" tamanho="medio" voz={false} />
+    </div>
+  )
+}
+
+/**
  * Fundo do protótipo: carbono com Ken Burns, véu radial, brilho diagonal e pontos pulsantes.
  *
  * Tudo `aria-hidden` — é atmosfera, não informação. Cada camada sob `motion-safe`, então
@@ -214,22 +248,39 @@ function Rodape(): React.JSX.Element {
   const { t } = useTranslation()
 
   return (
+    /*
+     * Uma linha só, como o protótipo — daí `flex-wrap` ter saído daqui.
+     *
+     * Com wrap, a 924px o rodapé quebrava em duas linhas e passava a ocupar 95px de altura,
+     * empurrando a composição e roubando do card o espaço vertical que ele precisa. O protótipo
+     * mantém © à esquerda e links à direita na mesma linha, e é isso que a barra inferior
+     * comunica: uma faixa fina, não um bloco.
+     *
+     * O que absorve a falta de espaço é o `min-w-0` + `truncate` no copyright: em janela
+     * estreita ele encolhe e corta, em vez de empurrar os links para baixo. O texto legal é o
+     * que menos perde em ser cortado — os links continuam alcançáveis, que é o que importa.
+     */
     <footer
-      className="absolute inset-x-0 bottom-0 z-10 flex flex-wrap items-center justify-between gap-6 border-t border-[rgba(var(--jos-borda-rgb),0.09)] px-[34px] py-4 backdrop-blur-[6px] motion-safe:animate-[riseIn_800ms_ease_300ms_both]"
+      className="absolute inset-x-0 bottom-0 z-10 flex items-center justify-between gap-6 border-t border-[rgba(var(--jos-borda-rgb),0.09)] px-[34px] py-4 backdrop-blur-[6px] motion-safe:animate-[riseIn_800ms_ease_300ms_both]"
       style={{ background: 'linear-gradient(180deg, rgba(6,7,8,0), rgba(6,7,8,.6))' }}
     >
-      <div className="flex items-center gap-[11px]">
+      {/* `flex-1` junto com `min-w-0`: sem ele o bloco cede espaço que ninguém pediu e o
+          copyright trunca com a barra ainda vazia à direita (visto na captura). Com ele, o
+          texto ocupa o que sobra e só corta quando falta de verdade. */}
+      <div className="flex min-w-0 flex-1 items-center gap-[11px]">
         <span
           aria-hidden
           className="size-[6px] rounded-full bg-[var(--jos-cor-acento)] motion-safe:animate-[dotpulse_3.4s_ease-in-out_infinite]"
           style={{ boxShadow: '0 0 8px 1px var(--jos-cor-acento)' }}
         />
-        <span className="font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] tracking-[1px] text-[var(--jos-cor-texto-suave)]">
+        <span className="truncate font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] tracking-[1px] text-[var(--jos-cor-texto-suave)]">
           {t('auth.copyright')}
         </span>
       </div>
 
-      <div className="flex items-center gap-[26px]">
+      {/* `shrink-0`: quem cede espaço é o copyright (que trunca), não os links — texto legal
+          cortado continua legal; link cortado deixa de ser alcançável. */}
+      <div className="flex shrink-0 items-center gap-[26px]">
         <a
           href="#privacidade"
           className="text-[length:var(--jos-texto-corpo)] tracking-[.5px] text-[var(--jos-cor-texto-secundario)] no-underline transition-colors duration-[var(--jos-duracao-rapida)] hover:text-[var(--jos-cor-acento-leitura)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--jos-cor-acento)]"
@@ -242,8 +293,24 @@ function Rodape(): React.JSX.Element {
         >
           {t('auth.termos')}
         </a>
-        <span aria-hidden className="h-4 w-px bg-[rgba(var(--jos-borda-rgb),0.16)]" />
-        <span className="font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] tracking-[4px] text-[var(--jos-cor-texto-suave)]">
+        {/*
+         * A assinatura de origem some abaixo de 1100px — junto com o divisor que a antecede.
+         *
+         * Medido: numa janela de 924px o rodapé tem 856px úteis, o bloco de links consome 487
+         * (o `tracking:4px` do `GOIÂNIA · BRASIL` sozinho pesa ~60) e sobram 344,9 para um
+         * copyright que precisa de 345. Faltava menos de 1px, e o efeito era o texto legal
+         * aparecer cortado (`…direitos reserv—`) com a barra visualmente vazia.
+         *
+         * Entre truncar o aviso de copyright e esconder a assinatura de origem, some a
+         * assinatura: ela é a informação mais decorativa da barra, enquanto o texto legal
+         * precisa ser lido inteiro. Em telas largas — onde o protótipo foi desenhado — os dois
+         * cabem, e a composição é a original.
+         */}
+        <span
+          aria-hidden
+          className="hidden h-4 w-px bg-[rgba(var(--jos-borda-rgb),0.16)] min-[1100px]:block"
+        />
+        <span className="hidden font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] tracking-[4px] text-[var(--jos-cor-texto-suave)] min-[1100px]:inline">
           {t('auth.local')}
         </span>
       </div>
