@@ -24,7 +24,9 @@ const PERFIL = {
   name: 'Rodrigo Reis',
   email: 'rodrigo@example.com',
   locale: 'pt-BR' as const,
-  theme: 'sistema' as const
+  theme: 'sistema' as const,
+  accentNoa: null,
+  accentJarvis: null
 }
 
 function mockarPonte(): void {

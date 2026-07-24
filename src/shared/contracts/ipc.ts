@@ -8,6 +8,7 @@
  */
 
 import type {
+  AccentColor,
   AuditEvent,
   AuditEventType,
   Locale,
@@ -169,11 +170,17 @@ export interface WorkspaceSwitchResult {
  * `theme` é a preferência (`claro`/`escuro`/`sistema`); `resolvedTheme` é o que pintar
  * agora. A resolução acontece no main porque é ele quem enxerga o `nativeTheme` do SO —
  * o renderer não deve consultar o sistema por conta própria.
+ *
+ * `accentNoa`/`accentJarvis` vêm **já resolvidos**: nunca `null` aqui. Onde o `UserProfile` guarda
+ * `null` ("não escolheu"), o main aplica o `ACENTO_PADRAO` do DS antes de mandar — o renderer
+ * recebe sempre uma cor pintável, sem precisar conhecer o valor de fábrica.
  */
 export interface PreferencesSnapshot {
   readonly locale: Locale
   readonly theme: ThemePreference
   readonly resolvedTheme: ResolvedTheme
+  readonly accentNoa: AccentColor
+  readonly accentJarvis: AccentColor
 }
 
 /**

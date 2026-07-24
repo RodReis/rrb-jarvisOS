@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspaceId } from '@shared/domain/entities'
@@ -157,5 +157,19 @@ describe('CHOICE — painel TEMA (acento e tema como prévia)', () => {
     await waitFor(() => expect(savePreferences).toHaveBeenCalledWith({ theme: 'claro' }))
     // A CHOICE não inverte: é superfície de marca, permanece escura mesmo com a preferência clara.
     expect(document.querySelector('[data-jos-tela="choice"]')).toBeInTheDocument()
+  })
+
+  it('escolher um acento persiste pela mesma via da preferência (critério 4)', async () => {
+    render(<App />)
+    await esperarChoice()
+
+    await userEvent.click(screen.getByRole('button', { name: /ajustar tema e acento/i }))
+    // A paleta do NOA; o nome acessível de cada swatch é o hex.
+    const grupoNoa = screen.getByRole('radiogroup', { name: /acento de NOA/i })
+    await userEvent.click(within(grupoNoa).getByRole('radio', { name: '#FF2C2C' }))
+
+    // Grava `accentNoa` pela mesma via do tema/idioma — é o que persiste entre sessões e faz
+    // CHOICE e Settings editarem o mesmo valor (critério 5).
+    await waitFor(() => expect(savePreferences).toHaveBeenCalledWith({ accentNoa: '#FF2C2C' }))
   })
 })

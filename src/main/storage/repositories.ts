@@ -8,12 +8,14 @@
 
 import type { Database } from 'better-sqlite3'
 import type {
+  AccentColor,
   Locale,
   Session,
   ThemePreference,
   UserPreferences,
   UserProfile
 } from '@shared/domain/entities'
+import { isAccentColor } from '@shared/domain/entities'
 import { log } from '../logging/logger'
 
 interface ProfileRow {
@@ -22,6 +24,17 @@ interface ProfileRow {
   readonly email: string
   readonly locale: string
   readonly theme: string
+  readonly accent_noa: string | null
+  readonly accent_jarvis: string | null
+}
+
+/**
+ * Uma cor gravada só vale se ainda estiver na paleta. Uma coluna com hex fora do conjunto (schema
+ * antigo, edição manual do banco) é tratada como "não escolheu" — cai no default em runtime, em vez
+ * de pintar um acento que a paleta não oferece mais.
+ */
+function toAccent(value: string | null): AccentColor | null {
+  return isAccentColor(value) ? value : null
 }
 
 function toProfile(row: ProfileRow): UserProfile {
@@ -30,7 +43,9 @@ function toProfile(row: ProfileRow): UserProfile {
     name: row.name,
     email: row.email,
     locale: row.locale as Locale,
-    theme: row.theme as ThemePreference
+    theme: row.theme as ThemePreference,
+    accentNoa: toAccent(row.accent_noa),
+    accentJarvis: toAccent(row.accent_jarvis)
   }
 }
 
@@ -79,11 +94,19 @@ export class UserProfileRepository {
       this.db
         .prepare(
           `UPDATE user_profile
-              SET locale = COALESCE(?, locale),
-                  theme  = COALESCE(?, theme)
+              SET locale        = COALESCE(?, locale),
+                  theme         = COALESCE(?, theme),
+                  accent_noa    = COALESCE(?, accent_noa),
+                  accent_jarvis = COALESCE(?, accent_jarvis)
             WHERE id = ?`
         )
-        .run(preferences.locale ?? null, preferences.theme ?? null, userId)
+        .run(
+          preferences.locale ?? null,
+          preferences.theme ?? null,
+          preferences.accentNoa ?? null,
+          preferences.accentJarvis ?? null,
+          userId
+        )
 
       log.db.info('Preferências do usuário gravadas', {
         op: 'update',

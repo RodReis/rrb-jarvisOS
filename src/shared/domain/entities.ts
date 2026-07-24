@@ -49,19 +49,73 @@ export function isThemePreference(value: unknown): value is ThemePreference {
 /** O tema efetivamente aplicado, depois de resolver `sistema`. */
 export type ResolvedTheme = 'claro' | 'escuro'
 
-/** Perfil do usuário. Sem segredo: o que o renderer pode ver por inteiro. */
+/**
+ * As 8 cores de acento da paleta fechada (SPEC-DesignSystem-02; README §2.4).
+ *
+ * Vive aqui, no `shared`, e não só no DS, porque é **fronteira de confiança**: o renderer manda o
+ * acento escolhido, e o main precisa validar contra o conjunto conhecido antes de gravar — a mesma
+ * disciplina de `isLocale`/`isThemePreference`. O `src/shared` não pode importar de `src/design`
+ * (regra de fronteira da F01), então a lista canônica mora aqui.
+ *
+ * ponytail: hoje o DS (`src/design/tokens/acento.ts`) mantém a sua própria cópia das 8 cores. Um
+ * teste (`entities.spec.ts`) trava as duas listas em sincronia — a paleta é estável, então isso não
+ * acopla a fatia a nada. O upgrade é o DS passar a importar `ACCENT_PALETTE` daqui (renderer→shared
+ * é permitido); só não foi feito para manter esta fatia cirúrgica.
+ */
+export const ACCENT_PALETTE = [
+  '#D3AF37',
+  '#FF2C2C',
+  '#2CFF05',
+  '#2323FF',
+  '#C4C4C4',
+  '#FFFFE3',
+  '#8A00C4',
+  '#FF5C00'
+] as const
+
+export type AccentColor = (typeof ACCENT_PALETTE)[number]
+
+export function isAccentColor(value: unknown): value is AccentColor {
+  return typeof value === 'string' && (ACCENT_PALETTE as readonly string[]).includes(value)
+}
+
+/**
+ * Acento de fábrica por módulo, aplicado quando o usuário ainda não escolheu (coluna `null`).
+ *
+ * Fica no `shared` — e não só no DS — porque quem resolve `null → cor` é o **main** (`src/main` não
+ * importa `src/design`). É a fonte de verdade do resolver; o DS tem o seu `ACENTO_PADRAO` para uso
+ * visual. Um valor que diverja é **cosmético** (a cor de um card antes da 1ª escolha), não um bug
+ * de dado — por isso não há teste travando os dois, o que evitaria acoplar esta fatia à mudança de
+ * fábrica que corre em paralelo (`ACENTO_PADRAO.jarvis`, hoje sendo alinhado para prata). Ambos são
+ * prata neutra: a SPEC-CHOICE-01 §Acento fixa `jarvis #C4C4C4, noa #C4C4C4` como valor inicial.
+ */
+export const ACCENT_DEFAULT: Readonly<Record<'noa' | 'jarvis', AccentColor>> = {
+  noa: '#C4C4C4',
+  jarvis: '#C4C4C4'
+}
+
+/**
+ * Perfil do usuário. Sem segredo: o que o renderer pode ver por inteiro.
+ *
+ * `accentNoa`/`accentJarvis` são nuláveis: `null` significa "o usuário ainda não escolheu", e o
+ * valor de fábrica (`ACENTO_PADRAO` do DS) é aplicado em runtime. Ver a migration 6.
+ */
 export interface UserProfile {
   readonly id: string
   readonly name: string
   readonly email: string
   readonly locale: Locale
   readonly theme: ThemePreference
+  readonly accentNoa: AccentColor | null
+  readonly accentJarvis: AccentColor | null
 }
 
-/** O que a tela de Settings altera. Ambos opcionais: a UI muda um de cada vez. */
+/** O que a tela de Settings e a CHOICE alteram. Todos opcionais: a UI muda um de cada vez. */
 export interface UserPreferences {
   readonly locale?: Locale
   readonly theme?: ThemePreference
+  readonly accentNoa?: AccentColor
+  readonly accentJarvis?: AccentColor
 }
 
 /**

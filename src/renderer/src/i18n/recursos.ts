@@ -81,6 +81,8 @@ export const RECURSOS = {
         temaClaro: 'Claro',
         temaEscuro: 'Escuro',
         temaSistema: 'Sistema',
+        acento: 'Acento',
+        acentoDescricao: 'A cor de destaque de cada espaço. A mesma escolha da tela de entrada.',
         salvo: 'Preferências salvas.'
       },
       auth: {
@@ -203,6 +205,8 @@ export const RECURSOS = {
         temaClaro: 'Light',
         temaEscuro: 'Dark',
         temaSistema: 'System',
+        acento: 'Accent',
+        acentoDescricao: 'The highlight color of each space. The same choice as the entry screen.',
         salvo: 'Preferences saved.'
       },
       auth: {

@@ -267,6 +267,7 @@ export function AppShell({ perfil, onSair }: AppShellProps = {}): React.JSX.Elem
           preferencias={preferencias}
           erro={erroPreferencias}
           onSalvar={(mudanca) => void salvar(mudanca)}
+          uiTheme={uiTheme}
         />
       ) : (
         <section

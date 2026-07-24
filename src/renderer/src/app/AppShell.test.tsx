@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspaceId } from '@shared/domain/entities'
@@ -253,5 +253,19 @@ describe('Settings (SPEC-05)', () => {
 
     await trocarPara('JARVIS OS')
     expect(screen.getByLabelText('Idioma')).toBeInTheDocument()
+  })
+
+  it('oferece o acento por módulo com o mesmo seletor da CHOICE (SPEC-CHOICE-01, crit. 5)', async () => {
+    await abrirSettings()
+
+    // Os dois grupos de acento, um por módulo — a paleta fechada, não picker livre.
+    const grupoNoa = screen.getByRole('radiogroup', { name: /acento de NOA/i })
+    const grupoJarvis = screen.getByRole('radiogroup', { name: /acento de JARVIS/i })
+    expect(grupoNoa).toBeInTheDocument()
+    expect(grupoJarvis).toBeInTheDocument()
+
+    // Escolher grava `accentJarvis` pela mesma via da CHOICE — um valor, dois lugares de edição.
+    await userEvent.click(within(grupoJarvis).getByRole('radio', { name: '#D3AF37' }))
+    await waitFor(() => expect(savePreferences).toHaveBeenCalledWith({ accentJarvis: '#D3AF37' }))
   })
 })

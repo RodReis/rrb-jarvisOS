@@ -1,6 +1,11 @@
 import { useState } from 'react'
-import type { ThemePreference, UserProfile, WorkspaceId } from '@shared/domain/entities'
-import { ACENTO_PADRAO, type CorAcento } from '@design/tokens/acento'
+import type {
+  AccentColor,
+  ThemePreference,
+  UserProfile,
+  WorkspaceId
+} from '@shared/domain/entities'
+import type { CorAcento } from '@design/tokens/acento'
 import type { Modulo } from '@design/tokens/semantic'
 import { log } from '../lib/log'
 import { usePreferences } from '../preferences/usePreferences'
@@ -40,20 +45,9 @@ export function SessaoAtiva({
   const { preferencias, salvar } = usePreferences()
   const [fase, setFase] = useState<Fase>({ nome: 'escolhendo' })
 
-  /*
-   * Acento por módulo em estado local, iniciado no default de fábrica.
-   *
-   * **PR 1 (esta entrega) não persiste o acento** — é a segunda metade da fatia (critério 4,
-   * migration no `UserProfile`). Aqui ele vive na sessão: escolher pinta o card na hora e vale
-   * até o shell montar. O PR 2 troca a fonte deste estado para a preferência do usuário, sem
-   * mudar a `TelaChoice` — ela já recebe o acento por prop.
-   */
-  const [acentoNoa, setAcentoNoa] = useState<CorAcento>(ACENTO_PADRAO.noa)
-  const [acentoJarvis, setAcentoJarvis] = useState<CorAcento>(ACENTO_PADRAO.jarvis)
-
   function escolherAcento(modulo: Modulo, cor: CorAcento): void {
-    if (modulo === 'noa') setAcentoNoa(cor)
-    else setAcentoJarvis(cor)
+    const chave = modulo === 'noa' ? 'accentNoa' : 'accentJarvis'
+    void salvar({ [chave]: cor as AccentColor })
   }
 
   /** O seletor de tema da CHOICE escreve a preferência da SPEC-Fundacao-05 (mesmo caminho do Settings). */
@@ -89,6 +83,17 @@ export function SessaoAtiva({
     return <AppShell perfil={perfil} onSair={onSair} />
   }
 
+  // A CHOICE e a transição pintam com o acento; esperar as preferências evita um flash com o
+  // fallback antes de o acento gravado chegar. O snapshot do main já resolveu `null → default`,
+  // então daqui para baixo o acento é sempre uma cor pintável — sem fallback duplicado no renderer.
+  if (!preferencias) {
+    return <main className="fixed inset-0 bg-[#060708]" aria-hidden />
+  }
+
+  // Mesma paleta de 8 hex nos dois lados; o cast é seguro porque o main só devolve cor validada.
+  const acentoNoa = preferencias.accentNoa as CorAcento
+  const acentoJarvis = preferencias.accentJarvis as CorAcento
+
   if (fase.nome === 'entrando') {
     const modulo: Modulo = fase.destino
     return (
@@ -104,7 +109,7 @@ export function SessaoAtiva({
     <TelaChoice
       acentoNoa={acentoNoa}
       acentoJarvis={acentoJarvis}
-      tema={preferencias?.theme ?? 'sistema'}
+      tema={preferencias.theme}
       onEscolherAcento={escolherAcento}
       onEscolherTema={escolherTema}
       onEntrar={entrar}

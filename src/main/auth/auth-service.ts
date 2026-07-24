@@ -202,14 +202,16 @@ export class AuthService {
         : (sessao.user.email ?? 'Usuário')
 
     // Preserva as preferências de quem já entrou antes: `save` só atualiza identidade
-    // (ver `UserProfileRepository.save`), então idioma e tema escolhidos sobrevivem.
+    // (ver `UserProfileRepository.save`), então idioma, tema e acento escolhidos sobrevivem.
     const existente = this.deps.profiles.findById(sessao.user.id)
     const profile = this.deps.profiles.save({
       id: sessao.user.id,
       name: nome,
       email: sessao.user.email ?? '',
       locale: existente?.locale ?? 'pt-BR',
-      theme: existente?.theme ?? 'sistema'
+      theme: existente?.theme ?? 'sistema',
+      accentNoa: existente?.accentNoa ?? null,
+      accentJarvis: existente?.accentJarvis ?? null
     })
 
     const expiresAt = new Date(agora.getTime() + OFFLINE_SESSION_MAX_DAYS * MS_POR_DIA)
