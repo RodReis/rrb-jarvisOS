@@ -1,6 +1,6 @@
 # STATUS.md — Kanban / Roadmap
 
-Atualizado em: **2026-07-23**. Mantido pelo Code a cada entrega (junto com `DEVELOPMENT.md`). Este arquivo espelha o board das GitHub Issues (`proplan:*`) — se divergirem, as **Issues vencem** e este arquivo deve ser corrigido.
+Atualizado em: **2026-07-24**. Mantido pelo Code a cada entrega (junto com `DEVELOPMENT.md`). Este arquivo espelha o board das GitHub Issues (`proplan:*`) — se divergirem, as **Issues vencem** e este arquivo deve ser corrigido.
 
 ## Board
 
@@ -14,6 +14,10 @@ Atualizado em: **2026-07-23**. Mantido pelo Code a cada entrega (junto com `DEVE
 > **`proplan:next` = [#34](https://github.com/RodReis/rrb-jarvisOS/issues/34)** (`[INFRA]` — separar o E2E em job de CI próprio).
 
 > ✅ **MVP-003 aceito pelo PI em 2026-07-23.** As 8 fatias (#17–#24) estão `closed` + `proplan:finalizado` e o épico **[#16](https://github.com/RodReis/rrb-jarvisOS/issues/16) foi fechado**. Os três `[FIX]` que nasceram durante o corte (#43, #47, #52) seguem em `proplan:done`, aguardando aceite à parte.
+
+> Card **[#58](https://github.com/RodReis/rrb-jarvisOS/issues/58)** (`[FIX]`, 2026-07-24): **o Tailwind não varria `src/design/`** — o v4 detecta os arquivos a partir da pasta do CSS de entrada (`src/renderer/`), e sem `@source` o design system inteiro ficava fora do scanning. Toda classe usada **só** por um componente do DS nunca entrou no bundle: `text-[var(--jos-cor-texto)]` (37 usos em 20 arquivos), `disabled:opacity-45`, `mix-blend-screen`, os anéis do `VoiceMascot`. Efeito visível: o `Button` secundário caía no `button { color: inherit }` do reset e herdava a cor do `body` — **texto quase preto sobre superfície escura**. CSS compilado 22,9 KB → 56,8 KB depois da correção. Achado ao portar o login (#57), na captura do app real; confirmado por CDP (`CSS.getMatchedStylesForNode`). Os 562 testes passavam porque **jsdom não aplica folha de estilo**. Corrigido junto com #57 porque a tela não fica correta sem ele. **Mergeado** (PR [#59](https://github.com/RodReis/rrb-jarvisOS/pull/59)), aguardando aceite.
+
+> Card **[#57](https://github.com/RodReis/rrb-jarvisOS/issues/57)** (`[FIX]`, 2026-07-24): **a tela de login não seguia o protótipo** — era o placeholder de 66 linhas da F03 (um botão `sky-600` num card cinza), escrito quando ainda não havia design system e declarando isso no próprio cabeçalho. O MVP-003 fechou e a dívida venceu: o protótipo tem o markup completo da tela, o mockup canônico está em `screens/01-login.png`, `SUPERFICIES_DE_MARCA` já previa `'login'` e o `Button` documenta `larguraTotal` como *"o 'ACESSAR' do login"*. O DS foi construído para esta tela e nunca foi aplicado nela. Portada fiel: fundo carbono com Ken Burns, véu radial, sheen, dots, card glass 340px, `VoiceMascot`, rodapé institucional. **Google segue como única entrada** — o mockup mostra usuário/senha e GitHub, que o backend não tem (decisão do PI: fatia nova, com spec própria). **Mergeado** (PR [#59](https://github.com/RodReis/rrb-jarvisOS/pull/59)), aguardando aceite.
 
 > Card **[#52](https://github.com/RodReis/rrb-jarvisOS/issues/52)** (`[FIX]`, 2026-07-23): **o `Meter` escondia o rótulo em `aria-label`** — acessível a quem usa leitor de tela, invisível para quem enxerga. Achado ao **revisar a captura do JARVIS HUD para o aceite**: quatro barras de telemetria com números à direita e nenhuma forma de saber qual era CPU, RAM, GPU ou DISK. É o inverso do critério 5 (F06): informação essencial ausente da tela. Corrigido no componente (prop `rotuloVisivel`), não no uso. **Mergeado** (PR [#53](https://github.com/RodReis/rrb-jarvisOS/pull/53)), aguardando aceite.
 
@@ -34,6 +38,8 @@ Atualizado em: **2026-07-23**. Mantido pelo Code a cada entrega (junto com `DEVE
 | [#43](https://github.com/RodReis/rrb-jarvisOS/issues/43) | — (`[FIX]`) | MVP-001 | *(sem spec — fonte: `.env.example` §1-8)* | — | [#44](https://github.com/RodReis/rrb-jarvisOS/pull/44) | 2026-07-23 |
 | [#47](https://github.com/RodReis/rrb-jarvisOS/issues/47) | — (`[FIX]`) | MVP-001 | *(sem spec — fonte: `TESTING.md` §2/§3, ADR-003)* | — | [#48](https://github.com/RodReis/rrb-jarvisOS/pull/48) | 2026-07-23 |
 | [#52](https://github.com/RodReis/rrb-jarvisOS/issues/52) | — (`[FIX]`) | MVP-003 | *(sem spec — fonte: SPEC-DS-03b crit. 4, SPEC-DS-06 crit. 5)* | — | [#53](https://github.com/RodReis/rrb-jarvisOS/pull/53) | 2026-07-23 |
+| [#57](https://github.com/RodReis/rrb-jarvisOS/issues/57) | — (`[FIX]`) | MVP-001 | *(sem spec — fonte: protótipo `Login`, `01-login.png`, README §2.6)* | — | [#59](https://github.com/RodReis/rrb-jarvisOS/pull/59) | 2026-07-24 |
+| [#58](https://github.com/RodReis/rrb-jarvisOS/issues/58) | — (`[FIX]`) | MVP-003 | *(sem spec — fonte: `src/design/README.md` § Base técnica)* | — | [#59](https://github.com/RodReis/rrb-jarvisOS/pull/59) | 2026-07-24 |
 
 > **04 e 02 saíram no mesmo PR**, por decisão do PI (2026-07-22): o critério 4 da SPEC-04 exige `AuditEvent` de `workspace-switch`, cujo fluxo nasce na F02 — separá-las exigiria um stub que a F02 jogaria fora. O critério 4 fica **parcialmente atendido**: `workspace-switch` está provado ponta a ponta; `login`/`logout`/`login-offline-reuse` têm o tipo no contrato e o fluxo nasce na F03.
 
