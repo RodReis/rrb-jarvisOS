@@ -39,15 +39,16 @@ const ID_SENHA = 'login-senha'
 /**
  * O acento desta tela — prata fixa, fora da paleta do usuário (decisão do PI, 2026-07-24).
  *
- * `#C4C4C4` é uma das oito cores de `PALETA_ACENTO` (README §2.4) e o default de fábrica do NOA;
- * aqui ela entra como **cor de marca da porta de entrada**, não como acento de um módulo. Por
- * isso o valor é literal e não `ACENTO_PADRAO.noa`: ler o token do NOA amarraria a tela de login
- * a uma mudança de identidade que nada tem a ver com ela.
+ * `#C4C4C4` é uma das oito cores de `PALETA_ACENTO` (README §2.4). Aqui ela entra como **cor de
+ * marca da porta de entrada**, não como acento de um módulo: quem está no login ainda não
+ * escolheu espaço nem cor, e pintar anel, glow e dot com o acento de um módulo ainda não aberto
+ * anteciparia uma identidade que o usuário não selecionou.
  *
- * Nota de escopo: a `SPEC-CHOICE-01` (rascunho, ainda não `aprovada-pi`) propõe mudar o
- * `ACENTO_PADRAO` do JARVIS de `#C4C4C4` para `#C4C4C4` — o que tornaria esta constante
- * redundante. Enquanto a spec não for aprovada, o default do app segue `#C4C4C4` e a
- * neutralização vive aqui, no consumidor, sem alterar o token que outras telas leem.
+ * O valor é literal, e não `ACENTO_PADRAO.jarvis`, **de propósito** — mesmo agora que o token
+ * também vale `#C4C4C4` (o PI o alterou em 2026-07-24, alinhando ao que a SPEC-CHOICE-01 pedia).
+ * Ler o token amarraria a porta de entrada ao default de um módulo: no dia em que o JARVIS
+ * voltar a ter acento próprio, o login o herdaria em silêncio. A coincidência de valor hoje não
+ * é a mesma decisão — uma é "o default do JARVIS", a outra é "a tela de entrada não tem acento".
  */
 const ACENTO_DA_MARCA = '#C4C4C4' as const
 
