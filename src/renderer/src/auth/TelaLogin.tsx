@@ -1,6 +1,5 @@
 import { useTranslation } from 'react-i18next'
 import type { AuthSnapshot } from '@shared/contracts/auth'
-import { ACENTO_PADRAO } from '@design/tokens/acento'
 import { ProvedorDeTema } from '@design/tokens/provider'
 import { Button, InlineAlert, Input, PasswordInput, VoiceMascot } from '@design/ui'
 import carbono from '@design/assets/carbono.jpg'
@@ -38,6 +37,21 @@ const ID_USUARIO = 'login-usuario'
 const ID_SENHA = 'login-senha'
 
 /**
+ * O acento desta tela — prata fixa, fora da paleta do usuário (decisão do PI, 2026-07-24).
+ *
+ * `#C4C4C4` é uma das oito cores de `PALETA_ACENTO` (README §2.4) e o default de fábrica do NOA;
+ * aqui ela entra como **cor de marca da porta de entrada**, não como acento de um módulo. Por
+ * isso o valor é literal e não `ACENTO_PADRAO.noa`: ler o token do NOA amarraria a tela de login
+ * a uma mudança de identidade que nada tem a ver com ela.
+ *
+ * Nota de escopo: a `SPEC-CHOICE-01` (rascunho, ainda não `aprovada-pi`) propõe mudar o
+ * `ACENTO_PADRAO` do JARVIS de `#FF5C00` para `#C4C4C4` — o que tornaria esta constante
+ * redundante. Enquanto a spec não for aprovada, o default do app segue `#FF5C00` e a
+ * neutralização vive aqui, no consumidor, sem alterar o token que outras telas leem.
+ */
+const ACENTO_DA_MARCA = '#C4C4C4' as const
+
+/**
  * Handler vazio dos campos de maquete.
  *
  * O `Input` exige `onMudar`; campo desabilitado não dispara `change`, então isto nunca roda. Fora
@@ -58,13 +72,22 @@ export function TelaLogin({ auth, onEntrar }: TelaLoginProps): React.JSX.Element
      * `superficie="login"` é o contrato que a F02 deixou pronto e nunca foi usado: a tela de
      * entrada é **superfície de marca** e permanece escura mesmo com `uiTheme='light'`
      * (README §2.6). Por isso não lê `usePreferences` — não há preferência a respeitar aqui.
+     *
+     * E o acento vai **fixo em prata** (decisão do PI, 2026-07-24): a tela de entrada antecede
+     * a identidade. Quem está aqui ainda não escolheu espaço nem cor, e o laranja do JARVIS
+     * (`#FF5C00`, o default de fábrica) pintava anel, glow e dot de um módulo que o usuário
+     * ainda não abriu — no protótipo esses elementos são metálicos.
+     *
+     * Passar o acento **ao provider**, em vez de trocar cor a cor, é o que faz um único ponto
+     * governar a tela inteira: todo `var(--jos-cor-acento)` daqui para baixo lê prata, e um
+     * elemento novo nasce neutro sem ninguém lembrar de neutralizá-lo.
      */
     <ProvedorDeTema
       uiTheme="dark"
       modulo="jarvis"
       superficie="login"
-      accentJarvis={ACENTO_PADRAO.jarvis}
-      accentNoa={ACENTO_PADRAO.noa}
+      accentJarvis={ACENTO_DA_MARCA}
+      accentNoa={ACENTO_DA_MARCA}
     >
       {/*
        * `fixed inset-0`, e não `h-full`: o `ProvedorDeTema` insere um `<div>` de bloco entre
