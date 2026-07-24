@@ -194,4 +194,18 @@ describe('critério 5 — nenhum estado essencial só por cor', () => {
     expect(screen.getByText('82')).toBeInTheDocument()
     expect(screen.getByText('34')).toBeInTheDocument()
   })
+
+  it('cada barra do HUD tem o nome da medida **visível**, não só em `aria-label`', () => {
+    render(<JarvisHud uiTheme="dark" />)
+
+    // A captura mostrou quatro barras com números à direita e nenhuma forma de saber qual era
+    // CPU, RAM, GPU ou DISK: o rótulo vivia só no `aria-label`. Acessível a quem usa leitor de
+    // tela, **invisível** para quem enxerga — o inverso do critério 5.
+    //
+    // `getByText` não vê `aria-label`, e é isso que torna a asserção honesta: ela falha se o
+    // rótulo voltar a ser só atributo.
+    for (const medida of ['CPU', 'RAM', 'GPU', 'DISK']) {
+      expect(screen.getByText(medida)).toBeInTheDocument()
+    }
+  })
 })
