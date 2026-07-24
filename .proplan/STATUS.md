@@ -19,9 +19,7 @@ _(vazio)_
 
 ## Em Andamento
 
-### Sem épico
-
-- [MVP3][SPEC-DesignSystem-03b][FIX] Meter esconde o rótulo em aria-label (#52)
+_(vazio)_
 
 ## Feito
 
@@ -29,16 +27,16 @@ _(vazio)_
 
 ## Finalizado
 
-### [MVP3] Design System da Plataforma — base única, 2 identidades (#16)
+### #16 (#16)
 
-- [MVP3][F03b] Componentes: dados + overlays + feedback (#20, finalizado em: 2026-07-24)
-- [MVP3][F05] Identidades NOA e JARVIS (#23, finalizado em: 2026-07-24)
-- [MVP3][F04a] AppShell + navegação (#21, finalizado em: 2026-07-24)
-- [MVP3][F04b] Padrões operacionais (#22, finalizado em: 2026-07-24)
 - [MVP3][F06] Adoção & hardening (#24, finalizado em: 2026-07-24)
+- [MVP3][F05] Identidades NOA e JARVIS (#23, finalizado em: 2026-07-24)
+- [MVP3][F04b] Padrões operacionais (#22, finalizado em: 2026-07-24)
+- [MVP3][F04a] AppShell + navegação (#21, finalizado em: 2026-07-24)
+- [MVP3][F03b] Componentes: dados + overlays + feedback (#20, finalizado em: 2026-07-24)
 - [MVP3][F03a] Componentes: ações + formulários (#19, finalizado em: 2026-07-23)
-- [MVP3][F01] Infra do design system (#17, finalizado em: 2026-07-23)
 - [MVP3][F02] Foundations + ponte com o protótipo (#18, finalizado em: 2026-07-23)
+- [MVP3][F01] Infra do design system (#17, finalizado em: 2026-07-23)
 
 ### #9 (#9)
 
@@ -59,6 +57,9 @@ _(vazio)_
 
 ### Sem épico
 
+- [MVP3][SPEC-DesignSystem-01][FIX] Tailwind não varria src/design — o DS inteiro renderizava sem parte do seu CSS (#58, finalizado em: 2026-07-24)
+- [MVP1][SPEC-Fundacao-03][FIX] Tela de login não segue o protótipo (#57, finalizado em: 2026-07-24)
+- [MVP3][SPEC-DesignSystem-03b][FIX] Meter esconde o rótulo em aria-label (#52, finalizado em: 2026-07-24)
 - [MVP1][INFRA][FIX] navegacao.spec.ts nunca rodou — fora do include de toda categoria (#47, finalizado em: 2026-07-24)
 - [MVP1][SPEC-Fundacao-03][FIX] O app nunca lê o arquivo .env — login sempre indisponível (#43, finalizado em: 2026-07-23)
 
