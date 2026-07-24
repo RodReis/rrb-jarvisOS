@@ -14,6 +14,10 @@ coverage
 # Artefatos brutos dos runners: o relatório versionado é reports/TESTS.md (ADR-003).
 reports/.raw
 
+# Capturas de comparação com o protótipo — mesma razão de `reports/prova/`: PNG regerável,
+# que muda a cada ajuste de pixel e ninguém revisa no diff.
+reports/comparacao/
+
 # Cache local do grafo de conhecimento (CLAUDE.md § graphify).
 graphify-out
 
