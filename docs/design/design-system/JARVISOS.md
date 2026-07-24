@@ -13,7 +13,7 @@
 - **Tom**: tático, leal, direto, "máquina de guerra". Copy objetiva, mono para dados.
 - **Fundo do app**: `#0a0b0e` + brilho radial do acento no topo: `radial-gradient(1200px 500px at 70% 0%, color-mix(in srgb, accJ 6%, transparent), transparent 65%)`.
 - **Hairlines**: `rgba(200,204,212,.08–.12)`.
-- **Acento** (`accJ`): prop `acentoJarvis`, default de fábrica `#FF5C00`; fallback runtime `#D3AF37`. Derivados `accJA20/35/50/70/80` via `hexA`.
+- **Acento** (`accJ`): prop `acentoJarvis`, default de fábrica `#C4C4C4 `; fallback runtime `#D3AF37`. Derivados `accJA20/35/50/70/80` via `hexA`.
 - **Mascote**: `assets/jarvis-cabeca.jpg` (`mix-blend-mode:screen`), com olhos e boca reativos à voz.
 - **Prop extra**: `falaAutomatica` (boolean, default `true`) — JARVIS fala ao entrar.
 

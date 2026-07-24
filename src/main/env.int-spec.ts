@@ -54,9 +54,9 @@ describe('parseEnv', () => {
     // Chave em base64 termina em `=`, e `#` aparece em cor hex. Cortar no primeiro `=` ou
     // tratar `#` como comentário no meio da linha truncaria credencial em silêncio — o valor
     // ficaria *quase* certo, que é a pior forma de errar.
-    expect(parseEnv('KEY=abc==\nCOR=#FF5C00\nURL=https://x.co/a?b=c')).toEqual({
+    expect(parseEnv('KEY=abc==\nCOR=#C4C4C4\nURL=https://x.co/a?b=c')).toEqual({
       KEY: 'abc==',
-      COR: '#FF5C00',
+      COR: '#C4C4C4',
       URL: 'https://x.co/a?b=c'
     })
   })

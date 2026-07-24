@@ -61,7 +61,7 @@ export function JarvisHud({
       uiTheme={uiTheme}
       modulo="jarvis"
       superficie="jarvis"
-      accentJarvis={acento ?? '#FF5C00'}
+      accentJarvis={acento ?? '#C4C4C4'}
       accentNoa="#C4C4C4"
     >
       <div

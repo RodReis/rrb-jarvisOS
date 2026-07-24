@@ -74,7 +74,7 @@ describe('critério 1 — o mesmo componente serve as duas identidades', () => {
 
 describe('critério 2 — acento default por módulo, sem vazamento entre eles', () => {
   it('cada módulo aplica o seu acento de fábrica', () => {
-    expect(tema('jarvis')['--jos-cor-acento']).toBe('#FF5C00')
+    expect(tema('jarvis')['--jos-cor-acento']).toBe('#C4C4C4')
     expect(tema('noa')['--jos-cor-acento']).toBe('#C4C4C4')
   })
 

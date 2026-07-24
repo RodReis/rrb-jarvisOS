@@ -17,7 +17,7 @@ Expressar NOA e JARVIS OS como **duas identidades sobre a mesma base**, sem dupl
 
 - **Contrato de identidade:** um token-set por módulo aplicado sobre as foundations (Fatia 02), **com par escuro/claro** (README §2.6):
   - **NOA** (`NOA.md §1`): tom calmo/íntimo; fundo escuro `#0b0d0d` (viés verde neutro) ↔ claro `#f2f4f2` aprox.; hairlines `nBord` `200,212,206` ↔ `34,44,38`; acento default `#C4C4C4` (fallback `#2CFF05`); mascote `assets/noa-cabeca.png`; tokens de tema `nt*`; **sem voz** por padrão.
-  - **JARVIS** (`JARVISOS.md §1`): tom tático/direto; fundo escuro `#0a0b0e` **+ glow radial do acento** (`radial-gradient(1200px 500px at 70% 0%, color-mix(in srgb, accJ 6%, transparent), transparent 65%)`) ↔ claro `#f5f6f8` aprox.; hairlines `jBord` `200,204,212` ↔ `30,35,46`; acento default `#FF5C00` (fallback `#D3AF37`); mascote `assets/jarvis-cabeca.jpg`; tokens de tema `jt*`; prop `falaAutomatica` reservada (voz real é Corte 4).
+  - **JARVIS** (`JARVISOS.md §1`): tom tático/direto; fundo escuro `#0a0b0e` **+ glow radial do acento** (`radial-gradient(1200px 500px at 70% 0%, color-mix(in srgb, accJ 6%, transparent), transparent 65%)`) ↔ claro `#f5f6f8` aprox.; hairlines `jBord` `200,204,212` ↔ `30,35,46`; acento default `#C4C4C4` (fallback `#D3AF37`); mascote `assets/jarvis-cabeca.jpg`; tokens de tema `jt*`; prop `falaAutomatica` reservada (voz real é Corte 4).
 - **`uiTheme` é global e compartilhado** entre as duas identidades (README §2.6): o toggle da topbar afeta os dois módulos ao mesmo tempo. Identidade **não** troca o modo; só troca o token-set (`jt*` vs `nt*`) e o acento.
 - **Mascote como componente visual** (VoiceMascot): anel `spin`, glow `corepulse`, `bob`, `mix-blend-mode:screen` (tile **sempre escuro**, inclusive no claro), olhos/boca reativos — **estado por props** (`speaking`/`listening`), **sem** motor de TTS/STT (mock/estático). Serve NOA e JARVIS trocando imagem/acento. **No NOA, voz desabilitada por prop** (mascote sem estados de fala por padrão).
 - **Glow radial do JARVIS mantido** (decisão do PI): a atmosfera do acento no topo do conteúdo é parte da identidade tática e permanece como no protótipo.
@@ -34,7 +34,7 @@ Expressar NOA e JARVIS OS como **duas identidades sobre a mesma base**, sem dupl
 ## Critérios de aceite
 
 1. Um mesmo componente (ex.: Card, Button) renderiza com identidade **NOA** e **JARVIS** trocando só o token-set/prop — **sem** componente duplicado (teste renderiza os dois).
-2. Acento default por módulo aplicado (NOA `#C4C4C4`, JARVIS `#FF5C00`); trocar o acento de um **não** afeta o outro (teste).
+2. Acento default por módulo aplicado (NOA `#C4C4C4`, JARVIS `#C4C4C4`); trocar o acento de um **não** afeta o outro (teste).
 3. Par escuro/claro por identidade aplica os valores do README §2.6; `uiTheme` global afeta as duas identidades juntas (teste).
 4. Glow radial do JARVIS presente no fundo do conteúdo (inspeção/teste de estilo).
 5. `status-*`/`risk-*` idênticos nos dois módulos e nos dois modos (teste: identidade e `uiTheme` não mudam semântica).

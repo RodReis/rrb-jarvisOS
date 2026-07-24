@@ -156,7 +156,7 @@ describe('variáveis do tema', () => {
   it('cada módulo lê o próprio acento', () => {
     const noa = variaveisDoTema({
       uiTheme: 'dark',
-      accentJarvis: '#FF5C00',
+      accentJarvis: '#C4C4C4',
       accentNoa: '#2323FF',
       modulo: 'noa',
       superficie: 'noa'

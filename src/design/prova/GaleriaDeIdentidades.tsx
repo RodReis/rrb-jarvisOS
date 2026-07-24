@@ -44,7 +44,7 @@ function ColunaDaIdentidade({
       uiTheme={modo}
       modulo={modulo}
       superficie={modulo}
-      accentJarvis={acento ?? '#FF5C00'}
+      accentJarvis={acento ?? '#C4C4C4'}
       accentNoa={acento ?? '#C4C4C4'}
     >
       <FundoDaIdentidade

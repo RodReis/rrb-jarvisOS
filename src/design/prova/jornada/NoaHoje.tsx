@@ -62,7 +62,7 @@ export function NoaHoje({
       modulo="noa"
       superficie="noa"
       accentNoa={acento ?? '#C4C4C4'}
-      accentJarvis="#FF5C00"
+      accentJarvis="#C4C4C4"
     >
       <div
         data-jornada="noa-hoje"

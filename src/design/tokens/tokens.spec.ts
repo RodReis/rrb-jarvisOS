@@ -251,12 +251,12 @@ describe('acento do usuário (critério 3)', () => {
   })
 
   it('cada módulo tem o default de fábrica do protótipo', () => {
-    expect(ACENTO_PADRAO.jarvis).toBe('#FF5C00')
+    expect(ACENTO_PADRAO.jarvis).toBe('#C4C4C4')
     expect(ACENTO_PADRAO.noa).toBe('#C4C4C4')
   })
 
   it('hexA concatena o byte de alfa', () => {
-    expect(hexA('#FF5C00', 'b3')).toBe('#FF5C00b3')
+    expect(hexA('#C4C4C4', 'b3')).toBe('#C4C4C4b3')
   })
 
   it('o contraste segue a razão WCAG (preto/branco = 21:1)', () => {
@@ -267,7 +267,7 @@ describe('acento do usuário (critério 3)', () => {
   describe('ajuste de tom só para leitura', () => {
     it('preserva a cor quando o contraste já é suficiente', () => {
       // O acento é identidade: mexer nele sem necessidade seria descaracterizar a escolha.
-      const acento = '#FF5C00'
+      const acento = '#C4C4C4'
       expect(acentoParaLeitura(acento, '#0a0b0e')).toBe(acento)
     })
 
@@ -306,8 +306,8 @@ describe('acento do usuário (critério 3)', () => {
 
 describe('primitivos de base', () => {
   it('a sombra do card compõe com o glow do acento', () => {
-    const sombra = sombraComGlow('#FF5C00')
+    const sombra = sombraComGlow('#C4C4C4')
     expect(sombra).toContain('0 20px 46px -18px rgba(0,0,0,.9)')
-    expect(sombra).toContain('#FF5C00')
+    expect(sombra).toContain('#C4C4C4')
   })
 })

@@ -53,7 +53,7 @@ export function GaleriaDeShell({
       <AppShell
         modulo={modulo}
         uiTheme={uiTheme}
-        accentJarvis={acento ?? '#FF5C00'}
+        accentJarvis={acento ?? '#C4C4C4'}
         accentNoa={acento ?? '#C4C4C4'}
         rail={
           <Rail

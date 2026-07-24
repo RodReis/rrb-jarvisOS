@@ -24,7 +24,7 @@ export type CorAcento = (typeof PALETA_ACENTO)[number]
 
 /** Default de fábrica por módulo — README §2.4. */
 export const ACENTO_PADRAO: Readonly<Record<Modulo, CorAcento>> = {
-  jarvis: '#FF5C00',
+  jarvis: '#C4C4C4',
   noa: '#C4C4C4'
 }
 
