@@ -1,7 +1,7 @@
 # SPEC-Fundacao-02 — AppShell e WorkspaceSwitcher
 
 - MVP: `docs/mvp/mvp-001-fundacao.md` (Fatia 02)
-- Status: **aprovada-pi** (2026-07-21) — todas as perguntas abertas resolvidas pelo PI. **Emenda 2026-07-22 (PI):** +critério de aceite de logging (F06 / CONVENTION §3) — a instrumentação do `workspace-switch` vive aqui, não no F06.
+- Status: **aprovada-pi** (2026-07-21) — todas as perguntas abertas resolvidas pelo PI. **Emenda 2026-07-22 (PI):** +critério de aceite de logging (F06 / CONVENTION §3) — a instrumentação do `workspace-switch` vive aqui, não no F06. **Emenda 2026-07-24 (PI):** parte desta spec é superseded pela SPEC-CHOICE-01 (ver § Emenda 2026-07-24).
 - Dependências: Fatia 01 entregue. Contratos de dados da Fatia 04 podem ser detalhados em paralelo (esta spec consome `Workspace`).
 
 ## Objetivo
@@ -43,3 +43,22 @@ Shell visual do app com sidebar, área de conteúdo e alternância NOA ⇄ JARVI
 2. Fechar no "X" da janela: **minimizar para tray** (comportamento padrão, sem prompt). — aprovado.
 3. Semântica da troca de workspace: **rota preservada por espaço** — cada workspace restaura a última tela ao voltar; a rota do outro nunca vaza. — aprovado.
 4. Segunda instância: **single-instance lock** — foca a janela existente em vez de abrir outra. — aprovado.
+
+## Emenda 2026-07-24 (PI) — supersessão mínima pela SPEC-CHOICE-01
+
+A tela CHOICE (`docs/spec/spec-choice-01-selecao-de-espaco.md`, `aprovada-pi` 2026-07-24, revisada na
+opção A no mesmo dia) muda **um único ponto** desta spec: o destino pós-login.
+
+| Item desta spec | Estado após a emenda |
+|---|---|
+| Pergunta resolvida 1 — "abrir sempre no JARVIS OS, ignora último estado" | **Revogado.** O app abre na **CHOICE** em todo login; o espaço de **entrada** é escolhido ali. |
+| Crit. 1 — "Alternância NOA⇄JARVIS OS funciona" **via rail** | **Permanece intacto.** O rail continua sendo o trocador de espaço na sessão; a CHOICE não o substitui. |
+| Crit. 1/3 — isolamento + **rota preservada por espaço** | **Permanece intacto.** Nada muda; o teste A→B→A continua valendo como está (via rail). |
+| Crit. 4/7 — `workspace-switch` (`AuditEvent`/logging) | **Permanece.** Entrar pela CHOICE e trocar pelo rail são o mesmo evento. |
+
+Perguntas resolvidas 2 (fechar no "X" → tray) e 4 (single-instance) **não** são afetadas. A CHOICE
+**não** mexe em `WorkspaceSwitcher` nem em `navegacao.spec.ts` — o rail fica como está. Detalhe e
+critérios na SPEC-CHOICE-01.
+
+> Nota histórica: uma versão anterior desta emenda (mesma data) previa "porta única" — o rail deixando
+> de alternar em favor da CHOICE. O PI descartou (opção A). O rail permanece.

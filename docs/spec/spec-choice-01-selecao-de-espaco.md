@@ -1,23 +1,24 @@
 # SPEC-CHOICE-01 — Tela CHOICE (seleção de espaço + acento)
 
 - MVP: **container em aberto** — o PI decidiu (2026-07-24) que a CHOICE vem **antes do MVP-004** e que o vínculo de épico fica para depois. Ver *Nota de vínculo*.
-- Status: **rascunho — todos os residuais resolvidos pelo PI (2026-07-24); aguardando o Cowork marcar `aprovada-pi`.** O Code registrou as respostas, mas não muda o status: o documento é do Cowork, e é ele quem faz a emenda à SPEC-Fundacao-02 e cria a issue-fatia.
+- Status: **`aprovada-pi` (2026-07-24)** — carimbada pelo Cowork. **Revisão 2026-07-24 (opção A, PI):** a Decisão 2 mudou — a CHOICE é porta de **entrada** (em todo login), e a troca na sessão continua pelo **rail**, não pela CHOICE. Supersessão da SPEC-Fundacao-02 reduzida ao mínimo (só o destino pós-login). Issue-fatia: **[#69](https://github.com/RodReis/rrb-jarvisOS/issues/69)** (Backlog, assignee PI).
 - Autor: Claude Cowork (2026-07-24), a partir do kickoff do Code.
 - Origem: `docs/kickoff-choice-selecao-de-espaco.md` (Code, 2026-07-24) + captura da CHOICE enviada pelo PI durante o ajuste do login (#57).
 - Dependências: Fatias 02 (AppShell/WorkspaceSwitcher), 04 (UserProfile), 05 (Settings) entregues; MVP-003 (design system, inclui `AccentSwatchSelector`, identidades, superfícies de marca) entregue.
 
-> **Esta spec revoga parte de comportamento já entregue e aceito (SPEC-Fundacao-02).** A revogação é
-> decisão de escopo do PI, registrada aqui; sua formalização exige **emenda à SPEC-Fundacao-02** (ato do PI).
-> Ver § *Supersessão*.
+> **Supersessão mínima da SPEC-Fundacao-02:** esta spec muda **apenas** o destino pós-login (o app abre
+> na CHOICE em vez de ir direto ao JARVIS). A alternância de espaço pelo rail permanece **intacta**.
+> Emenda registrada na SPEC-Fundacao-02 (§ Emenda 2026-07-24). Ver § *Supersessão*.
 
 ---
 
 ## Objetivo
 
 Trazer a tela CHOICE (`LOGIN → CHOICE → NOA | JARVIS`) do protótipo e da prova visual do design
-system para dentro do app. A CHOICE passa a ser **a porta de entrada de cada sessão e a única forma
-de trocar de espaço**, e o lugar onde o usuário **escolhe o acento de cor** de NOA e de JARVIS — as
-duas identidades lado a lado.
+system para dentro do app. A CHOICE passa a ser **a porta de entrada de cada sessão** — aparece em
+todo login, igual ao protótipo — e o lugar onde o usuário **escolhe o acento de cor** de NOA e de
+JARVIS, as duas identidades lado a lado. **Não** é a forma de trocar de espaço no meio da sessão:
+isso continua sendo a sidebar/rail, como na SPEC-Fundacao-02.
 
 ## Contexto: o que já existe
 
@@ -39,8 +40,10 @@ A CHOICE existe visualmente e no design system; **não está no fluxo do app**. 
 
 1. **A CHOICE entra em TODO login.** Fiel ao protótipo (`LOGIN → CHOICE → espaço`). Isso **revoga** a
    decisão da SPEC-Fundacao-02 de "abrir sempre no JARVIS, ignorando último estado" — ver § Supersessão.
-2. **A CHOICE é a porta única de troca de espaço.** O rail do AppShell **deixa de alternar** NOA⇄JARVIS;
-   trocar de espaço passa a ser: voltar à CHOICE. Ver § Mecanismo de retorno.
+2. **A CHOICE é porta de ENTRADA, não de troca.** Depois de escolher no login, a troca NOA⇄JARVIS no
+   meio da sessão é pela **sidebar/rail, direto** (igual ao protótipo). O rail **continua alternando**
+   como na SPEC-Fundacao-02; a CHOICE não reaparece na sessão. *(Revisado em 2026-07-24, opção A: a
+   decisão anterior de "porta única / rail deixa de alternar" foi descartada pelo PI.)*
 3. **O acento é escolhido na CHOICE e reajustável no Settings** (ambos os lugares).
 4. **O seletor de tema fica na CHOICE, como prévia** do que virá ao entrar no espaço (não afeta a
    própria CHOICE, que é superfície de marca).
@@ -65,9 +68,9 @@ A CHOICE existe visualmente e no design system; **não está no fluxo do app**. 
 - **Seletor de tema na CHOICE**: claro/escuro/sistema, no canto, como **prévia**. Escreve a mesma
   preferência de tema do Settings (SPEC-Fundacao-05); tem efeito ao entrar no espaço. A CHOICE em si
   não inverte (superfície de marca).
-- **Mecanismo de retorno à CHOICE** (consequência da decisão 2): uma ação no shell — "Trocar de
-  espaço" — que retorna à CHOICE **sem deslogar**. O controle de alternância de espaço do rail
-  (entregue na F02) é **substituído** por essa ação. Ver § Mecanismo de retorno.
+- **Troca de espaço na sessão permanece no rail** (não é escopo novo): a sidebar/rail alterna
+  NOA⇄JARVIS direto, exatamente como entregue na F02. Esta fatia **não** mexe nesse mecanismo — só o
+  preserva. A CHOICE não tem papel na troca durante a sessão.
 - **Tela de transição CHOICE → espaço** (decisão do PI no residual, 2026-07-24): o overlay de marca
   que o protótipo executa entre escolher o card e o espaço abrir. `'transicao'` já está em
   `SUPERFICIES_DE_MARCA`, então não inverte no tema claro. Como toda animação do projeto, respeita
@@ -96,10 +99,11 @@ A CHOICE existe visualmente e no design system; **não está no fluxo do app**. 
 
 ### Troca de espaço no meio da sessão
 
-- O rail **não** alterna espaços (decisão 2). Para trocar, o usuário aciona **"Trocar de espaço"** no
-  shell, que o leva de volta à CHOICE, de onde escolhe o outro card. Volta a emitir `workspace-switch`.
-- **Rota preservada por espaço permanece** (invariante da SPEC-Fundacao-02 crit. 1/3): ao reentrar num
-  espaço pela CHOICE, o app restaura a última rota daquele espaço; a rota do outro nunca vaza.
+- A sidebar/rail alterna NOA⇄JARVIS **direto**, como na SPEC-Fundacao-02 (entregue e testado). A
+  CHOICE não participa: ela só decidiu o espaço de **entrada** ao vir do login. Trocar de espaço emite
+  `workspace-switch`, como já emite hoje.
+- **Rota preservada por espaço permanece intacta** (SPEC-Fundacao-02 crit. 1/3): ao voltar a um espaço
+  pelo rail, o app restaura a última rota daquele espaço; a rota do outro nunca vaza. Nada disso muda.
 
 ### Acento
 
@@ -112,19 +116,18 @@ A CHOICE existe visualmente e no design system; **não está no fluxo do app**. 
 
 ## Supersessão da SPEC-Fundacao-02
 
-Esta fatia altera comportamento entregue, testado e aceito (PR #28, aceite 2026-07-22). Registrado
-explicitamente para que a **emenda à SPEC-Fundacao-02 seja feita pelo PI**:
+Com a opção A (revisão 2026-07-24), a supersessão é **mínima**: um único ponto muda.
 
 | SPEC-Fundacao-02 | O que muda |
 |---|---|
-| "Workspace ativo ao abrir: sempre JARVIS OS, ignora último estado" (Pergunta resolvida 1) | **Revogado.** O app abre na CHOICE em todo login; o espaço ativo é escolhido ali. |
-| Crit. 1 — "Alternância NOA⇄JARVIS OS funciona" **via rail** | **Re-homologado.** A alternância migra do rail para a CHOICE. O rail perde o controle de troca de espaço. |
-| Crit. 1/3 — isolamento de navegação + **rota preservada por espaço** | **Permanece válido.** A invariante não muda; só muda por onde se dispara a troca. O teste A→B→A continua exigido (agora a troca é via CHOICE). |
-| Crit. 7 — `workspace-switch` emite `info`/`AuditEvent` | **Permanece.** Entrar na CHOICE é o mesmo evento. |
+| "Workspace ativo ao abrir: sempre JARVIS OS, ignora último estado" (Pergunta resolvida 1) | **Revogado.** O app abre na **CHOICE** em todo login; o espaço de entrada é escolhido ali. |
+| Crit. 1 — "Alternância NOA⇄JARVIS OS funciona" **via rail** | **Permanece intacto.** O rail continua sendo o trocador de espaço na sessão. A CHOICE não substitui o rail. |
+| Crit. 1/3 — isolamento de navegação + **rota preservada por espaço** | **Permanece intacto.** Nada muda; o teste A→B→A continua valendo como está (via rail). |
+| Crit. 7 — `workspace-switch` emite `info`/`AuditEvent` | **Permanece.** Entrar pela CHOICE e trocar pelo rail são o mesmo evento. |
 
-> **Risco a registrar:** remover a alternância do rail toca código entregue (`WorkspaceSwitcher`,
-> `navegacao.spec.ts` — este último só voltou a rodar no #47). A fatia precisa **atualizar os testes
-> de isolamento** para exercitar a troca via CHOICE, não via rail, sem perder a cobertura da invariante.
+> **Sem risco sobre código de troca:** como o rail **não** muda, esta fatia **não** mexe em
+> `WorkspaceSwitcher` nem migra `navegacao.spec.ts`. A única alteração de fluxo entregue é o destino
+> pós-login (shell → CHOICE). Isso torna a fatia bem mais leve do que a versão "porta única".
 
 ---
 
@@ -132,9 +135,9 @@ explicitamente para que a **emenda à SPEC-Fundacao-02 seja feita pelo PI**:
 
 1. Após login, o app abre na **CHOICE**, não no shell direto.
 2. Escolher um card entra no espaço correspondente, aplicando acento e tema vigentes.
-3. O rail **não** alterna espaços; a ação "Trocar de espaço" retorna à CHOICE sem deslogar, e de lá se
-   troca. Teste: entrar em NOA → "Trocar de espaço" → escolher JARVIS restaura a rota de JARVIS; a rota
-   de NOA nunca aparece na tela de JARVIS (invariante da SPEC-Fundacao-02 preservada, disparada pela CHOICE).
+3. O rail **continua** alternando espaços na sessão (SPEC-Fundacao-02 intacta): a troca NOA⇄JARVIS é
+   direta pelo rail, sem passar pela CHOICE. O teste A→B→A de isolamento de rota (crit. 1/3 da
+   SPEC-Fundacao-02) continua passando **como está** — esta fatia não o altera.
 4. O acento escolhido na CHOICE aplica no espaço e **persiste entre sessões** (por usuário).
 5. O acento é editável no **Settings** com o **mesmo seletor fechado** (não picker livre); mudar num
    lugar reflete no outro.
@@ -162,9 +165,10 @@ explicitamente para que a **emenda à SPEC-Fundacao-02 seja feita pelo PI**:
 Registradas pelo Code, a pedido do PI. **Marcar a spec como `aprovada-pi` é ato do Cowork**, dono
 deste documento — o Code registra as respostas, não muda o status.
 
-- **Q3 — pular a CHOICE.** **Confirmado: sempre aparece, sem flag de skip.** É a consequência das
-  decisões 1 e 2: sendo ela a porta única de troca de espaço, um "lembrar e entrar direto" deixaria
-  o usuário sem caminho para trocar.
+- **Q3 — pular a CHOICE.** **Confirmado: aparece em TODO login, sem flag de skip** (revisão
+  2026-07-24, "igual ao protótipo"). A justificativa antiga ("porta única") caiu com a opção A; a
+  razão agora é simples: a CHOICE é a tela de entrada de marca a cada login, e o usuário escolhe ali
+  onde a sessão começa. Trocar depois é pelo rail.
 - **Q6 — persistência do acento.** **Confirmada a proposta do Cowork:** campo(s) no `UserProfile`
   (exige migration), **por usuário**, **sem** `AuditEvent` — mesmo critério de tema/idioma na
   SPEC-Fundacao-05. Entrar num espaço continua auditando (`workspace-switch`).
@@ -176,14 +180,13 @@ deste documento — o Code registra as respostas, não muda o status.
 
 ### Nota de tamanho (Q-transição)
 
-Com a transição dentro, a fatia acumula quatro frentes: integrar a CHOICE ao fluxo, **revogar a
-alternância pelo rail** (código entregue e aceito), **migrar os testes de isolamento** para
-exercitarem a troca via CHOICE sem perder a invariante do critério 1/3 da SPEC-Fundacao-02,
-**adicionar migration** do acento no `UserProfile` e ainda o overlay de transição.
+Com a opção A, a fatia encolheu. As frentes agora são três: integrar a CHOICE ao fluxo (destino
+pós-login: shell → CHOICE), **adicionar migration** do acento no `UserProfile` (+ o mesmo seletor no
+Settings) e o overlay de transição. **Saíram** a revogação do rail e a migração dos testes de
+isolamento — o rail fica intacto.
 
-O risco não é a transição em si — é ela somar-se à revogação do rail, que é a parte delicada. Se
-durante a implementação ficar claro que a fatia não fecha em uma entrega, o Code **para e reporta**
-em vez de partir por conta própria: fatiar é decisão do PI.
+Ainda assim, se durante a implementação ficar claro que a fatia não fecha em uma entrega, o Code
+**para e reporta** em vez de fatiar por conta própria: fatiar é decisão do PI.
 
 ### Nota de vínculo (Q7)
 
@@ -207,7 +210,13 @@ porta de entrada do app: **CHOICE**, **transição** e **login por senha/GitHub*
 
 ## Próximo passo (processo)
 
-Quando o PI resolver os residuais acima, o Cowork: (1) marca esta spec `aprovada-pi`; (2) faz/registra a
-**emenda à SPEC-Fundacao-02**; (3) cria a issue-fatia (Backlog, assignee PI) com título no padrão
-`[MVP?][CHOICE?] Tela CHOICE — seleção de espaço + acento`, ajustando os tokens conforme o vínculo de MVP
-decidido. O Code não implementa antes disso.
+Estado em 2026-07-24:
+
+- ✅ **(1) `aprovada-pi`** — carimbada pelo Cowork; revisada na opção A (2026-07-24).
+- ✅ **(2) Emenda à SPEC-Fundacao-02** registrada (§ Emenda 2026-07-24 daquela spec).
+- ✅ **(3) Issue-fatia criada** — **[#69](https://github.com/RodReis/rrb-jarvisOS/issues/69)**, título
+  `[CHOICE] Tela CHOICE — seleção de espaço + acento`, em **Backlog** (`proplan:backlog`), assignee **PI**,
+  corpo linkando esta spec. Card solto (sem MVP pai, ver *Nota de vínculo*).
+
+O Code **não implementa antes de a issue existir** e de ela entrar na fila via `STATUS.md` — cuja
+atualização (posição da CHOICE antes do MVP-004, `proplan:next`) é do Code, não desta spec.
