@@ -1,8 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import type { AuthSnapshot } from '@shared/contracts/auth'
-import { ACENTO_PADRAO } from '@design/tokens/acento'
 import { ProvedorDeTema } from '@design/tokens/provider'
-import { Button, InlineAlert, VoiceMascot } from '@design/ui'
+import { Button, InlineAlert, Input, PasswordInput, VoiceMascot } from '@design/ui'
 import carbono from '@design/assets/carbono.jpg'
 
 /**
@@ -28,6 +27,38 @@ interface TelaLoginProps {
   readonly onEntrar: () => void
 }
 
+/**
+ * Ids dos campos da maquete.
+ *
+ * Constantes, e não `useId()`: os campos são estáticos e desabilitados — não há duas instâncias
+ * desta tela na mesma página, que é o problema que o `useId` resolve.
+ */
+const ID_USUARIO = 'login-usuario'
+const ID_SENHA = 'login-senha'
+
+/**
+ * O acento desta tela — prata fixa, fora da paleta do usuário (decisão do PI, 2026-07-24).
+ *
+ * `#C4C4C4` é uma das oito cores de `PALETA_ACENTO` (README §2.4) e o default de fábrica do NOA;
+ * aqui ela entra como **cor de marca da porta de entrada**, não como acento de um módulo. Por
+ * isso o valor é literal e não `ACENTO_PADRAO.noa`: ler o token do NOA amarraria a tela de login
+ * a uma mudança de identidade que nada tem a ver com ela.
+ *
+ * Nota de escopo: a `SPEC-CHOICE-01` (rascunho, ainda não `aprovada-pi`) propõe mudar o
+ * `ACENTO_PADRAO` do JARVIS de `#FF5C00` para `#C4C4C4` — o que tornaria esta constante
+ * redundante. Enquanto a spec não for aprovada, o default do app segue `#FF5C00` e a
+ * neutralização vive aqui, no consumidor, sem alterar o token que outras telas leem.
+ */
+const ACENTO_DA_MARCA = '#C4C4C4' as const
+
+/**
+ * Handler vazio dos campos de maquete.
+ *
+ * O `Input` exige `onMudar`; campo desabilitado não dispara `change`, então isto nunca roda. Fora
+ * do componente para não recriar a função a cada render.
+ */
+const NAO_FAZ_NADA = (): void => undefined
+
 export function TelaLogin({ auth, onEntrar }: TelaLoginProps): React.JSX.Element {
   const { t } = useTranslation()
 
@@ -41,13 +72,22 @@ export function TelaLogin({ auth, onEntrar }: TelaLoginProps): React.JSX.Element
      * `superficie="login"` é o contrato que a F02 deixou pronto e nunca foi usado: a tela de
      * entrada é **superfície de marca** e permanece escura mesmo com `uiTheme='light'`
      * (README §2.6). Por isso não lê `usePreferences` — não há preferência a respeitar aqui.
+     *
+     * E o acento vai **fixo em prata** (decisão do PI, 2026-07-24): a tela de entrada antecede
+     * a identidade. Quem está aqui ainda não escolheu espaço nem cor, e o laranja do JARVIS
+     * (`#FF5C00`, o default de fábrica) pintava anel, glow e dot de um módulo que o usuário
+     * ainda não abriu — no protótipo esses elementos são metálicos.
+     *
+     * Passar o acento **ao provider**, em vez de trocar cor a cor, é o que faz um único ponto
+     * governar a tela inteira: todo `var(--jos-cor-acento)` daqui para baixo lê prata, e um
+     * elemento novo nasce neutro sem ninguém lembrar de neutralizá-lo.
      */
     <ProvedorDeTema
       uiTheme="dark"
       modulo="jarvis"
       superficie="login"
-      accentJarvis={ACENTO_PADRAO.jarvis}
-      accentNoa={ACENTO_PADRAO.noa}
+      accentJarvis={ACENTO_DA_MARCA}
+      accentNoa={ACENTO_DA_MARCA}
     >
       {/*
        * `fixed inset-0`, e não `h-full`: o `ProvedorDeTema` insere um `<div>` de bloco entre
@@ -106,37 +146,126 @@ export function TelaLogin({ auth, onEntrar }: TelaLoginProps): React.JSX.Element
           )}
 
           {/*
-           * `secundaria`, não `primaria`, e a razão é o protótipo: o "ACESSAR" é **contornado**
-           * com fundo translúcido, não um bloco sólido. Provado na captura do app real — com o
-           * preenchimento sólido, o acento de fábrica do JARVIS (`#FF5C00`) tomava a tela e as
-           * quatro cores do logo do Google brigavam com o laranja atrás delas. O botão passava
-           * a ser o assunto da tela; no protótipo, o assunto é o mascote.
+           * Os campos do protótipo — **maquete**, desabilitados (decisão do PI, 2026-07-24).
            *
-           * O realce do acento entra por **composição**, no wrapper abaixo, e não por uma
-           * variante nova: o `Button` tem superfície fechada (decisão 4 da F03a) e uma variante
-           * `primaria-contornada` existiria para um único consumidor. A borda e o glow são
-           * decoração da moldura; o botão continua sendo o alvo de clique e de foco inteiro.
+           * Não há login por senha: `auth-service.ts` só faz `signInWithOAuth`. Renderizá-los
+           * ativos convidaria o usuário a digitar credenciais que ninguém recebe — pior que não
+           * tê-los. Desabilitados, dizem "vem aí" sem prometer que já funciona, e o aviso abaixo
+           * fecha a lacuna para quem não interpreta o cinza (inclusive leitor de tela: o
+           * `disabled` é anunciado).
+           *
+           * O rótulo é um `<label>` `sr-only` ligado pelo `id`, não um `aria-label`: o `Input`
+           * do DS aceita `id` (via `AtributosDoControle`) mas não `aria-label`, e alargar a
+           * superfície do componente por causa desta tela seria mudar o DS para acomodar um
+           * consumidor. O `<label>` resolve com HTML padrão e sem tocar em nada.
+           *
+           * Rótulo invisível, e não ausente: o protótipo não o desenha, mas um campo sem nome
+           * acessível é anunciado como "editar texto, desabilitado" — sem dizer qual campo é.
+           * Placeholder não substitui rótulo (some ao digitar).
            */}
-          <div
-            className="group w-full rounded-[var(--jos-raio-card)] border border-[color-mix(in_srgb,var(--jos-cor-acento)_50%,transparent)] transition-[box-shadow] duration-[var(--jos-duracao-rapida)] focus-within:shadow-[0_0_24px_-6px_var(--jos-cor-acento)] hover:shadow-[0_0_24px_-6px_var(--jos-cor-acento)]"
-            style={{
-              background:
-                'linear-gradient(90deg, color-mix(in srgb, var(--jos-cor-acento) 14%, transparent), transparent 80%)'
-            }}
-          >
+          <div className="flex w-full flex-col gap-[12px]">
+            <div>
+              <label htmlFor={ID_USUARIO} className="sr-only">
+                {t('auth.usuario')}
+              </label>
+              <Input
+                id={ID_USUARIO}
+                valor=""
+                onMudar={NAO_FAZ_NADA}
+                desabilitado
+                placeholder={t('auth.usuario')}
+                autoComplete="username"
+                icone={<IconeUsuario />}
+              />
+            </div>
+            <div>
+              <label htmlFor={ID_SENHA} className="sr-only">
+                {t('auth.senha')}
+              </label>
+              <PasswordInput
+                id={ID_SENHA}
+                valor=""
+                onMudar={NAO_FAZ_NADA}
+                desabilitado
+                placeholder={t('auth.senha')}
+                autoComplete="current-password"
+                icone={<IconeCadeado />}
+              />
+            </div>
+          </div>
+
+          <CredenciaisIndisponiveis />
+
+          {/*
+           * O "ACESSAR" do protótipo: contornado, **neutro fixo**, sem o acento do usuário
+           * (decisão do PI, 2026-07-24). É a única superfície do app onde o acento escolhido não
+           * aparece — e isso é deliberado: a tela de entrada antecede a preferência, e o
+           * protótipo a desenha em cinza.
+           *
+           * Desabilitado porque não há credenciais a enviar: os campos acima são maquete até a
+           * spec de senha existir. `aria-disabled` em vez de `disabled` deixaria o botão focável
+           * anunciando que não funciona; aqui `desabilitado` é a verdade simples — não há ação.
+           */}
+          <Button variante="secundaria" larguraTotal desabilitado iconeFinal={<SetaEntrar />}>
+            {t('auth.acessar')}
+          </Button>
+
+          <Divisor />
+
+          {/*
+           * Os dois provedores lado a lado, como o protótipo. **Só o Google funciona** — é o
+           * único que `auth-service.ts` implementa (`signInWithOAuth({ provider: 'google' })`).
+           * O GitHub fica desabilitado em vez de ausente: o PI pediu a maquete fiel, e um botão
+           * desabilitado diz "existe, ainda não" — enquanto um botão que aceita clique e não
+           * autentica diria "funciona", que é mentira.
+           */}
+          <div className="grid w-full grid-cols-2 gap-[10px]">
+            {/*
+             * O rótulo visível é só "Google", como o protótipo; o nome acessível é a frase
+             * inteira ("Entrar com o Google"), completada por um trecho `sr-only` dentro do
+             * botão.
+             *
+             * Por que não `aria-label`: o `Button` do DS tem superfície fechada (decisão 4 da
+             * F03a) e não o aceita — e alargar o componente por causa desta tela seria mudar o
+             * DS para acomodar um consumidor. O `sr-only` no conteúdo resolve com o que já
+             * existe, e tem uma vantagem: `aria-label` **substitui** o conteúdo, então quem usa
+             * comando de voz ("clicar em Google") perderia o rótulo visível como alvo.
+             *
+             * Enquanto autentica, o rótulo vira "Aguardando o navegador…" e a frase de destino
+             * sai junto — o botão passa a descrever o estado, não a ação.
+             */}
             <Button
               variante="secundaria"
               larguraTotal
               onClick={onEntrar}
               carregando={autenticando}
               iconeInicial={autenticando ? undefined : <LogoGoogle />}
-              iconeFinal={autenticando ? undefined : <SetaEntrar />}
             >
-              {autenticando
-                ? t('auth.entrando')
-                : houveFalha
-                  ? t('auth.tentarNovamente')
-                  : t('auth.entrar')}
+              {autenticando ? (
+                t('auth.entrando')
+              ) : (
+                <>
+                  {/*
+                   * O texto visível é sempre "Google" — curto, como o protótipo. A frase do
+                   * nome acessível muda com o estado: "Entrar com o Google" na primeira vez,
+                   * "Tentar novamente com o Google" depois de falhar.
+                   *
+                   * Motivo de o rótulo visível **não** virar "Tentar novamente": ele não cabe
+                   * em metade da grade de dois provedores — quebrava em duas linhas e
+                   * desalinhava os dois botões (visto na captura do app real). O convite a
+                   * repetir já está no `InlineAlert` logo acima, que é onde o usuário lê o que
+                   * aconteceu.
+                   */}
+                  <span className="sr-only">
+                    {houveFalha ? t('auth.tentarNovamenteCom') : t('auth.entrarCom')}
+                  </span>
+                  {` ${t('auth.google')}`}
+                </>
+              )}
+            </Button>
+            <Button variante="secundaria" larguraTotal desabilitado iconeInicial={<LogoGitHub />}>
+              <span className="sr-only">{t('auth.entrarCom')}</span>
+              {` ${t('auth.github')}`}
             </Button>
           </div>
         </main>
@@ -144,6 +273,120 @@ export function TelaLogin({ auth, onEntrar }: TelaLoginProps): React.JSX.Element
         <Rodape />
       </div>
     </ProvedorDeTema>
+  )
+}
+
+/**
+ * Aviso de que senha e GitHub ainda não autenticam.
+ *
+ * A maquete fiel ao protótipo cria uma promessa que o sistema não cumpre: três caminhos de
+ * entrada visíveis, um só funcionando. O cinza do desabilitado comunica isso a quem enxerga bem
+ * o contraste; esta frase comunica a todo mundo, e é o que separa "em construção" de "quebrado".
+ *
+ * Sem `role="alert"`: não é uma falha, é o estado normal da tela hoje. Alerta anunciaria urgência
+ * onde não há — e competiria com o `role="alert"` real do erro de login, logo acima.
+ */
+function CredenciaisIndisponiveis(): React.JSX.Element {
+  const { t } = useTranslation()
+
+  return (
+    <p className="text-center text-[length:var(--jos-texto-mini)] text-[var(--jos-cor-texto-suave)]">
+      {t('auth.senhaEmBreve')}
+    </p>
+  )
+}
+
+/**
+ * O divisor "ou cadastre-se com" do protótipo.
+ *
+ * As duas linhas são gradientes que se dissolvem na direção do texto — o protótipo não usa régua
+ * sólida. `aria-hidden` nelas: separador decorativo não é informação.
+ */
+function Divisor(): React.JSX.Element {
+  const { t } = useTranslation()
+
+  return (
+    <div className="flex w-full items-center gap-3">
+      <span
+        aria-hidden
+        className="h-px flex-1"
+        style={{
+          background: 'linear-gradient(90deg, transparent, rgba(var(--jos-borda-rgb),0.2))'
+        }}
+      />
+      <span className="whitespace-nowrap font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] tracking-[2px] text-[var(--jos-cor-texto-suave)]">
+        {t('auth.ouCadastre')}
+      </span>
+      <span
+        aria-hidden
+        className="h-px flex-1"
+        style={{
+          background: 'linear-gradient(90deg, rgba(var(--jos-borda-rgb),0.2), transparent)'
+        }}
+      />
+    </div>
+  )
+}
+
+/** Ícone de usuário do protótipo. Decorativo — o `<label>` é quem nomeia o campo. */
+function IconeUsuario(): React.JSX.Element {
+  return (
+    <svg
+      aria-hidden
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      focusable="false"
+    >
+      <circle cx="12" cy="8" r="3.6" />
+      <path d="M5 20c1.2-3.4 4-5 7-5s5.8 1.6 7 5" />
+    </svg>
+  )
+}
+
+/** Cadeado do campo de senha. Decorativo, como o de usuário. */
+function IconeCadeado(): React.JSX.Element {
+  return (
+    <svg
+      aria-hidden
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      focusable="false"
+    >
+      <rect x="5" y="10.5" width="14" height="9" rx="2" />
+      <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" />
+    </svg>
+  )
+}
+
+/**
+ * Logo do GitHub — monocromático, em `currentColor`.
+ *
+ * Diferente do Google, cujas diretrizes de marca exigem as quatro cores: o GitHub aceita a marca
+ * em cor única, então ela acompanha o estado do botão (inclusive a opacidade do desabilitado).
+ */
+function LogoGitHub(): React.JSX.Element {
+  return (
+    <svg
+      aria-hidden
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className="shrink-0"
+      focusable="false"
+    >
+      <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.57.11.78-.25.78-.55 0-.27-.01-1.16-.02-2.1-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11.1 11.1 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.38-5.25 5.67.41.35.78 1.05.78 2.12 0 1.53-.01 2.76-.01 3.14 0 .3.2.67.79.55A11.51 11.51 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z" />
+    </svg>
   )
 }
 
