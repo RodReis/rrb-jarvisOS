@@ -162,7 +162,7 @@ Priorizam cautela sobre velocidade; em tarefa trivial, bom senso.
 
 ## Grafo de conhecimento (graphify)
 
-O repo tem um grafo de conhecimento persistente em `graphify-out/` (gerado pela skill `/graphify` — https://github.com/Graphify-Labs/graphify). Ele indexa `src/` + `docs/` + `scripts/` (1596 nós, 133 comunidades — atualizado em 2026-07-23, após a F03b) e responde perguntas sobre o codebase gastando muito menos tokens que ler arquivos. O escopo exclui `.aiox-core/` e as imagens de `docs/design/` — framework de terceiros e mockups não entram no grafo.
+O repo tem um grafo de conhecimento persistente em `graphify-out/` (gerado pela skill `/graphify` — https://github.com/Graphify-Labs/graphify). Ele indexa `src/` + `docs/` + `scripts/` (1748 nós, 154 comunidades — atualizado em 2026-07-23, ao fechar o MVP-003) e responde perguntas sobre o codebase gastando muito menos tokens que ler arquivos. O escopo exclui `.aiox-core/` e as imagens de `docs/design/` — framework de terceiros e mockups não entram no grafo.
 
 - **Antes de explorar o codebase** para entender arquitetura, fluxos ou "quem chama o quê": consulte o grafo primeiro — `/graphify query "<pergunta>"` (ou `graphify query` via CLI). Só leia arquivos direto quando precisar do conteúdo exato.
 - **Achar no grafo, afirmar pelo arquivo.** A topologia localiza; ela não prova. Antes de qualquer afirmação quantitativa ou de unicidade ("é a única aresta", "só existe em X", "as cópias divergiram"), conte todas as arestas relevantes e confirme no disco (`md5sum`, `diff`, ler o trecho). Cite a granularidade que o dado tem: se o grafo guarda `source_location: "§Seção"`, não invente número de linha.
