@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspaceId } from '@shared/domain/entities'
 import { App } from './App'
+import { entrarPelaChoice } from './test-utils'
 
 const sendLog = vi.fn()
 const minimizeToTray = vi.fn()
@@ -85,15 +86,13 @@ beforeEach(() => {
 })
 
 describe('AppShell', () => {
-  it('abre sempre no JARVIS OS (decisão do PI)', async () => {
-    render(<App />)
-
-    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('JARVIS OS')
-  })
+  // Antes ("abre sempre no JARVIS OS") esta suíte partia direto do shell. Com a SPEC-CHOICE-01 o
+  // app abre na CHOICE (a regra "sempre JARVIS" foi **revogada** pela emenda à SPEC-Fundacao-02),
+  // e o shell só monta depois de escolher um espaço. `entrarPelaChoice()` atravessa a CHOICE; o
+  // que cada teste prova sobre o shell não muda — só o caminho até ele.
 
   it('identifica o espaço ativo em qualquer tela (critério 2)', async () => {
-    render(<App />)
-    await screen.findByRole('heading', { level: 1 })
+    await entrarPelaChoice()
 
     expect(screen.getByRole('radio', { name: /JARVIS OS/i })).toHaveAttribute(
       'aria-checked',
@@ -103,8 +102,7 @@ describe('AppShell', () => {
   })
 
   it('não oferece Desenvolvimento como espaço (critério 5)', async () => {
-    render(<App />)
-    await screen.findByRole('heading', { level: 1 })
+    await entrarPelaChoice()
 
     const espacos = screen.getAllByRole('radio').map((b) => b.textContent ?? '')
 
@@ -114,8 +112,7 @@ describe('AppShell', () => {
 
   it('A→B→A restaura a rota de A e a de B nunca vaza (critério 1)', async () => {
     // O cenário exato do critério de aceite, agora pela UI real.
-    render(<App />)
-    await screen.findByRole('heading', { level: 1 })
+    await entrarPelaChoice()
 
     // Navega no JARVIS até "Operações".
     await userEvent.click(screen.getByRole('button', { name: 'Operações' }))
@@ -140,8 +137,8 @@ describe('AppShell', () => {
 
   it('troca de espaço passa pelo main, que audita', async () => {
     // A UI não muda o espaço sozinha: pede ao main e reflete o que ele devolveu.
-    render(<App />)
-    await screen.findByRole('heading', { level: 1 })
+    await entrarPelaChoice()
+    switchWorkspace.mockClear() // ignora a chamada da entrada pela CHOICE; o assunto é a troca no rail.
 
     await trocarPara('NOA')
 
@@ -151,9 +148,8 @@ describe('AppShell', () => {
 
   it('mostra erro e não troca o espaço quando o main recusa', async () => {
     // Se a auditoria falhar no main, o espaço não muda — a UI tem de refletir isso.
+    await entrarPelaChoice()
     switchWorkspace.mockRejectedValueOnce(new Error('auditoria falhou'))
-    render(<App />)
-    await screen.findByRole('heading', { level: 1 })
 
     await userEvent.click(screen.getByRole('radio', { name: /NOA/i }))
 
@@ -165,8 +161,7 @@ describe('AppShell', () => {
   })
 
   it('pede ao main para minimizar para a bandeja', async () => {
-    render(<App />)
-    await screen.findByRole('heading', { level: 1 })
+    await entrarPelaChoice()
 
     await userEvent.click(screen.getByRole('button', { name: /minimizar/i }))
 
@@ -174,8 +169,13 @@ describe('AppShell', () => {
   })
 
   it('exibe erro quando a ponte falha ao carregar o espaço', async () => {
+    // A falha é no `getWorkspace` do boot do shell — que só roda depois de a CHOICE mandar
+    // entrar. O shell não monta; o `alert` aparece no lugar do heading, então aqui não se
+    // usa `entrarPelaChoice` (ela espera o heading), e sim o clique cru no card.
     getWorkspace.mockRejectedValueOnce(new Error('sem ponte'))
     render(<App />)
+
+    await userEvent.click(await screen.findByRole('button', { name: /entrar em JARVIS/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/espaço de trabalho/i)
   })
@@ -189,14 +189,13 @@ describe('AppShell', () => {
 })
 
 describe('Settings (SPEC-05)', () => {
-  /** Entra na tela de Settings do espaço ativo. */
+  /** Entra pela CHOICE e abre a tela de Settings do espaço ativo. */
   async function abrirSettings(): Promise<void> {
-    await screen.findByRole('heading', { level: 1 })
+    await entrarPelaChoice()
     await userEvent.click(screen.getByRole('button', { name: 'Configurações' }))
   }
 
   it('é acessível nos dois workspaces', async () => {
-    render(<App />)
     await abrirSettings()
     expect(screen.getByLabelText('Idioma')).toBeInTheDocument()
 
@@ -207,7 +206,6 @@ describe('Settings (SPEC-05)', () => {
   })
 
   it('troca o idioma e a UI muda na hora, sem reiniciar (critério 1)', async () => {
-    render(<App />)
     await abrirSettings()
 
     await userEvent.selectOptions(screen.getByLabelText('Idioma'), 'en-US')
@@ -219,7 +217,6 @@ describe('Settings (SPEC-05)', () => {
   })
 
   it('aplica o tema escolhido no documento (critério 2)', async () => {
-    render(<App />)
     await abrirSettings()
 
     await userEvent.click(screen.getByRole('radio', { name: 'Claro' }))
@@ -231,7 +228,6 @@ describe('Settings (SPEC-05)', () => {
   it('aplica o tema resolvido pelo main quando a preferência é `sistema`', async () => {
     // `sistema` não pinta nada por si: quem resolve para claro/escuro é o main, via
     // `nativeTheme`. A UI aplica o resultado.
-    render(<App />)
     await abrirSettings()
 
     await waitFor(() => expect(document.documentElement.dataset.tema).toBe('escuro'))
@@ -239,9 +235,8 @@ describe('Settings (SPEC-05)', () => {
   })
 
   it('mostra erro quando o main recusa a gravação', async () => {
-    savePreferences.mockRejectedValueOnce(new Error('disco cheio'))
-    render(<App />)
     await abrirSettings()
+    savePreferences.mockRejectedValueOnce(new Error('disco cheio'))
 
     await userEvent.click(screen.getByRole('radio', { name: 'Escuro' }))
 
@@ -251,7 +246,6 @@ describe('Settings (SPEC-05)', () => {
   it('a rota de Settings também é preservada por espaço', async () => {
     // Settings é rota dos dois espaços, não uma exceção fora do mapa — então segue a
     // mesma regra de isolamento (SPEC-02, critério 1).
-    render(<App />)
     await abrirSettings()
 
     await trocarPara('NOA')

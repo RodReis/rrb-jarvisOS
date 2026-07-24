@@ -69,7 +69,11 @@ Atualizado em: **2026-07-24**. Mantido pelo Code a cada entrega (junto com `DEVE
 
 ### A Fazer · Em Andamento
 
-*(vazios)*
+| Issue | Fatia | MVP | Spec | Coluna |
+|---|---|---|---|---|
+| [#69](https://github.com/RodReis/rrb-jarvisOS/issues/69) | CHOICE seleção de espaço + acento | *(container em aberto)* | `spec-choice-01-selecao-de-espaco.md` | **Em Andamento** (`proplan:doing`) |
+
+> **#69 em andamento** (Code, 2026-07-24). Branch `feat/choice-selecao-de-espaco`. Entrega em duas partes sob a mesma issue, ambas `refs #69`: **PR 1 (jornada)** — `TelaChoice` fiel ao protótipo + integração ao fluxo + transição (crits. 1, 2, 6, 7, 9, 10, 11); **PR 2 (acento persistido)** — migration no `UserProfile` + IPC + Settings (crits. 4, 5, 8). Rail e `WorkspaceSwitcher` **intactos** (opção A da spec). O `proplan:next` segue no #34 (INFRA) — a #69 puxou por decisão de sequência, não pela cabeça da fila.
 
 ### MVP-003 Design System — 8 fatias (todas `aprovada-pi`, assignee PI)
 

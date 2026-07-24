@@ -19,6 +19,29 @@ export const RECURSOS = {
         jarvisDescricao: 'Espaço profissional',
         seletor: 'Espaço de trabalho'
       },
+      // Tela CHOICE (SPEC-CHOICE-01) — a porta de entrada de cada sessão.
+      choice: {
+        titulo: 'Escolha o espaço',
+        entrar: 'Entrar',
+        // Rótulo visível curto ("Entrar"), como o protótipo; o nome acessível diz em qual espaço.
+        entrarEm: 'Entrar em {{espaco}}',
+        noa: {
+          // Marca curta do card, distinta do nome completo do espaço ("NOA" vs. o mesmo aqui).
+          nome: 'NOA',
+          tagline: 'Pessoal',
+          descricao: 'Agenda, rotina, saúde e finanças — privado por padrão.'
+        },
+        jarvis: {
+          nome: 'JARVIS',
+          tagline: 'Profissional · OS',
+          descricao: 'Agentes, squads, workflows e operações de negócio.'
+        },
+        tema: {
+          abrir: 'Ajustar tema e acento',
+          titulo: 'Tema',
+          acentoDe: 'Acento de {{espaco}}'
+        }
+      },
       navegacao: {
         principal: 'Navegação principal',
         de: 'Navegação de {{espaco}}',
@@ -123,6 +146,26 @@ export const RECURSOS = {
         jarvis: 'JARVIS OS',
         jarvisDescricao: 'Professional space',
         seletor: 'Workspace'
+      },
+      choice: {
+        titulo: 'Choose your space',
+        entrar: 'Enter',
+        entrarEm: 'Enter {{espaco}}',
+        noa: {
+          nome: 'NOA',
+          tagline: 'Personal',
+          descricao: 'Calendar, routine, health, and finances — private by default.'
+        },
+        jarvis: {
+          nome: 'JARVIS',
+          tagline: 'Professional · OS',
+          descricao: 'Agents, squads, workflows, and business operations.'
+        },
+        tema: {
+          abrir: 'Adjust theme and accent',
+          titulo: 'Theme',
+          acentoDe: '{{espaco}} accent'
+        }
       },
       navegacao: {
         principal: 'Main navigation',

@@ -3,6 +3,7 @@ import type { AuthSnapshot } from '@shared/contracts/auth'
 import { ProvedorDeTema } from '@design/tokens/provider'
 import { Button, InlineAlert, Input, PasswordInput, VoiceMascot } from '@design/ui'
 import carbono from '@design/assets/carbono.jpg'
+import { AtmosferaDeMarca } from '../app/AtmosferaDeMarca'
 
 /**
  * Tela de entrada (SPEC-Fundacao-03, critérios 1 e 6; protótipo `data-screen-label="Login"`).
@@ -106,7 +107,7 @@ export function TelaLogin({ auth, onEntrar }: TelaLoginProps): React.JSX.Element
         data-jos-tela="login"
         className="fixed inset-0 flex items-center justify-center overflow-hidden bg-[#060708] font-[family-name:var(--jos-fonte-corpo)]"
       >
-        <Atmosfera />
+        <AtmosferaDeMarca imagem={carbono} />
 
         <main
           aria-labelledby="login-titulo"
@@ -449,50 +450,6 @@ function Emblema(): React.JSX.Element {
        * seria estado falso — o componente recusa o estado em vez de confiar em quem o chama.
        */}
       <VoiceMascot modulo="jarvis" tamanho="medio" voz={false} />
-    </div>
-  )
-}
-
-/**
- * Fundo do protótipo: carbono com Ken Burns, véu radial, brilho diagonal e pontos pulsantes.
- *
- * Tudo `aria-hidden` — é atmosfera, não informação. Cada camada sob `motion-safe`, então
- * `prefers-reduced-motion` entrega a mesma composição estática, e não uma tela vazia: o fundo
- * **é** a identidade da marca, e removê-lo junto com o movimento puniria quem pediu menos
- * movimento com menos design.
- */
-function Atmosfera(): React.JSX.Element {
-  return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-      <img
-        src={carbono}
-        alt=""
-        draggable={false}
-        // 112% e offset de -6%: o `kb` faz zoom e pan, e a sobra evita que a borda da imagem
-        // entre em quadro no fim do ciclo.
-        className="absolute -top-[6%] -left-[6%] h-[112%] w-[112%] object-cover motion-safe:animate-[kb_28s_ease-in-out_infinite_alternate]"
-        style={{ filter: 'brightness(.62) contrast(1.08)' }}
-      />
-      {/* Véu radial: escurece as bordas para o card ganhar o centro sem competir com a textura. */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            'radial-gradient(ellipse at 50% 46%, rgba(6,7,8,0) 0%, rgba(6,7,8,.55) 58%, rgba(6,7,8,.92) 100%)'
-        }}
-      />
-      <div
-        className="absolute inset-y-0 w-[46%] motion-safe:animate-[sheen_9s_ease-in-out_infinite]"
-        style={{
-          background:
-            'linear-gradient(100deg, rgba(200,204,212,0) 20%, rgba(200,204,212,.05) 50%, rgba(200,204,212,0) 80%)'
-        }}
-      />
-      {/* Três pontos em ciclos primos entre si — nunca pulsam juntos, que é o que os faz ler
-          como sinais independentes em vez de uma animação só. */}
-      <span className="absolute top-[24%] left-[18%] size-[3px] rounded-full bg-[rgba(200,204,212,.7)] motion-safe:animate-[dotpulse_3.2s_ease-in-out_infinite]" />
-      <span className="absolute top-[64%] right-[22%] size-[2px] rounded-full bg-[var(--jos-cor-acento)] opacity-80 motion-safe:animate-[dotpulse_4.1s_ease-in-out_infinite]" />
-      <span className="absolute top-[18%] right-[30%] size-[2px] rounded-full bg-[rgba(200,204,212,.5)] motion-safe:animate-[dotpulse_5s_ease-in-out_infinite]" />
     </div>
   )
 }
