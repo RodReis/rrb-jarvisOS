@@ -131,7 +131,9 @@ function semearSessaoAtiva(diasAtras = 0): void {
     name: 'Rodrigo Reis',
     email: SESSAO_SUPABASE.user.email,
     locale: 'pt-BR',
-    theme: 'sistema'
+    theme: 'sistema',
+    accentNoa: null,
+    accentJarvis: null
   })
 
   sessions.save({

@@ -90,11 +90,19 @@ const runs = {
 const minimizeToTray = vi.fn()
 
 const preferences = {
-  atual: vi.fn(() => ({ locale: 'pt-BR', theme: 'sistema', resolvedTheme: 'escuro' })),
+  atual: vi.fn(() => ({
+    locale: 'pt-BR',
+    theme: 'sistema',
+    resolvedTheme: 'escuro',
+    accentNoa: '#C4C4C4',
+    accentJarvis: '#C4C4C4'
+  })),
   salvar: vi.fn((p: Record<string, unknown>) => ({
     locale: p['locale'] ?? 'pt-BR',
     theme: p['theme'] ?? 'sistema',
-    resolvedTheme: 'escuro'
+    resolvedTheme: 'escuro',
+    accentNoa: p['accentNoa'] ?? '#C4C4C4',
+    accentJarvis: p['accentJarvis'] ?? '#C4C4C4'
   }))
 }
 
@@ -291,7 +299,9 @@ describe('canais de preferências (SPEC-05)', () => {
     expect(invocar(IPC_CHANNELS.preferencesGet)).toEqual({
       locale: 'pt-BR',
       theme: 'sistema',
-      resolvedTheme: 'escuro'
+      resolvedTheme: 'escuro',
+      accentNoa: '#C4C4C4',
+      accentJarvis: '#C4C4C4'
     })
   })
 

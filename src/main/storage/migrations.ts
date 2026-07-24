@@ -151,6 +151,22 @@ const MIGRATIONS: readonly string[] = [
     created_at     TEXT NOT NULL
   );
   CREATE INDEX idx_execution_run_user ON execution_run(user_id, workspace_id);
+  `,
+
+  // 6 — acento por módulo, escolhido na CHOICE (SPEC-CHOICE-01, critério 4).
+  //
+  // Duas colunas nuláveis, uma por módulo. **DEFAULT NULL, não o hex de fábrica**: NULL diz
+  // "o usuário ainda não escolheu", e quem resolve para `ACENTO_PADRAO` é o serviço, em runtime.
+  // Gravar o hex aqui duplicaria o valor de fábrica no schema — e no dia em que o default do
+  // JARVIS mudar (já está mudando), as linhas antigas ficariam presas no valor velho enquanto o
+  // código usaria o novo. NULL mantém a fonte única do default no TS, não no SQL.
+  //
+  // Por módulo, e não uma coluna só: NOA e JARVIS têm acento independente (SPEC-DS-05), e escolher
+  // num não pode mover o outro. Sem `AuditEvent` — é preferência de baixo risco, igual a
+  // tema/idioma (SPEC-Fundacao-05); entrar num espaço continua auditando (`workspace-switch`).
+  `
+  ALTER TABLE user_profile ADD COLUMN accent_noa    TEXT;
+  ALTER TABLE user_profile ADD COLUMN accent_jarvis TEXT;
   `
 ]
 

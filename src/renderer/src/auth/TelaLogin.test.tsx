@@ -24,7 +24,9 @@ const PERFIL = {
   name: 'Rodrigo Reis',
   email: 'rodrigo@example.com',
   locale: 'pt-BR' as const,
-  theme: 'sistema' as const
+  theme: 'sistema' as const,
+  accentNoa: null,
+  accentJarvis: null
 }
 
 function mockarPonte(): void {
@@ -75,9 +77,18 @@ describe('gate de autenticação', () => {
     expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument()
   })
 
-  it('monta o shell e mostra nome e e-mail quando ativo (critério 1)', async () => {
+  it('ativo abre na CHOICE, e escolher um espaço leva ao shell com nome e e-mail (critério 1)', async () => {
+    // A prova do critério 1 ("login completou → app mostra de quem é a sessão") agora atravessa a
+    // CHOICE: `ativo` abre a porta de entrada (SPEC-CHOICE-01), e o e-mail vive no shell, alcançado
+    // ao escolher um espaço. Login → CHOICE → shell, ponta a ponta.
     await renderizarCom({ state: 'ativo', profile: PERFIL })
 
+    // Primeiro a CHOICE: os dois cards de espaço, ainda sem shell.
+    expect(await screen.findByRole('button', { name: /entrar em NOA/i })).toBeVisible()
+    expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument()
+
+    // Escolhe um espaço e chega ao shell, onde nome e e-mail aparecem.
+    await userEvent.click(screen.getByRole('button', { name: /entrar em JARVIS/i }))
     expect(await screen.findByText('Rodrigo Reis')).toBeVisible()
     expect(screen.getByText('rodrigo@example.com')).toBeVisible()
     expect(screen.getByRole('radiogroup')).toBeInTheDocument()
@@ -124,6 +135,8 @@ describe('gate de autenticação', () => {
     logout.mockResolvedValue({ state: 'deslogado' })
     await renderizarCom({ state: 'ativo', profile: PERFIL })
 
+    // "Sair" vive no rail do shell, não na CHOICE — então atravessa a porta de entrada primeiro.
+    await userEvent.click(await screen.findByRole('button', { name: /entrar em JARVIS/i }))
     await userEvent.click(await screen.findByRole('button', { name: /^sair$/i }))
 
     expect(logout).toHaveBeenCalledTimes(1)
@@ -140,6 +153,8 @@ describe('gate de autenticação', () => {
     expect(listener).toBeDefined()
     listener?.({ state: 'ativo', profile: PERFIL })
 
-    expect(await screen.findByText('rodrigo@example.com')).toBeVisible()
+    // A prova de que a transição foi refletida é a CHOICE surgir (o app entrou na sessão). O
+    // nome/e-mail vêm no shell, um passo além — coberto pelo teste do critério 1 acima.
+    expect(await screen.findByRole('button', { name: /entrar em JARVIS/i })).toBeVisible()
   })
 })

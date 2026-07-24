@@ -22,5 +22,8 @@ export const LOCAL_USER_PROFILE: UserProfile = {
   name: 'Usuário local',
   email: '',
   locale: 'pt-BR',
-  theme: 'sistema'
+  theme: 'sistema',
+  // `null` = ainda não escolheu; o `PreferencesService` resolve para o default de fábrica.
+  accentNoa: null,
+  accentJarvis: null
 }
