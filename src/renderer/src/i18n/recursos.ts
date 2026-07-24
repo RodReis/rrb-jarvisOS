@@ -64,7 +64,15 @@ export const RECURSOS = {
         titulo: 'JARVIS OS',
         subtitulo: 'Entre com sua conta Google para começar.',
         entrar: 'Entrar com o Google',
-        entrando: 'Aguardando o navegador…',
+        // Rótulo do botão enquanto o login corre no navegador, em duas partes: o visível fica
+        // curto porque o botão divide a largura com o do GitHub — a frase inteira quebrava em
+        // três linhas e isolava o spinner. O complemento vai no nome acessível.
+        //
+        // São duas frases inteiras, e não um prefixo + complemento: concatenar daria
+        // "Aguardando… o navegador", com a pausa no meio. O rótulo curto fica `aria-hidden` e a
+        // frase completa vive no `sr-only`, então cada público lê a versão que lhe serve.
+        aguardando: 'Aguardando…',
+        aguardandoNavegador: 'Aguardando o navegador…',
         entrandoDescricao:
           'Concluímos o login na aba que abrimos no seu navegador. Volte aqui quando terminar.',
         sair: 'Sair',
@@ -158,7 +166,8 @@ export const RECURSOS = {
         titulo: 'JARVIS OS',
         subtitulo: 'Sign in with your Google account to get started.',
         entrar: 'Sign in with Google',
-        entrando: 'Waiting for the browser…',
+        aguardando: 'Waiting…',
+        aguardandoNavegador: 'Waiting for the browser…',
         entrandoDescricao:
           'We opened a tab in your browser to finish signing in. Come back here when you are done.',
         sair: 'Sign out',

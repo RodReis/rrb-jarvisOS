@@ -45,8 +45,8 @@ const ID_SENHA = 'login-senha'
  * a uma mudança de identidade que nada tem a ver com ela.
  *
  * Nota de escopo: a `SPEC-CHOICE-01` (rascunho, ainda não `aprovada-pi`) propõe mudar o
- * `ACENTO_PADRAO` do JARVIS de `#FF5C00` para `#C4C4C4` — o que tornaria esta constante
- * redundante. Enquanto a spec não for aprovada, o default do app segue `#FF5C00` e a
+ * `ACENTO_PADRAO` do JARVIS de `#C4C4C4` para `#C4C4C4` — o que tornaria esta constante
+ * redundante. Enquanto a spec não for aprovada, o default do app segue `#C4C4C4` e a
  * neutralização vive aqui, no consumidor, sem alterar o token que outras telas leem.
  */
 const ACENTO_DA_MARCA = '#C4C4C4' as const
@@ -75,7 +75,7 @@ export function TelaLogin({ auth, onEntrar }: TelaLoginProps): React.JSX.Element
      *
      * E o acento vai **fixo em prata** (decisão do PI, 2026-07-24): a tela de entrada antecede
      * a identidade. Quem está aqui ainda não escolheu espaço nem cor, e o laranja do JARVIS
-     * (`#FF5C00`, o default de fábrica) pintava anel, glow e dot de um módulo que o usuário
+     * (`#C4C4C4`, o default de fábrica) pintava anel, glow e dot de um módulo que o usuário
      * ainda não abriu — no protótipo esses elementos são metálicos.
      *
      * Passar o acento **ao provider**, em vez de trocar cor a cor, é o que faz um único ponto
@@ -231,8 +231,8 @@ export function TelaLogin({ auth, onEntrar }: TelaLoginProps): React.JSX.Element
              * existe, e tem uma vantagem: `aria-label` **substitui** o conteúdo, então quem usa
              * comando de voz ("clicar em Google") perderia o rótulo visível como alvo.
              *
-             * Enquanto autentica, o rótulo vira "Aguardando o navegador…" e a frase de destino
-             * sai junto — o botão passa a descrever o estado, não a ação.
+             * Enquanto autentica, o botão descreve o estado em vez da ação — mesma regra dos
+             * outros dois rótulos: visível curto, nome acessível inteiro.
              */}
             <Button
               variante="secundaria"
@@ -242,7 +242,23 @@ export function TelaLogin({ auth, onEntrar }: TelaLoginProps): React.JSX.Element
               iconeInicial={autenticando ? undefined : <LogoGoogle />}
             >
               {autenticando ? (
-                t('auth.entrando')
+                <>
+                  {/*
+                   * Visível "Aguardando…", anunciado "Aguardando o navegador…".
+                   *
+                   * A frase inteira ocupava três linhas em metade da grade de dois provedores e
+                   * empurrava o spinner para uma linha sozinha (visto na captura do app real).
+                   * A reticência já diz que a espera continua; **onde** ela acontece está no
+                   * parágrafo acima do card, visível para todos.
+                   *
+                   * Duas frases completas em vez de prefixo + complemento: concatenados, os
+                   * dois trechos dariam "Aguardando… o navegador", com a pausa no meio. Por isso
+                   * o rótulo curto vai `aria-hidden` e a frase inteira vive no `sr-only` — cada
+                   * público recebe a versão que lhe serve, sem que uma estrague a outra.
+                   */}
+                  <span aria-hidden>{t('auth.aguardando')}</span>
+                  <span className="sr-only">{t('auth.aguardandoNavegador')}</span>
+                </>
               ) : (
                 <>
                   {/*
