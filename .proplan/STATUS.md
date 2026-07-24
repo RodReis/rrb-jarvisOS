@@ -25,18 +25,13 @@ _(vazio)_
 
 ## Feito
 
-### [MVP3] Design System da Plataforma — base única, 2 identidades (#16)
-
-- [MVP3][F03b] Componentes: dados + overlays + feedback (#20)
-
-### Sem épico
-
-- [MVP1][INFRA][FIX] navegacao.spec.ts nunca rodou — fora do include de toda categoria (#47)
+_(vazio)_
 
 ## Finalizado
 
 ### [MVP3] Design System da Plataforma — base única, 2 identidades (#16)
 
+- [MVP3][F03b] Componentes: dados + overlays + feedback (#20, finalizado em: 2026-07-24)
 - [MVP3][F05] Identidades NOA e JARVIS (#23, finalizado em: 2026-07-24)
 - [MVP3][F04a] AppShell + navegação (#21, finalizado em: 2026-07-24)
 - [MVP3][F04b] Padrões operacionais (#22, finalizado em: 2026-07-24)
@@ -64,6 +59,7 @@ _(vazio)_
 
 ### Sem épico
 
+- [MVP1][INFRA][FIX] navegacao.spec.ts nunca rodou — fora do include de toda categoria (#47, finalizado em: 2026-07-24)
 - [MVP1][SPEC-Fundacao-03][FIX] O app nunca lê o arquivo .env — login sempre indisponível (#43, finalizado em: 2026-07-23)
 
 ## Descartado
