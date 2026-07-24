@@ -80,7 +80,23 @@ export const RECURSOS = {
         copyright: '© 2026 RRB Trading — Todos os direitos reservados',
         privacidade: 'Política de Privacidade',
         termos: 'Termos de Uso',
-        local: 'GOIÂNIA · BRASIL'
+        local: 'GOIÂNIA · BRASIL',
+        // Campos e provedores da maquete do protótipo. Usuário/senha e GitHub estão
+        // desabilitados — só o Google autentica (SPEC-Fundacao-03). O aviso existe para que o
+        // cinza do desabilitado não seja a única pista de que ainda não funcionam.
+        usuario: 'usuário',
+        senha: 'senha',
+        acessar: 'Acessar',
+        ouCadastre: 'ou cadastre-se com',
+        google: 'Google',
+        github: 'GitHub',
+        // Prefixo `sr-only` dos botões de provedor: o rótulo visível é só a marca ("Google"),
+        // como no protótipo, mas o nome acessível precisa dizer a ação inteira.
+        entrarCom: 'Entrar com o',
+        // Depois de uma falha, o nome acessível do botão do provedor convida a repetir — sem
+        // alongar o rótulo visível, que não cabe em metade da grade de dois provedores.
+        tentarNovamenteCom: 'Tentar novamente com o',
+        senhaEmBreve: 'Login por usuário e senha e entrada com GitHub ainda não estão disponíveis.'
       },
       erro: {
         espaco: 'Não foi possível carregar o espaço de trabalho.',
@@ -154,7 +170,16 @@ export const RECURSOS = {
         privacidade: 'Privacy Policy',
         termos: 'Terms of Use',
         // Não traduzido: é o nome próprio da cidade e do país, não uma string de UI.
-        local: 'GOIÂNIA · BRAZIL'
+        local: 'GOIÂNIA · BRAZIL',
+        usuario: 'username',
+        senha: 'password',
+        acessar: 'Sign in',
+        ouCadastre: 'or sign up with',
+        google: 'Google',
+        github: 'GitHub',
+        entrarCom: 'Sign in with',
+        tentarNovamenteCom: 'Try again with',
+        senhaEmBreve: 'Username and password sign-in and GitHub are not available yet.'
       },
       erro: {
         espaco: 'Could not load the workspace.',
