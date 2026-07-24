@@ -40,6 +40,7 @@ Atualizado em: **2026-07-24**. Mantido pelo Code a cada entrega (junto com `DEVE
 | [#52](https://github.com/RodReis/rrb-jarvisOS/issues/52) | — (`[FIX]`) | MVP-003 | *(sem spec — fonte: SPEC-DS-03b crit. 4, SPEC-DS-06 crit. 5)* | — | [#53](https://github.com/RodReis/rrb-jarvisOS/pull/53) | 2026-07-23 |
 | [#57](https://github.com/RodReis/rrb-jarvisOS/issues/57) | — (`[FIX]`) | MVP-001 | *(sem spec — fonte: protótipo `Login`, `01-login.png`, README §2.6)* | — | [#59](https://github.com/RodReis/rrb-jarvisOS/pull/59) | 2026-07-24 |
 | [#58](https://github.com/RodReis/rrb-jarvisOS/issues/58) | — (`[FIX]`) | MVP-003 | *(sem spec — fonte: `src/design/README.md` § Base técnica)* | — | [#59](https://github.com/RodReis/rrb-jarvisOS/pull/59) | 2026-07-24 |
+| [#69](https://github.com/RodReis/rrb-jarvisOS/issues/69) | CHOICE seleção de espaço + acento | *(container em aberto)* | `spec-choice-01-selecao-de-espaco.md` | — | [#70](https://github.com/RodReis/rrb-jarvisOS/pull/70) | 2026-07-24 |
 
 > **04 e 02 saíram no mesmo PR**, por decisão do PI (2026-07-22): o critério 4 da SPEC-04 exige `AuditEvent` de `workspace-switch`, cujo fluxo nasce na F02 — separá-las exigiria um stub que a F02 jogaria fora. O critério 4 fica **parcialmente atendido**: `workspace-switch` está provado ponta a ponta; `login`/`logout`/`login-offline-reuse` têm o tipo no contrato e o fluxo nasce na F03.
 
@@ -69,11 +70,9 @@ Atualizado em: **2026-07-24**. Mantido pelo Code a cada entrega (junto com `DEVE
 
 ### A Fazer · Em Andamento
 
-| Issue | Fatia | MVP | Spec | Coluna |
-|---|---|---|---|---|
-| [#69](https://github.com/RodReis/rrb-jarvisOS/issues/69) | CHOICE seleção de espaço + acento | *(container em aberto)* | `spec-choice-01-selecao-de-espaco.md` | **Em Andamento** (`proplan:doing`) |
+*(vazios)*
 
-> **#69 em andamento** (Code, 2026-07-24). Branch `feat/choice-selecao-de-espaco`. Entrega em duas partes sob a mesma issue, ambas `refs #69`: **PR 1 (jornada)** — `TelaChoice` fiel ao protótipo + integração ao fluxo + transição (crits. 1, 2, 6, 7, 9, 10, 11); **PR 2 (acento persistido)** — migration no `UserProfile` + IPC + Settings (crits. 4, 5, 8). Rail e `WorkspaceSwitcher` **intactos** (opção A da spec). O `proplan:next` segue no #34 (INFRA) — a #69 puxou por decisão de sequência, não pela cabeça da fila.
+> **#69 CHOICE entregue** (Code, 2026-07-24) — PR [#70](https://github.com/RodReis/rrb-jarvisOS/pull/70) **mergeado** (squash `0d4e42d`), CI verde. Os **11 critérios** entregues num PR só (os dois PRs planejados viraram dois commits na mesma branch). `TelaChoice` fiel ao protótipo, acento persistido no `UserProfile` (migration 6), Settings com o mesmo seletor. Rail e `WorkspaceSwitcher` **intactos** (opção A). Aguarda **aceite do PI** (`proplan:done`). O `proplan:next` volta ao #34 (INFRA), a cabeça da fila.
 
 ### MVP-003 Design System — 8 fatias (todas `aprovada-pi`, assignee PI)
 
