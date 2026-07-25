@@ -35,6 +35,12 @@ export default defineConfig({
   renderer: {
     root: 'src/renderer',
     plugins: [react(), tailwindcss()],
+    // Porta fixa 5180 com strictPort: se ocupada, falha em vez de saltar de porta
+    // (CLAUDE.md § Portas). Porta que "se conserta sozinha" faz abrir a tela do
+    // processo errado sem perceber — falha silenciosa que o projeto trata como pior
+    // que falha ruidosa. host 127.0.0.1 explícito porque no Windows `localhost` pode
+    // resolver para IPv6 e confundir ferramenta que sonda IPv4 (armadilha da F03a).
+    server: { host: '127.0.0.1', port: 5180, strictPort: true },
     build: {
       rollupOptions: {
         input: { index: resolve(__dirname, 'src/renderer/index.html') }
