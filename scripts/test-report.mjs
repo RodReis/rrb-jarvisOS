@@ -23,6 +23,16 @@ import { mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+/*
+ * O E2E Playwright-Electron NÃO roda aqui (card #34). Ele domina o tempo de CI
+ * (build + xvfb + keyring) e prova a fronteira preload/IPC/janela — que muda
+ * raramente. Virou job próprio no `ci.yml`, condicional por `paths`, e saiu da
+ * categoria "Tela" do relatório: "Tela" passou a contar SÓ o vitest-componente
+ * (config sem `playwrightJson`). O relatório continua sendo evidência de máquina
+ * das três categorias unitárias/integração; o E2E é um check à parte, com seu
+ * próprio verde no PR que toca a fronteira. Ver docs/TESTING.md §3 e §6.
+ */
+
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const RAW = resolve(ROOT, 'reports/.raw')
 const check = process.argv.includes('--check')
@@ -71,20 +81,13 @@ function runVitestProject(project, rawName, coverageDir) {
 if (!noRun) {
   mkdirSync(RAW, { recursive: true })
 
-  // As 3 categorias do ADR-003. A parte Playwright de `tela` passou a existir na
-  // Fatia 03 (SPEC-Fundacao-03, critério 9) — antes contava 0 sem invalidar o
-  // relatório (docs/TESTING.md §8).
+  // As 3 categorias do ADR-003, todas via Vitest. "Tela" conta só o
+  // vitest-componente (jsdom) — o E2E Playwright-Electron saiu daqui no card #34
+  // (ver o cabeçalho deste arquivo). Sem `npm run build` nem `playwright test`: o
+  // relatório não depende mais do app empacotado, e a geração local ficou rápida.
   runVitestProject('regras', 'regras.json', 'regras')
   runVitestProject('banco', 'banco.json', 'banco')
   runVitestProject('tela', 'tela-vitest.json', 'tela')
-
-  // E2E Electron. Exige o build (`out/`) — o Playwright sobe o app empacotado, não o
-  // servidor de dev, então rodá-lo sem build testaria a versão anterior do código.
-  run('npm', ['run', 'build'])
-  // O reporter JSON e o caminho de saída vêm do `playwright.config.ts`, que já grava
-  // em `reports/.raw/tela-playwright.json` — o mesmo caminho que o
-  // `test-report.config.json` declara para a categoria Tela.
-  run('npx', ['playwright', 'test'])
 }
 
 const entry = selfcheck ? 'scripts/gen-test-report.selfcheck.mjs' : 'scripts/gen-test-report.mjs'
