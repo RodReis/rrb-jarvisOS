@@ -26,7 +26,7 @@ O app sobe sem configuração nenhuma — só o **login** fica indisponível at�
 
 | O quê | Porta | Observação |
 |---|---:|---|
-| Renderer (dev) | 5173 | Default do Vite. O `electron.vite.config.ts` **não declara porta**, então a 5180 com `strictPort` do CLAUDE.md ainda não vale — é o bug [#41](https://github.com/RodReis/rrb-jarvisOS/issues/41) |
+| Renderer (dev) | 5180 | `strictPort` — falha se ocupada, em vez de trocar (CLAUDE.md § Portas). `host: 127.0.0.1` explícito para evitar resolução IPv6 no Windows |
 | Galeria de prova | 5181 | `strictPort` — falha se ocupada, em vez de trocar |
 | Supabase local | 54321 | Só quando a stack Docker está no ar |
 

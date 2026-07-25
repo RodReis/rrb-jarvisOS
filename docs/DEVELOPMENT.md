@@ -342,7 +342,7 @@ Status: **entregue** — spec `aprovada-pi` (2026-07-21); issue [#19](https://gi
 - `RadioGroup` por setas **não é verificável em jsdom** (roving tabindex do Radix depende de foco real). `it.todo` com a razão escrita, em vez de um teste que passa medindo outra coisa — cobre-se no E2E da F04a.
 - A galeria cobre **4 de 32** combinações de acento. Os dois defeitos apareceram nos defaults; ampliar a matriz é candidato para a F06.
 - **`:active` não existe em nenhum dos 16** — nenhum controle dá feedback de pressão. Anotado para a F06 (hardening).
-- Card **[#41](https://github.com/RodReis/rrb-jarvisOS/issues/41)**: o renderer sobe em porta variável, contra o `strictPort` do CLAUDE.md. Achado ao subir o app para inspeção; não misturado na fatia.
+- Card **[#41](https://github.com/RodReis/rrb-jarvisOS/issues/41)**: o renderer subia em porta variável, contra o `strictPort` do CLAUDE.md. Achado ao subir o app para inspeção; não misturado na fatia. **Corrigido em 2026-07-24** (PR [#73](https://github.com/RodReis/rrb-jarvisOS/pull/73)): `server: { host: '127.0.0.1', port: 5180, strictPort: true }` no `renderer` de `electron.vite.config.ts`, provado no app real (5180 fixa; falha ruidosa se ocupada).
 
 ### Fatia 03b — Componentes: dados + overlays + feedback (`docs/spec/spec-design-system-03b-componentes-dados-overlays.md`)
 
