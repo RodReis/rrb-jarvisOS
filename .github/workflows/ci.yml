@@ -23,6 +23,16 @@ on:
   pull_request:
     branches: [main]
 
+# Cancela a execução anterior quando um novo push chega no MESMO PR (card #66): sem isto,
+# empurrar três vezes seguidas deixava três suítes inteiras (~7 min cada) rodando em
+# paralelo, e só a última importa. `github.ref` agrupa por branch do PR; a `main` não passa
+# por aqui (o workflow só dispara em `pull_request`), então não há risco de cancelar o CI de
+# um merge. Runner efêmero: cancelar não deixa Supabase nem processo órfão — o ambiente
+# inteiro é descartado. Economiza minuto de runner e devolve o resultado do push atual antes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   pull-requests: write
