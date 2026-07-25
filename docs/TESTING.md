@@ -275,8 +275,10 @@ registradas no código de referência da §10):
 
 ## 6. Workflow de CI — `.github/workflows/ci.yml`
 
-Dispara em **todo pull request** para `main`. Desde o **card #34** (2026-07-24) são **três jobs**,
-não um:
+Dispara em **todo pull request** para `main`. Um bloco `concurrency` (card #66) cancela a execução
+anterior quando chega um push novo no mesmo PR — três pushes seguidos não deixam três suítes
+inteiras (~7 min cada) rodando em paralelo quando só a última importa. Desde o **card #34**
+(2026-07-24) são **três jobs**, não um:
 
 - **`test`** — roda em todo PR. Runners unitários/integração + relatório + guarda anti-drift
   (descrito nesta seção). **Não sobe Electron** e **não roda E2E**.

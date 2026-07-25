@@ -8,9 +8,10 @@ Atualizado em: **2026-07-24**. Mantido pelo Code a cada entrega (junto com `DEVE
 
 | Issue | Fatia | MVP | Spec | Índice |
 |---|---|---|---|---|
+| [#64](https://github.com/RodReis/rrb-jarvisOS/issues/64) | — (`[FIX]`) | MVP-001 | *(sem spec — bug documentado, SPEC-Fundacao-03)* | — |
 | [#41](https://github.com/RodReis/rrb-jarvisOS/issues/41) | — (`[FIX]`) | MVP-001 | *(sem spec — bug documentado)* | — |
 
-> **`proplan:next` sem sucessor definido.** O #34 (que era o `next`) saiu para **Em Andamento** em 2026-07-24. A cabeça da fila agora é decisão do PI (item 11 abaixo): o `[FIX]` **#41** (renderer em porta variável × `strictPort`) ou o **MVP-004** ([#10](https://github.com/RodReis/rrb-jarvisOS/issues/10)). Enquanto o PI não marca, nenhum card abaixo carrega `proplan:next`.
+> **`proplan:next` sem sucessor definido.** Os dois cards de INFRA-CI (#34 E2E por paths, #66 concurrency) saíram para entrega em 2026-07-24. A cabeça da fila é decisão do PI (item 11 abaixo): o `[FIX]` **#64** (rótulo do login quebra o botão), o `[FIX]` **#41** (renderer em porta variável × `strictPort`) ou o **MVP-004** ([#10](https://github.com/RodReis/rrb-jarvisOS/issues/10)). Enquanto o PI não marca, nenhum card carrega `proplan:next`.
 
 > ✅ **MVP-003 aceito pelo PI em 2026-07-23.** As 8 fatias (#17–#24) estão `closed` + `proplan:finalizado` e o épico **[#16](https://github.com/RodReis/rrb-jarvisOS/issues/16) foi fechado**. Os três `[FIX]` que nasceram durante o corte (#43, #47, #52) seguem em `proplan:done`, aguardando aceite à parte.
 
@@ -40,6 +41,7 @@ Atualizado em: **2026-07-24**. Mantido pelo Code a cada entrega (junto com `DEVE
 | [#57](https://github.com/RodReis/rrb-jarvisOS/issues/57) | — (`[FIX]`) | MVP-001 | *(sem spec — fonte: protótipo `Login`, `01-login.png`, README §2.6)* | — | [#59](https://github.com/RodReis/rrb-jarvisOS/pull/59) | 2026-07-24 |
 | [#58](https://github.com/RodReis/rrb-jarvisOS/issues/58) | — (`[FIX]`) | MVP-003 | *(sem spec — fonte: `src/design/README.md` § Base técnica)* | — | [#59](https://github.com/RodReis/rrb-jarvisOS/pull/59) | 2026-07-24 |
 | [#69](https://github.com/RodReis/rrb-jarvisOS/issues/69) | CHOICE seleção de espaço + acento | *(container em aberto)* | `spec-choice-01-selecao-de-espaco.md` | — | [#70](https://github.com/RodReis/rrb-jarvisOS/pull/70) | 2026-07-24 |
+| [#34](https://github.com/RodReis/rrb-jarvisOS/issues/34) | — (`[INFRA]`) | — | *(sem spec — fonte: PI 2026-07-22 + ADR-003)* | — | [#71](https://github.com/RodReis/rrb-jarvisOS/pull/71) | 2026-07-24 |
 
 > **04 e 02 saíram no mesmo PR**, por decisão do PI (2026-07-22): o critério 4 da SPEC-04 exige `AuditEvent` de `workspace-switch`, cujo fluxo nasce na F02 — separá-las exigiria um stub que a F02 jogaria fora. O critério 4 fica **parcialmente atendido**: `workspace-switch` está provado ponta a ponta; `login`/`logout`/`login-offline-reuse` têm o tipo no contrato e o fluxo nasce na F03.
 
@@ -71,9 +73,11 @@ Atualizado em: **2026-07-24**. Mantido pelo Code a cada entrega (junto com `DEVE
 
 | Issue | Fatia | MVP | Spec | Coluna |
 |---|---|---|---|---|
-| [#34](https://github.com/RodReis/rrb-jarvisOS/issues/34) | — (`[INFRA]`) | — | *(sem spec — infra)* | Em Andamento (`proplan:doing`) |
+| [#66](https://github.com/RodReis/rrb-jarvisOS/issues/66) | — (`[INFRA]`) | — | *(sem spec — infra)* | Em Andamento (`proplan:doing`) |
 
-> **#34 em andamento** (Code, 2026-07-24) — separar o E2E do CI em job próprio, condicional por `paths`. Branch `feat/ci-e2e-job-condicional`. Três jobs no `ci.yml`: `test` (relatório, sem E2E), `e2e` (build+xvfb+keyring+Playwright, só quando o PR toca a fronteira preload/IPC/janela) e `gate` (required check, agrega os dois). Categoria "Tela" do relatório passou a contar **só vitest-componente** (215, era 218 com E2E). Fonte da decisão: PI (2026-07-22) + ADR-003. **Ao mergear:** trocar o required check de `test` → `gate` na branch protection.
+> **#66 em andamento** (Code, 2026-07-24) — `concurrency` no `ci.yml`: cancela a execução anterior quando chega push novo no mesmo PR (não deixa suítes paralelas obsoletas rodando). Branch `feat/ci-concurrency`. O card já estava **resolvido na origem** (o PI tornou o repo público → Actions grátis); segue aberto como guarda "se voltar a privado". As outras opções do card já saíram: **separar o E2E por paths** foi o **#34** (mergeado); **validar local antes do push** é disciplina do Code. `concurrency` é a última peça codificável.
+
+> **#34 entregue** (Code, 2026-07-24) — PR [#71](https://github.com/RodReis/rrb-jarvisOS/pull/71) **mergeado** (squash `05835c5`), CI verde: `test` ✅, `e2e` **skipped** (o PR não toca a fronteira), `gate` ✅ — a primeira prova do mecanismo. Três jobs (`test`/`e2e`/`gate`) + `changes`; "Tela" no relatório = só vitest (215). Required check trocado `test` → `gate`. `proplan:done`, aguardando aceite do PI.
 
 > **#69 CHOICE entregue** (Code, 2026-07-24) — PR [#70](https://github.com/RodReis/rrb-jarvisOS/pull/70) **mergeado** (squash `0d4e42d`), CI verde. Os **11 critérios** entregues num PR só (os dois PRs planejados viraram dois commits na mesma branch). `TelaChoice` fiel ao protótipo, acento persistido no `UserProfile` (migration 6), Settings com o mesmo seletor. Rail e `WorkspaceSwitcher` **intactos** (opção A). Aguarda **aceite do PI** (`proplan:done`). O `proplan:next` volta ao #34 (INFRA), a cabeça da fila.
 

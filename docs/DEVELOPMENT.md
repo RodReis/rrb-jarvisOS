@@ -512,7 +512,7 @@ Três `[FIX]` nasceram durante o corte e seguem em `proplan:done`, aguardando ac
 
 Ordem: **MVP-004** ([#10](https://github.com/RodReis/rrb-jarvisOS/issues/10), execução real + terminal) → MVP de providers (Corte 3, com BudgetPolicy). Ordem macro em `docs/LANDSCAPE.md` § Roadmap.
 
-### [INFRA] #34 — Separar o E2E em job de CI próprio, condicional por paths (em andamento, 2026-07-24)
+### [INFRA] #34 — Separar o E2E em job de CI próprio, condicional por paths (entregue, 2026-07-24 · PR #71)
 
 Card de infra (sem spec — fonte: decisão do PI de 2026-07-22 + ADR-003). O E2E Playwright-Electron dominava o tempo de CI (build + xvfb + keyring + boot do Electron, ~15 min) e rodava **em todo PR**, mesmo quando o PR não tocava a fronteira que o E2E prova. Passos:
 
@@ -520,9 +520,20 @@ Card de infra (sem spec — fonte: decisão do PI de 2026-07-22 + ADR-003). O E2
 - [x] **Config** (`test-report.config.json`): a categoria "Tela" perdeu o `playwrightJson` — passou a contar **só o vitest-componente**. Estado atual: Tela 215 (era 218 com os 3 do E2E somados). `readPlaywrightJson` fica no gerador (repo-agnóstico), sem chamador, apontado no comentário.
 - [x] **`ci.yml`**: três jobs. `test` (relatório, sem E2E), `e2e` (todos os steps de ambiente — binário, setuid, keyring, build, xvfb — só quando o PR toca a fronteira) e `gate` (required check único que agrega `test` + `e2e`). Um job `changes` faz `git diff` contra a base e casa `src/main/preload/**`, `src/main/index.ts`, `src/main/window.ts`, `tests/e2e/**`, `playwright.config.ts` — sem action de terceiros (`paths:` no evento cancelaria o workflow inteiro).
 - [x] **`docs/TESTING.md`**: §2/§3/§3.1/§6/§9 atualizadas — "Tela" no relatório = componente; E2E é check à parte condicional.
-- [ ] **Ao mergear:** trocar o required check de `test` → `gate` na branch protection (só admin). Enquanto não trocar, `gate` roda mas não barra, e `test` segue sendo o gate — o E2E não bloquearia. Por isso a troca é parte da entrega.
+- [x] **Ao mergear:** required check trocado de `test` → `gate` na branch protection (feito pelo PI — é ação de admin, o classificador me bloqueou de mexer na proteção da `main`). Ordem seguida: trocar primeiro (gate já verde no #71, não bloqueou), mergear depois.
 
 **A decisão de projeto que fecha a garantia do card** ("o E2E completo tem de rodar no caminho para a `main`, a condicional nunca esconde regressão"): o `gate` é required em vez do `e2e`. Um required check **pulado** por `if:` fica *pending eterno* no GitHub e bloqueia o merge — a armadilha clássica de condicionar job por paths. O `gate` sempre roda (`if: always()`), lê `needs.e2e.result` e aceita `skipped` (PR não toca a fronteira) ou `success`, barrando em `failure`. Assim o E2E condicional nunca trava o merge, e um E2E que falha de verdade ainda derruba o gate.
+
+### [INFRA] #66 — Custo do GitHub Actions / `concurrency` no CI (2026-07-24 · PR #72)
+
+Card criado pelo Code quando o orçamento de Actions chegou a $3,30/$5,00 (repo privado ⇒ Actions cobrado). **Resolvido na origem pelo PI**, que tornou o repo **público** (Actions grátis e ilimitado) após a auditoria de segurança do próprio card (`.env` nunca commitado, nenhuma chave real no histórico). O card ficou aberto como guarda — *"se voltar a privado, o custo volta"*.
+
+Das opções técnicas do card, duas já haviam saído — **separar o E2E por paths** foi o #34; **validar local antes do push** é disciplina, não código. Sobrou **`concurrency`**, entregue aqui:
+
+- [x] **`ci.yml`**: bloco `concurrency` com `group: ci-${{ github.ref }}` + `cancel-in-progress: true`. Push novo no mesmo PR cancela a execução anterior — três pushes seguidos não deixam três suítes (~7 min cada) rodando em paralelo quando só a última conta. A `main` não passa por aqui (o workflow só dispara em `pull_request`), então não há risco de cancelar o CI de um merge. Runner efêmero: cancelar não deixa Supabase nem processo órfão.
+- [x] **`docs/TESTING.md` §6**: `concurrency` documentado na descrição dos disparos.
+
+Efeito mensurável do #34 + #66 juntos: o PR fora da fronteira roda `test` (~4 min) e pula o `e2e` (~15 min); pushes repetidos param de empilhar. O custo de Actions cai mesmo se o repo voltar a privado.
 
 ## Registro de entregas
 
