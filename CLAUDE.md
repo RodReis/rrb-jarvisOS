@@ -18,7 +18,7 @@ Desktop app **local-first** (Electron + React + TypeScript) com dois espaços de
 
 ## Papéis e governança
 
-- **Rodrigo Reis (PI)** — decide escopo, prioridades e trade-offs; aprova specs e aceita entregas.
+- **Rodrigo Reis (PI)** — decide escopo, prioridades e trade-offs; aprova specs e aceita entregas, não cria issue.
 - **Claude Cowork (planejamento)** — especifica e mantém `docs/` e as specs em `docs/specs/`. Antes de finalizar qualquer spec, apresenta as perguntas abertas e dúvidas ao PI — spec só vira `aprovada-pi` com todas resolvidas (evitar retrabalho). Quando a spec vira `aprovada-pi`, **cria a issue-fatia no board** (coluna Backlog, assignee PI). **Nunca implementa código** — implementação é exclusiva do Claude Code.
 - **Claude Code (você)** — planeja, codifica, testa (código, UX e UI — pode usar as skills do impeccable), atualiza a documentação e **sempre commita todos os documentos de `docs/`** junto da entrega. Implementa a partir deste arquivo + `docs/` + spec da feature em `docs/specs/`. **Não cria a issue** (é do Cowork) — pega o card, move pelo fluxo e entrega com PR. Pode criticar arquitetura, **não escopo**. Sem spec para a tarefa, ou spec ambígua → perguntar ao PI antes de codificar, nunca assumir. Deve apontar problemas técnicos da spec — a correção passa pelo PI.
 
