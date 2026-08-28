@@ -23,6 +23,8 @@ A proposta não é um módulo isolado. Ela combina planejamento versionado, apro
 8. Cada pergunta pode oferecer **Decida por mim**. A IA escolhe quando houver delegação explícita e registra justificativa e origem da decisão.
 9. Após criar o PRD preliminar, o PI deve anexar obrigatoriamente `DESIGN-SYSTEM.md` e protótipos HTML.
 10. A recuperação permite **três tentativas totais**: implementação inicial e até duas correções.
+11. Não existe aceite duplo: a mesma revisão aprovada não volta ao PI, e merge não exige aprovação humana adicional. Uma mudança estrutural cria outra revisão e reabre somente o gate afetado.
+12. A pipeline executa apenas requisitos fornecidos ou aprovados pelo PI. Ela não deduz exigências legais, regulatórias, de consentimento ou classificações de domínio.
 
 ## 3. Objetivo e condição de parada
 
@@ -226,6 +228,9 @@ O HTML nunca roda com acesso ao Electron, Node, filesystem, credenciais ou cooki
 | `docs/LANDSCAPE.md` | Cenário competitivo atual: o que o mercado já oferece, o que deixou de ser diferencial ou morreu e quais gatilhos obrigam nova análise. Toda afirmação externa registra fonte e data; não pode ser preenchido por memória não verificada. |
 | `docs/TESTING.md` | Estratégia, classificação, critérios, matriz e índice de evidência por SPEC/issue. Resume o resultado atual sem números escritos à mão. |
 | `docs/REVIEW.md` | Política exclusiva da pipeline de revisão: o que sinalizar, severidade, evidência mínima, falsos positivos, formato do relatório e elegibilidade para autocorreção. |
+| `docs/AGENT-POLICY.md` | Política humana de execução: orçamento de contexto, autoridade de decisão, bloqueios legítimos, resolução de skills e ciclo de vida Docker. Não redefine requisito do produto. |
+| `skills-policy.json` | Contrato validável de capacidades, aliases aceitos, obrigatoriedade, fallback e restrições de uso por perfil de tarefa. |
+| `skills.lock.json` | Resolução efetiva e reproduzível de skills, MCPs e ferramentas, com origem, versão ou hash e disponibilidade verificada. |
 | `docs/DEVELOPMENT.md` | Progresso interno da fatia em execução: passos e evidências locais. Não duplica a coluna da issue nem o roadmap do `STATUS.md`. |
 | `reports/TESTS.md` | Evidência detalhada gerada por máquina por SPEC/issue. É referenciada por `docs/TESTING.md` e nunca editada manualmente. |
 | `docs/mvp/mvp-<nnn>-<slug>.md` | Tese, fatias previstas, dependências macro, fora de escopo e critérios de encerramento do MVP, criado após aprovação do MVP. |
@@ -243,6 +248,8 @@ O HTML nunca roda com acesso ao Electron, Node, filesystem, credenciais ou cooki
 7. `REVIEW.md` é injetado nos agentes da pipeline de revisão como a política de projeto de maior prioridade, abaixo apenas de segurança da plataforma, instruções do ambiente e spec aprovada. Ele não pode ampliar escopo nem redefinir requisito do PI.
 8. Todo merge de fatia atualiza no mesmo commit os documentos afetados e o índice de evidência. Documento sem mudança material não recebe edição cosmética.
 9. O `ArtifactBundle` registra path e hash de cada documento estrutural. Alteração estrutural cria nova revisão e invalida somente aprovações dependentes.
+10. `AGENT-POLICY.md` explica a política; `skills-policy.json` é sua parte executável. Divergência entre ambos falha na validação antes do run.
+11. `skills.lock.json` registra o que foi realmente resolvido para o run. Nome de skill ausente não bloqueia quando existir fallback aprovado para a mesma capacidade.
 
 O pacote aprovado referencia hashes do PRD, arquitetura, design system e protótipos. Mudar qualquer entrada estrutural cria nova revisão e invalida as aprovações dependentes.
 
@@ -262,6 +269,9 @@ O pacote aprovado referencia hashes do PRD, arquitetura, design system e protót
 - **ExecutionEvent**: evento operacional ordenado e correlacionado.
 - **UsageEvent**: tokens observados, custo estimado ou `unknown`.
 - **FailureSignature**: categoria, alvo, trecho normalizado e hash.
+- **ContextPolicy**: limites de entrada, saída, turnos, arquivos, bytes, expansão e exceções por fase e tentativa.
+- **SkillResolution**: capacidade requerida, aliases, implementação escolhida, versão ou hash, fallback e resultado do preflight.
+- **ResourceLease**: projeto, run, stack Docker, portas, volumes, expiração e estado de limpeza.
 
 ### 11.2 Máquinas de estado
 
@@ -338,6 +348,32 @@ O prompt de recuperação recebe somente:
 
 Histórico completo não é injetado indiscriminadamente.
 
+### 13.1 Autoridade de decisão e bloqueios
+
+“Documento não bloqueia código” vale depois de a revisão da fatia estar aprovada. Antes disso, os três gates de entrada continuam obrigatórios; depois disso, documento auxiliar ou ADR faltante é criado ou atualizado no mesmo PR, sem novo aceite.
+
+| Situação | Autoridade | Comportamento |
+|---|---|---|
+| Escolha técnica reversível dentro da spec | agente | decide, implementa, testa e registra no PR; ADR somente quando estrutural |
+| Documento de apoio desatualizado após aprovação da fatia | agente | implementa e atualiza no mesmo PR |
+| Comportamento de produto ausente, irreversível ou fora da spec | PI | retorna ao gate afetado com uma pergunta objetiva; não cria aceite adicional para a mesma revisão |
+| Revisão aprovada inexistente, alterada ou com hash divergente | gate existente | não inicia ou suspende o run até aprovação da revisão correta |
+| Autenticação, quota, segredo obrigatório, política negada ou path fora da allowlist | infraestrutura/política | bloqueia com causa e próxima ação verificável |
+| Dependência ou CI obrigatório indisponível além do prazo configurado | infraestrutura externa | bloqueia sem inventar sucesso |
+| Base/SHA obsoleto, conflito sem resolução segura ou risco de sobrescrever trabalho do usuário | Git/política | reconcilia; bloqueia se não houver ação segura dentro do escopo |
+| Orçamento esgotado ou falha repetida sem hipótese nova | orçamento/recuperação | compacta quando possível; caso contrário bloqueia cedo |
+
+A frase “se parou, o motivo está errado” não é uma regra operacional: ela esconderia bloqueios reais e estimularia a pipeline a fabricar conclusão. Todo bloqueio precisa de categoria fechada, evidência, responsável e ação de desbloqueio.
+
+### 13.2 Docker e portas
+
+- A pipeline pode iniciar automaticamente a stack declarada quando ela estiver desligada.
+- Cada projeto/run usa nome de projeto Compose determinístico e um lease persistido no SQLite para portas, containers e volumes.
+- Uma stack saudável do mesmo projeto pode ser reutilizada; recurso de outro projeto nunca é reutilizado implicitamente.
+- Porta é alocada de um intervalo configurado, testada antes do uso e reservada transacionalmente. “Sempre criar porta nova” sem lease é proibido porque vaza recursos e ainda permite corrida.
+- Recursos temporários são removidos no encerramento ou pelo reconciler. Volumes persistentes seguem a política explícita do projeto e nunca são apagados como limpeza automática.
+- Docker indisponível vira `BLOCKED_INFRA` somente quando for dependência obrigatória da fatia.
+
 ## 14. Segurança operacional
 
 - `--dangerously-skip-permissions` é proibido na V1.
@@ -372,6 +408,60 @@ O ledger separa:
 - custo `unknown` quando o provider não expõe valor monetário.
 
 Plano Max/Pro não é tratado como API de orçamento exato. Quota ou sessão esgotada vira falha de provider, não falha de código.
+
+### 15.1 Orçamento de contexto
+
+Cada fase e tentativa recebe `ContextPolicy` com limites configuráveis de tokens de entrada, tokens de saída, turnos, arquivos, bytes e expansões. A entrada contabiliza instruções, skills, resultados de ferramentas e contexto de tentativas anteriores — não apenas arquivos do repositório.
+
+Antes de chamar o provider, o adapter faz preflight do orçamento. Ao atingir o limiar de alerta configurado, reduz expansão, resume evidência preservando referências e sinaliza o ledger. Se a tarefa não puder continuar com fidelidade dentro do teto, termina em `BLOCKED_BUDGET`; exceder silenciosamente não é permitido.
+
+`wholeRepoAllowed` é `false` por padrão. Leitura integral exige exceção explícita da política, motivo, estimativa e registro no ledger. Limites iniciais pertencem ao template do projeto e podem ser ajustados pelo PI sem alterar a regra global.
+
+### 15.2 Aquisição progressiva de contexto
+
+O contexto é montado nesta ordem:
+
+1. spec aprovada, política aplicável e snapshot da tentativa;
+2. diff, arquivos alterados, testes e erros diretamente relacionados;
+3. busca por `rg`, manifestos e dependências imediatas;
+4. consulta a índice estrutural opcional;
+5. expansão para arquivos adicionais somente com relação demonstrável e motivo registrado.
+
+Resultados são cacheados por hash do arquivo e base SHA. Recuperação recebe apenas o delta desde a tentativa anterior e assinaturas de falhas já conhecidas. Relatório anterior completo não é reapresentado quando o conteúdo relevante não mudou.
+
+### 15.3 Índice estrutural opcional com Graphify
+
+Graphify é um acelerador opcional, não fonte de verdade nem dependência universal. A configuração inicial é `strict=false` e análise de código local, sem passagem semântica por modelo. Ele é ativado quando o tamanho ou a transversalidade da tarefa ultrapassar o limiar configurado e deve consultar o grafo antes de expandir arquivos.
+
+O índice registra o base SHA, é reconstruído ou invalidado quando ficar obsoleto e permanece fora do contexto automático e do cache de prompt. Falha ou ausência do Graphify usa `rg` e manifestos como fallback. Torná-lo padrão exige experimento A/B que preserve qualidade e reduza tokens totais observados pelo provider.
+
+### 15.4 Compressão experimental
+
+Caveman ou skill equivalente fica desativada por padrão. Pode ser testada somente em saídas naturalmente curtas — status, mensagem de commit e resumo de revisão — com telemetria própria desativada, origem aprovada e versão/hash fixados.
+
+O gate A/B mede tokens totais faturáveis ou reportados pelo provider, qualidade, número de correções, tempo e falhas; contar linhas removidas de um arquivo não prova economia de tokens. A compressão é rejeitada se aumentar entrada, ocultar evidência ou piorar a taxa de primeira passagem. Arquitetura, invariantes, segurança técnica e regras críticas nunca dependem de linguagem comprimida para manter significado.
+
+### 15.5 Orquestração de skills e ferramentas
+
+A política resolve **capacidade**, não um nome literal. Cada entrada de `skills-policy.json` contém capacidade, aliases aceitos, perfil de tarefa, `required` ou `optional`, fallback executável e restrições. O preflight gera `skills.lock.json` e o run registra o que foi realmente usado.
+
+Ausência de uma skill não autoriza pular a disciplina nem bloqueia por nome: usa-se o fallback aprovado. Skill externa só pode vir de catálogo/origem aprovada, com versão ou hash fixado; instalação arbitrária durante o run é proibida.
+
+Perfis mínimos:
+
+- toda mudança de código: testes proporcionais e uma revisão independente;
+- UI: design de frontend, crítica visual, smoke ao vivo e evidência visual;
+- comportamento crítico: TDD e revisão aprofundada de invariantes e segurança técnica;
+- mobile: disciplina Expo quando a stack exigir;
+- biblioteca, SDK, API, CLI ou cloud: documentação atual via Context7, com fallback documentado se o MCP não estiver exposto;
+- documentação: schema, links, hashes e antideriva; não aciona suíte visual sem interface;
+- finalização: testes completos aplicáveis, CI, PR, merge e limpeza de worktree.
+
+Skills sobrepostas não são empilhadas por ritual. O perfil escolhe o conjunto mínimo que cubra as capacidades e evita múltiplas revisões equivalentes consumindo o mesmo contexto.
+
+### 15.6 Limite dos requisitos da pipeline
+
+A pipeline não cria, presume ou impõe requisito legal, regulatório, jurídico, de consentimento ou classificação de domínio que não conste dos artefatos fornecidos e aprovados pelo PI. Se o PI não passou o requisito, ele não existe para a execução. Isso não reduz os guardrails técnicos da plataforma — segredos, allowlist, isolamento de processo, hashes e verificação de SHA — e não cria gate ou aceite adicional.
 
 ## 16. Testes
 
@@ -443,6 +533,33 @@ A prova roda localmente, sob comando explícito, e não no CI comum:
 10. fazer merge automático;
 11. verificar ledger, hashes e referências.
 
+### 16.8 Contexto e custo
+
+- preflight soma instruções, skills, ferramentas e arquivos;
+- ordem progressiva de aquisição e cache por hash/SHA;
+- tentativa de leitura integral negada sem exceção registrada;
+- compactação no limiar e `BLOCKED_BUDGET` no teto;
+- recuperação não reinjeta relatório antigo sem delta;
+- Graphify obsoleto é invalidado e seu fallback funciona;
+- experimento de compressão mede total do provider e rejeita regressão de qualidade.
+
+### 16.9 Skills e recursos locais
+
+- aliases resolvem a mesma capacidade e geram lock reproduzível;
+- skill ausente executa o fallback aprovado;
+- skill externa sem origem ou versão/hash é recusada;
+- perfis não acionam revisões redundantes;
+- leases de Docker impedem colisão entre projetos;
+- stack saudável do mesmo projeto é reutilizada e recursos temporários são limpos após falha e sucesso.
+
+### 16.10 Aprovação e limite de requisitos
+
+- a mesma revisão não solicita aprovação duas vezes;
+- mudança estrutural reabre somente o gate dependente;
+- merge técnico não cria aceite final do PI;
+- requisito não fornecido pelo PI não é inventado pelo planejamento, implementação ou revisão;
+- guardrail técnico não é convertido em regra de produto.
+
 ## 17. Critérios de aceite da V1
 
 1. Um projeto novo percorre o Wizard A com autosave, recomendação e `Decida por mim` auditável.
@@ -460,6 +577,13 @@ A prova roda localmente, sob comando explícito, e não no CI comum:
 13. Resultado terminal é `merged` ou `blocked` com evidência e próxima ação.
 14. A jornada real completa passa com Claude Code e GitHub reais.
 15. A árvore documental da seção 10.3 é gerada, os papéis não se sobrepõem e os testes antideriva confirmam numeração, links, hashes e evidências.
+16. Nenhum run lê o repositório inteiro sem exceção explícita registrada.
+17. Cada fase e tentativa respeita o orçamento de contexto ou termina em `BLOCKED_BUDGET` com evidência.
+18. Ausência de skill nominal usa o fallback da capacidade; não elimina a disciplina nem bloqueia sem necessidade.
+19. Graphify, quando usado, referencia o base SHA e falha com fallback funcional.
+20. Compressão só vira padrão após A/B com redução de tokens totais e qualidade não inferior.
+21. Docker não colide com outro projeto e não deixa recurso temporário órfão após reconciliação.
+22. A mesma revisão recebe um único aceite em cada gate aplicável, e nenhum requisito externo ao pacote aprovado é criado pela pipeline.
 
 ## 18. Dependências no roadmap
 
@@ -477,6 +601,9 @@ A especificação e o plano podem ser preparados antes, mas a implementação de
 - Claude Code CLI: modo não interativo com `-p` e saída `json`/`stream-json`; limite de turns e allow/disallow tools devem ser configurados pelo adapter.
 - Codex futuro: o modo não interativo é `codex exec`; eventos são JSONL com `--json`, e o resultado final pode usar `--output-schema`. Não reutilizar as flags do Claude.
 - GitHub: runner self-hosted não é considerado ambiente efêmero confiável; a V1 mantém Claude e credenciais fora do GitHub Actions.
+- Graphify: análise estrutural local e consulta por grafo podem reduzir leitura bruta; o índice é derivado e precisa ser preso ao SHA. `https://github.com/Graphify-Labs/graphify`
+- Caveman: compressão de saída pode adicionar contexto de entrada; economia líquida deve ser medida no provider. `https://github.com/JuliusBrussee/caveman` e `https://github.com/JuliusBrussee/caveman/blob/main/docs/HONEST-NUMBERS.md`
+- Estudo “84%”: o número publicado compara linhas de contexto carregado, não custo faturado ponta a ponta; a pipeline aproveita deduplicação e carregamento sob demanda, mas exige sua própria medição. `https://www.tabnews.com.br/andersonlimadev/como-criei-uma-skill-que-economiza-84-por-cento-dos-tokens-no-claude-code`
 
 ## 20. Questões encerradas
 
