@@ -14,10 +14,10 @@ Ligar a **execução real com guardrails**. O motor sai do modo simulado (MVP-00
 
 ## Checklist de fatias previstas
 
-Cada item vira issue-filha **somente** quando sua spec estiver `aprovada-pi` (lazy). Ainda sem spec:
+Cada item vira issue-filha **somente** quando sua spec estiver `aprovada-pi` (lazy). **Ambas as specs `aprovada-pi` em 2026-07-24** — prontas para virar issue-filha quando o épico #10 as receber. A fronteira F01×F02 foi cravada pelo PI (2026-07-24): **F01 = só filesystem; comando/processo é exclusivo da F02.**
 
-- [ ] **Fatia 01 — Execução real allowlisted:** o motor do MVP-002 passa a executar de verdade **dentro da allowlist + Policy Engine**, fail-closed, auditado (ADR-004) e logado (ADR-005). Toda execução real gera `AuditEvent` antes e depois.
-- [ ] **Fatia 02 — Terminal controlado no Desktop:** terminal dentro das permissões e da allowlist; comando fora do permitido é bloqueado; sessão auditada e logada.
+- [ ] **Fatia 01 — Execução real de filesystem allowlisted (enforcement + aprovação):** o motor do MVP-002 sai do modo report e passa a tocar **filesystem** de verdade (ler/gravar/apagar/mover/sobrescrever) **dentro da allowlist + Policy Engine em enforcement fail-closed**, auditado (ADR-004) e logado (ADR-005). Toda operação real gera `AuditEvent` antes e depois; ação `requires-approval` **pausa** o run e espera aprovação humana real (UI mínima). **Comando/processo NÃO entra aqui.** Spec: `spec-execucao-real-01-filesystem-allowlisted.md`.
+- [ ] **Fatia 02 — Terminal controlado no Desktop (command-runner):** terminal que executa comandos reais só via **allowlist de comandos** (conceito novo) + cwd na allowlist de diretórios, sem elevação, com timeout/kill; comando fora do permitido é bloqueado, destrutivo pausa por aprovação (fluxo da F01); erro aparece no terminal e gera `AuditEvent`. Modelo **command-runner**, não PTY interativo. Consome o enforcement e a aprovação da F01. Spec: `spec-execucao-real-02-terminal-controlado.md`.
 
 > **BudgetPolicy saiu deste MVP.** Ela só mede **gasto com providers de IA**, que só existem no Corte 3; construí-la aqui seria o guarda antes de existir o que guardar. Foi movida para o **MVP de providers (Corte 3)**. O modelo já está decidido (ADR-001, questão 1): **estimativa + alerta com bloqueio no ponto único de chamada** do adapter — não proxy.
 
