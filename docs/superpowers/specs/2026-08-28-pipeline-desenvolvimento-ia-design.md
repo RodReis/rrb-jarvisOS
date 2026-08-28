@@ -216,12 +216,33 @@ O HTML nunca roda com acesso ao Electron, Node, filesystem, credenciais ou cooki
 
 ### 10.3 Gerados após os anexos
 
-- `docs/ARCHITECTURE.md`;
-- `docs/DECISIONS.md`;
-- `docs/CONVENTION.md`;
-- `docs/STATUS.md`;
-- `docs/mvp/mvp-<nnn>-<slug>.md` após proposta e aprovação do MVP;
-- `docs/spec/spec-<mvp>-<fatia>-<slug>.md` após decomposição da fatia.
+| Artefato | Responsabilidade e limite |
+|---|---|
+| `docs/ARCHITECTURE.md` | Desenho, módulos, fronteiras, dados, integrações e resiliência. Não recebe histórico de execução. |
+| `docs/DECISIONS.md` | Índice dos ADRs e decisões estruturais vigentes. Toda mudança estrutural exige leitura prévia; a decisão completa vive em `docs/adr/`. |
+| `docs/CONVENTION.md` | Contrato de domínio: entidades, estados, invariantes e regras de negócio. É o coração do produto, não um manual genérico de estilo. |
+| `docs/STATUS.md` | Kanban/roadmap curto e **índice Fatia ↔ SPEC**, fonte única da numeração. Mantém somente estado atual, ordem e referências; prosa longa é proibida. |
+| `docs/STATUS-ARQUIVO.md` | Histórico detalhado que complementa o `STATUS.md`. Recebe decisões operacionais encerradas, mudanças de ordem e contexto removido do status corrente. Não governa estado atual. |
+| `docs/LANDSCAPE.md` | Cenário competitivo atual: o que o mercado já oferece, o que deixou de ser diferencial ou morreu e quais gatilhos obrigam nova análise. Toda afirmação externa registra fonte e data; não pode ser preenchido por memória não verificada. |
+| `docs/TESTING.md` | Estratégia, classificação, critérios, matriz e índice de evidência por SPEC/issue. Resume o resultado atual sem números escritos à mão. |
+| `docs/REVIEW.md` | Política exclusiva da pipeline de revisão: o que sinalizar, severidade, evidência mínima, falsos positivos, formato do relatório e elegibilidade para autocorreção. |
+| `docs/DEVELOPMENT.md` | Progresso interno da fatia em execução: passos e evidências locais. Não duplica a coluna da issue nem o roadmap do `STATUS.md`. |
+| `reports/TESTS.md` | Evidência detalhada gerada por máquina por SPEC/issue. É referenciada por `docs/TESTING.md` e nunca editada manualmente. |
+| `docs/mvp/mvp-<nnn>-<slug>.md` | Tese, fatias previstas, dependências macro, fora de escopo e critérios de encerramento do MVP, criado após aprovação do MVP. |
+| `docs/spec/spec-<mvp>-<fatia>-<slug>.md` | Contrato executável da fatia, criado após decomposição e antes da aprovação do PI. |
+| `docs/adr/adr-<nnn>-<slug>.md` | Registro imutável de uma decisão estrutural, contexto, alternativas, consequências e estado. |
+
+### 10.4 Regras antideriva documental
+
+1. `STATUS.md` é a única fonte da numeração Fatia ↔ SPEC. GitHub confirma o estado externo da issue; nenhum outro documento mantém uma segunda numeração ou coluna.
+2. `STATUS-ARQUIVO.md` é histórico complementar, nunca fonte do estado atual.
+3. `DEVELOPMENT.md` responde onde a execução está dentro da fatia; `STATUS.md` responde qual fatia vem antes ou depois. O mesmo fato não mora nos dois.
+4. `DECISIONS.md` é índice; o conteúdo integral de cada decisão vive em um ADR.
+5. `TESTING.md` define e indexa evidência; `reports/TESTS.md` contém o resultado detalhado gerado pelos runners.
+6. `LANDSCAPE.md` inclui `verificado_em`, fontes e gatilhos de revisão. Mudança relevante de concorrente, plataforma, preço, licença, integração ou capacidade gratuita marca o documento como desatualizado até nova pesquisa.
+7. `REVIEW.md` é injetado nos agentes da pipeline de revisão como a política de projeto de maior prioridade, abaixo apenas de segurança da plataforma, instruções do ambiente e spec aprovada. Ele não pode ampliar escopo nem redefinir requisito do PI.
+8. Todo merge de fatia atualiza no mesmo commit os documentos afetados e o índice de evidência. Documento sem mudança material não recebe edição cosmética.
+9. O `ArtifactBundle` registra path e hash de cada documento estrutural. Alteração estrutural cria nova revisão e invalida somente aprovações dependentes.
 
 O pacote aprovado referencia hashes do PRD, arquitetura, design system e protótipos. Mudar qualquer entrada estrutural cria nova revisão e invalida as aprovações dependentes.
 
@@ -438,6 +459,7 @@ A prova roda localmente, sob comando explícito, e não no CI comum:
 12. Reinício não duplica execução, commit, PR ou merge.
 13. Resultado terminal é `merged` ou `blocked` com evidência e próxima ação.
 14. A jornada real completa passa com Claude Code e GitHub reais.
+15. A árvore documental da seção 10.3 é gerada, os papéis não se sobrepõem e os testes antideriva confirmam numeração, links, hashes e evidências.
 
 ## 18. Dependências no roadmap
 
