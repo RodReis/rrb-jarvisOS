@@ -100,3 +100,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-07-24 | #34 | — | Regras de Negócio | 231 | 231 | 0 | 78.8 | #71 | [#71](https://github.com/RodReis/rrb-jarvisOS/pull/71) |
 | 2026-07-24 | #34 | — | Banco | 137 | 137 | 0 | 85.7 | #71 | [#71](https://github.com/RodReis/rrb-jarvisOS/pull/71) |
 | 2026-07-24 | #34 | — | Tela | 215 | 214 | 0 | 92.8 | #71 | [#71](https://github.com/RodReis/rrb-jarvisOS/pull/71) |
+| — | #74 | spec-execucao-real-01-filesystem-allowlisted | Regras de Negócio | 234 | 234 | 0 | 78.7 | #81 | [#81](https://github.com/RodReis/rrb-jarvisOS/pull/81) |
+| — | #74 | spec-execucao-real-01-filesystem-allowlisted | Banco | 142 | 142 | 0 | 85.5 | #81 | [#81](https://github.com/RodReis/rrb-jarvisOS/pull/81) |
+| — | #74 | spec-execucao-real-01-filesystem-allowlisted | Tela | 217 | 216 | 0 | 92.1 | #81 | [#81](https://github.com/RodReis/rrb-jarvisOS/pull/81) |
