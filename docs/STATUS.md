@@ -10,21 +10,23 @@ Atualizado em: **2026-08-28**. Mantido pelo Code a cada entrega (junto com `DEVE
 
 | Issue | Fatia | MVP | Spec | Índice |
 |---|---|---|---|---|
-| [#74](https://github.com/RodReis/rrb-jarvisOS/issues/74) | 01 Execução real de filesystem allowlisted | MVP-004 (#10) | `spec-execucao-real-01-filesystem-allowlisted.md` | M4-F01 |
 | [#75](https://github.com/RodReis/rrb-jarvisOS/issues/75) | 02 Terminal controlado (command-runner) | MVP-004 (#10) | `spec-execucao-real-02-terminal-controlado.md` | M4-F02 |
 | [#77](https://github.com/RodReis/rrb-jarvisOS/issues/77) | 01 Vault de credenciais (CredentialRef) | MVP-005 (#76) | `spec-providers-01-vault-credenciais.md` | M5-F01 |
 | [#78](https://github.com/RodReis/rrb-jarvisOS/issues/78) | 02 Framework de adapters + Claude API | MVP-005 (#76) | `spec-providers-02-adapter-claude-api.md` | M5-F02 |
 | [#79](https://github.com/RodReis/rrb-jarvisOS/issues/79) | 03 BudgetPolicy (gate de custo) | MVP-005 (#76) | `spec-providers-03-budget-policy.md` | M5-F03 |
 | [#80](https://github.com/RodReis/rrb-jarvisOS/issues/80) | 04 Multi-provider + roteamento | MVP-005 (#76) | `spec-providers-04-multi-provider-roteamento.md` | M5-F04 |
-| [#64](https://github.com/RodReis/rrb-jarvisOS/issues/64) | — (`[FIX]`) | MVP-001 | *(sem spec — fonte: protótipo § Login, `base.ts` `ALTURA_CONTROLE`)* | — |
 
-> ⚠️ **#64 está com rótulo errado no board.** O `[FIX]` foi **entregue e mergeado** em 2026-07-24 — PR [#65](https://github.com/RodReis/rrb-jarvisOS/pull/65), squash `b9f583a`; o rótulo visível `'Aguardando…'` e o nome acessível `'Aguardando o navegador…'` estão na `main` (`src/renderer/src/i18n/recursos.ts:99-100`). A issue deveria carregar `proplan:done` (Feito, aguardando aceite), não `proplan:backlog`. O Code tentou corrigir o rótulo em 2026-08-28 e **a escrita no board foi negada pelo ambiente**; fica registrado aqui até que o rótulo seja aplicado.
+> **Rótulo do #64 corrigido em 2026-08-28.** O `[FIX]` estava em `proplan:backlog` desde 2026-07-24 apesar de **entregue e mergeado** (PR [#65](https://github.com/RodReis/rrb-jarvisOS/pull/65), squash `b9f583a`) — aparecia como trabalho pendente por mais de um mês. Verificado na `main` antes de mover (`src/renderer/src/i18n/recursos.ts:99-100`) e carimbado `proplan:done`. Está em **Feito**, aguardando o aceite do PI.
 
-> **`proplan:next` sem sucessor definido.** Nenhuma issue aberta carrega o marcador. A cabeça da fila é a **F01 do MVP-004** (#74), primeira fatia da frente decidida no roadmap macro ("Execução real"); o MVP-005 (#76) é o corte seguinte e **independe do MVP-004** (providers são caminho de execução distinto — rede/adapter, não FS/terminal).
+> **`proplan:next` sem sucessor definido.** Nenhuma issue aberta carrega o marcador. Com a F01 (#74) em `doing`, a próxima da fila é a **F02 do MVP-004** (#75), que consome o enforcement e a aprovação da F01. O MVP-005 (#76) é o corte seguinte e **independe do MVP-004** (providers são caminho de execução distinto — rede/adapter, não FS/terminal).
 
 ### Feito (`proplan:done` — entregue, aguardando aceite do PI)
 
-*Vazio.* Todo o trabalho entregue até 2026-07-25 foi aceito pelo PI — ver **Finalizado**. (Exceto o #64, cuja entrega está mergeada mas o rótulo no board ainda não reflete — ver o aviso acima.)
+| Issue | Card | MVP | Spec | PR | Mergeado |
+|---|---|---|---|---|---|
+| [#64](https://github.com/RodReis/rrb-jarvisOS/issues/64) | rótulo "Aguardando…" quebrava o botão do provedor | MVP-001 | *(sem spec — fonte: protótipo § Login, `base.ts` `ALTURA_CONTROLE`)* | [#65](https://github.com/RodReis/rrb-jarvisOS/pull/65) | 2026-07-24 |
+
+Todo o resto entregue até 2026-07-25 já foi aceito — ver **Finalizado**.
 
 ### Finalizado (`closed` + `proplan:finalizado` — aceito pelo PI)
 
@@ -101,9 +103,15 @@ Atualizado em: **2026-08-28**. Mantido pelo Code a cada entrega (junto com `DEVE
 
 ### A Fazer · Em Andamento
 
-*Vazio.* Nenhuma issue com `proplan:todo` ou `proplan:doing`. WIP = 0.
+| Issue | Fatia | MVP | Spec | Coluna |
+|---|---|---|---|---|
+| [#74](https://github.com/RodReis/rrb-jarvisOS/issues/74) | 01 Execução real de filesystem allowlisted | MVP-004 (#10) | `spec-execucao-real-01-filesystem-allowlisted.md` | Em Andamento (`proplan:doing`) |
 
-> **Trabalho não commitado no working tree (2026-08-28).** A branch `codex/mvp4-f01-filesystem-allowlisted` tem 4 commits, todos de **documentação de pipeline** (`docs/planos/2026-08-28-pipeline-*`). Além deles, há alterações **não commitadas** em `src/main/policy/allowlist-canon.ts`, `src/main/execution/execution-repository.ts`, `src/main/ipc/handlers.ts`, `src/main/storage/migrations.ts` e `src/shared/domain/execution.ts` — código que aparenta ser o começo da **F01 (#74)**, ainda sem card em `doing`. Ao retomar a fatia, mover o #74 pelo fluxo (`todo` → `doing`) antes de seguir.
+> **#74 em andamento** (Code, 2026-08-28). WIP = 1. Branch `codex/mvp4-f01-filesystem-allowlisted`, no remoto. Três commits: `ab206f3` (motor de enforcement, `ApprovalRequest` + migration 7, UI de aprovação, IPC tipado), `990a130` (specs, MVPs 005–009 e este arquivo) e `ce80ca2` (teclado/foco na fila + relatório).
+>
+> **Os 7 critérios estão cobertos.** Os de comportamento (1–4) são provados **pelo efeito** em 4 testes de integração do motor: arquivo não criado quando bloqueia, não apagado sem aprovação, leitura fora só retorna depois do aprovado. Piso verde — `test` (585), `lint`, `typecheck` e `test:report:check`.
+>
+> ⚠️ **Verificação só por teste automatizado.** A fila de aprovação **não foi vista no app real**; os testes de UI rodam em jsdom, que não aplica folha de estilo nem layout — foi assim que #57, #58 e #64 passaram despercebidos. Vale uma captura antes do aceite.
 
 ### Índice Fatia ↔ SPEC (fonte única do par MVP↔SPEC↔Fatia)
 
@@ -144,8 +152,8 @@ Não há catálogo numérico `SPEC-nnn`: as specs são identificadas por slug e 
 
 ## Próximas ações
 
-1. **Code — iniciar o MVP-004 pela F01 (#74).** É a cabeça da fila: primeira fatia da frente "Execução real" do roadmap macro, spec `aprovada-pi` desde 2026-07-24. Converte o modo report do MVP-002 (Policy Engine classifica mas não barra; allowlist checa mas não gateia) em **enforcement fail-closed** sobre filesystem, com `AuditEvent` antes e depois e pausa por aprovação humana. **Comando/processo fica fora** — é a F02 (#75), fronteira cravada pelo PI. WIP = 1: mover o card `todo` → `doing` antes de codificar.
-2. **PI — aplicar `proplan:done` no #64.** A entrega está mergeada (PR #65) desde 2026-07-24 e a issue segue em `proplan:backlog`, o que a faz parecer trabalho pendente. O Code tentou corrigir e a escrita no board foi negada pelo ambiente.
+1. **Code — fechar a F01 (#74) com PR.** Os 7 critérios estão cobertos e o piso está verde; falta o PR com `refs #74` (nunca `closes` — o aceite é do PI) e, antes dele, a verificação no app real que os testes em jsdom não cobrem.
+2. **PI — aceitar o #64** (`proplan:done` desde 2026-08-28) e as fatias que forem entrando em Feito.
 3. **PI — decidir se o MVP-005 (#76) corre em paralelo ou depois do MVP-004.** Ele **independe** do MVP-004 (providers são caminho de execução por rede/adapter, gateado por Policy Engine + BudgetPolicy, não pelo FS/terminal), então a ordem é escolha de foco, não de dependência. Com WIP = 1 e time solo, a leitura do Code é **sequencial: MVP-004 → MVP-005**.
 4. **Cowork — spec de login por senha + GitHub** (decisão do PI, 2026-07-24). O mockup `01-login.png` mostra usuário/senha, GitHub e "cadastre-se com"; o backend só tem Google OAuth, e o #57 entregou a tela sem esses controles justamente para a UI não prometer o que o sistema não faz. Virar fatia exige a spec resolver, com o PI: política de senha; quem pode se cadastrar (aberto? convite? domínio restrito?); recuperação de senha (**depende de e-mail transacional, que não existe** — o ambiente é 100% local até o fim do MVP); vinculação de contas com o mesmo e-mail via Google e GitHub; verificação de e-mail. **Não é `[FIX]`** — há decisão de produto em cada linha.
 5. **PI — (opcional) decidir a adoção de numeração `SPEC-nnn`.**
