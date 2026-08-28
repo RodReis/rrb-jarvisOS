@@ -53,8 +53,17 @@ describe('migrations', () => {
     const caminho = join(dir, 'antigo.db')
     const antigo = openDatabase(caminho)
     new AuditRepository(antigo, CHAVE).append({ user_id: 'u-1', type: 'login' })
-    // Volta o schema para a v1: derruba a coluna nova e o marcador de versão.
+    // Volta o schema para a v1: desfaz tudo que as migrations posteriores criam e recua o
+    // marcador de versão. Cada migration nova precisa ser desfeita aqui — senão a migração
+    // tenta recriar um objeto que já existe. A v2 adicionou `theme`; a v3, `allowed_directory`;
+    // a v6, o acento por módulo.
     antigo.exec('ALTER TABLE user_profile DROP COLUMN theme')
+    antigo.exec('ALTER TABLE user_profile DROP COLUMN accent_noa')
+    antigo.exec('ALTER TABLE user_profile DROP COLUMN accent_jarvis')
+    antigo.exec('DROP TABLE allowed_directory')
+    antigo.exec('DROP TABLE workflow')
+    antigo.exec('DROP TABLE automation')
+    antigo.exec('DROP TABLE execution_run')
     antigo.pragma('user_version = 1')
     antigo.close()
 
@@ -231,7 +240,9 @@ describe('perfil de usuário', () => {
       name: 'Rodrigo',
       email: 'rod@example.com',
       locale: 'pt-BR' as const,
-      theme: 'sistema' as const
+      theme: 'sistema' as const,
+      accentNoa: null,
+      accentJarvis: null
     }
 
     profiles.save(perfil)
@@ -250,7 +261,9 @@ describe('perfil de usuário', () => {
       name: 'Usuário local',
       email: '',
       locale: 'pt-BR' as const,
-      theme: 'sistema' as const
+      theme: 'sistema' as const,
+      accentNoa: null,
+      accentJarvis: null
     }
 
     profiles.save(padrao)
@@ -278,7 +291,15 @@ describe('instrumentação do logger (critério de aceite 7)', () => {
     db.exec('DROP TABLE user_profile')
 
     expect(() =>
-      profiles.save({ id: 'u-1', name: 'x', email: 'x@y.z', locale: 'pt-BR', theme: 'sistema' })
+      profiles.save({
+        id: 'u-1',
+        name: 'x',
+        email: 'x@y.z',
+        locale: 'pt-BR',
+        theme: 'sistema',
+        accentNoa: null,
+        accentJarvis: null
+      })
     ).toThrow()
     expect(logDb.error).toHaveBeenCalledWith(
       'Falha ao gravar perfil de usuário',

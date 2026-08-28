@@ -9,8 +9,11 @@
 
 import type { PreferencesSnapshot } from '@shared/contracts/ipc'
 import {
+  ACCENT_DEFAULT,
+  isAccentColor,
   isLocale,
   isThemePreference,
+  type AccentColor,
   type ResolvedTheme,
   type ThemePreference,
   type UserPreferences,
@@ -44,7 +47,11 @@ export class PreferencesService {
     return {
       locale: profile.locale,
       theme: profile.theme,
-      resolvedTheme: this.resolver(profile.theme)
+      resolvedTheme: this.resolver(profile.theme),
+      // `null` (não escolheu) resolve para o default de fábrica: o renderer sempre recebe uma cor
+      // pintável e não precisa conhecer o valor de fábrica.
+      accentNoa: profile.accentNoa ?? ACCENT_DEFAULT.noa,
+      accentJarvis: profile.accentJarvis ?? ACCENT_DEFAULT.jarvis
     }
   }
 
@@ -57,7 +64,13 @@ export class PreferencesService {
         op: 'select',
         table: 'user_profile'
       })
-      return { locale: 'pt-BR', theme: 'sistema', resolvedTheme: this.temaDoSistema() }
+      return {
+        locale: 'pt-BR',
+        theme: 'sistema',
+        resolvedTheme: this.temaDoSistema(),
+        accentNoa: ACCENT_DEFAULT.noa,
+        accentJarvis: ACCENT_DEFAULT.jarvis
+      }
     }
 
     return this.snapshot(profile)
@@ -70,9 +83,14 @@ export class PreferencesService {
    * confiança, e um `locale` inventado viraria uma UI sem tradução nenhuma.
    */
   salvar(preferences: UserPreferences): PreferencesSnapshot {
+    const acentoValido = (cor: AccentColor | undefined): cor is AccentColor => isAccentColor(cor)
     const validadas: UserPreferences = {
       ...(isLocale(preferences.locale) ? { locale: preferences.locale } : {}),
-      ...(isThemePreference(preferences.theme) ? { theme: preferences.theme } : {})
+      ...(isThemePreference(preferences.theme) ? { theme: preferences.theme } : {}),
+      // Acento fora da paleta é descartado como locale/theme inválidos: o renderer é fronteira de
+      // confiança, e um hex arbitrário reabriria o contraste que a paleta fechada fechou.
+      ...(acentoValido(preferences.accentNoa) ? { accentNoa: preferences.accentNoa } : {}),
+      ...(acentoValido(preferences.accentJarvis) ? { accentJarvis: preferences.accentJarvis } : {})
     }
 
     if (Object.keys(validadas).length === 0) {

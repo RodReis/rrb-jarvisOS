@@ -1,33 +1,16 @@
 ---
 proplan: v1
-updated: 2026-07-22
+updated: 2026-07-24
 ---
 <!-- gerado pelo ProPlan a partir das Issues — não edite à mão -->
 # Status
 
 ## Backlog
 
-### [MVP2] Execução local controlada — fundação de execução (permissões, allowlist, execução simulada) (#9)
-
-- [MVP2][F01] Supabase local (Docker) + ambiente de sync (dev) (#15)
-- [MVP2][F05] Motor de execução em modo simulado (#14)
-- [MVP2][F04] Registro de workflows + automações manuais (#13)
-- [MVP2][F03] Diretórios permitidos (allowlist) (#12)
-- [MVP2][F02] Policy Engine mínimo (classificação, fail-closed) (#11)
-
-### [MVP3] Design System da Plataforma — base única, 2 identidades (#16)
-
-- [MVP3][F06] Adoção & hardening (#24)
-- [MVP3][F05] Identidades NOA e JARVIS (#23)
-- [MVP3][F04b] Padrões operacionais (#22)
-- [MVP3][F04a] AppShell + navegação (#21)
-- [MVP3][F03b] Componentes: dados + overlays + feedback (#20)
-- [MVP3][F03a] Componentes: ações + formulários (#19)
-- [MVP3][F02] Foundations + ponte com o protótipo (#18)
-- [MVP3][F01] Infra do design system (#17)
-
 ### Sem épico
 
+- [INFRA] CI: separar E2E em job próprio, condicional por paths (#34)
+- [MVP1][FIX] Renderer sobe em porta variável — `strictPort` não aplicado (#41)
 - [MVP4] Execução real — terminal controlado + execução allowlisted (#10)
 
 ## A Fazer
@@ -44,7 +27,26 @@ _(vazio)_
 
 ## Finalizado
 
-### [MVP1] Fundação — esqueleto local-first (Electron + auth + workspaces) (#1)
+### #16 (#16)
+
+- [MVP3][F06] Adoção & hardening (#24, finalizado em: 2026-07-24)
+- [MVP3][F05] Identidades NOA e JARVIS (#23, finalizado em: 2026-07-24)
+- [MVP3][F04b] Padrões operacionais (#22, finalizado em: 2026-07-24)
+- [MVP3][F04a] AppShell + navegação (#21, finalizado em: 2026-07-24)
+- [MVP3][F03b] Componentes: dados + overlays + feedback (#20, finalizado em: 2026-07-24)
+- [MVP3][F03a] Componentes: ações + formulários (#19, finalizado em: 2026-07-23)
+- [MVP3][F02] Foundations + ponte com o protótipo (#18, finalizado em: 2026-07-23)
+- [MVP3][F01] Infra do design system (#17, finalizado em: 2026-07-23)
+
+### #9 (#9)
+
+- [MVP2][F05] Motor de execução em modo simulado (#14, finalizado em: 2026-07-23)
+- [MVP2][F03] Diretórios permitidos (allowlist) (#12, finalizado em: 2026-07-23)
+- [MVP2][F04] Registro de workflows + automações manuais (#13, finalizado em: 2026-07-23)
+- [MVP2][F02] Policy Engine mínimo (classificação, fail-closed) (#11, finalizado em: 2026-07-22)
+- [MVP2][F01] Supabase local (Docker) + ambiente de sync (dev) (#15, finalizado em: 2026-07-22)
+
+### #1 (#1)
 
 - [MVP1][F03] Autenticação Google local-first (#4, finalizado em: 2026-07-22)
 - [MVP1][F05] Settings mínimo (#6, finalizado em: 2026-07-22)
@@ -52,6 +54,14 @@ _(vazio)_
 - [MVP1][F02] AppShell e WorkspaceSwitcher (#3, finalizado em: 2026-07-22)
 - [MVP1][F06] Observabilidade e Logging (#8, finalizado em: 2026-07-22)
 - [MVP1][F01] Bootstrap e estrutura (#2, finalizado em: 2026-07-22)
+
+### Sem épico
+
+- [MVP3][SPEC-DesignSystem-01][FIX] Tailwind não varria src/design — o DS inteiro renderizava sem parte do seu CSS (#58, finalizado em: 2026-07-24)
+- [MVP1][SPEC-Fundacao-03][FIX] Tela de login não segue o protótipo (#57, finalizado em: 2026-07-24)
+- [MVP3][SPEC-DesignSystem-03b][FIX] Meter esconde o rótulo em aria-label (#52, finalizado em: 2026-07-24)
+- [MVP1][INFRA][FIX] navegacao.spec.ts nunca rodou — fora do include de toda categoria (#47, finalizado em: 2026-07-24)
+- [MVP1][SPEC-Fundacao-03][FIX] O app nunca lê o arquivo .env — login sempre indisponível (#43, finalizado em: 2026-07-23)
 
 ## Descartado
 

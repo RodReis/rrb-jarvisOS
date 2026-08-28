@@ -88,7 +88,7 @@ Paleta oferecida em ambos (swatches no seletor de tema):
 ```
 #D3AF37  #FF2C2C  #2CFF05  #2323FF  #C4C4C4  #FFFFE3  #8A00C4  #FF5C00
 ```
-- **JARVIS** → prop `acentoJarvis` (default de fábrica `#FF5C00`; fallback de runtime `#D3AF37`).
+- **JARVIS** → prop `acentoJarvis` (default de fábrica `#C4C4C4 `; fallback de runtime `#D3AF37`).
 - **NOA** → prop `acentoNoa` (default `#C4C4C4`; fallback de runtime `#2CFF05`).
 - Helper de alfa: `hexA(hex, aa)` concatena um byte hex (`'59'`=35%, `'80'`=50%, `'b3'`=70%, `'cc'`=80%, `'1a'`/`'20'`/`'33'` para brilhos suaves).
   Derivados usados no código: `accJA20/35/50/70/80`, `accNA35/50/70`, `accLA35/50/70/80` (acento neutro `accL=#C4C4C4`).

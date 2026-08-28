@@ -2,9 +2,14 @@ import { describe, expect, it } from 'vitest'
 import {
   NAVEGACAO_INICIAL,
   ROTA_INICIAL,
+  ROTAS_POR_SUB_MODULO,
+  ROTAS_POR_WORKSPACE,
+  SUB_MODULOS_JARVIS,
   navegar,
   rotaDoWorkspace,
-  rotaPertenceAoWorkspace
+  rotaInicialDoSubModulo,
+  rotaPertenceAoWorkspace,
+  subModuloDaRota
 } from './navegacao'
 
 describe('navegar', () => {
@@ -71,5 +76,51 @@ describe('rotaPertenceAoWorkspace', () => {
   it('não reconhece Desenvolvimento como rota de nenhum espaço', () => {
     expect(rotaPertenceAoWorkspace('noa', 'desenvolvimento')).toBe(false)
     expect(rotaPertenceAoWorkspace('jarvis', 'desenvolvimento')).toBe(false)
+  })
+})
+
+/**
+ * Rail dual do JARVIS (SPEC-DesignSystem-04a, critério 3).
+ *
+ * `Agentic OS` é área **interna** do JARVIS, nunca um quarto workspace (CLAUDE.md § Regras
+ * técnicas invioláveis) — por isso o sub-módulo vive aqui, como dimensão da navegação do
+ * JARVIS, e não em `WorkspaceId`.
+ */
+describe('sub-módulos do JARVIS', () => {
+  it('toda rota do JARVIS pertence a exatamente um sub-módulo', () => {
+    // O acordo entre `ROTAS_POR_WORKSPACE.jarvis` e `ROTAS_POR_SUB_MODULO` é frágil: acrescentar
+    // uma rota ao JARVIS sem colocá-la num sub-módulo a deixaria órfã — visível na sidebar de
+    // nenhum dos dois rails. Este teste é o que impede a divergência silenciosa.
+    for (const rota of ROTAS_POR_WORKSPACE.jarvis) {
+      const donos = SUB_MODULOS_JARVIS.filter((sub) => ROTAS_POR_SUB_MODULO[sub].includes(rota))
+      expect(donos, `rota "${rota}" deveria ter exatamente um sub-módulo`).toHaveLength(1)
+    }
+  })
+
+  it('nenhum sub-módulo declara rota que não é do JARVIS', () => {
+    // A recíproca: uma rota em `ROTAS_POR_SUB_MODULO` que não exista no espaço apareceria no
+    // rail e levaria a lugar nenhum.
+    for (const sub of SUB_MODULOS_JARVIS) {
+      for (const rota of ROTAS_POR_SUB_MODULO[sub]) {
+        expect(rotaPertenceAoWorkspace('jarvis', rota), `"${rota}" não é rota do JARVIS`).toBe(true)
+      }
+    }
+  })
+
+  it('resolve o sub-módulo a partir da rota — é o que sincroniza rail e sidebar', () => {
+    expect(subModuloDaRota('operacoes')).toBe('command')
+    expect(subModuloDaRota('agentes')).toBe('agents')
+  })
+
+  it('devolve `null` para rota que não é do JARVIS, em vez de um default plausível', () => {
+    // `'command'` aqui pareceria resposta legítima e acenderia o rail errado.
+    expect(subModuloDaRota('notas')).toBeNull()
+    expect(subModuloDaRota('inexistente')).toBeNull()
+  })
+
+  it('a rota inicial de cada sub-módulo pertence a ele', () => {
+    for (const sub of SUB_MODULOS_JARVIS) {
+      expect(ROTAS_POR_SUB_MODULO[sub]).toContain(rotaInicialDoSubModulo(sub))
+    }
   })
 })

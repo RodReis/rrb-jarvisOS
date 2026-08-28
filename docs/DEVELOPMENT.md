@@ -4,7 +4,7 @@
 
 Regra de trabalho: **uma fatia por vez (WIP = 1)**. Só iniciar fatia com spec `aprovada-pi` e issue criada.
 
-**Ordem de execução:** 01 → **06 (logging, infra transversal)** → **04 + 02 (entregues juntas)** → 03 → 05. A Fatia 06 roda logo após a 01 porque 02–05 devem logar desde o início; a 04 vem antes da 02 porque 02/03 consomem seus contratos tipados (decisão de 2026-07-22). As seções abaixo estão em ordem numérica; a 06 aparece após a 01 por ser quando ela executa.
+**Ordem de execução (MVP-001):** 01 → **06 (logging, infra transversal)** → **04 + 02 (entregues juntas)** → 03 → 05. A Fatia 06 roda logo após a 01 porque 02–05 devem logar desde o início; a 04 vem antes da 02 porque 02/03 consomem seus contratos tipados (decisão de 2026-07-22). As seções abaixo estão em ordem numérica; a 06 aparece após a 01 por ser quando ela executa.
 
 > **04 e 02 saíram no mesmo PR (#28), por decisão do PI de 2026-07-22.** O critério 4 da SPEC-04 exige `AuditEvent` de `workspace-switch`, cujo fluxo nasce na F02 — entregá-las juntas evitou stub provisório que a F02 jogaria fora. A **F03 ficou de fora do bloco** por falta de credenciais (ver a seção dela).
 
@@ -96,6 +96,14 @@ Status: **entregue** — spec `aprovada-pi` (2026-07-21, emendada em 2026-07-22)
 3. **`userId` virou função em `WorkspaceService` e nos handlers IPC** — a identidade deixou de ser fixa (local antes do login, sessão depois). Capturar a string no boot congelaria o escopo da auditoria no usuário local para sempre.
 4. **Teardown do E2E usa `app.exit()`, não `close()` nem `quit()`** — os dois travam, por comportamento correto do produto: o app vive no tray (`window-all-closed` vazio, SPEC-02) e os timers de rotação do `winston-daily-rotate-file` seguram o event loop no `will-quit`. Registrado em `docs/TESTING.md`.
 
+**Correção posterior — [#43](https://github.com/RodReis/rrb-jarvisOS/issues/43) (2026-07-23): o `.env` nunca era lido.**
+
+A fatia foi dada como entregue com o login funcionando, mas o app **não carregava o arquivo `.env`**: `readSupabaseConfig()` lê `process.env` cru e `dotenv` não existia no repo. O login funcionou no dia da entrega porque as variáveis estavam exportadas no shell daquela sessão — o arquivo em disco nunca foi exercitado. Quem clonasse o repo e seguisse o `.env.example` receberia "credenciais ausentes" com o arquivo corretamente preenchido, sem nenhum sinal de que ele fora ignorado.
+
+A lição não é sobre `dotenv`. É que **"funcionou na minha máquina" e "funciona a partir do repo" eram estados indistinguíveis** — nenhum teste cobria o caminho do arquivo, e o comportamento correto de degradação graciosa (sem credencial ⇒ só o login indisponível) mascarava o defeito: o app exibia exatamente a mesma tela de quem nunca configurou nada. Um defeito que se disfarça do estado esperado não aparece sozinho; só aparece quando alguém roda o caminho limpo. Corrigido em `src/main/env.ts` com precedência **ambiente vence arquivo** (o CI segue injetando os próprios valores) e provado no app real com as quatro variáveis removidas do shell.
+
+Junto dele, dois fatos da fatia foram vistos rodando pela primeira vez fora do teste: os tokens gravados cifrados no cofre (DPAPI) e a sessão de 30 dias (`expiresAt` a 30 dias do login, ADR-001 §2).
+
 ### Fatia 04 — Modelo de dados mínimo + AuditEvent stub (`docs/spec/spec-fundacao-04-dados-audit.md`)
 
 Status: **entregue** — spec `aprovada-pi` (2026-07-21, emendada em 2026-07-22); issue #5; PR [#28](https://github.com/RodReis/rrb-jarvisOS/pull/28). Sustenta 02 (entregue junto) e 03 (bloqueada).
@@ -144,69 +152,413 @@ Status: **entregue** — spec `aprovada-pi` (2026-07-21); issue #6; PR [#29](htt
 
 ### Fatia 01 — Supabase local + ambiente de sync (`docs/spec/spec-execucao-local-01-supabase-local.md`)
 
-Status: spec `aprovada-pi` (2026-07-21); issue [#15](https://github.com/RodReis/rrb-jarvisOS/issues/15) em Backlog. **Ambiente, roda independente.** Só o alvo de sync — o sync em si é Corte 3.
+Status: **finalizada** — aceita pelo PI em 2026-07-22 (issue [#15](https://github.com/RodReis/rrb-jarvisOS/issues/15) fechada, `proplan:finalizado`); spec `aprovada-pi` (2026-07-21); PR [#32](https://github.com/RodReis/rrb-jarvisOS/pull/32) mergeado. **Ambiente, roda independente.** Só o alvo de sync — o sync em si é Corte 3.
 
-- [ ] `supabase` CLI: stack local via Docker; `supabase/` versionado (config+migrations+seed); README (subir/derrubar, portas); `supabase db reset` reproduzível
-- [ ] Migrations starter: `UserProfile`, `Workspace`, `AuditEvent` com campos de escopo
-- [ ] **RLS comprovada** com role de aplicação **não-owner** (só enxerga o próprio user_id/workspace_id)
-- [ ] **Nenhum segredo no schema cloud** (sem coluna de token/`Session`); SQLite segue fonte de verdade; nada escreve no Supabase ainda
-- [ ] Entrega: PR `refs #N`; docs/ commitados
+- [x] `supabase` CLI: stack local via Docker; `supabase/` versionado (config+migrations+seed); [README](../supabase/README.md) (subir/derrubar, portas); `supabase db reset` reproduzível
+- [x] Migrations starter: `user_profile`, `workspace`, `audit_event` com campos de escopo (`user_id`/`workspace_id`)
+- [x] **RLS comprovada** com role de aplicação **não-owner** (JWT `authenticated` via PostgREST) — só enxerga o próprio `user_id`/`workspace_id`; provado por mutação (RLS desligada ⇒ 2 testes vermelhos)
+- [x] **Nenhum segredo no schema cloud** (sem coluna de token/`Session`) — teste lê as migrations e falha se `access_token`/`refresh_token`/tabela de sessão aparecer
+- [x] `audit_event` append-only também no cloud (ADR-004): sem policy de update/delete + trigger, com teste de cada camada
+- [x] SQLite segue fonte de verdade; nenhuma escrita da aplicação no Supabase nesta fatia
+- [x] Entrega: PR [#32](https://github.com/RodReis/rrb-jarvisOS/pull/32) (`refs #15`); docs/ commitados
+
+**Decisões e achados desta fatia:**
+
+1. **Ausência de policy não devolve erro — devolve zero linhas.** A primeira versão do teste de append-only esperava exceção no UPDATE via PostgREST e falhou. O motivo não é bug: a RLS filtra as linhas *antes* do UPDATE/DELETE, então sem policy do verbo nenhuma linha é visível para ele, o comando afeta 0 linhas e a resposta é 204. O que se afirma passou a ser o **efeito** (a linha continua intacta), que vale nos dois caminhos — inclusive se alguém adicionar a policy depois, quando o trigger é que barra.
+2. **O trigger é exercitado pelo owner, não pelo cliente.** O owner do banco *pula* RLS — é justamente por onde a camada 1 não protege (migration, script de manutenção, psql com credencial de serviço). Por isso o teste da segunda camada roda `psql` dentro do container. Sem ele, o trigger seria código nunca executado e a "segunda camada" do ADR-004 valeria como intenção, não garantia.
+3. **O nome do container deriva do `project_id`, nunca fixo.** A máquina de desenvolvimento roda outros stacks Supabase em paralelo (`rrb-adv`, `rrb-escola`, `rrb-organize`); um nome chutado apontaria para o banco do projeto errado — e o teste passaria ou falharia por motivo alheio a este repo.
+4. **No CI, pular é falha.** Os testes se pulam quando a stack não responde, para não punir quem clona o repo sem Docker. Só que no CI a stack sobe de propósito: se ela não subir, o skip transformaria ausência de prova em verde e o relatório contaria RLS como coberta. O `beforeAll` lança quando `process.env.CI` está setado — verificado nos três estados (com stack, sem stack local, sem stack no CI).
+5. **Portas do CLI mantidas (faixa `5432x`).** A política de portas do `CLAUDE.md` remapeia Postgres para `5433` e Redis para `6380`, mas aquilo pertence a outro stack; não há colisão real aqui (verificado com `netstat`). Remapear sem colisão seria configuração a mais para manter.
+6. **GRANT explícito na migration — permissão de tabela é camada anterior à RLS.** Os testes passavam na máquina local e falhavam **só no CI**, com `42501 insufficient_privilege`. Não era RLS filtrando: sem `GRANT`, o Postgres recusa a consulta *antes* de avaliar qualquer policy. A diferença é que o `ALTER DEFAULT PRIVILEGES` que a stack do Supabase configura só concede quando a tabela é criada pelo role que detém o default — um banco de desenvolvimento herda isso, um banco recriado do zero não. Localmente o default ainda mascara o grant (a ACL aparece como `arwdDxtm` para todas as roles), então **este caso não reproduz na máquina local**: quem provou a correção foi o CI. Lição operacional: schema que depende de privilégio implícito não é reproduzível — o grant vai na migration.
+7. **`--reporter=json` escondia qual teste falhava.** O orquestrador do relatório escrevia só no arquivo JSON, então a falha no CI não aparecia em lugar nenhum do log — a única pista era a divergência de números que a guarda anti-drift acusa depois, que diz *que* houve falha e não *qual*. Custou uma rodada de CI às cegas; `scripts/test-report.mjs` passou a emitir também o reporter de terminal.
+8. **`(select auth.uid())` e não `auth.uid()` nas policies** — com o select, o planner avalia uma vez por consulta em vez de uma por linha. Diferença invisível no seed de dois usuários, relevante quando o espelho tiver volume.
 
 ### Fatia 02 — Policy Engine mínimo (classificação) (`docs/spec/spec-execucao-local-02-policy-engine.md`)
 
-Status: spec `aprovada-pi` (2026-07-21); issue [#11](https://github.com/RodReis/rrb-jarvisOS/issues/11) em Backlog. **Modo report** — classifica e audita, não bloqueia; enforcement fail-closed liga no MVP-003.
+Status: **entregue** — spec `aprovada-pi` (2026-07-21); issue [#11](https://github.com/RodReis/rrb-jarvisOS/issues/11); PR [#33](https://github.com/RodReis/rrb-jarvisOS/pull/33). **Modo report** — classifica e audita, não bloqueia; enforcement fail-closed liga no MVP-003.
 
-- [ ] Núcleo avaliador puro `evaluate(action, context) → { tier, outcome, reason }` em `src/shared/policies/`
-- [ ] Taxonomia de risco (baixo/médio/alto/bloqueado) como **seed** a partir dos requisitos — sem hardcode
-- [ ] Classificação sensível ao contexto (JARVIS + personal/financial/health ⇒ alto); não reconhecida ⇒ `bloqueado`
-- [ ] Toda decisão gera `AuditEvent` encadeado (ADR-004); `verifyChain` passa
-- [ ] Modo report: runtime recebe a decisão e **não bloqueia**; UI só vê resultado via IPC tipado
-- [ ] Entrega: PR `refs #N`; docs/ commitados
+- [x] Núcleo avaliador puro `evaluate(action, context) → { action, tier, outcome, reason }` em `src/shared/policies/` (categoria Regras, sem I/O)
+- [x] Taxonomia de risco (baixo/médio/alto) como **seed** (`taxonomy.ts`) espelhando os requisitos § Ações Possíveis — mudar risco = editar dado, teste lê do seed
+- [x] Classificação sensível ao contexto: JARVIS + `personal|financial|health` ⇒ `alto`/requires-approval; ação não reconhecida ⇒ `bloqueado` (fail-closed na classificação)
+- [x] Toda decisão gera `AuditEvent` encadeado (ADR-004); contexto **redigido** antes de gravar (ADR-005); `verifyChain` passa
+- [x] Modo report: `PolicyService.classify` devolve e audita a decisão, **nunca barra** — mesmo `bloqueado` volta ao chamador
+- [x] Renderer não avalia: canal `policy:classify` — `evaluate` roda no main, UI só vê a `PolicyDecision` via IPC tipado (critério 7)
+- [x] Entrega: PR [#33](https://github.com/RodReis/rrb-jarvisOS/pull/33) (`refs #11`); docs/ commitados
+
+**Decisões técnicas desta fatia:**
+
+1. **Taxonomia é dado, o núcleo não conhece ação por nome.** `evaluate` consulta um `Map` (`RISK_TAXONOMY`) montado a partir de três listas que espelham os requisitos § Ações Possíveis. Um id ausente do mapa é *desconhecido* e cai em `bloqueado` — a via fail-closed. Isso mantém a regra "sem hardcode": ajustar o risco de uma ação é editar `taxonomy.ts`, nunca o avaliador.
+2. **"Bloqueado no MVP" não é tier semeável.** Os requisitos têm uma lista "Bloqueado no MVP", mas ela **não** vira entradas com `tier: 'bloqueado'`: a intenção é que essas ações nem existam como id reconhecido. Elas chegam ao engine como desconhecidas e caem em `bloqueado` pela mesma via fail-closed. Semear um id para elas sugeriria que são ações previstas (só que barradas) — não são. Por isso `TaxonomyEntry.tier` é `Exclude<RiskTier, 'bloqueado'>`: o tipo proíbe semear bloqueado.
+3. **`outcome` deriva do tier, não mora no seed.** baixo→allow, médio/alto→requires-approval, bloqueado→block. Derivar garante que os dois nunca divirjam — não há linha do seed capaz de dizer `alto`+`allow` por engano.
+4. **Precedência: fail-closed > sensibilidade > seed.** Ação desconhecida é bloqueada *antes* de qualquer regra de contexto (não há tier a elevar). A sensibilidade no JARVIS eleva a `alto` sobrepondo o seed. Há teste para cada ramo, inclusive "desconhecida + sensível ⇒ bloqueado" (fail-closed vence).
+5. **O contexto é redigido antes de virar `AuditEvent`.** O `detail` da ação (caminho, alvo, payload) passa pelo mesmo `redact` do logging (reuso, não reimplementação) antes de a decisão ser gravada. Auditar o contexto cru transformaria a auditoria — que é permanente e append-only — num vazamento. Teste varre o evento serializado atrás do segredo.
+6. **`workspace` inválido no IPC vira `jarvis`, não erro.** O contexto vem do renderer (fronteira de confiança); na dúvida sobre o ambiente, tratar como JARVIS é fail-safe — é o espaço onde a regra de sensibilidade morde. Errar para mais cauteloso, nunca para menos.
+7. **A decisão de política é auditada na categoria `agent`, não `ipc`.** É decisão do runtime agente sobre uma ação, não tráfego de canal. A categoria já existia no contrato de logging (F06) sem fluxo que a usasse — esta fatia é o primeiro.
 
 ### Fatia 03 — Diretórios permitidos (allowlist) (`docs/spec/spec-execucao-local-03-allowlist-diretorios.md`)
 
-Status: spec `aprovada-pi` (2026-07-21); issue [#12](https://github.com/RodReis/rrb-jarvisOS/issues/12) em Backlog. Depende da Fatia 02. Nesta fatia a allowlist é **dado + checagem**, não gating real de FS (isso é MVP-003).
+Status: **entregue** — spec `aprovada-pi` (2026-07-21); issue [#12](https://github.com/RodReis/rrb-jarvisOS/issues/12); PR [#35](https://github.com/RodReis/rrb-jarvisOS/pull/35). Depende da Fatia 02. Nesta fatia a allowlist é **dado + checagem**, não gating real de FS (isso é MVP-003).
 
-- [ ] Allowlist persistida (SQLite), escopada por `user_id`; **default = só o diretório do app** (`userData`)
-- [ ] `isPathAllowed` com canonicalização (`..`/symlink) + matching recursivo; path que resolve pra fora ⇒ `false`
-- [ ] Add/remove de diretório gera `AuditEvent` encadeado (ADR-004)
-- [ ] Integra com o Policy Engine (F02): path fora do permitido eleva o tier
-- [ ] Renderer não lê/edita FS nem a allowlist direto — só IPC tipado; checagem no main
-- [ ] Entrega: PR `refs #N`; docs/ commitados
+- [x] Allowlist persistida (SQLite, migration 3 `allowed_directory`), escopada por `user_id`; **default de fábrica = só o diretório do app** (`userData`), invariante — não é linha removível
+- [x] `isPathAllowed` **puro** (`src/shared`) com matching recursivo + anti-escape por segmento; **canonicalização com symlink** no main (`allowlist-canon.ts`, `node:fs`) — a divisão mantém a regra testável sem Electron
+- [x] Add/remove de diretório gera `AuditEvent` encadeado (ADR-004), tipo `allowlist-change`; idempotente (no-op não audita); `verifyChain` passa
+- [x] Integra com o Policy Engine (F02): `pathAllowed:false` no `PolicyContext` **eleva um nível** a partir do seed — o main resolve o path e passa o booleano, o `evaluate` segue puro
+- [x] Renderer não lê/edita FS nem a allowlist direto — canais `allowlist:list/add/remove`; checagem e persistência no main
+- [x] Entrega: PR [#35](https://github.com/RodReis/rrb-jarvisOS/pull/35) (`refs #12`); docs/ commitados
+
+**Decisões técnicas desta fatia:**
+
+1. **A checagem é dividida em duas metades por causa da fronteira de processo.** `isPathAllowed` é pura (comparação de paths canônicos, `src/shared`, categoria Regras); a canonicalização com symlink usa `node:fs` e vive no main (`allowlist-canon.ts`, categoria Banco). `src/shared` compila também para o renderer, que não tem Node — juntar as duas ali quebraria o typecheck. O main resolve o path real, a função pura decide se está dentro.
+2. **Contenção por segmento, não por prefixo de string.** `/home/user/app-data` não pode casar `/home/user/app-data-secreto`. Comparar strings deixaria um diretório vizinho de nome parecido vazar a allowlist; a comparação é feita segmento a segmento.
+3. **`realpath` é o que fecha o buraco do symlink.** `path.resolve` elimina `..`/`.` textualmente mas não segue link — um symlink dentro de um diretório permitido apontando pra fora passaria. Só `fs.realpathSync` revela o destino real. Há teste de integração com symlink de verdade provando o barramento (e o caso simétrico: link apontando pra dentro continua permitido).
+4. **O default de fábrica é invariante, não linha.** `list()` sempre inclui o `appDir`; ele não é gravado na tabela. Se fosse linha, o usuário poderia removê-lo e ficar sem base permitida nenhuma. As entradas explícitas se somam a ele.
+5. **A integração com o F02 passa um booleano, não o path.** Decisão do PI: o `evaluate` continua puro. O main canoniza + checa (I/O) e passa `pathAllowed` já resolvido no `PolicyContext`. A precedência da elevação é **fail-closed > sensibilidade(JARVIS) > path-fora > seed**, e a elevação por path satura em `alto` — `bloqueado` fica reservado ao desconhecido (fail-closed), não a uma ação conhecida que só tocou um path fora.
+6. **`allowlist-change` é tipo de auditoria próprio, não `policy-decision`.** Editar a allowlist é mudança de configuração sensível (RF-019), não a classificação de uma ação. Sobrecarregar `policy-decision` confundiria os dois na auditoria.
+7. **A migration 3 quebrou o teste de migração v1→v2 — e isso é o teste funcionando.** O teste simula um banco parado na v1 desfazendo o que as migrations posteriores criam; ele só desfazia a coluna `theme` (v2). A v3 (`allowed_directory`) exigiu desfazer também a tabela — cada migration nova precisa ser revertida ali, senão a migração tenta recriar objeto existente. O teste pegou a regressão antes do CI.
 
 ### Fatia 04 — Registro de workflows + automações (`docs/spec/spec-execucao-local-04-registro-workflows.md`)
 
-Status: spec `aprovada-pi` (2026-07-21); issue [#13](https://github.com/RodReis/rrb-jarvisOS/issues/13) em Backlog. Depende da Fatia 02. **Só registro/catálogo, sem execução** (executar é a Fatia 05).
+Status: **entregue** — spec `aprovada-pi` (2026-07-21); issue [#13](https://github.com/RodReis/rrb-jarvisOS/issues/13); PR [#36](https://github.com/RodReis/rrb-jarvisOS/pull/36). Depende da Fatia 02. **Só registro/catálogo, sem execução** (executar é a Fatia 05).
 
-- [ ] Workflow com **schema pleno RF-006** (etapas seq/paralelo, agenteId?/skillId? nullable, entradas/saídas, critérios de sucesso, `requiresApproval`, status, agenda); nasce `disabled`
-- [ ] Trigger Registry registra `manual|cron|evento|webhook` como dado; **nenhum dispara** (só manual acionável, via F05)
-- [ ] Automação RF-007: gatilho (manual acionável; demais schema), alvo, squadId?/skillId? nullable, estado/retentativa
-- [ ] CRUD completo; **nenhuma execução** ocorre; criar/alterar/ativar-desativar auditado (ADR-004) + classificado (F02)
-- [ ] Etapas = descritores de ação compatíveis com a taxonomia do Policy Engine (p/ a F05 classificar/simular)
-- [ ] Entrega: PR `refs #N`; docs/ commitados
+- [x] Workflow com **schema pleno RF-006** (etapas seq/paralelo, agenteId?/skillId? nullable, entradas/saídas, critérios de sucesso, `requiresApproval`, status, agenda); nasce `disabled`; escopo `user_id`/`workspace_id`
+- [x] Trigger Registry registra `manual|cron|evento|webhook` como dado; **nenhum dispara** (teste: cron não agenda; `lastRun`/`nextRun` ficam nulos)
+- [x] Automação RF-007: gatilho, alvo (`workflowId | descriptor`), squadId?/skillId? nullable, estado/retentativa; nasce desabilitada
+- [x] CRUD completo (`WorkflowService`/repositórios); **nenhuma execução** ocorre; criar/alterar/toggle **classificado** (F02) + **auditado** (`workflow-change`/`automation-change`, ADR-004); `verifyChain` passa
+- [x] Etapas = `ActionDescriptor` cujo `action` é um `ActionId` da taxonomia do Policy Engine — teste prova que a F05 poderá classificar cada etapa
+- [x] Contratos em `src/shared/domain/workflows.ts`; renderer via IPC tipado (9 canais); nunca toca o storage
+- [x] Entrega: PR [#36](https://github.com/RodReis/rrb-jarvisOS/pull/36) (`refs #13`); docs/ commitados
+
+**Decisões técnicas desta fatia:**
+
+1. **Etapas e triggers são JSON em coluna, não tabelas normalizadas** (decisão do PI). O catálogo não consulta etapa isoladamente nesta fatia — nada roda —, então normalizar (tabelas `workflow_step`/`trigger` com FK, joins na leitura) seria custo sem retorno até a execução real (MVP-003). A forma é validada no contrato TS e re-hidratada na leitura, com parse defensivo (banco corrompido não derruba a listagem).
+2. **O elo 04→02→05 é o `ActionId`.** Cada etapa carrega um `ActionDescriptor` cujo `action` é uma chave da taxonomia do Policy Engine (Fatia 02). É isso que permite a Fatia 05 pegar uma etapa e chamar `evaluate(step.action, …)` para classificar e simular. Há teste provando que a ação da etapa-exemplo existe no seed — se a taxonomia e o schema divergissem, o elo quebraria silenciosamente.
+3. **A auditoria mora no serviço, não no repositório.** Os repositórios são só persistência (testáveis sem o engine); o `WorkflowService` classifica pela F02 e audita antes de devolver. Cada mutação gera **dois** eventos: o `policy-decision` da classificação e o `workflow-change`/`automation-change` da mudança em si — a auditoria separa "classifiquei a edição" de "a edição aconteceu".
+4. **Ativar um workflow muda o status, não executa.** `setWorkflowStatus(id, 'online')` mexe no catálogo; `lastRun` continua nulo. Há teste afirmando isso — é a fronteira entre esta fatia (registro) e a F05 (execução).
+5. **Tipos de auditoria próprios** (`workflow-change`, `automation-change`), pela mesma razão de `allowlist-change` na F03: são mudanças de catálogo distintas, e a auditoria deve distingui-las sem parsear o payload.
+6. **Nasce sempre `disabled`/desabilitada** — o criador não escolhe o status inicial. Uma definição recém-registrada não está no ar até o usuário ativá-la (critério 1).
 
 ### Fatia 05 — Motor de execução simulado (`docs/spec/spec-execucao-local-05-execucao-simulada.md`)
 
-Status: spec `aprovada-pi` (2026-07-21); issue [#14](https://github.com/RodReis/rrb-jarvisOS/issues/14) em Backlog. **Headline do MVP** — junta F02+F03+F04. **Zero efeito colateral** (execução real é MVP-003).
+Status: **entregue** — spec `aprovada-pi` (2026-07-21); issue [#14](https://github.com/RodReis/rrb-jarvisOS/issues/14); PR [#37](https://github.com/RodReis/rrb-jarvisOS/pull/37). **Headline do MVP** — junta F02+F03+F04. **Zero efeito colateral** (execução real é MVP-003).
 
-- [ ] Motor no main: lê workflow (F04), percorre etapas (seq/paralelo) por gatilho manual
-- [ ] Por etapa: classifica (F02, report) → checa allowlist se há path (F03) → **simula** sem efeito real
-- [ ] `ExecutionRun` persistido com máquina de estados RF (`planejado→em execução→concluído|falhou|cancelado`; `aguardando aprovação` auto-continua) + trace por etapa
-- [ ] Simulação determinística (sucesso por padrão; falha declarável p/ testar `falhou`/retentativa)
-- [ ] Início/fim + etapas geram `AuditEvent` encadeado (ADR-004, `verifyChain` passa); run logado (ADR-005) com `correlationId`
-- [ ] **Zero efeito colateral** (teste: etapa "gravar arquivo" não cria arquivo); renderer dispara via IPC tipado
-- [ ] Entrega: PR `refs #N`; docs/ commitados
+- [x] Motor no main (`SimulationEngine`): lê workflow (F04), percorre etapas por gatilho manual
+- [x] Por etapa: checa allowlist se há path (F03) → classifica (F02, report, recebendo `pathAllowed`) → **simula** sem efeito real
+- [x] `ExecutionRun` persistido (migration 5) com máquina de estados RF; trace por etapa (ação, decisão, allowlist, resultado, timing)
+- [x] Simulação determinística: sucesso por padrão; falha declarável via `params.simulateFailure` (decisão do PI)
+- [x] Início/fim + cada etapa geram `AuditEvent` encadeado (`execution-run`/`execution-step`); `verifyChain` passa; run logado com `correlationId`
+- [x] **Zero efeito colateral provado**: etapa "gravar arquivo" não cria arquivo; listagem do diretório idêntica antes/depois
+- [x] Renderer dispara via IPC tipado (`execution:run`/`execution:list`); motor no main
+- [x] Entrega: PR [#37](https://github.com/RodReis/rrb-jarvisOS/pull/37) (`refs #14`); docs/ commitados
 
-## Após o MVP-002
+**Decisões técnicas desta fatia:**
 
-Ordem: MVP-002 (fundação de execução) → **MVP-003** ([#10](https://github.com/RodReis/rrb-jarvisOS/issues/10), execução real + terminal) → MVP de providers (Corte 3, com BudgetPolicy). Ordem macro em `docs/LANDSCAPE.md` § Roadmap.
+1. **O invariante é a ausência.** `simulation-engine.ts` **não importa** `node:fs`, `node:child_process` nem nada de rede — por desenho, não por esquecimento. "Simular" é produzir o veredito e a nota que a ação *teria*, nunca executá-la. Dois testes provam pelo efeito: o arquivo alvo não existe depois do run, e a listagem do diretório é idêntica antes/depois.
+2. **Falha declarável via `params.simulateFailure`** (decisão do PI), não campo no `WorkflowStep`. Fica no dado do workflow e some naturalmente quando a execução for real (MVP-003), sem deixar campo morto no schema da F04.
+3. **A ordem dentro da etapa é allowlist → política.** A F03 roda primeiro porque seu resultado (`pathAllowed`) é **insumo** da classificação da F02 — é o elo 03→02 desta fatia. Inverter perderia a elevação de tier por path fora.
+4. **Modo report ponta a ponta:** uma etapa classificada `bloqueado` (ação fora da taxonomia, fail-closed) **não barra** o run — ele conclui. Há teste afirmando isso. Barrar é enforcement, e enforcement é MVP-003.
+5. **Falha encerra o run; aprovação não.** Etapa que falha para o run em `falhou` e as seguintes não rodam (teste prova). `requiresApproval` vira **marco** e o run auto-continua — o fluxo de aprovação é MVP-003.
+6. **Workflow inexistente ⇒ run `cancelado`, registrado.** Um gatilho para um id que não existe é um fato a auditar, não um erro a engolir: o run nasce, é gravado com `workflowId: null` e estado `cancelado`.
+7. **Tipos de auditoria próprios** (`execution-run` para os marcos de início/fim, `execution-step` por etapa) — mesma linha de `allowlist-change`/`workflow-change`: a auditoria distingue sem parsear payload.
+
+## MVP-003 — Design System da Plataforma
+
+Épico [#16](https://github.com/RodReis/rrb-jarvisOS/issues/16). **As 8 fatias têm spec `aprovada-pi`** (issues #17–#24). Base técnica: **Radix + Tailwind v4 + Lucide**. Ordem: F01 → F02 → (F03a, F03b, F05 ‖) → F04a → F04b → F06.
+
+### Fatia 01 — Infra do design system (`docs/spec/spec-design-system-01-infra.md`)
+
+Status: **entregue** — spec `aprovada-pi` (2026-07-21); issue [#17](https://github.com/RodReis/rrb-jarvisOS/issues/17); PR [#38](https://github.com/RodReis/rrb-jarvisOS/pull/38). Abre o MVP-003. **Só esqueleto** — nenhum token, cor ou componente de produto (Fatias 02+).
+
+- [x] Três camadas em `src/design/{tokens,ui,patterns}` com export de exemplo por camada, importadas na ordem permitida (`patterns` → `ui` → `tokens`)
+- [x] `tokens` sem React — provado na categoria **Regras** (ambiente `node`), não em jsdom
+- [x] `ui/Alternador` encapsula o Radix Switch com **lista fechada de props**; consumidor não importa Radix direto (PRD §24)
+- [x] `patterns/LinhaDeAjuste` compõe `ui` + ícone Lucide (import individual); recebe dados só por props tipadas
+- [x] **Fronteira via ESLint** (`no-restricted-imports` escopada a `src/design/**`): quebra o `lint` ao importar domínio/renderer/main/Electron/Node/Supabase
+- [x] Alias `@design` no renderer, no Vitest e no `tsconfig.web` — main e preload **não** o resolvem
+- [x] `README` em `src/design/` (camadas, base técnica, regra de dependência, onde cada teste cai)
+- [x] Entrega: PR [#38](https://github.com/RodReis/rrb-jarvisOS/pull/38) (`refs #17`); docs/ commitados
+
+**Decisões técnicas desta fatia:**
+
+1. **A fronteira é lint, não convenção — e o lint é exercitado.** Uma regra `no-restricted-imports` mal escopada (`files:` errado, `group:` incompleto) fica silenciosamente inerte, e o `lint` verde passa a dizer que a fronteira existe quando ela não existe. Por isso `tests/design/fronteira.int-spec.ts` roda o **ESLint real** sobre a config real, nos dois sentidos que o critério 2 pede. Verificado por **mutação**: removendo o bloco da regra, os 6 casos de violação ficam vermelhos.
+2. **O teste também guarda o *escopo* da regra, não só sua existência.** Há uma asserção sobre um arquivo do renderer: ele importa `@shared` e isso **tem** de continuar passando. Sem ela, alargar o `files:` por engano (de `src/design/**` para `src/**`) quebraria o app inteiro e o teste da fronteira seguiria verde — falharia o lint em outro lugar, longe da causa.
+3. **`tokens` é testado em `node`, não em jsdom.** O critério 3 é "importável sem React"; sob jsdom o teste passaria mesmo se a camada importasse React por engano, porque o ambiente fornece o DOM. O ambiente é a prova, não a asserção — por isso `src/design/**/*.spec.ts` entrou na categoria **Regras** e não na **Tela**.
+4. **O wrapper do Radix declara props à mão.** `extends RadixSwitch.SwitchProps` ou um `{...rest}` no `Root` reabririam a superfície inteira do primitivo por herança: o tipo pareceria fechado, mas qualquer prop do Radix passaria em runtime, e trocar de primitivo passaria a quebrar consumidor. Há asserção contra `...rest`/`...props` no corpo do componente — também verificada por mutação.
+5. **`@design` não é resolvido por main e preload.** O alias existe só no bloco `renderer` do `electron.vite.config.ts`. É a mesma fronteira do lint, vista do outro lado: um import do DS no main falharia no bundle, não só no lint.
+6. **O teste da fronteira caiu na categoria Banco.** Ele escreve arquivos temporários dentro de `src/design/` (a regra é escopada por caminho — o arquivo precisa morar lá para ser avaliado). Toca disco, logo é integração. A régua da categoria é "integração com storage local", como já registrado na F06 do MVP-001.
+7. **Achado de processo: o relatório de entrega precisa ser gerado no ambiente do CI.** Custou **duas** rodadas de CI vermelhas nesta fatia, por duas guardas diferentes e a mesma causa de fundo — `npm run test:report` rodado sem as condições que o CI impõe. (a) **Stack parada:** com o Docker desligado o gerador roda até o fim e escreve `Banco 110 pass` em vez de `117` — os 7 testes de RLS se pulam (comportamento correto: não punir quem clona sem Docker) e somem da contagem. (b) **Sem as variáveis `REPORT_*`:** o gerador escreve o "Estado atual" mas **não** a linha de histórico da entrega, e a guarda `--require-entry` barra. Nos dois casos nada falha e nada avisa localmente: o arquivo parece válido. Quem pegou foram as guardas do ADR-003 — que é o que elas existem para fazer, e a prova de que a rotina de relatório não é decorativa. O desperdício não foi a falha, foi descobrir no CI o que dava para ver antes do push. Registrado em `docs/TESTING.md` §7 (*"Gerar o relatório de entrega: reproduza o ambiente do CI"*) com o comando exato, incluindo rodar a guarda idêntica à do CI antes de empurrar.
+
+### Fatia 02 — Foundations + ponte com o protótipo (`docs/spec/spec-design-system-02-foundations.md`)
+
+Status: **entregue** — spec `aprovada-pi` (2026-07-21); issue [#18](https://github.com/RodReis/rrb-jarvisOS/issues/18); PR [#40](https://github.com/RodReis/rrb-jarvisOS/pull/40). Depende da F01. É a fatia da **ponte**: o protótipo entra como valor de token; a implementação segue o PRD (React tipado, WCAG 2.2).
+
+- [x] **71 tokens de tema** (51 `jt` + 20 `nt`) × 2 modos, **extraídos** do protótipo por `scripts/extrair-tokens-prototipo.mjs` (determinístico)
+- [x] Tokens-base: raios, espaçamento, sombras, movimento, tipografia, z-index, breakpoints (README §2.5/§3/§6)
+- [x] Semânticas `status`/`risco` **fixas** — não invertem, não são retematizáveis (PRD §15)
+- [x] Camada de **papéis** traduz `jt16` → `surfaceRaised`; componentes das fatias seguintes nunca veem `jt*`
+- [x] Acento por **paleta fechada de 8**, `hexA`, e o **ajuste de tom só para leitura** (decisão do PI): tom preservado na marca, luminância ajustada só quando renderiza texto ilegível
+- [x] `ProvedorDeTema`: `uiTheme` por props → CSS variables; o DS **não persiste** preferência
+- [x] **Superfícies de marca** (Login/Choice/transição/Toast) não invertem — `SUPERFICIES_DE_MARCA` + `modoEfetivo()`
+- [x] Fontes **locais** (Michroma/Rajdhani/Share Tech Mono, 78 KB, subset latin) + `tabular-nums`
+- [x] `prefers-reduced-motion` zera a duração **no token**
+- [x] Entrega: PR [#40](https://github.com/RodReis/rrb-jarvisOS/pull/40) (`refs #18`); docs/ commitados
+
+**Decisões técnicas desta fatia:**
+
+1. **Extrair, não transcrever.** São 142 valores de cor. Um typo aí não quebra nada — só fica sutilmente errado, que é a pior classe de defeito visual. O script é determinístico (MD5 idêntico entre execuções), e é isso que permite ao teste de paridade **afirmar** que o escuro é o do protótipo em vez de supor. Um `tokenDeTema()` inexistente **lança**: CSS engole `undefined` em silêncio.
+2. **Nomes semânticos por cima dos 71 brutos** (decisão do PI). A spec manda fidelidade ao protótipo, cujos tokens têm nome opaco (`jt16`); o PRD §9.1 pede nomes semânticos. Conciliados em camadas: o bruto é dado, o papel é a superfície pública. Só os papéis que o README §2.6 nomeia entraram — inventar papel para 71 tokens seria decidir escopo que é do PI.
+3. **A exceção da marca é dado, não convenção.** Bastaria não montar o provider em Login/Choice/Toast, mas isso não é verificável: seria confiar em que ninguém o montaria por engano numa tela que ainda nem existe (F03b/F04a). Declarando a superfície, a marca recebe tokens — sempre os escuros — e o teste afirma sobre o **valor**. Provado por mutação: removendo a exceção, 6 testes ficam vermelhos.
+4. **Duas variáveis de acento.** `--jos-cor-acento` preserva o tom escolhido; `--jos-cor-acento-leitura` ajusta só a luminância quando o contraste falha. Uma variável só forçaria escolher entre identidade e legibilidade — a decisão do PI é ter as duas. O ajuste itera em passos pequenos porque a relação entre luminância HSL e contraste WCAG não é linear.
+5. **Fontes locais, não CDN.** O README §3 importa do Google Fonts, mas o app é local-first e a CSP do renderer declara `font-src 'self' data:` (critério de aceite da SPEC-Fundacao-01). Um `@import` remoto falharia **em silêncio** e a UI cairia na fonte de sistema. Baixadas e versionadas: 78 KB, subset latin, SIL OFL 1.1.
+6. **`reduced-motion` zera a duração no token**, não em cada animação — quem anima lê `--jos-duracao-*`, então anular a variável desliga a árvore toda. Caçar `animation` por componente deixaria passar o próximo que alguém escrever. `0.01ms` e não `0`: duração zero cancela `transitionend` e travaria componente que espera esse evento.
+7. **A fronteira da F01 pegou o teste desta fatia.** `node:fs` importado em `src/design/` — o lint barrou. Corrigido importando o JSON como módulo, não abrindo exceção: se a regra cedesse para teste, viraria "vale exceto quando incomoda". A regra da fatia anterior mordendo o autor dela é o melhor sinal de que é real.
+
+### Fatia 03a — Componentes: ações + formulários (`docs/spec/spec-design-system-03a-componentes-acoes-forms.md`)
+
+Status: **entregue** — spec `aprovada-pi` (2026-07-21); issue [#19](https://github.com/RodReis/rrb-jarvisOS/issues/19); PR [#42](https://github.com/RodReis/rrb-jarvisOS/pull/42). Depende da F01 (Radix + fronteira) e da F02 (tokens). Pode andar em paralelo com a 03b.
+
+- [x] **Ações** (PRD §11.1): `Button` (primária/secundária/perigo), `IconButton`, `ButtonGroup`, `Link`
+- [x] **Campos** (PRD §11.2): `Field`, `FormMessage`, `Input`, `PasswordInput`, `Textarea`
+- [x] **Radix encapsulado**: `Select`, `Checkbox`, `RadioGroup`, `Slider`, `Alternador` (Switch)
+- [x] **`Combobox` próprio** — padrão ARIA completo; o Radix não publica um
+- [x] `ui/base.ts`: altura única (44px), foco, borda, transição, estado desabilitado
+- [x] Estado nunca só por cor — inclusive **entre variantes** (correção do critique)
+- [x] Regra de lint do critério 5: componentes consomem só tokens
+- [x] **Galeria de prova visual** + 8 asserções num navegador real
+- [x] Entrega: PR [#42](https://github.com/RodReis/rrb-jarvisOS/pull/42) (`refs #19`); docs/ commitados
+
+**Decisões técnicas desta fatia:**
+
+1. **A gramática visual foi derivada do protótipo, não inventada.** Só **3 dos 16** componentes têm tela de referência (Input, Button primário e secundário, da tela de login); as outras 41 telas são de exibição. Decisão do PI: extrair o vocabulário do que existe — 44px, raio de card, borda de baixo alfa, label mono UPPERCASE, foco no acento — e concentrá-lo em `ui/base.ts`. Inventar estética a cada arquivo produziria 16 dialetos.
+2. **A hierarquia de ação é preenchimento, não matiz.** A primeira versão distinguia as variantes só por cor. Com `#C4C4C4` (default do NOA) ou `#FFFFE3` — ambos na paleta de 8 que o usuário escolhe —, primária, carregando e desabilitado renderizavam como o **mesmo botão cinza**. O sistema aplicava "estado nunca só por cor" dentro de cada componente (check, alça, ponto) e violava a regra uma camada acima. Agora primária é sólida e pesada; perigo, contornada e pesada — peso e preenchimento sobrevivem a qualquer acento.
+3. **As semânticas ganharam variante de leitura.** Como texto no modo claro, as cinco falhavam a régua: `err` 2.53:1, `violet` 2.52, `warn` 1.99, `ok` 1.78, `info` 1.54. Foram desenhadas para fundo escuro. A cor de marca segue intacta em borda, ícone e preenchimento; só o texto lê da variante ajustada — o mesmo mecanismo que o acento já usava desde a F02.
+4. **`textMuted` corrigido, e fidelidade cedeu à legibilidade.** `#6b7382` media 4.08–4.12:1 no escuro, e o token não é decorativo: carrega placeholders, texto de apoio e **todas as labels** (via `LABEL_MONO`, em `--jos-texto-micro` com uppercase — texto pequeno, sem isenção). `#757d8c` é o desvio mínimo que atinge 4.5:1. É o princípio 1 do PRODUCT.md ("clareza antes de efeito visual") decidindo contra o protótipo.
+5. **`Field` devolve os atributos ARIA por render prop.** Cada componente montar o próprio `aria-describedby` é a via para um esquecer. O erro precede a descrição na ordem de leitura: quem acabou de errar precisa ouvir o problema antes da instrução genérica.
+6. **`ButtonGroup papel="segmentado"` foi removido, não remendado.** Prometia `role="radiogroup"` sobre filhos `<button>` — o leitor de tela anunciaria um grupo de rádio **sem rádios dentro**, pior que a fileira de botões que a variante tentava corrigir. Um controle segmentado de verdade precisa de estado e navegação por setas; é escopo da F04a, onde há tela que o use. Entregar a casca seria oferecer acessibilidade inexistente.
+7. **`Combobox` fecha por `focusout`, não por timer.** A versão inicial usava `setTimeout(…, 120)` para o `mousedown` da opção registrar antes do fechamento: o timer nunca era limpo (disparava após o unmount) e, sob quadro lento, a lista fechava antes do clique. `relatedTarget` responde a pergunta certa — "o foco saiu daqui?" — sem constante para calibrar.
+8. **Três camadas de verificação, cada uma pegando o que a anterior não pega.** Os 91 testes de papel acharam o `aria-label` no `Root` do slider em vez do `Thumb` (a faixa ficava anônima). A **prova visual** achou dois defeitos com esses 91 verdes: o CSS dos componentes não estava sendo gerado (o Tailwind v4 varre a partir da `root` do Vite, e `../ui` ficava fora) e o card do NOA estava invertido (`nt16` é cor de **texto** — os índices `jt`/`nt` são independentes, não numerações paralelas). O **`/impeccable critique`** achou os 10 itens de contraste e hierarquia. Cada correção deixou teste que a trava, verificado por mutação.
+
+**Registrado, não silenciado:**
+
+- `RadioGroup` por setas **não é verificável em jsdom** (roving tabindex do Radix depende de foco real). `it.todo` com a razão escrita, em vez de um teste que passa medindo outra coisa — cobre-se no E2E da F04a.
+- A galeria cobre **4 de 32** combinações de acento. Os dois defeitos apareceram nos defaults; ampliar a matriz é candidato para a F06.
+- **`:active` não existe em nenhum dos 16** — nenhum controle dá feedback de pressão. Anotado para a F06 (hardening).
+- Card **[#41](https://github.com/RodReis/rrb-jarvisOS/issues/41)**: o renderer subia em porta variável, contra o `strictPort` do CLAUDE.md. Achado ao subir o app para inspeção; não misturado na fatia. **Corrigido em 2026-07-24** (PR [#73](https://github.com/RodReis/rrb-jarvisOS/pull/73)): `server: { host: '127.0.0.1', port: 5180, strictPort: true }` no `renderer` de `electron.vite.config.ts`, provado no app real (5180 fixa; falha ruidosa se ocupada).
+
+### Fatia 03b — Componentes: dados + overlays + feedback (`docs/spec/spec-design-system-03b-componentes-dados-overlays.md`)
+
+Status: **entregue** — spec `aprovada-pi` (2026-07-21); issue [#20](https://github.com/RodReis/rrb-jarvisOS/issues/20); PR [#45](https://github.com/RodReis/rrb-jarvisOS/pull/45). Depende da F01 (Radix + fronteira) e da F02 (tokens). Paralela à 03a.
+
+- [x] **Exibição de dados** (PRD §11.4): `Card`, `Panel`, `Badge`, `Tag`, `Avatar`, `Table`, `Tree`, `Separator`, `Tooltip`, `Progress`, `Meter`, `Skeleton`, `Spinner`, `EmptyState`
+- [x] **Overlays** (PRD §11.5, Radix): `Dialog`, `AlertDialog`, `Popover`, `DropdownMenu`, `Drawer`
+- [x] **Feedback** (PRD §11.5): `InlineAlert`, `ErrorState`, `LoadingState`
+- [x] **Toast unificado** fiel ao protótipo (README §5): 5 simultâneos, 4200 ms, glass + barra lateral + progresso, `stamp` HH:MM:SS, sempre escuro
+- [x] **Notificações** (PRD §12.6): `ToastViewport`, `NotificationCenter`, `NotificationItem`, `UnreadIndicator` — lista por props
+- [x] Critério 1 — focus-trap, `Escape` e **retorno de foco** provados nos 5 overlays (`overlays.test.tsx`)
+- [x] Critério 2 — Toast: variante, pausa em hover **e** foco, máx. 5, dedupe e permanência escura no tema claro (`toast/toast.test.tsx`)
+- [x] Critério 3 — `AlertDialog` é o caminho do destrutivo: verbo específico, clique fora inerte, Escape cancela e nunca confirma
+- [x] Critério 4 — estado sem cor em `Badge`/`Progress`/`Meter`/`InlineAlert`/`EmptyState`/`ErrorState`/notificações (`dados-feedback.test.tsx`)
+- [x] Critérios 5 e 6 — só tokens; fronteira da F01 verde
+- [x] Critério 7 — `test` 461 ✓, `lint` ✓, `typecheck` ✓ (**+50 testes**)
+- [x] Entrega: PR [#45](https://github.com/RodReis/rrb-jarvisOS/pull/45) (`refs #20`); docs/ commitados
+
+**Decisões técnicas desta fatia:**
+
+1. **O teste achou dois defeitos reais de a11y que a leitura do código não pegou.** Ambos em componentes que *pareciam* corretos e cujo comentário afirmava a garantia que eles não davam.
+   - **Retorno de foco em `Dialog`/`AlertDialog`/`Drawer`.** O cabeçalho do arquivo afirmava "o Radix entrega os três de fábrica". Entrega — **quando ele é dono do gatilho**. Estes três são controlados por prop (`aberto`) e não têm `Trigger`: o Radix não tem para onde voltar, e o foco caía no `<body>`. Quem navega por teclado voltava ao topo do documento a cada modal fechado. Corrigido com `useRetornoDeFoco`, que guarda `document.activeElement` na abertura e restaura no fechamento (com guarda `isConnected`, para o caso de o gatilho ter sido removido *pelo próprio* modal).
+   - **`Panel` não era uma região.** Um `<section>` sem nome acessível não vira `role="region"` — ele some da lista de marcos do leitor de tela, e o `sr-only` do tom fica órfão no DOM: o texto "erro:" existia, mas não era lido ao pousar no painel. O `sr-only` migrou para dentro do `<h3>`, que agora é referenciado por `aria-labelledby` — o nome da região carrega **tom + título** juntos.
+   
+   Os dois foram verificados por mutação: removendo `useRetornoDeFoco` e o `aria-labelledby`, 4 testes ficam vermelhos.
+2. **O critério 4 não se prova medindo cor — prova-se afirmando o sinal não-cromático.** Uma asserção sobre cor computada em jsdom mediria a string que o próprio componente escreveu. O que sobrevive ao daltonismo, ao alto contraste e ao leitor de tela é **texto e papel ARIA**, e é sobre isso que as asserções falam: o `82%` escrito ao lado do `Meter`, o `"erro:"` no `InlineAlert`, o `"não lida"` no `NotificationItem`, o `aria-valuenow` ausente no `Progress` indeterminado (um `0` seria pior que a ausência — diria "nada foi feito").
+3. **O toast escuro é asserção estrutural, pelo mesmo motivo.** O critério pede que ele **não inverta** sob `uiTheme='light'`. Em jsdom a prova possível é que o card referencia `--jos-toast-*` (superfície de marca) e **nunca** `--jos-cor-superficie*`, que inverte. Junto vai a asserção de que o provider de fato pintou `data-modo="light"` — sem ela, o teste passaria mesmo se o `uiTheme` fosse ignorado, medindo o default escuro.
+4. **`fireEvent` no teste de Toast, `userEvent` em todo o resto.** Não é preferência: sob `vi.useFakeTimers()` as esperas internas do `userEvent` nunca resolvem, e todo clique estoura o timeout. O alvo ali é o **motor** (fila, timers, dedupe), não a fidelidade da sequência do ponteiro. E os timers falsos são o que permite afirmar sobre o **resto** do timer na pausa — hover aos 4000 ms, avança 10 s, sai, e 200 ms bastam para fechar. Um teste que só verificasse "pausou" não distinguiria pausa de reinício da duração cheia.
+5. **A recusa do `userEvent` virou a evidência do clique-fora.** O `AlertDialog` marca o conteúdo de trás com `pointer-events: none` **e** `aria-hidden`. O `userEvent` se recusa a clicar num elemento inerte — essa recusa é a prova de que o clique não chega a lugar nenhum. Forçar por `fireEvent` furaria a barreira e mediria outra coisa. O `aria-hidden` entra na mesma asserção: `getByRole` não acha o botão de fora, só `getByTestId`.
+6. **Uma suposição minha sobre o `AlertDialog` estava errada, e o teste corrigiu.** Escrevi que Escape não deveria fechá-lo. O Radix fecha — e está certo: o critério 1 exige "Escape fecha" para *todos* os overlays, e bloquear a tecla deixaria o usuário de teclado preso num diálogo sem saída. A assimetria correta é clique fora (distração) bloqueado, Escape (tecla deliberada) permitido. O que Escape nunca faz é **confirmar**: o teste afirma `onConfirmar` não chamado.
+7. **A fronteira da F01 mordeu de novo, e de novo cedeu o import, não a regra.** O teste do Toast importava `../../tokens/provider`; a regra bane `../../*` porque é a forma como um import escaparia de `src/design/`. Trocado pelo alias `@design`, que diz a mesma coisa sem depender da profundidade do arquivo. Mesma decisão da F02.
+
+### Fatia 05 — Identidades NOA e JARVIS (`docs/spec/spec-design-system-05-identidades.md`)
+
+Status: **entregue** — spec `aprovada-pi` (2026-07-21); issue [#23](https://github.com/RodReis/rrb-jarvisOS/issues/23); PR [#46](https://github.com/RodReis/rrb-jarvisOS/pull/46). Depende da F02 (tokens/tema/acento). Era a paralela da F03b.
+
+- [x] **Contrato de identidade** (`tokens/identidade.ts`): tom, acento padrão, mascote, nome e `vozPadrao` por módulo, como dado
+- [x] **Glow radial do JARVIS** (critério 4): `--jos-atmosfera` + `FundoDaIdentidade` que a pinta; no NOA lê `none`
+- [x] **VoiceMascot** (critérios 6 e 7): um componente para as duas identidades, anéis/glow/bob/boca/olhos, tile sempre escuro
+- [x] **Sem motor de voz**: `falando`/`ouvindo` são reflexo por prop; no NOA são **recusados**, não só omitidos
+- [x] Critérios 1–3 e 5 — mesmo componente nos dois módulos, acento sem vazamento, par escuro/claro, `uiTheme` global, semânticas idênticas
+- [x] **Galeria de identidades** + 11 asserções em navegador real (as duas colunas lado a lado)
+- [x] `test` 500 ✓, `lint` ✓, `typecheck` ✓, prova visual 40 ✓ (**+21 testes**)
+- [x] Entrega: PR [#46](https://github.com/RodReis/rrb-jarvisOS/pull/46) (`refs #23`); docs/ commitados
+
+**Decisões técnicas desta fatia:**
+
+1. **A F02 já tinha entregue metade da identidade — o delta era menor do que a spec sugere.** `papeis()` (fundos por módulo e modo), `bordaRgb()` (hairlines) e `ACENTO_PADRAO` já carregavam o par escuro/claro e o acento de fábrica; `uiTheme` já era global e `data-modulo` já ia ao DOM. O que faltava era **atmosfera, mascote e tom** — e testes que afirmassem os critérios *como identidade*, não como tema. Reescrever o que existia para "ficar tudo junto na fatia" seria refatorar o que não quebrou; o `identidade.ts` **acrescenta** e não duplica.
+2. **O teste do critério 5 achou um defeito de contraste real.** A variante de leitura das semânticas era ajustada contra `p.surface` — a superfície do **módulo ativo**. Como os fundos claros diferem (`#f5f6f8` no JARVIS, `#f2f4f2` no NOA) e o ajuste para no primeiro passo que cruza 4.5:1, a mesma semântica rendia cores diferentes nos dois espaços. Só o `violet` divergia, porque as outras quatro têm folga — e não era cosmético: o `#7a4ff5` do JARVIS media **4.45:1 sobre o fundo do NOA**, abaixo da régua. Uma semântica "compartilhada" legível em apenas um dos espaços não está compartilhada. Corrigido com `fundoDeReferencia()`, que ajusta contra o **mais exigente** dos dois fundos — o valor que serve ao pior caso serve aos dois, e sobra nos dois lados (violet: 5.10 / 4.98). Provado por mutação: voltando a `p.surface`, 2 testes ficam vermelhos.
+3. **A igualdade sozinha não provava nada, e por isso há duas asserções.** "As duas identidades produzem a mesma cor" passaria com duas cores igualmente ilegíveis. A asserção que fecha o critério é a segunda: a cor de leitura atinge 4.5:1 **sobre os fundos das duas identidades**. Foi a diferença entre detectar o sintoma (valores divergentes) e o defeito (um deles reprovado).
+4. **A prova visual achou um buraco que os 21 testes verdes não pegaram.** As nove asserções de navegador falharam achando **zero** elementos: `FundoDaIdentidade` aceitava só `children`/`className`, e o `data-prova-identidade` da galeria era descartado em silêncio. O componente de teste estava certo; o de produção é que não repassava o atributo. Corrigido na raiz (prop declarada na lista fechada, no padrão de `PropsDeComposicao` da F03a) em vez de contornar no seletor — contornar teria deixado o DS sem forma de recortar identidade para inspeção.
+5. **Três critérios só são verificáveis no navegador, e não por preferência de ferramenta.** Em jsdom, `background-image` devolve a string que o componente escreveu: um `var(--jos-atmosfera)` apontando para variável inexistente passaria no teste de componente e pintaria nada. `getComputedStyle` resolve a variável — se ela não existe, vem `none` e a asserção quebra. O mesmo vale para `mix-blend-mode` (critério 7), que nenhum DOM virtual compõe, e para comparar a **cor pintada** das semânticas nos dois espaços (critério 5), que é a comparação que o olho do usuário faz.
+6. **O guardrail anti-duplicação virou asserção, não recomendação.** Há um teste que varre a superfície de exportação do DS e falha se algum componente tiver `noa` ou `jarvis` no nome. Sem ele, "não duplicar componente" seria uma promessa no comentário — e a fatia seguinte (F04a) é justamente a que teria a tentação de criar um `AppShellJarvis`.
+7. **Os assets do mascote moram dentro do DS, e isso corrigiu um atalho da F02.** O primeiro impulso foi pô-los em `src/renderer/assets/`, ao lado das fontes. O ESLint barrou: a regra de fronteira da F01 bane `**/src/renderer/*`. As fontes escapam porque são alcançadas por `url()` no CSS, que o ESLint não inspeciona — mas a razão da regra vale igual. O mascote **é** parte do design system, não algo que ele busca no renderer; copiar o arquivo para `src/design/assets/` custa 2 MB no repo e mantém a camada fechada.
+
+**Registrado, não silenciado:**
+
+- **Os mascotes estão muito maiores que o uso**: `jarvis-cabeca.jpg` é 2048×2048 (824 KB) e `noa-cabeca.png` é 1024×1024 (1,2 MB), para renderizar num círculo de ~120px. Redimensionar exige ferramenta de imagem e é otimização, não critério de aceite — candidato para a F06 (hardening).
+- **`falaAutomatica` não foi implementada.** A spec a chama de "prop reservada" e o motor de voz é Corte 4. Uma prop que não faz nada seria pior que a ausência: sugeriria comportamento que não existe.
+- A galeria de identidades cobre **1 de 8** acentos da paleta (o default de cada módulo), mais um segundo acento na asserção do glow. Ampliar a matriz é o mesmo candidato da F03a para a F06.
+
+### Fatia 04a — AppShell + navegação (`docs/spec/spec-design-system-04a-appshell-navegacao.md`)
+
+Status: **entregue** — spec `aprovada-pi` (2026-07-21); issue [#21](https://github.com/RodReis/rrb-jarvisOS/issues/21); PR [#49](https://github.com/RodReis/rrb-jarvisOS/pull/49). **Re-plataforma** a SPEC-Fundacao-02. Depende das F02, F03a/F03b e integra a F05.
+
+- [x] **Grid do protótipo** (`60px 232px 1fr` / `52px 1fr 34px`), idêntico nos dois espaços
+- [x] `AppShell`, `Rail`, `Sidebar`, `NavigationGroup`, `WorkspaceSwitcher`, `TopBar`, `ShellFooter` em `@design/patterns`
+- [x] **Rail dual do JARVIS** (Command Center ⇄ Agents OS) com sub-módulo derivado da rota
+- [x] **Toggle sol/lua** no TopBar — `uiTheme` global, sem reload, persistido pela via do Settings
+- [x] Critério 2 — as garantias da SPEC-Fundacao-02 preservadas: **os 15 testes daquela fatia passam sem uma linha alterada**
+- [x] Critério 4 — falha do runtime mantém o shell vivo e navegável
+- [x] Critério 5 — fronteira verde; o DS não sabe o que é workspace
+- [x] **Prova visual do shell** — as medidas do grid **renderizadas** (`boundingBox`), +10 asserções
+- [x] `test` 522 ✓, `lint` ✓, `typecheck` ✓, prova visual 50 ✓
+- [x] Entrega: PR [#49](https://github.com/RodReis/rrb-jarvisOS/pull/49) (`refs #21`); docs/ commitados
+
+**Decisões técnicas desta fatia:**
+
+1. **A prova de que foi re-plataforma, e não reescrita, são os testes que *não* mudaram.** Os 15 testes da SPEC-Fundacao-02 passam sem uma linha alterada. Isso não é conveniência: se algum tivesse precisado de ajuste, o que mudou não teria sido só a pele — teria sido o contrato, e aí a fatia estaria quebrando a fundação em vez de re-vesti-la. A divisão que sustenta isso é rígida: o DS desenha e não sabe o que é workspace; o renderer sabe o que é workspace e não desenha.
+2. **O sub-módulo do JARVIS é derivado da rota, nunca guardado.** Um `useState('command')` ao lado da rota seriam duas fontes para a mesma verdade — e elas divergem no primeiro caminho que atualiza uma sem a outra: o rail acende Command Center enquanto a sidebar mostra a navegação do Agents OS. `subModuloDaRota(rotaAtiva)` é a única fonte. Provado por mutação: fixando o sub-módulo, o teste do critério 3 fica vermelho.
+3. **`Agentic OS` não virou um quarto espaço por acidente.** O CLAUDE.md é explícito, e a tentação era real: `SubModuloJarvis` ao lado de `WorkspaceId` teria sido a modelagem "natural". Ele vive como **dimensão da navegação do JARVIS**, e há teste afirmando que o rail dual não aparece no NOA.
+4. **O toggle de tema persiste pela via do Settings.** Estado local aqui faria o toggle da topbar e o seletor de Settings discordarem assim que o usuário usasse os dois — são dois controles da mesma preferência (SPEC-Fundacao-05). E o que se aplica é o `resolvedTheme` do main, não a preferência crua: `theme: 'sistema'` não diz se pinta claro ou escuro, e ler o valor cru deixaria o shell escuro com o sistema em claro. Também provado por mutação.
+5. **O acordo entre rotas e sub-módulos virou asserção.** `ROTAS_POR_WORKSPACE.jarvis` e `ROTAS_POR_SUB_MODULO` têm de cobrir exatamente o mesmo conjunto; acrescentar uma rota sem colocá-la num sub-módulo a deixaria **órfã** — visível na sidebar de nenhum dos dois rails, sem nada falhar. Dois testes fecham os dois sentidos da relação.
+6. **Um bug de três MVPs apareceu de raspão, e virou card próprio.** O teste novo do rail dual não rodava; a investigação mostrou que **`navegacao.spec.ts` nunca havia rodado** — o `include` da categoria Regras não alcançava `src/renderer`, e 75 linhas cobrindo o isolamento de rota por espaço estavam fora de toda categoria desde o PR #28. Corrigido no card **[#47](https://github.com/RodReis/rrb-jarvisOS/issues/47)** / PR [#48](https://github.com/RodReis/rrb-jarvisOS/pull/48), em branch próprio, **sem misturar na fatia**. A lição ficou no `TESTING.md` §2: um teste que não roda é indistinguível de um que não existe — e é pior, porque o relatório sugere cobertura que não há.
+7. **A prova visual mede o grid, que é o que jsdom não vê.** `width: 60px` em jsdom é a string que o componente escreveu: um rail colapsado por um `flex` mal resolvido passaria em todos os testes de papel. `boundingBox` mede o renderizado. Junto vai a asserção de que as regiões **não se sobrepõem** — o defeito clássico de shell (conteúdo passando por baixo da sidebar), invisível para qualquer asserção de ARIA.
+8. **`main.tsx` trocou a cadeia de ternários por mapa.** Com quatro galerias o encadeamento já tinha três níveis, e o próximo `else if` seria onde o default se perde de vista. Galeria desconhecida agora **lança** em vez de cair no default — mesma disciplina que a `cena` já tinha: sem isso a captura teria o nome de uma galeria e o conteúdo de outra.
+
+**Registrado, não silenciado:**
+
+- **Seis componentes da spec §Escopo ficaram de fora**: `Breadcrumb`, `PageHeader`, `Tabs`, `Accordion`, `CommandBar` e `CommandPalette`. Nenhum é exigido pelos critérios de aceite, e sem tela de produto que os use (Corte 3+) seriam casca — pior que ausência num componente de navegação, porque sugere um caminho que não leva a lugar nenhum. A F04b/F06 decide com tela real na mão.
+- O `WorkspaceSwitcher` mora na sidebar, não na topbar. O protótipo põe o atalho para o outro espaço **no rodapé do rail** (JARVISOS §2) — que também existe aqui. Manter o radiogroup na sidebar preserva as quatro asserções da fundação sem duplicar o controle; unificá-los é decisão de produto, não minha.
+- O rail do NOA está vazio de itens próprios (só mascote + rodapé). O protótipo o usa para atalhos de view (NOA §2), e essas views são Corte 3+.
+
+### Fatia 04b — Padrões operacionais (`docs/spec/spec-design-system-04b-padroes-operacionais.md`)
+
+Status: **entregue** — spec `aprovada-pi` (2026-07-21); issue [#22](https://github.com/RodReis/rrb-jarvisOS/issues/22); PR [#50](https://github.com/RodReis/rrb-jarvisOS/pull/50). Depende das F03b e F04a.
+
+- [x] **Status** (critério 4): `SyncStatus` com os 5 estados do PRD §12.4; `StatusOperacional` para agente/serviço/provider/conector/execução
+- [x] **Risco e aprovação** (critério 1): `RiskIndicator`, `SensitiveActionSummary`, `ApprovalDialog` — impacto, solicitante, risco e custo **antes** da confirmação
+- [x] **Redaction de texto** (critério 3): `redigir.ts` + `LogViewer` que a aplica sempre
+- [x] **BYOK** (critério 2): `ProviderSetup` com a mensagem literal do PRD §12.5, `MaskedCredentialSummary`, `RemoveCredentialDialog`
+- [x] **Diagnóstico** (critério 5): `RuntimeUnavailable` com cópia **redigida** e reinício condicional
+- [x] Critério 6 — tudo por props; fronteira verde
+- [x] **Galeria de operacionais** + 14 asserções em navegador real (contraste computado e segredo ausente)
+- [x] `test` 552 ✓, `lint` ✓, `typecheck` ✓, prova visual 64 ✓ (**+30 testes**)
+- [x] Entrega: PR [#50](https://github.com/RodReis/rrb-jarvisOS/pull/50) (`refs #22`); docs/ commitados
+
+**Decisões técnicas desta fatia:**
+
+1. **A redaction de texto é camada nova, não cópia da que existe.** O `redact()` de `src/shared/contracts/logging-redaction.ts` opera sobre **objeto estruturado** — apaga o valor de chaves sensíveis em qualquer profundidade. O `LogViewer` recebe **linha já formatada**, e um `Authorization: Bearer sk-abc…` no meio de uma mensagem é string, não chave: passa intacto por aquela função. Confirmei lendo a implementação antes de escrever a minha. A fronteira da F01 (o DS não importa `@shared`) não foi obstáculo a contornar — foi o que manteve `redigir.ts` puro e sem contexto de domínio.
+2. **O teste achou um bug na minha própria regex, e era do tipo pior.** A regra de cabeçalho parava em `Bearer` e deixava o token logo depois: `Authorization: [redigido] xyz98765`. Um vazamento que **parece limpo** é pior que nenhum saneamento — quem revisa o log vê o marcador e para de procurar. Corrigido fazendo o esquema (`Bearer`/`Basic`/`Token`) entrar no trecho consumido. Pego pelo teste "mais de um segredo na mesma linha", que eu escrevi sem esperar que falhasse.
+3. **Os limites da redaction estão escritos como teste, não como ressalva em comentário.** Três casos documentam o que ela **não** pega: segredo sem nome, prefixo ou forma; valor quebrado em várias linhas; campo em idioma não previsto. Nenhum é bug a corrigir com mais regex — um segredo sem forma reconhecível é indistinguível de um id qualquer, e a regra que o pegasse apagaria metade do log. O que fecha o buraco é o `redact()` do main, na escrita. Uma regex de segurança sem os seus limites escritos vira promessa falsa.
+4. **No BYOK, quem recusa a chave é o tipo.** `CredencialMascarada` não tem campo onde ela caiba — nem opcional, porque opcional é o que alguém preenche "só neste caso". A chave crua existe apenas entre a digitação e o submit, e é limpa **antes** de qualquer `await`: um `setChave('')` depois da validação de rede a deixaria viva no estado React durante toda a chamada, visível em devtools. E `autoComplete="off"` porque o gerenciador de senhas do navegador é exatamente o "storage do renderer" que o PRD §15 proíbe.
+5. **`StatusOperacional` é um componente para os seis nomes da spec.** `AgentStatus`, `ServiceStatus`, `ProviderStatus`, `ConnectorStatus`, `ExecutionStatus` seriam cinco cópias do mesmo `texto + ícone + cor`; o que muda entre eles é o **rótulo**, que vem por prop. Mesma disciplina anti-duplicação da F05, aplicada a nomes em vez de identidades.
+6. **`inativo` não virou um quinto tom semântico.** `TomSemantico` tem quatro valores e não inclui neutro, o que está certo: as semânticas comunicam *estado do sistema*, e "desligado" não é um estado semântico — é a falta de um. Mapeia para `undefined`, e o leitor de tela ouve "inativo" em vez de um tom inventado que se espalharia pelo DS inteiro para servir um caso.
+7. **A prova visual mede o contraste de quem carrega a informação mais crítica.** Risco e sync leem justamente as semânticas que a F03a mediu falhando 4.5:1 como texto no modo claro. Um risco alto ilegível é pior que um sem estilo: ele *parece* informação. E o critério 3 ganha ali a prova mais forte — nenhum segredo no `innerText` **nem no HTML cru**, o que cobre `title`, `aria-label` e `value`, que o texto renderizado não vê.
+8. **As cenas da galeria passaram a ser validadas por galeria.** A lista era global desde a F03b; com `aprovacao`/`remocao` entrando, uma lista única aceitaria `toasts` na galeria de operacionais e devolveria a cena estática com o nome de outra — o mesmo tipo de mentira silenciosa que a validação existe para impedir.
+
+**Registrado, não silenciado:**
+
+- **Treze componentes da spec §Escopo ficaram de fora**: `ExecutionCard`/`ExecutionRow`/`ExecutionTimeline`, `CostMeter`/`BudgetStatus`/`DurationIndicator`, `ApprovalRequestCard`, `RejectionReason`, `AuditEvent` visual, `RetryAction` isolado e os quatro `*Status` cobertos por `StatusOperacional`. Nenhum é exigido pelos critérios de aceite. Custo e orçamento são visuais com dado mock por decisão do PI (Corte 3) e, sem tela que os consuma, seriam casca — mesma razão da F04a.
+- O `ApprovalDialog` estendeu o `AlertDialog` da F03b com `children` opcional, em vez de criar um segundo diálogo em `patterns`. Duas implementações do contrato do destrutivo divergiriam, e a que divergisse seria a usada em produção.
+
+### Fatia 06 — Adoção & hardening (`docs/spec/spec-design-system-06-adocao-hardening.md`)
+
+Status: **entregue** — spec `aprovada-pi` (2026-07-21); issue [#24](https://github.com/RodReis/rrb-jarvisOS/issues/24); PR [#51](https://github.com/RodReis/rrb-jarvisOS/pull/51). **Fecha o MVP-003.**
+
+- [x] **Jornada de 3 telas** só com componentes/tokens públicos: CHOICE, NOA Hoje, JARVIS HUD
+- [x] `AccentSwatchSelector` — a paleta fixa por módulo, que vive na CHOICE (a F04a a deixou fora do shell de propósito)
+- [x] Critério 2 — telas internas em claro **e** escuro; CHOICE aplica o acento por módulo
+- [x] Critério 3 — as duas identidades corretas e sem vazamento; o acento escolhido **chega** à tela interna
+- [x] Critério 4 — navegação completa por teclado, foco visível medido em navegador real
+- [x] Critério 5 — nenhum estado essencial só por cor
+- [x] **Hardening**: 5 usos de `focus-visible:ring` eliminados; assets 2043 KB → 77 KB
+- [x] `test` 568 ✓, `lint` ✓, `typecheck` ✓, `build` ✓, prova visual 77 ✓ (**+16 testes**)
+- [x] Entrega: PR [#51](https://github.com/RodReis/rrb-jarvisOS/pull/51) (`refs #24`); docs/ commitados
+
+**Decisões técnicas desta fatia:**
+
+1. **Três defeitos, e os três invisíveis para teste de papel.** Esta fatia justificou o nome "hardening" pelo que a captura revelou, não pelo que eu planejei consertar:
+   - **A camada `patterns` estava sem CSS utilitário.** O `@source '../patterns'` faltava no `prova.css` — a camada nasceu na F04a, *depois* daquele bloco, e ninguém a acrescentou. Os swatches, declarados `size-7` (28px), renderizavam a **2px**. `getByRole('radio')` acha um botão de 2px tão bem quanto um de 28px, então nenhuma asserção de papel jamais acusaria. É o mesmo defeito que motivou o bloco na F03a, repetido numa camada nova — a lição é que `@source` é uma lista que precisa **crescer junto com as camadas**, e agora há teste que a trava.
+   - **O `vite.prova.config.ts` não declarava o alias `@design`**, que os outros **três** configs já tinham. A troca de `../../` pelo alias — exigida pela fronteira da F01, que barrou os imports das telas em `prova/jornada/` — quebrou a galeria inteira: 76 provas falharam de uma vez. E `test`/`lint`/`typecheck` seguiram **verdes o tempo todo**, porque cada ferramenta tem o seu próprio mapa de alias e três deles concordavam. Três gates locais verdes com o app quebrado.
+   - **Um dialeto de foco que eu mesmo introduzi**: 5 usos de `focus-visible:ring` nas F04a/F06, contra a constante `FOCO` que o DS tem desde a F03a. Pego pela prova visual do anel de foco. A correção não foi contornar o teste — foi eliminar o estilo paralelo, que é literalmente o que o critério 1 desta fatia manda fazer.
+2. **A jornada prova o que tela isolada não provaria.** Três capturas estáticas mostrariam três telas bonitas; o que o percurso verifica é a **costura**: o acento escolhido na CHOICE chega ao provider da tela interna, e escolher no NOA não move o JARVIS. Um setter por módulo (em vez de um objeto compartilhado) é a garantia estrutural disso.
+3. **A dívida da F05 foi quitada, não herdada.** Os mascotes eram 2048²/1024² e somavam 2 MB — três vezes o bundle de JS — para renderizar num círculo de no máximo 160px. Reduzidos a 512px (cobre 2× retina do maior uso). O PNG do NOA **não tinha canal alfa** — o recorte é feito por `mask-image` no CSS —, então o formato sem perdas não comprava nada: 304 KB viraram 32 KB. Total: **2043 KB → 77 KB (−96%)**.
+4. **A CHOICE não entra na matriz claro/escuro, e isso é conteúdo do teste.** Ela é superfície de marca (F02): não *tem* modo claro. Capturá-la duas vezes produziria dois arquivos idênticos com nomes diferentes — uma mentira silenciosa sobre cobertura. Em vez disso há uma asserção de que ela **permanece escura** sob `modo=light`, que é o conceito da F02 sobrevivendo à composição real.
+5. **O critério 1 não ganhou teste próprio, de propósito.** Quem prova "só componentes públicos" é o **lint**: a regra do critério 5 da F03a barra cor e medida literais em `src/design`, e a fronteira da F01 barra import de fora. Um teste que "verificasse composição" mediria o que eu escrevi, não o que a regra impõe — e passaria feliz enquanto eu escrevesse `<div style={{color:'red'}}>`.
+6. **O swatch selecionado não é marcado por cor.** Ele **é** uma cor: destacá-lo com outra competiria com o próprio valor que mostra. A seleção vive em `aria-checked` (leitor de tela) e em escala + borda clara (daltonismo).
+
+**Registrado, não silenciado:**
+
+- O `it.todo` do `RadioGroup` por setas (F03a) **continua aberto**: roving tabindex do Radix não é verificável em jsdom. O teste de teclado da jornada cobre `Tab` e `Enter`/espaço nos swatches e checkboxes, mas não navegação por setas dentro de um `radiogroup` do Radix. Candidato ao E2E de uma fatia futura.
+- O roteiro **manual** de teclado que a spec menciona (§Escopo) não foi executado por mim — só o automatizado. É verificação do PI no aceite.
+- A jornada usa dados mock por props, como a spec determina: é prova de composição, não a entrega das telas de produto (Corte 3+).
+
+## MVP-003 — aceito e fechado
+
+**Aceito pelo PI em 2026-07-23.** As 8 fatias (#17–#24) estão `closed` + `proplan:finalizado`; o épico **[#16](https://github.com/RodReis/rrb-jarvisOS/issues/16)** foi fechado. O corte inteiro saiu em um dia.
+
+O que o MVP-003 deixa: **569 testes** (Regras 230 · Banco 132 · Tela 211, cobertura 92%) e **77 provas visuais** em navegador real. A tese que o motivou — *base única, duas identidades* — está provada na jornada da F06: NOA e JARVIS lado a lado na CHOICE, saídos dos mesmos componentes, diferentes só por token.
+
+**A lição de método do corte** foi sobre camadas de verificação, e ela se repetiu em quase toda fatia: os testes de papel provam contrato, a **prova visual em navegador prova pintura**, e as duas não se substituem. O que só a captura pegou, com os testes verdes: o CSS que não era gerado (F03a), o card do NOA invertido (F03a), o `data-attribute` descartado em silêncio (F05), o alias que quebrou a galeria inteira com `test`/`lint`/`typecheck` verdes (F06), a camada `patterns` sem CSS utilitário desde a F04a (F06) e o `Meter` que escondia o rótulo (#52, achado ao revisar a captura **para o aceite**).
+
+Três `[FIX]` nasceram durante o corte e seguem em `proplan:done`, aguardando aceite à parte: **#43**, **#47** e **#52**.
+
+## Após o MVP-003
+
+Ordem: **MVP-004** ([#10](https://github.com/RodReis/rrb-jarvisOS/issues/10), execução real + terminal) → MVP de providers (Corte 3, com BudgetPolicy). Ordem macro em `docs/LANDSCAPE.md` § Roadmap.
+
+### [INFRA] #34 — Separar o E2E em job de CI próprio, condicional por paths (entregue, 2026-07-24 · PR #71)
+
+Card de infra (sem spec — fonte: decisão do PI de 2026-07-22 + ADR-003). O E2E Playwright-Electron dominava o tempo de CI (build + xvfb + keyring + boot do Electron, ~15 min) e rodava **em todo PR**, mesmo quando o PR não tocava a fronteira que o E2E prova. Passos:
+
+- [x] **Orquestrador** (`scripts/test-report.mjs`): tirei `npm run build` + `playwright test`. O relatório não depende mais do app empacotado; geração local caiu de ~min para ~16s.
+- [x] **Config** (`test-report.config.json`): a categoria "Tela" perdeu o `playwrightJson` — passou a contar **só o vitest-componente**. Estado atual: Tela 215 (era 218 com os 3 do E2E somados). `readPlaywrightJson` fica no gerador (repo-agnóstico), sem chamador, apontado no comentário.
+- [x] **`ci.yml`**: três jobs. `test` (relatório, sem E2E), `e2e` (todos os steps de ambiente — binário, setuid, keyring, build, xvfb — só quando o PR toca a fronteira) e `gate` (required check único que agrega `test` + `e2e`). Um job `changes` faz `git diff` contra a base e casa `src/main/preload/**`, `src/main/index.ts`, `src/main/window.ts`, `tests/e2e/**`, `playwright.config.ts` — sem action de terceiros (`paths:` no evento cancelaria o workflow inteiro).
+- [x] **`docs/TESTING.md`**: §2/§3/§3.1/§6/§9 atualizadas — "Tela" no relatório = componente; E2E é check à parte condicional.
+- [x] **Ao mergear:** required check trocado de `test` → `gate` na branch protection (feito pelo PI — é ação de admin, o classificador me bloqueou de mexer na proteção da `main`). Ordem seguida: trocar primeiro (gate já verde no #71, não bloqueou), mergear depois.
+
+**A decisão de projeto que fecha a garantia do card** ("o E2E completo tem de rodar no caminho para a `main`, a condicional nunca esconde regressão"): o `gate` é required em vez do `e2e`. Um required check **pulado** por `if:` fica *pending eterno* no GitHub e bloqueia o merge — a armadilha clássica de condicionar job por paths. O `gate` sempre roda (`if: always()`), lê `needs.e2e.result` e aceita `skipped` (PR não toca a fronteira) ou `success`, barrando em `failure`. Assim o E2E condicional nunca trava o merge, e um E2E que falha de verdade ainda derruba o gate.
+
+### [INFRA] #66 — Custo do GitHub Actions / `concurrency` no CI (2026-07-24 · PR #72)
+
+Card criado pelo Code quando o orçamento de Actions chegou a $3,30/$5,00 (repo privado ⇒ Actions cobrado). **Resolvido na origem pelo PI**, que tornou o repo **público** (Actions grátis e ilimitado) após a auditoria de segurança do próprio card (`.env` nunca commitado, nenhuma chave real no histórico). O card ficou aberto como guarda — *"se voltar a privado, o custo volta"*.
+
+Das opções técnicas do card, duas já haviam saído — **separar o E2E por paths** foi o #34; **validar local antes do push** é disciplina, não código. Sobrou **`concurrency`**, entregue aqui:
+
+- [x] **`ci.yml`**: bloco `concurrency` com `group: ci-${{ github.ref }}` + `cancel-in-progress: true`. Push novo no mesmo PR cancela a execução anterior — três pushes seguidos não deixam três suítes (~7 min cada) rodando em paralelo quando só a última conta. A `main` não passa por aqui (o workflow só dispara em `pull_request`), então não há risco de cancelar o CI de um merge. Runner efêmero: cancelar não deixa Supabase nem processo órfão.
+- [x] **`docs/TESTING.md` §6**: `concurrency` documentado na descrição dos disparos.
+
+Efeito mensurável do #34 + #66 juntos: o PR fora da fronteira roda `test` (~4 min) e pula o `e2e` (~15 min); pushes repetidos param de empilhar. O custo de Actions cai mesmo se o repo voltar a privado.
 
 ## Registro de entregas
 
 | Data | Fatia | PR | Observação |
 |---|---|---|---|
+| 2026-07-24 | [INFRA] Separar o E2E em job de CI próprio, condicional por paths (#34) | [#71](https://github.com/RodReis/rrb-jarvisOS/pull/71) | Regras 231 (78.8%), Banco 137 (85.7%), **Tela 215 (92.8%)** — a Tela caiu de 218 porque o E2E (3 testes) saiu da soma do relatório. O E2E, que rodava em todo PR (~15 min: build + xvfb + keyring), virou **job próprio condicional por paths** — só roda quando o PR toca a fronteira preload/IPC/janela. A decisão de projeto que fecha a garantia do card ("o E2E completo tem de rodar no caminho para a `main`"): o **required check é o `gate`, não o `e2e`** — um required pulado por `if:` fica *pending eterno* e trava o merge; o `gate` sempre roda e aceita `e2e=skipped`, barrando só em `failure`. **Este próprio PR** é a primeira prova: não toca a fronteira → `e2e` skipped, `gate` verde. Pós-merge: trocar o required check `test`→`gate` na branch protection (só admin). Sem spec (infra); fonte: PI (2026-07-22) + ADR-003. |
+| 2026-07-24 | CHOICE · seleção de espaço + acento (#69) — **PR 2/2 (acento persistido)** | [#70](https://github.com/RodReis/rrb-jarvisOS/pull/70) | Fecha os critérios 4, 5 e 8: o acento **persiste** por usuário e é editável nos **dois** lugares (CHOICE e Settings), com o mesmo `AccentSwatchSelector`. Migration 6 (`accent_noa`/`accent_jarvis` no `UserProfile`), **DEFAULT NULL** e não o hex — `null` diz "não escolheu", e quem resolve para o default de fábrica é o `PreferencesService` em runtime, mantendo a fonte única do valor no TS (e desacoplando esta fatia da mudança de `ACENTO_PADRAO.jarvis` que corre em paralelo). A paleta ganha uma **segunda cópia** no `@shared` (`ACCENT_PALETTE`), porque o main precisa validar a cor gravada e a regra de fronteira da F01 proíbe importar o DS — um teste no renderer (`acento-sincronia.spec.ts`) trava as duas listas em sincronia. O `SessaoAtiva` deixou de ter estado local do acento: lê o snapshot resolvido do main, e escolher grava pela mesma via do tema. **575 testes** (+8 do acento). |
+| 2026-07-24 | CHOICE · seleção de espaço + acento (#69) — **PR 1/2 (jornada)** | [#70](https://github.com/RodReis/rrb-jarvisOS/pull/70) | A tela CHOICE do protótipo trazida para o app: `login → CHOICE → shell`. Reusa a atmosfera de marca do login (extraída para `AtmosferaDeMarca`, sem duplicar), dois cards de identidade com anel + glow no acento, painel TEMA flutuante (8 swatches por módulo + seletor de tema como prévia) e o overlay de transição. Verificado no browser contra o protótipo: o acento pinta o card ao vivo (anel, glow, tagline), NOA e JARVIS isolados. **A opção A da spec encolheu a fatia**: o rail fica **intacto** (a CHOICE é porta de entrada, não de troca) — a SPEC-Fundacao-02 não muda, e `navegacao.spec.ts` não migra. Mas 24 testes que montam `<App/>` passaram a atravessar a CHOICE (helper `entrarPelaChoice` compartilhado); as asserções de shell ficam idênticas, só muda o caminho. Um teste afirmava a regra revogada ("abre sempre no JARVIS") e virou "abre na CHOICE" — autorizado pela emenda. 567 testes verdes (+6 da CHOICE, −1 da regra revogada). |
+| 2026-07-24 | MVP-001 · [FIX] Tela de login fiel ao protótipo (#57) **e** MVP-003 · [FIX] Tailwind não varria `src/design` (#58) | [#59](https://github.com/RodReis/rrb-jarvisOS/pull/59) | 562 testes + 3 E2E verdes, sem asserção afrouxada. A tela de login era o **último lugar do app onde o MVP-003 não tinha chegado**: o placeholder da F03 (66 linhas, botão `sky-600`, card cinza) sobreviveu ao design system inteiro, apesar de o protótipo ter o markup completo, `SUPERFICIES_DE_MARCA` já prever `'login'` e o `Button` documentar `larguraTotal` como *"o 'ACESSAR' do login"*. O DS foi construído para esta tela e nunca foi aplicado nela. **E a lição de método do MVP-003 se repetiu inteira**: com os 562 testes verdes, a captura do app real mostrou quatro defeitos — a tela parando em 538px numa janela de 820px (o `div` do provider colapsa e `h-full` herda o valor errado), o botão sólido no acento tomando a tela, o mascote a 160px onde o protótipo pede 112px, e o texto do botão **quase preto sobre fundo escuro**. Esse último abriu o **#58**: o Tailwind v4 detecta sources a partir da pasta do CSS de entrada, e sem `@source` o `src/design/` inteiro estava fora do scanning — `text-[var(--jos-cor-texto)]` (37 usos), `disabled:opacity-45`, `mix-blend-screen` e os anéis do `VoiceMascot` nunca entraram no bundle. CSS 22,9 KB → **56,8 KB**. Diagnosticado por CDP (`CSS.getMatchedStylesForNode`), que mostrou o `button { color: inherit }` do reset como única regra de cor casando. É o **mesmo defeito da F06** (`@source '../patterns'` faltando no `prova.css`), agora na outra ponta: lá era a galeria, aqui era o app. Junto: `carbono.jpg` 1020 KB → 155 KB (o precedente de otimização da F06). |
+| 2026-07-23 | MVP-003 · F06 Adoção & hardening (#24) | [#51](https://github.com/RodReis/rrb-jarvisOS/pull/51) | Regras 230 (78.9%), Banco 132 (85.5%), Tela 210 (92.0%) — **+16 testes**. **Fecha o MVP-003 (8/8 entregues).** A jornada de 3 telas prova a tese do corte: CHOICE com as duas identidades lado a lado, NOA Hoje e JARVIS HUD nos dois modos, tudo com componentes públicos. E o hardening justificou o nome — **três defeitos que nenhum teste de papel pegaria**: o `@source '../patterns'` faltava no `prova.css` desde a F04a, deixando a camada sem CSS utilitário (os swatches `size-7` renderizavam a **2px**); o `vite.prova.config.ts` não declarava o alias `@design` que os outros três configs tinham, e a galeria inteira quebrou com `test`/`lint`/`typecheck` **verdes** — cada ferramenta tem seu próprio mapa de alias; e cinco `focus-visible:ring` que eu mesmo introduzi contra a constante `FOCO` do DS. Junto, a dívida da F05 quitada: assets de **2043 KB → 77 KB** (−96%). |
+| 2026-07-23 | MVP-003 · F04b Padrões operacionais (#22) | [#50](https://github.com/RodReis/rrb-jarvisOS/pull/50) | Regras 230 (78.9%), Banco 132 (85.5%), Tela 194 (91.2%) — **+30 testes**. A fatia da **fronteira dura**: risco e aprovação aqui são UI; quem decide é o Policy Engine no main. A headline é a redaction de texto — camada **nova**, não cópia do `redact()` do shared, que opera sobre objeto estruturado e deixa passar `Bearer sk-abc` no meio de uma string. E o próprio teste achou um bug na regex, do tipo pior: a regra parava em `Bearer` e produzia `Authorization: [redigido] xyz98765` — um vazamento que *parece limpo*, e por isso passa por revisão. A suíte documenta **os limites** em três testes: uma regex de segurança sem os seus limites escritos vira promessa falsa. No BYOK, quem recusa a chave é o **tipo** — `CredencialMascarada` não tem campo onde ela caiba. |
+| 2026-07-23 | MVP-003 · F04a AppShell + navegação (#21) | [#49](https://github.com/RodReis/rrb-jarvisOS/pull/49) | Regras 217 (78.3%), Banco 132 (85.5%), Tela 177 (91.0%) — **+13 testes**. **Re-plataforma** o shell da fundação, e a prova de que foi troca de pele e não de contrato são os testes que *não* mudaram: os 15 da SPEC-Fundacao-02 passam **sem uma linha alterada**. O grid do protótipo (`60px 232px 1fr`) é idêntico nos dois espaços — a base única aparecendo na maior peça do sistema. Duas decisões travadas por mutação: o sub-módulo do JARVIS é **derivado da rota** (estado próprio faria o rail acender um lado e a sidebar mostrar o outro) e o toggle de tema persiste pela via do Settings lendo o `resolvedTheme` do main, não a preferência crua. E a fatia esbarrou num **bug de três MVPs**: `navegacao.spec.ts` nunca havia rodado — 75 linhas do isolamento de rota fora de toda categoria desde o PR #28. Virou card próprio ([#47](https://github.com/RodReis/rrb-jarvisOS/issues/47) / PR [#48](https://github.com/RodReis/rrb-jarvisOS/pull/48)), sem misturar na fatia. |
+| 2026-07-23 | MVP-001 · [FIX] `include` de Regras não alcançava `src/renderer` (#47) | [#48](https://github.com/RodReis/rrb-jarvisOS/pull/48) | Regras **203 → 212** (+9). Os testes estavam corretos; nunca tinham sido executados. Achado durante a F04a: o teste novo do rail dual não rodava, e a investigação mostrou que os antigos também não. A `docs/TESTING.md` §2 repetia a omissão na tabela das categorias (dizia `src/shared` e `src/main`) — corrigida junto, com a lição registrada: *a categoria é definida pelo que o teste prova (a extensão), não pela pasta onde ele mora*. |
+| 2026-07-23 | MVP-003 · F05 Identidades NOA e JARVIS (#23) | [#46](https://github.com/RodReis/rrb-jarvisOS/pull/46) | Regras 203 (77.5%), Banco 132 (85.5%), Tela 169 (90.7%) — **+21 testes**. A tese "base única, 2 identidades" vira código verificável: o delta inteiro entre NOA e JARVIS é **dado** (`tokens/identidade.ts`), e há teste que varre a superfície de exportação do DS e falha se algum componente ganhar `noa`/`jarvis` no nome. A headline é um **defeito de contraste que o critério 5 achou**: a variante de leitura das semânticas era ajustada contra a superfície do *módulo ativo*, então a mesma semântica rendia cores diferentes nos dois espaços — e o `violet` do JARVIS media **4.45:1 sobre o fundo do NOA**, abaixo da régua. Uma semântica compartilhada legível em só um dos espaços não está compartilhada. O conserto (`fundoDeReferencia`, o mais exigente dos dois fundos) tem duas asserções de propósito: a igualdade sozinha passaria com duas cores igualmente ilegíveis. E de novo a **prova visual pegou o que os testes verdes não pegaram** — nove asserções falharam achando zero elementos, porque `FundoDaIdentidade` descartava o `data-prova-identidade` em silêncio; corrigido na raiz, não no seletor. |
+| 2026-07-23 | MVP-003 · F03b Componentes: dados + overlays + feedback (#20) | [#45](https://github.com/RodReis/rrb-jarvisOS/pull/45) | Regras 203 (78.2%), Banco 132 (85.5%), Tela 148 (90.4%) — **+53 testes** (os 15 de Banco vieram da `main`, do FIX #43).  A metade "saída/estrutura" do conjunto essencial: 14 componentes de dados, 5 overlays, 3 de feedback, o Toast unificado e as notificações. A headline é **o que o teste achou e a leitura do código não**: dois defeitos de a11y em componentes cujo próprio comentário afirmava a garantia que eles não davam. O Radix devolve o foco ao gatilho — **quando ele é dono do gatilho**; `Dialog`/`AlertDialog`/`Drawer` são controlados por prop e não têm `Trigger`, então o foco caía no `<body>` e quem navega por teclado voltava ao topo do documento a cada modal fechado. E um `<section>` sem nome acessível não vira `role="region"`: o `sr-only` do tom do `Panel` existia no DOM e nunca era lido. Ambos provados por mutação (4 testes vermelhos sem as correções). A fatia também firmou que **o critério "estado sem cor" não se prova medindo cor** — em jsdom a asserção mediria a string que o próprio componente escreveu; o que sobrevive ao daltonismo e ao leitor de tela é texto e papel ARIA, e é sobre isso que as 53 asserções falam. |
+| 2026-07-23 | MVP-003 · F03a Componentes: ações + formulários (#19) | [#42](https://github.com/RodReis/rrb-jarvisOS/pull/42) | Regras 203 (78.2%), Banco 117 (87.5%), Tela 95 (89.6%) — **+85 testes**. Os 16 componentes de ação e formulário. A fatia introduziu **três camadas de verificação**, e cada uma pegou o que a anterior não pegava: os testes de papel acharam o `aria-label` no lugar errado do slider; a **prova visual** achou o CSS não sendo gerado e o card do NOA invertido, **com os 91 testes de papel verdes**; o **`/impeccable critique`** achou 10 itens de contraste e hierarquia — incluindo a ação primária colapsando com a desabilitada em 2 dos 8 acentos da paleta. A lição que fica é sobre método: o rigor de contraste existia só no caminho do acento (a cor que o *usuário* escolhe) e não nos papéis que *nós* escolhemos. Agora são 41 asserções sobre todos os papéis × 2 módulos × 2 modos. |
+| 2026-07-23 | MVP-003 · F02 Foundations + ponte com o protótipo (#18) | [#40](https://github.com/RodReis/rrb-jarvisOS/pull/40) | Regras 158 (77.9%), Banco 117 (87.5%), Tela 55 (91.2%) — **+42 testes**. A ponte protótipo→código: 71 tokens × 2 modos **extraídos** (determinístico), não transcritos — 142 valores de cor à mão é onde o typo silencioso mora. Duas provas por mutação: sem a exceção da marca, 6 testes vermelhos; sem a regra de fronteira (F01), 6 vermelhos. As 8 cores da paleta × 2 fundos atingem 4.5:1 — paleta fechada permite afirmar sobre **todas**, não amostrar. Fontes baixadas e versionadas (78 KB) porque a CSP do renderer não aceita CDN e falharia em silêncio. Junto: `PRODUCT.md` (contexto de design via `/impeccable init`, a pedido do PI) documentando as **três camadas** — Desenvolvimento não é espaço de usuário. |
+| 2026-07-23 | MVP-003 · F01 Infra do design system (#17) | [#38](https://github.com/RodReis/rrb-jarvisOS/pull/38) | Regras 139 (75.0%), Banco 117 (87.5%), Tela 39 (93.6%) — **+16 testes**. **Abre o MVP-003.** Só esqueleto: três camadas, toolchain e fronteira, sem nenhum token ou componente de produto. O que a fatia realmente entrega é a **fronteira verificável** — `no-restricted-imports` escopada a `src/design/**` que quebra o `lint`, exercitada pelo ESLint real nos dois sentidos e provada por mutação (sem o bloco da regra, 6 casos ficam vermelhos). O teste guarda também o *escopo*: alargar o `files:` por engano quebraria o renderer, então há asserção de que um arquivo fora do DS continua livre para importar `@shared`. `tokens` é testado em `node` e não em jsdom — o ambiente é o que prova "sem React". |
 | 2026-07-22 | MVP-001 · F01 Bootstrap e estrutura (#2) | [#25](https://github.com/RodReis/rrb-jarvisOS/pull/25) | CI verde na 1ª execução. Relatório ADR-003 ativo: selfcheck 10/10, guarda anti-drift verificada nos dois sentidos. Regras 14 (85%), Tela 4 (100%), Banco 0 (F04). |
 | 2026-07-22 | MVP-001 · F06 Observabilidade e Logging (#8) | [#27](https://github.com/RodReis/rrb-jarvisOS/pull/27) | Regras 49 (87.2%), **Banco 8 (85.5%)**, Tela 13 (97.6%). A categoria **Banco deixa de estar vazia antes da F04**: os testes de integração do logger tocam disco real (arquivo temporário, teardown por teste), que é exatamente o que a categoria mede — o `TESTING.md` §8 previa SQLite como primeiro caso, mas a régua é "integração com storage local", não "SQLite". Verificado também no app real: os três arquivos nascem em `userData/logs` e o registro do renderer chega ao disco. |
 | 2026-07-22 | MVP-001 · F04 Dados + AuditEvent (#5) **e** F02 AppShell/workspaces (#3) | [#28](https://github.com/RodReis/rrb-jarvisOS/pull/28) | Regras 78 (86.6%), Banco 32 (89.5%), Tela 16 (98.5%). Duas fatias no mesmo PR por decisão do PI: o critério 4 da SPEC-04 exige `AuditEvent` de `workspace-switch`, cujo fluxo nasce na F02. Carimbo pela issue do primeiro `refs` (#5), como o CI extrai. Verificado no app real: schema v1, 2 triggers ativos, chave de auditoria cifrada por DPAPI no disco. **F03 não entrou** — bloqueada por credenciais (ver a seção da fatia). |
 | 2026-07-22 | MVP-001 · F05 Settings mínimo (#6) | [#29](https://github.com/RodReis/rrb-jarvisOS/pull/29) | Regras 83 (84.0%), Banco 45 (89.6%), Tela 22 (95.5%). Fecha o MVP-001 **exceto a F03**. Primeira migration incremental do projeto (v1 → v2) exercitada sobre banco real com dado gravado — o log registrou `Migrations aplicadas {"quantidade":1}` e o perfil sobreviveu. Corrigiu um bug latente da F04: o upsert do perfil sobrescrevia `locale`/`theme` a cada boot. |
+| 2026-07-22 | MVP-002 · F05 Motor de execução simulado (#14) | [#37](https://github.com/RodReis/rrb-jarvisOS/pull/37) | Regras 137 (74.8%), Banco 109 (87.5%), Tela 33 (93.5%) — **+16 testes**. **Fecha o MVP-002 (5/5 entregues).** A headline: junta F02 (classifica), F03 (allowlist) e F04 (definições) num motor que percorre etapas **sem tocar recurso real**. O invariante foi provado pelo efeito, não pela intenção: a etapa "gravar arquivo" roda e o arquivo não existe; a listagem do diretório é idêntica antes/depois. Modo report ponta a ponta — etapa `bloqueado` não barra o run. |
+| 2026-07-22 | MVP-002 · F04 Registro de workflows + automações (#13) | [#36](https://github.com/RodReis/rrb-jarvisOS/pull/36) | Regras 134 (74.7%), Banco 96 (85.3%), Tela 33 (93.5%) — **+14 testes**. Catálogo RF-006/007 (schema pleno), migration 4 (`workflow`/`automation`, etapas em JSON). Nada executa: ativar muda status, não roda etapa; cron registra sem agendar. Edição classificada (F02) + auditada (`workflow-change`/`automation-change`). Elo 04→02→05 provado: etapa carrega `ActionId` da taxonomia. 9 canais IPC novos — as listas da ponte (preload.spec, E2E) pegaram todos. |
+| 2026-07-22 | MVP-002 · F03 Diretórios permitidos (allowlist) (#12) | [#35](https://github.com/RodReis/rrb-jarvisOS/pull/35) | Regras 129 (78.2%), Banco 87 (86.8%), Tela 33 (93.5%) — **+35 testes**. Checagem dividida: `isPathAllowed` pura (Regras) + canonicalização com symlink no main (Banco). Anti-escape provado com symlink real apontando pra fora. Default de fábrica = só o `userData`, invariante. Add/remove auditado (`allowlist-change`). Integração F02: `pathAllowed:false` eleva o tier, `evaluate` segue puro. Junto: **[INFRA] cache do binário do Electron** (commit `c37a5f0`, ~2-3 min a menos no CI) e o card **#34** para separar o E2E em job próprio. |
+| 2026-07-22 | MVP-002 · F02 Policy Engine (classificação) (#11) | [#33](https://github.com/RodReis/rrb-jarvisOS/pull/33) | Regras 107 (77.0%), Banco 74 (87.0%), Tela 33 (93.5%) — **+21 testes**. Backbone das fatias 03/05 do MVP-002. Núcleo `evaluate` puro (Regras) + `PolicyService` que audita cada decisão (Banco). Taxonomia como seed dos requisitos § Ações Possíveis — dado, não hardcode. Fail-closed na classificação: desconhecido ⇒ `bloqueado`. Modo report: nada barra (mesmo `bloqueado` volta ao chamador). Canal `policy:classify` provou a fronteira — o E2E e o `preload.spec` que listam a superfície da ponte pegaram o método novo, como esperado. |
+| 2026-07-22 | MVP-002 · F01 Supabase local + ambiente de sync (#15) | [#32](https://github.com/RodReis/rrb-jarvisOS/pull/32) | Regras 92 (79.6%), **Banco 68 (87.0%)**, Tela 33 (93.5%). Abre o MVP-002. Os 8 testes novos entram na categoria Banco: RLS real, contra a stack Docker, com JWT de usuário final pelo PostgREST — nunca a conexão do owner, que pularia RLS e faria tudo passar sem provar nada. A prova de que os testes provam algo veio por **mutação**: com `user_profile` sem RLS, dois deles ficam vermelhos. O CI passou a subir a stack (`supabase/setup-cli` + `supabase start`), e o teste **falha em vez de pular** quando `CI` está setado — sem isso, uma stack que não sobe deixaria o CI verde sobre RLS não testada. |
 | 2026-07-22 | MVP-001 · F03 Autenticação Google local-first (#4) | [#30](https://github.com/RodReis/rrb-jarvisOS/pull/30) | Regras 92 (79.6%), Banco 60 (87.0%), Tela 33 (93.5%) — **185 testes** contando os 3 E2E. **Fecha o MVP-001 (6/6 entregues).** Desbloqueada no mesmo dia, quando o PI criou as credenciais. A **categoria E2E deixa de contar 0**: o Playwright-Electron sobe o app empacotado e prova, com preload e IPC reais, que o shell não monta sem sessão e que a ponte não expõe caminho até o token. Dois achados de ambiente custaram tempo e ficaram registrados: `ELECTRON_RUN_AS_NODE` herdado do shell faz o Electron subir como Node puro (erro se disfarça de falha de bundle), e `close()`/`quit()` travam o teardown — o app vive no tray e os timers do `winston-daily-rotate-file` seguram o event loop. |

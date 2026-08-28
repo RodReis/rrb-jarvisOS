@@ -5,7 +5,16 @@ import { AuthService } from './auth/auth-service'
 import { createSupabaseClient, readSupabaseConfig } from './auth/supabase-client'
 import { SafeStorageTokenVault } from './auth/token-vault'
 import { registerIpcHandlers } from './ipc/handlers'
+import { AllowlistRepository } from './policy/allowlist-repository'
+import { canonicalize } from './policy/allowlist-canon'
+import { PolicyService } from './policy/policy-service'
 import { PreferencesService } from './preferences/preferences-service'
+import { WorkflowService } from './workflows/workflow-service'
+import { WorkflowRepository } from './workflows/workflow-repository'
+import { AutomationRepository } from './workflows/automation-repository'
+import { SimulationEngine } from './execution/simulation-engine'
+import { ExecutionRepository } from './execution/execution-repository'
+import { carregarEnv } from './env'
 import { closeLogger, initLogger, log } from './logging/logger'
 import { initRendererLogBridge } from './logging/renderer-bridge'
 import { LOCAL_USER_ID, LOCAL_USER_PROFILE } from './storage/local-user'
@@ -46,6 +55,21 @@ if (!app.requestSingleInstanceLock()) {
       plataforma: process.platform
     })
 
+    /*
+     * Carga do `.env` (FIX #43), depois do logger e **antes** de `criarAuthService`, que é o
+     * primeiro a ler `process.env`. Depois do logger de propósito: `writeLog` engole a linha
+     * enquanto o logger não existe, e "o arquivo foi lido?" foi exatamente a pergunta que este
+     * bug deixou sem resposta por uma fatia inteira — o sinal precisa chegar ao disco.
+     *
+     * Só fora do empacotado: um app instalado lê configuração do sistema, não um arquivo de
+     * desenvolvimento ao lado do binário. Vão para o log os **nomes** das chaves, nunca os
+     * valores, que são credenciais.
+     */
+    if (!app.isPackaged) {
+      const aplicadas = carregarEnv(join(app.getAppPath(), '.env'))
+      log.sistema.info('Carga do .env concluída', { chaves: aplicadas })
+    }
+
     // Storage depois do logger, antes dos handlers — que já podem consultá-lo.
     const storage = initStorage(app.getPath('userData'))
     // Usuário local da fundação: continua sendo a identidade de quem ainda não entrou.
@@ -68,11 +92,47 @@ if (!app.requestSingleInstanceLock()) {
     const preferences = new PreferencesService(storage.profiles, LOCAL_USER_ID, () =>
       nativeTheme.shouldUseDarkColors ? 'escuro' : 'claro'
     )
+    // Policy Engine (SPEC-Execucao-02): classifica e audita a decisão. Modo report — não
+    // bloqueia nesta fatia. Compartilha o mesmo `userIdAtual` para a auditoria ser escopada.
+    const policy = new PolicyService(storage.audit, userIdAtual)
+    // Allowlist de diretórios (SPEC-Execucao-03). O default de fábrica é o `userData`, já
+    // canonizado — o repositório compara paths canônicos, então a base tem de ser uma.
+    const allowlist = new AllowlistRepository(
+      storage.db,
+      storage.audit,
+      canonicalize(app.getPath('userData'))
+    )
+    // Registro de workflows/automações (SPEC-Execucao-04). Catálogo — nada executa. Compartilha
+    // policy/audit/userId para a edição ser classificada e auditada no escopo do usuário.
+    const workflowRepo = new WorkflowRepository(storage.db)
+    const workflowsService = new WorkflowService(
+      workflowRepo,
+      new AutomationRepository(storage.db),
+      policy,
+      storage.audit,
+      userIdAtual
+    )
+    // Motor de execução simulada (SPEC-Execucao-05): junta F02 (classifica), F03 (allowlist)
+    // e F04 (definições). **Zero efeito colateral** — nada toca FS, rede ou terminal.
+    const runs = new ExecutionRepository(storage.db)
+    const execution = new SimulationEngine(
+      workflowRepo,
+      policy,
+      allowlist,
+      runs,
+      storage.audit,
+      userIdAtual
+    )
 
     registerIpcHandlers({
       audit: storage.audit,
       workspaces,
       preferences,
+      policy,
+      allowlist,
+      workflows: workflowsService,
+      execution,
+      runs,
       userId: userIdAtual,
       auth,
       minimizeToTray: () => janela?.hide()

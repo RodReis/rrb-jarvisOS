@@ -8,12 +8,47 @@ import {
 } from '@shared/contracts/ipc'
 import { AUTH_MENSAGENS, type AuthSnapshot } from '@shared/contracts/auth'
 import { parseLogInput } from '@shared/contracts/logging-input'
+import { isSensitivity, type PolicyContext, type PolicyDecision } from '@shared/policies'
 import { isWorkspaceId, type AuditEvent, type AuditEventType } from '@shared/domain/entities'
 import type { AuthService } from '../auth/auth-service'
 import { log, writeLog } from '../logging/logger'
+import type { AllowlistRepository } from '../policy/allowlist-repository'
+import type { PolicyService } from '../policy/policy-service'
+import type { WorkflowService } from '../workflows/workflow-service'
+import type { SimulationEngine } from '../execution/simulation-engine'
+import type { ExecutionRepository } from '../execution/execution-repository'
+import type { ExecutionRun } from '@shared/domain/execution'
+import { isWorkflowStatus } from '@shared/domain/workflows'
+import type { Automation, AutomationInput, Workflow, WorkflowInput } from '@shared/domain/workflows'
 import type { PreferencesService } from '../preferences/preferences-service'
 import type { AuditRepository } from '../storage/audit-repository'
 import type { WorkspaceService } from '../workspace/workspace-service'
+
+/**
+ * Normaliza o contexto de política vindo do renderer (fronteira de confiança).
+ *
+ * `workspace` fora do enum vira `jarvis` — o espaço **mais restrito** para a regra de
+ * sensibilidade (CONVENTION §2). Na dúvida sobre o ambiente, tratar como JARVIS é a escolha
+ * fail-safe: erra para mais cauteloso, nunca para menos. `sensitivity` inválida é descartada
+ * (vira `undefined`); `detail` só passa se for objeto — o `PolicyService` o redige depois.
+ */
+function parsePolicyContext(value: unknown): PolicyContext {
+  const source =
+    typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {}
+
+  const workspace = source['workspace'] === 'noa' ? 'noa' : 'jarvis'
+  const sensitivity = isSensitivity(source['sensitivity']) ? source['sensitivity'] : undefined
+  const detail =
+    typeof source['detail'] === 'object' && source['detail'] !== null
+      ? (source['detail'] as Record<string, unknown>)
+      : undefined
+
+  return {
+    workspace,
+    ...(sensitivity ? { sensitivity } : {}),
+    ...(detail ? { detail } : {})
+  }
+}
 
 /** Monta o payload público do app. Sem segredo, sem caminho de disco, sem env cru. */
 export function buildAppInfo(): AppInfo {
@@ -41,6 +76,16 @@ export interface IpcDependencies {
    * congelaria o id do boot e faria a UI listar a auditoria de quem não está logado.
    */
   readonly userId: () => string
+  /** Policy Engine (SPEC-Execucao-02): classifica e audita a decisão, não bloqueia. */
+  readonly policy: PolicyService
+  /** Allowlist de diretórios (SPEC-Execucao-03): edição auditada, checagem no main. */
+  readonly allowlist: AllowlistRepository
+  /** Registro de workflows/automações (SPEC-Execucao-04): CRUD classificado + auditado. */
+  readonly workflows: WorkflowService
+  /** Motor de execução simulada (SPEC-Execucao-05): zero efeito colateral. */
+  readonly execution: SimulationEngine
+  /** Runs persistidos, para a UI listar o histórico. */
+  readonly runs: ExecutionRepository
   /** Ausente quando as credenciais não estão configuradas — o app roda sem login. */
   readonly auth?: AuthService
   /** Minimizar para o tray. Injetado porque a janela nasce depois dos handlers. */
@@ -204,6 +249,147 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 
     return await deps.auth.logout()
   })
+
+  // Policy Engine (SPEC-Execucao-02, critério 7): o renderer não avalia política — pede,
+  // o main classifica e audita, e devolve a decisão. Modo report: nada é barrado aqui.
+  ipcMain.handle(
+    IPC_CHANNELS.policyClassify,
+    (_event, action: unknown, context: unknown): PolicyDecision => {
+      // Fronteira de confiança: `action` e `context` vêm do renderer. Ação inválida não é
+      // erro a estourar — é o próprio caso fail-closed: o `evaluate` a trata como
+      // desconhecida (`bloqueado`). O que se valida aqui é a *forma* do contexto.
+      const acao = typeof action === 'string' ? action : ''
+      const ctx = parsePolicyContext(context)
+
+      log.agent.info('Classificação de política solicitada', {
+        canal: IPC_CHANNELS.policyClassify,
+        direction: 'in',
+        action: acao
+      })
+
+      return deps.policy.classify(acao, ctx)
+    }
+  )
+
+  // Allowlist de diretórios (SPEC-Execucao-03, critério 5). O renderer nunca toca o FS nem
+  // a tabela: lê e edita por aqui, e a checagem/persistência ficam no main. Os três
+  // devolvem a lista atualizada, para a UI refletir sem um segundo round-trip.
+  ipcMain.handle(IPC_CHANNELS.allowlistList, (): readonly string[] => {
+    return deps.allowlist.list(deps.userId())
+  })
+
+  ipcMain.handle(IPC_CHANNELS.allowlistAdd, (_event, path: unknown): readonly string[] => {
+    // `path` vem do renderer (fronteira de confiança). String vazia/não-string não vira
+    // erro: o repositório canoniza e a checagem downstream barra o que resolver pra fora.
+    const alvo = typeof path === 'string' ? path : ''
+    if (alvo) deps.allowlist.add(deps.userId(), alvo)
+    return deps.allowlist.list(deps.userId())
+  })
+
+  ipcMain.handle(IPC_CHANNELS.allowlistRemove, (_event, path: unknown): readonly string[] => {
+    const alvo = typeof path === 'string' ? path : ''
+    if (alvo) deps.allowlist.remove(deps.userId(), alvo)
+    return deps.allowlist.list(deps.userId())
+  })
+
+  // Registro de workflows/automações (SPEC-Execucao-04, critério 7). CRUD de definições —
+  // nada executa. `workspace` vem do renderer: validado contra o enum fechado antes de
+  // tocar o serviço; o resto do input o serviço/repositório trata (JSON de etapas etc.).
+  ipcMain.handle(IPC_CHANNELS.workflowList, (_event, workspace: unknown): readonly Workflow[] => {
+    if (!isWorkspaceId(workspace)) return []
+    return deps.workflows.listWorkflows(workspace)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.workflowCreate, (_event, input: unknown): Workflow => {
+    // O input carrega workspace + etapas. Validamos o workspace (fronteira); as etapas são
+    // dados de catálogo que o repositório serializa — não há execução a proteger aqui.
+    const pedido = input as Omit<WorkflowInput, 'user_id'>
+    if (!isWorkspaceId(pedido?.workspace_id)) {
+      throw new Error('Workspace inválido.')
+    }
+    return deps.workflows.createWorkflow(pedido)
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.workflowUpdate,
+    (_event, id: unknown, patch: unknown): Workflow | undefined => {
+      if (typeof id !== 'string') return undefined
+      return deps.workflows.updateWorkflow(id, (patch ?? {}) as Partial<Workflow>)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.workflowSetStatus,
+    (_event, id: unknown, status: unknown): Workflow | undefined => {
+      if (typeof id !== 'string' || !isWorkflowStatus(status)) return undefined
+      return deps.workflows.setWorkflowStatus(id, status)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.workflowRemove,
+    (_event, id: unknown, workspace: unknown): boolean => {
+      if (typeof id !== 'string' || !isWorkspaceId(workspace)) return false
+      return deps.workflows.removeWorkflow(id, workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.automationList,
+    (_event, workspace: unknown): readonly Automation[] => {
+      if (!isWorkspaceId(workspace)) return []
+      return deps.workflows.listAutomations(workspace)
+    }
+  )
+
+  ipcMain.handle(IPC_CHANNELS.automationCreate, (_event, input: unknown): Automation => {
+    const pedido = input as Omit<AutomationInput, 'user_id'>
+    if (!isWorkspaceId(pedido?.workspace_id)) {
+      throw new Error('Workspace inválido.')
+    }
+    return deps.workflows.createAutomation(pedido)
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.automationSetEnabled,
+    (_event, id: unknown, enabled: unknown): Automation | undefined => {
+      if (typeof id !== 'string') return undefined
+      return deps.workflows.setAutomationEnabled(id, enabled === true)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.automationRemove,
+    (_event, id: unknown, workspace: unknown): boolean => {
+      if (typeof id !== 'string' || !isWorkspaceId(workspace)) return false
+      return deps.workflows.removeAutomation(id, workspace)
+    }
+  )
+
+  // Execução simulada (SPEC-Execucao-05, critério 7). O renderer só dispara e lê; o motor
+  // roda no main e não toca recurso real. Gatilho manual — nada é agendado.
+  ipcMain.handle(
+    IPC_CHANNELS.executionRun,
+    (_event, workflowId: unknown, workspace: unknown): ExecutionRun => {
+      if (typeof workflowId !== 'string' || !isWorkspaceId(workspace)) {
+        throw new Error('Parâmetros inválidos para execução simulada.')
+      }
+      log.agent.info('Execução simulada solicitada pela interface', {
+        canal: IPC_CHANNELS.executionRun,
+        direction: 'in',
+        workflowId
+      })
+      return deps.execution.runWorkflow(workflowId, workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.executionList,
+    (_event, workspace: unknown): readonly ExecutionRun[] => {
+      if (!isWorkspaceId(workspace)) return []
+      return deps.runs.list(deps.userId(), workspace)
+    }
+  )
 
   // Só de ida: o renderer manda o registro, o main grava. Sem resposta de propósito —
   // esperar confirmação de log tornaria a UI refém do disco.

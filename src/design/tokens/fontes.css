@@ -1,0 +1,327 @@
+/*
+ * Tipografia do design system (SPEC-DesignSystem-02, critério 5; README §3).
+ *
+ * As três famílias do protótipo, **servidas localmente**. O README §3 as importa do Google
+ * Fonts por CDN, mas duas regras do projeto barram isso: o app é local-first e tem de abrir
+ * offline com a fonte certa (CLAUDE.md), e a CSP do renderer declara `font-src 'self' data:`
+ * — sem host remoto (critério de aceite da SPEC-Fundacao-01). Um `@import` de CDN falharia
+ * silenciosamente e a UI cairia na fonte de sistema sem nada avisar.
+ *
+ * Só o subset **latin**: o app é pt-BR e os subsets devanagari/latin-ext do Rajdhani
+ * triplicariam o peso sem uso. Michroma e Share Tech Mono, SIL Open Font License 1.1;
+ * Rajdhani, SIL OFL 1.1 — redistribuição permitida.
+ */
+
+@font-face {
+  font-family: 'Michroma';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../../renderer/assets/fonts/michroma-latin.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Rajdhani';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('../../renderer/assets/fonts/rajdhani-500-latin.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Rajdhani';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../../renderer/assets/fonts/rajdhani-600-latin.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Rajdhani';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../../renderer/assets/fonts/rajdhani-700-latin.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Share Tech Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../../renderer/assets/fonts/sharetechmono-latin.woff2') format('woff2');
+}
+
+/*
+ * Algarismos tabulares (critério 5).
+ *
+ * Custo, tokens e duração mudam a cada tick; com algarismos proporcionais o número "dança"
+ * horizontalmente a cada atualização. Tabular trava a largura do dígito — é legibilidade em
+ * dado que muda, não preciosismo tipográfico.
+ */
+.jos-numero {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+/*
+ * Label pequena — README §3: "toda label pequena e caption é Share Tech Mono em UPPERCASE com
+ * letter-spacing 1.5–3px e cor --tx-dim".
+ */
+.jos-label {
+  font-family: var(--jos-fonte-mono);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--jos-cor-texto-suave);
+}
+
+/*
+ * `prefers-reduced-motion` (critério 6; PRD §14.2).
+ *
+ * Zera as durações **no token**, não em cada animação: quem anima lê `--jos-duracao-*`, então
+ * anular a variável desliga o movimento em toda a árvore de uma vez. Caçar `animation` por
+ * componente deixaria passar o próximo componente que alguém escrever.
+ *
+ * `0.01ms` em vez de `0`: duração zero cancela o evento `transitionend`, e componente que
+ * espera esse evento para limpar estado ficaria travado. É a diferença entre "instantâneo" e
+ * "nunca aconteceu".
+ */
+/*
+ * Faixa deslizante do Progress indeterminado (SPEC-DesignSystem-03b).
+ *
+ * Uma barra sem valor conhecido não pode mostrar largura fixa — a faixa varre a trilha para
+ * dizer "algo está acontecendo, sem previsão de fim". `transform` e não `left`: propriedade de
+ * compositor, não de layout.
+ */
+@keyframes deslizar {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+/*
+ * Entradas dos overlays (SPEC-DesignSystem-03b).
+ *
+ * `surgir` para modais e popovers (fade + leve escala); `entrar-direita`/`entrar-esquerda` para
+ * a gaveta. Todos usam só `opacity` e `transform` — propriedades de compositor. Reveladas por
+ * `data-[state=open]`, então o conteúdo já está no DOM quando a animação corre: a animação é
+ * enfeite da entrada, nunca gate da visibilidade (headless render e aba oculta não a executam,
+ * e o overlay tem de aparecer mesmo assim).
+ */
+@keyframes aparecer {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes surgir {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes entrar-direita {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes entrar-esquerda {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/*
+ * Toast (SPEC-DesignSystem-03b, README §5.2).
+ *
+ * `toast-in`: entrada por slide-x + escala. `toast-barra`: a barra de progresso inferior encolhe
+ * de 100% a 0 no tempo do toast, dando ao usuário a pista visual de quanto falta para fechar. As
+ * duas usam só `transform` — a barra escala em X em vez de animar `width` (compositor, não
+ * layout). O sheen diagonal do protótipo é `toast-sheen`, e fica sob `motion-safe` no componente.
+ */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes toast-barra {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+/*
+ * Mascote (SPEC-DesignSystem-05; README §6 tabela de animações, `JARVISOS.md §3.2`).
+ *
+ * Loops ambientais, na faixa de 2–30s do README §6 — não são feedback de ação, e por isso são
+ * lentos: um loop rápido no canto da tela vira distração permanente. Todos animam só `transform`
+ * e `opacity`; o bloco de `prefers-reduced-motion` abaixo os zera junto com o resto.
+ *
+ * `spin`/`spinr` giram os dois anéis em sentidos opostos — é o que dá a leitura de "sistema
+ * ativo" sem indicar progresso, que seria mentira: o mascote não sabe quanto falta de nada.
+ */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes spinr {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+/* Glow do núcleo — respira. Opacidade só, para não deslocar nada em volta. */
+@keyframes corepulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.75;
+  }
+}
+
+/* Flutuação vertical do mascote. Amplitude pequena de propósito: presença, não salto. */
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+/*
+ * Boca falando (`talk`) e olhos.
+ *
+ * O `animation-play-state` é que segue o estado `speaking` (protótipo `JARVISOS.md §3.2`): a
+ * animação existe sempre e é **pausada** quando calado, em vez de montada/desmontada. Trocar o
+ * play-state não recomeça o ciclo — remontar faria a boca saltar para o quadro zero a cada
+ * palavra.
+ */
+@keyframes talk {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes eyeblink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  96% {
+    transform: scaleY(0.1);
+  }
+}
+
+/*
+ * Atmosfera do Login (protótipo, `data-screen-label="Login"`; README §6 tabela de animações).
+ *
+ * Quatro loops ambientais que dão à tela de entrada a leitura de "sistema vivo, ainda não
+ * aberto". Todos na faixa de 2–30s do README §6 — a tela de login é onde o usuário *espera*, e
+ * um loop rápido aqui vira ansiedade, não presença. Como o resto do arquivo, animam só
+ * `transform` e `opacity`; o bloco de `prefers-reduced-motion` abaixo os zera junto.
+ *
+ * O card e o rodapé usam `riseIn` **uma vez** (`both`), não em loop: é entrada, não ambiente.
+ */
+
+/* Ken Burns do fundo carbono — zoom+pan de 28s em `alternate`, sem corte de volta ao início. */
+@keyframes kb {
+  0% {
+    transform: scale(1) translate(0, 0);
+  }
+  100% {
+    transform: scale(1.12) translate(-1.5%, 1.5%);
+  }
+}
+
+/*
+ * Brilho diagonal varrendo a tela. Sai de fora e volta a sair — os 45% restantes do ciclo são
+ * a pausa: sem ela o brilho passaria de novo antes de o olho esquecer o anterior, e o efeito
+ * viraria estroboscópio.
+ */
+@keyframes sheen {
+  0% {
+    transform: translateX(-140%) skewX(-18deg);
+  }
+  55%,
+  100% {
+    transform: translateX(240%) skewX(-18deg);
+  }
+}
+
+/* Pontos de status respirando. Só opacidade — um ponto que mudasse de tamanho pediria atenção. */
+@keyframes dotpulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* Entrada do card e do rodapé: sobem e aparecem. Executa uma vez (`both` preserva o estado). */
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --jos-duracao-rapida: 0.01ms;
+    --jos-duracao-media: 0.01ms;
+    --jos-duracao-lenta: 0.01ms;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

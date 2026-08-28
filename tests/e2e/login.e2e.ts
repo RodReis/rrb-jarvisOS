@@ -122,18 +122,33 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
   })
 
   expect(superficie.metodos).toEqual([
+    'addAllowedDirectory',
+    'classifyAction',
+    'createAutomation',
+    'createWorkflow',
     'getAppInfo',
     'getAuth',
     'getPreferences',
     'getWorkspace',
+    'listAllowedDirectories',
     'listAuditEvents',
+    'listAutomations',
+    'listExecutionRuns',
+    'listWorkflows',
     'login',
     'logout',
     'minimizeToTray',
     'onAuthChanged',
+    'removeAllowedDirectory',
+    'removeAutomation',
+    'removeWorkflow',
+    'runWorkflowSimulated',
     'savePreferences',
     'sendLog',
+    'setAutomationEnabled',
+    'setWorkflowStatus',
     'switchWorkspace',
+    'updateWorkflow',
     'verifyAuditChain'
   ])
 

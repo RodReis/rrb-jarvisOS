@@ -8,6 +8,7 @@
  */
 
 import type {
+  AccentColor,
   AuditEvent,
   AuditEventType,
   Locale,
@@ -18,6 +19,15 @@ import type {
 } from '../domain/entities'
 import type { AuthSnapshot } from './auth'
 import type { LogInput } from './logging'
+import type { PolicyContext, PolicyDecision } from '../policies/contracts'
+import type {
+  Automation,
+  AutomationInput,
+  Workflow,
+  WorkflowInput,
+  WorkflowStatus
+} from '../domain/workflows'
+import type { ExecutionRun } from '../domain/execution'
 
 /** Canais de request/response (renderer → main → renderer). */
 export const IPC_CHANNELS = {
@@ -48,7 +58,42 @@ export const IPC_CHANNELS = {
    */
   authLogin: 'auth:login',
   /** Revoga a sessão, apaga os tokens e volta para `deslogado` (critério 3). */
-  authLogout: 'auth:logout'
+  authLogout: 'auth:logout',
+  /**
+   * Classifica uma ação pelo Policy Engine e devolve a `PolicyDecision` (SPEC-Execucao-02,
+   * critério 7). O `evaluate` roda no **main** — o renderer nunca avalia política, só lê o
+   * resultado. Modo report: a decisão é auditada, mas nada é barrado nesta fatia.
+   */
+  policyClassify: 'policy:classify',
+  /**
+   * Allowlist de diretórios permitidos (SPEC-Execucao-03, critério 5). O renderer **não**
+   * lê/edita FS nem a allowlist direto — vê e edita via estes canais; a checagem e a
+   * persistência vivem no main. `add`/`remove` auditam (ADR-004).
+   */
+  allowlistList: 'allowlist:list',
+  allowlistAdd: 'allowlist:add',
+  allowlistRemove: 'allowlist:remove',
+  /**
+   * Registro de workflows e automações (SPEC-Execucao-04, critério 7). CRUD de **definições**
+   * — nada executa. O renderer nunca toca o storage: vê e edita por aqui, e criar/alterar/
+   * toggle é classificado (F02) + auditado no main.
+   */
+  workflowList: 'workflow:list',
+  workflowCreate: 'workflow:create',
+  workflowUpdate: 'workflow:update',
+  workflowSetStatus: 'workflow:set-status',
+  workflowRemove: 'workflow:remove',
+  automationList: 'automation:list',
+  automationCreate: 'automation:create',
+  automationSetEnabled: 'automation:set-enabled',
+  automationRemove: 'automation:remove',
+  /**
+   * Execução simulada (SPEC-Execucao-05, critério 7). O renderer **dispara** o run por
+   * gatilho manual e lê o `ExecutionRun`/trace; o motor roda no **main**. Zero efeito
+   * colateral — nada toca FS, rede, terminal ou provider.
+   */
+  executionRun: 'execution:run',
+  executionList: 'execution:list'
 } as const
 
 /**
@@ -125,11 +170,17 @@ export interface WorkspaceSwitchResult {
  * `theme` é a preferência (`claro`/`escuro`/`sistema`); `resolvedTheme` é o que pintar
  * agora. A resolução acontece no main porque é ele quem enxerga o `nativeTheme` do SO —
  * o renderer não deve consultar o sistema por conta própria.
+ *
+ * `accentNoa`/`accentJarvis` vêm **já resolvidos**: nunca `null` aqui. Onde o `UserProfile` guarda
+ * `null` ("não escolheu"), o main aplica o `ACENTO_PADRAO` do DS antes de mandar — o renderer
+ * recebe sempre uma cor pintável, sem precisar conhecer o valor de fábrica.
  */
 export interface PreferencesSnapshot {
   readonly locale: Locale
   readonly theme: ThemePreference
   readonly resolvedTheme: ResolvedTheme
+  readonly accentNoa: AccentColor
+  readonly accentJarvis: AccentColor
 }
 
 /**
@@ -162,6 +213,50 @@ export interface JarvisBridge {
 
   /** Pede ao main para minimizar a janela para o tray. */
   minimizeToTray(): void
+
+  /**
+   * Classifica uma ação pelo Policy Engine (SPEC-Execucao-02, critério 7). O `evaluate`
+   * roda no main; a UI só lê a `PolicyDecision`. Nesta fatia a decisão é auditada e
+   * devolvida, **nunca** barra a execução (modo report).
+   */
+  classifyAction(action: string, context: PolicyContext): Promise<PolicyDecision>
+
+  /**
+   * Allowlist de diretórios (SPEC-Execucao-03, critério 5). O renderer vê e edita a lista
+   * por aqui; a checagem de FS e a persistência ficam no main. `add`/`remove` auditam.
+   * Devolvem a lista atualizada de paths canônicos permitidos.
+   */
+  listAllowedDirectories(): Promise<readonly string[]>
+  addAllowedDirectory(path: string): Promise<readonly string[]>
+  removeAllowedDirectory(path: string): Promise<readonly string[]>
+
+  /**
+   * Registro de workflows e automações (SPEC-Execucao-04, critério 7). CRUD de definições;
+   * nada executa. `create`/`update`/`setStatus`/`setEnabled`/`remove` classificam (F02) e
+   * auditam no main. O `WorkflowInput`/`AutomationInput` da UI não traz `user_id` — o main o
+   * resolve pela sessão corrente.
+   */
+  listWorkflows(workspace: WorkspaceId): Promise<readonly Workflow[]>
+  createWorkflow(input: Omit<WorkflowInput, 'user_id'>): Promise<Workflow>
+  updateWorkflow(
+    id: string,
+    patch: Partial<Pick<Workflow, 'name' | 'steps' | 'triggers' | 'schedule'>>
+  ): Promise<Workflow | undefined>
+  setWorkflowStatus(id: string, status: WorkflowStatus): Promise<Workflow | undefined>
+  removeWorkflow(id: string, workspace: WorkspaceId): Promise<boolean>
+
+  listAutomations(workspace: WorkspaceId): Promise<readonly Automation[]>
+  createAutomation(input: Omit<AutomationInput, 'user_id'>): Promise<Automation>
+  setAutomationEnabled(id: string, enabled: boolean): Promise<Automation | undefined>
+  removeAutomation(id: string, workspace: WorkspaceId): Promise<boolean>
+
+  /**
+   * Dispara um workflow em **modo simulado** (SPEC-Execucao-05) e devolve o `ExecutionRun`
+   * com o trace por etapa. Gatilho manual — nada é agendado. **Zero efeito colateral:** o
+   * motor não toca FS, rede, terminal nem provider.
+   */
+  runWorkflowSimulated(workflowId: string, workspace: WorkspaceId): Promise<ExecutionRun>
+  listExecutionRuns(workspace: WorkspaceId): Promise<readonly ExecutionRun[]>
 }
 
 /** Nome da propriedade exposta via contextBridge no renderer. */

@@ -1,6 +1,26 @@
 @import 'tailwindcss';
 
 /*
+ * O design system precisa ser declarado como fonte de classes.
+ *
+ * O Tailwind v4 detecta os arquivos a varrer a partir da **pasta do CSS de entrada** — aqui,
+ * `src/renderer/`. `src/design/` fica fora dessa raiz, então nenhuma classe usada apenas por um
+ * componente do DS entrava no bundle: o CSS era gerado sem elas e o componente renderizava com
+ * a regra faltando, em silêncio.
+ *
+ * O efeito medido no app real (F06+, card [FIX] #57): `text-[var(--jos-cor-texto)]` do `Button`
+ * não existia no CSS, então todo botão secundário caía no `button { color: inherit }` do reset e
+ * herdava a cor do `body` — texto quase preto sobre superfície escura. Junto com ele faltavam
+ * `disabled:opacity-45` (o estado desabilitado não escurecia), `mix-blend-screen` e os anéis do
+ * `VoiceMascot`. Verificado por contagem: 4 de 4 classes exclusivas de `src/design/` ausentes do
+ * `out/renderer/assets/index-*.css`.
+ *
+ * Nada disso aparecia nos 562 testes porque jsdom não aplica folha de estilo, e não aparecia na
+ * revisão porque o CSS que falta não deixa erro — deixa um componente sutilmente errado.
+ */
+@source '../../../design';
+
+/*
  * Tema claro/escuro (SPEC-Fundacao-05). O sistema de tokens completo é o MVP-003; aqui
  * ficam só as superfícies e a cor de texto que o shell precisa.
  *

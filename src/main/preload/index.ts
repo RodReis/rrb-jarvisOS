@@ -12,6 +12,15 @@ import {
 } from '@shared/contracts/ipc'
 import type { AuthSnapshot } from '@shared/contracts/auth'
 import type { LogInput } from '@shared/contracts/logging'
+import type { PolicyContext, PolicyDecision } from '@shared/policies'
+import type {
+  Automation,
+  AutomationInput,
+  Workflow,
+  WorkflowInput,
+  WorkflowStatus
+} from '@shared/domain/workflows'
+import type { ExecutionRun } from '@shared/domain/execution'
 import type {
   AuditEvent,
   AuditEventType,
@@ -59,7 +68,44 @@ const bridge: JarvisBridge = {
     return () => ipcRenderer.removeListener(IPC_EVENT_CHANNELS.authChanged, wrapped)
   },
 
-  minimizeToTray: (): void => ipcRenderer.send(IPC_SEND_CHANNELS.windowMinimizeToTray)
+  minimizeToTray: (): void => ipcRenderer.send(IPC_SEND_CHANNELS.windowMinimizeToTray),
+
+  classifyAction: (action: string, context: PolicyContext): Promise<PolicyDecision> =>
+    ipcRenderer.invoke(IPC_CHANNELS.policyClassify, action, context),
+
+  listAllowedDirectories: (): Promise<readonly string[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.allowlistList),
+  addAllowedDirectory: (path: string): Promise<readonly string[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.allowlistAdd, path),
+  removeAllowedDirectory: (path: string): Promise<readonly string[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.allowlistRemove, path),
+
+  listWorkflows: (workspace: WorkspaceId): Promise<readonly Workflow[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.workflowList, workspace),
+  createWorkflow: (input: Omit<WorkflowInput, 'user_id'>): Promise<Workflow> =>
+    ipcRenderer.invoke(IPC_CHANNELS.workflowCreate, input),
+  updateWorkflow: (
+    id: string,
+    patch: Partial<Pick<Workflow, 'name' | 'steps' | 'triggers' | 'schedule'>>
+  ): Promise<Workflow | undefined> => ipcRenderer.invoke(IPC_CHANNELS.workflowUpdate, id, patch),
+  setWorkflowStatus: (id: string, status: WorkflowStatus): Promise<Workflow | undefined> =>
+    ipcRenderer.invoke(IPC_CHANNELS.workflowSetStatus, id, status),
+  removeWorkflow: (id: string, workspace: WorkspaceId): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.workflowRemove, id, workspace),
+
+  listAutomations: (workspace: WorkspaceId): Promise<readonly Automation[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.automationList, workspace),
+  createAutomation: (input: Omit<AutomationInput, 'user_id'>): Promise<Automation> =>
+    ipcRenderer.invoke(IPC_CHANNELS.automationCreate, input),
+  setAutomationEnabled: (id: string, enabled: boolean): Promise<Automation | undefined> =>
+    ipcRenderer.invoke(IPC_CHANNELS.automationSetEnabled, id, enabled),
+  removeAutomation: (id: string, workspace: WorkspaceId): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.automationRemove, id, workspace),
+
+  runWorkflowSimulated: (workflowId: string, workspace: WorkspaceId): Promise<ExecutionRun> =>
+    ipcRenderer.invoke(IPC_CHANNELS.executionRun, workflowId, workspace),
+  listExecutionRuns: (workspace: WorkspaceId): Promise<readonly ExecutionRun[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.executionList, workspace)
 }
 
 if (process.contextIsolated) {

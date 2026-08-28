@@ -51,14 +51,58 @@ const workspaces = {
   trocar: vi.fn((destino: string) => ({ workspace: destino, auditSeq: 3 }))
 }
 
+const policy = {
+  classify: vi.fn((action: string) => ({
+    action,
+    tier: 'baixo',
+    outcome: 'allow',
+    reason: 'classificada-pelo-seed'
+  }))
+}
+
+const allowlist = {
+  list: vi.fn(() => ['/app/userData']),
+  add: vi.fn(() => ({ path: '/app/userData/x', added: true })),
+  remove: vi.fn(() => ({ path: '/app/userData/x', removed: true }))
+}
+
+const workflows = {
+  listWorkflows: vi.fn(() => []),
+  createWorkflow: vi.fn((input: Record<string, unknown>) => ({ id: 'wf-1', ...input })),
+  updateWorkflow: vi.fn(() => ({ id: 'wf-1' })),
+  setWorkflowStatus: vi.fn(() => ({ id: 'wf-1', status: 'online' })),
+  removeWorkflow: vi.fn(() => true),
+  listAutomations: vi.fn(() => []),
+  createAutomation: vi.fn((input: Record<string, unknown>) => ({ id: 'a-1', ...input })),
+  setAutomationEnabled: vi.fn(() => ({ id: 'a-1', enabled: true })),
+  removeAutomation: vi.fn(() => true)
+}
+
+const execution = {
+  runWorkflow: vi.fn((workflowId: string) => ({ id: 'run-1', workflowId, state: 'concluido' }))
+}
+
+const runs = {
+  list: vi.fn(() => []),
+  findById: vi.fn(() => undefined)
+}
+
 const minimizeToTray = vi.fn()
 
 const preferences = {
-  atual: vi.fn(() => ({ locale: 'pt-BR', theme: 'sistema', resolvedTheme: 'escuro' })),
+  atual: vi.fn(() => ({
+    locale: 'pt-BR',
+    theme: 'sistema',
+    resolvedTheme: 'escuro',
+    accentNoa: '#C4C4C4',
+    accentJarvis: '#C4C4C4'
+  })),
   salvar: vi.fn((p: Record<string, unknown>) => ({
     locale: p['locale'] ?? 'pt-BR',
     theme: p['theme'] ?? 'sistema',
-    resolvedTheme: 'escuro'
+    resolvedTheme: 'escuro',
+    accentNoa: p['accentNoa'] ?? '#C4C4C4',
+    accentJarvis: p['accentJarvis'] ?? '#C4C4C4'
   }))
 }
 
@@ -66,6 +110,11 @@ const deps = {
   audit,
   workspaces,
   preferences,
+  policy,
+  allowlist,
+  workflows,
+  execution,
+  runs,
   // Função desde a F03: a identidade muda em runtime (local antes do login, usuário da
   // sessão depois), então os handlers a resolvem a cada chamada em vez de capturá-la.
   userId: () => 'local',
@@ -99,6 +148,16 @@ beforeEach(() => {
   minimizeToTray.mockClear()
   audit.list.mockClear()
   workspaces.trocar.mockClear()
+  allowlist.list.mockClear()
+  allowlist.add.mockClear()
+  allowlist.remove.mockClear()
+  policy.classify.mockClear()
+  workflows.listWorkflows.mockClear()
+  workflows.createWorkflow.mockClear()
+  workflows.setWorkflowStatus.mockClear()
+  workflows.createAutomation.mockClear()
+  execution.runWorkflow.mockClear()
+  runs.list.mockClear()
   logIpc.info.mockClear()
   logIpc.warn.mockClear()
   logIpc.error.mockClear()
@@ -240,7 +299,9 @@ describe('canais de preferências (SPEC-05)', () => {
     expect(invocar(IPC_CHANNELS.preferencesGet)).toEqual({
       locale: 'pt-BR',
       theme: 'sistema',
-      resolvedTheme: 'escuro'
+      resolvedTheme: 'escuro',
+      accentNoa: '#C4C4C4',
+      accentJarvis: '#C4C4C4'
     })
   })
 
@@ -266,5 +327,82 @@ describe('canal de janela', () => {
     emitir(IPC_SEND_CHANNELS.windowMinimizeToTray)
 
     expect(minimizeToTray).toHaveBeenCalled()
+  })
+})
+
+describe('canais da allowlist (SPEC-Execucao-03)', () => {
+  it('lista devolve os diretórios permitidos do usuário', () => {
+    expect(invocar(IPC_CHANNELS.allowlistList)).toEqual(['/app/userData'])
+    expect(allowlist.list).toHaveBeenCalledWith('local')
+  })
+
+  it('add encaminha o path e devolve a lista atualizada', () => {
+    invocar(IPC_CHANNELS.allowlistAdd, '/home/user/projeto')
+    expect(allowlist.add).toHaveBeenCalledWith('local', '/home/user/projeto')
+  })
+
+  it('remove encaminha o path e devolve a lista atualizada', () => {
+    invocar(IPC_CHANNELS.allowlistRemove, '/home/user/projeto')
+    expect(allowlist.remove).toHaveBeenCalledWith('local', '/home/user/projeto')
+  })
+
+  it('path não-string no add não chama o repositório (fronteira de confiança)', () => {
+    invocar(IPC_CHANNELS.allowlistAdd, { malicioso: true })
+    expect(allowlist.add).not.toHaveBeenCalled()
+  })
+})
+
+describe('canais de workflows/automações (SPEC-Execucao-04)', () => {
+  it('list encaminha o workspace válido', () => {
+    invocar(IPC_CHANNELS.workflowList, 'jarvis')
+    expect(workflows.listWorkflows).toHaveBeenCalledWith('jarvis')
+  })
+
+  it('list com workspace fora do enum devolve vazio sem tocar o serviço', () => {
+    expect(invocar(IPC_CHANNELS.workflowList, 'Desenvolvimento')).toEqual([])
+    expect(workflows.listWorkflows).not.toHaveBeenCalled()
+  })
+
+  it('create com workspace válido cria; com inválido lança', () => {
+    invocar(IPC_CHANNELS.workflowCreate, { workspace_id: 'jarvis', name: 'W', steps: [] })
+    expect(workflows.createWorkflow).toHaveBeenCalled()
+    expect(() => invocar(IPC_CHANNELS.workflowCreate, { workspace_id: 'x' })).toThrow(/inválido/)
+  })
+
+  it('setStatus só aceita status do enum', () => {
+    invocar(IPC_CHANNELS.workflowSetStatus, 'wf-1', 'online')
+    expect(workflows.setWorkflowStatus).toHaveBeenCalledWith('wf-1', 'online')
+    // status inventado não chama o serviço
+    workflows.setWorkflowStatus.mockClear()
+    expect(invocar(IPC_CHANNELS.workflowSetStatus, 'wf-1', 'turbo')).toBeUndefined()
+    expect(workflows.setWorkflowStatus).not.toHaveBeenCalled()
+  })
+
+  it('automação: create valida workspace; setEnabled coage para boolean', () => {
+    invocar(IPC_CHANNELS.automationCreate, {
+      workspace_id: 'jarvis',
+      name: 'A',
+      trigger: { id: 't', type: 'manual' },
+      target: { workflowId: 'wf-1' }
+    })
+    expect(workflows.createAutomation).toHaveBeenCalled()
+  })
+})
+
+describe('canais de execução simulada (SPEC-Execucao-05)', () => {
+  it('dispara o run com workflowId + workspace válidos', () => {
+    invocar(IPC_CHANNELS.executionRun, 'wf-1', 'jarvis')
+    expect(execution.runWorkflow).toHaveBeenCalledWith('wf-1', 'jarvis')
+  })
+
+  it('recusa parâmetros inválidos sem tocar o motor', () => {
+    expect(() => invocar(IPC_CHANNELS.executionRun, 123, 'jarvis')).toThrow(/inválidos/)
+    expect(() => invocar(IPC_CHANNELS.executionRun, 'wf-1', 'Desenvolvimento')).toThrow(/inválidos/)
+    expect(execution.runWorkflow).not.toHaveBeenCalled()
+  })
+
+  it('lista runs escopada ao usuário corrente', () => {
+    invocar(IPC_CHANNELS.executionList, 'jarvis')
+    expect(runs.list).toHaveBeenCalledWith('local', 'jarvis')
   })
 })

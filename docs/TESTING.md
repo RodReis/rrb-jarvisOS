@@ -34,12 +34,23 @@ Postgres; o "banco" é a persistência local, ver ADR-001 e a SPEC-Fundacao-04):
 
 | Categoria | Camada | O que prova | Stack | Velocidade |
 |---|---|---|---|---|
-| **Regras de Negócio** | Unidade (base) | Lógica de domínio pura: uma função/regra/policy faz o que deve, isolada de storage, IPC e rede | Vitest — `src/shared/**/*.spec.ts` e `src/main/**/*.spec.ts` | rápida (ms) |
-| **Banco** | Integração (meio) | Persistência local real: o adapter de storage (**SQLite** — proposta SPEC-04) contra um arquivo temporário; round-trip IPC↔runtime↔storage | Vitest — `src/main/**/*.int-spec.ts` e `tests/**/*.int-spec.ts`, SQLite temp | média (s) |
-| **Tela** | Componente + E2E (topo) | UI: componente renderiza/reage certo (Vitest + Testing Library + jsdom) e fluxo crítico funciona no app real (Playwright-Electron) | Vitest — `src/renderer/**/*.test.tsx`; Playwright — `e2e/**/*.spec.ts` | componente rápida / e2e lenta |
+| **Regras de Negócio** | Unidade (base) | Lógica de domínio pura: uma função/regra/policy faz o que deve, isolada de storage, IPC e rede | Vitest — `src/{shared,main,design,renderer}/**/*.spec.ts` | rápida (ms) |
+| **Banco** | Integração (meio) | Storage real, não dublê: **SQLite** (`better-sqlite3`) contra arquivo temporário, round-trip IPC↔runtime↔storage — e, desde a M2-F01, a **RLS do Supabase local** contra a stack Docker | Vitest — `src/main/**/*.int-spec.ts` e `tests/**/*.int-spec.ts` | média (s) |
+| **Tela** | Componente + E2E (topo) | UI: componente renderiza/reage certo (Vitest + Testing Library + jsdom) e fluxo crítico funciona no app real (Playwright-Electron) | Vitest — `src/renderer/**/*.test.tsx`; Playwright — `tests/e2e/**/*.e2e.ts` | componente rápida / e2e lenta |
 
 Notas de aprendizado:
 
+- **A categoria é definida pelo que o teste prova, não pela pasta onde ele mora.** A extensão é
+  que separa: `*.spec.ts` é unidade pura, `*.int-spec.ts` toca storage, `*.test.tsx` renderiza
+  componente. O `include` de **Regras** cobre `src/{shared,main,design,renderer}` — inclusive o
+  renderer, porque lógica pura pode morar ao lado da UI que a consome (`workspace/navegacao.ts` é
+  estado sem React). Componente React continua fora de Regras pela extensão, não pelo caminho.
+  Isto é registro de um bug real: o padrão original omitia `src/renderer`, e
+  `workspace/navegacao.spec.ts` **nunca rodou** — 75 linhas cobrindo o isolamento de rota por
+  espaço (SPEC-Fundacao-02, critérios 1 e 5) ficaram fora de toda categoria por três MVPs, sem
+  nada falhar. Corrigido no card [#47](https://github.com/RodReis/rrb-jarvisOS/issues/47).
+  **Um teste que não roda é indistinguível de um teste que não existe** — e é pior, porque a
+  tabela do relatório sugere cobertura que não há.
 - **Clientes externos são mockados no boundary.** Supabase (auth/sync) e Google OAuth **nunca**
   são chamados de verdade num teste. Casa com a regra de arquitetura "renderer nunca acessa Node,
   segredo ou rede direto" e com o fail-closed do Policy Engine — no teste, mock. Testa-se *o nosso
@@ -48,8 +59,15 @@ Notas de aprendizado:
   *verifica* algo útil. 100% de cobertura em getters triviais é teatro. Por isso o portão é
   **report-only** (§6): olha-se a tendência, não persegue um número.
 - **E2E não tem "cobertura de linha" que valha.** Playwright prova *comportamento*, não linhas.
-  Na coluna Cobertura, "Tela" reflete o **Vitest** (componente); Playwright entra só com
-  **contagem** (pass/falha). Isso é honesto, não uma lacuna.
+- **O E2E não entra no relatório (card #34).** Desde 2026-07-24, a categoria "Tela" do
+  `reports/TESTS.md` conta **só o Vitest-componente** — o E2E Playwright-Electron virou um
+  **check de CI à parte** (job `e2e`, condicional por `paths`, ver §6), fora da tabela. O
+  motivo: o E2E domina o tempo de CI (build + xvfb + keyring, ~15 min) e prova a fronteira
+  preload/IPC/janela, que muda raramente; somá-lo ao relatório acoplava um número que oscilaria
+  conforme o E2E rodasse ou não naquele PR, contra a guarda anti-drift (que compara execução
+  limpa). O verde do E2E vive no gate do PR, não no relatório. As linhas "Tela" **anteriores** a
+  esta data já incluem a contagem do E2E — são imutáveis (append-only); a mudança vale das
+  próximas em diante.
 - **O campo "Falha" será quase sempre 0** no momento da entrega — verde é o portão. O valor do
   registro está na **tendência de cobertura e no histórico por fatia**, não no pass/falha de um
   instante.
@@ -123,8 +141,14 @@ comportamentos corretos dele. Quem for escrever ou depurar E2E aqui deve ler ant
    onde ele deveria provar a garantia.
 
 **O E2E exige build.** O Playwright sobe o app empacotado (`out/`), não o servidor de dev —
-rodá-lo sem `npm run build` testaria a versão anterior do código. O orquestrador
-(`scripts/test-report.mjs`) já faz o build antes de chamar o Playwright.
+rodá-lo sem `npm run build` testaria a versão anterior do código. Desde o card #34 o E2E **não**
+é mais chamado pelo orquestrador do relatório (`scripts/test-report.mjs`); ele roda no job `e2e`
+do CI (§6), que faz o `npm run build` antes do `playwright test`. Para rodar o E2E localmente:
+`npm run build && npx playwright test`.
+
+> **Onde vivem as armadilhas 4–6 (binário, setuid, keyring).** Elas são exigências do E2E, e só
+> dele — desde o card #34 os steps que as tratam moram no **job `e2e`** do `ci.yml`, não no job
+> do relatório. O job `test` (relatório) não sobe Electron, então não precisa de nenhuma delas.
 
 **Padrão das armadilhas:** nenhuma se apresenta como o que é. Falha de launch do
 Electron no CI quase sempre reporta timeout ou "browser has been closed" — mensagens que
@@ -251,19 +275,99 @@ registradas no código de referência da §10):
 
 ## 6. Workflow de CI — `.github/workflows/ci.yml`
 
-Dispara em **todo pull request** para `main`. Job `test`:
+Dispara em **todo pull request** para `main`. Um bloco `concurrency` (card #66) cancela a execução
+anterior quando chega um push novo no mesmo PR — três pushes seguidos não deixam três suítes
+inteiras (~7 min cada) rodando em paralelo quando só a última importa. Desde o **card #34**
+(2026-07-24) são **três jobs**, não um:
 
-- **Services:** **nenhum por padrão.** O "Banco" testa o storage local (SQLite em arquivo temp),
-  que não é serviço. (Se um dia a fase de persistência Docker/Supabase local exigir Postgres real
-  em algum int-spec, o serviço entra aqui — até lá, não.)
+- **`test`** — roda em todo PR. Runners unitários/integração + relatório + guarda anti-drift
+  (descrito nesta seção). **Não sobe Electron** e **não roda E2E**.
+- **`e2e`** — sobe o app Electron de verdade (build + xvfb + keyring + Playwright). Custa ~15 min
+  e prova a fronteira preload/IPC/janela, que muda raramente. **Só executa quando o PR toca essa
+  fronteira** — um job leve `changes` faz `git diff` contra a base e casa
+  `src/main/preload/**`, `src/main/index.ts`, `src/main/window.ts`, `tests/e2e/**`,
+  `playwright.config.ts`; nos demais PRs o `e2e` é pulado (no-op). Filtro por `paths:` no evento
+  não serve aqui — cancelaria o workflow inteiro, não um job.
+- **`gate`** — o **required check** (branch protection exige `gate`, não `e2e`). Sempre roda,
+  agrega `test` e `e2e`: falha se `test` falhou ou se o `e2e` **rodou e** falhou; passa quando o
+  `e2e` foi legitimamente pulado. É o que impede o E2E condicional de bloquear o merge em
+  "pending eterno" — a armadilha do required check pulado no GitHub.
+
+> **A garantia (card #34):** o E2E completo tem de rodar no caminho para a `main`. O filtro de
+> `paths` do job `changes` cobre toda a fronteira que o E2E prova; PR que a toca roda o E2E e é
+> barrado se falhar; PR que não a toca não pode introduzir regressão de fronteira. Manter o filtro
+> em sincronia com o que o E2E realmente exercita é parte do contrato. Falso verde é pior que
+> teste ausente.
+
+O job `test` em detalhe:
+
+- **Services:** **nenhum** no sentido do `services:` do Actions. A maior parte do "Banco" testa o
+  storage local (SQLite em arquivo temp), que não é serviço. Desde a **M2-F01** (entregue em
+  2026-07-22) há uma exceção: o int-spec de RLS exige o **Supabase local**, que sobe pela CLI
+  (`supabase/setup-cli` + `supabase start`) e não por `services:` — não é um container só, e sim a
+  stack que a CLI orquestra (Postgres + PostgREST + Auth), com migrations e seed aplicados no start.
+  - **Pular, no CI, é falha.** Esses testes se pulam quando a stack não responde, para não punir
+    quem clona o repo sem Docker. No CI a stack sobe de propósito, então o `beforeAll` **lança**
+    quando `process.env.CI` está setado. Sem isso, uma stack que não subisse deixaria o CI verde
+    sobre RLS jamais exercitada — o relatório contaria a categoria como coberta. Falso verde é
+    pior que teste ausente: ele *afirma* a garantia que não foi medida.
+  - **Localmente, pular envenena o relatório — suba a stack antes de gerá-lo.** O outro lado da
+    mesma moeda. Com o Docker parado, `npm run test:report` roda até o fim e escreve um número que
+    *parece* válido: os 7 testes de RLS simplesmente somem da contagem (`Banco 110 pass` em vez de
+    `117`). Nada falha, nada avisa. Quem pega é a guarda anti-drift, que compara o arquivo
+    commitado com uma execução limpa — mas só no CI, depois do push. **Antes de
+    `npm run test:report`, confirme a stack no ar** (`npx supabase status`); se estiver parada,
+    `npx supabase start`. Vale a mesma regra do ADR-003 vista de perto: número de relatório é
+    evidência de execução limpa, não da máquina de quem commitou.
+
+### Gerar o relatório de entrega: reproduza o ambiente do CI
+
+Duas rodadas de CI vermelhas na **M3-F01** (2026-07-23), por duas guardas diferentes, com a mesma
+causa de fundo: `npm run test:report` rodado sem as condições que o CI impõe. As guardas fizeram o
+trabalho delas — o desperdício foi descobrir no CI o que dava para ver antes do push.
+
+| Guarda | O que cobra | Como falha em silêncio localmente |
+|---|---|---|
+| anti-drift (`--check`) | números batem com execução limpa | stack parada ⇒ testes pulados somem da contagem |
+| `--require-entry` | linha da entrega no **Histórico** | sem as variáveis `REPORT_*`, só o "Estado atual" é escrito |
+
+O carimbo do histórico nasce das variáveis que o CI injeta (`REPORT_ISSUE` extraída do `refs #N` do
+PR, `REPORT_SPEC` do corpo, `REPORT_PR`/`REPORT_PR_URL`/`REPORT_DATE`). Sem elas o gerador escreve
+um relatório válido — só que **sem a linha de histórico**, e `--require-entry` barra.
+
+Antes de commitar o relatório de uma entrega, rode o equivalente ao CI:
+
+```bash
+npx supabase status                      # stack no ar? se não: npx supabase start
+
+REPORT_PR='#<PR>' \
+REPORT_PR_URL='https://github.com/RodReis/rrb-jarvisOS/pull/<PR>' \
+REPORT_ISSUE='#<issue>' \
+REPORT_SPEC='<slug-da-spec>' \
+REPORT_DATE='<YYYY-MM-DD>' \
+npm run test:report
+
+# e a guarda idêntica à do CI, que é o que realmente prova:
+REPORT_ISSUE='#<issue>' REQUIRE_ENTRY=1 npm run test:report:check -- --require-entry
+```
+
+O número do PR só existe depois de abri-lo — então a ordem é **abrir o PR, carimbar, empurrar**.
+Rodar a guarda local antes do push é o passo que fecha o ciclo: se ela passa aqui, passa lá.
+  - **Role não-owner, sempre.** O Postgres pula RLS para superuser e para o dono da tabela. Todo
+    teste de isolamento fala pelo PostgREST com JWT de usuário final; usar a conexão do owner
+    faria as asserções passarem sem tocar em política nenhuma. A única exceção deliberada é o
+    teste do trigger append-only, que **precisa** do owner justamente para provar a camada que
+    protege contra quem escapa da RLS.
 - **Passos:**
   1. `npm ci`.
   2. **Domínio/main:** `vitest run` das categorias `regras` e `banco` com `--coverage --reporter=json`.
   3. **Renderer (componente):** `vitest run` (jsdom) com `--coverage --reporter=json`.
-  3b. **E2E:** ativo desde a **Fatia 03** (entregue em 2026-07-22). `npm run build` →
-     `xvfb-run playwright test` (o Electron abre janela: no Linux do CI precisa de display
-     virtual). O reporter JSON e o caminho de saída vivem no `playwright.config.ts`. Ver §3.1
-     para as armadilhas de ambiente antes de depurar falha de launch no CI.
+  3b. **E2E:** ativo desde a **Fatia 03** (entregue em 2026-07-22); desde o **card #34** roda no
+     **job `e2e` à parte** (não neste job, e só quando o PR toca a fronteira — ver a abertura da
+     §6). Lá dentro: `npm run build` → `xvfb-run playwright test` (o Electron abre janela: no Linux
+     do CI precisa de display virtual). O reporter JSON e o caminho de saída vivem no
+     `playwright.config.ts`. Ver §3.1 para as armadilhas de ambiente antes de depurar falha de
+     launch no CI.
   4. `npm run test:report` → escreve a tabela em **`$GITHUB_STEP_SUMMARY`** (aba do run) **e**
      publica/atualiza um **comentário fixo no PR** (sticky comment).
   5. `npm run test:report:check` → **falha se `reports/TESTS.md` divergir** de uma execução limpa.
@@ -316,13 +420,25 @@ Para o Code implementar **na Fatia 01** e o PI conferir:
 - **Gerenciador/comando:** `npm run test:report` (a **SPEC-Fundacao-01 fixou npm**; o `pnpm` do
   proplan não se aplica — o `electron-vite` é single-package, sem monorepo).
 - **Runner:** **Vitest** (unidade + componente) e **Playwright-Electron** (E2E). Sem Jest.
-- **Playwright no CI:** **ativo desde a Fatia 03** (2026-07-22). Roda **sempre** enquanto a suíte
-  for pequena (3 testes, ~2s local); com `xvfb-run` (Electron precisa de display). Reavaliar
-  (label/condicional) se o tempo de CI incomodar. `workers: 1` é obrigatório, não preferência: o
+- **Playwright no CI:** **ativo desde a Fatia 03** (2026-07-22). Desde o **card #34** (2026-07-24)
+  roda **condicional por `paths`** no job `e2e` — só quando o PR toca a fronteira preload/IPC/janela
+  (ver §6), porque build + xvfb + keyring dominavam o tempo de CI (~15 min) em todo PR. Com
+  `xvfb-run` (Electron precisa de display). `workers: 1` é obrigatório, não preferência: o
   `requestSingleInstanceLock()` (SPEC-02) faz instâncias paralelas se derrubarem entre si.
-- **Storage do "Banco":** o setup concreto (arquivo temp, migrations de teste) **finaliza quando a
-  SPEC-Fundacao-04 decidir SQLite vs JSON**. A metodologia (3 categorias, evidência de máquina,
-  anti-drift) independe dessa escolha.
+- **Storage do "Banco":** decidido na **SPEC-Fundacao-04** — **SQLite** (`better-sqlite3`) contra
+  arquivo temporário, com as migrations reais e teardown por teste. Desde a **M2-F01** a categoria
+  cobre também o **Supabase local** (RLS, ver §6): a régua da categoria é *"integração com storage
+  real"*, não *"SQLite"*. `fileParallelism: false` continua obrigatório — integração toca disco e
+  singletons de processo (o logger é um), e em paralelo um arquivo derruba o outro.
+
+- **Conflito de merge no `reports/TESTS.md`:** é **esperado** sempre que dois branches entregam em
+  paralelo — o bloco "Estado atual" é regenerado por inteiro a cada entrega, então duas fatias
+  sempre reescrevem as mesmas linhas. **Não resolva à mão** (o cabeçalho do arquivo diz `NÃO EDITAR
+  À MÃO`, e escolher números na marra produziria um relatório que não corresponde a execução
+  nenhuma — exatamente o que o `--check` existe para barrar). A resolução é mecânica:
+  `git checkout --theirs reports/TESTS.md`, fechar o merge e rodar `npm run test:report` — os
+  números saem da suíte combinada, que é o único estado que passa a valer. Visto na **M3-F03b**,
+  quando o merge da `main` trouxe o FIX #43 (+15 em Banco).
 
 Governadas pelo **ADR-003** (`docs/DECISIONS.md`).
 

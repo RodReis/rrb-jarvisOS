@@ -1,0 +1,42 @@
+@import 'tailwindcss';
+
+/*
+ * Estilos da galeria de prova (SPEC-DesignSystem-03a).
+ *
+ * Importa as fontes locais do DS — a captura tem de mostrar a tipografia real, não a fonte de
+ * sistema. É justamente o que uma verificação por screenshot existe para pegar: se o
+ * `@font-face` estivesse quebrado, o teste em jsdom nunca acusaria.
+ */
+
+@import '../tokens/fontes.css';
+
+/*
+ * Fonte de classes explícita.
+ *
+ * O Tailwind v4 descobre as classes varrendo a partir da `root` do Vite, que aqui é
+ * `src/design/prova/`. Os componentes moram em `../ui/` — **fora** dessa raiz —, então nenhuma
+ * classe deles entrava no CSS gerado: a galeria renderizava texto sem estilo nenhum.
+ *
+ * Foi o primeiro defeito que a captura pegou, e exatamente do tipo que só um navegador revela:
+ * os testes em jsdom continuavam verdes, porque consultam papel ARIA e não pintura.
+ */
+@source '../ui';
+@source '../tokens';
+/*
+ * `../patterns` faltava — a camada nasceu na F04a, depois deste bloco, e ninguém a acrescentou.
+ *
+ * O efeito: todos os componentes de `patterns/` renderizavam **sem as classes utilitárias** desde
+ * então. O AppShell sobrevivia porque quase tudo nele é classe com `var(--jos-*)` entre colchetes,
+ * que o Tailwind gera sob demanda a partir do arquivo onde aparece — mas `size-7`, `size-10` e
+ * afins são utilitárias da escala, e essas só entram no CSS se o arquivo for varrido.
+ *
+ * Achado na F06 pela captura da CHOICE: os swatches, declarados `size-7` (28px), renderizavam a
+ * **2px** — pontinhos. Nenhum teste de papel acusaria: `getByRole('radio')` acha um botão de 2px
+ * tão bem quanto um de 28px. É o mesmo defeito que motivou este bloco na F03a, repetido numa
+ * camada nova — e a lição é que `@source` é uma lista que precisa crescer junto com as camadas.
+ */
+@source '../patterns';
+
+body {
+  margin: 0;
+}

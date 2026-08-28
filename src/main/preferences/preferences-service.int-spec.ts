@@ -30,7 +30,15 @@ function servicoDe(userId: string): InstanceType<typeof PreferencesService> {
 }
 
 function perfil(id: string) {
-  return { id, name: 'Usuário', email: '', locale: 'pt-BR' as const, theme: 'sistema' as const }
+  return {
+    id,
+    name: 'Usuário',
+    email: '',
+    locale: 'pt-BR' as const,
+    theme: 'sistema' as const,
+    accentNoa: null,
+    accentJarvis: null
+  }
 }
 
 beforeEach(() => {
@@ -53,7 +61,10 @@ describe('padrões do produto', () => {
     expect(servicoDe('u-1').atual()).toEqual({
       locale: 'pt-BR',
       theme: 'sistema',
-      resolvedTheme: 'escuro'
+      resolvedTheme: 'escuro',
+      // Acento não escolhido resolve para o default de fábrica.
+      accentNoa: '#C4C4C4',
+      accentJarvis: '#C4C4C4'
     })
   })
 
@@ -139,5 +150,65 @@ describe('isolamento por usuário (critério 3)', () => {
 
     expect(servicoDe('u-2').atual()).toMatchObject({ locale: 'pt-BR', theme: 'sistema' })
     expect(servicoDe('u-1').atual()).toMatchObject({ locale: 'en-US', theme: 'escuro' })
+  })
+})
+
+describe('acento (SPEC-CHOICE-01, critérios 4, 5, 8)', () => {
+  it('acento não escolhido resolve para o default de fábrica', () => {
+    profiles.save(perfil('u-1'))
+
+    // `null` no banco vira a cor de fábrica no snapshot — o renderer nunca vê `null`.
+    expect(servicoDe('u-1').atual()).toMatchObject({
+      accentNoa: '#C4C4C4',
+      accentJarvis: '#C4C4C4'
+    })
+  })
+
+  it('o acento escolhido persiste e é lido de volta (critério 4)', () => {
+    profiles.save(perfil('u-1'))
+    const service = servicoDe('u-1')
+
+    service.salvar({ accentNoa: '#FF2C2C', accentJarvis: '#D3AF37' })
+
+    // Relê de um serviço novo: prova que veio do disco, não de estado em memória.
+    expect(servicoDe('u-1').atual()).toMatchObject({
+      accentNoa: '#FF2C2C',
+      accentJarvis: '#D3AF37'
+    })
+  })
+
+  it('escolher o acento de um módulo não move o outro', () => {
+    profiles.save(perfil('u-1'))
+    const service = servicoDe('u-1')
+
+    service.salvar({ accentNoa: '#2323FF' })
+
+    // JARVIS continua no default; só o NOA mudou. Colunas separadas garantem isso.
+    expect(service.atual()).toMatchObject({ accentNoa: '#2323FF', accentJarvis: '#C4C4C4' })
+  })
+
+  it('descarta cor fora da paleta em vez de gravar', () => {
+    profiles.save(perfil('u-1'))
+    const service = servicoDe('u-1')
+
+    // `#123456` não está nas 8 cores da paleta: a fronteira de confiança recusa, como faz com
+    // locale/theme inválidos — senão reabriria o contraste que a paleta fechada fechou.
+    const resultado = service.salvar({ accentNoa: '#123456' } as never)
+
+    expect(resultado).toMatchObject({ accentNoa: '#C4C4C4' })
+    expect(logCat.warn).toHaveBeenCalled()
+  })
+
+  it('acento de um usuário não vaza para outro (critério 8)', () => {
+    profiles.save(perfil('u-1'))
+    profiles.save(perfil('u-2'))
+
+    servicoDe('u-1').salvar({ accentNoa: '#8A00C4', accentJarvis: '#2CFF05' })
+
+    // u-2 nunca escolheu: continua no default, sem herdar o de u-1.
+    expect(servicoDe('u-2').atual()).toMatchObject({
+      accentNoa: '#C4C4C4',
+      accentJarvis: '#C4C4C4'
+    })
   })
 })
