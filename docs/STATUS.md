@@ -22,21 +22,11 @@ Atualizado em: **2026-08-28** (pós-merge da F01). Mantido pelo Code a cada entr
 
 ### Feito (`proplan:done` — entregue, aguardando aceite do PI)
 
-| Issue | Fatia | MVP | Spec | PR | Mergeado |
-|---|---|---|---|---|---|
-| [#74](https://github.com/RodReis/rrb-jarvisOS/issues/74) | 01 Execução real de filesystem allowlisted | MVP-004 (#10) | `spec-execucao-real-01-filesystem-allowlisted.md` | [#81](https://github.com/RodReis/rrb-jarvisOS/pull/81) | 2026-08-28 |
-
-> **F01 entregue** (Code, 2026-08-28) — PR [#81](https://github.com/RodReis/rrb-jarvisOS/pull/81) mergeado (squash `19870a3`), CI verde nos quatro checks. Os 7 critérios cobertos; os de comportamento (1–4) provados **pelo efeito** em 4 testes de integração. Evidência carimbada no `reports/TESTS.md` com issue, spec e PR.
->
-> ⚠️ **A fila de aprovação não foi vista renderizada no app real.** O app foi levantado e duas `ApprovalRequest` pendentes foram semeadas no SQLite, mas ele para na tela de login — sem sessão não se alcança a rota Operações. O que a captura alcançou está em `reports/comparacao/f01-tela-inicial.png`. jsdom não aplica folha de estilo nem faz layout, e foi assim que #57, #58 e #64 passaram com a suíte verde. Fechar a lacuna exige login real (OAuth, passo humano) ou decisão do PI sobre semear a sessão.
->
-> O CI pegou quatro coisas que o piso local não pegou: superfície da ponte no E2E (o build de `out/` estava velho), stack Supabase parada (7 testes de RLS pulados), `ENTREGA SEM CARIMBO` no relatório e o conflito do `CLAUDE.md` com o #31.
-
-O #64 foi **aceito pelo PI em 2026-08-28** e saiu daqui para **Finalizado**.
+*Vazio.* A **F01 (#74)** foi entregue e **aceita pelo PI no mesmo dia** (2026-08-28) — está em **Finalizado**. O #64 também.
 
 ### Finalizado (`closed` + `proplan:finalizado` — aceito pelo PI)
 
-**32 issues fechadas.** Os três MVPs entregues estão consolidados na tabela de MVPs; abaixo, as fatias e os cards avulsos.
+**33 issues fechadas.** Os três MVPs entregues estão consolidados na tabela de MVPs; abaixo, as fatias e os cards avulsos.
 
 #### MVP-001 Fundação (épico #1, fechado)
 
@@ -79,6 +69,18 @@ O #64 foi **aceito pelo PI em 2026-08-28** e saiu daqui para **Finalizado**.
 | [#24](https://github.com/RodReis/rrb-jarvisOS/issues/24) | 06 Adoção & hardening | `spec-design-system-06-adocao-hardening.md` | M3-F06 | [#51](https://github.com/RodReis/rrb-jarvisOS/pull/51) | 2026-07-23 |
 
 > Base técnica (Fatia 01): **Radix + Tailwind v4 + Lucide**. Specs `03`/`04` originais viraram stubs *superseded* (divididas em a/b). Ordem executada: F01 → F02 → (F03a, F03b, F05 ‖) → F04a → F04b → F06 — **as 8 fatias em um dia** (2026-07-23).
+
+#### MVP-004 Execução real (épico #10, aberto)
+
+| Issue | Fatia | Spec | Índice | PR | Aceite |
+|---|---|---|---|---|---|
+| [#74](https://github.com/RodReis/rrb-jarvisOS/issues/74) | 01 Execução real de filesystem allowlisted | `spec-execucao-real-01-filesystem-allowlisted.md` | M4-F01 | [#81](https://github.com/RodReis/rrb-jarvisOS/pull/81) | 2026-08-28 |
+
+> **F01 entregue** (Code, 2026-08-28) — PR [#81](https://github.com/RodReis/rrb-jarvisOS/pull/81) mergeado (squash `19870a3`), CI verde nos quatro checks. Os 7 critérios cobertos; os de comportamento (1–4) provados **pelo efeito** em 4 testes de integração. Evidência carimbada no `reports/TESTS.md` com issue, spec e PR.
+>
+> ⚠️ **A fila de aprovação não foi vista renderizada no app real.** O app foi levantado e duas `ApprovalRequest` pendentes foram semeadas no SQLite, mas ele para na tela de login — sem sessão não se alcança a rota Operações. O que a captura alcançou está em `reports/comparacao/f01-tela-inicial.png`. jsdom não aplica folha de estilo nem faz layout, e foi assim que #57, #58 e #64 passaram com a suíte verde. Fechar a lacuna exige login real (OAuth, passo humano) ou decisão do PI sobre semear a sessão.
+>
+> O CI pegou quatro coisas que o piso local não pegou: superfície da ponte no E2E (o build de `out/` estava velho), stack Supabase parada (7 testes de RLS pulados), `ENTREGA SEM CARIMBO` no relatório e o conflito do `CLAUDE.md` com o #31.
 
 #### Fatia avulsa (sem MVP pai)
 
@@ -136,7 +138,7 @@ Não há catálogo numérico `SPEC-nnn`: as specs são identificadas por slug e 
 | MVP-001 Fundação | [#1](https://github.com/RodReis/rrb-jarvisOS/issues/1) | **fechado** — aceito pelo PI em 2026-07-22 | **6 / 6** |
 | MVP-002 Execução local controlada | [#9](https://github.com/RodReis/rrb-jarvisOS/issues/9) | **fechado** — aceito pelo PI em 2026-07-23 | **5 / 5** |
 | MVP-003 Design System | [#16](https://github.com/RodReis/rrb-jarvisOS/issues/16) | **fechado** — aceito pelo PI em 2026-07-23 | **8 / 8** |
-| MVP-004 Execução real (FS + terminal) | [#10](https://github.com/RodReis/rrb-jarvisOS/issues/10) | **aberto** — F01 (#74) entregue em 2026-08-28, aguardando aceite; F02 (#75) em Backlog | 0 / 2 (1 entregue) |
+| MVP-004 Execução real (FS + terminal) | [#10](https://github.com/RodReis/rrb-jarvisOS/issues/10) | **aberto** — F01 (#74) entregue e **aceita** em 2026-08-28; F02 (#75) em Backlog | **1 / 2** |
 | MVP-005 Providers + Vault + BudgetPolicy | [#76](https://github.com/RodReis/rrb-jarvisOS/issues/76) | **aberto** — 4 fatias em Backlog (#77–#80); as 4 specs `aprovada-pi` em 2026-07-24 | 0 / 4 |
 | MVP-006 Conectores Essenciais | — | desenho aprovado pelo PI (2026-08-28); **6 specs em revisão documental**, implementação não autorizada — sem issues | — |
 | MVP-007 Memória Contextual e RAG | — | slot reservado; proposta não detalhada; implementação não autorizada | — |
@@ -153,8 +155,8 @@ Não há catálogo numérico `SPEC-nnn`: as specs são identificadas por slug e 
 
 ## Próximas ações
 
-1. **PI — aceitar a F01 (#74)**, em `proplan:done` desde 2026-08-28. Antes disso, vale fechar a ressalva: a fila de aprovação nunca foi vista renderizada no app real (ver a nota em **Feito**) — precisa de um login real ou da decisão sobre semear a sessão.
-2. **Code — iniciar a F02 (#75)** depois que o PI decidir a ordem: terminal controlado (command-runner allowlisted), que consome o enforcement e a aprovação da F01. Spec `aprovada-pi` desde 2026-07-24.
+1. **PI — decidir a ressalva aberta da F01.** A fatia foi aceita, mas a **fila de aprovação nunca foi vista renderizada no app real** (ver a nota em **Finalizado** → MVP-004). Fechar exige um login real (OAuth, passo humano) ou a decisão sobre semear a sessão no SQLite. Enquanto isso, a garantia da UI é só de jsdom — que não faz layout.
+2. **Code — iniciar a F02 (#75)** quando o PI der a ordem: terminal controlado (command-runner allowlisted), que consome o enforcement e a aprovação da F01. Spec `aprovada-pi` desde 2026-07-24. É a cabeça da fila.
 3. **PI — decidir se o MVP-005 (#76) corre em paralelo ou depois do MVP-004.** Ele **independe** do MVP-004 (providers são caminho de execução por rede/adapter, gateado por Policy Engine + BudgetPolicy, não pelo FS/terminal), então a ordem é escolha de foco, não de dependência. Com WIP = 1 e time solo, a leitura do Code é **sequencial: MVP-004 → MVP-005**.
 4. **Cowork — spec de login por senha + GitHub** (decisão do PI, 2026-07-24). O mockup `01-login.png` mostra usuário/senha, GitHub e "cadastre-se com"; o backend só tem Google OAuth, e o #57 entregou a tela sem esses controles justamente para a UI não prometer o que o sistema não faz. Virar fatia exige a spec resolver, com o PI: política de senha; quem pode se cadastrar (aberto? convite? domínio restrito?); recuperação de senha (**depende de e-mail transacional, que não existe** — o ambiente é 100% local até o fim do MVP); vinculação de contas com o mesmo e-mail via Google e GitHub; verificação de e-mail. **Não é `[FIX]`** — há decisão de produto em cada linha.
 5. **PI — (opcional) decidir a adoção de numeração `SPEC-nnn`.**
