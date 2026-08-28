@@ -22,6 +22,7 @@ import type {
 } from '@shared/domain/workflows'
 import type { ExecutionRun } from '@shared/domain/execution'
 import type { ApprovalDecision, ApprovalRequest } from '@shared/domain/execution'
+import type { CommandExecution, CommandSubmission } from '@shared/domain/terminal'
 import type {
   AuditEvent,
   AuditEventType,
@@ -111,8 +112,20 @@ const bridge: JarvisBridge = {
     ipcRenderer.invoke(IPC_CHANNELS.executionList, workspace),
   listPendingApprovals: (workspace: WorkspaceId): Promise<readonly ApprovalRequest[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.approvalList, workspace),
-  resolveApproval: (id: string, decision: ApprovalDecision): Promise<ExecutionRun | undefined> =>
-    ipcRenderer.invoke(IPC_CHANNELS.approvalResolve, id, decision)
+  resolveApproval: (
+    id: string,
+    decision: ApprovalDecision
+  ): Promise<ExecutionRun | CommandExecution | undefined> =>
+    ipcRenderer.invoke(IPC_CHANNELS.approvalResolve, id, decision),
+
+  runCommand: (submission: CommandSubmission, workspace: WorkspaceId): Promise<CommandExecution> =>
+    ipcRenderer.invoke(IPC_CHANNELS.terminalRun, submission, workspace),
+  listAllowedCommands: (workspace: WorkspaceId): Promise<readonly string[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.commandAllowlistList, workspace),
+  addAllowedCommand: (binary: string, workspace: WorkspaceId): Promise<readonly string[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.commandAllowlistAdd, binary, workspace),
+  removeAllowedCommand: (binary: string, workspace: WorkspaceId): Promise<readonly string[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.commandAllowlistRemove, binary, workspace)
 }
 
 if (process.contextIsolated) {

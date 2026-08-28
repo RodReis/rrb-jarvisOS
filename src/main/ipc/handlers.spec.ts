@@ -101,7 +101,33 @@ const runs = {
 }
 
 const approvals = {
-  listPending: vi.fn(() => [])
+  listPending: vi.fn(() => []),
+  /** Por padrão a pendência é de filesystem — o roteamento por `kind` é exercitado à parte. */
+  findById: vi.fn(
+    (_userId: string, id: string): { id: string; operation: Record<string, unknown> } => ({
+      id,
+      operation: { kind: 'write', path: '/tmp/x' }
+    })
+  )
+}
+
+const terminal = {
+  run: vi.fn((submission: { binary: string }) => ({
+    id: 'cmd-1',
+    binary: submission.binary,
+    state: 'concluido'
+  })),
+  resolveApproval: vi.fn((id: string, decision: string) => ({
+    id: 'cmd-1',
+    approval: id,
+    decision
+  }))
+}
+
+const commandAllowlist = {
+  list: vi.fn(() => ['git']),
+  add: vi.fn(() => ({ binary: 'git', added: true })),
+  remove: vi.fn(() => ({ binary: 'git', removed: true }))
 }
 
 const minimizeToTray = vi.fn()
@@ -132,6 +158,8 @@ const deps = {
   workflows,
   execution,
   realExecution,
+  terminal,
+  commandAllowlist,
   runs,
   approvals,
   // Função desde a F03: a identidade muda em runtime (local antes do login, usuário da
@@ -180,6 +208,12 @@ beforeEach(() => {
   realExecution.resolveApproval.mockClear()
   runs.list.mockClear()
   approvals.listPending.mockClear()
+  approvals.findById.mockClear()
+  terminal.run.mockClear()
+  terminal.resolveApproval.mockClear()
+  commandAllowlist.list.mockClear()
+  commandAllowlist.add.mockClear()
+  commandAllowlist.remove.mockClear()
   logIpc.info.mockClear()
   logIpc.warn.mockClear()
   logIpc.error.mockClear()
@@ -447,5 +481,70 @@ describe('canais de execução real e aprovação (SPEC-ExecucaoReal-01)', () =>
     realExecution.resolveApproval.mockClear()
     expect(() => invocar(IPC_CHANNELS.approvalResolve, 'apr-1', 'talvez')).toThrow(/inválidos/)
     expect(realExecution.resolveApproval).not.toHaveBeenCalled()
+  })
+})
+
+describe('canais do terminal controlado (SPEC-ExecucaoReal-02)', () => {
+  it('submete o comando ao motor com binário, argumentos e cwd separados', () => {
+    invocar(
+      IPC_CHANNELS.terminalRun,
+      { binary: 'git', args: ['status'], cwd: '/permitido' },
+      'jarvis'
+    )
+    expect(terminal.run).toHaveBeenCalledWith(
+      { binary: 'git', args: ['status'], cwd: '/permitido' },
+      'jarvis'
+    )
+  })
+
+  it('rejeita submissão sem binário ou sem cwd — não há default seguro para nenhum dos dois', () => {
+    expect(() => invocar(IPC_CHANNELS.terminalRun, { args: [], cwd: '/x' }, 'jarvis')).toThrow(
+      /inválidos/
+    )
+    expect(() => invocar(IPC_CHANNELS.terminalRun, { binary: 'git', args: [] }, 'jarvis')).toThrow(
+      /inválidos/
+    )
+    expect(terminal.run).not.toHaveBeenCalled()
+  })
+
+  it('descarta argumentos que não são string na fronteira de confiança', () => {
+    invocar(
+      IPC_CHANNELS.terminalRun,
+      { binary: 'git', args: ['status', 42, null, '--short'], cwd: '/permitido' },
+      'jarvis'
+    )
+    expect(terminal.run).toHaveBeenCalledWith(
+      { binary: 'git', args: ['status', '--short'], cwd: '/permitido' },
+      'jarvis'
+    )
+  })
+
+  it('roteia a resolução da aprovação para o motor que criou o pedido', () => {
+    // A fila é compartilhada com a F01; o `kind` do payload é o que diz qual motor retoma.
+    approvals.findById.mockReturnValueOnce({
+      id: 'apr-cmd',
+      operation: { kind: 'comando', binary: 'git', args: [], cwd: '/permitido' }
+    })
+
+    invocar(IPC_CHANNELS.approvalResolve, 'apr-cmd', 'aprovado')
+
+    expect(terminal.resolveApproval).toHaveBeenCalledWith('apr-cmd', 'aprovado')
+    expect(realExecution.resolveApproval).not.toHaveBeenCalled()
+  })
+
+  it('gerencia a allowlist de comandos escopada por usuário e espaço', () => {
+    invocar(IPC_CHANNELS.commandAllowlistList, 'jarvis')
+    expect(commandAllowlist.list).toHaveBeenCalledWith('local', 'jarvis')
+
+    invocar(IPC_CHANNELS.commandAllowlistAdd, 'git', 'jarvis')
+    expect(commandAllowlist.add).toHaveBeenCalledWith('local', 'jarvis', 'git')
+
+    invocar(IPC_CHANNELS.commandAllowlistRemove, 'git', 'jarvis')
+    expect(commandAllowlist.remove).toHaveBeenCalledWith('local', 'jarvis', 'git')
+  })
+
+  it('ignora workspace inválido sem tocar a allowlist de comandos', () => {
+    expect(invocar(IPC_CHANNELS.commandAllowlistAdd, 'git', 'inexistente')).toEqual([])
+    expect(commandAllowlist.add).not.toHaveBeenCalled()
   })
 })

@@ -1,6 +1,6 @@
 # STATUS.md — Kanban / Roadmap
 
-Atualizado em: **2026-08-28** (pós-merge da F01). Mantido pelo Code a cada entrega (junto com `DEVELOPMENT.md`). Este arquivo espelha o board das GitHub Issues (`proplan:*`) — se divergirem, as **Issues vencem** e este arquivo deve ser corrigido.
+Atualizado em: **2026-08-28** (pós-entrega da F02 — MVP-004 com as duas fatias entregues). Mantido pelo Code a cada entrega (junto com `DEVELOPMENT.md`). Este arquivo espelha o board das GitHub Issues (`proplan:*`) — se divergirem, as **Issues vencem** e este arquivo deve ser corrigido.
 
 > **Correção de deriva (2026-08-28).** O arquivo tinha parado em 2026-07-24 e descrevia um board que não existe mais: apontava #34, #41, #43, #47, #52, #57, #58 e #69 como "aguardando aceite" (todos já `proplan:finalizado`), #66 como "Em Andamento" (fechado em 2026-07-25) e não conhecia as **7 issues novas** (#74–#80) nem os MVPs **005 a 009**. Reescrito contra o board real.
 
@@ -10,7 +10,6 @@ Atualizado em: **2026-08-28** (pós-merge da F01). Mantido pelo Code a cada entr
 
 | Issue | Fatia | MVP | Spec | Índice |
 |---|---|---|---|---|
-| [#75](https://github.com/RodReis/rrb-jarvisOS/issues/75) | 02 Terminal controlado (command-runner) | MVP-004 (#10) | `spec-execucao-real-02-terminal-controlado.md` | M4-F02 |
 | [#77](https://github.com/RodReis/rrb-jarvisOS/issues/77) | 01 Vault de credenciais (CredentialRef) | MVP-005 (#76) | `spec-providers-01-vault-credenciais.md` | M5-F01 |
 | [#78](https://github.com/RodReis/rrb-jarvisOS/issues/78) | 02 Framework de adapters + Claude API | MVP-005 (#76) | `spec-providers-02-adapter-claude-api.md` | M5-F02 |
 | [#79](https://github.com/RodReis/rrb-jarvisOS/issues/79) | 03 BudgetPolicy (gate de custo) | MVP-005 (#76) | `spec-providers-03-budget-policy.md` | M5-F03 |
@@ -18,11 +17,19 @@ Atualizado em: **2026-08-28** (pós-merge da F01). Mantido pelo Code a cada entr
 
 > **Rótulo do #64 corrigido em 2026-08-28.** O `[FIX]` estava em `proplan:backlog` desde 2026-07-24 apesar de **entregue e mergeado** (PR [#65](https://github.com/RodReis/rrb-jarvisOS/pull/65), squash `b9f583a`) — aparecia como trabalho pendente por mais de um mês. Verificado na `main` antes de mover (`src/renderer/src/i18n/recursos.ts:99-100`) e carimbado `proplan:done`. Está em **Feito**, aguardando o aceite do PI.
 
-> **`proplan:next` sem sucessor definido.** Nenhuma issue aberta carrega o marcador. Com a F01 entregue, a cabeça da fila é a **F02 do MVP-004** (#75) — ela consome o enforcement e o fluxo de aprovação que a F01 acabou de entregar. O MVP-005 (#76) é o corte seguinte e **independe do MVP-004** (providers são caminho de execução distinto — rede/adapter, não FS/terminal).
+> **`proplan:next` no [#77](https://github.com/RodReis/rrb-jarvisOS/issues/77)** (Vault de credenciais, M5-F01) — marcado ao puxar a F02 para `doing`. Com a F02 entregue, o **MVP-004 tem as duas fatias fora do Backlog**: a F01 aceita, a F02 aguardando aceite. O MVP-005 (#76) é o corte seguinte e **independe do MVP-004** (providers são caminho de execução distinto — rede/adapter, não FS/terminal).
 
 ### Feito (`proplan:done` — entregue, aguardando aceite do PI)
 
-*Vazio.* A **F01 (#74)** foi entregue e **aceita pelo PI no mesmo dia** (2026-08-28) — está em **Finalizado**. O #64 também.
+| Issue | Fatia | MVP | Spec | PR | Mergeado |
+|---|---|---|---|---|---|
+| [#75](https://github.com/RodReis/rrb-jarvisOS/issues/75) | 02 Terminal controlado (command-runner) | MVP-004 (#10) | `spec-execucao-real-02-terminal-controlado.md` | [#83](https://github.com/RodReis/rrb-jarvisOS/pull/83) | 2026-08-28 |
+
+> **F02 entregue** (Code, 2026-08-28). Os 11 critérios cobertos; os de comportamento (1–8) provados **por efeito** em 18 testes de integração — comando permitido cria arquivo no disco, comando barrado não cria nada. **639 testes verdes** (+27). Duas decisões do PI sustentam a fatia e estão registradas no `DEVELOPMENT.md`: submissão em **campos separados** (com `shell: false`, metacaractere deixa de existir em vez de ser rejeitado por lista) e **allowlist satisfeita libera a execução** (precedente que a F01 abriu para `fs.write-allowed`) — sem a segunda, `git status` pediria aprovação e as duas barreiras colapsariam numa só.
+>
+> ⚠️ **Herda a mesma ressalva da F01: a UI não foi vista renderizada no app real.** O app para na tela de login, e sem sessão não se alcança a rota `terminal`. jsdom não aplica folha de estilo nem faz layout — foi assim que #57, #58 e #64 passaram com a suíte verde. Fechar exige login real (passo humano) ou a decisão do PI sobre semear a sessão.
+
+A **F01 (#74)** foi entregue e **aceita pelo PI no mesmo dia** (2026-08-28) — está em **Finalizado**. O #64 também.
 
 ### Finalizado (`closed` + `proplan:finalizado` — aceito pelo PI)
 
@@ -114,7 +121,7 @@ Atualizado em: **2026-08-28** (pós-merge da F01). Mantido pelo Code a cada entr
 
 *Vazio.* Nenhuma issue com `proplan:todo` ou `proplan:doing`. WIP = 0.
 
-> A próxima da fila é a **F02 do MVP-004** ([#75](https://github.com/RodReis/rrb-jarvisOS/issues/75) — terminal controlado), que consome o enforcement e o fluxo de aprovação entregues pela F01.
+> A próxima da fila é a **F01 do MVP-005** ([#77](https://github.com/RodReis/rrb-jarvisOS/issues/77) — vault de credenciais), que carrega o marcador `proplan:next`. Com a F02 entregue, o **MVP-004 aguarda só o aceite do PI na #75** para o épico [#10](https://github.com/RodReis/rrb-jarvisOS/issues/10) poder fechar.
 
 ### Índice Fatia ↔ SPEC (fonte única do par MVP↔SPEC↔Fatia)
 
@@ -138,7 +145,7 @@ Não há catálogo numérico `SPEC-nnn`: as specs são identificadas por slug e 
 | MVP-001 Fundação | [#1](https://github.com/RodReis/rrb-jarvisOS/issues/1) | **fechado** — aceito pelo PI em 2026-07-22 | **6 / 6** |
 | MVP-002 Execução local controlada | [#9](https://github.com/RodReis/rrb-jarvisOS/issues/9) | **fechado** — aceito pelo PI em 2026-07-23 | **5 / 5** |
 | MVP-003 Design System | [#16](https://github.com/RodReis/rrb-jarvisOS/issues/16) | **fechado** — aceito pelo PI em 2026-07-23 | **8 / 8** |
-| MVP-004 Execução real (FS + terminal) | [#10](https://github.com/RodReis/rrb-jarvisOS/issues/10) | **aberto** — F01 (#74) entregue e **aceita** em 2026-08-28; F02 (#75) em Backlog | **1 / 2** |
+| MVP-004 Execução real (FS + terminal) | [#10](https://github.com/RodReis/rrb-jarvisOS/issues/10) | **aberto** — F01 (#74) **aceita** em 2026-08-28; F02 (#75) entregue no PR [#83](https://github.com/RodReis/rrb-jarvisOS/pull/83), aguardando aceite | **1 / 2** |
 | MVP-005 Providers + Vault + BudgetPolicy | [#76](https://github.com/RodReis/rrb-jarvisOS/issues/76) | **aberto** — 4 fatias em Backlog (#77–#80); as 4 specs `aprovada-pi` em 2026-07-24 | 0 / 4 |
 | MVP-006 Conectores Essenciais | — | desenho aprovado pelo PI (2026-08-28); **6 specs em revisão documental**, implementação não autorizada — sem issues | — |
 | MVP-007 Memória Contextual e RAG | — | slot reservado; proposta não detalhada; implementação não autorizada | — |
@@ -156,7 +163,7 @@ Não há catálogo numérico `SPEC-nnn`: as specs são identificadas por slug e 
 ## Próximas ações
 
 1. **PI — decidir a ressalva aberta da F01.** A fatia foi aceita, mas a **fila de aprovação nunca foi vista renderizada no app real** (ver a nota em **Finalizado** → MVP-004). Fechar exige um login real (OAuth, passo humano) ou a decisão sobre semear a sessão no SQLite. Enquanto isso, a garantia da UI é só de jsdom — que não faz layout.
-2. **Code — iniciar a F02 (#75)** quando o PI der a ordem: terminal controlado (command-runner allowlisted), que consome o enforcement e a aprovação da F01. Spec `aprovada-pi` desde 2026-07-24. É a cabeça da fila.
+2. **PI — aceitar (ou recusar) a F02 (#75).** Entregue no PR [#83](https://github.com/RodReis/rrb-jarvisOS/pull/83). Aceita, **as duas fatias do MVP-004 fecham** e o épico [#10](https://github.com/RodReis/rrb-jarvisOS/issues/10) pode ser fechado pelo PI. Ela herda a ressalva do item 1 — a UI do terminal também só tem garantia de jsdom.
 3. **PI — decidir se o MVP-005 (#76) corre em paralelo ou depois do MVP-004.** Ele **independe** do MVP-004 (providers são caminho de execução por rede/adapter, gateado por Policy Engine + BudgetPolicy, não pelo FS/terminal), então a ordem é escolha de foco, não de dependência. Com WIP = 1 e time solo, a leitura do Code é **sequencial: MVP-004 → MVP-005**.
 4. **Cowork — spec de login por senha + GitHub** (decisão do PI, 2026-07-24). O mockup `01-login.png` mostra usuário/senha, GitHub e "cadastre-se com"; o backend só tem Google OAuth, e o #57 entregou a tela sem esses controles justamente para a UI não prometer o que o sistema não faz. Virar fatia exige a spec resolver, com o PI: política de senha; quem pode se cadastrar (aberto? convite? domínio restrito?); recuperação de senha (**depende de e-mail transacional, que não existe** — o ambiente é 100% local até o fim do MVP); vinculação de contas com o mesmo e-mail via Google e GitHub; verificação de e-mail. **Não é `[FIX]`** — há decisão de produto em cada linha.
 5. **PI — (opcional) decidir a adoção de numeração `SPEC-nnn`.**

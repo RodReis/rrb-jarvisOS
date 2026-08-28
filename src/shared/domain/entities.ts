@@ -156,7 +156,13 @@ export const AUDIT_EVENT_TYPES = [
   'execution-step',
   // SPEC-ExecucaoReal-01: aprovação humana real e operação de filesystem auditada.
   'approval-request',
-  'filesystem-operation'
+  'filesystem-operation',
+  // SPEC-ExecucaoReal-02: execução de comando no terminal controlado (RF-016 exige que
+  // comando, diretório, saída, erro, duração e exit code sejam auditados — e que **erro de
+  // execução** gere evento, não só sucesso). Tipo próprio, e não `filesystem-operation`:
+  // executar processo e tocar arquivo são capacidades distintas, com allowlists distintas, e
+  // a auditoria tem de poder separá-las sem parsear o payload.
+  'terminal-command'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]

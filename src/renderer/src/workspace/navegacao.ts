@@ -21,7 +21,7 @@ import type { WorkspaceId } from '@shared/domain/entities'
  */
 export const ROTAS_POR_WORKSPACE: Readonly<Record<WorkspaceId, readonly string[]>> = {
   noa: ['inicio', 'notas', 'agenda', 'settings'],
-  jarvis: ['inicio', 'operacoes', 'agentes', 'settings']
+  jarvis: ['inicio', 'operacoes', 'terminal', 'agentes', 'settings']
 }
 
 /** Rota inicial de cada espaço, usada na primeira visita. */
@@ -83,7 +83,7 @@ export const SUB_MODULO_INICIAL: SubModuloJarvis = 'command'
 
 /** Rotas por sub-módulo do JARVIS — protótipo JARVISOS §2 (`navJDef` / `navADef`). */
 export const ROTAS_POR_SUB_MODULO: Readonly<Record<SubModuloJarvis, readonly string[]>> = {
-  command: ['inicio', 'operacoes', 'settings'],
+  command: ['inicio', 'operacoes', 'terminal', 'settings'],
   agents: ['agentes']
 }
 

@@ -122,6 +122,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
   })
 
   expect(superficie.metodos).toEqual([
+    'addAllowedCommand',
     'addAllowedDirectory',
     'classifyAction',
     'createAutomation',
@@ -130,6 +131,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'getAuth',
     'getPreferences',
     'getWorkspace',
+    'listAllowedCommands',
     'listAllowedDirectories',
     'listAuditEvents',
     'listAutomations',
@@ -140,10 +142,12 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'logout',
     'minimizeToTray',
     'onAuthChanged',
+    'removeAllowedCommand',
     'removeAllowedDirectory',
     'removeAutomation',
     'removeWorkflow',
     'resolveApproval',
+    'runCommand',
     'runWorkflowReal',
     'runWorkflowSimulated',
     'savePreferences',

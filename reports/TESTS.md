@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 234 | 234 | 0 | 78.7 | — | — |
-| — | — | — | Banco | 142 | 142 | 0 | 85.5 | — | — |
-| — | — | — | Tela | 217 | 216 | 0 | 92.1 | — | — |
+| — | — | — | Regras de Negócio | 254 | 254 | 0 | 79.8 | — | — |
+| — | — | — | Banco | 160 | 160 | 0 | 87.6 | — | — |
+| — | — | — | Tela | 226 | 225 | 0 | 91.6 | — | — |
 
 ## Histórico por entrega
 
@@ -103,3 +103,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | — | #74 | spec-execucao-real-01-filesystem-allowlisted | Regras de Negócio | 234 | 234 | 0 | 78.7 | #81 | [#81](https://github.com/RodReis/rrb-jarvisOS/pull/81) |
 | — | #74 | spec-execucao-real-01-filesystem-allowlisted | Banco | 142 | 142 | 0 | 85.5 | #81 | [#81](https://github.com/RodReis/rrb-jarvisOS/pull/81) |
 | — | #74 | spec-execucao-real-01-filesystem-allowlisted | Tela | 217 | 216 | 0 | 92.1 | #81 | [#81](https://github.com/RodReis/rrb-jarvisOS/pull/81) |
+| — | #75 | spec-execucao-real-02-terminal-controlado | Regras de Negócio | 254 | 254 | 0 | 79.8 | #83 | [#83](https://github.com/RodReis/rrb-jarvisOS/pull/83) |
+| — | #75 | spec-execucao-real-02-terminal-controlado | Banco | 160 | 160 | 0 | 87.6 | #83 | [#83](https://github.com/RodReis/rrb-jarvisOS/pull/83) |
+| — | #75 | spec-execucao-real-02-terminal-controlado | Tela | 226 | 225 | 0 | 91.6 | #83 | [#83](https://github.com/RodReis/rrb-jarvisOS/pull/83) |

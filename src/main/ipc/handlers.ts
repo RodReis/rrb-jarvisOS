@@ -17,8 +17,11 @@ import type { PolicyService } from '../policy/policy-service'
 import type { WorkflowService } from '../workflows/workflow-service'
 import type { SimulationEngine } from '../execution/simulation-engine'
 import type { RealFileSystemEngine } from '../execution/real-filesystem-engine'
+import type { TerminalEngine } from '../execution/terminal-engine'
+import type { CommandAllowlistRepository } from '../policy/command-allowlist-repository'
 import type { ExecutionRepository } from '../execution/execution-repository'
 import type { ApprovalDecision, ExecutionRun } from '@shared/domain/execution'
+import type { CommandExecution, CommandSubmission } from '@shared/domain/terminal'
 import { isWorkflowStatus } from '@shared/domain/workflows'
 import type { Automation, AutomationInput, Workflow, WorkflowInput } from '@shared/domain/workflows'
 import type { PreferencesService } from '../preferences/preferences-service'
@@ -88,6 +91,10 @@ export interface IpcDependencies {
   readonly execution: SimulationEngine
   /** Motor de filesystem real (SPEC-ExecucaoReal-01): enforcement fail-closed. */
   readonly realExecution: RealFileSystemEngine
+  /** Motor do terminal controlado (SPEC-ExecucaoReal-02): duas barreiras + timeout. */
+  readonly terminal: TerminalEngine
+  /** Allowlist de comandos (SPEC-ExecucaoReal-02, 1ª barreira): edição de alto risco. */
+  readonly commandAllowlist: CommandAllowlistRepository
   /** Runs persistidos, para a UI listar o histórico. */
   readonly runs: ExecutionRepository
   /** Fila de aprovações pendentes do usuário corrente. */
@@ -417,13 +424,92 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     return deps.approvals.listPending(deps.userId(), workspace)
   })
 
+  // Resolver uma aprovação **roteia pelo motor que a criou**.
+  //
+  // A fila é uma só de propósito (a F02 reusa a da F01 — o usuário tem um lugar para ver o
+  // que espera por ele), mas retomar um comando é executar processo, e retomar uma etapa de
+  // filesystem é tocar arquivo: dois motores. O discriminante é o `kind` gravado no payload
+  // da operação — `comando` para terminal, as operações de FS para o resto. Sem este
+  // roteamento, aprovar um comando cairia no motor de filesystem, que não saberia o que fazer
+  // com o payload e falharia a etapa silenciosamente.
   ipcMain.handle(
     IPC_CHANNELS.approvalResolve,
-    (_event, id: unknown, decision: unknown): ExecutionRun | undefined => {
+    (_event, id: unknown, decision: unknown): ExecutionRun | CommandExecution | undefined => {
       if (typeof id !== 'string' || (decision !== 'aprovado' && decision !== 'negado')) {
         throw new Error('Parâmetros inválidos para aprovação.')
       }
+
+      const pedido = deps.approvals.findById(deps.userId(), id)
+      if (pedido?.operation['kind'] === 'comando') {
+        return deps.terminal.resolveApproval(id, decision as ApprovalDecision)
+      }
+
       return deps.realExecution.resolveApproval(id, decision as ApprovalDecision)
+    }
+  )
+
+  // Terminal controlado (SPEC-ExecucaoReal-02). O renderer submete; **só o main executa**.
+  //
+  // A validação aqui é de *forma* (fronteira de confiança), não de política: binário e cwd
+  // precisam ser string e os argumentos precisam ser strings. Quem decide se o comando pode
+  // rodar é o motor, com as duas barreiras — repetir a decisão aqui criaria uma segunda
+  // fonte de política, e duas fontes divergem.
+  ipcMain.handle(
+    IPC_CHANNELS.terminalRun,
+    (_event, submission: unknown, workspace: unknown): CommandExecution => {
+      const pedido =
+        typeof submission === 'object' && submission !== null
+          ? (submission as Record<string, unknown>)
+          : {}
+
+      const binary = typeof pedido['binary'] === 'string' ? pedido['binary'] : ''
+      const cwd = typeof pedido['cwd'] === 'string' ? pedido['cwd'] : ''
+      const args = Array.isArray(pedido['args'])
+        ? pedido['args'].filter((a): a is string => typeof a === 'string')
+        : []
+
+      if (!isWorkspaceId(workspace) || binary.length === 0 || cwd.length === 0) {
+        throw new Error('Parâmetros inválidos para execução de comando.')
+      }
+
+      log.agent.info('Execução de comando solicitada pela interface', {
+        canal: IPC_CHANNELS.terminalRun,
+        direction: 'in',
+        binary
+      })
+
+      const entrada: CommandSubmission = { binary, args, cwd }
+      return deps.terminal.run(entrada, workspace)
+    }
+  )
+
+  // Allowlist de comandos. Escopada por espaço; `add`/`remove` classificam (alto risco) e
+  // auditam no repositório. Devolvem a lista atualizada, como os canais de diretório.
+  ipcMain.handle(
+    IPC_CHANNELS.commandAllowlistList,
+    (_event, workspace: unknown): readonly string[] => {
+      if (!isWorkspaceId(workspace)) return []
+      return deps.commandAllowlist.list(deps.userId(), workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.commandAllowlistAdd,
+    (_event, binary: unknown, workspace: unknown): readonly string[] => {
+      if (!isWorkspaceId(workspace)) return []
+      const alvo = typeof binary === 'string' ? binary : ''
+      if (alvo) deps.commandAllowlist.add(deps.userId(), workspace, alvo)
+      return deps.commandAllowlist.list(deps.userId(), workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.commandAllowlistRemove,
+    (_event, binary: unknown, workspace: unknown): readonly string[] => {
+      if (!isWorkspaceId(workspace)) return []
+      const alvo = typeof binary === 'string' ? binary : ''
+      if (alvo) deps.commandAllowlist.remove(deps.userId(), workspace, alvo)
+      return deps.commandAllowlist.list(deps.userId(), workspace)
     }
   )
 

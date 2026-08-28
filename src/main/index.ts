@@ -16,6 +16,8 @@ import { SimulationEngine } from './execution/simulation-engine'
 import { ExecutionRepository } from './execution/execution-repository'
 import { ApprovalRepository } from './execution/approval-repository'
 import { RealFileSystemEngine } from './execution/real-filesystem-engine'
+import { TerminalEngine } from './execution/terminal-engine'
+import { CommandAllowlistRepository } from './policy/command-allowlist-repository'
 import { carregarEnv } from './env'
 import { closeLogger, initLogger, log } from './logging/logger'
 import { initRendererLogBridge } from './logging/renderer-bridge'
@@ -136,6 +138,21 @@ if (!app.requestSingleInstanceLock()) {
       userIdAtual
     )
 
+    // Terminal controlado (SPEC-ExecucaoReal-02): o segundo caminho de execução real. Reusa
+    // `approvals`/`runs` da F01 de propósito — uma fila só de aprovações pendentes, um lugar
+    // só para o usuário ver o que espera por ele. A allowlist de comandos é conceito novo e
+    // nasce **vazia**: nada roda até o usuário permitir explicitamente.
+    const commandAllowlist = new CommandAllowlistRepository(storage.db, storage.audit, policy)
+    const terminal = new TerminalEngine(
+      policy,
+      commandAllowlist,
+      allowlist,
+      runs,
+      approvals,
+      storage.audit,
+      userIdAtual
+    )
+
     registerIpcHandlers({
       audit: storage.audit,
       workspaces,
@@ -145,6 +162,8 @@ if (!app.requestSingleInstanceLock()) {
       workflows: workflowsService,
       execution,
       realExecution,
+      terminal,
+      commandAllowlist,
       runs,
       approvals,
       userId: userIdAtual,

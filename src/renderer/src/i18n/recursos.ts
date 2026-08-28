@@ -49,6 +49,7 @@ export const RECURSOS = {
         notas: 'Notas',
         agenda: 'Agenda',
         operacoes: 'Operações',
+        terminal: 'Terminal',
         agentes: 'Agentes',
         settings: 'Configurações'
       },
@@ -176,6 +177,7 @@ export const RECURSOS = {
         notas: 'Notes',
         agenda: 'Calendar',
         operacoes: 'Operations',
+        terminal: 'Terminal',
         agentes: 'Agents',
         settings: 'Settings'
       },

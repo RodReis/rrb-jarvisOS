@@ -53,6 +53,7 @@ describe('ponte do preload', () => {
     // Critério de aceite 4: a superfície é fechada. Um `invoke`/`send`/`on` cru aqui
     // deixaria o renderer alcançar qualquer handler do main.
     expect(Object.keys(bridge).sort()).toEqual([
+      'addAllowedCommand',
       'addAllowedDirectory',
       'classifyAction',
       'createAutomation',
@@ -61,6 +62,7 @@ describe('ponte do preload', () => {
       'getAuth',
       'getPreferences',
       'getWorkspace',
+      'listAllowedCommands',
       'listAllowedDirectories',
       'listAuditEvents',
       'listAutomations',
@@ -71,10 +73,12 @@ describe('ponte do preload', () => {
       'logout',
       'minimizeToTray',
       'onAuthChanged',
+      'removeAllowedCommand',
       'removeAllowedDirectory',
       'removeAutomation',
       'removeWorkflow',
       'resolveApproval',
+      'runCommand',
       'runWorkflowReal',
       'runWorkflowSimulated',
       'savePreferences',
