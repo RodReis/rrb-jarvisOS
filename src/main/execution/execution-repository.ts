@@ -78,6 +78,24 @@ export class ExecutionRepository {
     return run
   }
 
+  update(run: ExecutionRun): ExecutionRun {
+    this.db
+      .prepare(
+        `UPDATE execution_run
+            SET state = ?,
+                trace = ?,
+                finished_at = ?
+          WHERE user_id = ? AND id = ?`
+      )
+      .run(run.state, JSON.stringify(run.trace), run.finishedAt, run.user_id, run.id)
+    log.db.info('Execução registrada atualizada', {
+      op: 'update',
+      table: 'execution_run',
+      state: run.state
+    })
+    return run
+  }
+
   list(userId: string, workspaceId: WorkspaceId): readonly ExecutionRun[] {
     const rows = this.db
       .prepare(

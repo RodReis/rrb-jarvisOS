@@ -14,6 +14,9 @@ const savePreferences = vi.fn()
 const getAuth = vi.fn()
 const login = vi.fn()
 const logout = vi.fn()
+const listPendingApprovals = vi.fn()
+const resolveApproval = vi.fn()
+const runWorkflowReal = vi.fn()
 
 /**
  * Perfil da sessão usada nestes testes. O `App` só monta o AppShell quando a auth está
@@ -43,6 +46,9 @@ function mockarPonte(): void {
       getAuth,
       login,
       logout,
+      runWorkflowReal,
+      listPendingApprovals,
+      resolveApproval,
       // Devolve a função de cancelamento, como a ponte real: sem isso o `useEffect`
       // tentaria chamar `undefined` na desmontagem e o cleanup estouraria.
       onAuthChanged: vi.fn(() => () => undefined)
@@ -64,7 +70,13 @@ beforeEach(() => {
   sendLog.mockClear()
   minimizeToTray.mockClear()
   savePreferences.mockClear()
+  listPendingApprovals.mockClear()
+  resolveApproval.mockClear()
+  runWorkflowReal.mockClear()
   getAuth.mockResolvedValue({ state: 'ativo', profile: PERFIL_LOGADO })
+  listPendingApprovals.mockResolvedValue([])
+  resolveApproval.mockResolvedValue({ id: 'run-1', state: 'concluido' })
+  runWorkflowReal.mockResolvedValue({ id: 'run-1', state: 'concluido' })
   // O main é a fonte do espaço ativo; o mock reflete a troca, como ele faria.
   getWorkspace.mockResolvedValue('jarvis' as WorkspaceId)
   switchWorkspace.mockImplementation((w: WorkspaceId) =>
@@ -166,6 +178,38 @@ describe('AppShell', () => {
     await userEvent.click(screen.getByRole('button', { name: /minimizar/i }))
 
     expect(minimizeToTray).toHaveBeenCalled()
+  })
+
+  it('mostra aprovações pendentes em Operações e resolve pela ponte', async () => {
+    listPendingApprovals.mockResolvedValueOnce([
+      {
+        id: 'apr-1',
+        user_id: 'u-1',
+        workspace_id: 'jarvis',
+        runId: 'run-1',
+        stepId: 's-read',
+        action: 'fs.list-allowed',
+        status: 'pendente',
+        risk: 'medio',
+        reason: 'elevada-por-path-fora-da-allowlist',
+        operation: { kind: 'read', path: 'C:\\fora\\entrada.txt' },
+        created_at: '2026-07-24T10:00:00.000Z'
+      }
+    ])
+
+    await entrarPelaChoice()
+    await userEvent.click(screen.getByRole('button', { name: 'Operações' }))
+
+    expect(await screen.findByText('Etapa s-read')).toBeInTheDocument()
+    expect(
+      screen.getByText('Autoriza uma exceção pontual fora da allowlist para esta execução.')
+    ).toBeInTheDocument()
+
+    const aprovar = screen.getByRole('button', { name: 'Aprovar' })
+    aprovar.focus()
+    await userEvent.keyboard('{Enter}')
+
+    expect(resolveApproval).toHaveBeenCalledWith('apr-1', 'aprovado')
   })
 
   it('exibe erro quando a ponte falha ao carregar o espaço', async () => {

@@ -14,6 +14,8 @@ import { WorkflowRepository } from './workflows/workflow-repository'
 import { AutomationRepository } from './workflows/automation-repository'
 import { SimulationEngine } from './execution/simulation-engine'
 import { ExecutionRepository } from './execution/execution-repository'
+import { ApprovalRepository } from './execution/approval-repository'
+import { RealFileSystemEngine } from './execution/real-filesystem-engine'
 import { carregarEnv } from './env'
 import { closeLogger, initLogger, log } from './logging/logger'
 import { initRendererLogBridge } from './logging/renderer-bridge'
@@ -115,11 +117,21 @@ if (!app.requestSingleInstanceLock()) {
     // Motor de execução simulada (SPEC-Execucao-05): junta F02 (classifica), F03 (allowlist)
     // e F04 (definições). **Zero efeito colateral** — nada toca FS, rede ou terminal.
     const runs = new ExecutionRepository(storage.db)
+    const approvals = new ApprovalRepository(storage.db)
     const execution = new SimulationEngine(
       workflowRepo,
       policy,
       allowlist,
       runs,
+      storage.audit,
+      userIdAtual
+    )
+    const realExecution = new RealFileSystemEngine(
+      workflowRepo,
+      policy,
+      allowlist,
+      runs,
+      approvals,
       storage.audit,
       userIdAtual
     )
@@ -132,7 +144,9 @@ if (!app.requestSingleInstanceLock()) {
       allowlist,
       workflows: workflowsService,
       execution,
+      realExecution,
       runs,
+      approvals,
       userId: userIdAtual,
       auth,
       minimizeToTray: () => janela?.hide()

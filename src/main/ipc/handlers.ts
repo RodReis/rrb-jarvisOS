@@ -16,13 +16,15 @@ import type { AllowlistRepository } from '../policy/allowlist-repository'
 import type { PolicyService } from '../policy/policy-service'
 import type { WorkflowService } from '../workflows/workflow-service'
 import type { SimulationEngine } from '../execution/simulation-engine'
+import type { RealFileSystemEngine } from '../execution/real-filesystem-engine'
 import type { ExecutionRepository } from '../execution/execution-repository'
-import type { ExecutionRun } from '@shared/domain/execution'
+import type { ApprovalDecision, ExecutionRun } from '@shared/domain/execution'
 import { isWorkflowStatus } from '@shared/domain/workflows'
 import type { Automation, AutomationInput, Workflow, WorkflowInput } from '@shared/domain/workflows'
 import type { PreferencesService } from '../preferences/preferences-service'
 import type { AuditRepository } from '../storage/audit-repository'
 import type { WorkspaceService } from '../workspace/workspace-service'
+import type { ApprovalRepository } from '../execution/approval-repository'
 
 /**
  * Normaliza o contexto de política vindo do renderer (fronteira de confiança).
@@ -84,8 +86,12 @@ export interface IpcDependencies {
   readonly workflows: WorkflowService
   /** Motor de execução simulada (SPEC-Execucao-05): zero efeito colateral. */
   readonly execution: SimulationEngine
+  /** Motor de filesystem real (SPEC-ExecucaoReal-01): enforcement fail-closed. */
+  readonly realExecution: RealFileSystemEngine
   /** Runs persistidos, para a UI listar o histórico. */
   readonly runs: ExecutionRepository
+  /** Fila de aprovações pendentes do usuário corrente. */
+  readonly approvals: ApprovalRepository
   /** Ausente quando as credenciais não estão configuradas — o app roda sem login. */
   readonly auth?: AuthService
   /** Minimizar para o tray. Injetado porque a janela nasce depois dos handlers. */
@@ -384,10 +390,40 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
   )
 
   ipcMain.handle(
+    IPC_CHANNELS.executionRunReal,
+    (_event, workflowId: unknown, workspace: unknown): ExecutionRun => {
+      if (typeof workflowId !== 'string' || !isWorkspaceId(workspace)) {
+        throw new Error('Parâmetros inválidos para execução real.')
+      }
+      log.agent.info('Execução real de filesystem solicitada pela interface', {
+        canal: IPC_CHANNELS.executionRunReal,
+        direction: 'in',
+        workflowId
+      })
+      return deps.realExecution.runWorkflow(workflowId, workspace)
+    }
+  )
+
+  ipcMain.handle(
     IPC_CHANNELS.executionList,
     (_event, workspace: unknown): readonly ExecutionRun[] => {
       if (!isWorkspaceId(workspace)) return []
       return deps.runs.list(deps.userId(), workspace)
+    }
+  )
+
+  ipcMain.handle(IPC_CHANNELS.approvalList, (_event, workspace: unknown) => {
+    if (!isWorkspaceId(workspace)) return []
+    return deps.approvals.listPending(deps.userId(), workspace)
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.approvalResolve,
+    (_event, id: unknown, decision: unknown): ExecutionRun | undefined => {
+      if (typeof id !== 'string' || (decision !== 'aprovado' && decision !== 'negado')) {
+        throw new Error('Parâmetros inválidos para aprovação.')
+      }
+      return deps.realExecution.resolveApproval(id, decision as ApprovalDecision)
     }
   )
 

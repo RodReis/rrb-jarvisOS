@@ -21,6 +21,7 @@ import type {
   WorkflowStatus
 } from '@shared/domain/workflows'
 import type { ExecutionRun } from '@shared/domain/execution'
+import type { ApprovalDecision, ApprovalRequest } from '@shared/domain/execution'
 import type {
   AuditEvent,
   AuditEventType,
@@ -104,8 +105,14 @@ const bridge: JarvisBridge = {
 
   runWorkflowSimulated: (workflowId: string, workspace: WorkspaceId): Promise<ExecutionRun> =>
     ipcRenderer.invoke(IPC_CHANNELS.executionRun, workflowId, workspace),
+  runWorkflowReal: (workflowId: string, workspace: WorkspaceId): Promise<ExecutionRun> =>
+    ipcRenderer.invoke(IPC_CHANNELS.executionRunReal, workflowId, workspace),
   listExecutionRuns: (workspace: WorkspaceId): Promise<readonly ExecutionRun[]> =>
-    ipcRenderer.invoke(IPC_CHANNELS.executionList, workspace)
+    ipcRenderer.invoke(IPC_CHANNELS.executionList, workspace),
+  listPendingApprovals: (workspace: WorkspaceId): Promise<readonly ApprovalRequest[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.approvalList, workspace),
+  resolveApproval: (id: string, decision: ApprovalDecision): Promise<ExecutionRun | undefined> =>
+    ipcRenderer.invoke(IPC_CHANNELS.approvalResolve, id, decision)
 }
 
 if (process.contextIsolated) {

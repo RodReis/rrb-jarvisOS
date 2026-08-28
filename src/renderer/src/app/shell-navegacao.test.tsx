@@ -46,6 +46,11 @@ function mockarPonte(): void {
       getAuth,
       login: vi.fn(),
       logout: vi.fn(),
+      runWorkflowReal: vi.fn(),
+      // A rota Operações monta as aprovações pendentes (SPEC-ExecucaoReal-01); sem o stub
+      // o efeito da lista estoura antes de o teste chegar ao que ele mede.
+      listPendingApprovals: vi.fn(async () => []),
+      resolveApproval: vi.fn(),
       onAuthChanged: vi.fn(() => () => undefined)
     },
     configurable: true,

@@ -82,9 +82,26 @@ const execution = {
   runWorkflow: vi.fn((workflowId: string) => ({ id: 'run-1', workflowId, state: 'concluido' }))
 }
 
+const realExecution = {
+  runWorkflow: vi.fn((workflowId: string) => ({
+    id: 'run-real-1',
+    workflowId,
+    state: 'concluido'
+  })),
+  resolveApproval: vi.fn((id: string, decision: string) => ({
+    id: 'run-real-1',
+    approval: id,
+    decision
+  }))
+}
+
 const runs = {
   list: vi.fn(() => []),
   findById: vi.fn(() => undefined)
+}
+
+const approvals = {
+  listPending: vi.fn(() => [])
 }
 
 const minimizeToTray = vi.fn()
@@ -114,7 +131,9 @@ const deps = {
   allowlist,
   workflows,
   execution,
+  realExecution,
   runs,
+  approvals,
   // Função desde a F03: a identidade muda em runtime (local antes do login, usuário da
   // sessão depois), então os handlers a resolvem a cada chamada em vez de capturá-la.
   userId: () => 'local',
@@ -157,7 +176,10 @@ beforeEach(() => {
   workflows.setWorkflowStatus.mockClear()
   workflows.createAutomation.mockClear()
   execution.runWorkflow.mockClear()
+  realExecution.runWorkflow.mockClear()
+  realExecution.resolveApproval.mockClear()
   runs.list.mockClear()
+  approvals.listPending.mockClear()
   logIpc.info.mockClear()
   logIpc.warn.mockClear()
   logIpc.error.mockClear()
@@ -404,5 +426,26 @@ describe('canais de execução simulada (SPEC-Execucao-05)', () => {
   it('lista runs escopada ao usuário corrente', () => {
     invocar(IPC_CHANNELS.executionList, 'jarvis')
     expect(runs.list).toHaveBeenCalledWith('local', 'jarvis')
+  })
+})
+
+describe('canais de execução real e aprovação (SPEC-ExecucaoReal-01)', () => {
+  it('dispara o run real com workflowId + workspace válidos', () => {
+    invocar(IPC_CHANNELS.executionRunReal, 'wf-1', 'jarvis')
+    expect(realExecution.runWorkflow).toHaveBeenCalledWith('wf-1', 'jarvis')
+  })
+
+  it('lista aprovações pendentes escopadas ao usuário corrente', () => {
+    invocar(IPC_CHANNELS.approvalList, 'jarvis')
+    expect(approvals.listPending).toHaveBeenCalledWith('local', 'jarvis')
+  })
+
+  it('resolve aprovação só com decisão do enum', () => {
+    invocar(IPC_CHANNELS.approvalResolve, 'apr-1', 'aprovado')
+    expect(realExecution.resolveApproval).toHaveBeenCalledWith('apr-1', 'aprovado')
+
+    realExecution.resolveApproval.mockClear()
+    expect(() => invocar(IPC_CHANNELS.approvalResolve, 'apr-1', 'talvez')).toThrow(/inválidos/)
+    expect(realExecution.resolveApproval).not.toHaveBeenCalled()
   })
 })
