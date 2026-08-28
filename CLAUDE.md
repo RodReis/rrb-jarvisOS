@@ -18,7 +18,7 @@ Desktop app **local-first** (Electron + React + TypeScript) com dois espaços de
 
 ## Papéis e governança
 
-- **Rodrigo Reis (PI)** — decide escopo, prioridades e trade-offs; aprova specs e aceita entregas.
+- **Rodrigo Reis (PI)** — decide escopo, prioridades e trade-offs; aprova specs e aceita entregas. **Não executa o fluxo**: não cria issue, não commita, não abre PR e não faz merge. O aceite é dele; a execução é do Code.
 - **Claude Cowork (planejamento)** — especifica e mantém `docs/` e as specs em `docs/specs/`. Antes de finalizar qualquer spec, apresenta as perguntas abertas e dúvidas ao PI — spec só vira `aprovada-pi` com todas resolvidas (evitar retrabalho). Quando a spec vira `aprovada-pi`, **cria a issue-fatia no board** (coluna Backlog, assignee PI). **Nunca implementa código** — implementação é exclusiva do Claude Code.
 - **Claude Code (você)** — planeja, codifica, testa (código, UX e UI — pode usar as skills do impeccable), atualiza a documentação e **sempre commita todos os documentos de `docs/`** junto da entrega. Implementa a partir deste arquivo + `docs/` + spec da feature em `docs/specs/`. **Não cria a issue** (é do Cowork) — pega o card, move pelo fluxo e entrega com PR. Pode criticar arquitetura, **não escopo**. Sem spec para a tarefa, ou spec ambígua → perguntar ao PI antes de codificar, nunca assumir. Deve apontar problemas técnicos da spec — a correção passa pelo PI.
 
@@ -100,6 +100,13 @@ Exemplo vivo: **sync SHA-aware** (elimina o `noop` falso) — não tem spec e **
 - **Sem hardcode e sem mock** — dado local de desenvolvimento entra via seed (`prisma/seed.ts`), criado na primeira fatia que precisar.
 - **Ambiente 100% local até o fim do MVP** (docker-compose; sem deploy em nuvem).
 - **Portas**: web `5180` (strictPort — se ocupada, falha em vez de trocar), API `3311` (era 3000; remapeada por colisão com outros stacks locais — configurável via `API_PORT`). Postgres host `5433`, Redis host `6380` (host bindings remapeados; rede interna do compose segue 5432/6379).
+- **Nunca afirmar estado de CI, PR ou job sem verificar no momento da fala.** Se o PI diz que
+  terminou, a resposta é `gh pr checks <n>` — nunca contradizer sem checar. Silêncio de
+  ferramenta não é evidência de nada: um watcher que emudece parece idêntico a um job que ainda
+  roda. Para esperar CI, usar **`gh pr checks <n> --watch`** em background (ele bloqueia até o
+  fim e devolve código de saída), nunca loop de monitor artesanal — o loop que espera "todos
+  saírem de `pending`" fica girando calado quando uma chamada falha, e foi assim que uma entrega
+  pronta ficou parada até o PI olhar por conta própria.
 
 ### Colunas do board (mapeamento Issues → Kanban)
 
@@ -170,3 +177,17 @@ O repo tem um grafo de conhecimento persistente em `graphify-out/` (gerado pela 
 - **Ao final de cada entrega** (junto com STATUS.md/DEVELOPMENT.md): Sempre me pergunta se pode ou não fazer o comando `/graphify . --update` — incremental, re-extrai só arquivos novos/alterados via manifest. Não recrie o grafo do zero.
 - `graphify-out/` é artefato local (cache), não entra em commit.
 
+## Skills relevantes a usar (Claude Code)
+
+- `superpowers:brainstorming` — antes de implementar feature não-trivial
+- `superpowers:writing-plans` — pra task com mais de 1 etapa de DB/API
+- `superpowers:test-driven-development` — feature crítica (LGPD, RLS, anti-banimento)
+- `superpowers:systematic-debugging` — bugs reportados
+- `superpowers:verification-before-completion` — antes de declarar "pronto"
+- `frontend-design` — UI distinta (não cair em shadcn-default genérico)
+-`context7-mcp` - pesquisa na internet
+-`playwright` - smoke ao vivo
+-`security-review` - segurança do sistema
+-`design-review` - padrões do frontend.
+-`code-review` - padrões do código criado.
+-`impeccable` - critique craft layout delight clarify polish optimize 
