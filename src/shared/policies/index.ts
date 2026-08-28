@@ -1,6 +1,18 @@
 /** Superfície pública do Policy Engine (SPEC-Execucao-02) e da allowlist (SPEC-Execucao-03). */
 export { evaluate } from './evaluate'
 export { isPathAllowed } from './allowlist'
+export {
+  canonicalizeBinary,
+  isCommandAllowed,
+  isElevationAttempt,
+  PREFIXOS_DE_ELEVACAO,
+  type CommandRequest
+} from './command'
+export {
+  matchDestructivePattern,
+  DESTRUCTIVE_PATTERNS,
+  type DestructivePattern
+} from './destructive-commands'
 export { RISK_TAXONOMY, type TaxonomyEntry } from './taxonomy'
 export {
   SENSITIVITIES,

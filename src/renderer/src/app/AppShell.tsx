@@ -29,6 +29,7 @@ import {
 } from '../workspace/navegacao'
 import { Settings } from './Settings'
 import { AprovacoesPendentes } from './AprovacoesPendentes'
+import { TerminalControlado } from './TerminalControlado'
 
 /**
  * AppShell do renderer (SPEC-DesignSystem-04a).
@@ -282,6 +283,7 @@ export function AppShell({ perfil, onSair }: AppShellProps = {}): React.JSX.Elem
             {t('conteudo.placeholder')}
           </p>
           {rotaAtiva === 'operacoes' && <AprovacoesPendentes workspace={workspace} />}
+          {rotaAtiva === 'terminal' && <TerminalControlado workspace={workspace} />}
         </section>
       )}
     </ShellDoDesign>

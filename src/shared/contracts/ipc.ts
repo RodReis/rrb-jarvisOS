@@ -28,6 +28,7 @@ import type {
   WorkflowStatus
 } from '../domain/workflows'
 import type { ExecutionRun } from '../domain/execution'
+import type { CommandExecution, CommandSubmission } from '../domain/terminal'
 import type { ApprovalDecision, ApprovalRequest } from '../domain/execution'
 
 /** Canais de request/response (renderer → main → renderer). */
@@ -97,7 +98,20 @@ export const IPC_CHANNELS = {
   executionRunReal: 'execution:run-real',
   executionList: 'execution:list',
   approvalList: 'approval:list',
-  approvalResolve: 'approval:resolve'
+  approvalResolve: 'approval:resolve',
+  /**
+   * Terminal controlado (SPEC-ExecucaoReal-02). O renderer **submete** binário + argumentos +
+   * cwd e lê o resultado; quem executa o processo é o main. O renderer nunca toca
+   * `child_process` (ARCHITECTURE § Fronteiras 1) — nem indiretamente: não há canal que aceite
+   * uma linha de comando a ser interpretada por shell.
+   *
+   * A allowlist de **comandos** é conceito novo desta fatia e vive separada da de diretórios:
+   * um comando precisa das duas (binário permitido **e** cwd permitido).
+   */
+  terminalRun: 'terminal:run',
+  commandAllowlistList: 'command-allowlist:list',
+  commandAllowlistAdd: 'command-allowlist:add',
+  commandAllowlistRemove: 'command-allowlist:remove'
 } as const
 
 /**
@@ -264,7 +278,38 @@ export interface JarvisBridge {
   runWorkflowReal(workflowId: string, workspace: WorkspaceId): Promise<ExecutionRun>
   listExecutionRuns(workspace: WorkspaceId): Promise<readonly ExecutionRun[]>
   listPendingApprovals(workspace: WorkspaceId): Promise<readonly ApprovalRequest[]>
-  resolveApproval(id: string, decision: ApprovalDecision): Promise<ExecutionRun | undefined>
+  /**
+   * Resolve uma aprovação pendente. O retorno varia com o que estava pausado: uma etapa de
+   * filesystem devolve o `ExecutionRun` retomado (F01); um comando devolve o
+   * `CommandExecution` (F02). A fila é uma só — o painel de aprovações não distingue —, mas
+   * o desfecho é do tipo do motor que executou.
+   */
+  resolveApproval(
+    id: string,
+    decision: ApprovalDecision
+  ): Promise<ExecutionRun | CommandExecution | undefined>
+
+  /**
+   * Submete um comando ao terminal controlado (SPEC-ExecucaoReal-02) e devolve o resultado.
+   *
+   * **Binário e argumentos separados, nunca uma linha.** A assinatura é a garantia de
+   * segurança: não existindo um campo "linha de comando", não há o que um shell interprete —
+   * `;`, `&&` e `$()` chegam ao processo como texto literal de argumento. Uma API que
+   * aceitasse a linha inteira reintroduziria a superfície que esta forma fecha.
+   *
+   * Nunca rejeita por política: uma recusa volta como `CommandExecution` com `state`
+   * `bloqueado` e o `reason` correspondente — é desfecho a exibir, não erro a tratar.
+   */
+  runCommand(submission: CommandSubmission, workspace: WorkspaceId): Promise<CommandExecution>
+
+  /**
+   * Allowlist de **comandos** (1ª barreira). Escopada por espaço: o que o JARVIS pode
+   * executar não é o que o NOA pode. `add`/`remove` são ações de **alto risco**, classificadas
+   * e auditadas no main. Devolvem a lista atualizada, para a UI refletir sem novo round-trip.
+   */
+  listAllowedCommands(workspace: WorkspaceId): Promise<readonly string[]>
+  addAllowedCommand(binary: string, workspace: WorkspaceId): Promise<readonly string[]>
+  removeAllowedCommand(binary: string, workspace: WorkspaceId): Promise<readonly string[]>
 }
 
 /** Nome da propriedade exposta via contextBridge no renderer. */

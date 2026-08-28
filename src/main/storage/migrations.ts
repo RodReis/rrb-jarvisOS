@@ -192,6 +192,38 @@ const MIGRATIONS: readonly string[] = [
   );
   CREATE INDEX idx_approval_request_user_status
     ON approval_request(user_id, workspace_id, status, created_at);
+  `,
+
+  // 8 — allowlist de **comandos** (SPEC-ExecucaoReal-02, 1ª barreira).
+  //
+  // Conceito novo: o MVP-002 só tinha allowlist de *diretórios*. As duas coexistem e são
+  // checadas juntas — um comando precisa de binário permitido **e** cwd permitido.
+  //
+  // `binary` guarda o nome **canônico** (minúsculas, sem diretório, sem `.exe`): o main
+  // canoniza antes de gravar, pela mesma razão que a allowlist de diretórios grava o path
+  // canônico. Sem isso, `GIT.EXE` e `git` seriam entradas distintas e a lista vazaria por
+  // variação de escrita.
+  //
+  // Escopo por `user_id` **e** `workspace_id` (CONVENTION §2), diferente de
+  // `allowed_directory`, que é só por usuário: o que o JARVIS OS pode rodar não é o que o
+  // NOA pode. Diretório permitido é sobre onde os arquivos do usuário estão; comando
+  // permitido é sobre o que aquele espaço tem autoridade para executar — e a spec pede
+  // escopo por workspace explicitamente.
+  //
+  // **Sem default de fábrica.** A tabela nasce vazia e nada é semeado: o terminal não roda
+  // nada até o usuário permitir explicitamente (spec § Dentro). É o oposto de
+  // `allowed_directory`, cujo `appDir` é invariante por construção — ali havia um diretório
+  // que o app precisa alcançar para funcionar; aqui não há comando nenhum que o app precise.
+  `
+  CREATE TABLE allowed_command (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    binary       TEXT NOT NULL,
+    created_at   TEXT NOT NULL,
+    UNIQUE (user_id, workspace_id, binary)
+  );
+  CREATE INDEX idx_allowed_command_user ON allowed_command(user_id, workspace_id);
   `
 ]
 
