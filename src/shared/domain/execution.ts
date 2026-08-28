@@ -27,8 +27,20 @@ export const EXECUTION_STATES = [
 ] as const
 export type ExecutionState = (typeof EXECUTION_STATES)[number]
 
-/** Resultado simulado de uma etapa. Sem efeito real — só o veredito e uma nota. */
-export type StepOutcome = 'simulado-ok' | 'simulado-falha' | 'marco-aprovacao'
+/**
+ * Resultado de uma etapa.
+ *
+ * Os três primeiros valores preservam o MVP-002 simulado. Os demais entram no modo real
+ * (SPEC-ExecucaoReal-01), onde a decisão do Policy Engine passa a ter efeito.
+ */
+export type StepOutcome =
+  | 'simulado-ok'
+  | 'simulado-falha'
+  | 'marco-aprovacao'
+  | 'real-ok'
+  | 'real-falha'
+  | 'bloqueado'
+  | 'aguardando-aprovacao'
 
 /**
  * O rastro de **uma** etapa percorrida. Reúne o que as três fatias produziram para ela:
@@ -48,6 +60,8 @@ export interface StepTrace {
   readonly outcome: StepOutcome
   /** Nota humana do que foi simulado (pt-BR). Nunca um efeito real, só a descrição. */
   readonly nota: string
+  readonly output?: Readonly<Record<string, unknown>>
+  readonly approvalRequestId?: string
   readonly durationMs: number
 }
 
@@ -68,6 +82,27 @@ export interface ExecutionRun {
   readonly startedAt: string
   readonly finishedAt: string
   readonly created_at: string
+}
+
+export const APPROVAL_REQUEST_STATUSES = ['pendente', 'aprovado', 'negado'] as const
+export type ApprovalRequestStatus = (typeof APPROVAL_REQUEST_STATUSES)[number]
+
+export type ApprovalDecision = Extract<ApprovalRequestStatus, 'aprovado' | 'negado'>
+
+export interface ApprovalRequest {
+  readonly id: string
+  readonly user_id: string
+  readonly workspace_id: string
+  readonly runId: string
+  readonly stepId: string
+  readonly action: string
+  readonly status: ApprovalRequestStatus
+  readonly risk: string
+  readonly reason: string
+  readonly operation: Readonly<Record<string, unknown>>
+  readonly created_at: string
+  readonly resolved_at?: string
+  readonly resolved_by?: string
 }
 
 export function isExecutionState(value: unknown): value is ExecutionState {

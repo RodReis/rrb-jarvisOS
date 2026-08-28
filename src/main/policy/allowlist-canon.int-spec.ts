@@ -66,6 +66,24 @@ describe('canonicalize — symlink (o caso que só realpath pega, critério 2)',
     expect(isPathAllowed(canon, [permitido])).toBe(false)
   })
 
+  it('arquivo novo dentro de symlink apontando pra fora também é barrado', () => {
+    const fora = join(raiz, 'segredo-novo')
+    mkdirSync(fora)
+
+    const link = join(permitido, 'atalho-novo')
+    try {
+      symlinkSync(fora, link, 'dir')
+    } catch (erro) {
+      const e = erro as NodeJS.ErrnoException
+      if (e.code === 'EPERM' || e.code === 'ENOSYS') return
+      throw erro
+    }
+
+    const canon = canonicalize(join(link, 'ainda-nao-existe.txt'))
+    expect(canon).toBe(join(fora, 'ainda-nao-existe.txt'))
+    expect(isPathAllowed(canon, [permitido])).toBe(false)
+  })
+
   it('symlink DENTRO do permitido apontando pra DENTRO continua permitido', () => {
     const alvo = join(permitido, 'real')
     mkdirSync(alvo)

@@ -28,6 +28,7 @@ import {
   type SubModuloJarvis
 } from '../workspace/navegacao'
 import { Settings } from './Settings'
+import { AprovacoesPendentes } from './AprovacoesPendentes'
 
 /**
  * AppShell do renderer (SPEC-DesignSystem-04a).
@@ -280,6 +281,7 @@ export function AppShell({ perfil, onSair }: AppShellProps = {}): React.JSX.Elem
           <p className="mt-2 text-[length:var(--jos-texto-mini)] text-[var(--jos-cor-texto-suave)]">
             {t('conteudo.placeholder')}
           </p>
+          {rotaAtiva === 'operacoes' && <AprovacoesPendentes workspace={workspace} />}
         </section>
       )}
     </ShellDoDesign>

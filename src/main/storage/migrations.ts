@@ -167,6 +167,31 @@ const MIGRATIONS: readonly string[] = [
   `
   ALTER TABLE user_profile ADD COLUMN accent_noa    TEXT;
   ALTER TABLE user_profile ADD COLUMN accent_jarvis TEXT;
+  `,
+
+  // 7 — aprovação humana real (SPEC-ExecucaoReal-01).
+  //
+  // A aprovação é o ponto em que o modo real deixa de auto-continuar. O payload da operação
+  // fica em JSON para permitir retomar a etapa após decisão humana sem normalizar cada tipo
+  // de ação de filesystem em tabela própria neste MVP.
+  `
+  CREATE TABLE approval_request (
+    id             TEXT PRIMARY KEY,
+    user_id        TEXT NOT NULL,
+    workspace_id   TEXT NOT NULL,
+    run_id         TEXT NOT NULL,
+    step_id        TEXT NOT NULL,
+    action         TEXT NOT NULL,
+    status         TEXT NOT NULL,
+    risk           TEXT NOT NULL,
+    reason         TEXT NOT NULL,
+    operation      TEXT NOT NULL,
+    created_at     TEXT NOT NULL,
+    resolved_at    TEXT,
+    resolved_by    TEXT
+  );
+  CREATE INDEX idx_approval_request_user_status
+    ON approval_request(user_id, workspace_id, status, created_at);
   `
 ]
 

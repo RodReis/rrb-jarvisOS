@@ -28,6 +28,7 @@ import type {
   WorkflowStatus
 } from '../domain/workflows'
 import type { ExecutionRun } from '../domain/execution'
+import type { ApprovalDecision, ApprovalRequest } from '../domain/execution'
 
 /** Canais de request/response (renderer → main → renderer). */
 export const IPC_CHANNELS = {
@@ -93,7 +94,10 @@ export const IPC_CHANNELS = {
    * colateral — nada toca FS, rede, terminal ou provider.
    */
   executionRun: 'execution:run',
-  executionList: 'execution:list'
+  executionRunReal: 'execution:run-real',
+  executionList: 'execution:list',
+  approvalList: 'approval:list',
+  approvalResolve: 'approval:resolve'
 } as const
 
 /**
@@ -256,7 +260,11 @@ export interface JarvisBridge {
    * motor não toca FS, rede, terminal nem provider.
    */
   runWorkflowSimulated(workflowId: string, workspace: WorkspaceId): Promise<ExecutionRun>
+  /** Dispara um workflow em modo real de filesystem, com enforcement e aprovação. */
+  runWorkflowReal(workflowId: string, workspace: WorkspaceId): Promise<ExecutionRun>
   listExecutionRuns(workspace: WorkspaceId): Promise<readonly ExecutionRun[]>
+  listPendingApprovals(workspace: WorkspaceId): Promise<readonly ApprovalRequest[]>
+  resolveApproval(id: string, decision: ApprovalDecision): Promise<ExecutionRun | undefined>
 }
 
 /** Nome da propriedade exposta via contextBridge no renderer. */

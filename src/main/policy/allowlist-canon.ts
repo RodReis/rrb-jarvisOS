@@ -13,7 +13,7 @@
  */
 
 import { realpathSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { dirname, join, parse, relative, resolve } from 'node:path'
 
 /**
  * Devolve o path canônico (absoluto, sem `..`/`.`, symlinks resolvidos).
@@ -33,6 +33,21 @@ export function canonicalize(path: string): string {
   try {
     return realpathSync(absoluto)
   } catch {
+    const root = parse(absoluto).root
+    let existente = absoluto
+
+    while (existente !== root) {
+      existente = dirname(existente)
+      try {
+        const baseReal = realpathSync(existente)
+        const resto = relative(existente, absoluto)
+        return resto ? join(baseReal, resto) : baseReal
+      } catch {
+        // Continua subindo até achar um ancestral existente. Se nenhum puder ser
+        // resolvido, cai no path textual absoluto abaixo.
+      }
+    }
+
     return absoluto
   }
 }

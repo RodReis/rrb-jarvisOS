@@ -64,6 +64,7 @@ describe('migrations', () => {
     antigo.exec('DROP TABLE workflow')
     antigo.exec('DROP TABLE automation')
     antigo.exec('DROP TABLE execution_run')
+    antigo.exec('DROP TABLE approval_request')
     antigo.pragma('user_version = 1')
     antigo.close()
 

@@ -14,6 +14,9 @@ const savePreferences = vi.fn()
 const getAuth = vi.fn()
 const login = vi.fn()
 const logout = vi.fn()
+const listPendingApprovals = vi.fn()
+const resolveApproval = vi.fn()
+const runWorkflowReal = vi.fn()
 
 /**
  * Perfil da sessão usada nestes testes. O `App` só monta o AppShell quando a auth está
@@ -43,6 +46,9 @@ function mockarPonte(): void {
       getAuth,
       login,
       logout,
+      runWorkflowReal,
+      listPendingApprovals,
+      resolveApproval,
       // Devolve a função de cancelamento, como a ponte real: sem isso o `useEffect`
       // tentaria chamar `undefined` na desmontagem e o cleanup estouraria.
       onAuthChanged: vi.fn(() => () => undefined)
@@ -64,7 +70,13 @@ beforeEach(() => {
   sendLog.mockClear()
   minimizeToTray.mockClear()
   savePreferences.mockClear()
+  listPendingApprovals.mockClear()
+  resolveApproval.mockClear()
+  runWorkflowReal.mockClear()
   getAuth.mockResolvedValue({ state: 'ativo', profile: PERFIL_LOGADO })
+  listPendingApprovals.mockResolvedValue([])
+  resolveApproval.mockResolvedValue({ id: 'run-1', state: 'concluido' })
+  runWorkflowReal.mockResolvedValue({ id: 'run-1', state: 'concluido' })
   // O main é a fonte do espaço ativo; o mock reflete a troca, como ele faria.
   getWorkspace.mockResolvedValue('jarvis' as WorkspaceId)
   switchWorkspace.mockImplementation((w: WorkspaceId) =>
@@ -166,6 +178,87 @@ describe('AppShell', () => {
     await userEvent.click(screen.getByRole('button', { name: /minimizar/i }))
 
     expect(minimizeToTray).toHaveBeenCalled()
+  })
+
+  it('mostra aprovações pendentes em Operações e resolve pela ponte', async () => {
+    listPendingApprovals.mockResolvedValueOnce([
+      {
+        id: 'apr-1',
+        user_id: 'u-1',
+        workspace_id: 'jarvis',
+        runId: 'run-1',
+        stepId: 's-read',
+        action: 'fs.list-allowed',
+        status: 'pendente',
+        risk: 'medio',
+        reason: 'elevada-por-path-fora-da-allowlist',
+        operation: { kind: 'read', path: 'C:\\fora\\entrada.txt' },
+        created_at: '2026-07-24T10:00:00.000Z'
+      }
+    ])
+
+    await entrarPelaChoice()
+    await userEvent.click(screen.getByRole('button', { name: 'Operações' }))
+
+    expect(await screen.findByText('Etapa s-read')).toBeInTheDocument()
+    expect(
+      screen.getByText('Autoriza uma exceção pontual fora da allowlist para esta execução.')
+    ).toBeInTheDocument()
+
+    const aprovar = screen.getByRole('button', { name: 'Aprovar' })
+    aprovar.focus()
+    await userEvent.keyboard('{Enter}')
+
+    expect(resolveApproval).toHaveBeenCalledWith('apr-1', 'aprovado')
+  })
+
+  /**
+   * Critério 5 da SPEC-ExecucaoReal-01: a fila é operável por teclado, com foco visível, e o
+   * risco nunca aparece só por cor. O teste acima resolve pela ponte mas dá o foco na mão
+   * (`.focus()`), o que não prova que a ordem de tabulação chega aos botões — aqui a travessia
+   * é por `Tab`, como a de quem só tem o teclado.
+   */
+  it('percorre a fila de aprovação por teclado, com risco legível sem cor', async () => {
+    listPendingApprovals.mockResolvedValueOnce([
+      {
+        id: 'apr-2',
+        user_id: 'u-1',
+        workspace_id: 'jarvis',
+        runId: 'run-2',
+        stepId: 's-delete',
+        action: 'fs.delete-move-overwrite',
+        status: 'pendente',
+        risk: 'alto',
+        reason: 'operacao-destrutiva',
+        operation: { kind: 'delete', path: 'C:\\permitido\\antigo.txt' },
+        created_at: '2026-07-24T10:05:00.000Z'
+      }
+    ])
+
+    await entrarPelaChoice()
+    await userEvent.click(screen.getByRole('button', { name: 'Operações' }))
+    await screen.findByText('Etapa s-delete')
+
+    // O risco alto se lê como texto, não só pelo tom: quem não distingue cor continua sabendo.
+    expect(screen.getByText('Risco alto')).toBeInTheDocument()
+
+    const aprovar = screen.getByRole('button', { name: 'Aprovar' })
+    const negar = screen.getByRole('button', { name: 'Negar' })
+
+    // Tabula até Aprovar em vez de focar na mão — prova que os botões estão na ordem de foco.
+    for (let i = 0; i < 40 && document.activeElement !== aprovar; i += 1) {
+      await userEvent.tab()
+    }
+    expect(aprovar).toHaveFocus()
+    // O anel de foco do DS (`ANEL_FOCO`, base.ts) é `focus-visible` — aparece para o teclado e
+    // não para o clique. Sem ele, o foco existe mas ninguém vê onde está.
+    expect(aprovar).toHaveClass('focus-visible:border-[var(--jos-cor-acento)]')
+
+    await userEvent.tab()
+    expect(negar).toHaveFocus()
+
+    await userEvent.keyboard('{Enter}')
+    expect(resolveApproval).toHaveBeenCalledWith('apr-2', 'negado')
   })
 
   it('exibe erro quando a ponte falha ao carregar o espaço', async () => {
