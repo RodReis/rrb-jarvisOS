@@ -418,8 +418,8 @@ describe('Claude Code CLI — subprocess app-managed (critério 2)', () => {
 
   it('binário ausente vira mensagem que diz o que fazer', async () => {
     const adapter = new ClaudeCodeAdapter(process.cwd(), ((
-      bin: string,
-      args: readonly string[],
+      _bin: string,
+      _args: readonly string[],
       o: object
     ) => spawn('binario-que-nao-existe-em-lugar-nenhum', [], o)) as typeof spawn)
 
