@@ -124,6 +124,10 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
   expect(superficie.metodos).toEqual([
     'addAllowedCommand',
     'addAllowedDirectory',
+    // SPEC-Providers-02: os três da chamada de IA. Enumerados um a um (e não por padrão) pela
+    // mesma razão da F01 — um padrão aceitaria um método futuro que devolvesse credencial.
+    'callAi',
+    'cancelAi',
     'classifyAction',
     'createAutomation',
     'createWorkflow',
@@ -142,6 +146,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'login',
     'logout',
     'minimizeToTray',
+    'onAiStreamEvent',
     'onAuthChanged',
     'removeAllowedCommand',
     'removeAllowedDirectory',
