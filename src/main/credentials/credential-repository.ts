@@ -12,6 +12,7 @@ import { randomUUID } from 'node:crypto'
 import type { Database } from 'better-sqlite3'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { CredentialKey } from '@shared/domain/credentials'
+import type { ConnectorCredentialKey } from '@shared/domain/connectors'
 import { log } from '../logging/logger'
 import type { SecretCipher } from './secret-vault'
 
@@ -22,6 +23,23 @@ interface CredentialRow {
   readonly created_at: string
   readonly updated_at: string
 }
+
+/**
+ * Uma chave endereçável no vault.
+ *
+ * Duas famílias, e não uma: `CredentialKey` são as credenciais de provider de IA
+ * (SPEC-Providers-01) e `ConnectorCredentialKey` são as de conector (SPEC-Conectores-01) —
+ * separadas por decisão do PI (2026-08-29), porque a tela de credenciais lista o que **falta**
+ * por chave, e misturá-las faria o Settings anunciar credenciais de conector ausentes que
+ * ninguém consegue usar até a M6-F03.
+ *
+ * O que elas compartilham é o **armazenamento**: a coluna `credential_ref.key` sempre foi
+ * texto, e o `UNIQUE (user_id, workspace_id, key)` já endereça qualquer chave lógica. Um
+ * segundo cofre para conector duplicaria a cifra, a migration e o cuidado com o segredo em
+ * troca de nada — a separação que importa é a de **taxonomia**, e ela vive nos tipos do
+ * domínio, não em duas tabelas.
+ */
+export type VaultKey = CredentialKey | ConnectorCredentialKey
 
 export class CredentialRepository {
   constructor(
@@ -49,7 +67,7 @@ export class CredentialRepository {
   find(
     userId: string,
     workspaceId: WorkspaceId,
-    key: CredentialKey
+    key: VaultKey
   ): { id: string; created_at: string; updated_at: string } | undefined {
     const row = this.db
       .prepare(
@@ -72,7 +90,7 @@ export class CredentialRepository {
    * `created_at` é preservado no update (`excluded` só toca `secret` e `updated_at`): a
    * credencial é a mesma; o que mudou foi o valor dela.
    */
-  upsert(userId: string, workspaceId: WorkspaceId, key: CredentialKey, plaintext: string): void {
+  upsert(userId: string, workspaceId: WorkspaceId, key: VaultKey, plaintext: string): void {
     const agora = new Date().toISOString()
 
     this.db
@@ -89,7 +107,7 @@ export class CredentialRepository {
   }
 
   /** Remove a credencial do vault. Devolve `false` quando não havia nada a remover (no-op). */
-  remove(userId: string, workspaceId: WorkspaceId, key: CredentialKey): boolean {
+  remove(userId: string, workspaceId: WorkspaceId, key: VaultKey): boolean {
     const info = this.db
       .prepare('DELETE FROM credential_ref WHERE user_id = ? AND workspace_id = ? AND key = ?')
       .run(userId, workspaceId, key)
@@ -112,7 +130,7 @@ export class CredentialRepository {
    * camada de cima já sabe tratar. Derrubar a chamada do provider por um cofre indecifrável
    * daria ao usuário um erro técnico onde cabe "credencial ausente".
    */
-  readSecret(userId: string, workspaceId: WorkspaceId, key: CredentialKey): string | undefined {
+  readSecret(userId: string, workspaceId: WorkspaceId, key: VaultKey): string | undefined {
     const row = this.db
       .prepare(
         'SELECT secret FROM credential_ref WHERE user_id = ? AND workspace_id = ? AND key = ?'

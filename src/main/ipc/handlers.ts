@@ -39,6 +39,12 @@ import type { ProviderStatus, RoutingPolicy } from '@shared/domain/routing'
 import { isBudgetLimitsInput, type BudgetSnapshot } from '@shared/domain/budget'
 import { isProviderRoute, isTaskType } from '@shared/domain/routing'
 import {
+  isConnectorRequest,
+  type ConnectorCapability,
+  type ConnectorOutcome
+} from '@shared/domain/connectors'
+import type { ConnectorService } from '../connectors/connector-service'
+import {
   isAiProvider,
   type AiCallHandle,
   type AiRequest,
@@ -128,6 +134,8 @@ export interface IpcDependencies {
   readonly routing: RoutingService
   /** O repositório, para a lista de modelos — leitura pura, sem passar pelo serviço. */
   readonly routingRepo: RoutingRepository
+  /** O ponto único de conectores (SPEC-Conectores-01). */
+  readonly connectors: ConnectorService
   /** Minimizar para o tray. Injetado porque a janela nasce depois dos handlers. */
   readonly minimizeToTray: () => void
 }
@@ -790,6 +798,52 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       }
 
       return deps.routing.setRota(scope, rota)
+    }
+  )
+
+  // Conectores (SPEC-Conectores-01, critérios 5 e 6). **Dois canais, nenhum genérico**: listar
+  // o que os adapters declaram, e executar uma dessas operações. Não existe canal que receba
+  // URL — a diferença entre este par e um proxy HTTP é que o renderer nomeia uma operação de
+  // uma lista fechada, e quem sabe que endereço isso vira é o adapter, no main.
+  ipcMain.handle(IPC_CHANNELS.connectorsCapabilities, (): readonly ConnectorCapability[] =>
+    deps.connectors.capabilities()
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.connectorsInvoke,
+    async (_event, request: unknown, workspace: unknown): Promise<ConnectorOutcome> => {
+      const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+
+      // Forma errada vira `ConnectorError` em vez de exceção, pelo mesmo motivo que o desfecho
+      // do serviço é união discriminada: o renderer precisa **mostrar** a recusa, e um throw
+      // atravessando o IPC chega como erro genérico sem código estável para tratar.
+      if (!isConnectorRequest(request)) {
+        log.ipc.warn('Pedido a conector descartado por não casar com o contrato', {
+          canal: IPC_CHANNELS.connectorsInvoke
+        })
+
+        return {
+          ok: false,
+          code: 'validacao-invalida',
+          mensagem: 'O pedido não casa com o contrato de conectores.',
+          retryable: false,
+          acao: 'corrigir-entrada',
+          provenance: {
+            connector: 'github',
+            operation: 'desconhecida',
+            obtidoEm: new Date().toISOString()
+          }
+        }
+      }
+
+      log.ipc.info('Chamada a conector solicitada pela interface', {
+        correlationId: request.correlationId,
+        canal: IPC_CHANNELS.connectorsInvoke,
+        connector: request.connector,
+        operation: request.operation
+      })
+
+      return await deps.connectors.call(request, { userId: deps.userId(), workspace: escopo })
     }
   )
 

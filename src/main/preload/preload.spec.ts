@@ -60,6 +60,10 @@ describe('ponte do preload', () => {
       // lista é enumerada (e não um padrão `/ai/`) pela mesma razão da F01: um padrão aceitaria
       // um método futuro que devolvesse valor, e é justamente isso que esta guarda barra.
       'callAi',
+      // SPEC-Conectores-01: executa **uma** operação declarada por um adapter registrado. O
+      // que faz dele o oposto de um proxy é o argumento: um `ConnectorRequest` que nomeia
+      // conector e operação de listas fechadas, nunca uma URL.
+      'callConnector',
       'cancelAi',
       'classifyAction',
       'createAutomation',
@@ -80,6 +84,7 @@ describe('ponte do preload', () => {
       'listAllowedDirectories',
       'listAuditEvents',
       'listAutomations',
+      'listConnectorCapabilities',
       'listCredentials',
       'listExecutionRuns',
       'listPendingApprovals',
@@ -248,6 +253,32 @@ describe('ponte do preload', () => {
       IPC_EVENT_CHANNELS.authChanged,
       expect.any(Function)
     )
+  })
+
+  it('não existe canal de proxy HTTP genérico (SPEC-Conectores-01, critério 6)', async () => {
+    const bridge = await carregarPonte()
+
+    // A prova é por **ausência**, como a do vault: nenhum canal do contrato aceita endereço,
+    // e nenhum método da ponte tem nome que sugira alcançar um. Se alguém adicionar um
+    // `connectors:fetch` ou um `httpRequest` amanhã, é aqui que fica vermelho — e a diferença
+    // entre o núcleo de conectores e um proxy é exatamente esta linha.
+    const canaisDeConector = Object.entries(IPC_CHANNELS)
+      .filter(([nome]) => /connector/i.test(nome))
+      .map(([, canal]) => canal)
+
+    expect(canaisDeConector).toEqual([
+      IPC_CHANNELS.connectorsCapabilities,
+      IPC_CHANNELS.connectorsInvoke
+    ])
+
+    expect(
+      Object.keys(bridge).filter((k) => /fetch|http|request|proxy|url|endpoint/i.test(k))
+    ).toEqual([])
+
+    // E o que o método existente leva é o pedido tipado, pelo canal nomeado.
+    const pedido = { connector: 'github', operation: 'issues.create' }
+    await (bridge.callConnector as (r: unknown, w: string) => Promise<unknown>)(pedido, 'jarvis')
+    expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.connectorsInvoke, pedido, 'jarvis')
   })
 
   it('recusa expor a ponte quando contextIsolation está desligado', async () => {
