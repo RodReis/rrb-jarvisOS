@@ -127,6 +127,10 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     // SPEC-Providers-02: os três da chamada de IA. Enumerados um a um (e não por padrão) pela
     // mesma razão da F01 — um padrão aceitaria um método futuro que devolvesse credencial.
     'callAi',
+    // SPEC-Conectores-01: executa **uma** operação declarada por um adapter registrado. O que
+    // o distingue de um proxy é o argumento — um `ConnectorRequest` que nomeia conector e
+    // operação de listas fechadas, nunca uma URL.
+    'callConnector',
     'cancelAi',
     'classifyAction',
     'createAutomation',
@@ -150,6 +154,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'listAllowedDirectories',
     'listAuditEvents',
     'listAutomations',
+    'listConnectorCapabilities',
     'listCredentials',
     'listExecutionRuns',
     'listPendingApprovals',

@@ -12,8 +12,8 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 339 | 339 | 0 | 70.6 | — | — |
-| — | — | — | Banco | 289 | 289 | 0 | 88.5 | — | — |
+| — | — | — | Regras de Negócio | 363 | 363 | 0 | 70.6 | — | — |
+| — | — | — | Banco | 304 | 304 | 0 | 88.4 | — | — |
 | — | — | — | Tela | 301 | 300 | 0 | 90.2 | — | — |
 
 ## Histórico por entrega
@@ -133,3 +133,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-08-29 | #80 | SPEC-Providers-04 | Regras de Negócio | 339 | 339 | 0 | 70.6 | #142 | [#142](https://github.com/RodReis/rrb-jarvisOS/pull/142) |
 | 2026-08-29 | #80 | SPEC-Providers-04 | Banco | 289 | 289 | 0 | 88.5 | #142 | [#142](https://github.com/RodReis/rrb-jarvisOS/pull/142) |
 | 2026-08-29 | #80 | SPEC-Providers-04 | Tela | 301 | 300 | 0 | 90.2 | #142 | [#142](https://github.com/RodReis/rrb-jarvisOS/pull/142) |
+| 2026-08-29 | #87 | spec-conectores-01-nucleo | Regras de Negócio | 363 | 363 | 0 | 70.6 | #144 | [#144](https://github.com/RodReis/rrb-jarvisOS/pull/144) |
+| 2026-08-29 | #87 | spec-conectores-01-nucleo | Banco | 304 | 304 | 0 | 88.4 | #144 | [#144](https://github.com/RodReis/rrb-jarvisOS/pull/144) |
+| 2026-08-29 | #87 | spec-conectores-01-nucleo | Tela | 301 | 300 | 0 | 90.2 | #144 | [#144](https://github.com/RodReis/rrb-jarvisOS/pull/144) |

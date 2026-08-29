@@ -28,6 +28,8 @@ import { RealFileSystemEngine } from './execution/real-filesystem-engine'
 import { TerminalEngine } from './execution/terminal-engine'
 import { CommandAllowlistRepository } from './policy/command-allowlist-repository'
 import { CredentialService } from './credentials/credential-service'
+import { ConnectorRegistry } from './connectors/registry'
+import { ConnectorService } from './connectors/connector-service'
 import { CredentialRepository } from './credentials/credential-repository'
 import { SafeStorageCipher } from './credentials/secret-vault'
 import { carregarEnv } from './env'
@@ -169,11 +171,8 @@ if (!app.requestSingleInstanceLock()) {
     // de tokens (`safeStorage`/DPAPI) e é construída **aqui**, no boot, e não sob demanda: se
     // o SO não oferece cifra, é melhor o app falhar cedo e visível do que na primeira vez que
     // o usuário tentar salvar uma chave.
-    const credentials = new CredentialService(
-      new CredentialRepository(storage.db, new SafeStorageCipher()),
-      storage.audit,
-      policy
-    )
+    const credentialRepository = new CredentialRepository(storage.db, new SafeStorageCipher())
+    const credentials = new CredentialService(credentialRepository, storage.audit, policy)
 
     // Gate de orçamento (SPEC-Providers-03). Construído **antes** do ponto único porque é
     // dependência dele: um `AiCallService` sem gate seria um caminho até o provider sem
@@ -217,6 +216,29 @@ if (!app.requestSingleInstanceLock()) {
 
     const ai = new AiCallService(adapters, credentials, policy, storage.audit, budget, routing)
 
+    // Ponto único de conectores (SPEC-Conectores-01). **Runtime separado** do ponto único de
+    // IA por decisão do PI (2026-08-29): compartilham o vault, a auditoria encadeada e o
+    // ledger de uso, e nada além disso — `ai` não aparece na construção abaixo.
+    //
+    // O registro nasce **vazio**, e é isso que a fatia entrega: os adapters concretos (GitHub
+    // na M6-F03/F04, Tavily na M6-F05/F06) se registram aqui quando existirem. Até lá, pedir
+    // por um conector conhecido devolve `connector-nao-registrado` — que é o critério 1
+    // valendo, não uma lacuna.
+    const connectorRegistry = new ConnectorRegistry()
+    const connectors = new ConnectorService(
+      connectorRegistry,
+      // A fonte de segredo de conector lê o **mesmo cofre** das credenciais de IA: a coluna
+      // `credential_ref.key` é texto e o índice único já endereça qualquer chave lógica. O que
+      // é separado são as taxonomias (`ConnectorCredentialKey` versus `CredentialKey`), e elas
+      // vivem nos tipos — um segundo cofre duplicaria cifra e migration por nada. O payload
+      // estruturado (access + refresh + `expires_at`) e a rotação atômica são a M6-F03.
+      {
+        resolve: (userId, workspace, key) => credentialRepository.readSecret(userId, workspace, key)
+      },
+      policy,
+      storage.audit
+    )
+
     registerIpcHandlers({
       audit: storage.audit,
       workspaces,
@@ -233,6 +255,7 @@ if (!app.requestSingleInstanceLock()) {
       budget,
       routing,
       routingRepo,
+      connectors,
       runs,
       approvals,
       userId: userIdAtual,

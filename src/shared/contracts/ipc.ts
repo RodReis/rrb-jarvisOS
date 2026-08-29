@@ -34,6 +34,7 @@ import type { AiCallHandle, AiProvider, AiRequest, AiStreamEvent } from '../doma
 import type { ApprovalDecision, ApprovalRequest } from '../domain/execution'
 import type { BudgetLimitsInput, BudgetSnapshot } from '@shared/domain/budget'
 import type { ProviderRoute, ProviderStatus, RoutingPolicy } from '@shared/domain/routing'
+import type { ConnectorCapability, ConnectorOutcome, ConnectorRequest } from '../domain/connectors'
 
 /** Canais de request/response (renderer → main → renderer). */
 export const IPC_CHANNELS = {
@@ -168,7 +169,17 @@ export const IPC_CHANNELS = {
   providerModels: 'provider:models',
   providerSetModel: 'provider:set-model',
   routingGet: 'routing:get',
-  routingSetRoute: 'routing:set-route'
+  routingSetRoute: 'routing:set-route',
+  /**
+   * Conectores externos (SPEC-Conectores-01, critérios 5 e 6). **Dois canais nomeados, e
+   * nenhum genérico**: `connectors:capabilities` lista o que os adapters registrados declaram
+   * saber fazer, e `connectors:invoke` executa **uma** dessas operações. Não existe canal que
+   * receba endereço — um `connectors:fetch(url)` seria o proxy HTTP genérico que o critério 6
+   * proíbe, e a diferença é exatamente esta: o renderer escolhe uma operação de uma lista
+   * fechada, nunca um destino de rede.
+   */
+  connectorsCapabilities: 'connectors:capabilities',
+  connectorsInvoke: 'connectors:invoke'
 } as const
 
 /**
@@ -454,6 +465,24 @@ export interface JarvisBridge {
   getRouting(workspace: WorkspaceId): Promise<RoutingPolicy>
   /** Edita a rota de um tipo de tarefa e devolve o conjunto resultante. */
   setRoute(rota: ProviderRoute, workspace: WorkspaceId): Promise<RoutingPolicy>
+
+  /**
+   * Conectores externos (SPEC-Conectores-01, critério 5).
+   *
+   * `listConnectorCapabilities` devolve **metadado** — operação, efeito e descrição —, que é o
+   * que faz "capacidades permitidas" ser uma lista concreta em vez do resultado de tentar. Sem
+   * ela, a UI descobriria o que pode pedir sendo recusada.
+   *
+   * `callConnector` executa **uma** dessas operações. Não há método que receba URL, host ou
+   * cabeçalho: o renderer nomeia a operação, e quem sabe qual endereço isso vira é o adapter,
+   * no main (critério 6).
+   *
+   * **Não há método que devolva credencial de conector** — e, como no vault de IA, a ausência é
+   * o critério, não esquecimento: o `ConnectorOutcome` não tem campo onde um token caiba, e a
+   * ponte não tem forma de pedir um.
+   */
+  listConnectorCapabilities(): Promise<readonly ConnectorCapability[]>
+  callConnector(request: ConnectorRequest, workspace: WorkspaceId): Promise<ConnectorOutcome>
 }
 
 /** Nome da propriedade exposta via contextBridge no renderer. */

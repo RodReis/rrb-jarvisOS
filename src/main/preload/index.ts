@@ -25,6 +25,11 @@ import type { ApprovalDecision, ApprovalRequest } from '@shared/domain/execution
 import type { CommandExecution, CommandSubmission } from '@shared/domain/terminal'
 import type { AiCallHandle, AiProvider, AiRequest, AiStreamEvent } from '@shared/domain/ai'
 import type { ProviderRoute, ProviderStatus, RoutingPolicy } from '@shared/domain/routing'
+import type {
+  ConnectorCapability,
+  ConnectorOutcome,
+  ConnectorRequest
+} from '@shared/domain/connectors'
 import type { CredentialKey, CredentialStatusView } from '@shared/domain/credentials'
 import type { BudgetLimitsInput, BudgetSnapshot } from '@shared/domain/budget'
 import type {
@@ -180,7 +185,12 @@ const bridge: JarvisBridge = {
   getRouting: (workspace: WorkspaceId): Promise<RoutingPolicy> =>
     ipcRenderer.invoke(IPC_CHANNELS.routingGet, workspace),
   setRoute: (rota: ProviderRoute, workspace: WorkspaceId): Promise<RoutingPolicy> =>
-    ipcRenderer.invoke(IPC_CHANNELS.routingSetRoute, rota, workspace)
+    ipcRenderer.invoke(IPC_CHANNELS.routingSetRoute, rota, workspace),
+
+  listConnectorCapabilities: (): Promise<readonly ConnectorCapability[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.connectorsCapabilities),
+  callConnector: (request: ConnectorRequest, workspace: WorkspaceId): Promise<ConnectorOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.connectorsInvoke, request, workspace)
 }
 
 if (process.contextIsolated) {

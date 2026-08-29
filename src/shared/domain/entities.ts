@@ -189,7 +189,16 @@ export const AUDIT_EVENT_TYPES = [
   // rota ou trocando o modelo ativo. Sob um tipo só, "com que frequência o preferido cai"
   // exigiria parsear payload para descartar as edições.
   'provider-selection',
-  'routing-change'
+  'routing-change',
+  // SPEC-Conectores-01: chamada a conector externo (GitHub, Tavily). **Dois eventos por
+  // chamada** — `fase: 'requisicao'` antes e `fase: 'conclusao'` depois —, pela mesma razão
+  // que `ai-call` os tem: uma chamada que morre no meio precisa deixar rastro, e o evento de
+  // conclusão sozinho perderia exatamente a que falhou. Tipo próprio, e não `ai-call`: os dois
+  // runtimes são separados (decisão do PI de 2026-08-29), e "quantas vezes o GitHub falhou"
+  // exigiria parsear payload para descartar as chamadas de IA. O payload traz conector,
+  // operação, efeito, código de erro e créditos consumidos; **nunca o input, a resposta ou a
+  // credencial** (ADR-004).
+  'connector-call'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]
