@@ -1,5 +1,7 @@
 # Pipeline 04 — Execução automática, recuperação e prova Implementation Plan
 
+> **SUPERSEDED em 2026-08-28 — NÃO EXECUTAR.** O desenho foi redistribuído em seis fatias do MVP-009 e depende dos adapters do MVP-006. A fonte atual é `docs/mvp/mvp-009-entrega-autonoma.md` e `docs/spec/spec-entrega-01..06`. Novo plano somente após aprovação explícita da fatia.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Executar a primeira fatia aprovada em worktree isolado, abrir PR, recuperar até duas vezes, observar CI, fazer squash merge automático e provar a jornada real.

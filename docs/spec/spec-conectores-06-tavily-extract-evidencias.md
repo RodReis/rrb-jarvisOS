@@ -34,3 +34,7 @@ Cada item preserva URL original/canônica, título, domínio, data de coleta, da
 
 Fixtures de HTML, Markdown, redirect, duplicata, falha parcial e conteúdo hostil; smoke real limitado; relatório `SPEC-Conectores-06`.
 
+## Referências técnicas verificadas via Context7
+
+- [Tavily Extract API](https://docs.tavily.com/api-reference/endpoint/extract)
+- [Visão geral da Tavily API](https://docs.tavily.com/documentation/api-reference/introduction)

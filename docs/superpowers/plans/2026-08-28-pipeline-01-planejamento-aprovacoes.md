@@ -1,5 +1,7 @@
 # Pipeline 01 — Planejamento e aprovações Implementation Plan
 
+> **SUPERSEDED em 2026-08-28 — NÃO EXECUTAR.** O plano antecede a decomposição aprovada em MVP-006/008/009 e contém fronteiras que mudaram. A fonte atual é `docs/mvp/mvp-008-planejamento-governado.md` e `docs/spec/spec-planejamento-01..06`. Um novo plano técnico só será escrito quando a fatia correspondente for autorizada.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Entregar Project Hub, Wizard A, geração rastreável dos artefatos versionados e os três gates de aprovação sem qualquer execução de código ou Git automático ainda.

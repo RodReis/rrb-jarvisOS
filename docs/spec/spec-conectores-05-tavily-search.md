@@ -36,3 +36,7 @@ Pesquisar web geral e mercado pela Tavily Search API, preservando URLs, proveni�
 
 Fixtures de sucesso e erros 401/429/432/433; deduplicação de URL; roteamento Context7/Tavily; smoke real com teto de créditos. Relatório `SPEC-Conectores-05`.
 
+## Referências técnicas verificadas via Context7
+
+- [Tavily Search API](https://docs.tavily.com/documentation/api-reference/endpoint/search)
+- [Créditos e planos da API](https://docs.tavily.com/documentation/api-credits)

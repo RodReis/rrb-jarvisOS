@@ -82,3 +82,37 @@ flowchart LR
 Electron · React · TypeScript · Vite · Vitest · Playwright · Tailwind (+ Radix ad-hoc) · Supabase (dev na nuvem para OAuth — ADR-002; Docker local na fase de persistência) · SQLite local (proposta SPEC-Fundacao-04).
 
 Estrutura de diretórios: `src/main/` (electron, ipc, runtime) · `src/renderer/` (app, components, modules, styles) · `src/shared/` (domain, contracts, policies) · `supabase/` (migrations, seed) · `tests/` · `e2e/`.
+
+## Pipeline de desenvolvimento governado (desenho aprovado; não implementado)
+
+A capacidade de desenvolvimento autônomo foi separada em três MVPs executáveis e um slot não bloqueante:
+
+`MVP-006 Conectores Essenciais → MVP-008 Planejamento Governado → MVP-009 Entrega Autônoma`; o `MVP-007 Memória Contextual/RAG` permanece proposto e não bloqueia a sequência.
+
+- **MVP-006:** runtime comum de conectores, GitHub App por Device Flow e ResearchAdapter Tavily Search+Extract.
+- **MVP-008:** projeto/SQLite/Git local, ContextPack, wizard, PRD/Landscape/Convention, anexos do PI, arquitetura, roadmap e aprovações por hash.
+- **MVP-009:** publicação GitHub, DAG/fila WIP=1, reconciliação, worktree, Claude Code, revisão, CI, squash merge e evidência.
+
+### Fontes de verdade
+
+- arquivos versionados: conteúdo aprovado;
+- Git: revisões e hashes;
+- SQLite: sessão, fila, runs, tentativas, leases e projeções;
+- Vault: material secreto;
+- GitHub: issue, PR, checks e merge;
+- `STATUS.md`: índice Fatia ↔ SPEC;
+- ledger: custo, eventos e evidências.
+
+O reconciliador consulta as fontes reais antes de repetir efeitos. Uma saída de processo não substitui confirmação no GitHub/filesystem.
+
+### Fronteiras específicas
+
+- O PI anexa `DESIGN-SYSTEM.md`, HTML e assets depois do PRD; arquitetura aguarda esses anexos.
+- Context7 atende documentação técnica atual; Tavily atende mercado e web geral.
+- Conteúdo externo é dado não confiável.
+- O checkout ativo nunca é cwd do executor; cada fatia usa worktree e base SHA registrados.
+- Git após aprovação é automático; merge não cria aceite adicional.
+- Documento/ADR auxiliar não bloqueia código depois da SPEC aprovada.
+- A pipeline não herda nem inventa classificação de saúde, finanças, documentos, LGPD ou consentimento.
+
+Documentos canônicos: `docs/mvp/mvp-006-conectores-essenciais.md`, `mvp-008-planejamento-governado.md`, `mvp-009-entrega-autonoma.md` e suas SPECs.

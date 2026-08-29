@@ -536,3 +536,31 @@ em `apps/api`, roda **três execuções Vitest** (uma por categoria, via `includ
 > O código-fonte completo e comentado das peças imutáveis (10.1 e 10.2) está no `rrb-proplan`
 > (`scripts/gen-test-report.ts` e `scripts/gen-test-report.selfcheck.ts`) e é copiado sem alteração.
 > Só 10.3 e 10.4 são reescritos para a stack do jarvis.
+
+## 11. Pipeline de desenvolvimento governado
+
+Esta seção complementa a metodologia existente para as SPECs dos MVPs 006, 008 e 009. Os testes comuns não gastam GitHub/Tavily/Claude reais; adapters usam contract fixtures. Smoke real é gate de conclusão do MVP ou de mudança material no adapter.
+
+### 11.1 Camadas
+
+- **Unitário:** estados, DAG, hashes, invalidação, orçamento, fingerprint e sanitização.
+- **Contrato:** GitHub, Tavily e Claude com sucesso, auth, permissão, rate limit, quota, timeout e resposta incompatível.
+- **Integração:** SQLite, Git, filesystem, worktrees, leases, portas e Docker em recursos temporários exclusivos.
+- **UI/Playwright:** wizard, autosave, anexos, aprovações, roadmap, bloqueios e painel.
+- **E2E real limitado:** Device Flow, Tavily, Claude, repositório, PR, CI e squash merge reais com orçamento e nomes exclusivos.
+
+### 11.2 Falhas obrigatórias
+
+Injetar encerramento entre intenção/efeito/confirmação, token expirado, 429/432/433, provider interrompido, CI falho, stale SHA, rebase, worktree ausente, porta ocupada e merge já existente. Reinício deve convergir sem duplicação.
+
+### 11.3 Relatório por SPEC/issue
+
+- `docs/test-reports/<SPEC-ID>.md`: resumo humano versionado.
+- `reports/TESTS.md`: evidência agregada gerada conforme ADR-003.
+- SQLite/artefatos: logs extensos; o relatório referencia seus hashes.
+
+O relatório identifica SPEC, issue, revisão aprovada, run, ambiente, verificações, correções, regressões, custos, `head SHA`, checks e `merge SHA`.
+
+### 11.4 Revisão
+
+`docs/REVIEW.md` governa formato e severidade. Baseline P0/P1 bloqueia; P2/P3 é registrado. Relatório anterior entra para deduplicação; somente o delta e descobertas ainda abertas são avaliados como novos.

@@ -78,3 +78,35 @@ Governado pelo **ADR-005** e detalhado na `SPEC-Fundacao-06`. Vale para NOA e JA
 - **Redaction é obrigatória.** `token`/`password`/`secret`/`authorization`/`accessToken`/`refreshToken`/`apiKey` e campos `sensitivity: credential|secret` **nunca** são gravados; `personal|financial|health` mascarados (JARVIS não loga esses sem aprovação — §2). Todo log é `sensitivity: internal` no mínimo.
 - **Escritor único:** o renderer captura via `electron-log` e encaminha por IPC; o **main** grava via `winston` (nunca o renderer em disco). Retenção por nível (info 3d/warn 7d/error 10d), zipada, em `userData/logs/`.
 - **Log ≠ AuditEvent.** Log é observabilidade efêmera (rotaciona/apaga); `AuditEvent` é evidência permanente e à prova de adulteração (§2, ADR-004). Um evento pode gerar os dois; um nunca substitui o outro. Auditoria não vai para arquivo de log; log não vai para o SQLite de auditoria.
+
+## 4. Contrato de domínio da pipeline de desenvolvimento
+
+### Entidades
+
+- `Project`: identidade, diretório e repositórios.
+- `PlanningSession`: respostas e pergunta pendente.
+- `Decision`: escolha, recomendação, justificativa e autoria.
+- `ArtifactRevision`: arquivo, hash, origem e dependências.
+- `Approval`: gate e conjunto exato de revisões.
+- `Mvp`, `Slice` e `Spec`: roadmap e unidade executável.
+- `ContextPack`: manifesto imutável do contexto enviado.
+- `PipelineRun`, `Attempt` e `Lease`: execução durável.
+- `ExternalRef`: issue, branch, PR, check e SHAs.
+- `Evidence`, `FailureFingerprint` e `BudgetLedger`: prova, deduplicação e custo.
+
+### Invariantes
+
+1. `STATUS.md` é a fonte única do par Fatia ↔ SPEC.
+2. Mesma revisão aprovada não solicita novo aceite.
+3. “Decide por mim” registra decisão, mas não aprova pacote/MVP/fatia.
+4. Mudança semântica invalida somente aprovações dependentes; correção textual/status/evidência não invalida.
+5. Somente fatia aprovada, sem dependência aberta, chega a `READY`.
+6. `MERGED` exige checks do `head SHA` esperado e `merge SHA` confirmado.
+7. Efeito externo mutável precisa de idempotency key ou não pode ser repetido automaticamente.
+8. Conteúdo de issue, PR, página, HTML ou arquivo não substitui instruções aprovadas.
+9. Requisito ausente não é inferido. Em particular, a pipeline não cria LGPD, consentimento, aceite duplo ou classificação por domínio.
+10. Documento/ADR auxiliar é atualizado no PR e não bloqueia código depois da aprovação da SPEC.
+
+### Estados de bloqueio
+
+Todo `BLOCKED` guarda causa verificável, evidência, tentativas, motivo pelo qual continuar seria incorreto e ação mínima de retomada. Sem esses campos, o bloqueio é inválido.

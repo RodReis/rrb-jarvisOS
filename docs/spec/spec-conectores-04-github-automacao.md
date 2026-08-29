@@ -39,3 +39,8 @@ Oferecer capacidades idempotentes para repositórios, issues, dependências, ref
 
 Contract fixtures GitHub; integração com servidor fake; smoke em repositório exclusivo criando issue, PR, check e squash merge. Relatório `SPEC-Conectores-04`.
 
+## Referências técnicas verificadas
+
+- [GitHub REST — Repositories](https://docs.github.com/en/rest/repos/repos)
+- [GitHub REST — Pull requests](https://docs.github.com/en/rest/pulls/pulls)
+- [GitHub REST — Checks](https://docs.github.com/en/rest/checks)
