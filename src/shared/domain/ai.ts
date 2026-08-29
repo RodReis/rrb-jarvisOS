@@ -14,6 +14,7 @@
 
 import type { WorkspaceId } from './entities'
 import type { CredentialKey } from './credentials'
+import type { TaskType } from './routing'
 
 /**
  * Os providers que o app conhece — **dado, não lógica**, como `CREDENTIAL_KEYS`.
@@ -156,9 +157,26 @@ export const TIMEOUT_PADRAO_MS = 120_000
 
 /** O que o chamador pede. Stateless nesta fatia: o contexto é o que vem aqui (spec § Fora). */
 export interface AiRequest {
-  readonly provider: AiProvider
-  /** Ausente = `MODELO_PADRAO[provider]`. */
+  /**
+   * O provider, quando o chamador **escolhe** um explicitamente.
+   *
+   * Opcional desde a F04: com `taskType`, quem escolhe é o `ProviderRoute` — e é esse o
+   * caminho normal. O provider explícito continua existindo para o painel de teste do
+   * Settings, onde o ponto é justamente falar com um provider específico.
+   *
+   * Um dos dois tem de vir. Sem nenhum, a chamada não sabe para onde ir; o ponto único recusa
+   * com mensagem em vez de escolher um por conta própria.
+   */
+  readonly provider?: AiProvider
+  /** Ausente = o modelo ativo do provider escolhido (F04) ou `MODELO_PADRAO`. */
   readonly model?: string
+  /**
+   * O tipo de tarefa, quando a escolha do provider é do **roteamento** (SPEC-Providers-04).
+   *
+   * O chamador declara o tipo; o `ProviderRoute` decide quem atende, com preferência local e
+   * fallback por disponibilidade. Agentes que declarem o tipo sozinhos são Corte 3+/4.
+   */
+  readonly taskType?: TaskType
   readonly prompt: string
   /** Instrução de sistema, opcional. */
   readonly system?: string
@@ -234,11 +252,18 @@ export type AiStreamEvent =
       readonly erro?: string
     }
 
-/** O que o renderer recebe ao disparar a chamada — o handle para casar os eventos. */
+/**
+ * O que o renderer recebe ao disparar a chamada — o handle para casar os eventos.
+ *
+ * `provider` e `model` são **opcionais desde a F04**: quando a chamada é roteada por
+ * `taskType`, quem atende só se sabe depois da seleção, que acontece dentro do serviço. O
+ * handle deixou de afirmar o que o handler não tinha como saber — e quem precisa do provider
+ * escolhido o lê no `CostEvent` do evento `fim`, onde ele é fato medido e não previsão.
+ */
 export interface AiCallHandle {
   readonly id: string
-  readonly provider: AiProvider
-  readonly model: string
+  readonly provider?: AiProvider
+  readonly model?: string
 }
 
 export function isAiProvider(value: unknown): value is AiProvider {

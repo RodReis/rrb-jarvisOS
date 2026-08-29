@@ -10,6 +10,8 @@ import { AnthropicAdapter } from './ai/anthropic-adapter'
 import { GeminiAdapter } from './ai/gemini-adapter'
 import { OllamaAdapter } from './ai/ollama-adapter'
 import { ClaudeCodeAdapter } from './ai/claude-code-adapter'
+import { RoutingService, SondaDeAdapters } from './ai/routing-service'
+import { RoutingRepository } from './ai/routing-repository'
 import { BudgetService } from './budget/budget-service'
 import { BudgetRepository } from './budget/budget-repository'
 import { AllowlistRepository } from './policy/allowlist-repository'
@@ -185,18 +187,35 @@ if (!app.requestSingleInstanceLock()) {
     // e o ponto de chamada não mudou por causa disso, que é o critério 1 da F02 valendo na
     // prática. `ollama` e `claude-code` não recebem credencial: o primeiro fala com o
     // `localhost`, o segundo usa a sessão do próprio CLI.
-    const ai = new AiCallService(
-      {
-        anthropic: new AnthropicAdapter(),
-        gemini: new GeminiAdapter(),
-        ollama: new OllamaAdapter(),
-        'claude-code': new ClaudeCodeAdapter()
-      },
-      credentials,
-      policy,
-      storage.audit,
-      budget
+    const ollamaAdapter = new OllamaAdapter()
+    const claudeCodeAdapter = new ClaudeCodeAdapter()
+    const adapters = {
+      anthropic: new AnthropicAdapter(),
+      gemini: new GeminiAdapter(),
+      ollama: ollamaAdapter,
+      'claude-code': claudeCodeAdapter
+    }
+
+    // Roteamento e healthcheck (SPEC-Providers-04). A sonda é montada aqui porque **cada
+    // provider responde a uma pergunta diferente**: os locais têm healthcheck próprio (o
+    // servidor pode não estar rodando), e os de nuvem estão indisponíveis para *este* usuário
+    // quando falta credencial — pingar a API para descobrir isso custaria uma requisição por
+    // checagem e responderia a pergunta errada.
+    const routingRepo = new RoutingRepository(storage.db)
+    const routing = new RoutingService(
+      routingRepo,
+      new SondaDeAdapters({
+        anthropic: async () =>
+          credentials.resolve(userIdAtual(), workspaces.atual(), 'anthropic') !== undefined,
+        gemini: async () =>
+          credentials.resolve(userIdAtual(), workspaces.atual(), 'gemini') !== undefined,
+        ollama: () => ollamaAdapter.disponivel(),
+        'claude-code': () => claudeCodeAdapter.disponivel()
+      }),
+      storage.audit
     )
+
+    const ai = new AiCallService(adapters, credentials, policy, storage.audit, budget, routing)
 
     registerIpcHandlers({
       audit: storage.audit,
@@ -212,6 +231,8 @@ if (!app.requestSingleInstanceLock()) {
       credentials,
       ai,
       budget,
+      routing,
+      routingRepo,
       runs,
       approvals,
       userId: userIdAtual,

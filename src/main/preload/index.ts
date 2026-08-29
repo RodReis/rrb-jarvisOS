@@ -23,7 +23,8 @@ import type {
 import type { ExecutionRun } from '@shared/domain/execution'
 import type { ApprovalDecision, ApprovalRequest } from '@shared/domain/execution'
 import type { CommandExecution, CommandSubmission } from '@shared/domain/terminal'
-import type { AiCallHandle, AiRequest, AiStreamEvent } from '@shared/domain/ai'
+import type { AiCallHandle, AiProvider, AiRequest, AiStreamEvent } from '@shared/domain/ai'
+import type { ProviderRoute, ProviderStatus, RoutingPolicy } from '@shared/domain/routing'
 import type { CredentialKey, CredentialStatusView } from '@shared/domain/credentials'
 import type { BudgetLimitsInput, BudgetSnapshot } from '@shared/domain/budget'
 import type {
@@ -164,7 +165,22 @@ const bridge: JarvisBridge = {
   getBudget: (workspace: WorkspaceId): Promise<BudgetSnapshot> =>
     ipcRenderer.invoke(IPC_CHANNELS.budgetGet, workspace),
   setBudgetLimits: (limites: BudgetLimitsInput, workspace: WorkspaceId): Promise<BudgetSnapshot> =>
-    ipcRenderer.invoke(IPC_CHANNELS.budgetSetLimits, limites, workspace)
+    ipcRenderer.invoke(IPC_CHANNELS.budgetSetLimits, limites, workspace),
+
+  getProviderStatus: (workspace: WorkspaceId): Promise<readonly ProviderStatus[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.providerStatus, workspace),
+  getProviderModels: (provider: AiProvider): Promise<readonly string[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.providerModels, provider),
+  setProviderModel: (
+    provider: AiProvider,
+    modelo: string,
+    workspace: WorkspaceId
+  ): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.providerSetModel, provider, modelo, workspace),
+  getRouting: (workspace: WorkspaceId): Promise<RoutingPolicy> =>
+    ipcRenderer.invoke(IPC_CHANNELS.routingGet, workspace),
+  setRoute: (rota: ProviderRoute, workspace: WorkspaceId): Promise<RoutingPolicy> =>
+    ipcRenderer.invoke(IPC_CHANNELS.routingSetRoute, rota, workspace)
 }
 
 if (process.contextIsolated) {

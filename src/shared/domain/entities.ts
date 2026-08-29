@@ -182,7 +182,14 @@ export const AUDIT_EVENT_TYPES = [
   // payload para descartar as edições. O payload traz limite, acumulado e estimativa —
   // números, nunca o prompt.
   'budget-decision',
-  'budget-change'
+  'budget-change',
+  // SPEC-Providers-04: o roteamento. **Dois tipos**, pela mesma razão que separa
+  // `budget-decision` de `budget-change`: `provider-selection` é o veredito sobre uma chamada
+  // (quem atendeu, e se foi fallback — critério 4), `routing-change` é o usuário editando a
+  // rota ou trocando o modelo ativo. Sob um tipo só, "com que frequência o preferido cai"
+  // exigiria parsear payload para descartar as edições.
+  'provider-selection',
+  'routing-change'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]

@@ -72,6 +72,9 @@ describe('ponte do preload', () => {
       // método aqui daria ao renderer uma resposta que ele só poderia duplicar.
       'getBudget',
       'getPreferences',
+      'getProviderModels',
+      'getProviderStatus',
+      'getRouting',
       'getWorkspace',
       'listAllowedCommands',
       'listAllowedDirectories',
@@ -103,6 +106,8 @@ describe('ponte do preload', () => {
       'setAutomationEnabled',
       'setBudgetLimits',
       'setCredential',
+      'setProviderModel',
+      'setRoute',
       'setWorkflowStatus',
       'switchWorkspace',
       'updateWorkflow',

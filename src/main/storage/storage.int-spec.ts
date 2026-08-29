@@ -70,6 +70,8 @@ describe('migrations', () => {
     antigo.exec('DROP TABLE credential_ref')
     antigo.exec('DROP TABLE budget_policy')
     antigo.exec('DROP TABLE cost_event')
+    antigo.exec('DROP TABLE provider_route')
+    antigo.exec('DROP TABLE active_model')
     antigo.pragma('user_version = 1')
     antigo.close()
 

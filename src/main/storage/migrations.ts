@@ -307,6 +307,45 @@ const MIGRATIONS: readonly string[] = [
     created_at   TEXT NOT NULL    -- ISO UTC; é por ele que o período é recortado
   );
   CREATE INDEX idx_cost_event_escopo ON cost_event(user_id, workspace_id, created_at);
+  `,
+
+  // 11 — roteamento por tarefa e modelo ativo (SPEC-Providers-04).
+  //
+  // `provider_route` guarda **uma linha por tipo de tarefa**, e não um JSON com as cinco: a
+  // tela edita uma rota de cada vez, e uma coluna JSON faria salvar `chat` reescrever o
+  // documento inteiro — perdendo a edição concorrente de outro tipo. A PK composta
+  // `(user_id, workspace_id, task_type)` é o que torna cada rota independente.
+  //
+  // `preferencia` é JSON numa coluna porque é uma **lista ordenada** e a ordem é o dado: uma
+  // tabela filha com coluna de posição responderia à mesma pergunta com duas tabelas e um
+  // JOIN, para um array de no máximo quatro itens que nunca é consultado por elemento.
+  //
+  // `active_model` mora em tabela separada, e não como coluna de `provider_route`, porque o
+  // escopo é outro: modelo é **por provider**, rota é **por tipo de tarefa**. Juntar faria o
+  // mesmo modelo do Gemini ser gravado cinco vezes, uma por rota que o menciona — e as cinco
+  // divergiriam na primeira troca.
+  //
+  // Ausência de linha nas duas é o **padrão valendo** (`ROTEAMENTO_PADRAO`, `MODELO_PADRAO`),
+  // não erro: o app roteia desde o primeiro boot, sem semear linha por usuário.
+  `
+  CREATE TABLE provider_route (
+    user_id       TEXT NOT NULL,
+    workspace_id  TEXT NOT NULL,
+    task_type     TEXT NOT NULL,
+    preferencia   TEXT NOT NULL,   -- JSON: AiProvider[], **ordenado** (a ordem é o dado)
+    preferir_local INTEGER NOT NULL,
+    updated_at    TEXT NOT NULL,
+    PRIMARY KEY (user_id, workspace_id, task_type)
+  );
+
+  CREATE TABLE active_model (
+    user_id      TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    provider     TEXT NOT NULL,
+    model        TEXT NOT NULL,
+    updated_at   TEXT NOT NULL,
+    PRIMARY KEY (user_id, workspace_id, provider)
+  );
   `
 ]
 

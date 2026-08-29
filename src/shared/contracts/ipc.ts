@@ -30,9 +30,10 @@ import type {
 import type { ExecutionRun } from '../domain/execution'
 import type { CommandExecution, CommandSubmission } from '../domain/terminal'
 import type { CredentialKey, CredentialStatusView } from '../domain/credentials'
-import type { AiCallHandle, AiRequest, AiStreamEvent } from '../domain/ai'
+import type { AiCallHandle, AiProvider, AiRequest, AiStreamEvent } from '../domain/ai'
 import type { ApprovalDecision, ApprovalRequest } from '../domain/execution'
 import type { BudgetLimitsInput, BudgetSnapshot } from '@shared/domain/budget'
+import type { ProviderRoute, ProviderStatus, RoutingPolicy } from '@shared/domain/routing'
 
 /** Canais de request/response (renderer → main → renderer). */
 export const IPC_CHANNELS = {
@@ -157,7 +158,17 @@ export const IPC_CHANNELS = {
    * decisão que já foi tomada.
    */
   budgetGet: 'budget:get',
-  budgetSetLimits: 'budget:set-limits'
+  budgetSetLimits: 'budget:set-limits',
+  /**
+   * Providers e roteamento (SPEC-Providers-04, critérios 5 e 8). O renderer **lê** status e
+   * rotas, e **edita** rotas e modelo ativo; quem escolhe o provider de uma chamada é o ponto
+   * único, no main. Não há canal que peça a seleção: o renderer não decide quem atende.
+   */
+  providerStatus: 'provider:status',
+  providerModels: 'provider:models',
+  providerSetModel: 'provider:set-model',
+  routingGet: 'routing:get',
+  routingSetRoute: 'routing:set-route'
 } as const
 
 /**
@@ -426,6 +437,23 @@ export interface JarvisBridge {
    * Entrada inválida (limite negativo, limiar fora de 0–1) é **recusada no main**.
    */
   setBudgetLimits(limites: BudgetLimitsInput, workspace: WorkspaceId): Promise<BudgetSnapshot>
+
+  /**
+   * Status por provider: estado, modelo ativo, origem e latência (SPEC-Providers-04, crit. 5).
+   *
+   * O healthcheck roda no main, com cache curto — o renderer não sonda nada. Uma tela que
+   * pingasse providers por conta própria manteria uma segunda noção de "quem está de pé", e a
+   * dela discordaria da que roteia.
+   */
+  getProviderStatus(workspace: WorkspaceId): Promise<readonly ProviderStatus[]>
+  /** Os modelos que um provider oferece — o que o seletor de troca lista. */
+  getProviderModels(provider: AiProvider): Promise<readonly string[]>
+  /** Troca o modelo ativo. `false` quando o modelo não existe na tabela de preço. */
+  setProviderModel(provider: AiProvider, modelo: string, workspace: WorkspaceId): Promise<boolean>
+  /** As regras de roteamento do escopo, com as padrão preenchendo o que nunca foi editado. */
+  getRouting(workspace: WorkspaceId): Promise<RoutingPolicy>
+  /** Edita a rota de um tipo de tarefa e devolve o conjunto resultante. */
+  setRoute(rota: ProviderRoute, workspace: WorkspaceId): Promise<RoutingPolicy>
 }
 
 /** Nome da propriedade exposta via contextBridge no renderer. */
