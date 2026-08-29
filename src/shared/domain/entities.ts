@@ -162,7 +162,13 @@ export const AUDIT_EVENT_TYPES = [
   // execução** gere evento, não só sucesso). Tipo próprio, e não `filesystem-operation`:
   // executar processo e tocar arquivo são capacidades distintas, com allowlists distintas, e
   // a auditoria tem de poder separá-las sem parsear o payload.
-  'terminal-command'
+  'terminal-command',
+  // SPEC-Providers-01: mudança no vault de credenciais (RF-010). Tipo próprio, e não
+  // `allowlist-change`: allowlist define o que a máquina pode fazer, credencial define com
+  // que identidade ela fala com terceiros — e a auditoria tem de separá-las sem parsear o
+  // payload. O payload traz `key`, escopo, ator e operação; **jamais o valor** (ADR-004: "o
+  // log de auditoria não é lugar de credencial").
+  'credential-change'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]

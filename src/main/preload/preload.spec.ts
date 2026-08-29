@@ -66,6 +66,7 @@ describe('ponte do preload', () => {
       'listAllowedDirectories',
       'listAuditEvents',
       'listAutomations',
+      'listCredentials',
       'listExecutionRuns',
       'listPendingApprovals',
       'listWorkflows',
@@ -76,6 +77,7 @@ describe('ponte do preload', () => {
       'removeAllowedCommand',
       'removeAllowedDirectory',
       'removeAutomation',
+      'removeCredential',
       'removeWorkflow',
       'resolveApproval',
       'runCommand',
@@ -84,6 +86,7 @@ describe('ponte do preload', () => {
       'savePreferences',
       'sendLog',
       'setAutomationEnabled',
+      'setCredential',
       'setWorkflowStatus',
       'switchWorkspace',
       'updateWorkflow',
@@ -150,7 +153,53 @@ describe('ponte do preload', () => {
 
     // A superfície é fechada por nome: um `getToken`/`getSession`/`refreshToken` aqui
     // seria o caminho tipado até a credencial que a SPEC-03 proíbe existir.
-    expect(Object.keys(bridge).some((k) => /token|secret|credential|session/i.test(k))).toBe(false)
+    //
+    // O vault (SPEC-Providers-01) trouxe três métodos com `credential` no nome, e a guarda
+    // ficou **mais** estrita em vez de mais frouxa: em vez de aceitar qualquer nome com a
+    // palavra, ela agora enumera exatamente os três que existem — e todos gerenciam
+    // *metadados* (status, origem, provider), nenhum devolve valor. Um `getCredential`
+    // amanhã não entra nesta lista, e por isso quebra o teste.
+    const GESTAO_DE_CREDENCIAL_SEM_VALOR = ['listCredentials', 'setCredential', 'removeCredential']
+
+    const suspeitos = Object.keys(bridge)
+      .filter((k) => /token|secret|credential|session/i.test(k))
+      .filter((k) => !GESTAO_DE_CREDENCIAL_SEM_VALOR.includes(k))
+
+    expect(suspeitos).toEqual([])
+  })
+
+  it('nenhum método do vault tem forma de devolver o valor de uma credencial', async () => {
+    const bridge = await carregarPonte()
+
+    // O critério 2 diz "o renderer nunca recebe o valor". A prova aqui é a **ausência de
+    // canal**: os três métodos do vault roteiam para canais que devolvem status, e não existe
+    // nenhum canal no contrato cujo nome sugira leitura de segredo. Se alguém adicionar
+    // `credential:read`, este teste é o que fica vermelho.
+    const canaisDeCredencial = Object.entries(IPC_CHANNELS)
+      .filter(([nome]) => /credential/i.test(nome))
+      .map(([, canal]) => canal)
+
+    expect(canaisDeCredencial).toEqual([
+      IPC_CHANNELS.credentialList,
+      IPC_CHANNELS.credentialSet,
+      IPC_CHANNELS.credentialRemove
+    ])
+
+    await (bridge.listCredentials as (w: string) => Promise<unknown>)('jarvis')
+    expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.credentialList, 'jarvis')
+
+    // `setCredential` leva o valor de ida — e a assimetria é o desenho: entra e não volta.
+    await (bridge.setCredential as (k: string, v: string, w: string) => Promise<unknown>)(
+      'openai',
+      'sk-secreto',
+      'jarvis'
+    )
+    expect(invoke).toHaveBeenCalledWith(
+      IPC_CHANNELS.credentialSet,
+      'openai',
+      'sk-secreto',
+      'jarvis'
+    )
   })
 
   it('onAuthChanged devolve um cancelador e não vaza o evento do Electron', async () => {

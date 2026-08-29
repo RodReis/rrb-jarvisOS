@@ -6,13 +6,15 @@ import {
   type AccentColor,
   type Locale,
   type ThemePreference,
-  type UserPreferences
+  type UserPreferences,
+  type WorkspaceId
 } from '@shared/domain/entities'
 import { AccentSwatchSelector } from '@design/patterns'
 import { identidade } from '@design/tokens/identidade'
 import { ProvedorDeTema } from '@design/tokens/provider'
 import type { CorAcento } from '@design/tokens/acento'
 import type { Modulo } from '@design/tokens/semantic'
+import { CredenciaisDoWorkspace } from './CredenciaisDoWorkspace'
 
 /**
  * Tela de configurações (SPEC-Fundacao-05 + SPEC-CHOICE-01 crit. 5): idioma, tema e acento.
@@ -31,6 +33,16 @@ interface SettingsProps {
   readonly onSalvar: (mudanca: UserPreferences) => void
   /** `uiTheme` do shell — o grupo de acento acompanha o tema da tela, não força escuro. */
   readonly uiTheme: 'light' | 'dark'
+  /**
+   * Espaço ativo, para a seção de credenciais (SPEC-Providers-01).
+   *
+   * Entra como prop em vez de o Settings ler `window.jarvis.getWorkspace()`: idioma, tema e
+   * acento são preferências **do usuário** e não mudam com o espaço; credencial é do par
+   * usuário+espaço. Quem já sabe qual espaço está ativo é o shell — duplicar essa leitura aqui
+   * criaria uma segunda fonte que pode divergir da que pinta o resto da tela.
+   */
+  readonly workspace: WorkspaceId
+  readonly nomeDoEspaco: string
 }
 
 const ROTULO_IDIOMA: Readonly<Record<Locale, string>> = {
@@ -42,7 +54,9 @@ export function Settings({
   preferencias,
   erro,
   onSalvar,
-  uiTheme
+  uiTheme,
+  workspace,
+  nomeDoEspaco
 }: SettingsProps): React.JSX.Element {
   const { t } = useTranslation()
 
@@ -144,6 +158,12 @@ export function Settings({
           ))}
         </div>
       </div>
+
+      {/*
+       * Credenciais por último: é a única seção escopada ao **espaço**, não ao usuário, e vem
+       * depois das três preferências pessoais para a leitura não alternar entre os dois escopos.
+       */}
+      <CredenciaisDoWorkspace workspace={workspace} nomeDoEspaco={nomeDoEspaco} />
     </section>
   )
 }

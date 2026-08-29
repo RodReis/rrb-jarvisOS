@@ -19,9 +19,11 @@ import type { SimulationEngine } from '../execution/simulation-engine'
 import type { RealFileSystemEngine } from '../execution/real-filesystem-engine'
 import type { TerminalEngine } from '../execution/terminal-engine'
 import type { CommandAllowlistRepository } from '../policy/command-allowlist-repository'
+import type { CredentialService } from '../credentials/credential-service'
 import type { ExecutionRepository } from '../execution/execution-repository'
 import type { ApprovalDecision, ExecutionRun } from '@shared/domain/execution'
 import type { CommandExecution, CommandSubmission } from '@shared/domain/terminal'
+import { isCredentialKey, type CredentialStatusView } from '@shared/domain/credentials'
 import { isWorkflowStatus } from '@shared/domain/workflows'
 import type { Automation, AutomationInput, Workflow, WorkflowInput } from '@shared/domain/workflows'
 import type { PreferencesService } from '../preferences/preferences-service'
@@ -95,6 +97,8 @@ export interface IpcDependencies {
   readonly terminal: TerminalEngine
   /** Allowlist de comandos (SPEC-ExecucaoReal-02, 1ª barreira): edição de alto risco. */
   readonly commandAllowlist: CommandAllowlistRepository
+  /** Vault de credenciais (SPEC-Providers-01): status para a UI, valor só dentro do main. */
+  readonly credentials: CredentialService
   /** Runs persistidos, para a UI listar o histórico. */
   readonly runs: ExecutionRepository
   /** Fila de aprovações pendentes do usuário corrente. */
@@ -510,6 +514,48 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       const alvo = typeof binary === 'string' ? binary : ''
       if (alvo) deps.commandAllowlist.remove(deps.userId(), workspace, alvo)
       return deps.commandAllowlist.list(deps.userId(), workspace)
+    }
+  )
+
+  // Vault de credenciais (SPEC-Providers-01, critério 8). Os três canais devolvem a lista de
+  // status — nunca valor. O ator é **fixo em `usuario`** aqui, e não parâmetro: o que chega
+  // por este canal veio da UI, onde só o dono digita. Deixar o renderer escolher o ator faria
+  // do campo uma forma de o agente se declarar usuário e escapar da classificação de alto
+  // risco — a distinção do critério 5 só vale enquanto o call site a decide.
+  ipcMain.handle(
+    IPC_CHANNELS.credentialList,
+    (_event, workspace: unknown): readonly CredentialStatusView[] => {
+      if (!isWorkspaceId(workspace)) return []
+      return deps.credentials.listStatus(deps.userId(), workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.credentialSet,
+    (_event, key: unknown, value: unknown, workspace: unknown): readonly CredentialStatusView[] => {
+      if (!isWorkspaceId(workspace) || !isCredentialKey(key)) return []
+
+      // Valor vazio não é "gravar string vazia": é ausência de entrada, e gravá-la deixaria a
+      // credencial `present` com um valor que o provider recusaria. Vira no-op.
+      const segredo = typeof value === 'string' ? value.trim() : ''
+      if (segredo.length === 0) return deps.credentials.listStatus(deps.userId(), workspace)
+
+      // Sem `ctx` com a chave: o log registra o fato e o provider, nunca o valor.
+      log.integracao.info('Credencial submetida pela interface', {
+        canal: IPC_CHANNELS.credentialSet,
+        direction: 'in',
+        key
+      })
+
+      return deps.credentials.set(deps.userId(), workspace, key, segredo, 'usuario')
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.credentialRemove,
+    (_event, key: unknown, workspace: unknown): readonly CredentialStatusView[] => {
+      if (!isWorkspaceId(workspace) || !isCredentialKey(key)) return []
+      return deps.credentials.remove(deps.userId(), workspace, key, 'usuario')
     }
   )
 

@@ -18,6 +18,9 @@ import { ApprovalRepository } from './execution/approval-repository'
 import { RealFileSystemEngine } from './execution/real-filesystem-engine'
 import { TerminalEngine } from './execution/terminal-engine'
 import { CommandAllowlistRepository } from './policy/command-allowlist-repository'
+import { CredentialService } from './credentials/credential-service'
+import { CredentialRepository } from './credentials/credential-repository'
+import { SafeStorageCipher } from './credentials/secret-vault'
 import { carregarEnv } from './env'
 import { closeLogger, initLogger, log } from './logging/logger'
 import { initRendererLogBridge } from './logging/renderer-bridge'
@@ -153,6 +156,16 @@ if (!app.requestSingleInstanceLock()) {
       userIdAtual
     )
 
+    // Vault de credenciais (SPEC-Providers-01): a base do MVP-005. A cifra é a mesma do cofre
+    // de tokens (`safeStorage`/DPAPI) e é construída **aqui**, no boot, e não sob demanda: se
+    // o SO não oferece cifra, é melhor o app falhar cedo e visível do que na primeira vez que
+    // o usuário tentar salvar uma chave.
+    const credentials = new CredentialService(
+      new CredentialRepository(storage.db, new SafeStorageCipher()),
+      storage.audit,
+      policy
+    )
+
     registerIpcHandlers({
       audit: storage.audit,
       workspaces,
@@ -164,6 +177,7 @@ if (!app.requestSingleInstanceLock()) {
       realExecution,
       terminal,
       commandAllowlist,
+      credentials,
       runs,
       approvals,
       userId: userIdAtual,
