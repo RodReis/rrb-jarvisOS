@@ -736,6 +736,8 @@ Três E2E com Electron, `ANTHROPIC_BASE_URL` apontando para um servidor SSE loca
 
 **Por que não foi desfeito.** `git branch -f` devolveu os commits ao branch da fatia e a `main` local voltou a `18eed62`, mas o force-push para a `origin/main` foi **rejeitado**: a proteção tem `allow_force_pushes: false`. Desligar a proteção para consertar um erro de processo trocaria uma garantia real por conveniência. **Decisão do PI (2026-08-29):** aceitar o estado, abrir um PR de verificação para o CI rodar sobre o código, e registrar aqui.
 
+**O que o PR de verificação alcançou, e o que não alcançou.** O PR [#140](https://github.com/RodReis/rrb-jarvisOS/pull/140) fez o `gate` e o `test` rodarem sobre a árvore que contém a F03 — **824 testes verdes no CI**, não só na minha máquina. O que ele **não** alcançou é o job `e2e`: ele é condicional por paths (`src/main/preload/**`, `src/main/index.ts`, `tests/e2e/**` — card #34), e o PR de verificação toca só `docs/`. A F03 mexeu nos três, então o `e2e` **teria** rodado num PR normal e não rodou em nenhum. Os 3 E2E foram executados localmente e provados por contrafactual, mas essa é a lacuna que o commit direto deixou e que este PR não fecha.
+
 **A guarda que faltava.** Confirmar o branch **uma vez, no início** não basta: o custo do erro é assimétrico (segundos para checar, proteção de branch para desfazer). O `git branch --show-current` tem de vir **junto do commit**, não antes da primeira edição.
 
 #### Limites registrados, não silenciados
