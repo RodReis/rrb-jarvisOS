@@ -143,6 +143,9 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     // SPEC-Providers-03: leitura do orçamento (limites + acumulado). Não há canal que pergunte
     // "esta chamada cabe?" — a decisão é do main, dentro do ponto único.
     'getBudget',
+    // SPEC-Conectores-02: teto de créditos por conector. Leitura e edição do **teto** —
+    // nenhum método pergunta se uma chamada cabe: essa decisão é do gate, no main.
+    'getConnectorCredits',
     'getPreferences',
     // SPEC-Providers-04: providers e roteamento. Enumerados um a um, como todos os anteriores.
     // **Nenhum** deles seleciona provider: quem escolhe quem atende é o ponto único, no main.
@@ -182,6 +185,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'setAutomationEnabled',
     // SPEC-Providers-03: edição dos limites. O renderer edita; o cálculo e a decisão são do main.
     'setBudgetLimits',
+    'setConnectorCreditLimits',
     'setCredential',
     // SPEC-Providers-04: troca de modelo ativo e edição de rota.
     'setProviderModel',

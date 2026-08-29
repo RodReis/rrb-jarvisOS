@@ -6,6 +6,8 @@ import {
   IPC_SEND_CHANNELS,
   type AppInfo,
   type AuditVerification,
+  type ConnectorCreditLimitsInput,
+  type ConnectorCreditView,
   type JarvisBridge,
   type PreferencesSnapshot,
   type WorkspaceSwitchResult
@@ -27,6 +29,7 @@ import type { AiCallHandle, AiProvider, AiRequest, AiStreamEvent } from '@shared
 import type { ProviderRoute, ProviderStatus, RoutingPolicy } from '@shared/domain/routing'
 import type {
   ConnectorCapability,
+  ConnectorId,
   ConnectorOutcome,
   ConnectorRequest
 } from '@shared/domain/connectors'
@@ -190,7 +193,18 @@ const bridge: JarvisBridge = {
   listConnectorCapabilities: (): Promise<readonly ConnectorCapability[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.connectorsCapabilities),
   callConnector: (request: ConnectorRequest, workspace: WorkspaceId): Promise<ConnectorOutcome> =>
-    ipcRenderer.invoke(IPC_CHANNELS.connectorsInvoke, request, workspace)
+    ipcRenderer.invoke(IPC_CHANNELS.connectorsInvoke, request, workspace),
+  getConnectorCredits: (
+    connector: ConnectorId,
+    workspace: WorkspaceId
+  ): Promise<ConnectorCreditView> =>
+    ipcRenderer.invoke(IPC_CHANNELS.connectorCreditsGet, connector, workspace),
+  setConnectorCreditLimits: (
+    connector: ConnectorId,
+    limites: ConnectorCreditLimitsInput,
+    workspace: WorkspaceId
+  ): Promise<ConnectorCreditView> =>
+    ipcRenderer.invoke(IPC_CHANNELS.connectorCreditsSetLimits, connector, limites, workspace)
 }
 
 if (process.contextIsolated) {

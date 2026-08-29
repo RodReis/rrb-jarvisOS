@@ -111,6 +111,38 @@ describe('decidirRetry — a ordem das recusas é a política (critérios 2 e 3)
     }
   )
 
+  it('quando as duas recusas se aplicam, a repetibilidade é a que responde', () => {
+    // O caso que prova a **ordem**, e não só as regras. Uma mutação sem chave contra um 401
+    // dispara as duas recusas; qual delas o motivo nomeia determina o que a auditoria conta e,
+    // mais importante, qual regra alguém vai achar que pode relaxar depois.
+    //
+    // A repetibilidade vem primeiro porque é a mais forte: `codigo-terminal` depende de uma
+    // lista que cresce; `nao-repetivel` vale para **todo** código, inclusive os que ainda não
+    // existem. Invertida a ordem, este teste é o único que fica vermelho — os outros não
+    // distinguem os dois motivos porque neles só uma recusa se aplica.
+    const d = decidirRetry({
+      code: 'credencial-recusada',
+      tentativa: 1,
+      maxTentativas: MAX_TENTATIVAS_PADRAO,
+      repetivel: false
+    })
+
+    expect(d).toEqual({ repetir: false, motivo: 'nao-repetivel' })
+  })
+
+  it('e o orçamento de tentativas é o último a falar', () => {
+    // Esgotado **e** não repetível: nem por isso o motivo vira `esgotou`. Só faz sentido
+    // perguntar "já tentei demais?" sobre algo que valeria a pena tentar.
+    const d = decidirRetry({
+      code: 'timeout',
+      tentativa: 99,
+      maxTentativas: MAX_TENTATIVAS_PADRAO,
+      repetivel: false
+    })
+
+    expect(d).toEqual({ repetir: false, motivo: 'nao-repetivel' })
+  })
+
   it('para quando o orçamento de tentativas acaba', () => {
     const d = decidirRetry({
       code: 'timeout',

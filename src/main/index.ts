@@ -266,6 +266,7 @@ if (!app.requestSingleInstanceLock()) {
       routing,
       routingRepo,
       connectors,
+      connectorCredits,
       runs,
       approvals,
       userId: userIdAtual,

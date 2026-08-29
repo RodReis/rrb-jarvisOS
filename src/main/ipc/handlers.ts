@@ -44,6 +44,9 @@ import {
   type ConnectorOutcome
 } from '@shared/domain/connectors'
 import type { ConnectorService } from '../connectors/connector-service'
+import { CreditInputError, type CreditService } from '../connectors/credit-service'
+import { isConnectorId } from '@shared/domain/connectors'
+import type { ConnectorCreditView } from '@shared/contracts/ipc'
 import {
   isAiProvider,
   type AiCallHandle,
@@ -136,6 +139,8 @@ export interface IpcDependencies {
   readonly routingRepo: RoutingRepository
   /** O ponto único de conectores (SPEC-Conectores-01). */
   readonly connectors: ConnectorService
+  /** O ledger de créditos de conector (SPEC-Conectores-02). */
+  readonly connectorCredits: CreditService
   /** Minimizar para o tray. Injetado porque a janela nasce depois dos handlers. */
   readonly minimizeToTray: () => void
 }
@@ -844,6 +849,62 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       })
 
       return await deps.connectors.call(request, { userId: deps.userId(), workspace: escopo })
+    }
+  )
+
+  // Teto de créditos por conector (SPEC-Conectores-02, critério 8). Leitura e edição; **nenhum
+  // canal decide** se a chamada cabe — isso é do gate, no ponto único.
+  ipcMain.handle(
+    IPC_CHANNELS.connectorCreditsGet,
+    (_event, connector: unknown, workspace: unknown): ConnectorCreditView | undefined => {
+      if (!isConnectorId(connector)) return undefined
+      const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+      return deps.connectorCredits.snapshot({ userId: deps.userId(), workspace: escopo }, connector)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.connectorCreditsSetLimits,
+    (
+      _event,
+      connector: unknown,
+      limites: unknown,
+      workspace: unknown
+    ): ConnectorCreditView | undefined => {
+      if (!isConnectorId(connector)) return undefined
+      const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+      const scope = { userId: deps.userId(), workspace: escopo }
+
+      const valores = limites as { dailyLimit?: unknown; monthlyLimit?: unknown } | null
+      if (
+        valores === null ||
+        typeof valores?.dailyLimit !== 'number' ||
+        typeof valores?.monthlyLimit !== 'number'
+      ) {
+        log.ipc.warn('Teto de créditos descartado por não casar com o contrato', {
+          canal: IPC_CHANNELS.connectorCreditsSetLimits
+        })
+        return deps.connectorCredits.snapshot(scope, connector)
+      }
+
+      try {
+        return deps.connectorCredits.setLimits(scope, connector, {
+          dailyLimit: valores.dailyLimit,
+          monthlyLimit: valores.monthlyLimit
+        })
+      } catch (erro) {
+        // Entrada inválida devolve o estado corrente em vez de lançar — como o
+        // `setBudgetLimits`: a tela precisa continuar mostrando um teto, e o erro de forma é do
+        // chamador, não do usuário.
+        if (erro instanceof CreditInputError) {
+          log.ipc.warn('Teto de créditos recusado', {
+            canal: IPC_CHANNELS.connectorCreditsSetLimits,
+            motivo: erro.message
+          })
+          return deps.connectorCredits.snapshot(scope, connector)
+        }
+        throw erro
+      }
     }
   )
 

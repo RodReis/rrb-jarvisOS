@@ -348,9 +348,16 @@ export class ConnectorService {
     adapter: ConnectorAdapter,
     execution: ConnectorExecution
   ): Promise<{ readonly desfecho: ConnectorOutcome; readonly tentativas: number }> {
-    // Repetível = leitura (segura por natureza) ou mutação **com** chave. A `validarConnectorRequest`
-    // da F01 já recusou mutação sem chave na entrada; esta linha é o que garante que, se aquela
-    // guarda mudar, o retry continue conservador em vez de herdar o buraco.
+    // Repetível = leitura (segura por natureza) ou mutação **com** chave.
+    //
+    // Uma **segunda** checagem, e não a primeira: `validarConnectorRequest` (F01) já recusa
+    // mutação sem chave na entrada, e é lá que o critério 3 é garantido — o teste que o prova
+    // conta requisições no servidor e vê zero. Esta linha existe porque a condição de retry é
+    // sobre repetir, e derivá-la aqui mantém o laço correto por conta própria em vez de por
+    // suposição sobre o que outra função recusou. **Não é redundância verificável hoje**: com a
+    // validação no lugar, nenhum caminho a alcança com mutação sem chave. Se aquela guarda cair,
+    // este laço continua conservador — mas o que impede o pedido é a validação, não isto, e é
+    // ali que um contrafactual encontra a prova.
     const repetivel =
       execution.capability.effect === 'leitura' ||
       (execution.request.idempotencyKey ?? '').trim() !== ''
