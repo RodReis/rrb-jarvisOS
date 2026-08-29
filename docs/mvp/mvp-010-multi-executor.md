@@ -1,6 +1,6 @@
 # MVP-010 — Multi-executor Claude + Codex
 
-- Status: **arquitetura aprovada pelo PI** em 2026-08-29; fatias em revisão.
+- Status: **arquitetura e cinco fatias aprovadas pelo PI** em 2026-08-29; implementação depende da fila.
 - Depende de: MVP-005 e MVP-009 concluídos.
 - Dono do aceite: PI.
 - Design: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v2-design.md`.

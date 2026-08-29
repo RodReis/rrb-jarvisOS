@@ -1,6 +1,6 @@
 # MVP-012 — Scheduler concorrente
 
-- Status: **arquitetura aprovada pelo PI** em 2026-08-29; fatias em revisão.
+- Status: **arquitetura e cinco fatias aprovadas pelo PI** em 2026-08-29; implementação depende da fila.
 - Depende de: MVP-011 concluído.
 - Dono do aceite: PI.
 - Design: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v2-design.md`.

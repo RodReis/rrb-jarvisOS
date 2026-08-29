@@ -1,7 +1,7 @@
 # SPEC-Multi-Executor-05 — UI e prova operacional
 
 - MVP: `docs/mvp/mvp-010-multi-executor.md` (Fatia 05) — **fecha o MVP-010**.
-- Status: **revisão-pi** — implementação não autorizada.
+- Status: **aprovada-pi** (2026-08-29) — entra no backlog na ordem do MVP; implementação depende da fila.
 - Depende de: F04 aprovada e entregue; `DESIGN-SYSTEM.md` e protótipo HTML aprovados antes da construção da UI.
 
 ## Objetivo
@@ -50,4 +50,4 @@ Dar ao PI controle compreensível dos executores e provar, numa jornada real lim
 
 ## Perguntas abertas ao PI
 
-Nenhuma. Aguarda aprovação desta revisão exata e dos artefatos de design exigidos antes da UI.
+Nenhuma sobre esta SPEC. Revisão exata aprovada pelo PI em 2026-08-29. O gate de Design System e protótipo HTML permanece antes da construção da UI.

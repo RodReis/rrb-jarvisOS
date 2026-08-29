@@ -1,7 +1,7 @@
 # SPEC-Scheduler-01 — Pool global e fila justa
 
 - MVP: `docs/mvp/mvp-012-scheduler-concorrente.md` (Fatia 01).
-- Status: **revisão-pi** — implementação não autorizada.
+- Status: **aprovada-pi** (2026-08-29) — entra no backlog na ordem do MVP; implementação depende da fila.
 - Depende de: MVP-011 concluído.
 
 ## Objetivo
@@ -48,4 +48,4 @@ Substituir o slot global único da V1 por um pool durável de capacidade, com do
 
 ## Perguntas abertas ao PI
 
-Nenhuma. Aguarda aprovação desta revisão exata.
+Nenhuma. Revisão exata aprovada pelo PI em 2026-08-29.

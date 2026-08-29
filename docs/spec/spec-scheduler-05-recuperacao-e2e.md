@@ -1,7 +1,7 @@
 # SPEC-Scheduler-05 — Recuperação e E2E concorrente
 
 - MVP: `docs/mvp/mvp-012-scheduler-concorrente.md` (Fatia 05) — **fecha o MVP-012**.
-- Status: **revisão-pi** — implementação não autorizada.
+- Status: **aprovada-pi** (2026-08-29) — entra no backlog na ordem do MVP; implementação depende da fila.
 - Depende de: F04 aprovada e entregue.
 
 ## Objetivo
@@ -48,4 +48,4 @@ Provar concorrência segura ponta a ponta e fechar recuperação, cancelamento s
 
 ## Perguntas abertas ao PI
 
-Nenhuma. Aguarda aprovação desta revisão exata.
+Nenhuma. Revisão exata aprovada pelo PI em 2026-08-29.

@@ -1,7 +1,7 @@
 # SPEC-Squads-01 — Registro de capacidades e perfis
 
 - MVP: `docs/mvp/mvp-011-squads-limitados.md` (Fatia 01).
-- Status: **revisão-pi** — implementação não autorizada.
+- Status: **aprovada-pi** (2026-08-29) — entra no backlog na ordem do MVP; implementação depende da fila.
 - Depende de: MVP-010 concluído.
 
 ## Objetivo
@@ -45,4 +45,4 @@ Descrever Squads por capacidades verificáveis, não por nomes de skills ou agen
 
 ## Perguntas abertas ao PI
 
-Nenhuma. Aguarda aprovação desta revisão exata.
+Nenhuma. Revisão exata aprovada pelo PI em 2026-08-29.

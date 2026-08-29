@@ -1,7 +1,7 @@
 # SPEC-Contínuo-02 — Dispatcher e retomada
 
 - MVP: `docs/mvp/mvp-013-execucao-continua.md` (Fatia 02).
-- Status: **revisão-pi** — implementação não autorizada.
+- Status: **aprovada-pi** (2026-08-29) — entra no backlog na ordem do MVP; implementação depende da fila.
 - Depende de: F01 aprovada e entregue.
 
 ## Objetivo
@@ -47,4 +47,4 @@ Selecionar continuamente o próximo nó elegível do DAG e atravessar merges, re
 
 ## Perguntas abertas ao PI
 
-Nenhuma. Aguarda aprovação desta revisão exata.
+Nenhuma. Revisão exata aprovada pelo PI em 2026-08-29.

@@ -1,7 +1,7 @@
 # SPEC-Contínuo-03 — Controles operacionais
 
 - MVP: `docs/mvp/mvp-013-execucao-continua.md` (Fatia 03).
-- Status: **revisão-pi** — implementação não autorizada.
+- Status: **aprovada-pi** (2026-08-29) — entra no backlog na ordem do MVP; implementação depende da fila.
 - Depende de: F02 aprovada e entregue.
 
 ## Objetivo
@@ -49,4 +49,4 @@ Controlar uma execução longa com pausa, retomada, cancelamento, quotas, orçam
 
 ## Perguntas abertas ao PI
 
-Nenhuma. Aguarda aprovação desta revisão exata.
+Nenhuma. Revisão exata aprovada pelo PI em 2026-08-29.

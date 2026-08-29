@@ -1,7 +1,7 @@
 # SPEC-Multi-Executor-03 — Codex Exec Adapter
 
 - MVP: `docs/mvp/mvp-010-multi-executor.md` (Fatia 03).
-- Status: **revisão-pi** — implementação não autorizada.
+- Status: **aprovada-pi** (2026-08-29) — entra no backlog na ordem do MVP; implementação depende da fila.
 - Depende de: F02 aprovada e entregue.
 
 ## Objetivo
@@ -51,4 +51,4 @@ Implementar `CodexExecExecutorAdapter` sobre o CLI Codex, mantendo o contrato es
 
 ## Perguntas abertas ao PI
 
-Nenhuma. Aguarda aprovação desta revisão exata. Flags exatas serão confirmadas na documentação atual durante o plano técnico, sem alterar estes contratos.
+Nenhuma. Revisão exata aprovada pelo PI em 2026-08-29. Flags exatas serão confirmadas na documentação atual durante o plano técnico, sem alterar estes contratos.

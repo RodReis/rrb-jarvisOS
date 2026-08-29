@@ -1,7 +1,7 @@
 # SPEC-Squads-02 — Planejador e validador determinístico
 
 - MVP: `docs/mvp/mvp-011-squads-limitados.md` (Fatia 02).
-- Status: **revisão-pi** — implementação não autorizada.
+- Status: **aprovada-pi** (2026-08-29) — entra no backlog na ordem do MVP; implementação depende da fila.
 - Depende de: F01 aprovada e entregue.
 
 ## Objetivo
@@ -45,4 +45,4 @@ Permitir que um planejador proponha tarefas internas, mas fazer o kernel decidir
 
 ## Perguntas abertas ao PI
 
-Nenhuma. Aguarda aprovação desta revisão exata.
+Nenhuma. Revisão exata aprovada pelo PI em 2026-08-29.

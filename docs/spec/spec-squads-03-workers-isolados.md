@@ -1,7 +1,7 @@
 # SPEC-Squads-03 — Workers isolados
 
 - MVP: `docs/mvp/mvp-011-squads-limitados.md` (Fatia 03).
-- Status: **revisão-pi** — implementação não autorizada.
+- Status: **aprovada-pi** (2026-08-29) — entra no backlog na ordem do MVP; implementação depende da fila.
 - Depende de: F02 aprovada e entregue.
 
 ## Objetivo
@@ -47,4 +47,4 @@ Executar tarefas especialistas em paralelo com contexto mínimo, acesso compatí
 
 ## Perguntas abertas ao PI
 
-Nenhuma. Aguarda aprovação desta revisão exata.
+Nenhuma. Revisão exata aprovada pelo PI em 2026-08-29.

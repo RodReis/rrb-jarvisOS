@@ -1,7 +1,7 @@
 # SPEC-Contínuo-01 — Inventário e DAG global
 
 - MVP: `docs/mvp/mvp-013-execucao-continua.md` (Fatia 01).
-- Status: **revisão-pi** — implementação não autorizada.
+- Status: **aprovada-pi** (2026-08-29) — entra no backlog na ordem do MVP; implementação depende da fila.
 - Depende de: MVP-012 concluído.
 
 ## Objetivo
@@ -47,4 +47,4 @@ Construir uma visão durável do roadmap autorizado, conciliando documentação 
 
 ## Perguntas abertas ao PI
 
-Nenhuma. Aguarda aprovação desta revisão exata.
+Nenhuma. Revisão exata aprovada pelo PI em 2026-08-29.

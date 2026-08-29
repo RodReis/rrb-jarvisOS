@@ -1,7 +1,7 @@
 # SPEC-Contínuo-04 — Projeções e próximo gate
 
 - MVP: `docs/mvp/mvp-013-execucao-continua.md` (Fatia 04).
-- Status: **revisão-pi** — implementação não autorizada.
+- Status: **aprovada-pi** (2026-08-29) — entra no backlog na ordem do MVP; implementação depende da fila.
 - Depende de: F03 aprovada e entregue.
 
 ## Objetivo
@@ -48,4 +48,4 @@ Projetar o estado real da execução em GitHub, STATUS e evidências, e preparar
 
 ## Perguntas abertas ao PI
 
-Nenhuma. Aguarda aprovação desta revisão exata.
+Nenhuma. Revisão exata aprovada pelo PI em 2026-08-29.

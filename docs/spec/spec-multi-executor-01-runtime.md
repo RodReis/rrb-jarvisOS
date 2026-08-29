@@ -1,7 +1,7 @@
 # SPEC-Multi-Executor-01 — Contrato comum e runtime de executores
 
 - MVP: `docs/mvp/mvp-010-multi-executor.md` (Fatia 01).
-- Status: **revisão-pi** — implementação não autorizada.
+- Status: **aprovada-pi** (2026-08-29) — entra no backlog na ordem do MVP; implementação depende da fila.
 - Depende de: MVP-009 concluído e `CodingExecutorAdapter` introduzido na V1.
 
 ## Objetivo
@@ -49,4 +49,4 @@ Estabilizar a fronteira entre o kernel e qualquer CLI executor de código. O ker
 
 ## Perguntas abertas ao PI
 
-Nenhuma. Aguarda aprovação desta revisão exata.
+Nenhuma. Revisão exata aprovada pelo PI em 2026-08-29.

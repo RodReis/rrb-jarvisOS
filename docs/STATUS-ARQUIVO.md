@@ -90,6 +90,8 @@ Foram criados os documentos dos MVP-010 a MVP-013 e vinte SPECs, cinco por MVP, 
 
 As SPECs preservam os contratos já decididos: um writer por fatia; Git/GitHub no kernel; CLIs autenticados por perfis isolados; nenhuma rota monetária silenciosa; workers sem escrita/Git; fallback sequencial quando independência não é provada; merge serializado; pausa/cancelamento sem apagar trabalho remoto; e nenhum gate, regra ou aceite inventado pelo agente.
 
+Em 2026-08-29, o PI aprovou as vinte revisões exatas. Os estados passaram para `aprovada-pi` e foi autorizada a criação dos quatro épicos e vinte sub-issues na ordem de implementação. A aprovação adiciona backlog futuro; não move nenhuma fatia da V2 para `proplan:next` e não substitui a fila já registrada.
+
 ## Pendências históricas preservadas
 
 - A UI de allowlist ainda exigia decisão de produto: localização, seletor nativo e remoção de `appDir`.
