@@ -1,7 +1,7 @@
 # Design — Pipeline V3: release, operação e aprendizado
 
-- Status: **direção da V3 e onze SPECs dos MVPs 014–015 aprovadas pelo PI** em 2026-08-29.
-- Escopo deste documento: fronteira da Pipeline V3 e design detalhado do MVP-014. O MVP-015 possui design complementar próprio.
+- Status: **direção da V3, designs dos MVPs 014–016 e onze SPECs dos MVPs 014–015 aprovados pelo PI** em 2026-08-29.
+- Escopo deste documento: fronteira da Pipeline V3 e design detalhado do MVP-014. Os MVPs 015–016 possuem designs complementares próprios.
 - Implementação: **não autorizada por este documento**. Cada SPEC continua sujeita ao aceite pré-construção do PI.
 - Predecessora: `2026-08-29-pipeline-desenvolvimento-ia-v2-design.md`.
 
@@ -17,11 +17,11 @@ Produção é automática depois do merge e dos gates técnicos. Não existe um 
 
 1. **MVP-014 — Release e Deploy Governado.** Preview isolado, Staging persistente, Produção automática, compensações e evidência de release.
 2. **MVP-015 — Observabilidade Operacional.** Runs, PRs, deploys, custos, quotas, falhas, saúde dos adapters e timeline por SPEC/MVP.
-3. **MVP-016 — Aprendizado Operacional da Pipeline.** Memória de falhas, comparação somente de deltas, contexto mínimo e controle de tokens. Não substitui o MVP-007, que trata memória contextual/RAG do produto.
+3. **MVP-016 — Aprendizado Operacional da Pipeline.** Lições e políticas versionadas, memória de falhas, replay/shadow/canário e otimização de contexto/tokens sem substituir o MVP-007 nem reimplementar os mecanismos dos MVPs 008/009.
 4. **MVP-017 — Biblioteca de Blueprints.** Padrões de PRD, arquitetura, SPEC, DESIGN-SYSTEM, protótipos e perguntas orientadas com “Decide por mim”.
 5. **MVP-018 — Gestão de Portfólio.** Vários projetos, fila global, prioridade do PI, custo/quota por projeto e prontidão de planejamento.
 
-O MVP-014 está detalhado neste documento. O MVP-015 possui design e seis SPECs aprovadas em `2026-08-29-mvp-015-observabilidade-operacional-design.md`. MVP-016 a MVP-018 mantêm somente direção aprovada.
+O MVP-014 está detalhado neste documento. O MVP-015 possui design e seis SPECs aprovadas em `2026-08-29-mvp-015-observabilidade-operacional-design.md`. O MVP-016 possui design e seis fatias aprovadas em `2026-08-29-mvp-016-aprendizado-operacional-design.md`; suas SPECs ainda serão redigidas. MVP-017 e MVP-018 mantêm somente direção aprovada.
 
 ## 3. Decisões do PI para o MVP-014
 

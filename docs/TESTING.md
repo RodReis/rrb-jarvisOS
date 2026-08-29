@@ -590,3 +590,16 @@ Smokes externos não rodam na suíte comum. Sua ausência em ambiente sem creden
 - **Smoke externo:** opt-in em projetos de prova; nunca Produção e nunca na suíte comum.
 
 Provas mínimas: domínio continua apesar de projetor indisponível; replay não duplica; evento atrasado não regride estado atual; payload proibido é rejeitado antes de persistir; `quota_unknown` não vira percentual; UI e CLI retornam a mesma projeção; compactação preserva marcos, alertas abertos, auditoria e evidência.
+
+### 11.7 Aprendizado operacional — MVP-016
+
+- **Unitário:** fingerprints, aplicabilidade, estados, resolução por escopo, conflitos, guardrails e rollback.
+- **Property tests:** idempotência de ingestão, deduplicação, ordem de eventos e snapshots imutáveis.
+- **Integração SQLite:** migrations, checkpoints, concorrência de promoção, crash/replay e rebuild.
+- **Replay/diferencial:** fixtures históricas com baseline e candidata sobre casos elegíveis equivalentes; resultado `improved | regressed | inconclusive` reproduzível.
+- **Contrato:** seleção, compressão e cache opcionais; Graphify/Caveman ausentes ou falhos recuam para estratégia determinística.
+- **Fault injection:** evidência ausente/hash divergente, executor indisponível, versão-base obsoleta, canário regressivo e rollback falho.
+- **Playwright/E2E:** run → falha → resolução → candidata → replay/shadow/canário → política ativa → regressão/reversão, incluindo `Decide por mim` e teclado/foco.
+- **Prova real limitada:** separada das suítes comuns, sem serviço pago obrigatório; registra executor, modelo, ambiente, amostra, consumo, versões e hashes.
+
+Provas mínimas: falha semelhante não esconde causa nova; economia não promove com guardrail violado; run mantém o snapshot inicial; override de projeto vence global; política incompatível fica `stale`; ausência do aprendizado mantém política estável/base e não bloqueia a pipeline.

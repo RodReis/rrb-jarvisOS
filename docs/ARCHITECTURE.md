@@ -103,7 +103,7 @@ A capacidade de desenvolvimento autônomo foi separada em três MVPs executávei
 - A V2 termina no merge do DAG aprovado. Deploy e produção permanecem fora.
 - Fonte completa: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v2-design.md`.
 
-### Pipeline V3 — Release e operação (MVP-014/015 detalhados; não implementados)
+### Pipeline V3 — Release, operação e aprendizado (MVP-014–016 detalhados; não implementados)
 
 `MVP-014 Release → MVP-015 Observabilidade → MVP-016 Aprendizado operacional → MVP-017 Blueprints → MVP-018 Portfólio`.
 
@@ -138,6 +138,24 @@ Provedores ── reconciliadores tipados ────────────�
 O main process é o único dono do SQLite. UI e CLI compartilham contratos de consulta; o renderer recebe snapshot e deltas versionados. Logs brutos não são copiados. O observador persiste fatos permitidos por schema, reconcilia GitHub/GHCR/Vercel/Railway/executores, mantém rollups e emite alertas determinísticos. Falha do observador degrada o painel, nunca reverte ou bloqueia a operação canônica.
 
 Fonte completa: `docs/superpowers/specs/2026-08-29-mvp-015-observabilidade-operacional-design.md` e `docs/mvp/mvp-015-observabilidade-operacional.md`.
+
+O MVP-016 consome evidências dos runs de forma assíncrona e entrega políticas versionadas aos mecanismos existentes:
+
+```text
+Evidências ── ingestão/atributos ── memória de falhas ── candidatas
+                                                         │
+                                   replay → shadow → canário
+                                                         │
+                                      PolicyRegistry/Resolver
+                                                         │
+                                        PolicySnapshot por run
+                                                         │
+                               ContextSelector/RecoveryController existentes
+```
+
+Política por projeto vence padrão global local. Cada run congela seu snapshot; promoção nunca altera execução em andamento. Claude/Codex podem propor hipóteses, mas guardrails e promoção são determinísticos. Falha do aprendizado mantém a última política estável ou a base e nunca bloqueia construção, merge ou release. O MVP-016 não substitui a memória/RAG do MVP-007 nem duplica os atuadores dos MVPs 008/009.
+
+Fonte completa: `docs/superpowers/specs/2026-08-29-mvp-016-aprendizado-operacional-design.md` e `docs/mvp/mvp-016-aprendizado-operacional.md`.
 
 ### Fontes de verdade
 

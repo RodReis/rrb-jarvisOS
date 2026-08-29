@@ -156,3 +156,23 @@ Invariantes:
 10. Marcos duráveis e alertas permanecem; amostras frequentes compactam após 30 dias somente depois do rollup.
 11. Console é read-mostly. Run, deploy, rollback, compensação e política continuam nos runtimes proprietários.
 12. A UI da M15-F05 depende de `DESIGN-SYSTEM.md` e protótipos HTML formais aprovados antes da construção.
+
+### 4.4 Contratos de aprendizado operacional da Pipeline V3
+
+Entidades: `LearningObservation`, `FailureSignature`, `ResolutionEvidence`, `OperationalLesson`, `PolicyCandidate`, `PolicyExperiment`, `PolicyVersion`, `PolicySnapshot` e `ApplicabilityKey`.
+
+Invariantes:
+
+1. MVP-016 aprende sobre operação da pipeline; memória contextual/RAG continua no MVP-007.
+2. Mecanismos dos MVPs 008/009 permanecem donos da seleção, recuperação, revisão e orçamento; aprendizado fornece configuração versionada.
+3. `PolicySnapshot` é imutável por run; política nova só alcança runs futuros.
+4. Política específica do projeto vence global local; conteúdo e regra de negócio nunca são promovidos ao global.
+5. Qualidade e aderência à SPEC são guardrails; economia de tokens/custo não compensa regressão.
+6. Promoção segue replay, shadow e canário conforme o impacto; alto impacto sempre exige PI.
+7. IA propõe e explica; resultado e promoção dependem de evidência e regra determinística.
+8. Similaridade semântica não fecha, ignora nem funde falha automaticamente.
+9. Política incompatível fica `stale`; regressão cria reversão auditável e fallback estável.
+10. Graphify, Caveman ou equivalente são opcionais; ausência mantém fallback determinístico.
+11. Falha do aprendizado não bloqueia pipeline nem altera efeito em andamento.
+12. Prompt, log, arquivo, diff e repositório bruto não são copiados para a memória operacional.
+13. A UI da M16-F06 depende de `DESIGN-SYSTEM.md` e protótipos HTML formais aprovados antes da construção.

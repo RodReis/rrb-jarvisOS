@@ -65,4 +65,12 @@
 15. Custos/quotas projetam o ledger existente e declaram qualidade da origem; scraping/OCR de tela e valor inventado são proibidos.
 16. Marcos duráveis permanecem; amostras frequentes compactam após 30 dias em rollups diários permanentes.
 17. O console aprovado é por projeto e read-mostly. Visão cruzada/portfólio pertence ao MVP-018.
-18. O MVP-015 foi decomposto em seis fatias e suas seis SPECs receberam aceite exato do PI. Permanecem sem issues e fora da fila; a F05 mantém gate visual. MVP-016–MVP-018 mantêm somente direção aprovada.
+18. O MVP-015 foi decomposto em seis fatias e suas seis SPECs receberam aceite exato do PI. Permanecem sem issues e fora da fila; a F05 mantém gate visual.
+19. O MVP-016 aprende entre runs e não substitui o MVP-007 nem reimplementa seleção, recuperação, revisão ou orçamento dos MVPs 008/009.
+20. Aprendizado usa camada específica por projeto e global local; a específica vence e conteúdo/regra de negócio não sobe ao global.
+21. Cada run congela `PolicySnapshot`. Promoção segue replay, shadow e canário; qualidade é guardrail anterior à eficiência.
+22. Baixo/médio impacto autorizado pode promover automaticamente com kill-switch e rollback. Escopo, SPEC, gates, tentativas máximas, limite financeiro, provider, merge, deploy e regra de produto exigem PI.
+23. Falha usa fingerprint determinístico; similaridade semântica somente sugere associação. Claude/Codex propõem e explicam, mas não promovem por opinião.
+24. Graphify, Caveman e equivalentes são estratégias opcionais com fallback determinístico. Whole-repo continua exigindo exceção do MVP-008.
+25. `ApplicabilityKey` torna lição incompatível `stale`; indisponibilidade usa política estável/base e não bloqueia a pipeline.
+26. O MVP-016 foi decomposto em seis fatias aprovadas. Suas SPECs e issues ainda não existem; a F06 mantém gate visual. MVP-017–MVP-018 mantêm somente direção aprovada.

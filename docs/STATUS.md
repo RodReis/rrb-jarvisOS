@@ -54,7 +54,7 @@ Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do
 | MVP-013 Execução contínua | [#133](https://github.com/RodReis/rrb-jarvisOS/issues/133) | fatias [#134–#138](https://github.com/RodReis/rrb-jarvisOS/issues/134) no Backlog | 0/5 |
 | MVP-014 Release e Deploy Governado | — | cinco SPECs `aprovada-pi`; issues ainda não criadas; depois do MVP-013 | 0/5 |
 | MVP-015 Observabilidade Operacional | — | seis SPECs `aprovada-pi`; issues ainda não criadas; depois do MVP-014 | 0/6 |
-| MVP-016 Aprendizado Operacional da Pipeline | — | direção aprovada; sem fatias e sem SPEC; não substitui o MVP-007 | — |
+| MVP-016 Aprendizado Operacional da Pipeline | — | design e seis fatias aprovados; SPECs ainda não redigidas; depois do MVP-015 | 0/6 |
 | MVP-017 Biblioteca de Blueprints | — | direção aprovada; sem fatias e sem SPEC | — |
 | MVP-018 Gestão de Portfólio | — | direção aprovada; sem fatias e sem SPEC | — |
 
@@ -65,6 +65,8 @@ Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do
 > **Pipeline V2 aprovada e publicada (2026-08-29).** Arquitetura, quatro MVPs e vinte SPECs receberam `aprovada-pi`. Épicos #115/#121/#127/#133 e fatias #116–#120/#122–#126/#128–#132/#134–#138 foram criados com parents e bloqueios nativos na ordem de implementação. Isso adiciona backlog futuro sem furar a fila corrente. A V2 termina no merge do DAG aprovado; deploy permanece fora. Fonte: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v2-design.md`.
 
 > **Pipeline V3 em especificação (2026-08-29).** A direção MVP-014–MVP-018 e onze SPECs dos MVPs 014–015 foram aprovadas. O MVP-014 usa Docker Compose local, GHCR, Vercel, Railway e PostgreSQL separado; publica automaticamente depois de merge e gates, sem aceite duplo. O MVP-015 é local-first e observa sem criar gates. Nenhuma issue da V3 foi criada e a fila corrente não muda. Fontes: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v3-design.md` e `docs/superpowers/specs/2026-08-29-mvp-015-observabilidade-operacional-design.md`.
+
+> **MVP-016 desenhado (2026-08-29).** Seis fatias aprovadas separam aprendizado operacional da memória/RAG do MVP-007 e dos atuadores dos MVPs 008/009. Políticas por projeto/global local atravessam replay, shadow e canário; qualidade precede eficiência; Claude/Codex propõem, mas promoção é determinística. SPECs e issues ainda não existem, a fila não muda e a M16-F06 mantém gate de `DESIGN-SYSTEM.md` + protótipos HTML. Fonte: `docs/superpowers/specs/2026-08-29-mvp-016-aprendizado-operacional-design.md`.
 
 > **MVP-009 aprovado (2026-08-29).** Três decisões do PI: **o container Docker é o sandbox do executor** — o Claude Code roda nele com o worktree montado, nunca no host; **merge autônomo ligado por padrão com kill-switch por projeto**, e desligado o run termina no PR verde aguardando o PI; **Context7 é ferramenta do agente construtor** na M9-F04, fechando a pendência herdada do MVP-008. A decisão do container fecha um buraco real: o MVP-004 proibiu comando arbitrário, mas um agente que constrói software precisa exatamente disso — sem fronteira nova, o MVP-009 passaria por cima do enforcement que o MVP-004 entregou. **Docker passa a ser dependência dura**, sem fallback para o host.
 
@@ -133,19 +135,25 @@ Não existe catálogo global `SPEC-nnn`. O identificador canônico é o slug aba
 | M15-F04 | MVP-015 | Consultas, retenção, rollups e CLI | `spec-observabilidade-04-consultas-retencao-cli.md` |
 | M15-F05 | MVP-015 | Console operacional | `spec-observabilidade-05-console-operacional.md` |
 | M15-F06 | MVP-015 | Resiliência, desempenho e prova E2E | `spec-observabilidade-06-resiliencia-desempenho-e2e.md` |
+| M16-F01 | MVP-016 | Fundação e ingestão | a redigir |
+| M16-F02 | MVP-016 | Memória de falhas | a redigir |
+| M16-F03 | MVP-016 | Registro e resolução de políticas | a redigir |
+| M16-F04 | MVP-016 | Experimentos e promoção | a redigir |
+| M16-F05 | MVP-016 | Estratégias e recomendações assistidas | a redigir |
+| M16-F06 | MVP-016 | Interface, resiliência e prova E2E | a redigir |
 
 ## Próximas ações
 
 1. PI aceitar ou recusar as **quatro** fatias em **Done**: F02 do MVP-004 (#75), M5-F01 (#77), o `[FIX]` #107 e a M5-F02 (#78).
 2. Fila corrente: **#110** (UI da allowlist) é o `next`. Depois dele, a ordem entre #79 (BudgetPolicy) e #80 (Multi-provider) é decisão do PI — as duas têm spec aprovada.
 3. A **F03 encaixa no ponto único** que a F02 deixou pronto: a estimativa pré-chamada já é calculada e o `CostEvent` já carrega `estimadoUsd`/`realUsd`. O gate entra entre a estimativa e o disparo do adapter — nenhuma refatoração do ponto de chamada é necessária.
-4. **MVP-006, MVP-008, MVP-009, Pipeline V2 e MVP-014–015 revisados e aprovados (2026-08-29).** As 55 SPECs executáveis do projeto estão `aprovada-pi`; as onze dos MVPs 014–015 ainda não possuem issue.
-5. MVP-007 e MVP-016–MVP-018 serão detalhados quando entrarem no planejamento ativo. O MVP-015 possui seis SPECs aprovadas, mas permanece fora da fila e sem issues.
+4. **MVP-006, MVP-008, MVP-009, Pipeline V2 e MVP-014–015 revisados e aprovados (2026-08-29).** As 55 SPECs executáveis do projeto estão `aprovada-pi`; as onze dos MVPs 014–015 ainda não possuem issue. O design do MVP-016 não aumenta essa contagem porque suas SPECs ainda serão redigidas.
+5. MVP-007 e MVP-017–MVP-018 ainda serão detalhados. O MVP-016 possui design e seis fatias aprovados, mas permanece sem SPECs, issues e posição executável.
 6. **M4-F03 (UI da allowlist de diretórios) especificada e aprovada (2026-08-29)** — fechou a última fatia conhecida sem SPEC antes da V3. As cinco SPECs do MVP-014 também foram aprovadas, mas ainda não possuem issues.
 7. **Docker virou dependência dura do MVP-009** (sandbox do executor). Confirmar que a máquina de execução tem Docker antes daquele MVP entrar na fila.
 8. **Pipeline V2 publicada:** épicos #115/#121/#127/#133 e 20 fatias #116–#138, com os intervalos de épicos excluídos, estão no Backlog com sub-issues e dependências nativas. A publicação não altera o `next` atual.
-9. **Pipeline V3:** MVP-014 e MVP-015 aprovados. Criar issues da V3 somente por solicitação explícita do PI, sem alterar a fila atual; a M15-F05 ainda exige `DESIGN-SYSTEM.md` e protótipos HTML antes da construção.
+9. **Pipeline V3:** MVP-014 e MVP-015 possuem SPECs aprovadas; MVP-016 possui design/fatias aprovados e é o próximo alvo de especificação. Criar issues da V3 somente por solicitação explícita do PI, sem alterar a fila atual; M15-F05 e M16-F06 exigem `DESIGN-SYSTEM.md` e protótipos HTML antes da construção.
 
 ## Roadmap
 
-MVP-001 ✅ → MVP-002 ✅ → MVP-003 ✅ → MVP-004 → MVP-005 → MVP-006 → MVP-008 → MVP-009 → MVP-010 → MVP-011 → MVP-012 → MVP-013 → MVP-014 → MVP-015. MVP-007 é paralelo/não bloqueante; MVP-014–015 possuem SPECs aprovadas, mas ainda não têm issues nem posição executável; MVP-016–MVP-018 têm apenas direção aprovada.
+MVP-001 ✅ → MVP-002 ✅ → MVP-003 ✅ → MVP-004 → MVP-005 → MVP-006 → MVP-008 → MVP-009 → MVP-010 → MVP-011 → MVP-012 → MVP-013 → MVP-014 → MVP-015 → MVP-016. MVP-007 é paralelo/não bloqueante; MVP-014–015 possuem SPECs aprovadas; MVP-016 possui design/fatias aprovados, mas ainda não tem SPECs/issues; nenhum dos três possui posição executável. MVP-017–MVP-018 têm apenas direção aprovada.
