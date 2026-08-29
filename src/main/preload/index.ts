@@ -29,6 +29,8 @@ import type { AiCallHandle, AiProvider, AiRequest, AiStreamEvent } from '@shared
 import type { ProviderRoute, ProviderStatus, RoutingPolicy } from '@shared/domain/routing'
 import type {
   ConnectorCapability,
+  ConnectorCredentialKey,
+  ConnectorCredentialStatusView,
   ConnectorError,
   ConnectorId,
   ConnectorOutcome,
@@ -207,6 +209,23 @@ const bridge: JarvisBridge = {
     workspace: WorkspaceId
   ): Promise<ConnectorCreditView> =>
     ipcRenderer.invoke(IPC_CHANNELS.connectorCreditsSetLimits, connector, limites, workspace),
+  // Credenciais de conector (SPEC-Conectores-05, crit. 7). Como no trio de credenciais de IA, o
+  // valor entra e nunca volta: o retorno é a lista de status, sem campo onde o segredo caiba.
+  listConnectorCredentials: (
+    workspace: WorkspaceId
+  ): Promise<readonly ConnectorCredentialStatusView[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.connectorCredentialList, workspace),
+  setConnectorCredential: (
+    key: ConnectorCredentialKey,
+    value: string,
+    workspace: WorkspaceId
+  ): Promise<readonly ConnectorCredentialStatusView[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.connectorCredentialSet, key, value, workspace),
+  removeConnectorCredential: (
+    key: ConnectorCredentialKey,
+    workspace: WorkspaceId
+  ): Promise<readonly ConnectorCredentialStatusView[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.connectorCredentialRemove, key, workspace),
   // GitHub por Device Flow (SPEC-Conectores-03). **Nenhuma destas funções devolve token** — não
   // existe `getGithubToken` na ponte, e é essa ausência que garante o critério 2.
   getGithubAuthStatus: (workspace: WorkspaceId): Promise<GithubAuthSnapshot> =>

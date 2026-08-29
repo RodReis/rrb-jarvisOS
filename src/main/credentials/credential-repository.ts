@@ -50,8 +50,13 @@ export class CredentialRepository {
   /**
    * As chaves que **têm valor no vault** naquele escopo. Só as chaves — o valor não sai daqui
    * a não ser por `readSecret`, que tem um call site só (o adapter, no momento da chamada).
+   *
+   * `VaultKey` e não `CredentialKey`: a coluna guarda as duas taxonomias, e tipar o retorno como
+   * só uma delas afirmaria que uma chave de conector gravada aqui é uma chave de IA. Quem
+   * consome filtra pela lista que lhe interessa — é o que `listStatus` e `listConnectorStatus`
+   * fazem, cada um varrendo o próprio enum.
    */
-  listKeys(userId: string, workspaceId: WorkspaceId): readonly CredentialKey[] {
+  listKeys(userId: string, workspaceId: WorkspaceId): readonly VaultKey[] {
     const rows = this.db
       .prepare(
         `SELECT key FROM credential_ref
@@ -60,7 +65,7 @@ export class CredentialRepository {
       )
       .all(userId, workspaceId) as Pick<CredentialRow, 'key'>[]
 
-    return rows.map((row) => row.key as CredentialKey)
+    return rows.map((row) => row.key as VaultKey)
   }
 
   /** Metadados de uma credencial do vault, sem tocar o valor. */

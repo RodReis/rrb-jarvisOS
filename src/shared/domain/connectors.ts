@@ -134,6 +134,33 @@ export interface ConnectorCredentialRef {
 }
 
 /**
+ * O que o renderer vê sobre uma credencial de conector — **nunca o valor** (crit. 7 da F05).
+ *
+ * Tipo próprio e não `CredentialStatusView`, pela mesma razão que as chaves são um conjunto
+ * próprio: as duas taxonomias respondem a listas diferentes, e um tipo compartilhado obrigaria
+ * `key` a ser a união das duas — o que faria a tela de IA ter de filtrar chave de conector e
+ * vice-versa, em dois lugares, para sempre.
+ *
+ * A diferença de forma é real, não cosmética: **não há `source` nem `envDisponivel`**. A
+ * credencial de conector vive só no vault — não existe `JARVIS_CREDENTIAL_TAVILY`, e não é
+ * esquecimento: um caminho por `.env` seria uma segunda fonte de verdade que nenhuma spec pediu,
+ * e que faria "configurada" na tela significar duas coisas diferentes.
+ *
+ * `gerenciavel: false` é o caso do GitHub, que tem credencial mas não campo de chave — ela nasce
+ * do Device Flow (F03), e oferecer um campo de texto para colá-la convidaria o usuário a inventar
+ * um valor que nada consumiria.
+ */
+export interface ConnectorCredentialStatusView {
+  readonly key: ConnectorCredentialKey
+  /** Rótulo do conector, para a tela não derivar texto de identificador. */
+  readonly conector: string
+  readonly workspace: WorkspaceId
+  readonly status: 'present' | 'missing'
+  /** A credencial é cadastrável por campo de chave nesta tela? */
+  readonly gerenciavel: boolean
+}
+
+/**
  * O pedido a um conector.
  *
  * `input` é `unknown` de propósito: o núcleo **não** conhece a forma do payload de cada
