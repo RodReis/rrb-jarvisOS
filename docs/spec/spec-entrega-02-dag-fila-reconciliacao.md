@@ -2,7 +2,7 @@
 
 - MVP/Fatia: MVP-009 · M9-F02.
 - Issue: [#102](https://github.com/RodReis/rrb-jarvisOS/issues/102).
-- Status: **revisão documental; implementação não autorizada**.
+- Status: **aprovada-pi** (2026-08-29) — aprovada sem pergunta estrutural aberta; os estados e a reconciliação já refletem as invariantes da CONVENTION §4.
 - Depende de: M9-F01.
 
 ## Objetivo
@@ -39,3 +39,9 @@ Consultar SQLite, filesystem, Git e GitHub. Completar evento pendente quando o e
 ## Testes e evidência
 
 Property/unit tests de DAG/estado; integração com relógio controlado e crashes em todas as fronteiras. Relatório `SPEC-Entrega-02`.
+
+## Decisões cravadas pelo Cowork (coerentes com decisões anteriores; PI pode vetar)
+
+- **A reconciliação consulta também o container e as portas** do lease (M9-F03), não só SQLite/FS/Git/GitHub — desde a decisão do sandbox, um container órfão é estado tão real quanto um worktree órfão.
+- **`reconcileAll` no boot é bloqueante:** nenhum trabalho novo é adquirido antes dela terminar. Já está nas regras; cravado aqui como invariante de inicialização.
+- **Lease expirado nunca autoriza roubo direto** — a reconciliação decide, porque a expiração pode significar máquina lenta, não processo morto.

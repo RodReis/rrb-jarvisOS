@@ -2,7 +2,7 @@
 
 - MVP/Fatia: MVP-006 · M6-F04.
 - Issue: [#90](https://github.com/RodReis/rrb-jarvisOS/issues/90).
-- Status: **revisão documental; implementação não autorizada**.
+- Status: **aprovada-pi** (2026-08-29) — aprovada sem pergunta estrutural aberta; as decisões do MVP-006 vêm das fatias F01/F03.
 - Depende de: M6-F03.
 
 ## Objetivo
@@ -45,3 +45,10 @@ Contract fixtures GitHub; integração com servidor fake; smoke em repositório 
 - [GitHub REST — Repositories](https://docs.github.com/en/rest/repos/repos)
 - [GitHub REST — Pull requests](https://docs.github.com/en/rest/pulls/pulls)
 - [GitHub REST — Checks](https://docs.github.com/en/rest/checks)
+
+## Decisões cravadas pelo Cowork (coerentes com decisões anteriores; PI pode vetar)
+
+- **`ensureIssueDependency` usa a API de sub-issues do GitHub**, não texto no corpo da issue. É a mesma relação pai/filho que o processo deste repo já usa para MVP→fatia (CLAUDE.md § Hierarquia), então a capacidade precisa devolver o vínculo real, não um checklist em markdown.
+- **Smoke real em repositório exclusivo e descartável**, com token via `source: env` (nunca PAT em runtime, nunca no vault) — coerente com a SPEC-Conectores-03.
+- **Escopo de auditoria e ledger:** `user_id` + `workspace_id`; `project_id` nulo até o MVP-008.
+- **Nenhuma capacidade desta fatia decide quando é usada** — a orquestração é MVP-009. Repetir isso aqui evita que a fatia cresça para dentro da entrega autônoma.

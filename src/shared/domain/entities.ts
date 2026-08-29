@@ -168,7 +168,13 @@ export const AUDIT_EVENT_TYPES = [
   // que identidade ela fala com terceiros — e a auditoria tem de separá-las sem parsear o
   // payload. O payload traz `key`, escopo, ator e operação; **jamais o valor** (ADR-004: "o
   // log de auditoria não é lugar de credencial").
-  'credential-change'
+  'credential-change',
+  // SPEC-Providers-02: chamada a provider de IA (RF-011). **Dois eventos por chamada** —
+  // `fase: 'requisicao'` antes e `fase: 'conclusao'` depois (critério 5) —, e não um só no
+  // fim: uma chamada que morre no meio precisa deixar rastro, e o evento de conclusão sozinho
+  // perderia exatamente a que falhou. O payload carrega provider, modelo, custo e latência;
+  // **nunca o prompt, a resposta ou a credencial** (ADR-004).
+  'ai-call'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]

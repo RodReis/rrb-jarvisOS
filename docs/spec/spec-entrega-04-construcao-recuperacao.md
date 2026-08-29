@@ -2,16 +2,18 @@
 
 - MVP/Fatia: MVP-009 · M9-F04.
 - Issue: [#104](https://github.com/RodReis/rrb-jarvisOS/issues/104).
-- Status: **revisão documental; implementação não autorizada**.
+- Status: **aprovada-pi** (2026-08-29) — local de execução (container) e acesso a documentação técnica resolvidos pelo PI nesta data.
 - Depende de: M9-F03 e adapter Claude Code do MVP-005.
 
 ## Objetivo
 
-Executar Claude Code no worktree aprovado, validar continuamente e recuperar até duas vezes usando somente delta e falhas relevantes.
+Executar Claude Code **dentro do container da M9-F03**, sobre o worktree montado, validar continuamente e recuperar até duas vezes usando somente delta e falhas relevantes.
 
 ## Entrada do executor
 
 SPEC/hashes aprovados, ContextPack, paths permitidos, comandos de validação, `REVIEW.md`, orçamento, tentativa e falhas abertas. Segredos e relatórios resolvidos não entram.
+
+**Ferramentas do executor.** O agente dispõe do **Context7 como MCP** para consultar documentação técnica atual durante a construção — é aqui que a consulta técnica vive na pipeline (decisão do PI 2026-08-29, herdada da revisão do MVP-008). O **aplicativo não expõe Context7 como conector**; nada no app o chama.
 
 ## Regras
 
@@ -32,14 +34,27 @@ SPEC/hashes aprovados, ContextPack, paths permitidos, comandos de validação, `
 
 ## Critérios de aceite
 
-1. Comando e cwd são controlados pelo adapter.
+1. Comando e cwd são controlados pelo adapter, **dentro do container**; não existe caminho de execução no host.
 2. Tentativa excedente é impedida.
 3. Recuperação não repete descoberta resolvida.
 4. Alteração fora do escopo bloqueia commit e traz diff.
 5. Cancelamento não deixa subprocesso órfão.
 6. Custo/tokens são atribuídos por tentativa.
 7. Falha terminal contém ação mínima de retomada.
+8. **Execução é containerizada:** o adapter só inicia o executor com o container pronto e o worktree montado. Teste comprova que sem container não há execução.
+9. **Uso da rota de assinatura é registrado sem valor monetário** (emenda da SPEC-Providers-03); atribuição por tentativa continua obrigatória. Teste.
 
 ## Testes e evidência
 
 Adapter fake nas suítes comuns; fixtures de timeout/cancelamento/falha repetida/nova; smoke Claude real limitado. Relatório `SPEC-Entrega-04`.
+
+## Perguntas resolvidas pelo PI (2026-08-29)
+
+1. **Onde o Claude Code roda:** **dentro do container da M9-F03**, com o worktree montado — nunca no host. Ver a decisão completa e o motivo na SPEC-Entrega-03. — decidido.
+2. **Documentação técnica (Context7):** vive **aqui**, como ferramenta do agente construtor (MCP), e não como conector do aplicativo. Fecha a pendência herdada da revisão do MVP-008; a M9-F03 monta o ContextPack, mas o ContextPack é manifesto imutável do que foi enviado — a consulta técnica acontece **durante** a construção, que é esta fatia. — decidido.
+
+## Decisões cravadas pelo Cowork (coerentes com decisões anteriores; PI pode vetar)
+
+- **O agente não fala com o GitHub.** Efeito remoto é do app (M9-F01/M9-F05); o container não recebe token.
+- **Três tentativas contam o run inteiro** (inicial + duas), não por etapa — já é regra, cravado para não virar "três por fase".
+- **Escolha técnica reversível dentro da SPEC é autônoma e registrada**; requisito de produto ausente **nunca** é inferido (invariante 9 da CONVENTION §4).

@@ -5,6 +5,8 @@ import { AuthService } from './auth/auth-service'
 import { createSupabaseClient, readSupabaseConfig } from './auth/supabase-client'
 import { SafeStorageTokenVault } from './auth/token-vault'
 import { registerIpcHandlers } from './ipc/handlers'
+import { AiCallService } from './ai/call-provider'
+import { AnthropicAdapter } from './ai/anthropic-adapter'
 import { AllowlistRepository } from './policy/allowlist-repository'
 import { canonicalize } from './policy/allowlist-canon'
 import { PolicyService } from './policy/policy-service'
@@ -166,6 +168,16 @@ if (!app.requestSingleInstanceLock()) {
       policy
     )
 
+    // Ponto único de chamada de IA (SPEC-Providers-02). Construído **depois** do vault porque
+    // depende dele: nenhum adapter chama provider sem credencial, e o serviço a resolve por
+    // escopo no instante da chamada. O mapa de adapters é onde a F04 acrescenta providers.
+    const ai = new AiCallService(
+      { anthropic: new AnthropicAdapter() },
+      credentials,
+      policy,
+      storage.audit
+    )
+
     registerIpcHandlers({
       audit: storage.audit,
       workspaces,
@@ -178,6 +190,7 @@ if (!app.requestSingleInstanceLock()) {
       terminal,
       commandAllowlist,
       credentials,
+      ai,
       runs,
       approvals,
       userId: userIdAtual,

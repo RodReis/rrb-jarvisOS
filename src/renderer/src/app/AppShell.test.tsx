@@ -19,6 +19,11 @@ const resolveApproval = vi.fn()
 const runWorkflowReal = vi.fn()
 const listCredentials = vi.fn()
 const setCredential = vi.fn()
+// SPEC-Providers-02: o painel de chamada de IA vive no Settings e assina o canal de stream ao
+// montar. Sem estes no dublê, montar o Settings estoura antes de qualquer asserção.
+const callAi = vi.fn()
+const cancelAi = vi.fn()
+const onAiStreamEvent = vi.fn(() => () => {})
 const removeCredential = vi.fn()
 
 /**
@@ -57,6 +62,9 @@ function mockarPonte(): void {
       // este mock incompleto se manifestaria: um segundo `role="alert"` na página.
       listCredentials,
       setCredential,
+      callAi,
+      cancelAi,
+      onAiStreamEvent,
       removeCredential,
       // Devolve a função de cancelamento, como a ponte real: sem isso o `useEffect`
       // tentaria chamar `undefined` na desmontagem e o cleanup estouraria.
@@ -79,6 +87,7 @@ beforeEach(() => {
   sendLog.mockClear()
   listCredentials.mockResolvedValue([])
   setCredential.mockResolvedValue([])
+  onAiStreamEvent.mockReturnValue(() => {})
   removeCredential.mockResolvedValue([])
   minimizeToTray.mockClear()
   savePreferences.mockClear()

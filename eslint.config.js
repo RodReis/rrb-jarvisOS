@@ -78,6 +78,38 @@ export default tseslint.config(
     }
   },
   {
+    // Isolamento dos adapters de IA (SPEC-Providers-02, critério 1).
+    //
+    // "O ponto de chamada não conhece Anthropic diretamente — só a interface `AiAdapter`" é
+    // uma frase da spec até virar regra. A garantia real é esta: **só** `src/main/ai/` pode
+    // importar um SDK de provider, e dentro dela só o arquivo do adapter o faz.
+    //
+    // Sem isto, o isolamento decai por conveniência — o primeiro lugar que precisa de um tipo
+    // do SDK o importa direto, e a troca de provider deixa de ser "escrever outro adapter".
+    // Escopo em `src/main/` e não em `src/**`: no flat config, um bloco posterior que declare
+    // `no-restricted-imports` **substitui** o do bloco anterior para os arquivos que ele casa,
+    // e um `src/**` aqui apagaria a fronteira do design system logo abaixo — foi exatamente o
+    // que `tests/design/fronteira.int-spec.ts` pegou. O main é onde o SDK poderia ser
+    // importado de qualquer forma: `src/design/` e `src/renderer/` já não alcançam node_modules
+    // de provider pelas suas próprias fronteiras.
+    files: ['src/main/**/*.ts'],
+    ignores: ['src/main/ai/anthropic-adapter.ts', 'src/main/ai/*.int-spec.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@anthropic-ai/*'],
+              message:
+                'Critério 1 (SPEC-Providers-02): só o adapter do provider importa o SDK dele. O resto do app fala com a interface `AiAdapter` — é isso que torna trocar de provider uma questão de escrever outro adapter.'
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
     // Componentes consomem só tokens (SPEC-DesignSystem-03a, critério 5).
     //
     // A camada `ui` é onde o valor solto entra: um `#0a0b0e` ou um `text-[14px]` digitado à

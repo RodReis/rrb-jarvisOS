@@ -2,7 +2,7 @@
 
 - MVP/Fatia: MVP-009 · M9-F01.
 - Issue: [#101](https://github.com/RodReis/rrb-jarvisOS/issues/101).
-- Status: **revisão documental; implementação não autorizada**.
+- Status: **aprovada-pi** (2026-08-29) — aprovada sem pergunta estrutural aberta; as decisões que a afetam vêm do MVP-006 e da M9-F03.
 - Dependências: MVP-006 concluído e pacote/MVP/fatia do MVP-008 aprovados.
 
 ## Objetivo
@@ -33,3 +33,9 @@ Validar autenticação/instalação → `ensureRepository` → configurar branch
 ## Testes, evidência e custo
 
 Integração com GitHub fake e injeção de crash; smoke em repositório exclusivo. Evidência: URLs, IDs e SHAs, nunca tokens. Relatório `SPEC-Entrega-01`.
+
+## Decisões cravadas pelo Cowork (coerentes com decisões anteriores; PI pode vetar)
+
+- **Todo Git da pipeline usa o mesmo caminho da M8-F01** — `git` do sistema pelo terminal controlado do MVP-004, auditado. Publicar não abre um segundo caminho de escrita.
+- **Efeito remoto é do app, não do agente:** `ensureRepository`/`ensureIssue` rodam no main pelo GitHub Adapter (M6-F04). O executor nunca recebe token nem fala com o GitHub.
+- **Escopo:** `user_id` + `workspace_id` + `project_id`; aqui o `project_id` já existe (criado no MVP-008).

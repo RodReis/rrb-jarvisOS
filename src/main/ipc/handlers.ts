@@ -1,6 +1,7 @@
 import { app, ipcMain } from 'electron'
 import {
   IPC_CHANNELS,
+  IPC_EVENT_CHANNELS,
   IPC_SEND_CHANNELS,
   type AppInfo,
   type AuditVerification,
@@ -30,6 +31,14 @@ import type { PreferencesService } from '../preferences/preferences-service'
 import type { AuditRepository } from '../storage/audit-repository'
 import type { WorkspaceService } from '../workspace/workspace-service'
 import type { ApprovalRepository } from '../execution/approval-repository'
+import type { AiCallService } from '../ai/call-provider'
+import {
+  isAiProvider,
+  type AiCallHandle,
+  type AiRequest,
+  type AiStreamEvent
+} from '@shared/domain/ai'
+import { MODELO_PADRAO } from '@shared/domain/ai'
 
 /**
  * Normaliza o contexto de política vindo do renderer (fronteira de confiança).
@@ -105,6 +114,8 @@ export interface IpcDependencies {
   readonly approvals: ApprovalRepository
   /** Ausente quando as credenciais não estão configuradas — o app roda sem login. */
   readonly auth?: AuthService
+  /** Ponto único de chamada de IA (SPEC-Providers-02): classifica, estima, audita, mede. */
+  readonly ai: AiCallService
   /** Minimizar para o tray. Injetado porque a janela nasce depois dos handlers. */
   readonly minimizeToTray: () => void
 }
@@ -558,6 +569,88 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       return deps.credentials.remove(deps.userId(), workspace, key, 'usuario')
     }
   )
+
+  // Chamada de IA (SPEC-Providers-02, critérios 2 e 8). O `invoke` devolve só o handle; o
+  // texto chega pelo canal de evento, um `send` por chunk. O renderer **nunca** recebe a
+  // credencial: quem a lê do Vault é o ponto único de chamada, dentro do main.
+  //
+  ipcMain.handle(
+    IPC_CHANNELS.aiCall,
+    async (event, request: unknown, workspace: unknown): Promise<AiCallHandle | undefined> => {
+      if (!isWorkspaceId(workspace)) return undefined
+      if (typeof request !== 'object' || request === null) return undefined
+
+      const bruto = request as Partial<AiRequest>
+      // Validação na fronteira: provider fechado pelo enum e prompt não-vazio. O `model` é
+      // aceito como veio porque a tabela de preço já trata modelo desconhecido — e recusá-lo
+      // aqui exigiria manter uma segunda lista em sincronia com a primeira.
+      if (!isAiProvider(bruto.provider)) return undefined
+      const prompt = typeof bruto.prompt === 'string' ? bruto.prompt.trim() : ''
+      if (prompt.length === 0) return undefined
+
+      const pedido: AiRequest = {
+        provider: bruto.provider,
+        prompt,
+        ...(typeof bruto.model === 'string' ? { model: bruto.model } : {}),
+        ...(typeof bruto.system === 'string' ? { system: bruto.system } : {}),
+        ...(typeof bruto.maxTokens === 'number' ? { maxTokens: bruto.maxTokens } : {})
+      }
+
+      // Sem prompt no log: o texto do usuário é conteúdo, e o canal registra o fato da
+      // chamada, não o que ela diz.
+      log.ipc.info('Chamada de IA solicitada pela interface', {
+        canal: IPC_CHANNELS.aiCall,
+        direction: 'in',
+        provider: pedido.provider
+      })
+
+      const stream = deps.ai.call(pedido, { userId: deps.userId(), workspace })
+      const iterador = stream[Symbol.asyncIterator]()
+
+      // O primeiro evento é consumido aqui para descobrir o `id` que o serviço gerou — é ele
+      // que o renderer usa para casar os chunks. Consumir e **reemitir** (em vez de descartar)
+      // é o que impede o primeiro pedaço de texto de sumir quando a resposta é curta.
+      const primeiro = await iterador.next()
+      if (primeiro.done === true) return undefined
+
+      const id = primeiro.value.id
+
+      // O bombeamento roda **solto**, sem `await`: o `invoke` tem de devolver o handle agora
+      // para que o renderer assine os eventos. Esperar o stream aqui entregaria o handle
+      // depois da resposta inteira — que é exatamente o oposto de streaming.
+      void (async () => {
+        try {
+          let evento: IteratorResult<AiStreamEvent> = primeiro
+          while (evento.done !== true) {
+            // A janela pode ter fechado no meio do stream. `isDestroyed` antes de cada envio
+            // porque `send` num `webContents` morto lança — e derrubaria o bombeamento.
+            if (event.sender.isDestroyed()) break
+            event.sender.send(IPC_EVENT_CHANNELS.aiStreamEvent, evento.value)
+            evento = await iterador.next()
+          }
+        } catch (erro) {
+          log.ai.error('Falha ao bombear o stream de IA para o renderer', {
+            correlationId: id,
+            direction: 'out',
+            stack: erro instanceof Error ? erro.stack : undefined
+          })
+        }
+      })()
+
+      return {
+        id,
+        provider: pedido.provider,
+        model: pedido.model ?? MODELO_PADRAO[pedido.provider]
+      }
+    }
+  )
+
+  ipcMain.handle(IPC_CHANNELS.aiCancel, (_event, id: unknown): void => {
+    if (typeof id !== 'string') return
+    // No-op quando a chamada já terminou: cancelar o que acabou não é erro, é corrida normal
+    // entre o clique do usuário e o fim do stream.
+    deps.ai.cancel(id)
+  })
 
   // Só de ida: o renderer manda o registro, o main grava. Sem resposta de propósito —
   // esperar confirmação de log tornaria a UI refém do disco.
