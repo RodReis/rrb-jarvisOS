@@ -82,6 +82,14 @@ Por solicitação explícita do PI, foram criados os épicos [#86](https://githu
 
 Como as SPECs continuavam em revisão, as fatias receberam `proplan:planejado`, não `proplan:backlog`. Isso preserva a regra de que issue existente não equivale a autorização de implementação. O texto anterior registra o estado antes dessa decisão e permanece como histórico.
 
+### Pipeline V2 especificada (2026-08-29)
+
+O PI aprovou a arquitetura da Pipeline V2, encerrando as decisões estruturais sobre multi-executor Claude/Codex, Squads limitados pela SPEC, duas fatias concorrentes com prova de independência e execução contínua do DAG já autorizado. A V2 termina no merge técnico; deploy e aceite final permanecem fora.
+
+Foram criados os documentos dos MVP-010 a MVP-013 e vinte SPECs, cinco por MVP, todas em `revisão-pi`. A arquitetura aprovada autoriza essa especificação, mas não autoriza implementação nem publicação das issues. Depois do aceite das revisões exatas, as issues devem ser criadas em ordem de implementação, de M10-F01 a M13-F05.
+
+As SPECs preservam os contratos já decididos: um writer por fatia; Git/GitHub no kernel; CLIs autenticados por perfis isolados; nenhuma rota monetária silenciosa; workers sem escrita/Git; fallback sequencial quando independência não é provada; merge serializado; pausa/cancelamento sem apagar trabalho remoto; e nenhum gate, regra ou aceite inventado pelo agente.
+
 ## Pendências históricas preservadas
 
 - A UI de allowlist ainda exigia decisão de produto: localização, seletor nativo e remoção de `appDir`.
