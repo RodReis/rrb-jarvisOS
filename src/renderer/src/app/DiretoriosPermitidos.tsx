@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Button, EmptyState, ErrorState, LoadingState, Tag } from '@design/ui'
+import { Button, EmptyState, ErrorState, InlineAlert, LoadingState, Tag } from '@design/ui'
 import { log } from '../lib/log'
 
 /**
@@ -27,7 +27,18 @@ export function DiretoriosPermitidos(): React.JSX.Element {
   const [diretorios, setDiretorios] = useState<readonly string[]>([])
   const [appDir, setAppDir] = useState<string | null>(null)
   const [carregando, setCarregando] = useState(true)
-  const [erro, setErro] = useState<string | null>(null)
+  /**
+   * Dois erros, não um — é a distinção que o DS faz entre `ErrorState` e `InlineAlert`.
+   *
+   * Falhar ao **carregar** significa que a lista não existe: o conteúdo é substituído, porque
+   * mostrar uma lista vazia ao lado do aviso diria "nenhuma pasta permitida" quando o certo é
+   * "não sabemos quais são" — e o botão de permitir agiria às cegas sobre um estado desconhecido.
+   *
+   * Falhar numa **ação** é outra coisa: a lista está na tela e continua correta, só a operação
+   * não foi. Aí o aviso é uma faixa sobre o conteúdo, que permanece.
+   */
+  const [erroAoCarregar, setErroAoCarregar] = useState<string | null>(null)
+  const [erroDaAcao, setErroDaAcao] = useState<string | null>(null)
   /** Trava o botão enquanto o diálogo nativo está aberto — ele é modal, mas a tela não. */
   const [ocupado, setOcupado] = useState(false)
 
@@ -47,11 +58,11 @@ export function DiretoriosPermitidos(): React.JSX.Element {
         if (!ativo) return
         setDiretorios(lista)
         setAppDir(dirDoApp)
-        setErro(null)
+        setErroAoCarregar(null)
       })
       .catch((error: unknown) => {
         if (!ativo) return
-        setErro(t('settings.diretoriosErro'))
+        setErroAoCarregar(t('settings.diretoriosErro'))
         log.ui.error('Falha ao listar diretórios permitidos', { error })
       })
       .finally(() => {
@@ -69,9 +80,9 @@ export function DiretoriosPermitidos(): React.JSX.Element {
       // Cancelar o diálogo cai aqui também: o main devolve a lista inalterada, e reatribuí-la
       // é um no-op. É o critério 3 — não há ramo de "cancelou" a tratar na tela.
       setDiretorios(await window.jarvis.pickAllowedDirectory())
-      setErro(null)
+      setErroDaAcao(null)
     } catch (error) {
-      setErro(t('settings.diretoriosErroAdicionar'))
+      setErroDaAcao(t('settings.diretoriosErroAdicionar'))
       log.ui.error('Falha ao permitir diretório', { error })
     } finally {
       setOcupado(false)
@@ -81,9 +92,9 @@ export function DiretoriosPermitidos(): React.JSX.Element {
   async function remover(caminho: string): Promise<void> {
     try {
       setDiretorios(await window.jarvis.removeAllowedDirectory(caminho))
-      setErro(null)
+      setErroDaAcao(null)
     } catch (error) {
-      setErro(t('settings.diretoriosErroRemover'))
+      setErroDaAcao(t('settings.diretoriosErroRemover'))
       log.ui.error('Falha ao remover diretório', { error })
     }
   }
@@ -105,10 +116,12 @@ export function DiretoriosPermitidos(): React.JSX.Element {
       </p>
       <p className="text-xs opacity-70">{t('settings.diretoriosDescricao')}</p>
 
-      {erro !== null && <ErrorState titulo={erro} descricao={t('settings.diretoriosFixoMotivo')} />}
+      {erroDaAcao !== null && <InlineAlert tom="err" titulo={erroDaAcao} />}
 
       {carregando ? (
         <LoadingState rotulo={t('settings.diretoriosCarregando')} />
+      ) : erroAoCarregar !== null ? (
+        <ErrorState titulo={erroAoCarregar} descricao={t('settings.diretoriosErroDescricao')} />
       ) : semEscolhaDoUsuario ? (
         <EmptyState
           titulo={t('settings.diretoriosVazio')}

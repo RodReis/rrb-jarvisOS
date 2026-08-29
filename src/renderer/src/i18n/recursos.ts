@@ -102,6 +102,10 @@ export const RECURSOS = {
         diretoriosVazioDescricao:
           'Permita uma pasta para o aplicativo poder trabalhar nela — sem isso, o terminal recusa qualquer diretório de trabalho fora da pasta do app.',
         diretoriosErro: 'Não foi possível ler os diretórios permitidos',
+        // Diz **o que fazer**, não só que falhou (PRD §14). Sem a lista, permitir ou remover
+        // pasta agiria às cegas — daí a instrução ser reabrir, e não "tente de novo".
+        diretoriosErroDescricao:
+          'Feche e reabra as configurações. Enquanto a lista não carregar, não é possível permitir nem remover pastas com segurança.',
         diretoriosErroAdicionar: 'Não foi possível permitir essa pasta.',
         diretoriosErroRemover: 'Não foi possível remover essa pasta.'
       },
@@ -242,6 +246,8 @@ export const RECURSOS = {
         diretoriosVazioDescricao:
           'Allow a folder so the app can work in it — without one, the terminal refuses any working directory outside the app folder.',
         diretoriosErro: 'Could not read the allowed directories',
+        diretoriosErroDescricao:
+          'Close and reopen settings. Until the list loads, allowing or removing folders is not safe.',
         diretoriosErroAdicionar: 'Could not allow that folder.',
         diretoriosErroRemover: 'Could not remove that folder.'
       },

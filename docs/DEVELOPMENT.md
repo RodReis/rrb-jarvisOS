@@ -630,6 +630,8 @@ Status: **entregue** — spec `aprovada-pi` (2026-08-29); issue [#110](https://g
 
 **Contrafactuais** (a régua adotada depois de #57/#58): `appDir` marcado como removível, erro técnico vazando para a tela no lugar da mensagem de produto, e a tela ignorando o path que o main devolveu — os três reprovam o teste correspondente.
 
+**Um defeito que a revisão pegou e a suíte de 9 testes não pegava.** A primeira versão renderizava o `ErrorState` como **irmão** do conteúdo, e não no lugar dele. Falhando a carga, o `catch` deixava `diretorios` em `[]` e `appDir` em `null`; `semEscolhaDoUsuario` dava **false** (`0 !== 1`) e a tela caía no ramo da lista — o usuário via o aviso "não foi possível ler" **junto de uma lista vazia com o botão de permitir**. Duas mentiras de uma vez: "você não tem nenhuma pasta permitida" quando o certo é "não sabemos quais são", e uma ação oferecida sobre estado desconhecido. O teste de erro que existia passava porque só afirmava o **texto** do alerta, nunca o que estava ao lado dele. A correção separa os dois erros pela distinção que o próprio DS documenta: falha de **carga** substitui o conteúdo (`ErrorState`), falha de **ação** é faixa sobre o conteúdo que continua correto (`InlineAlert`). Mais dois testes, um para cada lado, e o contrafactual reprova o novo com o defeito de volta. A lição repete a das fatias anteriores em outra forma: **asserção de texto não é asserção de estado** — o alerta certo pode conviver com a tela errada.
+
 ## MVP-005 — Providers de IA + Vault + BudgetPolicy ([#76](https://github.com/RodReis/rrb-jarvisOS/issues/76))
 
 O corte em que o app passa a **falar com provider de IA**. Independe do MVP-004: providers são

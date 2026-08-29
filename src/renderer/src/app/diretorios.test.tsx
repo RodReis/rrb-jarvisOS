@@ -144,6 +144,40 @@ describe('diretórios permitidos (SPEC-ExecucaoReal-03)', () => {
     expect(alerta).not.toHaveTextContent(/EPERM/)
   })
 
+  it('falha ao listar substitui o conteúdo — não convive com uma lista vazia (critério 8)', async () => {
+    listAllowedDirectories.mockRejectedValue(new Error('EPERM: canal caiu'))
+
+    render(<DiretoriosPermitidos />)
+    await screen.findByRole('alert')
+
+    /*
+     * O erro de **carga** significa que a lista não existe, e é diferente de "nenhuma pasta
+     * permitida". Mostrar o aviso ao lado de uma lista vazia com o botão de permitir diria ao
+     * usuário que ele não tem nenhum diretório — quando o certo é que não se sabe quais são —
+     * e ofereceria uma ação que agiria às cegas sobre estado desconhecido.
+     */
+    expect(screen.queryByRole('list')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /permitir uma pasta/i })).not.toBeInTheDocument()
+    // E diz o que fazer, não só que falhou (PRD §14).
+    expect(screen.getByText(/feche e reabra as configurações/i)).toBeInTheDocument()
+  })
+
+  it('falha numa ação mantém a lista na tela — ela continua correta (critério 8)', async () => {
+    listAllowedDirectories.mockResolvedValue([APP_DIR, PROJETO])
+    removeAllowedDirectory.mockRejectedValue(new Error('EBUSY'))
+
+    render(<DiretoriosPermitidos />)
+    await screen.findByText(PROJETO)
+
+    await userEvent.click(screen.getByRole('button', { name: `Remover ${PROJETO}` }))
+
+    // O oposto do teste acima: aqui a lista **não** foi invalidada — a remoção é que falhou.
+    // Sumir com o conteúdo faria o usuário perder de vista o que continua permitido.
+    expect(await screen.findByRole('alert')).toHaveTextContent(/não foi possível remover/i)
+    expect(screen.getByText(PROJETO)).toBeInTheDocument()
+    expect(screen.getByRole('list')).toBeInTheDocument()
+  })
+
   it('a tela só fala por IPC tipado — nenhuma API de filesystem (critério 6)', async () => {
     listAllowedDirectories.mockResolvedValue([APP_DIR, PROJETO])
 
