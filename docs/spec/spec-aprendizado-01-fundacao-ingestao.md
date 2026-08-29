@@ -2,7 +2,7 @@
 
 - MVP/Fatia: MVP-016 · M16-F01.
 - Issue: ainda não criada.
-- Status: **revisão-pi** (2026-08-29); implementação não autorizada.
+- Status: **aprovada-pi** (2026-08-29); implementação depende da fila e de issue ainda não criada.
 - Depende de: MVP-015 concluído.
 - Design: `docs/superpowers/specs/2026-08-29-mvp-016-aprendizado-operacional-design.md`.
 
@@ -144,4 +144,4 @@ npm run build
 
 ## Perguntas abertas ao PI
 
-Nenhuma. Documento pronto para revisão exata do PI.
+Nenhuma. Revisão exata aprovada pelo PI em 2026-08-29.

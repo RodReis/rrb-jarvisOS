@@ -73,4 +73,4 @@
 23. Falha usa fingerprint determinístico; similaridade semântica somente sugere associação. Claude/Codex propõem e explicam, mas não promovem por opinião.
 24. Graphify, Caveman e equivalentes são estratégias opcionais com fallback determinístico. Whole-repo continua exigindo exceção do MVP-008.
 25. `ApplicabilityKey` torna lição incompatível `stale`; indisponibilidade usa política estável/base e não bloqueia a pipeline.
-26. O MVP-016 foi decomposto em seis fatias aprovadas. A M16-F01 está em `revisão-pi`; as demais SPECs e todas as issues ainda não existem. A F06 mantém gate visual. MVP-017–MVP-018 mantêm somente direção aprovada.
+26. O MVP-016 foi decomposto em seis fatias aprovadas. A M16-F01 recebeu `aprovada-pi`; as demais SPECs e todas as issues ainda não existem. A F06 mantém gate visual. MVP-017–MVP-018 mantêm somente direção aprovada.

@@ -1,6 +1,6 @@
 # MVP-016 — Aprendizado Operacional da Pipeline
 
-- Status: **design e seis fatias aprovados pelo PI** em 2026-08-29; M16-F01 em `revisão-pi`; implementação não autorizada.
+- Status: **design, seis fatias e M16-F01 aprovados pelo PI** em 2026-08-29; implementação depende da fila e de issues ainda não criadas.
 - GitHub: épico e issues ainda não criados.
 - Depende de: MVP-015 concluído.
 - Dono do aceite: PI.
@@ -14,7 +14,7 @@ Aprender com evidências de runs concluídos para reduzir recorrência, retrabal
 
 | Ordem | Fatia | SPEC | Estado |
 |---:|---|---|---|
-| 1 | Fundação e ingestão | `spec-aprendizado-01-fundacao-ingestao.md` | revisão-pi |
+| 1 | Fundação e ingestão | `spec-aprendizado-01-fundacao-ingestao.md` | aprovada-pi |
 | 2 | Memória de falhas | a redigir | design aprovado |
 | 3 | Registro e resolução de políticas | a redigir | design aprovado |
 | 4 | Experimentos e promoção | a redigir | design aprovado |

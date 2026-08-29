@@ -1,6 +1,6 @@
 # Design — Pipeline V3: release, operação e aprendizado
 
-- Status: **direção da V3, designs dos MVPs 014–016 e onze SPECs dos MVPs 014–015 aprovados pelo PI** em 2026-08-29.
+- Status: **direção da V3, designs dos MVPs 014–016, onze SPECs dos MVPs 014–015 e a M16-F01 aprovados pelo PI** em 2026-08-29.
 - Escopo deste documento: fronteira da Pipeline V3 e design detalhado do MVP-014. Os MVPs 015–016 possuem designs complementares próprios.
 - Implementação: **não autorizada por este documento**. Cada SPEC continua sujeita ao aceite pré-construção do PI.
 - Predecessora: `2026-08-29-pipeline-desenvolvimento-ia-v2-design.md`.
@@ -21,7 +21,7 @@ Produção é automática depois do merge e dos gates técnicos. Não existe um 
 4. **MVP-017 — Biblioteca de Blueprints.** Padrões de PRD, arquitetura, SPEC, DESIGN-SYSTEM, protótipos e perguntas orientadas com “Decide por mim”.
 5. **MVP-018 — Gestão de Portfólio.** Vários projetos, fila global, prioridade do PI, custo/quota por projeto e prontidão de planejamento.
 
-O MVP-014 está detalhado neste documento. O MVP-015 possui design e seis SPECs aprovadas em `2026-08-29-mvp-015-observabilidade-operacional-design.md`. O MVP-016 possui design e seis fatias aprovadas em `2026-08-29-mvp-016-aprendizado-operacional-design.md`; a M16-F01 está em `revisão-pi` e as demais SPECs ainda serão redigidas. MVP-017 e MVP-018 mantêm somente direção aprovada.
+O MVP-014 está detalhado neste documento. O MVP-015 possui design e seis SPECs aprovadas em `2026-08-29-mvp-015-observabilidade-operacional-design.md`. O MVP-016 possui design e seis fatias aprovadas em `2026-08-29-mvp-016-aprendizado-operacional-design.md`; a M16-F01 está `aprovada-pi` e as demais SPECs ainda serão redigidas. MVP-017 e MVP-018 mantêm somente direção aprovada.
 
 ## 3. Decisões do PI para o MVP-014
 
