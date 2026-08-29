@@ -852,6 +852,55 @@ Status: **entregue** — spec `aprovada-pi` (2026-08-29); issue [#87](https://gi
 - **`project_id` fica fora dos contratos** até o MVP-008, onde projeto nasce. Um campo opcional que ninguém preenche por dois MVPs é campo que se aprende a ignorar.
 - **O relatório por SPEC** sai pelo `reports/TESTS.md` gerado no CI (ADR-003), não em `docs/test-reports/` — o caminho que a spec cita nunca existiu no projeto, e criar um segundo lugar para o mesmo número é como os dois passam a divergir.
 
+### Fatia 02 — Operação e governança (`docs/spec/spec-conectores-02-operacao-governanca.md`)
+
+Status: **entregue** — spec `aprovada-pi` (2026-08-29); issue [#88](https://github.com/RodReis/rrb-jarvisOS/issues/88). Depende da F01 (o ponto único) e do MVP-005 (Vault, auditoria).
+
+- [x] **`connector-governance.ts`, tudo função pura** — `ESTADO_DO_ERRO` (tabela, não `switch` espalhado), `decidirRetry`, `calcularEspera`, `contaContraOBreaker`, `proximoCircuito` e `avaliarCreditos`
+- [x] **Migration 12**: `connector_credit_policy` + `credit_event` — ledger em **créditos**, separado do `cost_event` em USD (decisão do PI)
+- [x] **`CreditRepository`/`CreditService`**: teto por `user_id`+`workspace_id`+**conector**, recorte de período por prefixo ISO, auditoria dos dois desfechos
+- [x] **Governança no ponto único**: circuito → gate de créditos → cofre → auditoria → execução com timeout, `AbortSignal` e retry. **Nada do caminho da F01 foi refatorado** — só instrumentado, que é o critério 1 dela valendo
+- [x] **Dois canais IPC** para o teto; **nenhum** pergunta se a chamada cabe
+- [x] **Dois tipos de `AuditEvent`**: `connector-credit-decision` (o veredito) e `connector-credit-change` (a edição), pela mesma razão que separa `budget-decision` de `budget-change`
+- [x] **57 testes novos** (39 Regras, 18 Banco); total **1025**. Seis contrafactuais, **dois deles reprovaram a suíte em vez do código**
+
+#### Decisões que valem registro
+
+1. **Duas perguntas ao PI antes de codificar.** (a) Os estados `READY`/`DEGRADED`/`BLOCKED_EXTERNAL`/`FAILED` são **do desfecho de uma chamada**, não status de painel — é assim que as F03/F05 já os usam, e `health()` entra como método **opcional** do adapter. (b) O "smoke real" da spec vira **servidor HTTP local que conta requisições**, já que não há adapter concreto até a F03.
+2. **`health()` não recebe nada — nem `ConnectorExecution`, nem segredo.** O critério 5 ("health não exige revelar credencial") vira **assinatura**, não disciplina: um health que precisasse da credencial para responder seria um health que a revela, e a única forma de impedir isso é o parâmetro não existir.
+3. **A ordem das recusas do `decidirRetry` é a política inteira.** Repetibilidade vence código terminal vence orçamento de tentativas — e a primeira é a mais forte de propósito: `codigo-terminal` depende de uma lista que cresce, `nao-repetivel` vale para **todo** código, inclusive os que ainda não existem.
+4. **`CODIGOS_SEM_RETRY` lista quem *não* pode, não quem pode.** Um `ConnectorErrorCode` novo cai no caso conservador em vez de virar retry por omissão. Errar para o lado de não repetir é o lado barato: a chamada perdida o usuário refaz; a repetida contra um 401 vira bloqueio de conta.
+5. **O breaker não conta o que é problema nosso.** Credencial recusada, permissão negada e o **nosso** teto de créditos não abrem o circuito — contá-los transformaria um erro de configuração num apagão do conector inteiro. Cancelamento também não: o usuário desistir não é o serviço falhar.
+6. **`avaliarCreditos` tem dois caminhos, não três.** O orçamento em USD alerta porque o usuário decide se aceita gastar mais; crédito de conector é cota comprada — ou cabe, ou não cabe. Um alerta pediria uma decisão que ele não tem como tomar no meio da chamada.
+7. **Custo zero sempre passa, mesmo com o teto estourado.** O GitHub não cobra; barrar uma chamada gratuita porque uma paga esgotou a cota seria cobrar por algo que não custa.
+8. **O bloqueio por crédito não gera `connector-call/conclusao`.** O fato já mora em `connector-credit-decision`, com os números. Repeti-lo faria "quantas chamadas concluíram" contar chamadas que nunca saíram — o defeito que a M5-F03 pegou no `cost_event`.
+
+#### O que o teste pegou e a leitura não
+
+- **O `Retry-After` não era obedecido, e o critério 2 pede que seja.** O adapter guardava o cabeçalho em `evidencia` (string) e o serviço nunca o lia: o backoff caía na curva exponencial. Virou campo próprio e **número** (`ConnectorError.retryAfterMs`) — uma orientação que só existe como texto na mensagem é uma orientação que ninguém obedece.
+- **Dois contrafactuais não derrubaram nada, e o defeito era da suíte.** (a) Inverter a ordem das recusas do `decidirRetry` passava despercebido, porque nenhum teste cobria o caso em que **as duas** se aplicam — que é justamente onde a ordem importa; dois testes novos. (b) A guarda de repetibilidade dentro do serviço é **inalcançável** com a validação da F01 no lugar; ficou registrada como tal no comentário, em vez de fingir uma redundância que nenhum contrafactual alcança.
+- **A migração v1 do `storage.int-spec` cobrou as duas tabelas novas**, como cobrou na M5-F04. Terceiro caso do mesmo padrão.
+- **As duas guardas de superfície foram atualizadas juntas desta vez** — na F01 eu só tinha visto a do preload, e o E2E de login me pegou no CI.
+
+#### Contrafactuais (cada guarda revertida, e o teste que reprovou)
+
+| Guarda revertida | Testes que reprovam |
+|---|---|
+| Ordem das recusas do `decidirRetry` invertida | 1 (só o caso em que as duas se aplicam) |
+| Gate de créditos em report-only | 3 (Banco) |
+| Validação de idempotência da F01 desligada | 4 (2 Regras, 2 Banco — inclusive o do servidor que conta) |
+| Circuit breaker desligado | 1 (o contador do servidor se move) |
+| `AbortSignal` não repassado ao adapter | 2 (timeout não aborta a conexão) |
+| Guarda de repetibilidade do serviço removida | **0 — inalcançável; registrada, não maquiada** |
+
+#### Limites registrados, não silenciados
+
+- **O adapter das provas é HTTP de verdade, mas não é um conector de produção.** `fetch`, `AbortSignal` e status reais (401/403/429/500/timeout) contra um servidor local que **conta requisições** — é o que separa "o mock não foi chamado" de "a requisição não saiu". GitHub é a F03, Tavily a F05; o smoke contra serviço externo real fica para lá.
+- **Sem verificação no app real**, pelo mesmo motivo da F01: não há conector registrado para exercitar pela tela, e nenhuma tela nova foi entregue.
+- **`health()` não tem chamador ainda.** O método existe no contrato e o critério 5 é garantido pela assinatura; quem o consome é a F03, que terá um serviço a sondar.
+- **`project_id` existe na coluna e é sempre nulo** até o MVP-008 (critério 7). A coluna entrou agora para a fatia que a preencher não precisar de migration.
+- **O teto de créditos não tem tela.** Os canais existem e são testados; a UI mínima chega com o conector que a torna útil.
+
 ## Registro de entregas
 
 | Data | Fatia | PR | Observação |
