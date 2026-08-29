@@ -25,7 +25,8 @@ import {
   TAVILY_CAPABILITIES,
   TAVILY_OPERATIONS,
   creditosDaBusca,
-  creditosDaExtracao,
+  creditosCobradosNaExtracao,
+  creditosEstimadosDaExtracao,
   dominioDe,
   erroDeBuscaSemFontes,
   normalizarUrl,
@@ -131,7 +132,7 @@ export class TavilyAdapter implements ConnectorAdapter {
 
     if (execution.request.operation === TAVILY_OPERATIONS.extract) {
       const urls = input?.urls
-      return Array.isArray(urls) ? creditosDaExtracao(urls.length, depth) : 0
+      return Array.isArray(urls) ? creditosEstimadosDaExtracao(urls.length, depth) : 0
     }
 
     return 0
@@ -267,14 +268,23 @@ export class TavilyAdapter implements ConnectorAdapter {
       // O consumo **real**: a Tavily não cobra por URL que falhou, então o fallback conta as
       // extrações bem-sucedidas — nunca as pedidas. Cobrar do ledger o que o serviço não cobrou
       // gastaria cota que ninguém consumiu.
-      creditos: this.creditosCobrados(resposta.corpo) ?? creditosDaExtracao(extraidos.length, depth)
+      // O `usage` da resposta é a **única** fonte verdadeira aqui: a Tavily acumula URLs entre
+      // chamadas e cobra a cada 5 no total, então nenhuma fórmula sobre esta chamada isolada
+      // reproduz o valor (smoke real de 2026-08-29). Sem o campo, supomos zero em vez de
+      // inventar — quem protege a cota é o gate, com a estimativa, antes de a chamada sair.
+      creditos: this.creditosCobrados(resposta.corpo) ?? creditosCobradosNaExtracao()
     }
   }
 
   /**
    * O consumo que a **Tavily** informou, quando informa.
    *
-   * Dois formatos porque a API usa dois: `usage.credits` no Search e `usage.total_credits_used`
+   * O smoke real (2026-08-29) mostrou que **as duas rotas usam `usage.credits`** — a doc previa
+   * `total_credits_used` no Extract, e a API não o manda. O segundo nome fica lido como
+   * alternativa porque custa uma linha e cobre a doc estar certa em algum plano ou versão; o que
+   * não pode acontecer é o número da Tavily ser ignorado por causa do nome do campo.
+   *
+   * Dois formatos porque a doc cita dois: `usage.credits` e `usage.total_credits_used`
    * no Extract. Ler os dois aqui evita que a diferença vire um `if` em cada chamador.
    */
   private creditosCobrados(corpo: unknown): number | undefined {

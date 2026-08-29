@@ -21,7 +21,8 @@ import {
   TAVILY_CAPABILITIES,
   TAVILY_OPERATIONS,
   creditosDaBusca,
-  creditosDaExtracao,
+  creditosCobradosNaExtracao,
+  creditosEstimadosDaExtracao,
   dominioDe,
   ehUrlHttp,
   erroDeBuscaSemFontes,
@@ -80,27 +81,50 @@ describe('créditos — a tabela da Tavily, não uma estimativa nossa', () => {
     expect(creditosDaBusca('advanced')).toBe(2)
   })
 
-  it('extração cobra por grupo de 5, arredondando para cima', () => {
-    // O grupo é indivisível: 6 URLs custam dois grupos, não 1,2. Arredondar para baixo
-    // subestimaria o gate justamente na chamada que estoura a cota.
-    expect(creditosDaExtracao(1, 'basic')).toBe(1)
-    expect(creditosDaExtracao(5, 'basic')).toBe(1)
-    expect(creditosDaExtracao(6, 'basic')).toBe(2)
-    expect(creditosDaExtracao(10, 'basic')).toBe(2)
-    expect(creditosDaExtracao(11, 'basic')).toBe(3)
+  it('a ESTIMATIVA da extração arredonda para cima — o gate assume o pior caso', () => {
+    // O gate decide sem saber quantas URLs darão certo, e subestimar deixaria passar justamente
+    // a chamada que estoura a cota. Superestimar erra para o lado barato.
+    expect(creditosEstimadosDaExtracao(1, 'basic')).toBe(1)
+    expect(creditosEstimadosDaExtracao(5, 'basic')).toBe(1)
+    expect(creditosEstimadosDaExtracao(6, 'basic')).toBe(2)
+    expect(creditosEstimadosDaExtracao(11, 'basic')).toBe(3)
+  })
+
+  it('sem o usage da resposta, a extração supõe ZERO — não há fórmula local possível', () => {
+    // O achado do smoke real (2026-08-29): a cobrança da extração **não é local à chamada**. A
+    // Tavily acumula URLs entre chamadas e cobra 1 crédito a cada 5 no total — seis chamadas
+    // seguidas de 1 URL custaram `0,0,0,0,1,0`. A mesma chamada, repetida, custa 0 ou 1
+    // conforme o que veio antes.
+    //
+    // Qualquer fórmula sobre a contagem desta chamada erraria de forma sistemática, e o erro se
+    // acumularia no ledger. Entre inventar e assumir zero, zero é o honesto — e quem protege a
+    // cota é o gate, com a estimativa, antes de a chamada sair.
+    expect(creditosCobradosNaExtracao()).toBe(0)
+  })
+
+  it('a estimativa nunca subestima o que uma chamada pode custar', () => {
+    // A propriedade que torna a estimativa segura para o gate: para qualquer contagem, ela é ao
+    // menos o número de grupos de 5 que aquelas URLs formam.
+    for (let urls = 1; urls <= 20; urls += 1) {
+      expect(creditosEstimadosDaExtracao(urls, 'basic')).toBeGreaterThanOrEqual(
+        Math.floor(urls / 5)
+      )
+      expect(creditosEstimadosDaExtracao(urls, 'advanced')).toBeGreaterThanOrEqual(
+        creditosEstimadosDaExtracao(urls, 'basic')
+      )
+    }
   })
 
   it('advanced custa o dobro do mesmo número de grupos', () => {
-    expect(creditosDaExtracao(5, 'advanced')).toBe(2)
-    expect(creditosDaExtracao(6, 'advanced')).toBe(4)
+    expect(creditosEstimadosDaExtracao(5, 'advanced')).toBe(2)
+    expect(creditosEstimadosDaExtracao(6, 'advanced')).toBe(4)
   })
 
   it('extração de zero URLs não custa nada', () => {
-    // Importa porque é o caso da falha total: nenhuma URL extraída com sucesso, e a Tavily não
-    // cobra por extração que falhou. Cobrar aqui gastaria cota que ninguém consumiu.
-    expect(creditosDaExtracao(0, 'basic')).toBe(0)
-    expect(creditosDaExtracao(0, 'advanced')).toBe(0)
-    expect(creditosDaExtracao(-1, 'basic')).toBe(0)
+    // O caso da falha total: nenhuma URL extraída com sucesso, e a Tavily não cobra por
+    // extração que falhou.
+    expect(creditosEstimadosDaExtracao(0, 'basic')).toBe(0)
+    expect(creditosEstimadosDaExtracao(-1, 'basic')).toBe(0)
   })
 
   it('o padrão de profundidade é o mais barato', () => {

@@ -128,21 +128,42 @@ export function creditosDaBusca(depth: TavilyDepth): number {
 }
 
 /**
- * Quantos créditos a extração consome, para uma dada quantidade de URLs.
+ * Quantos créditos a extração **pode** consumir — a estimativa que o gate usa antes de gastar.
  *
- * A tabela da Tavily é **por grupo de 5**: 1 crédito a cada 5 URLs em `basic`, 2 a cada 5 em
- * `advanced`. O arredondamento é para cima porque o grupo é indivisível — 6 URLs custam dois
- * grupos, não 1,2.
+ * A tabela da Tavily é por grupo de 5 URLs (1 crédito em `basic`, 2 em `advanced`), e aqui o
+ * arredondamento é **para cima**: o gate decide sem saber quantas URLs darão certo, e
+ * subestimar deixaria passar justamente a chamada que estoura a cota. Superestimar erra para o
+ * lado barato — a chamada é barrada cedo demais, e o usuário ajusta o teto.
  *
- * O parâmetro é a contagem de URLs **bem-sucedidas** quando isto mede o consumo real, e a
- * contagem de URLs pedidas quando estima o gate. São dois números diferentes de propósito: a
- * Tavily não cobra por extração que falhou, então estimar pelo pedido é o pior caso — que é
- * exatamente o que um gate deve assumir antes de gastar.
+ * **Não** use isto para lançar consumo no ledger: o que a Tavily cobra de fato vem no `usage`
+ * da resposta, e o smoke real mostrou que os dois números divergem (veja
+ * `creditosCobradosNaExtracao`).
  */
-export function creditosDaExtracao(urls: number, depth: TavilyDepth): number {
+export function creditosEstimadosDaExtracao(urls: number, depth: TavilyDepth): number {
   if (urls <= 0) return 0
   const grupos = Math.ceil(urls / 5)
   return depth === 'advanced' ? grupos * 2 : grupos
+}
+
+/**
+ * Quantos créditos supor quando a resposta da extração **não** traz o `usage`.
+ *
+ * Zero, e a razão vem do smoke real contra a API (2026-08-29): **a cobrança da extração não é
+ * local à chamada**. A Tavily acumula URLs entre chamadas e cobra 1 crédito a cada 5 no total —
+ * seis chamadas seguidas de 1 URL custaram `0,0,0,0,1,0`. A mesma chamada, repetida, custa 0 ou
+ * 1 conforme o que veio antes dela.
+ *
+ * Isso torna **impossível** reconstruir o valor cobrado a partir do que esta chamada sabe:
+ * qualquer fórmula sobre a contagem de URLs — `ceil`, `floor` ou média — erraria de forma
+ * sistemática, e o erro se acumularia no ledger a cada chamada. Entre inventar um número e
+ * assumir zero, zero é o honesto: o `usage` da resposta é a única fonte verdadeira, e ele
+ * praticamente sempre vem (pedimos `include_usage: true`).
+ *
+ * O que **protege a cota** neste desenho não é este fallback, é o gate: ele usa
+ * `creditosEstimadosDaExtracao`, que arredonda para cima e roda antes de a chamada sair.
+ */
+export function creditosCobradosNaExtracao(): number {
+  return 0
 }
 
 /**

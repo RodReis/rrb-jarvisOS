@@ -377,37 +377,66 @@ describe('extração — evidência com hash, e falha parcial que preserva as v�
     expect(data.falhas[0]?.motivo.length).toBe(300)
   })
 
-  it('cobra do ledger só o que a Tavily cobrou — falha não custa', async () => {
-    // Sem `usage` na resposta, o fallback conta as extrações **bem-sucedidas**. Contar as
-    // pedidas gastaria cota que ninguém consumiu, porque a Tavily não cobra por URL que falhou.
-    //
-    // Os números são escolhidos para **atravessar** a fronteira do grupo de 5: 6 pedidas caem em
-    // dois grupos (2 créditos) e 4 bem-sucedidas num só (1 crédito). Com 3 e 1 os dois cálculos
-    // dariam 1, e o teste passaria mesmo contando as pedidas — foi o que um contrafactual
-    // mostrou, e a correção é esta escolha de números, não outra asserção.
+  it('o ledger recebe o número da Tavily, mesmo com falha parcial na mesma chamada', async () => {
+    // O consumo é o que **ela** cobrou, não uma conta nossa sobre quantas URLs deram certo: a
+    // cobrança da extração acumula entre chamadas (smoke real de 2026-08-29), então só o
+    // `usage` da resposta sabe o valor daquela chamada.
     const { instancia } = adapter(() =>
       resposta({
-        results: Array.from({ length: 4 }, (_, i) => ({
+        results: [{ url: 'https://ok.com', raw_content: 'conteúdo' }],
+        failed_results: [{ url: 'https://caiu.com', error: 'x' }],
+        usage: { credits: 2 }
+      })
+    )
+    const desfecho = (await instancia.executar(
+      execution(TAVILY_OPERATIONS.extract, { urls: ['https://ok.com', 'https://caiu.com'] })
+    )) as ConnectorResult
+
+    expect(desfecho.usage.creditos).toBe(2)
+  })
+
+  it('sem usage na resposta, a extração não inventa custo', async () => {
+    // Zero, e não uma fórmula: a cobrança não é local à chamada, então qualquer número
+    // calculado aqui erraria de forma sistemática e o erro se acumularia no ledger. Quem
+    // protege a cota é o gate, com a estimativa, antes de a chamada sair.
+    const { instancia } = adapter(() =>
+      resposta({
+        results: Array.from({ length: 6 }, (_, i) => ({
           url: `https://ok.com/${i}`,
-          raw_content: `conteúdo ${i}`
+          raw_content: 'x'
         })),
-        failed_results: [
-          { url: 'https://b.com', error: 'x' },
-          { url: 'https://c.com', error: 'x' }
-        ]
+        failed_results: []
       })
     )
     const desfecho = (await instancia.executar(
       execution(TAVILY_OPERATIONS.extract, {
-        urls: [
-          ...Array.from({ length: 4 }, (_, i) => `https://ok.com/${i}`),
-          'https://b.com',
-          'https://c.com'
-        ]
+        urls: Array.from({ length: 6 }, (_, i) => `https://ok.com/${i}`)
       })
     )) as ConnectorResult
 
-    expect(desfecho.usage.creditos).toBe(1)
+    expect(desfecho.usage.creditos).toBe(0)
+  })
+
+  it('o número que a Tavily informa vence a fórmula, inclusive quando é zero', async () => {
+    // `?? 0` seria o bug clássico aqui: `usage.credits: 0` é informação — "não cobramos por
+    // esta" —, e tratá-lo como ausente faria o fallback inventar um custo que o serviço não
+    // cobrou. `numero()` distingue ausência de zero, e este teste é o que mantém assim.
+    const { instancia } = adapter(() =>
+      resposta({
+        results: Array.from({ length: 6 }, (_, i) => ({
+          url: `https://ok.com/${i}`,
+          raw_content: 'x'
+        })),
+        usage: { credits: 0 }
+      })
+    )
+    const desfecho = (await instancia.executar(
+      execution(TAVILY_OPERATIONS.extract, {
+        urls: Array.from({ length: 6 }, (_, i) => `https://ok.com/${i}`)
+      })
+    )) as ConnectorResult
+
+    expect(desfecho.usage.creditos).toBe(0)
   })
 
   it('extração totalmente falha não custa nada e devolve as ausentes', async () => {
