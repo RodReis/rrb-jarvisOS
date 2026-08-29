@@ -1,6 +1,7 @@
 # SPEC-Entrega-02 — DAG, fila e reconciliação
 
 - MVP/Fatia: MVP-009 · M9-F02.
+- Issue: [#102](https://github.com/RodReis/rrb-jarvisOS/issues/102).
 - Status: **revisão documental; implementação não autorizada**.
 - Depende de: M9-F01.
 
@@ -38,4 +39,3 @@ Consultar SQLite, filesystem, Git e GitHub. Completar evento pendente quando o e
 ## Testes e evidência
 
 Property/unit tests de DAG/estado; integração com relógio controlado e crashes em todas as fronteiras. Relatório `SPEC-Entrega-02`.
-

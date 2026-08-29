@@ -1,6 +1,7 @@
 # SPEC-Conectores-05 — Tavily Search
 
 - MVP/Fatia: MVP-006 · M6-F05.
+- Issue: [#91](https://github.com/RodReis/rrb-jarvisOS/issues/91).
 - Status: **revisão documental; implementação não autorizada**.
 - Depende de: M6-F01, M6-F02 e Vault do MVP-005.
 
@@ -36,3 +37,7 @@ Pesquisar web geral e mercado pela Tavily Search API, preservando URLs, proveni�
 
 Fixtures de sucesso e erros 401/429/432/433; deduplicação de URL; roteamento Context7/Tavily; smoke real com teto de créditos. Relatório `SPEC-Conectores-05`.
 
+## Referências técnicas verificadas via Context7
+
+- [Tavily Search API](https://docs.tavily.com/documentation/api-reference/endpoint/search)
+- [Créditos e planos da API](https://docs.tavily.com/documentation/api-credits)

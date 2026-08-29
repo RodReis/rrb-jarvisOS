@@ -608,3 +608,28 @@ A especificação e o plano podem ser preparados antes, mas a implementação de
 ## 20. Questões encerradas
 
 Não há questão de produto aberta para este design. Escolhas de implementação — schemas exatos, contratos IPC, migrations, nomes de eventos, templates e divisão em fatias — pertencem ao plano de implementação e não podem alterar as decisões desta especificação sem nova aprovação do PI.
+
+## 21. Emenda aprovada — decomposição e contratos (2026-08-28)
+
+Depois da aprovação inicial, o PI decidiu continuar a especificação antes de qualquer implementação. Esta emenda substitui a leitura de “um único módulo” por três MVPs executáveis:
+
+- `MVP-006 Conectores Essenciais`: seis fatias para núcleo/governança, GitHub App/automação e Tavily Search/Extract.
+- `MVP-008 Planejamento Governado`: seis fatias para projeto/Git local, contexto/custo, wizard, PRD/Landscape/Convention, anexos/arquitetura e roadmap/aprovações.
+- `MVP-009 Entrega Autônoma`: seis fatias para publicação, DAG/fila, worktree/Docker, construção/recuperação, revisão/CI/merge e evidência/limpeza.
+
+O `MVP-007 Memória Contextual/RAG` é slot proposto e não bloqueante. Documentos canônicos vivem em `docs/mvp/` e `docs/spec/`; as SPECs novas estão em revisão documental e **não autorizam implementação**.
+
+### Correções de interpretação
+
+1. O PI, e não a IA, anexa obrigatoriamente `DESIGN-SYSTEM.md`, protótipos HTML e assets depois do PRD. A IA analisa e propõe ajustes.
+2. Cada novo MVP executável contém seis fatias.
+3. GitHub usa GitHub App + Device Flow; `gh` e private key embarcada estão excluídos.
+4. Tavily V1 usa Search+Extract; `/research` está adiado. Context7 permanece obrigatório para documentação técnica suportada.
+5. Planejamento cria Git local e commits por marco. Git remoto, issues, PR, CI e merge entram no MVP-009.
+6. O pacote estrutural é aprovado uma vez por revisão; cada MVP/fatia é aprovado antes da construção; a mesma revisão não recebe aceite duplicado.
+7. O executor opera em worktree, WIP=1 e até três tentativas totais. O merge técnico é automático.
+8. Documento/ADR auxiliar não bloqueia código depois do gate. A pipeline não inventa LGPD, consentimento, aceite duplo, classificação de domínio ou requisito de produto.
+
+### Contratos complementares
+
+Fontes de verdade, entidades, invalidação, experiência do PI, política de bloqueios, severidades e prova mínima estão consolidadas em `ARCHITECTURE.md`, `CONVENTION.md`, `REVIEW.md`, `TESTING.md` e nas 18 SPECs. Em conflito com tarefas dos planos antigos, esta emenda e as SPECs novas vencem.

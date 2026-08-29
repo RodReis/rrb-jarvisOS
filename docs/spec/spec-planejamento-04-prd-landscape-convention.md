@@ -1,6 +1,7 @@
 # SPEC-Planejamento-04 — PRD, Landscape e Convention
 
 - MVP/Fatia: MVP-008 · M8-F04.
+- Issue: [#97](https://github.com/RodReis/rrb-jarvisOS/issues/97).
 - Status: **revisão documental; implementação não autorizada**.
 - Depende de: M8-F03 e M6-F05/F06.
 
@@ -37,4 +38,3 @@ Gerar rascunho → pesquisar/extrair → vincular afirmações → detectar cont
 ## Testes, evidência e custo
 
 Fixtures de fontes, indisponibilidade, contradição e conteúdo hostil; validação de links/hashes; smoke Tavily com teto de créditos. Relatório `SPEC-Planejamento-04`.
-

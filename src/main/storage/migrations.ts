@@ -224,6 +224,41 @@ const MIGRATIONS: readonly string[] = [
     UNIQUE (user_id, workspace_id, binary)
   );
   CREATE INDEX idx_allowed_command_user ON allowed_command(user_id, workspace_id);
+  `,
+
+  // 9 — vault de credenciais (SPEC-Providers-01).
+  //
+  // **`secret` guarda o valor cifrado pelo `safeStorage`/DPAPI, nunca em claro.** É a única
+  // coluna do banco que carrega segredo, e por isso carrega também a regra: quem lê esta
+  // tabela fora do `SecretVault` está lendo bytes cifrados que não sabe decifrar. O
+  // `CredentialRef` que atravessa o IPC **não tem campo para este valor** — a coluna existe
+  // no storage, o tipo não a expõe.
+  //
+  // BLOB e não TEXT: `safeStorage.encryptString` devolve `Buffer`, e gravá-lo como texto o
+  // faria passar por uma decodificação UTF-8 que corrompe bytes que não formam caractere
+  // válido. O ciclo grava→lê→decifra só fecha com BLOB.
+  //
+  // Escopo por `user_id` **e** `workspace_id`, com `UNIQUE` incluindo a `key`: é o que faz a
+  // mesma `openai` ter valores distintos em `noa` e `jarvis` sem se misturar (critério 1). O
+  // `UNIQUE` também torna "gravar de novo" um UPDATE da linha existente, não uma segunda
+  // credencial para a mesma chave — o vault é um mapa, não um histórico.
+  //
+  // Sem coluna `source`/`status`: as duas são **derivadas** em runtime (linha presente aqui =
+  // `vault`; ausente aqui e presente no env = `env`; ausente nos dois = `missing`).
+  // Persisti-las criaria uma segunda fonte da verdade que envelhece sozinha quando o `.env`
+  // muda entre dois boots.
+  `
+  CREATE TABLE credential_ref (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    key          TEXT NOT NULL,
+    secret       BLOB NOT NULL,   -- cifrado pelo safeStorage/DPAPI; nunca em claro
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL,
+    UNIQUE (user_id, workspace_id, key)
+  );
+  CREATE INDEX idx_credential_ref_user ON credential_ref(user_id, workspace_id);
   `
 ]
 

@@ -17,6 +17,9 @@ const logout = vi.fn()
 const listPendingApprovals = vi.fn()
 const resolveApproval = vi.fn()
 const runWorkflowReal = vi.fn()
+const listCredentials = vi.fn()
+const setCredential = vi.fn()
+const removeCredential = vi.fn()
 
 /**
  * Perfil da sessão usada nestes testes. O `App` só monta o AppShell quando a auth está
@@ -49,6 +52,12 @@ function mockarPonte(): void {
       runWorkflowReal,
       listPendingApprovals,
       resolveApproval,
+      // A seção de credenciais do Settings (SPEC-Providers-01) consulta a ponte ao montar.
+      // Sem estes três, a tela cai no `catch` e exibe o próprio alerta de erro — que é como
+      // este mock incompleto se manifestaria: um segundo `role="alert"` na página.
+      listCredentials,
+      setCredential,
+      removeCredential,
       // Devolve a função de cancelamento, como a ponte real: sem isso o `useEffect`
       // tentaria chamar `undefined` na desmontagem e o cleanup estouraria.
       onAuthChanged: vi.fn(() => () => undefined)
@@ -68,6 +77,9 @@ async function trocarPara(nome: string): Promise<void> {
 
 beforeEach(() => {
   sendLog.mockClear()
+  listCredentials.mockResolvedValue([])
+  setCredential.mockResolvedValue([])
+  removeCredential.mockResolvedValue([])
   minimizeToTray.mockClear()
   savePreferences.mockClear()
   listPendingApprovals.mockClear()
@@ -333,7 +345,12 @@ describe('Settings (SPEC-05)', () => {
 
     await userEvent.click(screen.getByRole('radio', { name: 'Escuro' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/não foi possível salvar/i)
+    // `findAllByRole` e não `findByRole`: a tela de Settings tem duas regiões que podem
+    // alertar (preferências e credenciais), e uma busca que exige alerta único passaria a
+    // depender de a outra estar sempre silenciosa. O que este teste afirma é que **existe**
+    // o alerta da gravação — não que ele é o único da página.
+    const alertas = await screen.findAllByRole('alert')
+    expect(alertas.some((a) => /não foi possível salvar/i.test(a.textContent ?? ''))).toBe(true)
   })
 
   it('a rota de Settings também é preservada por espaço', async () => {

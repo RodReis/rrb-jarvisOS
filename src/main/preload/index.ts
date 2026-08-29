@@ -23,6 +23,7 @@ import type {
 import type { ExecutionRun } from '@shared/domain/execution'
 import type { ApprovalDecision, ApprovalRequest } from '@shared/domain/execution'
 import type { CommandExecution, CommandSubmission } from '@shared/domain/terminal'
+import type { CredentialKey, CredentialStatusView } from '@shared/domain/credentials'
 import type {
   AuditEvent,
   AuditEventType,
@@ -125,7 +126,20 @@ const bridge: JarvisBridge = {
   addAllowedCommand: (binary: string, workspace: WorkspaceId): Promise<readonly string[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.commandAllowlistAdd, binary, workspace),
   removeAllowedCommand: (binary: string, workspace: WorkspaceId): Promise<readonly string[]> =>
-    ipcRenderer.invoke(IPC_CHANNELS.commandAllowlistRemove, binary, workspace)
+    ipcRenderer.invoke(IPC_CHANNELS.commandAllowlistRemove, binary, workspace),
+  listCredentials: (workspace: WorkspaceId): Promise<readonly CredentialStatusView[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.credentialList, workspace),
+  setCredential: (
+    key: CredentialKey,
+    value: string,
+    workspace: WorkspaceId
+  ): Promise<readonly CredentialStatusView[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.credentialSet, key, value, workspace),
+  removeCredential: (
+    key: CredentialKey,
+    workspace: WorkspaceId
+  ): Promise<readonly CredentialStatusView[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.credentialRemove, key, workspace)
 }
 
 if (process.contextIsolated) {

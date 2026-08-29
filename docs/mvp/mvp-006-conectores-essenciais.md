@@ -1,6 +1,7 @@
 # MVP-006 — Conectores Essenciais
 
 - Status: **desenho aprovado pelo PI em 2026-08-28; SPECs em revisão documental; implementação não autorizada**.
+- GitHub: épico [#86](https://github.com/RodReis/rrb-jarvisOS/issues/86); fatias [#87–#92](https://github.com/RodReis/rrb-jarvisOS/issues/87), estado `proplan:planejado`.
 - Depende de: MVP-005 (Vault, gateway de providers e BudgetPolicy).
 - Não depende de: MVP-007.
 - Dono do aceite de construção: PI.
@@ -50,4 +51,3 @@ As duas trilhas podem ser especificadas em paralelo, mas a implementação mant�
 - Fila, worktree, Claude, PR/CI e merge orquestrados: MVP-009.
 - Tavily `/research`: adiado; duplica síntese e reduz rastreabilidade na V1.
 - Memória híbrida/RAG: MVP-007 proposto.
-

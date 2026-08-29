@@ -1,6 +1,7 @@
 # SPEC-Entrega-04 — Construção e recuperação
 
 - MVP/Fatia: MVP-009 · M9-F04.
+- Issue: [#104](https://github.com/RodReis/rrb-jarvisOS/issues/104).
 - Status: **revisão documental; implementação não autorizada**.
 - Depende de: M9-F03 e adapter Claude Code do MVP-005.
 
@@ -42,4 +43,3 @@ SPEC/hashes aprovados, ContextPack, paths permitidos, comandos de validação, `
 ## Testes e evidência
 
 Adapter fake nas suítes comuns; fixtures de timeout/cancelamento/falha repetida/nova; smoke Claude real limitado. Relatório `SPEC-Entrega-04`.
-

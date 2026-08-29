@@ -56,7 +56,8 @@ describe('migrations', () => {
     // Volta o schema para a v1: desfaz tudo que as migrations posteriores criam e recua o
     // marcador de versão. Cada migration nova precisa ser desfeita aqui — senão a migração
     // tenta recriar um objeto que já existe. A v2 adicionou `theme`; a v3, `allowed_directory`;
-    // a v6, o acento por módulo; a v7, `approval_request`; a v8, `allowed_command`.
+    // a v6, o acento por módulo; a v7, `approval_request`; a v8, `allowed_command`; a v9,
+    // `credential_ref`.
     antigo.exec('ALTER TABLE user_profile DROP COLUMN theme')
     antigo.exec('ALTER TABLE user_profile DROP COLUMN accent_noa')
     antigo.exec('ALTER TABLE user_profile DROP COLUMN accent_jarvis')
@@ -66,6 +67,7 @@ describe('migrations', () => {
     antigo.exec('DROP TABLE execution_run')
     antigo.exec('DROP TABLE approval_request')
     antigo.exec('DROP TABLE allowed_command')
+    antigo.exec('DROP TABLE credential_ref')
     antigo.pragma('user_version = 1')
     antigo.close()
 

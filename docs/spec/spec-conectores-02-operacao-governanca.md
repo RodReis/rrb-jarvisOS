@@ -1,6 +1,7 @@
 # SPEC-Conectores-02 — Operação e governança
 
 - MVP/Fatia: MVP-006 · M6-F02.
+- Issue: [#88](https://github.com/RodReis/rrb-jarvisOS/issues/88).
 - Status: **revisão documental; implementação não autorizada**.
 - Depende de: M6-F01 e MVP-005.
 
@@ -36,4 +37,3 @@ Adicionar ao ponto único de conectores health, timeout, retry, rate limit, cust
 ## Testes e evidência
 
 Fixtures para 401/403/429/timeout/5xx; teste de cancelamento, redaction, circuit breaker e auditoria. Relatório `SPEC-Conectores-02`. Chamadas reais apenas em smoke limitado.
-

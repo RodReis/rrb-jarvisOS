@@ -31,3 +31,17 @@
 1. ~~**BudgetPolicy com BYOK**: estimativa + alerta vs. proxy para bloqueio real.~~ **Resolvida (2026-07-21, PI):** estimativa + alerta com **bloqueio no ponto único de chamada** (adapter recusa novas chamadas ao bater o limite; sem proxy). Registrada no ADR-001 (questão aberta 1). **A BudgetPolicy mora no MVP de providers (Corte 3)**, não no MVP-003 — só há gasto a medir quando os providers existirem.
 2. ~~**Duração da sessão offline**: proposta de 30 dias na SPEC-Fundacao-03 — pendente de aprovação do PI.~~ **Resolvida (2026-07-21, PI): 30 dias** (registrada no ADR-001 §Questões abertas 2; aplicada na SPEC-Fundacao-03).
 3. **Conflitos de sync multi-dispositivo**: last-write-wins vs. merge por entidade. Bloqueia: sync bidirecional (Corte 3+).
+
+## Decisões da pipeline de desenvolvimento (PI, 2026-08-28)
+
+1. A pipeline foi dividida em **MVP-006 Conectores Essenciais**, **MVP-008 Planejamento Governado** e **MVP-009 Entrega Autônoma**. O MVP-007 Memória/RAG não bloqueia os dois últimos.
+2. Cada MVP executável novo possui seis fatias; as SPECs permanecem em revisão documental até aprovação explícita para construção.
+3. O MVP-006 é dono do framework de conectores, GitHub Adapter e ResearchAdapter. Conectores antigos voltam ao backlog sem numeração.
+4. GitHub usa **GitHub App + OAuth Device Flow**, com user/refresh tokens no Vault; não usa `gh` como dependência de runtime nem private key no desktop.
+5. ResearchAdapter V1 usa **Tavily Search + Extract**. `/research` fica adiado. Context7 é obrigatório para documentação técnica suportada.
+6. MVP-008 cria diretório, SQLite e Git local; respostas autosalvam sem commit, e marcos documentais recebem commit automático. Remote/push/issues pertencem ao MVP-009.
+7. O PI anexa obrigatoriamente `DESIGN-SYSTEM.md`, protótipos HTML e assets depois do PRD. A IA analisa e propõe ajustes; não substitui o anexo.
+8. O PI aprova uma vez o pacote estrutural por revisão e aprova cada MVP/fatia antes da construção. A mesma revisão não pede aceite novamente; merge técnico é automático.
+9. MVP-009 usa worktree isolado, WIP=1 e no máximo três tentativas totais. Reinício reconcilia antes de repetir efeito.
+10. Documentação/ADR auxiliar não bloqueia código depois do gate. A pipeline não inventa LGPD, consentimento, aceite duplo, classificação de domínio ou requisito não fornecido pelo PI.
+11. Por solicitação explícita do PI, os épicos e as 18 fatias dos MVPs 006/008/009 foram pré-criados no GitHub em ordem. Fatias com SPEC em revisão usam `proplan:planejado`, ficam fora da fila e não autorizam implementação; ao aprovar, a mesma issue migra para `proplan:backlog`.

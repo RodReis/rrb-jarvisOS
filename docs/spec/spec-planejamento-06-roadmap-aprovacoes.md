@@ -1,6 +1,7 @@
 # SPEC-Planejamento-06 — Roadmap e aprovações
 
 - MVP/Fatia: MVP-008 · M8-F06.
+- Issue: [#99](https://github.com/RodReis/rrb-jarvisOS/issues/99).
 - Status: **revisão documental; implementação não autorizada**.
 - Depende de: M8-F05.
 
@@ -38,4 +39,3 @@ Correção textual, STATUS, evidência e ADR registrando decisão já tomada nã
 ## Testes e evidência
 
 Unitários de DAG, hash e matriz de invalidação; Playwright do centro de aprovações; teste de revisão cosmética/material. Relatório `SPEC-Planejamento-06`.
-

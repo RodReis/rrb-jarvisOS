@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 254 | 254 | 0 | 79.8 | — | — |
-| — | — | — | Banco | 160 | 160 | 0 | 87.6 | — | — |
-| — | — | — | Tela | 226 | 225 | 0 | 91.6 | — | — |
+| — | — | — | Regras de Negócio | 261 | 261 | 0 | 78.8 | — | — |
+| — | — | — | Banco | 183 | 183 | 0 | 88.0 | — | — |
+| — | — | — | Tela | 235 | 234 | 0 | 91.4 | — | — |
 
 ## Histórico por entrega
 
@@ -106,3 +106,9 @@ Append-only — linhas de entregas passadas são imutáveis.
 | — | #75 | spec-execucao-real-02-terminal-controlado | Regras de Negócio | 254 | 254 | 0 | 79.8 | #83 | [#83](https://github.com/RodReis/rrb-jarvisOS/pull/83) |
 | — | #75 | spec-execucao-real-02-terminal-controlado | Banco | 160 | 160 | 0 | 87.6 | #83 | [#83](https://github.com/RodReis/rrb-jarvisOS/pull/83) |
 | — | #75 | spec-execucao-real-02-terminal-controlado | Tela | 226 | 225 | 0 | 91.6 | #83 | [#83](https://github.com/RodReis/rrb-jarvisOS/pull/83) |
+| 2026-08-28 | #77 | spec-providers-01-vault-credenciais | Regras de Negócio | 261 | 261 | 0 | 78.8 | #108 | [#108](https://github.com/RodReis/rrb-jarvisOS/pull/108) |
+| 2026-08-28 | #77 | spec-providers-01-vault-credenciais | Banco | 183 | 182 | 1 | — | #108 | [#108](https://github.com/RodReis/rrb-jarvisOS/pull/108) |
+| 2026-08-28 | #77 | spec-providers-01-vault-credenciais | Tela | 235 | 234 | 0 | 91.4 | #108 | [#108](https://github.com/RodReis/rrb-jarvisOS/pull/108) |
+| 2026-08-28 | #77 | spec-providers-01-vault-credenciais | Regras de Negócio | 261 | 261 | 0 | 78.8 | #108 | [#108](https://github.com/RodReis/rrb-jarvisOS/pull/108) |
+| 2026-08-28 | #77 | spec-providers-01-vault-credenciais | Banco | 183 | 183 | 0 | 88.0 | #108 | [#108](https://github.com/RodReis/rrb-jarvisOS/pull/108) |
+| 2026-08-28 | #77 | spec-providers-01-vault-credenciais | Tela | 235 | 234 | 0 | 91.4 | #108 | [#108](https://github.com/RodReis/rrb-jarvisOS/pull/108) |

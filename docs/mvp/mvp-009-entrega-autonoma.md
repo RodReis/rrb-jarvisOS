@@ -1,6 +1,7 @@
 # MVP-009 — Entrega Autônoma
 
 - Status: **desenho aprovado pelo PI em 2026-08-28; SPECs em revisão documental; implementação não autorizada**.
+- GitHub: épico [#100](https://github.com/RodReis/rrb-jarvisOS/issues/100); fatias [#101–#106](https://github.com/RodReis/rrb-jarvisOS/issues/101), estado `proplan:planejado`.
 - Depende de: MVP-005, MVP-006 e MVP-008 concluídos.
 - Não depende de: MVP-007.
 - Resultado: uma fatia aprovada percorre publicação, construção, PR, CI, merge e prova sem aceite duplicado.
@@ -37,4 +38,3 @@ Executar somente o que foi aprovado, em worktree isolado, com WIP=1, Git automá
 - Estado externo é confirmado antes de declarar sucesso.
 - Evidências, custos e SHAs são registrados.
 - Worktree, leases, containers e portas temporários são reconciliados.
-

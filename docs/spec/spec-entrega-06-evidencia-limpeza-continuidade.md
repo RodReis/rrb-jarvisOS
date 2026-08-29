@@ -1,6 +1,7 @@
 # SPEC-Entrega-06 — Evidência, limpeza e continuidade
 
 - MVP/Fatia: MVP-009 · M9-F06.
+- Issue: [#106](https://github.com/RodReis/rrb-jarvisOS/issues/106).
 - Status: **revisão documental; implementação não autorizada**.
 - Depende de: M9-F05.
 
@@ -37,4 +38,3 @@ Mostrar resultado, custo, evidência e próxima decisão. Detalhes Git/logs fica
 ## Testes e evidência
 
 Playwright do painel, integração de limpeza parcial/reinício e jornada E2E real completa. O smoke real usa projeto/repositório exclusivos e orçamento limitado. Relatório `SPEC-Entrega-06`.
-

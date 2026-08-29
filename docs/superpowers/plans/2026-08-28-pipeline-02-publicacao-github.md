@@ -1,5 +1,7 @@
 # Pipeline 02 — Bootstrap, DAG e publicação GitHub Implementation Plan
 
+> **SUPERSEDED em 2026-08-28 — NÃO EXECUTAR.** Este plano usa GitHub CLI e combina responsabilidades agora separadas. O GitHub Adapter pertence ao MVP-006 e a publicação ao MVP-009. Fontes atuais: `mvp-006-conectores-essenciais.md`, `mvp-009-entrega-autonoma.md` e suas SPECs. Novo plano somente após autorização da fatia.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Transformar um pacote aprovado em repositório local/remoto, DAG persistido e issues GitHub idempotentes, sem iniciar construção.

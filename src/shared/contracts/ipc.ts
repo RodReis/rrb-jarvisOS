@@ -29,6 +29,7 @@ import type {
 } from '../domain/workflows'
 import type { ExecutionRun } from '../domain/execution'
 import type { CommandExecution, CommandSubmission } from '../domain/terminal'
+import type { CredentialKey, CredentialStatusView } from '../domain/credentials'
 import type { ApprovalDecision, ApprovalRequest } from '../domain/execution'
 
 /** Canais de request/response (renderer → main → renderer). */
@@ -111,7 +112,20 @@ export const IPC_CHANNELS = {
   terminalRun: 'terminal:run',
   commandAllowlistList: 'command-allowlist:list',
   commandAllowlistAdd: 'command-allowlist:add',
-  commandAllowlistRemove: 'command-allowlist:remove'
+  commandAllowlistRemove: 'command-allowlist:remove',
+  /**
+   * Vault de credenciais (SPEC-Providers-01, critério 8). **Nenhum destes canais devolve o
+   * valor de uma credencial** — nem existe canal que o peça. O renderer vê `status`, `source`
+   * e o nome do provider; o segredo só é decifrado no main, no instante da chamada ao
+   * provider (F02).
+   *
+   * `set` recebe o valor **de ida** (é o usuário digitando a própria chave no Settings), e a
+   * assimetria é o desenho: entra e nunca volta. O retorno dos três canais é a lista de
+   * status atualizada, para a UI refletir sem novo round-trip.
+   */
+  credentialList: 'credential:list',
+  credentialSet: 'credential:set',
+  credentialRemove: 'credential:remove'
 } as const
 
 /**
@@ -310,6 +324,29 @@ export interface JarvisBridge {
   listAllowedCommands(workspace: WorkspaceId): Promise<readonly string[]>
   addAllowedCommand(binary: string, workspace: WorkspaceId): Promise<readonly string[]>
   removeAllowedCommand(binary: string, workspace: WorkspaceId): Promise<readonly string[]>
+
+  /**
+   * Vault de credenciais (SPEC-Providers-01). **Não há método aqui que devolva o valor de uma
+   * credencial** — e essa ausência é o critério 2, não um esquecimento: o renderer não tem
+   * como pedir o segredo porque a ponte não tem forma de entregá-lo.
+   *
+   * `listCredentials` devolve **todas** as chaves conhecidas, inclusive as ausentes
+   * (`status: missing`) — é o que permite a UI dizer o que falta sem exibir segredo (RF-010).
+   *
+   * `setCredential` recebe o valor de ida: o usuário digita a chave dele no Settings, ela
+   * atravessa a ponte uma vez e é cifrada no main. Escopo por espaço: a mesma chave lógica
+   * tem valores próprios no NOA e no JARVIS.
+   */
+  listCredentials(workspace: WorkspaceId): Promise<readonly CredentialStatusView[]>
+  setCredential(
+    key: CredentialKey,
+    value: string,
+    workspace: WorkspaceId
+  ): Promise<readonly CredentialStatusView[]>
+  removeCredential(
+    key: CredentialKey,
+    workspace: WorkspaceId
+  ): Promise<readonly CredentialStatusView[]>
 }
 
 /** Nome da propriedade exposta via contextBridge no renderer. */

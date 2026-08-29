@@ -1,5 +1,7 @@
 # Pipeline 03 — Contexto, skills e recursos locais Implementation Plan
 
+> **SUPERSEDED em 2026-08-28 — NÃO EXECUTAR.** Contexto/skills/orçamento passaram ao MVP-008 antes da primeira geração; worktree/Docker pertencem ao MVP-009. Fontes atuais: `spec-planejamento-02-contexto-skills-orcamento.md` e `spec-entrega-03-worktree-preflight-docker.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Aplicar orçamento de contexto, aquisição progressiva, resolução de skills por capacidade e leases de Docker/portas antes de ligar a execução autônoma.

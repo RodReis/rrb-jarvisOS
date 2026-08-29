@@ -1,6 +1,7 @@
 # SPEC-Planejamento-03 — Wizard orientado
 
 - MVP/Fatia: MVP-008 · M8-F03.
+- Issue: [#96](https://github.com/RodReis/rrb-jarvisOS/issues/96).
 - Status: **revisão documental; implementação não autorizada**.
 - Depende de: M8-F01 e M8-F02.
 
@@ -40,4 +41,3 @@ Conduzir o PI por uma decisão de cada vez até eliminar lacunas materiais, com 
 ## Testes e evidência
 
 Unitários do grafo de perguntas; Playwright para escolha, delegação, voltar, contradição, autosave e retomada. Relatório `SPEC-Planejamento-03` com vídeo/screenshot apenas quando útil.
-

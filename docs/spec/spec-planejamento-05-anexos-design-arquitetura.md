@@ -1,6 +1,7 @@
 # SPEC-Planejamento-05 — Anexos de design e arquitetura
 
 - MVP/Fatia: MVP-008 · M8-F05.
+- Issue: [#98](https://github.com/RodReis/rrb-jarvisOS/issues/98).
 - Status: **revisão documental; implementação não autorizada**.
 - Depende de: M8-F04.
 
@@ -41,4 +42,3 @@ Verificar links/assets, telas versus PRD, navegação, estados vazio/loading/err
 ## Testes e evidência
 
 Fixtures de anexo ausente, links quebrados e fluxo divergente; parser/servidor local para HTML; Playwright nos protótipos. Relatório `SPEC-Planejamento-05`.
-

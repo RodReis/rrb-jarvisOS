@@ -1,6 +1,7 @@
 # SPEC-Conectores-03 — GitHub App e autenticação
 
 - MVP/Fatia: MVP-006 · M6-F03.
+- Issue: [#89](https://github.com/RodReis/rrb-jarvisOS/issues/89).
 - Status: **revisão documental; implementação não autorizada**.
 - Depende de: M6-F01, M6-F02 e Vault do MVP-005.
 
@@ -40,3 +41,8 @@ A permissão efetiva é limitada simultaneamente pelo usuário, pela organizaç�
 
 Contract fixtures do Device Flow, `authorization_pending`, `slow_down`, expiração e refresh; inspeção de logs; smoke real de autenticação. Relatório `SPEC-Conectores-03`; nenhum token é anexado.
 
+## Referências técnicas verificadas
+
+- [GitHub App Device Flow para CLI/desktop](https://docs.github.com/en/apps/creating-github-apps/writing-code-for-a-github-app/building-a-cli-with-a-github-app)
+- [Refresh de user access tokens](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/refreshing-user-access-tokens)
+- [Permissões exigidas por endpoints REST](https://docs.github.com/en/rest/authentication/permissions-required-for-github-apps)
