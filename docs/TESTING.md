@@ -196,6 +196,29 @@ servidor falso responde instantâneo e consistente; a suíte estava verde e o co
    ganhou um atraso de visibilidade configurável, e um contrafactual confirma que sem a correção o
    teste cai. Sem esse passo, o achado do smoke não vira regressão detectável.
 
+### 3.3 Quando o smoke contradiz a si mesmo, sonde antes de concluir (achado da M6-F06)
+
+O smoke da Tavily afirmou que uma extração de 2 URLs custa 0 créditos. Na execução seguinte, **a
+mesma chamada custou 1**. A tentação é escolher uma das duas medições e seguir; as duas estavam
+certas, e a conclusão a tirar delas era outra.
+
+Sondando o comportamento em vez de repetir o teste — seis chamadas seguidas de **1 URL** — o padrão
+apareceu: `0,0,0,0,1,0`. A Tavily **acumula URLs entre chamadas** e cobra 1 crédito a cada 5 no
+total. Nenhuma fórmula sobre a contagem de uma chamada isolada reproduz isso.
+
+**As lições:**
+
+1. **Medição que varia entre execuções idênticas é informação, não ruído.** O primeiro impulso —
+   "ajustar o teste para aceitar 0 ou 1" — teria escondido o fato. A pergunta certa é *o que muda
+   entre as duas execuções*, e responder exige sondar, não reexecutar.
+2. **Fórmula local sobre estado remoto acumulado é sempre errada, e erra acumulando.** A conclusão
+   de projeto foi remover o cálculo: o adapter usa o número que o serviço informa, e o fallback é
+   zero — inventar um valor poluiria o ledger a cada chamada. Quem protege a cota é o gate, com
+   estimativa **para cima**, antes de a chamada sair.
+3. **O que o smoke afirma tem de ser o que é estável.** O passo final não afirma "custa 0"; afirma
+   que uma extração de 2 URLs cabe em `{0, 1}` — nunca 2, que é o que uma cobrança por URL daria.
+   Um smoke que afirma o instável falha por motivo errado e ensina a ignorá-lo.
+
 ## 4. O relatório: `reports/TESTS.md`
 
 **Local:** `reports/` na raiz — **diretório neutro**. Não vai em `docs/` (um arquivo reescrito a

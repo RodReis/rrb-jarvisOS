@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 495 | 495 | 0 | 64.8 | — | — |
-| — | — | — | Banco | 380 | 380 | 0 | 87.8 | — | — |
-| — | — | — | Tela | 316 | 315 | 0 | 89.2 | — | — |
+| — | — | — | Regras de Negócio | 595 | 595 | 0 | 69.5 | — | — |
+| — | — | — | Banco | 400 | 400 | 0 | 86.5 | — | — |
+| — | — | — | Tela | 325 | 324 | 0 | 87.7 | — | — |
 
 ## Histórico por entrega
 
@@ -145,3 +145,9 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-08-29 | #90 | spec-conectores-04-github-automacao | Regras de Negócio | 495 | 495 | 0 | 64.8 | — | — |
 | 2026-08-29 | #90 | spec-conectores-04-github-automacao | Banco | 380 | 380 | 0 | 87.8 | — | — |
 | 2026-08-29 | #90 | spec-conectores-04-github-automacao | Tela | 316 | 315 | 0 | 89.2 | — | — |
+| — | #91 | spec-conectores-05-tavily-search | Regras de Negócio | 595 | 595 | 0 | 69.5 | — | — |
+| — | #91 | spec-conectores-05-tavily-search | Banco | 400 | 400 | 0 | 86.5 | — | — |
+| — | #91 | spec-conectores-05-tavily-search | Tela | 325 | 324 | 0 | 87.7 | — | — |
+| — | #92 | spec-conectores-06-tavily-extract-evidencias | Regras de Negócio | 595 | 595 | 0 | 69.5 | — | — |
+| — | #92 | spec-conectores-06-tavily-extract-evidencias | Banco | 400 | 400 | 0 | 86.5 | — | — |
+| — | #92 | spec-conectores-06-tavily-extract-evidencias | Tela | 325 | 324 | 0 | 87.7 | — | — |
