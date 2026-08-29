@@ -130,3 +130,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-08-29 | #110 | spec-execucao-real-03-ui-allowlist-diretorios | Regras de Negócio | 276 | 276 | 0 | 75.6 | #114 | [#114](https://github.com/RodReis/rrb-jarvisOS/pull/114) |
 | 2026-08-29 | #110 | spec-execucao-real-03-ui-allowlist-diretorios | Banco | 209 | 209 | 0 | 88.1 | #114 | [#114](https://github.com/RodReis/rrb-jarvisOS/pull/114) |
 | 2026-08-29 | #110 | spec-execucao-real-03-ui-allowlist-diretorios | Tela | 265 | 264 | 0 | 91.5 | #114 | [#114](https://github.com/RodReis/rrb-jarvisOS/pull/114) |
+| 2026-08-29 | #80 | SPEC-Providers-04 | Regras de Negócio | 339 | 339 | 0 | 70.6 | #142 | [#142](https://github.com/RodReis/rrb-jarvisOS/pull/142) |
+| 2026-08-29 | #80 | SPEC-Providers-04 | Banco | 289 | 289 | 0 | 88.5 | #142 | [#142](https://github.com/RodReis/rrb-jarvisOS/pull/142) |
+| 2026-08-29 | #80 | SPEC-Providers-04 | Tela | 301 | 300 | 0 | 90.2 | #142 | [#142](https://github.com/RodReis/rrb-jarvisOS/pull/142) |

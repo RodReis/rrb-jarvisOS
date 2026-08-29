@@ -136,7 +136,15 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'getAppDirectory',
     'getAppInfo',
     'getAuth',
+    // SPEC-Providers-03: leitura do orçamento (limites + acumulado). Não há canal que pergunte
+    // "esta chamada cabe?" — a decisão é do main, dentro do ponto único.
+    'getBudget',
     'getPreferences',
+    // SPEC-Providers-04: providers e roteamento. Enumerados um a um, como todos os anteriores.
+    // **Nenhum** deles seleciona provider: quem escolhe quem atende é o ponto único, no main.
+    'getProviderModels',
+    'getProviderStatus',
+    'getRouting',
     'getWorkspace',
     'listAllowedCommands',
     'listAllowedDirectories',
@@ -167,7 +175,12 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'savePreferences',
     'sendLog',
     'setAutomationEnabled',
+    // SPEC-Providers-03: edição dos limites. O renderer edita; o cálculo e a decisão são do main.
+    'setBudgetLimits',
     'setCredential',
+    // SPEC-Providers-04: troca de modelo ativo e edição de rota.
+    'setProviderModel',
+    'setRoute',
     'setWorkflowStatus',
     'switchWorkspace',
     'updateWorkflow',
