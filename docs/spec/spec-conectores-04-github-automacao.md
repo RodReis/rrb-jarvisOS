@@ -2,7 +2,7 @@
 
 - MVP/Fatia: MVP-006 · M6-F04.
 - Issue: [#90](https://github.com/RodReis/rrb-jarvisOS/issues/90).
-- Status: **aprovada-pi** (2026-08-29) — aprovada sem pergunta estrutural aberta; as decisões do MVP-006 vêm das fatias F01/F03.
+- Status: **entregue** (2026-08-29) — implementada na M6-F04; **aprovada-pi** (2026-08-29) — aprovada sem pergunta estrutural aberta; as decisões do MVP-006 vêm das fatias F01/F03.
 - Depende de: M6-F03.
 
 ## Objetivo
