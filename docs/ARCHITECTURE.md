@@ -103,7 +103,7 @@ A capacidade de desenvolvimento autônomo foi separada em três MVPs executávei
 - A V2 termina no merge do DAG aprovado. Deploy e produção permanecem fora.
 - Fonte completa: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v2-design.md`.
 
-### Pipeline V3 — Release e operação (MVP-014 detalhado; não implementado)
+### Pipeline V3 — Release e operação (MVP-014/015 detalhados; não implementados)
 
 `MVP-014 Release → MVP-015 Observabilidade → MVP-016 Aprendizado operacional → MVP-017 Blueprints → MVP-018 Portfólio`.
 
@@ -122,6 +122,22 @@ Merge ── ReleaseQueue ── ReleaseOrchestrator
 Local, cada Preview, Staging e Produção possuem configurações e bancos separados. Migration é forward-only; compensação automática alcança aplicações, não restaura banco. Produção é automática depois dos gates e não espera fechamento administrativo da issue.
 
 Fonte completa: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v3-design.md` e `docs/mvp/mvp-014-release-deploy-governado.md`.
+
+O MVP-015 adiciona uma camada local-first de leitura, sem assumir autoridade do orquestrador:
+
+```text
+Domínios ── estado + outbox SQLite ── projetores ── eventos/métricas/alertas
+                                                     ▲
+Provedores ── reconciliadores tipados ────────────────┘
+                                                     │
+                                      ObservabilityQueryService
+                                           ├── IPC → Console React
+                                           └── CLI read-only
+```
+
+O main process é o único dono do SQLite. UI e CLI compartilham contratos de consulta; o renderer recebe snapshot e deltas versionados. Logs brutos não são copiados. O observador persiste fatos permitidos por schema, reconcilia GitHub/GHCR/Vercel/Railway/executores, mantém rollups e emite alertas determinísticos. Falha do observador degrada o painel, nunca reverte ou bloqueia a operação canônica.
+
+Fonte completa: `docs/superpowers/specs/2026-08-29-mvp-015-observabilidade-operacional-design.md` e `docs/mvp/mvp-015-observabilidade-operacional.md`.
 
 ### Fontes de verdade
 

@@ -577,3 +577,16 @@ O relatório identifica SPEC, issue, revisão aprovada, run, ambiente, verifica�
 Provas mínimas: mesmo digest/deployment em Staging e Produção; zero segredo persistido; reinício sem duplicação; Preview removido; banco nunca restaurado automaticamente; tag/GitHub Release somente depois de Produção estabilizada; falha de código devolvida à V2 na mesma SPEC.
 
 Smokes externos não rodam na suíte comum. Sua ausência em ambiente sem credencial é `not_run`, nunca “pass”. O relatório registra provider, ambiente, IDs, SHA/digest, duração, custo/quota observada, gates e hash das evidências extensas.
+
+### 11.6 Observabilidade operacional — MVP-015
+
+- **Unitário:** schemas/versionamento, allowlist de payload, idempotência, deduplicação, severidade, resolução, retenção e rollups.
+- **Integração SQLite:** estado + outbox atômicos, crash/replay, migrations, checkpoints e rebuild completo das projeções.
+- **Contrato:** GitHub, GHCR, Vercel, Railway, Codex e executores com sucesso, auth, timeout, rate limit, quota parcial/desconhecida e schema incompatível.
+- **Fault injection:** evento duplicado, atrasado e fora de ordem; clock skew; disco indisponível; processo encerrado; notificação falha e provedor alternando entre saudável/desconhecido.
+- **IPC:** snapshot inicial, deltas versionados, salto de versão, reconexão e paginação por cursor.
+- **Playwright/E2E:** run → PR → Preview → Release → alerta → reconhecimento → resolução → evidência, incluindo teclado/foco e `critical` com notificação nativa simulada.
+- **Carga de referência:** fixture determinística com 100 mil eventos e 10 mil ocorrências; consulta principal `p95 ≤ 500 ms`, console útil em até 2 s e evento interno visível em até 1 s. Ambiente e warm-up são registrados para evitar número sem contexto.
+- **Smoke externo:** opt-in em projetos de prova; nunca Produção e nunca na suíte comum.
+
+Provas mínimas: domínio continua apesar de projetor indisponível; replay não duplica; evento atrasado não regride estado atual; payload proibido é rejeitado antes de persistir; `quota_unknown` não vira percentual; UI e CLI retornam a mesma projeção; compactação preserva marcos, alertas abertos, auditoria e evidência.

@@ -1,7 +1,7 @@
 # Design — Pipeline V3: release, operação e aprendizado
 
-- Status: **direção da V3, arquitetura e cinco SPECs do MVP-014 aprovadas pelo PI** em 2026-08-29.
-- Escopo deste documento: fronteira da Pipeline V3 e design detalhado do MVP-014.
+- Status: **direção da V3, MVP-014 e design/decomposição do MVP-015 aprovados pelo PI** em 2026-08-29.
+- Escopo deste documento: fronteira da Pipeline V3 e design detalhado do MVP-014. O MVP-015 possui design complementar próprio.
 - Implementação: **não autorizada por este documento**. Cada SPEC continua sujeita ao aceite pré-construção do PI.
 - Predecessora: `2026-08-29-pipeline-desenvolvimento-ia-v2-design.md`.
 
@@ -21,7 +21,7 @@ Produção é automática depois do merge e dos gates técnicos. Não existe um 
 4. **MVP-017 — Biblioteca de Blueprints.** Padrões de PRD, arquitetura, SPEC, DESIGN-SYSTEM, protótipos e perguntas orientadas com “Decide por mim”.
 5. **MVP-018 — Gestão de Portfólio.** Vários projetos, fila global, prioridade do PI, custo/quota por projeto e prontidão de planejamento.
 
-Somente o MVP-014 está detalhado neste documento. MVP-015 a MVP-018 têm direção aprovada, mas ainda não possuem fatias nem SPECs executáveis.
+O MVP-014 está detalhado neste documento. O MVP-015 possui design aprovado e seis fatias ainda sem SPEC executável em `2026-08-29-mvp-015-observabilidade-operacional-design.md`. MVP-016 a MVP-018 mantêm somente direção aprovada.
 
 ## 3. Decisões do PI para o MVP-014
 
@@ -226,6 +226,6 @@ Uma fatia mergeada percorre Preview, Staging e Produção sem novo aceite, usa o
 
 ## 17. Gates e autorização
 
-Este design autoriza redigir as cinco SPECs do MVP-014 e continuar a especificação do MVP-015. Não autoriza implementação, criação de issues, gasto novo, push ou PR. Cada SPEC precisa de aceite pré-construção do PI antes de entrar no backlog executável.
+Este design autoriza as cinco SPECs do MVP-014 e remete o MVP-015 ao seu design complementar aprovado. Não autoriza implementação, criação de issues, gasto novo, push ou PR. Cada SPEC precisa de aceite pré-construção do PI antes de entrar no backlog executável.
 
 Não resta questão estrutural aberta para o design do MVP-014. Nomes exatos de tipos, schemas IPC, migrations locais e divisão interna de arquivos pertencem às SPECs e não podem alterar os contratos acima.

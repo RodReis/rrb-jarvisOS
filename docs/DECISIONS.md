@@ -59,4 +59,10 @@
 9. Estabilização padrão é cinco minutos. Somente depois nascem tag, GitHub Release e changelog.
 10. Falha de código retorna à V2 em nova branch/PR ligada à mesma SPEC, sem alteração direta de Produção e sem novo aceite quando o escopo não muda.
 11. Fechamento de issue é administrativo; não bloqueia deploy nem constitui aceite de produto adicional.
-12. MVP-015–MVP-018 têm direção aprovada, mas permanecem sem fatias/SPECs até planejamento ativo.
+12. O MVP-015 é local-first, sem SaaS novo: outbox transacional, projeções reconstruíveis e reconciliação estruturada alimentam UI/CLI pelo mesmo serviço.
+13. Observabilidade emite sinais/alertas, mas não cria gates nem executa retry de run, deploy, rollback ou compensação. Falha do observador não bloqueia a pipeline.
+14. Alertas usam fingerprint e ciclo `open → acknowledged → resolved`; central interna é canônica e Windows notifica somente novo `critical` em segundo plano.
+15. Custos/quotas projetam o ledger existente e declaram qualidade da origem; scraping/OCR de tela e valor inventado são proibidos.
+16. Marcos duráveis permanecem; amostras frequentes compactam após 30 dias em rollups diários permanentes.
+17. O console aprovado é por projeto e read-mostly. Visão cruzada/portfólio pertence ao MVP-018.
+18. O MVP-015 foi decomposto em seis fatias aprovadas, ainda sem SPECs executáveis ou issues. MVP-016–MVP-018 mantêm somente direção aprovada.

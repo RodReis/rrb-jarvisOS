@@ -137,3 +137,22 @@ Invariantes:
 8. Merge e gates promovem Produção automaticamente; fechamento da issue é administrativo e não cria aceite duplo.
 9. Falha de código retorna à V2 em branch/PR da mesma SPEC; agente nunca edita Produção diretamente.
 10. Documento ou evidência incompleta gera reparo, não rollback de aplicação saudável.
+
+### 4.3 Contratos de observabilidade operacional da Pipeline V3
+
+Entidades: `OutboxEvent`, `OperationalEvent`, `ProviderObservation`, `ProviderHealthSnapshot`, `UsageSnapshot`, `Alert`, `AlertOccurrence`, `NotificationDelivery`, `DailyRollup`, `ReconciliationCursor` e `ProjectionCheckpoint`.
+
+Invariantes:
+
+1. Estado canônico e `OutboxEvent` nascem na mesma transação; projetores são assíncronos, idempotentes e reconstruíveis.
+2. `OperationalEvent`, log e `AuditEvent` permanecem separados; um nunca substitui outro.
+3. Evento atrasado completa histórico, mas não sobrescreve observação externa mais nova.
+4. Payload usa allowlist antes da persistência. Credencial, ambiente, prompt/resposta, arquivo, diff e stdout/stderr brutos são proibidos.
+5. Quota/custo registra fonte `authoritative | reported | estimated | unknown`; janelas incompatíveis não são somadas e USD não é inventado.
+6. Alertas não possuem autoridade de gate. Somente política aprovada no domínio proprietário bloqueia ou compensa.
+7. Mesmo fingerprint atualiza/reabre o alerta e preserva ocorrências; reconhecimento não significa resolução.
+8. Main process é o único dono do SQLite; UI e CLI usam `ObservabilityQueryService`.
+9. Falha do observador degrada a projeção e agenda recuperação; não reverte nem bloqueia a pipeline canônica.
+10. Marcos duráveis e alertas permanecem; amostras frequentes compactam após 30 dias somente depois do rollup.
+11. Console é read-mostly. Run, deploy, rollback, compensação e política continuam nos runtimes proprietários.
+12. A UI da M15-F05 depende de `DESIGN-SYSTEM.md` e protótipos HTML formais aprovados antes da construção.
