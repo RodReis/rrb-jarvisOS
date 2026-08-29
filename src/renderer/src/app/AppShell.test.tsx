@@ -40,6 +40,17 @@ const listAllowedDirectories = vi.fn(() => Promise.resolve([]))
 const getAppDirectory = vi.fn(() => Promise.resolve('/app/userData'))
 const pickAllowedDirectory = vi.fn(() => Promise.resolve([]))
 const removeAllowedDirectory = vi.fn(() => Promise.resolve([]))
+// SPEC-Conectores-03: o painel do GitHub consulta o estado da conexão ao montar. Sem ele o
+// Settings dos testes exercitaria um painel em estado de erro — a mesma armadilha que a M5-F04
+// registrou, e a razão de o mock ser conferido inteiro e não só no que a suíte afirma.
+const getGithubAuthStatus = vi.fn(() =>
+  Promise.resolve({ estado: 'missing' as const, renovavel: false, clientIdConfigurado: true })
+)
+const startGithubAuth = vi.fn()
+const awaitGithubAuth = vi.fn()
+const cancelGithubAuth = vi.fn()
+const logoutGithub = vi.fn()
+const setGithubClientId = vi.fn()
 
 /**
  * Perfil da sessão usada nestes testes. O `App` só monta o AppShell quando a auth está
@@ -97,6 +108,12 @@ function mockarPonte(): void {
       getAppDirectory,
       pickAllowedDirectory,
       removeAllowedDirectory,
+      getGithubAuthStatus,
+      startGithubAuth,
+      awaitGithubAuth,
+      cancelGithubAuth,
+      logoutGithub,
+      setGithubClientId,
       // Devolve a função de cancelamento, como a ponte real: sem isso o `useEffect`
       // tentaria chamar `undefined` na desmontagem e o cleanup estouraria.
       onAuthChanged: vi.fn(() => () => undefined)

@@ -132,6 +132,40 @@ export class UserProfileRepository {
 
     return row ? toProfile(row) : undefined
   }
+
+  /**
+   * O override do `client_id` da GitHub App (SPEC-Conectores-03, critério 7).
+   *
+   * Métodos próprios e **fora de `UserPreferences`**: aquele tipo é o contrato de idioma, tema e
+   * acento — o que a tela de aparência edita e o que o `PreferencesSnapshot` leva ao renderer a
+   * cada boot. Um `client_id` ali viajaria junto de toda leitura de preferência e apareceria em
+   * `savePreferences` como se fosse escolha de interface. São dois assuntos; a coluna é a mesma
+   * tabela, o contrato não precisa ser.
+   *
+   * `undefined` = usar o `client_id` embutido. Texto vazio é normalizado para `NULL` na escrita:
+   * limpar o campo na tela é *voltar ao embutido*, não configurar um identificador em branco.
+   */
+  findGithubClientId(userId: string): string | undefined {
+    const row = this.db
+      .prepare('SELECT github_client_id FROM user_profile WHERE id = ?')
+      .get(userId) as { github_client_id: string | null } | undefined
+
+    return row?.github_client_id ?? undefined
+  }
+
+  saveGithubClientId(userId: string, clientId: string | undefined): void {
+    const normalizado = clientId?.trim()
+
+    this.db
+      .prepare('UPDATE user_profile SET github_client_id = ? WHERE id = ?')
+      .run(normalizado === undefined || normalizado === '' ? null : normalizado, userId)
+
+    // O valor não é segredo, mas também não precisa estar no log: o fato de ter mudado basta.
+    log.db.info('Override do client ID do GitHub gravado', {
+      op: 'update',
+      table: 'user_profile'
+    })
+  }
 }
 
 export class SessionRepository {

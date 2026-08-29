@@ -395,6 +395,52 @@ const MIGRATIONS: readonly string[] = [
   );
   CREATE INDEX idx_credit_event_escopo
     ON credit_event(user_id, workspace_id, connector, created_at);
+  `,
+
+  // 13 — `expires_at` no vault: a emenda do OAuth (SPEC-Conectores-03, critério 8).
+  //
+  // A M5-F01 guardava **um valor** por chave, e a SPEC-Providers-01 declarava rotação como
+  // "futuro". O Device Flow traz o futuro: access token, refresh token e prazo, que só fazem
+  // sentido juntos. O material secreto continua numa coluna só — cifrado como **payload
+  // estruturado** —, e o que esta migration acrescenta é o único pedaço que precisa ser lido
+  // **sem decifrar**.
+  //
+  // Por que `expires_at` fora da cifra, e por que isso não afrouxa nada: a decisão "preciso
+  // renovar antes de usar?" é tomada muitas vezes, e tomá-la exigindo o DPAPI faria toda
+  // consulta de estado (a tela de Configurações, inclusive) destravar o segredo para ler um
+  // relógio. O prazo **não é segredo** — dizer "este token vence dia 3" não ajuda ninguém a
+  // usá-lo. O segredo continua inteiro dentro do BLOB.
+  //
+  // NULLable porque a maioria das credenciais não expira: chave de API de provider de IA
+  // (M5-F01) não tem prazo, e a GitHub App só emite expiração quando a configuração dela liga
+  // expiração de user token. NULL diz "não expira"; uma data inventada diria que expira.
+  //
+  // `ALTER TABLE ADD COLUMN` e não recriação: a tabela pode já ter credenciais gravadas, e
+  // recriá-la exigiria copiar segredo cifrado entre tabelas — mais chances de perder material
+  // que o dono não consegue reemitir. Coluna nova entra vazia e as linhas antigas seguem
+  // válidas, que é o comportamento correto (elas de fato não expiram).
+  `
+  ALTER TABLE credential_ref ADD COLUMN expires_at TEXT;
+  `,
+
+  // 14 — override do `client_id` da GitHub App (SPEC-Conectores-03, critério 7).
+  //
+  // **Fora do vault, e essa é a decisão que importa.** O `client_id` de uma GitHub App é público
+  // por desenho no Device Flow — é ele que vai na URL que o usuário abre no navegador. Guardá-lo
+  // cifrado o faria aparecer na tela de credenciais como se fosse segredo, anunciando um risco
+  // que não existe e ensinando o usuário a tratar como sigiloso algo que ele vai colar de uma
+  // página pública. O que **nunca** entra em lugar nenhum é private key ou client secret.
+  //
+  // Em `user_profile` e não numa tabela de config nova (decisão do PI, 2026-08-29): é uma coluna
+  // para um campo, do mesmo jeito que `theme` e `accent_*` entraram, e uma tabela `connector_config`
+  // com uma linha por usuário seria a estrutura de amanhã pagando o custo hoje. Quando a M6-F05
+  // trouxer configuração de conector de verdade, a tabela nasce com o que ela precisa.
+  //
+  // Por usuário e não por espaço: a GitHub App pertence a quem autentica, e o NOA — onde a
+  // credencial simplesmente aparece `missing` (spec § decisões cravadas) — não teria por que ter
+  // um `client_id` diferente do JARVIS OS. NULL = usar o embutido.
+  `
+  ALTER TABLE user_profile ADD COLUMN github_client_id TEXT;
   `
 ]
 

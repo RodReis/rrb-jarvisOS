@@ -29,10 +29,12 @@ import type { AiCallHandle, AiProvider, AiRequest, AiStreamEvent } from '@shared
 import type { ProviderRoute, ProviderStatus, RoutingPolicy } from '@shared/domain/routing'
 import type {
   ConnectorCapability,
+  ConnectorError,
   ConnectorId,
   ConnectorOutcome,
   ConnectorRequest
 } from '@shared/domain/connectors'
+import type { GithubAuthSnapshot, GithubDeviceFlowView } from '@shared/domain/github-auth'
 import type { CredentialKey, CredentialStatusView } from '@shared/domain/credentials'
 import type { BudgetLimitsInput, BudgetSnapshot } from '@shared/domain/budget'
 import type {
@@ -204,7 +206,21 @@ const bridge: JarvisBridge = {
     limites: ConnectorCreditLimitsInput,
     workspace: WorkspaceId
   ): Promise<ConnectorCreditView> =>
-    ipcRenderer.invoke(IPC_CHANNELS.connectorCreditsSetLimits, connector, limites, workspace)
+    ipcRenderer.invoke(IPC_CHANNELS.connectorCreditsSetLimits, connector, limites, workspace),
+  // GitHub por Device Flow (SPEC-Conectores-03). **Nenhuma destas funções devolve token** — não
+  // existe `getGithubToken` na ponte, e é essa ausência que garante o critério 2.
+  getGithubAuthStatus: (workspace: WorkspaceId): Promise<GithubAuthSnapshot> =>
+    ipcRenderer.invoke(IPC_CHANNELS.githubAuthStatus, workspace),
+  startGithubAuth: (workspace: WorkspaceId): Promise<GithubDeviceFlowView | ConnectorError> =>
+    ipcRenderer.invoke(IPC_CHANNELS.githubAuthStart, workspace),
+  awaitGithubAuth: (workspace: WorkspaceId): Promise<GithubAuthSnapshot | ConnectorError> =>
+    ipcRenderer.invoke(IPC_CHANNELS.githubAuthAwait, workspace),
+  cancelGithubAuth: (workspace: WorkspaceId): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.githubAuthCancel, workspace),
+  logoutGithub: (workspace: WorkspaceId): Promise<GithubAuthSnapshot> =>
+    ipcRenderer.invoke(IPC_CHANNELS.githubAuthLogout, workspace),
+  setGithubClientId: (clientId: string, workspace: WorkspaceId): Promise<GithubAuthSnapshot> =>
+    ipcRenderer.invoke(IPC_CHANNELS.githubSetClientId, clientId, workspace)
 }
 
 if (process.contextIsolated) {
