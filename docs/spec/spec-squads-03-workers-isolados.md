@@ -1,6 +1,7 @@
 # SPEC-Squads-03 — Workers isolados
 
 - MVP: `docs/mvp/mvp-011-squads-limitados.md` (Fatia 03).
+- Issue: [#124](https://github.com/RodReis/rrb-jarvisOS/issues/124); épico [#121](https://github.com/RodReis/rrb-jarvisOS/issues/121).
 - Status: **aprovada-pi** (2026-08-29) — entra no backlog na ordem do MVP; implementação depende da fila.
 - Depende de: F02 aprovada e entregue.
 

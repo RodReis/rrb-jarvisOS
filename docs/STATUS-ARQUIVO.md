@@ -92,6 +92,14 @@ As SPECs preservam os contratos já decididos: um writer por fatia; Git/GitHub n
 
 Em 2026-08-29, o PI aprovou as vinte revisões exatas. Os estados passaram para `aprovada-pi` e foi autorizada a criação dos quatro épicos e vinte sub-issues na ordem de implementação. A aprovação adiciona backlog futuro; não move nenhuma fatia da V2 para `proplan:next` e não substitui a fila já registrada.
 
+### Publicação das issues da Pipeline V2 (2026-08-29)
+
+Os quatro épicos e vinte fatias foram publicados sem lacuna numérica dentro de cada grupo: MVP-010 [#115](https://github.com/RodReis/rrb-jarvisOS/issues/115), fatias #116–#120; MVP-011 [#121](https://github.com/RodReis/rrb-jarvisOS/issues/121), fatias #122–#126; MVP-012 [#127](https://github.com/RodReis/rrb-jarvisOS/issues/127), fatias #128–#132; MVP-013 [#133](https://github.com/RodReis/rrb-jarvisOS/issues/133), fatias #134–#138.
+
+Cada fatia recebeu `proplan:backlog`, parent nativo e um `blocked by` que preserva a ordem aprovada. Cada épico recebeu `proplan:mvp` e depende do épico anterior; a primeira fatia de cada MVP também aponta para o épico anterior, repetindo o padrão dos MVPs 008/009. A relação remota organiza o backlog, mas não altera o contrato da Pipeline V2: merge confirmado satisfaz dependência técnica mesmo enquanto a issue aguarda fechamento/aceite do PI.
+
+A reconciliação pós-criação consultou as 24 issues diretamente no GitHub e confirmou zero erros de label, parent, estado ou dependência. Nenhuma issue foi marcada `proplan:next` e nenhuma implementação foi iniciada.
+
 ## Pendências históricas preservadas
 
 - A UI de allowlist ainda exigia decisão de produto: localização, seletor nativo e remoção de `appDir`.

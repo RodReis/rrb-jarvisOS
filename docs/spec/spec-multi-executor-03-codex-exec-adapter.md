@@ -1,6 +1,7 @@
 # SPEC-Multi-Executor-03 — Codex Exec Adapter
 
 - MVP: `docs/mvp/mvp-010-multi-executor.md` (Fatia 03).
+- Issue: [#118](https://github.com/RodReis/rrb-jarvisOS/issues/118); épico [#115](https://github.com/RodReis/rrb-jarvisOS/issues/115).
 - Status: **aprovada-pi** (2026-08-29) — entra no backlog na ordem do MVP; implementação depende da fila.
 - Depende de: F02 aprovada e entregue.
 

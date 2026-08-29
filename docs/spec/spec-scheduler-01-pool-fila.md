@@ -1,6 +1,7 @@
 # SPEC-Scheduler-01 — Pool global e fila justa
 
 - MVP: `docs/mvp/mvp-012-scheduler-concorrente.md` (Fatia 01).
+- Issue: [#128](https://github.com/RodReis/rrb-jarvisOS/issues/128); épico [#127](https://github.com/RodReis/rrb-jarvisOS/issues/127).
 - Status: **aprovada-pi** (2026-08-29) — entra no backlog na ordem do MVP; implementação depende da fila.
 - Depende de: MVP-011 concluído.
 

@@ -1,6 +1,7 @@
 # SPEC-Scheduler-05 — Recuperação e E2E concorrente
 
 - MVP: `docs/mvp/mvp-012-scheduler-concorrente.md` (Fatia 05) — **fecha o MVP-012**.
+- Issue: [#132](https://github.com/RodReis/rrb-jarvisOS/issues/132); épico [#127](https://github.com/RodReis/rrb-jarvisOS/issues/127).
 - Status: **aprovada-pi** (2026-08-29) — entra no backlog na ordem do MVP; implementação depende da fila.
 - Depende de: F04 aprovada e entregue.
 

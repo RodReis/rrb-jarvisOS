@@ -1,6 +1,7 @@
 # SPEC-Contínuo-01 — Inventário e DAG global
 
 - MVP: `docs/mvp/mvp-013-execucao-continua.md` (Fatia 01).
+- Issue: [#134](https://github.com/RodReis/rrb-jarvisOS/issues/134); épico [#133](https://github.com/RodReis/rrb-jarvisOS/issues/133).
 - Status: **aprovada-pi** (2026-08-29) — entra no backlog na ordem do MVP; implementação depende da fila.
 - Depende de: MVP-012 concluído.
 

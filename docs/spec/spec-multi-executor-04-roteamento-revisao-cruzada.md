@@ -1,6 +1,7 @@
 # SPEC-Multi-Executor-04 — Roteamento, fallback e revisão cruzada
 
 - MVP: `docs/mvp/mvp-010-multi-executor.md` (Fatia 04).
+- Issue: [#119](https://github.com/RodReis/rrb-jarvisOS/issues/119); épico [#115](https://github.com/RodReis/rrb-jarvisOS/issues/115).
 - Status: **aprovada-pi** (2026-08-29) — entra no backlog na ordem do MVP; implementação depende da fila.
 - Depende de: F03 aprovada e entregue.
 

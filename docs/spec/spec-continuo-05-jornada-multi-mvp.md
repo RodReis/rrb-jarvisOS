@@ -1,6 +1,7 @@
 # SPEC-Contínuo-05 — Jornada multi-MVP
 
 - MVP: `docs/mvp/mvp-013-execucao-continua.md` (Fatia 05) — **fecha o MVP-013 e a Pipeline V2**.
+- Issue: [#138](https://github.com/RodReis/rrb-jarvisOS/issues/138); épico [#133](https://github.com/RodReis/rrb-jarvisOS/issues/133).
 - Status: **aprovada-pi** (2026-08-29) — entra no backlog na ordem do MVP; implementação depende da fila.
 - Depende de: F04 aprovada e entregue.
 

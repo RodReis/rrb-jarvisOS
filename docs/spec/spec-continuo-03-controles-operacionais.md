@@ -1,6 +1,7 @@
 # SPEC-Contínuo-03 — Controles operacionais
 
 - MVP: `docs/mvp/mvp-013-execucao-continua.md` (Fatia 03).
+- Issue: [#136](https://github.com/RodReis/rrb-jarvisOS/issues/136); épico [#133](https://github.com/RodReis/rrb-jarvisOS/issues/133).
 - Status: **aprovada-pi** (2026-08-29) — entra no backlog na ordem do MVP; implementação depende da fila.
 - Depende de: F02 aprovada e entregue.
 

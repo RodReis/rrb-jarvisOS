@@ -12,7 +12,10 @@ Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do
 | Backlog | [#87–#92](https://github.com/RodReis/rrb-jarvisOS/issues/87) · MVP-006 | seis SPECs `aprovada-pi` (2026-08-29); atrás de #79/#80 na fila |
 | Backlog | [#94–#99](https://github.com/RodReis/rrb-jarvisOS/issues/94) · MVP-008 | seis SPECs `aprovada-pi` (2026-08-29); atrás do MVP-006 na fila |
 | Backlog | [#101–#106](https://github.com/RodReis/rrb-jarvisOS/issues/101) · MVP-009 | seis SPECs `aprovada-pi` (2026-08-29); fim da fila |
-| Planejamento | Pipeline V2 · MVP-010–013 | arquitetura e 20 SPECs `aprovada-pi` (2026-08-29); publicação das issues pendente |
+| Backlog | [#116–#120](https://github.com/RodReis/rrb-jarvisOS/issues/116) · MVP-010 | cinco SPECs `aprovada-pi`; depois do MVP-009 |
+| Backlog | [#122–#126](https://github.com/RodReis/rrb-jarvisOS/issues/122) · MVP-011 | cinco SPECs `aprovada-pi`; depois do MVP-010 |
+| Backlog | [#128–#132](https://github.com/RodReis/rrb-jarvisOS/issues/128) · MVP-012 | cinco SPECs `aprovada-pi`; depois do MVP-011 |
+| Backlog | [#134–#138](https://github.com/RodReis/rrb-jarvisOS/issues/134) · MVP-013 | cinco SPECs `aprovada-pi`; depois do MVP-012 |
 | Done | [#75](https://github.com/RodReis/rrb-jarvisOS/issues/75) · MVP-004 F02 Terminal | PR [#83](https://github.com/RodReis/rrb-jarvisOS/pull/83), aguardando aceite |
 | Done | [#77](https://github.com/RodReis/rrb-jarvisOS/issues/77) · MVP-005 F01 Vault | PR [#108](https://github.com/RodReis/rrb-jarvisOS/pull/108), aguardando aceite |
 | Done | [#107](https://github.com/RodReis/rrb-jarvisOS/issues/107) · `[FIX]` overlays em portal sem tokens | PR [#109](https://github.com/RodReis/rrb-jarvisOS/pull/109), aguardando aceite |
@@ -45,16 +48,16 @@ Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do
 | MVP-007 Memória Contextual/RAG | — | slot proposto; **sem fatias e sem SPEC** — nada a aprovar até entrar em planejamento ativo | — |
 | MVP-008 Planejamento Governado | [#93](https://github.com/RodReis/rrb-jarvisOS/issues/93) | seis SPECs `aprovada-pi` (2026-08-29); fatias no Backlog | 0/6 |
 | MVP-009 Entrega Autônoma | [#100](https://github.com/RodReis/rrb-jarvisOS/issues/100) | seis SPECs `aprovada-pi` (2026-08-29); fatias no Backlog | 0/6 |
-| MVP-010 Multi-executor Claude + Codex | — | cinco SPECs `aprovada-pi` (2026-08-29); publicação das issues pendente | 0/5 |
-| MVP-011 Squads limitados | — | cinco SPECs `aprovada-pi` (2026-08-29); publicação das issues pendente | 0/5 |
-| MVP-012 Scheduler concorrente | — | cinco SPECs `aprovada-pi` (2026-08-29); publicação das issues pendente | 0/5 |
-| MVP-013 Execução contínua | — | cinco SPECs `aprovada-pi` (2026-08-29); publicação das issues pendente | 0/5 |
+| MVP-010 Multi-executor Claude + Codex | [#115](https://github.com/RodReis/rrb-jarvisOS/issues/115) | fatias [#116–#120](https://github.com/RodReis/rrb-jarvisOS/issues/116) no Backlog | 0/5 |
+| MVP-011 Squads limitados | [#121](https://github.com/RodReis/rrb-jarvisOS/issues/121) | fatias [#122–#126](https://github.com/RodReis/rrb-jarvisOS/issues/122) no Backlog | 0/5 |
+| MVP-012 Scheduler concorrente | [#127](https://github.com/RodReis/rrb-jarvisOS/issues/127) | fatias [#128–#132](https://github.com/RodReis/rrb-jarvisOS/issues/128) no Backlog | 0/5 |
+| MVP-013 Execução contínua | [#133](https://github.com/RodReis/rrb-jarvisOS/issues/133) | fatias [#134–#138](https://github.com/RodReis/rrb-jarvisOS/issues/134) no Backlog | 0/5 |
 
 > **MVP-006 aprovado (2026-08-29).** As seis SPECs passaram pelo gate de perguntas abertas e viraram `aprovada-pi`. Sete decisões do PI: runtime de conectores **separado** do ponto único de IA do MVP-005; **ledger de créditos próprio** para conector, independente da `BudgetPolicy` em USD; **GitHub App do projeto** com `client_id` embutido e override em Settings; **emenda do Vault para OAuth** (payload estruturado, `expires_at`, rotação atômica) como escopo da M6-F03, sem reabrir a M5-F01; **roteamento Context7↔Tavily removido** da M6-F05 e transferido ao MVP-008; **UI mínima dentro de cada fatia**, sem fatia dedicada; **evidência extensa no diretório de artefatos do app**. A aprovação **não muda a fila** — a cabeça continua sendo a M5-F02 (#78).
 
 > **MVP-008 aprovado (2026-08-29).** Seis decisões do PI: projeto nasce **sob `userData`** e criar projeto nunca amplia a allowlist; **Git é o `git` do sistema pelo terminal controlado do MVP-004**, sem segundo caminho de escrita fora do enforcement; **importar o próprio `rrb-jarvisOS`** é critério de aceite; a **rota de assinatura (Claude MAX via Claude Code) registra uso sem valor monetário** e a `BudgetPolicy` gateia só rota paga; o app **não chama Context7** — ele é do agente construtor no MVP-009; **anexos de design entram por seletor que copia e hasheia no ato**. Duas dependências duras ficaram registradas: a M8-F01 depende da M4-F02 (#75) e fica limitada ao diretório do app até existir a fatia de UI da allowlist. Emendas em `spec-providers-03` e `spec-providers-04`: rota de assinatura é `subscription_limited`. **A fila não mudou** — a cabeça continua sendo a M5-F02 (#78).
 
-> **Pipeline V2 aprovada (2026-08-29).** Arquitetura, quatro MVPs e vinte SPECs receberam `aprovada-pi`; o PI autorizou publicar todas as issues em ordem de implementação. A aprovação coloca as fatias no backlog, sem furar a fila corrente. A V2 termina no merge do DAG aprovado; deploy permanece fora. Fonte: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v2-design.md`.
+> **Pipeline V2 aprovada e publicada (2026-08-29).** Arquitetura, quatro MVPs e vinte SPECs receberam `aprovada-pi`. Épicos #115/#121/#127/#133 e fatias #116–#120/#122–#126/#128–#132/#134–#138 foram criados com parents e bloqueios nativos na ordem de implementação. Isso adiciona backlog futuro sem furar a fila corrente. A V2 termina no merge do DAG aprovado; deploy permanece fora. Fonte: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v2-design.md`.
 
 > **MVP-009 aprovado (2026-08-29).** Três decisões do PI: **o container Docker é o sandbox do executor** — o Claude Code roda nele com o worktree montado, nunca no host; **merge autônomo ligado por padrão com kill-switch por projeto**, e desligado o run termina no PR verde aguardando o PI; **Context7 é ferramenta do agente construtor** na M9-F04, fechando a pendência herdada do MVP-008. A decisão do container fecha um buraco real: o MVP-004 proibiu comando arbitrário, mas um agente que constrói software precisa exatamente disso — sem fronteira nova, o MVP-009 passaria por cima do enforcement que o MVP-004 entregou. **Docker passa a ser dependência dura**, sem fallback para o host.
 
@@ -92,26 +95,26 @@ Não existe catálogo global `SPEC-nnn`. O identificador canônico é o slug aba
 | M9-F04 | MVP-009 | Construção/recuperação | `spec-entrega-04-construcao-recuperacao.md` |
 | M9-F05 | MVP-009 | Revisão/CI/merge | `spec-entrega-05-revisao-ci-merge.md` |
 | M9-F06 | MVP-009 | Evidência/limpeza | `spec-entrega-06-evidencia-limpeza-continuidade.md` |
-| M10-F01 | MVP-010 | Runtime de executores | `spec-multi-executor-01-runtime.md` |
-| M10-F02 | MVP-010 | Autenticação Codex | `spec-multi-executor-02-autenticacao-codex.md` |
-| M10-F03 | MVP-010 | Codex Exec Adapter | `spec-multi-executor-03-codex-exec-adapter.md` |
-| M10-F04 | MVP-010 | Roteamento e revisão cruzada | `spec-multi-executor-04-roteamento-revisao-cruzada.md` |
-| M10-F05 | MVP-010 | UI e prova operacional | `spec-multi-executor-05-ui-prova-operacional.md` |
-| M11-F01 | MVP-011 | Capacidades e perfis | `spec-squads-01-capacidades-perfis.md` |
-| M11-F02 | MVP-011 | Planejador e validador | `spec-squads-02-planejador-validador.md` |
-| M11-F03 | MVP-011 | Workers isolados | `spec-squads-03-workers-isolados.md` |
-| M11-F04 | MVP-011 | Revisão independente | `spec-squads-04-revisao-independente.md` |
-| M11-F05 | MVP-011 | Orçamento, cancelamento e E2E | `spec-squads-05-orcamento-cancelamento-e2e.md` |
-| M12-F01 | MVP-012 | Pool global e fila | `spec-scheduler-01-pool-fila.md` |
-| M12-F02 | MVP-012 | Independência e locks | `spec-scheduler-02-independencia-locks.md` |
-| M12-F03 | MVP-012 | Isolamento concorrente | `spec-scheduler-03-isolamento-concorrente.md` |
-| M12-F04 | MVP-012 | Merge serializado | `spec-scheduler-04-merge-serializado.md` |
-| M12-F05 | MVP-012 | Recuperação e E2E | `spec-scheduler-05-recuperacao-e2e.md` |
-| M13-F01 | MVP-013 | Inventário e DAG | `spec-continuo-01-inventario-dag.md` |
-| M13-F02 | MVP-013 | Dispatcher e retomada | `spec-continuo-02-dispatcher-retomada.md` |
-| M13-F03 | MVP-013 | Controles operacionais | `spec-continuo-03-controles-operacionais.md` |
-| M13-F04 | MVP-013 | Projeções e gates | `spec-continuo-04-projecoes-gates.md` |
-| M13-F05 | MVP-013 | Jornada multi-MVP | `spec-continuo-05-jornada-multi-mvp.md` |
+| M10-F01 | MVP-010 | Runtime de executores ([#116](https://github.com/RodReis/rrb-jarvisOS/issues/116)) | `spec-multi-executor-01-runtime.md` |
+| M10-F02 | MVP-010 | Autenticação Codex ([#117](https://github.com/RodReis/rrb-jarvisOS/issues/117)) | `spec-multi-executor-02-autenticacao-codex.md` |
+| M10-F03 | MVP-010 | Codex Exec Adapter ([#118](https://github.com/RodReis/rrb-jarvisOS/issues/118)) | `spec-multi-executor-03-codex-exec-adapter.md` |
+| M10-F04 | MVP-010 | Roteamento e revisão cruzada ([#119](https://github.com/RodReis/rrb-jarvisOS/issues/119)) | `spec-multi-executor-04-roteamento-revisao-cruzada.md` |
+| M10-F05 | MVP-010 | UI e prova operacional ([#120](https://github.com/RodReis/rrb-jarvisOS/issues/120)) | `spec-multi-executor-05-ui-prova-operacional.md` |
+| M11-F01 | MVP-011 | Capacidades e perfis ([#122](https://github.com/RodReis/rrb-jarvisOS/issues/122)) | `spec-squads-01-capacidades-perfis.md` |
+| M11-F02 | MVP-011 | Planejador e validador ([#123](https://github.com/RodReis/rrb-jarvisOS/issues/123)) | `spec-squads-02-planejador-validador.md` |
+| M11-F03 | MVP-011 | Workers isolados ([#124](https://github.com/RodReis/rrb-jarvisOS/issues/124)) | `spec-squads-03-workers-isolados.md` |
+| M11-F04 | MVP-011 | Revisão independente ([#125](https://github.com/RodReis/rrb-jarvisOS/issues/125)) | `spec-squads-04-revisao-independente.md` |
+| M11-F05 | MVP-011 | Orçamento, cancelamento e E2E ([#126](https://github.com/RodReis/rrb-jarvisOS/issues/126)) | `spec-squads-05-orcamento-cancelamento-e2e.md` |
+| M12-F01 | MVP-012 | Pool global e fila ([#128](https://github.com/RodReis/rrb-jarvisOS/issues/128)) | `spec-scheduler-01-pool-fila.md` |
+| M12-F02 | MVP-012 | Independência e locks ([#129](https://github.com/RodReis/rrb-jarvisOS/issues/129)) | `spec-scheduler-02-independencia-locks.md` |
+| M12-F03 | MVP-012 | Isolamento concorrente ([#130](https://github.com/RodReis/rrb-jarvisOS/issues/130)) | `spec-scheduler-03-isolamento-concorrente.md` |
+| M12-F04 | MVP-012 | Merge serializado ([#131](https://github.com/RodReis/rrb-jarvisOS/issues/131)) | `spec-scheduler-04-merge-serializado.md` |
+| M12-F05 | MVP-012 | Recuperação e E2E ([#132](https://github.com/RodReis/rrb-jarvisOS/issues/132)) | `spec-scheduler-05-recuperacao-e2e.md` |
+| M13-F01 | MVP-013 | Inventário e DAG ([#134](https://github.com/RodReis/rrb-jarvisOS/issues/134)) | `spec-continuo-01-inventario-dag.md` |
+| M13-F02 | MVP-013 | Dispatcher e retomada ([#135](https://github.com/RodReis/rrb-jarvisOS/issues/135)) | `spec-continuo-02-dispatcher-retomada.md` |
+| M13-F03 | MVP-013 | Controles operacionais ([#136](https://github.com/RodReis/rrb-jarvisOS/issues/136)) | `spec-continuo-03-controles-operacionais.md` |
+| M13-F04 | MVP-013 | Projeções e gates ([#137](https://github.com/RodReis/rrb-jarvisOS/issues/137)) | `spec-continuo-04-projecoes-gates.md` |
+| M13-F05 | MVP-013 | Jornada multi-MVP ([#138](https://github.com/RodReis/rrb-jarvisOS/issues/138)) | `spec-continuo-05-jornada-multi-mvp.md` |
 
 ## Próximas ações
 
@@ -122,7 +125,7 @@ Não existe catálogo global `SPEC-nnn`. O identificador canônico é o slug aba
 5. MVP-007 será detalhado apenas quando entrar no planejamento ativo — hoje não tem fatia nem SPEC, então não há o que aprovar.
 6. **M4-F03 (UI da allowlist de diretórios) especificada e aprovada (2026-08-29)** — fecha a última fatia conhecida sem SPEC. Desbloqueia uso real do terminal/filesystem pelo app e tira o limite da M8-F01. Não existe mais fatia conhecida sem spec.
 7. **Docker virou dependência dura do MVP-009** (sandbox do executor). Confirmar que a máquina de execução tem Docker antes daquele MVP entrar na fila.
-8. Publicar os quatro épicos e as 20 issues da Pipeline V2 na ordem M10-F01 → M13-F05, com sub-issues e dependências nativas. A publicação não altera o `next` atual.
+8. **Pipeline V2 publicada:** épicos #115/#121/#127/#133 e 20 fatias #116–#138, com os intervalos de épicos excluídos, estão no Backlog com sub-issues e dependências nativas. A publicação não altera o `next` atual.
 
 ## Roadmap
 

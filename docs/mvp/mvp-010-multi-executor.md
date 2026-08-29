@@ -1,6 +1,7 @@
 # MVP-010 — Multi-executor Claude + Codex
 
 - Status: **arquitetura e cinco fatias aprovadas pelo PI** em 2026-08-29; implementação depende da fila.
+- GitHub: épico [#115](https://github.com/RodReis/rrb-jarvisOS/issues/115); fatias [#116–#120](https://github.com/RodReis/rrb-jarvisOS/issues/116), estado `proplan:backlog`.
 - Depende de: MVP-005 e MVP-009 concluídos.
 - Dono do aceite: PI.
 - Design: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v2-design.md`.
@@ -25,7 +26,7 @@ Permitir que a mesma pipeline execute uma fatia com Claude Code ou Codex sem con
 - Claude Code e Codex como implementações independentes;
 - autenticação de assinatura por perfil dedicado;
 - modos `subscription_limited`, `subscription_credits`, `api` e `local`;
-- seleção por projeto/tarefa, fallback reconciliado e revisão por provider diferente;
+- seleção por projeto/tarefa, fallback reconciliado e revisão por executor diferente;
 - prova real limitada em container.
 
 ## Fora

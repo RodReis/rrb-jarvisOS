@@ -1,6 +1,7 @@
 # SPEC-Multi-Executor-01 — Contrato comum e runtime de executores
 
 - MVP: `docs/mvp/mvp-010-multi-executor.md` (Fatia 01).
+- Issue: [#116](https://github.com/RodReis/rrb-jarvisOS/issues/116); épico [#115](https://github.com/RodReis/rrb-jarvisOS/issues/115).
 - Status: **aprovada-pi** (2026-08-29) — entra no backlog na ordem do MVP; implementação depende da fila.
 - Depende de: MVP-009 concluído e `CodingExecutorAdapter` introduzido na V1.
 

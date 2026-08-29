@@ -1,6 +1,7 @@
 # SPEC-Contínuo-02 — Dispatcher e retomada
 
 - MVP: `docs/mvp/mvp-013-execucao-continua.md` (Fatia 02).
+- Issue: [#135](https://github.com/RodReis/rrb-jarvisOS/issues/135); épico [#133](https://github.com/RodReis/rrb-jarvisOS/issues/133).
 - Status: **aprovada-pi** (2026-08-29) — entra no backlog na ordem do MVP; implementação depende da fila.
 - Depende de: F01 aprovada e entregue.
 

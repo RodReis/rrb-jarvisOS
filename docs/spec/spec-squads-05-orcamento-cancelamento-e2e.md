@@ -1,6 +1,7 @@
 # SPEC-Squads-05 — Orçamento, cancelamento e E2E
 
 - MVP: `docs/mvp/mvp-011-squads-limitados.md` (Fatia 05) — **fecha o MVP-011**.
+- Issue: [#126](https://github.com/RodReis/rrb-jarvisOS/issues/126); épico [#121](https://github.com/RodReis/rrb-jarvisOS/issues/121).
 - Status: **aprovada-pi** (2026-08-29) — entra no backlog na ordem do MVP; implementação depende da fila.
 - Depende de: F04 aprovada e entregue.
 

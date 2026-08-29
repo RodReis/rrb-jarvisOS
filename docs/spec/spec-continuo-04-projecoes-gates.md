@@ -1,6 +1,7 @@
 # SPEC-Contínuo-04 — Projeções e próximo gate
 
 - MVP: `docs/mvp/mvp-013-execucao-continua.md` (Fatia 04).
+- Issue: [#137](https://github.com/RodReis/rrb-jarvisOS/issues/137); épico [#133](https://github.com/RodReis/rrb-jarvisOS/issues/133).
 - Status: **aprovada-pi** (2026-08-29) — entra no backlog na ordem do MVP; implementação depende da fila.
 - Depende de: F03 aprovada e entregue.
 

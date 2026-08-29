@@ -1,6 +1,7 @@
 # MVP-011 — Squads limitados pela SPEC
 
 - Status: **arquitetura e cinco fatias aprovadas pelo PI** em 2026-08-29; implementação depende da fila.
+- GitHub: épico [#121](https://github.com/RodReis/rrb-jarvisOS/issues/121); fatias [#122–#126](https://github.com/RodReis/rrb-jarvisOS/issues/122), estado `proplan:backlog`.
 - Depende de: MVP-010 concluído.
 - Dono do aceite: PI.
 - Design: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v2-design.md`.

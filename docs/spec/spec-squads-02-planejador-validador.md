@@ -1,6 +1,7 @@
 # SPEC-Squads-02 — Planejador e validador determinístico
 
 - MVP: `docs/mvp/mvp-011-squads-limitados.md` (Fatia 02).
+- Issue: [#123](https://github.com/RodReis/rrb-jarvisOS/issues/123); épico [#121](https://github.com/RodReis/rrb-jarvisOS/issues/121).
 - Status: **aprovada-pi** (2026-08-29) — entra no backlog na ordem do MVP; implementação depende da fila.
 - Depende de: F01 aprovada e entregue.
 
