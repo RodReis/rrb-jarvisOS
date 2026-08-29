@@ -20,11 +20,7 @@
  */
 
 import { createHash } from 'node:crypto'
-import type {
-  EvidenceFailure,
-  EvidenceItem,
-  TavilyExtractData
-} from '@shared/domain/tavily'
+import type { EvidenceFailure, EvidenceItem, TavilyExtractData } from '@shared/domain/tavily'
 import { dominioDe, normalizarUrl } from '@shared/domain/tavily'
 
 /**

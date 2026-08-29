@@ -943,7 +943,8 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       // Valor vazio é ausência de entrada, não "gravar string vazia": gravá-la deixaria a
       // credencial `present` com um valor que a Tavily recusaria. Vira no-op.
       const segredo = typeof value === 'string' ? value.trim() : ''
-      if (segredo.length === 0) return deps.credentials.listConnectorStatus(deps.userId(), workspace)
+      if (segredo.length === 0)
+        return deps.credentials.listConnectorStatus(deps.userId(), workspace)
 
       // A credencial gerida por Device Flow não entra por aqui — gravar um texto colado por
       // cima do par access/refresh quebraria o refresh em silêncio. O serviço também recusa;

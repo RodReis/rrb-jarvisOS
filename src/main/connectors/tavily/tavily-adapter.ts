@@ -80,16 +80,35 @@ export class TavilyAdapter implements ConnectorAdapter {
    */
   validar(execution: ConnectorExecution): ConnectorError | undefined {
     const problema = validarEntrada(execution.request.operation, execution.request.input)
-    if (problema === undefined) return undefined
 
-    return {
-      ok: false,
-      code: 'validacao-invalida',
-      mensagem: problema,
-      retryable: false,
-      acao: 'corrigir-entrada',
-      provenance: this.provenance(execution)
+    if (problema !== undefined) {
+      return {
+        ok: false,
+        code: 'validacao-invalida',
+        mensagem: problema,
+        retryable: false,
+        acao: 'corrigir-entrada',
+        provenance: this.provenance(execution)
+      }
     }
+
+    // O pedido **referencia** uma credencial? Nenhuma operação da Tavily é pública, e o serviço
+    // só consulta o cofre quando `request.credential` existe — sem o campo, a chamada sairia com
+    // `Bearer` vazio e voltaria 401 depois de gastar uma requisição. Conferir a **referência**
+    // não é conferir o segredo: `secret` está sempre ausente nesta etapa, e é por isso que a
+    // guarda olha o pedido, não o material.
+    if (execution.request.credential === undefined) {
+      return {
+        ok: false,
+        code: 'credencial-ausente',
+        mensagem: 'A Tavily exige credencial. Cadastre a chave em Configurações.',
+        retryable: false,
+        acao: 'reautenticar',
+        provenance: this.provenance(execution)
+      }
+    }
+
+    return undefined
   }
 
   /**
@@ -410,7 +429,14 @@ export class TavilyAdapter implements ConnectorAdapter {
     if (status === 429) {
       return {
         ok: false,
-        code: 'limite-excedido',
+        // `indisponivel`, e **não** `limite-excedido`: a governança da F02 trata
+        // `limite-excedido` como terminal (ele está em `CODIGOS_SEM_RETRY`, porque significa
+        // cota esgotada — repetir não devolve cota). Um 429 é o oposto: o serviço está no
+        // limite **agora** e passa com o tempo. Usar o mesmo código dos dois faria o
+        // `retryable: true` daqui ser letra morta, e o `Retry-After` que a Tavily manda nunca
+        // seria obedecido. Foi o que o teste contra o servidor que conta mostrou: uma
+        // requisição em vez de duas.
+        code: 'indisponivel',
         mensagem: 'A Tavily pediu para esperar antes da próxima pesquisa.',
         retryable: true,
         acao: 'retentar',
