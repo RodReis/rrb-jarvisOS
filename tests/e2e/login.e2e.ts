@@ -135,6 +135,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'listAllowedDirectories',
     'listAuditEvents',
     'listAutomations',
+    'listCredentials',
     'listExecutionRuns',
     'listPendingApprovals',
     'listWorkflows',
@@ -145,6 +146,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'removeAllowedCommand',
     'removeAllowedDirectory',
     'removeAutomation',
+    'removeCredential',
     'removeWorkflow',
     'resolveApproval',
     'runCommand',
@@ -153,6 +155,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'savePreferences',
     'sendLog',
     'setAutomationEnabled',
+    'setCredential',
     'setWorkflowStatus',
     'switchWorkspace',
     'updateWorkflow',
@@ -160,7 +163,17 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
   ])
 
   // Nenhum método entrega credencial — a superfície fechada é o critério 4 em runtime.
-  expect(superficie.metodos.some((m) => /token|secret|session|credential/i.test(m))).toBe(false)
+  //
+  // O vault (SPEC-Providers-01) trouxe três métodos com `credential` no nome, e a guarda ficou
+  // **mais** estrita: em vez de aceitar qualquer nome com a palavra, enumera exatamente os três
+  // que existem — todos de *metadados* (status, origem, provider), nenhum devolve valor. Um
+  // `getCredential` amanhã não entra nesta lista e quebra o teste, com o app rodando de verdade.
+  const GESTAO_SEM_VALOR = ['listCredentials', 'setCredential', 'removeCredential']
+  expect(
+    superficie.metodos
+      .filter((m) => /token|secret|session|credential/i.test(m))
+      .filter((m) => !GESTAO_SEM_VALOR.includes(m))
+  ).toEqual([])
   expect(superficie.temRequire).toBe('undefined')
   expect(superficie.temProcess).toBe('undefined')
 })
