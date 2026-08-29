@@ -6,9 +6,8 @@ Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do
 
 | Coluna | Item | Estado |
 |---|---|---|
-| Próximo | [#78](https://github.com/RodReis/rrb-jarvisOS/issues/78) · M5-F02 Adapter Claude | `proplan:next` |
+| Próximo | [#84](https://github.com/RodReis/rrb-jarvisOS/issues/84) · `[FIX]` card de aprovação descreve comando como filesystem | `proplan:next` |
 | Backlog | [#110](https://github.com/RodReis/rrb-jarvisOS/issues/110) · M4-F03 UI da allowlist de diretórios | `aprovada-pi` 2026-08-29; desbloqueia MVP-004 e M8-F01 |
-| Backlog | [#84](https://github.com/RodReis/rrb-jarvisOS/issues/84) · `[FIX]` card de aprovação descreve comando como filesystem | despriorizado pelo PI em favor do #107 |
 | Backlog | [#79](https://github.com/RodReis/rrb-jarvisOS/issues/79) · BudgetPolicy | aprovado, aguardando fila |
 | Backlog | [#80](https://github.com/RodReis/rrb-jarvisOS/issues/80) · Multi-provider | aprovado, aguardando fila |
 | Backlog | [#87–#92](https://github.com/RodReis/rrb-jarvisOS/issues/87) · MVP-006 | seis SPECs `aprovada-pi` (2026-08-29); atrás de #79/#80 na fila |
@@ -16,7 +15,8 @@ Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do
 | Backlog | [#101–#106](https://github.com/RodReis/rrb-jarvisOS/issues/101) · MVP-009 | seis SPECs `aprovada-pi` (2026-08-29); fim da fila |
 | Done | [#75](https://github.com/RodReis/rrb-jarvisOS/issues/75) · MVP-004 F02 Terminal | PR [#83](https://github.com/RodReis/rrb-jarvisOS/pull/83), aguardando aceite |
 | Done | [#77](https://github.com/RodReis/rrb-jarvisOS/issues/77) · MVP-005 F01 Vault | PR [#108](https://github.com/RodReis/rrb-jarvisOS/pull/108), aguardando aceite |
-| Done | [#107](https://github.com/RodReis/rrb-jarvisOS/issues/107) · `[FIX]` overlays em portal sem tokens | PR desta entrega, aguardando aceite |
+| Done | [#107](https://github.com/RodReis/rrb-jarvisOS/issues/107) · `[FIX]` overlays em portal sem tokens | PR [#109](https://github.com/RodReis/rrb-jarvisOS/pull/109), aguardando aceite |
+| Done | [#78](https://github.com/RodReis/rrb-jarvisOS/issues/78) · MVP-005 F02 Adapter Claude | PR desta entrega, aguardando aceite |
 | A Fazer/Em Andamento | — | WIP = 0 |
 
 > **M5-F01 entregue (2026-08-28) — abre o MVP-005.** Os 9 critérios cobertos; **679 testes verdes** (+38: 9 Regras, 20 Banco, 9 Tela). A garantia central é **estrutural**: nenhum tipo que atravessa o IPC tem campo onde o segredo caiba, e não existe método na ponte que o peça. Verificado no app real — o segredo semeado aparece **0 vezes** em `jarvis.db`/`-wal`/`-shm` enquanto `credential_ref` aparece 3 (prova de que a busca funciona); é a prova do **DPAPI real**, já que o teste de integração usa cifra dublada. `verifyAuditChain` → `{ok: true, checked: 95}`. Detalhe em `DEVELOPMENT.md`.
@@ -24,6 +24,10 @@ Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do
 > **A verificação achou um defeito do design system, não da fatia** ([#107](https://github.com/RodReis/rrb-jarvisOS/issues/107)): overlays em portal renderizam **sem tokens** — modal transparente e ilegível. O `ProvedorDeTema` injeta as variáveis num `div`, o Radix monta o portal no `body`, fora dela. Atinge os 5 componentes com portal, é anterior a esta fatia. **Terceira repetição do mesmo método no projeto** (depois de #57/#58): jsdom não aplica folha de estilo, então componente visualmente quebrado passa verde.
 >
 > **#107 entregue (2026-08-28).** Cada `Portal` recebe o nó do provider como `container` — preserva os providers aninhados que a CHOICE e o Settings usam, o que promover os tokens a `:root` quebraria. A verificação no app real achou um **segundo defeito com a mesma causa raiz**, escondido pelo primeiro: o painel herdava a cor de texto do `FundoDaIdentidade`, que o portal não tem, e o título caía no preto do navegador. **684 testes** (+5) e **82 provas de navegador** (+5), todos provados por contrafactual. A régua nova é em duas camadas por necessidade: jsdom só afirma topologia, o valor computado só o navegador mede — que é exatamente o buraco pelo qual este defeito passou.
+
+> **M5-F02 entregue (2026-08-29).** A IA passa a chamar de verdade. O que a fatia entrega de estrutural é o **ponto único de chamada** — a sede do gate de orçamento da F03 (ADR-001 q1); um segundo caminho até um adapter seria um caminho sem gate. O **isolamento do provider virou regra do ESLint** (barra `@anthropic-ai/*` em todo `src/main/` menos o adapter), provada por contrafactual. **732 testes** (+48) e 2 E2E novos; verificado no app real com Electron, com o log do app mostrando `correlationId`, `AuditEvent` e custo medido. A cobertura de Regras caiu para 75.5% por **diluição**, não regressão: `ai.ts` está a 100% ali, e o que cresceu (`preload`, `handlers`) é coberto por Banco e E2E.
+>
+> **Decisões do PI (2026-08-29):** três modelos na tabela de preço (Opus 5, Sonnet 5, Haiku 4.5) para dar spread à F03 e à F04; **SDK oficial** `@anthropic-ai/sdk` em vez de `fetch` cru; **painel mínimo** de teste no Settings — a tela de providers é F04, explicitamente.
 
 ## MVPs
 
@@ -33,7 +37,7 @@ Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do
 | MVP-002 Execução local | [#9](https://github.com/RodReis/rrb-jarvisOS/issues/9) | fechado/aceito | 5/5 |
 | MVP-003 Design System | [#16](https://github.com/RodReis/rrb-jarvisOS/issues/16) | fechado/aceito | 8/8 |
 | MVP-004 Execução real | [#10](https://github.com/RodReis/rrb-jarvisOS/issues/10) | F01 aceita; F02 aguardando aceite; **F03 nova** (`aprovada-pi` 2026-08-29) | 1/3 |
-| MVP-005 Providers/Vault/Budget | [#76](https://github.com/RodReis/rrb-jarvisOS/issues/76) | F01 entregue, aguardando aceite; três SPECs no Backlog | 1/4 |
+| MVP-005 Providers/Vault/Budget | [#76](https://github.com/RodReis/rrb-jarvisOS/issues/76) | F01 e F02 entregues, aguardando aceite; duas SPECs no Backlog | 2/4 |
 | MVP-006 Conectores Essenciais | [#86](https://github.com/RodReis/rrb-jarvisOS/issues/86) | seis SPECs `aprovada-pi` (2026-08-29); fatias no Backlog | 0/6 |
 | MVP-007 Memória Contextual/RAG | — | slot proposto; **sem fatias e sem SPEC** — nada a aprovar até entrar em planejamento ativo | — |
 | MVP-008 Planejamento Governado | [#93](https://github.com/RodReis/rrb-jarvisOS/issues/93) | seis SPECs `aprovada-pi` (2026-08-29); fatias no Backlog | 0/6 |
@@ -82,9 +86,9 @@ Não existe catálogo global `SPEC-nnn`. O identificador canônico é o slug aba
 
 ## Próximas ações
 
-1. PI aceitar ou recusar as três fatias em **Done**: F02 do MVP-004 (#75), M5-F01 (#77) e o `[FIX]` #107.
-2. Ordem da fila **decidida pelo PI (2026-08-28)**: #107 primeiro (entregue), depois a M5-F02 (#78). O #84 volta ao Backlog e reentra depois.
-3. Decidir sobre a **UI da allowlist de diretórios** (pendência registrada na F02 do MVP-004): é fatia, precisa de spec — sem ela o usuário não consegue permitir diretório pelo app.
+1. PI aceitar ou recusar as **quatro** fatias em **Done**: F02 do MVP-004 (#75), M5-F01 (#77), o `[FIX]` #107 e a M5-F02 (#78).
+2. Fila corrente: **#84** é o `next`. Depois dele, a ordem entre #110 (UI da allowlist), #79 (BudgetPolicy) e #80 (Multi-provider) é decisão do PI — as três têm spec aprovada.
+3. A **F03 encaixa no ponto único** que a F02 deixou pronto: a estimativa pré-chamada já é calculada e o `CostEvent` já carrega `estimadoUsd`/`realUsd`. O gate entra entre a estimativa e o disparo do adapter — nenhuma refatoração do ponto de chamada é necessária.
 4. **MVP-006, MVP-008 e MVP-009 revisados e aprovados (2026-08-29)** — dezesseis decisões estruturais do PI registradas nas SPECs e nos docs dos épicos; #87–#92, #94–#99 e #101–#106 migraram para `proplan:backlog`. **Todas as 24 SPECs do projeto estão `aprovada-pi`.**
 5. MVP-007 será detalhado apenas quando entrar no planejamento ativo — hoje não tem fatia nem SPEC, então não há o que aprovar.
 6. **M4-F03 (UI da allowlist de diretórios) especificada e aprovada (2026-08-29)** — fecha a última fatia conhecida sem SPEC. Desbloqueia uso real do terminal/filesystem pelo app e tira o limite da M8-F01. Não existe mais fatia conhecida sem spec.
