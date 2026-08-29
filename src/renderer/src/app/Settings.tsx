@@ -15,6 +15,7 @@ import { ProvedorDeTema } from '@design/tokens/provider'
 import type { CorAcento } from '@design/tokens/acento'
 import type { Modulo } from '@design/tokens/semantic'
 import { CredenciaisDoWorkspace } from './CredenciaisDoWorkspace'
+import { ChamadaDeIa } from './ChamadaDeIa'
 
 /**
  * Tela de configurações (SPEC-Fundacao-05 + SPEC-CHOICE-01 crit. 5): idioma, tema e acento.
@@ -164,6 +165,7 @@ export function Settings({
        * depois das três preferências pessoais para a leitura não alternar entre os dois escopos.
        */}
       <CredenciaisDoWorkspace workspace={workspace} nomeDoEspaco={nomeDoEspaco} />
+      <ChamadaDeIa workspace={workspace} nomeDoEspaco={nomeDoEspaco} />
     </section>
   )
 }

@@ -55,6 +55,12 @@ describe('ponte do preload', () => {
     expect(Object.keys(bridge).sort()).toEqual([
       'addAllowedCommand',
       'addAllowedDirectory',
+      // SPEC-Providers-02: os três da chamada de IA. `callAi` devolve só o handle, `cancelAi`
+      // aborta e `onAiStreamEvent` assina os chunks — **nenhum** deles devolve credencial. A
+      // lista é enumerada (e não um padrão `/ai/`) pela mesma razão da F01: um padrão aceitaria
+      // um método futuro que devolvesse valor, e é justamente isso que esta guarda barra.
+      'callAi',
+      'cancelAi',
       'classifyAction',
       'createAutomation',
       'createWorkflow',
@@ -73,6 +79,7 @@ describe('ponte do preload', () => {
       'login',
       'logout',
       'minimizeToTray',
+      'onAiStreamEvent',
       'onAuthChanged',
       'removeAllowedCommand',
       'removeAllowedDirectory',

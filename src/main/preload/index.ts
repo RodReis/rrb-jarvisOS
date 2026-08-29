@@ -23,6 +23,7 @@ import type {
 import type { ExecutionRun } from '@shared/domain/execution'
 import type { ApprovalDecision, ApprovalRequest } from '@shared/domain/execution'
 import type { CommandExecution, CommandSubmission } from '@shared/domain/terminal'
+import type { AiCallHandle, AiRequest, AiStreamEvent } from '@shared/domain/ai'
 import type { CredentialKey, CredentialStatusView } from '@shared/domain/credentials'
 import type {
   AuditEvent,
@@ -139,7 +140,21 @@ const bridge: JarvisBridge = {
     key: CredentialKey,
     workspace: WorkspaceId
   ): Promise<readonly CredentialStatusView[]> =>
-    ipcRenderer.invoke(IPC_CHANNELS.credentialRemove, key, workspace)
+    ipcRenderer.invoke(IPC_CHANNELS.credentialRemove, key, workspace),
+
+  callAi: (request: AiRequest, workspace: WorkspaceId): Promise<AiCallHandle> =>
+    ipcRenderer.invoke(IPC_CHANNELS.aiCall, request, workspace),
+  cancelAi: (id: string): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.aiCancel, id),
+
+  onAiStreamEvent: (listener: (evento: AiStreamEvent) => void): (() => void) => {
+    // Mesmo recorte do `onAuthChanged`: o `IpcRendererEvent` fica de fora da chamada porque
+    // carrega `sender`, um objeto do Electron que não pode vazar para o renderer.
+    const wrapped = (_event: unknown, evento: AiStreamEvent): void => listener(evento)
+
+    ipcRenderer.on(IPC_EVENT_CHANNELS.aiStreamEvent, wrapped)
+
+    return () => ipcRenderer.removeListener(IPC_EVENT_CHANNELS.aiStreamEvent, wrapped)
+  }
 }
 
 if (process.contextIsolated) {

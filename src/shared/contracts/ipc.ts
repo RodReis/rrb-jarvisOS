@@ -30,6 +30,7 @@ import type {
 import type { ExecutionRun } from '../domain/execution'
 import type { CommandExecution, CommandSubmission } from '../domain/terminal'
 import type { CredentialKey, CredentialStatusView } from '../domain/credentials'
+import type { AiCallHandle, AiRequest, AiStreamEvent } from '../domain/ai'
 import type { ApprovalDecision, ApprovalRequest } from '../domain/execution'
 
 /** Canais de request/response (renderer → main → renderer). */
@@ -125,7 +126,15 @@ export const IPC_CHANNELS = {
    */
   credentialList: 'credential:list',
   credentialSet: 'credential:set',
-  credentialRemove: 'credential:remove'
+  credentialRemove: 'credential:remove',
+  /**
+   * Dispara uma chamada de IA (SPEC-Providers-02, critério 8). Devolve só o `AiCallHandle` —
+   * o texto chega pelo canal de evento `aiStreamEvent`, casado pelo `id`. O renderer **nunca**
+   * vê a credencial: quem a lê do Vault é o ponto único de chamada, no main.
+   */
+  aiCall: 'ai:call',
+  /** Aborta uma chamada em andamento (o usuário fechou a tela ou desistiu). */
+  aiCancel: 'ai:cancel'
 } as const
 
 /**
@@ -154,7 +163,15 @@ export const IPC_SEND_CHANNELS = {
  */
 export const IPC_EVENT_CHANNELS = {
   /** Novo `AuthSnapshot` a cada transição de estado. Nunca carrega token. */
-  authChanged: 'auth:changed'
+  authChanged: 'auth:changed',
+  /**
+   * Um evento por chunk de uma chamada de IA, mais o `fim` (SPEC-Providers-02, critério 2).
+   *
+   * Canal de **evento** e não retorno do `invoke`: o ponto do streaming é o texto aparecer
+   * enquanto chega. Um `invoke` que resolvesse com a resposta inteira entregaria o mesmo
+   * conteúdo depois de o usuário ter esperado por ele em silêncio.
+   */
+  aiStreamEvent: 'ai:stream-event'
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]
@@ -347,6 +364,18 @@ export interface JarvisBridge {
     key: CredentialKey,
     workspace: WorkspaceId
   ): Promise<readonly CredentialStatusView[]>
+
+  /**
+   * Dispara uma chamada de IA e devolve o handle (SPEC-Providers-02, critério 8).
+   *
+   * A resposta **não** vem por aqui: chega em chunks por `onAiStreamEvent`, casados pelo `id`
+   * do handle. O renderer monta o texto incrementalmente e nunca toca a credencial.
+   */
+  callAi(request: AiRequest, workspace: WorkspaceId): Promise<AiCallHandle>
+  /** Aborta uma chamada em andamento. No-op se ela já terminou. */
+  cancelAi(id: string): Promise<void>
+  /** Assina os eventos de stream. Devolve a função que cancela a assinatura. */
+  onAiStreamEvent(listener: (evento: AiStreamEvent) => void): () => void
 }
 
 /** Nome da propriedade exposta via contextBridge no renderer. */
