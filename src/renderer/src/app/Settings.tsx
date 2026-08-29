@@ -15,6 +15,7 @@ import { ProvedorDeTema } from '@design/tokens/provider'
 import type { CorAcento } from '@design/tokens/acento'
 import type { Modulo } from '@design/tokens/semantic'
 import { CredenciaisDoWorkspace } from './CredenciaisDoWorkspace'
+import { OrcamentoDoWorkspace } from './OrcamentoDoWorkspace'
 import { DiretoriosPermitidos } from './DiretoriosPermitidos'
 import { ChamadaDeIa } from './ChamadaDeIa'
 
@@ -172,6 +173,12 @@ export function Settings({
       <DiretoriosPermitidos />
 
       <CredenciaisDoWorkspace workspace={workspace} nomeDoEspaco={nomeDoEspaco} />
+      {/*
+       * O orçamento vem **antes** do painel de chamada, e não depois: quem vai disparar uma
+       * chamada precisa ver o teto e o acumulado primeiro. Depois, o número apareceria como
+       * explicação de um bloqueio já sofrido em vez de aviso antes dele.
+       */}
+      <OrcamentoDoWorkspace workspace={workspace} nomeDoEspaco={nomeDoEspaco} />
       <ChamadaDeIa workspace={workspace} nomeDoEspaco={nomeDoEspaco} />
     </section>
   )

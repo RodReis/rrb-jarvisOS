@@ -259,6 +259,54 @@ const MIGRATIONS: readonly string[] = [
     UNIQUE (user_id, workspace_id, key)
   );
   CREATE INDEX idx_credential_ref_user ON credential_ref(user_id, workspace_id);
+  `,
+
+  // 10 — orçamento e custo de IA (SPEC-Providers-03).
+  //
+  // Duas tabelas porque são dois fatos de natureza diferente: `budget_policy` é **configuração
+  // mutável** (o usuário edita o limite), `cost_event` é **registro do que aconteceu**. Somar
+  // gasto exige a segunda; a F02 emitia o `CostEvent` só como payload de auditoria, e payload
+  // de auditoria não se consulta por período — a tabela `audit_event` é append-only justamente
+  // para não ser reinterpretada, e derivar orçamento de dentro dela acoplaria o gate ao
+  // formato do log.
+  //
+  // Escopo `user_id` + `workspace_id` nas duas (CONVENTION §2), com `UNIQUE` na policy: o
+  // orçamento é um por escopo, então "salvar de novo" é UPDATE da linha, não segunda política.
+  // Ausência de linha **não** é ausência de orçamento — é o padrão de `orcamentoPadrao`
+  // (USD 1/USD 1/0,8) valendo. Semear a linha no primeiro boot criaria a pergunta "e o
+  // usuário que existe desde antes desta migration?"; o default em código não a tem.
+  //
+  // `created_at` no `cost_event` guarda o **ISO UTC** do fim da chamada, e é por ele que o
+  // período é recortado. Dia e mês contam separado (critério 3), então o índice cobre
+  // `(user_id, workspace_id, created_at)` — a consulta é sempre "este escopo, esta janela".
+  //
+  // `real_usd` é NULLable de propósito: a chamada que falhou antes de o provider reportar
+  // `usage` não tem custo medido. Somar tratando ausente como zero seria dizer que não custou;
+  // deixar NULL diz que **não se sabe**, e o `SUM` do SQLite ignora NULL em vez de inventar.
+  `
+  CREATE TABLE budget_policy (
+    user_id         TEXT NOT NULL,
+    workspace_id    TEXT NOT NULL,
+    daily_limit     REAL NOT NULL,
+    monthly_limit   REAL NOT NULL,
+    alert_threshold REAL NOT NULL,
+    currency        TEXT NOT NULL,
+    updated_at      TEXT NOT NULL,
+    PRIMARY KEY (user_id, workspace_id)
+  );
+
+  CREATE TABLE cost_event (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    call_id      TEXT NOT NULL,
+    provider     TEXT NOT NULL,
+    model        TEXT NOT NULL,
+    estimado_usd REAL NOT NULL,
+    real_usd     REAL,            -- NULL = custo não medido (a chamada não chegou ao usage)
+    created_at   TEXT NOT NULL    -- ISO UTC; é por ele que o período é recortado
+  );
+  CREATE INDEX idx_cost_event_escopo ON cost_event(user_id, workspace_id, created_at);
   `
 ]
 

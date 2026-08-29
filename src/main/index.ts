@@ -7,6 +7,8 @@ import { SafeStorageTokenVault } from './auth/token-vault'
 import { registerIpcHandlers } from './ipc/handlers'
 import { AiCallService } from './ai/call-provider'
 import { AnthropicAdapter } from './ai/anthropic-adapter'
+import { BudgetService } from './budget/budget-service'
+import { BudgetRepository } from './budget/budget-repository'
 import { AllowlistRepository } from './policy/allowlist-repository'
 import { canonicalize } from './policy/allowlist-canon'
 import { PolicyService } from './policy/policy-service'
@@ -168,6 +170,11 @@ if (!app.requestSingleInstanceLock()) {
       policy
     )
 
+    // Gate de orçamento (SPEC-Providers-03). Construído **antes** do ponto único porque é
+    // dependência dele: um `AiCallService` sem gate seria um caminho até o provider sem
+    // orçamento, que é exatamente o que o ponto único existe para não permitir.
+    const budget = new BudgetService(new BudgetRepository(storage.db), storage.audit)
+
     // Ponto único de chamada de IA (SPEC-Providers-02). Construído **depois** do vault porque
     // depende dele: nenhum adapter chama provider sem credencial, e o serviço a resolve por
     // escopo no instante da chamada. O mapa de adapters é onde a F04 acrescenta providers.
@@ -175,7 +182,8 @@ if (!app.requestSingleInstanceLock()) {
       { anthropic: new AnthropicAdapter() },
       credentials,
       policy,
-      storage.audit
+      storage.audit,
+      budget
     )
 
     registerIpcHandlers({
@@ -191,6 +199,7 @@ if (!app.requestSingleInstanceLock()) {
       commandAllowlist,
       credentials,
       ai,
+      budget,
       runs,
       approvals,
       userId: userIdAtual,

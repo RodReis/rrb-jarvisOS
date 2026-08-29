@@ -25,6 +25,7 @@ import type { ApprovalDecision, ApprovalRequest } from '@shared/domain/execution
 import type { CommandExecution, CommandSubmission } from '@shared/domain/terminal'
 import type { AiCallHandle, AiRequest, AiStreamEvent } from '@shared/domain/ai'
 import type { CredentialKey, CredentialStatusView } from '@shared/domain/credentials'
+import type { BudgetLimitsInput, BudgetSnapshot } from '@shared/domain/budget'
 import type {
   AuditEvent,
   AuditEventType,
@@ -158,7 +159,12 @@ const bridge: JarvisBridge = {
     ipcRenderer.on(IPC_EVENT_CHANNELS.aiStreamEvent, wrapped)
 
     return () => ipcRenderer.removeListener(IPC_EVENT_CHANNELS.aiStreamEvent, wrapped)
-  }
+  },
+
+  getBudget: (workspace: WorkspaceId): Promise<BudgetSnapshot> =>
+    ipcRenderer.invoke(IPC_CHANNELS.budgetGet, workspace),
+  setBudgetLimits: (limites: BudgetLimitsInput, workspace: WorkspaceId): Promise<BudgetSnapshot> =>
+    ipcRenderer.invoke(IPC_CHANNELS.budgetSetLimits, limites, workspace)
 }
 
 if (process.contextIsolated) {

@@ -32,6 +32,7 @@ import type { CommandExecution, CommandSubmission } from '../domain/terminal'
 import type { CredentialKey, CredentialStatusView } from '../domain/credentials'
 import type { AiCallHandle, AiRequest, AiStreamEvent } from '../domain/ai'
 import type { ApprovalDecision, ApprovalRequest } from '../domain/execution'
+import type { BudgetLimitsInput, BudgetSnapshot } from '@shared/domain/budget'
 
 /** Canais de request/response (renderer → main → renderer). */
 export const IPC_CHANNELS = {
@@ -147,7 +148,16 @@ export const IPC_CHANNELS = {
    */
   aiCall: 'ai:call',
   /** Aborta uma chamada em andamento (o usuário fechou a tela ou desistiu). */
-  aiCancel: 'ai:cancel'
+  aiCancel: 'ai:cancel',
+  /**
+   * Orçamento de IA (SPEC-Providers-03, critério 8). O renderer **lê** limites e acumulado e
+   * **edita** limites; a decisão do gate e a soma do período são do main. Não há canal que
+   * peça "esta chamada cabe?" — quem pergunta é o ponto único, de dentro do main, e um canal
+   * assim ofereceria ao renderer uma resposta que ele não usa para nada além de duplicar a
+   * decisão que já foi tomada.
+   */
+  budgetGet: 'budget:get',
+  budgetSetLimits: 'budget:set-limits'
 } as const
 
 /**
@@ -402,6 +412,20 @@ export interface JarvisBridge {
   cancelAi(id: string): Promise<void>
   /** Assina os eventos de stream. Devolve a função que cancela a assinatura. */
   onAiStreamEvent(listener: (evento: AiStreamEvent) => void): () => void
+
+  /**
+   * Orçamento do escopo: limites e acumulado do dia e do mês (SPEC-Providers-03, critério 8).
+   *
+   * Leitura apenas — a soma é feita no main, sobre os `CostEvent` gravados. O renderer não
+   * recalcula: um segundo cálculo divergiria do que o gate usa, e o número na tela deixaria de
+   * ser o número que barra.
+   */
+  getBudget(workspace: WorkspaceId): Promise<BudgetSnapshot>
+  /**
+   * Edita os limites e devolve o estado resultante, já com o acumulado — como `savePreferences`.
+   * Entrada inválida (limite negativo, limiar fora de 0–1) é **recusada no main**.
+   */
+  setBudgetLimits(limites: BudgetLimitsInput, workspace: WorkspaceId): Promise<BudgetSnapshot>
 }
 
 /** Nome da propriedade exposta via contextBridge no renderer. */

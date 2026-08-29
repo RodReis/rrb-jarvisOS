@@ -174,7 +174,15 @@ export const AUDIT_EVENT_TYPES = [
   // fim: uma chamada que morre no meio precisa deixar rastro, e o evento de conclusão sozinho
   // perderia exatamente a que falhou. O payload carrega provider, modelo, custo e latência;
   // **nunca o prompt, a resposta ou a credencial** (ADR-004).
-  'ai-call'
+  'ai-call',
+  // SPEC-Providers-03: o gate de orçamento. **Dois tipos, não um** — pela mesma razão que
+  // separa `allowlist-change` de `policy-decision`: `budget-decision` é o veredito sobre uma
+  // chamada (permitido/alerta/bloqueado, critério 6), `budget-change` é o usuário editando o
+  // próprio limite. Sob um tipo só, "quantas vezes o orçamento barrou" exigiria parsear o
+  // payload para descartar as edições. O payload traz limite, acumulado e estimativa —
+  // números, nunca o prompt.
+  'budget-decision',
+  'budget-change'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]

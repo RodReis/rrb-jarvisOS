@@ -32,6 +32,8 @@ import type { AuditRepository } from '../storage/audit-repository'
 import type { WorkspaceService } from '../workspace/workspace-service'
 import type { ApprovalRepository } from '../execution/approval-repository'
 import type { AiCallService } from '../ai/call-provider'
+import { BudgetInputError, type BudgetService } from '../budget/budget-service'
+import { isBudgetLimitsInput, type BudgetSnapshot } from '@shared/domain/budget'
 import {
   isAiProvider,
   type AiCallHandle,
@@ -116,6 +118,8 @@ export interface IpcDependencies {
   readonly auth?: AuthService
   /** Ponto único de chamada de IA (SPEC-Providers-02): classifica, estima, audita, mede. */
   readonly ai: AiCallService
+  /** Gate de orçamento (SPEC-Providers-03): a UI lê limites e acumulado, e edita limites. */
+  readonly budget: BudgetService
   /** Minimizar para o tray. Injetado porque a janela nasce depois dos handlers. */
   readonly minimizeToTray: () => void
 }
@@ -675,6 +679,48 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     // entre o clique do usuário e o fim do stream.
     deps.ai.cancel(id)
   })
+
+  // Orçamento (SPEC-Providers-03, critério 8). Leitura e edição de **limites**; a decisão do
+  // gate não tem canal — quem pergunta "cabe?" é o ponto único, de dentro do main.
+  ipcMain.handle(IPC_CHANNELS.budgetGet, (_event, workspace: unknown): BudgetSnapshot => {
+    const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+    return deps.budget.snapshot({ userId: deps.userId(), workspace: escopo })
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.budgetSetLimits,
+    (_event, limites: unknown, workspace: unknown): BudgetSnapshot => {
+      const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+      const scope = { userId: deps.userId(), workspace: escopo }
+
+      // Validação na fronteira (CONVENTION §2): o payload do IPC é entrada externa como
+      // qualquer outra. Forma errada devolve o estado corrente em vez de lançar — a tela
+      // precisa continuar mostrando um orçamento, e o erro de forma é do chamador, não do
+      // usuário.
+      if (!isBudgetLimitsInput(limites)) {
+        log.ipc.warn('Limites de orçamento descartados por não casarem com o contrato', {
+          canal: IPC_CHANNELS.budgetSetLimits
+        })
+        return deps.budget.snapshot(scope)
+      }
+
+      try {
+        return deps.budget.setLimits(scope, limites)
+      } catch (erro) {
+        // `BudgetInputError` é recusa de **valor** (limite negativo, limiar fora de 0–1), e
+        // não de forma: o usuário digitou algo que a UI deixou passar. Devolver o estado
+        // corrente mantém a tela consistente — ela mostra o que de fato vale.
+        if (erro instanceof BudgetInputError) {
+          log.ipc.warn('Limites de orçamento recusados', {
+            canal: IPC_CHANNELS.budgetSetLimits,
+            motivo: erro.message
+          })
+          return deps.budget.snapshot(scope)
+        }
+        throw erro
+      }
+    }
+  )
 
   // Só de ida: o renderer manda o registro, o main grava. Sem resposta de propósito —
   // esperar confirmação de log tornaria a UI refém do disco.

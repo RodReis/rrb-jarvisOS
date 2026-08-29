@@ -67,6 +67,10 @@ describe('ponte do preload', () => {
       'getAppDirectory',
       'getAppInfo',
       'getAuth',
+      // SPEC-Providers-03: leitura e edição de **limites**. Não existe método que pergunte
+      // "esta chamada cabe?" — a decisão do gate é do main, dentro do ponto único, e um
+      // método aqui daria ao renderer uma resposta que ele só poderia duplicar.
+      'getBudget',
       'getPreferences',
       'getWorkspace',
       'listAllowedCommands',
@@ -97,6 +101,7 @@ describe('ponte do preload', () => {
       'savePreferences',
       'sendLog',
       'setAutomationEnabled',
+      'setBudgetLimits',
       'setCredential',
       'setWorkflowStatus',
       'switchWorkspace',

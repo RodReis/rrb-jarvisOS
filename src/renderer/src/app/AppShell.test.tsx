@@ -18,6 +18,8 @@ const listPendingApprovals = vi.fn()
 const resolveApproval = vi.fn()
 const runWorkflowReal = vi.fn()
 const listCredentials = vi.fn()
+const getBudget = vi.fn()
+const setBudgetLimits = vi.fn()
 const setCredential = vi.fn()
 // SPEC-Providers-02: o painel de chamada de IA vive no Settings e assina o canal de stream ao
 // montar. Sem estes no dublê, montar o Settings estoura antes de qualquer asserção.
@@ -69,6 +71,10 @@ function mockarPonte(): void {
       // este mock incompleto se manifestaria: um segundo `role="alert"` na página.
       listCredentials,
       setCredential,
+      // Mesma razão dos três acima: o painel de orçamento (SPEC-Providers-03) consulta a ponte
+      // ao montar, e sem estes dois a tela cai no `catch` e exibe o próprio alerta de erro.
+      getBudget,
+      setBudgetLimits,
       callAi,
       cancelAi,
       onAiStreamEvent,
@@ -97,6 +103,19 @@ async function trocarPara(nome: string): Promise<void> {
 beforeEach(() => {
   sendLog.mockClear()
   listCredentials.mockResolvedValue([])
+  const ORCAMENTO_PADRAO = {
+    policy: {
+      user_id: 'u-1',
+      workspace_id: 'jarvis' as const,
+      dailyLimit: 1,
+      monthlyLimit: 1,
+      alertThreshold: 0.8,
+      currency: 'USD' as const
+    },
+    gasto: { diaUsd: 0, mesUsd: 0 }
+  }
+  getBudget.mockResolvedValue(ORCAMENTO_PADRAO)
+  setBudgetLimits.mockResolvedValue(ORCAMENTO_PADRAO)
   setCredential.mockResolvedValue([])
   onAiStreamEvent.mockReturnValue(() => {})
   removeCredential.mockResolvedValue([])
