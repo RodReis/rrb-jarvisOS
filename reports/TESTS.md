@@ -14,7 +14,7 @@ Totais da última execução (regenerado, não acumulado):
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
 | — | — | — | Regras de Negócio | 261 | 261 | 0 | 78.8 | — | — |
 | — | — | — | Banco | 183 | 183 | 0 | 88.0 | — | — |
-| — | — | — | Tela | 235 | 234 | 0 | 91.4 | — | — |
+| — | — | — | Tela | 240 | 239 | 0 | 91.5 | — | — |
 
 ## Histórico por entrega
 
@@ -112,3 +112,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-08-28 | #77 | spec-providers-01-vault-credenciais | Regras de Negócio | 261 | 261 | 0 | 78.8 | #108 | [#108](https://github.com/RodReis/rrb-jarvisOS/pull/108) |
 | 2026-08-28 | #77 | spec-providers-01-vault-credenciais | Banco | 183 | 183 | 0 | 88.0 | #108 | [#108](https://github.com/RodReis/rrb-jarvisOS/pull/108) |
 | 2026-08-28 | #77 | spec-providers-01-vault-credenciais | Tela | 235 | 234 | 0 | 91.4 | #108 | [#108](https://github.com/RodReis/rrb-jarvisOS/pull/108) |
+| 2026-08-28 | #107 | — | Regras de Negócio | 261 | 261 | 0 | 78.8 | #109 | [#109](https://github.com/RodReis/rrb-jarvisOS/pull/109) |
+| 2026-08-28 | #107 | — | Banco | 183 | 183 | 0 | 88.0 | #109 | [#109](https://github.com/RodReis/rrb-jarvisOS/pull/109) |
+| 2026-08-28 | #107 | — | Tela | 240 | 239 | 0 | 91.5 | #109 | [#109](https://github.com/RodReis/rrb-jarvisOS/pull/109) |
