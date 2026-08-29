@@ -55,29 +55,20 @@ describe('ponte do preload', () => {
     expect(Object.keys(bridge).sort()).toEqual([
       'addAllowedCommand',
       'addAllowedDirectory',
-      // SPEC-Providers-02: os três da chamada de IA. `callAi` devolve só o handle, `cancelAi`
-      // aborta e `onAiStreamEvent` assina os chunks — **nenhum** deles devolve credencial. A
-      // lista é enumerada (e não um padrão `/ai/`) pela mesma razão da F01: um padrão aceitaria
-      // um método futuro que devolvesse valor, e é justamente isso que esta guarda barra.
+      'awaitGithubAuth',
       'callAi',
-      // SPEC-Conectores-01: executa **uma** operação declarada por um adapter registrado. O
-      // que faz dele o oposto de um proxy é o argumento: um `ConnectorRequest` que nomeia
-      // conector e operação de listas fechadas, nunca uma URL.
       'callConnector',
       'cancelAi',
+      'cancelGithubAuth',
       'classifyAction',
       'createAutomation',
       'createWorkflow',
       'getAppDirectory',
       'getAppInfo',
       'getAuth',
-      // SPEC-Providers-03: leitura e edição de **limites**. Não existe método que pergunte
-      // "esta chamada cabe?" — a decisão do gate é do main, dentro do ponto único, e um
-      // método aqui daria ao renderer uma resposta que ele só poderia duplicar.
       'getBudget',
-      // SPEC-Conectores-02: teto de créditos por conector. Leitura e edição do **teto** —
-      // nenhum método pergunta se uma chamada cabe: essa decisão é do gate, no main.
       'getConnectorCredits',
+      'getGithubAuthStatus',
       'getPreferences',
       'getProviderModels',
       'getProviderStatus',
@@ -94,11 +85,10 @@ describe('ponte do preload', () => {
       'listWorkflows',
       'login',
       'logout',
+      'logoutGithub',
       'minimizeToTray',
       'onAiStreamEvent',
       'onAuthChanged',
-      // SPEC-ExecucaoReal-03: abre o seletor nativo no main. Não devolve handle de arquivo —
-      // só a lista de paths, como os outros três canais da allowlist.
       'pickAllowedDirectory',
       'removeAllowedCommand',
       'removeAllowedDirectory',
@@ -115,9 +105,11 @@ describe('ponte do preload', () => {
       'setBudgetLimits',
       'setConnectorCreditLimits',
       'setCredential',
+      'setGithubClientId',
       'setProviderModel',
       'setRoute',
       'setWorkflowStatus',
+      'startGithubAuth',
       'switchWorkspace',
       'updateWorkflow',
       'verifyAuditChain'

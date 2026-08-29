@@ -207,7 +207,19 @@ export const AUDIT_EVENT_TYPES = [
   // orçamentos são independentes (decisão do PI de 2026-08-29): um conta créditos do conector,
   // o outro conta USD de IA — e a auditoria tem de dizer qual dos dois estourou.
   'connector-credit-decision',
-  'connector-credit-change'
+  'connector-credit-change',
+  // SPEC-Conectores-03: o Device Flow do GitHub App. Tipo próprio, e não `credential-change`,
+  // pela mesma razão que separa `budget-decision` de `budget-change`: `credential-change` é o
+  // **usuário editando o cofre** no Settings; isto é o **protocolo de autenticação** rodando
+  // (abriu o fluxo, autorizou, renovou, saiu). Sob um tipo só, "quantas vezes a renovação
+  // falhou" exigiria parsear payload para descartar as edições manuais — e a renovação é
+  // justamente o que ninguém vê acontecer.
+  //
+  // O payload traz a fase (`inicio`/`autorizado`/`renovado`/`logout`/`falhou`), o conector e o
+  // código de erro normalizado; **nunca o device code, o user code, o token ou o refresh
+  // token** (ADR-004). O `user_code` fica de fora mesmo sendo mostrado na tela: ele é
+  // efêmero por desenho, e guardá-lo na cadeia append-only o tornaria permanente.
+  'connector-auth'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]

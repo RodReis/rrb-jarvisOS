@@ -124,31 +124,21 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
   expect(superficie.metodos).toEqual([
     'addAllowedCommand',
     'addAllowedDirectory',
-    // SPEC-Providers-02: os três da chamada de IA. Enumerados um a um (e não por padrão) pela
-    // mesma razão da F01 — um padrão aceitaria um método futuro que devolvesse credencial.
+    'awaitGithubAuth',
     'callAi',
-    // SPEC-Conectores-01: executa **uma** operação declarada por um adapter registrado. O que
-    // o distingue de um proxy é o argumento — um `ConnectorRequest` que nomeia conector e
-    // operação de listas fechadas, nunca uma URL.
     'callConnector',
     'cancelAi',
+    'cancelGithubAuth',
     'classifyAction',
     'createAutomation',
     'createWorkflow',
-    // SPEC-ExecucaoReal-03: só-leitura, devolve o path do diretório gerido pelo app. É string,
-    // não handle — a tela o compara com a lista para marcar o item fixo, e nada mais.
     'getAppDirectory',
     'getAppInfo',
     'getAuth',
-    // SPEC-Providers-03: leitura do orçamento (limites + acumulado). Não há canal que pergunte
-    // "esta chamada cabe?" — a decisão é do main, dentro do ponto único.
     'getBudget',
-    // SPEC-Conectores-02: teto de créditos por conector. Leitura e edição do **teto** —
-    // nenhum método pergunta se uma chamada cabe: essa decisão é do gate, no main.
     'getConnectorCredits',
+    'getGithubAuthStatus',
     'getPreferences',
-    // SPEC-Providers-04: providers e roteamento. Enumerados um a um, como todos os anteriores.
-    // **Nenhum** deles seleciona provider: quem escolhe quem atende é o ponto único, no main.
     'getProviderModels',
     'getProviderStatus',
     'getRouting',
@@ -164,12 +154,10 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'listWorkflows',
     'login',
     'logout',
+    'logoutGithub',
     'minimizeToTray',
     'onAiStreamEvent',
     'onAuthChanged',
-    // SPEC-ExecucaoReal-03: abre o seletor **no main**. Devolve a lista de paths, nunca um
-    // handle de arquivo — é o que mantém o critério 6 (o renderer não toca o filesystem) de pé
-    // mesmo com a tela oferecendo escolha de pasta.
     'pickAllowedDirectory',
     'removeAllowedCommand',
     'removeAllowedDirectory',
@@ -183,14 +171,14 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'savePreferences',
     'sendLog',
     'setAutomationEnabled',
-    // SPEC-Providers-03: edição dos limites. O renderer edita; o cálculo e a decisão são do main.
     'setBudgetLimits',
     'setConnectorCreditLimits',
     'setCredential',
-    // SPEC-Providers-04: troca de modelo ativo e edição de rota.
+    'setGithubClientId',
     'setProviderModel',
     'setRoute',
     'setWorkflowStatus',
+    'startGithubAuth',
     'switchWorkspace',
     'updateWorkflow',
     'verifyAuditChain'

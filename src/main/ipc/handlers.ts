@@ -41,10 +41,14 @@ import { isProviderRoute, isTaskType } from '@shared/domain/routing'
 import {
   isConnectorRequest,
   type ConnectorCapability,
+  type ConnectorError,
   type ConnectorOutcome
 } from '@shared/domain/connectors'
 import type { ConnectorService } from '../connectors/connector-service'
 import { CreditInputError, type CreditService } from '../connectors/credit-service'
+import type { GithubAuthService } from '../connectors/github/github-auth-service'
+import type { GithubAuthSnapshot, GithubDeviceFlowView } from '@shared/domain/github-auth'
+import type { UserProfileRepository } from '../storage/repositories'
 import { isConnectorId } from '@shared/domain/connectors'
 import type { ConnectorCreditView } from '@shared/contracts/ipc'
 import {
@@ -141,6 +145,10 @@ export interface IpcDependencies {
   readonly connectors: ConnectorService
   /** O ledger de créditos de conector (SPEC-Conectores-02). */
   readonly connectorCredits: CreditService
+  /** O Device Flow do GitHub App (SPEC-Conectores-03). */
+  readonly githubAuth: GithubAuthService
+  /** O override do `client_id`, lido e gravado no perfil — não é segredo, não vai ao vault. */
+  readonly profiles: UserProfileRepository
   /** Minimizar para o tray. Injetado porque a janela nasce depois dos handlers. */
   readonly minimizeToTray: () => void
 }
@@ -905,6 +913,68 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
         }
         throw erro
       }
+    }
+  )
+
+  // Autenticação do GitHub por Device Flow (SPEC-Conectores-03, critério 9).
+  //
+  // **Nenhum destes canais devolve token**, e a garantia é a forma do retorno:
+  // `GithubAuthSnapshot` e `GithubDeviceFlowView` não têm campo onde access ou refresh token
+  // caiba. É a mesma garantia estrutural do `CredentialStatusView` da M5-F01 — o renderer não
+  // recebe o segredo porque não existe caminho tipado por onde ele passe.
+  ipcMain.handle(
+    IPC_CHANNELS.githubAuthStatus,
+    (_event, workspace: unknown): GithubAuthSnapshot => {
+      const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+      return deps.githubAuth.snapshot({ userId: deps.userId(), workspace: escopo })
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.githubAuthStart,
+    async (_event, workspace: unknown): Promise<GithubDeviceFlowView | ConnectorError> => {
+      const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+      log.ipc.info('Device Flow do GitHub solicitado pela interface', {
+        canal: IPC_CHANNELS.githubAuthStart,
+        connector: 'github'
+      })
+      return await deps.githubAuth.iniciar({ userId: deps.userId(), workspace: escopo })
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.githubAuthAwait,
+    async (_event, workspace: unknown): Promise<GithubAuthSnapshot | ConnectorError> => {
+      const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+      return await deps.githubAuth.aguardarAutorizacao({ userId: deps.userId(), workspace: escopo })
+    }
+  )
+
+  ipcMain.handle(IPC_CHANNELS.githubAuthCancel, (_event, workspace: unknown): void => {
+    const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+    deps.githubAuth.cancelar({ userId: deps.userId(), workspace: escopo })
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.githubAuthLogout,
+    (_event, workspace: unknown): GithubAuthSnapshot => {
+      const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+      return deps.githubAuth.logout({ userId: deps.userId(), workspace: escopo })
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.githubSetClientId,
+    (_event, clientId: unknown, workspace: unknown): GithubAuthSnapshot => {
+      const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+      // Só texto é aceito; qualquer outra coisa vira "limpar", que é voltar ao embutido. O
+      // renderer é fronteira de confiança, e um objeto gravado aqui viraria `[object Object]`
+      // na URL do Device Flow.
+      deps.profiles.saveGithubClientId(
+        deps.userId(),
+        typeof clientId === 'string' ? clientId : undefined
+      )
+      return deps.githubAuth.snapshot({ userId: deps.userId(), workspace: escopo })
     }
   )
 

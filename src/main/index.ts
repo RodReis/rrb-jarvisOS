@@ -31,6 +31,8 @@ import { CredentialService } from './credentials/credential-service'
 import { ConnectorRegistry } from './connectors/registry'
 import { ConnectorService } from './connectors/connector-service'
 import { CreditService } from './connectors/credit-service'
+import { GithubAdapter } from './connectors/github/github-adapter'
+import { GithubAuthService } from './connectors/github/github-auth-service'
 import { CreditRepository } from './connectors/credit-repository'
 import { CredentialRepository } from './credentials/credential-repository'
 import { SafeStorageCipher } from './credentials/secret-vault'
@@ -227,6 +229,21 @@ if (!app.requestSingleInstanceLock()) {
     // por um conector conhecido devolve `connector-nao-registrado` — que é o critério 1
     // valendo, não uma lacuna.
     const connectorRegistry = new ConnectorRegistry()
+    // O primeiro adapter concreto (SPEC-Conectores-03): o limite que a F01 registrou
+    // ("nenhum adapter concreto existe") fecha aqui. Declara `auth.identify` e só — repositório,
+    // issue e PR são a M6-F04.
+    connectorRegistry.register(new GithubAdapter())
+
+    // O Device Flow (SPEC-Conectores-03). Lê e grava o **payload estruturado** no mesmo cofre
+    // das credenciais de IA, com `expires_at` fora da cifra e rotação atômica — a emenda ao
+    // Vault que o PI cravou como escopo desta fatia, sem reabrir a M5-F01.
+    const githubAuth = new GithubAuthService(
+      credentialRepository,
+      storage.audit,
+      // O override do `client_id` vem do perfil, não do cofre: não é segredo (é público por
+      // desenho no Device Flow), e guardá-lo cifrado o anunciaria como se fosse.
+      () => storage.profiles.findGithubClientId(userIdAtual())
+    )
     // O gate de créditos (SPEC-Conectores-02). Construído **antes** do ponto único porque é
     // dependência dele, como o `BudgetService` é do `AiCallService`: um `ConnectorService` sem
     // gate seria um caminho até o conector sem teto.
@@ -242,7 +259,14 @@ if (!app.requestSingleInstanceLock()) {
       // vivem nos tipos — um segundo cofre duplicaria cifra e migration por nada. O payload
       // estruturado (access + refresh + `expires_at`) e a rotação atômica são a M6-F03.
       {
-        resolve: (userId, workspace, key) => credentialRepository.readSecret(userId, workspace, key)
+        // O GitHub tem caminho próprio: seu segredo é o **payload OAuth**, e entregá-lo cru ao
+        // adapter mandaria o JSON inteiro no header `Authorization`. `tokenParaUso` decifra,
+        // **renova quando está vencendo** (critério 5) e devolve só o access token. Os demais
+        // conectores seguem lendo o valor único, que é o formato deles.
+        resolve: async (userId, workspace, key) =>
+          key === 'github'
+            ? await githubAuth.tokenParaUso({ userId, workspace })
+            : credentialRepository.readSecret(userId, workspace, key)
       },
       policy,
       storage.audit,
@@ -267,6 +291,8 @@ if (!app.requestSingleInstanceLock()) {
       routingRepo,
       connectors,
       connectorCredits,
+      githubAuth,
+      profiles: storage.profiles,
       runs,
       approvals,
       userId: userIdAtual,

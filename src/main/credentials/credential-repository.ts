@@ -119,6 +119,97 @@ export class CredentialRepository {
   }
 
   /**
+   * Grava um **payload estruturado** e o prazo, numa escrita só (SPEC-Conectores-03, crit. 8).
+   *
+   * A emenda do OAuth ao vault da M5-F01. O que muda em relação ao `upsert`: o segredo cifrado
+   * é um objeto serializado (access + refresh + expirações), e o `expires_at` acompanha **fora**
+   * da cifra, para que "vence quando?" seja respondível sem destravar o DPAPI.
+   *
+   * **A rotação é atômica porque é um único `INSERT … ON CONFLICT DO UPDATE`**, e é isto que o
+   * critério 8 cobra: se o refresh falhar depois, a linha antiga continua inteira; se ele der
+   * certo, o par novo substitui o par velho de uma vez. A alternativa — `DELETE` seguido de
+   * `INSERT`, ou uma coluna por campo — teria um instante em que o cofre guarda um refresh token
+   * sem o access token que ele renova, que é credencial meio-escrita.
+   */
+  upsertPayload(
+    userId: string,
+    workspaceId: WorkspaceId,
+    key: VaultKey,
+    payload: unknown,
+    expiresAt?: string
+  ): void {
+    const agora = new Date().toISOString()
+
+    this.db
+      .prepare(
+        `INSERT INTO credential_ref
+           (id, user_id, workspace_id, key, secret, expires_at, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (user_id, workspace_id, key)
+         DO UPDATE SET secret = excluded.secret,
+                       expires_at = excluded.expires_at,
+                       updated_at = excluded.updated_at`
+      )
+      .run(
+        randomUUID(),
+        userId,
+        workspaceId,
+        key,
+        this.cipher.encrypt(JSON.stringify(payload)),
+        expiresAt ?? null,
+        agora,
+        agora
+      )
+
+    log.db.info('Credencial estruturada gravada cifrada no vault', {
+      op: 'upsert',
+      table: 'credential_ref'
+    })
+  }
+
+  /**
+   * Lê o payload estruturado, decifrando e desserializando.
+   *
+   * `undefined` cobre os três casos em que não há payload utilizável — ausente, ilegível
+   * (cifra de outra máquina) e não-JSON (uma credencial gravada por `upsert` como valor único,
+   * que é o formato legítimo das chaves de IA). Os três significam a mesma coisa para quem
+   * chama: *não há credencial OAuth aqui*, que é o desfecho que a camada de cima já trata.
+   */
+  readPayload<T>(userId: string, workspaceId: WorkspaceId, key: VaultKey): T | undefined {
+    const cru = this.readSecret(userId, workspaceId, key)
+    if (cru === undefined) return undefined
+
+    try {
+      return JSON.parse(cru) as T
+    } catch {
+      // Sem `error` no log: a mensagem do `JSON.parse` cita o trecho que falhou, e o trecho é o
+      // segredo decifrado. O fato de não ser JSON é tudo que precisa ser registrado.
+      log.db.warn('Credencial do vault não é um payload estruturado; tratada como ausente', {
+        op: 'select',
+        table: 'credential_ref'
+      })
+      return undefined
+    }
+  }
+
+  /**
+   * Quando aquela credencial vence — **sem decifrar nada**.
+   *
+   * O caminho que justifica a coluna: a tela de Configurações pergunta isto a cada render, e
+   * responder decifrando faria o app destravar o DPAPI para ler um relógio. `undefined` = não
+   * expira (ou não existe), que é o mesmo desfecho prático: não há renovação a fazer.
+   */
+  expiresAt(userId: string, workspaceId: WorkspaceId, key: VaultKey): string | undefined {
+    const row = this.db
+      .prepare(
+        'SELECT expires_at FROM credential_ref WHERE user_id = ? AND workspace_id = ? AND key = ?'
+      )
+      .get(userId, workspaceId, key) as { expires_at: string | null } | undefined
+
+    return row?.expires_at ?? undefined
+  }
+
+  /**
    * Decifra e devolve o valor — **o único caminho por onde o segredo sai do storage**.
    *
    * Chamado pelos adapters (F02) no instante da chamada ao provider, no main. Não existe canal

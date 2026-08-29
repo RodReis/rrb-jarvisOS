@@ -89,7 +89,7 @@ export interface ConnectorSecretSource {
     userId: string,
     workspace: WorkspaceId,
     key: import('@shared/domain/connectors').ConnectorCredentialKey
-  ): string | undefined
+  ): Promise<string | undefined> | string | undefined
 }
 
 /** O desfecho, com o estado em que a chamada terminou (SPEC-Conectores-02, § Regras). */
@@ -230,7 +230,7 @@ export class ConnectorService {
     }
 
     // (6) **Só agora** o cofre. Depois de tudo que pode recusar sem ele.
-    const credencial = this.resolverCredencial(request, ctx)
+    const credencial = await this.resolverCredencial(request, ctx)
     if (credencial.erro !== undefined) return credencial.erro
 
     // (7) Classificação e auditoria da requisição. `api.external-call` (tier médio) é a ação
@@ -476,14 +476,22 @@ export class ConnectorService {
    * Devolve `{ erro }` em vez de lançar, e `credencial-ausente` é desfecho previsto: o app roda
    * sem conector configurado, e a tela precisa dizer o que fazer a respeito — a mesma
    * degradação graciosa do provider de IA sem chave.
+   *
+   * **`await` sobre uma fonte que pode ser síncrona** (M6-F03): a F01 tipava o retorno como
+   * `string | undefined` porque ler o cofre é leitura de disco local. O GitHub trouxe o caso que
+   * não cabe nisso — "renovar antes do uso" (SPEC-Conectores-03, critério 5) é uma chamada de
+   * rede, e ela precisa acontecer **aqui**, no instante do uso. As alternativas eram piores:
+   * renovar por timer gastaria refresh em token que ninguém vai usar, e renovar dentro do
+   * adapter faria cada adapter futuro reimplementar a decisão. A fonte síncrona continua
+   * válida — `await` sobre valor não-Promise é o próprio valor.
    */
-  private resolverCredencial(
+  private async resolverCredencial(
     request: ConnectorRequest,
     ctx: ConnectorCallContext
-  ): { readonly secret?: string; readonly erro?: ConnectorError } {
+  ): Promise<{ readonly secret?: string; readonly erro?: ConnectorError }> {
     if (request.credential === undefined) return {}
 
-    const secret = this.secrets.resolve(ctx.userId, ctx.workspace, request.credential.key)
+    const secret = await this.secrets.resolve(ctx.userId, ctx.workspace, request.credential.key)
     if (secret === undefined || secret === '') {
       return {
         erro: this.recusar(

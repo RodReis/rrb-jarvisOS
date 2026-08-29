@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 402 | 402 | 0 | 68.5 | — | — |
-| — | — | — | Banco | 322 | 322 | 0 | 89.0 | — | — |
-| — | — | — | Tela | 301 | 300 | 0 | 90.2 | — | — |
+| — | — | — | Regras de Negócio | 451 | 451 | 0 | 70.1 | — | — |
+| — | — | — | Banco | 349 | 349 | 0 | 88.4 | — | — |
+| — | — | — | Tela | 316 | 315 | 0 | 89.2 | — | — |
 
 ## Histórico por entrega
 
@@ -139,3 +139,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-08-29 | #88 | spec-conectores-02-operacao-governanca | Regras de Negócio | 402 | 402 | 0 | 68.5 | #145 | [#145](https://github.com/RodReis/rrb-jarvisOS/pull/145) |
 | 2026-08-29 | #88 | spec-conectores-02-operacao-governanca | Banco | 322 | 322 | 0 | 89.0 | #145 | [#145](https://github.com/RodReis/rrb-jarvisOS/pull/145) |
 | 2026-08-29 | #88 | spec-conectores-02-operacao-governanca | Tela | 301 | 300 | 0 | 90.2 | #145 | [#145](https://github.com/RodReis/rrb-jarvisOS/pull/145) |
+| 2026-08-29 | #89 | spec-conectores-03-github-app-autenticacao | Regras de Negócio | 451 | 451 | 0 | 70.1 | #146 | [#146](https://github.com/RodReis/rrb-jarvisOS/pull/146) |
+| 2026-08-29 | #89 | spec-conectores-03-github-app-autenticacao | Banco | 349 | 349 | 0 | 88.4 | #146 | [#146](https://github.com/RodReis/rrb-jarvisOS/pull/146) |
+| 2026-08-29 | #89 | spec-conectores-03-github-app-autenticacao | Tela | 316 | 315 | 0 | 89.2 | #146 | [#146](https://github.com/RodReis/rrb-jarvisOS/pull/146) |

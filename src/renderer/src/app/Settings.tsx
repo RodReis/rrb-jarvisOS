@@ -16,6 +16,7 @@ import type { CorAcento } from '@design/tokens/acento'
 import type { Modulo } from '@design/tokens/semantic'
 import { CredenciaisDoWorkspace } from './CredenciaisDoWorkspace'
 import { OrcamentoDoWorkspace } from './OrcamentoDoWorkspace'
+import { ConectorGitHub } from './ConectorGitHub'
 import { ProvidersDoWorkspace } from './ProvidersDoWorkspace'
 import { DiretoriosPermitidos } from './DiretoriosPermitidos'
 import { ChamadaDeIa } from './ChamadaDeIa'
@@ -187,6 +188,12 @@ export function Settings({
        */}
       <ProvidersDoWorkspace workspace={workspace} nomeDoEspaco={nomeDoEspaco} />
       <ChamadaDeIa workspace={workspace} nomeDoEspaco={nomeDoEspaco} />
+      {/*
+       * Conectores por último: são capacidade externa, não configuração do próprio app, e o
+       * bloco de IA acima é o que o operador visita todo dia. Colocá-lo antes empurraria o
+       * orçamento — que ele consulta antes de cada chamada — para baixo da dobra.
+       */}
+      <ConectorGitHub workspace={workspace} nomeDoEspaco={nomeDoEspaco} />
     </section>
   )
 }

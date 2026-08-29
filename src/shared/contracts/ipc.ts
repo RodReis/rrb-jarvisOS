@@ -36,11 +36,13 @@ import type { BudgetLimitsInput, BudgetSnapshot } from '@shared/domain/budget'
 import type { ProviderRoute, ProviderStatus, RoutingPolicy } from '@shared/domain/routing'
 import type {
   ConnectorCapability,
+  ConnectorError,
   ConnectorId,
   ConnectorOutcome,
   ConnectorRequest
 } from '../domain/connectors'
 import type { ConnectorCreditPolicy } from '../domain/connector-governance'
+import type { GithubAuthSnapshot, GithubDeviceFlowView } from '../domain/github-auth'
 
 /** Canais de request/response (renderer → main → renderer). */
 export const IPC_CHANNELS = {
@@ -195,7 +197,30 @@ export const IPC_CHANNELS = {
    * Mesma ausência deliberada do gate de orçamento do MVP-005.
    */
   connectorCreditsGet: 'connectors:credits-get',
-  connectorCreditsSetLimits: 'connectors:credits-set-limits'
+  connectorCreditsSetLimits: 'connectors:credits-set-limits',
+  /**
+   * Autenticação do GitHub por Device Flow (SPEC-Conectores-03, critério 9).
+   *
+   * Quatro canais e nenhum que devolva token — a garantia do critério 2 é a **forma dos tipos**:
+   * `GithubAuthSnapshot` e `GithubDeviceFlowView` não têm campo onde access ou refresh token
+   * caiba, do mesmo jeito que `CredentialStatusView` não tem (M5-F01). Um canal
+   * `github:token` não existe, e é por isso que o renderer não o recebe nem por engano.
+   *
+   * `start` e `await` são separados porque a tela precisa mostrar o código **antes** de a espera
+   * começar: um canal único só responderia quando o usuário já tivesse autorizado — e ele nunca
+   * saberia o que digitar. `cancel` existe porque o critério 3 exige que o polling termine por
+   * vontade do usuário, não só por prazo.
+   *
+   * O `client_id` **override** entra em `github:set-client-id` e não no vault: ele não é segredo
+   * (é público por desenho no Device Flow) e guardá-lo cifrado o faria aparecer na tela de
+   * credenciais como se fosse — anunciando um segredo que não existe.
+   */
+  githubAuthStatus: 'github:auth-status',
+  githubAuthStart: 'github:auth-start',
+  githubAuthAwait: 'github:auth-await',
+  githubAuthCancel: 'github:auth-cancel',
+  githubAuthLogout: 'github:auth-logout',
+  githubSetClientId: 'github:set-client-id'
 } as const
 
 /**
@@ -517,6 +542,33 @@ export interface JarvisBridge {
     limites: ConnectorCreditLimitsInput,
     workspace: WorkspaceId
   ): Promise<ConnectorCreditView>
+
+  /**
+   * Autenticação do GitHub por Device Flow (SPEC-Conectores-03).
+   *
+   * **Nenhum destes métodos devolve token.** A garantia é a assinatura: `GithubAuthSnapshot` e
+   * `GithubDeviceFlowView` não têm campo onde access ou refresh token caiba, e não existe um
+   * `getGithubToken()`. É a mesma ausência deliberada do valor de credencial na M5-F01.
+   */
+  getGithubAuthStatus(workspace: WorkspaceId): Promise<GithubAuthSnapshot>
+  /**
+   * Abre o fluxo e devolve o código a mostrar. Separado do `await` porque a tela precisa exibir
+   * o código **antes** de a espera começar.
+   */
+  startGithubAuth(workspace: WorkspaceId): Promise<GithubDeviceFlowView | ConnectorError>
+  /** Espera a autorização. Resolve em sucesso, cancelamento, expiração ou erro normalizado. */
+  awaitGithubAuth(workspace: WorkspaceId): Promise<GithubAuthSnapshot | ConnectorError>
+  /** Cancela o fluxo em andamento — a saída por vontade do usuário que o critério 3 exige. */
+  cancelGithubAuth(workspace: WorkspaceId): Promise<void>
+  /** Remove a credencial local e limpa o estado (critério 6). */
+  logoutGithub(workspace: WorkspaceId): Promise<GithubAuthSnapshot>
+  /**
+   * Grava o override do `client_id` (critério 7). Texto vazio limpa e volta ao embutido.
+   *
+   * Não passa pelo vault de propósito: o `client_id` é público por desenho no Device Flow, e
+   * guardá-lo cifrado o anunciaria como segredo que ele não é.
+   */
+  setGithubClientId(clientId: string, workspace: WorkspaceId): Promise<GithubAuthSnapshot>
 }
 
 /** Teto + consumo, como a tela os lê. */
