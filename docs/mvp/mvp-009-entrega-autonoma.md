@@ -5,6 +5,7 @@
 - Depende de: MVP-005, MVP-006 e MVP-008 concluídos.
 - Não depende de: MVP-007.
 - Resultado: uma fatia aprovada percorre publicação, construção, PR, CI, merge e prova sem aceite duplicado.
+- **Herdado da revisão do MVP-008 (decisão do PI 2026-08-29):** a consulta a **documentação técnica atual (Context7)** pertence a este MVP — é o agente construtor (Claude Code, que já tem Context7 como MCP) quem a faz. O aplicativo não expõe Context7 como conector. A ser tratado na revisão das SPECs deste MVP; hoje é pendência registrada, não fatia.
 
 ## Tese
 

@@ -2,7 +2,7 @@
 
 - MVP/Fatia: MVP-008 · M8-F03.
 - Issue: [#96](https://github.com/RodReis/rrb-jarvisOS/issues/96).
-- Status: **revisão documental; implementação não autorizada**.
+- Status: **aprovada-pi** (2026-08-29) — aprovada sem pergunta estrutural aberta; o contrato da pergunta já reflete as regras do PI.
 - Depende de: M8-F01 e M8-F02.
 
 ## Objetivo
@@ -41,3 +41,9 @@ Conduzir o PI por uma decisão de cada vez até eliminar lacunas materiais, com 
 ## Testes e evidência
 
 Unitários do grafo de perguntas; Playwright para escolha, delegação, voltar, contradição, autosave e retomada. Relatório `SPEC-Planejamento-03` com vídeo/screenshot apenas quando útil.
+
+## Decisões cravadas pelo Cowork (coerentes com decisões anteriores; PI pode vetar)
+
+- **"Decide por mim" grava a `Decision` com o agente como autor**, nunca o PI — e não aprova gate (invariante 3 da CONVENTION §4). A trilha distingue quem escolheu de quem aceitou.
+- **A proibição de inventar requisito é literal:** o wizard não cria LGPD, consentimento, aceite duplo nem classificação por domínio que o PI não tenha informado (invariante 9). Nenhuma pergunta do wizard os oferece como default.
+- **Uma pergunta por pop-up** é contrato de UI, não sugestão: opções mutuamente exclusivas, recomendada primeiro, impacto declarado, campo livre quando couber.

@@ -1,6 +1,6 @@
 # STATUS.md — Kanban / Roadmap
 
-Atualizado em: **2026-08-28**. Visão curta do estado corrente e fonte única do índice Fatia ↔ SPEC. Histórico e ressalvas: `docs/STATUS-ARQUIVO.md`. O board GitHub vence em caso de divergência factual.
+Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do índice Fatia ↔ SPEC. Histórico e ressalvas: `docs/STATUS-ARQUIVO.md`. O board GitHub vence em caso de divergência factual.
 
 ## Agora
 
@@ -10,8 +10,8 @@ Atualizado em: **2026-08-28**. Visão curta do estado corrente e fonte única do
 | Backlog | [#84](https://github.com/RodReis/rrb-jarvisOS/issues/84) · `[FIX]` card de aprovação descreve comando como filesystem | despriorizado pelo PI em favor do #107 |
 | Backlog | [#79](https://github.com/RodReis/rrb-jarvisOS/issues/79) · BudgetPolicy | aprovado, aguardando fila |
 | Backlog | [#80](https://github.com/RodReis/rrb-jarvisOS/issues/80) · Multi-provider | aprovado, aguardando fila |
-| Planejado | [#87–#92](https://github.com/RodReis/rrb-jarvisOS/issues/87) · MVP-006 | SPECs em revisão; fora da fila |
-| Planejado | [#94–#99](https://github.com/RodReis/rrb-jarvisOS/issues/94) · MVP-008 | SPECs em revisão; fora da fila |
+| Backlog | [#87–#92](https://github.com/RodReis/rrb-jarvisOS/issues/87) · MVP-006 | seis SPECs `aprovada-pi` (2026-08-29); atrás de #79/#80 na fila |
+| Backlog | [#94–#99](https://github.com/RodReis/rrb-jarvisOS/issues/94) · MVP-008 | seis SPECs `aprovada-pi` (2026-08-29); atrás do MVP-006 na fila |
 | Planejado | [#101–#106](https://github.com/RodReis/rrb-jarvisOS/issues/101) · MVP-009 | SPECs em revisão; fora da fila |
 | Done | [#75](https://github.com/RodReis/rrb-jarvisOS/issues/75) · MVP-004 F02 Terminal | PR [#83](https://github.com/RodReis/rrb-jarvisOS/pull/83), aguardando aceite |
 | Done | [#77](https://github.com/RodReis/rrb-jarvisOS/issues/77) · MVP-005 F01 Vault | PR [#108](https://github.com/RodReis/rrb-jarvisOS/pull/108), aguardando aceite |
@@ -33,10 +33,14 @@ Atualizado em: **2026-08-28**. Visão curta do estado corrente e fonte única do
 | MVP-003 Design System | [#16](https://github.com/RodReis/rrb-jarvisOS/issues/16) | fechado/aceito | 8/8 |
 | MVP-004 Execução real | [#10](https://github.com/RodReis/rrb-jarvisOS/issues/10) | F01 aceita; F02 aguardando aceite | 1/2 |
 | MVP-005 Providers/Vault/Budget | [#76](https://github.com/RodReis/rrb-jarvisOS/issues/76) | F01 entregue, aguardando aceite; três SPECs no Backlog | 1/4 |
-| MVP-006 Conectores Essenciais | [#86](https://github.com/RodReis/rrb-jarvisOS/issues/86) | seis fatias `planejado`; sem autorização | 0/6 |
-| MVP-007 Memória Contextual/RAG | — | slot proposto; não bloqueante | — |
-| MVP-008 Planejamento Governado | [#93](https://github.com/RodReis/rrb-jarvisOS/issues/93) | seis fatias `planejado`; sem autorização | 0/6 |
+| MVP-006 Conectores Essenciais | [#86](https://github.com/RodReis/rrb-jarvisOS/issues/86) | seis SPECs `aprovada-pi` (2026-08-29); fatias no Backlog | 0/6 |
+| MVP-007 Memória Contextual/RAG | — | slot proposto; **sem fatias e sem SPEC** — nada a aprovar até entrar em planejamento ativo | — |
+| MVP-008 Planejamento Governado | [#93](https://github.com/RodReis/rrb-jarvisOS/issues/93) | seis SPECs `aprovada-pi` (2026-08-29); fatias no Backlog | 0/6 |
 | MVP-009 Entrega Autônoma | [#100](https://github.com/RodReis/rrb-jarvisOS/issues/100) | seis fatias `planejado`; sem autorização | 0/6 |
+
+> **MVP-006 aprovado (2026-08-29).** As seis SPECs passaram pelo gate de perguntas abertas e viraram `aprovada-pi`. Sete decisões do PI: runtime de conectores **separado** do ponto único de IA do MVP-005; **ledger de créditos próprio** para conector, independente da `BudgetPolicy` em USD; **GitHub App do projeto** com `client_id` embutido e override em Settings; **emenda do Vault para OAuth** (payload estruturado, `expires_at`, rotação atômica) como escopo da M6-F03, sem reabrir a M5-F01; **roteamento Context7↔Tavily removido** da M6-F05 e transferido ao MVP-008; **UI mínima dentro de cada fatia**, sem fatia dedicada; **evidência extensa no diretório de artefatos do app**. A aprovação **não muda a fila** — a cabeça continua sendo a M5-F02 (#78).
+
+> **MVP-008 aprovado (2026-08-29).** Seis decisões do PI: projeto nasce **sob `userData`** e criar projeto nunca amplia a allowlist; **Git é o `git` do sistema pelo terminal controlado do MVP-004**, sem segundo caminho de escrita fora do enforcement; **importar o próprio `rrb-jarvisOS`** é critério de aceite; a **rota de assinatura (Claude MAX via Claude Code) registra uso sem valor monetário** e a `BudgetPolicy` gateia só rota paga; o app **não chama Context7** — ele é do agente construtor no MVP-009; **anexos de design entram por seletor que copia e hasheia no ato**. Duas dependências duras ficaram registradas: a M8-F01 depende da M4-F02 (#75) e fica limitada ao diretório do app até existir a fatia de UI da allowlist. Emendas em `spec-providers-03` e `spec-providers-04`: rota de assinatura é `unmetered`. **A fila não mudou** — a cabeça continua sendo a M5-F02 (#78).
 
 ## Índice Fatia ↔ SPEC
 
@@ -77,8 +81,10 @@ Não existe catálogo global `SPEC-nnn`. O identificador canônico é o slug aba
 1. PI aceitar ou recusar as três fatias em **Done**: F02 do MVP-004 (#75), M5-F01 (#77) e o `[FIX]` #107.
 2. Ordem da fila **decidida pelo PI (2026-08-28)**: #107 primeiro (entregue), depois a M5-F02 (#78). O #84 volta ao Backlog e reentra depois.
 3. Decidir sobre a **UI da allowlist de diretórios** (pendência registrada na F02 do MVP-004): é fatia, precisa de spec — sem ela o usuário não consegue permitir diretório pelo app.
-4. Revisar as SPECs dos MVPs 006/008/009; as issues #87–#106 permanecem `proplan:planejado` e só migram para `backlog` após aprovação explícita.
-5. MVP-007 será detalhado apenas quando entrar no planejamento ativo.
+4. **MVP-006 e MVP-008 revisados e aprovados (2026-08-29)** — treze decisões estruturais do PI registradas nas SPECs e nos docs dos épicos; #87–#92 e #94–#99 migraram para `proplan:backlog`. Falta revisar o **MVP-009**: #101–#106 seguem `proplan:planejado`.
+5. MVP-007 será detalhado apenas quando entrar no planejamento ativo — hoje não tem fatia nem SPEC, então não há o que aprovar.
+6. **Decidir a fatia de UI da allowlist de diretórios** subiu de prioridade: a M8-F01 fica limitada ao diretório do app enquanto ela não existir (item 3 acima).
+7. Revisão do MVP-009 herda uma pendência: alocar a consulta de **documentação técnica (Context7)** pelo agente construtor a uma fatia daquele MVP.
 
 ## Roadmap
 

@@ -2,7 +2,7 @@
 
 - MVP/Fatia: MVP-008 · M8-F06.
 - Issue: [#99](https://github.com/RodReis/rrb-jarvisOS/issues/99).
-- Status: **revisão documental; implementação não autorizada**.
+- Status: **aprovada-pi** (2026-08-29) — aprovada sem pergunta estrutural aberta; os gates já refletem as invariantes da CONVENTION §4.
 - Depende de: M8-F05.
 
 ## Objetivo
@@ -39,3 +39,10 @@ Correção textual, STATUS, evidência e ADR registrando decisão já tomada nã
 ## Testes e evidência
 
 Unitários de DAG, hash e matriz de invalidação; Playwright do centro de aprovações; teste de revisão cosmética/material. Relatório `SPEC-Planejamento-06`.
+
+## Decisões cravadas pelo Cowork (coerentes com decisões anteriores; PI pode vetar)
+
+- **Identidade do PI na aprovação** = a sessão autenticada local (SPEC-Fundacao-03). A aprovação funciona **offline** dentro da validade de sessão offline já definida lá; sem sessão válida, não há aprovação — o gate falha fechado, nunca "aprova como anônimo".
+- **`STATUS.md` gerado espelha o formato deste repositório** (Agora, MVPs, Índice Fatia ↔ SPEC, Próximas ações), porque é o formato que o MVP-009 lê.
+- **Commit documental automático ao fechar o pacote** usa o mesmo caminho de Git da M8-F01 — terminal controlado, auditado.
+- **Nenhum gate é aprovado por "Decide por mim"** (critério 7 e invariante 3): delegação escolhe, o PI aceita.

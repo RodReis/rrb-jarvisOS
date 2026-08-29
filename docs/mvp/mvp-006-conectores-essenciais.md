@@ -1,7 +1,7 @@
 # MVP-006 — Conectores Essenciais
 
-- Status: **desenho aprovado pelo PI em 2026-08-28; SPECs em revisão documental; implementação não autorizada**.
-- GitHub: épico [#86](https://github.com/RodReis/rrb-jarvisOS/issues/86); fatias [#87–#92](https://github.com/RodReis/rrb-jarvisOS/issues/87), estado `proplan:planejado`.
+- Status: **as seis SPECs `aprovada-pi` em 2026-08-29** — revisão de perguntas abertas concluída com o PI; fatias liberadas para o Backlog na ordem da fila do `STATUS.md`.
+- GitHub: épico [#86](https://github.com/RodReis/rrb-jarvisOS/issues/86); fatias [#87–#92](https://github.com/RodReis/rrb-jarvisOS/issues/87), estado `proplan:backlog`.
 - Depende de: MVP-005 (Vault, gateway de providers e BudgetPolicy).
 - Não depende de: MVP-007.
 - Dono do aceite de construção: PI.
@@ -18,6 +18,20 @@ Entregar uma base auditável para integrações externas e os dois conectores ne
 - Efeitos externos são auditados e reconciliados.
 - Context7 continua sendo a fonte obrigatória para documentação técnica suportada; Tavily atende mercado e web geral.
 - Google Workspace, ElevenLabs, sync Supabase e Obsidian ficam no backlog sem numeração.
+
+## Decisões estruturais do PI (2026-08-29)
+
+Resolvidas na revisão que liberou as seis SPECs; cada uma está registrada na sua SPEC.
+
+| # | Decisão | Onde |
+|---|---|---|
+| 1 | Runtime de conectores é **separado** do ponto único de IA do MVP-005; compartilham Vault, auditoria e ledger | M6-F01 |
+| 2 | Crédito de conector tem **ledger próprio em créditos**, independente da `BudgetPolicy` em USD | M6-F02 |
+| 3 | GitHub App é **do projeto**, `client_id` embutido com override opcional em Settings | M6-F03 |
+| 4 | Emenda do Vault para OAuth (payload estruturado + `expires_at` + rotação atômica) é **escopo da M6-F03** | M6-F03 |
+| 5 | Roteamento Context7↔Tavily **sai da M6-F05**; o app nunca chama Context7 — ele é do agente construtor no **MVP-009** (ajuste na mesma data, revisão do MVP-008) | M6-F05 |
+| 6 | UI é **mínima e dentro de cada fatia**; não há fatia dedicada de UI de Conectores | M6-F03, M6-F05 |
+| 7 | Evidência extensa vive no **diretório de artefatos do app**, referenciada por hash | M6-F06 |
 
 ## Fatias
 
@@ -40,7 +54,7 @@ As duas trilhas podem ser especificadas em paralelo, mas a implementação mant�
 
 - GitHub autentica por Device Flow sem segredo embarcado e renova tokens pelo Vault.
 - Operações GitHub são idempotentes e confirmadas na origem.
-- Tavily Search e Extract preservam fontes, `request_id` e créditos.
+- Tavily Search e Extract preservam fontes, `request_id` e créditos, com teto próprio no ledger de créditos.
 - Erros externos produzem bloqueio retomável com causa e ação.
 - Contract tests e um smoke real limitado passam.
 - Nenhum segredo aparece em renderer, prompt, log ou evidência.

@@ -2,6 +2,7 @@
 
 - MVP: `docs/mvp/mvp-005-providers-vault-budget.md` (Fatia 04) — **fecha o MVP-005**.
 - Status: **aprovada-pi** (2026-07-24) — profundidade do roteamento e inclusão do Claude Code CLI resolvidas pelo PI nesta data.
+- **Emenda 2026-08-29 (PI, na revisão do MVP-008):** a rota **Claude Code CLI** é a rota de **assinatura** (plano Claude MAX) e é **`unmetered`** — registra uso sem valor monetário e não é barrada pela `BudgetPolicy` (emenda correspondente na SPEC-Providers-03). O `ProviderRoute` marca cada rota como **paga** ou **de assinatura**; a distinção é do contrato, não do adapter.
 - Dependências: **Fatia 02 entregue** (framework de adapters + ponto único de chamada — os novos providers plugam nele) e **Fatia 03** (BudgetPolicy — o gate vale para qualquer provider no ponto único). **Fatia 01** (Vault — Gemini e outros cloud leem credencial). MVP-002 (Policy Engine, `AuditEvent`). **Independe do MVP-004** (ver nota de reconciliação sobre o CLI).
 - Decisões que sustentam esta spec: requisitos RF-011 (providers de IA: Ollama/local; tela com status `online/loading/offline`, modelo ativo, latência, origem local/cloud, troca de modelo; **lógica de roteamento por tarefa, preferência local/offline**), "Claude deve suportar Claude API **e Claude Code CLI**", modelo `ProviderRoute` ("regra de roteamento por tipo de tarefa"); ARCHITECTURE § Provider Adapters e § Resiliência (healthcheck por serviço; roteamento com preferência local/offline); ADR-004 (auditoria); ADR-005 (logging).
 
