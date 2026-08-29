@@ -4,7 +4,7 @@
 - Pipeline: V3, depois do MVP-015.
 - Implementação: **não autorizada por este documento**.
 - Issues: não criadas.
-- SPECs: ainda não redigidas.
+- SPECs: M16-F01 em `revisão-pi`; M16-F02–F06 ainda não redigidas.
 - Design predecessor: `2026-08-29-mvp-015-observabilidade-operacional-design.md`.
 
 ## 1. Resultado esperado
