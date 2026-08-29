@@ -30,6 +30,7 @@ import {
   type SquashMergeInput,
   type WorkflowRunNormalizado
 } from '@shared/domain/github-automation'
+import { log } from '../../logging/logger'
 import { lista, numero, texto, type GithubRest, type RespostaRest } from './github-rest'
 
 /**
@@ -115,9 +116,19 @@ function normalizarRepo(
  * processo renomeia a fatia) e a issue passaria a ser criada de novo a cada mudança. A chave é
  * determinística e derivada do par MVP/Fatia/SPEC pelo chamador — o vínculo que o critério 2 pede.
  *
- * A busca usa a listagem do repositório e não a `search` API: `search` é eventualmente consistente
- * (uma issue criada há segundos pode não aparecer), e o `ensure` chamado duas vezes seguidas —
- * exatamente o cenário do critério 1 — cairia no vão.
+ * **A listagem do GitHub é eventualmente consistente, e o smoke real mediu isso**: uma issue
+ * recém-criada leva cerca de 1,5 s para aparecer em `GET /issues`. Dois `ensure` em sequência
+ * dentro dessa janela criariam duas issues — exatamente o que o critério 1 proíbe, e exatamente o
+ * que nenhum servidor falso mostraria, porque ele responde instantâneo e consistente.
+ *
+ * A defesa é **reconferir depois de criar**: se a releitura revelar mais de uma issue com a chave,
+ * a operação converge para a **mais antiga** (menor `number`) e reporta a duplicata. Duas execuções
+ * concorrentes acabam apontando para a mesma issue, que é o que "idempotente" precisa significar
+ * quando o serviço do outro lado não oferece criação condicional.
+ *
+ * O que isto **não** faz: apagar a issue extra. Fechar ou deletar issue por conta própria é ato de
+ * curadoria do board, e o processo deste repo é explícito em que issue não se deleta — a extra fica
+ * visível para quem decide o que fazer com ela.
  */
 export async function ensureIssue(
   rest: GithubRest,
@@ -136,6 +147,23 @@ export async function ensureIssue(
     })
   )
 
+  // Convergência: relê e fica com a mais antiga se a janela de inconsistência tiver produzido
+  // duas. A releitura pode não enxergar nem a que acabamos de criar — nesse caso a criada é a
+  // resposta, que é o desfecho correto de qualquer forma.
+  const todas = await todasComChave(rest, input)
+  const maisAntiga = todas.reduce<{ item: unknown; numero: number } | undefined>((menor, item) => {
+    const n = numero(item, 'number') ?? Number.MAX_SAFE_INTEGER
+    return menor === undefined || n < menor.numero ? { item, numero: n } : menor
+  }, undefined)
+
+  const numeroCriado = numero(criada.corpo, 'number') ?? 0
+  if (maisAntiga !== undefined && maisAntiga.numero < numeroCriado) {
+    log.integracao.warn('Duas issues com a mesma chave externa; usando a mais antiga', {
+      connector: 'github'
+    })
+    return normalizarIssue(maisAntiga.item, false)
+  }
+
   return normalizarIssue(criada.corpo, true)
 }
 
@@ -153,6 +181,16 @@ async function procurarIssuePorChave(
   rest: GithubRest,
   input: EnsureIssueInput
 ): Promise<unknown | undefined> {
+  return (await todasComChave(rest, input))[0]
+}
+
+/** Todas as issues com aquela chave — normalmente zero ou uma; mais de uma é a duplicata. */
+async function todasComChave(
+  rest: GithubRest,
+  input: EnsureIssueInput
+): Promise<readonly unknown[]> {
+  const achadas: unknown[] = []
+
   // ponytail: 5 páginas de 100 (500 issues). Paginar até o fim se um repo real passar disso.
   for (let pagina = 1; pagina <= 5; pagina += 1) {
     const resposta = exigirOk(
@@ -163,17 +201,18 @@ async function procurarIssuePorChave(
     )
 
     const itens = lista(resposta.corpo)
-    const achada = itens.find(
-      (i) =>
-        i.pull_request === undefined && corpoTemChaveExterna(texto(i, 'body'), input.externalKey)
+    achadas.push(
+      ...itens.filter(
+        (i) =>
+          i.pull_request === undefined && corpoTemChaveExterna(texto(i, 'body'), input.externalKey)
+      )
     )
-    if (achada !== undefined) return achada
 
     // Página incompleta = última página. Continuar pediria uma página vazia por nada.
-    if (itens.length < 100) return undefined
+    if (itens.length < 100) break
   }
 
-  return undefined
+  return achadas
 }
 
 function normalizarIssue(

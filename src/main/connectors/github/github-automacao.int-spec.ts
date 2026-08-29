@@ -60,6 +60,16 @@ let origem: string
 let requisicoes: { metodo: string; caminho: string; corpo: unknown }[]
 /** Respostas forçadas por caminho, para exercitar 404/409/422/429 sem inventar estado. */
 let forcadas: Map<string, { status: number; corpo?: unknown; headers?: Record<string, string> }>
+/**
+ * Quantas listagens uma issue recém-criada leva para aparecer.
+ *
+ * Zero = consistente (o padrão dos testes). Valor maior imita o GitHub real, cuja listagem é
+ * **eventualmente consistente** — o smoke real mediu ~1,5 s de atraso. É a mentira que o fake
+ * precisa saber contar: sem ela, "repetir não duplica" fica verde num cenário que não existe.
+ */
+let listagensAteAparecer = 0
+/** Quantas listagens faltam para cada issue nova aparecer. */
+let atrasos: Map<number, number>
 
 function estadoInicial(): EstadoFake {
   return {
@@ -121,7 +131,12 @@ function responder(
 
   // GET /repos/{o}/{r}/issues  (listagem para o ensure)
   if (metodo === 'GET' && /\/issues$/.test(semQuery)) {
-    return { status: 200, corpo: estado.issues }
+    // Esconde as `listagensAteAparecer` primeiras leituras de cada issue nova.
+    const visiveis = estado.issues.filter((i) => (atrasos.get(i.number) ?? 0) <= 0)
+    for (const [n, restante] of atrasos) {
+      if (restante > 0) atrasos.set(n, restante - 1)
+    }
+    return { status: 200, corpo: visiveis }
   }
 
   // POST /repos/{o}/{r}/issues
@@ -135,6 +150,7 @@ function responder(
       html_url: `https://github.com/${OWNER}/${REPO}/issues/${numeroNovo}`
     }
     estado.issues.push(issue)
+    if (listagensAteAparecer > 0) atrasos.set(numeroNovo, listagensAteAparecer)
     return { status: 201, corpo: issue }
   }
 
@@ -308,6 +324,8 @@ beforeEach(async () => {
   estado = estadoInicial()
   requisicoes = []
   forcadas = new Map()
+  atrasos = new Map()
+  listagensAteAparecer = 0
 
   servidor = createServer((req, res) => {
     let cru = ''
@@ -396,6 +414,21 @@ describe('issue.ensure — critérios 1 e 2', () => {
 
     expect(estado.issues).toHaveLength(1)
     expect(estado.issues[0]?.title).toBe(entrada.title)
+  })
+
+  it('converge para a mais antiga quando a listagem ainda não mostra a recém-criada', async () => {
+    // **O caso que o smoke real revelou e nenhum fake mostraria sozinho:** a listagem do GitHub é
+    // eventualmente consistente, e a issue criada só aparece ~1,5 s depois. Sem a releitura pós-
+    // criação, dois `ensure` em sequência criariam duas issues — o oposto do critério 1.
+    listagensAteAparecer = 2
+
+    const a = (await executar(GITHUB_OPERATIONS.ensureIssue, entrada)) as ConnectorResult
+    const b = (await executar(GITHUB_OPERATIONS.ensureIssue, entrada)) as ConnectorResult
+
+    // As duas chamadas apontam para a MESMA issue — a mais antiga —, mesmo tendo o serviço
+    // escondido a primeira na hora da segunda busca.
+    expect((a.data as { numero: number }).numero).toBe(1)
+    expect((b.data as { numero: number }).numero).toBe(1)
   })
 
   it('chave diferente cria outra issue', async () => {

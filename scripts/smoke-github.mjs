@@ -104,13 +104,34 @@ async function main() {
   })
   relatar('issue.ensure (cria)', issuePai.ok, `#${issuePai.corpo?.number}`)
 
-  // 3b. idempotência: a busca acha a issue pela chave, e um segundo ensure não criaria outra
-  const listadas = await api('GET', `/repos/${OWNER}/${REPO}/issues?state=all&per_page=100`)
-  const achadas = (Array.isArray(listadas.corpo) ? listadas.corpo : []).filter(
-    (i) => !i.pull_request && typeof i.body === 'string' && i.body.includes(marcador)
-  )
+  // 3b. Idempotência da issue, e o que este passo **de fato** mede.
+  //
+  // **A listagem do GitHub é eventualmente consistente**, e foi este smoke que descobriu: a issue
+  // recém-criada leva vários segundos para aparecer em `GET /issues` — mais que os 3 s que uma
+  // primeira tentativa de espera assumiu. Isso não é defeito nosso; é o serviço.
+  //
+  // A consequência para o app é real, e a correção mora em `ensureIssue`: ele **relê depois de
+  // criar** e converge para a issue mais antiga com aquela chave, para que duas execuções dentro
+  // da janela acabem apontando para a mesma. Nenhum servidor falso mostraria isso, porque responde
+  // instantâneo e consistente — este é exatamente o tipo de fato que só o smoke real revela.
+  //
+  // O que este passo afirma, então, é a convergência: com tempo suficiente, existe **uma** issue
+  // com a chave. Espera com tentativas em vez de uma pausa fixa, porque a janela é variável — uma
+  // pausa fixa transformaria latência do GitHub em falha nossa.
+  let achadas = []
+  for (let tentativa = 1; tentativa <= 10; tentativa += 1) {
+    await new Promise((r) => setTimeout(r, 2000))
+    const listadas = await api('GET', `/repos/${OWNER}/${REPO}/issues?state=all&per_page=100`)
+    achadas = (Array.isArray(listadas.corpo) ? listadas.corpo : []).filter(
+      (i) => !i.pull_request && typeof i.body === 'string' && i.body.includes(marcador)
+    )
+    if (achadas.length > 0) {
+      console.log(`       (a listagem levou ~${tentativa * 2}s para mostrar a issue criada)`)
+      break
+    }
+  }
   relatar(
-    'issue.ensure (idempotente: a chave acha exatamente uma)',
+    'issue.ensure (converge: a chave acha exatamente uma issue)',
     achadas.length === 1,
     `${achadas.length} issue(s) com a chave`
   )

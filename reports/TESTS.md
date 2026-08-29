@@ -12,8 +12,8 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 451 | 451 | 0 | 70.1 | — | — |
-| — | — | — | Banco | 349 | 349 | 0 | 88.4 | — | — |
+| — | — | — | Regras de Negócio | 495 | 495 | 0 | 64.8 | — | — |
+| — | — | — | Banco | 380 | 380 | 0 | 87.8 | — | — |
 | — | — | — | Tela | 316 | 315 | 0 | 89.2 | — | — |
 
 ## Histórico por entrega
@@ -142,3 +142,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-08-29 | #89 | spec-conectores-03-github-app-autenticacao | Regras de Negócio | 451 | 451 | 0 | 70.1 | #146 | [#146](https://github.com/RodReis/rrb-jarvisOS/pull/146) |
 | 2026-08-29 | #89 | spec-conectores-03-github-app-autenticacao | Banco | 349 | 349 | 0 | 88.4 | #146 | [#146](https://github.com/RodReis/rrb-jarvisOS/pull/146) |
 | 2026-08-29 | #89 | spec-conectores-03-github-app-autenticacao | Tela | 316 | 315 | 0 | 89.2 | #146 | [#146](https://github.com/RodReis/rrb-jarvisOS/pull/146) |
+| 2026-08-29 | #90 | spec-conectores-04-github-automacao | Regras de Negócio | 495 | 495 | 0 | 64.8 | — | — |
+| 2026-08-29 | #90 | spec-conectores-04-github-automacao | Banco | 380 | 380 | 0 | 87.8 | — | — |
+| 2026-08-29 | #90 | spec-conectores-04-github-automacao | Tela | 316 | 315 | 0 | 89.2 | — | — |
