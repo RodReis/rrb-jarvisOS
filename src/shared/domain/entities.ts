@@ -198,7 +198,16 @@ export const AUDIT_EVENT_TYPES = [
   // exigiria parsear payload para descartar as chamadas de IA. O payload traz conector,
   // operação, efeito, código de erro e créditos consumidos; **nunca o input, a resposta ou a
   // credencial** (ADR-004).
-  'connector-call'
+  'connector-call',
+  // SPEC-Conectores-02: o ledger de créditos de conector. **Dois tipos**, pela mesma razão que
+  // separa `budget-decision` de `budget-change`: `connector-credit-decision` é o veredito sobre
+  // uma chamada (permitido/bloqueado, critério 8), `connector-credit-change` é o usuário
+  // editando o próprio teto. Sob um tipo só, "quantas vezes a cota barrou" exigiria parsear
+  // payload para descartar as edições. **Distinto de `budget-decision`** porque os dois
+  // orçamentos são independentes (decisão do PI de 2026-08-29): um conta créditos do conector,
+  // o outro conta USD de IA — e a auditoria tem de dizer qual dos dois estourou.
+  'connector-credit-decision',
+  'connector-credit-change'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]
