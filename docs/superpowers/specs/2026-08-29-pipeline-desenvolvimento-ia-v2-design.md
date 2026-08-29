@@ -8,7 +8,7 @@
 
 A Pipeline V2 recebe um roadmap de MVPs e fatias previamente aprovados, distribui o trabalho entre Claude Code e Codex, usa Squads limitados pela SPEC, executa no máximo duas fatias independentes em paralelo e continua até que todo o DAG autorizado esteja mergeado ou tenha bloqueio explicável.
 
-A V2 termina no merge técnico. Deploy, produção e rollback de ambiente permanecem fora desta versão. Merge não fecha a issue nem substitui o aceite final do PI.
+A V2 termina no merge técnico. Deploy, produção e rollback de ambiente permanecem fora desta versão. Merge não fecha a issue; o fechamento continua administrativo e não cria um segundo aceite do PI nem bloqueia a promoção definida pela V3.
 
 ## 2. Decisões do PI
 
@@ -196,7 +196,7 @@ Eliminar a pausa operacional entre fatias já aprovadas e continuar até consumi
 ### Regras
 
 - Dependência técnica é satisfeita pelo merge confirmado; não espera fechamento da issue.
-- Fechamento e aceite final continuam exclusivos do PI.
+- Fechamento administrativo continua exclusivo do PI, mas não constitui novo gate de aceite nem bloqueia a promoção definida pela V3.
 - Fatia sem SPEC aprovada e MVP sem gate de entrada permanecem fora da fila executável.
 - Pausa impede nova aquisição e leva runs ativos à próxima fronteira segura.
 - Cancelamento usa a matriz por fase e nunca apaga trabalho remoto.

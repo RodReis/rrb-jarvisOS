@@ -52,12 +52,19 @@ Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do
 | MVP-011 Squads limitados | [#121](https://github.com/RodReis/rrb-jarvisOS/issues/121) | fatias [#122–#126](https://github.com/RodReis/rrb-jarvisOS/issues/122) no Backlog | 0/5 |
 | MVP-012 Scheduler concorrente | [#127](https://github.com/RodReis/rrb-jarvisOS/issues/127) | fatias [#128–#132](https://github.com/RodReis/rrb-jarvisOS/issues/128) no Backlog | 0/5 |
 | MVP-013 Execução contínua | [#133](https://github.com/RodReis/rrb-jarvisOS/issues/133) | fatias [#134–#138](https://github.com/RodReis/rrb-jarvisOS/issues/134) no Backlog | 0/5 |
+| MVP-014 Release e Deploy Governado | — | design aprovado; cinco fatias nominadas; SPECs ainda não redigidas; depois do MVP-013 | — |
+| MVP-015 Observabilidade Operacional | — | direção aprovada; sem fatias e sem SPEC | — |
+| MVP-016 Aprendizado Operacional da Pipeline | — | direção aprovada; sem fatias e sem SPEC; não substitui o MVP-007 | — |
+| MVP-017 Biblioteca de Blueprints | — | direção aprovada; sem fatias e sem SPEC | — |
+| MVP-018 Gestão de Portfólio | — | direção aprovada; sem fatias e sem SPEC | — |
 
 > **MVP-006 aprovado (2026-08-29).** As seis SPECs passaram pelo gate de perguntas abertas e viraram `aprovada-pi`. Sete decisões do PI: runtime de conectores **separado** do ponto único de IA do MVP-005; **ledger de créditos próprio** para conector, independente da `BudgetPolicy` em USD; **GitHub App do projeto** com `client_id` embutido e override em Settings; **emenda do Vault para OAuth** (payload estruturado, `expires_at`, rotação atômica) como escopo da M6-F03, sem reabrir a M5-F01; **roteamento Context7↔Tavily removido** da M6-F05 e transferido ao MVP-008; **UI mínima dentro de cada fatia**, sem fatia dedicada; **evidência extensa no diretório de artefatos do app**. A aprovação **não muda a fila** — a cabeça continua sendo a M5-F02 (#78).
 
 > **MVP-008 aprovado (2026-08-29).** Seis decisões do PI: projeto nasce **sob `userData`** e criar projeto nunca amplia a allowlist; **Git é o `git` do sistema pelo terminal controlado do MVP-004**, sem segundo caminho de escrita fora do enforcement; **importar o próprio `rrb-jarvisOS`** é critério de aceite; a **rota de assinatura (Claude MAX via Claude Code) registra uso sem valor monetário** e a `BudgetPolicy` gateia só rota paga; o app **não chama Context7** — ele é do agente construtor no MVP-009; **anexos de design entram por seletor que copia e hasheia no ato**. Duas dependências duras ficaram registradas: a M8-F01 depende da M4-F02 (#75) e fica limitada ao diretório do app até existir a fatia de UI da allowlist. Emendas em `spec-providers-03` e `spec-providers-04`: rota de assinatura é `subscription_limited`. **A fila não mudou** — a cabeça continua sendo a M5-F02 (#78).
 
 > **Pipeline V2 aprovada e publicada (2026-08-29).** Arquitetura, quatro MVPs e vinte SPECs receberam `aprovada-pi`. Épicos #115/#121/#127/#133 e fatias #116–#120/#122–#126/#128–#132/#134–#138 foram criados com parents e bloqueios nativos na ordem de implementação. Isso adiciona backlog futuro sem furar a fila corrente. A V2 termina no merge do DAG aprovado; deploy permanece fora. Fonte: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v2-design.md`.
+
+> **Pipeline V3 em especificação (2026-08-29).** A direção MVP-014–MVP-018 e a arquitetura completa do MVP-014 foram aprovadas. O MVP-014 usa Docker Compose local, GHCR, Vercel, Railway e PostgreSQL separado; publica automaticamente depois de merge e gates, sem aceite duplo. Suas cinco fatias estão nominadas, mas ainda não possuem SPEC nem issue e, portanto, não entram na fila executável. Fonte: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v3-design.md`.
 
 > **MVP-009 aprovado (2026-08-29).** Três decisões do PI: **o container Docker é o sandbox do executor** — o Claude Code roda nele com o worktree montado, nunca no host; **merge autônomo ligado por padrão com kill-switch por projeto**, e desligado o run termina no PR verde aguardando o PI; **Context7 é ferramenta do agente construtor** na M9-F04, fechando a pendência herdada do MVP-008. A decisão do container fecha um buraco real: o MVP-004 proibiu comando arbitrário, mas um agente que constrói software precisa exatamente disso — sem fronteira nova, o MVP-009 passaria por cima do enforcement que o MVP-004 entregou. **Docker passa a ser dependência dura**, sem fallback para o host.
 
@@ -121,12 +128,13 @@ Não existe catálogo global `SPEC-nnn`. O identificador canônico é o slug aba
 1. PI aceitar ou recusar as **quatro** fatias em **Done**: F02 do MVP-004 (#75), M5-F01 (#77), o `[FIX]` #107 e a M5-F02 (#78).
 2. Fila corrente: **#110** (UI da allowlist) é o `next`. Depois dele, a ordem entre #79 (BudgetPolicy) e #80 (Multi-provider) é decisão do PI — as duas têm spec aprovada.
 3. A **F03 encaixa no ponto único** que a F02 deixou pronto: a estimativa pré-chamada já é calculada e o `CostEvent` já carrega `estimadoUsd`/`realUsd`. O gate entra entre a estimativa e o disparo do adapter — nenhuma refatoração do ponto de chamada é necessária.
-4. **MVP-006, MVP-008, MVP-009 e Pipeline V2 revisados e aprovados (2026-08-29).** As 44 SPECs executáveis do projeto estão `aprovada-pi`; MVP-007 permanece sem SPEC por não estar em planejamento ativo.
-5. MVP-007 será detalhado apenas quando entrar no planejamento ativo — hoje não tem fatia nem SPEC, então não há o que aprovar.
-6. **M4-F03 (UI da allowlist de diretórios) especificada e aprovada (2026-08-29)** — fecha a última fatia conhecida sem SPEC. Desbloqueia uso real do terminal/filesystem pelo app e tira o limite da M8-F01. Não existe mais fatia conhecida sem spec.
+4. **MVP-006, MVP-008, MVP-009 e Pipeline V2 revisados e aprovados (2026-08-29).** As 44 SPECs executáveis do projeto estão `aprovada-pi`. A Pipeline V3 ainda não acrescenta SPEC executável.
+5. MVP-007 e MVP-015–MVP-018 serão detalhados apenas quando entrarem no planejamento ativo; hoje não têm fatia nem SPEC.
+6. **M4-F03 (UI da allowlist de diretórios) especificada e aprovada (2026-08-29)** — fechou a última fatia conhecida sem SPEC antes da V3. As cinco fatias do MVP-014 agora precisam ser redigidas e aprovadas antes de entrar no backlog.
 7. **Docker virou dependência dura do MVP-009** (sandbox do executor). Confirmar que a máquina de execução tem Docker antes daquele MVP entrar na fila.
 8. **Pipeline V2 publicada:** épicos #115/#121/#127/#133 e 20 fatias #116–#138, com os intervalos de épicos excluídos, estão no Backlog com sub-issues e dependências nativas. A publicação não altera o `next` atual.
+9. **Pipeline V3:** revisar o design do MVP-014 e então redigir suas cinco SPECs. Não criar issues antes desse gate.
 
 ## Roadmap
 
-MVP-001 ✅ → MVP-002 ✅ → MVP-003 ✅ → MVP-004 → MVP-005 → MVP-006 → MVP-008 → MVP-009 → MVP-010 → MVP-011 → MVP-012 → MVP-013. MVP-007 é paralelo/não bloqueante.
+MVP-001 ✅ → MVP-002 ✅ → MVP-003 ✅ → MVP-004 → MVP-005 → MVP-006 → MVP-008 → MVP-009 → MVP-010 → MVP-011 → MVP-012 → MVP-013 → MVP-014. MVP-007 é paralelo/não bloqueante; MVP-015–MVP-018 têm apenas direção aprovada e permanecem fora da fila executável.
