@@ -1,4 +1,4 @@
-import { app, ipcMain } from 'electron'
+import { app, dialog, ipcMain } from 'electron'
 import {
   IPC_CHANNELS,
   IPC_EVENT_CHANNELS,
@@ -318,6 +318,30 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     const alvo = typeof path === 'string' ? path : ''
     if (alvo) deps.allowlist.remove(deps.userId(), alvo)
     return deps.allowlist.list(deps.userId())
+  })
+
+  // Seletor nativo de pasta (SPEC-ExecucaoReal-03, decisão 2 do PI). O diálogo abre **aqui**,
+  // não no renderer: escolher um caminho é tocar o filesystem, e a fronteira do ARCHITECTURE
+  // não abre exceção para leitura. O renderer só dispara o canal e recebe a lista de volta.
+  ipcMain.handle(IPC_CHANNELS.allowlistPick, async (): Promise<readonly string[]> => {
+    const escolha = await dialog.showOpenDialog({ properties: ['openDirectory'] })
+    const [diretorio] = escolha.filePaths
+
+    // Duas condições, não uma: `canceled` cobre o usuário fechando o diálogo, e a checagem do
+    // path cobre um retorno confirmado porém vazio — que passaria `undefined` ao repositório
+    // como se fosse escolha. Sem adicionar não há `AuditEvent`: ele nasce dentro do `add`.
+    if (!escolha.canceled && diretorio) {
+      deps.allowlist.add(deps.userId(), diretorio)
+    }
+
+    return deps.allowlist.list(deps.userId())
+  })
+
+  // O diretório do app (default de fábrica). Só-leitura, para a UI saber qual item da lista
+  // apresentar como fixo — o repositório já recusa removê-lo, este canal só torna a regra
+  // visível na tela em vez de deixá-la ser inferida por posição.
+  ipcMain.handle(IPC_CHANNELS.allowlistAppDir, (): string => {
+    return deps.allowlist.appDirectory()
   })
 
   // Registro de workflows/automações (SPEC-Execucao-04, critério 7). CRUD de definições —

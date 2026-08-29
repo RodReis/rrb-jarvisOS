@@ -38,6 +38,16 @@ export class AllowlistRepository {
   ) {}
 
   /**
+   * O diretório gerido pelo app, canônico. Exposto porque a UI precisa saber **qual** dos
+   * paths da lista é o default de fábrica para apresentá-lo como fixo — o `list` devolve
+   * strings sem marcação, e inferir a identidade dele por posição acoplaria a tela à ordem
+   * de inserção daqui.
+   */
+  appDirectory(): string {
+    return this.appDir
+  }
+
+  /**
    * Diretórios permitidos do usuário. **Sempre inclui o `appDir`** — o default de fábrica
    * não é uma linha gravada (que o usuário poderia remover e ficar sem base nenhuma), e sim
    * um invariante: o diretório do app é permitido por construção. As entradas explícitas do

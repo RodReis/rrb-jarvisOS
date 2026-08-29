@@ -131,6 +131,9 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'classifyAction',
     'createAutomation',
     'createWorkflow',
+    // SPEC-ExecucaoReal-03: só-leitura, devolve o path do diretório gerido pelo app. É string,
+    // não handle — a tela o compara com a lista para marcar o item fixo, e nada mais.
+    'getAppDirectory',
     'getAppInfo',
     'getAuth',
     'getPreferences',
@@ -148,6 +151,10 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'minimizeToTray',
     'onAiStreamEvent',
     'onAuthChanged',
+    // SPEC-ExecucaoReal-03: abre o seletor **no main**. Devolve a lista de paths, nunca um
+    // handle de arquivo — é o que mantém o critério 6 (o renderer não toca o filesystem) de pé
+    // mesmo com a tela oferecendo escolha de pasta.
+    'pickAllowedDirectory',
     'removeAllowedCommand',
     'removeAllowedDirectory',
     'removeAutomation',

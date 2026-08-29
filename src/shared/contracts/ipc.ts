@@ -78,6 +78,19 @@ export const IPC_CHANNELS = {
   allowlistAdd: 'allowlist:add',
   allowlistRemove: 'allowlist:remove',
   /**
+   * Seletor nativo de pasta (SPEC-ExecucaoReal-03, decisão 2 do PI). O diálogo abre no
+   * **main** — o renderer nunca toca o filesystem, nem para escolher um caminho. Escolha
+   * confirmada entra na allowlist já canonizada; cancelar não altera nada e não audita.
+   */
+  allowlistPick: 'allowlist:pick',
+  /**
+   * O diretório gerido pelo app (`userData`), canônico. Só-leitura: a UI precisa saber
+   * **qual** dos paths de `allowlist:list` é o default de fábrica para apresentá-lo como
+   * fixo (SPEC-ExecucaoReal-03, critério 4) — o repositório já recusa removê-lo, e sem
+   * este canal a tela teria de inferir a identidade dele por posição na lista.
+   */
+  allowlistAppDir: 'allowlist:app-dir',
+  /**
    * Registro de workflows e automações (SPEC-Execucao-04, critério 7). CRUD de **definições**
    * — nada executa. O renderer nunca toca o storage: vê e edita por aqui, e criar/alterar/
    * toggle é classificado (F02) + auditado no main.
@@ -278,6 +291,19 @@ export interface JarvisBridge {
   listAllowedDirectories(): Promise<readonly string[]>
   addAllowedDirectory(path: string): Promise<readonly string[]>
   removeAllowedDirectory(path: string): Promise<readonly string[]>
+
+  /**
+   * Abre o seletor nativo de pasta no main e adiciona a escolha à allowlist
+   * (SPEC-ExecucaoReal-03, critérios 2 e 3). Devolve a lista atualizada — igual à de
+   * `listAllowedDirectories`, e **inalterada** quando o usuário cancela o diálogo.
+   */
+  pickAllowedDirectory(): Promise<readonly string[]>
+
+  /**
+   * O diretório gerido pelo app, canônico. A tela o compara com os itens da lista para
+   * marcar o fixo; não é um path que o renderer possa usar para tocar o FS.
+   */
+  getAppDirectory(): Promise<string>
 
   /**
    * Registro de workflows e automações (SPEC-Execucao-04, critério 7). CRUD de definições;
