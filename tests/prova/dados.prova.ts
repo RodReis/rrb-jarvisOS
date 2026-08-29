@@ -43,6 +43,35 @@ async function abrir(page: import('@playwright/test').Page, query: string): Prom
   await page.evaluate(() => document.fonts.ready)
 }
 
+/**
+ * Espera as animações de entrada terminarem antes de medir.
+ *
+ * `waitForSelector` devolve o nó assim que ele entra no DOM — no meio do `entrar-direita`, que
+ * anima `translate`. Um elemento em transformação mede a posição **do quadro corrente**, não a
+ * final: o Drawer aparecia em `x=1201` numa execução e `x=1239` na seguinte, e só depois
+ * assentava em `864`.
+ *
+ * Enquanto o portal montava no `<body>` a corrida não aparecia (a árvore já estava pronta
+ * quando o seletor resolvia). Dentro do provider (FIX #107) a montagem custa um tick a mais e
+ * a medida caía no meio da animação — teste sensível a tempo, que falharia sozinho numa
+ * máquina lenta. Medir depois de `finished` é o que torna a asserção sobre **layout**.
+ */
+async function esperarAnimacoes(
+  page: import('@playwright/test').Page,
+  seletor: string
+): Promise<void> {
+  await page.waitForSelector(seletor)
+  await page.waitForFunction(
+    (sel) => {
+      const el = document.querySelector(sel)
+      if (el === null) return false
+      return el.getAnimations().every((a) => a.playState === 'finished')
+    },
+    seletor,
+    { timeout: 5000 }
+  )
+}
+
 test.describe('galeria de dados', () => {
   for (const cenario of CENARIOS) {
     test(`captura ${cenario.nome}`, async ({ page }) => {
@@ -232,6 +261,8 @@ test.describe('overlays: o que só existe com layout', () => {
 
   test('o Drawer encosta na borda direita', async ({ page }) => {
     await abrir(page, 'modo=dark&cena=drawer')
+    // Medir com `entrar-direita` ainda rodando lê a posição do quadro corrente, não a final.
+    await esperarAnimacoes(page, '[role="dialog"]')
     const caixa = await page.locator('[role="dialog"]').boundingBox()
 
     expect(caixa).not.toBeNull()
@@ -295,5 +326,128 @@ test.describe('tipografia e números', () => {
     })
 
     expect(variante).toContain('tabular-nums')
+  })
+})
+
+/**
+ * Tokens no overlay portado (FIX #107).
+ *
+ * O defeito que estes testes existem para impedir: os tokens `--jos-*` são `style` inline no nó
+ * do `ProvedorDeTema`; o Radix montava o portal no `<body>`, fora dessa subárvore, e todo
+ * `var(--jos-…)` resolvia para vazio. O painel saía transparente, sem raio, sem sombra e sem
+ * `z-index` — o conteúdo da página aparecia através dele.
+ *
+ * A régua tem de ser **computada**: as classes sempre estiveram no `className` (o teste de
+ * componente as vê e passa), e o que faltava era o valor. É a terceira vez que este modo de
+ * falha aparece no projeto — depois de #57 e #58 — e é o motivo de a asserção morar aqui, num
+ * navegador de verdade, e não em jsdom.
+ */
+test.describe('overlay em portal recebe os tokens do tema (FIX issue 107)', () => {
+  /** Um `rgba(…, 0)` é o fundo que o defeito produzia: transparente, sem token resolvido. */
+  const transparente = (cor: string): boolean => cor.replace(/\s/g, '').endsWith(',0)')
+
+  // `temRaio` distingue o que é token faltando do que é desenho: o Drawer é uma gaveta colada
+  // na borda e **não tem** `rounded-*` — cobrar raio dele reprovaria o componente correto.
+  for (const [cena, seletor, temRaio] of [
+    ['dialog', '[role="dialog"]', true],
+    ['alert', '[role="alertdialog"]', true],
+    ['drawer', '[role="dialog"]', false]
+  ] as const) {
+    test(`o painel do ${cena} tem fundo opaco, sombra e z-index do tema`, async ({ page }) => {
+      await abrir(page, `modo=dark&cena=${cena}`)
+      await esperarAnimacoes(page, seletor)
+
+      const estilo = await page.evaluate((sel) => {
+        const el = document.querySelector(sel)
+        if (el === null) throw new Error(`Painel não encontrado: ${sel}`)
+        const s = getComputedStyle(el)
+        return {
+          fundo: s.backgroundColor,
+          raio: s.borderRadius,
+          sombra: s.boxShadow,
+          zIndex: s.zIndex,
+          // O token lido no próprio nó: vazio significa que ele está fora da subárvore do tema.
+          token: s.getPropertyValue('--jos-cor-superficie-elevada').trim()
+        }
+      }, seletor)
+
+      // O token tem de **existir** naquele ponto da árvore. Foi exatamente isto que a inspeção
+      // por CDP mediu como `""` na issue.
+      expect(estilo.token, `token no painel do ${cena}`).not.toBe('')
+      // …e o navegador tem de tê-lo aplicado. Um painel transparente deixa o texto da página
+      // atravessar o modal.
+      expect(transparente(estilo.fundo), `fundo do ${cena}: ${estilo.fundo}`).toBe(false)
+      if (temRaio) expect(estilo.raio, `raio do ${cena}`).not.toBe('0px')
+      expect(estilo.sombra, `sombra do ${cena}`).not.toBe('none')
+      // Sem `z-index` o painel empilha pela ordem do documento — e o conteúdo da página pode
+      // ficar por cima do modal.
+      expect(estilo.zIndex, `z-index do ${cena}`).not.toBe('auto')
+    })
+  }
+
+  test('o título do modal é legível — cor de texto declarada, não herdada', async ({ page }) => {
+    await abrir(page, 'modo=dark&cena=dialog')
+    await esperarAnimacoes(page, '[role="dialog"]')
+
+    // O portal não herda a cor de texto do `FundoDaIdentidade` como o resto do app. Sem
+    // `text-[var(--jos-cor-texto)]` no painel, o título cai no preto padrão do navegador sobre a
+    // superfície escura — e o contraste denuncia (1.x:1). Era o segundo defeito que a mesma causa
+    // raiz escondia: enquanto o painel também era transparente, ninguém via qual dos dois falhava.
+    // Medida inline: `medirContraste` é local do describe de contraste. Repetir a fórmula aqui é
+    // mais barato que expor um helper compartilhado para dois chamadores.
+    const razao = await page.evaluate(() => {
+      const lum = (cor: string): number => {
+        const m = cor.match(/[\d.]+/g)
+        if (m === null) throw new Error(`Cor não interpretável: ${cor}`)
+        const [r, g, b] = m
+          .slice(0, 3)
+          .map(Number)
+          .map((c) => {
+            const v = c / 255
+            return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
+          })
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
+      }
+      const painel = document.querySelector('[role="dialog"]') as HTMLElement
+      const titulo = painel.querySelector('h2') as HTMLElement | null
+      if (titulo === null) throw new Error('Título do modal não encontrado.')
+      const a = lum(getComputedStyle(titulo).color)
+      const b = lum(getComputedStyle(painel).backgroundColor)
+      const [claro, escuro] = a > b ? [a, b] : [b, a]
+      return (claro + 0.05) / (escuro + 0.05)
+    })
+    expect(razao, 'contraste do título do modal').toBeGreaterThanOrEqual(4.5)
+  })
+
+  test('o painel do modal é mais claro que a página — a superfície elevada elevou', async ({
+    page
+  }) => {
+    await abrir(page, 'modo=dark&cena=dialog')
+    await esperarAnimacoes(page, '[role="dialog"]')
+
+    // Fundo opaco sozinho não basta: um painel que herdasse a cor da página passaria a régua
+    // acima e continuaria invisível. `superficie-elevada` só cumpre o nome se destacar.
+    const { painel, pagina } = await page.evaluate(() => {
+      const lum = (cor: string): number => {
+        const m = cor.match(/[\d.]+/g)
+        if (m === null) throw new Error(`Cor não interpretável: ${cor}`)
+        const [r, g, b] = m
+          .slice(0, 3)
+          .map(Number)
+          .map((c) => {
+            const s = c / 255
+            return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
+          })
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
+      }
+      const modal = document.querySelector('[role="dialog"]') as HTMLElement
+      const galeria = document.querySelector('[data-testid="galeria"]') as HTMLElement
+      return {
+        painel: lum(getComputedStyle(modal).backgroundColor),
+        pagina: lum(getComputedStyle(galeria).backgroundColor)
+      }
+    })
+
+    expect(painel).toBeGreaterThan(pagina)
   })
 })

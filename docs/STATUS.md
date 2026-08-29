@@ -6,21 +6,23 @@ Atualizado em: **2026-08-28**. Visão curta do estado corrente e fonte única do
 
 | Coluna | Item | Estado |
 |---|---|---|
-| Próximo | [#84](https://github.com/RodReis/rrb-jarvisOS/issues/84) · `[FIX]` card de aprovação descreve comando como filesystem | `proplan:next` |
-| Backlog | [#107](https://github.com/RodReis/rrb-jarvisOS/issues/107) · `[FIX]` overlays em portal renderizam sem tokens | achado na verificação da M5-F01; atinge **todo overlay do app** |
-| Backlog | [#78](https://github.com/RodReis/rrb-jarvisOS/issues/78) · Adapter Claude | aprovado, aguardando fila |
+| Próximo | [#78](https://github.com/RodReis/rrb-jarvisOS/issues/78) · M5-F02 Adapter Claude | `proplan:next` |
+| Backlog | [#84](https://github.com/RodReis/rrb-jarvisOS/issues/84) · `[FIX]` card de aprovação descreve comando como filesystem | despriorizado pelo PI em favor do #107 |
 | Backlog | [#79](https://github.com/RodReis/rrb-jarvisOS/issues/79) · BudgetPolicy | aprovado, aguardando fila |
 | Backlog | [#80](https://github.com/RodReis/rrb-jarvisOS/issues/80) · Multi-provider | aprovado, aguardando fila |
 | Planejado | [#87–#92](https://github.com/RodReis/rrb-jarvisOS/issues/87) · MVP-006 | SPECs em revisão; fora da fila |
 | Planejado | [#94–#99](https://github.com/RodReis/rrb-jarvisOS/issues/94) · MVP-008 | SPECs em revisão; fora da fila |
 | Planejado | [#101–#106](https://github.com/RodReis/rrb-jarvisOS/issues/101) · MVP-009 | SPECs em revisão; fora da fila |
 | Done | [#75](https://github.com/RodReis/rrb-jarvisOS/issues/75) · MVP-004 F02 Terminal | PR [#83](https://github.com/RodReis/rrb-jarvisOS/pull/83), aguardando aceite |
-| Done | [#77](https://github.com/RodReis/rrb-jarvisOS/issues/77) · MVP-005 F01 Vault | PR desta entrega, aguardando aceite |
+| Done | [#77](https://github.com/RodReis/rrb-jarvisOS/issues/77) · MVP-005 F01 Vault | PR [#108](https://github.com/RodReis/rrb-jarvisOS/pull/108), aguardando aceite |
+| Done | [#107](https://github.com/RodReis/rrb-jarvisOS/issues/107) · `[FIX]` overlays em portal sem tokens | PR desta entrega, aguardando aceite |
 | A Fazer/Em Andamento | — | WIP = 0 |
 
 > **M5-F01 entregue (2026-08-28) — abre o MVP-005.** Os 9 critérios cobertos; **679 testes verdes** (+38: 9 Regras, 20 Banco, 9 Tela). A garantia central é **estrutural**: nenhum tipo que atravessa o IPC tem campo onde o segredo caiba, e não existe método na ponte que o peça. Verificado no app real — o segredo semeado aparece **0 vezes** em `jarvis.db`/`-wal`/`-shm` enquanto `credential_ref` aparece 3 (prova de que a busca funciona); é a prova do **DPAPI real**, já que o teste de integração usa cifra dublada. `verifyAuditChain` → `{ok: true, checked: 95}`. Detalhe em `DEVELOPMENT.md`.
 >
 > **A verificação achou um defeito do design system, não da fatia** ([#107](https://github.com/RodReis/rrb-jarvisOS/issues/107)): overlays em portal renderizam **sem tokens** — modal transparente e ilegível. O `ProvedorDeTema` injeta as variáveis num `div`, o Radix monta o portal no `body`, fora dela. Atinge os 5 componentes com portal, é anterior a esta fatia. **Terceira repetição do mesmo método no projeto** (depois de #57/#58): jsdom não aplica folha de estilo, então componente visualmente quebrado passa verde.
+>
+> **#107 entregue (2026-08-28).** Cada `Portal` recebe o nó do provider como `container` — preserva os providers aninhados que a CHOICE e o Settings usam, o que promover os tokens a `:root` quebraria. A verificação no app real achou um **segundo defeito com a mesma causa raiz**, escondido pelo primeiro: o painel herdava a cor de texto do `FundoDaIdentidade`, que o portal não tem, e o título caía no preto do navegador. **684 testes** (+5) e **82 provas de navegador** (+5), todos provados por contrafactual. A régua nova é em duas camadas por necessidade: jsdom só afirma topologia, o valor computado só o navegador mede — que é exatamente o buraco pelo qual este defeito passou.
 
 ## MVPs
 
@@ -72,8 +74,8 @@ Não existe catálogo global `SPEC-nnn`. O identificador canônico é o slug aba
 
 ## Próximas ações
 
-1. PI aceitar ou recusar as duas fatias em **Done**: F02 do MVP-004 (#75) e M5-F01 (#77).
-2. Decidir a ordem da fila: os dois `[FIX]` de UI (#84 e #107) antes da M5-F02 (#78), ou o MVP-005 seguindo direto. O **#107 é o mais amplo** — atinge todo overlay do app, não uma tela.
+1. PI aceitar ou recusar as três fatias em **Done**: F02 do MVP-004 (#75), M5-F01 (#77) e o `[FIX]` #107.
+2. Ordem da fila **decidida pelo PI (2026-08-28)**: #107 primeiro (entregue), depois a M5-F02 (#78). O #84 volta ao Backlog e reentra depois.
 3. Decidir sobre a **UI da allowlist de diretórios** (pendência registrada na F02 do MVP-004): é fatia, precisa de spec — sem ela o usuário não consegue permitir diretório pelo app.
 4. Revisar as SPECs dos MVPs 006/008/009; as issues #87–#106 permanecem `proplan:planejado` e só migram para `backlog` após aprovação explícita.
 5. MVP-007 será detalhado apenas quando entrar no planejamento ativo.

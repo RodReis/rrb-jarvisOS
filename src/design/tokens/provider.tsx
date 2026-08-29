@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo } from 'react'
+import { createContext, useContext, useMemo, useState } from 'react'
 import {
   ACENTO_PADRAO,
   acentoParaLeitura,
@@ -63,6 +63,34 @@ export interface TemaProps {
 }
 
 const TemaContexto = createContext<TemaProps | null>(null)
+
+/**
+ * Onde um overlay em portal deve ser montado (FIX #107).
+ *
+ * Os tokens `--jos-*` vivem como `style` inline no `div` do provider — não em `:root`. O Radix
+ * monta portal no `<body>` por padrão, **fora** dessa subárvore, e lá `var(--jos-cor-superficie-elevada)`
+ * resolve para vazio: o painel sai transparente, sem raio, sem sombra e sem `z-index`.
+ *
+ * Este contexto carrega o próprio nó do provider para que `Overlays` o passe como `container` do
+ * `Portal`. Mantém o portal (que existe para escapar de `overflow: hidden`) e devolve os tokens.
+ *
+ * A alternativa — promover os tokens a `:root` — quebraria o invariante de dois módulos com
+ * acentos distintos na mesma tela, que Choice e Settings usam hoje (providers aninhados).
+ *
+ * `null` fora de um provider: o Radix então usa o default (`body`). Um overlay montado sem tema
+ * é caso de teste, não de tela.
+ */
+const ContainerDeOverlayContexto = createContext<HTMLElement | null>(null)
+
+/**
+ * O nó onde overlays em portal devem montar — o `div` do `ProvedorDeTema` mais próximo.
+ *
+ * Devolve `null` fora do provider, que é exatamente o que o `container` do Radix espera para
+ * cair no comportamento padrão.
+ */
+export function useContainerDeOverlay(): HTMLElement | null {
+  return useContext(ContainerDeOverlayContexto)
+}
 
 /**
  * Lê o tema ativo.
@@ -250,16 +278,30 @@ export function ProvedorDeTema({
   // faria o CSS e o teste discordarem da tela.
   const modo = modoEfetivo(superficie, uiTheme)
 
+  // `useState` como ref-callback, não `useRef`: o container precisa **re-renderizar** os
+  // consumidores quando o nó existe. Um `useRef` guardaria o nó sem avisar ninguém, e o primeiro
+  // render de um overlay já aberto leria `null` — voltando a montar no `body`, que é o defeito.
+  const [no, setNo] = useState<HTMLDivElement | null>(null)
+
   return (
     <TemaContexto.Provider value={tema}>
-      <div
-        data-modo={modo}
-        data-modulo={modulo}
-        data-superficie={superficie}
-        style={variaveis as React.CSSProperties}
-      >
-        {children}
-      </div>
+      <ContainerDeOverlayContexto.Provider value={no}>
+        <div
+          ref={setNo}
+          // Marcador de recorte do nó que carrega os tokens. `data-modo`/`data-modulo` já
+          // existiam, mas descrevem o **tema**, não o papel de raiz — e em Choice há providers
+          // aninhados, onde procurar por `[data-modo]` acharia o primeiro do DOM, que não é
+          // necessariamente o certo. O teste do FIX #107 pergunta "o portal caiu dentro do
+          // provider?" e precisa de um alvo inequívoco.
+          data-jos-tema=""
+          data-modo={modo}
+          data-modulo={modulo}
+          data-superficie={superficie}
+          style={variaveis as React.CSSProperties}
+        >
+          {children}
+        </div>
+      </ContainerDeOverlayContexto.Provider>
     </TemaContexto.Provider>
   )
 }
