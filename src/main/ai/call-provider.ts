@@ -163,13 +163,15 @@ export class AiCallService {
       estimadoUsd
     })
 
-    const credencial = this.credentials.resolve(
-      ctx.userId,
-      ctx.workspace,
-      CREDENCIAL_DO_PROVIDER[request.provider]
-    )
+    // Nem todo provider consome credencial (F04): o Ollama fala com o `localhost` e o
+    // `claude-code` usa a sessão do próprio CLI. `undefined` no mapa é a declaração disso, e
+    // não uma entrada esquecida — por isso a busca no Vault só acontece quando há chave a
+    // buscar, e "sem credencial" deixa de ser sinônimo de "não configurado".
+    const chave = CREDENCIAL_DO_PROVIDER[request.provider]
+    const credencial =
+      chave === undefined ? undefined : this.credentials.resolve(ctx.userId, ctx.workspace, chave)
 
-    if (credencial === undefined) {
+    if (chave !== undefined && credencial === undefined) {
       // Credencial ausente é desfecho previsto, não exceção: o app roda sem provider
       // configurado (mesma degradação graciosa do login sem `.env`), e a tela precisa dizer o
       // que fazer a respeito.
@@ -199,7 +201,7 @@ export class AiCallService {
         prompt: request.prompt,
         ...(request.system === undefined ? {} : { system: request.system }),
         maxTokens,
-        apiKey: credencial.value,
+        ...(credencial === undefined ? {} : { apiKey: credencial.value }),
         timeoutMs: TIMEOUT_PADRAO_MS,
         signal: controle.signal
       })) {

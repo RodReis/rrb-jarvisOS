@@ -20,14 +20,18 @@ export interface AdapterRequest {
   readonly system?: string
   readonly maxTokens: number
   /**
-   * A credencial, crua, vinda do Vault (F01).
+   * A credencial, crua, vinda do Vault (F01). **Ausente** quando o provider não consome
+   * nenhuma (F04): o Ollama fala com o `localhost` e o `claude-code` usa a sessão do CLI.
    *
    * Entra por parâmetro em vez de o adapter ler o Vault sozinho: quem decide **qual** escopo
    * de credencial usar é o ponto de chamada, que conhece usuário e workspace. Um adapter que
    * lesse o cofre por conta própria precisaria conhecer o escopo — e passaria a ser mais um
    * lugar onde o segredo é buscado.
+   *
+   * Opcional, e não string vazia: `''` obrigaria cada adapter a decidir se aquilo é "sem
+   * credencial" ou "credencial em branco", e um deles decidiria errado.
    */
-  readonly apiKey: string
+  readonly apiKey?: string
   readonly timeoutMs: number
   /** Aborta o stream (timeout, ou o usuário fechando a tela). */
   readonly signal?: AbortSignal

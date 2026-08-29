@@ -18,11 +18,12 @@ import type { CredentialKey } from './credentials'
 /**
  * Os providers que o app conhece — **dado, não lógica**, como `CREDENTIAL_KEYS`.
  *
- * Nesta fatia só a Anthropic tem adapter; a lista já é plural porque a F04 acrescenta linha
- * aqui, e um tipo que nasce singular vira `string` no primeiro provider novo. A `CredentialKey`
- * homônima não é coincidência: o provider é quem consome a credencial daquele nome.
+ * A F04 acrescentou os três previstos: `gemini` (HTTP cloud), `ollama` (HTTP local, grátis) e
+ * `claude-code` (subprocess app-managed, rota de assinatura). A `CredentialKey` homônima não é
+ * coincidência onde existe: o provider é quem consome a credencial daquele nome — e `ollama` e
+ * `claude-code` **não têm** credencial, o que o `CREDENCIAL_DO_PROVIDER` registra explicitamente.
  */
-export const AI_PROVIDERS = ['anthropic'] as const
+export const AI_PROVIDERS = ['anthropic', 'gemini', 'ollama', 'claude-code'] as const
 
 export type AiProvider = (typeof AI_PROVIDERS)[number]
 
@@ -56,17 +57,83 @@ export const TABELA_DE_PRECO: Readonly<
     'claude-opus-5': { entrada: 5.0, saida: 25.0 },
     'claude-sonnet-5': { entrada: 2.0, saida: 10.0 },
     'claude-haiku-4-5': { entrada: 1.0, saida: 5.0 }
+  },
+  gemini: {
+    'gemini-2.5-pro': { entrada: 1.25, saida: 10.0 },
+    'gemini-2.5-flash': { entrada: 0.3, saida: 2.5 }
+  },
+  // **Zero é o preço, não um valor faltando.** O Ollama roda no `localhost` do próprio
+  // usuário: não há cobrança por token, e a estimativa da F03 devolve US$ 0,00 — o que faz a
+  // rota local passar pelo gate de orçamento sempre, que é exatamente a preferência
+  // "local/offline quando viável" do RF-011 valendo na conta.
+  ollama: {
+    'llama3.1': { entrada: 0, saida: 0 },
+    'qwen2.5-coder': { entrada: 0, saida: 0 }
+  },
+  // Rota de **assinatura** (plano Claude MAX pelo CLI), `unmetered` por emenda do PI de
+  // 2026-08-29: registra uso sem valor monetário. Zero aqui não é "de graça" — é "não se
+  // converte em USD". Converter seria número inventado, e o gate barraria com base nele.
+  'claude-code': {
+    'claude-opus-5': { entrada: 0, saida: 0 },
+    'claude-sonnet-5': { entrada: 0, saida: 0 }
   }
+}
+
+/**
+ * As rotas que **não** têm custo monetário por chamada, e por isso a `BudgetPolicy` não barra
+ * (SPEC-Providers-03, emenda do PI de 2026-08-29; SPEC-Providers-04).
+ *
+ * Duas razões distintas sob a mesma marca: o `ollama` roda na máquina do usuário (grátis de
+ * fato) e o `claude-code` é assinatura (pago por mês, não por chamada). O que as une é o que
+ * importa aqui — **não existe USD por chamada a somar**, e uma estimativa em dólar seria
+ * inventada.
+ *
+ * Dado e não `if`: o gate pergunta "esta rota é medida?" em vez de listar providers, e
+ * acrescentar um provider grátis passa a ser acrescentar uma linha aqui.
+ */
+export const ROTAS_UNMETERED: readonly AiProvider[] = ['ollama', 'claude-code']
+
+/** `true` quando a rota registra uso sem valor monetário — a `BudgetPolicy` não a barra. */
+export function isRotaUnmetered(provider: AiProvider): boolean {
+  return ROTAS_UNMETERED.includes(provider)
+}
+
+/**
+ * De onde o provider responde (RF-011: "origem local/cloud" na tela de providers).
+ *
+ * Não é detalhe cosmético: é o insumo da preferência "local/offline quando viável" do
+ * roteamento, e o que o usuário lê para saber se o prompt saiu da máquina dele.
+ */
+export const ORIGEM_DO_PROVIDER: Readonly<Record<AiProvider, 'local' | 'cloud'>> = {
+  anthropic: 'cloud',
+  gemini: 'cloud',
+  ollama: 'local',
+  // `local` no sentido que importa aqui: o processo roda nesta máquina. O CLI fala com a
+  // Anthropic por dentro, mas quem o app executa é um binário local — e é isso que a tela
+  // precisa dizer para o usuário entender o que está acontecendo no computador dele.
+  'claude-code': 'local'
 }
 
 /** O modelo usado quando o chamador não escolhe. */
 export const MODELO_PADRAO: Readonly<Record<AiProvider, string>> = {
-  anthropic: 'claude-opus-5'
+  anthropic: 'claude-opus-5',
+  gemini: 'gemini-2.5-pro',
+  ollama: 'llama3.1',
+  'claude-code': 'claude-opus-5'
 }
 
-/** A credencial que cada provider consome. Explícito para não derivar nome de string. */
-export const CREDENCIAL_DO_PROVIDER: Readonly<Record<AiProvider, CredentialKey>> = {
-  anthropic: 'anthropic'
+/**
+ * A credencial que cada provider consome, ou `undefined` quando não consome nenhuma.
+ *
+ * `undefined` explícito e não chave ausente do mapa: `ollama` fala com o `localhost` e
+ * `claude-code` usa a sessão do próprio CLI — os dois **não têm** credencial no Vault, e o
+ * `Record` completo obriga quem acrescentar provider a decidir isso em vez de esquecer.
+ */
+export const CREDENCIAL_DO_PROVIDER: Readonly<Record<AiProvider, CredentialKey | undefined>> = {
+  anthropic: 'anthropic',
+  gemini: 'gemini',
+  ollama: undefined,
+  'claude-code': undefined
 }
 
 /**

@@ -7,6 +7,9 @@ import { SafeStorageTokenVault } from './auth/token-vault'
 import { registerIpcHandlers } from './ipc/handlers'
 import { AiCallService } from './ai/call-provider'
 import { AnthropicAdapter } from './ai/anthropic-adapter'
+import { GeminiAdapter } from './ai/gemini-adapter'
+import { OllamaAdapter } from './ai/ollama-adapter'
+import { ClaudeCodeAdapter } from './ai/claude-code-adapter'
 import { BudgetService } from './budget/budget-service'
 import { BudgetRepository } from './budget/budget-repository'
 import { AllowlistRepository } from './policy/allowlist-repository'
@@ -178,8 +181,17 @@ if (!app.requestSingleInstanceLock()) {
     // Ponto único de chamada de IA (SPEC-Providers-02). Construído **depois** do vault porque
     // depende dele: nenhum adapter chama provider sem credencial, e o serviço a resolve por
     // escopo no instante da chamada. O mapa de adapters é onde a F04 acrescenta providers.
+    // Os quatro adapters (SPEC-Providers-04). O mapa é onde a F04 acrescentou os três novos —
+    // e o ponto de chamada não mudou por causa disso, que é o critério 1 da F02 valendo na
+    // prática. `ollama` e `claude-code` não recebem credencial: o primeiro fala com o
+    // `localhost`, o segundo usa a sessão do próprio CLI.
     const ai = new AiCallService(
-      { anthropic: new AnthropicAdapter() },
+      {
+        anthropic: new AnthropicAdapter(),
+        gemini: new GeminiAdapter(),
+        ollama: new OllamaAdapter(),
+        'claude-code': new ClaudeCodeAdapter()
+      },
       credentials,
       policy,
       storage.audit,

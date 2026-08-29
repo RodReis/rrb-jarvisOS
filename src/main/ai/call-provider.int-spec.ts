@@ -125,7 +125,10 @@ function servico(
   budget: BudgetService = gate({ dailyLimit: 1000, monthlyLimit: 1000 })
 ): InstanceType<typeof AiCallService> {
   return new AiCallService(
-    { anthropic: adapter },
+    // Os quatro do contrato. Os três da F04 recebem o mesmo dublê: esta suíte é sobre o
+    // **ponto único**, e o que ela precisa é que todo provider passe por ele — não que cada
+    // adapter fale seu protocolo, o que tem suíte própria.
+    { anthropic: adapter, gemini: adapter, ollama: adapter, 'claude-code': adapter },
     credentials,
     new PolicyService(audit, () => USUARIO),
     audit,
