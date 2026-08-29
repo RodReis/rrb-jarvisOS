@@ -16,7 +16,7 @@ Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do
 | Done | [#77](https://github.com/RodReis/rrb-jarvisOS/issues/77) · MVP-005 F01 Vault | PR [#108](https://github.com/RodReis/rrb-jarvisOS/pull/108), aguardando aceite |
 | Done | [#107](https://github.com/RodReis/rrb-jarvisOS/issues/107) · `[FIX]` overlays em portal sem tokens | PR [#109](https://github.com/RodReis/rrb-jarvisOS/pull/109), aguardando aceite |
 | Done | [#78](https://github.com/RodReis/rrb-jarvisOS/issues/78) · MVP-005 F02 Adapter Claude | PR desta entrega, aguardando aceite |
-| Done | [#84](https://github.com/RodReis/rrb-jarvisOS/issues/84) · `[FIX]` card de aprovação descreve comando como filesystem | PR desta entrega, aguardando aceite |
+| Done | [#84](https://github.com/RodReis/rrb-jarvisOS/issues/84) · `[FIX]` card de aprovação descreve comando como filesystem | PR [#113](https://github.com/RodReis/rrb-jarvisOS/pull/113), aguardando aceite |
 | A Fazer/Em Andamento | — | WIP = 0 |
 
 > **M5-F01 entregue (2026-08-28) — abre o MVP-005.** Os 9 critérios cobertos; **679 testes verdes** (+38: 9 Regras, 20 Banco, 9 Tela). A garantia central é **estrutural**: nenhum tipo que atravessa o IPC tem campo onde o segredo caiba, e não existe método na ponte que o peça. Verificado no app real — o segredo semeado aparece **0 vezes** em `jarvis.db`/`-wal`/`-shm` enquanto `credential_ref` aparece 3 (prova de que a busca funciona); é a prova do **DPAPI real**, já que o teste de integração usa cifra dublada. `verifyAuditChain` → `{ok: true, checked: 95}`. Detalhe em `DEVELOPMENT.md`.
