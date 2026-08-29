@@ -6,8 +6,7 @@ Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do
 
 | Coluna | Item | Estado |
 |---|---|---|
-| Próximo | [#84](https://github.com/RodReis/rrb-jarvisOS/issues/84) · `[FIX]` card de aprovação descreve comando como filesystem | `proplan:next` |
-| Backlog | [#110](https://github.com/RodReis/rrb-jarvisOS/issues/110) · M4-F03 UI da allowlist de diretórios | `aprovada-pi` 2026-08-29; desbloqueia MVP-004 e M8-F01 |
+| Próximo | [#110](https://github.com/RodReis/rrb-jarvisOS/issues/110) · M4-F03 UI da allowlist de diretórios | `proplan:next`; `aprovada-pi` 2026-08-29; desbloqueia MVP-004 e M8-F01 |
 | Backlog | [#79](https://github.com/RodReis/rrb-jarvisOS/issues/79) · BudgetPolicy | aprovado, aguardando fila |
 | Backlog | [#80](https://github.com/RodReis/rrb-jarvisOS/issues/80) · Multi-provider | aprovado, aguardando fila |
 | Backlog | [#87–#92](https://github.com/RodReis/rrb-jarvisOS/issues/87) · MVP-006 | seis SPECs `aprovada-pi` (2026-08-29); atrás de #79/#80 na fila |
@@ -17,6 +16,7 @@ Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do
 | Done | [#77](https://github.com/RodReis/rrb-jarvisOS/issues/77) · MVP-005 F01 Vault | PR [#108](https://github.com/RodReis/rrb-jarvisOS/pull/108), aguardando aceite |
 | Done | [#107](https://github.com/RodReis/rrb-jarvisOS/issues/107) · `[FIX]` overlays em portal sem tokens | PR [#109](https://github.com/RodReis/rrb-jarvisOS/pull/109), aguardando aceite |
 | Done | [#78](https://github.com/RodReis/rrb-jarvisOS/issues/78) · MVP-005 F02 Adapter Claude | PR desta entrega, aguardando aceite |
+| Done | [#84](https://github.com/RodReis/rrb-jarvisOS/issues/84) · `[FIX]` card de aprovação descreve comando como filesystem | PR [#113](https://github.com/RodReis/rrb-jarvisOS/pull/113), aguardando aceite |
 | A Fazer/Em Andamento | — | WIP = 0 |
 
 > **M5-F01 entregue (2026-08-28) — abre o MVP-005.** Os 9 critérios cobertos; **679 testes verdes** (+38: 9 Regras, 20 Banco, 9 Tela). A garantia central é **estrutural**: nenhum tipo que atravessa o IPC tem campo onde o segredo caiba, e não existe método na ponte que o peça. Verificado no app real — o segredo semeado aparece **0 vezes** em `jarvis.db`/`-wal`/`-shm` enquanto `credential_ref` aparece 3 (prova de que a busca funciona); é a prova do **DPAPI real**, já que o teste de integração usa cifra dublada. `verifyAuditChain` → `{ok: true, checked: 95}`. Detalhe em `DEVELOPMENT.md`.
@@ -26,6 +26,8 @@ Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do
 > **#107 entregue (2026-08-28).** Cada `Portal` recebe o nó do provider como `container` — preserva os providers aninhados que a CHOICE e o Settings usam, o que promover os tokens a `:root` quebraria. A verificação no app real achou um **segundo defeito com a mesma causa raiz**, escondido pelo primeiro: o painel herdava a cor de texto do `FundoDaIdentidade`, que o portal não tem, e o título caía no preto do navegador. **684 testes** (+5) e **82 provas de navegador** (+5), todos provados por contrafactual. A régua nova é em duas camadas por necessidade: jsdom só afirma topologia, o valor computado só o navegador mede — que é exatamente o buraco pelo qual este defeito passou.
 
 > **M5-F02 entregue (2026-08-29).** A IA passa a chamar de verdade. O que a fatia entrega de estrutural é o **ponto único de chamada** — a sede do gate de orçamento da F03 (ADR-001 q1); um segundo caminho até um adapter seria um caminho sem gate. O **isolamento do provider virou regra do ESLint** (barra `@anthropic-ai/*` em todo `src/main/` menos o adapter), provada por contrafactual. **732 testes** (+48) e 2 E2E novos; verificado no app real com Electron, com o log do app mostrando `correlationId`, `AuditEvent` e custo medido. A cobertura de Regras caiu para 75.5% por **diluição**, não regressão: `ai.ts` está a 100% ali, e o que cresceu (`preload`, `handlers`) é coberto por Banco e E2E.
+>
+> **#84 entregue (2026-08-29).** O card da fila descrevia **toda** pendência como filesystem — uma execução de processo aparecia como "Filesystem: comando", sem binário, argumentos ou cwd, e o usuário aprovava às cegas. A correção **não inventa discriminante**: reusa o `operation.kind` que o handler de `approval:resolve` já usava para rotear a decisão entre os dois motores — o dado existia, só a apresentação o ignorava. **735 testes** (+3, todos de Tela), provados por contrafactual, e o ramo de filesystem intacto. Verificado no app real: o card lê "Executar comando: node --force" com o cwd no escopo, e **Aprovar continua executando** (`verifyAuditChain` → `{ok: true, checked: 125}`). O achado que vale registrar é de método: o componente não tinha **nenhum** teste — o defeito não passou por asserção frouxa, passou por ausência de suíte.
 >
 > **Decisões do PI (2026-08-29):** três modelos na tabela de preço (Opus 5, Sonnet 5, Haiku 4.5) para dar spread à F03 e à F04; **SDK oficial** `@anthropic-ai/sdk` em vez de `fetch` cru; **painel mínimo** de teste no Settings — a tela de providers é F04, explicitamente.
 
@@ -87,7 +89,7 @@ Não existe catálogo global `SPEC-nnn`. O identificador canônico é o slug aba
 ## Próximas ações
 
 1. PI aceitar ou recusar as **quatro** fatias em **Done**: F02 do MVP-004 (#75), M5-F01 (#77), o `[FIX]` #107 e a M5-F02 (#78).
-2. Fila corrente: **#84** é o `next`. Depois dele, a ordem entre #110 (UI da allowlist), #79 (BudgetPolicy) e #80 (Multi-provider) é decisão do PI — as três têm spec aprovada.
+2. Fila corrente: **#110** (UI da allowlist) é o `next`. Depois dele, a ordem entre #79 (BudgetPolicy) e #80 (Multi-provider) é decisão do PI — as duas têm spec aprovada.
 3. A **F03 encaixa no ponto único** que a F02 deixou pronto: a estimativa pré-chamada já é calculada e o `CostEvent` já carrega `estimadoUsd`/`realUsd`. O gate entra entre a estimativa e o disparo do adapter — nenhuma refatoração do ponto de chamada é necessária.
 4. **MVP-006, MVP-008 e MVP-009 revisados e aprovados (2026-08-29)** — dezesseis decisões estruturais do PI registradas nas SPECs e nos docs dos épicos; #87–#92, #94–#99 e #101–#106 migraram para `proplan:backlog`. **Todas as 24 SPECs do projeto estão `aprovada-pi`.**
 5. MVP-007 será detalhado apenas quando entrar no planejamento ativo — hoje não tem fatia nem SPEC, então não há o que aprovar.
