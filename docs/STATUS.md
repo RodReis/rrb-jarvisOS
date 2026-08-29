@@ -6,10 +6,9 @@ Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do
 
 | Coluna | Item | Estado |
 |---|---|---|
-| Próximo | [#87](https://github.com/RodReis/rrb-jarvisOS/issues/87) · MVP-006 F01 Núcleo de conectores | `proplan:next`; cabeça da fila — o MVP-005 fechou |
-| Feito | [#80](https://github.com/RodReis/rrb-jarvisOS/issues/80) · Multi-provider | entregue (PR [#142](https://github.com/RodReis/rrb-jarvisOS/pull/142)), aguardando aceite — **fecha o MVP-005** |
-| Feito | [#79](https://github.com/RodReis/rrb-jarvisOS/issues/79) · BudgetPolicy | entregue (PR [#140](https://github.com/RodReis/rrb-jarvisOS/pull/140)), aguardando aceite |
-| Backlog | [#88–#92](https://github.com/RodReis/rrb-jarvisOS/issues/88) · MVP-006 | cinco SPECs `aprovada-pi` (2026-08-29); atrás da #87 na fila |
+| Em Andamento | [#87](https://github.com/RodReis/rrb-jarvisOS/issues/87) · MVP-006 F01 Núcleo de conectores | `proplan:doing`; **abre o MVP-006** |
+| Próximo | [#88](https://github.com/RodReis/rrb-jarvisOS/issues/88) · MVP-006 F02 Operação e governança | `proplan:next`; cabeça da fila |
+| Backlog | [#89–#92](https://github.com/RodReis/rrb-jarvisOS/issues/89) · MVP-006 | quatro SPECs `aprovada-pi` (2026-08-29); atrás da #88 na fila |
 | Backlog | [#94–#99](https://github.com/RodReis/rrb-jarvisOS/issues/94) · MVP-008 | seis SPECs `aprovada-pi` (2026-08-29); atrás do MVP-006 na fila |
 | Backlog | [#101–#106](https://github.com/RodReis/rrb-jarvisOS/issues/101) · MVP-009 | seis SPECs `aprovada-pi` (2026-08-29); fim da fila |
 | Finalizado | [#75](https://github.com/RodReis/rrb-jarvisOS/issues/75) · MVP-004 F02 Terminal | aceito pelo PI (2026-08-29), PR [#83](https://github.com/RodReis/rrb-jarvisOS/pull/83) |
@@ -20,6 +19,8 @@ Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do
 | Finalizado | [#110](https://github.com/RodReis/rrb-jarvisOS/issues/110) · M4-F03 UI da allowlist de diretórios | aceito pelo PI (2026-08-29), PR [#114](https://github.com/RodReis/rrb-jarvisOS/pull/114) |
 | A Fazer/Em Andamento | — | WIP = 0 |
 
+> **M6-F01 entregue (2026-08-29) — abre o MVP-006.** O contrato único de capacidades externas, sem proxy HTTP genérico: cada adapter declara o que sabe fazer, valida sua entrada e devolve resultado ou erro **normalizado**. O que a fatia entrega de estrutural é o **ponto único de conectores** — a sede da governança que a F02 instala (health, retry, rate limit, ledger de créditos), pela mesma lógica que fez o `AiCallService` ser a sede do gate de orçamento. **Runtime separado do ponto único de IA** por decisão do PI: os dois compartilham Vault, auditoria encadeada e ledger, e nada mais. **968 testes** (+39: 24 Regras, 15 Banco), quatro provados por contrafactual. **Duas perguntas foram ao PI antes de codificar**, e as duas mudaram o construído: a F01 entrega canais tipados + listagem de capacidades (sem tela), e as chaves de credencial de conector viram **conjunto próprio** — acrescentá-las ao enum de IA faria o Settings anunciar credenciais ausentes que ninguém consegue usar até a F03. O cofre, esse, é o **mesmo**: `credential_ref.key` sempre foi texto, e o que é separado é a taxonomia, não o armazenamento. **O contrafactual pegou uma asserção que não provava o que dizia:** os testes de "recusa antes de I/O" afirmavam que o cofre não fora consultado, mas os pedidos não traziam credencial — a lista ficaria vazia mesmo com o defeito. Com credencial no pedido, reprovam dois em vez de um. **Limite registrado:** nenhum adapter concreto existe (GitHub é F03/F04, Tavily é F05/F06), então não há verificação no app real — o que os testes exercitam é o *contract fixture* que a spec pede, e a prova em Electron chega com o primeiro adapter.
+>
 > **M5-F01 entregue (2026-08-28) — abre o MVP-005.** Os 9 critérios cobertos; **679 testes verdes** (+38: 9 Regras, 20 Banco, 9 Tela). A garantia central é **estrutural**: nenhum tipo que atravessa o IPC tem campo onde o segredo caiba, e não existe método na ponte que o peça. Verificado no app real — o segredo semeado aparece **0 vezes** em `jarvis.db`/`-wal`/`-shm` enquanto `credential_ref` aparece 3 (prova de que a busca funciona); é a prova do **DPAPI real**, já que o teste de integração usa cifra dublada. `verifyAuditChain` → `{ok: true, checked: 95}`. Detalhe em `DEVELOPMENT.md`.
 >
 > **A verificação achou um defeito do design system, não da fatia** ([#107](https://github.com/RodReis/rrb-jarvisOS/issues/107)): overlays em portal renderizam **sem tokens** — modal transparente e ilegível. O `ProvedorDeTema` injeta as variáveis num `div`, o Radix monta o portal no `body`, fora dela. Atinge os 5 componentes com portal, é anterior a esta fatia. **Terceira repetição do mesmo método no projeto** (depois de #57/#58): jsdom não aplica folha de estilo, então componente visualmente quebrado passa verde.
@@ -47,7 +48,7 @@ Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do
 | MVP-003 Design System | [#16](https://github.com/RodReis/rrb-jarvisOS/issues/16) | fechado/aceito | 8/8 |
 | MVP-004 Execução real | [#10](https://github.com/RodReis/rrb-jarvisOS/issues/10) | **três fatias finalizadas**; o épico aguarda o fechamento do PI | 3/3 |
 | MVP-005 Providers/Vault/Budget | [#76](https://github.com/RodReis/rrb-jarvisOS/issues/76) | F01 e F02 finalizadas; **F03 e F04 entregues**, aguardando aceite | 4/4 |
-| MVP-006 Conectores Essenciais | [#86](https://github.com/RodReis/rrb-jarvisOS/issues/86) | seis SPECs `aprovada-pi` (2026-08-29); fatias no Backlog | 0/6 |
+| MVP-006 Conectores Essenciais | [#86](https://github.com/RodReis/rrb-jarvisOS/issues/86) | **F01 em andamento**; cinco fatias no Backlog | 0/6 |
 | MVP-007 Memória Contextual/RAG | — | slot proposto; **sem fatias e sem SPEC** — nada a aprovar até entrar em planejamento ativo | — |
 | MVP-008 Planejamento Governado | [#93](https://github.com/RodReis/rrb-jarvisOS/issues/93) | seis SPECs `aprovada-pi` (2026-08-29); fatias no Backlog | 0/6 |
 | MVP-009 Entrega Autônoma | [#100](https://github.com/RodReis/rrb-jarvisOS/issues/100) | seis SPECs `aprovada-pi` (2026-08-29); fatias no Backlog | 0/6 |
@@ -95,9 +96,9 @@ Não existe catálogo global `SPEC-nnn`. O identificador canônico é o slug aba
 
 ## Próximas ações
 
-1. **Seis fatias aceitas pelo PI em 2026-08-29** — #75, #77, #78, #84, #107 e #110, todas `proplan:finalizado`. Nada aguarda aceite: a coluna **Feito** está vazia.
-2. **O MVP-004 ([#10](https://github.com/RodReis/rrb-jarvisOS/issues/10)) tem as três fatias finalizadas** e só falta o PI fechar o épico. Fila corrente: **#79** (BudgetPolicy) é o `next`; a ordem entre ele e #80 (Multi-provider) é decisão do PI — as duas têm spec aprovada.
-3. A **F03 encaixa no ponto único** que a F02 deixou pronto: a estimativa pré-chamada já é calculada e o `CostEvent` já carrega `estimadoUsd`/`realUsd`. O gate entra entre a estimativa e o disparo do adapter — nenhuma refatoração do ponto de chamada é necessária.
+1. **O MVP-005 fechou**: as quatro fatias foram entregues, e #79/#80 seguem aguardando o aceite do PI junto do épico [#76](https://github.com/RodReis/rrb-jarvisOS/issues/76).
+2. **O MVP-004 ([#10](https://github.com/RodReis/rrb-jarvisOS/issues/10)) tem as três fatias finalizadas** e só falta o PI fechar o épico.
+3. **A M6-F02 herda a sede pronta**: o `ConnectorService` da F01 é o ponto único onde health, retry, rate limit, circuit breaker e o ledger de créditos entram — nenhuma refatoração do caminho de chamada é necessária, do mesmo modo que a M5-F03 encaixou no ponto único da M5-F02.
 4. **MVP-006, MVP-008 e MVP-009 revisados e aprovados (2026-08-29)** — dezesseis decisões estruturais do PI registradas nas SPECs e nos docs dos épicos; #87–#92, #94–#99 e #101–#106 migraram para `proplan:backlog`. **Todas as 24 SPECs do projeto estão `aprovada-pi`.**
 5. MVP-007 será detalhado apenas quando entrar no planejamento ativo — hoje não tem fatia nem SPEC, então não há o que aprovar.
 6. **A M4-F03 fechou a última fatia conhecida sem SPEC** e foi entregue no mesmo dia: não existe mais fatia conhecida sem spec, e o uso real do terminal/filesystem pelo app deixou de depender da ponte — a M8-F01 perde o limite de criar projeto só dentro do diretório do app.

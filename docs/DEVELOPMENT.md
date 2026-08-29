@@ -802,6 +802,56 @@ Seis E2E com Electron, no **pior cenário** — sem credencial de nuvem e sem Ol
 - **Escopo squad/agente do `ProviderRoute` fica para o Corte 4**, como a spec determina.
 - **O chamador declara o `taskType`.** Agentes que o declarem sozinhos são Corte 3+/4 (spec § Fora).
 
+## MVP-006 — Conectores Essenciais ([#86](https://github.com/RodReis/rrb-jarvisOS/issues/86))
+
+Seis fatias, todas com spec `aprovada-pi` (2026-08-29). Ordem:
+`M6-F01 → M6-F02 → (M6-F03 → M6-F04) + (M6-F05 → M6-F06)`.
+
+### Fatia 01 — Núcleo de conectores (`docs/spec/spec-conectores-01-nucleo.md`)
+
+Status: **entregue** — spec `aprovada-pi` (2026-08-29); issue [#87](https://github.com/RodReis/rrb-jarvisOS/issues/87). **Abre o MVP-006.** Depende do MVP-005 (Vault e tipos de auditoria).
+
+- [x] **`src/shared/domain/connectors.ts`** — `ConnectorId`, `ConnectorCapability`, versão de contrato, `ConnectorRequest`, `ConnectorResult`, `ConnectorError` (código estável, retentabilidade, evidência e ação de retomada) e `ConnectorOutcome` como união discriminada por `ok`
+- [x] **`validarConnectorRequest` é função pura** — e é isso que torna o critério 1 afirmável: "falha antes de qualquer I/O" é fato sobre uma função que não toca rede, disco nem cofre, não promessa sobre a implementação
+- [x] **Interface `ConnectorAdapter`** com três métodos (declarar capacidades, validar input, executar). O molde é o `AiAdapter` da M5-F02 — o que fez o multi-provider da M5-F04 caber sem mexer no ponto de chamada
+- [x] **`ConnectorRegistry`**: registro explícito, resolução por `ConnectorId` de lista fechada, e recusa da segunda inscrição do mesmo conector. **Nenhuma resolução por URL** (critério 6)
+- [x] **`ConnectorService`, o ponto único** — resolve → valida envelope → valida input pelo adapter → **só então** o cofre → classifica (`api.external-call`) → audita → executa → audita. É a sede da governança que a F02 instala
+- [x] **Dois canais IPC nomeados** (`connectors:capabilities`, `connectors:invoke`) e **nenhum** que receba endereço
+- [x] **`connector-call` como tipo próprio de `AuditEvent`**, dois eventos por chamada (`requisicao`/`conclusao`) — mesma razão de `ai-call`: chamada que morre no meio precisa deixar rastro
+- [x] **39 testes novos** (24 Regras, 15 Banco); total **968**. Quatro provados por contrafactual
+
+#### Decisões que valem registro
+
+1. **Duas perguntas foram ao PI antes de uma linha de código, e as duas mudaram o que foi construído.** (a) O critério 5 pede "renderer acessa somente IPC tipado", mas a F01 não tem adapter concreto — decisão: **canais tipados + listagem de capacidades, sem tela**. (b) O `ConnectorRequest` carrega `CredentialRef`, mas `CREDENTIAL_KEYS` é enum fechado de IA e a emenda do Vault está cravada na M6-F03 — decisão: **conjunto próprio de chaves de conector**.
+2. **`ConnectorCredentialKey` é separado de `CredentialKey`, e a separação tem consequência visível.** Acrescentar `github`/`tavily` ao enum de IA faria a tela de credenciais do Settings anunciar duas credenciais ausentes que ninguém consegue usar até a F03 — uma promessa que o app não cumpre. A M5-F01 fica fechada e a emenda (payload estruturado, `expires_at`, rotação atômica) permanece onde o PI a cravou.
+3. **O cofre é o mesmo; o que é separado é a taxonomia.** `credential_ref.key` sempre foi texto e o `UNIQUE (user_id, workspace_id, key)` já endereça qualquer chave lógica — o repositório passou a aceitar `VaultKey` (as duas famílias). Um segundo cofre duplicaria cifra, migration e cuidado com o segredo em troca de nada.
+4. **A regra da idempotência mora no contrato, não na governança da F02.** Uma mutação sem chave é um pedido que ninguém pode repetir com segurança, e a F02 não teria como consertar isso depois — só como recusar-se a retentar, o que já é tarde. Recusar na entrada é o que mantém o critério 3 de lá viável.
+5. **`input` e `data` são `unknown` de propósito.** A forma do payload pertence à operação; tipá-los obrigaria o núcleo a saber o que um `issues.create` recebe — exatamente o acoplamento que a fatia existe para não ter.
+6. **O registro nasce vazio, e isso é a entrega.** Pedir por um conector conhecido mas não registrado devolve `connector-nao-registrado`; os adapters concretos entram na F03–F06 sem tocar contrato nem ponto de chamada.
+
+#### O que o teste pegou e a leitura não
+
+- **A primeira versão da asserção de ordem não provava ordem.** Os testes de "recusa antes de I/O" afirmavam `segredos.pedidas === []`, mas os pedidos não traziam credencial — então a lista ficaria vazia **mesmo** numa implementação que consultasse o cofre antes de validar. O contrafactual expôs isso: movida a busca de credencial para antes da validação, só **um** teste reprovou. Com credencial no pedido, reprovam dois. Uma asserção que passa com e sem o defeito não é asserção.
+- **`AuditRepository.list(userId, workspaceId?)`** — passei `100` como segundo argumento supondo um limite, e o filtro por espaço engoliu tudo em silêncio: os eventos vinham vazios e o teste dizia "não auditou". O erro era do teste, não do código.
+- **A guarda de superfície do preload cobrou os dois métodos novos**, como nas quatro fatias anteriores. Enumerados um a um, não por padrão `/connector/` — um padrão aceitaria um `connectorFetch` futuro, que é justamente o que a guarda existe para barrar.
+
+#### Contrafactuais (cada guarda revertida, e o teste que reprovou)
+
+| Guarda revertida | Testes que reprovam |
+|---|---|
+| Cofre consultado **antes** da validação | 2 (capacidade desconhecida; credencial ausente) |
+| Regra de idempotência desligada | 3 (2 Regras, 1 Banco) |
+| Mensagem da exceção do SDK repassada crua | 1 (a que verifica que `tvly-segredo` não vaza) |
+| Canal `connectors:fetch` acrescentado ao contrato | 1 (o critério 6 no preload) |
+
+#### Limites registrados, não silenciados
+
+- **Nenhum adapter concreto existe**, por escopo: GitHub é F03/F04, Tavily é F05/F06. O que os testes exercitam é um **contract fixture** — dois adapters falsos que satisfazem a interface real. É o que a spec pede, e é a prova do critério 4: se `ConnectorAdapter` exigisse algo que só o GitHub tem, o arquivo de teste não compilaria.
+- **Sem verificação no app real**, e é consequência do escopo: não há conector registrado para exercitar pela tela, e nenhuma tela nova foi entregue (decisão do PI). O que atravessa o IPC é provado pela guarda do preload e pelo teste de serialização; a prova em Electron chega com o primeiro adapter concreto, na F03.
+- **Governança é da F02** — health, timeout, retry, rate limit, circuit breaker, ledger de créditos e sanitização de evidência. O `ConnectorUsage` mede créditos e ninguém os soma ainda; o gate é lá.
+- **`project_id` fica fora dos contratos** até o MVP-008, onde projeto nasce. Um campo opcional que ninguém preenche por dois MVPs é campo que se aprende a ignorar.
+- **O relatório por SPEC** sai pelo `reports/TESTS.md` gerado no CI (ADR-003), não em `docs/test-reports/` — o caminho que a spec cita nunca existiu no projeto, e criar um segundo lugar para o mesmo número é como os dois passam a divergir.
+
 ## Registro de entregas
 
 | Data | Fatia | PR | Observação |
