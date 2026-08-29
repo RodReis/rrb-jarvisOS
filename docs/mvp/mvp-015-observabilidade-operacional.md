@@ -14,12 +14,12 @@ Dar ao PI uma visão local, correlacionada e verificável de runs, PRs, deploys,
 
 | Ordem | Fatia | SPEC | Estado |
 |---:|---|---|---|
-| 1 | Núcleo de eventos, outbox e projeções | `spec-observabilidade-01-eventos-outbox-projecoes.md` | a redigir |
-| 2 | Reconciliação, saúde, custos e quotas | `spec-observabilidade-02-reconciliacao-saude-custos-quotas.md` | a redigir |
-| 3 | Alertas e notificações | `spec-observabilidade-03-alertas-notificacoes.md` | a redigir |
-| 4 | Consultas, retenção, rollups e CLI | `spec-observabilidade-04-consultas-retencao-cli.md` | a redigir |
-| 5 | Console operacional | `spec-observabilidade-05-console-operacional.md` | a redigir |
-| 6 | Resiliência, desempenho e prova E2E | `spec-observabilidade-06-resiliencia-desempenho-e2e.md` | a redigir |
+| 1 | Núcleo de eventos, outbox e projeções | `spec-observabilidade-01-eventos-outbox-projecoes.md` | rascunho |
+| 2 | Reconciliação, saúde, custos e quotas | `spec-observabilidade-02-reconciliacao-saude-custos-quotas.md` | rascunho |
+| 3 | Alertas e notificações | `spec-observabilidade-03-alertas-notificacoes.md` | rascunho |
+| 4 | Consultas, retenção, rollups e CLI | `spec-observabilidade-04-consultas-retencao-cli.md` | rascunho |
+| 5 | Console operacional | `spec-observabilidade-05-console-operacional.md` | rascunho |
+| 6 | Resiliência, desempenho e prova E2E | `spec-observabilidade-06-resiliencia-desempenho-e2e.md` | rascunho |
 
 ## Dentro
 

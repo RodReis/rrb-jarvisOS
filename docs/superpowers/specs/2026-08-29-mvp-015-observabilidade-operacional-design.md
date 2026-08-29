@@ -4,7 +4,7 @@
 - Pipeline: V3, depois do MVP-014.
 - Implementação: **não autorizada por este documento**.
 - Issues: não criadas.
-- SPECs: seis fatias aprovadas como decomposição; documentos executáveis ainda serão redigidos e submetidos ao aceite pré-construção.
+- SPECs: seis rascunhos redigidos; nenhum é executável antes do aceite pré-construção do PI.
 - Design predecessor: `2026-08-29-pipeline-desenvolvimento-ia-v3-design.md`.
 
 ## 1. Resultado esperado
@@ -258,6 +258,6 @@ Para um projeto selecionado, o PI vê estado atual e histórico causal de uma jo
 
 ## 16. Gates e autorização
 
-Este design autoriza redigir as seis SPECs do MVP-015. Não autoriza implementação, criação de issues, push, PR, contratação de serviço, smoke externo pago ou mudança na fila.
+Este design autorizou redigir as seis SPECs do MVP-015, agora em `rascunho`. Não autoriza implementação, criação de issues, push, PR, contratação de serviço, smoke externo pago ou mudança na fila.
 
 Cada SPEC precisa de aceite exato do PI antes da construção. A F05 também depende do `DESIGN-SYSTEM.md` e dos protótipos HTML formais aprovados. Não resta questão estrutural aberta; nomes exatos de tipos, migrations e divisão de arquivos pertencem às SPECs sem poder alterar os contratos deste design.
