@@ -70,9 +70,22 @@ function adapter(devolver: () => Response): {
 }
 
 describe('capacidades', () => {
-  it('declara auth.identify e nada além — repositório e issue são a M6-F04', () => {
+  it('declara auth.identify e as nove capacidades da M6-F04', () => {
+    // O teste da F03 afirmava `['auth.identify']` e nada mais — e foi ele que cobrou esta
+    // atualização quando a F04 chegou, que era o ponto de tê-lo escrito assim.
     const caps = new GithubAdapter().capacidades()
-    expect(caps.map((c) => c.operation)).toEqual(['auth.identify'])
+    expect(caps.map((c) => c.operation)).toEqual([
+      'auth.identify',
+      'repo.ensure',
+      'issue.ensure',
+      'issue.ensure-dependency',
+      'ref.ensure',
+      'pr.ensure',
+      'checks.for-head',
+      'actions.runs-for-head',
+      'pr.squash-merge',
+      'pr.merge-state'
+    ])
     expect(caps[0]).toMatchObject({ connector: 'github', effect: 'leitura' })
   })
 
@@ -87,21 +100,48 @@ describe('capacidades', () => {
 })
 
 describe('validar', () => {
-  it('recusa sem credencial, antes de qualquer I/O', () => {
+  it('NÃO confere credencial — quem faz isso é o serviço, depois desta etapa', () => {
+    // O `ConnectorService` chama `validar` no passo 3 e resolve o cofre no passo 6, de propósito:
+    // recusar pedido malformado sem tocar o segredo. Então `secret` está sempre ausente aqui, e
+    // uma guarda de credencial recusaria **toda** chamada — que foi exatamente o que o E2E da
+    // F04 pegou, com a guarda que a F03 havia posto e que só tinha teste unitário.
+    expect(new GithubAdapter().validar(execution())).toBeUndefined()
+  })
+
+  it('valida o input da operação sem tocar a rede', () => {
     const buscar = vi.fn()
     const instancia = new GithubAdapter(buscar)
 
-    const erro = instancia.validar(execution())
-    expect(erro).toMatchObject({ code: 'credencial-ausente', acao: 'reautenticar' })
+    const erro = instancia.validar({
+      request: { ...REQUEST, operation: 'repo.ensure', input: { owner: '', repo: '' } },
+      capability: {
+        connector: 'github',
+        operation: 'repo.ensure',
+        effect: 'mutacao',
+        descricao: 'x'
+      }
+    })
+
+    expect(erro).toMatchObject({ code: 'validacao-invalida', acao: 'corrigir-entrada' })
     expect(buscar).not.toHaveBeenCalled()
   })
 
-  it('credencial em branco conta como ausente, não como token vazio enviado ao GitHub', () => {
-    expect(new GithubAdapter().validar(execution(''))).toMatchObject({ code: 'credencial-ausente' })
-  })
-
-  it('com credencial, não há o que recusar', () => {
-    expect(new GithubAdapter().validar(execution('ghu_x'))).toBeUndefined()
+  it('input válido passa', () => {
+    expect(
+      new GithubAdapter().validar({
+        request: {
+          ...REQUEST,
+          operation: 'repo.ensure',
+          input: { owner: 'o', repo: 'r', visibility: 'private' }
+        },
+        capability: {
+          connector: 'github',
+          operation: 'repo.ensure',
+          effect: 'mutacao',
+          descricao: 'x'
+        }
+      })
+    ).toBeUndefined()
   })
 })
 
