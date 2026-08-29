@@ -11,6 +11,7 @@ O board é uma **projeção** das GitHub Issues: `issue → coluna` por **label 
 | Label | Coluna | Estado da issue | Significado |
 |---|---|---|---|
 | `proplan:mvp` | — (épico) | open até o PI fechar | Container de fatias; corpo = checklist |
+| `proplan:planejado` | Planejado | open | Issue pré-criada pelo PI; SPEC ainda não aprovada; fora da fila de implementação |
 | `proplan:backlog` | Backlog | open | Spec `aprovada-pi`, aguardando fila |
 | `proplan:next` | — (marcador, fica no card do topo do Backlog) | open | Cabeça da fila do `docs/STATUS.md` — o próximo card a puxar. Não é coluna |
 | `proplan:todo` | A Fazer | open | Próxima fatia; Code se atribuiu |
@@ -32,7 +33,8 @@ O board é uma **projeção** das GitHub Issues: `issue → coluna` por **label 
   A armadilha é nossa: **`[FIX]` é o nosso token de tipo de card**, então a palavra aparece naturalmente ao falar de um card de correção. Ao citar um card `[FIX]` numa mensagem de commit, separe o número da palavra — `o FIX do card #43`, `FIX-43` — ou escreva sem `#` (`card 43`). Só o `refs #N` deliberado leva `#`.
 - Issue nunca é deletada; descarte = `closed` + `proplan:descartado`.
 - Mover para Finalizado/Descartado posta comentário de carimbo na issue.
-- Fatia só vira issue quando a spec correspondente em `docs/spec/` está `aprovada-pi`, com link para o arquivo da spec no corpo e assignee = PI.
+- Regra normal: fatia só vira issue quando a spec correspondente está `aprovada-pi`, com link para a spec e assignee = PI.
+- Exceção explícita do PI (2026-08-28): issues podem ser pré-criadas para tornar a ordem visível. Nesse caso recebem somente `proplan:planejado`, declaram “implementação não autorizada” e não podem receber `next`, `todo` ou `doing`. Ao aprovar a SPEC, o Cowork troca `planejado` por `backlog`; não cria outra issue.
 - `card = fatia`, nunca passo de spec. Passos vivem em `docs/DEVELOPMENT.md`.
 
 ### Specs

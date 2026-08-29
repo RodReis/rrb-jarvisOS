@@ -1,6 +1,7 @@
 # SPEC-Entrega-01 — Publicação no GitHub
 
 - MVP/Fatia: MVP-009 · M9-F01.
+- Issue: [#101](https://github.com/RodReis/rrb-jarvisOS/issues/101).
 - Status: **revisão documental; implementação não autorizada**.
 - Dependências: MVP-006 concluído e pacote/MVP/fatia do MVP-008 aprovados.
 
@@ -32,4 +33,3 @@ Validar autenticação/instalação → `ensureRepository` → configurar branch
 ## Testes, evidência e custo
 
 Integração com GitHub fake e injeção de crash; smoke em repositório exclusivo. Evidência: URLs, IDs e SHAs, nunca tokens. Relatório `SPEC-Entrega-01`.
-

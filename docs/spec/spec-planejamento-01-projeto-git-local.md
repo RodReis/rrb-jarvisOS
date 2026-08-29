@@ -1,6 +1,7 @@
 # SPEC-Planejamento-01 — Projeto, persistência e Git local
 
 - MVP/Fatia: MVP-008 · M8-F01.
+- Issue: [#94](https://github.com/RodReis/rrb-jarvisOS/issues/94).
 - Status: **revisão documental; implementação não autorizada**.
 - Dependências: MVP-005 e MVP-006 concluídos.
 
@@ -37,4 +38,3 @@ Criar ou importar um projeto local, persistir seu planejamento e inicializar Git
 ## Testes, evidência e custo
 
 Integração em diretórios temporários para novo/importado/colisão/reinício/falha de commit. Relatório `SPEC-Planejamento-01`. Sem API externa e sem custo de modelo obrigatório.
-

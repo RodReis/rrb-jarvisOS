@@ -76,6 +76,12 @@ O #58 expôs que jsdom não aplica folha de estilo: 562 testes passavam mesmo co
 - 2026-08-28: seis fatias por MVP executável, GitHub App + Device Flow, Tavily Search+Extract, Context7 técnico, anexos de design pelo PI, Git automático e ausência de aceite duplicado.
 - As 18 SPECs foram criadas para revisão documental. Não nasceram issues e não houve autorização de implementação.
 
+### Publicação antecipada das issues (2026-08-28)
+
+Por solicitação explícita do PI, foram criados os épicos [#86](https://github.com/RodReis/rrb-jarvisOS/issues/86), [#93](https://github.com/RodReis/rrb-jarvisOS/issues/93) e [#100](https://github.com/RodReis/rrb-jarvisOS/issues/100), com 18 sub-issues na ordem #87–#92, #94–#99 e #101–#106. O GitHub registra sub-issues e dependências nativas entre fatias/MVPs.
+
+Como as SPECs continuavam em revisão, as fatias receberam `proplan:planejado`, não `proplan:backlog`. Isso preserva a regra de que issue existente não equivale a autorização de implementação. O texto anterior registra o estado antes dessa decisão e permanece como histórico.
+
 ## Pendências históricas preservadas
 
 - A UI de allowlist ainda exigia decisão de produto: localização, seletor nativo e remoção de `appDir`.

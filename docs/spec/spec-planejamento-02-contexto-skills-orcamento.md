@@ -1,6 +1,7 @@
 # SPEC-Planejamento-02 — Contexto, skills e orçamento
 
 - MVP/Fatia: MVP-008 · M8-F02.
+- Issue: [#95](https://github.com/RodReis/rrb-jarvisOS/issues/95).
 - Status: **revisão documental; implementação não autorizada**.
 - Depende de: M8-F01, MVP-005 e MVP-006.
 
@@ -41,4 +42,3 @@ Registrar limite por etapa, consumo estimado/real, créditos externos e justific
 ## Testes e evidência
 
 Unitários de seleção, hash, deduplicação e budget; fixtures com relatório antigo/novo; teste de ausência de skills. Relatório `SPEC-Planejamento-02`; custo externo zero nas suítes comuns.
-

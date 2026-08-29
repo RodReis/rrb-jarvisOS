@@ -44,3 +44,4 @@
 8. O PI aprova uma vez o pacote estrutural por revisão e aprova cada MVP/fatia antes da construção. A mesma revisão não pede aceite novamente; merge técnico é automático.
 9. MVP-009 usa worktree isolado, WIP=1 e no máximo três tentativas totais. Reinício reconcilia antes de repetir efeito.
 10. Documentação/ADR auxiliar não bloqueia código depois do gate. A pipeline não inventa LGPD, consentimento, aceite duplo, classificação de domínio ou requisito não fornecido pelo PI.
+11. Por solicitação explícita do PI, os épicos e as 18 fatias dos MVPs 006/008/009 foram pré-criados no GitHub em ordem. Fatias com SPEC em revisão usam `proplan:planejado`, ficam fora da fila e não autorizam implementação; ao aprovar, a mesma issue migra para `proplan:backlog`.

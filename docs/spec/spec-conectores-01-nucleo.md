@@ -1,6 +1,7 @@
 # SPEC-Conectores-01 — Núcleo de conectores
 
 - MVP/Fatia: MVP-006 · M6-F01.
+- Issue: [#87](https://github.com/RodReis/rrb-jarvisOS/issues/87).
 - Status: **revisão documental; implementação não autorizada**.
 - Dependências: MVP-005 (Vault e tipos de auditoria).
 
@@ -38,4 +39,3 @@ Resolver adapter → validar capacidade/entrada → obter referência de credenc
 ## Testes e evidência
 
 Unitários de validação/registro; contract fixture de adapter fake; teste de serialização IPC; relatório em `docs/test-reports/SPEC-Conectores-01.md`. Custo externo esperado: zero.
-

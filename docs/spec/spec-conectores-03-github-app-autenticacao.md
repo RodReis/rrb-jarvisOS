@@ -1,6 +1,7 @@
 # SPEC-Conectores-03 — GitHub App e autenticação
 
 - MVP/Fatia: MVP-006 · M6-F03.
+- Issue: [#89](https://github.com/RodReis/rrb-jarvisOS/issues/89).
 - Status: **revisão documental; implementação não autorizada**.
 - Depende de: M6-F01, M6-F02 e Vault do MVP-005.
 

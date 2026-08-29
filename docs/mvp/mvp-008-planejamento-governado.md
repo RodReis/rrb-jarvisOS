@@ -1,6 +1,7 @@
 # MVP-008 — Planejamento Governado
 
 - Status: **desenho aprovado pelo PI em 2026-08-28; SPECs em revisão documental; implementação não autorizada**.
+- GitHub: épico [#93](https://github.com/RodReis/rrb-jarvisOS/issues/93); fatias [#94–#99](https://github.com/RodReis/rrb-jarvisOS/issues/94), estado `proplan:planejado`.
 - Depende de: MVP-005 e MVP-006.
 - Não depende de: MVP-007.
 - Resultado: projeto local, documentação estrutural aprovada, roadmap completo e próxima SPEC pronta para aprovação.
@@ -38,4 +39,3 @@ A mesma revisão não volta ao PI. Mudanças invalidam somente gates dependentes
 - Pacote estrutural aprovado referencia hashes exatos.
 - Roadmap completo existe; somente a próxima fatia recebe detalhamento executável.
 - Commits documentais são automáticos por marco.
-

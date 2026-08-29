@@ -11,6 +11,9 @@ Atualizado em: **2026-08-28**. Visão curta do estado corrente e fonte única do
 | Backlog | [#78](https://github.com/RodReis/rrb-jarvisOS/issues/78) · Adapter Claude | aprovado, aguardando fila |
 | Backlog | [#79](https://github.com/RodReis/rrb-jarvisOS/issues/79) · BudgetPolicy | aprovado, aguardando fila |
 | Backlog | [#80](https://github.com/RodReis/rrb-jarvisOS/issues/80) · Multi-provider | aprovado, aguardando fila |
+| Planejado | [#87–#92](https://github.com/RodReis/rrb-jarvisOS/issues/87) · MVP-006 | SPECs em revisão; fora da fila |
+| Planejado | [#94–#99](https://github.com/RodReis/rrb-jarvisOS/issues/94) · MVP-008 | SPECs em revisão; fora da fila |
+| Planejado | [#101–#106](https://github.com/RodReis/rrb-jarvisOS/issues/101) · MVP-009 | SPECs em revisão; fora da fila |
 | Done | [#75](https://github.com/RodReis/rrb-jarvisOS/issues/75) · MVP-004 F02 Terminal | PR [#83](https://github.com/RodReis/rrb-jarvisOS/pull/83), aguardando aceite |
 | Done | [#77](https://github.com/RodReis/rrb-jarvisOS/issues/77) · MVP-005 F01 Vault | PR desta entrega, aguardando aceite |
 | A Fazer/Em Andamento | — | WIP = 0 |
@@ -28,10 +31,10 @@ Atualizado em: **2026-08-28**. Visão curta do estado corrente e fonte única do
 | MVP-003 Design System | [#16](https://github.com/RodReis/rrb-jarvisOS/issues/16) | fechado/aceito | 8/8 |
 | MVP-004 Execução real | [#10](https://github.com/RodReis/rrb-jarvisOS/issues/10) | F01 aceita; F02 aguardando aceite | 1/2 |
 | MVP-005 Providers/Vault/Budget | [#76](https://github.com/RodReis/rrb-jarvisOS/issues/76) | F01 entregue, aguardando aceite; três SPECs no Backlog | 1/4 |
-| MVP-006 Conectores Essenciais | — | seis SPECs em revisão; sem autorização/issues | — |
+| MVP-006 Conectores Essenciais | [#86](https://github.com/RodReis/rrb-jarvisOS/issues/86) | seis fatias `planejado`; sem autorização | 0/6 |
 | MVP-007 Memória Contextual/RAG | — | slot proposto; não bloqueante | — |
-| MVP-008 Planejamento Governado | — | seis SPECs em revisão; sem autorização/issues | — |
-| MVP-009 Entrega Autônoma | — | seis SPECs em revisão; sem autorização/issues | — |
+| MVP-008 Planejamento Governado | [#93](https://github.com/RodReis/rrb-jarvisOS/issues/93) | seis fatias `planejado`; sem autorização | 0/6 |
+| MVP-009 Entrega Autônoma | [#100](https://github.com/RodReis/rrb-jarvisOS/issues/100) | seis fatias `planejado`; sem autorização | 0/6 |
 
 ## Índice Fatia ↔ SPEC
 
@@ -72,7 +75,7 @@ Não existe catálogo global `SPEC-nnn`. O identificador canônico é o slug aba
 1. PI aceitar ou recusar as duas fatias em **Done**: F02 do MVP-004 (#75) e M5-F01 (#77).
 2. Decidir a ordem da fila: os dois `[FIX]` de UI (#84 e #107) antes da M5-F02 (#78), ou o MVP-005 seguindo direto. O **#107 é o mais amplo** — atinge todo overlay do app, não uma tela.
 3. Decidir sobre a **UI da allowlist de diretórios** (pendência registrada na F02 do MVP-004): é fatia, precisa de spec — sem ela o usuário não consegue permitir diretório pelo app.
-4. Revisar documentalmente as SPECs dos MVPs 006/008/009 já com issues abertas (#86–#106); implementação só após autorização explícita do PI.
+4. Revisar as SPECs dos MVPs 006/008/009; as issues #87–#106 permanecem `proplan:planejado` e só migram para `backlog` após aprovação explícita.
 5. MVP-007 será detalhado apenas quando entrar no planejamento ativo.
 
 ## Roadmap

@@ -1,6 +1,7 @@
 # SPEC-Conectores-04 — Automação GitHub
 
 - MVP/Fatia: MVP-006 · M6-F04.
+- Issue: [#90](https://github.com/RodReis/rrb-jarvisOS/issues/90).
 - Status: **revisão documental; implementação não autorizada**.
 - Depende de: M6-F03.
 

@@ -1,6 +1,7 @@
 # SPEC-Conectores-06 — Tavily Extract e evidências
 
 - MVP/Fatia: MVP-006 · M6-F06.
+- Issue: [#92](https://github.com/RodReis/rrb-jarvisOS/issues/92).
 - Status: **revisão documental; implementação não autorizada**.
 - Depende de: M6-F05.
 

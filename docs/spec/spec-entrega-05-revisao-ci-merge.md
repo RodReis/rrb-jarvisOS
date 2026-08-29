@@ -1,6 +1,7 @@
 # SPEC-Entrega-05 — Revisão, CI e merge
 
 - MVP/Fatia: MVP-009 · M9-F05.
+- Issue: [#105](https://github.com/RodReis/rrb-jarvisOS/issues/105).
 - Status: **revisão documental; implementação não autorizada**.
 - Depende de: M9-F04 e GitHub Adapter M6-F04.
 
@@ -37,4 +38,3 @@ Escopo → testes/lint/type/build → code/architecture review → design review
 ## Testes e evidência
 
 Fixtures de review/CI; integração de PR existente, CI failure, stale SHA, rebase e merge já ocorrido; smoke GitHub real. Relatório `SPEC-Entrega-05`.
-

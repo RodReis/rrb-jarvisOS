@@ -1,6 +1,7 @@
 # SPEC-Entrega-03 — Worktree, preflight e Docker
 
 - MVP/Fatia: MVP-009 · M9-F03.
+- Issue: [#103](https://github.com/RodReis/rrb-jarvisOS/issues/103).
 - Status: **revisão documental; implementação não autorizada**.
 - Depende de: M9-F02 e SPEC aprovada da fatia-alvo.
 
@@ -39,4 +40,3 @@ Resolver/fetch da base → fixar base SHA → criar branch/worktree determiníst
 ## Testes e evidência
 
 Integração Git real temporária, colisão de porta/container e validação de path; smoke Docker quando aplicável. Relatório `SPEC-Entrega-03`.
-
