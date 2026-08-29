@@ -728,6 +728,16 @@ Três E2E com Electron, `ANTHROPIC_BASE_URL` apontando para um servidor SSE loca
 1. **`npm run build` roda `typecheck` antes.** O primeiro contrafactual (`if (false)`) não compilava, o build abortava, e o Playwright rodava contra o **bundle anterior**, intacto: "3 passed" sem ter provado nada. O contrafactual precisou virar uma condição que compila (`&& globalThis.X === true`) para de fato exercitar o app sem o gate.
 2. **Auditar `decisao: 'bloqueado'` não prova enforcement.** O terceiro E2E passava com e sem o gate, porque o serviço decide de qualquer forma — quem barra é o ponto único, e em report-only ele produziria exatamente o mesmo `AuditEvent`. O que separa os dois é a **ausência da fase `requisicao`**: ela só é auditada depois do gate, então uma chamada barrada tem `conclusao` e nada mais. Com a asserção corrigida, os três caem sem o bloqueio.
 
+#### Incidente de processo: a fatia entrou na `main` sem PR (2026-08-29)
+
+**O que aconteceu.** Os três commits da F03 foram para a `main` em vez do `feat/budget-policy` e o push os levou para a `origin/main`. O branch foi criado corretamente no início (`git checkout -b feat/budget-policy`, confirmado por `git branch --show-current`), mas em algum ponto o HEAD voltou para `main` — e eu não reverifiquei antes de nenhum dos três commits. O erro só apareceu quando `gh pr create` respondeu *"head branch main is the same as base branch main"*.
+
+**O que isso custou, concretamente.** O CI dispara em `pull_request`; nenhuma execução rodou sobre estes commits. O código está na `main` **sem ter passado pelo `gate`** — que é exatamente a garantia que "um branch por fatia" existe para preservar. O conteúdo é o mesmo que teria ido pelo PR (824 testes e 3 E2E verdes localmente, docs incluídas), mas "verde na minha máquina" não é o que o processo pede.
+
+**Por que não foi desfeito.** `git branch -f` devolveu os commits ao branch da fatia e a `main` local voltou a `18eed62`, mas o force-push para a `origin/main` foi **rejeitado**: a proteção tem `allow_force_pushes: false`. Desligar a proteção para consertar um erro de processo trocaria uma garantia real por conveniência. **Decisão do PI (2026-08-29):** aceitar o estado, abrir um PR de verificação para o CI rodar sobre o código, e registrar aqui.
+
+**A guarda que faltava.** Confirmar o branch **uma vez, no início** não basta: o custo do erro é assimétrico (segundos para checar, proteção de branch para desfazer). O `git branch --show-current` tem de vir **junto do commit**, não antes da primeira edição.
+
 #### Limites registrados, não silenciados
 
 - **A prova de valor computado ficou pendente.** As 15 asserções de Tela rodam em jsdom, que não aplica folha de estilo: a cor da barra ao cruzar o limiar, a altura de 44px dos campos e o anel de foco por teclado **não foram medidos**. O caminho normal — abrir o app e navegar até Settings — exige sessão, e sem a stack Supabase no ar o app fica no login; a galeria de prova do DS hospeda componentes do design system, não telas de app com ponte. **Decisão do PI (2026-08-29): entregar assim e registrar.** É o mesmo tipo de buraco pelo qual passaram o #57, o #58 e o #107.
