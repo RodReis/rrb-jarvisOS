@@ -1,11 +1,11 @@
 # MVP-009 — Entrega Autônoma
 
-- Status: **desenho aprovado pelo PI em 2026-08-28; SPECs em revisão documental; implementação não autorizada**.
-- GitHub: épico [#100](https://github.com/RodReis/rrb-jarvisOS/issues/100); fatias [#101–#106](https://github.com/RodReis/rrb-jarvisOS/issues/101), estado `proplan:planejado`.
+- Status: **as seis SPECs `aprovada-pi` em 2026-08-29** — revisão de perguntas abertas concluída com o PI; fatias liberadas para o Backlog, no fim da fila.
+- GitHub: épico [#100](https://github.com/RodReis/rrb-jarvisOS/issues/100); fatias [#101–#106](https://github.com/RodReis/rrb-jarvisOS/issues/101), estado `proplan:backlog`.
 - Depende de: MVP-005, MVP-006 e MVP-008 concluídos.
 - Não depende de: MVP-007.
 - Resultado: uma fatia aprovada percorre publicação, construção, PR, CI, merge e prova sem aceite duplicado.
-- **Herdado da revisão do MVP-008 (decisão do PI 2026-08-29):** a consulta a **documentação técnica atual (Context7)** pertence a este MVP — é o agente construtor (Claude Code, que já tem Context7 como MCP) quem a faz. O aplicativo não expõe Context7 como conector. A ser tratado na revisão das SPECs deste MVP; hoje é pendência registrada, não fatia.
+- **Pendência herdada do MVP-008, resolvida nesta revisão:** a consulta a documentação técnica (Context7) vive na **M9-F04**, como ferramenta do agente construtor via MCP. O aplicativo não expõe Context7 como conector.
 
 ## Tese
 
@@ -22,6 +22,21 @@ Executar somente o que foi aprovado, em worktree isolado, com WIP=1, Git automá
 | M9-F05 | `spec-entrega-05-revisao-ci-merge.md` | Revisão, CI e squash merge automático |
 | M9-F06 | `spec-entrega-06-evidencia-limpeza-continuidade.md` | Ledger, limpeza e próxima fatia |
 
+## Decisões estruturais do PI (2026-08-29)
+
+| # | Decisão | Onde |
+|---|---|---|
+| 1 | **O container Docker é o sandbox do executor** — o Claude Code roda nele, com o worktree montado, nunca no host. A allowlist de comandos do MVP-004 continua governando o terminal do usuário | M9-F03, M9-F04 |
+| 2 | **Merge autônomo ligado por padrão, com kill-switch por projeto**; desligado, o run termina no PR verde aguardando o PI | M9-F05 |
+| 3 | **Context7 é ferramenta do agente construtor** (MCP) na entrada do executor, não conector do app | M9-F04 |
+
+**Por que a decisão 1 importa.** O MVP-004 criou a allowlist de comandos para o app não rodar comando arbitrário. Um agente que constrói software precisa rodar comando arbitrário — a allowlist não pode governá-lo sem inviabilizá-lo. Sem uma fronteira nova, o MVP-009 seria um caminho para executar qualquer coisa na máquina, passando por cima do enforcement que o MVP-004 entregou. O container é essa fronteira.
+
+## Dependências duras registradas
+
+- **Docker é dependência dura do MVP-009.** Ausente ou incapaz de subir ⇒ `BLOCKED_EXTERNAL` com ação; **nunca** há fallback para executar no host.
+- Depende do MVP-008 concluído (projeto, pacote aprovado, Git local) e do MVP-006 (GitHub Adapter).
+
 ## Invariantes
 
 - Nenhum código é construído sem MVP e SPEC aprovados.
@@ -31,6 +46,7 @@ Executar somente o que foi aprovado, em worktree isolado, com WIP=1, Git automá
 - CI verde precisa corresponder ao `head SHA` mergeado.
 - Reinício não duplica commit, issue, PR ou merge.
 - Merge técnico não cria outro aceite do PI.
+- O executor roda em container; nenhum segredo entra nele e ele nunca fala com o GitHub.
 
 ## Done do MVP
 
