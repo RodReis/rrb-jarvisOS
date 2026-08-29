@@ -8,10 +8,10 @@ Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do
 |---|---|---|
 | Feito | [#88](https://github.com/RodReis/rrb-jarvisOS/issues/88) · MVP-006 F02 Operação e governança | entregue (PR [#145](https://github.com/RodReis/rrb-jarvisOS/pull/145)), aguardando aceite |
 | Feito | [#87](https://github.com/RodReis/rrb-jarvisOS/issues/87) · MVP-006 F01 Núcleo de conectores | entregue (PR [#144](https://github.com/RodReis/rrb-jarvisOS/pull/144)), aguardando aceite — **abre o MVP-006** |
-| Feito | [#89](https://github.com/RodReis/rrb-jarvisOS/issues/89) · MVP-006 F03 GitHub App/autenticação | entregue (PR desta entrega), aguardando aceite |
-| Feito | [#90](https://github.com/RodReis/rrb-jarvisOS/issues/90) · MVP-006 F04 Automação GitHub idempotente | entregue (PR desta entrega), aguardando aceite |
-| Feito | [#91](https://github.com/RodReis/rrb-jarvisOS/issues/91) · MVP-006 F05 ResearchAdapter Tavily Search | entregue (PR desta entrega), aguardando aceite |
-| Feito | [#92](https://github.com/RodReis/rrb-jarvisOS/issues/92) · MVP-006 F06 Tavily Extract e evidências | entregue (PR desta entrega), aguardando aceite — **fecha o MVP-006** |
+| Feito | [#89](https://github.com/RodReis/rrb-jarvisOS/issues/89) · MVP-006 F03 GitHub App/autenticação | entregue PR [#146](https://github.com/RodReis/rrb-jarvisOS/pull/146), aguardando aceite |
+| Feito | [#90](https://github.com/RodReis/rrb-jarvisOS/issues/90) · MVP-006 F04 Automação GitHub idempotente | entregue PR [#147](https://github.com/RodReis/rrb-jarvisOS/pull/147), aguardando aceite |
+| Feito | [#91](https://github.com/RodReis/rrb-jarvisOS/issues/91) · MVP-006 F05 ResearchAdapter Tavily Search | entregue PR [#148](https://github.com/RodReis/rrb-jarvisOS/pull/148), aguardando aceite |
+| Feito | [#92](https://github.com/RodReis/rrb-jarvisOS/issues/92) · MVP-006 F06 Tavily Extract e evidências | entregue PR [#148](https://github.com/RodReis/rrb-jarvisOS/pull/148), aguardando aceite — **fecha o MVP-006** |
 | Próximo | [#94](https://github.com/RodReis/rrb-jarvisOS/issues/94) · MVP-008 F01 | cabeça da fila; marcar `proplan:next` |
 | Backlog | [#94–#99](https://github.com/RodReis/rrb-jarvisOS/issues/94) · MVP-008 | seis SPECs `aprovada-pi` (2026-08-29); atrás do MVP-006 na fila |
 | Backlog | [#101–#106](https://github.com/RodReis/rrb-jarvisOS/issues/101) · MVP-009 | seis SPECs `aprovada-pi` (2026-08-29); fim da fila |
