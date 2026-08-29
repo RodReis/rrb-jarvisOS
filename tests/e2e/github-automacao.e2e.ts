@@ -284,13 +284,20 @@ test('as nove capacidades chegam ao renderer pela listagem do núcleo', async ()
   const janela = await app.firstWindow()
   await janela.waitForLoadState('domcontentloaded')
 
+  // Filtrado pelo conector: o registro passou a ter Tavily na M6-F05, e este teste é sobre as
+  // capacidades **do GitHub**. Sem o filtro, ele quebraria a cada conector novo por um motivo
+  // que nada tem a ver com o que afirma.
   const operacoes = await janela.evaluate(async () => {
     const bridge = (
       window as unknown as {
-        jarvis: { listConnectorCapabilities: () => Promise<{ operation: string }[]> }
+        jarvis: {
+          listConnectorCapabilities: () => Promise<{ connector: string; operation: string }[]>
+        }
       }
     ).jarvis
-    return (await bridge.listConnectorCapabilities()).map((c) => c.operation)
+    return (await bridge.listConnectorCapabilities())
+      .filter((c) => c.connector === 'github')
+      .map((c) => c.operation)
   })
 
   expect(operacoes).toEqual([
