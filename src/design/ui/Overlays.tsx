@@ -6,6 +6,7 @@ import * as RadixDropdown from '@radix-ui/react-dropdown-menu'
 import { X } from 'lucide-react'
 import { Button } from './Button'
 import { cx } from './base'
+import { useContainerDeOverlay } from '../tokens/provider'
 
 /**
  * Overlays (SPEC-DesignSystem-03b, PRD §11.5; critérios 1 e 3).
@@ -18,6 +19,11 @@ import { cx } from './base'
  *
  * O `backdrop` some no `prefers-reduced-motion` sem animar; o conteúdo sempre aparece (a
  * animação é enfeite da entrada, nunca gate da visibilidade).
+ *
+ * **Todo `Portal` daqui recebe `container`** (`useContainerDeOverlay`) — o nó do `ProvedorDeTema`,
+ * não o `<body>`. Os tokens `--jos-*` são `style` inline nesse nó; um portal no `body` cai fora da
+ * subárvore e renderiza sem fundo, sem raio, sem sombra e sem `z-index` (FIX #107). Portal ainda é
+ * portal: continua escapando de `overflow: hidden`, só que dentro do tema.
  */
 
 const BACKDROP = cx(
@@ -31,6 +37,11 @@ const PAINEL_MODAL = cx(
   'fixed left-1/2 top-1/2 z-[var(--jos-camada-modal)] w-[min(92vw,32rem)] -translate-x-1/2 -translate-y-1/2',
   'flex flex-col gap-4 rounded-[var(--jos-raio-modal)] p-5',
   'border border-[rgba(var(--jos-borda-rgb),0.16)] bg-[var(--jos-cor-superficie-elevada)]',
+  // Cor de texto **declarada**, não herdada. O painel vive num portal: a herança que o resto do
+  // app recebe do `FundoDaIdentidade` não chega até aqui, e sem isto o título cai no preto padrão
+  // do navegador — ilegível sobre a superfície escura. O mesmo defeito de fundo que o `container`
+  // resolveu, na propriedade que a herança carregava.
+  'text-[var(--jos-cor-texto)]',
   'shadow-[var(--jos-sombra-card)]',
   'data-[state=open]:animate-[surgir_var(--jos-duracao-media)_ease-out]'
 )
@@ -86,10 +97,11 @@ export function Dialog({
   rodape
 }: DialogProps): React.JSX.Element {
   useRetornoDeFoco(aberto)
+  const container = useContainerDeOverlay()
 
   return (
     <RadixDialog.Root open={aberto} onOpenChange={(o) => !o && onFechar()}>
-      <RadixDialog.Portal>
+      <RadixDialog.Portal container={container}>
         <RadixDialog.Overlay className={BACKDROP} />
         <RadixDialog.Content className={PAINEL_MODAL}>
           <header className="flex items-start justify-between gap-4">
@@ -178,10 +190,11 @@ export function AlertDialog({
   children
 }: AlertDialogProps): React.JSX.Element {
   useRetornoDeFoco(aberto)
+  const container = useContainerDeOverlay()
 
   return (
     <RadixAlertDialog.Root open={aberto} onOpenChange={(o) => !o && onFechar()}>
-      <RadixAlertDialog.Portal>
+      <RadixAlertDialog.Portal container={container}>
         <RadixAlertDialog.Overlay className={BACKDROP} />
         <RadixAlertDialog.Content className={PAINEL_MODAL}>
           <RadixAlertDialog.Title className="font-[var(--jos-peso-forte)] text-[length:var(--jos-texto-secao)]">
@@ -221,15 +234,18 @@ interface PopoverProps {
  * posicionado por `absolute` seria cortado. Foco entra no conteúdo, Escape fecha, foco retorna.
  */
 export function Popover({ gatilho, children }: PopoverProps): React.JSX.Element {
+  const container = useContainerDeOverlay()
+
   return (
     <RadixPopover.Root>
       <RadixPopover.Trigger asChild>{gatilho}</RadixPopover.Trigger>
-      <RadixPopover.Portal>
+      <RadixPopover.Portal container={container}>
         <RadixPopover.Content
           sideOffset={6}
           className={cx(
             'z-[var(--jos-camada-overlay)] w-64 rounded-[var(--jos-raio-card)] p-3',
             'border border-[rgba(var(--jos-borda-rgb),0.16)] bg-[var(--jos-cor-superficie-elevada)]',
+            'text-[var(--jos-cor-texto)]',
             'shadow-[var(--jos-sombra-card)]',
             'data-[state=open]:animate-[surgir_var(--jos-duracao-rapida)_ease-out]'
           )}
@@ -262,16 +278,19 @@ interface DropdownMenuProps {
  * direto no menu.
  */
 export function DropdownMenu({ gatilho, itens }: DropdownMenuProps): React.JSX.Element {
+  const container = useContainerDeOverlay()
+
   return (
     <RadixDropdown.Root>
       <RadixDropdown.Trigger asChild>{gatilho}</RadixDropdown.Trigger>
-      <RadixDropdown.Portal>
+      <RadixDropdown.Portal container={container}>
         <RadixDropdown.Content
           sideOffset={6}
           align="end"
           className={cx(
             'z-[var(--jos-camada-overlay)] min-w-44 rounded-[var(--jos-raio-card)] p-1',
             'border border-[rgba(var(--jos-borda-rgb),0.16)] bg-[var(--jos-cor-superficie-elevada)]',
+            'text-[var(--jos-cor-texto)]',
             'shadow-[var(--jos-sombra-card)]'
           )}
         >
@@ -325,15 +344,17 @@ export function Drawer({
   lado = 'direita'
 }: DrawerProps): React.JSX.Element {
   useRetornoDeFoco(aberto)
+  const container = useContainerDeOverlay()
 
   return (
     <RadixDialog.Root open={aberto} onOpenChange={(o) => !o && onFechar()}>
-      <RadixDialog.Portal>
+      <RadixDialog.Portal container={container}>
         <RadixDialog.Overlay className={BACKDROP} />
         <RadixDialog.Content
           className={cx(
             'fixed top-0 z-[var(--jos-camada-modal)] flex h-full w-[min(90vw,26rem)] flex-col gap-4 p-5',
             'border-[rgba(var(--jos-borda-rgb),0.16)] bg-[var(--jos-cor-superficie-elevada)]',
+            'text-[var(--jos-cor-texto)]',
             'shadow-[var(--jos-sombra-card)]',
             lado === 'direita'
               ? 'right-0 border-l data-[state=open]:animate-[entrar-direita_var(--jos-duracao-media)_ease-out]'

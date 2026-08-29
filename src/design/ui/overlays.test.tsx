@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { AlertDialog, Button, Dialog, DropdownMenu, Drawer, IconButton, Popover } from './index'
+import { ProvedorDeTema } from '../tokens/provider'
 
 /**
  * Overlays (SPEC-DesignSystem-03b, critérios 1 e 3; PRD §11.5).
@@ -367,5 +368,125 @@ describe('AlertDialog (critérios 1 e 3)', () => {
     await user.keyboard('{Escape}')
     expect(onFechar).toHaveBeenCalledTimes(1)
     expect(onConfirmar).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * Onde o portal monta (FIX #107).
+ *
+ * Os tokens `--jos-*` vivem como `style` inline no `div` do `ProvedorDeTema`, não em `:root`. Um
+ * portal montado no `<body>` cai **fora** dessa subárvore e renderiza sem fundo, sem raio, sem
+ * sombra e sem `z-index` — o painel sai transparente e ilegível.
+ *
+ * jsdom não aplica folha de estilo nem resolve `var()`, então aqui não dá para medir a cor: foi
+ * exatamente por isso que 679 testes verdes conviveram com cinco overlays quebrados. O que jsdom
+ * **consegue** afirmar é a topologia — se o nó portado é descendente do provider. É a condição
+ * necessária, e é o que volta a falhar se alguém remover o `container`.
+ *
+ * A medida do valor computado (fundo opaco de verdade) fica na prova de navegador,
+ * `tests/prova/dados.prova.ts`, onde o `var()` resolve.
+ */
+describe('portal dentro do tema (FIX issue 107)', () => {
+  /** O nó do provider — o único lugar da árvore onde os tokens existem. */
+  function raizDoTema(): HTMLElement {
+    const no = document.querySelector('[data-jos-tema]')
+    if (no === null) throw new Error('Provider de tema não encontrado.')
+    return no as HTMLElement
+  }
+
+  it('Dialog monta dentro da subárvore do provider, não no body', async () => {
+    const user = userEvent.setup()
+    render(
+      <ProvedorDeTema>
+        <ComGatilho
+          render={(aberto, fechar) => (
+            <Dialog aberto={aberto} onFechar={fechar} titulo="Editar workflow">
+              <p>Conteúdo</p>
+            </Dialog>
+          )}
+        />
+      </ProvedorDeTema>
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Abrir' }))
+    const dialogo = await screen.findByRole('dialog', { name: 'Editar workflow' })
+
+    expect(raizDoTema().contains(dialogo)).toBe(true)
+  })
+
+  it('AlertDialog monta dentro da subárvore do provider, não no body', async () => {
+    const user = userEvent.setup()
+    render(
+      <ProvedorDeTema>
+        <ComGatilho
+          render={(aberto, fechar) => (
+            <AlertDialog
+              aberto={aberto}
+              onFechar={fechar}
+              onConfirmar={vi.fn()}
+              titulo="Excluir?"
+              descricao="Permanente."
+              verboConfirmar="Excluir"
+            />
+          )}
+        />
+      </ProvedorDeTema>
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Abrir' }))
+    expect(raizDoTema().contains(await screen.findByRole('alertdialog'))).toBe(true)
+  })
+
+  it('Drawer monta dentro da subárvore do provider, não no body', async () => {
+    const user = userEvent.setup()
+    render(
+      <ProvedorDeTema>
+        <ComGatilho
+          render={(aberto, fechar) => (
+            <Drawer aberto={aberto} onFechar={fechar} titulo="Detalhes">
+              <p>Conteúdo</p>
+            </Drawer>
+          )}
+        />
+      </ProvedorDeTema>
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Abrir' }))
+    expect(raizDoTema().contains(await screen.findByRole('dialog', { name: 'Detalhes' }))).toBe(
+      true
+    )
+  })
+
+  it('Popover monta dentro da subárvore do provider, não no body', async () => {
+    const user = userEvent.setup()
+    render(
+      <ProvedorDeTema>
+        <Popover gatilho={<Button>Abrir</Button>}>
+          <p>Filtro</p>
+        </Popover>
+      </ProvedorDeTema>
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Abrir' }))
+    expect(raizDoTema().contains(await screen.findByRole('dialog'))).toBe(true)
+  })
+
+  it('DropdownMenu monta dentro da subárvore do provider, não no body', async () => {
+    const user = userEvent.setup()
+    render(
+      <ProvedorDeTema>
+        <DropdownMenu
+          gatilho={
+            <IconButton rotulo="Ações">
+              <span aria-hidden="true">⋯</span>
+            </IconButton>
+          }
+          itens={[{ rotulo: 'Duplicar', onSelecionar: vi.fn() }]}
+        />
+      </ProvedorDeTema>
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Ações' }))
+    expect(raizDoTema().contains(await screen.findByRole('menu'))).toBe(true)
   })
 })
