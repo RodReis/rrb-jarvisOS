@@ -20,8 +20,46 @@ import type { ConnectorError, ConnectorErrorCode } from './connectors'
  * `.env` pudessem mudar seria o proxy genérico que a SPEC-Conectores-01 (critério 6) proíbe —
  * por um caminho diferente, mas com o mesmo efeito. O teste substitui o `fetch`, não a URL.
  */
-export const GITHUB_DEVICE_CODE_URL = 'https://github.com/login/device/code'
-export const GITHUB_ACCESS_TOKEN_URL = 'https://github.com/login/oauth/access_token'
+export const GITHUB_OAUTH_ORIGIN = 'https://github.com'
+export const GITHUB_DEVICE_CODE_PATH = '/login/device/code'
+export const GITHUB_ACCESS_TOKEN_PATH = '/login/oauth/access_token'
+
+export const GITHUB_DEVICE_CODE_URL = `${GITHUB_OAUTH_ORIGIN}${GITHUB_DEVICE_CODE_PATH}`
+export const GITHUB_ACCESS_TOKEN_URL = `${GITHUB_OAUTH_ORIGIN}${GITHUB_ACCESS_TOKEN_PATH}`
+
+/**
+ * A origem efetiva do OAuth, com o override de **ambiente do main** quando presente.
+ *
+ * Existe por uma razão só: provar o Device Flow no app real, contra um servidor local que conta
+ * requisições, sem falar com o GitHub de verdade — a mesma técnica do `ANTHROPIC_BASE_URL` que
+ * os E2E do MVP-005 já usam, e a decisão de método do PI que separa "o mock não foi chamado" de
+ * "a requisição não saiu".
+ *
+ * **Isto não é o proxy genérico que a SPEC-Conectores-01 (critério 6) proíbe**, e a diferença é
+ * quem escolhe: ali seria o *renderer* mandando um endereço pelo IPC; aqui é uma variável do
+ * processo main, o mesmo grau de confiança do `.env` que já guarda credencial. Não há canal que
+ * a alcance, e a UI não tem como influenciá-la.
+ *
+ * **Só origem, nunca caminho.** Os paths continuam constantes e são concatenados aqui — um
+ * override que carregasse caminho poderia apontar o polling para outro endpoint da mesma
+ * origem, e o que este ponto de teste precisa é trocar o *servidor*, não a rota.
+ *
+ * Valor inválido é ignorado em vez de derrubar o boot: uma variável mal digitada não deve
+ * impedir alguém de usar o GitHub de verdade.
+ */
+export function origemDoOAuth(override?: string): string {
+  const limpo = override?.trim()
+  if (limpo === undefined || limpo === '') return GITHUB_OAUTH_ORIGIN
+
+  try {
+    // `new URL(…).origin` descarta caminho, query e fragmento — é o que faz "só origem" ser
+    // uma garantia da forma, e não uma regra que alguém precisa lembrar de respeitar.
+    const url = new URL(limpo)
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.origin : GITHUB_OAUTH_ORIGIN
+  } catch {
+    return GITHUB_OAUTH_ORIGIN
+  }
+}
 
 /**
  * Onde o usuário instala a GitHub App.

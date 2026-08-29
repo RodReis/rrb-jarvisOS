@@ -2,7 +2,7 @@
 
 - MVP/Fatia: MVP-006 · M6-F03.
 - Issue: [#89](https://github.com/RodReis/rrb-jarvisOS/issues/89).
-- Status: **aprovada-pi** (2026-08-29) — dono da GitHub App, emenda ao Vault e escopo de UI resolvidos pelo PI nesta data.
+- Status: **entregue** (2026-08-29) — implementada na M6-F03; **aprovada-pi** (2026-08-29) — dono da GitHub App, emenda ao Vault e escopo de UI resolvidos pelo PI nesta data.
 - Depende de: M6-F01, M6-F02 e Vault do MVP-005.
 
 ## Objetivo

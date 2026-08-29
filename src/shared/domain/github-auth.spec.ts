@@ -9,6 +9,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   GITHUB_CLIENT_ID_EMBUTIDO,
+  GITHUB_OAUTH_ORIGIN,
   MARGEM_DE_RENOVACAO_MS,
   SLOW_DOWN_ACRESCIMO_MS,
   erroDeInstalacaoAusente,
@@ -16,6 +17,7 @@ import {
   interpretarRespostaDeToken,
   lerGrantDeDeviceCode,
   lerPayloadDeToken,
+  origemDoOAuth,
   precisaRenovar,
   resolverClientId,
   urlDeInstalacao
@@ -44,6 +46,32 @@ describe('resolverClientId', () => {
     // `client_id` real for embutido, este teste falha e cobra a atualização — que é o ponto.
     expect(GITHUB_CLIENT_ID_EMBUTIDO).toBe('')
     expect(resolverClientId()).toBeUndefined()
+  })
+})
+
+describe('origemDoOAuth', () => {
+  it('sem override, fala com o GitHub', () => {
+    expect(origemDoOAuth()).toBe(GITHUB_OAUTH_ORIGIN)
+    expect(origemDoOAuth('')).toBe(GITHUB_OAUTH_ORIGIN)
+  })
+
+  it('aceita um servidor local — é o que permite provar o fluxo no app real', () => {
+    expect(origemDoOAuth('http://127.0.0.1:54321')).toBe('http://127.0.0.1:54321')
+  })
+
+  it('descarta caminho, query e fragmento: o override troca o servidor, não a rota', () => {
+    // Sem isto, um override poderia apontar o polling para outro endpoint da mesma origem —
+    // e o ponto de teste viraria um redirecionador de rota.
+    expect(origemDoOAuth('http://127.0.0.1:54321/qualquer/rota?x=1#y')).toBe(
+      'http://127.0.0.1:54321'
+    )
+  })
+
+  it('recusa esquema que não seja http(s) e valor sem forma de URL', () => {
+    expect(origemDoOAuth('file:///etc/passwd')).toBe(GITHUB_OAUTH_ORIGIN)
+    expect(origemDoOAuth('javascript:alert(1)')).toBe(GITHUB_OAUTH_ORIGIN)
+    // Valor mal digitado não derruba o boot: cai no GitHub de verdade.
+    expect(origemDoOAuth('nao-e-url')).toBe(GITHUB_OAUTH_ORIGIN)
   })
 })
 

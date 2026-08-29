@@ -22,12 +22,13 @@
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { ConnectorError, ConnectorErrorCode } from '@shared/domain/connectors'
 import {
-  GITHUB_ACCESS_TOKEN_URL,
-  GITHUB_DEVICE_CODE_URL,
+  GITHUB_ACCESS_TOKEN_PATH,
+  GITHUB_DEVICE_CODE_PATH,
   grantExpirou,
   interpretarRespostaDeToken,
   lerGrantDeDeviceCode,
   lerPayloadDeToken,
+  origemDoOAuth,
   precisaRenovar,
   resolverClientId,
   type DeviceCodeGrant,
@@ -75,7 +76,13 @@ export class GithubAuthService {
      */
     private readonly esperar: (ms: number) => Promise<void> = (ms) =>
       new Promise((resolve) => setTimeout(resolve, ms)),
-    private readonly agora: () => number = () => Date.now()
+    private readonly agora: () => number = () => Date.now(),
+    /**
+     * A origem do OAuth. Lida do **ambiente do main** e não de configuração da UI: existe para
+     * o E2E poder apontar o fluxo a um servidor local que conta requisições, e nenhum canal
+     * IPC a alcança (ver `origemDoOAuth`).
+     */
+    private readonly origem: string = origemDoOAuth(process.env.GITHUB_OAUTH_ORIGIN)
   ) {}
 
   /**
@@ -150,7 +157,7 @@ export class GithubAuthService {
 
     let resposta: Response
     try {
-      resposta = await this.buscar(GITHUB_DEVICE_CODE_URL, {
+      resposta = await this.buscar(`${this.origem}${GITHUB_DEVICE_CODE_PATH}`, {
         method: 'POST',
         headers: {
           Accept: 'application/json',
@@ -268,7 +275,7 @@ export class GithubAuthService {
 
       let corpo: Record<string, unknown> | undefined
       try {
-        const resposta = await this.buscar(GITHUB_ACCESS_TOKEN_URL, {
+        const resposta = await this.buscar(`${this.origem}${GITHUB_ACCESS_TOKEN_PATH}`, {
           method: 'POST',
           headers: {
             Accept: 'application/json',
@@ -390,7 +397,7 @@ export class GithubAuthService {
     if (clientId === undefined) return undefined
 
     try {
-      const resposta = await this.buscar(GITHUB_ACCESS_TOKEN_URL, {
+      const resposta = await this.buscar(`${this.origem}${GITHUB_ACCESS_TOKEN_PATH}`, {
         method: 'POST',
         headers: {
           Accept: 'application/json',
