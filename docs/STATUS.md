@@ -6,8 +6,7 @@ Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do
 
 | Coluna | Item | Estado |
 |---|---|---|
-| Próximo | [#110](https://github.com/RodReis/rrb-jarvisOS/issues/110) · M4-F03 UI da allowlist de diretórios | `proplan:next`; `aprovada-pi` 2026-08-29; desbloqueia MVP-004 e M8-F01 |
-| Backlog | [#79](https://github.com/RodReis/rrb-jarvisOS/issues/79) · BudgetPolicy | aprovado, aguardando fila |
+| Próximo | [#79](https://github.com/RodReis/rrb-jarvisOS/issues/79) · BudgetPolicy | `proplan:next`; aprovado, cabeça da fila |
 | Backlog | [#80](https://github.com/RodReis/rrb-jarvisOS/issues/80) · Multi-provider | aprovado, aguardando fila |
 | Backlog | [#87–#92](https://github.com/RodReis/rrb-jarvisOS/issues/87) · MVP-006 | seis SPECs `aprovada-pi` (2026-08-29); atrás de #79/#80 na fila |
 | Backlog | [#94–#99](https://github.com/RodReis/rrb-jarvisOS/issues/94) · MVP-008 | seis SPECs `aprovada-pi` (2026-08-29); atrás do MVP-006 na fila |
@@ -17,7 +16,8 @@ Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do
 | Done | [#107](https://github.com/RodReis/rrb-jarvisOS/issues/107) · `[FIX]` overlays em portal sem tokens | PR [#109](https://github.com/RodReis/rrb-jarvisOS/pull/109), aguardando aceite |
 | Done | [#78](https://github.com/RodReis/rrb-jarvisOS/issues/78) · MVP-005 F02 Adapter Claude | PR desta entrega, aguardando aceite |
 | Done | [#84](https://github.com/RodReis/rrb-jarvisOS/issues/84) · `[FIX]` card de aprovação descreve comando como filesystem | PR [#113](https://github.com/RodReis/rrb-jarvisOS/pull/113), aguardando aceite |
-| A Fazer/Em Andamento | — | WIP = 0 |
+| Em Andamento | [#110](https://github.com/RodReis/rrb-jarvisOS/issues/110) · M4-F03 UI da allowlist de diretórios | PR [#114](https://github.com/RodReis/rrb-jarvisOS/pull/114) aberto, aguardando CI |
+| A Fazer | — | WIP = 1 |
 
 > **M5-F01 entregue (2026-08-28) — abre o MVP-005.** Os 9 critérios cobertos; **679 testes verdes** (+38: 9 Regras, 20 Banco, 9 Tela). A garantia central é **estrutural**: nenhum tipo que atravessa o IPC tem campo onde o segredo caiba, e não existe método na ponte que o peça. Verificado no app real — o segredo semeado aparece **0 vezes** em `jarvis.db`/`-wal`/`-shm` enquanto `credential_ref` aparece 3 (prova de que a busca funciona); é a prova do **DPAPI real**, já que o teste de integração usa cifra dublada. `verifyAuditChain` → `{ok: true, checked: 95}`. Detalhe em `DEVELOPMENT.md`.
 >
@@ -29,6 +29,8 @@ Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do
 >
 > **#84 entregue (2026-08-29).** O card da fila descrevia **toda** pendência como filesystem — uma execução de processo aparecia como "Filesystem: comando", sem binário, argumentos ou cwd, e o usuário aprovava às cegas. A correção **não inventa discriminante**: reusa o `operation.kind` que o handler de `approval:resolve` já usava para rotear a decisão entre os dois motores — o dado existia, só a apresentação o ignorava. **735 testes** (+3, todos de Tela), provados por contrafactual, e o ramo de filesystem intacto. Verificado no app real: o card lê "Executar comando: node --force" com o cwd no escopo, e **Aprovar continua executando** (`verifyAuditChain` → `{ok: true, checked: 125}`). O achado que vale registrar é de método: o componente não tinha **nenhum** teste — o defeito não passou por asserção frouxa, passou por ausência de suíte.
 >
+> **M4-F03 entregue (2026-08-29).** A tela que faltava desde o MVP-002: os canais da allowlist de diretórios existiam na ponte e **nenhuma tela os usava**, então pelo aplicativo ninguém conseguia permitir uma pasta — e sem isso o terminal recusava todo cwd. A fatia **não toca enforcement**; entrega o acesso a ele. **Adicionou dois canais IPC, não um** como a spec previa: o critério 4 pede marcar o `appDir` como fixo, mas `listAllowedDirectories` devolve strings sem marcação e o `appDir` nunca atravessava o IPC identificado — as alternativas eram mudar um contrato que a spec proíbe mudar, ou inferir a identidade por posição no renderer (acoplando a UI à ordem de inserção do `Set` no repositório). **Decisão do PI: canal só-leitura `allowlist:app-dir`.** **748 testes** (+13: 4 Regras, 9 Tela) e **+1 E2E**; os três testes centrais provados por contrafactual. **Verificado no app real pela ponte real:** a pasta recusada por `cwd-fora-da-allowlist` passa a executar `node --version` → `v24.15.0` depois de permitida, o `appDir` resiste à remoção e `verifyAuditChain` → `{ok: true, checked: 10}`. **Ressalva registrada:** a seção **não foi vista renderizada** — o app abre no gate de login e atravessá-lo exige autenticação interativa no navegador. A tela está provada em jsdom, mas **a aparência não foi medida**, e é essa a lacuna que pegou os defeitos de #57/#58, #107 e #84.
+>
 > **Decisões do PI (2026-08-29):** três modelos na tabela de preço (Opus 5, Sonnet 5, Haiku 4.5) para dar spread à F03 e à F04; **SDK oficial** `@anthropic-ai/sdk` em vez de `fetch` cru; **painel mínimo** de teste no Settings — a tela de providers é F04, explicitamente.
 
 ## MVPs
@@ -38,7 +40,7 @@ Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do
 | MVP-001 Fundação | [#1](https://github.com/RodReis/rrb-jarvisOS/issues/1) | fechado/aceito | 6/6 |
 | MVP-002 Execução local | [#9](https://github.com/RodReis/rrb-jarvisOS/issues/9) | fechado/aceito | 5/5 |
 | MVP-003 Design System | [#16](https://github.com/RodReis/rrb-jarvisOS/issues/16) | fechado/aceito | 8/8 |
-| MVP-004 Execução real | [#10](https://github.com/RodReis/rrb-jarvisOS/issues/10) | F01 aceita; F02 aguardando aceite; **F03 nova** (`aprovada-pi` 2026-08-29) | 1/3 |
+| MVP-004 Execução real | [#10](https://github.com/RodReis/rrb-jarvisOS/issues/10) | F01 aceita; F02 e F03 entregues, aguardando aceite | 1/3 |
 | MVP-005 Providers/Vault/Budget | [#76](https://github.com/RodReis/rrb-jarvisOS/issues/76) | F01 e F02 entregues, aguardando aceite; duas SPECs no Backlog | 2/4 |
 | MVP-006 Conectores Essenciais | [#86](https://github.com/RodReis/rrb-jarvisOS/issues/86) | seis SPECs `aprovada-pi` (2026-08-29); fatias no Backlog | 0/6 |
 | MVP-007 Memória Contextual/RAG | — | slot proposto; **sem fatias e sem SPEC** — nada a aprovar até entrar em planejamento ativo | — |
