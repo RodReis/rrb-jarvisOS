@@ -118,3 +118,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-08-29 | #78 | — | Regras de Negócio | 272 | 272 | 0 | 75.5 | #TBD | — |
 | 2026-08-29 | #78 | — | Banco | 209 | 209 | 0 | 88.2 | #TBD | — |
 | 2026-08-29 | #78 | — | Tela | 251 | 250 | 0 | 91.2 | #TBD | — |
+| 2026-08-29 | #78 | — | Regras de Negócio | 272 | 272 | 0 | 75.5 | #112 | [#112](https://github.com/RodReis/rrb-jarvisOS/pull/112) |
+| 2026-08-29 | #78 | — | Banco | 209 | 209 | 0 | 88.2 | #112 | [#112](https://github.com/RodReis/rrb-jarvisOS/pull/112) |
+| 2026-08-29 | #78 | — | Tela | 251 | 250 | 0 | 91.2 | #112 | [#112](https://github.com/RodReis/rrb-jarvisOS/pull/112) |
