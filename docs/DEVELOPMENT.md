@@ -12,7 +12,7 @@ Regra de trabalho: **uma fatia por vez (WIP = 1)**. Só iniciar fatia com spec `
 
 ### Fatia 01 — Bootstrap e estrutura (`docs/spec/spec-fundacao-01-bootstrap.md`)
 
-Status: **entregue** (`proplan:done`, aguardando aceite do PI) — spec `aprovada-pi` (2026-07-21); issue #2; PR [#25](https://github.com/RodReis/rrb-jarvisOS/pull/25) mergeado em 2026-07-22 com CI verde.
+Status: **finalizado** (aceito pelo PI) — spec `aprovada-pi` (2026-07-21); issue #2; PR [#25](https://github.com/RodReis/rrb-jarvisOS/pull/25) mergeado em 2026-07-22 com CI verde.
 
 - [x] Scaffold Electron + React + TS + Vite via **electron-vite** (Electron 43, Vite 7, React 19, Vitest 4; `engines.node >= 22`)
 - [x] Estrutura `src/main` / `src/renderer` / `src/shared` com READMEs
@@ -506,7 +506,7 @@ O que o MVP-003 deixa: **569 testes** (Regras 230 · Banco 132 · Tela 211, cobe
 
 **A lição de método do corte** foi sobre camadas de verificação, e ela se repetiu em quase toda fatia: os testes de papel provam contrato, a **prova visual em navegador prova pintura**, e as duas não se substituem. O que só a captura pegou, com os testes verdes: o CSS que não era gerado (F03a), o card do NOA invertido (F03a), o `data-attribute` descartado em silêncio (F05), o alias que quebrou a galeria inteira com `test`/`lint`/`typecheck` verdes (F06), a camada `patterns` sem CSS utilitário desde a F04a (F06) e o `Meter` que escondia o rótulo (#52, achado ao revisar a captura **para o aceite**).
 
-Três `[FIX]` nasceram durante o corte e seguem em `proplan:done`, aguardando aceite à parte: **#43**, **#47** e **#52**.
+Três `[FIX]` nasceram durante o corte e foram aceitos à parte: **#43**, **#47** e **#52** — todos `proplan:finalizado`.
 
 ## Após o MVP-003
 
