@@ -103,6 +103,26 @@ A capacidade de desenvolvimento autônomo foi separada em três MVPs executávei
 - A V2 termina no merge do DAG aprovado. Deploy e produção permanecem fora.
 - Fonte completa: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v2-design.md`.
 
+### Pipeline V3 — Release e operação (MVP-014 detalhado; não implementado)
+
+`MVP-014 Release → MVP-015 Observabilidade → MVP-016 Aprendizado operacional → MVP-017 Blueprints → MVP-018 Portfólio`.
+
+O MVP-014 separa dois fluxos: `PreviewRun` por PR/fatia e `ReleaseRun` após merge. O núcleo determinístico mantém fila, estados, gates, idempotência, leases e compensações; adapters híbridos e CLI-first integram Docker Compose, GHCR, Vercel e Railway.
+
+```text
+PR/SPEC ── PreviewCoordinator ── Vercel Preview + Railway backend/Postgres temporários
+
+Merge ── ReleaseQueue ── ReleaseOrchestrator
+                         ├── GHCR: imagem OCI por digest
+                         ├── Staging: Railway + Vercel + Postgres separados
+                         ├── Produção: mesmos artefatos, migration e estabilização
+                         └── Falha de código: correção pela Pipeline V2
+```
+
+Local, cada Preview, Staging e Produção possuem configurações e bancos separados. Migration é forward-only; compensação automática alcança aplicações, não restaura banco. Produção é automática depois dos gates e não espera fechamento administrativo da issue.
+
+Fonte completa: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v3-design.md` e `docs/mvp/mvp-014-release-deploy-governado.md`.
+
 ### Fontes de verdade
 
 - arquivos versionados: conteúdo aprovado;

@@ -45,3 +45,18 @@
 9. MVP-009 usa worktree isolado, WIP=1 e no máximo três tentativas totais. Reinício reconcilia antes de repetir efeito.
 10. Documentação/ADR auxiliar não bloqueia código depois do gate. A pipeline não inventa LGPD, consentimento, aceite duplo, classificação de domínio ou requisito não fornecido pelo PI.
 11. Por solicitação explícita do PI, os épicos e as 18 fatias dos MVPs 006/008/009 foram pré-criados no GitHub em ordem. Fatias com SPEC em revisão usam `proplan:planejado`, ficam fora da fila e não autorizam implementação; ao aprovar, a mesma issue migra para `proplan:backlog`.
+
+## Decisões da Pipeline V3 (PI, 2026-08-29)
+
+1. A V3 sucede o merge técnico da V2 e cobre release, operação e aprendizado nos MVPs 014–018.
+2. O MVP-014 usa Docker Compose local, GHCR, Vercel para frontend e Railway para backend/PostgreSQL separado.
+3. Cada PR/fatia recebe Preview full-stack isolado; Staging é persistente; Produção é automática após merge e gates, sem segundo aceite.
+4. O núcleo determinístico trabalha com estados, diário idempotente, leases e compensações; provedores ficam atrás de adapters híbridos e CLI-first.
+5. Migrations são forward-only/expand-contract. Backup precede Produção e restore nunca é automático.
+6. Segredos permanecem nos provedores; a pipeline persiste somente referências e fingerprints.
+7. Uma release ativa por projeto/ambiente; merges anteriores a Staging podem ser consolidados, preservando SHAs `superseded`.
+8. Staging e Produção recebem o mesmo digest OCI do GHCR e o mesmo deployment imutável da Vercel.
+9. Estabilização padrão é cinco minutos. Somente depois nascem tag, GitHub Release e changelog.
+10. Falha de código retorna à V2 em nova branch/PR ligada à mesma SPEC, sem alteração direta de Produção e sem novo aceite quando o escopo não muda.
+11. Fechamento de issue é administrativo; não bloqueia deploy nem constitui aceite de produto adicional.
+12. MVP-015–MVP-018 têm direção aprovada, mas permanecem sem fatias/SPECs até planejamento ativo.

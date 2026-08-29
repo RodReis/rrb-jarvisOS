@@ -16,8 +16,8 @@ O board é uma **projeção** das GitHub Issues: `issue → coluna` por **label 
 | `proplan:next` | — (marcador, fica no card do topo do Backlog) | open | Cabeça da fila do `docs/STATUS.md` — o próximo card a puxar. Não é coluna |
 | `proplan:todo` | A Fazer | open | Próxima fatia; Code se atribuiu |
 | `proplan:doing` | Em Andamento | open | Em implementação (WIP = 1) |
-| `proplan:done` | Feito | open | PR **mergeado**, aguardando aceite do PI |
-| `proplan:finalizado` | Finalizado | closed | Aceito pelo PI (só o PI fecha) |
+| `proplan:done` | Feito | open | PR **mergeado**; encerramento administrativo pendente, sem segundo aceite nem bloqueio de deploy |
+| `proplan:finalizado` | Finalizado | closed | Encerrado administrativamente pelo PI; não representa novo gate técnico |
 | `proplan:descartado` | Descartado | closed | Descartada deliberadamente pelo PI |
 
 ### Regras invariantes
@@ -25,7 +25,7 @@ O board é uma **projeção** das GitHub Issues: `issue → coluna` por **label 
 - Uma issue de fatia tem **exatamente um** label `proplan:*` de coluna por vez; a transição troca o label, nunca acumula.
 - `proplan:next` é **marcador, não coluna**: coexiste com `proplan:backlog` (fica no card do topo da fila) e **não** viola a regra acima. No máximo **um** `proplan:next` entre as issues abertas — zero quando a fila esvazia.
 - A **ordem da fila** é decisão do PI e vive **só** no `docs/STATUS.md`. `proplan:next` é a projeção da **cabeça** dessa fila no board, nunca uma segunda fonte da ordem completa. O **Cowork** marca `next` na cabeça ao montar/reordenar o Backlog; o **Code**, ao puxar o card `next` para A Fazer, **avança o marcador** para o próximo item da fila do STATUS.md — ação mecânica que segue a ordem, não decide prioridade.
-- **`closes #N` é proibido** em PR/commit — forjaria o aceite. Sempre `refs #N`.
+- **`closes #N` é proibido** em PR/commit — forjaria o fechamento administrativo deliberado. Sempre `refs #N`.
 - **`refs #N` no corpo não basta: o squash concatena todas as mensagens do PR.** Se **qualquer** commit contiver `fix #N`, `fixes #N`, `closes #N` ou `resolve #N` — em qualquer posição, inclusive no título — o GitHub fecha a issue no merge, mesmo que todos os outros commits usem `refs`.
 
   Aconteceu no PR [#44](https://github.com/RodReis/rrb-jarvisOS/pull/44) (2026-07-23): os três commits usavam só `refs #43`, mas um deles se chamava `docs: registra o FIX #43 (...)`. O GitHub leu `FIX #43` como palavra-chave e fechou a issue — exatamente o fechamento frágil que o processo existe para impedir. A issue foi reaberta e o carimbo `proplan:done` aplicado à mão.
@@ -120,3 +120,20 @@ Governado pelo **ADR-005** e detalhado na `SPEC-Fundacao-06`. Vale para NOA e JA
 ### Estados de bloqueio
 
 Todo `BLOCKED` guarda causa verificável, evidência, tentativas, motivo pelo qual continuar seria incorreto e ação mínima de retomada. Sem esses campos, o bloqueio é inválido.
+
+### 4.2 Contratos de release da Pipeline V3
+
+Entidades: `PreviewRun`, `ReleaseRun`, `Artifact`, `Deployment`, `MigrationExecution`, `GateResult`, `ConfigurationReference` e `CompensationExecution`.
+
+Invariantes:
+
+1. `PreviewRun` e `ReleaseRun` são distintos; Preview nunca recebe tag de Produção.
+2. Uma única release escreve por projeto/ambiente; projetos diferentes podem publicar em paralelo.
+3. Ao entrar em Staging, SHA, digest do backend e deployment do frontend ficam imutáveis.
+4. Staging e Produção usam o mesmo digest/deployment; rebuild entre ambientes é proibido.
+5. Efeito externo registra intenção e reconcilia estado ambíguo antes de retry.
+6. Migration é forward-only; restore do PostgreSQL exige comando operacional explícito.
+7. `ConfigurationReference` comporta nome/fingerprint/estado, nunca valor secreto.
+8. Merge e gates promovem Produção automaticamente; fechamento da issue é administrativo e não cria aceite duplo.
+9. Falha de código retorna à V2 em branch/PR da mesma SPEC; agente nunca edita Produção diretamente.
+10. Documento ou evidência incompleta gera reparo, não rollback de aplicação saudável.

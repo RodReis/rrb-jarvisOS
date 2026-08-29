@@ -52,7 +52,7 @@ Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do
 | MVP-011 Squads limitados | [#121](https://github.com/RodReis/rrb-jarvisOS/issues/121) | fatias [#122–#126](https://github.com/RodReis/rrb-jarvisOS/issues/122) no Backlog | 0/5 |
 | MVP-012 Scheduler concorrente | [#127](https://github.com/RodReis/rrb-jarvisOS/issues/127) | fatias [#128–#132](https://github.com/RodReis/rrb-jarvisOS/issues/128) no Backlog | 0/5 |
 | MVP-013 Execução contínua | [#133](https://github.com/RodReis/rrb-jarvisOS/issues/133) | fatias [#134–#138](https://github.com/RodReis/rrb-jarvisOS/issues/134) no Backlog | 0/5 |
-| MVP-014 Release e Deploy Governado | — | design aprovado; cinco fatias nominadas; SPECs ainda não redigidas; depois do MVP-013 | — |
+| MVP-014 Release e Deploy Governado | — | design aprovado; cinco SPECs em revisão do PI; fora da fila até aprovação | 0/5 |
 | MVP-015 Observabilidade Operacional | — | direção aprovada; sem fatias e sem SPEC | — |
 | MVP-016 Aprendizado Operacional da Pipeline | — | direção aprovada; sem fatias e sem SPEC; não substitui o MVP-007 | — |
 | MVP-017 Biblioteca de Blueprints | — | direção aprovada; sem fatias e sem SPEC | — |
@@ -64,7 +64,7 @@ Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do
 
 > **Pipeline V2 aprovada e publicada (2026-08-29).** Arquitetura, quatro MVPs e vinte SPECs receberam `aprovada-pi`. Épicos #115/#121/#127/#133 e fatias #116–#120/#122–#126/#128–#132/#134–#138 foram criados com parents e bloqueios nativos na ordem de implementação. Isso adiciona backlog futuro sem furar a fila corrente. A V2 termina no merge do DAG aprovado; deploy permanece fora. Fonte: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v2-design.md`.
 
-> **Pipeline V3 em especificação (2026-08-29).** A direção MVP-014–MVP-018 e a arquitetura completa do MVP-014 foram aprovadas. O MVP-014 usa Docker Compose local, GHCR, Vercel, Railway e PostgreSQL separado; publica automaticamente depois de merge e gates, sem aceite duplo. Suas cinco fatias estão nominadas, mas ainda não possuem SPEC nem issue e, portanto, não entram na fila executável. Fonte: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v3-design.md`.
+> **Pipeline V3 em especificação (2026-08-29).** A direção MVP-014–MVP-018 e a arquitetura completa do MVP-014 foram aprovadas. O MVP-014 usa Docker Compose local, GHCR, Vercel, Railway e PostgreSQL separado; publica automaticamente depois de merge e gates, sem aceite duplo. Suas cinco SPECs foram redigidas e aguardam revisão do PI; ainda não possuem issue e não entram na fila executável. Fonte: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v3-design.md`.
 
 > **MVP-009 aprovado (2026-08-29).** Três decisões do PI: **o container Docker é o sandbox do executor** — o Claude Code roda nele com o worktree montado, nunca no host; **merge autônomo ligado por padrão com kill-switch por projeto**, e desligado o run termina no PR verde aguardando o PI; **Context7 é ferramenta do agente construtor** na M9-F04, fechando a pendência herdada do MVP-008. A decisão do container fecha um buraco real: o MVP-004 proibiu comando arbitrário, mas um agente que constrói software precisa exatamente disso — sem fronteira nova, o MVP-009 passaria por cima do enforcement que o MVP-004 entregou. **Docker passa a ser dependência dura**, sem fallback para o host.
 
@@ -122,6 +122,11 @@ Não existe catálogo global `SPEC-nnn`. O identificador canônico é o slug aba
 | M13-F03 | MVP-013 | Controles operacionais ([#136](https://github.com/RodReis/rrb-jarvisOS/issues/136)) | `spec-continuo-03-controles-operacionais.md` |
 | M13-F04 | MVP-013 | Projeções e gates ([#137](https://github.com/RodReis/rrb-jarvisOS/issues/137)) | `spec-continuo-04-projecoes-gates.md` |
 | M13-F05 | MVP-013 | Jornada multi-MVP ([#138](https://github.com/RodReis/rrb-jarvisOS/issues/138)) | `spec-continuo-05-jornada-multi-mvp.md` |
+| M14-F01 | MVP-014 | Núcleo de release e fila | `spec-release-01-nucleo-estados-fila.md` |
+| M14-F02 | MVP-014 | Docker, artefatos e configuração | `spec-release-02-compose-artefatos-config.md` |
+| M14-F03 | MVP-014 | Preview isolado por PR | `spec-release-03-preview-isolado.md` |
+| M14-F04 | MVP-014 | Staging e Produção automática | `spec-release-04-staging-producao.md` |
+| M14-F05 | MVP-014 | Compensação, retorno à V2 e E2E | `spec-release-05-recuperacao-e2e.md` |
 
 ## Próximas ações
 
@@ -130,10 +135,10 @@ Não existe catálogo global `SPEC-nnn`. O identificador canônico é o slug aba
 3. A **F03 encaixa no ponto único** que a F02 deixou pronto: a estimativa pré-chamada já é calculada e o `CostEvent` já carrega `estimadoUsd`/`realUsd`. O gate entra entre a estimativa e o disparo do adapter — nenhuma refatoração do ponto de chamada é necessária.
 4. **MVP-006, MVP-008, MVP-009 e Pipeline V2 revisados e aprovados (2026-08-29).** As 44 SPECs executáveis do projeto estão `aprovada-pi`. A Pipeline V3 ainda não acrescenta SPEC executável.
 5. MVP-007 e MVP-015–MVP-018 serão detalhados apenas quando entrarem no planejamento ativo; hoje não têm fatia nem SPEC.
-6. **M4-F03 (UI da allowlist de diretórios) especificada e aprovada (2026-08-29)** — fechou a última fatia conhecida sem SPEC antes da V3. As cinco fatias do MVP-014 agora precisam ser redigidas e aprovadas antes de entrar no backlog.
+6. **M4-F03 (UI da allowlist de diretórios) especificada e aprovada (2026-08-29)** — fechou a última fatia conhecida sem SPEC antes da V3. As cinco SPECs do MVP-014 agora estão redigidas e precisam de aprovação antes de entrar no backlog.
 7. **Docker virou dependência dura do MVP-009** (sandbox do executor). Confirmar que a máquina de execução tem Docker antes daquele MVP entrar na fila.
 8. **Pipeline V2 publicada:** épicos #115/#121/#127/#133 e 20 fatias #116–#138, com os intervalos de épicos excluídos, estão no Backlog com sub-issues e dependências nativas. A publicação não altera o `next` atual.
-9. **Pipeline V3:** revisar o design do MVP-014 e então redigir suas cinco SPECs. Não criar issues antes desse gate.
+9. **Pipeline V3:** revisar as cinco SPECs do MVP-014. Não criar issues antes desse gate.
 
 ## Roadmap
 

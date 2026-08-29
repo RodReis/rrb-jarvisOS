@@ -564,3 +564,16 @@ O relatório identifica SPEC, issue, revisão aprovada, run, ambiente, verifica�
 ### 11.4 Revisão
 
 `docs/REVIEW.md` governa formato e severidade. Baseline P0/P1 bloqueia; P2/P3 é registrado. Relatório anterior entra para deduplicação; somente o delta e descobertas ainda abertas são avaliados como novos.
+
+### 11.5 Release governada — MVP-014
+
+- **Unitário:** estados/transições, leases, idempotência, consolidação de SHAs, redaction e janela de estabilização.
+- **Contrato:** Docker, GHCR, Vercel e Railway com sucesso, auth, timeout, quota, estado incompatível, resposta parcial e efeito ambíguo.
+- **Integração:** SQLite, Docker Compose, PostgreSQL real, migrations e ownership de portas/containers.
+- **Fault injection:** crash entre intenção/efeito/confirmação, migration quebrada, health falho, promoção parcial, retry e compensação incompleta.
+- **Playwright:** smoke funcional nas URLs de Preview, Staging, Produção e após rollback.
+- **E2E real limitado:** projeto de prova exclusivo, nomes/recursos únicos e orçamento explícito; percorre Preview → Staging → Produção → estabilização → compensação/limpeza.
+
+Provas mínimas: mesmo digest/deployment em Staging e Produção; zero segredo persistido; reinício sem duplicação; Preview removido; banco nunca restaurado automaticamente; tag/GitHub Release somente depois de Produção estabilizada; falha de código devolvida à V2 na mesma SPEC.
+
+Smokes externos não rodam na suíte comum. Sua ausência em ambiente sem credencial é `not_run`, nunca “pass”. O relatório registra provider, ambiente, IDs, SHA/digest, duração, custo/quota observada, gates e hash das evidências extensas.
