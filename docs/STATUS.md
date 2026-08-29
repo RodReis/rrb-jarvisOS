@@ -6,7 +6,7 @@ Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do
 
 | Coluna | Item | Estado |
 |---|---|---|
-| Em Andamento | [#87](https://github.com/RodReis/rrb-jarvisOS/issues/87) · MVP-006 F01 Núcleo de conectores | `proplan:doing`; **abre o MVP-006** |
+| Feito | [#87](https://github.com/RodReis/rrb-jarvisOS/issues/87) · MVP-006 F01 Núcleo de conectores | entregue (PR [#144](https://github.com/RodReis/rrb-jarvisOS/pull/144)), aguardando aceite — **abre o MVP-006** |
 | Próximo | [#88](https://github.com/RodReis/rrb-jarvisOS/issues/88) · MVP-006 F02 Operação e governança | `proplan:next`; cabeça da fila |
 | Backlog | [#89–#92](https://github.com/RodReis/rrb-jarvisOS/issues/89) · MVP-006 | quatro SPECs `aprovada-pi` (2026-08-29); atrás da #88 na fila |
 | Backlog | [#94–#99](https://github.com/RodReis/rrb-jarvisOS/issues/94) · MVP-008 | seis SPECs `aprovada-pi` (2026-08-29); atrás do MVP-006 na fila |
@@ -48,7 +48,7 @@ Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do
 | MVP-003 Design System | [#16](https://github.com/RodReis/rrb-jarvisOS/issues/16) | fechado/aceito | 8/8 |
 | MVP-004 Execução real | [#10](https://github.com/RodReis/rrb-jarvisOS/issues/10) | **três fatias finalizadas**; o épico aguarda o fechamento do PI | 3/3 |
 | MVP-005 Providers/Vault/Budget | [#76](https://github.com/RodReis/rrb-jarvisOS/issues/76) | F01 e F02 finalizadas; **F03 e F04 entregues**, aguardando aceite | 4/4 |
-| MVP-006 Conectores Essenciais | [#86](https://github.com/RodReis/rrb-jarvisOS/issues/86) | **F01 em andamento**; cinco fatias no Backlog | 0/6 |
+| MVP-006 Conectores Essenciais | [#86](https://github.com/RodReis/rrb-jarvisOS/issues/86) | **F01 entregue**, aguardando aceite; cinco fatias no Backlog | 1/6 |
 | MVP-007 Memória Contextual/RAG | — | slot proposto; **sem fatias e sem SPEC** — nada a aprovar até entrar em planejamento ativo | — |
 | MVP-008 Planejamento Governado | [#93](https://github.com/RodReis/rrb-jarvisOS/issues/93) | seis SPECs `aprovada-pi` (2026-08-29); fatias no Backlog | 0/6 |
 | MVP-009 Entrega Autônoma | [#100](https://github.com/RodReis/rrb-jarvisOS/issues/100) | seis SPECs `aprovada-pi` (2026-08-29); fatias no Backlog | 0/6 |
