@@ -18,6 +18,9 @@ reports/.raw
 # que muda a cada ajuste de pixel e ninguém revisa no diff.
 reports/comparacao/
 
+# Capturas da verificação no app real — mesma razão: PNG regenerável a cada verificação.
+reports/verificacao/
+
 # Cache local do grafo de conhecimento (CLAUDE.md § graphify).
 graphify-out
 
