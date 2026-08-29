@@ -32,6 +32,8 @@ import { AuditRepository } from '../storage/audit-repository'
 import { PolicyService } from '../policy/policy-service'
 import { ConnectorRegistry } from './registry'
 import { ConnectorService, type ConnectorSecretSource } from './connector-service'
+import { CreditService } from './credit-service'
+import { CreditRepository } from './credit-repository'
 import type { ConnectorAdapter, ConnectorExecution } from './adapter'
 
 const USUARIO = 'user-teste'
@@ -101,6 +103,8 @@ let db: Db
 let audit: InstanceType<typeof AuditRepository>
 let registry: ConnectorRegistry
 let segredos: ConnectorSecretSource & { readonly pedidas: string[] }
+let credits: CreditService
+let esperas: number[]
 let service: ConnectorService
 
 /** Quantos eventos de conector a cadeia guardou. */
@@ -126,7 +130,20 @@ beforeEach(() => {
     }
   }
 
-  service = new ConnectorService(registry, segredos, new PolicyService(audit, () => USUARIO), audit)
+  credits = new CreditService(new CreditRepository(db), audit)
+  // Espera dublada: o que o teste do backoff precisa afirmar é **quanto** se esperou, não que
+  // se esperou de verdade — segundos de relógio real não provariam nada a mais.
+  esperas = []
+  service = new ConnectorService(
+    registry,
+    segredos,
+    new PolicyService(audit, () => USUARIO),
+    audit,
+    credits,
+    async (ms) => {
+      esperas.push(ms)
+    }
+  )
 })
 
 afterEach(() => {

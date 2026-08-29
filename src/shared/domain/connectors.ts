@@ -305,6 +305,16 @@ export interface ConnectorError {
   readonly provenance: ConnectorProvenance
   /** Detalhe técnico sanitizado, para auditoria e investigação. */
   readonly evidencia?: string
+  /**
+   * Quanto o **serviço** pediu para esperar antes de tentar de novo, em ms — o `Retry-After` ou
+   * equivalente (SPEC-Conectores-02: "backoff respeita orientação do serviço").
+   *
+   * Campo próprio e **número**, não texto dentro de `evidencia`: a governança precisa decidir
+   * com ele, e uma orientação que só existe como string na mensagem é uma orientação que
+   * ninguém obedece — foi exatamente o que o teste do backoff pegou. Quem traduz o cabeçalho
+   * é o adapter, que conhece o formato do seu serviço (segundos, data HTTP, milissegundos).
+   */
+  readonly retryAfterMs?: number
 }
 
 /**

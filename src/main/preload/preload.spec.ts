@@ -75,6 +75,9 @@ describe('ponte do preload', () => {
       // "esta chamada cabe?" — a decisão do gate é do main, dentro do ponto único, e um
       // método aqui daria ao renderer uma resposta que ele só poderia duplicar.
       'getBudget',
+      // SPEC-Conectores-02: teto de créditos por conector. Leitura e edição do **teto** —
+      // nenhum método pergunta se uma chamada cabe: essa decisão é do gate, no main.
+      'getConnectorCredits',
       'getPreferences',
       'getProviderModels',
       'getProviderStatus',
@@ -110,6 +113,7 @@ describe('ponte do preload', () => {
       'sendLog',
       'setAutomationEnabled',
       'setBudgetLimits',
+      'setConnectorCreditLimits',
       'setCredential',
       'setProviderModel',
       'setRoute',
@@ -268,7 +272,11 @@ describe('ponte do preload', () => {
 
     expect(canaisDeConector).toEqual([
       IPC_CHANNELS.connectorsCapabilities,
-      IPC_CHANNELS.connectorsInvoke
+      IPC_CHANNELS.connectorsInvoke,
+      // SPEC-Conectores-02: os dois do teto de créditos. Enumerados como os outros — um canal
+      // futuro que aceitasse endereço não entra nesta lista, e por isso quebra o teste.
+      IPC_CHANNELS.connectorCreditsGet,
+      IPC_CHANNELS.connectorCreditsSetLimits
     ])
 
     expect(

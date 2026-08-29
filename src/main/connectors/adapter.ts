@@ -11,10 +11,11 @@
  * método — stream de chunks lá, desfecho único aqui —, e é exatamente essa incompatibilidade
  * que sustentou a decisão de não unificar os dois.
  *
- * Três métodos, e nenhum a mais (YAGNI, como o método único do `AiAdapter`): declarar o que
- * sabe fazer, validar a entrada da operação e executar. `health`, `retry` e custo são da F02 e
- * não têm consumidor aqui — interface que já nasce larga é onde a segunda implementação
- * descobre que metade dos métodos não fazia sentido para ela.
+ * Três métodos obrigatórios — declarar o que sabe fazer, validar a entrada e executar — mais
+ * dois **opcionais** que a M6-F02 acrescentou quando passaram a ter consumidor: `custoEstimado`
+ * (o gate de créditos) e `health` (a sonda). Opcionais e não obrigatórios porque um conector
+ * que não cobra e não tem endpoint de status — o caso do GitHub — não deve ser forçado a
+ * escrever dois métodos que responderiam "zero" e "sim".
  */
 
 import type {
@@ -91,4 +92,31 @@ export interface ConnectorAdapter {
    * para todo adapter.
    */
   executar(execution: ConnectorExecution): Promise<ConnectorResult | ConnectorError>
+
+  /**
+   * Quantos créditos esta operação consome, **antes** de ela sair (SPEC-Conectores-02, crit. 8).
+   *
+   * Estimativa e não medição, pela mesma razão do `estimarCustoUsd` da M5-F03: o gate precisa
+   * decidir quando ainda dá para não gastar. O consumo real vem no `ConnectorUsage` do
+   * resultado, e é ele que entra no ledger.
+   *
+   * Ausente = **zero**, e zero sempre passa no gate. É o caso do GitHub, que não cobra —
+   * declarar o método para devolver `0` seria cerimônia, e o gate trata a ausência como o fato
+   * que ela é.
+   */
+  custoEstimado?(execution: ConnectorExecution): number
+
+  /**
+   * O serviço está de pé? (critério 5: **health não exige revelar credencial**.)
+   *
+   * A assinatura é o que garante o critério: recebe **nada** — nem `ConnectorExecution`, nem
+   * segredo. Um health que precisasse da credencial para responder seria um health que a
+   * revela a quem o chama, e a única forma de impedir isso de virar disciplina é o parâmetro
+   * não existir.
+   *
+   * Opcional: quem não implementa é considerado disponível até falhar de verdade — a evidência
+   * que o circuit breaker acumula. Sondar por conta própria um serviço que não expõe status
+   * seria inventar uma chamada só para descobrir algo que a próxima chamada real diria.
+   */
+  health?(): Promise<boolean>
 }

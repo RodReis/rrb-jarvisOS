@@ -34,7 +34,13 @@ import type { AiCallHandle, AiProvider, AiRequest, AiStreamEvent } from '../doma
 import type { ApprovalDecision, ApprovalRequest } from '../domain/execution'
 import type { BudgetLimitsInput, BudgetSnapshot } from '@shared/domain/budget'
 import type { ProviderRoute, ProviderStatus, RoutingPolicy } from '@shared/domain/routing'
-import type { ConnectorCapability, ConnectorOutcome, ConnectorRequest } from '../domain/connectors'
+import type {
+  ConnectorCapability,
+  ConnectorId,
+  ConnectorOutcome,
+  ConnectorRequest
+} from '../domain/connectors'
+import type { ConnectorCreditPolicy } from '../domain/connector-governance'
 
 /** Canais de request/response (renderer → main → renderer). */
 export const IPC_CHANNELS = {
@@ -179,7 +185,17 @@ export const IPC_CHANNELS = {
    * fechada, nunca um destino de rede.
    */
   connectorsCapabilities: 'connectors:capabilities',
-  connectorsInvoke: 'connectors:invoke'
+  connectorsInvoke: 'connectors:invoke',
+  /**
+   * Teto de créditos por conector (SPEC-Conectores-02, critério 8). Leitura e edição — o teto é
+   * ajustável, com padrão conservador (spec § decisões cravadas).
+   *
+   * **Não existe canal que pergunte "esta chamada cabe?"**: a decisão do gate é do main, dentro
+   * do ponto único, e um canal aqui daria ao renderer uma resposta que ele só poderia duplicar.
+   * Mesma ausência deliberada do gate de orçamento do MVP-005.
+   */
+  connectorCreditsGet: 'connectors:credits-get',
+  connectorCreditsSetLimits: 'connectors:credits-set-limits'
 } as const
 
 /**
@@ -483,6 +499,36 @@ export interface JarvisBridge {
    */
   listConnectorCapabilities(): Promise<readonly ConnectorCapability[]>
   callConnector(request: ConnectorRequest, workspace: WorkspaceId): Promise<ConnectorOutcome>
+
+  /**
+   * Teto de créditos de um conector, com o consumo do dia e do mês (SPEC-Conectores-02).
+   *
+   * Leitura apenas — a soma é feita no main, sobre os `credit_event` gravados, como no
+   * `getBudget` do MVP-005. O renderer não recalcula: um segundo cálculo divergiria do que o
+   * gate usa, e o número na tela deixaria de ser o número que barra.
+   *
+   * **Ledger distinto do orçamento em USD**: `getBudget` responde sobre chamadas de IA, este
+   * responde sobre conectores, e os dois estouram separado (decisão do PI de 2026-08-29).
+   */
+  getConnectorCredits(connector: ConnectorId, workspace: WorkspaceId): Promise<ConnectorCreditView>
+  /** Edita o teto e devolve o estado resultante, já com o consumo — como `setBudgetLimits`. */
+  setConnectorCreditLimits(
+    connector: ConnectorId,
+    limites: ConnectorCreditLimitsInput,
+    workspace: WorkspaceId
+  ): Promise<ConnectorCreditView>
+}
+
+/** Teto + consumo, como a tela os lê. */
+export interface ConnectorCreditView {
+  readonly policy: ConnectorCreditPolicy
+  readonly consumido: { readonly dia: number; readonly mes: number }
+}
+
+/** O que a tela envia ao editar o teto. */
+export interface ConnectorCreditLimitsInput {
+  readonly dailyLimit: number
+  readonly monthlyLimit: number
 }
 
 /** Nome da propriedade exposta via contextBridge no renderer. */

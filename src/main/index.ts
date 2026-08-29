@@ -30,6 +30,8 @@ import { CommandAllowlistRepository } from './policy/command-allowlist-repositor
 import { CredentialService } from './credentials/credential-service'
 import { ConnectorRegistry } from './connectors/registry'
 import { ConnectorService } from './connectors/connector-service'
+import { CreditService } from './connectors/credit-service'
+import { CreditRepository } from './connectors/credit-repository'
 import { CredentialRepository } from './credentials/credential-repository'
 import { SafeStorageCipher } from './credentials/secret-vault'
 import { carregarEnv } from './env'
@@ -225,6 +227,13 @@ if (!app.requestSingleInstanceLock()) {
     // por um conector conhecido devolve `connector-nao-registrado` — que é o critério 1
     // valendo, não uma lacuna.
     const connectorRegistry = new ConnectorRegistry()
+    // O gate de créditos (SPEC-Conectores-02). Construído **antes** do ponto único porque é
+    // dependência dele, como o `BudgetService` é do `AiCallService`: um `ConnectorService` sem
+    // gate seria um caminho até o conector sem teto.
+    //
+    // **Ledger separado do de USD** (decisão do PI): este conta créditos por conector, o
+    // `budget` conta dólares por espaço. Nenhum dos dois soma o outro.
+    const connectorCredits = new CreditService(new CreditRepository(storage.db), storage.audit)
     const connectors = new ConnectorService(
       connectorRegistry,
       // A fonte de segredo de conector lê o **mesmo cofre** das credenciais de IA: a coluna
@@ -236,7 +245,8 @@ if (!app.requestSingleInstanceLock()) {
         resolve: (userId, workspace, key) => credentialRepository.readSecret(userId, workspace, key)
       },
       policy,
-      storage.audit
+      storage.audit,
+      connectorCredits
     )
 
     registerIpcHandlers({
@@ -256,6 +266,7 @@ if (!app.requestSingleInstanceLock()) {
       routing,
       routingRepo,
       connectors,
+      connectorCredits,
       runs,
       approvals,
       userId: userIdAtual,

@@ -346,6 +346,55 @@ const MIGRATIONS: readonly string[] = [
     updated_at   TEXT NOT NULL,
     PRIMARY KEY (user_id, workspace_id, provider)
   );
+  `,
+
+  // 12 — ledger de créditos de conector (SPEC-Conectores-02, critério 8).
+  //
+  // **Tabelas próprias, não colunas em `budget_policy`/`cost_event`.** A decisão do PI
+  // (2026-08-29) é que os dois orçamentos são independentes: a `BudgetPolicy` do MVP-005 conta
+  // **USD** por usuário+espaço; este conta **créditos** por usuário+espaço+**conector**. Somar
+  // os dois exigiria converter crédito em dólar, o que depende do plano contratado e produziria
+  // número falso — e esconderia qual dos dois orçamentos estourou.
+  //
+  // O `connector` entra na PK porque o teto é **por conector**: a Tavily esgotar a cota não
+  // pode barrar o GitHub, que nem cobra. Sem ele na chave, um teto só governaria todos.
+  //
+  // `credit_event.creditos` é NOT NULL e não NULLable como o `real_usd` do `cost_event`, e a
+  // diferença é real: lá o custo pode ser desconhecido (a chamada morreu antes de o provider
+  // reportar `usage`); aqui o adapter declara o consumo, e uma chamada que não consumiu
+  // consumiu **zero** — que é um fato, não uma ausência.
+  //
+  // Ausência de linha em `connector_credit_policy` é o **padrão valendo**
+  // (`tetoDeCreditosPadrao`), como em `budget_policy`: o app tem teto desde o primeiro boot,
+  // sem semear linha por usuário.
+  `
+  CREATE TABLE connector_credit_policy (
+    user_id       TEXT NOT NULL,
+    workspace_id  TEXT NOT NULL,
+    connector     TEXT NOT NULL,
+    daily_limit   REAL NOT NULL,
+    monthly_limit REAL NOT NULL,
+    updated_at    TEXT NOT NULL,
+    PRIMARY KEY (user_id, workspace_id, connector)
+  );
+
+  CREATE TABLE credit_event (
+    id            TEXT PRIMARY KEY,
+    user_id       TEXT NOT NULL,
+    workspace_id  TEXT NOT NULL,
+    connector     TEXT NOT NULL,
+    operation     TEXT NOT NULL,
+    -- O correlationId da chamada: casa o consumo com a auditoria e o log.
+    correlation_id TEXT NOT NULL,
+    -- Créditos consumidos. Zero é fato (o GitHub não cobra), não ausência.
+    creditos      REAL NOT NULL,
+    -- project_id entra no MVP-008, onde projeto nasce (spec § decisões cravadas). Nulo até lá,
+    -- e a coluna existe agora para o critério 7 não exigir migration na fatia que a preencher.
+    project_id    TEXT,
+    created_at    TEXT NOT NULL   -- ISO UTC; é por ele que o período é recortado
+  );
+  CREATE INDEX idx_credit_event_escopo
+    ON credit_event(user_id, workspace_id, connector, created_at);
   `
 ]
 
