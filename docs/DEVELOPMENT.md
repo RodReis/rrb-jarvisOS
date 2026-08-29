@@ -573,9 +573,37 @@ Status: **entregue** — spec `aprovada-pi` (2026-07-24); issue [#75](https://gi
 - **Exit code ≠ 0 é falha do comando, não do terminal.** Um `npm test` que reprova é desfecho normal; tratá-lo como erro de infraestrutura confundiria a UI. Os dois casos têm `reason` distinto e evento de auditoria distinto.
 - **A migration nova precisou ser desfeita no teste v1→v2.** O `storage.int-spec.ts` recua o schema derrubando o que cada migration cria; sem derrubar `allowed_command`, a migração tentava recriar a tabela. O próprio comentário do teste avisa disso — a suíte cobrou.
 
-**Registrado, não silenciado:**
+### Verificação no app real (2026-08-28) — e o login que a destravou
 
-- **A UI não foi vista renderizada no app real** — a mesma lacuna que a F01 registrou. O app para na tela de login e sem sessão não se alcança a rota `terminal`; jsdom não aplica folha de estilo nem faz layout, que foi como #57, #58 e #64 passaram com a suíte verde. Fechar isso exige login real (passo humano) ou decisão do PI sobre semear a sessão.
+A ressalva de UI que a F01 abriu e a F02 herdou (*"a fila de aprovação nunca foi vista renderizada"*) só existia porque **o login não funcionava**. Investigado com o log do app, e a causa eram **duas configurações**, nenhuma delas código:
+
+1. **O projeto Supabase estava pausado** (`INACTIVE`). Um projeto pausado não atende `/auth/v1/authorize`.
+2. **`http://127.0.0.1:*` não estava na allowlist de Redirect URLs.** O Supabase descartava o `redirect_to` e caía no Site URL (`localhost:3000`, o default de fábrica); o servidor loopback nunca recebia o código e o fluxo morria no timeout de 5 min.
+
+O log conta a história inteira, e é o que fecha o diagnóstico sem chute:
+
+```
+23:32:30  Servidor de retorno iniciado {porta: 64525}
+23:32:30  Fluxo aberto no navegador
+23:37:30  (5 min depois) Tempo esgotado aguardando o retorno do login   ← antes
+...
+23:56:03  Servidor de retorno iniciado {porta: 53952}
+23:56:08  Tokens gravados cifrados no cofre
+23:56:08  Login concluído                                              ← depois: 5s
+```
+
+**O console do Google estava correto o tempo todo** — ele só devolve para o Supabase (`/auth/v1/callback`), nunca para o app; quem precisa aceitar `127.0.0.1:<porta>` é a allowlist do Supabase. A porta é efêmera (`loopback-server.ts`), daí o wildcard: na doc do Supabase os separadores de glob são `.` e `/`, então `*` cobre a porta.
+
+**Método que vale registrar:** o primeiro teste que usei para provar a allowlist (`callback` com `state` inventado) era **inconclusivo** — com state inválido o Supabase aborta antes de resolver o `redirect_to` e cai no Site URL de qualquer jeito, o que parece exatamente igual a "allowlist recusou". Só o teste com `state` legítimo (obtido de um `/authorize` real) distingue os dois.
+
+Com o login de pé, a verificação rodou no app real (Electron com debug remoto, efeitos no disco). Os 8 critérios de comportamento confirmados: binário barrado **não** cria arquivo; permitido cria; `node --version` devolve `v24.15.0` na tela; destrutivo pausa e só executa depois do Aprovar; Negar não executa; `sudo` barrado **mesmo allowlistado**; erro com exit 3 e stderr; timeout matando em 30s exatos. `verifyAuditChain` → `{ok: true, checked: 77}`. **A fila de aprovações renderiza**, fechando também a ressalva da F01.
+
+E, como no MVP-003, **a verificação no app real achou o que a suíte verde não acha** — dois defeitos:
+
+- **O card de aprovação descreve comando de terminal como filesystem** (issue **#84**). `AprovacoesPendentes.tsx:27` monta `Filesystem: ${operation}` fixo e lê só `path`/`targetPath`; a F02 grava `kind: 'comando'` com `binary`/`args`/`cwd`, que o componente ignora. O usuário aprova uma execução de processo **sem ver qual comando é** — contra a SPEC-DS-04b §21 ("exibem ação… antes da confirmação") e o contrato `AcaoSensivel` ("em linguagem de usuário"). É `[FIX]`: o certo já está escrito.
+- **A allowlist de *diretórios* não tem UI nenhuma.** Os canais existem na ponte desde o MVP-002 e **nenhuma tela os usa** (zero referência a `addAllowedDirectory` em `src/renderer`). Pelo app o usuário não consegue permitir um diretório — e sem isso o terminal não executa nada, porque o cwd sempre cai fora. Precisei usar a ponte direto para concluir a verificação. **Não** é `[FIX]`: não há parágrafo definindo onde essa tela mora nem como se comporta ⇒ é fatia, com spec e aval do PI.
+
+**Registrado, não silenciado:**
 - **Argumento com espaço não é suportado.** A divisão dos argumentos é por espaço, sem aspas nem escape — deliberado: um parser mais esperto se aproxima de ser um mini-shell no renderer, que é o que a fatia evita. Quando aparecer uso real, vira campo de lista, não sintaxe.
 - **Granularidade por subcomando** (permitir `git status` mas não `git push`) segue fora, como a spec determina: a 1ª barreira é por binário, e o refino fica para quando houver caso concreto.
 
