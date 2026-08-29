@@ -25,6 +25,13 @@ const callAi = vi.fn()
 const cancelAi = vi.fn()
 const onAiStreamEvent = vi.fn(() => () => {})
 const removeCredential = vi.fn()
+// SPEC-ExecucaoReal-03: a seção de diretórios permitidos também consulta a ponte ao montar,
+// e as duas leituras vão num `Promise.all` — faltando qualquer uma, a seção inteira cai no
+// `catch` e põe um segundo `role="alert"` na página.
+const listAllowedDirectories = vi.fn(() => Promise.resolve([]))
+const getAppDirectory = vi.fn(() => Promise.resolve('/app/userData'))
+const pickAllowedDirectory = vi.fn(() => Promise.resolve([]))
+const removeAllowedDirectory = vi.fn(() => Promise.resolve([]))
 
 /**
  * Perfil da sessão usada nestes testes. O `App` só monta o AppShell quando a auth está
@@ -66,6 +73,10 @@ function mockarPonte(): void {
       cancelAi,
       onAiStreamEvent,
       removeCredential,
+      listAllowedDirectories,
+      getAppDirectory,
+      pickAllowedDirectory,
+      removeAllowedDirectory,
       // Devolve a função de cancelamento, como a ponte real: sem isso o `useEffect`
       // tentaria chamar `undefined` na desmontagem e o cleanup estouraria.
       onAuthChanged: vi.fn(() => () => undefined)

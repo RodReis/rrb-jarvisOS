@@ -84,7 +84,30 @@ export const RECURSOS = {
         temaSistema: 'Sistema',
         acento: 'Acento',
         acentoDescricao: 'A cor de destaque de cada espaço. A mesma escolha da tela de entrada.',
-        salvo: 'Preferências salvas.'
+        salvo: 'Preferências salvas.',
+        // Diretórios permitidos (SPEC-ExecucaoReal-03). O texto diz o que a permissão
+        // alcança — filesystem **e** terminal — porque a lista governa os dois, e o usuário
+        // que a lesse como "pastas do explorador" subestimaria o que está autorizando.
+        diretorios: 'Diretórios permitidos',
+        diretoriosDescricao:
+          'As pastas que o aplicativo pode ler, escrever e usar como diretório de trabalho no terminal. Nada fora desta lista é alcançável.',
+        diretoriosAdicionar: 'Permitir uma pasta…',
+        diretoriosRemover: 'Remover',
+        diretoriosRemoverDe: 'Remover {{caminho}}',
+        diretoriosFixo: 'Fixo',
+        diretoriosFixoMotivo:
+          'A pasta do aplicativo é permitida por construção e não pode ser removida.',
+        diretoriosCarregando: 'Carregando os diretórios permitidos…',
+        diretoriosVazio: 'Só a pasta do aplicativo está permitida',
+        diretoriosVazioDescricao:
+          'Permita uma pasta para o aplicativo poder trabalhar nela — sem isso, o terminal recusa qualquer diretório de trabalho fora da pasta do app.',
+        diretoriosErro: 'Não foi possível ler os diretórios permitidos',
+        // Diz **o que fazer**, não só que falhou (PRD §14). Sem a lista, permitir ou remover
+        // pasta agiria às cegas — daí a instrução ser reabrir, e não "tente de novo".
+        diretoriosErroDescricao:
+          'Feche e reabra as configurações. Enquanto a lista não carregar, não é possível permitir nem remover pastas com segurança.',
+        diretoriosErroAdicionar: 'Não foi possível permitir essa pasta.',
+        diretoriosErroRemover: 'Não foi possível remover essa pasta.'
       },
       auth: {
         titulo: 'JARVIS OS',
@@ -209,7 +232,24 @@ export const RECURSOS = {
         temaSistema: 'System',
         acento: 'Accent',
         acentoDescricao: 'The highlight color of each space. The same choice as the entry screen.',
-        salvo: 'Preferences saved.'
+        salvo: 'Preferences saved.',
+        diretorios: 'Allowed directories',
+        diretoriosDescricao:
+          'The folders the app can read, write and use as a working directory in the terminal. Nothing outside this list is reachable.',
+        diretoriosAdicionar: 'Allow a folder…',
+        diretoriosRemover: 'Remove',
+        diretoriosRemoverDe: 'Remove {{caminho}}',
+        diretoriosFixo: 'Fixed',
+        diretoriosFixoMotivo: 'The app folder is allowed by design and cannot be removed.',
+        diretoriosCarregando: 'Loading allowed directories…',
+        diretoriosVazio: 'Only the app folder is allowed',
+        diretoriosVazioDescricao:
+          'Allow a folder so the app can work in it — without one, the terminal refuses any working directory outside the app folder.',
+        diretoriosErro: 'Could not read the allowed directories',
+        diretoriosErroDescricao:
+          'Close and reopen settings. Until the list loads, allowing or removing folders is not safe.',
+        diretoriosErroAdicionar: 'Could not allow that folder.',
+        diretoriosErroRemover: 'Could not remove that folder.'
       },
       auth: {
         titulo: 'JARVIS OS',

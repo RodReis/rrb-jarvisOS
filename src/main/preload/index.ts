@@ -83,6 +83,10 @@ const bridge: JarvisBridge = {
     ipcRenderer.invoke(IPC_CHANNELS.allowlistAdd, path),
   removeAllowedDirectory: (path: string): Promise<readonly string[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.allowlistRemove, path),
+  // Sem argumento: quem escolhe o caminho é o usuário, no diálogo nativo que abre no main.
+  pickAllowedDirectory: (): Promise<readonly string[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.allowlistPick),
+  getAppDirectory: (): Promise<string> => ipcRenderer.invoke(IPC_CHANNELS.allowlistAppDir),
 
   listWorkflows: (workspace: WorkspaceId): Promise<readonly Workflow[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.workflowList, workspace),

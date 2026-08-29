@@ -64,6 +64,7 @@ describe('ponte do preload', () => {
       'classifyAction',
       'createAutomation',
       'createWorkflow',
+      'getAppDirectory',
       'getAppInfo',
       'getAuth',
       'getPreferences',
@@ -81,6 +82,9 @@ describe('ponte do preload', () => {
       'minimizeToTray',
       'onAiStreamEvent',
       'onAuthChanged',
+      // SPEC-ExecucaoReal-03: abre o seletor nativo no main. Não devolve handle de arquivo —
+      // só a lista de paths, como os outros três canais da allowlist.
+      'pickAllowedDirectory',
       'removeAllowedCommand',
       'removeAllowedDirectory',
       'removeAutomation',

@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 272 | 272 | 0 | 75.5 | — | — |
-| — | — | — | Banco | 209 | 209 | 0 | 88.2 | — | — |
-| — | — | — | Tela | 254 | 253 | 0 | 91.3 | — | — |
+| — | — | — | Regras de Negócio | 276 | 276 | 0 | 75.6 | — | — |
+| — | — | — | Banco | 209 | 209 | 0 | 88.1 | — | — |
+| — | — | — | Tela | 265 | 264 | 0 | 91.5 | — | — |
 
 ## Histórico por entrega
 
@@ -124,3 +124,9 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-08-29 | #84 | spec-design-system-04b-padroes-operacionais | Regras de Negócio | 272 | 272 | 0 | 75.5 | #113 | [#113](https://github.com/RodReis/rrb-jarvisOS/pull/113) |
 | 2026-08-29 | #84 | spec-design-system-04b-padroes-operacionais | Banco | 209 | 209 | 0 | 88.2 | #113 | [#113](https://github.com/RodReis/rrb-jarvisOS/pull/113) |
 | 2026-08-29 | #84 | spec-design-system-04b-padroes-operacionais | Tela | 254 | 253 | 0 | 91.3 | #113 | [#113](https://github.com/RodReis/rrb-jarvisOS/pull/113) |
+| 2026-08-29 | #110 | spec-execucao-real-03-ui-allowlist-diretorios | Regras de Negócio | 276 | 276 | 0 | 75.6 | #114 | [#114](https://github.com/RodReis/rrb-jarvisOS/pull/114) |
+| 2026-08-29 | #110 | spec-execucao-real-03-ui-allowlist-diretorios | Banco | 209 | 209 | 0 | 88.1 | #114 | [#114](https://github.com/RodReis/rrb-jarvisOS/pull/114) |
+| 2026-08-29 | #110 | spec-execucao-real-03-ui-allowlist-diretorios | Tela | 263 | 262 | 0 | 91.3 | #114 | [#114](https://github.com/RodReis/rrb-jarvisOS/pull/114) |
+| 2026-08-29 | #110 | spec-execucao-real-03-ui-allowlist-diretorios | Regras de Negócio | 276 | 276 | 0 | 75.6 | #114 | [#114](https://github.com/RodReis/rrb-jarvisOS/pull/114) |
+| 2026-08-29 | #110 | spec-execucao-real-03-ui-allowlist-diretorios | Banco | 209 | 209 | 0 | 88.1 | #114 | [#114](https://github.com/RodReis/rrb-jarvisOS/pull/114) |
+| 2026-08-29 | #110 | spec-execucao-real-03-ui-allowlist-diretorios | Tela | 265 | 264 | 0 | 91.5 | #114 | [#114](https://github.com/RodReis/rrb-jarvisOS/pull/114) |

@@ -538,9 +538,11 @@ Efeito mensurável do #34 + #66 juntos: o PR fora da fronteira roda `test` (~4 m
 ## MVP-004 — Execução real ([#10](https://github.com/RodReis/rrb-jarvisOS/issues/10))
 
 O corte em que o **modo report vira enforcement**: a decisão do Policy Engine deixa de ser só
-rastro e passa a impedir ou pausar operações de verdade. Duas fatias entregues até aqui — a F01
-liga o filesystem, a F02 liga o terminal — e ambas compartilham a mesma espinha: Policy Engine
-em enforcement + `AuditEvent` antes/depois + aprovação humana numa fila só.
+rastro e passa a impedir ou pausar operações de verdade. Três fatias — a F01 liga o filesystem,
+a F02 liga o terminal, e as duas compartilham a mesma espinha: Policy Engine em enforcement +
+`AuditEvent` antes/depois + aprovação humana numa fila só. A **F03 nasceu da verificação da
+F02**: o enforcement funcionava, mas o usuário não tinha tela para permitir um diretório — e
+sem isso o terminal recusava todo cwd. Ela não muda enforcement nenhum; entrega o acesso a ele.
 
 ### Fatia 01 — Execução real de filesystem allowlisted (`docs/spec/spec-execucao-real-01-filesystem-allowlisted.md`)
 
@@ -601,11 +603,42 @@ Com o login de pé, a verificação rodou no app real (Electron com debug remoto
 E, como no MVP-003, **a verificação no app real achou o que a suíte verde não acha** — dois defeitos:
 
 - **O card de aprovação descreve comando de terminal como filesystem** (issue **#84**). `AprovacoesPendentes.tsx:27` monta `Filesystem: ${operation}` fixo e lê só `path`/`targetPath`; a F02 grava `kind: 'comando'` com `binary`/`args`/`cwd`, que o componente ignora. O usuário aprova uma execução de processo **sem ver qual comando é** — contra a SPEC-DS-04b §21 ("exibem ação… antes da confirmação") e o contrato `AcaoSensivel` ("em linguagem de usuário"). É `[FIX]`: o certo já está escrito. **Corrigido em 2026-08-29** (PR desta entrega): o resumo ramifica pelo mesmo `kind` que o handler de `approval:resolve` já usa para rotear. Ver o registro abaixo.
-- **A allowlist de *diretórios* não tem UI nenhuma.** Os canais existem na ponte desde o MVP-002 e **nenhuma tela os usa** (zero referência a `addAllowedDirectory` em `src/renderer`). Pelo app o usuário não consegue permitir um diretório — e sem isso o terminal não executa nada, porque o cwd sempre cai fora. Precisei usar a ponte direto para concluir a verificação. **Não** é `[FIX]`: não há parágrafo definindo onde essa tela mora nem como se comporta ⇒ é fatia, com spec e aval do PI.
+- **A allowlist de *diretórios* não tem UI nenhuma.** Os canais existem na ponte desde o MVP-002 e **nenhuma tela os usa** (zero referência a `addAllowedDirectory` em `src/renderer`). Pelo app o usuário não consegue permitir um diretório — e sem isso o terminal não executa nada, porque o cwd sempre cai fora. Precisei usar a ponte direto para concluir a verificação. **Não** é `[FIX]`: não há parágrafo definindo onde essa tela mora nem como se comporta ⇒ é fatia, com spec e aval do PI. **Virou a M4-F03, entregue em 2026-08-29** — seção abaixo.
 
 **Registrado, não silenciado:**
 - **Argumento com espaço não é suportado.** A divisão dos argumentos é por espaço, sem aspas nem escape — deliberado: um parser mais esperto se aproxima de ser um mini-shell no renderer, que é o que a fatia evita. Quando aparecer uso real, vira campo de lista, não sintaxe.
 - **Granularidade por subcomando** (permitir `git status` mas não `git push`) segue fora, como a spec determina: a 1ª barreira é por binário, e o refino fica para quando houver caso concreto.
+
+### Fatia 03 — UI da allowlist de diretórios (`docs/spec/spec-execucao-real-03-ui-allowlist-diretorios.md`)
+
+Status: **entregue** — spec `aprovada-pi` (2026-08-29); issue [#110](https://github.com/RodReis/rrb-jarvisOS/issues/110). Fecha o buraco que a verificação da F02 achou: a tela que faltava para o usuário permitir um diretório **pelo aplicativo**.
+
+- [x] **Seção "Diretórios permitidos" em Settings**, nos dois espaços — a allowlist governa filesystem (F01) *e* terminal (F02), é capacidade compartilhada (decisão 1 do PI)
+- [x] **Seletor nativo de pasta** (decisão 2 do PI): `dialog.showOpenDialog` com `properties: ['openDirectory']`, aberto **no main**; cancelar não altera nada e não audita
+- [x] **Listar e remover** pelos canais que já existiam desde o MVP-002 — contrato antigo intacto
+- [x] **`appDir` apresentado como fixo**, com a linha que diz **por quê** — o repositório já recusava removê-lo, a tela passa a mostrar a regra em vez de deixar o botão prometer o que não acontece
+- [x] **Estados vazio / carregando / erro** pelos componentes da SPEC-DS-04b (`EmptyState`, `LoadingState`, `ErrorState`), i18n nos dois idiomas
+- [x] **13 testes novos** (4 de Regras nos handlers, 9 de Tela) + **1 E2E** da jornada real
+
+**A fatia adicionou dois canais, não um — e vale registrar por quê.** A spec previa **um** canal novo (o do seletor). Ao implementar o critério 4 apareceu o que a spec não tinha: `listAllowedDirectories` devolve `readonly string[]`, strings sem marcação, e o `appDir` **nunca atravessava o IPC identificado** — a tela não tinha como saber qual dos paths é o fixo. As três saídas eram mudar o retorno de `list` (a spec proíbe explicitamente), inferir por posição no renderer (acopla a UI à ordem de inserção do `Set` no repositório e põe lógica de path na tela, contra a regra "a tela nunca canoniza nem valida path"), ou **um segundo canal só-leitura**. O PI decidiu pelo canal (`allowlist:app-dir`): o que a spec realmente protege é o **contrato antigo**, e ele fica intacto.
+
+**O que a fatia deliberadamente não faz:** o `AllowlistRepository` não mudou uma linha de comportamento — ganhou só um getter do `appDir` que já estava injetado. Nenhum `AuditEvent` novo, nenhuma classificação nova, nenhum toque em `isPathAllowed`. Adicionar e remover auditam porque **já auditavam** desde o MVP-002; o critério 5 estava coberto antes de a fatia começar.
+
+**Duas guardas de superfície cobraram os métodos novos** — `preload.spec.ts` e o E2E de login —, e as duas foram atualizadas **enumerando um a um**, como na F01 e na F02 do MVP-005. É o terceiro caso do mesmo padrão: a lista fechada é o que faz um método futuro que devolvesse handle de arquivo quebrar o teste em vez de passar despercebido.
+
+**O E2E prova a jornada; o seletor nativo fica fora dele.** `dialog.showOpenDialog` é janela do sistema operacional, fora do alcance do Playwright — automatizá-la mediria o gerenciador de arquivos do SO. O recorte é o mesmo do `login.e2e.ts` com a tela do Google: o E2E prova que a pasta **recusada** por `cwd-fora-da-allowlist` passa a ser aceita depois de permitida, e o que o diálogo faz depois da escolha (canonizar, adicionar) é provado no handler com o `dialog` dublado.
+
+**Contrafactuais** (a régua adotada depois de #57/#58): `appDir` marcado como removível, erro técnico vazando para a tela no lugar da mensagem de produto, e a tela ignorando o path que o main devolveu — os três reprovam o teste correspondente.
+
+**Verificação no app real (2026-08-29), com a sessão logada.** A seção foi medida renderizada, no Electron com debug remoto — a régua que faltava, e a que pegou os defeitos de #57/#58, #107 e #84. Os valores computados confirmam o que jsdom não mede: texto em `rgb(238,241,245)` sobre o fundo do tema (os tokens resolvem — não é o caso do #107), a `Tag` do `appDir` em 12px com borda a 24% de opacidade, os botões de remover na variante perigo (`rgb(255,107,129)`), altura de controle 44px, **sem overflow horizontal** com paths longos, e o anel de foco de 3px alcançável por teclado. Remover **pela tela** (não pela ponte) tira o item da lista, o `appDir` não tem botão de remover, e `verifyAuditChain` → `{ok: true, checked: 129}`.
+
+**E a verificação achou algo que só a tela poderia mostrar** — não um defeito desta fatia, mas o que a ausência dela escondia: a allowlist tinha **duas entradas-lixo** gravadas por uso manual da ponte durante as verificações anteriores — uma terminando em `\rrb-jarvisOS\jarvis`, outra em `\rrb-jarvisOS\DesenvProjetos rb-jarvisOS`. Elas existem porque `canonicalize` chama `resolve(path)`, que **relativiza contra o cwd** um path não-absoluto — comportamento documentado do MVP-002, e o handler aceita qualquer string por desenho ("a checagem downstream barra o que resolver pra fora"). O ponto que interessa é que **o seletor nativo torna isso impossível**: `dialog.showOpenDialog` só devolve caminho absoluto real. É exatamente a decisão 2 do PI — *"num campo onde errar significa permitir a pasta errada, digitação livre é risco sem contrapartida"* —, e a tela agora **expõe** o que antes era invisível: até existir UI, ninguém tinha como ver o que estava permitido.
+rb-jarvisOS\jarvis`, outra em `
+rb-jarvisOS\DesenvProjetos rb-jarvisOS`. Elas existem porque `canonicalize` chama `resolve(path)`, que **relativiza contra o cwd** um path não-absoluto — comportamento documentado do MVP-002, e o handler aceita qualquer string por desenho ("a checagem downstream barra o que resolver pra fora"). O ponto que interessa é que **o seletor nativo torna isso impossível**: `dialog.showOpenDialog` só devolve caminho absoluto real. É exatamente a decisão 2 do PI — *"num campo onde errar significa permitir a pasta errada, digitação livre é risco sem contrapartida"* —, e a tela agora **expõe** o que antes era invisível: até existir UI, ninguém tinha como ver o que estava permitido.
+rb-jarvisOS\jarvis` e `…
+rb-jarvisOS\DesenvProjetos rb-jarvisOS`). Elas existem porque `canonicalize` chama `resolve(path)`, que **relativiza contra o cwd** um path não-absoluto — comportamento documentado do MVP-002, e o handler aceita qualquer string por desenho ("a checagem downstream barra o que resolver pra fora"). O ponto que interessa é que **o seletor nativo torna isso impossível**: `dialog.showOpenDialog` só devolve caminho absoluto real. É exatamente a decisão 2 do PI — *"num campo onde errar significa permitir a pasta errada, digitação livre é risco sem contrapartida"* —, e a tela agora **expõe** o que antes era invisível: até existir UI, ninguém tinha como ver o que estava permitido.
+
+**Um defeito que a revisão pegou e a suíte de 9 testes não pegava.** A primeira versão renderizava o `ErrorState` como **irmão** do conteúdo, e não no lugar dele. Falhando a carga, o `catch` deixava `diretorios` em `[]` e `appDir` em `null`; `semEscolhaDoUsuario` dava **false** (`0 !== 1`) e a tela caía no ramo da lista — o usuário via o aviso "não foi possível ler" **junto de uma lista vazia com o botão de permitir**. Duas mentiras de uma vez: "você não tem nenhuma pasta permitida" quando o certo é "não sabemos quais são", e uma ação oferecida sobre estado desconhecido. O teste de erro que existia passava porque só afirmava o **texto** do alerta, nunca o que estava ao lado dele. A correção separa os dois erros pela distinção que o próprio DS documenta: falha de **carga** substitui o conteúdo (`ErrorState`), falha de **ação** é faixa sobre o conteúdo que continua correto (`InlineAlert`). Mais dois testes, um para cada lado, e o contrafactual reprova o novo com o defeito de volta. A lição repete a das fatias anteriores em outra forma: **asserção de texto não é asserção de estado** — o alerta certo pode conviver com a tela errada.
 
 ## MVP-005 — Providers de IA + Vault + BudgetPolicy ([#76](https://github.com/RodReis/rrb-jarvisOS/issues/76))
 

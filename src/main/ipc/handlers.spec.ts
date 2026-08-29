@@ -6,6 +6,7 @@ import { buildAppInfo, registerIpcHandlers, type IpcDependencies } from './handl
 const handle = vi.fn()
 const on = vi.fn()
 const writeLog = vi.fn()
+const showOpenDialog = vi.fn()
 const logIpc = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 
 vi.mock('electron', () => ({
@@ -17,6 +18,11 @@ vi.mock('electron', () => ({
   ipcMain: {
     handle: (...args: unknown[]) => handle(...args),
     on: (...args: unknown[]) => on(...args)
+  },
+  // O seletor nativo de pasta (SPEC-ExecucaoReal-03) é dublado: o que interessa é o que o
+  // handler faz com a escolha e com o cancelamento, não o diálogo do sistema operacional.
+  dialog: {
+    showOpenDialog: (...args: unknown[]) => showOpenDialog(...args)
   }
 }))
 
@@ -63,7 +69,8 @@ const policy = {
 const allowlist = {
   list: vi.fn(() => ['/app/userData']),
   add: vi.fn(() => ({ path: '/app/userData/x', added: true })),
-  remove: vi.fn(() => ({ path: '/app/userData/x', removed: true }))
+  remove: vi.fn(() => ({ path: '/app/userData/x', removed: true })),
+  appDirectory: vi.fn(() => '/app/userData')
 }
 
 const workflows = {
@@ -198,6 +205,8 @@ beforeEach(() => {
   allowlist.list.mockClear()
   allowlist.add.mockClear()
   allowlist.remove.mockClear()
+  allowlist.appDirectory.mockClear()
+  showOpenDialog.mockReset()
   policy.classify.mockClear()
   workflows.listWorkflows.mockClear()
   workflows.createWorkflow.mockClear()
@@ -405,6 +414,45 @@ describe('canais da allowlist (SPEC-Execucao-03)', () => {
   it('path não-string no add não chama o repositório (fronteira de confiança)', () => {
     invocar(IPC_CHANNELS.allowlistAdd, { malicioso: true })
     expect(allowlist.add).not.toHaveBeenCalled()
+  })
+
+  // SPEC-ExecucaoReal-03: o seletor nativo e a identidade do `appDir`.
+  it('o seletor abre o diálogo de pasta no main e adiciona a escolha', async () => {
+    showOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/home/user/projeto'] })
+
+    await invocar(IPC_CHANNELS.allowlistPick)
+
+    // `openDirectory` é o que faz o diálogo escolher pasta e não arquivo — sem ele o
+    // usuário selecionaria um arquivo e permitiria o diretório errado.
+    expect(showOpenDialog).toHaveBeenCalledWith(
+      expect.objectContaining({ properties: ['openDirectory'] })
+    )
+    expect(allowlist.add).toHaveBeenCalledWith('local', '/home/user/projeto')
+  })
+
+  it('cancelar o seletor não toca a allowlist (critério 3)', async () => {
+    showOpenDialog.mockResolvedValue({ canceled: true, filePaths: [] })
+
+    const lista = await invocar(IPC_CHANNELS.allowlistPick)
+
+    // Nada adicionado significa nada auditado: o `AuditEvent` nasce dentro do `add`.
+    expect(allowlist.add).not.toHaveBeenCalled()
+    // Ainda assim devolve a lista, para a UI não precisar de um segundo round-trip.
+    expect(lista).toEqual(['/app/userData'])
+  })
+
+  it('diálogo confirmado sem path não adiciona nada', async () => {
+    // `canceled: false` com `filePaths` vazio é o caso que uma leitura só do `canceled`
+    // erraria — passaria `undefined` adiante como se fosse um diretório escolhido.
+    showOpenDialog.mockResolvedValue({ canceled: false, filePaths: [] })
+
+    await invocar(IPC_CHANNELS.allowlistPick)
+
+    expect(allowlist.add).not.toHaveBeenCalled()
+  })
+
+  it('devolve o diretório do app para a UI marcá-lo como fixo (critério 4)', () => {
+    expect(invocar(IPC_CHANNELS.allowlistAppDir)).toBe('/app/userData')
   })
 })
 

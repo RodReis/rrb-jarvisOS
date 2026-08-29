@@ -15,6 +15,7 @@ import { ProvedorDeTema } from '@design/tokens/provider'
 import type { CorAcento } from '@design/tokens/acento'
 import type { Modulo } from '@design/tokens/semantic'
 import { CredenciaisDoWorkspace } from './CredenciaisDoWorkspace'
+import { DiretoriosPermitidos } from './DiretoriosPermitidos'
 import { ChamadaDeIa } from './ChamadaDeIa'
 
 /**
@@ -161,9 +162,15 @@ export function Settings({
       </div>
 
       {/*
-       * Credenciais por último: é a única seção escopada ao **espaço**, não ao usuário, e vem
-       * depois das três preferências pessoais para a leitura não alternar entre os dois escopos.
+       * Diretórios permitidos (SPEC-ExecucaoReal-03) fecham o bloco do **usuário**: como
+       * idioma, tema e acento, a allowlist de diretórios não se separa por espaço — o
+       * filesystem da máquina é o mesmo nos dois.
+       *
+       * As duas seções seguintes são escopadas ao **espaço** ativo. A ordem agrupa a leitura
+       * em dois blocos de escopo em vez de alternar entre eles a cada seção.
        */}
+      <DiretoriosPermitidos />
+
       <CredenciaisDoWorkspace workspace={workspace} nomeDoEspaco={nomeDoEspaco} />
       <ChamadaDeIa workspace={workspace} nomeDoEspaco={nomeDoEspaco} />
     </section>
