@@ -36,6 +36,8 @@ import type { BudgetLimitsInput, BudgetSnapshot } from '@shared/domain/budget'
 import type { ProviderRoute, ProviderStatus, RoutingPolicy } from '@shared/domain/routing'
 import type {
   ConnectorCapability,
+  ConnectorCredentialKey,
+  ConnectorCredentialStatusView,
   ConnectorError,
   ConnectorId,
   ConnectorOutcome,
@@ -198,6 +200,18 @@ export const IPC_CHANNELS = {
    */
   connectorCreditsGet: 'connectors:credits-get',
   connectorCreditsSetLimits: 'connectors:credits-set-limits',
+  /**
+   * Credenciais de **conector** (SPEC-Conectores-05, critério 7). Trio irmão do de credenciais
+   * de IA, e separado dele pela mesma razão que as taxonomias são separadas: cada tela varre a
+   * própria lista, e um canal comum obrigaria as duas a filtrar a do outro.
+   *
+   * A garantia é idêntica e vale reafirmar: **nenhum destes canais devolve o valor**. `set`
+   * recebe a chave de ida — é o usuário colando a própria credencial — e ela nunca volta; o
+   * retorno dos três é a lista de status, cujo tipo não tem campo onde o segredo caiba.
+   */
+  connectorCredentialList: 'connectors:credential-list',
+  connectorCredentialSet: 'connectors:credential-set',
+  connectorCredentialRemove: 'connectors:credential-remove',
   /**
    * Autenticação do GitHub por Device Flow (SPEC-Conectores-03, critério 9).
    *
@@ -542,6 +556,29 @@ export interface JarvisBridge {
     limites: ConnectorCreditLimitsInput,
     workspace: WorkspaceId
   ): Promise<ConnectorCreditView>
+
+  /**
+   * Credenciais de conector (SPEC-Conectores-05, critério 7).
+   *
+   * Mesma garantia estrutural do trio de credenciais de IA, e pelo mesmo mecanismo: **não há
+   * método aqui que devolva o valor**. `ConnectorCredentialStatusView` não tem campo onde o
+   * segredo caiba, e não existe um `getConnectorCredential()`.
+   *
+   * `setConnectorCredential` recusa a chave gerida por Device Flow (o GitHub): gravar um texto
+   * colado por cima do par access/refresh quebraria o refresh em silêncio.
+   */
+  listConnectorCredentials(
+    workspace: WorkspaceId
+  ): Promise<readonly ConnectorCredentialStatusView[]>
+  setConnectorCredential(
+    key: ConnectorCredentialKey,
+    value: string,
+    workspace: WorkspaceId
+  ): Promise<readonly ConnectorCredentialStatusView[]>
+  removeConnectorCredential(
+    key: ConnectorCredentialKey,
+    workspace: WorkspaceId
+  ): Promise<readonly ConnectorCredentialStatusView[]>
 
   /**
    * Autenticação do GitHub por Device Flow (SPEC-Conectores-03).

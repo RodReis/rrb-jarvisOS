@@ -20,6 +20,12 @@ import {
   type CredentialSource,
   type CredentialStatusView
 } from '@shared/domain/credentials'
+import {
+  CONNECTOR_CREDENTIAL_KEYS,
+  ROTULO_DO_CONECTOR,
+  type ConnectorCredentialKey,
+  type ConnectorCredentialStatusView
+} from '@shared/domain/connectors'
 import type { WorkspaceId } from '@shared/domain/entities'
 import { log } from '../logging/logger'
 import type { AuditRepository } from '../storage/audit-repository'
@@ -182,6 +188,96 @@ export class CredentialService {
   }
 
   /**
+   * O status das credenciais de **conector** naquele espaço (SPEC-Conectores-05, crit. 7).
+   *
+   * Método irmão de `listStatus` e não uma extensão dele: as duas taxonomias são separadas por
+   * decisão do PI, e juntá-las numa lista só faria a tela de IA precisar filtrar chave de
+   * conector — a mistura que a separação existe para evitar.
+   *
+   * Sem `source`: credencial de conector vive só no vault (não há `JARVIS_CREDENTIAL_TAVILY`).
+   * E nenhum campo carrega segredo, nem indício dele — sem tamanho, prefixo, máscara ou hash.
+   */
+  listConnectorStatus(
+    userId: string,
+    workspaceId: WorkspaceId
+  ): readonly ConnectorCredentialStatusView[] {
+    const noVault = new Set(this.repository.listKeys(userId, workspaceId))
+
+    return CONNECTOR_CREDENTIAL_KEYS.map((key) => ({
+      key,
+      conector: ROTULO_DO_CONECTOR[key],
+      workspace: workspaceId,
+      status: noVault.has(key) ? ('present' as const) : ('missing' as const),
+      // O GitHub tem credencial, mas ela nasce do Device Flow (F03) e não de um campo de texto.
+      // Oferecer o campo convidaria a colar um valor que nada consumiria.
+      gerenciavel: key !== 'github'
+    }))
+  }
+
+  /**
+   * Grava a credencial de um conector no vault e audita.
+   *
+   * Espelha `set` no que importa — mesmo cofre, mesma auditoria, valor nunca no payload — e
+   * difere no que a taxonomia exige: `key` é `ConnectorCredentialKey`, e a lista devolvida é a
+   * de conectores.
+   *
+   * A credencial gerida por Device Flow não passa por aqui: quem a grava é o `GithubAuthService`,
+   * com payload estruturado e rotação atômica. Aceitar um texto colado para ela gravaria por cima
+   * do par access/refresh e quebraria o refresh silenciosamente.
+   */
+  setConnector(
+    userId: string,
+    workspaceId: WorkspaceId,
+    key: ConnectorCredentialKey,
+    plaintext: string,
+    actor: CredentialActor
+  ): readonly ConnectorCredentialStatusView[] {
+    if (key === 'github') {
+      throw new Error('A credencial do GitHub é obtida pelo Device Flow, não por chave colada.')
+    }
+
+    this.classificarSeAgente(workspaceId, key, 'set', actor)
+    this.repository.upsert(userId, workspaceId, key, plaintext)
+
+    this.audit.append({
+      user_id: userId,
+      workspace_id: workspaceId,
+      type: 'credential-change',
+      payload: { op: 'set', key, actor }
+    })
+
+    log.integracao.info('Credencial de conector gravada no vault', { op: 'set', actor })
+    return this.listConnectorStatus(userId, workspaceId)
+  }
+
+  /**
+   * Remove a credencial de um conector do vault e audita.
+   *
+   * Como em `remove`, no-op **não** audita: registrar um evento que não corresponde a mudança
+   * nenhuma polui a evidência.
+   */
+  removeConnector(
+    userId: string,
+    workspaceId: WorkspaceId,
+    key: ConnectorCredentialKey,
+    actor: CredentialActor
+  ): readonly ConnectorCredentialStatusView[] {
+    this.classificarSeAgente(workspaceId, key, 'remove', actor)
+
+    if (this.repository.remove(userId, workspaceId, key)) {
+      this.audit.append({
+        user_id: userId,
+        workspace_id: workspaceId,
+        type: 'credential-change',
+        payload: { op: 'remove', key, actor }
+      })
+      log.integracao.info('Credencial de conector removida do vault', { op: 'remove', actor })
+    }
+
+    return this.listConnectorStatus(userId, workspaceId)
+  }
+
+  /**
    * Classifica a edição quando o ator é agente; para o usuário, não há o que classificar.
    *
    * A classificação vem **antes** da gravação, como no `CommandAllowlistRepository`: a decisão
@@ -190,7 +286,9 @@ export class CredentialService {
    */
   private classificarSeAgente(
     workspaceId: WorkspaceId,
-    key: CredentialKey,
+    // As duas taxonomias, porque a classificação é sobre o **ato** de mexer em credencial, e
+    // esse ato é o mesmo `secrets.change` para chave de IA e de conector.
+    key: CredentialKey | ConnectorCredentialKey,
     op: 'set' | 'remove',
     actor: CredentialActor
   ): void {

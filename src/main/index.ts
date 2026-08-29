@@ -32,6 +32,7 @@ import { ConnectorRegistry } from './connectors/registry'
 import { ConnectorService } from './connectors/connector-service'
 import { CreditService } from './connectors/credit-service'
 import { GithubAdapter } from './connectors/github/github-adapter'
+import { TavilyAdapter } from './connectors/tavily/tavily-adapter'
 import { GithubAuthService } from './connectors/github/github-auth-service'
 import { CreditRepository } from './connectors/credit-repository'
 import { CredentialRepository } from './credentials/credential-repository'
@@ -230,9 +231,13 @@ if (!app.requestSingleInstanceLock()) {
     // valendo, não uma lacuna.
     const connectorRegistry = new ConnectorRegistry()
     // O primeiro adapter concreto (SPEC-Conectores-03): o limite que a F01 registrou
-    // ("nenhum adapter concreto existe") fecha aqui. Declara `auth.identify` e só — repositório,
-    // issue e PR são a M6-F04.
+    // ("nenhum adapter concreto existe") fecha aqui. `auth.identify` veio na F03; as nove
+    // capacidades idempotentes de automação, na F04.
     connectorRegistry.register(new GithubAdapter())
+    // O segundo (SPEC-Conectores-05 e 06): pesquisa e extração de evidência. É o primeiro
+    // conector que **cobra** — e por isso o primeiro cujo `custoEstimado` faz o gate de créditos
+    // da F02 ter o que decidir.
+    connectorRegistry.register(new TavilyAdapter())
 
     // O Device Flow (SPEC-Conectores-03). Lê e grava o **payload estruturado** no mesmo cofre
     // das credenciais de IA, com `expires_at` fora da cifra e rotação atômica — a emenda ao

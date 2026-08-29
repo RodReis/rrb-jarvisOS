@@ -148,6 +148,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'listAuditEvents',
     'listAutomations',
     'listConnectorCapabilities',
+    'listConnectorCredentials',
     'listCredentials',
     'listExecutionRuns',
     'listPendingApprovals',
@@ -162,6 +163,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'removeAllowedCommand',
     'removeAllowedDirectory',
     'removeAutomation',
+    'removeConnectorCredential',
     'removeCredential',
     'removeWorkflow',
     'resolveApproval',
@@ -172,6 +174,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'sendLog',
     'setAutomationEnabled',
     'setBudgetLimits',
+    'setConnectorCredential',
     'setConnectorCreditLimits',
     'setCredential',
     'setGithubClientId',
@@ -190,7 +193,19 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
   // **mais** estrita: em vez de aceitar qualquer nome com a palavra, enumera exatamente os três
   // que existem — todos de *metadados* (status, origem, provider), nenhum devolve valor. Um
   // `getCredential` amanhã não entra nesta lista e quebra o teste, com o app rodando de verdade.
-  const GESTAO_SEM_VALOR = ['listCredentials', 'setCredential', 'removeCredential']
+  //
+  // A M6-F05 trouxe o trio irmão para credencial de **conector**, e a guarda continua
+  // enumerando: seis nomes, todos de metadados. `ConnectorCredentialStatusView` não tem campo
+  // onde o segredo caiba — e o teste `nada do que volta pela ponte contém a chave da Tavily`
+  // (tavily-conector.e2e.ts) mede isso com um valor real atravessando o app.
+  const GESTAO_SEM_VALOR = [
+    'listCredentials',
+    'setCredential',
+    'removeCredential',
+    'listConnectorCredentials',
+    'setConnectorCredential',
+    'removeConnectorCredential'
+  ]
   expect(
     superficie.metodos
       .filter((m) => /token|secret|session|credential/i.test(m))

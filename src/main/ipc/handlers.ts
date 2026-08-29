@@ -39,8 +39,10 @@ import type { ProviderStatus, RoutingPolicy } from '@shared/domain/routing'
 import { isBudgetLimitsInput, type BudgetSnapshot } from '@shared/domain/budget'
 import { isProviderRoute, isTaskType } from '@shared/domain/routing'
 import {
+  isConnectorCredentialKey,
   isConnectorRequest,
   type ConnectorCapability,
+  type ConnectorCredentialStatusView,
   type ConnectorError,
   type ConnectorOutcome
 } from '@shared/domain/connectors'
@@ -913,6 +915,63 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
         }
         throw erro
       }
+    }
+  )
+
+  // Credenciais de conector (SPEC-Conectores-05, critério 7). Trio irmão do de credenciais de
+  // IA, com as mesmas duas garantias: o retorno nunca carrega valor, e o ator é **fixo em
+  // `usuario`** — deixá-lo vir do renderer daria ao agente uma forma de se declarar usuário e
+  // escapar da classificação de alto risco.
+  ipcMain.handle(
+    IPC_CHANNELS.connectorCredentialList,
+    (_event, workspace: unknown): readonly ConnectorCredentialStatusView[] => {
+      if (!isWorkspaceId(workspace)) return []
+      return deps.credentials.listConnectorStatus(deps.userId(), workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.connectorCredentialSet,
+    (
+      _event,
+      key: unknown,
+      value: unknown,
+      workspace: unknown
+    ): readonly ConnectorCredentialStatusView[] => {
+      if (!isWorkspaceId(workspace) || !isConnectorCredentialKey(key)) return []
+
+      // Valor vazio é ausência de entrada, não "gravar string vazia": gravá-la deixaria a
+      // credencial `present` com um valor que a Tavily recusaria. Vira no-op.
+      const segredo = typeof value === 'string' ? value.trim() : ''
+      if (segredo.length === 0)
+        return deps.credentials.listConnectorStatus(deps.userId(), workspace)
+
+      // A credencial gerida por Device Flow não entra por aqui — gravar um texto colado por
+      // cima do par access/refresh quebraria o refresh em silêncio. O serviço também recusa;
+      // a guarda aqui evita a exceção atravessar o IPC como falha genérica.
+      if (key === 'github') {
+        log.ipc.warn('Credencial do GitHub recusada: ela vem do Device Flow', {
+          canal: IPC_CHANNELS.connectorCredentialSet
+        })
+        return deps.credentials.listConnectorStatus(deps.userId(), workspace)
+      }
+
+      // Sem `ctx` com a chave: o log registra o fato e o conector, nunca o valor.
+      log.integracao.info('Credencial de conector submetida pela interface', {
+        canal: IPC_CHANNELS.connectorCredentialSet,
+        direction: 'in',
+        connector: key
+      })
+
+      return deps.credentials.setConnector(deps.userId(), workspace, key, segredo, 'usuario')
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.connectorCredentialRemove,
+    (_event, key: unknown, workspace: unknown): readonly ConnectorCredentialStatusView[] => {
+      if (!isWorkspaceId(workspace) || !isConnectorCredentialKey(key)) return []
+      return deps.credentials.removeConnector(deps.userId(), workspace, key, 'usuario')
     }
   )
 

@@ -48,6 +48,12 @@ const getGithubAuthStatus = vi.fn(() =>
 )
 const startGithubAuth = vi.fn()
 const awaitGithubAuth = vi.fn()
+// SPEC-Conectores-05: a seção de credenciais de conector consulta a ponte ao montar — mesma
+// armadilha dos anteriores, e é ela que faz o Settings dos testes cair em erro quando o dublê
+// fica para trás de um canal novo.
+const listConnectorCredentials = vi.fn(() => Promise.resolve([]))
+const setConnectorCredential = vi.fn(() => Promise.resolve([]))
+const removeConnectorCredential = vi.fn(() => Promise.resolve([]))
 const cancelGithubAuth = vi.fn()
 const logoutGithub = vi.fn()
 const setGithubClientId = vi.fn()
@@ -109,6 +115,9 @@ function mockarPonte(): void {
       pickAllowedDirectory,
       removeAllowedDirectory,
       getGithubAuthStatus,
+      listConnectorCredentials,
+      setConnectorCredential,
+      removeConnectorCredential,
       startGithubAuth,
       awaitGithubAuth,
       cancelGithubAuth,

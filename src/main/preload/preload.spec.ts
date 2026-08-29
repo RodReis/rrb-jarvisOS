@@ -79,6 +79,7 @@ describe('ponte do preload', () => {
       'listAuditEvents',
       'listAutomations',
       'listConnectorCapabilities',
+      'listConnectorCredentials',
       'listCredentials',
       'listExecutionRuns',
       'listPendingApprovals',
@@ -93,6 +94,7 @@ describe('ponte do preload', () => {
       'removeAllowedCommand',
       'removeAllowedDirectory',
       'removeAutomation',
+      'removeConnectorCredential',
       'removeCredential',
       'removeWorkflow',
       'resolveApproval',
@@ -103,6 +105,7 @@ describe('ponte do preload', () => {
       'sendLog',
       'setAutomationEnabled',
       'setBudgetLimits',
+      'setConnectorCredential',
       'setConnectorCreditLimits',
       'setCredential',
       'setGithubClientId',
@@ -181,7 +184,18 @@ describe('ponte do preload', () => {
     // palavra, ela agora enumera exatamente os três que existem — e todos gerenciam
     // *metadados* (status, origem, provider), nenhum devolve valor. Um `getCredential`
     // amanhã não entra nesta lista, e por isso quebra o teste.
-    const GESTAO_DE_CREDENCIAL_SEM_VALOR = ['listCredentials', 'setCredential', 'removeCredential']
+    //
+    // A M6-F05 trouxe o trio irmão para credencial de **conector**, e a guarda continua
+    // enumerando: seis nomes, todos de metadados. `ConnectorCredentialStatusView` não tem campo
+    // onde o segredo caiba, do mesmo modo que `CredentialStatusView` não tem.
+    const GESTAO_DE_CREDENCIAL_SEM_VALOR = [
+      'listCredentials',
+      'setCredential',
+      'removeCredential',
+      'listConnectorCredentials',
+      'setConnectorCredential',
+      'removeConnectorCredential'
+    ]
 
     const suspeitos = Object.keys(bridge)
       .filter((k) => /token|secret|credential|session/i.test(k))
@@ -204,7 +218,12 @@ describe('ponte do preload', () => {
     expect(canaisDeCredencial).toEqual([
       IPC_CHANNELS.credentialList,
       IPC_CHANNELS.credentialSet,
-      IPC_CHANNELS.credentialRemove
+      IPC_CHANNELS.credentialRemove,
+      // O trio de conector (M6-F05) roteia para status pela mesma razão e com a mesma ausência:
+      // não há `connectors:credential-read`.
+      IPC_CHANNELS.connectorCredentialList,
+      IPC_CHANNELS.connectorCredentialSet,
+      IPC_CHANNELS.connectorCredentialRemove
     ])
 
     await (bridge.listCredentials as (w: string) => Promise<unknown>)('jarvis')
@@ -268,7 +287,13 @@ describe('ponte do preload', () => {
       // SPEC-Conectores-02: os dois do teto de créditos. Enumerados como os outros — um canal
       // futuro que aceitasse endereço não entra nesta lista, e por isso quebra o teste.
       IPC_CHANNELS.connectorCreditsGet,
-      IPC_CHANNELS.connectorCreditsSetLimits
+      IPC_CHANNELS.connectorCreditsSetLimits,
+      // SPEC-Conectores-05: os três da credencial de conector. Nenhum aceita endereço — levam
+      // chave lógica de um enum fechado e espaço —, e enumerá-los aqui é o que mantém a guarda
+      // capaz de acusar o canal que aceitasse.
+      IPC_CHANNELS.connectorCredentialList,
+      IPC_CHANNELS.connectorCredentialSet,
+      IPC_CHANNELS.connectorCredentialRemove
     ])
 
     expect(

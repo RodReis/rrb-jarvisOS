@@ -17,6 +17,7 @@ import type { Modulo } from '@design/tokens/semantic'
 import { CredenciaisDoWorkspace } from './CredenciaisDoWorkspace'
 import { OrcamentoDoWorkspace } from './OrcamentoDoWorkspace'
 import { ConectorGitHub } from './ConectorGitHub'
+import { CredenciaisDeConector } from './CredenciaisDeConector'
 import { ProvidersDoWorkspace } from './ProvidersDoWorkspace'
 import { DiretoriosPermitidos } from './DiretoriosPermitidos'
 import { ChamadaDeIa } from './ChamadaDeIa'
@@ -193,6 +194,13 @@ export function Settings({
        * bloco de IA acima é o que o operador visita todo dia. Colocá-lo antes empurraria o
        * orçamento — que ele consulta antes de cada chamada — para baixo da dobra.
        */}
+      {/*
+       * A credencial vem antes do fluxo que a usa: quem chega aqui para configurar a Tavily
+       * precisa do campo de chave, não de um conector que recusa por falta dela. O GitHub
+       * aparece nesta lista como estado (vem do Device Flow logo abaixo), e é essa vizinhança
+       * que torna a ordem legível.
+       */}
+      <CredenciaisDeConector workspace={workspace} nomeDoEspaco={nomeDoEspaco} />
       <ConectorGitHub workspace={workspace} nomeDoEspaco={nomeDoEspaco} />
     </section>
   )
