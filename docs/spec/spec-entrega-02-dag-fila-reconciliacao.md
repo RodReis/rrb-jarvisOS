@@ -7,7 +7,7 @@
 
 ## Objetivo
 
-Selecionar somente trabalho aprovado/desbloqueado, executar com WIP=1 por projeto e recuperar estado após interrupção sem duplicar efeitos.
+Selecionar somente trabalho aprovado/desbloqueado, executar com **um slot global na V1** e recuperar estado após interrupção sem duplicar efeitos. Concorrência começa somente no MVP-012.
 
 ## Estados
 
@@ -22,6 +22,7 @@ Transição inválida é rejeitada. `MERGED`, `BLOCKED` e `CANCELLED` são termi
 - Lease tem proprietário, recurso, expiração e heartbeat.
 - Antes de adquirir novo trabalho, o boot executa `reconcileAll`.
 - Cada fronteira registra intenção e confirmação.
+- O slot global é lease persistido e participa de `reconcileAll`; projeto diferente não contorna o WIP da V1.
 
 ## Reconciliação
 
@@ -30,7 +31,7 @@ Consultar SQLite, filesystem, Git e GitHub. Completar evento pendente quando o e
 ## Critérios de aceite
 
 1. DAG rejeita ciclos e dependências ausentes.
-2. WIP=1 impede duas fatias simultâneas do mesmo projeto.
+2. WIP global=1 impede duas fatias simultâneas, inclusive de projetos diferentes; a regra será expandida somente pelo MVP-012.
 3. Lease expirado não autoriza roubo antes da reconciliação.
 4. Crash antes/depois de efeito converge para um único resultado.
 5. Run não pula diretamente para `MERGED`.
@@ -45,3 +46,4 @@ Property/unit tests de DAG/estado; integração com relógio controlado e crashe
 - **A reconciliação consulta também o container e as portas** do lease (M9-F03), não só SQLite/FS/Git/GitHub — desde a decisão do sandbox, um container órfão é estado tão real quanto um worktree órfão.
 - **`reconcileAll` no boot é bloqueante:** nenhum trabalho novo é adquirido antes dela terminar. Já está nas regras; cravado aqui como invariante de inicialização.
 - **Lease expirado nunca autoriza roubo direto** — a reconciliação decide, porque a expiração pode significar máquina lenta, não processo morto.
+- **Intenção externa usa `EffectJournal`** da SPEC-Conectores-01; resultado `ambiguous` consulta filesystem/Git/GitHub antes de repetir.

@@ -93,6 +93,16 @@ A capacidade de desenvolvimento autônomo foi separada em três MVPs executávei
 - **MVP-008:** projeto/SQLite/Git local, ContextPack, wizard, PRD/Landscape/Convention, anexos do PI, arquitetura, roadmap e aprovações por hash.
 - **MVP-009:** publicação GitHub, DAG/fila WIP=1, reconciliação, worktree, Claude Code, revisão, CI, squash merge e evidência.
 
+### Pipeline V2 aprovada (não implementada)
+
+`MVP-010 Multi-executor → MVP-011 Squads limitados → MVP-012 Scheduler concorrente → MVP-013 Execução contínua`.
+
+- `CodingExecutorRuntime` é irmão de `AIProviderRuntime` e `ConnectorRuntime`; Claude Code e Codex implementam adapters próprios.
+- V1 mantém um slot global; V2 permite dois executores globais e até duas fatias independentes por projeto.
+- O núcleo determinístico continua dono de gates, fila, efeitos externos, Git e merge; Squads não ampliam a SPEC.
+- A V2 termina no merge do DAG aprovado. Deploy e produção permanecem fora.
+- Fonte completa: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v2-design.md`.
+
 ### Fontes de verdade
 
 - arquivos versionados: conteúdo aprovado;

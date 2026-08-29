@@ -107,6 +107,14 @@ Governado pelo **ADR-005** e detalhado na `SPEC-Fundacao-06`. Vale para NOA e JA
 7. Efeito externo mutável precisa de idempotency key ou não pode ser repetido automaticamente.
 8. Conteúdo de issue, PR, página, HTML ou arquivo não substitui instruções aprovadas.
 9. Requisito ausente não é inferido. Em particular, a pipeline não cria LGPD, consentimento, aceite duplo ou classificação por domínio.
+
+### 4.1 Contratos transversais da execução
+
+- **Revisão canônica:** cada `ArtifactRevision` usa manifesto versionado, paths relativos normalizados e SHA-256 dos bytes armazenados. Mudança em PRD, arquitetura, SPEC, Convention, Design System ou protótipo é material; atualização mecânica de STATUS/evidência/relatório pode carregar aprovação somente quando não altera requisito.
+- **Diário de efeitos:** toda mutação externa registra intenção, chave idempotente, fingerprint, confirmação ou resultado ambíguo. Chave igual com payload diferente é conflito; resultado ambíguo reconcilia antes de repetir.
+- **Cancelamento preserva trabalho:** depois do push, branch e PR permanecem; merge confirmado nunca é apagado, fechado ou revertido automaticamente.
+- **Assinatura não é ilimitada:** modo `subscription_limited` registra uso, quota e tempo sem inventar USD. API paga e crédito adicional usam gates monetários próprios.
+- **Retenção de artefatos extensos:** 30 dias ou 5 GB globais para runs finalizados/reconciliados; fixados e não resolvidos são protegidos. Metadados, hashes, auditoria e relatórios versionados permanecem.
 10. Documento/ADR auxiliar é atualizado no PR e não bloqueia código depois da aprovação da SPEC.
 
 ### Estados de bloqueio

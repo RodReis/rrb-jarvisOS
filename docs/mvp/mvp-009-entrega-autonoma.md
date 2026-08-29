@@ -46,7 +46,7 @@ Executar somente o que foi aprovado, em worktree isolado, com WIP=1, Git automá
 - CI verde precisa corresponder ao `head SHA` mergeado.
 - Reinício não duplica commit, issue, PR ou merge.
 - Merge técnico não cria outro aceite do PI.
-- O executor roda em container; nenhum segredo entra nele e ele nunca fala com o GitHub.
+- O executor roda em container; somente autenticação do executor/MCP entra por mount dedicado. GitHub, Vault e credenciais do projeto ficam fora, e o executor nunca fala com o GitHub.
 
 ## Done do MVP
 

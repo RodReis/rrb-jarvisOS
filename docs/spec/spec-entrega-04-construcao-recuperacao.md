@@ -43,6 +43,7 @@ SPEC/hashes aprovados, ContextPack, paths permitidos, comandos de validação, `
 7. Falha terminal contém ação mínima de retomada.
 8. **Execução é containerizada:** o adapter só inicia o executor com o container pronto e o worktree montado. Teste comprova que sem container não há execução.
 9. **Uso da rota de assinatura é registrado sem valor monetário** (emenda da SPEC-Providers-03); atribuição por tentativa continua obrigatória. Teste.
+10. Rota de assinatura é `subscription_limited`: quota desconhecida não vira saldo infinito; rate limit tenta somente fallback já autorizado ou termina em espera/bloqueio explicável.
 
 ## Testes e evidência
 
@@ -58,3 +59,4 @@ Adapter fake nas suítes comuns; fixtures de timeout/cancelamento/falha repetida
 - **O agente não fala com o GitHub.** Efeito remoto é do app (M9-F01/M9-F05); o container não recebe token.
 - **Três tentativas contam o run inteiro** (inicial + duas), não por etapa — já é regra, cravado para não virar "três por fase".
 - **Escolha técnica reversível dentro da SPEC é autônoma e registrada**; requisito de produto ausente **nunca** é inferido (invariante 9 da CONVENTION §4).
+- **Adapter consumido:** a construção usa `CodingExecutorAdapter`; Claude é a implementação V1 e Codex entra no MVP-010 sem alterar esta orquestração.

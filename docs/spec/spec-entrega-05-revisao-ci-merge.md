@@ -13,6 +13,8 @@ Validar o delta, executar revisões, corrigir falhas elegíveis e concluir o mes
 
 Escopo → testes/lint/type/build → code/architecture review → design review quando houver UI → QA/smoke → correção/revalidação → commits automáticos → push → `ensurePullRequest` → checks do head atual → recuperação no mesmo PR → confirmação do SHA → squash merge → confirmação na origem.
 
+O conjunto obrigatório vem das regras/rulesets observados para a branch-base e é persistido com referência/data. Somente conclusões aceitas pela origem no `head SHA` esperado satisfazem o gate. `failure`, `cancelled`, `timed_out`, check ausente e SHA obsoleto não passam. Merge queue fica fora da V1.
+
 ## Revisão
 
 `REVIEW.md` é a instrução de maior prioridade fornecida pelo projeto aos revisores. Baseline: P0/P1 bloqueiam; P2/P3 são registrados. Relatório anterior é usado para deduplicar e avaliar apenas o delta ainda aberto.
@@ -37,6 +39,8 @@ Escopo → testes/lint/type/build → code/architecture review → design review
 6. `mergeSha` é confirmado na origem.
 7. Código do comando zero, sozinho, não prova sucesso.
 8. **Kill-switch respeitado:** com merge autônomo desligado, o run para no PR verde sem mergear e sem marcar falha; com ligado, mergeia e confirma na origem. Teste dos dois caminhos.
+9. Mudança de ruleset/check obrigatório durante o run força novo snapshot e reconciliação; check `neutral`/`skipped` só passa quando a própria regra da origem o considerar satisfatório.
+10. Repositório que exige merge queue termina com PR verde e bloqueio externo explicável; a pipeline V1 não tenta contorná-la.
 
 ## Testes e evidência
 

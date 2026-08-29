@@ -25,7 +25,7 @@ Resolver/fetch da base → fixar base SHA → criar branch/worktree determiníst
 **Duplo papel, decidido em 2026-08-29:** (a) **sandbox do executor** — o container onde o Claude Code roda, com o worktree montado e nada mais; (b) serviços do projeto (banco, cache) quando a SPEC-alvo os exigir. O papel (a) é obrigatório; o (b) só existe se o projeto declarar serviços.
 
 - **Docker ausente ou desligado e que não sobe → `BLOCKED_EXTERNAL`** com ação concreta. **Nunca há fallback para executar no host** — seria justamente o buraco que esta decisão fecha.
-- O container do executor recebe **o worktree e o ContextPack**, e **nenhum segredo**: token do GitHub, credenciais do Vault e chaves de provider ficam no main.
+- O container recebe worktree, ContextPack e **somente autenticação do executor/MCP aprovada**, por volume/secret dedicado e fora da imagem/worktree/log. Token GitHub, Vault e credenciais do projeto ficam no main.
 - Pode iniciar o serviço quando estiver desligado.
 - Reutiliza apenas recurso identificado como pertencente ao mesmo projeto/run.
 - Novo recurso recebe nome e porta livres, nunca porta configurada por outro container/projeto.
@@ -41,7 +41,7 @@ Resolver/fetch da base → fixar base SHA → criar branch/worktree determiníst
 6. Mudança fora do allowlist é detectada antes do commit.
 7. Limpeza não alcança path ou recurso não pertencente ao run.
 8. **O executor só recebe cwd dentro do container**, com o worktree montado; tentativa de executar no host é impedida. Teste comprova que não existe caminho de execução no host.
-9. **Nenhum segredo entra no container.** Teste inspeciona ambiente e montagens do container e não encontra token, chave ou credencial.
+9. **Segredo mínimo e segregado:** teste encontra somente mounts de autenticação do executor/MCP declarados; não encontra GitHub, Vault, credencial do projeto nem segredo na imagem, worktree, env exposto, log ou evidência.
 10. **Docker indisponível bloqueia o preflight** com `BLOCKED_EXTERNAL` e ação; nenhum executor inicia. Teste.
 
 ## Testes e evidência
@@ -57,3 +57,4 @@ Integração Git real temporária, colisão de porta/container e validação de 
 - **O container é do run, não do projeto:** nome e portas derivam do lease, e a limpeza da M9-F06 o remove. Volume persistente de serviço do projeto continua preservado.
 - **Git da pipeline roda no host**, pelo terminal controlado (M8-F01) — commits, push e rebase são atos do app. O agente altera arquivos no worktree montado; quem versiona é o app.
 - **Reconciliação de porta antes de subir** vale para os dois papéis do Docker, sandbox incluído.
+- **Perfis dedicados:** Claude usa `CLAUDE_CONFIG_DIR` e, na V2, Codex usa `CODEX_HOME`; o PI autentica diretamente no CLI e o app trata apenas referência/status.

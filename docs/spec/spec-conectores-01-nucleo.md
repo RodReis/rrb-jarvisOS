@@ -22,6 +22,7 @@ Definir um contrato único de capacidades externas sem criar um proxy HTTP gené
 - `ConnectorResult`: dado normalizado, proveniência, uso e referências externas.
 - `ConnectorError`: código estável, retentabilidade, evidência segura e ação de retomada.
 - Registro explícito de adapters; nenhuma resolução arbitrária por URL.
+- `EffectJournal`: chave idempotente, fingerprint da entrada, alvo, intenção, confirmação/ambiguidade e `ExternalRef`.
 
 ## Fluxo
 
@@ -35,6 +36,7 @@ Resolver adapter → validar capacidade/entrada → obter referência de credenc
 4. Erros equivalentes de adapters diferentes podem ser tratados pelo orquestrador.
 5. Renderer acessa somente IPC tipado e capacidades permitidas.
 6. Não existe endpoint de proxy HTTP genérico.
+7. Reutilizar idempotency key com payload diferente falha antes de I/O; resultado ambíguo exige reconciliação na origem antes de repetir.
 
 ## Testes e evidência
 
