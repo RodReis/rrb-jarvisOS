@@ -6,8 +6,8 @@ Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do
 
 | Coluna | Item | Estado |
 |---|---|---|
-| Próximo | [#87](https://github.com/RodReis/rrb-jarvisOS/issues/87) · MVP-006 F01 Núcleo de conectores | cabeça da fila — o MVP-005 fechou |
-| Em Andamento | [#80](https://github.com/RodReis/rrb-jarvisOS/issues/80) · Multi-provider | `proplan:doing`; entregue, PR aberto — **fecha o MVP-005** |
+| Próximo | [#87](https://github.com/RodReis/rrb-jarvisOS/issues/87) · MVP-006 F01 Núcleo de conectores | `proplan:next`; cabeça da fila — o MVP-005 fechou |
+| Feito | [#80](https://github.com/RodReis/rrb-jarvisOS/issues/80) · Multi-provider | entregue (PR [#142](https://github.com/RodReis/rrb-jarvisOS/pull/142)), aguardando aceite — **fecha o MVP-005** |
 | Feito | [#79](https://github.com/RodReis/rrb-jarvisOS/issues/79) · BudgetPolicy | entregue (PR [#140](https://github.com/RodReis/rrb-jarvisOS/pull/140)), aguardando aceite |
 | Backlog | [#88–#92](https://github.com/RodReis/rrb-jarvisOS/issues/88) · MVP-006 | cinco SPECs `aprovada-pi` (2026-08-29); atrás da #87 na fila |
 | Backlog | [#94–#99](https://github.com/RodReis/rrb-jarvisOS/issues/94) · MVP-008 | seis SPECs `aprovada-pi` (2026-08-29); atrás do MVP-006 na fila |
@@ -18,7 +18,7 @@ Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do
 | Finalizado | [#78](https://github.com/RodReis/rrb-jarvisOS/issues/78) · MVP-005 F02 Adapter Claude | aceito pelo PI (2026-08-29), PR [#112](https://github.com/RodReis/rrb-jarvisOS/pull/112) |
 | Finalizado | [#84](https://github.com/RodReis/rrb-jarvisOS/issues/84) · `[FIX]` card de aprovação descreve comando como filesystem | aceito pelo PI (2026-08-29), PR [#113](https://github.com/RodReis/rrb-jarvisOS/pull/113) |
 | Finalizado | [#110](https://github.com/RodReis/rrb-jarvisOS/issues/110) · M4-F03 UI da allowlist de diretórios | aceito pelo PI (2026-08-29), PR [#114](https://github.com/RodReis/rrb-jarvisOS/pull/114) |
-| A Fazer | — | WIP = 1 (#80) |
+| A Fazer/Em Andamento | — | WIP = 0 |
 
 > **M5-F01 entregue (2026-08-28) — abre o MVP-005.** Os 9 critérios cobertos; **679 testes verdes** (+38: 9 Regras, 20 Banco, 9 Tela). A garantia central é **estrutural**: nenhum tipo que atravessa o IPC tem campo onde o segredo caiba, e não existe método na ponte que o peça. Verificado no app real — o segredo semeado aparece **0 vezes** em `jarvis.db`/`-wal`/`-shm` enquanto `credential_ref` aparece 3 (prova de que a busca funciona); é a prova do **DPAPI real**, já que o teste de integração usa cifra dublada. `verifyAuditChain` → `{ok: true, checked: 95}`. Detalhe em `DEVELOPMENT.md`.
 >
