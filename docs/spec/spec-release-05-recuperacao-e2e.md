@@ -2,7 +2,7 @@
 
 - MVP/Fatia: MVP-014 · M14-F05 — **fecha o MVP-014**.
 - Issue: ainda não criada.
-- Status: **rascunho para revisão do PI**.
+- Status: **aprovada-pi** (2026-08-29); implementação depende da fila e de issue ainda não criada.
 - Depende de: M14-F04 aprovada e entregue.
 - Design: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v3-design.md`.
 
@@ -106,4 +106,4 @@ npm run test:report:check
 
 ## Perguntas abertas ao PI
 
-Nenhuma. Aguardando aprovação desta revisão completa.
+Nenhuma. Revisão exata aprovada pelo PI em 2026-08-29.

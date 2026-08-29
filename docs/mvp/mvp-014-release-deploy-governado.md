@@ -1,6 +1,6 @@
 # MVP-014 — Release e Deploy Governado
 
-- Status: **design aprovado; SPECs em revisão documental**.
+- Status: **design e cinco SPECs aprovados pelo PI em 2026-08-29**; implementação aguarda a ordem da fila.
 - Issue épico: ainda não criada.
 - Depende de: MVP-013 concluído.
 - Design: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v3-design.md`.

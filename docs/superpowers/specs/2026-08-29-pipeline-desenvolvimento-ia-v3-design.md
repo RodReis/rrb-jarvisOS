@@ -1,6 +1,6 @@
 # Design — Pipeline V3: release, operação e aprendizado
 
-- Status: **direção da V3 e arquitetura do MVP-014 aprovadas pelo PI** em 2026-08-29.
+- Status: **direção da V3, arquitetura e cinco SPECs do MVP-014 aprovadas pelo PI** em 2026-08-29.
 - Escopo deste documento: fronteira da Pipeline V3 e design detalhado do MVP-014.
 - Implementação: **não autorizada por este documento**. Cada SPEC continua sujeita ao aceite pré-construção do PI.
 - Predecessora: `2026-08-29-pipeline-desenvolvimento-ia-v2-design.md`.
