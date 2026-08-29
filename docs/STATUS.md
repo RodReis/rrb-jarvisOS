@@ -7,6 +7,7 @@ Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do
 | Coluna | Item | Estado |
 |---|---|---|
 | Próximo | [#78](https://github.com/RodReis/rrb-jarvisOS/issues/78) · M5-F02 Adapter Claude | `proplan:next` |
+| Backlog | [#110](https://github.com/RodReis/rrb-jarvisOS/issues/110) · M4-F03 UI da allowlist de diretórios | `aprovada-pi` 2026-08-29; desbloqueia MVP-004 e M8-F01 |
 | Backlog | [#84](https://github.com/RodReis/rrb-jarvisOS/issues/84) · `[FIX]` card de aprovação descreve comando como filesystem | despriorizado pelo PI em favor do #107 |
 | Backlog | [#79](https://github.com/RodReis/rrb-jarvisOS/issues/79) · BudgetPolicy | aprovado, aguardando fila |
 | Backlog | [#80](https://github.com/RodReis/rrb-jarvisOS/issues/80) · Multi-provider | aprovado, aguardando fila |
@@ -31,7 +32,7 @@ Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do
 | MVP-001 Fundação | [#1](https://github.com/RodReis/rrb-jarvisOS/issues/1) | fechado/aceito | 6/6 |
 | MVP-002 Execução local | [#9](https://github.com/RodReis/rrb-jarvisOS/issues/9) | fechado/aceito | 5/5 |
 | MVP-003 Design System | [#16](https://github.com/RodReis/rrb-jarvisOS/issues/16) | fechado/aceito | 8/8 |
-| MVP-004 Execução real | [#10](https://github.com/RodReis/rrb-jarvisOS/issues/10) | F01 aceita; F02 aguardando aceite | 1/2 |
+| MVP-004 Execução real | [#10](https://github.com/RodReis/rrb-jarvisOS/issues/10) | F01 aceita; F02 aguardando aceite; **F03 nova** (`aprovada-pi` 2026-08-29) | 1/3 |
 | MVP-005 Providers/Vault/Budget | [#76](https://github.com/RodReis/rrb-jarvisOS/issues/76) | F01 entregue, aguardando aceite; três SPECs no Backlog | 1/4 |
 | MVP-006 Conectores Essenciais | [#86](https://github.com/RodReis/rrb-jarvisOS/issues/86) | seis SPECs `aprovada-pi` (2026-08-29); fatias no Backlog | 0/6 |
 | MVP-007 Memória Contextual/RAG | — | slot proposto; **sem fatias e sem SPEC** — nada a aprovar até entrar em planejamento ativo | — |
@@ -55,6 +56,7 @@ Não existe catálogo global `SPEC-nnn`. O identificador canônico é o slug aba
 | M3-F01–F06 | MVP-003 | Infra · Foundations · Componentes a/b · AppShell a/b · Identidades · Hardening | `spec-design-system-01..06` |
 | M4-F01 | MVP-004 | Filesystem allowlisted | `spec-execucao-real-01-filesystem-allowlisted.md` |
 | M4-F02 | MVP-004 | Terminal controlado | `spec-execucao-real-02-terminal-controlado.md` |
+| M4-F03 | MVP-004 | UI da allowlist de diretórios ([#110](https://github.com/RodReis/rrb-jarvisOS/issues/110)) | `spec-execucao-real-03-ui-allowlist-diretorios.md` |
 | M5-F01 | MVP-005 | Vault | `spec-providers-01-vault-credenciais.md` |
 | M5-F02 | MVP-005 | Adapter Claude | `spec-providers-02-adapter-claude-api.md` |
 | M5-F03 | MVP-005 | BudgetPolicy | `spec-providers-03-budget-policy.md` |
@@ -82,11 +84,10 @@ Não existe catálogo global `SPEC-nnn`. O identificador canônico é o slug aba
 
 1. PI aceitar ou recusar as três fatias em **Done**: F02 do MVP-004 (#75), M5-F01 (#77) e o `[FIX]` #107.
 2. Ordem da fila **decidida pelo PI (2026-08-28)**: #107 primeiro (entregue), depois a M5-F02 (#78). O #84 volta ao Backlog e reentra depois.
-3. Decidir sobre a **UI da allowlist de diretórios** (pendência registrada na F02 do MVP-004): é fatia, precisa de spec — sem ela o usuário não consegue permitir diretório pelo app.
-4. **MVP-006, MVP-008 e MVP-009 revisados e aprovados (2026-08-29)** — dezesseis decisões estruturais do PI registradas nas SPECs e nos docs dos épicos; #87–#92, #94–#99 e #101–#106 migraram para `proplan:backlog`. **Todas as 24 SPECs do projeto estão `aprovada-pi`.**
-5. MVP-007 será detalhado apenas quando entrar no planejamento ativo — hoje não tem fatia nem SPEC, então não há o que aprovar.
-6. **Escrever a spec da UI da allowlist de diretórios** — única fatia conhecida sem SPEC. Bloqueia uso real do MVP-004 e limita a M8-F01 ao diretório do app.
-7. **Docker virou dependência dura do MVP-009** (sandbox do executor). Confirmar que a máquina de execução tem Docker antes daquele MVP entrar na fila.
+3. **MVP-006, MVP-008 e MVP-009 revisados e aprovados (2026-08-29)** — dezesseis decisões estruturais do PI registradas nas SPECs e nos docs dos épicos; #87–#92, #94–#99 e #101–#106 migraram para `proplan:backlog`. **Todas as SPECs do projeto estão `aprovada-pi`.**
+4. MVP-007 será detalhado apenas quando entrar no planejamento ativo — hoje não tem fatia nem SPEC, então não há o que aprovar.
+5. **M4-F03 (UI da allowlist de diretórios) especificada e aprovada (2026-08-29)** — fecha a última fatia conhecida sem SPEC. Desbloqueia uso real do terminal/filesystem pelo app e tira o limite da M8-F01. Não existe mais fatia conhecida sem spec.
+6. **Docker virou dependência dura do MVP-009** (sandbox do executor). Confirmar que a máquina de execução tem Docker antes daquele MVP entrar na fila.
 
 ## Roadmap
 
