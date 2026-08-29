@@ -12,6 +12,7 @@ import {
   LIMITE_DIARIO_PADRAO,
   LIMITE_MENSAL_PADRAO,
   avaliarOrcamento,
+  isBudgetLimitsInput,
   mensagemDeBloqueio,
   orcamentoPadrao,
   type BudgetPolicy
@@ -209,5 +210,36 @@ describe('mensagemDeBloqueio', () => {
     })
 
     expect(texto).toContain('mensal')
+  })
+})
+
+describe('isBudgetLimitsInput — guard da fronteira do IPC', () => {
+  const valido = { dailyLimit: 1, monthlyLimit: 10, alertThreshold: 0.8 }
+
+  it('aceita o payload com os três campos numéricos', () => {
+    expect(isBudgetLimitsInput(valido)).toBe(true)
+  })
+
+  it('aceita valor fora da faixa: forma é forma, faixa é regra de negócio', () => {
+    // O guard checa **forma**. Limite negativo e limiar acima de 1 passam aqui e são
+    // recusados no serviço — os dois casos merecem tratamentos diferentes: um é chamador
+    // quebrado, o outro é usuário digitando.
+    expect(isBudgetLimitsInput({ ...valido, dailyLimit: -1 })).toBe(true)
+    expect(isBudgetLimitsInput({ ...valido, alertThreshold: 9 })).toBe(true)
+  })
+
+  it.each([
+    ['null', null],
+    ['undefined', undefined],
+    ['string', 'orçamento'],
+    ['número', 42],
+    ['array', [1, 2, 3]],
+    ['objeto vazio', {}],
+    ['sem o limiar', { dailyLimit: 1, monthlyLimit: 10 }],
+    ['limite como string', { ...valido, dailyLimit: '1' }],
+    ['limite NaN', { ...valido, monthlyLimit: Number.NaN }],
+    ['limite infinito', { ...valido, dailyLimit: Number.POSITIVE_INFINITY }]
+  ])('recusa %s', (_caso, entrada) => {
+    expect(isBudgetLimitsInput(entrada)).toBe(false)
   })
 })
