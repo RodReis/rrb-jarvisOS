@@ -1,6 +1,6 @@
 # Design — Pipeline V3: release, operação e aprendizado
 
-- Status: **direção da V3, MVP-014 e design/decomposição do MVP-015 aprovados pelo PI** em 2026-08-29.
+- Status: **direção da V3 e onze SPECs dos MVPs 014–015 aprovadas pelo PI** em 2026-08-29.
 - Escopo deste documento: fronteira da Pipeline V3 e design detalhado do MVP-014. O MVP-015 possui design complementar próprio.
 - Implementação: **não autorizada por este documento**. Cada SPEC continua sujeita ao aceite pré-construção do PI.
 - Predecessora: `2026-08-29-pipeline-desenvolvimento-ia-v2-design.md`.
@@ -21,7 +21,7 @@ Produção é automática depois do merge e dos gates técnicos. Não existe um 
 4. **MVP-017 — Biblioteca de Blueprints.** Padrões de PRD, arquitetura, SPEC, DESIGN-SYSTEM, protótipos e perguntas orientadas com “Decide por mim”.
 5. **MVP-018 — Gestão de Portfólio.** Vários projetos, fila global, prioridade do PI, custo/quota por projeto e prontidão de planejamento.
 
-O MVP-014 está detalhado neste documento. O MVP-015 possui design aprovado e seis fatias ainda sem SPEC executável em `2026-08-29-mvp-015-observabilidade-operacional-design.md`. MVP-016 a MVP-018 mantêm somente direção aprovada.
+O MVP-014 está detalhado neste documento. O MVP-015 possui design e seis SPECs aprovadas em `2026-08-29-mvp-015-observabilidade-operacional-design.md`. MVP-016 a MVP-018 mantêm somente direção aprovada.
 
 ## 3. Decisões do PI para o MVP-014
 

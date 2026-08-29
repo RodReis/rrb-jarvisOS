@@ -1,6 +1,6 @@
 # MVP-015 — Observabilidade Operacional
 
-- Status: **design e decomposição em seis fatias aprovados pelo PI** em 2026-08-29.
+- Status: **design e seis SPECs aprovados pelo PI** em 2026-08-29; implementação depende da fila e de issues ainda não criadas.
 - GitHub: épico e issues ainda não criados.
 - Depende de: MVP-014 concluído.
 - Dono do aceite: PI.
@@ -14,12 +14,12 @@ Dar ao PI uma visão local, correlacionada e verificável de runs, PRs, deploys,
 
 | Ordem | Fatia | SPEC | Estado |
 |---:|---|---|---|
-| 1 | Núcleo de eventos, outbox e projeções | `spec-observabilidade-01-eventos-outbox-projecoes.md` | rascunho |
-| 2 | Reconciliação, saúde, custos e quotas | `spec-observabilidade-02-reconciliacao-saude-custos-quotas.md` | rascunho |
-| 3 | Alertas e notificações | `spec-observabilidade-03-alertas-notificacoes.md` | rascunho |
-| 4 | Consultas, retenção, rollups e CLI | `spec-observabilidade-04-consultas-retencao-cli.md` | rascunho |
-| 5 | Console operacional | `spec-observabilidade-05-console-operacional.md` | rascunho |
-| 6 | Resiliência, desempenho e prova E2E | `spec-observabilidade-06-resiliencia-desempenho-e2e.md` | rascunho |
+| 1 | Núcleo de eventos, outbox e projeções | `spec-observabilidade-01-eventos-outbox-projecoes.md` | aprovada-pi |
+| 2 | Reconciliação, saúde, custos e quotas | `spec-observabilidade-02-reconciliacao-saude-custos-quotas.md` | aprovada-pi |
+| 3 | Alertas e notificações | `spec-observabilidade-03-alertas-notificacoes.md` | aprovada-pi |
+| 4 | Consultas, retenção, rollups e CLI | `spec-observabilidade-04-consultas-retencao-cli.md` | aprovada-pi |
+| 5 | Console operacional | `spec-observabilidade-05-console-operacional.md` | aprovada-pi; gate visual pendente antes da construção |
+| 6 | Resiliência, desempenho e prova E2E | `spec-observabilidade-06-resiliencia-desempenho-e2e.md` | aprovada-pi |
 
 ## Dentro
 

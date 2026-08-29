@@ -2,7 +2,7 @@
 
 - MVP/Fatia: MVP-015 · M15-F05.
 - Issue: ainda não criada.
-- Status: **rascunho** (2026-08-29); aguarda aceite pré-construção do PI.
+- Status: **aprovada-pi** (2026-08-29); implementação depende da fila, de issue ainda não criada e do gate visual abaixo.
 - Depende de: M15-F04 aprovada e entregue; `DESIGN-SYSTEM.md` e protótipos HTML formais anexados/aprovados.
 - Design: `docs/superpowers/specs/2026-08-29-mvp-015-observabilidade-operacional-design.md`.
 - Gate visual: layout **A — console operacional** aprovado no brainstorming; não substitui os artefatos formais do PI.
@@ -94,4 +94,4 @@ npm run test:prova
 
 ## Perguntas abertas ao PI
 
-Nenhuma pergunta estrutural. O aceite desta SPEC não substitui o gate futuro do `DESIGN-SYSTEM.md` e dos protótipos HTML formais antes da construção.
+Nenhuma sobre esta SPEC. Revisão exata aprovada pelo PI em 2026-08-29. O aceite não substitui o gate futuro do `DESIGN-SYSTEM.md` e dos protótipos HTML formais antes da construção.

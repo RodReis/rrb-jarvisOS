@@ -65,4 +65,4 @@
 15. Custos/quotas projetam o ledger existente e declaram qualidade da origem; scraping/OCR de tela e valor inventado são proibidos.
 16. Marcos duráveis permanecem; amostras frequentes compactam após 30 dias em rollups diários permanentes.
 17. O console aprovado é por projeto e read-mostly. Visão cruzada/portfólio pertence ao MVP-018.
-18. O MVP-015 foi decomposto em seis fatias aprovadas, ainda sem SPECs executáveis ou issues. MVP-016–MVP-018 mantêm somente direção aprovada.
+18. O MVP-015 foi decomposto em seis fatias e suas seis SPECs receberam aceite exato do PI. Permanecem sem issues e fora da fila; a F05 mantém gate visual. MVP-016–MVP-018 mantêm somente direção aprovada.

@@ -2,7 +2,7 @@
 
 - MVP/Fatia: MVP-015 · M15-F06 — **fecha o MVP-015**.
 - Issue: ainda não criada.
-- Status: **rascunho** (2026-08-29); aguarda aceite pré-construção do PI.
+- Status: **aprovada-pi** (2026-08-29); implementação depende da fila e de issue ainda não criada.
 - Depende de: M15-F05 aprovada e entregue.
 - Design: `docs/superpowers/specs/2026-08-29-mvp-015-observabilidade-operacional-design.md`.
 
@@ -96,4 +96,4 @@ npm run test:report:check
 
 ## Perguntas abertas ao PI
 
-Nenhuma pergunta estrutural. Pendente apenas o aceite desta revisão exata antes da construção.
+Nenhuma. Revisão exata aprovada pelo PI em 2026-08-29.
