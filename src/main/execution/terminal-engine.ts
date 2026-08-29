@@ -98,7 +98,13 @@ const VARIAVEIS_DE_AMBIENTE_PERMITIDAS: readonly string[] = [
   'PATHEXT'
 ]
 
-function ambienteControlado(): NodeJS.ProcessEnv {
+/**
+ * Exportada desde a F04 do MVP-005: o adapter do Claude Code CLI também roda subprocess e
+ * precisa da **mesma** lista de permissão. Duas cópias divergiriam, e a que divergisse seria a
+ * que vaza — a lição da M4-F02 (`process.env` do main não pode alcançar o processo filho) vale
+ * igual para um binário que o app invoca como sua própria dependência.
+ */
+export function ambienteControlado(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {}
   for (const chave of VARIAVEIS_DE_AMBIENTE_PERMITIDAS) {
     const valor = process.env[chave]

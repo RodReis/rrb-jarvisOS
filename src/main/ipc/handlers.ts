@@ -33,7 +33,11 @@ import type { WorkspaceService } from '../workspace/workspace-service'
 import type { ApprovalRepository } from '../execution/approval-repository'
 import type { AiCallService } from '../ai/call-provider'
 import { BudgetInputError, type BudgetService } from '../budget/budget-service'
+import type { RoutingService } from '../ai/routing-service'
+import type { RoutingRepository } from '../ai/routing-repository'
+import type { ProviderStatus, RoutingPolicy } from '@shared/domain/routing'
 import { isBudgetLimitsInput, type BudgetSnapshot } from '@shared/domain/budget'
+import { isProviderRoute, isTaskType } from '@shared/domain/routing'
 import {
   isAiProvider,
   type AiCallHandle,
@@ -120,6 +124,10 @@ export interface IpcDependencies {
   readonly ai: AiCallService
   /** Gate de orçamento (SPEC-Providers-03): a UI lê limites e acumulado, e edita limites. */
   readonly budget: BudgetService
+  /** Roteamento e healthcheck (SPEC-Providers-04): status por provider e edição de rotas. */
+  readonly routing: RoutingService
+  /** O repositório, para a lista de modelos — leitura pura, sem passar pelo serviço. */
+  readonly routingRepo: RoutingRepository
   /** Minimizar para o tray. Injetado porque a janela nasce depois dos handlers. */
   readonly minimizeToTray: () => void
 }
@@ -609,16 +617,22 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       if (typeof request !== 'object' || request === null) return undefined
 
       const bruto = request as Partial<AiRequest>
-      // Validação na fronteira: provider fechado pelo enum e prompt não-vazio. O `model` é
-      // aceito como veio porque a tabela de preço já trata modelo desconhecido — e recusá-lo
-      // aqui exigiria manter uma segunda lista em sincronia com a primeira.
-      if (!isAiProvider(bruto.provider)) return undefined
+      // Validação na fronteira: prompt não-vazio, e **um dos dois** caminhos de escolha —
+      // provider explícito (fechado pelo enum) ou `taskType` (fechado pela taxonomia). Aceitar
+      // um pedido sem nenhum dos dois empurraria a recusa para dentro do serviço, longe de
+      // quem a causou. O `model` é aceito como veio porque a tabela de preço já trata modelo
+      // desconhecido — recusá-lo aqui exigiria uma segunda lista em sincronia com a primeira.
+      const temProvider = isAiProvider(bruto.provider)
+      const temTarefa = isTaskType(bruto.taskType)
+      if (!temProvider && !temTarefa) return undefined
+
       const prompt = typeof bruto.prompt === 'string' ? bruto.prompt.trim() : ''
       if (prompt.length === 0) return undefined
 
       const pedido: AiRequest = {
-        provider: bruto.provider,
         prompt,
+        ...(temProvider ? { provider: bruto.provider } : {}),
+        ...(temTarefa ? { taskType: bruto.taskType } : {}),
         ...(typeof bruto.model === 'string' ? { model: bruto.model } : {}),
         ...(typeof bruto.system === 'string' ? { system: bruto.system } : {}),
         ...(typeof bruto.maxTokens === 'number' ? { maxTokens: bruto.maxTokens } : {})
@@ -629,7 +643,8 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       log.ipc.info('Chamada de IA solicitada pela interface', {
         canal: IPC_CHANNELS.aiCall,
         direction: 'in',
-        provider: pedido.provider
+        provider: pedido.provider ?? null,
+        taskType: pedido.taskType ?? null
       })
 
       const stream = deps.ai.call(pedido, { userId: deps.userId(), workspace })
@@ -665,10 +680,17 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
         }
       })()
 
+      // O handle carrega **só o que o handler sabe**. Com roteamento por `taskType`, quem
+      // atende é decidido dentro do serviço, depois deste retorno — afirmar um provider aqui
+      // seria prever a escolha, e a previsão erraria toda vez que houvesse fallback. O
+      // provider realmente usado chega no `CostEvent` do evento `fim`.
       return {
         id,
-        provider: pedido.provider,
-        model: pedido.model ?? MODELO_PADRAO[pedido.provider]
+        ...(pedido.provider === undefined ? {} : { provider: pedido.provider }),
+        ...(pedido.provider !== undefined && pedido.model === undefined
+          ? { model: MODELO_PADRAO[pedido.provider] }
+          : {}),
+        ...(pedido.model === undefined ? {} : { model: pedido.model })
       }
     }
   )
@@ -719,6 +741,55 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
         }
         throw erro
       }
+    }
+  )
+
+  // Providers e roteamento (SPEC-Providers-04, critérios 5 e 8). Leitura de status e edição de
+  // rotas/modelo. **Não há canal de seleção**: quem escolhe quem atende é o ponto único, no
+  // main — um canal aqui daria ao renderer uma decisão que ele só poderia duplicar.
+  ipcMain.handle(
+    IPC_CHANNELS.providerStatus,
+    async (_event, workspace: unknown): Promise<readonly ProviderStatus[]> => {
+      const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+      return await deps.routing.status({ userId: deps.userId(), workspace: escopo })
+    }
+  )
+
+  ipcMain.handle(IPC_CHANNELS.providerModels, (_event, provider: unknown): readonly string[] => {
+    if (!isAiProvider(provider)) return []
+    return deps.routingRepo.modelosDisponiveis(provider)
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.providerSetModel,
+    (_event, provider: unknown, modelo: unknown, workspace: unknown): boolean => {
+      if (!isAiProvider(provider) || typeof modelo !== 'string') return false
+      const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+      return deps.routing.setModelo({ userId: deps.userId(), workspace: escopo }, provider, modelo)
+    }
+  )
+
+  ipcMain.handle(IPC_CHANNELS.routingGet, (_event, workspace: unknown): RoutingPolicy => {
+    const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+    return deps.routing.rotas({ userId: deps.userId(), workspace: escopo })
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.routingSetRoute,
+    (_event, rota: unknown, workspace: unknown): RoutingPolicy => {
+      const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+      const scope = { userId: deps.userId(), workspace: escopo }
+
+      // Forma errada devolve o estado corrente em vez de lançar — a tela precisa continuar
+      // mostrando rotas, e o erro de forma é do chamador, não do usuário.
+      if (!isProviderRoute(rota)) {
+        log.ipc.warn('Rota de provider descartada por não casar com o contrato', {
+          canal: IPC_CHANNELS.routingSetRoute
+        })
+        return deps.routing.rotas(scope)
+      }
+
+      return deps.routing.setRota(scope, rota)
     }
   )
 

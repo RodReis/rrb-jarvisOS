@@ -3,10 +3,13 @@ import {
   AI_PROVIDERS,
   CREDENCIAL_DO_PROVIDER,
   MODELO_PADRAO,
+  ROTAS_UNMETERED,
   TABELA_DE_PRECO,
   calcularCustoUsd,
   estimarCustoUsd,
-  isAiProvider
+  isAiProvider,
+  isRotaUnmetered,
+  type AiProvider
 } from './ai'
 import { CREDENTIAL_KEYS } from './credentials'
 
@@ -32,19 +35,55 @@ describe('tabela de preço (critério 4)', () => {
     }
   })
 
-  it('todo provider aponta para uma credencial que existe no vault', () => {
+  it('todo provider que consome credencial aponta para uma que existe no vault', () => {
     // O elo com a F01: `CREDENCIAL_DO_PROVIDER` é explícito para não derivar nome de string,
     // e este teste é o que impede a explicitude de apontar para uma chave inexistente — caso
     // em que a chamada falharia por "credencial ausente" com a chave gravada e presente.
+    //
+    // `undefined` é resposta válida desde a F04, e **só** para quem de fato não consome
+    // credencial: o Ollama fala com o `localhost` e o `claude-code` usa a sessão do CLI. A
+    // guarda não afrouxou — ela passou a distinguir "não precisa" de "aponta para o nada".
     for (const provider of AI_PROVIDERS) {
-      expect(CREDENTIAL_KEYS).toContain(CREDENCIAL_DO_PROVIDER[provider])
+      const chave = CREDENCIAL_DO_PROVIDER[provider]
+      if (chave === undefined) {
+        expect(ROTAS_UNMETERED).toContain(provider)
+        continue
+      }
+      expect(CREDENTIAL_KEYS).toContain(chave)
     }
   })
 
-  it('saída custa mais que entrada em todo modelo — a assimetria da Anthropic', () => {
+  it('só rota unmetered pode dispensar credencial — nenhum provider pago escapa', () => {
+    // O contrafactual da guarda acima: sem esta, marcar um provider pago como `undefined`
+    // passaria em silêncio e a chamada sairia sem chave.
+    for (const provider of AI_PROVIDERS) {
+      if (isRotaUnmetered(provider)) continue
+      expect(CREDENCIAL_DO_PROVIDER[provider]).toBeDefined()
+    }
+  })
+
+  it('saída custa mais que entrada em todo modelo pago — a assimetria dos providers', () => {
     for (const [provider, modelos] of Object.entries(TABELA_DE_PRECO)) {
+      // Rota `unmetered` custa zero nos dois lados, e zero > zero é falso. Pular aqui não é
+      // exceção conveniente: a assimetria é um fato sobre **preço cobrado**, e não existe
+      // preço a comparar onde não há cobrança por chamada.
+      if (isRotaUnmetered(provider as AiProvider)) continue
+
       for (const [modelo, preco] of Object.entries(modelos)) {
         expect(preco.saida, `${provider}/${modelo}`).toBeGreaterThan(preco.entrada)
+      }
+    }
+  })
+
+  it('toda rota unmetered custa exatamente zero — não "quase zero"', () => {
+    // O par da guarda acima: o que a isenta da assimetria é ser zero, e este teste é o que
+    // impede um preço pequeno de se esconder atrás da isenção.
+    for (const provider of AI_PROVIDERS) {
+      if (!isRotaUnmetered(provider)) continue
+
+      for (const [modelo, preco] of Object.entries(TABELA_DE_PRECO[provider])) {
+        expect(preco.entrada, `${provider}/${modelo}`).toBe(0)
+        expect(preco.saida, `${provider}/${modelo}`).toBe(0)
       }
     }
   })

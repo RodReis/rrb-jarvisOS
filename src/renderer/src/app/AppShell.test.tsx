@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspaceId } from '@shared/domain/entities'
 import { App } from './App'
 import { entrarPelaChoice } from './test-utils'
+import { ROTEAMENTO_PADRAO } from '@shared/domain/routing'
 
 const sendLog = vi.fn()
 const minimizeToTray = vi.fn()
@@ -19,6 +20,11 @@ const resolveApproval = vi.fn()
 const runWorkflowReal = vi.fn()
 const listCredentials = vi.fn()
 const getBudget = vi.fn()
+const getProviderStatus = vi.fn()
+const getProviderModels = vi.fn()
+const setProviderModel = vi.fn()
+const getRouting = vi.fn()
+const setRoute = vi.fn()
 const setBudgetLimits = vi.fn()
 const setCredential = vi.fn()
 // SPEC-Providers-02: o painel de chamada de IA vive no Settings e assina o canal de stream ao
@@ -75,6 +81,14 @@ function mockarPonte(): void {
       // ao montar, e sem estes dois a tela cai no `catch` e exibe o próprio alerta de erro.
       getBudget,
       setBudgetLimits,
+      // Mesma razão dos anteriores: a tela de providers (SPEC-Providers-04) consulta a ponte
+      // ao montar. Sem estes cinco ela cai no `catch` e o Settings dos testes exercitaria um
+      // painel em estado de erro — verde, mas não é o Settings que o usuário vê.
+      getProviderStatus,
+      getProviderModels,
+      setProviderModel,
+      getRouting,
+      setRoute,
       callAi,
       cancelAi,
       onAiStreamEvent,
@@ -115,6 +129,12 @@ beforeEach(() => {
     gasto: { diaUsd: 0, mesUsd: 0 }
   }
   getBudget.mockResolvedValue(ORCAMENTO_PADRAO)
+  getProviderStatus.mockResolvedValue([])
+  getProviderModels.mockResolvedValue([])
+  setProviderModel.mockResolvedValue(true)
+  const ROTAS_PADRAO = { user_id: 'u-1', workspace_id: 'jarvis' as const, rotas: ROTEAMENTO_PADRAO }
+  getRouting.mockResolvedValue(ROTAS_PADRAO)
+  setRoute.mockResolvedValue(ROTAS_PADRAO)
   setBudgetLimits.mockResolvedValue(ORCAMENTO_PADRAO)
   setCredential.mockResolvedValue([])
   onAiStreamEvent.mockReturnValue(() => {})

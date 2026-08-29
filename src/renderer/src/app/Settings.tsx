@@ -16,6 +16,7 @@ import type { CorAcento } from '@design/tokens/acento'
 import type { Modulo } from '@design/tokens/semantic'
 import { CredenciaisDoWorkspace } from './CredenciaisDoWorkspace'
 import { OrcamentoDoWorkspace } from './OrcamentoDoWorkspace'
+import { ProvidersDoWorkspace } from './ProvidersDoWorkspace'
 import { DiretoriosPermitidos } from './DiretoriosPermitidos'
 import { ChamadaDeIa } from './ChamadaDeIa'
 
@@ -179,6 +180,12 @@ export function Settings({
        * explicação de um bloqueio já sofrido em vez de aviso antes dele.
        */}
       <OrcamentoDoWorkspace workspace={workspace} nomeDoEspaco={nomeDoEspaco} />
+      {/*
+       * Providers depois do orçamento e antes do painel de chamada: a ordem segue o que o
+       * usuário precisa saber para decidir — quanto pode gastar, quem está de pé, e só então
+       * disparar.
+       */}
+      <ProvidersDoWorkspace workspace={workspace} nomeDoEspaco={nomeDoEspaco} />
       <ChamadaDeIa workspace={workspace} nomeDoEspaco={nomeDoEspaco} />
     </section>
   )
