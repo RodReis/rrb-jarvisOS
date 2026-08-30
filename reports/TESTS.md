@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 702 | 702 | 0 | 68.6 | — | — |
-| — | — | — | Banco | 486 | 486 | 0 | 87.7 | — | — |
-| — | — | — | Tela | 380 | 379 | 0 | 86.5 | — | — |
+| — | — | — | Regras de Negócio | 749 | 749 | 0 | 69.4 | — | — |
+| — | — | — | Banco | 513 | 513 | 0 | 88.1 | — | — |
+| — | — | — | Tela | 393 | 392 | 0 | 86.7 | — | — |
 
 ## Histórico por entrega
 
@@ -172,3 +172,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | — | #96 | spec-planejamento-03-wizard-orientado | Regras de Negócio | 702 | 702 | 0 | 68.6 | #175 | [#175](https://github.com/RodReis/rrb-jarvisOS/pull/175) |
 | — | #96 | spec-planejamento-03-wizard-orientado | Banco | 486 | 486 | 0 | 87.7 | #175 | [#175](https://github.com/RodReis/rrb-jarvisOS/pull/175) |
 | — | #96 | spec-planejamento-03-wizard-orientado | Tela | 380 | 379 | 0 | 86.5 | #175 | [#175](https://github.com/RodReis/rrb-jarvisOS/pull/175) |
+| — | #97 | spec-planejamento-04-prd-landscape-convention | Regras de Negócio | 749 | 749 | 0 | 69.4 | #176 | [#176](https://github.com/RodReis/rrb-jarvisOS/pull/176) |
+| — | #97 | spec-planejamento-04-prd-landscape-convention | Banco | 513 | 513 | 0 | 88.1 | #176 | [#176](https://github.com/RodReis/rrb-jarvisOS/pull/176) |
+| — | #97 | spec-planejamento-04-prd-landscape-convention | Tela | 393 | 392 | 0 | 86.7 | #176 | [#176](https://github.com/RodReis/rrb-jarvisOS/pull/176) |
