@@ -242,6 +242,14 @@ A fila remota estava em #101 no início e passou para #102 na conferência final
 
 Próxima SPEC do MVP-007: M7-F01 (#180). Permanecem 80 SPECs aprovadas no acervo local. Sem implementação, instalação, testes de produto, PR, push ou deploy; validação desta etapa foi documental e dos registros/vínculos do GitHub.
 
+### MVP-007 — SPEC da M7-F01 redigida para revisão (2026-08-30)
+
+Após a publicação vinculada no commit local `4c68e06`, o PI solicitou prosseguir. Redigida `docs/spec/spec-memoria-01-nucleo-identidade-persistencia.md`, status `rascunho`, para a issue #180. Contratos v1 propostos: identidade composta, separação de produto e workspace, tipos de conteúdo/evento, provas de substituição, variantes conflitantes, invalidação lógica, suporte/proveniência, limites e gravação SQLite atômica. Vinte critérios de aceite propostos, incluindo permutações de entrega, falhas e reinício.
+
+A inspeção da fundação confirmou SQLite local no main, migrations forward-only e enum de workspace `noa | jarvis`; AgentsOS não cria workspace. Context7 foi usado para conferir o contrato de transações do driver. Não foram alterados código, migrations, dependências ou registros de produto. Busca, ingestão real, manutenção, Graphify, avaliação de lições e UI continuam nas fatias seguintes.
+
+Índice canônico atualizado somente na associação da M7-F01; F02–F08 permanecem a redigir. A SPEC segue para revisão do PI, sem antecipar `aprovada-pi`, Backlog ou execução. Não houve teste de produto, captura, instalação, push ou deploy nesta redação.
+
 ## Pendências históricas preservadas
 
 - A UI de allowlist ainda exigia decisão de produto: localização, seletor nativo e remoção de `appDir`.

@@ -4,7 +4,7 @@
 - Esta revisão registra decisões parciais de escopo e contratos nas seções abaixo; **não é um design completo nem uma SPEC aprovada para construção**.
 - Origem: proposta do PI de usar Graphify para memória e aprendizado transversal, acompanhada de quatro capturas dos menus futuros de JarvisOS/AgentsOS; aprovação da divisão entre MVP-007, M16-F05 e MVP-016.
 - Documento do MVP: `docs/mvp/mvp-007-memoria-contextual.md`.
-- Fatias: oito recortes de planejamento, com publicação autorizada pelo PI em 2026-08-30; SPECs ainda a redigir, sem aceite para construção. Índice canônico: `docs/STATUS.md`.
+- Fatias: oito recortes de planejamento, com publicação autorizada pelo PI em 2026-08-30; SPEC da F01 em rascunho para revisão, F02–F08 a redigir, sem aceite para construção. Índice canônico: `docs/STATUS.md`.
 - Issues do MVP-007: épico [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179) e oito fatias #180–#187 publicadas como Planejadas, conforme a seção 15. A #164 pertence ao MVP-016 e não substitui esse acompanhamento.
 - Relação com a execução: planejamento paralelo, não bloqueante para MVP-008, MVP-009 ou MVP-016; fila preservada.
 
@@ -188,7 +188,9 @@ Foi afastado aceitar qualquer objeto livre: facilitaria a primeira integração,
 
 O PI autorizou organizar as fatias por dependência e publicar o épico e suas issues de planejamento. Foram derivados oito recortes dos contratos acima: núcleo/identidade/persistência; fontes/ingestão/retomada; recuperação/orçamento; retenção/reconstrução; adapter opcional do Graphify; memória operacional/lições; Agent Memory/Notebook; resiliência/prova integrada.
 
-O plano de publicação está em `docs/superpowers/plans/2026-08-30-mvp-007-publicacao-issues.md`, com escopo, dependências, alvos de verificação e pendências por fatia. Numeração e associação às SPECs permanecem no índice canônico de `docs/STATUS.md`; as oito SPECs estão **a redigir**, sem status `aprovada-pi`.
+O plano de publicação está em `docs/superpowers/plans/2026-08-30-mvp-007-publicacao-issues.md`, com escopo, dependências, alvos de verificação e pendências por fatia. Numeração e associação às SPECs permanecem no índice canônico de `docs/STATUS.md`; a F01 possui **rascunho para revisão**, F02–F08 estão **a redigir**, nenhuma está `aprovada-pi`.
+
+Rascunho da F01: `docs/spec/spec-memoria-01-nucleo-identidade-persistencia.md`. Propõe schemas/limites v1, chaves compostas, revisões com substituição comprovada, conflitos, invalidação e armazenamento no SQLite existente, com vinte critérios de aceite. As representações concretas das seções 7/8/14 foram detalhadas como proposta, não como novo aceite do PI. A #180 permanece Planejada; ingestão, recuperação, manutenção, Graphify, avaliações e UI continuam nas respectivas fatias.
 
 Graphify permanece uma ramificação opcional: busca básica, memória operacional e interface não dependem dele. A prova final cobre presença e ausência do adapter. Fontes futuras não se tornam requisitos obrigatórios do núcleo; MVP-008, MVP-009, MVP-016 e M16-F05 não recebem bloqueios por este MVP. Agent Memory/Notebook preserva os artefatos visuais exigidos pelo PI, sem incorporar a construção de todos os menus das capturas.
 
@@ -198,7 +200,7 @@ Publicação conferida em 2026-08-30: épico #179, oito sub-issues #180–#187 e
 
 ## 16. Decisões ainda abertas
 
-1. Redação, critérios de aceite finais e aprovação das oito SPECs; a organização e publicação das issues não equivalem a esse aceite.
+1. Revisão/aceite da SPEC em rascunho da F01; redação, critérios finais e aprovação das outras sete SPECs. A organização/publicação das issues não equivale a esse aceite.
 2. Representação de cobertura e mecanismos de corte, confirmação, retomada, pendências e retentativas conforme a seção 11.
 3. Contratos técnicos de armazenamento/compactação/reconstrução, capacidade e exclusão física conforme a seção 8; sincronização permanece fora deste recorte.
 4. Contratos técnicos de consulta/resultados, atualização incremental e limites conforme a seção 9.

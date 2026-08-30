@@ -1,6 +1,6 @@
 # MVP-007 — Memória Contextual e RAG
 
-- Status: **contratos parciais aprovados pelo PI em 2026-08-30; oito fatias de planejamento com publicação autorizada; SPECs a redigir; design em elaboração; implementação não autorizada**.
+- Status: **contratos parciais aprovados pelo PI em 2026-08-30; oito fatias Planejadas; F01 com SPEC em rascunho, F02–F08 a redigir; design em elaboração; implementação não autorizada**.
 - Origem: recorte de memória híbrida/RAG anteriormente associado ao Corte 3.
 - Relação com a pipeline: **não bloqueia MVP-008, MVP-009 nem MVP-016**; a M16-F05 mantém escopo próprio e integração reutilizável.
 - Design em elaboração: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`.
@@ -78,6 +78,8 @@ Tempo do acontecimento e da recepção são distintos e não provam substituiç�
 O MVP está em planejamento ativo, sem mudar a fila de construção. O PI autorizou organizar e publicar oito fatias como Planejadas; isso não equivale ao aceite de um design completo ou de SPECs ainda inexistentes. Contratos e critérios serão detalhados nas fatias do plano de publicação; a numeração permanece exclusivamente no índice de `docs/STATUS.md`. Busca básica, memória operacional e interface não dependem da entrega do Graphify.
 
 ## Não decidido
+
+A M7-F01 possui proposta escrita em `docs/spec/spec-memoria-01-nucleo-identidade-persistencia.md`: schema v1, identidade composta, revisão/substituição, conflitos, limites, SQLite transacional e vinte critérios de aceite. Esses detalhes aguardam revisão do PI; não estão aprovados por constarem no documento. Sua issue #180 continua Planejada. As pendências abaixo permanecem não aprovadas ou pertencem às fatias seguintes.
 
 - representações concretas de IDs/escopo, catálogo de tipos/operações, schemas completos e limites conforme o contrato comum aprovado;
 - representação de cobertura e mecanismos de corte, confirmação, retomada, pendências e retentativas conforme a política aprovada;

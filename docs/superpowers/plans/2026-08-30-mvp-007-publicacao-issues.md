@@ -29,6 +29,8 @@ F03, F06 e F07 não dependem de F05 para funcionar. A dependência de F08 sobre 
 
 ### M7-F01 — Núcleo, identidade e persistência
 
+**Atualização documental (2026-08-30):** SPEC redigida em `docs/spec/spec-memoria-01-nucleo-identidade-persistencia.md`, status `rascunho`, com vinte critérios propostos. Os alvos e pendências de publicação abaixo foram detalhados nessa proposta e ainda aguardam aceite do PI. Issue #180 permanece Planejada; não há autorização de implementação.
+
 **Dependências diretas:** nenhuma fatia anterior do MVP-007; reutiliza a fundação local existente.
 **Fonte:** seções 2, 7, 8 e 14 do design.
 
