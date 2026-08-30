@@ -25,6 +25,7 @@
  */
 
 import { _electron as electron, expect, test, type ElectronApplication } from '@playwright/test'
+import { execFileSync } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -110,6 +111,13 @@ test('o pacote nasce das decisões, vira arquivo com origem e commita', async ()
   expect(projeto.reason).toBe('criado')
   const projectId = projeto.project?.id ?? ''
   const diretorio = projeto.project?.diretorio ?? ''
+
+  // Identidade de Git **local ao repositório do projeto**: a máquina de CI pode não ter uma
+  // global, e o commit do marco falharia por motivo alheio ao que se testa — a mesma razão
+  // registrada em `project-service.int-spec.ts`. O app não configura identidade de propósito:
+  // o repositório é do usuário, e escolher o autor dos commits dele não é decisão nossa.
+  execFileSync('git', ['config', 'user.email', 'teste@jarvis'], { cwd: diretorio })
+  execFileSync('git', ['config', 'user.name', 'Teste'], { cwd: diretorio })
 
   // Consulta vazia: o Landscape sai sem cenário e **declara** isso. É o caminho que não gasta
   // crédito e ainda exercita a composição inteira, a escrita e o commit.
