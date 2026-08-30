@@ -48,6 +48,7 @@ import type {
   ProjectOutcome
 } from '@shared/domain/projects'
 import type { Resposta, RespostaOutcome, VistaDoWizard } from '@shared/domain/wizard'
+import type { PacoteEstrutural, PacoteOutcome } from '@shared/domain/pacote-estrutural'
 import type { CredentialKey, CredentialStatusView } from '@shared/domain/credentials'
 import type { BudgetLimitsInput, BudgetSnapshot } from '@shared/domain/budget'
 import type {
@@ -307,6 +308,18 @@ const bridge: JarvisBridge = {
     workspace: WorkspaceId
   ): Promise<RespostaOutcome> =>
     ipcRenderer.invoke(IPC_CHANNELS.wizardAnswer, projectId, resposta, workspace),
+
+  // O pacote estrutural (SPEC-Planejamento-04). Nenhum método recebe conteúdo de documento: a
+  // tela pede a geração e mostra o que voltou; compor é do main, a partir de decisões e
+  // evidências.
+  gerarPacote: (
+    projectId: string,
+    consulta: string,
+    workspace: WorkspaceId
+  ): Promise<PacoteOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.pacoteGerar, projectId, consulta, workspace),
+  listarPacotes: (projectId: string): Promise<readonly PacoteEstrutural[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.pacoteListar, projectId),
 
   // Contexto, skills e orçamento (SPEC-Planejamento-02). Nenhum método que leia arquivo: a tela
   // indica caminhos relativos e o main lê, dentro do diretório do projeto. Um `readFile` aqui

@@ -26,6 +26,9 @@ const addAllowedCommand = vi.fn()
 const listContextPacks = vi.fn()
 const listCapabilities = vi.fn()
 const listFailures = vi.fn()
+// O painel do pacote (M8-F04) é filho do painel de contexto: abrir o contexto monta os dois, e
+// sem este método o teste do contexto quebraria por falta de mock, não pelo que investiga.
+const listarPacotes = vi.fn()
 
 function projeto(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -53,6 +56,7 @@ beforeEach(() => {
   listContextPacks.mockReset().mockResolvedValue([])
   listCapabilities.mockReset().mockResolvedValue([])
   listFailures.mockReset().mockResolvedValue([])
+  listarPacotes.mockReset().mockResolvedValue([])
   listProjects.mockResolvedValue([])
 
   Object.defineProperty(window, 'jarvis', {
@@ -66,7 +70,8 @@ beforeEach(() => {
       addAllowedCommand,
       listContextPacks,
       listCapabilities,
-      listFailures
+      listFailures,
+      listarPacotes
     },
     configurable: true,
     writable: true

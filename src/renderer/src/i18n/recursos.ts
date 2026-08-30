@@ -112,6 +112,31 @@ export const RECURSOS = {
         planejar: 'Planejar',
         planejarDe: 'Planejar {{nome}}'
       },
+      pacote: {
+        titulo: 'Pacote estrutural',
+        descricao:
+          'PRD, Landscape e Convention de {{nome}}, compostos das decisões do planejamento e das fontes pesquisadas.',
+        consulta: 'Pesquisa de mercado',
+        consultaPlaceholder: 'Ex.: alternativas a gestores de tarefas locais',
+        consultaAjuda:
+          'O termo que busca concorrentes e alternativas. Em branco, o Landscape sai sem cenário e declara isso.',
+        gerar: 'Gerar pacote',
+        carregando: 'Carregando revisões…',
+        vazio: 'Nenhuma revisão gerada ainda.',
+        pendencias: 'Faltam: {{lista}}.',
+        revisao: 'Última revisão de {{count}}',
+        semCommit: 'Sem commit',
+        commitCompleto: 'Commit completo: {{hash}}',
+        afirmacoes: '{{count}} afirmações',
+        hashCompleto: 'Hash completo: {{hash}}',
+        bloqueio: {
+          causa: 'Causa',
+          evidencia: 'Evidência',
+          tentativas: 'Tentativas',
+          porQueNaoSeguir: 'Por que não seguir',
+          retomada: 'Como retomar'
+        }
+      },
       wizard: {
         titulo: 'Planejamento de {{nome}}',
         descricao:
@@ -373,6 +398,31 @@ export const RECURSOS = {
         contextoAbrir: 'Open context for {{nome}}',
         planejar: 'Plan',
         planejarDe: 'Plan {{nome}}'
+      },
+      pacote: {
+        titulo: 'Structural package',
+        descricao:
+          'PRD, Landscape and Convention for {{nome}}, composed from planning decisions and researched sources.',
+        consulta: 'Market research',
+        consultaPlaceholder: 'e.g. alternatives to local task managers',
+        consultaAjuda:
+          'The term used to find competitors and alternatives. Left blank, the Landscape ships without a scenario and says so.',
+        gerar: 'Generate package',
+        carregando: 'Loading revisions…',
+        vazio: 'No revision generated yet.',
+        pendencias: 'Missing: {{lista}}.',
+        revisao: 'Latest revision of {{count}}',
+        semCommit: 'No commit',
+        commitCompleto: 'Full commit: {{hash}}',
+        afirmacoes: '{{count}} statements',
+        hashCompleto: 'Full hash: {{hash}}',
+        bloqueio: {
+          causa: 'Cause',
+          evidencia: 'Evidence',
+          tentativas: 'Attempts',
+          porQueNaoSeguir: 'Why not proceed',
+          retomada: 'How to resume'
+        }
       },
       wizard: {
         titulo: 'Planning for {{nome}}',

@@ -694,6 +694,74 @@ const MIGRATIONS: readonly string[] = [
   -- A consulta do wizard é sempre "as decisões deste projeto, na ordem em que foram tomadas":
   -- o histórico append-only só é reconstruível por ordem de inserção.
   CREATE INDEX idx_decision_projeto ON decision(user_id, project_id, created_at);
+  `,
+
+  // 19 — Evidência extraída e pacote estrutural (SPEC-Planejamento-04).
+  //
+  // **Por que persistir a evidência, e não só citá-la no `LANDSCAPE.md`.** O critério 7 pede
+  // que os três documentos formem revisão imutável, e o 2 exige evidência extraída por
+  // conclusão material. Sem a linha no banco, reabrir o projeto perde a prova: `conteudoMudou`
+  // (M6-F06) precisa do `hash_conteudo` guardado para dizer que a fonte mudou desde a coleta, e
+  // re-extrair para descobrir isso gastaria crédito para responder o que já sabíamos.
+  //
+  // `hash_conteudo` **não** é UNIQUE, ao contrário do `hash` do `context_pack`. Duas coletas da
+  // mesma URL em datas diferentes com o mesmo conteúdo são dois fatos — "em 10/03 ainda dizia
+  // isto" é exatamente o que um gatilho de revisão precisa afirmar. O que dedupe dentro de uma
+  // coleta é `deduplicar()`, no momento da extração; o histórico entre coletas fica.
+  //
+  // `conteudo` guarda o texto extraído inteiro, e não só o trecho: `conteudoMudou` compara o
+  // hash do conteúdo **atual** com o guardado, e `trechoConfere` precisa provar que a citação
+  // saiu daquele conteúdo. Guardar só o trecho tornaria as duas verificações impossíveis.
+  `
+  CREATE TABLE evidence (
+    id             TEXT PRIMARY KEY,
+    user_id        TEXT NOT NULL,
+    workspace_id   TEXT NOT NULL,
+    project_id     TEXT NOT NULL,
+    -- URL canônica (dedupe) e a original (reproduz a chamada) — as duas, como na M6-F05.
+    url            TEXT NOT NULL,
+    url_original   TEXT NOT NULL,
+    dominio        TEXT NOT NULL,
+    titulo         TEXT,
+    publicado_em   TEXT,
+    coletado_em    TEXT NOT NULL,
+    conteudo       TEXT NOT NULL,
+    -- Detecta que a fonte mudou entre revisões.
+    hash_conteudo  TEXT NOT NULL,
+    -- Prova que a citação corresponde ao extraído. NULL quando não houve trecho citado.
+    trecho         TEXT,
+    hash_trecho    TEXT,
+    request_id     TEXT,
+    created_at     TEXT NOT NULL
+  );
+  CREATE INDEX idx_evidence_projeto ON evidence(user_id, project_id, created_at);
+  CREATE INDEX idx_evidence_url ON evidence(user_id, project_id, url);
+
+  -- O pacote estrutural: os três documentos como uma revisão só.
+  --
+  -- **Append-only, como o "context_pack".** Regerar não edita: insere outro pacote. Um "UPDATE"
+  -- faria o "hash" descrever um conteúdo que talvez não seja o que virou commit, e o invariante
+  -- 2 do CONVENTION §4 (mesma revisão não pede aceite de novo) passaria a depender de ninguém
+  -- ter mexido depois.
+  --
+  -- "hash" é UNIQUE: dois pacotes com o mesmo conteúdo canônico **são** a mesma revisão — é o
+  -- que permite à M8-F06 reconhecer que nada mudou e não pedir aceite outra vez.
+  --
+  -- "commit_hash" nasce NULL e é preenchido quando o marco vira commit. Nulo não é falha: o
+  -- pacote existe antes de ser commitado, e a M8-F01 já estabeleceu que falha de commit
+  -- preserva os dados e oferece retomada.
+  CREATE TABLE pacote_estrutural (
+    id             TEXT PRIMARY KEY,
+    user_id        TEXT NOT NULL,
+    workspace_id   TEXT NOT NULL,
+    project_id     TEXT NOT NULL,
+    -- JSON dos três documentos: caminho, conteúdo, hash e afirmações com origem.
+    documentos     TEXT NOT NULL,
+    hash           TEXT NOT NULL UNIQUE,
+    commit_hash    TEXT,
+    created_at     TEXT NOT NULL
+  );
+  CREATE INDEX idx_pacote_projeto ON pacote_estrutural(user_id, project_id, created_at);
   `
 ]
 

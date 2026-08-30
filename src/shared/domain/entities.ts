@@ -257,7 +257,18 @@ export const AUDIT_EVENT_TYPES = [
   // aprova gate"): sem `autor` na cadeia, delegação e aprovação ficariam indistinguíveis
   // depois do fato. O **autosave do wizard não gera evento** (isso é rascunho, e um evento por
   // tecla afogaria a cadeia); só a decisão gravada gera.
-  'planning-decision'
+  'planning-decision',
+  // SPEC-Planejamento-04: a geração do pacote estrutural (PRD, Landscape, Convention) — gerado
+  // ou bloqueado. Tipo próprio, e não `project-milestone`, pela mesma razão que separou
+  // `planning-decision` dele: o marco é o **commit**, isto é a **revisão sendo composta**, e
+  // "quantas vezes a pesquisa bloqueou o pacote" exigiria parsear payload para descartar os
+  // commits.
+  //
+  // O payload carrega o hash do pacote, a contagem de fontes e — no bloqueio — a causa e as
+  // tentativas. **Nunca o conteúdo dos documentos nem o texto extraído** (ADR-004): a auditoria
+  // responde "o que foi gerado, e a partir de quantas fontes?", e responder isso não exige
+  // repetir o que foi escrito.
+  'pacote-estrutural'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]

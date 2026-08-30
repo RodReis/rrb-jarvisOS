@@ -53,6 +53,7 @@ import type {
   ProjectOutcome
 } from '../domain/projects'
 import type { Resposta, RespostaOutcome, VistaDoWizard } from '../domain/wizard'
+import type { PacoteEstrutural, PacoteOutcome } from '../domain/pacote-estrutural'
 import type {
   ContextPack,
   ContextPackOutcome,
@@ -297,6 +298,18 @@ export const IPC_CHANNELS = {
    */
   wizardState: 'wizard:state',
   wizardAnswer: 'wizard:answer',
+  /**
+   * O pacote estrutural — PRD, Landscape e Convention (SPEC-Planejamento-04).
+   *
+   * **Nenhum canal que receba texto de documento.** A tela pede a geração e mostra o que voltou;
+   * o conteúdo é composto no main a partir das decisões e das evidências. Um canal que aceitasse
+   * o conteúdo pronto seria o caminho por onde uma afirmação sem origem entraria — exatamente o
+   * que os critérios 1 e 5 existem para impedir.
+   *
+   * `consulta` é o único texto que atravessa, e é termo de pesquisa, não conteúdo.
+   */
+  pacoteGerar: 'pacote:gerar',
+  pacoteListar: 'pacote:listar',
   /**
    * Contexto, skills e orçamento (SPEC-Planejamento-02).
    *
@@ -752,6 +765,16 @@ export interface JarvisBridge {
     resposta: Resposta,
     workspace: WorkspaceId
   ): Promise<RespostaOutcome>
+  /**
+   * Gera o pacote estrutural e commita o marco `prd-aprovado`.
+   *
+   * Devolve `PacoteOutcome` **inclusive nas recusas**, como `createProject`: "a pesquisa não
+   * saiu" não é falha técnica, é o desfecho que o PI lê com a ação de retomada junto — e
+   * rejeitar a promise faria o bloqueio chegar indistinguível de um disco cheio.
+   */
+  gerarPacote(projectId: string, consulta: string, workspace: WorkspaceId): Promise<PacoteOutcome>
+  /** Os pacotes já gerados do projeto, do mais recente ao mais antigo. */
+  listarPacotes(projectId: string): Promise<readonly PacoteEstrutural[]>
   /**
    * Monta o `ContextPack` — o gate do critério 1 (SPEC-Planejamento-02).
    *

@@ -31,6 +31,8 @@ import { ProjectRepository } from './projects/project-repository'
 import { ProjectService } from './projects/project-service'
 import { DecisionRepository } from './projects/decision-repository'
 import { WizardService } from './projects/wizard-service'
+import { PacoteRepository } from './projects/pacote-repository'
+import { PacoteService } from './projects/pacote-service'
 import { GitRunner } from './projects/git-runner'
 import { ContextRepository } from './context/context-repository'
 import { ContextService } from './context/context-service'
@@ -338,6 +340,19 @@ if (!app.requestSingleInstanceLock()) {
       connectorCredits
     )
 
+    // O pacote estrutural (SPEC-Planejamento-04). Recebe o `ConnectorService`, e **não** o
+    // `TavilyAdapter`: o gate de créditos vive dentro do `call()`, e um adapter injetado aqui
+    // seria o segundo caminho sem gate que o serviço de conectores existe para impedir.
+    const pacotes = new PacoteService({
+      repository: new PacoteRepository(storage.db),
+      projects: projectRepository,
+      projectService: projects,
+      decisions: new DecisionRepository(storage.db),
+      connectors,
+      audit: storage.audit,
+      userId: userIdAtual
+    })
+
     registerIpcHandlers({
       audit: storage.audit,
       workspaces,
@@ -352,6 +367,7 @@ if (!app.requestSingleInstanceLock()) {
       projects,
       contexts,
       wizard,
+      pacotes,
       credentials,
       ai,
       budget,
