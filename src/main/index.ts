@@ -27,6 +27,9 @@ import { ApprovalRepository } from './execution/approval-repository'
 import { RealFileSystemEngine } from './execution/real-filesystem-engine'
 import { TerminalEngine } from './execution/terminal-engine'
 import { CommandAllowlistRepository } from './policy/command-allowlist-repository'
+import { ProjectRepository } from './projects/project-repository'
+import { ProjectService } from './projects/project-service'
+import { GitRunner } from './projects/git-runner'
 import { CredentialService } from './credentials/credential-service'
 import { ConnectorRegistry } from './connectors/registry'
 import { ConnectorService } from './connectors/connector-service'
@@ -172,6 +175,18 @@ if (!app.requestSingleInstanceLock()) {
       userIdAtual
     )
 
+    // Projeto local e planejamento (SPEC-Planejamento-01). O `GitRunner` recebe o **terminal**,
+    // não um cliente de Git: é o que torna estruturalmente impossível existir um segundo
+    // caminho de escrita de repositório fora do enforcement do MVP-004 (decisão 2 do PI). Não
+    // há nada a injetar que permita contornar isso — só o terminal cabe no construtor.
+    const projects = new ProjectService({
+      repository: new ProjectRepository(storage.db),
+      allowlist,
+      git: new GitRunner(terminal),
+      audit: storage.audit,
+      userId: userIdAtual
+    })
+
     // Vault de credenciais (SPEC-Providers-01): a base do MVP-005. A cifra é a mesma do cofre
     // de tokens (`safeStorage`/DPAPI) e é construída **aqui**, no boot, e não sob demanda: se
     // o SO não oferece cifra, é melhor o app falhar cedo e visível do que na primeira vez que
@@ -289,6 +304,7 @@ if (!app.requestSingleInstanceLock()) {
       realExecution,
       terminal,
       commandAllowlist,
+      projects,
       credentials,
       ai,
       budget,

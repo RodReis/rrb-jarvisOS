@@ -37,6 +37,13 @@ import type {
   ConnectorRequest
 } from '@shared/domain/connectors'
 import type { GithubAuthSnapshot, GithubDeviceFlowView } from '@shared/domain/github-auth'
+import type {
+  MarcoDocumental,
+  MarcoOutcome,
+  PlanningSession,
+  Project,
+  ProjectOutcome
+} from '@shared/domain/projects'
 import type { CredentialKey, CredentialStatusView } from '@shared/domain/credentials'
 import type { BudgetLimitsInput, BudgetSnapshot } from '@shared/domain/budget'
 import type {
@@ -239,7 +246,52 @@ const bridge: JarvisBridge = {
   logoutGithub: (workspace: WorkspaceId): Promise<GithubAuthSnapshot> =>
     ipcRenderer.invoke(IPC_CHANNELS.githubAuthLogout, workspace),
   setGithubClientId: (clientId: string, workspace: WorkspaceId): Promise<GithubAuthSnapshot> =>
-    ipcRenderer.invoke(IPC_CHANNELS.githubSetClientId, clientId, workspace)
+    ipcRenderer.invoke(IPC_CHANNELS.githubSetClientId, clientId, workspace),
+
+  // Projeto local e planejamento (SPEC-Planejamento-01). Nenhum canal de Git: a UI pede
+  // projeto e marco; o Git roda no main, pelo terminal controlado (decisão 2 do PI).
+  listProjects: (workspace: WorkspaceId): Promise<readonly Project[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.projectList, workspace),
+  createProject: (
+    nome: string,
+    workspace: WorkspaceId,
+    diretorioBase?: string
+  ): Promise<ProjectOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.projectCreate, nome, workspace, diretorioBase),
+  importProject: (
+    diretorio: string,
+    workspace: WorkspaceId,
+    nomeSugerido?: string
+  ): Promise<ProjectOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.projectImport, diretorio, workspace, nomeSugerido),
+  pickProjectDirectory: (): Promise<string> =>
+    ipcRenderer.invoke(IPC_CHANNELS.projectPickDirectory),
+  renameProject: (
+    projectId: string,
+    nome: string,
+    workspace: WorkspaceId
+  ): Promise<ProjectOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.projectRename, projectId, nome, workspace),
+  removeProject: (projectId: string, workspace: WorkspaceId): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.projectRemove, projectId, workspace),
+  getPlanningSession: (
+    projectId: string,
+    workspace: WorkspaceId
+  ): Promise<PlanningSession | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.projectSession, projectId, workspace),
+  savePlanningAnswers: (
+    projectId: string,
+    etapa: string,
+    respostas: Readonly<Record<string, unknown>>,
+    workspace: WorkspaceId
+  ): Promise<PlanningSession | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.projectSaveAnswers, projectId, etapa, respostas, workspace),
+  completeMilestone: (
+    projectId: string,
+    marco: MarcoDocumental,
+    workspace: WorkspaceId
+  ): Promise<MarcoOutcome | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.projectCompleteMilestone, projectId, marco, workspace)
 }
 
 if (process.contextIsolated) {

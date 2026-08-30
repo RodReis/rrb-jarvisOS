@@ -49,6 +49,7 @@ export const RECURSOS = {
         notas: 'Notas',
         agenda: 'Agenda',
         operacoes: 'Operações',
+        projetos: 'Projetos',
         terminal: 'Terminal',
         agentes: 'Agentes',
         settings: 'Configurações'
@@ -72,6 +73,33 @@ export const RECURSOS = {
       conteudo: {
         de: 'Conteúdo de {{rota}}',
         placeholder: 'Conteúdo placeholder — os módulos entram em fatias futuras.'
+      },
+      // Projetos locais (SPEC-Planejamento-01). Sem nenhum rótulo de Git: a tela não expõe
+      // comando, e um texto de "inicializar repositório" anunciaria um controle que não existe.
+      projetos: {
+        titulo: 'Projetos locais',
+        descricao:
+          'Crie ou importe um projeto. O Git local é inicializado automaticamente; nada é publicado.',
+        nome: 'Nome do projeto',
+        nomePlaceholder: 'Ex.: Análise de Mercado',
+        nomeAjuda: 'Vira o nome da pasta do projeto, sem acentos nem espaços.',
+        criar: 'Criar projeto',
+        importar: 'Importar pasta',
+        carregando: 'Carregando projetos…',
+        vazio: 'Nenhum projeto ainda',
+        vazioDescricao: 'Crie um projeto novo ou importe uma pasta existente para começar.',
+        criado: 'Criado',
+        importado: 'Importado',
+        renomear: 'Renomear',
+        renomearDe: 'Renomear {{nome}}',
+        salvar: 'Salvar',
+        cancelar: 'Cancelar',
+        remover: 'Remover',
+        removerDe: 'Remover {{nome}} da lista',
+        confirmar: 'Remover da lista',
+        // Diz o que **de fato** acontece. Um "tem certeza?" genérico faria o usuário supor a
+        // perda dos arquivos e desistir de uma ação que é reversível por reimportação.
+        removerAviso: 'Sai da lista; a pasta e o histórico Git continuam no disco.'
       },
       settings: {
         titulo: 'Configurações',
@@ -200,6 +228,7 @@ export const RECURSOS = {
         notas: 'Notes',
         agenda: 'Calendar',
         operacoes: 'Operations',
+        projetos: 'Projects',
         terminal: 'Terminal',
         agentes: 'Agents',
         settings: 'Settings'
@@ -220,6 +249,29 @@ export const RECURSOS = {
       conteudo: {
         de: '{{rota}} content',
         placeholder: 'Placeholder content — modules arrive in later slices.'
+      },
+      projetos: {
+        titulo: 'Local projects',
+        descricao:
+          'Create or import a project. Local Git is initialized automatically; nothing is published.',
+        nome: 'Project name',
+        nomePlaceholder: 'e.g. Market Analysis',
+        nomeAjuda: 'Becomes the project folder name, without accents or spaces.',
+        criar: 'Create project',
+        importar: 'Import folder',
+        carregando: 'Loading projects…',
+        vazio: 'No projects yet',
+        vazioDescricao: 'Create a new project or import an existing folder to get started.',
+        criado: 'Created',
+        importado: 'Imported',
+        renomear: 'Rename',
+        renomearDe: 'Rename {{nome}}',
+        salvar: 'Save',
+        cancelar: 'Cancel',
+        remover: 'Remove',
+        removerDe: 'Remove {{nome}} from the list',
+        confirmar: 'Remove from list',
+        removerAviso: 'Removed from the list; folder and Git history stay on disk.'
       },
       settings: {
         titulo: 'Settings',
