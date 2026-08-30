@@ -7,6 +7,8 @@
  * projeto, MVP e fatia — e misturá-los faria o conector depender do vocabulário do MVP-009.
  */
 
+import type { BloqueioExterno } from './pacote-estrutural'
+
 /**
  * O prefixo de toda chave externa deste app.
  *
@@ -57,6 +59,41 @@ export function chaveDeProjeto(projectId: string): string {
 /** Dois dígitos, para `mvp-09` ordenar junto de `mvp-10` na leitura humana. */
 function pad(n: number): string {
   return String(n).padStart(2, '0')
+}
+
+/** Onde publicar. `origem` é a URL do repositório — a mesma que o push recebe. */
+export interface AlvoDaPublicacao {
+  readonly owner: string
+  readonly repo: string
+  readonly origem: string
+}
+
+/**
+ * Por que a publicação terminou como terminou. Enum fechado: a tela decide o que mostrar a partir
+ * dele, e um desfecho novo é mudança de contrato — nunca uma string que apareceu no caminho.
+ */
+export const PUBLICACAO_REASONS = [
+  'publicado',
+  'projeto-inexistente',
+  'sem-backlog-aprovado',
+  'bloqueado'
+] as const
+
+export type PublicacaoReason = (typeof PUBLICACAO_REASONS)[number]
+
+export interface PublicacaoOutcome {
+  readonly reason: PublicacaoReason
+  /**
+   * Quantos recursos foram **criados** nesta execução.
+   *
+   * É o que torna a idempotência observável de fora, e o que o critério 1 mede: uma segunda
+   * publicação percorre o mesmo fluxo — `ensure` é a forma de perguntar "já existe?" — mas cria
+   * zero. Contar chamadas não serviria: elas acontecem nas duas vezes, e é justamente isso.
+   */
+  readonly criados: number
+  /** O commit confirmado **na origem**, não o que mandamos (critério 2). */
+  readonly commitPublicado?: string
+  readonly bloqueio?: BloqueioExterno
 }
 
 /**

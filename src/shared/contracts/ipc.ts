@@ -57,6 +57,7 @@ import type { PacoteEstrutural, PacoteOutcome } from '../domain/pacote-estrutura
 import type { Anexo, AnexoOutcome, TipoDeAnexo } from '../domain/anexos-de-design'
 import type { ValidacaoDoPrototipo } from '../domain/validacao-de-prototipo'
 import type { ArquiteturaOutcome, PacoteArquitetura } from '../domain/arquitetura'
+import type { AlvoDaPublicacao, PublicacaoOutcome } from '../domain/publicacao'
 import type { Roadmap, RoadmapOutcome } from '../domain/roadmap'
 import type {
   Approval,
@@ -351,6 +352,15 @@ export const IPC_CHANNELS = {
   aprovacaoRevisoes: 'aprovacao:revisoes',
   aprovacaoAprovar: 'aprovacao:aprovar',
   aprovacaoSimular: 'aprovacao:simular',
+  /**
+   * SPEC-Entrega-01: publica o repositório e o backlog aprovado no GitHub.
+   *
+   * **O renderer não manda credencial nem escolhe o que publicar.** Ele pede o ato e informa o
+   * alvo; o que sai é o que o PI já aprovou para a fila, lido no main. Um canal que aceitasse a
+   * lista de issues deixaria o renderer publicar trabalho que ninguém liberou — e "nenhuma issue
+   * futura equivale a autorização de construção" é regra da spec.
+   */
+  publicacaoPublicar: 'publicacao:publicar',
   anexoEscolher: 'anexo:escolher',
   anexoAnexar: 'anexo:anexar',
   anexoListar: 'anexo:listar',
@@ -839,6 +849,11 @@ export interface JarvisBridge {
   gerarRoadmap(projectId: string, workspace: WorkspaceId): Promise<RoadmapOutcome>
   /** O roadmap gravado do projeto. */
   carregarRoadmap(projectId: string, workspace: WorkspaceId): Promise<Roadmap>
+  publicarNoGitHub(
+    projectId: string,
+    alvo: AlvoDaPublicacao,
+    workspace: WorkspaceId
+  ): Promise<PublicacaoOutcome>
   /** As aprovações registradas, da mais recente à mais antiga. */
   listarAprovacoes(projectId: string, workspace: WorkspaceId): Promise<readonly Approval[]>
   /** As revisões que este gate aprova hoje — os hashes exatos (critério 4). */

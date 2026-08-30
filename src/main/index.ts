@@ -36,6 +36,7 @@ import { PacoteService } from './projects/pacote-service'
 import { AnexoRepository } from './projects/anexo-repository'
 import { AnexoService } from './projects/anexo-service'
 import { RoadmapRepository } from './projects/roadmap-repository'
+import { PublicacaoService } from './projects/publicacao-service'
 import { RoadmapService } from './projects/roadmap-service'
 import { GitRunner } from './projects/git-runner'
 import { ContextRepository } from './context/context-repository'
@@ -190,10 +191,13 @@ if (!app.requestSingleInstanceLock()) {
     // caminho de escrita de repositório fora do enforcement do MVP-004 (decisão 2 do PI). Não
     // há nada a injetar que permita contornar isso — só o terminal cabe no construtor.
     const projectRepository = new ProjectRepository(storage.db)
+    // Uma instância só, compartilhada com a publicação (M9-F01): duas seriam dois objetos sobre o
+    // mesmo terminal — inofensivo hoje, mas sugeriria que existe mais de um caminho de Git.
+    const gitRunner = new GitRunner(terminal)
     const projects = new ProjectService({
       repository: projectRepository,
       allowlist,
-      git: new GitRunner(terminal),
+      git: gitRunner,
       audit: storage.audit,
       userId: userIdAtual
     })
@@ -377,8 +381,9 @@ if (!app.requestSingleInstanceLock()) {
     // fechado (decisão cravada da spec), e `userIdAtual` cai no usuário local — que existe
     // sempre e faria toda aprovação passar como se houvesse alguém logado. A distinção é o
     // critério 4: a aprovação registra *quem* aceitou, e "o usuário local" não é ninguém.
+    const roadmapRepository = new RoadmapRepository(storage.db)
     const roadmap = new RoadmapService({
-      repository: new RoadmapRepository(storage.db),
+      repository: roadmapRepository,
       projects: projectRepository,
       projectService: projects,
       decisions: new DecisionRepository(storage.db),
@@ -389,6 +394,20 @@ if (!app.requestSingleInstanceLock()) {
       identidade: () => auth?.usuarioAtual()?.id
     })
 
+    // Publicação no GitHub (SPEC-Entrega-01). Recebe o `ConnectorService`, **não** o
+    // `GithubAdapter`: o gate de créditos, a policy e a auditoria vivem dentro do `call()`, e um
+    // adapter injetado aqui seria o segundo caminho sem gate — o mesmo erro que o `GitRunner`
+    // impede do lado do Git. O `token` é só para o push, que o terminal controlado não consegue
+    // autenticar por ambiente; o conector resolve o dele por dentro.
+    const publicacao = new PublicacaoService({
+      projects: projectRepository,
+      roadmap: roadmapRepository,
+      git: gitRunner,
+      connectors,
+      audit: storage.audit,
+      userId: userIdAtual,
+      token: async (userId, workspace) => await githubAuth.tokenParaUso({ userId, workspace })
+    })
     registerIpcHandlers({
       audit: storage.audit,
       workspaces,
@@ -406,6 +425,7 @@ if (!app.requestSingleInstanceLock()) {
       pacotes,
       anexos,
       roadmap,
+      publicacao,
       credentials,
       ai,
       budget,
