@@ -1,7 +1,7 @@
 # Design em elaboração — MVP-007: Memória compartilhada JarvisOS e AgentsOS
 
-- Status: **direção, captura, identidade/correções, persistência/retenção e recuperação contextual aprovadas pelo PI em 2026-08-30; detalhamento em elaboração**.
-- Esta revisão registra decisões parciais de escopo, captura, identidade, persistência e recuperação; **não é um design completo nem uma SPEC aprovada para construção**.
+- Status: **direção, captura, identidade/correções, persistência/retenção, recuperação e fontes iniciais aprovadas pelo PI em 2026-08-30; detalhamento em elaboração**.
+- Esta revisão registra decisões parciais de escopo, captura, identidade, persistência, recuperação e fontes; **não é um design completo nem uma SPEC aprovada para construção**.
 - Origem: proposta do PI de usar Graphify para memória e aprendizado transversal, acompanhada de quatro capturas dos menus futuros de JarvisOS/AgentsOS; aprovação da divisão entre MVP-007, M16-F05 e MVP-016.
 - Documento do MVP: `docs/mvp/mvp-007-memoria-contextual.md`.
 - Fatias e SPECs: ainda não definidas. Índice canônico: `docs/STATUS.md`.
@@ -113,10 +113,28 @@ O PI aprovou a seguinte política de recuperação:
 
 Foram afastados recuperar indiscriminadamente tudo e escolher apenas o texto mais parecido sem considerar decisões e relações. A memória fornece contexto rastreável, não autorização para agir. Formatos das consultas/resultados, ordenação técnica e valores dos limites serão detalhados sem alterar a política aprovada.
 
-## 10. Decisões ainda abertas
+## 10. Fontes iniciais e adaptadores de leitura (PI, 2026-08-30)
 
-1. Integrações iniciais e fronteira dos adaptadores de fonte, sem presumir que todos os menus/agentes já estejam implementados.
-2. Formato dos identificadores/revisões, schemas dos eventos, garantias de entrega e representação da cobertura conforme as seções 6 e 7.
+O PI aprovou três entradas para materializar progressivamente os quatro grupos do catálogo da seção 6:
+
+| Entrada | Recorte aprovado |
+|---|---|
+| Projetos registrados | Documentos e código selecionados, decisões, revisões Git e referências de artefatos, dentro do escopo permitido. |
+| Registros dos módulos | Tarefas, execuções de agentes, validações, falhas, workflows, automações e releases, conforme os módulos responsáveis estiverem disponíveis; cobre os grupos agentes e operações. |
+| Conhecimento explícito | Notas e orientações registradas no produto, preservando autoria e fonte. |
+
+Cada fonte entra por um adaptador de leitura que identifica registros e revisões, entrega alterações desde o último ponto processado e informa sua cobertura. A memória mantém seu próprio progresso de ingestão sem modificar os registros originais. Os contratos concretos de entrega e retomada ainda serão detalhados.
+
+O núcleo deve funcionar inicialmente com projetos/documentos e conhecimento explícito, sem esperar todos os menus futuros. Integrações operacionais entram conforme disponíveis, com ausências visíveis. Isso não declara tais integrações implementadas nem transforma módulos futuros em pré-requisitos do núcleo.
+
+Históricos externos de Claude/Codex, outros agentes, serviços externos e vaults não entram por varredura automática do computador: precisam de integração própria. Essa fronteira trata das fontes externas de conhecimento; não altera o uso do Vault de credenciais pelos runtimes existentes. Graphify organiza o material fornecido e não decide sozinho quais novas fontes acessar.
+
+Foram afastados integrar todos os menus de uma vez, o que criaria dependências de funcionalidades ainda não construídas, e limitar permanentemente a memória a arquivos, o que perderia resultados das operações. Esta aprovação define recorte e fronteiras, sem instalar conectores, importar históricos ou executar varreduras.
+
+## 11. Decisões ainda abertas
+
+1. Garantias de entrega, carga inicial, retomada e tratamento de falhas da ingestão por fonte.
+2. Formato dos identificadores/revisões, schemas dos eventos e representação da cobertura conforme as seções 6, 7 e 10.
 3. Contratos técnicos de armazenamento/compactação/reconstrução, capacidade e exclusão física conforme a seção 8; sincronização permanece fora deste recorte.
 4. Contratos técnicos de consulta/resultados, atualização incremental e limites conforme a seção 9.
 5. Contrato técnico/versionado do Graphify, alternativas e verificação de compatibilidade.
@@ -125,7 +143,7 @@ Foram afastados recuperar indiscriminadamente tudo e escolher apenas o texto mai
 
 As perguntas serão resolvidas uma por vez. Nenhum item aberto vira implementação, gate ou regra inventada pelo agente. Novos registros de decisão devem distinguir proposta de aprovação; design completo e SPECs terão sua revisão escrita no fluxo existente, sem pedir novamente aceite da mesma revisão.
 
-## 11. Evidência e limite desta revisão
+## 12. Evidência e limite desta revisão
 
 Este registro deriva da decisão do PI nesta conversa. A documentação oficial consultada para avaliar viabilidade está no [Graphify](https://github.com/Graphify-Labs/graphify); suporte documentado não prova compatibilidade com a versão instalada nem substitui futuros testes de contrato.
 

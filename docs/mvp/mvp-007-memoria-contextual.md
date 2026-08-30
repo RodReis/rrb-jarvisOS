@@ -1,6 +1,6 @@
 # MVP-007 — Memória Contextual e RAG
 
-- Status: **direção, captura, identidade/correções, persistência/retenção e recuperação contextual aprovadas pelo PI em 2026-08-30; design em elaboração; sem fatias ou SPECs; implementação não autorizada**.
+- Status: **direção, captura, identidade/correções, persistência/retenção, recuperação e fontes iniciais aprovadas pelo PI em 2026-08-30; design em elaboração; sem fatias ou SPECs; implementação não autorizada**.
 - Origem: recorte de memória híbrida/RAG anteriormente associado ao Corte 3.
 - Relação com a pipeline: **não bloqueia MVP-008, MVP-009 nem MVP-016**; a M16-F05 mantém escopo próprio e integração reutilizável.
 - Design em elaboração: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`.
@@ -41,13 +41,19 @@ Recuperação seletiva e progressiva, começando por tarefa/projeto e ampliando 
 
 Priorizar relevância e validade, explicitar contradições e identificar material histórico. Entregar trechos com fonte, revisão, validade e lacunas; expandir apenas para resolver lacuna concreta, sob limites de consultas/tempo/tokens, encerrando sem informação nova ou orçamento. O solicitante fornece o orçamento e referências enviadas também contam; na pipeline, a memória fornece candidatos e o `ContextPack` decide o pacote final. Detalhamento aprovado na seção 9 do design.
 
+## Fontes iniciais aprovadas
+
+Três entradas materializam o catálogo: projetos registrados (documentos/código selecionados, decisões, revisões Git e artefatos); registros de módulos (tarefas, agentes e operações conforme disponíveis); conhecimento explícito registrado no produto (notas/orientações com autoria e fonte).
+
+Adaptadores de leitura identificam registros/revisões, entregam alterações desde o último ponto processado e informam cobertura. A memória mantém seu progresso sem alterar originais. Núcleo inicialmente operável com projetos/documentos e conhecimento explícito; integrações operacionais entram progressivamente, sem dependência de todos os menus futuros. Históricos/agentes/serviços/vaults externos exigem integração própria, não varredura automática. Graphify organiza material fornecido sem escolher novas fontes. Detalhamento aprovado na seção 10 do design.
+
 ## Regra de planejamento
 
 O MVP entra em planejamento ativo, sem mudar a fila de construção. A aprovação da direção não equivale ao aceite de um design completo ou de SPECs ainda inexistentes. Fatias, contratos e critérios serão definidos progressivamente; a numeração permanece exclusivamente no índice de `docs/STATUS.md`.
 
 ## Não decidido
 
-- formato técnico dos identificadores/revisões e schemas dos eventos, integrações iniciais, garantias de entrega e representação de cobertura;
+- formato técnico dos identificadores/revisões e schemas dos eventos, garantias de entrega/retomada e representação de cobertura para as fontes aprovadas;
 - contratos técnicos de armazenamento/compactação/reconstrução, capacidade e exclusão física conforme a política aprovada; sincronização fora deste recorte;
 - contratos técnicos de consulta/resultados, atualização incremental e valores dos limites dentro do orçamento do solicitante;
 - estratégia de atualização e contrato técnico/versionado do Graphify ou alternativa;

@@ -105,6 +105,8 @@ Persistência usa o armazenamento local existente. Memória durável permanece d
 
 Recuperação começa por tarefa/projeto, com busca textual e relações do grafo, sem embeddings obrigatórios. Ampliação justificada respeita permissões e limites do solicitante; respostas trazem trechos, fonte/revisão, validade, contradições e lacunas. Na pipeline, a memória fornece candidatos e o `ContextPack` mantém a composição final e seu orçamento. Nenhuma consulta amplia autoridade de execução.
 
+Fontes entram por adaptadores de leitura: projetos registrados, registros dos módulos disponíveis e conhecimento explícito. Adaptador identifica registros/revisões, entrega alterações e informa cobertura; a memória mantém seu progresso sem modificar originais. O núcleo opera primeiro com projetos/documentos e conhecimento explícito, sem depender de todos os menus futuros. Fontes externas precisam de integração própria; Graphify não escolhe acessos nem dispara varredura universal.
+
 Fonte: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`.
 
 ### Pipeline V2 aprovada (não implementada)

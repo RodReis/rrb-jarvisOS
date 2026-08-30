@@ -190,6 +190,14 @@ O pacote contém trechos com fonte/revisão, validade e lacunas. Expansão resol
 
 Próxima decisão: fontes iniciais e fronteira de integração. Nenhuma SPEC de fatia foi criada/aprovada, nenhuma issue foi alterada e não houve código, instalação, coleta real ou push. O total de 80 SPECs aprovadas, o índice e a fila permanecem preservados.
 
+### MVP-007: fontes iniciais e integração aprovadas (2026-08-30)
+
+Após recuperação contextual no commit local `4268ad0`, o PI aprovou fontes progressivas por adaptadores de leitura: projetos registrados, registros de módulos disponíveis e conhecimento explícito. O núcleo deve funcionar primeiro com projetos/documentos e conhecimento explícito, sem esperar todos os menus. Os registros dos módulos abrangem agentes e operações, mantendo os quatro grupos do catálogo inicial.
+
+Cada fonte identifica registros/revisões, entrega alterações desde o último ponto processado e informa cobertura. A memória mantém seu progresso sem modificar originais. Históricos externos de Claude/Codex, agentes, serviços e vaults precisam de integração própria, sem varredura automática do computador. Graphify organiza o material fornecido, sem decidir novos acessos. O uso do Vault de credenciais pelos runtimes existentes não foi alterado.
+
+Contrato registrado na seção 10 do design; próxima decisão: entrega e retomada da ingestão. Não houve implementação, importação de históricos, instalação, atualização de issues ou push. Nenhuma SPEC de fatia foi criada/aprovada; contagem de 80, índice e fila preservados.
+
 ## Pendências históricas preservadas
 
 - A UI de allowlist ainda exigia decisão de produto: localização, seletor nativo e remoção de `appDir`.
