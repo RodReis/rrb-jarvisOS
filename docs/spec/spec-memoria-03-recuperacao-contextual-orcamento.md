@@ -2,16 +2,17 @@
 
 - MVP/Fatia: MVP-007 · M7-F03.
 - Issue: [#182](https://github.com/RodReis/rrb-jarvisOS/issues/182); épico [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179).
-- Status: **rascunho** — revisão escrita para o PI; implementação não autorizada.
+- Status: **aprovada-pi** (2026-08-30); issue em `proplan:backlog`; permanece a orientação de não implementar agora.
+- Revisão aprovada: `c3b546a1787961bb0b9bb407cd7213d5b7046b1b`, aceite explícito do PI nesta conversa. Atualização registra somente o aceite, sem alterar o contrato técnico.
 - Depende de: M7-F02 (#181), revisão aprovada `e4a521c6ad2339b8a6368d183afb46b8c26b5b80`; preserva M7-F01, revisão `83e952fd4e5f22850653bf81cf1d45d6c4377c84`.
 - Design: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`, seções 2, 8, 9 e 12.
 - Índice canônico: `docs/STATUS.md`.
 
-## Objetivo e escolhas propostas
+## Objetivo e aceite desta revisão
 
 Recuperar trechos úteis para uma tarefa, com identidade/revisão, validade local, cobertura da fonte e contrapontos. JarvisOS e AgentsOS consomem o mesmo serviço. A memória fornece candidatos; não responde pela autoridade de uma decisão, não decide ações e não monta um segundo ContextPack.
 
-Política já aprovada: tarefa/projeto primeiro, expansão justificada, consulta histórica explícita, relações opcionais, fontes rastreáveis e orçamento do solicitante. Esta revisão propõe os schemas, busca local, ordenação, paginação, limites, integração e vinte critérios. As escolhas concretas abaixo aguardam aceite; não modificam os contratos aprovados de F01/F02.
+Política já aprovada: tarefa/projeto primeiro, expansão justificada, consulta histórica explícita, relações opcionais, fontes rastreáveis e orçamento do solicitante. Em 2026-08-30, o PI aprovou a revisão escrita `c3b546a1787961bb0b9bb407cd7213d5b7046b1b`: schemas, busca local, ordenação, paginação, limites, integração e vinte critérios. As expressões “proposta” e “recomendada” preservadas no corpo registram a redação submetida; seu conteúdo está abrangido pelo aceite. Os contratos aprovados de F01/F02 não foram modificados.
 
 Alternativas consideradas:
 
@@ -239,7 +240,7 @@ A seleção final mede o bloco completo, não soma estimativas individuais com a
 
 ## Integração concreta com ContextPack e chamada
 
-Proposta aditiva necessária, ainda não aprovada nesta SPEC:
+Integração aditiva aprovada pelo PI na revisão indicada no cabeçalho:
 
 1. Introduzir ponte interna opcional de candidatos de memória; `ContextService.montar` e IPC de caminhos existentes continuam aceitando o contrato atual. Não permitir que o renderer envie um texto alegando ser memória validada.
 2. `montarComMemoria` recebe pedido de contexto e handle de sessão interno. O ContextPack escolhe IDs/grupos conforme tarefa e saldo; a F03 não substitui a escolha de arquivos, regras e falhas abertas.
@@ -301,4 +302,4 @@ Contagens vêm do runner e relatórios gerados conforme TESTING.md; revisão usa
 
 F04: retenção/rebuild/limpeza; F05: implementação Graphify; F06: avaliação de lições; F07: UI/Notebook; F08: prova integrada. Não criar embeddings, web search, autoaprendizado/promotor, nova política financeira, fluxo de consentimento ou segundo seletor de ContextPack.
 
-Submeter esta revisão exata ao PI, especialmente busca lexical local, expansão limitada, tratamento explícito de cobertura, parcela de orçamento e ponte opcional com manifesto/envio. A proposta não vira aprovada por ter sido escrita. Aprovação documental futura não revoga a instrução de **não implementar agora**.
+Nenhuma pergunta pendente nesta fatia. O PI aprovou a revisão exata `c3b546a1787961bb0b9bb407cd7213d5b7046b1b`, incluindo busca lexical local, expansão limitada, cobertura explícita, parcela de orçamento, ponte opcional com manifesto/envio e vinte critérios. F04–F08 permanecem nas respectivas fatias. O aceite não revoga a instrução de **não implementar agora** nem autoriza push.

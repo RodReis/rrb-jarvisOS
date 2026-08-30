@@ -1,6 +1,6 @@
 # Plano de publicação — MVP-007: Memória compartilhada
 
-- Estado: planejamento e publicação autorizados pelo PI em 2026-08-30; épico #179 e oito fatias #180–#187 publicados. F01–F02 aprovadas/Backlog; F03–F08 Planejadas.
+- Estado: planejamento e publicação autorizados pelo PI em 2026-08-30; épico #179 e oito fatias #180–#187 publicados. F01–F03 aprovadas/Backlog; F04–F08 Planejadas.
 - Não é SPEC aprovada, plano de execução de código nem aceite do design completo. As pendências abaixo permanecem abertas.
 - Base: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`, decisões parciais registradas até o commit local `574d359`.
 - Índice canônico Fatia ↔ SPEC e links de issues: `docs/STATUS.md`. Não criar slugs de SPEC inexistente; estado inicial: a redigir.
@@ -81,7 +81,7 @@ Ingerir projetos registrados e conhecimento explícito com carga inicial, altera
 
 ### M7-F03 — Recuperação contextual e orçamento
 
-**Atualização documental (2026-08-30):** SPEC `docs/spec/spec-memoria-03-recuperacao-contextual-orcamento.md`, status `rascunho`, com vinte critérios propostos. Detalha índice lexical, consultas/histórico, cobertura/validade, ordenação, sessão/expansão, limites e ponte opcional com ContextPack/envio. Alvos e pendências abaixo foram tratados como proposta; ainda aguardam aceite da revisão escrita. #182 continua Planejada, dependente de #181; sem implementação.
+**Aceite documental (2026-08-30):** SPEC `docs/spec/spec-memoria-03-recuperacao-contextual-orcamento.md`, revisão `c3b546a1787961bb0b9bb407cd7213d5b7046b1b`, aprovada pelo PI com vinte critérios. Busca/índice lexical, histórico, validade/cobertura, ranking, sessão/expansão, limites e ponte opcional com ContextPack/envio estão resolvidos nessa revisão. Alvos e pendências originais abaixo preservam o histórico da publicação, sem exigir novo aceite. #182 passa a Backlog, dependente de #181; permanece a orientação de não implementar agora.
 
 **Dependências diretas:** M7-F02.
 **Fonte:** seções 2, 8, 9 e 12 do design.

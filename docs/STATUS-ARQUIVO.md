@@ -284,6 +284,14 @@ Inspeção somente de leitura do checkout principal `0799c8a` identificou Contex
 
 O índice Fatia ↔ SPEC mudou somente na associação da F03 ao rascunho. F01–F02 permanecem aprovadas/Backlog; F03 Planejada e F04–F08 a redigir. Permanecem 82 SPECs aprovadas; aprovação não foi antecipada. Validação desta etapa é documental, não teste de produto ou prova de busca funcionando. Sem implementação, captura, chamada de modelo, alteração de fila, PR, push ou deploy.
 
+### MVP-007 — aceite exato da M7-F03 registrado (2026-08-30)
+
+O PI aprovou a revisão `c3b546a1787961bb0b9bb407cd7213d5b7046b1b` de `docs/spec/spec-memoria-03-recuperacao-contextual-orcamento.md`, incluindo busca lexical local, histórico, validade/cobertura, ranking, sessão/expansão, limites, parcela de orçamento e ponte opcional com ContextPack/envio. Cabeçalho e textos de aceite atualizados; comparação com a revisão submetida preservou o corpo técnico e os vinte critérios. F01/F02 permaneceram intactas. Não foi iniciado plano de construção.
+
+A #182 passou de `proplan:planejado` para `proplan:backlog` e o épico #179 recebeu o aceite sem marcar entrega. Leitura posterior confirmou os corpos, estado aberto, parent #179, dependência única #181 e a ordem das oito filhas. F01–F03 estão em Backlog; F04–F08 continuam Planejadas. Não houve escrita de `next`, parents ou dependências, nem duplicação de issues.
+
+Arquitetura, convenções e acompanhamento apontam para o contrato aprovado. Validação documental confirmou 83 SPECs aprovadas, preservação do quadro Agora e das demais associações Fatia ↔ SPEC. Próxima especificação: M7-F04 (#183), retenção e reconstrução da memória. Sem implementação, testes de produto, instalação, captura, PR, push ou deploy; registro somente em Git local.
+
 ## Pendências históricas preservadas
 
 - A UI de allowlist ainda exigia decisão de produto: localização, seletor nativo e remoção de `appDir`.
