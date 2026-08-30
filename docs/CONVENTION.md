@@ -178,4 +178,4 @@ Invariantes:
 13. A UI da M16-F06 depende de `DESIGN-SYSTEM.md` e protótipos HTML formais aprovados antes da construção.
 14. Experimento fecha candidata/base, métrica, elegibilidade, coorte, critérios, prazos e consumo antes da coleta. Controle do canário é contemporâneo; retries/continuações não inflam amostra; falhas, pendências e exclusões permanecem auditáveis.
 15. `improved` exige prova suficiente, qualidade preservada e ganho/estabilidade contratados; apenas habilita a decisão de promoção. Dado desconhecido não é zero; estágio sem prova final não herda sucesso do run de baseline.
-16. `active` não significa `stable`. Estabilização exige tempo e amostra novos; prazo inconclusivo retira a política de novos runs, regressão reverte o grupo afetado, sem apagar histórico nem desfazer Git/deploy. Perfis e critérios estão na SPEC M16-F04, ainda em revisão-pi.
+16. `active` não significa `stable`. Estabilização exige tempo e amostra novos; prazo inconclusivo retira a política de novos runs, regressão reverte o grupo afetado, sem apagar histórico nem desfazer Git/deploy. Perfis e critérios estão na SPEC M16-F04, aprovada pelo PI na revisão `1cefc2c`.

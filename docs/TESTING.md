@@ -604,7 +604,7 @@ Provas mínimas: domínio continua apesar de projetor indisponível; replay não
 
 Provas mínimas: falha semelhante não esconde causa nova; economia não promove com guardrail violado; run mantém o snapshot inicial; override de projeto vence global; política incompatível fica `stale`; ausência do aprendizado mantém política estável/base e não bloqueia a pipeline.
 
-Detalhamento planejado da M16-F04 (`spec-aprendizado-04-experimentos-promocao.md`, em revisão-pi):
+Detalhamento aprovado da M16-F04 (`spec-aprendizado-04-experimentos-promocao.md`, revisão `1cefc2c`; implementação ainda não iniciada):
 
 - Contratos e seeds fixos provam alocação prévia, coorte completa e teto por contagem sob concorrência; retry/continuação não infla amostra.
 - Fixtures cobrem baseline zero, consumo ausente, falhas mais baratas, grupos desbalanceados, pendências, pesos/exclusões/cortes pós-resultado e diferença entre estimativa e medição.

@@ -3,8 +3,8 @@
 - Status: **design e seis fatias aprovados pelo PI** em 2026-08-29.
 - Pipeline: V3, depois do MVP-015.
 - Implementação: **não autorizada por este documento**.
-- Issues: épico [#162](https://github.com/RodReis/rrb-jarvisOS/issues/162); F01–F03 #163–#165 em `proplan:backlog`; F04–F06 #166–#168 em `proplan:planejado`.
-- SPECs: M16-F01–F03 `aprovada-pi`; M16-F04 em `revisão-pi` desde 2026-08-30; M16-F05–F06 ainda não redigidas.
+- Issues: épico [#162](https://github.com/RodReis/rrb-jarvisOS/issues/162); F01–F04 #163–#166 em `proplan:backlog`; F05–F06 #167–#168 em `proplan:planejado`.
+- SPECs: M16-F01–F04 `aprovada-pi`; último aceite: F04, revisão `1cefc2c`, em 2026-08-30. M16-F05–F06 ainda não redigidas.
 - Design predecessor: `2026-08-29-mvp-015-observabilidade-operacional-design.md`.
 
 ## 1. Resultado esperado
@@ -192,7 +192,7 @@ Detalhamento confirmado para a M16-F04 em 2026-08-29–2026-08-30:
 - Ativa não equivale a estável: estabilização exige tempo e novas unidades avaliáveis. Regressão aciona rollback do grupo afetado; prazo sem prova suficiente retira a política para novos runs como inconclusiva. Snapshot histórico e controles vivos permanecem conforme F03.
 - Outra candidata do mesmo escopo/grupo aguarda estabilização; mecanismos independentes e runs normais não aguardam essa conclusão.
 
-A revisão escrita está em `docs/spec/spec-aprendizado-04-experimentos-promocao.md`, com vinte critérios de aceite, em `revisão-pi`. A issue #166 continua Planejada até o aceite exato; não há implementação nesta tarefa.
+A revisão escrita está em `docs/spec/spec-aprendizado-04-experimentos-promocao.md`, com vinte critérios de aceite. Revisão exata do commit `1cefc2c` aprovada pelo PI em 2026-08-30; a issue #166 passa a Backlog, sem implementação nesta tarefa.
 
 ## 10. IA assistente
 
@@ -265,6 +265,6 @@ Para um projeto selecionado, uma falha recorrente é reconhecida sem esconder ca
 
 ## 17. Gates e autorização
 
-O PI aprovou o design e as seis fatias. Isso autoriza redigir as seis SPECs para revisão, mas não autoriza implementação, gasto, smoke externo, push ou PR. A publicação das issues foi autorizada separadamente e concluída em 2026-08-29; F01–F03 estão em backlog após aceite exato e F04–F06 permanecem planejadas até aprovação de suas SPECs.
+O PI aprovou o design e as seis fatias. Isso autoriza redigir as seis SPECs para revisão, mas não autoriza implementação, gasto, smoke externo, push ou PR. A publicação das issues foi autorizada separadamente e concluída em 2026-08-29; F01–F04 estão em backlog após aceite exato e F05–F06 permanecem planejadas até aprovação de suas SPECs. Esta tarefa continua em planejamento.
 
 A implementação de cada fatia depende do aceite exato da respectiva SPEC e da fila. A M16-F06 também depende de `DESIGN-SYSTEM.md` e protótipos HTML formais aprovados. Números dos perfis, schemas IPC, migrations e divisão interna de arquivos pertencem às SPECs sem poder alterar este design.

@@ -144,6 +144,12 @@ A issue #166 permanece `proplan:planejado`, com predecessor #165 e parent #162, 
 
 Não houve implementação, chamada de executor, mudança de fila, push ou deploy. A fila operacional do STATUS foi preservada do registro de 2026-08-29, sem apresentá-la como revalidada em 2026-08-30. O próximo marco é a revisão exata da F04; depois segue a especificação da F05.
 
+### M16-F04 aprovada pelo PI (2026-08-30)
+
+O PI aprovou a revisão exata da SPEC no commit `1cefc2c`, preservando requisitos, limites e vinte critérios de aceite. O status passa a `aprovada-pi` e a issue #166 passa a `proplan:backlog`, com predecessor #165 e parent #162 preservados. O épico passa a registrar F01–F04 aprovadas; F05–F06 permanecem Planejadas. A contagem normalizada passa a 80 SPECs aprovadas, com quinze fatias da V3 em Backlog.
+
+O aceite não inicia implementação, não muda `next`, não fecha a issue nem declara testes de código/entrega técnica. Esta tarefa continua no planejamento; próxima SPEC: M16-F05 (#167), estratégias e recomendações assistidas. Fila operacional anterior e demais trabalhos do repositório permanecem intactos; não houve push.
+
 ## Pendências históricas preservadas
 
 - A UI de allowlist ainda exigia decisão de produto: localização, seletor nativo e remoção de `appDir`.

@@ -2,8 +2,8 @@
 
 - MVP/Fatia: MVP-016 · M16-F04.
 - Issue: [#166](https://github.com/RodReis/rrb-jarvisOS/issues/166).
-- Status: **revisão-pi** (2026-08-30); decisões de desenho confirmadas, revisão escrita ainda sujeita ao aceite exato do PI.
-- GitHub: `proplan:planejado`; implementação não autorizada, sem alterar a fila corrente.
+- Status: **aprovada-pi** (2026-08-30); revisão exata do commit `1cefc2c` aprovada, sem alteração dos requisitos.
+- GitHub: `proplan:backlog`; implementação depende das dependências e da fila. Esta tarefa permanece em planejamento.
 - Depende de: M16-F03 concluída; predecessor [#165](https://github.com/RodReis/rrb-jarvisOS/issues/165).
 - Design: `docs/superpowers/specs/2026-08-29-mvp-016-aprendizado-operacional-design.md`.
 
@@ -268,4 +268,4 @@ Detalhamento confirmado em 2026-08-29–2026-08-30:
 
 ## Revisão pelo PI
 
-As decisões acima autorizam consolidar esta SPEC e atualizar a issue #166, não implementar. A revisão escrita fica `revisão-pi` e a issue permanece `proplan:planejado`, com parent #162 e predecessor #165. O aceite exato desta revisão será registrado antes da migração para Backlog; não altera a fila corrente nem constitui novo aceite de execução para uma revisão já aprovada.
+Revisão exata do commit `1cefc2c` aprovada pelo PI em 2026-08-30, sem alteração dos requisitos ou dos vinte critérios de aceite. A issue #166 passa a `proplan:backlog`, com parent #162 e predecessor #165 preservados. O aceite não inicia implementação nesta tarefa, não altera a fila corrente nem adiciona segundo aceite de execução. A tarefa segue no planejamento da M16-F05 (#167).
