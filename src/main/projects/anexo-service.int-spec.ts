@@ -295,7 +295,12 @@ describe('o ato de anexar (critério 7)', () => {
   })
 
   it('gera AuditEvent com hash e caminho, nunca com o conteúdo', () => {
-    service.anexar(PROJETO, 'design-system', arquivoExterno('DESIGN-SYSTEM.md', 'segredo'), 'jarvis')
+    service.anexar(
+      PROJETO,
+      'design-system',
+      arquivoExterno('DESIGN-SYSTEM.md', 'segredo'),
+      'jarvis'
+    )
 
     const evento = audit.list(USER).find((e) => e.type === 'design-anexo')
     const payload = JSON.stringify(evento?.payload ?? {})
@@ -555,7 +560,13 @@ describe('a arquitetura gerada', () => {
 describe('hashDaArquitetura', () => {
   it('muda quando um anexo muda, com os mesmos documentos', () => {
     const docs = [
-      { documento: 'ARCHITECTURE', caminho: 'a', conteudo: 'x', hash: 'd'.repeat(64), afirmacoes: [] }
+      {
+        documento: 'ARCHITECTURE',
+        caminho: 'a',
+        conteudo: 'x',
+        hash: 'd'.repeat(64),
+        afirmacoes: []
+      }
     ]
     const anexo = {
       id: 'i',
@@ -577,7 +588,13 @@ describe('hashDaArquitetura', () => {
 
   it('não depende da ordem em que os anexos chegam', () => {
     const docs = [
-      { documento: 'ARCHITECTURE', caminho: 'a', conteudo: 'x', hash: 'd'.repeat(64), afirmacoes: [] }
+      {
+        documento: 'ARCHITECTURE',
+        caminho: 'a',
+        conteudo: 'x',
+        hash: 'd'.repeat(64),
+        afirmacoes: []
+      }
     ]
     const base = {
       id: 'i',

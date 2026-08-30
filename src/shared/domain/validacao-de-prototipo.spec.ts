@@ -30,10 +30,7 @@ function renderOk(jornadas: readonly string[] = []): RenderDoPrototipo {
   }
 }
 
-function ref(
-  alvo: string,
-  overrides: Partial<ReferenciaDoPrototipo> = {}
-): ReferenciaDoPrototipo {
+function ref(alvo: string, overrides: Partial<ReferenciaDoPrototipo> = {}): ReferenciaDoPrototipo {
   return { alvo, tipo: 'asset', resolvido: true, remota: false, ...overrides }
 }
 
@@ -42,7 +39,12 @@ describe('analisarPrototipo — protótipo que não abre', () => {
     const r = analisarPrototipo(
       'home.html',
       [ref('logo.png', { resolvido: false })],
-      { carregou: false, errosDeConsole: ['ERR_FILE_NOT_FOUND'], elementosVisiveis: 0, jornadas: [] },
+      {
+        carregou: false,
+        errosDeConsole: ['ERR_FILE_NOT_FOUND'],
+        elementosVisiveis: 0,
+        jornadas: []
+      },
       ['Login']
     )
 
@@ -60,7 +62,12 @@ describe('analisarPrototipo — tela em branco', () => {
     const r = analisarPrototipo(
       'home.html',
       [],
-      { carregou: true, errosDeConsole: ['Uncaught TypeError'], elementosVisiveis: 0, jornadas: [] },
+      {
+        carregou: true,
+        errosDeConsole: ['Uncaught TypeError'],
+        elementosVisiveis: 0,
+        jornadas: []
+      },
       []
     )
 
@@ -72,7 +79,12 @@ describe('analisarPrototipo — tela em branco', () => {
 
 describe('analisarPrototipo — referências', () => {
   it('asset local faltando impede a arquitetura', () => {
-    const r = analisarPrototipo('home.html', [ref('css/app.css', { resolvido: false })], renderOk(), [])
+    const r = analisarPrototipo(
+      'home.html',
+      [ref('css/app.css', { resolvido: false })],
+      renderOk(),
+      []
+    )
     const achado = r.achados.find((a) => a.id.includes('ref-quebrada'))
     expect(achado?.severidade).toBe('impede-arquitetura')
     expect(achado?.evidencia).toContain('css/app.css')

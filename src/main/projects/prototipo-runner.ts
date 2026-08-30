@@ -32,7 +32,10 @@ import { readFileSync } from 'node:fs'
 import { existsSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import type { ReferenciaDoPrototipo, RenderDoPrototipo } from '@shared/domain/validacao-de-prototipo'
+import type {
+  ReferenciaDoPrototipo,
+  RenderDoPrototipo
+} from '@shared/domain/validacao-de-prototipo'
 import { log } from '../logging/logger'
 
 /** Quanto tempo um protótipo tem para carregar. */
@@ -223,7 +226,9 @@ function interpretarExtracao(bruto: string): Extracao {
     if (typeof parsed !== 'object' || parsed === null) return { jornadas: [], elementosVisiveis: 0 }
     const obj = parsed as Record<string, unknown>
     return {
-      jornadas: Array.isArray(obj.jornadas) ? obj.jornadas.filter((j) => typeof j === 'string') : [],
+      jornadas: Array.isArray(obj.jornadas)
+        ? obj.jornadas.filter((j) => typeof j === 'string')
+        : [],
       elementosVisiveis: typeof obj.elementosVisiveis === 'number' ? obj.elementosVisiveis : 0
     }
   } catch {

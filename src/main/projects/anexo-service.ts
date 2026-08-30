@@ -419,10 +419,12 @@ export class AnexoService {
   private telasDoPrd(userId: string, projectId: string): readonly string[] {
     const [prd] = this.pacotes.listarPacotes(userId, projectId)
     if (prd === undefined) return []
-    return prd.documentos
-      .find((d) => d.documento === 'PRD')
-      ?.afirmacoes.filter((a) => a.secao === 'Escopo')
-      .map((a) => a.texto) ?? []
+    return (
+      prd.documentos
+        .find((d) => d.documento === 'PRD')
+        ?.afirmacoes.filter((a) => a.secao === 'Escopo')
+        .map((a) => a.texto) ?? []
+    )
   }
 
   private montarDocumento(

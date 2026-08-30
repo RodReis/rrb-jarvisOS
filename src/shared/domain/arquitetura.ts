@@ -41,12 +41,7 @@ import { textoDaDecisao } from './pacote-compositor'
  * Os quatro documentos que esta fatia produz. Enum fechado pelo mesmo motivo do
  * `DOCUMENTOS_DO_PACOTE`: cada um tem seções próprias, e um quinto é mudança de contrato.
  */
-export const DOCUMENTOS_DA_ARQUITETURA = [
-  'ARCHITECTURE',
-  'DECISIONS',
-  'TESTING',
-  'REVIEW'
-] as const
+export const DOCUMENTOS_DA_ARQUITETURA = ['ARCHITECTURE', 'DECISIONS', 'TESTING', 'REVIEW'] as const
 
 export type DocumentoDaArquitetura = (typeof DOCUMENTOS_DA_ARQUITETURA)[number]
 
@@ -58,9 +53,7 @@ export const ARQUIVO_DA_ARQUITETURA: Readonly<Record<DocumentoDaArquitetura, str
 }
 
 /** As seções de cada documento, na ordem. Dado, não lógica — como na M8-F04. */
-export const SECOES_DA_ARQUITETURA: Readonly<
-  Record<DocumentoDaArquitetura, readonly string[]>
-> = {
+export const SECOES_DA_ARQUITETURA: Readonly<Record<DocumentoDaArquitetura, readonly string[]>> = {
   ARCHITECTURE: ['Fluxos cobertos', 'Módulos e fronteiras', 'Dados', 'Resiliência'],
   DECISIONS: ['Decisões estruturais', 'Questões em aberto'],
   TESTING: ['Estratégia', 'Evidência'],

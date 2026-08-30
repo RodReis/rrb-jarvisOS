@@ -126,10 +126,7 @@ export interface ValidacaoDoPrototipo {
 
 /** Normaliza para comparação: minúsculas, sem acento. */
 function normalizar(texto: string): string {
-  return texto
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+  return texto.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
 }
 
 /**
@@ -250,9 +247,7 @@ export function analisarPrototipo(
  * Deduplica por texto normalizado: duas telas com o mesmo nome em protótipos diferentes são a
  * mesma jornada, e listá-las duas vezes inflaria a cobertura sem acrescentar cobertura.
  */
-export function jornadasCobertas(
-  validacoes: readonly ValidacaoDoPrototipo[]
-): readonly string[] {
+export function jornadasCobertas(validacoes: readonly ValidacaoDoPrototipo[]): readonly string[] {
   const vistas = new Map<string, string>()
   for (const v of validacoes) {
     for (const jornada of v.jornadasCobertas) {

@@ -1436,10 +1436,8 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     }
   )
 
-  ipcMain.handle(
-    IPC_CHANNELS.anexoListar,
-    (_event, projectId: unknown): readonly Anexo[] =>
-      typeof projectId === 'string' ? deps.anexos.listar(projectId) : []
+  ipcMain.handle(IPC_CHANNELS.anexoListar, (_event, projectId: unknown): readonly Anexo[] =>
+    typeof projectId === 'string' ? deps.anexos.listar(projectId) : []
   )
 
   ipcMain.handle(

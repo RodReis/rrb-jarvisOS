@@ -162,9 +162,7 @@ export class AnexoRepository {
    */
   remover(userId: string, projectId: string, caminho: string): boolean {
     const r = this.db
-      .prepare(
-        'DELETE FROM design_attachment WHERE user_id = ? AND project_id = ? AND caminho = ?'
-      )
+      .prepare('DELETE FROM design_attachment WHERE user_id = ? AND project_id = ? AND caminho = ?')
       .run(userId, projectId, caminho)
     return r.changes > 0
   }

@@ -112,6 +112,39 @@ export const RECURSOS = {
         planejar: 'Planejar',
         planejarDe: 'Planejar {{nome}}'
       },
+      anexos: {
+        titulo: 'Anexos de design',
+        descricao:
+          'O design system e os protótipos de {{nome}}. A arquitetura só é gerada depois que eles chegam — anexar é um ato seu, e é ele que conta.',
+        carregando: 'Carregando anexos…',
+        tipo: {
+          'design-system': 'DESIGN-SYSTEM.md',
+          prototipo: 'Protótipo HTML',
+          asset: 'Asset'
+        },
+        anexado: 'Anexado',
+        pendente: 'Pendente',
+        anexar: 'Anexar',
+        substituir: 'Substituir',
+        remover: 'Remover',
+        removerAnexo: 'Remover {{caminho}}',
+        assets: 'Assets referenciados pelos protótipos',
+        adicionarAsset: 'Adicionar asset',
+        semAssets: 'Nenhum asset anexado. Anexe os que seus protótipos referenciam.',
+        gateAberto: 'Os anexos estão completos. A arquitetura pode ser gerada.',
+        gateFechado: 'Falta anexar: {{lista}}.',
+        validar: 'Validar protótipos',
+        gerarArquitetura: 'Gerar arquitetura',
+        pendencias: 'Faltam: {{lista}}.',
+        validacaoLimpa: 'Os protótipos não apresentaram problemas.',
+        impede: 'Impede a arquitetura',
+        recomendacao: 'Recomendação: {{texto}}',
+        revisao: 'Última arquitetura de {{count}}',
+        semCommit: 'Sem commit',
+        commitCompleto: 'Commit completo: {{hash}}',
+        afirmacoes: '{{count}} afirmações',
+        hashCompleto: 'Hash completo: {{hash}}'
+      },
       pacote: {
         titulo: 'Pacote estrutural',
         descricao:
@@ -398,6 +431,39 @@ export const RECURSOS = {
         contextoAbrir: 'Open context for {{nome}}',
         planejar: 'Plan',
         planejarDe: 'Plan {{nome}}'
+      },
+      anexos: {
+        titulo: 'Design attachments',
+        descricao:
+          'The design system and prototypes for {{nome}}. Architecture is only generated once they arrive — attaching is your act, and it is what counts.',
+        carregando: 'Loading attachments…',
+        tipo: {
+          'design-system': 'DESIGN-SYSTEM.md',
+          prototipo: 'HTML prototype',
+          asset: 'Asset'
+        },
+        anexado: 'Attached',
+        pendente: 'Pending',
+        anexar: 'Attach',
+        substituir: 'Replace',
+        remover: 'Remove',
+        removerAnexo: 'Remove {{caminho}}',
+        assets: 'Assets referenced by the prototypes',
+        adicionarAsset: 'Add asset',
+        semAssets: 'No assets attached. Attach the ones your prototypes reference.',
+        gateAberto: 'Attachments are complete. Architecture can be generated.',
+        gateFechado: 'Still to attach: {{lista}}.',
+        validar: 'Validate prototypes',
+        gerarArquitetura: 'Generate architecture',
+        pendencias: 'Missing: {{lista}}.',
+        validacaoLimpa: 'The prototypes raised no issues.',
+        impede: 'Blocks architecture',
+        recomendacao: 'Recommendation: {{texto}}',
+        revisao: 'Latest architecture of {{count}}',
+        semCommit: 'No commit',
+        commitCompleto: 'Full commit: {{hash}}',
+        afirmacoes: '{{count}} statements',
+        hashCompleto: 'Full hash: {{hash}}'
       },
       pacote: {
         titulo: 'Structural package',
