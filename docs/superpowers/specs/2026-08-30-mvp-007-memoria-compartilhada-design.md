@@ -1,7 +1,7 @@
 # Design em elaboração — MVP-007: Memória compartilhada JarvisOS e AgentsOS
 
-- Status: **direção, captura e contrato de identidade/correções aprovados pelo PI em 2026-08-30; detalhamento em elaboração**.
-- Esta revisão registra decisões parciais de escopo, captura e identidade/correções; **não é um design completo nem uma SPEC aprovada para construção**.
+- Status: **direção, captura, identidade/correções e persistência/retenção aprovadas pelo PI em 2026-08-30; detalhamento em elaboração**.
+- Esta revisão registra decisões parciais de escopo, captura, identidade e persistência; **não é um design completo nem uma SPEC aprovada para construção**.
 - Origem: proposta do PI de usar Graphify para memória e aprendizado transversal, acompanhada de quatro capturas dos menus futuros de JarvisOS/AgentsOS; aprovação da divisão entre MVP-007, M16-F05 e MVP-016.
 - Documento do MVP: `docs/mvp/mvp-007-memoria-contextual.md`.
 - Fatias e SPECs: ainda não definidas. Índice canônico: `docs/STATUS.md`.
@@ -81,24 +81,37 @@ O PI aprovou as seguintes regras de domínio:
 1. **Identidade pela origem:** produto, projeto, fonte e identificador estável distinguem os registros. Nome ou caminho não bastam; renomear um documento não deve criar outra identidade quando a continuidade é comprovada pela origem. O formato técnico dos identificadores ainda será especificado.
 2. **Reentrega não cria ocorrência:** repetição do mesmo evento é reconhecida e não duplica o registro. Execuções distintas permanecem distintas mesmo quando produzem conteúdos ou resultados iguais.
 3. **Fontes distintas permanecem rastreáveis:** documento, conversa e execução podem ser relacionados sem apagar suas origens. Similaridade textual, por si só, não autoriza fusão automática de identidades ou afirmações.
-4. **Correção cria revisão:** a revisão anterior fica identificada como substituída, com histórico sujeito à política de retenção ainda a definir. Evento antigo recebido com atraso não sobrescreve automaticamente informação mais recente. Ordem de chegada não é prova de substituição.
+4. **Correção cria revisão:** a revisão anterior fica identificada como substituída, com histórico sujeito à política de retenção da seção 8. Evento antigo recebido com atraso não sobrescreve automaticamente informação mais recente. Ordem de chegada não é prova de substituição.
 5. **Contradição explícita:** sem evidência de substituição, preservar as afirmações e apontar a divergência. Inferência de agente não passa a valer como decisão do PI apenas por ser mais recente ou repetida.
-6. **Invalidação pela fonte:** remoção ou desatualização da fonte invalida as relações e conclusões dependentes como conhecimento atual. Não continuar apresentando como vigente uma conclusão cuja sustentação deixou de existir. Esse estado não equivale, por si só, a apagar todo o histórico; retenção e exclusão física terão contrato próprio.
+6. **Invalidação pela fonte:** remoção ou desatualização da fonte invalida as relações e conclusões dependentes como conhecimento atual. Não continuar apresentando como vigente uma conclusão cuja sustentação deixou de existir. Esse estado não equivale, por si só, a apagar todo o histórico; aplica-se a retenção da seção 8, com mecanismo de exclusão física ainda a detalhar.
 
 Foram afastados a fusão baseada apenas em nome/texto e o uso indiscriminado da última mensagem recebida como verdade. O contrato preserva as responsabilidades de histórico, conhecimento e validação já aprovadas, sem criar autoridade nova nem bloquear execução da pipeline.
 
-## 8. Decisões ainda abertas
+## 8. Persistência, retenção e reconstrução (PI, 2026-08-30)
 
-1. Persistência, retenção, reconstrução e eventual sincronização dentro da arquitetura vigente.
+O PI aprovou separar memória durável de dados derivados descartáveis:
+
+1. **Persistência local:** usar o armazenamento existente do aplicativo, mantendo os registros originais nos módulos responsáveis. Não introduzir serviço externo obrigatório. Sincronização fica para um recorte próprio; este MVP não redefine a arquitetura local-first vigente.
+2. **Memória durável:** decisões, histórico de correções, lições e referências permanecem durante a vida do projeto, salvo exclusão explícita. Informação antiga pode continuar guardada sem ser considerada vigente. Essa regra não copia nem amplia automaticamente a retenção dos originais mantidos por outros módulos.
+3. **Detalhes repetitivos:** compactar projeções repetitivas da memória após **30 dias**, preservando marcos, contagens e referências necessárias. Não eliminar decisões, correções ou evidências ainda necessárias. O prazo não expira toda a memória e não muda a retenção dos módulos de origem.
+4. **Grafo e caches reconstruíveis:** regenerar a partir dos registros e fontes disponíveis, preservando correções e invalidações. Reconstrução não deve reativar relações invalidadas nem tratar uma versão antiga como atual.
+5. **Reconstrução não é backup:** se uma fonte original desapareceu, apresentar a lacuna. Resumo ou hash não reconstituem o conteúdo perdido nem provam que uma reconstrução foi completa.
+6. **Falha localizada:** indisponibilidade do grafo permite consultar as fontes e mecanismos básicos existentes, sem paralisar a pipeline. Recuperação continua limitada à disponibilidade real das fontes e ao orçamento vigente.
+
+Foram afastados guardar indiscriminadamente todos os detalhes para sempre e expirar todas as classes de informação pelo mesmo prazo. Os limites e mecanismos técnicos de compactação, armazenamento e exclusão ainda serão detalhados, sem alterar a política acima. Este aceite não executa limpeza, exclusão, backup ou restauração de dados.
+
+## 9. Decisões ainda abertas
+
+1. Recuperação contextual, mecanismo de atualização incremental e alocação do orçamento por operação.
 2. Formato dos identificadores/revisões, schemas dos eventos, integrações iniciais, garantias de entrega e representação da cobertura, implementando os contratos aprovados nas seções 6 e 7.
-3. Recuperação contextual, mecanismo de atualização incremental e alocação do orçamento por operação.
+3. Contratos técnicos de armazenamento/compactação/reconstrução, capacidade e exclusão física conforme a seção 8; sincronização permanece fora deste recorte.
 4. Contrato técnico/versionado do Graphify, alternativas e verificação de compatibilidade.
 5. Evidências necessárias para lições fora da pipeline.
 6. Fatias, ordem, dependências, critérios de aceite e interfaces formais.
 
 As perguntas serão resolvidas uma por vez. Nenhum item aberto vira implementação, gate ou regra inventada pelo agente. Novos registros de decisão devem distinguir proposta de aprovação; design completo e SPECs terão sua revisão escrita no fluxo existente, sem pedir novamente aceite da mesma revisão.
 
-## 9. Evidência e limite desta revisão
+## 10. Evidência e limite desta revisão
 
 Este registro deriva da decisão do PI nesta conversa. A documentação oficial consultada para avaliar viabilidade está no [Graphify](https://github.com/Graphify-Labs/graphify); suporte documentado não prova compatibilidade com a versão instalada nem substitui futuros testes de contrato.
 

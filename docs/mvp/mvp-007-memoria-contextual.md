@@ -1,6 +1,6 @@
 # MVP-007 — Memória Contextual e RAG
 
-- Status: **direção de memória compartilhada, captura e identidade/correções aprovadas pelo PI em 2026-08-30; design em elaboração; sem fatias ou SPECs; implementação não autorizada**.
+- Status: **direção de memória compartilhada, captura, identidade/correções e persistência/retenção aprovadas pelo PI em 2026-08-30; design em elaboração; sem fatias ou SPECs; implementação não autorizada**.
 - Origem: recorte de memória híbrida/RAG anteriormente associado ao Corte 3.
 - Relação com a pipeline: **não bloqueia MVP-008, MVP-009 nem MVP-016**; a M16-F05 mantém escopo próprio e integração reutilizável.
 - Design em elaboração: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`.
@@ -27,7 +27,13 @@ A atualização é incremental e assíncrona, dentro do orçamento existente, se
 
 Identidade usa origem por produto/projeto/fonte e identificador estável, não apenas nome ou caminho. Reentrega do mesmo evento não duplica ocorrência; execuções diferentes continuam distintas. Fontes semelhantes são relacionáveis, mas não fundidas automaticamente por texto.
 
-Correções criam revisões; chegada tardia não sobrescreve informação mais recente por ordem de recepção. Sem evidência de substituição, contradições permanecem explícitas e inferência de agente não substitui decisão do PI. Fonte removida/desatualizada invalida conhecimento dependente como atual. Histórico e exclusão física seguem a política de retenção ainda a definir. Detalhamento aprovado na seção 7 do design.
+Correções criam revisões; chegada tardia não sobrescreve informação mais recente por ordem de recepção. Sem evidência de substituição, contradições permanecem explícitas e inferência de agente não substitui decisão do PI. Fonte removida/desatualizada invalida conhecimento dependente como atual. Histórico segue a retenção da seção 8; mecanismo de exclusão física ainda será detalhado. Contrato de identidade aprovado na seção 7 do design.
+
+## Persistência e retenção aprovadas
+
+Usar o armazenamento local existente, sem serviço externo obrigatório; sincronização fica para recorte próprio. Decisões, histórico de correções, lições e referências permanecem durante a vida do projeto, salvo exclusão explícita. Compactar detalhes repetitivos das projeções após 30 dias, preservando marcos, contagens, referências e evidências ainda necessárias, sem mudar a retenção dos originais nos módulos responsáveis.
+
+Grafo e caches são reconstruíveis a partir das fontes disponíveis, sem reativar relações invalidadas ou apagar correções. Reconstrução não substitui backup: fonte perdida gera lacuna, não conteúdo inventado. Grafo indisponível permite fallback às fontes e mecanismos básicos sem bloquear a pipeline. Detalhamento aprovado na seção 8 do design.
 
 ## Regra de planejamento
 
@@ -36,7 +42,7 @@ O MVP entra em planejamento ativo, sem mudar a fila de construção. A aprovaç�
 ## Não decidido
 
 - formato técnico dos identificadores/revisões e schemas dos eventos, integrações iniciais, garantias de entrega e representação de cobertura;
-- persistência, retenção, reconstrução e eventual sincronização, respeitando a arquitetura vigente;
+- contratos técnicos de armazenamento/compactação/reconstrução, capacidade e exclusão física conforme a política aprovada; sincronização fora deste recorte;
 - mecanismo exato de recuperação, eventual necessidade de embeddings e orçamento;
 - estratégia de atualização e contrato técnico/versionado do Graphify ou alternativa;
 - critérios de validação de lições fora da pipeline;

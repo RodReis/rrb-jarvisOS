@@ -174,6 +174,14 @@ O contrato foi registrado na seção 7 do design. Formatos técnicos e política
 
 Nenhuma SPEC de fatia foi criada ou aprovada; contagem permanece 80. Fila, índice e SPECs aprovadas não foram alterados; não houve implementação, alteração de issues, captura real, instalação ou push.
 
+### MVP-007: persistência, retenção e reconstrução aprovadas (2026-08-30)
+
+Após identidade/correções no commit local `c411adf`, o PI aprovou armazenamento local existente, memória durável durante a vida do projeto (salvo exclusão explícita) e compactação das projeções repetitivas após 30 dias. Marcos, contagens, referências e evidências necessárias são preservados; a retenção dos registros originais nos módulos responsáveis não é alterada. Guardado não significa vigente.
+
+Grafo/cache são reconstruíveis a partir das fontes disponíveis, preservando correções e invalidações. Reconstrução não é backup e fonte perdida gera lacuna, não conteúdo inventado. Indisponibilidade do grafo permite fallback às fontes e mecanismos básicos sem bloquear a pipeline. Sincronização fica para recorte próprio. A seção 8 do design registra esse aceite; os formatos e mecanismos técnicos seguem abertos. Próximo bloco: recuperação contextual e orçamento.
+
+Esta atualização é exclusivamente documental: nenhuma compactação, exclusão, captura real, instalação, implementação, alteração de issues ou push foi executada. Contagem de 80 SPECs aprovadas, índice e fila permanecem inalterados. Os registros anteriores preservam a sequência das decisões.
+
 ## Pendências históricas preservadas
 
 - A UI de allowlist ainda exigia decisão de produto: localização, seletor nativo e remoção de `appDir`.
