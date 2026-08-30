@@ -250,6 +250,8 @@ A inspeção da fundação confirmou SQLite local no main, migrations forward-on
 
 Índice canônico atualizado somente na associação da M7-F01; F02–F08 permanecem a redigir. A SPEC segue para revisão do PI, sem antecipar `aprovada-pi`, Backlog ou execução. Não houve teste de produto, captura, instalação, push ou deploy nesta redação.
 
+Revisão escrita salva no commit local `83e952fd4e5f22850653bf81cf1d45d6c4377c84`. A issue #180 recebeu referência exata, resumo do contrato e os vinte critérios propostos; o épico #179 recebeu o andamento. Leitura posterior confirmou os dois corpos, #180 aberta com apenas `proplan:planejado`, parent #179, nenhuma dependência direta e as oito filhas #180–#187 ainda abertas/Planejadas na ordem original. Nenhum label, parent ou bloqueio foi escrito nesta atualização. Validação documental confirmou oitenta SPECs aprovadas, vinte critérios no rascunho, preservação do quadro Agora e das outras associações do índice, além de diff sem erros de whitespace. A revisão não foi aprovada pelo PI nem publicada por push.
+
 ## Pendências históricas preservadas
 
 - A UI de allowlist ainda exigia decisão de produto: localização, seletor nativo e remoção de `appDir`.
