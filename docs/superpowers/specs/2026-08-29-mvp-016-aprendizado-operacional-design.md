@@ -4,7 +4,7 @@
 - Pipeline: V3, depois do MVP-015.
 - Implementação: **não autorizada por este documento**.
 - Issues: épico [#162](https://github.com/RodReis/rrb-jarvisOS/issues/162); F01 #163 em `proplan:backlog`; F02–F06 #164–#168 em `proplan:planejado`.
-- SPECs: M16-F01 `aprovada-pi`; M16-F02–F06 ainda não redigidas.
+- SPECs: M16-F01 `aprovada-pi`; M16-F02 `revisão-pi`; M16-F03–F06 ainda não redigidas.
 - Design predecessor: `2026-08-29-mvp-015-observabilidade-operacional-design.md`.
 
 ## 1. Resultado esperado
@@ -98,7 +98,7 @@ O processo principal permanece dono do SQLite. O MVP-016 usa tabelas e migration
 Entidades principais:
 
 - `LearningObservation`: fato derivado de evidência canônica.
-- `FailureSignature`: identidade normalizada de uma causa provável.
+- `FailureSignature`: identidade normalizada de um padrão observado, não prova de causa raiz comum.
 - `ResolutionEvidence`: ação aplicada e prova posterior de resultado.
 - `OperationalLesson`: conclusão rastreável e limitada a um escopo.
 - `PolicyCandidate`: hipótese configurável com baseline e reversão.
@@ -135,11 +135,15 @@ Conflito não é combinado silenciosamente. O resolver escolhe uma versão compa
 
 ## 7. Memória de falhas
 
-O fingerprint determinístico considera categoria, etapa, comando/check, código de erro, provider, arquivo ou região estrutural e mensagem normalizada. Similaridade semântica pode sugerir associação, mas uma associação incerta permanece candidata.
+A classificação separa etapa e natureza; severidade e transitoriedade são atributos independentes, sem criar gates. O fingerprint versionado considera comando/check, código semântico, teste/regra, símbolo ou região estrutural, valores esperados/obtidos e mensagem normalizada, com provider quando discriminante. Remove somente elementos voláteis identificados, como timestamp, ID de run, raiz temporária e deslocamento de linha. SHA e ambiente permanecem na ocorrência/aplicabilidade.
 
-Cada `FailureSignature` mantém ocorrências, condições, soluções tentadas, resolução comprovada e recorrências. Mensagem semelhante com causa raiz diferente cria outra assinatura.
+Cada `FailureSignature` representa um padrão observado e mantém ocorrências, condições, ações tentadas e provas por referência. Dados insuficientes ficam inconclusivos. Evidência de causas distintas permite separar grupos preservando vínculos históricos; similaridade semântica sozinha não une, separa nem oculta falhas.
 
-Antes de uma recuperação, o MVP-016 fornece `FailureRecall` mínimo: assinaturas relevantes, ações que falharam, resolução comprovada e condição de recorrência. O `RecoveryController` do MVP-009 continua dono do prompt, do delta e das tentativas.
+Resolução exige sucesso conclusivo da validação que falhou ou operação afetada, correspondente à revisão/ambiente após a ação. Commit, merge, afirmação da IA, silêncio e validação pulada não são prova. O sucesso resolve a ocorrência/contexto, não toda a assinatura. Recorrência posterior preserva a resolução histórica.
+
+Antes de uma recuperação, o MVP-016 fornece `FailureRecall` mínimo: ocorrências atuais, resoluções comprovadas compatíveis do mesmo projeto e histórico pertinente de ações tentadas. Cada item traz resultado, condições e provas. Usa somente a parcela alocada pelo `ContextPack`, com exclusões diagnosticáveis e sem veto permanente a repetir uma ação sob condições diferentes. O `RecoveryController` do MVP-009 continua dono do prompt, do delta e das tentativas; recall nunca dispensa testes/review/gates.
+
+A M16-F02 entrega matching determinístico e contrato `FailureAssociationCandidate`, validado com produtor simulado. A F05 conecta sugestões reais pelos executores existentes; não há dependência de embeddings, banco vetorial ou MVP-007. A revisão escrita da F02 está em `docs/spec/spec-aprendizado-02-memoria-falhas.md`, aguardando aceite exato.
 
 ## 8. Estratégias de contexto e tokens
 
@@ -223,7 +227,7 @@ Suítes comuns não dependem de serviço pago nem CLI autenticada. Provas reais 
 ## 15. Fatias aprovadas
 
 1. **M16-F01 — Fundação e ingestão.** Contratos, migrations, checkpoints, observações, proveniência e rebuild.
-2. **M16-F02 — Memória de falhas.** Fingerprints, similaridade assistida, recorrência, resoluções e aplicabilidade.
+2. **M16-F02 — Memória de falhas.** Fingerprints, ocorrências, recorrência, resoluções, aplicabilidade, recall e contrato de sugestão assistida; geração real pertence à F05.
 3. **M16-F03 — Registro e resolução de políticas.** Candidatas, versões, escopos, conflitos e snapshots.
 4. **M16-F04 — Experimentos e promoção.** Replay, shadow, canário, perfis, guardrails, estabilização e rollback.
 5. **M16-F05 — Estratégias e recomendações assistidas.** Seleção, compressão, cache, Graphify/Caveman opcionais e Claude/Codex propositores.

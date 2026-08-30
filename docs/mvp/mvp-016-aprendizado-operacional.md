@@ -1,6 +1,6 @@
 # MVP-016 — Aprendizado Operacional da Pipeline
 
-- Status: **design, seis fatias e M16-F01 aprovados pelo PI** em 2026-08-29; implementação da F01 depende da fila; F02–F06 dependem de SPEC aprovada.
+- Status: **design, seis fatias e M16-F01 aprovados pelo PI** em 2026-08-29; implementação da F01 depende da fila; F02 em `revisão-pi`; F03–F06 aguardam redação das SPECs.
 - GitHub: épico [#162](https://github.com/RodReis/rrb-jarvisOS/issues/162); F01 [#163](https://github.com/RodReis/rrb-jarvisOS/issues/163) em `proplan:backlog`; F02–F06 [#164–#168](https://github.com/RodReis/rrb-jarvisOS/issues/164) em `proplan:planejado`.
 - Depende de: MVP-015 concluído.
 - Dono do aceite: PI.
@@ -15,7 +15,7 @@ Aprender com evidências de runs concluídos para reduzir recorrência, retrabal
 | Ordem | Fatia | SPEC | Estado |
 |---:|---|---|---|
 | 1 | Fundação e ingestão ([#163](https://github.com/RodReis/rrb-jarvisOS/issues/163)) | `spec-aprendizado-01-fundacao-ingestao.md` | aprovada-pi |
-| 2 | Memória de falhas ([#164](https://github.com/RodReis/rrb-jarvisOS/issues/164)) | a redigir | planejado; design aprovado |
+| 2 | Memória de falhas ([#164](https://github.com/RodReis/rrb-jarvisOS/issues/164)) | `spec-aprendizado-02-memoria-falhas.md` | revisão-pi; issue Planejada |
 | 3 | Registro e resolução de políticas ([#165](https://github.com/RodReis/rrb-jarvisOS/issues/165)) | a redigir | planejado; design aprovado |
 | 4 | Experimentos e promoção ([#166](https://github.com/RodReis/rrb-jarvisOS/issues/166)) | a redigir | planejado; design aprovado |
 | 5 | Estratégias e recomendações assistidas ([#167](https://github.com/RodReis/rrb-jarvisOS/issues/167)) | a redigir | planejado; design aprovado |

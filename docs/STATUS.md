@@ -54,7 +54,7 @@ Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do
 | MVP-013 Execução contínua | [#133](https://github.com/RodReis/rrb-jarvisOS/issues/133) | fatias [#134–#138](https://github.com/RodReis/rrb-jarvisOS/issues/134) no Backlog | 0/5 |
 | MVP-014 Release e Deploy Governado | [#149](https://github.com/RodReis/rrb-jarvisOS/issues/149) | cinco SPECs `aprovada-pi`; fatias #150–#154 em Backlog | 0/5 |
 | MVP-015 Observabilidade Operacional | [#155](https://github.com/RodReis/rrb-jarvisOS/issues/155) | seis SPECs `aprovada-pi`; fatias #156–#161 em Backlog | 0/6 |
-| MVP-016 Aprendizado Operacional da Pipeline | [#162](https://github.com/RodReis/rrb-jarvisOS/issues/162) | M16-F01 #163 em Backlog; F02–F06 #164–#168 Planejadas, SPECs a redigir | 0/6 |
+| MVP-016 Aprendizado Operacional da Pipeline | [#162](https://github.com/RodReis/rrb-jarvisOS/issues/162) | F01 #163 em Backlog; F02 #164 em revisão-pi/Planejada; F03–F06 #165–#168 Planejadas, SPECs a redigir | 0/6 |
 | MVP-017 Biblioteca de Blueprints | — | direção aprovada; sem fatias e sem SPEC | — |
 | MVP-018 Gestão de Portfólio | — | direção aprovada; sem fatias e sem SPEC | — |
 
@@ -66,7 +66,7 @@ Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do
 
 > **Pipeline V3 publicada e em especificação (2026-08-29).** MVP-014 (#149), MVP-015 (#155) e MVP-016 (#162) possuem 17 sub-issues com dependências nativas. Doze fatias aprovadas estão em Backlog; M16-F02–F06 permanecem Planejadas. Nenhuma nova issue recebeu `next`. Detalhe e reconciliação: `docs/STATUS-ARQUIVO.md`.
 
-> **MVP-016 desenhado (2026-08-29).** Aprendizado operacional não substitui MVP-007 nem os atuadores dos MVPs 008/009. A M16-F01 (#163) recebeu `aprovada-pi`; F02–F06 (#164–#168) aguardam SPEC em Planejado. A M16-F06 mantém gate visual. Fonte: `docs/superpowers/specs/2026-08-29-mvp-016-aprendizado-operacional-design.md`.
+> **MVP-016 em especificação (2026-08-29).** A M16-F01 (#163) está `aprovada-pi`; F02 (#164) está `revisão-pi`, mantendo a issue Planejada; F03–F06 (#165–#168) aguardam redação. A F06 mantém gate visual. Fonte: `docs/superpowers/specs/2026-08-29-mvp-016-aprendizado-operacional-design.md`.
 
 > **MVP-009 aprovado (2026-08-29).** Três decisões do PI: **o container Docker é o sandbox do executor** — o Claude Code roda nele com o worktree montado, nunca no host; **merge autônomo ligado por padrão com kill-switch por projeto**, e desligado o run termina no PR verde aguardando o PI; **Context7 é ferramenta do agente construtor** na M9-F04, fechando a pendência herdada do MVP-008. A decisão do container fecha um buraco real: o MVP-004 proibiu comando arbitrário, mas um agente que constrói software precisa exatamente disso — sem fronteira nova, o MVP-009 passaria por cima do enforcement que o MVP-004 entregou. **Docker passa a ser dependência dura**, sem fallback para o host.
 
@@ -136,7 +136,7 @@ Não existe catálogo global `SPEC-nnn`. O identificador canônico é o slug aba
 | M15-F05 | MVP-015 | Console operacional ([#160](https://github.com/RodReis/rrb-jarvisOS/issues/160)) | `spec-observabilidade-05-console-operacional.md` |
 | M15-F06 | MVP-015 | Resiliência, desempenho e prova E2E ([#161](https://github.com/RodReis/rrb-jarvisOS/issues/161)) | `spec-observabilidade-06-resiliencia-desempenho-e2e.md` |
 | M16-F01 | MVP-016 | Fundação e ingestão ([#163](https://github.com/RodReis/rrb-jarvisOS/issues/163)) | `spec-aprendizado-01-fundacao-ingestao.md` |
-| M16-F02 | MVP-016 | Memória de falhas ([#164](https://github.com/RodReis/rrb-jarvisOS/issues/164)) | a redigir |
+| M16-F02 | MVP-016 | Memória de falhas ([#164](https://github.com/RodReis/rrb-jarvisOS/issues/164)) | `spec-aprendizado-02-memoria-falhas.md` |
 | M16-F03 | MVP-016 | Registro e resolução de políticas ([#165](https://github.com/RodReis/rrb-jarvisOS/issues/165)) | a redigir |
 | M16-F04 | MVP-016 | Experimentos e promoção ([#166](https://github.com/RodReis/rrb-jarvisOS/issues/166)) | a redigir |
 | M16-F05 | MVP-016 | Estratégias e recomendações assistidas ([#167](https://github.com/RodReis/rrb-jarvisOS/issues/167)) | a redigir |
@@ -147,12 +147,12 @@ Não existe catálogo global `SPEC-nnn`. O identificador canônico é o slug aba
 1. PI aceitar ou recusar as **quatro** fatias em **Done**: F02 do MVP-004 (#75), M5-F01 (#77), o `[FIX]` #107 e a M5-F02 (#78).
 2. Fila corrente: **#110** (UI da allowlist) é o `next`. Depois dele, a ordem entre #79 (BudgetPolicy) e #80 (Multi-provider) é decisão do PI — as duas têm spec aprovada.
 3. A **F03 encaixa no ponto único** que a F02 deixou pronto: a estimativa pré-chamada já é calculada e o `CostEvent` já carrega `estimadoUsd`/`realUsd`. O gate entra entre a estimativa e o disparo do adapter — nenhuma refatoração do ponto de chamada é necessária.
-4. **MVP-006, MVP-008, MVP-009, Pipeline V2 e MVP-014–016 revisados (2026-08-29).** As 56 SPECs executáveis do projeto estão `aprovada-pi`; as doze dos MVPs 014–016 foram publicadas em Backlog.
-5. MVP-007 e MVP-017–MVP-018 ainda serão detalhados. O MVP-016 possui design, seis fatias e M16-F01 aprovados; as cinco SPECs restantes serão redigidas nas issues #164–#168, que permanecem Planejadas.
+4. **MVP-006, MVP-008, MVP-009, Pipeline V2 e MVP-014–016 revisados (2026-08-29).** Existem 76 SPECs com status `aprovada-pi` no acervo local; as doze dos MVPs 014–016 foram publicadas em Backlog. A M16-F02 em revisão não entra nessa contagem.
+5. MVP-007 e MVP-017–MVP-018 ainda serão detalhados. O MVP-016 possui design, seis fatias e M16-F01 aprovados; F02 aguarda aceite exato e F03–F06 aguardam redação. As issues #164–#168 permanecem Planejadas.
 6. **M4-F03 (UI da allowlist de diretórios) especificada e aprovada (2026-08-29)** — fechou a última fatia conhecida sem SPEC antes da V3. As cinco SPECs do MVP-014 também foram aprovadas e publicadas nas issues #150–#154.
 7. **Docker virou dependência dura do MVP-009** (sandbox do executor). Confirmar que a máquina de execução tem Docker antes daquele MVP entrar na fila.
 8. **Pipeline V2 publicada:** épicos #115/#121/#127/#133 e 20 fatias #116–#138, com os intervalos de épicos excluídos, estão no Backlog com sub-issues e dependências nativas. A publicação não altera o `next` atual.
-9. **Pipeline V3 publicada:** épicos #149/#155/#162 e 17 fatias, com parents e dependências reconciliados. Continuar a SPEC M16-F02 na #164; M15-F05 (#160) e M16-F06 (#168) mantêm `DESIGN-SYSTEM.md` e protótipos HTML antes da construção.
+9. **Pipeline V3 publicada:** épicos #149/#155/#162 e 17 fatias, com parents e dependências reconciliados. Revisar a SPEC M16-F02 na #164; M15-F05 (#160) e M16-F06 (#168) mantêm `DESIGN-SYSTEM.md` e protótipos HTML antes da construção.
 
 ## Roadmap
 

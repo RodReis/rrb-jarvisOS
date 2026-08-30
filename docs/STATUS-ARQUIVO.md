@@ -110,6 +110,12 @@ Cada fatia foi vinculada como sub-issue nativa ao seu épico. Cada épico depend
 
 Os gates visuais da M15-F05 (#160) e M16-F06 (#168) permanecem: `DESIGN-SYSTEM.md` e protótipos HTML formais aprovados antes da construção. A publicação não inicia código, não dispara executor e não autoriza gasto externo.
 
+### M16-F02 redigida para revisão exata (2026-08-29)
+
+O PI confirmou classificação por etapa/natureza, resolução provada por ocorrência/contexto, normalização conservadora, recall seletivo dentro da parcela do ContextPack e separação entre núcleo determinístico da F02 e assistência real da F05. A SPEC `docs/spec/spec-aprendizado-02-memoria-falhas.md` registra contratos, limites e quinze critérios verificáveis, em `revisão-pi`.
+
+A issue #164 permanece `proplan:planejado`, com predecessor #163 e parent #162; aprovação das decisões não foi confundida com aceite exato da revisão escrita. A conferência dos arquivos em `docs/spec` encontrou 76 cabeçalhos `aprovada-pi`, corrigindo a contagem anterior de 56 no STATUS; a F02 não entra nessa contagem. Não houve implementação, mudança de fila ou chamada de executor.
+
 ## Pendências históricas preservadas
 
 - A UI de allowlist ainda exigia decisão de produto: localização, seletor nativo e remoção de `appDir`.
