@@ -13,8 +13,8 @@ Totais da última execução (regenerado, não acumulado):
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
 | — | — | — | Regras de Negócio | 604 | 604 | 0 | 68.2 | — | — |
-| — | — | — | Banco | 421 | 421 | 0 | 87.0 | — | — |
-| — | — | — | Tela | 334 | 333 | 0 | 87.6 | — | — |
+| — | — | — | Banco | 422 | 422 | 0 | 86.9 | — | — |
+| — | — | — | Tela | 336 | 335 | 0 | 87.7 | — | — |
 
 ## Histórico por entrega
 
@@ -157,3 +157,9 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-08-30 | #94 | spec-planejamento-01-projeto-git-local | Regras de Negócio | 604 | 604 | 0 | 68.2 | #169 | [#169](https://github.com/RodReis/rrb-jarvisOS/pull/169) |
 | 2026-08-30 | #94 | spec-planejamento-01-projeto-git-local | Banco | 421 | 421 | 0 | 87.0 | #169 | [#169](https://github.com/RodReis/rrb-jarvisOS/pull/169) |
 | 2026-08-30 | #94 | spec-planejamento-01-projeto-git-local | Tela | 334 | 333 | 0 | 87.6 | #169 | [#169](https://github.com/RodReis/rrb-jarvisOS/pull/169) |
+| 2026-08-30 | #170 | spec-planejamento-01-projeto-git-local | Regras de Negócio | 604 | 604 | 0 | 68.2 | #171 | [#171](https://github.com/RodReis/rrb-jarvisOS/pull/171) |
+| 2026-08-30 | #170 | spec-planejamento-01-projeto-git-local | Banco | 422 | 421 | 1 | — | #171 | [#171](https://github.com/RodReis/rrb-jarvisOS/pull/171) |
+| 2026-08-30 | #170 | spec-planejamento-01-projeto-git-local | Tela | 336 | 335 | 0 | 87.7 | #171 | [#171](https://github.com/RodReis/rrb-jarvisOS/pull/171) |
+| 2026-08-30 | #170 | spec-planejamento-01-projeto-git-local | Regras de Negócio | 604 | 604 | 0 | 68.2 | #171 | [#171](https://github.com/RodReis/rrb-jarvisOS/pull/171) |
+| 2026-08-30 | #170 | spec-planejamento-01-projeto-git-local | Banco | 422 | 422 | 0 | 86.9 | #171 | [#171](https://github.com/RodReis/rrb-jarvisOS/pull/171) |
+| 2026-08-30 | #170 | spec-planejamento-01-projeto-git-local | Tela | 336 | 335 | 0 | 87.7 | #171 | [#171](https://github.com/RodReis/rrb-jarvisOS/pull/171) |

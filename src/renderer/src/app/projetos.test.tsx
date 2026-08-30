@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ProjetosLocais } from './ProjetosLocais'
@@ -19,6 +19,7 @@ const importProject = vi.fn()
 const pickProjectDirectory = vi.fn()
 const renameProject = vi.fn()
 const removeProject = vi.fn()
+const addAllowedCommand = vi.fn()
 
 function projeto(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -42,6 +43,7 @@ beforeEach(() => {
   pickProjectDirectory.mockReset()
   renameProject.mockReset()
   removeProject.mockReset()
+  addAllowedCommand.mockReset()
   listProjects.mockResolvedValue([])
 
   Object.defineProperty(window, 'jarvis', {
@@ -51,7 +53,8 @@ beforeEach(() => {
       importProject,
       pickProjectDirectory,
       renameProject,
-      removeProject
+      removeProject,
+      addAllowedCommand
     },
     configurable: true,
     writable: true
@@ -195,18 +198,98 @@ describe('ProjetosLocais', () => {
     await waitFor(() => expect(removeProject).toHaveBeenCalledWith('p-1', 'jarvis'))
   })
 
-  it('não expõe nenhum controle de Git', async () => {
-    listProjects.mockResolvedValue([projeto()])
+  it('oferece a correção dentro do alerta quando o git não está permitido', async () => {
+    const usuario = userEvent.setup()
+    createProject
+      .mockResolvedValueOnce({
+        reason: 'git-indisponivel',
+        mensagem: 'O comando `git` não está permitido neste espaço.'
+      })
+      .mockResolvedValueOnce({
+        reason: 'criado',
+        project: projeto(),
+        mensagem: 'Projeto criado com Git local inicializado.'
+      })
+    addAllowedCommand.mockResolvedValue(['git'])
+    listProjects.mockResolvedValueOnce([]).mockResolvedValue([projeto()])
 
     render(<ProjetosLocais workspace="jarvis" />)
-    await screen.findByText('Projeto Alfa')
+    await screen.findByText('Nenhum projeto ainda')
 
-    // A garantia estrutural da fatia, verificada pela forma da tela: não há botão que peça
-    // comando. Se alguém acrescentar um "Commit" aqui, este teste cai — e deve cair, porque
-    // seria o segundo caminho de escrita de repositório que a decisão 2 do PI proíbe.
-    for (const botao of screen.getAllByRole('button')) {
-      expect(botao.textContent?.toLowerCase()).not.toContain('git')
-      expect(botao.textContent?.toLowerCase()).not.toContain('commit')
-    }
+    await usuario.type(screen.getByRole('textbox', { name: /nome do projeto/i }), 'Projeto Alfa')
+    await usuario.click(screen.getByRole('button', { name: 'Criar projeto' }))
+
+    // A correção mora **dentro** do alerta que a pede: um erro cuja instrução é "vá em outra
+    // tela" transfere ao usuário o trabalho de achar o caminho.
+    const alerta = await screen.findByRole('alert')
+    const permitir = within(alerta).getByRole('button', { name: /permitir/i })
+
+    await usuario.click(permitir)
+
+    // Permite pelo canal auditado **e** retoma a criação: permitir sem retomar deixaria o
+    // usuário com um alerta resolvido e nenhum projeto.
+    await waitFor(() => expect(addAllowedCommand).toHaveBeenCalledWith('git', 'jarvis'))
+    expect(createProject).toHaveBeenCalledTimes(2)
+    expect(await screen.findByText('Projeto Alfa')).toBeInTheDocument()
+  })
+
+  it('não oferece o botão de permitir em erro que não é do git', async () => {
+    const usuario = userEvent.setup()
+    createProject.mockResolvedValue({
+      reason: 'colisao',
+      mensagem: 'Já existe um projeto com esse nome.'
+    })
+
+    render(<ProjetosLocais workspace="jarvis" />)
+    await screen.findByText('Nenhum projeto ainda')
+
+    await usuario.type(screen.getByRole('textbox', { name: /nome do projeto/i }), 'Projeto Alfa')
+    await usuario.click(screen.getByRole('button', { name: 'Criar projeto' }))
+
+    // A correção é específica do desfecho. Oferecer "permitir git" numa colisão sugeriria que a
+    // permissão resolve algo que ela não resolve.
+    const alerta = await screen.findByRole('alert')
+    expect(within(alerta).queryByRole('button', { name: /permitir/i })).not.toBeInTheDocument()
+  })
+
+  it('nunca submete comando — nem no caminho que permite o git', async () => {
+    const usuario = userEvent.setup()
+    const runCommand = vi.fn()
+    Object.defineProperty(window, 'jarvis', {
+      value: {
+        listProjects,
+        createProject,
+        importProject,
+        pickProjectDirectory,
+        renameProject,
+        removeProject,
+        addAllowedCommand,
+        runCommand
+      },
+      configurable: true,
+      writable: true
+    })
+
+    createProject.mockResolvedValue({
+      reason: 'git-indisponivel',
+      mensagem: 'O comando `git` não está permitido neste espaço.'
+    })
+    addAllowedCommand.mockResolvedValue(['git'])
+
+    render(<ProjetosLocais workspace="jarvis" />)
+    await screen.findByText('Nenhum projeto ainda')
+    await usuario.type(screen.getByRole('textbox', { name: /nome do projeto/i }), 'Projeto Alfa')
+    await usuario.click(screen.getByRole('button', { name: 'Criar projeto' }))
+    await usuario.click(
+      within(await screen.findByRole('alert')).getByRole('button', { name: /permitir/i })
+    )
+
+    // A garantia estrutural da fatia, afirmada pelo que a tela **chama**, não pelo texto dos
+    // rótulos. A versão anterior varria os botões procurando a palavra "git" — e passava por
+    // acidente, porque só rodava no estado sem erro. Agora existe um botão legítimo com "git"
+    // no rótulo, e o que continua proibido é outra coisa: a tela pede *projeto* e *permissão*,
+    // nunca um comando. Um `runCommand` aqui seria o segundo caminho de escrita de repositório
+    // que a decisão 2 do PI proíbe.
+    expect(runCommand).not.toHaveBeenCalled()
   })
 })

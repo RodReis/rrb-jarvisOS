@@ -432,6 +432,26 @@ comGit('caminho único de Git', () => {
     expect(eventos.some((e) => e.type === 'project-milestone')).toBe(true)
   })
 
+  it('falha do Git não deixa estrutura órfã que impeça a retentativa', () => {
+    // O bug que o E2E achou: sem rollback, a primeira tentativa escrevia `docs/` e o README
+    // antes de o `git init` falhar, e a **segunda** batia em `colisao` — ou seja, aplicar o
+    // remédio que a própria mensagem manda aplicar (permitir o `git`) devolvia outra recusa.
+    // Um estado que impede a própria correção é pior que não ter criado nada.
+    service = montar(false)
+    const recusa = service.criar('Projeto Alfa', 'jarvis')
+    expect(recusa.reason).toBe('git-indisponivel')
+
+    // Nada ficou para trás no disco.
+    expect(existsSync(join(appDir, 'projeto-alfa'))).toBe(false)
+
+    // E a retentativa, depois de permitir o binário, funciona — que é o ponto todo.
+    comandos.add(USER, 'jarvis', 'git')
+    const depois = service.criar('Projeto Alfa', 'jarvis')
+
+    expect(depois.reason).toBe('criado')
+    expect(existsSync(join(depois.project?.diretorio ?? '', '.git'))).toBe(true)
+  })
+
   it('audita a recusa, não só o sucesso', () => {
     service.criar('!!!', 'jarvis')
 

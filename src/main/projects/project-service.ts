@@ -26,7 +26,7 @@
  */
 
 import { randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { isPathAllowed } from '@shared/policies'
 import type { WorkspaceId } from '@shared/domain/entities'
@@ -188,11 +188,29 @@ export class ProjectService {
       )
     }
 
-    // Passo 5 — Git, pelo terminal controlado. Falha aqui **não** desfaz a estrutura: o
-    // usuário fica com os arquivos e o remédio (instalar/permitir o `git`), e o projeto não é
-    // registrado — reexecutar depois de resolver encontra a pasta e oferece importá-la.
+    // Passo 5 — Git, pelo terminal controlado.
+    //
+    // **Falha aqui desfaz a estrutura que esta chamada criou.** A primeira versão deixava os
+    // arquivos para trás, com o argumento de que o usuário ficava "com os arquivos e o remédio".
+    // O E2E mostrou que isso é falso: a pasta órfã faz a *próxima* tentativa bater em `colisao`,
+    // então instalar ou permitir o `git` e tentar de novo — o remédio que a mensagem manda
+    // aplicar — devolve outra recusa. Um estado que impede a própria correção é pior que não ter
+    // criado nada.
+    //
+    // O rollback é seguro **porque só existe aqui**: chegamos a este ponto tendo verificado que
+    // o destino não existia (passo 2), logo tudo que está nele foi escrito no passo 4. A
+    // importação, que roda sobre diretório do usuário, nunca passa por este caminho.
     const inicializado = this.inicializarGit(destino, workspaceId)
     if (!inicializado.ok) {
+      try {
+        rmSync(destino, { recursive: true, force: true })
+      } catch (erro) {
+        // Não escalar: a recusa do Git é o que o usuário precisa saber, e trocá-la por uma falha
+        // de limpeza esconderia a causa. O diretório remanescente aparece como colisão numa
+        // próxima tentativa — visível, com a saída de importar.
+        log.db.warn('Não foi possível remover a estrutura parcial após falha do Git', { erro })
+      }
+
       return this.recusar(userId, workspaceId, inicializado.reason, inicializado.mensagem, {
         diretorio: destino
       })
