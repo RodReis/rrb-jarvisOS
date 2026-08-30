@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 595 | 595 | 0 | 69.5 | — | — |
-| — | — | — | Banco | 400 | 400 | 0 | 86.5 | — | — |
-| — | — | — | Tela | 325 | 324 | 0 | 87.7 | — | — |
+| — | — | — | Regras de Negócio | 604 | 604 | 0 | 68.2 | — | — |
+| — | — | — | Banco | 421 | 406 | 0 | 87.4 | — | — |
+| — | — | — | Tela | 334 | 333 | 0 | 87.6 | — | — |
 
 ## Histórico por entrega
 
@@ -151,3 +151,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | — | #92 | spec-conectores-06-tavily-extract-evidencias | Regras de Negócio | 595 | 595 | 0 | 69.5 | — | — |
 | — | #92 | spec-conectores-06-tavily-extract-evidencias | Banco | 400 | 400 | 0 | 86.5 | — | — |
 | — | #92 | spec-conectores-06-tavily-extract-evidencias | Tela | 325 | 324 | 0 | 87.7 | — | — |
+| 2026-08-30 | #94 | spec-planejamento-01-projeto-git-local | Regras de Negócio | 604 | 604 | 0 | 68.2 | #169 | [#169](https://github.com/RodReis/rrb-jarvisOS/pull/169) |
+| 2026-08-30 | #94 | spec-planejamento-01-projeto-git-local | Banco | 421 | 406 | 0 | 87.4 | #169 | [#169](https://github.com/RodReis/rrb-jarvisOS/pull/169) |
+| 2026-08-30 | #94 | spec-planejamento-01-projeto-git-local | Tela | 334 | 333 | 0 | 87.6 | #169 | [#169](https://github.com/RodReis/rrb-jarvisOS/pull/169) |
