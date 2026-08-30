@@ -33,6 +33,11 @@ const listarPacotes = vi.fn()
 // monta junto. Sem os dois métodos, o teste do contexto quebraria por falta de mock.
 const listarAnexos = vi.fn()
 const listarArquiteturas = vi.fn()
+// E o painel de roadmap (M8-F06), pelo mesmo motivo — a terceira vez que este mock cresce por
+// um painel novo dentro do de contexto.
+const carregarRoadmap = vi.fn()
+const listarAprovacoes = vi.fn()
+const revisoesDoGate = vi.fn()
 
 function projeto(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -63,6 +68,9 @@ beforeEach(() => {
   listarPacotes.mockReset().mockResolvedValue([])
   listarAnexos.mockReset().mockResolvedValue([])
   listarArquiteturas.mockReset().mockResolvedValue([])
+  carregarRoadmap.mockReset().mockResolvedValue({ mvps: [], slices: [] })
+  listarAprovacoes.mockReset().mockResolvedValue([])
+  revisoesDoGate.mockReset().mockResolvedValue([])
   listProjects.mockResolvedValue([])
 
   Object.defineProperty(window, 'jarvis', {
@@ -79,7 +87,10 @@ beforeEach(() => {
       listFailures,
       listarPacotes,
       listarAnexos,
-      listarArquiteturas
+      listarArquiteturas,
+      carregarRoadmap,
+      listarAprovacoes,
+      revisoesDoGate
     },
     configurable: true,
     writable: true

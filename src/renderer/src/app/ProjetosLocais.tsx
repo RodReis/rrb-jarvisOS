@@ -9,6 +9,7 @@ import { ContextoDoProjeto } from './ContextoDoProjeto'
 import { WizardDoProjeto } from './WizardDoProjeto'
 import { PacoteDoProjeto } from './PacoteDoProjeto'
 import { AnexosDeDesign } from './AnexosDeDesign'
+import { RoadmapDoProjeto } from './RoadmapDoProjeto'
 
 /**
  * Projetos locais (SPEC-Planejamento-01).
@@ -492,6 +493,19 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
                       */}
                       <div className="mt-4 border-t border-[rgba(var(--jos-borda-rgb),0.10)] pt-4">
                         <AnexosDeDesign
+                          workspace={workspace}
+                          projectId={projeto.id}
+                          nomeDoProjeto={projeto.nome}
+                        />
+                      </div>
+                      {/*
+                        O roadmap fecha a sequência, e a ordem é o fluxo do MVP-008: contexto →
+                        PRD → design e arquitetura → roadmap. Ele depende das jornadas que os
+                        protótipos mostram, então vir antes deles proporia MVPs sobre telas que
+                        ninguém desenhou.
+                      */}
+                      <div className="mt-4 border-t border-[rgba(var(--jos-borda-rgb),0.10)] pt-4">
+                        <RoadmapDoProjeto
                           workspace={workspace}
                           projectId={projeto.id}
                           nomeDoProjeto={projeto.nome}

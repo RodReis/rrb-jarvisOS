@@ -112,6 +112,34 @@ export const RECURSOS = {
         planejar: 'Planejar',
         planejarDe: 'Planejar {{nome}}'
       },
+      roadmap: {
+        titulo: 'Roadmap e aprovações',
+        descricao:
+          'Os MVPs de {{nome}}, compostos das decisões e das jornadas prototipadas. Gerar propõe; aprovar é seu.',
+        carregando: 'Carregando o roadmap…',
+        gerar: 'Gerar roadmap',
+        regerar: 'Regerar roadmap',
+        mvps: '{{count}} MVPs propostos',
+        estado: {
+          proposto: 'Proposto',
+          'na-fila': 'Na fila',
+          concluido: 'Concluído'
+        },
+        dependeDe: 'Depende de: {{lista}}.',
+        detalhada: 'SPEC detalhada',
+        gates: 'Centro de aprovações',
+        gate: {
+          PROJECT_PACKAGE: 'O pacote do projeto: PRD, arquitetura e os anexos de design.',
+          MVP_ENTRY: 'A revisão do MVP que entra na fila de execução.',
+          SLICE_ENTRY: 'A revisão da SPEC a executar.'
+        },
+        aprovado: 'Aprovado',
+        pendente: 'Aguardando aceite',
+        aprovar: 'Aprovar',
+        semRevisoes: 'Nada a aprovar ainda neste gate.',
+        aprovadoPor: 'Aprovado por {{identidade}}.',
+        hashCompleto: 'Hash completo: {{hash}}'
+      },
       anexos: {
         titulo: 'Anexos de design',
         descricao:
@@ -431,6 +459,34 @@ export const RECURSOS = {
         contextoAbrir: 'Open context for {{nome}}',
         planejar: 'Plan',
         planejarDe: 'Plan {{nome}}'
+      },
+      roadmap: {
+        titulo: 'Roadmap and approvals',
+        descricao:
+          'The MVPs for {{nome}}, composed from decisions and prototyped journeys. Generating proposes; approving is yours.',
+        carregando: 'Loading the roadmap…',
+        gerar: 'Generate roadmap',
+        regerar: 'Regenerate roadmap',
+        mvps: '{{count}} proposed MVPs',
+        estado: {
+          proposto: 'Proposed',
+          'na-fila': 'Queued',
+          concluido: 'Done'
+        },
+        dependeDe: 'Depends on: {{lista}}.',
+        detalhada: 'Detailed SPEC',
+        gates: 'Approval center',
+        gate: {
+          PROJECT_PACKAGE: 'The project package: PRD, architecture and the design attachments.',
+          MVP_ENTRY: 'The revision of the MVP entering the execution queue.',
+          SLICE_ENTRY: 'The revision of the SPEC to execute.'
+        },
+        aprovado: 'Approved',
+        pendente: 'Awaiting approval',
+        aprovar: 'Approve',
+        semRevisoes: 'Nothing to approve in this gate yet.',
+        aprovadoPor: 'Approved by {{identidade}}.',
+        hashCompleto: 'Full hash: {{hash}}'
       },
       anexos: {
         titulo: 'Design attachments',
