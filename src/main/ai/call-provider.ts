@@ -33,6 +33,7 @@ import {
   TIMEOUT_PADRAO_MS,
   calcularCustoUsd,
   estimarCustoUsd,
+  isRotaUnmetered,
   type AiProvider,
   type AiRequest,
   type AiStreamEvent,
@@ -53,6 +54,19 @@ import type { AiAdapter } from './adapter'
 export interface AiCallContext {
   readonly userId: string
   readonly workspace: WorkspaceId
+}
+
+/**
+ * O que o ponto único precisa saber sobre `ContextPack`: **se ele existe**.
+ *
+ * Interface mínima e não o `ContextService` inteiro, de propósito. O que este ponto verifica é
+ * o critério 1 ("nenhuma geração sem ContextPack") — e verificar isso não exige poder *montar*
+ * um pack. Dependendo do serviço inteiro, o teste do gate passaria a precisar de repositório,
+ * de projeto e de disco; e, pior, o ponto único ganharia o poder de montar o manifesto que ele
+ * deveria apenas exigir.
+ */
+export interface VerificadorDeContexto {
+  buscar(packId: string): { readonly id: string } | undefined
 }
 
 export class AiCallService {
@@ -78,7 +92,13 @@ export class AiCallService {
      * precisar de um segundo caminho até o adapter — exatamente o que este ponto existe para
      * não permitir.
      */
-    private readonly routing: RoutingService
+    private readonly routing: RoutingService,
+    /**
+     * O verificador de `ContextPack` (SPEC-Planejamento-02, critério 1). Entra no construtor
+     * pela mesma razão do gate de orçamento: é **obrigatório**. Um `AiCallService` sem ele
+     * seria o caminho de geração sem manifesto que a fatia existe para fechar.
+     */
+    private readonly contextPacks: VerificadorDeContexto
   ) {}
 
   /**
@@ -138,13 +158,50 @@ export class AiCallService {
     const maxTokens = request.maxTokens ?? MAX_TOKENS_PADRAO
     const estimadoUsd = estimarCustoUsd(provider, model, request.prompt, maxTokens)
 
+    // (2) **Nenhuma geração sem ContextPack** (SPEC-Planejamento-02, critério 1).
+    //
+    // Antes do gate de orçamento porque a pergunta é anterior: uma chamada sem manifesto não é
+    // uma chamada cara demais, é uma chamada que não devia existir. O `contextPacks` entra por
+    // construtor como o `budget` — um `AiCallService` sem verificador de contexto seria o
+    // caminho sem manifesto que este ponto existe para não permitir.
+    //
+    // `diagnostico` é a **única** exceção, e ela é declarada por quem chama: o painel de teste
+    // do Settings verifica se o provider responde e não gera nada para projeto nenhum. Fosse a
+    // exceção "não informou pack", todo esquecimento viraria diagnóstico por omissão.
+    if (request.diagnostico !== true) {
+      const pack =
+        request.contextPackId === undefined
+          ? undefined
+          : this.contextPacks.buscar(request.contextPackId)
+
+      if (pack === undefined) {
+        yield this.finalizar(id, ctx, provider, model, {
+          estado: 'falhou',
+          erro:
+            request.contextPackId === undefined
+              ? 'Esta geração precisa de um contexto montado. Monte o ContextPack do projeto antes de gerar.'
+              : 'O contexto informado não foi encontrado. Monte o contexto novamente antes de gerar.',
+          latenciaTotalMs: 0,
+          estimadoUsd,
+          naoSaiu: true
+        })
+        return
+      }
+    }
+
     // (3) O **gate de orçamento** (SPEC-Providers-03, critério 2). Antes da auditoria de
     // requisição e antes de qualquer contato com o provider: barrar depois de o `AuditEvent`
     // dizer "requisitei" registraria uma requisição que nunca houve.
-    const veredito = this.budget.check(
-      { userId: ctx.userId, workspace: ctx.workspace },
-      estimadoUsd
-    )
+    //
+    // **A rota de assinatura não é gateada** (SPEC-Planejamento-02, critério 1a; emenda do PI
+    // de 2026-08-29): ela não tem custo por chamada, então não há USD a somar nem teto a
+    // estourar. A pergunta é `isRotaUnmetered(provider)` e **não** "o preço da tabela é zero":
+    // hoje as duas respostas coincidem, mas a segunda faz a isenção depender de um valor de
+    // preço — e no dia em que alguém corrigir a tabela do `claude-code` para um número
+    // qualquer, a rota de assinatura passaria a ser barrada sem ninguém ter decidido isso.
+    const veredito = isRotaUnmetered(provider)
+      ? ({ decisao: 'permitido' } as const)
+      : this.budget.check({ userId: ctx.userId, workspace: ctx.workspace }, estimadoUsd)
 
     if (veredito.decisao === 'bloqueado') {
       // Desfecho previsto, não exceção — o mesmo caminho da credencial ausente. A tela precisa
@@ -256,7 +313,8 @@ export class AiCallService {
           realUsd: calcularCustoUsd(provider, model, chunk.usage),
           latenciaTotalMs: Date.now() - inicio,
           ...(latenciaPrimeiroChunkMs === undefined ? {} : { latenciaPrimeiroChunkMs }),
-          estimadoUsd
+          estimadoUsd,
+          ...(request.contextPackId === undefined ? {} : { contextPackId: request.contextPackId })
         })
         return
       }
@@ -269,7 +327,8 @@ export class AiCallService {
         erro: 'O stream foi interrompido antes do fim.',
         latenciaTotalMs: Date.now() - inicio,
         ...(latenciaPrimeiroChunkMs === undefined ? {} : { latenciaPrimeiroChunkMs }),
-        estimadoUsd
+        estimadoUsd,
+        ...(request.contextPackId === undefined ? {} : { contextPackId: request.contextPackId })
       })
     } catch (erro) {
       yield this.finalizar(id, ctx, provider, model, {
@@ -281,7 +340,8 @@ export class AiCallService {
           erro instanceof AdapterError ? erro.message : 'Falha inesperada ao chamar o provider.',
         latenciaTotalMs: Date.now() - inicio,
         ...(latenciaPrimeiroChunkMs === undefined ? {} : { latenciaPrimeiroChunkMs }),
-        estimadoUsd
+        estimadoUsd,
+        ...(request.contextPackId === undefined ? {} : { contextPackId: request.contextPackId })
       })
     } finally {
       clearTimeout(relogio)
@@ -367,12 +427,24 @@ export class AiCallService {
        * custou nada, quando ela simplesmente não aconteceu. Auditar, sim; somar, não.
        */
       readonly naoSaiu?: boolean
+      /**
+       * O manifesto que autorizou esta geração. Vai para o `CostEvent` porque é o que liga o
+       * gasto ao contexto que o causou — sem ele, "por que esta etapa custou tanto?" só teria
+       * como resposta o horário da chamada.
+       */
+      readonly contextPackId?: string
     }
   ): AiStreamEvent {
+    const rotaSemPreco = isRotaUnmetered(provider)
+
     const custo: CostEvent = {
       provider,
       model,
       workspace: ctx.workspace,
+      // O número continua sendo emitido (é a estimativa que o gate teria usado), mas a flag
+      // diz à tela que ele **não é preço**. Sem ela, "US$ 0,00" num plano de assinatura seria
+      // lido como "esta chamada foi de graça" em vez de "esta rota não cobra por chamada".
+      ...(rotaSemPreco ? { unmetered: true } : {}),
       estimadoUsd: desfecho.estimadoUsd,
       ...(desfecho.realUsd === undefined ? {} : { realUsd: desfecho.realUsd }),
       ...(desfecho.usage === undefined ? {} : { usage: desfecho.usage }),
@@ -389,14 +461,30 @@ export class AiCallService {
     //
     // É aqui, e não no `check`, que o estouro no meio do stream se resolve: a chamada corrente
     // **terminou** (não a matamos), o real entra na soma, e a próxima é a barrada.
+    //
+    // **A rota de assinatura grava uso, não dinheiro** (SPEC-Planejamento-02, critério 1a):
+    // `estimadoUsd`/`realUsd` viram NULL e o que fica registrado são chamada, tokens e tempo.
+    // Uma linha existe nos dois casos porque a chamada **aconteceu** nos dois casos; o que muda
+    // é o que dela se pode somar em dólar.
     if (desfecho.naoSaiu !== true) {
+      const unmetered = rotaSemPreco
+
       this.budget.record(
         {
           callId: id,
           provider,
           model,
-          estimadoUsd: desfecho.estimadoUsd,
-          ...(desfecho.realUsd === undefined ? {} : { realUsd: desfecho.realUsd })
+          estimadoUsd: unmetered ? null : desfecho.estimadoUsd,
+          ...(unmetered || desfecho.realUsd === undefined ? {} : { realUsd: desfecho.realUsd }),
+          unmetered,
+          ...(desfecho.usage === undefined
+            ? {}
+            : {
+                tokensEntrada: desfecho.usage.tokensEntrada,
+                tokensSaida: desfecho.usage.tokensSaida
+              }),
+          latenciaTotalMs: desfecho.latenciaTotalMs,
+          ...(desfecho.contextPackId === undefined ? {} : { contextPackId: desfecho.contextPackId })
         },
         { userId: ctx.userId, workspace: ctx.workspace }
       )

@@ -8,10 +8,13 @@ import {
   type AuditVerification,
   type ConnectorCreditLimitsInput,
   type ConnectorCreditView,
+  type ContextPackRequest,
   type JarvisBridge,
   type PreferencesSnapshot,
   type WorkspaceSwitchResult
 } from '@shared/contracts/ipc'
+import type { ContextPack, ContextPackOutcome, FalhaRegistrada } from '@shared/domain/context-pack'
+import type { CapacidadeResolvida } from '@shared/domain/skills'
 import type { AuthSnapshot } from '@shared/contracts/auth'
 import type { LogInput } from '@shared/contracts/logging'
 import type { PolicyContext, PolicyDecision } from '@shared/policies'
@@ -291,7 +294,28 @@ const bridge: JarvisBridge = {
     marco: MarcoDocumental,
     workspace: WorkspaceId
   ): Promise<MarcoOutcome | null> =>
-    ipcRenderer.invoke(IPC_CHANNELS.projectCompleteMilestone, projectId, marco, workspace)
+    ipcRenderer.invoke(IPC_CHANNELS.projectCompleteMilestone, projectId, marco, workspace),
+
+  // Contexto, skills e orçamento (SPEC-Planejamento-02). Nenhum método que leia arquivo: a tela
+  // indica caminhos relativos e o main lê, dentro do diretório do projeto. Um `readFile` aqui
+  // seria um leitor de disco no renderer — a fronteira que o ARCHITECTURE fecha.
+  buildContextPack: (
+    pedido: ContextPackRequest,
+    workspace: WorkspaceId
+  ): Promise<ContextPackOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.contextBuild, pedido, workspace),
+  listContextPacks: (projectId: string): Promise<readonly ContextPack[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.contextList, projectId),
+  listCapabilities: (): Promise<readonly CapacidadeResolvida[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.contextCapabilities),
+  listFailures: (projectId: string): Promise<readonly FalhaRegistrada[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.contextFailures, projectId),
+  resolveFailure: (
+    projectId: string,
+    fingerprint: string,
+    workspace: WorkspaceId
+  ): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.contextResolveFailure, projectId, fingerprint, workspace)
 }
 
 if (process.contextIsolated) {

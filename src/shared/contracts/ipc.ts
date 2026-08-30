@@ -52,6 +52,14 @@ import type {
   Project,
   ProjectOutcome
 } from '../domain/projects'
+import type {
+  ContextPack,
+  ContextPackOutcome,
+  ExcecaoDeLeituraAmpla,
+  FalhaRegistrada,
+  OrigemDeContexto
+} from '../domain/context-pack'
+import type { CapacidadeResolvida } from '../domain/skills'
 
 /** Canais de request/response (renderer → main → renderer). */
 export const IPC_CHANNELS = {
@@ -272,7 +280,23 @@ export const IPC_CHANNELS = {
   projectRemove: 'project:remove',
   projectSession: 'project:session',
   projectSaveAnswers: 'project:save-answers',
-  projectCompleteMilestone: 'project:complete-milestone'
+  projectCompleteMilestone: 'project:complete-milestone',
+  /**
+   * Contexto, skills e orçamento (SPEC-Planejamento-02).
+   *
+   * **Nenhum canal que leia arquivo.** A tela não pede "leia `src/foo.ts`": ela indica
+   * candidatos por caminho relativo, e quem lê é o main, dentro do diretório do projeto. Um
+   * canal `context:read-file` seria um leitor de disco arbitrário no renderer — a mesma
+   * fronteira que a tela de Projetos respeita ao não ter canal de Git.
+   *
+   * `context:build` é o gate: ele devolve o manifesto **ou a recusa**, e é o `packId` dele que
+   * a chamada de IA precisa declarar. Não existe canal que gere sem passar por aqui.
+   */
+  contextBuild: 'context:build',
+  contextList: 'context:list',
+  contextCapabilities: 'context:capabilities',
+  contextFailures: 'context:failures',
+  contextResolveFailure: 'context:resolve-failure'
 } as const
 
 /**
@@ -691,6 +715,51 @@ export interface JarvisBridge {
     marco: MarcoDocumental,
     workspace: WorkspaceId
   ): Promise<MarcoOutcome | null>
+  /**
+   * Monta o `ContextPack` — o gate do critério 1 (SPEC-Planejamento-02).
+   *
+   * Devolve `ContextPackOutcome` **inclusive nas recusas**, como `createProject`: "este arquivo
+   * parece ter credencial" não é falha técnica, é desfecho que a tela mostra com o que fazer a
+   * respeito. Rejeitar a promise faria a recusa chegar indistinguível de um disco cheio.
+   */
+  buildContextPack(pedido: ContextPackRequest, workspace: WorkspaceId): Promise<ContextPackOutcome>
+  /** Os packs já montados do projeto, do mais recente ao mais antigo. */
+  listContextPacks(projectId: string): Promise<readonly ContextPack[]>
+  /**
+   * Como cada capacidade é atendida nesta execução — por skill ou pelo procedimento direto
+   * (critério 5). A tela mostra os dois meios igualmente: "direto" não é degradação.
+   */
+  listCapabilities(): Promise<readonly CapacidadeResolvida[]>
+  /** As falhas do projeto, abertas e resolvidas. Só as abertas entram no próximo pack. */
+  listFailures(projectId: string): Promise<readonly FalhaRegistrada[]>
+  /** Marca a falha como resolvida — a partir daqui ela não volta ao contexto (critério 4). */
+  resolveFailure(projectId: string, fingerprint: string, workspace: WorkspaceId): Promise<boolean>
+}
+
+/**
+ * O pedido de montagem, como o renderer o envia.
+ *
+ * Espelha o `PedidoDeContexto` do main **sem** o que o renderer não pode decidir: não há campo
+ * de conteúdo, só caminhos relativos. Quem lê o arquivo é o main, dentro do diretório do
+ * projeto — o renderer indica o que quer, nunca entrega o que leu.
+ */
+export interface ContextPackRequest {
+  readonly projectId: string
+  readonly tarefa: string
+  readonly etapa: string
+  readonly candidatos: readonly {
+    readonly caminho: string
+    readonly origem: OrigemDeContexto
+    readonly motivo: string
+    readonly linhas?: { readonly de: number; readonly ate: number }
+  }[]
+  readonly regras?: readonly string[]
+  readonly resumoAnterior?: string
+  readonly rota: AiProvider
+  readonly excecaoDeLeituraAmpla?: ExcecaoDeLeituraAmpla
+  readonly tetoDeTokens?: number
+  readonly motivoDaExpansao?: string
+  readonly packAnterior?: string
 }
 
 /** Teto + consumo, como a tela os lê. */

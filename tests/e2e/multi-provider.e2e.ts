@@ -1,4 +1,13 @@
 import { mkdtempSync, rmSync } from 'node:fs'
+/**
+ * **Nota da M8-F02:** as chamadas desta suíte declaram `diagnostico: true`.
+ *
+ * Não é atalho para escapar do gate do critério 1 ("nenhuma geração sem ContextPack"): é o que
+ * elas de fato **são**. O que se prova aqui é o comportamento do ponto único — stream, gate de
+ * orçamento, roteamento —, sem projeto e sem manifesto envolvidos, que é exatamente o caso do
+ * painel de diagnóstico do Settings. O gate em si tem prova própria, com o contrafactual, em
+ * `contexto-orcamento.e2e.ts`.
+ */
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import electronPath from 'electron'
@@ -199,7 +208,7 @@ test('rota sem provider disponível recusa a chamada em vez de gastar às cegas'
         resolve(evento)
       })
       // **Sem `provider`**: quem escolhe é a rota. É o caminho novo da F04.
-      void bridge.callAi({ taskType: 'chat', prompt: 'oi' }, 'jarvis')
+      void bridge.callAi({ taskType: 'chat', prompt: 'oi', diagnostico: true }, 'jarvis')
     })
   })) as { estado?: string; erro?: string }
 
@@ -238,7 +247,7 @@ test('a seleção e as edições ficam na cadeia de auditoria, que segue íntegr
         cancelar()
         resolve()
       })
-      void bridge.callAi({ taskType: 'chat', prompt: 'oi' }, 'jarvis')
+      void bridge.callAi({ taskType: 'chat', prompt: 'oi', diagnostico: true }, 'jarvis')
     })
   })
 

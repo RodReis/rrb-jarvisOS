@@ -52,6 +52,14 @@ import type { GithubAuthService } from '../connectors/github/github-auth-service
 import type { GithubAuthSnapshot, GithubDeviceFlowView } from '@shared/domain/github-auth'
 import type { UserProfileRepository } from '../storage/repositories'
 import type { ProjectService } from '../projects/project-service'
+import type {
+  CandidatoDeContexto,
+  ContextService,
+  PedidoDeContexto
+} from '../context/context-service'
+import { isOrigemDeContexto } from '@shared/domain/context-pack'
+import type { ContextPack, ContextPackOutcome, FalhaRegistrada } from '@shared/domain/context-pack'
+import type { CapacidadeResolvida } from '@shared/domain/skills'
 import {
   isMarcoDocumental,
   type MarcoOutcome,
@@ -92,6 +100,111 @@ function parsePolicyContext(value: unknown): PolicyContext {
     workspace,
     ...(sensitivity ? { sensitivity } : {}),
     ...(detail ? { detail } : {})
+  }
+}
+
+/**
+ * Valida o pedido de contexto na fronteira (SPEC-Planejamento-02; CONVENTION §2).
+ *
+ * Devolve `undefined` quando o pedido não casa o contrato. O que se valida aqui é **forma**, e
+ * só forma: se há projeto, tarefa, etapa e ao menos um candidato com caminho e origem
+ * conhecidos. A política — segredo, teto, exceção — mora no serviço, e repeti-la aqui criaria
+ * uma segunda fonte que divergiria da primeira no dia em que uma das duas mudasse.
+ *
+ * O candidato de origem desconhecida é **descartado**, não corrigido para um default: um item
+ * cuja origem o app não reconhece entraria no manifesto declarando uma procedência inventada, e
+ * a origem é justamente o que distingue "o usuário anexou" de "a busca encontrou".
+ */
+function parsePedidoDeContexto(value: unknown): PedidoDeContexto | undefined {
+  if (typeof value !== 'object' || value === null) return undefined
+  const source = value as Record<string, unknown>
+
+  const projectId = source['projectId']
+  const tarefa = source['tarefa']
+  const etapa = source['etapa']
+  const rota = source['rota']
+
+  if (
+    typeof projectId !== 'string' ||
+    typeof tarefa !== 'string' ||
+    typeof etapa !== 'string' ||
+    !isAiProvider(rota)
+  ) {
+    return undefined
+  }
+
+  const brutos = Array.isArray(source['candidatos']) ? source['candidatos'] : []
+  const candidatos: CandidatoDeContexto[] = []
+
+  for (const bruto of brutos) {
+    if (typeof bruto !== 'object' || bruto === null) continue
+    const item = bruto as Record<string, unknown>
+    const caminho = item['caminho']
+    const origem = item['origem']
+
+    if (typeof caminho !== 'string' || caminho.length === 0 || !isOrigemDeContexto(origem)) {
+      continue
+    }
+
+    const linhas = item['linhas']
+    const faixa =
+      typeof linhas === 'object' &&
+      linhas !== null &&
+      typeof (linhas as Record<string, unknown>)['de'] === 'number' &&
+      typeof (linhas as Record<string, unknown>)['ate'] === 'number'
+        ? {
+            de: (linhas as Record<string, number>)['de'] as number,
+            ate: (linhas as Record<string, number>)['ate'] as number
+          }
+        : undefined
+
+    candidatos.push({
+      caminho,
+      origem,
+      motivo: typeof item['motivo'] === 'string' ? item['motivo'] : 'selecionado na tela',
+      ...(faixa === undefined ? {} : { linhas: faixa })
+    })
+  }
+
+  if (candidatos.length === 0) return undefined
+
+  const excecao = source['excecaoDeLeituraAmpla']
+  const excecaoValida =
+    typeof excecao === 'object' &&
+    excecao !== null &&
+    typeof (excecao as Record<string, unknown>)['motivo'] === 'string' &&
+    typeof (excecao as Record<string, unknown>)['tetoDeBytes'] === 'number'
+      ? {
+          motivo: (excecao as Record<string, string>)['motivo'] as string,
+          tetoDeBytes: (excecao as Record<string, number>)['tetoDeBytes'] as number,
+          autorizadoPor:
+            typeof (excecao as Record<string, unknown>)['autorizadoPor'] === 'string'
+              ? ((excecao as Record<string, string>)['autorizadoPor'] as string)
+              : '',
+          autorizadoEm: new Date().toISOString()
+        }
+      : undefined
+
+  const regras = Array.isArray(source['regras'])
+    ? source['regras'].filter((r): r is string => typeof r === 'string')
+    : undefined
+
+  return {
+    projectId,
+    tarefa,
+    etapa,
+    candidatos,
+    rota,
+    ...(regras === undefined ? {} : { regras }),
+    ...(typeof source['resumoAnterior'] === 'string'
+      ? { resumoAnterior: source['resumoAnterior'] }
+      : {}),
+    ...(excecaoValida === undefined ? {} : { excecaoDeLeituraAmpla: excecaoValida }),
+    ...(typeof source['tetoDeTokens'] === 'number' ? { tetoDeTokens: source['tetoDeTokens'] } : {}),
+    ...(typeof source['motivoDaExpansao'] === 'string'
+      ? { motivoDaExpansao: source['motivoDaExpansao'] }
+      : {}),
+    ...(typeof source['packAnterior'] === 'string' ? { packAnterior: source['packAnterior'] } : {})
   }
 }
 
@@ -137,6 +250,12 @@ export interface IpcDependencies {
   readonly commandAllowlist: CommandAllowlistRepository
   /** Projeto local e planejamento (SPEC-Planejamento-01): Git só pelo terminal controlado. */
   readonly projects: ProjectService
+  /**
+   * Contexto, skills e orçamento (SPEC-Planejamento-02): o manifesto que toda geração exige.
+   * A leitura de arquivo acontece **aqui dentro**, sob o diretório do projeto — nunca no
+   * renderer, que só indica caminhos.
+   */
+  readonly contexts: ContextService
   /** Vault de credenciais (SPEC-Providers-01): status para a UI, valor só dentro do main. */
   readonly credentials: CredentialService
   /** Runs persistidos, para a UI listar o histórico. */
@@ -668,7 +787,14 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
         ...(temTarefa ? { taskType: bruto.taskType } : {}),
         ...(typeof bruto.model === 'string' ? { model: bruto.model } : {}),
         ...(typeof bruto.system === 'string' ? { system: bruto.system } : {}),
-        ...(typeof bruto.maxTokens === 'number' ? { maxTokens: bruto.maxTokens } : {})
+        ...(typeof bruto.maxTokens === 'number' ? { maxTokens: bruto.maxTokens } : {}),
+        // SPEC-Planejamento-02, critério 1. Este handler **reconstrói** o pedido campo a campo
+        // em vez de repassar o objeto cru — e por isso um campo novo que não seja copiado aqui
+        // some silenciosamente no caminho. Foi o que o E2E pegou: sem estas duas linhas, toda
+        // chamada vinda da UI chegava ao ponto único sem `contextPackId` e era recusada por
+        // falta de contexto, inclusive as que o declaravam.
+        ...(typeof bruto.contextPackId === 'string' ? { contextPackId: bruto.contextPackId } : {}),
+        ...(bruto.diagnostico === true ? { diagnostico: true } : {})
       }
 
       // Sem prompt no log: o texto do usuário é conteúdo, e o canal registra o fato da
@@ -1165,6 +1291,63 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
         return null
       }
       return deps.projects.concluirMarco(projectId, marco, workspace) ?? null
+    }
+  )
+
+  // Contexto, skills e orçamento (SPEC-Planejamento-02). O gate do critério 1 mora no serviço;
+  // o handler valida a forma do pedido na fronteira e não decide nada — duplicar a política
+  // aqui criaria uma segunda fonte que divergiria da primeira.
+  ipcMain.handle(
+    IPC_CHANNELS.contextBuild,
+    (_event, pedido: unknown, workspace: unknown): ContextPackOutcome => {
+      if (!isWorkspaceId(workspace)) {
+        throw new Error('Workspace inválido.')
+      }
+
+      const validado = parsePedidoDeContexto(pedido)
+      if (validado === undefined) {
+        // Recusa de forma, não de política: o pedido não casa o contrato. Desfecho e não
+        // exceção, pelo mesmo motivo dos outros — a tela precisa mostrar o que houve.
+        return {
+          reason: 'contexto-vazio',
+          mensagem: 'O pedido de contexto está incompleto. Selecione ao menos um arquivo.'
+        }
+      }
+
+      return deps.contexts.montar(validado, workspace)
+    }
+  )
+
+  ipcMain.handle(IPC_CHANNELS.contextList, (_event, projectId: unknown): readonly ContextPack[] => {
+    if (typeof projectId !== 'string') return []
+    return deps.contexts.listar(projectId)
+  })
+
+  // Sem parâmetro: as capacidades são do **ambiente**, não do projeto. E devolvem sempre a
+  // lista completa — é o critério 5 valendo na fronteira também.
+  ipcMain.handle(IPC_CHANNELS.contextCapabilities, (): readonly CapacidadeResolvida[] =>
+    deps.contexts.capacidades()
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.contextFailures,
+    (_event, projectId: unknown): readonly FalhaRegistrada[] => {
+      if (typeof projectId !== 'string') return []
+      return deps.contexts.listarFalhas(projectId)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.contextResolveFailure,
+    (_event, projectId: unknown, fingerprint: unknown, workspace: unknown): boolean => {
+      if (
+        !isWorkspaceId(workspace) ||
+        typeof projectId !== 'string' ||
+        typeof fingerprint !== 'string'
+      ) {
+        return false
+      }
+      return deps.contexts.resolverFalha(projectId, workspace, fingerprint)
     }
   )
 

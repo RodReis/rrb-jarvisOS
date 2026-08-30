@@ -58,7 +58,9 @@ describe('migrations', () => {
     // tenta recriar um objeto que já existe. A v2 adicionou `theme`; a v3, `allowed_directory`;
     // a v6, o acento por módulo; a v7, `approval_request`; a v8, `allowed_command`; a v9,
     // `credential_ref`; a v13, `credential_ref.expires_at`; a v14, `user_profile.github_client_id`;
-    // a v15, `project` e `planning_session`.
+    // a v15, `project` e `planning_session`; a v16, `context_pack`, `context_item` e
+    // `failure_fingerprint`. A v17 só acrescenta colunas a `cost_event`, que já é derrubada
+    // inteira aqui — não há o que desfazer separadamente.
     antigo.exec('ALTER TABLE user_profile DROP COLUMN theme')
     antigo.exec('ALTER TABLE user_profile DROP COLUMN github_client_id')
     antigo.exec('ALTER TABLE user_profile DROP COLUMN accent_noa')
@@ -78,6 +80,9 @@ describe('migrations', () => {
     antigo.exec('DROP TABLE credit_event')
     antigo.exec('DROP TABLE project')
     antigo.exec('DROP TABLE planning_session')
+    antigo.exec('DROP TABLE context_pack')
+    antigo.exec('DROP TABLE context_item')
+    antigo.exec('DROP TABLE failure_fingerprint')
     antigo.pragma('user_version = 1')
     antigo.close()
 

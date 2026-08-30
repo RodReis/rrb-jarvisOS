@@ -501,6 +501,151 @@ const MIGRATIONS: readonly string[] = [
     updated_at    TEXT NOT NULL,
     created_at    TEXT NOT NULL
   );
+  `,
+
+  // 16 — ContextPack, itens do manifesto, falhas deduplicadas e uso não-monetário
+  // (SPEC-Planejamento-02).
+  //
+  // **`context_pack` é append-only por desenho, não por convenção.** Não há `UPDATE` em lugar
+  // nenhum do repositório: expandir contexto insere **outro** pack, com `pack_anterior`
+  // apontando para este. Um manifesto editável descreveria um contexto que talvez não tenha
+  // sido o enviado, e o critério 2 ("reproduzir quais revisões foram enviadas") passaria a
+  // depender de ninguém ter mexido depois.
+  //
+  // `hash` é UNIQUE: dois packs com o mesmo conteúdo canônico **são** o mesmo pack, e é isso
+  // que torna verificável o invariante 2 do CONVENTION §4 (mesma revisão aprovada não pede
+  // aceite novo) sem comparar campo a campo.
+  //
+  // `context_item` em tabela filha, e não JSON numa coluna, porque o item **é consultado por
+  // elemento**: "esta geração viu esta revisão deste arquivo?" é a pergunta do critério 2, e
+  // respondê-la sobre um JSON exigiria varrer todos os packs e desserializar cada um.
+  //
+  // `excecao_*` NULLable em conjunto: ou os quatro campos existem (há exceção registrada) ou
+  // nenhum existe. Um booleano `whole_repo` registraria que aconteceu sem registrar por que e
+  // sob que teto — e o critério 3 pede a exceção **visível**, não o fato.
+  //
+  // `failure_fingerprint` tem PK composta `(user_id, project_id, fingerprint)`: o fingerprint
+  // é derivado do conteúdo normalizado da falha, então a mesma falha em dois projetos colide
+  // de propósito — e não pode. `resolvida` é o que sustenta o critério 4: falha resolvida não
+  // volta ao prompt, e `ocorrencias` é o contador que distingue "voltou" de "nunca saiu".
+  `
+  CREATE TABLE context_pack (
+    id            TEXT PRIMARY KEY,
+    user_id       TEXT NOT NULL,
+    workspace_id  TEXT NOT NULL,
+    project_id    TEXT NOT NULL,
+    tarefa        TEXT NOT NULL,
+    -- JSON: regras de domínio e falhas abertas, como texto já resolvido no momento do envio.
+    regras        TEXT NOT NULL,
+    falhas        TEXT NOT NULL,
+    resumo_anterior TEXT,
+    -- Orçamento da etapa. estimado_usd NULL = rota de assinatura (não se converte em USD).
+    etapa         TEXT NOT NULL,
+    unmetered     INTEGER NOT NULL,
+    teto_de_tokens INTEGER NOT NULL,
+    tokens_estimados INTEGER NOT NULL,
+    estimado_usd  REAL,
+    motivo_da_expansao TEXT,
+    -- Exceção de leitura ampla: os quatro juntos, ou nenhum.
+    excecao_motivo TEXT,
+    excecao_teto_bytes INTEGER,
+    excecao_autorizado_por TEXT,
+    excecao_autorizado_em TEXT,
+    rota          TEXT NOT NULL,
+    pack_anterior TEXT,
+    hash          TEXT NOT NULL UNIQUE,
+    created_at    TEXT NOT NULL
+  );
+  CREATE INDEX idx_context_pack_projeto ON context_pack(user_id, project_id, created_at);
+
+  CREATE TABLE context_item (
+    pack_id   TEXT NOT NULL,
+    caminho   TEXT NOT NULL,
+    hash      TEXT NOT NULL,
+    origem    TEXT NOT NULL,
+    bytes     INTEGER NOT NULL,
+    -- NULL nos dois = arquivo inteiro; preenchidos = trecho, como a busca estrutural devolve.
+    linha_de  INTEGER,
+    linha_ate INTEGER,
+    motivo    TEXT NOT NULL,
+    ordem     INTEGER NOT NULL,
+    PRIMARY KEY (pack_id, ordem)
+  );
+  CREATE INDEX idx_context_item_revisao ON context_item(hash);
+
+  CREATE TABLE failure_fingerprint (
+    user_id      TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    project_id   TEXT NOT NULL,
+    fingerprint  TEXT NOT NULL,
+    resumo       TEXT NOT NULL,
+    ocorrencias  INTEGER NOT NULL,
+    -- 1 = resolvida; resolvida não volta ao contexto (critério 4).
+    resolvida    INTEGER NOT NULL DEFAULT 0,
+    primeira_em  TEXT NOT NULL,
+    ultima_em    TEXT NOT NULL,
+    PRIMARY KEY (user_id, project_id, fingerprint)
+  );
+  `,
+
+  // 17 — uso não-monetário no ledger de custo (SPEC-Planejamento-02, critério 1a).
+  //
+  // **Um ledger só, e não dois.** A mesma chamada existindo em `cost_event` e num
+  // `planning_ledger` paralelo daria duas verdades sobre ela, e a primeira divergência entre
+  // as duas seria descoberta por quem auditasse o gasto do mês.
+  //
+  // `unmetered` é coluna e não dedução do `provider`: a rota que não se converte em USD é um
+  // **fato da linha**, e deduzi-lo consultando `ROTAS_UNMETERED` faria as linhas antigas
+  // mudarem de significado no dia em que a lista mudar. O `estimado_usd` da rota de assinatura
+  // fica NULL pela mesma razão que `real_usd` já é NULLable: zero afirmaria "custou nada",
+  // NULL diz "não se converte em USD" (emenda do PI de 2026-08-29).
+  //
+  // Tokens e tempo entram como colunas porque são **o que a rota de assinatura registra** no
+  // lugar do dinheiro (spec § Orçamento: "chamadas, tokens e tempo"). Sem eles, a linha da rota
+  // de assinatura seria uma linha com todos os números vazios — indistinguível de erro.
+  //
+  // `project_id` fecha a pendência anotada no MVP-006: a coluna existia em `credit_event`
+  // esperando o MVP-008, e é esta fatia que passa a ter projeto para preencher.
+  //
+  // **A tabela é recriada, e não só estendida**, por uma razão que o teste encontrou: a v10
+  // criou `estimado_usd` como NOT NULL, e a rota de assinatura precisa gravar NULL ali. SQLite
+  // não afrouxa NOT NULL por `ALTER`, então o caminho é o oficial (criar → copiar → trocar).
+  // Alternativa recusada: gravar zero na rota de assinatura para caber no NOT NULL — que é
+  // exatamente a mentira que o critério 1a existe para impedir ("custou nada" no lugar de "não
+  // se converte em USD").
+  //
+  // O `INSERT ... SELECT` preserva as linhas existentes, incluindo os ids: a migration não pode
+  // perder o ledger, que é o insumo do gate (SPEC-Fundacao-04: migration preserva dado). Elas
+  // entram com `unmetered = 0` porque é o que eram — chamadas em rota paga, todas.
+  `
+  CREATE TABLE cost_event_novo (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    call_id      TEXT NOT NULL,
+    provider     TEXT NOT NULL,
+    model        TEXT NOT NULL,
+    -- NULL = rota de assinatura: não se converte em USD (emenda do PI de 2026-08-29).
+    estimado_usd REAL,
+    real_usd     REAL,
+    created_at   TEXT NOT NULL,
+    unmetered    INTEGER NOT NULL DEFAULT 0,
+    -- O que a rota de assinatura registra no lugar do dinheiro.
+    tokens_entrada    INTEGER,
+    tokens_saida      INTEGER,
+    latencia_total_ms INTEGER,
+    project_id        TEXT,
+    context_pack_id   TEXT
+  );
+
+  INSERT INTO cost_event_novo
+    (id, user_id, workspace_id, call_id, provider, model, estimado_usd, real_usd, created_at)
+  SELECT id, user_id, workspace_id, call_id, provider, model, estimado_usd, real_usd, created_at
+    FROM cost_event;
+
+  DROP TABLE cost_event;
+  ALTER TABLE cost_event_novo RENAME TO cost_event;
+  CREATE INDEX idx_cost_event_escopo ON cost_event(user_id, workspace_id, created_at);
   `
 ]
 

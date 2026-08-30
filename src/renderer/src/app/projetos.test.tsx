@@ -20,6 +20,12 @@ const pickProjectDirectory = vi.fn()
 const renameProject = vi.fn()
 const removeProject = vi.fn()
 const addAllowedCommand = vi.fn()
+// A tela passou a hospedar o painel de contexto (SPEC-Planejamento-02). Os mocks entram aqui
+// porque o painel só monta quando o usuário o abre — e é justamente esse caminho que o teste
+// abaixo exercita.
+const listContextPacks = vi.fn()
+const listCapabilities = vi.fn()
+const listFailures = vi.fn()
 
 function projeto(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -44,6 +50,9 @@ beforeEach(() => {
   renameProject.mockReset()
   removeProject.mockReset()
   addAllowedCommand.mockReset()
+  listContextPacks.mockReset().mockResolvedValue([])
+  listCapabilities.mockReset().mockResolvedValue([])
+  listFailures.mockReset().mockResolvedValue([])
   listProjects.mockResolvedValue([])
 
   Object.defineProperty(window, 'jarvis', {
@@ -54,7 +63,10 @@ beforeEach(() => {
       pickProjectDirectory,
       renameProject,
       removeProject,
-      addAllowedCommand
+      addAllowedCommand,
+      listContextPacks,
+      listCapabilities,
+      listFailures
     },
     configurable: true,
     writable: true
@@ -291,5 +303,44 @@ describe('ProjetosLocais', () => {
     // nunca um comando. Um `runCommand` aqui seria o segundo caminho de escrita de repositório
     // que a decisão 2 do PI proíbe.
     expect(runCommand).not.toHaveBeenCalled()
+  })
+
+  it('abre o contexto do projeto no próprio item, e o botão declara o estado', async () => {
+    const usuario = userEvent.setup()
+    listProjects.mockResolvedValue([projeto()])
+
+    render(<ProjetosLocais workspace="jarvis" />)
+
+    const abrir = await screen.findByRole('button', { name: /Abrir contexto de Projeto Alfa/ })
+    // `aria-expanded` porque o botão alterna uma região desta mesma tela: sem ele, quem ouve
+    // a interface não sabe se o painel abriu ou se a página mudou.
+    expect(abrir).toHaveAttribute('aria-expanded', 'false')
+
+    await usuario.click(abrir)
+
+    expect(await screen.findByText('Contexto, skills e orçamento')).toBeInTheDocument()
+    expect(listContextPacks).toHaveBeenCalledWith('p-1')
+    expect(screen.getByRole('button', { name: 'Fechar contexto' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    )
+  })
+
+  it('mostra o contexto de um projeto por vez', async () => {
+    const usuario = userEvent.setup()
+    listProjects.mockResolvedValue([projeto(), projeto({ id: 'p-2', nome: 'Projeto Beta' })])
+
+    render(<ProjetosLocais workspace="jarvis" />)
+
+    await usuario.click(
+      await screen.findByRole('button', { name: /Abrir contexto de Projeto Alfa/ })
+    )
+    await usuario.click(
+      await screen.findByRole('button', { name: /Abrir contexto de Projeto Beta/ })
+    )
+
+    // Dois painéis abertos empurrariam a lista para fora da dobra e o usuário perderia a
+    // coluna que veio varrer.
+    expect(screen.getAllByText('Contexto, skills e orçamento')).toHaveLength(1)
   })
 })
