@@ -45,3 +45,11 @@
 9. MVP-009 usa worktree isolado, WIP=1 e no máximo três tentativas totais. Reinício reconcilia antes de repetir efeito.
 10. Documentação/ADR auxiliar não bloqueia código depois do gate. A pipeline não inventa LGPD, consentimento, aceite duplo, classificação de domínio ou requisito não fornecido pelo PI.
 11. Por solicitação explícita do PI, os épicos e as 18 fatias dos MVPs 006/008/009 foram pré-criados no GitHub em ordem. Fatias com SPEC em revisão usam `proplan:planejado`, ficam fora da fila e não autorizam implementação; ao aprovar, a mesma issue migra para `proplan:backlog`.
+
+## Decisões da revisão de furos do MVP-009 (PI, 2026-08-30)
+
+1. **Executor autentica por proxy no host.** O container do executor não recebe credencial nem sessão; `ANTHROPIC_BASE_URL` aponta para o main, que injeta a rota (assinatura ou API paga) e registra uso no ponto único do MVP-005. Alternativas descartadas: volume dedicado com `CLAUDE_CONFIG_DIR` (segredo dentro do sandbox) e executor no host (reverte a decisão do sandbox).
+2. **A pipeline gera o CI do projeto-alvo** no primeiro PR, a partir dos comandos de validação do pacote. Sem check configurado ou sem conclusão aceita pela origem no `head SHA`, não há merge — nunca verde por ausência.
+3. **WIP=1 é slot global** no MVP-009. Concorrência entre projetos é o MVP-012.
+4. **A branch `codex/pipeline-v2-design`** (33 commits: SPECs do MVP-7 e MVPs 10–16, emendas a SPECs aprovadas e à CONVENTION) foi enviada ao remoto e entra na `main` por PR de docs. As emendas dela que mudam significado de decisão já registrada — em especial redefinir `proplan:finalizado` como "encerramento administrativo" em vez de aceite do PI — **não valem até o PI decidir no PR**; até lá, o CLAUDE.md e a CONVENTION da `main` continuam a regra.
+5. **(Proposta do Cowork, não decidida pelo PI — PI pode vetar no PR.)** SPEC só é fonte para o Code quando está na `main`. Revisão "aprovada" em branch local não pushada não é aprovada para efeito de fila — issue que cita spec inexistente no remoto é issue sem spec.

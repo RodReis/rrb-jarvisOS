@@ -19,8 +19,8 @@ Desktop app **local-first** (Electron + React + TypeScript) com dois espaços de
 ## Papéis e governança
 
 - **Rodrigo Reis (PI)** — decide escopo, prioridades e trade-offs; aprova specs e aceita entregas. **Não executa o fluxo**: não cria issue, não commita, não abre PR e não faz merge. O aceite é dele; a execução é do Code.
-- **Claude Cowork (planejamento)** — especifica e mantém `docs/` e as specs em `docs/specs/`. Antes de finalizar qualquer spec, apresenta as perguntas abertas e dúvidas ao PI — spec só vira `aprovada-pi` com todas resolvidas (evitar retrabalho). Quando a spec vira `aprovada-pi`, **cria a issue-fatia no board** (coluna Backlog, assignee PI). **Nunca implementa código** — implementação é exclusiva do Claude Code.
-- **Claude Code (você)** — planeja, codifica, testa (código, UX e UI — pode usar as skills do impeccable), atualiza a documentação e **sempre commita todos os documentos de `docs/`** junto da entrega. Implementa a partir deste arquivo + `docs/` + spec da feature em `docs/specs/`. **Não cria a issue** (é do Cowork) — pega o card, move pelo fluxo e entrega com PR. Pode criticar arquitetura, **não escopo**. Sem spec para a tarefa, ou spec ambígua → perguntar ao PI antes de codificar, nunca assumir. Deve apontar problemas técnicos da spec — a correção passa pelo PI.
+- **Claude Cowork (planejamento)** — especifica e mantém `docs/` e as specs em `docs/spec/`. Antes de finalizar qualquer spec, apresenta as perguntas abertas e dúvidas ao PI — spec só vira `aprovada-pi` com todas resolvidas (evitar retrabalho). Quando a spec vira `aprovada-pi`, **cria a issue-fatia no board** (coluna Backlog, assignee PI) — ou, se a issue foi pré-criada em `proplan:planejado`, troca o label para `proplan:backlog` na mesma issue, sem criar outra. **Nunca implementa código** — implementação é exclusiva do Claude Code.
+- **Claude Code (você)** — planeja, codifica, testa (código, UX e UI — pode usar as skills do impeccable), atualiza a documentação e **sempre commita todos os documentos de `docs/`** junto da entrega. Implementa a partir deste arquivo + `docs/` + spec da feature em `docs/spec/`. **Não cria a issue** (é do Cowork) — pega o card, move pelo fluxo e entrega com PR. Pode criticar arquitetura, **não escopo**. Sem spec para a tarefa, ou spec ambígua → perguntar ao PI antes de codificar, nunca assumir. Deve apontar problemas técnicos da spec — a correção passa pelo PI.
 
 ### Hierarquia: MVP (épico) → fatia
 
@@ -82,18 +82,6 @@ Exemplos:
 
 O par MVP↔SPEC↔Fatia deriva do **Índice Fatia ↔ SPEC** do `docs/STATUS.md` (fonte única). Card de teste/descartável leva `[TEST]` no lugar do tipo.
 
-### Fatia exige spec. Correção de bug documentado, não.
-
-A regra *"sem spec `aprovada-pi` → não codificar"* existe para impedir **escopo assumido** — o Code inventando o que fazer. Ela **não se aplica** quando não há escopo a assumir:
-
-| tipo | precisa de spec? | por quê |
-|---|---|---|
-| **Fatia** (escopo novo, comportamento novo) | **Sim** | há decisões de produto a tomar — são do PI |
-| **Correção de bug já documentado** (o comportamento correto está escrito num ADR, no `ARCHITECTURE.md` ou numa spec existente) | **Não** | não há o que decidir: o certo já está definido. Basta o item no `STATUS.md` + a regra escrita |
-| **Bug sem comportamento correto definido** | **Sim** — ou pelo menos perguntar ao PI | se o certo ainda não foi decidido, decidir é do PI |
-
-Exemplo vivo: **sync SHA-aware** (elimina o `noop` falso) — não tem spec e **não precisa**. A regra está no `ARCHITECTURE.md` → Resiliência, com os call sites e o que é proibido. Implementar direto.
-
 ## Regras de trabalho
 
 - **Idioma**: documentação, specs, commits e comunicação sempre em português (pt-BR); código e identificadores em inglês.
@@ -110,6 +98,7 @@ Exemplo vivo: **sync SHA-aware** (elimina o `noop` falso) — não tem spec e **
 
 ### Colunas do board (mapeamento Issues → Kanban)
 
+- **Planejado** = `open` + `proplan:planejado` — *issue pré-criada por decisão do PI (2026-08-28) para dar visibilidade à ordem; SPEC ainda não `aprovada-pi`; nunca recebe `next`/`todo`/`doing`. Ao aprovar a SPEC, o Cowork troca o label para `proplan:backlog` na mesma issue*
 - **Backlog / A Fazer / Em Andamento** = `open` + `proplan:backlog` \| `proplan:todo` \| `proplan:doing`
 - **Feito** = `open` + `proplan:done` — *entregue (PR mergeado), aguardando aceite*
 - **Finalizado** = `closed` + `proplan:finalizado` — *aceito pelo dono*
@@ -128,6 +117,8 @@ A regra *"sem spec `aprovada-pi` → não codificar"* existe para impedir **esco
 | **Fatia** (escopo novo, comportamento novo) | **Sim** | há decisões de produto a tomar — são do PI |
 | **Correção de bug já documentado** (o comportamento correto está escrito num ADR, no `ARCHITECTURE.md` ou numa spec existente) | **Não** | não há o que decidir: o certo já está definido |
 | **Bug sem comportamento correto definido** | **Sim** — ou pelo menos perguntar ao PI | se o certo ainda não foi decidido, decidir é do PI |
+
+Exemplo vivo: **sync SHA-aware** (elimina o `noop` falso) — não tem spec e **não precisa**. A regra está no `ARCHITECTURE.md` → Resiliência, com os call sites e o que é proibido. Implementar direto.
 
 #### Correção: o Code cria a própria issue
 
