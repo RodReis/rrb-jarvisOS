@@ -109,6 +109,8 @@ Fontes entram por adaptadores de leitura: projetos registrados, registros dos m�
 
 Ingestão usa referência de corte na carga inicial e progresso próprio por fonte, persistido consistentemente com os resultados. Retomada parte do último ponto confirmado; reentregas são deduplicadas e divergência na mesma identidade/revisão é conflito. Evento problemático vira pendência durável antes de continuar, sem ser marcado como aplicado. Fontes falham independentemente, com retentativas progressivas e consumo limitado. Cobertura distingue carga, atualização, atraso, pendência e indisponibilidade; histórico expirado exige reconciliação do disponível e lacuna explícita, sem promessa de recuperação completa.
 
+Graphify entra por adapter substituível com contrato próprio e versão compatível verificada, recebendo fontes selecionadas com identidade/revisão, sem acesso ampliado ou instalação global automática. Código usa extração estrutural local; enriquecimento semântico usa executores autorizados e orçamento existente, sem migração silenciosa para API paga. Relações normalizadas distinguem extração/inferência e preservam fontes/revisões; correções/remoções invalidam relações antigas como atuais. Reflexões são candidatas rastreáveis, não memória canônica paralela nem promoção automática. Ausência/incompatibilidade mantém busca básica; atualizações exigem testes de compatibilidade. Interface, schemas e versão concreta ainda serão especificados.
+
 Fonte: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`.
 
 ### Pipeline V2 aprovada (não implementada)

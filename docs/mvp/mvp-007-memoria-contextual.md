@@ -1,6 +1,6 @@
 # MVP-007 — Memória Contextual e RAG
 
-- Status: **direção, captura, identidade/correções, persistência/retenção, recuperação, fontes iniciais e ingestão/retomada aprovadas pelo PI em 2026-08-30; design em elaboração; sem fatias ou SPECs; implementação não autorizada**.
+- Status: **direção, captura, identidade/correções, persistência/retenção, recuperação, fontes iniciais, ingestão/retomada e contrato de integração opcional do Graphify aprovados pelo PI em 2026-08-30; design em elaboração; sem fatias ou SPECs; implementação não autorizada**.
 - Origem: recorte de memória híbrida/RAG anteriormente associado ao Corte 3.
 - Relação com a pipeline: **não bloqueia MVP-008, MVP-009 nem MVP-016**; a M16-F05 mantém escopo próprio e integração reutilizável.
 - Design em elaboração: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`.
@@ -53,6 +53,12 @@ Carga inicial registra uma referência de corte para acompanhar as alterações 
 
 Evento problemático vira pendência durável com identificação, motivo e referência para reprocessamento antes de continuar, nunca aplicação fictícia. Falhas de uma fonte não interrompem as outras nem a pipeline; retentativas usam espera progressiva e consumo limitado. Cobertura distingue carga inicial, atualização, atraso, pendências e indisponibilidade. Histórico expirado exige reconciliar o disponível e declarar lacunas, sem prometer recuperação completa. Detalhamento aprovado na seção 11 do design; mecanismos e limites técnicos ainda serão especificados.
 
+## Integração opcional do Graphify aprovada
+
+Adapter substituível sob contrato próprio dos produtos, sem definir o modelo central pelo formato interno do Graphify. Recebe apenas fontes selecionadas com identidade/revisão, sem ampliar acessos ou instalar configurações globais automaticamente. Extração estrutural local de código e enriquecimento semântico de documentos/notas pelos executores autorizados, dentro do orçamento existente, sem migração silenciosa para API paga; compatibilidade concreta ainda será verificada.
+
+Saída normaliza relações com fonte, revisão e distinção entre extração e inferência; correções/remoções invalidam relações antigas antes de apresentá-las como atuais. Resultados de `save-result`/`reflect`, quando usados, são candidatos rastreáveis, não decisões do PI ou promoção automática de políticas. Ausência/incompatibilidade mantém busca básica; atualizações exigem testes de compatibilidade e não são silenciosas. Contrato aprovado na seção 12 do design; assinaturas, schemas e versão concreta ainda serão especificados, sem instalação ou implementação.
+
 ## Regra de planejamento
 
 O MVP entra em planejamento ativo, sem mudar a fila de construção. A aprovação da direção não equivale ao aceite de um design completo ou de SPECs ainda inexistentes. Fatias, contratos e critérios serão definidos progressivamente; a numeração permanece exclusivamente no índice de `docs/STATUS.md`.
@@ -62,7 +68,7 @@ O MVP entra em planejamento ativo, sem mudar a fila de construção. A aprovaç�
 - formato técnico dos identificadores/revisões e schemas dos eventos, representação de cobertura e mecanismos de corte, confirmação, retomada, pendências e retentativas conforme a política aprovada;
 - contratos técnicos de armazenamento/compactação/reconstrução, capacidade e exclusão física conforme a política aprovada; sincronização fora deste recorte;
 - contratos técnicos de consulta/resultados, atualização incremental e valores dos limites dentro do orçamento do solicitante;
-- estratégia de atualização e contrato técnico/versionado do Graphify ou alternativa;
+- assinaturas, schemas, versão concreta, execução e testes de compatibilidade do adapter conforme o contrato aprovado;
 - critérios de validação de lições fora da pipeline;
 - fatias, dependências, critérios de aceite e interfaces formais.
 

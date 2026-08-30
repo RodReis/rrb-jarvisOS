@@ -1,7 +1,7 @@
 # Design em elaboração — MVP-007: Memória compartilhada JarvisOS e AgentsOS
 
-- Status: **direção, captura, identidade/correções, persistência/retenção, recuperação, fontes iniciais e ingestão/retomada aprovadas pelo PI em 2026-08-30; detalhamento em elaboração**.
-- Esta revisão registra decisões parciais de escopo, captura, identidade, persistência, recuperação, fontes e ingestão; **não é um design completo nem uma SPEC aprovada para construção**.
+- Status: **direção, captura, identidade/correções, persistência/retenção, recuperação, fontes iniciais, ingestão/retomada e contrato de integração opcional do Graphify aprovados pelo PI em 2026-08-30; detalhamento em elaboração**.
+- Esta revisão registra decisões parciais de escopo, captura, identidade, persistência, recuperação, fontes, ingestão e integração do Graphify; **não é um design completo nem uma SPEC aprovada para construção**.
 - Origem: proposta do PI de usar Graphify para memória e aprendizado transversal, acompanhada de quatro capturas dos menus futuros de JarvisOS/AgentsOS; aprovação da divisão entre MVP-007, M16-F05 e MVP-016.
 - Documento do MVP: `docs/mvp/mvp-007-memoria-contextual.md`.
 - Fatias e SPECs: ainda não definidas. Índice canônico: `docs/STATUS.md`.
@@ -144,18 +144,31 @@ O PI aprovou o seguinte modelo de continuidade da ingestão:
 
 Foram afastados reconstruir tudo a cada início, pelo custo desnecessário, e ignorar eventos problemáticos, por ocultar perda. A política não promete entrega exatamente uma vez nem recuperação de conteúdo perdido. Preserva as regras de correção, invalidação e retenção das seções 7 e 8; não executa importação ou reprocessamento nesta etapa documental.
 
-## 12. Decisões ainda abertas
+## 12. Contrato de integração opcional do Graphify (PI, 2026-08-30)
 
-1. Contrato técnico/versionado do Graphify, alternativas e verificação de compatibilidade.
+O PI aprovou o seguinte contrato de fronteira para evitar duas memórias concorrentes:
+
+1. **Adapter substituível:** JarvisOS/AgentsOS mantêm um contrato próprio, com versão compatível verificada. O formato interno do Graphify não define o modelo central da memória; os registros canônicos continuam nos responsáveis já definidos.
+2. **Entrada delimitada:** o adapter recebe fontes selecionadas com identidade e revisão. Não amplia acessos nem instala configurações globais automaticamente. A seleção e o progresso das fontes permanecem sob os contratos das seções 10 e 11.
+3. **Código, documentos e notas:** extração estrutural local para código e enriquecimento semântico pelos executores autorizados, dentro do orçamento existente, sem migração silenciosa para API paga. O recorte não reduz a memória global a código nem exige chamada de modelo por evento. A compatibilidade concreta entre backend, executor e versão ainda será verificada; este aceite não a presume.
+4. **Saída rastreável:** normalizar relações com fonte, revisão e distinção entre extração e inferência. Correções e remoções devem invalidar relações antigas antes de apresentá-las como atuais. O estado do grafo não substitui a validade das fontes ou o histórico de correções do núcleo.
+5. **Reflexões como candidatas:** quando utilizados, resultados de `save-result`/`reflect` entram com proveniência e não substituem decisões do PI nem promovem políticas automaticamente. A disponibilidade desses recursos não cria uma segunda fonte canônica de memória nem transforma uma sugestão em lição validada. Validação operacional da pipeline permanece no MVP-016; critérios dos demais módulos ainda serão definidos.
+6. **Falha sem paralisação:** ausência ou incompatibilidade mantém a busca básica, sob os limites existentes. Atualizações do adapter exigem testes de compatibilidade; não atualizar silenciosamente. A integração opcional não bloqueia a pipeline nem torna o MVP-007 obrigatório para a F05.
+
+Foi afastado acoplar o núcleo ao formato interno do Graphify: economizaria adaptação inicial, mas dificultaria substituição e controle das correções. Permanecem para as SPECs a assinatura da interface, schemas normalizados, versão concreta, mecanismo de execução, mapeamento de erros e casos de teste. A aprovação do contrato não seleciona automaticamente todos os recursos do pacote, instala o componente ou inicia sua execução.
+
+## 13. Decisões ainda abertas
+
+1. Evidências necessárias para lições fora da pipeline.
 2. Formato dos identificadores/revisões, schemas dos eventos, representação de cobertura e mecanismos de corte, confirmação, retomada, pendências e retentativas conforme as seções 6, 7, 10 e 11.
 3. Contratos técnicos de armazenamento/compactação/reconstrução, capacidade e exclusão física conforme a seção 8; sincronização permanece fora deste recorte.
 4. Contratos técnicos de consulta/resultados, atualização incremental e limites conforme a seção 9.
-5. Evidências necessárias para lições fora da pipeline.
+5. Assinaturas, schemas, versão concreta, execução e testes de compatibilidade do adapter conforme o contrato aprovado na seção 12.
 6. Fatias, ordem, dependências, critérios de aceite e interfaces formais.
 
 As perguntas serão resolvidas uma por vez. Nenhum item aberto vira implementação, gate ou regra inventada pelo agente. Novos registros de decisão devem distinguir proposta de aprovação; design completo e SPECs terão sua revisão escrita no fluxo existente, sem pedir novamente aceite da mesma revisão.
 
-## 13. Evidência e limite desta revisão
+## 14. Evidência e limite desta revisão
 
 Este registro deriva da decisão do PI nesta conversa. A documentação oficial consultada para avaliar viabilidade está no [Graphify](https://github.com/Graphify-Labs/graphify); suporte documentado não prova compatibilidade com a versão instalada nem substitui futuros testes de contrato.
 

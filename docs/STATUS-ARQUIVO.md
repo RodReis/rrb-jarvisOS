@@ -206,6 +206,14 @@ Falhas de uma fonte não impedem outras nem a pipeline; retentativas usam espera
 
 Contrato registrado na seção 11 do design; próxima decisão: contrato técnico opcional do Graphify. Não houve implementação, ingestão, reprocessamento, instalação, atualização de issues ou push. Nenhuma SPEC de fatia foi criada/aprovada; contagem de 80, índice e fila preservados.
 
+### MVP-007 — contrato de integração opcional do Graphify aprovado (2026-08-30)
+
+Após o registro da ingestão/retomada no commit local `d76b632`, o PI aprovou adapter substituível sob contrato próprio, compatibilidade verificada e entrada delimitada por fontes selecionadas com identidade/revisão. Extração estrutural local para código; enriquecimento semântico pelos executores autorizados e dentro do orçamento existente, sem migração silenciosa para API paga. Não ampliar acessos nem instalar configurações globais automaticamente.
+
+Relações normalizadas preservam fonte/revisão, distinguem extração/inferência e deixam de valer como atuais quando afetadas por correções/remoções. Resultados de `save-result`/`reflect`, quando usados, entram como candidatos rastreáveis, não memória canônica paralela, decisão do PI ou promoção automática de políticas. Ausência/incompatibilidade mantém busca básica; atualizações exigem testes de compatibilidade e não são silenciosas.
+
+Contrato registrado na seção 12 do design; assinaturas, schemas, versão concreta e execução ainda serão especificados. Próxima decisão: validação das lições fora da pipeline. Não houve implementação, instalação, execução do Graphify, atualização de issues ou push. Nenhuma SPEC de fatia foi criada/aprovada; contagem de 80, índice e fila preservados.
+
 ## Pendências históricas preservadas
 
 - A UI de allowlist ainda exigia decisão de produto: localização, seletor nativo e remoção de `appDir`.
