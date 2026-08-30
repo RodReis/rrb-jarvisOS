@@ -1105,6 +1105,53 @@ A spec não define remoção nem edição de projeto, e o PI decidiu as duas ao 
 - **O critério 9 — importar o próprio `rrb-jarvisOS`** — é provado pelo teste que monta um repositório com histórico próprio em diretório temporário e confirma que conteúdo, histórico e ausência de `docs/spec/` do app permanecem. Importar o repositório real do disco num teste automatizado o colocaria sob escrita de um teste, que é justamente o risco que a fatia evita.
 - **Nenhum smoke ao vivo com o app rodando.** A fatia não chama serviço externo — o Git é local, e a suíte de integração o exercita de verdade, não por dublê. O que falta é o clique real na tela, e ele cabe na verificação do PI.
 
+### Fatia 02 — Contexto, skills e orçamento (`docs/spec/spec-planejamento-02-contexto-skills-orcamento.md`)
+
+Status: **entregue** — spec `aprovada-pi` (2026-08-29); issue [#95](https://github.com/RodReis/rrb-jarvisOS/issues/95). Depende da M8-F01, do MVP-005 e do MVP-006.
+
+- [x] **`src/shared/domain/context-pack.ts`** — `ContextPack`, `ContextItem`, `OrcamentoDaEtapa`, `ExcecaoDeLeituraAmpla`, `FalhaRegistrada` e as regras puras (`tokensDosItens`, `exigeExcecao`, `falhasParaOContexto`). Em `shared` porque a tela mostra o manifesto — o critério 3 pede a exceção *visível*
+- [x] **`src/shared/domain/skills.ts`** — resolução por **capacidade**, não por skill; `PROCEDIMENTO_DIRETO` existe para toda capacidade e é o que torna o critério 5 estrutural
+- [x] **`src/shared/domain/segredos.ts`** — detector por nome de arquivo e por formato reconhecível; **recusa, não redige**
+- [x] **Migration 16** (`context_pack`, `context_item`, `failure_fingerprint`) e **17** (`cost_event` com uso não-monetário). A 17 **recria** `cost_event`: a v10 criou `estimado_usd` como `NOT NULL`, e a rota de assinatura precisa gravar `NULL` ali
+- [x] **`ContextService`** — ordem projeto → contenção → segredo → exceção → teto → hash → gravação; toda recusa acontece **antes** da escrita, e por isso pack recusado não deixa linha
+- [x] **Gate no ponto único** — `AiRequest.contextPackId` obrigatório; o `AiCallService` recebe um `VerificadorDeContexto` no construtor, como já recebia o `BudgetService`
+- [x] **Rota de assinatura isenta por regra** — `isRotaUnmetered(provider)` no gate, e `unmetered = 0` no `totals` do orçamento
+- [x] **IPC + painel `ContextoDoProjeto`** — cinco canais, e **nenhum que leia arquivo**: a tela indica caminhos, o main lê
+- [x] **Testes**: 33 de integração, 26 de segredos, 18 de domínio, 14 de tela, 2 de handler e 4 E2E
+
+#### Decisões que valem registro
+
+1. **O gate é assinatura, não convenção** (decisão do PI). `contextPackId` é campo do `AiRequest`, e o ponto único recusa sem ele — mesma forma pela qual o `GitRunner` da F01 recebe o `TerminalEngine` e nada mais cabe no construtor. Um `ContextService` que apenas *chamasse* o ponto único deixaria o critério 1 dependendo de todo chamador futuro lembrar.
+2. **`diagnostico: true` é a única exceção, e é declarada por quem chama.** Fosse "não informou pack", todo esquecimento viraria diagnóstico por omissão, e o critério 1 seria contornado sem ninguém decidir isso. O painel de teste do Settings e as suítes E2E de stream/orçamento/roteamento a declaram porque é o que elas de fato são.
+3. **A rota de assinatura deixou de ser isenta por acidente.** Ela passava pelo gate porque seu preço na tabela é zero — não porque a regra dissesse isso. O gate agora pergunta `isRotaUnmetered(provider)`: no dia em que alguém "corrigisse" a tabela do `claude-code` para um número qualquer, a rota do PI passaria a ser barrada sem decisão de ninguém.
+4. **`null`, nunca zero, no orçamento da rota de assinatura.** Zero afirma "custou nada"; `null` diz "não se converte em USD", que é o fato (emenda do PI de 2026-08-29). O hash canônico do pack **distingue os dois**, senão dois manifestos que dizem coisas diferentes colidiriam.
+5. **`unmetered = 0` é filtro explícito no `totals`, não efeito colateral.** A linha da rota de assinatura já tem `real_usd` NULL e o `SUM` a ignoraria — mas depender disso faria a isenção viver num acidente: bastaria alguém preencher `real_usd` "para não deixar coluna vazia" e o uso do MAX passaria a barrar a rota paga.
+6. **Segredo recusa o pack inteiro, não o item.** Montar sem os arquivos acusados entregaria um contexto silenciosamente diferente do pedido. E o achado **nunca** carrega o trecho casado: um detector que repete o segredo para explicar-se acabou de copiá-lo para a mensagem, o log e a tela.
+7. **A exceção de leitura ampla é objeto, não booleano.** Um flag `wholeRepo: true` registraria que aconteceu sem registrar por que e sob que teto — e o critério 3 pede a exceção *visível*, não o fato. Na tela o campo do motivo só aparece quando há curinga: sempre visível, viraria pedágio do caminho normal e o usuário aprenderia a preenchê-lo por hábito.
+8. **Expansão de teto sem motivo é ignorada.** O pedido de teto maior só vale acompanhado de causa (critério 6); sem ela o padrão prevalece e a recusa acontece — que é o critério valendo, em vez de um teto que cresce sem explicação.
+9. **Fingerprint derivado do conteúdo normalizado.** Timestamps, UUIDs, hashes e números soltos saem antes: `foo:12` e `foo:47` são a mesma falha, e um id gerado faria a falha resolvida voltar como descoberta nova a cada execução.
+10. **Falha resolvida que reincide reabre.** Omiti-la do contexto porque um dia foi resolvida esconderia a regressão — que é o oposto do que o critério 4 protege.
+11. **Mesmo conteúdo canônico ⇒ mesmo pack.** `hash` é UNIQUE, e remontar contexto idêntico devolve o pack existente em vez de inserir outro. Duas linhas dariam duas identidades ao mesmo envio, e *"qual pack esta geração usou?"* passaria a ter duas respostas certas.
+12. **A UI da fatia mora dentro do item de projeto** (decisão do PI). O contexto é *do projeto*; uma tela separada obrigaria o usuário a levar na cabeça qual projeto estava olhando. Um painel por vez, porque dois abertos empurrariam a lista para fora da dobra.
+
+#### O que os testes pegaram
+
+1. **O handler do IPC descartava o `contextPackId`, e o gate recusava toda chamada da UI.** O `aiCall` **reconstrói** o `AiRequest` campo a campo, e um campo novo que ninguém copie ali some em silêncio. O gate estava certo; o transporte perdia o campo — e nenhum teste unitário do serviço veria isso, porque o serviço recebe o pedido já montado. Foi o **E2E** que pegou, com o app real: sem ele, a fatia teria sido entregue com a geração quebrada para todo usuário. Ficou um teste de handler com contrafactual (removida a linha, ele reprova).
+2. **O primeiro E2E do gate expirou por uma corrida que a tela real já conhecia.** Ele assinava `onAiStreamEvent` **depois** do `await callAi` — e quando a chamada é recusada o único evento é o `fim`, que o handler consome para descobrir o id e reemite imediatamente. O comentário do `ChamadaDeIa` nomeia essa janela desde a M5-F02; o teste tinha de assinar antes, como a tela faz.
+3. **O contrafactual do gate não compilou na primeira tentativa** — `if (false)` fez o `typecheck` abortar o `build`, e o Playwright teria medido o bundle anterior. É a armadilha registrada no MVP-006, reconhecida a tempo: o contrafactual virou "tratar ausência de pack como diagnóstico", que compila e reprova pelo motivo certo (a chamada avança até a credencial).
+4. **A listagem de packs era intermitente.** `created_at` tem precisão de milissegundo, e dois packs montados no mesmo milissegundo empatavam — com `id DESC` o desempate caía num UUID aleatório. Passava isolado, falhava na suíte completa quando a máquina estava rápida. Trocado por `rowid DESC`, que é a ordem de inserção — o que "mais recente" quer dizer aqui.
+5. **O `UNIQUE (hash)` transformou uma remontagem idêntica em `SqliteError`.** O teste que afirmava "mesmo conteúdo, mesmo hash" bateu na constraint — e a resposta certa não era afrouxar o índice, era reconhecer que a igualdade é afirmação do modelo: o serviço passou a devolver o pack existente.
+6. **O detector de segredo não acusava `DATABASE_PASSWORD`.** O `\b` antes de `password` nunca casa depois de um `_`, que é caractere de palavra. A âncora virou "início de linha ou separador" — e o teste de falso positivo (hash de commit, UUID, `API_KEY=` vazio, placeholder de documentação) continua verde, que é o que impede o detector de virar ruído.
+7. **Duas guardas de enumeração do preload acusaram os cinco métodos novos**, no unitário e no E2E. Resolvido enumerando, como na M8-F01 — a guarda existe justamente para que superfície nova seja decisão, não efeito colateral.
+
+#### Limites registrados, não silenciados
+
+- **A busca estrutural não é executada pelo app.** A spec manda começar por `rg`/índice antes de ler áreas amplas; esta fatia entrega a *origem* `busca-estrutural` no manifesto e o gate que exige exceção para leitura ampla, mas quem produz os caminhos é quem chama — na tela, o usuário. Executar `rg` seria comando arbitrário, e o MVP-004 fechou esse caminho.
+- **`skills: () => []` no boot.** Nenhuma skill está instalada, e isso **não é lacuna**: é o critério 5 sendo exercido no caminho real — todas as capacidades continuam atendidas pelo procedimento direto. Quando houver registro de skills, ele entra no `index.ts` sem tocar no serviço.
+- **A rota do pedido é a *prevista*, não a efetiva.** Quem escolhe o provider é o roteamento no instante da chamada; o pack declara a rota para decidir se o orçamento da etapa é em USD ou em uso. Um pack e uma chamada com rotas diferentes é possível — e o `CostEvent`, que carrega o `context_pack_id`, é onde os dois se cruzam.
+- **`resumoAnterior` e `regras` não têm produtor.** Os campos existem no manifesto porque a spec os lista; quem os preenche são as fatias seguintes (o wizard da M8-F03 e as aprovações da M8-F06). Declará-los agora evita que cada uma acrescente coluna.
+- **Sem smoke ao vivo contra provider real.** A fatia não chama serviço externo: o que ela faz é decidir se a chamada sai. O E2E exercita o gate no app real, com o ponto único inteiro no caminho.
+
 ### `[FIX]` Erro de git sem saída na tela de Projetos ([#170](https://github.com/RodReis/rrb-jarvisOS/issues/170))
 
 Status: **entregue** — correção de comportamento documentado (sem spec nova); PR [#171](https://github.com/RodReis/rrb-jarvisOS/pull/171), mergeado em 2026-08-30. Reportado pelo PI ao usar a tela da M8-F01.

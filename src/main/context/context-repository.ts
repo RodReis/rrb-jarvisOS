@@ -234,13 +234,22 @@ export class ContextRepository {
     return row === undefined ? undefined : this.montar(row)
   }
 
-  /** Os packs de um projeto, do mais recente ao mais antigo. */
+  /**
+   * Os packs de um projeto, do mais recente ao mais antigo.
+   *
+   * O desempate é o **`rowid`**, não o `id`. `created_at` tem precisão de milissegundo, e dois
+   * packs montados no mesmo milissegundo empatam — com `id DESC` o desempate cairia num UUID
+   * aleatório, e a listagem devolveria uma ordem diferente a cada execução. Foi assim que um
+   * teste desta suíte ficou intermitente: passava isolado e falhava na suíte completa, quando
+   * a máquina estava rápida o bastante para os dois `INSERT` caírem no mesmo milissegundo.
+   * `rowid` é a ordem de inserção, que é exatamente o que "mais recente" quer dizer aqui.
+   */
   listByProject(userId: string, projectId: string, limite = 20): readonly ContextPack[] {
     const rows = this.db
       .prepare(
         `SELECT * FROM context_pack
           WHERE user_id = ? AND project_id = ?
-          ORDER BY created_at DESC, id DESC
+          ORDER BY created_at DESC, rowid DESC
           LIMIT ?`
       )
       .all(userId, projectId, limite) as readonly PackRow[]

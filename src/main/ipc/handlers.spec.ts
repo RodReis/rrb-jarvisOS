@@ -156,8 +156,26 @@ const preferences = {
   }))
 }
 
+/**
+ * O ponto único de IA, dublado. Guarda o `AiRequest` que o handler montou — é isso que o teste
+ * de regressão abaixo inspeciona.
+ *
+ * O stream devolve **um** evento `fim` porque o handler consome o primeiro para descobrir o id;
+ * um iterável vazio faria o handler devolver `undefined` e o teste passaria sem nunca ter
+ * exercitado a montagem do pedido.
+ */
+const ai = {
+  recebido: undefined as Record<string, unknown> | undefined,
+  call: vi.fn(async function* (request: Record<string, unknown>) {
+    ai.recebido = request
+    yield { tipo: 'fim', id: 'chamada-1', estado: 'concluido' }
+  }),
+  cancel: vi.fn()
+}
+
 const deps = {
   audit,
+  ai,
   workspaces,
   preferences,
   policy,
@@ -183,6 +201,19 @@ function invocar(canal: string, ...args: unknown[]): unknown {
     ...rest: unknown[]
   ) => unknown
   return fn({}, ...args)
+}
+
+/**
+ * Como `invocar`, mas com um `event` que tem `sender` — o canal de IA bombeia os eventos do
+ * stream por ele, e um `{}` vazio derrubaria o bombeamento em vez de exercitar o handler.
+ */
+async function invocarComEvento(canal: string, ...args: unknown[]): Promise<unknown> {
+  registerIpcHandlers(deps)
+  const fn = handle.mock.calls.find(([c]) => c === canal)?.[1] as (
+    evento: unknown,
+    ...rest: unknown[]
+  ) => unknown
+  return await fn({ sender: { isDestroyed: () => false, send: vi.fn() } }, ...args)
 }
 
 /** Recupera o ouvinte de um canal só de ida e o dispara, como o Electron faria. */
@@ -594,5 +625,45 @@ describe('canais do terminal controlado (SPEC-ExecucaoReal-02)', () => {
   it('ignora workspace inválido sem tocar a allowlist de comandos', () => {
     expect(invocar(IPC_CHANNELS.commandAllowlistAdd, 'git', 'inexistente')).toEqual([])
     expect(commandAllowlist.add).not.toHaveBeenCalled()
+  })
+
+  /**
+   * O handler **reconstrói** o `AiRequest` campo a campo, e é por isso que este teste existe:
+   * um campo novo que ninguém copie ali some em silêncio no caminho até o ponto único.
+   *
+   * Não é hipótese. O E2E da M8-F02 pegou exatamente isso — `contextPackId` era descartado
+   * aqui, e toda chamada vinda da UI chegava ao gate sem manifesto e era recusada por falta de
+   * contexto, inclusive as que o declaravam. O gate estava certo; o transporte é que perdia o
+   * campo, e nenhum teste unitário do serviço veria isso porque o serviço recebia o pedido já
+   * montado.
+   */
+  it('repassa `contextPackId` e `diagnostico` ao ponto único (SPEC-Planejamento-02)', async () => {
+    await invocarComEvento(
+      IPC_CHANNELS.aiCall,
+      { provider: 'anthropic', prompt: 'oi', contextPackId: 'pack-1' },
+      'jarvis'
+    )
+
+    expect(ai.recebido).toMatchObject({ prompt: 'oi', contextPackId: 'pack-1' })
+  })
+
+  it('só marca `diagnostico` quando ele vem literalmente `true`', async () => {
+    // Qualquer outro valor não vira diagnóstico: fosse truthy, uma string qualquer abriria a
+    // única exceção do critério 1 por acidente.
+    await invocarComEvento(
+      IPC_CHANNELS.aiCall,
+      { provider: 'anthropic', prompt: 'oi', diagnostico: 'sim' },
+      'jarvis'
+    )
+
+    expect(ai.recebido?.['diagnostico']).toBeUndefined()
+
+    await invocarComEvento(
+      IPC_CHANNELS.aiCall,
+      { provider: 'anthropic', prompt: 'oi', diagnostico: true },
+      'jarvis'
+    )
+
+    expect(ai.recebido?.['diagnostico']).toBe(true)
   })
 })

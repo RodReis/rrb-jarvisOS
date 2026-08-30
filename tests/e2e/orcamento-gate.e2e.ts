@@ -1,4 +1,13 @@
 import { mkdtempSync, rmSync } from 'node:fs'
+/**
+ * **Nota da M8-F02:** as chamadas desta suíte declaram `diagnostico: true`.
+ *
+ * Não é atalho para escapar do gate do critério 1 ("nenhuma geração sem ContextPack"): é o que
+ * elas de fato **são**. O que se prova aqui é o comportamento do ponto único — stream, gate de
+ * orçamento, roteamento —, sem projeto e sem manifesto envolvidos, que é exatamente o caso do
+ * painel de diagnóstico do Settings. O gate em si tem prova própria, com o contrafactual, em
+ * `contexto-orcamento.e2e.ts`.
+ */
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createServer, type Server } from 'node:http'
@@ -151,7 +160,10 @@ function disparar(janela: import('@playwright/test').Page): Promise<Record<strin
         cancelar()
         resolve(evento)
       })
-      void bridge.callAi({ provider: 'anthropic', prompt: 'qual a capital da Franca' }, 'jarvis')
+      void bridge.callAi(
+        { provider: 'anthropic', prompt: 'qual a capital da Franca', diagnostico: true },
+        'jarvis'
+      )
     })
   })
 }

@@ -787,7 +787,14 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
         ...(temTarefa ? { taskType: bruto.taskType } : {}),
         ...(typeof bruto.model === 'string' ? { model: bruto.model } : {}),
         ...(typeof bruto.system === 'string' ? { system: bruto.system } : {}),
-        ...(typeof bruto.maxTokens === 'number' ? { maxTokens: bruto.maxTokens } : {})
+        ...(typeof bruto.maxTokens === 'number' ? { maxTokens: bruto.maxTokens } : {}),
+        // SPEC-Planejamento-02, critério 1. Este handler **reconstrói** o pedido campo a campo
+        // em vez de repassar o objeto cru — e por isso um campo novo que não seja copiado aqui
+        // some silenciosamente no caminho. Foi o que o E2E pegou: sem estas duas linhas, toda
+        // chamada vinda da UI chegava ao ponto único sem `contextPackId` e era recusada por
+        // falta de contexto, inclusive as que o declaravam.
+        ...(typeof bruto.contextPackId === 'string' ? { contextPackId: bruto.contextPackId } : {}),
+        ...(bruto.diagnostico === true ? { diagnostico: true } : {})
       }
 
       // Sem prompt no log: o texto do usuário é conteúdo, e o canal registra o fato da
