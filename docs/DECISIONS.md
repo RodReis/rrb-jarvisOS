@@ -81,6 +81,8 @@
 
 ## Memória compartilhada JarvisOS / AgentsOS (PI, 2026-08-30)
 
+**Aceite da M7-F01 (2026-08-30):** PI aprovou a revisão exata `83e952fd4e5f22850653bf81cf1d45d6c4377c84` de `docs/spec/spec-memoria-01-nucleo-identidade-persistencia.md`, incluindo contrato v1, identidade composta, revisões e provas de substituição, conflitos/invalidação, limites, SQLite transacional e vinte critérios. Registra-se somente o aceite, sem mudar o conteúdo técnico. #180 passa de Planejado a Backlog, sem `next`; F02–F08 seguem Planejadas. Mantida a instrução de apenas planejar, sem código ou push. As decisões numeradas abaixo preservam o histórico dos contratos parciais anteriores.
+
 1. O MVP-007 entra em detalhamento como núcleo compartilhado de memória contextual e conhecimento dos dois produtos, incluindo seu próprio desenvolvimento. Direção aprovada não equivale a design completo, fatias ou SPECs aprovadas para construção.
 2. Histórico mantém fatos nos módulos de origem; conhecimento usa grafo derivado/reconstruível; aprendizado distingue inferência de resultado validado. Graphify é componente opcional e substituível, não a única memória nem autoridade de validação.
 3. Visão global conserva origem por produto/projeto/agente e não aplica automaticamente regras de um projeto a outro. Menus previstos são consumidores do núcleo, não memórias independentes.

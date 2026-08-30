@@ -2,7 +2,8 @@
 
 - MVP/Fatia: MVP-007 · M7-F01.
 - Issue: [#180](https://github.com/RodReis/rrb-jarvisOS/issues/180); épico [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179).
-- Status: **rascunho** — revisão escrita para o PI; implementação não autorizada.
+- Status: **aprovada-pi** (2026-08-30); issue em `proplan:backlog`; permanece a orientação de não implementar agora.
+- Revisão aprovada: `83e952fd4e5f22850653bf81cf1d45d6c4377c84`, aceite explícito do PI nesta conversa. Atualização abaixo registra somente o aceite, sem alterar o contrato.
 - Depende de: fundação local existente; nenhuma fatia anterior do MVP-007.
 - Design: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`, seções 2, 7, 8, 11 e 14.
 - Índice canônico: `docs/STATUS.md`.
@@ -13,9 +14,9 @@ Entregar um núcleo local compartilhado que receba registros normalizados, conse
 
 Esta fatia entrega serviço interno e persistência testáveis, não coleta automática completa nem uma nova tela. “Memória registrada” não significa informação vigente, evidência comprovada ou lição validada.
 
-## Base aprovada e proposta desta revisão
+## Base e aceite desta revisão
 
-O PI já aprovou identidade por origem, separação registro/revisão/evento, substituição comprovada sem ordem de chegada, conflitos explícitos, armazenamento local existente e Graphify opcional. Esta revisão **propõe**, ainda sem aceite: schemas v1, chaves compostas, revisões com predecessoras explícitas, limites técnicos, tabelas e critérios de aceite abaixo.
+O PI já havia aprovado identidade por origem, separação registro/revisão/evento, substituição comprovada sem ordem de chegada, conflitos explícitos, armazenamento local existente e Graphify opcional. Em 2026-08-30, aprovou a revisão escrita indicada no cabeçalho: schemas v1, chaves compostas, revisões com predecessoras explícitas, limites técnicos, tabelas e os vinte critérios abaixo. As expressões “proposta” e “recomendada” preservadas no corpo registram a redação submetida; seu conteúdo está abrangido por esse aceite.
 
 Alternativas consideradas:
 
@@ -357,4 +358,4 @@ Esses comandos não foram executados nesta redação. UI/E2E não é exigência 
 
 ## Perguntas abertas ao PI
 
-Aprovar ou ajustar esta revisão escrita: contrato v1, modelo de revisões, limites técnicos e vinte critérios de aceite. São propostas técnicas, não decisões retroativamente atribuídas ao PI. As pendências de F02–F08 permanecem nas respectivas fatias, sem impedir a revisão de F01.
+Nenhuma pergunta pendente nesta fatia. O PI aprovou em 2026-08-30 o contrato v1, o modelo de revisões, os limites técnicos e os vinte critérios da revisão `83e952fd4e5f22850653bf81cf1d45d6c4377c84`. As pendências de F02–F08 permanecem nas respectivas fatias. O aceite não inicia implementação nem autoriza push.

@@ -1,10 +1,10 @@
 # MVP-007 — Memória Contextual e RAG
 
-- Status: **contratos parciais aprovados pelo PI em 2026-08-30; oito fatias Planejadas; F01 com SPEC em rascunho, F02–F08 a redigir; design em elaboração; implementação não autorizada**.
+- Status: **contratos parciais e SPEC da F01 aprovados pelo PI em 2026-08-30; F01 em Backlog, F02–F08 Planejadas/a redigir; design em elaboração; implementação não autorizada**.
 - Origem: recorte de memória híbrida/RAG anteriormente associado ao Corte 3.
 - Relação com a pipeline: **não bloqueia MVP-008, MVP-009 nem MVP-016**; a M16-F05 mantém escopo próprio e integração reutilizável.
 - Design em elaboração: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`.
-- Issues publicadas: épico [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179) e oito fatias #180–#187 em `proplan:planejado`, com pais/dependências conferidos em 2026-08-30. A #164 trata de memória de falhas do MVP-016, não deste núcleo.
+- Issues publicadas: épico [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179); #180 em `proplan:backlog` após aceite da SPEC, #181–#187 em `proplan:planejado`. Pais/dependências preservados. A #164 trata de memória de falhas do MVP-016, não deste núcleo.
 - Plano de publicação: `docs/superpowers/plans/2026-08-30-mvp-007-publicacao-issues.md`; índice e links canônicos em `docs/STATUS.md`.
 
 ## Intenção preservada
@@ -79,14 +79,14 @@ O MVP está em planejamento ativo, sem mudar a fila de construção. O PI autori
 
 ## Não decidido
 
-A M7-F01 possui proposta escrita em `docs/spec/spec-memoria-01-nucleo-identidade-persistencia.md`: schema v1, identidade composta, revisão/substituição, conflitos, limites, SQLite transacional e vinte critérios de aceite. Esses detalhes aguardam revisão do PI; não estão aprovados por constarem no documento. Sua issue #180 continua Planejada. As pendências abaixo permanecem não aprovadas ou pertencem às fatias seguintes.
+A M7-F01 foi aprovada pelo PI em 2026-08-30: `docs/spec/spec-memoria-01-nucleo-identidade-persistencia.md`, revisão `83e952fd4e5f22850653bf81cf1d45d6c4377c84`, com schema v1, identidade composta, revisão/substituição, conflitos, limites, SQLite transacional e vinte critérios de aceite. Sua issue #180 passa a Backlog sem iniciar construção. As pendências abaixo se restringem às fatias seguintes; não reabrem o contrato aprovado de F01.
 
-- representações concretas de IDs/escopo, catálogo de tipos/operações, schemas completos e limites conforme o contrato comum aprovado;
+- extensões de tipos/operações, schemas e limites nas integrações futuras, preservando o núcleo v1 aprovado na F01;
 - representação de cobertura e mecanismos de corte, confirmação, retomada, pendências e retentativas conforme a política aprovada;
 - contratos técnicos de armazenamento/compactação/reconstrução, capacidade e exclusão física conforme a política aprovada; sincronização fora deste recorte;
 - contratos técnicos de consulta/resultados, atualização incremental e valores dos limites dentro do orçamento do solicitante;
 - assinaturas, schemas, versão concreta, execução e testes de compatibilidade do adapter conforme o contrato aprovado;
 - formato de avaliação, estados/transições e critérios concretos das integrações para lições fora da pipeline, conforme o modelo aprovado;
-- critérios de aceite finais, interfaces formais e aprovação das SPECs das oito fatias planejadas.
+- critérios de aceite finais, interfaces formais e aprovação das SPECs de F02–F08.
 
 Nenhum desses itens em aberto pode ser inferido como requisito aprovado. A integração de Caveman discutida para a F05 não é automaticamente incorporada ao MVP-007.

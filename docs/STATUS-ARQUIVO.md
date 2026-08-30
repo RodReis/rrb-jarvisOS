@@ -252,6 +252,14 @@ A inspeção da fundação confirmou SQLite local no main, migrations forward-on
 
 Revisão escrita salva no commit local `83e952fd4e5f22850653bf81cf1d45d6c4377c84`. A issue #180 recebeu referência exata, resumo do contrato e os vinte critérios propostos; o épico #179 recebeu o andamento. Leitura posterior confirmou os dois corpos, #180 aberta com apenas `proplan:planejado`, parent #179, nenhuma dependência direta e as oito filhas #180–#187 ainda abertas/Planejadas na ordem original. Nenhum label, parent ou bloqueio foi escrito nesta atualização. Validação documental confirmou oitenta SPECs aprovadas, vinte critérios no rascunho, preservação do quadro Agora e das outras associações do índice, além de diff sem erros de whitespace. A revisão não foi aprovada pelo PI nem publicada por push.
 
+### MVP-007 — aceite exato da M7-F01 registrado (2026-08-30)
+
+O PI aprovou a revisão `83e952fd4e5f22850653bf81cf1d45d6c4377c84` da SPEC `spec-memoria-01-nucleo-identidade-persistencia.md`. Cabeçalho atualizado para `aprovada-pi` e pergunta de revisão encerrada; comparação do corpo técnico com a revisão aprovada confirmou que schemas, limites, regras e vinte critérios permanecem idênticos. Não foi iniciado plano de construção nem alterada a instrução de apenas planejar.
+
+Issue #180 atualizada de `proplan:planejado` para `proplan:backlog`, com aceite da revisão exata no corpo; épico #179 atualizado sem marcar entrega. Leitura posterior confirmou corpos, estado aberto, label único de Backlog na F01, parent #179, nenhuma dependência direta e a ordem das oito filhas. #181–#187 continuam abertas/Planejadas. Não houve escrita de `next`, parents ou bloqueios.
+
+Documentação de acompanhamento, arquitetura e convenções aponta para o contrato aprovado, sem reabrir decisões da pipeline/MVP-016. Validação documental confirmou 81 SPECs aprovadas, preservação do quadro Agora e das demais associações Fatia ↔ SPEC, e diff sem erros de whitespace. Próxima especificação: M7-F02 (#181), fontes iniciais, ingestão e retomada. Sem implementação, testes de produto, instalação, captura, push ou deploy; registro salvo somente em Git local.
+
 ## Pendências históricas preservadas
 
 - A UI de allowlist ainda exigia decisão de produto: localização, seletor nativo e remoção de `appDir`.

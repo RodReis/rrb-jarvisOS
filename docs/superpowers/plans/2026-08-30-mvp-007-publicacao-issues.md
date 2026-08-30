@@ -1,6 +1,6 @@
 # Plano de publicação — MVP-007: Memória compartilhada
 
-- Estado: planejamento e publicação autorizados pelo PI em 2026-08-30; épico #179 e oito fatias #180–#187 publicados, fatias em `proplan:planejado`.
+- Estado: planejamento e publicação autorizados pelo PI em 2026-08-30; épico #179 e oito fatias #180–#187 publicados. F01 aprovada/Backlog; F02–F08 Planejadas.
 - Não é SPEC aprovada, plano de execução de código nem aceite do design completo. As pendências abaixo permanecem abertas.
 - Base: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`, decisões parciais registradas até o commit local `574d359`.
 - Índice canônico Fatia ↔ SPEC e links de issues: `docs/STATUS.md`. Não criar slugs de SPEC inexistente; estado inicial: a redigir.
@@ -29,7 +29,7 @@ F03, F06 e F07 não dependem de F05 para funcionar. A dependência de F08 sobre 
 
 ### M7-F01 — Núcleo, identidade e persistência
 
-**Atualização documental (2026-08-30):** SPEC redigida em `docs/spec/spec-memoria-01-nucleo-identidade-persistencia.md`, status `rascunho`, com vinte critérios propostos. Os alvos e pendências de publicação abaixo foram detalhados nessa proposta e ainda aguardam aceite do PI. Issue #180 permanece Planejada; não há autorização de implementação.
+**Aceite documental (2026-08-30):** SPEC `docs/spec/spec-memoria-01-nucleo-identidade-persistencia.md`, revisão `83e952fd4e5f22850653bf81cf1d45d6c4377c84`, aprovada pelo PI com vinte critérios. Os alvos e pendências originais abaixo foram resolvidos pelo contrato dessa SPEC; não exigem novo aceite. Issue #180 passa a Backlog; permanece a orientação de não implementar agora.
 
 **Dependências diretas:** nenhuma fatia anterior do MVP-007; reutiliza a fundação local existente.
 **Fonte:** seções 2, 7, 8 e 14 do design.
