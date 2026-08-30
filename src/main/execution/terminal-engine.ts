@@ -114,6 +114,26 @@ export function ambienteControlado(): NodeJS.ProcessEnv {
 }
 
 /**
+ * Os argumentos como eles podem ir para a auditoria.
+ *
+ * Um argumento pode carregar segredo — a M9-F01 trouxe o caso concreto: o push da publicação leva o
+ * token na URL, porque `ambienteControlado()` não deixa variável de ambiente alcançar o subprocess.
+ * O `AuditRepository` grava o payload **cru**, então sem esta passagem o token entra no banco em
+ * claro e fica lá, encadeado no hash, sem como remover.
+ *
+ * A redação acontece aqui e não no chamador porque este é o ponto por onde todo comando passa:
+ * quem chamar o terminal de outra fatia herda a proteção sem saber que precisava dela. E acontece
+ * **só na auditoria** — a `ApprovalRequest` guarda o argumento real, porque é dela que a retomada
+ * reconstrói o comando, e um argumento redigido seria retomado quebrado.
+ */
+function argsSeguros(args: readonly string[]): string[] {
+  return args.map((arg) => {
+    const redigido = redact(arg)
+    return typeof redigido === 'string' ? redigido : String(redigido)
+  })
+}
+
+/**
  * Redige e trunca uma saída antes de ela virar evidência ou chegar à tela.
  *
  * A ordem importa: **redige primeiro, trunca depois**. Truncar antes poderia cortar um token
@@ -382,7 +402,7 @@ export class TerminalEngine {
         marco: 'antes',
         executionId: parcial.id,
         binary: canonicalizeBinary(ctx.submission.binary),
-        args: [...ctx.submission.args],
+        args: argsSeguros(ctx.submission.args),
         cwd: ctx.cwdCanonico,
         correlationId: ctx.correlationId,
         approvedBy: ctx.approvedBy ?? null
@@ -530,7 +550,7 @@ export class TerminalEngine {
         marco: 'antes',
         executionId: execucao.id,
         binary: canonicalizeBinary(ctx.submission.binary),
-        args: [...ctx.submission.args],
+        args: argsSeguros(ctx.submission.args),
         cwd: ctx.submission.cwd,
         correlationId: ctx.correlationId
       }
@@ -662,7 +682,7 @@ export class TerminalEngine {
         marco,
         executionId: execucao.id,
         binary: execucao.binary,
-        args: [...execucao.args],
+        args: argsSeguros(execucao.args),
         cwd: execucao.cwd,
         state: execucao.state,
         reason: execucao.reason,

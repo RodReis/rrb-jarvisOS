@@ -105,3 +105,31 @@ describe('redact', () => {
     expect(origem.token).toBe('segredo')
   })
 })
+
+describe('credencial dentro de URL', () => {
+  it('remove o user:senha de uma URL em qualquer string', () => {
+    // O caso que a M9-F01 trouxe: o push da publicação carrega a credencial na URL (o
+    // ambiente controlado do MVP-004 não deixa variável alcançar o subprocess), e a linha de
+    // comando é persistida em `execution_run` e no `AuditEvent`. Sem esta regra, o token vai
+    // para o banco em claro — e nenhuma chave por nome o pega, porque ele não está num campo.
+    const saida = redact({
+      args: ['push', 'https://x-access-token:ghs_segredo@github.com/d/r.git', 'HEAD:refs/heads/main']
+    }) as Record<string, string[]>
+
+    expect(saida['args']?.[1]).not.toContain('ghs_segredo')
+    // O resto da URL sobrevive: sem ela, ninguém sabe para onde o push foi.
+    expect(saida['args']?.[1]).toContain('github.com/d/r.git')
+  })
+
+  it('redige a URL ecoada no meio de uma mensagem de erro', () => {
+    const stderr = "fatal: unable to access 'https://user:senha@host/x.git/': erro"
+    expect(redact({ stderr }) as Record<string, string>).toMatchObject({
+      stderr: expect.not.stringContaining('senha') as unknown as string
+    })
+  })
+
+  it('não altera URL sem credencial', () => {
+    const url = 'https://github.com/dono/repo.git'
+    expect((redact({ url }) as Record<string, string>)['url']).toBe(url)
+  })
+})
