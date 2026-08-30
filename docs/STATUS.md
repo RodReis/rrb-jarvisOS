@@ -18,7 +18,7 @@ Atualizado em: **2026-08-30**. Visão curta do estado corrente e fonte única do
 | Feito | [#95](https://github.com/RodReis/rrb-jarvisOS/issues/95) · MVP-008 F02 Contexto, skills e orçamento | entregue PR [#174](https://github.com/RodReis/rrb-jarvisOS/pull/174), aguardando aceite |
 | Feito | [#96](https://github.com/RodReis/rrb-jarvisOS/issues/96) · MVP-008 F03 Wizard orientado | entregue PR [#175](https://github.com/RodReis/rrb-jarvisOS/pull/175), aguardando aceite |
 | Feito | [#97](https://github.com/RodReis/rrb-jarvisOS/issues/97) · MVP-008 F04 PRD, Landscape e Convention | entregue PR [#176](https://github.com/RodReis/rrb-jarvisOS/pull/176), aguardando aceite |
-| Feito | [#98](https://github.com/RodReis/rrb-jarvisOS/issues/98) · MVP-008 F05 Anexos de design e arquitetura | entregue PR __PR__, aguardando aceite |
+| Feito | [#98](https://github.com/RodReis/rrb-jarvisOS/issues/98) · MVP-008 F05 Anexos de design e arquitetura | entregue PR [#177](https://github.com/RodReis/rrb-jarvisOS/pull/177), aguardando aceite |
 | Próximo | [#99](https://github.com/RodReis/rrb-jarvisOS/issues/99) · MVP-008 F06 Roadmap e aprovações | cabeça da fila; `proplan:next` aplicado |
 | Backlog | [#99](https://github.com/RodReis/rrb-jarvisOS/issues/99) · MVP-008 | última fatia; SPEC `aprovada-pi` (2026-08-29) |
 | Backlog | [#101–#106](https://github.com/RodReis/rrb-jarvisOS/issues/101) · MVP-009 | seis SPECs `aprovada-pi` (2026-08-29); fim da fila |
