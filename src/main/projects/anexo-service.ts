@@ -210,6 +210,17 @@ export class AnexoService {
       payload: { projectId, tipo, caminho: relativo, hash, bytes, fase: 'anexado' }
     })
 
+    // O marco `design-anexado` sai **aqui**, no ato: é neste instante que o arquivo do PI entra
+    // no repositório, e é isto que o marco registra. Deixá-lo para a geração da arquitetura
+    // commitaria o design junto da revisão que ele deveria ter precedido — e o histórico não
+    // distinguiria "o PI anexou" de "a arquitetura foi composta", que são atos de autores
+    // diferentes.
+    //
+    // Um anexo por marco é deliberado: cada ato é um commit, e agrupá-los exigiria saber quando
+    // o PI terminou de anexar — coisa que só ele sabe. Commit sem nada a commitar falha sem
+    // perder o anexo, que já está no banco e no disco (mesma postura da M8-F01).
+    this.projectService.concluirMarco(projectId, 'design-anexado', workspaceId)
+
     log.agent.info('Anexo de design registrado', { projectId, tipo, caminho: relativo })
     return { reason: 'anexado', anexo, mensagem: 'Anexo registrado.' }
   }
@@ -377,10 +388,12 @@ export class AnexoService {
       }
     })
 
-    // Dois marcos, e não um: `design-anexado` registra que os anexos entraram, e
-    // `arquitetura-aprovada` que a revisão saiu. Sob um só, o histórico não distinguiria "o PI
-    // anexou" de "a arquitetura foi composta", que são atos de autores diferentes.
-    this.projectService.concluirMarco(projectId, 'design-anexado', workspaceId)
+    // **Um marco aqui, não dois.** `design-anexado` mora no ato de anexar, onde os arquivos do
+    // PI de fato entram no repositório; aqui sai `arquitetura-aprovada`, que é o que esta
+    // operação produz. Os dois em sequência no mesmo ponto foi o desenho inicial e estava
+    // errado: o primeiro commit levava tudo, o segundo não tinha o que commitar, e
+    // `arquitetura-aprovada` — justo o marco que a revisão precisa citar — voltava sem hash.
+    // O E2E foi quem mostrou; nos testes o `ProjectService` é dublê e sempre diz "commitado".
     const marco = this.projectService.concluirMarco(projectId, 'arquitetura-aprovada', workspaceId)
     if (marco?.commitado === true && marco.commitHash !== undefined) {
       this.repository.marcarCommit(userId, pacote.id, marco.commitHash)
@@ -410,21 +423,29 @@ export class AnexoService {
   }
 
   /**
-   * As telas que o PRD menciona — o outro lado do critério 4.
+   * As telas que o PRD menciona — hoje, **nenhuma**, e a lista vazia é a resposta correta.
    *
-   * Saem das afirmações do PRD gerado, e não de um parser do arquivo: o pacote guarda as
-   * afirmações com origem, e reler o `.md` do disco aceitaria como "tela do PRD" qualquer linha
-   * que alguém tivesse editado à mão.
+   * A intenção era o outro lado do critério 4: além de "a arquitetura não promete fluxo ausente
+   * dos protótipos", avisar quando o PRD cita uma tela que ninguém prototipou. Mas o PRD da
+   * M8-F04 **não tem telas** — a seção Escopo carrega decisões (`"**Escopo do projeto:** Uma
+   * fatia vertical funcionando ponta a ponta"`), compostas do título da pergunta e da opção
+   * escolhida no wizard. Comparar isso com os headings de um protótipo é categoria errada, e
+   * produz achado falso **em todo projeto**: as três decisões nunca aparecem como título de tela.
+   *
+   * O E2E foi quem mostrou. O int-spec fabricava o PRD com `'Tela de login'` no Escopo, e por
+   * isso a comparação parecia funcionar; contra o PRD que a M8-F04 realmente gera, o mesmo
+   * protótipo saudável colheu três perguntas sem sentido — exatamente o ruído que faz o PI
+   * parar de ler a lista.
+   *
+   * **A lista vazia não enfraquece o critério 4.** O que ele exige é que a arquitetura não
+   * prometa fluxo ausente dos protótipos, e isso é garantido na origem: `afirmacoesDosFluxos`
+   * só aceita `jornadasCobertas`, e não há caminho que produza linha de fluxo a partir de outra
+   * coisa. O aviso que se perde é o inverso — "o PRD pede algo que você não desenhou" —, e ele
+   * volta quando o PRD tiver telas nomeadas para comparar. A assinatura fica: quem as
+   * acrescentar acrescenta a fonte aqui, não a comparação inteira.
    */
-  private telasDoPrd(userId: string, projectId: string): readonly string[] {
-    const [prd] = this.pacotes.listarPacotes(userId, projectId)
-    if (prd === undefined) return []
-    return (
-      prd.documentos
-        .find((d) => d.documento === 'PRD')
-        ?.afirmacoes.filter((a) => a.secao === 'Escopo')
-        .map((a) => a.texto) ?? []
-    )
+  private telasDoPrd(_userId: string, _projectId: string): readonly string[] {
+    return []
   }
 
   private montarDocumento(

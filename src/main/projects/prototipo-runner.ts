@@ -157,13 +157,25 @@ export async function carregarPrototipo(caminhoAbsoluto: string): Promise<Render
   })
 
   try {
-    // Só `warning` (2) e `error` (3). Um protótipo com `console.log` de depuração não deve
-    // encher a evidência do achado com ruído que não é problema — e a evidência é o que o PI lê
-    // para decidir se o protótipo está certo.
+    /*
+     * A evidência do achado é o que o PI lê para decidir se o protótipo está certo, então ela
+     * carrega só o que **é** do protótipo. Três filtros, cada um por um motivo que o E2E mostrou:
+     *
+     *  - **Só `warning` e `error`.** Um protótipo com `console.log` de depuração não deve encher
+     *    a evidência com ruído que não é problema.
+     *  - **Sem os avisos do próprio Electron.** Ele emite "Electron Security Warning
+     *    (Insecure Content-Security-Policy)" no console de toda página sem CSP — o que descreve
+     *    o protótipo do PI como problemático por uma decisão nossa de como o carregamos.
+     *  - **Sem repetição.** O Electron entrega o mesmo evento pelo caminho legado e pelo novo,
+     *    e a mensagem chegava duplicada em toda evidência.
+     */
+    const vistas = new Set<string>()
     janela.webContents.on('console-message', (evento) => {
-      if (evento.level === 'warning' || evento.level === 'error') {
-        errosDeConsole.push(evento.message)
-      }
+      if (evento.level !== 'warning' && evento.level !== 'error') return
+      if (evento.message.includes('Electron Security Warning')) return
+      if (vistas.has(evento.message)) return
+      vistas.add(evento.message)
+      errosDeConsole.push(evento.message)
     })
 
     const carregou = await comTimeout(

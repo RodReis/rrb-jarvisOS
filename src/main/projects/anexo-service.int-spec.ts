@@ -483,25 +483,54 @@ describe('a arquitetura gerada', () => {
     expect(readFileSync(join(raiz, 'docs/TESTING.md'), 'utf8')).toContain('sha256:')
   })
 
+  /**
+   * O achado que é **pergunta** não barra a geração — ele fica registrado como questão em
+   * aberto. É o critério 2 tomando forma de documento: "o PI viu e seguiu" e "ninguém percebeu"
+   * precisam ser distinguíveis depois do fato.
+   *
+   * O caminho exercitado é o estado ausente, e não a tela do PRD sem par: aquela comparação foi
+   * removida quando o E2E mostrou que o Escopo do PRD carrega decisões, não nomes de tela (ver
+   * `telasDoPrd`). Um teste sobre um caminho que não existe mais provaria o dublê, não o produto.
+   */
   it('os achados que não impedem viram questões em aberto no DECISIONS', async () => {
-    gravarPrd(['Relatórios'])
-    anexarOMinimo()
+    gravarPrd()
+    service.anexar(PROJETO, 'design-system', arquivoExterno('DESIGN-SYSTEM.md'), 'jarvis')
+    service.anexar(PROJETO, 'prototipo', arquivoExterno('home.html', '<h1>x</h1>'), 'jarvis')
+    // Protótipo que abre e mostra conteúdo, mas não cobre o estado de bloqueio.
+    renders['docs/prototipos/home.html'] = {
+      carregou: true,
+      errosDeConsole: [],
+      elementosVisiveis: 10,
+      jornadas: ['Início', 'Lista vazia', 'Carregando', 'Erro']
+    }
 
     const r = await service.gerarArquitetura(PROJETO, 'jarvis')
 
     expect(r.reason).toBe('gerada')
-    // A tela do PRD sem par no protótipo é pergunta, não bloqueio — e fica registrada.
-    expect(r.achados?.some((a) => a.evidencia.includes('Relatórios'))).toBe(true)
-    expect(readFileSync(join(raiz, 'docs/DECISIONS.md'), 'utf8')).toContain('Relatórios')
+    expect(r.achados?.some((a) => a.id.includes('estado-ausente:bloqueio'))).toBe(true)
+    expect(readFileSync(join(raiz, 'docs/DECISIONS.md'), 'utf8')).toContain('bloqueio')
   })
 
-  it('conclui os dois marcos, na ordem', async () => {
+  /**
+   * Cada marco no ato que ele registra: `design-anexado` quando o arquivo do PI entra,
+   * `arquitetura-aprovada` quando a revisão sai.
+   *
+   * Os dois em sequência no mesmo ponto era o desenho inicial, e o E2E mostrou que estava
+   * errado: o primeiro commit levava tudo e o segundo não tinha o que commitar, deixando a
+   * revisão sem hash de commit. Aqui o `ProjectService` é dublê e sempre diz "commitado" — por
+   * isso este teste checa a **ordem e a origem** de cada marco, que é o que ele consegue provar;
+   * que o commit realmente sai é do E2E.
+   */
+  it('emite design-anexado no ato e arquitetura-aprovada na geração', async () => {
     gravarPrd()
     anexarOMinimo()
 
+    // Dois anexos ⇒ dois marcos de design, antes de qualquer geração.
+    expect(marcos).toEqual(['design-anexado', 'design-anexado'])
+
     await service.gerarArquitetura(PROJETO, 'jarvis')
 
-    expect(marcos).toEqual(['design-anexado', 'arquitetura-aprovada'])
+    expect(marcos).toEqual(['design-anexado', 'design-anexado', 'arquitetura-aprovada'])
   })
 
   it('regerar o mesmo conteúdo é a mesma revisão', async () => {
