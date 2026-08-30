@@ -134,8 +134,7 @@ test('a decisão atravessa a ponte, grava com autoria e a contradição não esc
     const segunda = await bridge.getWizardState(id, workspace)
     const perguntaInicial =
       primeira?.estado.tipo === 'pergunta' ? primeira.estado.pergunta.id : null
-    const perguntaRepetida =
-      segunda?.estado.tipo === 'pergunta' ? segunda.estado.pergunta.id : null
+    const perguntaRepetida = segunda?.estado.tipo === 'pergunta' ? segunda.estado.pergunta.id : null
 
     // 2. O PI escolhe a primeira pergunta.
     const escolhida = await bridge.answerWizard(
