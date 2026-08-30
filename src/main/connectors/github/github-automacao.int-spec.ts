@@ -51,6 +51,10 @@ interface EstadoFake {
   }[]
   checkRuns: Record<string, unknown>[]
   workflowRuns: Record<string, unknown>[]
+  /** A proteção gravada por branch — o `PUT` a substitui inteira, como na API real. */
+  protecoes: Map<string, Record<string, unknown>>
+  /** O commit para onde cada ref aponta na origem, para `commit.sha-for-ref`. */
+  commits: Map<string, string>
 }
 
 let estado: EstadoFake
@@ -79,7 +83,9 @@ function estadoInicial(): EstadoFake {
     refs: new Map(),
     pulls: [],
     checkRuns: [],
-    workflowRuns: []
+    workflowRuns: [],
+    protecoes: new Map(),
+    commits: new Map()
   }
 }
 
@@ -266,6 +272,44 @@ function responder(
   // GET /repos/{o}/{r}/actions/runs
   if (metodo === 'GET' && /\/actions\/runs$/.test(semQuery)) {
     return { status: 200, corpo: { workflow_runs: estado.workflowRuns } }
+  }
+
+  // PATCH /repos/{owner}/{repo} — default_branch
+  if (metodo === 'PATCH' && repoMatch) {
+    const chave = `${repoMatch[1]}/${repoMatch[2]}`
+    const repo = estado.repos.get(chave)
+    if (!repo) return { status: 404, corpo: { message: 'Not Found' } }
+    const alvo = String(corpoObj.default_branch)
+    // O GitHub recusa apontar a default para uma ref que não existe. Sem isto, o fake aceitaria
+    // um estado que a API real rejeita — e o teste ficaria verde sobre um repositório impossível.
+    if (!estado.refs.has(`heads/${alvo}`)) {
+      return { status: 422, corpo: { message: 'Invalid default branch' } }
+    }
+    repo.default_branch = alvo
+    return { status: 200, corpo: repo }
+  }
+
+  // PUT /repos/{o}/{r}/branches/{branch}/protection
+  const protMatch = /\/branches\/([^/]+)\/protection$/.exec(semQuery)
+  if (metodo === 'PUT' && protMatch) {
+    const branch = protMatch[1] ?? ''
+    if (!estado.refs.has(`heads/${branch}`)) {
+      return { status: 404, corpo: { message: 'Branch not found' } }
+    }
+    // Substitui inteiro, como o `PUT` real: repetir com a mesma entrada deixa o mesmo estado.
+    estado.protecoes.set(branch, corpoObj)
+    return { status: 200, corpo: corpoObj }
+  }
+
+  // GET /repos/{o}/{r}/commits/{ref}
+  const commitMatch = /\/commits\/([^/]+)$/.exec(semQuery)
+  if (metodo === 'GET' && commitMatch) {
+    const ref = commitMatch[1] ?? ''
+    // Aceita nome de branch e SHA, como a API real: a branch resolve pelo ref, o SHA por si.
+    const sha = estado.commits.get(ref) ?? estado.refs.get(`heads/${ref}`)
+    return sha === undefined
+      ? { status: 404, corpo: { message: 'No commit found for SHA' } }
+      : { status: 200, corpo: { sha, html_url: `https://github.com/${OWNER}/${REPO}/commit/${sha}` } }
   }
 
   return { status: 404, corpo: { message: 'Not Found' } }
@@ -766,6 +810,181 @@ describe('pr.merge-state', () => {
       merged: true,
       mergeSha: 'merged00sha00000000000000000000000000000'
     })
+  })
+})
+
+
+describe('repo.set-default-branch — M9-F01', () => {
+  beforeEach(async () => {
+    await executar(GITHUB_OPERATIONS.ensureRepository, {
+      owner: OWNER,
+      repo: REPO,
+      visibility: 'private'
+    })
+    estado.refs.set('heads/develop', SHA)
+  })
+
+  it('aponta a default para a branch informada', async () => {
+    const r = (await executar(GITHUB_OPERATIONS.setDefaultBranch, {
+      owner: OWNER,
+      repo: REPO,
+      branch: 'develop'
+    })) as ConnectorResult
+
+    expect(r.ok).toBe(true)
+    expect(r.data).toMatchObject({ defaultBranch: 'develop', alterado: true })
+    expect(estado.repos.get(`${OWNER}/${REPO}`)?.default_branch).toBe('develop')
+  })
+
+  it('repetir NÃO escreve: a segunda chamada não faz PATCH nenhum', async () => {
+    const entrada = { owner: OWNER, repo: REPO, branch: 'develop' }
+    await executar(GITHUB_OPERATIONS.setDefaultBranch, entrada)
+    requisicoes = []
+
+    const r = (await executar(GITHUB_OPERATIONS.setDefaultBranch, entrada)) as ConnectorResult
+
+    expect(r.ok).toBe(true)
+    // `alterado: false` é o que torna a idempotência observável de fora — e o contador prova que
+    // nenhuma mutação auditada saiu numa publicação repetida.
+    expect(r.data).toMatchObject({ alterado: false })
+    expect(contar('PATCH', /./)).toBe(0)
+  })
+
+  it('branch inexistente na origem falha em vez de deixar o repositório apontando para o vazio', async () => {
+    const r = (await executar(GITHUB_OPERATIONS.setDefaultBranch, {
+      owner: OWNER,
+      repo: REPO,
+      branch: 'nao-existe'
+    })) as ConnectorError
+
+    expect(r.ok).toBe(false)
+  })
+})
+
+describe('branch.ensure-protection — M9-F01', () => {
+  beforeEach(async () => {
+    await executar(GITHUB_OPERATIONS.ensureRepository, {
+      owner: OWNER,
+      repo: REPO,
+      visibility: 'private'
+    })
+    estado.refs.set('heads/main', SHA)
+  })
+
+  it('proíbe force-push e deleção da branch base', async () => {
+    const r = (await executar(GITHUB_OPERATIONS.ensureBranchProtection, {
+      owner: OWNER,
+      repo: REPO,
+      branch: 'main',
+      revisoesExigidas: 0
+    })) as ConnectorResult
+
+    expect(r.ok).toBe(true)
+    const gravado = estado.protecoes.get('main')
+    // É a razão de proteger: sem isto, uma publicação com divergência poderia reescrever o
+    // histórico da base em vez de falhar, e a regra da spec ("divergência preserva ambos os
+    // lados") dependeria só do nosso lado se comportar.
+    expect(gravado).toMatchObject({ allow_force_pushes: false, allow_deletions: false })
+  })
+
+  it('não exige revisor quando o merge é autônomo, mas mantém o resto da proteção', async () => {
+    await executar(GITHUB_OPERATIONS.ensureBranchProtection, {
+      owner: OWNER,
+      repo: REPO,
+      branch: 'main',
+      revisoesExigidas: 0
+    })
+
+    const gravado = estado.protecoes.get('main') as Record<string, Record<string, unknown>>
+    expect(gravado.required_pull_request_reviews?.required_approving_review_count).toBe(0)
+    // `enforce_admins: false` é deliberado: o merge autônomo do MVP-009 roda como o dono, e com
+    // `true` a proteção barraria a entrega que ela existe para proteger.
+    expect(gravado.enforce_admins).toBe(false)
+  })
+
+  it('repetir deixa o mesmo estado — o PUT substitui, não acumula', async () => {
+    const entrada = {
+      owner: OWNER,
+      repo: REPO,
+      branch: 'main',
+      revisoesExigidas: 1,
+      checksExigidos: ['ci']
+    }
+    await executar(GITHUB_OPERATIONS.ensureBranchProtection, entrada)
+    const primeira = JSON.stringify(estado.protecoes.get('main'))
+
+    await executar(GITHUB_OPERATIONS.ensureBranchProtection, entrada)
+
+    expect(JSON.stringify(estado.protecoes.get('main'))).toBe(primeira)
+  })
+
+  it('checks exigidos vazios limpam a lista, e omitidos preservam o que havia', async () => {
+    await executar(GITHUB_OPERATIONS.ensureBranchProtection, {
+      owner: OWNER,
+      repo: REPO,
+      branch: 'main',
+      revisoesExigidas: 0,
+      checksExigidos: []
+    })
+    expect(estado.protecoes.get('main')?.required_status_checks).toMatchObject({ contexts: [] })
+
+    await executar(GITHUB_OPERATIONS.ensureBranchProtection, {
+      owner: OWNER,
+      repo: REPO,
+      branch: 'main',
+      revisoesExigidas: 0
+    })
+    // `null` é como a API distingue "não mexa nisso" de "esvazie" — e confundir os dois apagaria
+    // a exigência de CI de um repositório que a tinha.
+    expect(estado.protecoes.get('main')?.required_status_checks).toBeNull()
+  })
+})
+
+describe('commit.sha-for-ref — critério 2 da M9-F01', () => {
+  beforeEach(async () => {
+    await executar(GITHUB_OPERATIONS.ensureRepository, {
+      owner: OWNER,
+      repo: REPO,
+      visibility: 'private'
+    })
+  })
+
+  it('lê na origem o commit para onde a branch aponta', async () => {
+    estado.refs.set('heads/main', SHA)
+
+    const r = (await executar(GITHUB_OPERATIONS.getCommitSha, {
+      owner: OWNER,
+      repo: REPO,
+      ref: 'main'
+    })) as ConnectorResult
+
+    expect(r.ok).toBe(true)
+    expect(r.data).toMatchObject({ ref: 'main', sha: SHA })
+  })
+
+  it('a leitura é da origem, não do que mandamos: um push parcial aparece como divergência', async () => {
+    // O cenário do critério 2. O local está em SHA; a origem ficou em OUTRO_SHA porque o push
+    // não chegou inteiro. Ler a origem é o que revela isso — comparar com o que enviamos diria
+    // que está tudo certo.
+    estado.refs.set('heads/main', OUTRO_SHA)
+
+    const r = (await executar(GITHUB_OPERATIONS.getCommitSha, {
+      owner: OWNER,
+      repo: REPO,
+      ref: 'main'
+    })) as ConnectorResult
+
+    expect((r.data as { sha: string }).sha).not.toBe(SHA)
+  })
+
+  it('ref ausente não vira sucesso vazio', async () => {
+    const r = (await executar(GITHUB_OPERATIONS.getCommitSha, {
+      owner: OWNER,
+      repo: REPO,
+      ref: 'nunca-publicada'
+    })) as ConnectorError
+
+    expect(r.ok).toBe(false)
   })
 })
 

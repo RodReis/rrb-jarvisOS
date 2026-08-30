@@ -19,6 +19,8 @@ import {
   corpoComChaveExterna,
   corpoTemChaveExterna,
   type CheckNormalizado,
+  type CommitShaInput,
+  type EnsureBranchProtectionInput,
   type EnsureBranchRefInput,
   type EnsureIssueDependencyInput,
   type EnsureIssueInput,
@@ -27,6 +29,7 @@ import {
   type HeadShaInput,
   type MergeStateNormalizado,
   type PullRequestInput,
+  type SetDefaultBranchInput,
   type SquashMergeInput,
   type WorkflowRunNormalizado
 } from '@shared/domain/github-automation'
@@ -520,4 +523,118 @@ export async function getMergeState(
   }
 
   return { data: estado, externalRef: { id: String(estado.numero) }, criado: false }
+}
+
+/**
+ * `repo.set-default-branch` — a branch base do repositório é a informada ao final.
+ *
+ * Lê antes de escrever, como todo `ensure` desta família: um `PATCH` incondicional funcionaria, mas
+ * gravaria uma mutação auditada a cada publicação repetida, e o critério 1 se mede pelo que **não**
+ * sai. Quando a default já é a branch pedida, nenhuma requisição de escrita acontece.
+ *
+ * A branch precisa existir na origem. Se não existir, o GitHub responde 422 — e é o desfecho
+ * honesto: apontar a default para uma ref ausente deixaria o repositório num estado que a interface
+ * do GitHub mostra como vazio.
+ */
+export async function setDefaultBranch(
+  rest: GithubRest,
+  input: SetDefaultBranchInput
+): Promise<ResultadoDeOperacao<{ readonly defaultBranch: string; readonly alterado: boolean }>> {
+  const atual = exigirOk(await rest.request('GET', `/repos/${input.owner}/${input.repo}`))
+  const jaEra = texto(atual.corpo, 'default_branch') === input.branch
+
+  if (!jaEra) {
+    exigirOk(
+      await rest.request('PATCH', `/repos/${input.owner}/${input.repo}`, {
+        default_branch: input.branch
+      })
+    )
+  }
+
+  return {
+    data: { defaultBranch: input.branch, alterado: !jaEra },
+    externalRef: {
+      id: `${input.owner}/${input.repo}`,
+      url: `https://github.com/${input.owner}/${input.repo}/tree/${input.branch}`
+    },
+    criado: false
+  }
+}
+
+/**
+ * `branch.ensure-protection` — a branch base está protegida ao final.
+ *
+ * Diferente dos outros `ensure`, este **não procura antes de criar**: a API de proteção é um `PUT`
+ * que substitui a configuração inteira, então é idempotente por construção — repetir com a mesma
+ * entrada deixa o mesmo estado. Ler antes só serviria para pular o `PUT`, e a comparação exigiria
+ * reproduzir a normalização que o GitHub faz nos campos aninhados; errar essa comparação deixaria a
+ * proteção desatualizada em silêncio, que é pior do que um `PUT` a mais.
+ *
+ * `enforce_admins: false` é deliberado: o merge autônomo do MVP-009 acontece como o usuário dono, e
+ * com `true` a própria proteção barraria a entrega que ela existe para proteger. A regra continua
+ * valendo para todo o resto — force-push e deleção seguem proibidos.
+ */
+export async function ensureBranchProtection(
+  rest: GithubRest,
+  input: EnsureBranchProtectionInput
+): Promise<ResultadoDeOperacao<{ readonly branch: string; readonly revisoesExigidas: number }>> {
+  exigirOk(
+    await rest.request(
+      'PUT',
+      `/repos/${input.owner}/${input.repo}/branches/${input.branch}/protection`,
+      {
+        required_status_checks:
+          input.checksExigidos === undefined
+            ? null
+            : { strict: true, contexts: [...input.checksExigidos] },
+        enforce_admins: false,
+        required_pull_request_reviews: {
+          required_approving_review_count: input.revisoesExigidas
+        },
+        restrictions: null,
+        allow_force_pushes: false,
+        allow_deletions: false
+      }
+    )
+  )
+
+  return {
+    data: { branch: input.branch, revisoesExigidas: input.revisoesExigidas },
+    externalRef: {
+      id: `${input.owner}/${input.repo}/protection/${input.branch}`,
+      url: `https://github.com/${input.owner}/${input.repo}/settings/branches`
+    },
+    criado: false
+  }
+}
+
+/**
+ * `commit.sha-for-ref` — o commit para onde uma ref aponta **na origem**.
+ *
+ * É o que torna o critério 2 verificável: sem ler o que está no GitHub, "os commits locais
+ * correspondem à branch remota" seria afirmado a partir do que mandamos, e um push parcial ou
+ * rejeitado passaria por completo. A leitura acontece depois do push, contra a origem.
+ *
+ * O 404 **não** é traduzido como ausência aqui — sobe como falha para o adapter, que distingue "não
+ * existe" de "existe e você não vê" (`significadoDo404`). Tratá-lo como ausência faria uma branch
+ * invisível por permissão parecer uma branch que nunca foi publicada.
+ */
+export async function getCommitSha(
+  rest: GithubRest,
+  input: CommitShaInput
+): Promise<ResultadoDeOperacao<{ readonly ref: string; readonly sha: string }>> {
+  const resposta = exigirOk(
+    await rest.request('GET', `/repos/${input.owner}/${input.repo}/commits/${input.ref}`)
+  )
+
+  const sha = texto(resposta.corpo, 'sha') ?? ''
+
+  return {
+    data: { ref: input.ref, sha },
+    externalRef: {
+      id: sha,
+      url: `https://github.com/${input.owner}/${input.repo}/commit/${sha}`
+    },
+    criado: false
+  }
 }
