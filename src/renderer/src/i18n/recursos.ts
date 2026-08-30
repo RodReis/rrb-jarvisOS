@@ -99,7 +99,11 @@ export const RECURSOS = {
         confirmar: 'Remover da lista',
         // Diz o que **de fato** acontece. Um "tem certeza?" genérico faria o usuário supor a
         // perda dos arquivos e desistir de uma ação que é reversível por reimportação.
-        removerAviso: 'Sai da lista; a pasta e o histórico Git continuam no disco.'
+        removerAviso: 'Sai da lista; a pasta e o histórico Git continuam no disco.',
+        permitirGit: 'Permitir `git` e criar',
+        // Diz o que o clique faz: é permissão de alto risco, auditada. O usuário merece saber
+        // disso antes, não depois.
+        permitirGitAviso: 'Ação de alto risco: registra o comando na lista permitida deste espaço.'
       },
       settings: {
         titulo: 'Configurações',
@@ -271,7 +275,9 @@ export const RECURSOS = {
         remover: 'Remove',
         removerDe: 'Remove {{nome}} from the list',
         confirmar: 'Remove from list',
-        removerAviso: 'Removed from the list; folder and Git history stay on disk.'
+        removerAviso: 'Removed from the list; folder and Git history stay on disk.',
+        permitirGit: 'Allow `git` and create',
+        permitirGitAviso: 'High-risk action: records the command in this space allowed list.'
       },
       settings: {
         titulo: 'Settings',
