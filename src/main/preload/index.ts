@@ -49,6 +49,9 @@ import type {
 } from '@shared/domain/projects'
 import type { Resposta, RespostaOutcome, VistaDoWizard } from '@shared/domain/wizard'
 import type { PacoteEstrutural, PacoteOutcome } from '@shared/domain/pacote-estrutural'
+import type { Anexo, AnexoOutcome, TipoDeAnexo } from '@shared/domain/anexos-de-design'
+import type { ValidacaoDoPrototipo } from '@shared/domain/validacao-de-prototipo'
+import type { ArquiteturaOutcome, PacoteArquitetura } from '@shared/domain/arquitetura'
 import type { CredentialKey, CredentialStatusView } from '@shared/domain/credentials'
 import type { BudgetLimitsInput, BudgetSnapshot } from '@shared/domain/budget'
 import type {
@@ -320,6 +323,29 @@ const bridge: JarvisBridge = {
     ipcRenderer.invoke(IPC_CHANNELS.pacoteGerar, projectId, consulta, workspace),
   listarPacotes: (projectId: string): Promise<readonly PacoteEstrutural[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.pacoteListar, projectId),
+
+  // Anexos de design e arquitetura (SPEC-Planejamento-05). Nenhum método recebe conteúdo de
+  // arquivo: o renderer manda o *caminho* que o seletor nativo devolveu, e quem lê, copia e
+  // hasheia é o main. Um método que aceitasse bytes seria um gravador de disco no renderer.
+  escolherAnexo: (tipo: TipoDeAnexo): Promise<string> =>
+    ipcRenderer.invoke(IPC_CHANNELS.anexoEscolher, tipo),
+  anexarDesign: (
+    projectId: string,
+    tipo: TipoDeAnexo,
+    origem: string,
+    workspace: WorkspaceId
+  ): Promise<AnexoOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.anexoAnexar, projectId, tipo, origem, workspace),
+  listarAnexos: (projectId: string): Promise<readonly Anexo[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.anexoListar, projectId),
+  removerAnexo: (projectId: string, caminho: string, workspace: WorkspaceId): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.anexoRemover, projectId, caminho, workspace),
+  validarPrototipos: (projectId: string): Promise<readonly ValidacaoDoPrototipo[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.anexoValidar, projectId),
+  gerarArquitetura: (projectId: string, workspace: WorkspaceId): Promise<ArquiteturaOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.arquiteturaGerar, projectId, workspace),
+  listarArquiteturas: (projectId: string): Promise<readonly PacoteArquitetura[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.arquiteturaListar, projectId),
 
   // Contexto, skills e orçamento (SPEC-Planejamento-02). Nenhum método que leia arquivo: a tela
   // indica caminhos relativos e o main lê, dentro do diretório do projeto. Um `readFile` aqui
