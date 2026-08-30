@@ -2,7 +2,8 @@
 
 - MVP/Fatia: MVP-007 · M7-F04.
 - Issue: [#183](https://github.com/RodReis/rrb-jarvisOS/issues/183); épico [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179).
-- Status: **rascunho** para revisão do PI; issue em `proplan:planejado`; implementação não autorizada.
+- Status: **aprovada-pi** (2026-08-30); issue em `proplan:backlog`; permanece a orientação de não implementar agora.
+- Revisão aprovada: `027f8274dc4e3d39a6fc24ce394ea6b53d70f986`, aceite explícito do PI nesta conversa. Atualização registra somente o aceite, sem alterar o contrato técnico.
 - Depende de: M7-F02 (#181), revisão `e4a521c6ad2339b8a6368d183afb46b8c26b5b80`; preserva M7-F01, revisão `83e952fd4e5f22850653bf81cf1d45d6c4377c84`.
 - Compatibilidade, não dependência: M7-F03 (#182), revisão `c3b546a1787961bb0b9bb407cd7213d5b7046b1b`.
 - Design: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`, seções 7, 8 e 11.
@@ -12,7 +13,7 @@
 
 Administrar a retenção local da memória sem confundir três operações: compactar detalhes, reconstruir derivados e excluir conteúdo por comando explícito. Preservar decisões, correções, lições, referências, cobertura e retomada. Uma reconstrução não é restauração de backup nem comprovação de que a fonte continua disponível.
 
-A política de duração do design já foi aprovada: memória durável durante a vida do projeto, salvo exclusão explícita; detalhes repetitivos compactáveis após 30 dias; fontes originais continuam com seus donos. Os mecanismos, limites e vinte critérios abaixo são **propostas desta revisão**, ainda sem aceite. Não alterar os textos técnicos aprovados das F01–F03.
+A política de duração do design já foi aprovada: memória durável durante a vida do projeto, salvo exclusão explícita; detalhes repetitivos compactáveis após 30 dias; fontes originais continuam com seus donos. Em 2026-08-30, o PI aprovou a revisão escrita `027f8274dc4e3d39a6fc24ce394ea6b53d70f986`, incluindo os mecanismos, limites e vinte critérios abaixo. As expressões “proposta” e “recomendada” preservadas no corpo registram a redação submetida; seu conteúdo está abrangido pelo aceite. Os textos técnicos aprovados das F01–F03 não foram alterados.
 
 Alternativas consideradas:
 
@@ -288,6 +289,6 @@ Na revisão, seguir `docs/REVIEW.md`: delta desta SPEC e interfaces diretamente 
 
 Esta entrega é documental. Não houve execução de manutenção, exclusão de dados, implementação, teste de produto, instalação, push ou deploy. Testes e medições acima são critérios futuros, não evidência de funcionamento já obtida.
 
-## Pergunta de revisão
+## Aceite registrado
 
-Aprovar a revisão escrita desta SPEC, incluindo os vinte critérios e os limites propostos, para mover **somente M7-F04 (#183)** de Planejado para Backlog? A aprovação não inicia implementação, não altera o next e não reabre as revisões aprovadas de F01–F03.
+O PI aprovou em 2026-08-30 a revisão exata `027f8274dc4e3d39a6fc24ce394ea6b53d70f986`, incluindo os vinte critérios e limites. **Somente M7-F04 (#183)** passa de Planejado para Backlog; parent #179 e dependência #181 preservados. O aceite não inicia implementação, não altera o next e não reabre as revisões aprovadas de F01–F03.

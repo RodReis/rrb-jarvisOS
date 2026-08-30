@@ -4,8 +4,8 @@
 - Esta revisão registra decisões parciais de escopo e contratos nas seções abaixo; **não é um design completo nem uma SPEC aprovada para construção**.
 - Origem: proposta do PI de usar Graphify para memória e aprendizado transversal, acompanhada de quatro capturas dos menus futuros de JarvisOS/AgentsOS; aprovação da divisão entre MVP-007, M16-F05 e MVP-016.
 - Documento do MVP: `docs/mvp/mvp-007-memoria-contextual.md`.
-- Fatias: oito recortes de planejamento, com publicação autorizada pelo PI em 2026-08-30; SPECs da F01–F03 aprovadas, F04 em rascunho para revisão e F05–F08 a redigir. Permanece a orientação de não implementar agora. Índice canônico: `docs/STATUS.md`.
-- Issues do MVP-007: épico [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179); #180–#182 em Backlog após aceite das SPECs e #183–#187 Planejadas, conforme a seção 15. A #164 pertence ao MVP-016 e não substitui esse acompanhamento.
+- Fatias: oito recortes de planejamento, com publicação autorizada pelo PI em 2026-08-30; SPECs da F01–F04 aprovadas e F05–F08 a redigir. Permanece a orientação de não implementar agora. Índice canônico: `docs/STATUS.md`.
+- Issues do MVP-007: épico [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179); #180–#183 em Backlog após aceite das SPECs e #184–#187 Planejadas, conforme a seção 15. A #164 pertence ao MVP-016 e não substitui esse acompanhamento.
 - Relação com a execução: planejamento paralelo, não bloqueante para MVP-008, MVP-009 ou MVP-016; fila preservada.
 
 ## 1. Objetivo aprovado
@@ -188,9 +188,9 @@ Foi afastado aceitar qualquer objeto livre: facilitaria a primeira integração,
 
 O PI autorizou organizar as fatias por dependência e publicar o épico e suas issues de planejamento. Foram derivados oito recortes dos contratos acima: núcleo/identidade/persistência; fontes/ingestão/retomada; recuperação/orçamento; retenção/reconstrução; adapter opcional do Graphify; memória operacional/lições; Agent Memory/Notebook; resiliência/prova integrada.
 
-O plano de publicação está em `docs/superpowers/plans/2026-08-30-mvp-007-publicacao-issues.md`, com escopo, dependências, alvos de verificação e pendências por fatia. Numeração e associação às SPECs permanecem no índice canônico de `docs/STATUS.md`; F01–F03 estão **aprovadas-pi**, F04 está em **rascunho para revisão** e F05–F08 estão **a redigir**.
+O plano de publicação está em `docs/superpowers/plans/2026-08-30-mvp-007-publicacao-issues.md`, com escopo, dependências, alvos de verificação e pendências por fatia. Numeração e associação às SPECs permanecem no índice canônico de `docs/STATUS.md`; F01–F04 estão **aprovadas-pi** e F05–F08 estão **a redigir**.
 
-SPEC da F04: `docs/spec/spec-memoria-04-retencao-reconstrucao.md`, rascunho redigido em 2026-08-30, com vinte critérios. Propõe compactação reversível após 30 dias, reconstrução retomável por gerações, exclusão escopada com supressão de reingestão, capacidade e agenda. #183 continua Planejada, dependente apenas de #181; FTS/Graphify são integrações opcionais. Os originais e ContextPacks congelados ficam com seus donos. Os mecanismos estão submetidos à revisão, não aprovados pela política geral da seção 8.
+SPEC da F04: `docs/spec/spec-memoria-04-retencao-reconstrucao.md`, revisão `027f8274dc4e3d39a6fc24ce394ea6b53d70f986`, aprovada explicitamente pelo PI em 2026-08-30, incluindo vinte critérios. Aceite cobre compactação reversível após 30 dias, reconstrução retomável por partição/geração/journal, exclusão escopada com supressão de reingestão, capacidade e agenda. #183 passa a Backlog, dependente apenas de #181; FTS/Graphify são integrações opcionais. Originais, auditoria e ContextPacks congelados ficam com seus donos. O mecanismo inicial da seção 8 está detalhado; F01–F03 permanecem intactas. Não iniciar implementação.
 
 SPEC da F03: `docs/spec/spec-memoria-03-recuperacao-contextual-orcamento.md`, revisão `c3b546a1787961bb0b9bb407cd7213d5b7046b1b`, aprovada explicitamente pelo PI em 2026-08-30. O aceite cobre busca/índice lexical local e relações opcionais, histórico e validade/cobertura explícitos, ranking, sessões/expansões limitadas, parcela de orçamento e integração opcional com ContextPack/envio, incluindo vinte critérios. O detalhamento inicial da seção 9 está resolvido; F01/F02 permanecem intactas. #182 passa a Backlog, dependente de #181, sem iniciar implementação.
 
@@ -206,9 +206,9 @@ Publicação conferida em 2026-08-30: épico #179, oito sub-issues #180–#187 e
 
 ## 16. Decisões ainda abertas
 
-1. Revisão e aprovação da SPEC M7-F04 (#183), já redigida; depois detalhar F05–F08, começando por M7-F05 (#184). F01–F03 aprovadas pelas revisões exatas acima, sem repetir seus aceites.
+1. Redação, critérios finais e aprovação de F05–F08, começando por M7-F05 (#184). F01–F04 aprovadas pelas revisões exatas acima, sem repetir seus aceites.
 2. Integrações futuras além das três entradas iniciais; adapters, recorte do histórico, notas, cobertura, corte, confirmação e retentativas iniciais estão aprovados na F02.
-3. Aprovação dos contratos de manutenção/compactação/reconstrução, capacidade e exclusão física propostos na F04 conforme a seção 8, sobre o armazenamento básico aprovado na F01; sincronização permanece fora deste recorte.
+3. Extensões futuras além da manutenção inicial; compactação/reconstrução, capacidade e exclusão escopada da seção 8 estão detalhadas na F04 aprovada. Sincronização permanece fora deste recorte.
 4. Extensões futuras além da recuperação inicial; contratos de consulta/resultados, atualização do índice, limites e ponte com ContextPack da seção 9 estão aprovados na F03.
 5. Assinaturas, schemas, versão concreta, execução e testes de compatibilidade do adapter conforme o contrato aprovado na seção 12.
 6. Formato de avaliação, estados/transições e critérios concretos das integrações para lições fora da pipeline conforme a seção 13.
@@ -220,4 +220,4 @@ As perguntas serão resolvidas uma por vez. Nenhum item aberto vira implementaç
 
 Este registro deriva da decisão do PI nesta conversa. A documentação oficial consultada para avaliar viabilidade está no [Graphify](https://github.com/Graphify-Labs/graphify); suporte documentado não prova compatibilidade com a versão instalada nem substitui futuros testes de contrato.
 
-Não houve instalação, execução de Graphify/Caveman, captura de atividade, implementação, alteração de fila por esta tarefa, push ou deploy. As issues foram publicadas conforme a seção 15; os aceites posteriores da F01–F03 movem #180–#182 para Backlog e elevam o acervo local a 83 SPECs aprovadas. Aprovação da SPEC não é evidência de entrega.
+Não houve instalação, execução de Graphify/Caveman, captura de atividade, implementação, alteração de fila por esta tarefa, push ou deploy. As issues foram publicadas conforme a seção 15; os aceites posteriores da F01–F04 movem #180–#183 para Backlog e elevam o acervo local a 84 SPECs aprovadas. Aprovação da SPEC não é evidência de entrega.

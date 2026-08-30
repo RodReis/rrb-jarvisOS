@@ -1,10 +1,10 @@
 # MVP-007 — Memória Contextual e RAG
 
-- Status: **contratos parciais e SPECs da F01–F03 aprovados pelo PI em 2026-08-30; F01–F03 em Backlog, F04 em rascunho/Planejada, F05–F08 a redigir; design em elaboração; implementação não autorizada**.
+- Status: **contratos parciais e SPECs da F01–F04 aprovados pelo PI em 2026-08-30; F01–F04 em Backlog, F05–F08 Planejadas/a redigir; design em elaboração; implementação não autorizada**.
 - Origem: recorte de memória híbrida/RAG anteriormente associado ao Corte 3.
 - Relação com a pipeline: **não bloqueia MVP-008, MVP-009 nem MVP-016**; a M16-F05 mantém escopo próprio e integração reutilizável.
 - Design em elaboração: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`.
-- Issues publicadas: épico [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179); #180–#182 em `proplan:backlog` após aceite das SPECs, #183–#187 em `proplan:planejado`. Pais/dependências preservados. A #164 trata de memória de falhas do MVP-016, não deste núcleo.
+- Issues publicadas: épico [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179); #180–#183 em `proplan:backlog` após aceite das SPECs, #184–#187 em `proplan:planejado`. Pais/dependências preservados. A #164 trata de memória de falhas do MVP-016, não deste núcleo.
 - Plano de publicação: `docs/superpowers/plans/2026-08-30-mvp-007-publicacao-issues.md`; índice e links canônicos em `docs/STATUS.md`.
 
 ## Intenção preservada
@@ -85,16 +85,16 @@ A M7-F02 foi aprovada pelo PI em 2026-08-30: `docs/spec/spec-memoria-02-fontes-i
 
 A M7-F01 foi aprovada pelo PI em 2026-08-30: `docs/spec/spec-memoria-01-nucleo-identidade-persistencia.md`, revisão `83e952fd4e5f22850653bf81cf1d45d6c4377c84`, com schema v1, identidade composta, revisão/substituição, conflitos, limites, SQLite transacional e vinte critérios de aceite. Sua issue #180 passa a Backlog sem iniciar construção. As pendências abaixo se restringem às fatias seguintes; não reabrem o contrato aprovado de F01.
 
-## Não decidido
+A M7-F04 foi aprovada pelo PI em 2026-08-30: `docs/spec/spec-memoria-04-retencao-reconstrucao.md`, revisão `027f8274dc4e3d39a6fc24ce394ea6b53d70f986`. O aceite cobre compactação reversível após 30 dias, reconstrução por partição/geração com retomada, exclusão escopada e barreira contra reingestão, capacidade/agenda e vinte critérios. Não depende da F03 ou do Graphify e preserva os donos de originais, auditoria e ContextPacks congelados. #183 passa a Backlog, mantendo dependência única #181; nenhuma implementação iniciada.
 
-M7-F04 (#183) possui proposta escrita em `docs/spec/spec-memoria-04-retencao-reconstrucao.md`: compactação reversível após 30 dias, reconstrução por gerações com retomada, exclusão escopada com barreira contra reingestão, capacidade/agenda e vinte critérios. Está em rascunho para revisão; não é aceite nem implementação. Não depende da F03 ou do Graphify e não apaga originais, auditoria ou ContextPacks congelados.
+## Não decidido
 
 - extensões de tipos/operações, schemas e limites nas integrações futuras, preservando o núcleo v1 aprovado na F01;
 - integrações das fontes futuras além de Git, decisões e notas; cobertura, corte, confirmação, retomada, pendências e retentativas dessas três entradas estão resolvidos na F02;
-- aprovação dos contratos de manutenção/compactação/reconstrução, capacidade e exclusão física propostos na F04 conforme a política aprovada; sincronização fora deste recorte;
+- extensões futuras da manutenção além dos contratos aprovados na F04; sincronização fora deste recorte;
 - extensões futuras de consulta além do contrato inicial aprovado na F03; busca, índice incremental, sessões/expansões, limites e ponte com ContextPack estão resolvidos nessa revisão;
 - assinaturas, schemas, versão concreta, execução e testes de compatibilidade do adapter conforme o contrato aprovado;
 - formato de avaliação, estados/transições e critérios concretos das integrações para lições fora da pipeline, conforme o modelo aprovado;
-- critérios de aceite finais, interfaces formais e aprovação das SPECs de F04–F08.
+- critérios de aceite finais, interfaces formais e aprovação das SPECs de F05–F08.
 
 Nenhum desses itens em aberto pode ser inferido como requisito aprovado. A integração de Caveman discutida para a F05 não é automaticamente incorporada ao MVP-007.

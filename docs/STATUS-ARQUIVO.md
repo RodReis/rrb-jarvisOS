@@ -302,6 +302,14 @@ Inspeção somente de leitura no checkout principal `0799c8a` confirmou SQLite/W
 
 Índice atualizado somente na associação da F04 ao rascunho; quadro Agora e demais associações preservados. Corrigida no cabeçalho do MVP uma referência antiga às labels F02/F03, que já estavam em Backlog. F01–F03 permanecem aprovadas/Backlog; F04 Planejada para revisão e F05–F08 a redigir. O acervo continua com 83 SPECs aprovadas. Validação desta etapa é documental, não teste de produto. Sem implementação, exclusão, captura, instalação, alteração de fila, PR, push ou deploy.
 
+### MVP-007 — aceite exato da M7-F04 registrado (2026-08-30)
+
+O PI aprovou a revisão `027f8274dc4e3d39a6fc24ce394ea6b53d70f986` de `docs/spec/spec-memoria-04-retencao-reconstrucao.md`, incluindo compactação reversível após 30 dias, reconstrução retomável por partição/geração/journal, exclusão escopada com barreira contra reingestão, capacidade, agenda e vinte critérios. Cabeçalho e textos de aceite atualizados; comparação com a revisão submetida preserva o corpo técnico. F01–F03 permanecem intactas. Não foi iniciado plano de construção.
+
+A #183 passa de `proplan:planejado` para `proplan:backlog` e o épico #179 recebe o aceite sem marcar entrega. Parent #179, dependência única #181 e ordem original das oito filhas são preservados; a atualização não escreve parents, dependências ou next. F01–F04 ficam em Backlog, F05–F08 Planejadas; implementação continua 0/8.
+
+Arquitetura, convenções e acompanhamento passam a apontar para o contrato aprovado. Acervo local: 84 SPECs aprovadas; quadro Agora e demais associações Fatia ↔ SPEC preservados. Próxima especificação: M7-F05 (#184), adapter opcional do Graphify. Validação documental não é teste de produto. Sem implementação, exclusão de dados, instalação, captura, PR, push ou deploy; registro somente em Git local.
+
 ## Pendências históricas preservadas
 
 - A UI de allowlist ainda exigia decisão de produto: localização, seletor nativo e remoção de `appDir`.
