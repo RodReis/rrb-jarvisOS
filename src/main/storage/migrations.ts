@@ -762,6 +762,73 @@ const MIGRATIONS: readonly string[] = [
     created_at     TEXT NOT NULL
   );
   CREATE INDEX idx_pacote_projeto ON pacote_estrutural(user_id, project_id, created_at);
+  `,
+
+  // SPEC-Planejamento-05: os anexos de design do PI e o pacote de arquitetura.
+  //
+  // "anexado_em" não é um "created_at" com outro nome, e a distinção é o gate inteiro: a decisão
+  // do PI (2026-08-29) é que o anexo entra por **seletor que copia e hasheia no ato**, e é esse
+  // instante que faz o arquivo contar. Um arquivo largado no diretório do projeto por fora não
+  // gera linha aqui e **não** satisfaz o gate (critério 7) — não há varredura de pasta que o
+  // encontre, de propósito: varrer tornaria ambíguo o instante em que o anexo passa a valer.
+  //
+  // "hash" é do conteúdo **copiado**, calculado no ato. É ele que o pacote de arquitetura cita
+  // (critério 6: o pacote registra os hashes de todos os anexos e saídas).
+  //
+  // "origem" guarda o caminho externo escolhido — auditoria, não ponteiro. O projeto guarda a
+  // cópia, e o original pode sumir sem que o anexo deixe de valer.
+  //
+  // Sem UNIQUE em "hash": anexar o mesmo arquivo duas vezes são **dois atos**, e o segundo é um
+  // fato tanto quanto o primeiro. O que precisa ser único é o destino — daí o índice em
+  // (user_id, project_id, caminho), que faz reanexar substituir a linha em vez de duplicá-la.
+  `
+  CREATE TABLE design_attachment (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    project_id   TEXT NOT NULL,
+    tipo         TEXT NOT NULL,
+    -- Caminho relativo à raiz do projeto: onde a cópia ficou.
+    caminho      TEXT NOT NULL,
+    -- O caminho externo de onde o PI tirou o arquivo. Auditoria.
+    origem       TEXT NOT NULL,
+    hash         TEXT NOT NULL,
+    bytes        INTEGER NOT NULL,
+    -- O instante do ato. É ele que faz o anexo contar para o gate.
+    anexado_em   TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX idx_anexo_destino ON design_attachment(user_id, project_id, caminho);
+  CREATE INDEX idx_anexo_projeto ON design_attachment(user_id, project_id, anexado_em);
+
+  -- O pacote de arquitetura: ARCHITECTURE, DECISIONS, TESTING e REVIEW como uma revisão só.
+  --
+  -- Tabela própria, e não mais linhas em "pacote_estrutural", porque as duas revisões respondem
+  -- perguntas diferentes e fecham em marcos diferentes ("prd-aprovado" e "arquitetura-aprovada").
+  -- Sob uma tabela só, "qual PRD esta arquitetura assume?" viraria uma busca por data em vez de
+  -- uma coluna — e o critério 3 (design e arquitetura referenciam a mesma revisão do PRD) é
+  -- exatamente essa pergunta.
+  --
+  -- "pacote_estrutural_id" é o que torna o critério 3 estrutural: a arquitetura aponta para a
+  -- revisão do PRD que ela assume, e não para "o PRD mais recente" — que mudaria sob os pés dela.
+  --
+  -- Append-only pela terceira vez, pela mesma razão: regerar insere, e "hash" UNIQUE reconhece
+  -- quando o conteúdo é o mesmo.
+  CREATE TABLE pacote_arquitetura (
+    id                   TEXT PRIMARY KEY,
+    user_id              TEXT NOT NULL,
+    workspace_id         TEXT NOT NULL,
+    project_id           TEXT NOT NULL,
+    -- A revisão do PRD que esta arquitetura assume (critério 3).
+    pacote_estrutural_id TEXT NOT NULL,
+    -- JSON dos quatro documentos: caminho, conteúdo, hash e afirmações com origem.
+    documentos           TEXT NOT NULL,
+    -- JSON dos hashes dos anexos que estavam no gate quando a arquitetura saiu (critério 6).
+    anexos               TEXT NOT NULL,
+    hash                 TEXT NOT NULL UNIQUE,
+    commit_hash          TEXT,
+    created_at           TEXT NOT NULL
+  );
+  CREATE INDEX idx_arquitetura_projeto ON pacote_arquitetura(user_id, project_id, created_at);
   `
 ]
 
