@@ -166,6 +166,14 @@ O detalhamento foi incorporado à seção 6 do design, mantendo como abertas ide
 
 Nenhuma SPEC de fatia foi criada ou aprovada; o total permanece 80. Fila e índice Fatia ↔ SPEC não mudaram; não houve implementação, alteração de issues, captura real, instalação, push ou deploy nesta atualização. Próximo bloco: identidade e tratamento de correções.
 
+### MVP-007: identidade e correções aprovadas (2026-08-30)
+
+Após o catálogo registrado no commit local `2b690a0`, o PI aprovou identidade por origem e identificador estável; deduplicação de reentregas sem fundir execuções distintas; fontes rastreáveis sem fusão por mera similaridade; correções por revisão; contradições explícitas; e invalidação de conhecimento dependente de fonte removida/desatualizada. Ordem de chegada não define verdade nem transforma inferência em decisão do PI.
+
+O contrato foi registrado na seção 7 do design. Formatos técnicos e política de retenção/exclusão física seguem abertos; não houve aprovação de armazenamento, prazos ou sincronização nesta etapa. Os registros históricos acima preservam a sequência das decisões. Próximo bloco: persistência, retenção e reconstrução.
+
+Nenhuma SPEC de fatia foi criada ou aprovada; contagem permanece 80. Fila, índice e SPECs aprovadas não foram alterados; não houve implementação, alteração de issues, captura real, instalação ou push.
+
 ## Pendências históricas preservadas
 
 - A UI de allowlist ainda exigia decisão de produto: localização, seletor nativo e remoção de `appDir`.

@@ -99,6 +99,8 @@ JarvisOS e AgentsOS compartilham um núcleo de conhecimento, inclusive sobre o d
 
 Agent Memory, Notebook, centros de comando e demais superfícies previstas consultam esse núcleo; não criam memórias independentes. Visão global conserva identidade de produto/projeto/agente e não aplica regras entre projetos automaticamente. A M16-F05 mantém seu recorte e contrato reutilizável, sem depender da entrega do MVP-007. O catálogo aprovado captura eventos de projetos, agentes, operações e conhecimento explícito; atualização incremental/assíncrona usa o orçamento existente, mantendo originais nos donos e lacunas de cobertura visíveis. Persistência e contratos técnicos ainda serão especificados; não há implementação autorizada.
 
+Identidade estável vem da origem, não do nome/caminho. Reentrega do mesmo evento não duplica ocorrência; fontes distintas mantêm proveniência e correções criam revisões. Contradição sem prova de substituição permanece explícita, e remoção/desatualização da fonte invalida conhecimento dependente como atual. Formato técnico, persistência e retenção ainda serão detalhados.
+
 Fonte: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`.
 
 ### Pipeline V2 aprovada (não implementada)
