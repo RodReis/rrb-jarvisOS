@@ -158,6 +158,14 @@ A decisão foi registrada em `docs/superpowers/specs/2026-08-30-mvp-007-memoria-
 
 A F05 permanece focada em estratégias/recomendações assistidas, com fronteira reutilizável. A #167 continua Planejada, com parent #162 e predecessor #166 verificados nesta conferência; a memória compartilhada não vira dependência obrigatória do MVP-016. As SPECs F01–F04 não mudam, a contagem permanece 80 e o índice Fatia ↔ SPEC não recebe números novos. Nenhuma implementação, instalação, chamada de executor, mudança de fila ou push foi realizada.
 
+### MVP-007: catálogo de captura aprovado (2026-08-30)
+
+Depois do registro da direção no commit local `ed3ec5c`, o PI aprovou captura automática por eventos em quatro grupos: projetos; agentes; operações; conhecimento explícito. Conteúdos originais permanecem nos módulos responsáveis; atualização incremental e assíncrona usa o orçamento existente, sem exigir chamada de modelo a cada evento. Fonte não integrada aparece como lacuna de cobertura, não como ausência de atividade.
+
+O detalhamento foi incorporado à seção 6 do design, mantendo como abertas identidade, proveniência, deduplicação, correções, garantias de entrega e demais contratos técnicos. A aprovação não escolhe captura indiscriminada de cliques/saídas de terminal nem depende de registro manual de cada atividade. O registro histórico anterior preserva a situação em que o catálogo ainda era a próxima decisão.
+
+Nenhuma SPEC de fatia foi criada ou aprovada; o total permanece 80. Fila e índice Fatia ↔ SPEC não mudaram; não houve implementação, alteração de issues, captura real, instalação, push ou deploy nesta atualização. Próximo bloco: identidade e tratamento de correções.
+
 ## Pendências históricas preservadas
 
 - A UI de allowlist ainda exigia decisão de produto: localização, seletor nativo e remoção de `appDir`.

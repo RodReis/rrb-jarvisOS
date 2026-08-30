@@ -1,7 +1,7 @@
 # Design em elaboração — MVP-007: Memória compartilhada JarvisOS e AgentsOS
 
-- Status: **direção aprovada pelo PI em 2026-08-30; detalhamento em elaboração**.
-- Esta revisão registra a decisão de escopo; **não é um design completo nem uma SPEC aprovada para construção**.
+- Status: **direção e catálogo inicial de captura aprovados pelo PI em 2026-08-30; detalhamento em elaboração**.
+- Esta revisão registra decisões parciais de escopo e captura; **não é um design completo nem uma SPEC aprovada para construção**.
 - Origem: proposta do PI de usar Graphify para memória e aprendizado transversal, acompanhada de quatro capturas dos menus futuros de JarvisOS/AgentsOS; aprovação da divisão entre MVP-007, M16-F05 e MVP-016.
 - Documento do MVP: `docs/mvp/mvp-007-memoria-contextual.md`.
 - Fatias e SPECs: ainda não definidas. Índice canônico: `docs/STATUS.md`.
@@ -11,7 +11,7 @@
 
 Compartilhar memória contextual e conhecimento entre JarvisOS e AgentsOS, abrangendo atividades e artefatos dos módulos que forem integrados, inclusive o desenvolvimento dos próprios produtos. Os consumidores recuperam contexto e relações com origem rastreável, sem manter memórias independentes e conflitantes por menu ou enviar todo o histórico a cada chamada de modelo.
 
-"Memorizar tudo" precisa ser traduzido em catálogo de atividades, fontes e cobertura de integração. Não constitui promessa de observar automaticamente módulos ainda inexistentes ou agentes externos sem integração. O catálogo inicial e seus gatilhos são a próxima decisão, ainda não aprovada.
+"Memorizar tudo" corresponde ao catálogo inicial aprovado na seção 6, com captura automática por eventos nos módulos integrados. Não constitui promessa de observar automaticamente módulos ainda inexistentes ou agentes externos sem integração. Schemas e garantias de entrega ainda serão detalhados.
 
 ## 2. Divisão de responsabilidades aprovada
 
@@ -57,19 +57,36 @@ O recorte técnico final das estratégias opcionais da F05 continua a ser consol
 - **Toda a memória global dentro da F05 — não escolhido:** mistura uma plataforma de conhecimento com uma fatia de estratégias da pipeline e amplia suas dependências.
 - **Memória separada por produto/menu — não escolhido:** duplica ingestão e favorece históricos e conclusões divergentes.
 
-## 6. Decisões ainda abertas
+## 6. Captura automática por eventos (PI, 2026-08-30)
 
-1. Catálogo inicial de atividades/fontes, cobertura e gatilhos de captura automática.
-2. Identidade, escopo, proveniência, deduplicação, versões e tratamento de correções/exclusões.
+O PI aprovou o seguinte catálogo inicial:
+
+| Grupo | Atividades/fontes a registrar quando integradas |
+|---|---|
+| Projetos | Decisões, revisões de documentos/código, tarefas, commits e artefatos. |
+| Agentes | Objetivo da execução, resultado, validações, falhas e correções. |
+| Operações | Execuções de workflows, automações e releases, com estado e consumo observado. |
+| Conhecimento explícito | Notas do Notebook, orientações do PI e conclusões vinculadas às fontes. |
+
+A captura é automática por eventos dos módulos integrados, não depende de inserção manual de cada atividade. Os conteúdos originais permanecem nos módulos responsáveis; a memória conecta suas referências. A atualização do conhecimento é incremental e assíncrona, respeitando o orçamento existente, sem exigir uma chamada de modelo a cada evento.
+
+Fonte ainda não integrada aparece como lacuna de cobertura, nunca como "nenhuma atividade". A aprovação do catálogo não significa que as integrações já existam ou que seja possível observar agentes externos sem adapter.
+
+Foram afastadas como padrão a captura apenas manual, que deixa lacunas, e a coleta indiscriminada de cada clique ou saída de terminal, que aumenta ruído e consumo. Isso não elimina os registros canônicos já mantidos pelos módulos nem impede consulta às evidências referenciadas.
+
+## 7. Decisões ainda abertas
+
+1. Identidade, escopo, proveniência, deduplicação, versões e tratamento de correções/exclusões.
+2. Schemas dos eventos, integrações iniciais, garantias de entrega e representação da cobertura do catálogo aprovado.
 3. Persistência, retenção, reconstrução e eventual sincronização dentro da arquitetura vigente.
-4. Recuperação contextual, atualização incremental e orçamento por operação.
+4. Recuperação contextual, mecanismo de atualização incremental e alocação do orçamento por operação.
 5. Contrato técnico/versionado do Graphify, alternativas e verificação de compatibilidade.
 6. Evidências necessárias para lições fora da pipeline.
 7. Fatias, ordem, dependências, critérios de aceite e interfaces formais.
 
 As perguntas serão resolvidas uma por vez. Nenhum item aberto vira implementação, gate ou regra inventada pelo agente. Novos registros de decisão devem distinguir proposta de aprovação; design completo e SPECs terão sua revisão escrita no fluxo existente, sem pedir novamente aceite da mesma revisão.
 
-## 7. Evidência e limite desta revisão
+## 8. Evidência e limite desta revisão
 
 Este registro deriva da decisão do PI nesta conversa. A documentação oficial consultada para avaliar viabilidade está no [Graphify](https://github.com/Graphify-Labs/graphify); suporte documentado não prova compatibilidade com a versão instalada nem substitui futuros testes de contrato.
 

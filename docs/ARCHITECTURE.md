@@ -97,7 +97,7 @@ A capacidade de desenvolvimento autônomo foi separada em três MVPs executávei
 
 JarvisOS e AgentsOS compartilham um núcleo de conhecimento, inclusive sobre o desenvolvimento dos próprios produtos. Histórico mantém os módulos de origem como donos dos fatos; o conhecimento usa relações derivadas/reconstruíveis, com Graphify opcional e substituível; aprendizado exige evidência, com validação operacional da pipeline mantida no MVP-016.
 
-Agent Memory, Notebook, centros de comando e demais superfícies previstas consultam esse núcleo; não criam memórias independentes. Visão global conserva identidade de produto/projeto/agente e não aplica regras entre projetos automaticamente. A M16-F05 mantém seu recorte e contrato reutilizável, sem depender da entrega do MVP-007. Catálogo de captura, persistência e contratos técnicos ainda serão especificados; não há implementação autorizada.
+Agent Memory, Notebook, centros de comando e demais superfícies previstas consultam esse núcleo; não criam memórias independentes. Visão global conserva identidade de produto/projeto/agente e não aplica regras entre projetos automaticamente. A M16-F05 mantém seu recorte e contrato reutilizável, sem depender da entrega do MVP-007. O catálogo aprovado captura eventos de projetos, agentes, operações e conhecimento explícito; atualização incremental/assíncrona usa o orçamento existente, mantendo originais nos donos e lacunas de cobertura visíveis. Persistência e contratos técnicos ainda serão especificados; não há implementação autorizada.
 
 Fonte: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`.
 
