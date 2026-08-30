@@ -1146,7 +1146,7 @@ Sem consentimento do Google o app para na tela de login e o AppShell não monta,
 
 ### `[FIX]` Configurações em abas ([#172](https://github.com/RodReis/rrb-jarvisOS/issues/172))
 
-Status: **entregue** — pedido direto do PI (2026-08-30, com screenshots); PR [#173](PENDENTE). Sem spec nova: o certo vem da instrução do PI (abas, combos, densidade) e do PRODUCT.md (*"um módulo novo nasce consistente sem que ninguém escreva CSS local"*).
+Status: **entregue** — pedido direto do PI (2026-08-30, com screenshots); PR [#173](https://github.com/RodReis/rrb-jarvisOS/pull/173). Sem spec nova: o certo vem da instrução do PI (abas, combos, densidade) e do PRODUCT.md (*"um módulo novo nasce consistente sem que ninguém escreva CSS local"*).
 
 - [x] **`Tabs`/`TabPanel` novos no DS** (`src/design/ui/Tabs.tsx`, Radix Tabs) — padrão ARIA completo (tablist nomeada, setas, roving tabindex) vindo do primitivo, não de teclado artesanal. No DS e não como layout local do Settings: a próxima tela densa usa o componente, não uma cópia
 - [x] **Settings em 5 abas** (decisão do PI entre três opções): Geral · Permissões · IA · Roteamento · Conectores — agrupadas pelo **escopo do dado** (usuário vs usuário+espaço), que é a divisão que o app já pratica por baixo

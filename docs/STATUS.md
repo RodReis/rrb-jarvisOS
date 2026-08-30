@@ -14,7 +14,7 @@ Atualizado em: **2026-08-29**. Visão curta do estado corrente e fonte única do
 | Feito | [#92](https://github.com/RodReis/rrb-jarvisOS/issues/92) · MVP-006 F06 Tavily Extract e evidências | entregue PR [#148](https://github.com/RodReis/rrb-jarvisOS/pull/148), aguardando aceite — **fecha o MVP-006** |
 | Feito | [#94](https://github.com/RodReis/rrb-jarvisOS/issues/94) · MVP-008 F01 Projeto local, SQLite e Git | entregue PR [#169](https://github.com/RodReis/rrb-jarvisOS/pull/169), aguardando aceite — **abre o MVP-008** |
 | Feito | [#170](https://github.com/RodReis/rrb-jarvisOS/issues/170) · `[FIX]` erro de git sem saída em Projetos | entregue PR [#171](https://github.com/RodReis/rrb-jarvisOS/pull/171), aguardando aceite |
-| Feito | [#172](https://github.com/RodReis/rrb-jarvisOS/issues/172) · `[FIX]` Configurações em abas | entregue PR [#173](PENDENTE), aguardando aceite |
+| Feito | [#172](https://github.com/RodReis/rrb-jarvisOS/issues/172) · `[FIX]` Configurações em abas | entregue PR [#173](https://github.com/RodReis/rrb-jarvisOS/pull/173), aguardando aceite |
 | Próximo | [#95](https://github.com/RodReis/rrb-jarvisOS/issues/95) · MVP-008 F02 | cabeça da fila; `proplan:next` aplicado |
 | Backlog | [#95–#99](https://github.com/RodReis/rrb-jarvisOS/issues/95) · MVP-008 | cinco fatias restantes; SPECs `aprovada-pi` (2026-08-29) |
 | Backlog | [#101–#106](https://github.com/RodReis/rrb-jarvisOS/issues/101) · MVP-009 | seis SPECs `aprovada-pi` (2026-08-29); fim da fila |
