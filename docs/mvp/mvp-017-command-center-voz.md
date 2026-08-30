@@ -1,6 +1,6 @@
 # MVP-017 — Command Center: voz, persona e mascote
 
-- Status: épico criado em 2026-08-30; divisão aprovada pelo PI na mesma data. **Nenhuma fatia tem SPEC** — nascimento lazy: fatia só vira issue quando a SPEC dela ficar `aprovada-pi`.
+- Status: épico criado em 2026-08-30; divisão aprovada pelo PI na mesma data. **SPEC da F01 `aprovada-pi` em 2026-08-30** (`spec-voz-01-stt-local-push-to-talk.md`); F02–F05 seguem sem SPEC — nascimento lazy: fatia só vira issue quando a SPEC dela ficar `aprovada-pi` **e chegar à `main`**.
 - GitHub: épico [#193](https://github.com/RodReis/rrb-jarvisOS/issues/193).
 - Fila: **depois do MVP-009**, antes dos MVP-010–016 (decisão do PI, 2026-08-30).
 - Depende de: MVP-005 (ponto único de IA, entregue). Não depende de: MVP-006, MVP-007.
@@ -21,15 +21,15 @@ O Command Center do protótipo (voz + mascote) é a identidade do produto. Este 
 
 ## Fatias previstas
 
-Índice `M17-Fnn`. Nomes de SPEC são **previstos** — a SPEC nasce quando a fatia entrar em redação.
+Índice `M17-Fnn`. Nomes de SPEC de F02–F05 são **previstos** — a SPEC nasce quando a fatia entrar em redação.
 
-| Índice | Fatia | SPEC prevista |
+| Índice | Fatia | SPEC |
 |---|---|---|
-| M17-F01 | STT local (Whisper) atrás de interface Engine + push-to-talk | `spec-voz-01-stt-local-push-to-talk.md` |
-| M17-F02 | TTS Piper com timestamps de fonema | `spec-voz-02-tts-piper-fonemas.md` |
-| M17-F03 | Persona JARVIS no ponto único de IA | `spec-voz-03-persona-ponto-unico.md` |
-| M17-F04 | Mascote com lip-sync por visemes + estados | `spec-voz-04-mascote-lipsync.md` |
-| M17-F05 | UI do Command Center (waveform, transcript, histórico) | `spec-voz-05-ui-command-center.md` |
+| M17-F01 | STT local (faster-whisper) atrás de interface Engine + push-to-talk | `spec-voz-01-stt-local-push-to-talk.md` — **`aprovada-pi` (2026-08-30)** |
+| M17-F02 | TTS Piper com timestamps de fonema | `spec-voz-02-tts-piper-fonemas.md` (prevista) |
+| M17-F03 | Persona JARVIS no ponto único de IA | `spec-voz-03-persona-ponto-unico.md` (prevista) |
+| M17-F04 | Mascote com lip-sync por visemes + estados | `spec-voz-04-mascote-lipsync.md` (prevista) |
+| M17-F05 | UI do Command Center (waveform, transcript, histórico) | `spec-voz-05-ui-command-center.md` (prevista) |
 
 Ordem: F01 → F02 → F03 → F04 → F05.
 
@@ -46,4 +46,4 @@ Ordem: F01 → F02 → F03 → F04 → F05.
 - Boca do mascote sincronizada por visemes, com estados idle/ouvindo/pensando/falando.
 - Persona editável em Settings sem rebuild.
 
-As perguntas abertas de cada fatia serão apresentadas ao PI na redação da SPEC correspondente — nenhuma está decidida por este documento.
+As perguntas abertas de cada fatia são apresentadas ao PI na redação da SPEC correspondente — as da F01 foram resolvidas em 2026-08-30 (oito decisões, registradas na própria SPEC).
