@@ -113,7 +113,11 @@ describe('credencial dentro de URL', () => {
     // comando é persistida em `execution_run` e no `AuditEvent`. Sem esta regra, o token vai
     // para o banco em claro — e nenhuma chave por nome o pega, porque ele não está num campo.
     const saida = redact({
-      args: ['push', 'https://x-access-token:ghs_segredo@github.com/d/r.git', 'HEAD:refs/heads/main']
+      args: [
+        'push',
+        'https://x-access-token:ghs_segredo@github.com/d/r.git',
+        'HEAD:refs/heads/main'
+      ]
     }) as Record<string, string[]>
 
     expect(saida['args']?.[1]).not.toContain('ghs_segredo')

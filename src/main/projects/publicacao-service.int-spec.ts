@@ -440,9 +440,9 @@ comGit('bloqueio retomável (critério 5) e reconciliação (critério 6)', () =
     expect(r.reason).toBe('bloqueado')
     expect(r.bloqueio?.causa).toBe('push-recusado')
     // Os dois lados inteiros: o commit alheio continua lá.
-    expect(
-      execFileSync('git', ['rev-parse', 'main'], { cwd: bare, encoding: 'utf8' })
-    ).toBe(naOrigem)
+    expect(execFileSync('git', ['rev-parse', 'main'], { cwd: bare, encoding: 'utf8' })).toBe(
+      naOrigem
+    )
   })
 })
 

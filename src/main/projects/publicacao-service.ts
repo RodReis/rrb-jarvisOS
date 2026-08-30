@@ -270,11 +270,7 @@ export class PublicacaoService {
   }
 
   /** O bloqueio de uma falha do conector, com a ação que destrava (critério 5). */
-  private bloqueado(
-    outcome: ConnectorOutcome,
-    oQue: string,
-    criados: number
-  ): PublicacaoOutcome {
+  private bloqueado(outcome: ConnectorOutcome, oQue: string, criados: number): PublicacaoOutcome {
     const erro = outcome as unknown as {
       code?: string
       mensagem?: string
@@ -314,7 +310,9 @@ export class PublicacaoService {
   }
 
   /** O bloqueio de um push que não saiu, traduzido pelo mesmo vocabulário do terminal. */
-  private bloqueioDoPush(push: { execucao: Parameters<typeof GitRunner.explicarFalha>[0] }): BloqueioExterno {
+  private bloqueioDoPush(push: {
+    execucao: Parameters<typeof GitRunner.explicarFalha>[0]
+  }): BloqueioExterno {
     const motivo = push.execucao.reason
     const naoPermitido = motivo === 'binario-fora-da-allowlist'
 

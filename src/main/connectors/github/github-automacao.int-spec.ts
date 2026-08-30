@@ -309,7 +309,10 @@ function responder(
     const sha = estado.commits.get(ref) ?? estado.refs.get(`heads/${ref}`)
     return sha === undefined
       ? { status: 404, corpo: { message: 'No commit found for SHA' } }
-      : { status: 200, corpo: { sha, html_url: `https://github.com/${OWNER}/${REPO}/commit/${sha}` } }
+      : {
+          status: 200,
+          corpo: { sha, html_url: `https://github.com/${OWNER}/${REPO}/commit/${sha}` }
+        }
   }
 
   return { status: 404, corpo: { message: 'Not Found' } }
@@ -812,7 +815,6 @@ describe('pr.merge-state', () => {
     })
   })
 })
-
 
 describe('repo.set-default-branch — M9-F01', () => {
   beforeEach(async () => {

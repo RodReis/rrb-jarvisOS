@@ -1396,6 +1396,33 @@ Status: **entregue** — pedido direto do PI (2026-08-30, com screenshots); PR [
 
 Mesma limitação do FIX #170: sem consentimento do Google o AppShell não monta, e a verificação **visual** das abas no app rodando é do PI. A estrutura, o teclado e o conteúdo por aba têm teste de componente.
 
+## MVP-009 — Entrega Autônoma ([#100](https://github.com/RodReis/rrb-jarvisOS/issues/100))
+
+### Fatia 01 — Publicação no GitHub (`docs/spec/spec-entrega-01-publicacao-github.md`)
+
+Status: **entregue** — spec `aprovada-pi` (2026-08-29); issue [#101](https://github.com/RodReis/rrb-jarvisOS/issues/101). Depende do MVP-006 e do MVP-008. **Abre o MVP-009.**
+
+- [x] **`src/shared/domain/publicacao.ts`** — a chave externa determinística (`chaveDeMvp`, `chaveDeFatia`, `chaveDeProjeto`), `urlDePushComToken` e `redigirUrlDeRemote`
+- [x] **Três capacidades novas no adapter** — `repo.set-default-branch`, `branch.ensure-protection` e `commit.sha-for-ref`, com validação, operação e despacho
+- [x] **`GitRunner.push` e `pushComToken`** — sem `--force`; a URL entra como argumento, nunca `git remote add`
+- [x] **Redação de credencial em URL** no `redact` compartilhado e nos três `audit.append` do `TerminalEngine`
+- [x] **`PublicacaoService`** — orquestra repositório → push → branch base → proteção → issues → dependências → confirmação na origem
+- [x] **`publicacao-github`** — tipo novo de `AuditEvent`
+- [x] **Canal `publicacao:publicar`** — o renderer informa o alvo, nunca a credencial nem o que publicar
+- [x] **Testes**: 14 de integração da orquestração, 7 do push com Git real, 12 das capacidades novas, 18 de domínio
+
+**A decisão que define a fatia.** O `ambienteControlado()` do MVP-004 não deixa variável de ambiente alcançar o subprocess — é a garantia da M4-F02, não um descuido, e abrir exceção criaria uma segunda lista de permissão. O PI decidiu pela **URL com token montada no ato**, passada como argumento: gravada no `.git/config`, a credencial sobreviveria ao run, ao processo e ao backup.
+
+**O teste de integração achou o vazamento onde ele estava de verdade.** A defesa óbvia era redigir o `stderr`, porque o Git ecoa a URL em `fatal: unable to access '...'`. Mas o Git **já remove a credencial do próprio eco** — aquela redação defendia contra o que não acontecia. O token vazava pelos **`args`**: o `AuditRepository` grava o payload cru e encadeado no hash, e entrando ali não sai mais sem quebrar a cadeia. A correção é no `redact` compartilhado e no `TerminalEngine`, que é o ponto por onde todo comando passa — **vale para qualquer segredo em argumento**, não só para este caso. A `ApprovalRequest` guarda o argumento real, porque é dela que a retomada reconstrói o comando.
+
+**Um contrafactual passou, e isso era lacuna de cobertura, não acerto.** Removida a redação dos args, a suíte ficou verde: o teste lia a cópia devolvida pelo runner (limpa) enquanto o banco estava sujo. O teste novo lê o `audit_event` do disco.
+
+**O seed de allowlist foi levantado e reprovado.** A decisão inicial do PI era semear o `git` ao criar projeto; ela colidia com **duas** regras escritas — a decisão 1 do MVP-008 (*"criar projeto nunca amplia a allowlist"*) e a regra do próprio MVP-004 no topo do `CommandAllowlistRepository` (*"sem default de fábrica; nenhum comando roda até o usuário permitir"*). Como `add()` classifica `permissions.change` de **alto risco**, o seed faria o app auto-conceder alto risco sem decisão humana — o que a barreira existe para impedir. Levantado ao PI, ficou o **bloqueio retomável**, que é literalmente o critério 5.
+
+**`branch.ensure-protection` é o único `ensure` que não procura antes de criar.** O `PUT` substitui a configuração inteira, então é idempotente por construção; comparar antes exigiria reproduzir a normalização que o GitHub faz nos campos aninhados, e errar essa comparação deixaria a proteção desatualizada em silêncio. `enforce_admins: false` é deliberado: o merge autônomo roda como o dono, e com `true` a proteção barraria a entrega que ela existe para proteger.
+
+**Limites:** sem tela — quem decide *quando* publicar é a M9-F02, e o canal existe para ela consumir. **Sem smoke real**: o push HTTPS autenticado não foi exercitado contra o GitHub (os testes usam bare local, que prova a mecânica do Git, não a autenticação), e isso precisa de repositório descartável com autorização do PI.
+
 ## Registro de entregas
 
 | Data | Fatia | PR | Observação |

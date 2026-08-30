@@ -42,7 +42,11 @@ export function chaveDeMvp(projectId: string, numeroDoMvp: number): string {
  * MVP-008 apareceria dentro do MVP-009. O segmento `f-` também separa a chave da fatia da chave do
  * MVP de mesmo número, que sem ele colidiriam.
  */
-export function chaveDeFatia(projectId: string, numeroDoMvp: number, numeroDaFatia: number): string {
+export function chaveDeFatia(
+  projectId: string,
+  numeroDoMvp: number,
+  numeroDaFatia: number
+): string {
   return `${chaveDeMvp(projectId, numeroDoMvp)}:f-${pad(numeroDaFatia)}`
 }
 
