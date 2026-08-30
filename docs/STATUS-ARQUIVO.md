@@ -122,6 +122,12 @@ O PI aprovou a revisão exata da SPEC no commit `eed7a5d`, preservando seus quin
 
 O registro do aceite não inicia implementação, não muda `next`, não fecha a issue nem declara entrega técnica. Esta tarefa continua no planejamento; próxima SPEC: M16-F03 (#165), registro e resolução de políticas.
 
+### M16-F03 redigida para revisão exata (2026-08-29)
+
+O PI confirmou cinco decisões: pacote completo por mecanismo, separação entre registro F03 e promoção F04, snapshot por run com controles operacionais vigentes, compatibilidade entre mecanismos com fallback do grupo afetado e persistência autossuficiente junto ao run. A SPEC `docs/spec/spec-aprendizado-03-registro-resolucao-politicas.md` consolida contratos, testes e quinze critérios de aceite, em `revisão-pi`.
+
+A issue #165 permanece `proplan:planejado`, vinculada ao épico #162 e ao predecessor #164. O total de SPECs aprovadas permanece 77; F04–F06 ainda aguardam redação. Não houve implementação, alteração da fila ou chamada de executor.
+
 ## Pendências históricas preservadas
 
 - A UI de allowlist ainda exigia decisão de produto: localização, seletor nativo e remoção de `appDir`.

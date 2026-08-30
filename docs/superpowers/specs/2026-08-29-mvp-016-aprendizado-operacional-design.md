@@ -4,7 +4,7 @@
 - Pipeline: V3, depois do MVP-015.
 - Implementação: **não autorizada por este documento**.
 - Issues: épico [#162](https://github.com/RodReis/rrb-jarvisOS/issues/162); F01–F02 #163–#164 em `proplan:backlog`; F03–F06 #165–#168 em `proplan:planejado`.
-- SPECs: M16-F01–F02 `aprovada-pi`; M16-F03–F06 ainda não redigidas.
+- SPECs: M16-F01–F02 `aprovada-pi`; M16-F03 `revisão-pi`; M16-F04–F06 ainda não redigidas.
 - Design predecessor: `2026-08-29-mvp-015-observabilidade-operacional-design.md`.
 
 ## 1. Resultado esperado
@@ -133,6 +133,16 @@ Ordem de resolução:
 
 Conflito não é combinado silenciosamente. O resolver escolhe uma versão compatível ou mantém a estável. Promoções são serializadas por `scope + mechanism`; concorrência sobre versão-base obsoleta força reavaliação.
 
+Detalhamento confirmado para a M16-F03:
+
+- Cada mecanismo recebe um pacote completo e tipado. Override substitui o pacote inteiro, sem merge de campos entre versões. Mudança de conteúdo gera revisão/hash novos e não herda prova automaticamente.
+- F03 registra candidatas, valida e persiste transições vinculadas à versão/base/evidências/autoridade. F04 conduz experimentos e promoção. Os testes da F03 usam produtor simulado; salvar candidata não a torna ativa.
+- O resolver valida também a composição: dependências relevantes entre mecanismos precisam ser satisfeitas. Conflito aciona fallback conjunto do grupo interdependente afetado para composição estável compatível/base, preservando mecanismos comprovadamente independentes.
+- O snapshot é congelado na criação efetiva do run, antes da primeira tentativa. Retry/retomada do mesmo run preserva o snapshot; continuação que constitua novo run recebe outro, mantendo vínculo.
+- Snapshot não congela pausa, cancelamento, kill-switch, quota, permissão ou habilitação de gasto. Os controles proprietários continuam vigentes.
+
+A revisão escrita está em `docs/spec/spec-aprendizado-03-registro-resolucao-politicas.md`, em `revisão-pi`; o aceite das decisões não antecipa o aceite exato da SPEC.
+
 ## 7. Memória de falhas
 
 A classificação separa etapa e natureza; severidade e transitoriedade são atributos independentes, sem criar gates. O fingerprint versionado considera comando/check, código semântico, teste/regra, símbolo ou região estrutural, valores esperados/obtidos e mensagem normalizada, com provider quando discriminante. Remove somente elementos voláteis identificados, como timestamp, ID de run, raiz temporária e deslocamento de linha. SHA e ambiente permanecem na ocorrência/aplicabilidade.
@@ -181,6 +191,8 @@ Toda proposta assistida registra executor, modelo, versão, contexto enviado e e
 ## 11. Persistência e reconstrução
 
 Registros canônicos: políticas, versões, decisões do PI, promoções, reversões e snapshots. Registros derivados reconstruíveis: observações, agregados, similaridades, métricas e índices de falhas. Artefatos extensos permanecem em seus donos e são referenciados por identificador, hash e localização permitida.
+
+O snapshot é autossuficiente: guarda configurações efetivas, versões, origem e hashes junto ao registro durável do run, na mesma transação de criação e no armazenamento existente. Índices do aprendizado não são outra fonte canônica. Catálogo indisponível usa composição estável compatível verificável/base em novos runs e não impede retomar um run pela cópia própria. Retenção/rebuild do aprendizado não remove esse snapshot; corrupção não é mascarada por consulta à política atual.
 
 Crash durante ingestão retoma por checkpoint sem duplicação. Projeções podem ser reconstruídas. Evidência perdida impede nova promoção automática quando a prova remanescente for insuficiente, mas não apaga o histórico.
 

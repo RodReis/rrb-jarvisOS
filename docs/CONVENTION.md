@@ -165,11 +165,11 @@ Invariantes:
 
 1. MVP-016 aprende sobre operação da pipeline; memória contextual/RAG continua no MVP-007.
 2. Mecanismos dos MVPs 008/009 permanecem donos da seleção, recuperação, revisão e orçamento; aprendizado fornece configuração versionada.
-3. `PolicySnapshot` é imutável por run; política nova só alcança runs futuros.
-4. Política específica do projeto vence global local; conteúdo e regra de negócio nunca são promovidos ao global.
+3. `PolicySnapshot` é imutável e autossuficiente por run, persistido com sua criação antes da primeira tentativa; retry/retomada do mesmo run não resolve política de novo. Novo run de continuação recebe snapshot próprio com vínculo ao anterior. Pausa, cancelamento, kill-switch, quota, permissão e habilitação de gasto continuam vigentes nos donos operacionais.
+4. Política específica compatível do projeto vence global local por pacote completo de mecanismo, sem merge implícito de campos; conteúdo e regra de negócio nunca são promovidos ao global. Composição incompatível aciona fallback conjunto do grupo interdependente afetado para estável compatível/base; independência não é presumida.
 5. Qualidade e aderência à SPEC são guardrails; economia de tokens/custo não compensa regressão.
 6. Promoção segue replay, shadow e canário conforme o impacto; alto impacto sempre exige PI.
-7. IA propõe e explica; resultado e promoção dependem de evidência e regra determinística.
+7. IA propõe e explica; resultado e promoção dependem de evidência e regra determinística. F03 registra/valida transições vinculadas à versão/base/autoridade; F04 conduz experimentos e promoção. Registrar candidata não a torna ativa.
 8. Similaridade semântica não fecha, ignora nem funde falha automaticamente.
 9. Política incompatível fica `stale`; regressão cria reversão auditável e fallback estável.
 10. Graphify, Caveman ou equivalente são opcionais; ausência mantém fallback determinístico.
