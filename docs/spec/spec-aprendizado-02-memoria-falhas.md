@@ -2,7 +2,7 @@
 
 - MVP/Fatia: MVP-016 · M16-F02.
 - Issue: [#164](https://github.com/RodReis/rrb-jarvisOS/issues/164).
-- Status: **revisão-pi** (2026-08-29); issue permanece `proplan:planejado`; implementação não autorizada.
+- Status: **aprovada-pi** (2026-08-29); issue em `proplan:backlog`; implementação depende das dependências e da fila.
 - Depende de: M16-F01 concluída, após MVP-015; predecessor [#163](https://github.com/RodReis/rrb-jarvisOS/issues/163).
 - Design: `docs/superpowers/specs/2026-08-29-mvp-016-aprendizado-operacional-design.md`.
 
@@ -192,4 +192,4 @@ npm run build
 
 ## Revisão pelo PI
 
-As decisões acima estão confirmadas. Esta revisão escrita aguarda aceite exato; a issue #164 continua Planejada e nenhum código está autorizado por este documento.
+Revisão exata do commit `eed7a5d` aprovada pelo PI em 2026-08-29, sem alteração dos requisitos. A issue #164 passa a Backlog, preservando o predecessor #163 e a fila corrente. O aceite não inicia implementação nesta tarefa, que permanece em planejamento.

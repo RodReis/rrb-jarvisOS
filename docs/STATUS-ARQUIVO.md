@@ -116,6 +116,12 @@ O PI confirmou classificação por etapa/natureza, resolução provada por ocorr
 
 A issue #164 permanece `proplan:planejado`, com predecessor #163 e parent #162; aprovação das decisões não foi confundida com aceite exato da revisão escrita. A conferência dos arquivos em `docs/spec` encontrou 76 cabeçalhos `aprovada-pi`, corrigindo a contagem anterior de 56 no STATUS; a F02 não entra nessa contagem. Não houve implementação, mudança de fila ou chamada de executor.
 
+### M16-F02 aprovada pelo PI (2026-08-29)
+
+O PI aprovou a revisão exata da SPEC no commit `eed7a5d`, preservando seus quinze critérios e limites. O status passa a `aprovada-pi` e a issue #164 passa a `proplan:backlog`, com predecessor #163 e parent #162 preservados. O épico passa a registrar F01–F02 aprovadas; F03–F06 permanecem Planejadas. O acervo local passa a 77 SPECs aprovadas e a Pipeline V3 a treze fatias em Backlog.
+
+O registro do aceite não inicia implementação, não muda `next`, não fecha a issue nem declara entrega técnica. Esta tarefa continua no planejamento; próxima SPEC: M16-F03 (#165), registro e resolução de políticas.
+
 ## Pendências históricas preservadas
 
 - A UI de allowlist ainda exigia decisão de produto: localização, seletor nativo e remoção de `appDir`.

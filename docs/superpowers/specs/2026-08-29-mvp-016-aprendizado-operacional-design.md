@@ -3,8 +3,8 @@
 - Status: **design e seis fatias aprovados pelo PI** em 2026-08-29.
 - Pipeline: V3, depois do MVP-015.
 - Implementação: **não autorizada por este documento**.
-- Issues: épico [#162](https://github.com/RodReis/rrb-jarvisOS/issues/162); F01 #163 em `proplan:backlog`; F02–F06 #164–#168 em `proplan:planejado`.
-- SPECs: M16-F01 `aprovada-pi`; M16-F02 `revisão-pi`; M16-F03–F06 ainda não redigidas.
+- Issues: épico [#162](https://github.com/RodReis/rrb-jarvisOS/issues/162); F01–F02 #163–#164 em `proplan:backlog`; F03–F06 #165–#168 em `proplan:planejado`.
+- SPECs: M16-F01–F02 `aprovada-pi`; M16-F03–F06 ainda não redigidas.
 - Design predecessor: `2026-08-29-mvp-015-observabilidade-operacional-design.md`.
 
 ## 1. Resultado esperado
@@ -143,7 +143,7 @@ Resolução exige sucesso conclusivo da validação que falhou ou operação afe
 
 Antes de uma recuperação, o MVP-016 fornece `FailureRecall` mínimo: ocorrências atuais, resoluções comprovadas compatíveis do mesmo projeto e histórico pertinente de ações tentadas. Cada item traz resultado, condições e provas. Usa somente a parcela alocada pelo `ContextPack`, com exclusões diagnosticáveis e sem veto permanente a repetir uma ação sob condições diferentes. O `RecoveryController` do MVP-009 continua dono do prompt, do delta e das tentativas; recall nunca dispensa testes/review/gates.
 
-A M16-F02 entrega matching determinístico e contrato `FailureAssociationCandidate`, validado com produtor simulado. A F05 conecta sugestões reais pelos executores existentes; não há dependência de embeddings, banco vetorial ou MVP-007. A revisão escrita da F02 está em `docs/spec/spec-aprendizado-02-memoria-falhas.md`, aguardando aceite exato.
+A M16-F02 entrega matching determinístico e contrato `FailureAssociationCandidate`, validado com produtor simulado. A F05 conecta sugestões reais pelos executores existentes; não há dependência de embeddings, banco vetorial ou MVP-007. A revisão escrita da F02 está em `docs/spec/spec-aprendizado-02-memoria-falhas.md`, com aceite exato do PI em 2026-08-29.
 
 ## 8. Estratégias de contexto e tokens
 
@@ -241,6 +241,6 @@ Para um projeto selecionado, uma falha recorrente é reconhecida sem esconder ca
 
 ## 17. Gates e autorização
 
-O PI aprovou o design e as seis fatias. Isso autoriza redigir as seis SPECs para revisão, mas não autoriza implementação, gasto, smoke externo, push ou PR. A publicação das issues foi autorizada separadamente e concluída em 2026-08-29; F01 está em backlog e F02–F06 permanecem planejadas até aprovação de suas SPECs.
+O PI aprovou o design e as seis fatias. Isso autoriza redigir as seis SPECs para revisão, mas não autoriza implementação, gasto, smoke externo, push ou PR. A publicação das issues foi autorizada separadamente e concluída em 2026-08-29; F01–F02 estão em backlog após aceite exato e F03–F06 permanecem planejadas até aprovação de suas SPECs.
 
 A implementação de cada fatia depende do aceite exato da respectiva SPEC e da fila. A M16-F06 também depende de `DESIGN-SYSTEM.md` e protótipos HTML formais aprovados. Números dos perfis, schemas IPC, migrations e divisão interna de arquivos pertencem às SPECs sem poder alterar este design.
