@@ -103,6 +103,8 @@ Identidade estável vem da origem, não do nome/caminho. Reentrega do mesmo even
 
 Persistência usa o armazenamento local existente. Memória durável permanece durante a vida do projeto, salvo exclusão explícita; detalhes repetitivos das projeções compactam após 30 dias com preservação de marcos e evidências necessárias, sem alterar retenção dos donos. Grafo/cache são reconstruíveis somente com fontes disponíveis, preservando invalidações; reconstrução não é backup. Falha do grafo usa mecanismos básicos/fontes sem bloquear a pipeline. Sincronização fica para recorte próprio.
 
+Recuperação começa por tarefa/projeto, com busca textual e relações do grafo, sem embeddings obrigatórios. Ampliação justificada respeita permissões e limites do solicitante; respostas trazem trechos, fonte/revisão, validade, contradições e lacunas. Na pipeline, a memória fornece candidatos e o `ContextPack` mantém a composição final e seu orçamento. Nenhuma consulta amplia autoridade de execução.
+
 Fonte: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`.
 
 ### Pipeline V2 aprovada (não implementada)

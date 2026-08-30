@@ -1,7 +1,7 @@
 # Design em elaboração — MVP-007: Memória compartilhada JarvisOS e AgentsOS
 
-- Status: **direção, captura, identidade/correções e persistência/retenção aprovadas pelo PI em 2026-08-30; detalhamento em elaboração**.
-- Esta revisão registra decisões parciais de escopo, captura, identidade e persistência; **não é um design completo nem uma SPEC aprovada para construção**.
+- Status: **direção, captura, identidade/correções, persistência/retenção e recuperação contextual aprovadas pelo PI em 2026-08-30; detalhamento em elaboração**.
+- Esta revisão registra decisões parciais de escopo, captura, identidade, persistência e recuperação; **não é um design completo nem uma SPEC aprovada para construção**.
 - Origem: proposta do PI de usar Graphify para memória e aprendizado transversal, acompanhada de quatro capturas dos menus futuros de JarvisOS/AgentsOS; aprovação da divisão entre MVP-007, M16-F05 e MVP-016.
 - Documento do MVP: `docs/mvp/mvp-007-memoria-contextual.md`.
 - Fatias e SPECs: ainda não definidas. Índice canônico: `docs/STATUS.md`.
@@ -23,7 +23,7 @@ Preservar referências a ações, decisões, execuções, falhas, resultados e a
 
 Conectar projetos, código, documentos, tarefas, agentes, skills e decisões por um núcleo compartilhado. Graphify é um componente opcional e substituível; o grafo é uma representação derivada e reconstruível, não a única cópia do histórico.
 
-Uma visão global mantém a identidade de produto/projeto/agente e as permissões vigentes. Consulta cruzada não transfere automaticamente regras entre projetos nem promove conteúdo de negócio a política global. O contrato concreto de consulta será especificado depois.
+Uma visão global mantém a identidade de produto/projeto/agente e as permissões vigentes. Consulta cruzada não transfere automaticamente regras entre projetos nem promove conteúdo de negócio a política global. A recuperação segue a seção 9; seu formato técnico será especificado depois.
 
 ### Aprendizado: o que comprovadamente funciona
 
@@ -100,18 +100,32 @@ O PI aprovou separar memória durável de dados derivados descartáveis:
 
 Foram afastados guardar indiscriminadamente todos os detalhes para sempre e expirar todas as classes de informação pelo mesmo prazo. Os limites e mecanismos técnicos de compactação, armazenamento e exclusão ainda serão detalhados, sem alterar a política acima. Este aceite não executa limpeza, exclusão, backup ou restauração de dados.
 
-## 9. Decisões ainda abertas
+## 9. Recuperação seletiva, progressiva e orçamento (PI, 2026-08-30)
 
-1. Recuperação contextual, mecanismo de atualização incremental e alocação do orçamento por operação.
-2. Formato dos identificadores/revisões, schemas dos eventos, integrações iniciais, garantias de entrega e representação da cobertura, implementando os contratos aprovados nas seções 6 e 7.
+O PI aprovou a seguinte política de recuperação:
+
+1. **Tarefa e projeto primeiro:** começar pelo contexto do solicitante. Conhecimento global ou de outros projetos é consultado quando a pergunta ou relações relevantes justificarem, dentro das permissões existentes. A ampliação não cria autoridade para aplicar regras entre projetos.
+2. **Busca textual e relações do grafo:** combinar os dois mecanismos sem tornar embeddings obrigatórios neste primeiro recorte. Ausência ou indisponibilidade do grafo mantém a busca básica.
+3. **Relevância e validade:** decisões aplicáveis do PI e fontes vigentes não são substituídas por inferências. Contradições relevantes aparecem explicitamente; material antigo pode responder perguntas históricas, identificado como tal.
+4. **Trechos rastreáveis:** entregar conteúdo selecionado, fonte, revisão, condição de validade e lacunas. Não carregar automaticamente toda a memória nem transformar um resultado parcial em alegação de completude.
+5. **Expansão justificada e limitada:** ampliar somente para resolver uma lacuna concreta, sob limites de consultas, tempo e tokens. Encerrar quando não houver informação nova ou orçamento disponível e declarar a limitação.
+6. **Orçamento do solicitante:** trechos e referências enviados contam no consumo; não há orçamento adicional automático. Na pipeline, a memória fornece candidatos e o `ContextPack` permanece responsável pelo pacote final, sem duplicar o seletor ou substituir os limites existentes.
+
+Foram afastados recuperar indiscriminadamente tudo e escolher apenas o texto mais parecido sem considerar decisões e relações. A memória fornece contexto rastreável, não autorização para agir. Formatos das consultas/resultados, ordenação técnica e valores dos limites serão detalhados sem alterar a política aprovada.
+
+## 10. Decisões ainda abertas
+
+1. Integrações iniciais e fronteira dos adaptadores de fonte, sem presumir que todos os menus/agentes já estejam implementados.
+2. Formato dos identificadores/revisões, schemas dos eventos, garantias de entrega e representação da cobertura conforme as seções 6 e 7.
 3. Contratos técnicos de armazenamento/compactação/reconstrução, capacidade e exclusão física conforme a seção 8; sincronização permanece fora deste recorte.
-4. Contrato técnico/versionado do Graphify, alternativas e verificação de compatibilidade.
-5. Evidências necessárias para lições fora da pipeline.
-6. Fatias, ordem, dependências, critérios de aceite e interfaces formais.
+4. Contratos técnicos de consulta/resultados, atualização incremental e limites conforme a seção 9.
+5. Contrato técnico/versionado do Graphify, alternativas e verificação de compatibilidade.
+6. Evidências necessárias para lições fora da pipeline.
+7. Fatias, ordem, dependências, critérios de aceite e interfaces formais.
 
 As perguntas serão resolvidas uma por vez. Nenhum item aberto vira implementação, gate ou regra inventada pelo agente. Novos registros de decisão devem distinguir proposta de aprovação; design completo e SPECs terão sua revisão escrita no fluxo existente, sem pedir novamente aceite da mesma revisão.
 
-## 10. Evidência e limite desta revisão
+## 11. Evidência e limite desta revisão
 
 Este registro deriva da decisão do PI nesta conversa. A documentação oficial consultada para avaliar viabilidade está no [Graphify](https://github.com/Graphify-Labs/graphify); suporte documentado não prova compatibilidade com a versão instalada nem substitui futuros testes de contrato.
 

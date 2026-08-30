@@ -1,6 +1,6 @@
 # MVP-007 — Memória Contextual e RAG
 
-- Status: **direção de memória compartilhada, captura, identidade/correções e persistência/retenção aprovadas pelo PI em 2026-08-30; design em elaboração; sem fatias ou SPECs; implementação não autorizada**.
+- Status: **direção, captura, identidade/correções, persistência/retenção e recuperação contextual aprovadas pelo PI em 2026-08-30; design em elaboração; sem fatias ou SPECs; implementação não autorizada**.
 - Origem: recorte de memória híbrida/RAG anteriormente associado ao Corte 3.
 - Relação com a pipeline: **não bloqueia MVP-008, MVP-009 nem MVP-016**; a M16-F05 mantém escopo próprio e integração reutilizável.
 - Design em elaboração: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`.
@@ -35,6 +35,12 @@ Usar o armazenamento local existente, sem serviço externo obrigatório; sincron
 
 Grafo e caches são reconstruíveis a partir das fontes disponíveis, sem reativar relações invalidadas ou apagar correções. Reconstrução não substitui backup: fonte perdida gera lacuna, não conteúdo inventado. Grafo indisponível permite fallback às fontes e mecanismos básicos sem bloquear a pipeline. Detalhamento aprovado na seção 8 do design.
 
+## Recuperação contextual aprovada
+
+Recuperação seletiva e progressiva, começando por tarefa/projeto e ampliando para conhecimento global ou outros projetos quando a pergunta ou relações relevantes justificarem, dentro das permissões existentes. Combinar busca textual e relações do grafo, sem embeddings obrigatórios neste recorte; ausência do grafo mantém a busca básica.
+
+Priorizar relevância e validade, explicitar contradições e identificar material histórico. Entregar trechos com fonte, revisão, validade e lacunas; expandir apenas para resolver lacuna concreta, sob limites de consultas/tempo/tokens, encerrando sem informação nova ou orçamento. O solicitante fornece o orçamento e referências enviadas também contam; na pipeline, a memória fornece candidatos e o `ContextPack` decide o pacote final. Detalhamento aprovado na seção 9 do design.
+
 ## Regra de planejamento
 
 O MVP entra em planejamento ativo, sem mudar a fila de construção. A aprovação da direção não equivale ao aceite de um design completo ou de SPECs ainda inexistentes. Fatias, contratos e critérios serão definidos progressivamente; a numeração permanece exclusivamente no índice de `docs/STATUS.md`.
@@ -43,7 +49,7 @@ O MVP entra em planejamento ativo, sem mudar a fila de construção. A aprovaç�
 
 - formato técnico dos identificadores/revisões e schemas dos eventos, integrações iniciais, garantias de entrega e representação de cobertura;
 - contratos técnicos de armazenamento/compactação/reconstrução, capacidade e exclusão física conforme a política aprovada; sincronização fora deste recorte;
-- mecanismo exato de recuperação, eventual necessidade de embeddings e orçamento;
+- contratos técnicos de consulta/resultados, atualização incremental e valores dos limites dentro do orçamento do solicitante;
 - estratégia de atualização e contrato técnico/versionado do Graphify ou alternativa;
 - critérios de validação de lições fora da pipeline;
 - fatias, dependências, critérios de aceite e interfaces formais.

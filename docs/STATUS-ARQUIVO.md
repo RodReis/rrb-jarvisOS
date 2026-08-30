@@ -182,6 +182,14 @@ Grafo/cache são reconstruíveis a partir das fontes disponíveis, preservando c
 
 Esta atualização é exclusivamente documental: nenhuma compactação, exclusão, captura real, instalação, implementação, alteração de issues ou push foi executada. Contagem de 80 SPECs aprovadas, índice e fila permanecem inalterados. Os registros anteriores preservam a sequência das decisões.
 
+### MVP-007: recuperação contextual e orçamento aprovados (2026-08-30)
+
+Após persistência/retenção no commit local `6c1f65e`, o PI aprovou recuperação seletiva/progressiva por tarefa/projeto, com consulta global ou cruzada quando justificada e permitida. Busca textual e relações do grafo são combinadas sem embeddings obrigatórios. Fontes vigentes e decisões aplicáveis não são substituídas por inferências; contradições e material histórico ficam explícitos.
+
+O pacote contém trechos com fonte/revisão, validade e lacunas. Expansão resolve lacuna concreta sob limites de consultas/tempo/tokens e encerra sem informação nova ou orçamento. Trechos e referências enviados contam no orçamento do solicitante; memória fornece candidatos, enquanto `ContextPack` permanece dono do pacote final na pipeline. Contrato registrado na seção 9 do design, sem transformar memória em autorização para agir.
+
+Próxima decisão: fontes iniciais e fronteira de integração. Nenhuma SPEC de fatia foi criada/aprovada, nenhuma issue foi alterada e não houve código, instalação, coleta real ou push. O total de 80 SPECs aprovadas, o índice e a fila permanecem preservados.
+
 ## Pendências históricas preservadas
 
 - A UI de allowlist ainda exigia decisão de produto: localização, seletor nativo e remoção de `appDir`.
