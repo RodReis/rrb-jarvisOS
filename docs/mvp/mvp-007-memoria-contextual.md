@@ -1,10 +1,11 @@
 # MVP-007 — Memória Contextual e RAG
 
-- Status: **direção, captura, identidade/correções, persistência/retenção, recuperação, fontes iniciais, ingestão/retomada, integração opcional do Graphify, validação das lições fora da pipeline e contrato comum dos registros/eventos aprovados pelo PI em 2026-08-30; design em elaboração; sem fatias ou SPECs; implementação não autorizada**.
+- Status: **contratos parciais aprovados pelo PI em 2026-08-30; oito fatias de planejamento com publicação autorizada; SPECs a redigir; design em elaboração; implementação não autorizada**.
 - Origem: recorte de memória híbrida/RAG anteriormente associado ao Corte 3.
 - Relação com a pipeline: **não bloqueia MVP-008, MVP-009 nem MVP-016**; a M16-F05 mantém escopo próprio e integração reutilizável.
 - Design em elaboração: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`.
-- Issues: ainda não criadas para o MVP-007, conforme conferência no GitHub em 2026-08-30; a #164 trata de memória de falhas do MVP-016, não deste núcleo.
+- Issues: publicação em preparação; a #164 trata de memória de falhas do MVP-016, não deste núcleo.
+- Plano de publicação: `docs/superpowers/plans/2026-08-30-mvp-007-publicacao-issues.md`; índice e links canônicos em `docs/STATUS.md`.
 
 ## Intenção preservada
 
@@ -74,7 +75,7 @@ Tempo do acontecimento e da recepção são distintos e não provam substituiç�
 
 ## Regra de planejamento
 
-O MVP entra em planejamento ativo, sem mudar a fila de construção. A aprovação da direção não equivale ao aceite de um design completo ou de SPECs ainda inexistentes. Fatias, contratos e critérios serão definidos progressivamente; a numeração permanece exclusivamente no índice de `docs/STATUS.md`.
+O MVP está em planejamento ativo, sem mudar a fila de construção. O PI autorizou organizar e publicar oito fatias como Planejadas; isso não equivale ao aceite de um design completo ou de SPECs ainda inexistentes. Contratos e critérios serão detalhados nas fatias do plano de publicação; a numeração permanece exclusivamente no índice de `docs/STATUS.md`. Busca básica, memória operacional e interface não dependem da entrega do Graphify.
 
 ## Não decidido
 
@@ -84,6 +85,6 @@ O MVP entra em planejamento ativo, sem mudar a fila de construção. A aprovaç�
 - contratos técnicos de consulta/resultados, atualização incremental e valores dos limites dentro do orçamento do solicitante;
 - assinaturas, schemas, versão concreta, execução e testes de compatibilidade do adapter conforme o contrato aprovado;
 - formato de avaliação, estados/transições e critérios concretos das integrações para lições fora da pipeline, conforme o modelo aprovado;
-- fatias, dependências, critérios de aceite e interfaces formais.
+- critérios de aceite finais, interfaces formais e aprovação das SPECs das oito fatias planejadas.
 
 Nenhum desses itens em aberto pode ser inferido como requisito aprovado. A integração de Caveman discutida para a F05 não é automaticamente incorporada ao MVP-007.

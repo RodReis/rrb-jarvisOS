@@ -4,8 +4,8 @@
 - Esta revisão registra decisões parciais de escopo e contratos nas seções abaixo; **não é um design completo nem uma SPEC aprovada para construção**.
 - Origem: proposta do PI de usar Graphify para memória e aprendizado transversal, acompanhada de quatro capturas dos menus futuros de JarvisOS/AgentsOS; aprovação da divisão entre MVP-007, M16-F05 e MVP-016.
 - Documento do MVP: `docs/mvp/mvp-007-memoria-contextual.md`.
-- Fatias e SPECs: ainda não definidas. Índice canônico: `docs/STATUS.md`.
-- Issues do MVP-007: ainda não criadas, conforme conferência no GitHub em 2026-08-30; a #164 pertence ao MVP-016 e não substitui esse acompanhamento.
+- Fatias: oito recortes de planejamento, com publicação autorizada pelo PI em 2026-08-30; SPECs ainda a redigir, sem aceite para construção. Índice canônico: `docs/STATUS.md`.
+- Issues do MVP-007: publicação em preparação conforme a seção 15; a #164 pertence ao MVP-016 e não substitui esse acompanhamento.
 - Relação com a execução: planejamento paralelo, não bloqueante para MVP-008, MVP-009 ou MVP-016; fila preservada.
 
 ## 1. Objetivo aprovado
@@ -184,9 +184,19 @@ O PI aprovou separar o registro, sua revisão e o evento que comunica uma mudan�
 
 Foi afastado aceitar qualquer objeto livre: facilitaria a primeira integração, mas transferiria ambiguidades para todos os consumidores. O envelope comum preserva diferenças entre fontes sem espalhá-las pelo núcleo. Representações concretas de IDs/escopo, catálogo de tipos/operações, schemas completos, limites e exemplos serão detalhados nas SPECs. Este contrato não migra dados nem reescreve contratos já aprovados do MVP-016.
 
-## 15. Decisões ainda abertas
+## 15. Organização das fatias e publicação autorizada (PI, 2026-08-30)
 
-1. Fatias, ordem, dependências, critérios de aceite e organização/publicação das issues do MVP-007; ainda não há épico ou fatias publicados.
+O PI autorizou organizar as fatias por dependência e publicar o épico e suas issues de planejamento. Foram derivados oito recortes dos contratos acima: núcleo/identidade/persistência; fontes/ingestão/retomada; recuperação/orçamento; retenção/reconstrução; adapter opcional do Graphify; memória operacional/lições; Agent Memory/Notebook; resiliência/prova integrada.
+
+O plano de publicação está em `docs/superpowers/plans/2026-08-30-mvp-007-publicacao-issues.md`, com escopo, dependências, alvos de verificação e pendências por fatia. Numeração e associação às SPECs permanecem no índice canônico de `docs/STATUS.md`; as oito SPECs estão **a redigir**, sem status `aprovada-pi`.
+
+Graphify permanece uma ramificação opcional: busca básica, memória operacional e interface não dependem dele. A prova final cobre presença e ausência do adapter. Fontes futuras não se tornam requisitos obrigatórios do núcleo; MVP-008, MVP-009, MVP-016 e M16-F05 não recebem bloqueios por este MVP. Agent Memory/Notebook preserva os artefatos visuais exigidos pelo PI, sem incorporar a construção de todos os menus das capturas.
+
+A publicação permite acompanhar o planejamento; não é aprovação de design completo ou de SPEC inexistente, não inicia implementação nem altera o `next` do projeto.
+
+## 16. Decisões ainda abertas
+
+1. Redação, critérios de aceite finais e aprovação das oito SPECs; a organização e publicação das issues não equivalem a esse aceite.
 2. Representação de cobertura e mecanismos de corte, confirmação, retomada, pendências e retentativas conforme a seção 11.
 3. Contratos técnicos de armazenamento/compactação/reconstrução, capacidade e exclusão física conforme a seção 8; sincronização permanece fora deste recorte.
 4. Contratos técnicos de consulta/resultados, atualização incremental e limites conforme a seção 9.
@@ -196,8 +206,8 @@ Foi afastado aceitar qualquer objeto livre: facilitaria a primeira integração,
 
 As perguntas serão resolvidas uma por vez. Nenhum item aberto vira implementação, gate ou regra inventada pelo agente. Novos registros de decisão devem distinguir proposta de aprovação; design completo e SPECs terão sua revisão escrita no fluxo existente, sem pedir novamente aceite da mesma revisão.
 
-## 16. Evidência e limite desta revisão
+## 17. Evidência e limite desta revisão
 
 Este registro deriva da decisão do PI nesta conversa. A documentação oficial consultada para avaliar viabilidade está no [Graphify](https://github.com/Graphify-Labs/graphify); suporte documentado não prova compatibilidade com a versão instalada nem substitui futuros testes de contrato.
 
-Não houve instalação, execução de Graphify/Caveman, captura de atividade, implementação, mudança de fila, push ou deploy. Esta revisão não aumenta a contagem de SPECs aprovadas.
+Não houve instalação, execução de Graphify/Caveman, captura de atividade, implementação, mudança de fila, push ou deploy. A publicação das issues de planejamento está autorizada conforme a seção 15. Esta revisão não aumenta a contagem de SPECs aprovadas.
