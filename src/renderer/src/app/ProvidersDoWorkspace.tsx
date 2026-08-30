@@ -8,7 +8,8 @@ import {
   type RoutingPolicy,
   type TaskType
 } from '@shared/domain/routing'
-import { Button, Checkbox, Field, InlineAlert, Panel, Select, Tag } from '@design/ui'
+import { ArrowDown, ArrowUp, Plus } from 'lucide-react'
+import { Button, Checkbox, Field, IconButton, InlineAlert, Panel, Select, Tag } from '@design/ui'
 import { StatusOperacional, type EstadoOperacional } from '@design/patterns'
 import { log } from '../lib/log'
 
@@ -156,21 +157,29 @@ function EditorDeRota({
               <span className="text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto)]">
                 {indice + 1}. {ROTULO_DO_PROVIDER[provider]}
               </span>
+              {/*
+               * `IconButton` com seta, não `Button` com frase: a frase inteira era o rótulo
+               * **visível**, e "SUBIR ANTHROPIC (CLAUDE API) EM CONVERSA" virava um botão de
+               * três linhas — a queixa literal do PI sobre esta tela. O nome acessível continua
+               * carregando provider e tarefa, porque numa lista de setas idênticas o leitor de
+               * tela precisa dizer qual sobe o quê; o olho, ao contrário, tem a linha inteira
+               * como contexto e só precisa da direção.
+               */}
               <div className="flex gap-1">
-                <Button
-                  variante="secundaria"
+                <IconButton
+                  rotulo={`Subir ${ROTULO_DO_PROVIDER[provider]} em ${ROTULO_DO_TASK_TYPE[taskType]}`}
                   onClick={() => mover(indice, -1)}
                   desabilitado={indice === 0}
                 >
-                  {`Subir ${ROTULO_DO_PROVIDER[provider]} em ${ROTULO_DO_TASK_TYPE[taskType]}`}
-                </Button>
-                <Button
-                  variante="secundaria"
+                  <ArrowUp className="size-4" />
+                </IconButton>
+                <IconButton
+                  rotulo={`Descer ${ROTULO_DO_PROVIDER[provider]} em ${ROTULO_DO_TASK_TYPE[taskType]}`}
                   onClick={() => mover(indice, 1)}
                   desabilitado={indice === preferencia.length - 1}
                 >
-                  {`Descer ${ROTULO_DO_PROVIDER[provider]} em ${ROTULO_DO_TASK_TYPE[taskType]}`}
-                </Button>
+                  <ArrowDown className="size-4" />
+                </IconButton>
               </div>
             </li>
           ))}
@@ -179,8 +188,17 @@ function EditorDeRota({
 
       <div className="flex flex-wrap gap-4">
         {AI_PROVIDERS.filter((p) => !preferencia.includes(p)).map((provider) => (
-          <Button key={provider} variante="secundaria" onClick={() => alternar(provider)}>
-            {`Incluir ${ROTULO_DO_PROVIDER[provider]} em ${ROTULO_DO_TASK_TYPE[taskType]}`}
+          // Visível: só o nome do provider com um `+`. O contexto da tarefa fica no nome
+          // acessível — o olho já está dentro da seção da tarefa, e repetir "em Conversa" em
+          // cada botão era o que fazia três botões ocuparem seis linhas.
+          <Button
+            key={provider}
+            variante="secundaria"
+            onClick={() => alternar(provider)}
+            aria-label={`Incluir ${ROTULO_DO_PROVIDER[provider]} em ${ROTULO_DO_TASK_TYPE[taskType]}`}
+            iconeInicial={<Plus aria-hidden="true" className="size-4" />}
+          >
+            {ROTULO_DO_PROVIDER[provider]}
           </Button>
         ))}
       </div>

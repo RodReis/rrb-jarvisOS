@@ -1144,6 +1144,27 @@ O teste *"não expõe nenhum controle de Git"* varria os rótulos dos botões pr
 
 Sem consentimento do Google o app para na tela de login e o AppShell não monta, então a **navegação pela sidebar fica fora do alcance do E2E** — pela mesma razão que o `login.e2e.ts` recusa automatizar a tela de consentimento de um provedor externo. O E2E exercita a ponte real e o efeito no disco; a renderização tem suíte de componente. A verificação visual final é do PI.
 
+### `[FIX]` Configurações em abas ([#172](https://github.com/RodReis/rrb-jarvisOS/issues/172))
+
+Status: **entregue** — pedido direto do PI (2026-08-30, com screenshots); PR [#173](PENDENTE). Sem spec nova: o certo vem da instrução do PI (abas, combos, densidade) e do PRODUCT.md (*"um módulo novo nasce consistente sem que ninguém escreva CSS local"*).
+
+- [x] **`Tabs`/`TabPanel` novos no DS** (`src/design/ui/Tabs.tsx`, Radix Tabs) — padrão ARIA completo (tablist nomeada, setas, roving tabindex) vindo do primitivo, não de teclado artesanal. No DS e não como layout local do Settings: a próxima tela densa usa o componente, não uma cópia
+- [x] **Settings em 5 abas** (decisão do PI entre três opções): Geral · Permissões · IA · Roteamento · Conectores — agrupadas pelo **escopo do dado** (usuário vs usuário+espaço), que é a divisão que o app já pratica por baixo
+- [x] **Re-plataforma no DS**: idioma sai do `<select>` cru para o `Select`; tema sai de botões crus para o `RadioGroup`; erro sai de parágrafo `rose-400` para `InlineAlert`. A tela era da SPEC-Fundacao-05, anterior ao MVP-003, e nunca tinha migrado — era a "combo quebrada" das screenshots
+- [x] **Roteamento compacto**: subir/descer viram `IconButton` de seta com o nome acessível completo (provider + tarefa) preservado; "Incluir X em Y" vira `+ X` com o contexto no `aria-label`
+- [x] **Testes**: 3 do componente Tabs (DS), 1 da régua de abas no Settings, idioma migrado para o padrão Radix. Suíte: 1365 verdes
+
+#### Decisões que valem registro
+
+1. **Só a aba ativa monta** (comportamento default do Radix, afirmado por teste). Não é detalhe: as seções escopadas ao espaço buscam dados ao montar, e a tela antiga disparava toda busca de todas as seções na abertura. Com abas, a busca da seção acontece quando a aba dela abre.
+2. **O rótulo visível e o nome acessível se separaram no roteamento.** "SUBIR ANTHROPIC (CLAUDE API) EM CONVERSA" era o nome acessível servindo de rótulo visível — três linhas por botão, seis botões por tarefa, cinco tarefas. O olho tem a linha inteira como contexto e só precisa da direção; o leitor de tela, numa lista de setas idênticas, precisa da frase — cada um recebe o seu.
+3. **Roteamento é aba própria** (escolha do PI): é a seção mais densa da tela, e dentro de IA empurrava o orçamento — que o operador consulta antes de cada chamada — para baixo da dobra.
+4. **`@radix-ui/react-tabs` entrou como dependência** — 15º primitivo Radix do DS, mesma família dos 14 existentes; reescrever o teclado do padrão ARIA à mão seria assumir manutenção do que existe pronto.
+
+#### Limite declarado
+
+Mesma limitação do FIX #170: sem consentimento do Google o AppShell não monta, e a verificação **visual** das abas no app rodando é do PI. A estrutura, o teclado e o conteúdo por aba têm teste de componente.
+
 ## Registro de entregas
 
 | Data | Fatia | PR | Observação |

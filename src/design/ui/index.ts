@@ -39,6 +39,9 @@ export {
   type NoArvore
 } from './Dados'
 
+// Navegação em tela (PRD §11.3) — nasceu com a reforma das Configurações (PI, 2026-08-30)
+export { Tabs, TabPanel, type AbaDefinicao } from './Tabs'
+
 // Overlays (PRD §11.5) — F03b
 export { Dialog, AlertDialog, Popover, DropdownMenu, Drawer, type ItemMenu } from './Overlays'
 
