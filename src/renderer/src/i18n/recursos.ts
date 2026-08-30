@@ -108,7 +108,33 @@ export const RECURSOS = {
         // o contexto é: um `contexto.*` de topo sugeriria uma tela própria que não existe.
         contexto: 'Contexto do projeto',
         contextoFechar: 'Fechar contexto',
-        contextoAbrir: 'Abrir contexto de {{nome}}'
+        contextoAbrir: 'Abrir contexto de {{nome}}',
+        planejar: 'Planejar',
+        planejarDe: 'Planejar {{nome}}'
+      },
+      wizard: {
+        titulo: 'Planejamento de {{nome}}',
+        descricao:
+          'Uma decisão por vez. A recomendação vem primeiro, mas a escolha é sua — e cada opção diz o que custa.',
+        carregando: 'Carregando o planejamento…',
+        indisponivel: 'Não foi possível abrir o planejamento deste projeto.',
+        fechar: 'Fechar',
+        restantes: '{{count}} restantes',
+        recomendada: 'Recomendada',
+        porque: 'Por quê: {{justificativa}}',
+        textoLivre: 'Outra resposta',
+        textoLivrePlaceholder: 'Descreva a sua escolha, se nenhuma opção servir',
+        decidePorMim: 'Decide por mim',
+        confirmar: 'Confirmar',
+        contradicaoTitulo: 'Esta resposta muda decisões já tomadas',
+        contradicaoItem: '{{pergunta}} — decidido antes: {{anterior}}',
+        contradicaoManter: 'Manter como está',
+        contradicaoSubstituir: 'Substituir',
+        resumo: 'Decisões',
+        jaDecidido: 'Já decidido',
+        resumoItem: '{{pergunta}}: {{escolha}}',
+        autorPi: 'Você',
+        autorAgente: 'Delegado'
       },
       contexto: {
         titulo: 'Contexto, skills e orçamento',
@@ -344,7 +370,33 @@ export const RECURSOS = {
         permitirGitAviso: 'High-risk action: records the command in this space allowed list.',
         contexto: 'Project context',
         contextoFechar: 'Close context',
-        contextoAbrir: 'Open context for {{nome}}'
+        contextoAbrir: 'Open context for {{nome}}',
+        planejar: 'Plan',
+        planejarDe: 'Plan {{nome}}'
+      },
+      wizard: {
+        titulo: 'Planning for {{nome}}',
+        descricao:
+          'One decision at a time. The recommendation comes first, but the choice is yours — and every option states its cost.',
+        carregando: 'Loading planning…',
+        indisponivel: 'Could not open planning for this project.',
+        fechar: 'Close',
+        restantes: '{{count}} remaining',
+        recomendada: 'Recommended',
+        porque: 'Why: {{justificativa}}',
+        textoLivre: 'Another answer',
+        textoLivrePlaceholder: 'Describe your choice if no option fits',
+        decidePorMim: 'Decide for me',
+        confirmar: 'Confirm',
+        contradicaoTitulo: 'This answer changes decisions already made',
+        contradicaoItem: '{{pergunta}} — decided before: {{anterior}}',
+        contradicaoManter: 'Keep as is',
+        contradicaoSubstituir: 'Replace',
+        resumo: 'Decisions',
+        jaDecidido: 'Already decided',
+        resumoItem: '{{pergunta}}: {{escolha}}',
+        autorPi: 'You',
+        autorAgente: 'Delegated'
       },
       contexto: {
         titulo: 'Context, skills and budget',

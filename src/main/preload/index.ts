@@ -47,6 +47,7 @@ import type {
   Project,
   ProjectOutcome
 } from '@shared/domain/projects'
+import type { Resposta, RespostaOutcome, VistaDoWizard } from '@shared/domain/wizard'
 import type { CredentialKey, CredentialStatusView } from '@shared/domain/credentials'
 import type { BudgetLimitsInput, BudgetSnapshot } from '@shared/domain/budget'
 import type {
@@ -295,6 +296,17 @@ const bridge: JarvisBridge = {
     workspace: WorkspaceId
   ): Promise<MarcoOutcome | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.projectCompleteMilestone, projectId, marco, workspace),
+
+  // O wizard orientado (SPEC-Planejamento-03). Dois métodos, como o contrato: ler o estado
+  // **não** avança, e é isso que faz a retomada do critério 6 funcionar ao reabrir a tela.
+  getWizardState: (projectId: string, workspace: WorkspaceId): Promise<VistaDoWizard | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.wizardState, projectId, workspace),
+  answerWizard: (
+    projectId: string,
+    resposta: Resposta,
+    workspace: WorkspaceId
+  ): Promise<RespostaOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.wizardAnswer, projectId, resposta, workspace),
 
   // Contexto, skills e orçamento (SPEC-Planejamento-02). Nenhum método que leia arquivo: a tela
   // indica caminhos relativos e o main lê, dentro do diretório do projeto. Um `readFile` aqui

@@ -52,6 +52,7 @@ import type { GithubAuthService } from '../connectors/github/github-auth-service
 import type { GithubAuthSnapshot, GithubDeviceFlowView } from '@shared/domain/github-auth'
 import type { UserProfileRepository } from '../storage/repositories'
 import type { ProjectService } from '../projects/project-service'
+import type { WizardService } from '../projects/wizard-service'
 import type {
   CandidatoDeContexto,
   ContextService,
@@ -67,6 +68,7 @@ import {
   type Project,
   type ProjectOutcome
 } from '@shared/domain/projects'
+import { isAutorDaDecisao, type RespostaOutcome, type VistaDoWizard } from '@shared/domain/wizard'
 import { isConnectorId } from '@shared/domain/connectors'
 import type { ConnectorCreditView } from '@shared/contracts/ipc'
 import {
@@ -256,6 +258,13 @@ export interface IpcDependencies {
    * renderer, que só indica caminhos.
    */
   readonly contexts: ContextService
+  /**
+   * O wizard orientado (SPEC-Planejamento-03): a pergunta pendente e o registro da decisão.
+   * Serviço próprio, e não um método a mais do `ProjectService`, porque a trilha de decisões
+   * tem regra própria — append-only e com autoria — que nada tem a ver com o ciclo de vida do
+   * projeto no disco.
+   */
+  readonly wizard: WizardService
   /** Vault de credenciais (SPEC-Providers-01): status para a UI, valor só dentro do main. */
   readonly credentials: CredentialService
   /** Runs persistidos, para a UI listar o histórico. */
@@ -1291,6 +1300,57 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
         return null
       }
       return deps.projects.concluirMarco(projectId, marco, workspace) ?? null
+    }
+  )
+
+  // O wizard orientado (SPEC-Planejamento-03). Como nos demais, o handler valida **forma** na
+  // fronteira e não decide política: se a pergunta existe, se a escolha é opção real e se a
+  // delegação é permitida são perguntas do serviço, que as responde contra o catálogo. Repetir
+  // a validação aqui criaria uma segunda fonte que divergiria da primeira na primeira pergunta
+  // nova.
+  ipcMain.handle(
+    IPC_CHANNELS.wizardState,
+    (_event, projectId: unknown, workspace: unknown): VistaDoWizard | null => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return null
+
+      const estado = deps.wizard.estado(projectId)
+      if (estado === undefined) return null
+
+      return { estado, historico: deps.wizard.historico(projectId) }
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.wizardAnswer,
+    (_event, projectId: unknown, resposta: unknown, workspace: unknown): RespostaOutcome => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
+        return { reason: 'projeto-inexistente', mensagem: 'Projeto não encontrado.' }
+      }
+
+      const bruta = typeof resposta === 'object' && resposta !== null ? resposta : {}
+      const { perguntaId, escolha, texto, autor, aceitarSubstituicao } = bruta as Record<
+        string,
+        unknown
+      >
+
+      if (typeof perguntaId !== 'string') {
+        return { reason: 'pergunta-desconhecida', mensagem: 'Pergunta desconhecida.' }
+      }
+
+      return deps.wizard.responder(
+        projectId,
+        {
+          perguntaId,
+          escolha: typeof escolha === 'string' ? escolha : null,
+          texto: typeof texto === 'string' ? texto : null,
+          // Autor fora do contrato vira `pi` — o valor que **não** ganha o passe da delegação.
+          // Cair para `agente` deixaria um renderer comprometido gravar decisão como se fosse
+          // delegada, e a delegação é justamente o caminho que não aprova gate.
+          autor: isAutorDaDecisao(autor) ? autor : 'pi',
+          aceitarSubstituicao: aceitarSubstituicao === true
+        },
+        workspace
+      )
     }
   )
 

@@ -124,6 +124,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
   expect(superficie.metodos).toEqual([
     'addAllowedCommand',
     'addAllowedDirectory',
+    'answerWizard',
     'awaitGithubAuth',
     'buildContextPack',
     'callAi',
@@ -146,6 +147,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'getProviderModels',
     'getProviderStatus',
     'getRouting',
+    'getWizardState',
     'getWorkspace',
     'importProject',
     'listAllowedCommands',

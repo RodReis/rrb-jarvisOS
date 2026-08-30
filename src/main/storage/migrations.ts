@@ -646,6 +646,54 @@ const MIGRATIONS: readonly string[] = [
   DROP TABLE cost_event;
   ALTER TABLE cost_event_novo RENAME TO cost_event;
   CREATE INDEX idx_cost_event_escopo ON cost_event(user_id, workspace_id, created_at);
+  `,
+
+  // 18 — Decisões do wizard orientado (SPEC-Planejamento-03).
+  //
+  // **`decision` é append-only por desenho, não por convenção.** Não há `UPDATE` no repositório:
+  // revisar uma resposta **insere** outra linha com `substituiu` apontando para a anterior. Um
+  // `UPDATE` faria o critério 5 ("contradição nunca é corrigida silenciosamente") depender de
+  // ninguém ter sobrescrito — e a decisão anterior, que a tela precisa **mostrar** ao propor a
+  // substituição, já não existiria para ser mostrada.
+  //
+  // **Por que não guardar isto no `planning_session.respostas`.** O JSON daquela tabela é o
+  // rascunho: ele sobrescreve, e é isso que se quer dele. O que ele não consegue guardar é
+  // **autoria por decisão** — e sem ela a invariante 3 do CONVENTION §4 ("Decide por mim
+  // registra decisão, mas não aprova gate") vira convenção verbal: nada no dado distinguiria a
+  // escolha do PI da escolha delegada ao agente. `autor` é coluna justamente para que o gate
+  // possa perguntar ao banco, não à memória de quem escreveu o código.
+  //
+  // `recomendacao` e `justificativa` são gravadas **mesmo quando o PI recusa a recomendação**:
+  // a trilha precisa registrar o que foi recomendado para que a decisão contrária seja legível
+  // depois. Guardar só a escolha esconderia metade do que aconteceu.
+  //
+  // `substituiu` referencia `decision(id)` sem `ON DELETE CASCADE` de propósito — linha de
+  // trilha não é apagada em cascata; apagar a anterior arrancaria o elo que torna a
+  // substituição auditável.
+  `
+  CREATE TABLE decision (
+    id             TEXT PRIMARY KEY,
+    user_id        TEXT NOT NULL,
+    workspace_id   TEXT NOT NULL,
+    project_id     TEXT NOT NULL,
+    pergunta_id    TEXT NOT NULL,
+    etapa          TEXT NOT NULL,
+    -- Id da opção escolhida; NULL quando a resposta veio como texto livre.
+    escolha        TEXT,
+    texto          TEXT,
+    -- O que fora recomendado no momento da decisão, mesmo que o PI tenha recusado.
+    recomendacao   TEXT NOT NULL,
+    justificativa  TEXT NOT NULL,
+    -- 'pi' | 'agente'. Só 'pi' aprova gate (CONVENTION §4, invariante 3).
+    autor          TEXT NOT NULL,
+    motivo         TEXT NOT NULL,
+    -- Decisão que esta substituiu, quando houve contradição resolvida pelo PI.
+    substituiu     TEXT REFERENCES decision(id),
+    created_at     TEXT NOT NULL
+  );
+  -- A consulta do wizard é sempre "as decisões deste projeto, na ordem em que foram tomadas":
+  -- o histórico append-only só é reconstruível por ordem de inserção.
+  CREATE INDEX idx_decision_projeto ON decision(user_id, project_id, created_at);
   `
 ]
 

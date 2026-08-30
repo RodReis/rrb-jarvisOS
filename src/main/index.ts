@@ -29,6 +29,8 @@ import { TerminalEngine } from './execution/terminal-engine'
 import { CommandAllowlistRepository } from './policy/command-allowlist-repository'
 import { ProjectRepository } from './projects/project-repository'
 import { ProjectService } from './projects/project-service'
+import { DecisionRepository } from './projects/decision-repository'
+import { WizardService } from './projects/wizard-service'
 import { GitRunner } from './projects/git-runner'
 import { ContextRepository } from './context/context-repository'
 import { ContextService } from './context/context-service'
@@ -208,6 +210,20 @@ if (!app.requestSingleInstanceLock()) {
       skills: () => []
     })
 
+    // O wizard orientado (SPEC-Planejamento-03). Recebe o `ProjectService` para o autosave do
+    // rascunho: a trilha de decisões é dele, mas o `PlanningSession` continua sendo do projeto,
+    // e duplicar a escrita da sessão aqui criaria dois donos do mesmo registro.
+    //
+    // O catálogo não é injetado no boot: em produção é sempre o do contexto, e deixá-lo
+    // configurável daria ao chamador o poder de trocar as perguntas que o PI responde.
+    const wizard = new WizardService({
+      decisions: new DecisionRepository(storage.db),
+      projects: projectRepository,
+      projectService: projects,
+      audit: storage.audit,
+      userId: userIdAtual
+    })
+
     // Vault de credenciais (SPEC-Providers-01): a base do MVP-005. A cifra é a mesma do cofre
     // de tokens (`safeStorage`/DPAPI) e é construída **aqui**, no boot, e não sob demanda: se
     // o SO não oferece cifra, é melhor o app falhar cedo e visível do que na primeira vez que
@@ -335,6 +351,7 @@ if (!app.requestSingleInstanceLock()) {
       commandAllowlist,
       projects,
       contexts,
+      wizard,
       credentials,
       ai,
       budget,

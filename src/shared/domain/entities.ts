@@ -245,7 +245,19 @@ export const AUDIT_EVENT_TYPES = [
   // responde é temporal — "esta falha já tinha acontecido?" —, e o `reason`
   // (`nova`/`reincidente`/`resolvida`) é a resposta. Misturado com `context-pack`, a
   // reincidência ficaria escondida entre montagens.
-  'context-failure'
+  'context-failure',
+  // SPEC-Planejamento-03: uma decisão do wizard. Tipo próprio, e não `project-milestone`, pela
+  // mesma razão que separa `budget-decision` de `budget-change`: o marco é a **revisão
+  // documental virando commit**, a decisão é **uma escolha do PI dentro da sessão**. Sob um
+  // tipo só, "o que o PI decidiu, e o que foi delegado ao agente" exigiria parsear payload
+  // para descartar os commits.
+  //
+  // O payload carrega `autor` (`pi`/`agente`), pergunta, escolha e motivo — é ele que torna
+  // verificável a invariante 3 do CONVENTION §4 ("Decide por mim registra decisão, mas não
+  // aprova gate"): sem `autor` na cadeia, delegação e aprovação ficariam indistinguíveis
+  // depois do fato. O **autosave do wizard não gera evento** (isso é rascunho, e um evento por
+  // tecla afogaria a cadeia); só a decisão gravada gera.
+  'planning-decision'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]
