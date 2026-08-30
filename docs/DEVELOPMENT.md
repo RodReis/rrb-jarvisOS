@@ -1284,6 +1284,58 @@ Status: **entregue** — spec `aprovada-pi` (2026-08-29); issue [#98](https://gi
 - **A contagem da suíte oscila em paralelo** (1715–1727) **sem jamais marcar teste como falho** — o mesmo evento de worker do Vitest registrado na M8-F03. O número carimbado é o da execução em série (`--no-file-parallelism`): **98/98 arquivos, 1727, zero erro, determinístico**. Os arquivos desta fatia passam 86/86 em cinco execuções consecutivas.
 - **A verificação visual do painel é do PI**, pelo mesmo limite de harness das fatias irmãs.
 
+### Fatia 06 — Roadmap e aprovações por revisão (`docs/spec/spec-planejamento-06-roadmap-aprovacoes.md`)
+
+Status: **entregue** — spec `aprovada-pi` (2026-08-29); issue [#99](https://github.com/RodReis/rrb-jarvisOS/issues/99). Depende da M8-F05. **Fecha o MVP-008.**
+
+- [x] **`src/shared/domain/roadmap.ts`** — `Mvp`, `Slice`, a validação do DAG (ciclo, dependência ausente, auto-dependência) e a ordenação topológica
+- [x] **`src/shared/domain/aprovacoes.ts`** — os três gates, `Approval` com `autor: 'pi'` literal, `aprovacaoVigente` (critério 5) e `gatesInvalidados` (invariante 4)
+- [x] **`src/shared/domain/roadmap-compositor.ts`** — decisão de escopo → estratégia de roadmap; `STATUS.md`, `STATUS-ARQUIVO.md` e a SPEC da próxima fatia
+- [x] **Migration 21** (`mvp`, `slice`, `approval`) — `approval` **sem coluna `autor`**; `mvp.estado` separa `proposto` de `na-fila`
+- [x] **`RoadmapRepository`** — `approval` append-only; `promover` separado de `salvarRoadmap`
+- [x] **`RoadmapService`** — `gerar` (compõe → valida DAG → escreve → marco `roadmap-aprovado`) e `aprovar` (revisões exatas + identidade)
+- [x] **`roadmap` e `approval`** — dois tipos novos de `AuditEvent`
+- [x] **Seis canais** — `roadmap:gerar` separado de `aprovacao:aprovar`; nenhum recebe identidade
+- [x] **`RoadmapDoProjeto.tsx`** — o mapa e o centro de aprovações, com as revisões à vista antes do botão
+- [x] **Testes**: 22 de integração, 59 de domínio, 14 de tela e 2 E2E
+
+#### Decisões que valem registro
+
+1. **Gerar e aprovar são operações separadas — e essa é a fatia.** Se gerar promovesse o MVP para a fila, a geração estaria aprovando o que ela mesma propôs (critério 3); se aprovar aceitasse autor qualquer, a delegação aprovaria gate (critério 7). Os dois erros têm a mesma forma — *quem propõe decidindo que a proposta vale* —, e a fronteira entre os métodos é o que os impede. A tela repete a separação: dois botões, nunca um "gerar e aprovar".
+2. **O critério 7 é garantido pelo tipo, não por checagem.** `Approval.autor` é o literal `'pi'`, e não uma união com `'agente'`; a tabela `approval` **não tem coluna `autor`**. Um campo que aceitasse os dois exigiria que todo call site lembrasse de checar. **Verificado por contrafactual:** ampliar o tipo faz o typecheck reprovar (`Unused '@ts-expect-error' directive`).
+3. **A estratégia do roadmap sai da decisão do PI, não de heurística nossa.** As duas opções de `escopo` descrevem roadmaps diferentes, e a composição só as escreve: `fatia-vertical` dá um MVP por jornada, sem dependência entre eles; `fundacao-ampla` põe um MVP de fundação antes, e o DAG reflete isso literalmente. Uma terceira estratégia exigiria uma terceira opção no wizard.
+4. **Sem decisão de escopo, ou sem jornada prototipada, o roadmap sai vazio.** Assumir uma estratégia seria escolher pelo PI; inventar jornada seria prometer o que ninguém desenhou — a mesma recusa do critério 4 da M8-F05. As jornadas vêm da validação dos protótipos, o **mesmo** conjunto que a arquitetura usou, não uma segunda leitura que poderia divergir.
+5. **Sem sessão autenticada não há aprovação** (decisão cravada da spec). `identidade` é `auth.usuarioAtual()?.id`, e **não** `userIdAtual`: este cai no usuário local, que existe sempre e faria toda aprovação passar como se houvesse alguém logado. "O usuário local" não é ninguém, e o critério 4 pergunta *quem* aceitou.
+6. **O critério 5 compara o conjunto de hashes, não o instante nem a lista ordenada.** A ordem de registro não é fato sobre a revisão, e ordená-la faria um pacote idêntico parecer novo. Uma revisão a mais invalida (aprovar quatro documentos não aprova o quinto); uma a menos também (o pacote deixou de conter o que o PI leu).
+7. **Mudança cosmética não invalida nada** (invariante 4) — nem o gate do próprio artefato. Se corrigir um typo derrubasse o gate, o PI reaprovaria por ruído até parar de ler o que aprova. E reescrever com o mesmo conteúdo não é mudança: o critério 5 vale ali também.
+8. **A SPEC gerada nasce `rascunho`, nunca `aprovada-pi`.** A aprovação é o gate `SLICE_ENTRY`, ato do PI — uma spec que nascesse aprovada faria a geração aprovar a si mesma, o mesmo erro que o critério 3 impede no MVP. E ela nasce **com pergunta em aberto**, porque a `CONVENTION.md` exige que seja resolvida antes de aprovar: nascer sem nenhuma sugeriria que não há nada a decidir, que é exatamente o que a geração não sabe.
+9. **`salvarRoadmap` substitui o roadmap mas preserva o estado.** Um MVP já promovido continua `na-fila` quando o roadmap é recomposto: a promoção é o gate `MVP_ENTRY`, e apagá-la ao regerar faria o roadmap desfazer uma aprovação.
+10. **`approval` é append-only; `mvp`/`slice` não.** Uma aprovação é um **fato datado**, e editá-la reescreveria a história; um MVP é um item de plano, e replanejar é o trabalho normal.
+11. **A identidade não atravessa a ponte.** Nem canal nem método a recebem: ela vem da sessão no main. Um parâmetro deixaria o renderer declarar quem aprovou. No handler de `simularMudanca`, a natureza vinda do renderer é validada com **default `semantica`** — uma natureza não reconhecida tem de invalidar, não passar.
+12. **`STATUS.md` é a fonte única do par Fatia ↔ SPEC** (invariante 1), e o arquivo gerado **declara isso no próprio corpo** — para quem o ler depois não montar um segundo índice em outro lugar. O formato espelha o deste repositório (decisão cravada), porque é o que o MVP-009 lê.
+
+#### O que os testes pegaram
+
+1. **Uma duplicação no relato de problemas do DAG.** Auto-dependência era reportada duas vezes — como `auto-dependencia` e de novo como `ciclo` pelo DFS. O mesmo fato com dois nomes faria o PI procurar dois problemas onde há um.
+2. **Um dublê irreal no teste de tela.** O mock devolvia as mesmas revisões para os três gates, e cada artefato aparecia três vezes — o teste teria medido o dublê, não o produto. Corrigido para o que o serviço faz: cada gate cobre artefatos próprios.
+3. **O mock de `projetos.test.tsx` cobrou os três métodos novos** — a terceira fatia seguida em que isso acontece, porque o painel de roadmap é mais um filho do painel de contexto. As duas guardas de superfície da ponte (unitária e E2E) acusaram os seis métodos novos; são 94 métodos no total.
+4. **Três contrafactuais medidos:** remover a exigência de identidade reprova 2 testes; fazer a geração promover MVP reprova 3; remover a guarda do DAG reprova 1.
+
+#### Uma costura de teste, declarada
+
+O teste de "DAG inválido não escreve nada" exigiu tornar o compositor injetável, e a razão está no código: **o compositor de produção só gera `[]` ou `['mvp-fundacao']` como dependência**, então nunca produz ciclo — a guarda do critério 1 seria inalcançável em teste.
+
+A guarda **não** é código morto: ela protege contra o compositor mudar (uma estratégia nova pode gerar dependências cruzadas) e contra um roadmap vindo do banco com linhas corrompidas. O que faltava era só o caminho para provocá-la, e `compor` injetável é ele — a mesma postura do `carregar` injetável da M8-F05.
+
+#### Limites registrados, não silenciados
+
+- **O caminho feliz de aprovação não é exercitável no E2E.** Sem consentimento do Google não há sessão, e sem sessão não há aprovação — por desenho. Ele vive no int-spec, com identidade injetada; o E2E prova o inverso, que é o que só o app real prova: **sem sessão, não aprova**, mesmo com o gate tendo o que aprovar.
+- **Uma fatia por MVP na composição.** Fatiar mais fino exigiria saber o que a jornada tem dentro — conhecimento que nenhuma decisão registrada contém, e inventá-lo seria conteúdo sem origem.
+- **O `STATUS-ARQUIVO.md` nasce vazio.** Ele é o histórico longo, e um projeto recém-planejado não tem histórico. Preenchê-lo com a própria geração seria inventar passado.
+- **`MVP_ENTRY` promove o primeiro MVP da ordem topológica**, não um escolhido pelo PI. Escolher qual promover é decisão de produto que a spec não define — quando definir, o gate recebe o id em vez de derivá-lo.
+- **Nenhuma chamada de IA nesta fatia**, como nas duas anteriores.
+- **A verificação visual do painel é do PI**, pelo mesmo limite de harness das fatias irmãs.
+
 ### `[FIX]` Erro de git sem saída na tela de Projetos ([#170](https://github.com/RodReis/rrb-jarvisOS/issues/170))
 
 Status: **entregue** — correção de comportamento documentado (sem spec nova); PR [#171](https://github.com/RodReis/rrb-jarvisOS/pull/171), mergeado em 2026-08-30. Reportado pelo PI ao usar a tela da M8-F01.
