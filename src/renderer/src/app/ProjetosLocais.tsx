@@ -7,6 +7,7 @@ import { Button, EmptyState, Field, InlineAlert, Input, LoadingState } from '@de
 import { log } from '../lib/log'
 import { ContextoDoProjeto } from './ContextoDoProjeto'
 import { WizardDoProjeto } from './WizardDoProjeto'
+import { PacoteDoProjeto } from './PacoteDoProjeto'
 
 /**
  * Projetos locais (SPEC-Planejamento-01).
@@ -469,6 +470,19 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
                         projectId={projeto.id}
                         nomeDoProjeto={projeto.nome}
                       />
+                      {/*
+                        O pacote estrutural mora no **mesmo painel** do contexto, e não num
+                        terceiro botão: os dois são do projeto e se leem juntos — o contexto diz
+                        o que foi enviado à IA, o pacote diz o que virou documento. Separá-los
+                        obrigaria o PI a alternar entre painéis para ver o mesmo projeto.
+                      */}
+                      <div className="mt-4 border-t border-[rgba(var(--jos-borda-rgb),0.10)] pt-4">
+                        <PacoteDoProjeto
+                          workspace={workspace}
+                          projectId={projeto.id}
+                          nomeDoProjeto={projeto.nome}
+                        />
+                      </div>
                     </div>
                   )}
 
