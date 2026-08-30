@@ -441,6 +441,66 @@ const MIGRATIONS: readonly string[] = [
   // um `client_id` diferente do JARVIS OS. NULL = usar o embutido.
   `
   ALTER TABLE user_profile ADD COLUMN github_client_id TEXT;
+  `,
+
+  // 15 — projeto local e sessão de planejamento (SPEC-Planejamento-01).
+  //
+  // **Duas tabelas, e a divisão entre elas é a decisão da fatia** (spec § Regras): `project` é
+  // o que existe no disco — identidade estável que sobrevive a reinício; `planning_session` é o
+  // que está em progresso — rascunho autosalvo que **não vira commit**. Uma tabela só faria o
+  // estado de trabalho compartilhar o ciclo de vida da identidade, e retomar depois de um
+  // reinício (critério 1) dependeria de distinguir na leitura o que a coluna não separa.
+  //
+  // `UNIQUE (user_id, workspace_id, slug)` é o que sustenta o critério 3: a colisão é detectada
+  // **antes** de qualquer escrita em disco, por consulta, não por erro de `mkdir` no meio da
+  // criação. Detectar por exceção de FS deixaria diretório parcial para trás — exatamente o que
+  // o critério proíbe.
+  //
+  // `diretorio` também é UNIQUE por usuário: dois projetos apontando para o mesmo diretório
+  // dariam dois donos ao mesmo repositório Git, e o commit de marco de um sobrescreveria o
+  // histórico documental do outro. Vale para importação, onde o slug pode diferir e o
+  // diretório não.
+  //
+  // `respostas` como TEXT com JSON e não colunas: as perguntas do wizard vêm das fatias
+  // seguintes (M8-F03 em diante), e uma coluna por resposta exigiria migration a cada pergunta
+  // nova. É estado de trabalho opaco — o SQLite guarda, não interpreta.
+  //
+  // `ultimo_marco` NULLable porque nenhum marco atingido é o estado inicial correto: uma string
+  // vazia diria "marco de nome vazio", e um default `estrutura-inicial` afirmaria um commit que
+  // ainda não aconteceu — e o critério 5 depende justamente de saber que ele não aconteceu.
+  `
+  CREATE TABLE project (
+    id            TEXT PRIMARY KEY,
+    user_id       TEXT NOT NULL,
+    workspace_id  TEXT NOT NULL,
+    nome          TEXT NOT NULL,
+    slug          TEXT NOT NULL,
+    -- Canônico (symlink resolvido), como tudo que a allowlist compara.
+    diretorio     TEXT NOT NULL,
+    -- 'criado' | 'importado'. Guardado porque as garantias dos dois diferem.
+    origem        TEXT NOT NULL,
+    -- 1 quando o repositório Git já existia: o app nunca reinicializa repo existente.
+    git_preexistente INTEGER NOT NULL DEFAULT 0,
+    created_at    TEXT NOT NULL,
+    UNIQUE (user_id, workspace_id, slug),
+    UNIQUE (user_id, diretorio)
+  );
+  CREATE INDEX idx_project_escopo ON project(user_id, workspace_id, created_at);
+
+  CREATE TABLE planning_session (
+    id            TEXT PRIMARY KEY,
+    user_id       TEXT NOT NULL,
+    workspace_id  TEXT NOT NULL,
+    -- Uma sessão por projeto: retomar reabre a mesma, nunca cria outra.
+    project_id    TEXT NOT NULL UNIQUE,
+    etapa         TEXT NOT NULL,
+    -- JSON das respostas do wizard. Opaco para esta fatia.
+    respostas     TEXT NOT NULL,
+    -- Último marco commitado; NULL enquanto nenhum foi atingido.
+    ultimo_marco  TEXT,
+    updated_at    TEXT NOT NULL,
+    created_at    TEXT NOT NULL
+  );
   `
 ]
 

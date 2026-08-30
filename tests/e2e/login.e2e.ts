@@ -130,7 +130,9 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'cancelAi',
     'cancelGithubAuth',
     'classifyAction',
+    'completeMilestone',
     'createAutomation',
+    'createProject',
     'createWorkflow',
     'getAppDirectory',
     'getAppInfo',
@@ -138,11 +140,13 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'getBudget',
     'getConnectorCredits',
     'getGithubAuthStatus',
+    'getPlanningSession',
     'getPreferences',
     'getProviderModels',
     'getProviderStatus',
     'getRouting',
     'getWorkspace',
+    'importProject',
     'listAllowedCommands',
     'listAllowedDirectories',
     'listAuditEvents',
@@ -152,6 +156,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'listCredentials',
     'listExecutionRuns',
     'listPendingApprovals',
+    'listProjects',
     'listWorkflows',
     'login',
     'logout',
@@ -160,16 +165,20 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'onAiStreamEvent',
     'onAuthChanged',
     'pickAllowedDirectory',
+    'pickProjectDirectory',
     'removeAllowedCommand',
     'removeAllowedDirectory',
     'removeAutomation',
     'removeConnectorCredential',
     'removeCredential',
+    'removeProject',
     'removeWorkflow',
+    'renameProject',
     'resolveApproval',
     'runCommand',
     'runWorkflowReal',
     'runWorkflowSimulated',
+    'savePlanningAnswers',
     'savePreferences',
     'sendLog',
     'setAutomationEnabled',
@@ -206,10 +215,17 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'setConnectorCredential',
     'removeConnectorCredential'
   ]
+  // A M8-F01 trouxe `session` num sentido **diferente** do que a guarda persegue: a
+  // `PlanningSession` é o rascunho do wizard (etapa + respostas do usuário), não uma sessão de
+  // autenticação — o tipo não tem campo onde token caiba. Enumerado, e não isento por regex mais
+  // frouxo: afrouxar o padrão deixaria passar o `getAuthSession` de amanhã, que é exatamente o
+  // que a guarda existe para pegar. Mesma decisão da guarda gêmea em `preload.spec.ts`.
+  const SESSAO_DE_PLANEJAMENTO_SEM_TOKEN = ['getPlanningSession', 'savePlanningAnswers']
   expect(
     superficie.metodos
       .filter((m) => /token|secret|session|credential/i.test(m))
       .filter((m) => !GESTAO_SEM_VALOR.includes(m))
+      .filter((m) => !SESSAO_DE_PLANEJAMENTO_SEM_TOKEN.includes(m))
   ).toEqual([])
   expect(superficie.temRequire).toBe('undefined')
   expect(superficie.temProcess).toBe('undefined')

@@ -219,7 +219,19 @@ export const AUDIT_EVENT_TYPES = [
   // código de erro normalizado; **nunca o device code, o user code, o token ou o refresh
   // token** (ADR-004). O `user_code` fica de fora mesmo sendo mostrado na tela: ele é
   // efêmero por desenho, e guardá-lo na cadeia append-only o tornaria permanente.
-  'connector-auth'
+  'connector-auth',
+  // SPEC-Planejamento-01: ciclo de vida de um projeto local. **Dois tipos**, pela mesma razão
+  // que separa `budget-decision` de `budget-change`: `project-lifecycle` é o projeto nascendo
+  // (criado, importado, recusado por colisão), `project-milestone` é um marco documental
+  // virando commit. Sob um tipo só, "quantos marcos foram commitados" exigiria parsear payload
+  // para descartar as criações — e o marco é justamente o que a revisão documental rastreia.
+  //
+  // O commit em si **não** ganha tipo próprio: ele roda pelo terminal controlado e já gera
+  // `terminal-command` com comando, saída e exit code (spec § Regras: nenhuma escrita de
+  // repositório por caminho paralelo). `project-milestone` registra a decisão de marco; o
+  // `terminal-command` registra a execução dela. Dois fatos distintos, dois eventos.
+  'project-lifecycle',
+  'project-milestone'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]

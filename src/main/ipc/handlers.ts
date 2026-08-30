@@ -51,6 +51,14 @@ import { CreditInputError, type CreditService } from '../connectors/credit-servi
 import type { GithubAuthService } from '../connectors/github/github-auth-service'
 import type { GithubAuthSnapshot, GithubDeviceFlowView } from '@shared/domain/github-auth'
 import type { UserProfileRepository } from '../storage/repositories'
+import type { ProjectService } from '../projects/project-service'
+import {
+  isMarcoDocumental,
+  type MarcoOutcome,
+  type PlanningSession,
+  type Project,
+  type ProjectOutcome
+} from '@shared/domain/projects'
 import { isConnectorId } from '@shared/domain/connectors'
 import type { ConnectorCreditView } from '@shared/contracts/ipc'
 import {
@@ -127,6 +135,8 @@ export interface IpcDependencies {
   readonly terminal: TerminalEngine
   /** Allowlist de comandos (SPEC-ExecucaoReal-02, 1ª barreira): edição de alto risco. */
   readonly commandAllowlist: CommandAllowlistRepository
+  /** Projeto local e planejamento (SPEC-Planejamento-01): Git só pelo terminal controlado. */
+  readonly projects: ProjectService
   /** Vault de credenciais (SPEC-Providers-01): status para a UI, valor só dentro do main. */
   readonly credentials: CredentialService
   /** Runs persistidos, para a UI listar o histórico. */
@@ -1034,6 +1044,127 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
         typeof clientId === 'string' ? clientId : undefined
       )
       return deps.githubAuth.snapshot({ userId: deps.userId(), workspace: escopo })
+    }
+  )
+
+  // Projeto local e planejamento (SPEC-Planejamento-01, critério 8).
+  //
+  // A validação aqui é de **forma** (fronteira de confiança), não de política: o serviço decide
+  // se o projeto pode nascer, com as checagens de nome, colisão e allowlist. Repetir a decisão
+  // aqui criaria uma segunda fonte — e duas fontes divergem.
+  //
+  // Nenhum destes canais recebe comando: a UI pede *projeto* e *marco*, e o Git é consequência
+  // disso no main, pelo terminal controlado (decisão 2 do PI).
+  ipcMain.handle(IPC_CHANNELS.projectList, (_event, workspace: unknown): readonly Project[] => {
+    if (!isWorkspaceId(workspace)) return []
+    return deps.projects.list(workspace)
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.projectCreate,
+    (_event, nome: unknown, workspace: unknown, diretorioBase: unknown): ProjectOutcome => {
+      if (!isWorkspaceId(workspace)) {
+        throw new Error('Workspace inválido.')
+      }
+
+      // `diretorioBase` ausente é o caminho comum e **correto**: o projeto nasce sob o
+      // diretório do app (decisão 1 do PI). Um valor não-string vira ausência em vez de erro —
+      // o default é seguro por construção, e recusar aqui só trocaria um caminho permitido por
+      // uma mensagem técnica.
+      const base = typeof diretorioBase === 'string' && diretorioBase ? diretorioBase : undefined
+
+      return deps.projects.criar(typeof nome === 'string' ? nome : '', workspace, base)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.projectImport,
+    (_event, diretorio: unknown, workspace: unknown, nomeSugerido: unknown): ProjectOutcome => {
+      if (!isWorkspaceId(workspace)) {
+        throw new Error('Workspace inválido.')
+      }
+
+      const nome = typeof nomeSugerido === 'string' ? nomeSugerido : undefined
+      return deps.projects.importar(typeof diretorio === 'string' ? diretorio : '', workspace, nome)
+    }
+  )
+
+  // Seletor nativo de pasta para importar. Mesma razão do `allowlist:pick`: escolher caminho é
+  // tocar o filesystem, e a fronteira do ARCHITECTURE não abre exceção para leitura. **Não**
+  // adiciona à allowlist — importar não amplia permissão (critério 7); o serviço recusa depois
+  // se a pasta escolhida estiver fora, com a ação concreta na mensagem.
+  ipcMain.handle(IPC_CHANNELS.projectPickDirectory, async (): Promise<string> => {
+    const escolha = await dialog.showOpenDialog({ properties: ['openDirectory'] })
+    const [diretorio] = escolha.filePaths
+    return !escolha.canceled && diretorio ? diretorio : ''
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.projectRename,
+    (_event, projectId: unknown, nome: unknown, workspace: unknown): ProjectOutcome => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
+        throw new Error('Parâmetros inválidos para renomear projeto.')
+      }
+      return deps.projects.renomear(projectId, typeof nome === 'string' ? nome : '', workspace)
+    }
+  )
+
+  // Desregistra sem tocar o disco. A ausência de qualquer opção de apagar arquivo é o desenho,
+  // não uma lacuna: apagar pasta do usuário é operação destrutiva, e destrutivo pertence ao
+  // fluxo de aprovação humana — não a um parâmetro opcional deste canal.
+  ipcMain.handle(
+    IPC_CHANNELS.projectRemove,
+    (_event, projectId: unknown, workspace: unknown): boolean => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return false
+      return deps.projects.remover(projectId, workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.projectSession,
+    (_event, projectId: unknown, workspace: unknown): PlanningSession | null => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return null
+      return deps.projects.abrirSessao(projectId, workspace) ?? null
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.projectSaveAnswers,
+    (
+      _event,
+      projectId: unknown,
+      etapa: unknown,
+      respostas: unknown,
+      workspace: unknown
+    ): PlanningSession | null => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return null
+
+      const mapa =
+        typeof respostas === 'object' && respostas !== null
+          ? (respostas as Record<string, unknown>)
+          : {}
+
+      return (
+        deps.projects.salvarRespostas(
+          projectId,
+          typeof etapa === 'string' ? etapa : 'inicio',
+          mapa,
+          workspace
+        ) ?? null
+      )
+    }
+  )
+
+  // O único gatilho de commit. `marco` é validado contra o enum fechado **antes** de chegar ao
+  // serviço: a mensagem de commit é derivada dele, e um valor livre produziria um commit com
+  // mensagem `undefined` num repositório do usuário.
+  ipcMain.handle(
+    IPC_CHANNELS.projectCompleteMilestone,
+    (_event, projectId: unknown, marco: unknown, workspace: unknown): MarcoOutcome | null => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string' || !isMarcoDocumental(marco)) {
+        return null
+      }
+      return deps.projects.concluirMarco(projectId, marco, workspace) ?? null
     }
   )
 

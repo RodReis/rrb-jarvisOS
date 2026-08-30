@@ -45,6 +45,13 @@ import type {
 } from '../domain/connectors'
 import type { ConnectorCreditPolicy } from '../domain/connector-governance'
 import type { GithubAuthSnapshot, GithubDeviceFlowView } from '../domain/github-auth'
+import type {
+  MarcoDocumental,
+  MarcoOutcome,
+  PlanningSession,
+  Project,
+  ProjectOutcome
+} from '../domain/projects'
 
 /** Canais de request/response (renderer → main → renderer). */
 export const IPC_CHANNELS = {
@@ -234,7 +241,38 @@ export const IPC_CHANNELS = {
   githubAuthAwait: 'github:auth-await',
   githubAuthCancel: 'github:auth-cancel',
   githubAuthLogout: 'github:auth-logout',
-  githubSetClientId: 'github:set-client-id'
+  githubSetClientId: 'github:set-client-id',
+  /**
+   * Projeto local e planejamento (SPEC-Planejamento-01, critério 8).
+   *
+   * **Nenhum canal de Git.** A UI não pede `git init` nem `git commit`: ela cria um projeto ou
+   * conclui um marco, e o Git é consequência disso no main, pelo terminal controlado. Um canal
+   * `project:git-run` seria o segundo caminho de escrita de repositório que a decisão 2 do PI
+   * proíbe — e a diferença é exatamente esta: o renderer escolhe um **marco** de uma lista
+   * fechada, nunca um comando.
+   *
+   * `create` e `import` são separados porque as garantias diferem: criar escreve estrutura
+   * documental nova; importar promete **não escrever nada** no conteúdo existente. Um canal só
+   * com um booleano faria a promessa depender de um parâmetro que a tela poderia errar.
+   *
+   * `save-answers` é o autosave do wizard: grava no SQLite e **não** commita. É o canal mais
+   * chamado da fatia — um por mudança de resposta —, e é por isso que ele não audita nem toca
+   * o Git (spec § Regras).
+   */
+  projectList: 'project:list',
+  projectCreate: 'project:create',
+  projectImport: 'project:import',
+  projectPickDirectory: 'project:pick-directory',
+  projectRename: 'project:rename',
+  /**
+   * Desregistra o projeto. **Não apaga nada do disco** (decisão do PI, 2026-08-29) — e é por
+   * isso que o canal não passa pelo fluxo de aprovação: não há efeito destrutivo a aprovar.
+   * Um canal que apagasse arquivos seria outro canal, com o gate humano junto.
+   */
+  projectRemove: 'project:remove',
+  projectSession: 'project:session',
+  projectSaveAnswers: 'project:save-answers',
+  projectCompleteMilestone: 'project:complete-milestone'
 } as const
 
 /**
@@ -606,6 +644,53 @@ export interface JarvisBridge {
    * guardá-lo cifrado o anunciaria como segredo que ele não é.
    */
   setGithubClientId(clientId: string, workspace: WorkspaceId): Promise<GithubAuthSnapshot>
+
+  /**
+   * Projeto local e planejamento (SPEC-Planejamento-01).
+   *
+   * `createProject`/`importProject` devolvem `ProjectOutcome` — **inclusive nas recusas**. A
+   * colisão não é exceção a capturar: é desfecho que a tela mostra com a opção de retomar.
+   * Rejeitar a promise faria "já existe um projeto com esse nome" chegar à UI como falha
+   * técnica, indistinguível de um disco cheio.
+   */
+  listProjects(workspace: WorkspaceId): Promise<readonly Project[]>
+  createProject(
+    nome: string,
+    workspace: WorkspaceId,
+    diretorioBase?: string
+  ): Promise<ProjectOutcome>
+  importProject(
+    diretorio: string,
+    workspace: WorkspaceId,
+    nomeSugerido?: string
+  ): Promise<ProjectOutcome>
+  /**
+   * Seletor nativo de pasta para importar. Abre no **main**, como o da allowlist: o renderer
+   * nunca toca o filesystem, nem para escolher um caminho. Cancelar devolve string vazia.
+   */
+  pickProjectDirectory(): Promise<string>
+  /** Renomeia o projeto — só o nome de exibição; slug e diretório não se movem. */
+  renameProject(projectId: string, nome: string, workspace: WorkspaceId): Promise<ProjectOutcome>
+  /** Desregistra o projeto. Os arquivos e o histórico Git permanecem no disco. */
+  removeProject(projectId: string, workspace: WorkspaceId): Promise<boolean>
+  /** A sessão de planejamento do projeto, criada na primeira leitura. */
+  getPlanningSession(projectId: string, workspace: WorkspaceId): Promise<PlanningSession | null>
+  /** Autosave do wizard. Não commita: resposta é estado de trabalho, não revisão documental. */
+  savePlanningAnswers(
+    projectId: string,
+    etapa: string,
+    respostas: Readonly<Record<string, unknown>>,
+    workspace: WorkspaceId
+  ): Promise<PlanningSession | null>
+  /**
+   * Conclui um marco: o **único** gatilho de commit. `commitado: false` não rejeita — o
+   * critério 5 exige que a falha preserve os dados e ofereça retomada.
+   */
+  completeMilestone(
+    projectId: string,
+    marco: MarcoDocumental,
+    workspace: WorkspaceId
+  ): Promise<MarcoOutcome | null>
 }
 
 /** Teto + consumo, como a tela os lê. */

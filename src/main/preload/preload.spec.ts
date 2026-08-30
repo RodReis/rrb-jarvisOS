@@ -61,7 +61,9 @@ describe('ponte do preload', () => {
       'cancelAi',
       'cancelGithubAuth',
       'classifyAction',
+      'completeMilestone',
       'createAutomation',
+      'createProject',
       'createWorkflow',
       'getAppDirectory',
       'getAppInfo',
@@ -69,11 +71,13 @@ describe('ponte do preload', () => {
       'getBudget',
       'getConnectorCredits',
       'getGithubAuthStatus',
+      'getPlanningSession',
       'getPreferences',
       'getProviderModels',
       'getProviderStatus',
       'getRouting',
       'getWorkspace',
+      'importProject',
       'listAllowedCommands',
       'listAllowedDirectories',
       'listAuditEvents',
@@ -83,6 +87,7 @@ describe('ponte do preload', () => {
       'listCredentials',
       'listExecutionRuns',
       'listPendingApprovals',
+      'listProjects',
       'listWorkflows',
       'login',
       'logout',
@@ -91,16 +96,20 @@ describe('ponte do preload', () => {
       'onAiStreamEvent',
       'onAuthChanged',
       'pickAllowedDirectory',
+      'pickProjectDirectory',
       'removeAllowedCommand',
       'removeAllowedDirectory',
       'removeAutomation',
       'removeConnectorCredential',
       'removeCredential',
+      'removeProject',
       'removeWorkflow',
+      'renameProject',
       'resolveApproval',
       'runCommand',
       'runWorkflowReal',
       'runWorkflowSimulated',
+      'savePlanningAnswers',
       'savePreferences',
       'sendLog',
       'setAutomationEnabled',
@@ -197,9 +206,18 @@ describe('ponte do preload', () => {
       'removeConnectorCredential'
     ]
 
+    // A M8-F01 trouxe `session` num sentido **diferente** do que a guarda persegue: a
+    // `PlanningSession` é o rascunho do wizard (etapa + respostas do usuário), não uma sessão
+    // de autenticação — o tipo não tem campo onde token caiba, do mesmo modo que
+    // `CredentialStatusView` não tem. Enumerado, e não isento por regex mais frouxo: afrouxar
+    // o padrão deixaria passar o `getAuthSession` de amanhã, que é exatamente o que a guarda
+    // existe para pegar.
+    const SESSAO_DE_PLANEJAMENTO_SEM_TOKEN = ['getPlanningSession', 'savePlanningAnswers']
+
     const suspeitos = Object.keys(bridge)
       .filter((k) => /token|secret|credential|session/i.test(k))
       .filter((k) => !GESTAO_DE_CREDENCIAL_SEM_VALOR.includes(k))
+      .filter((k) => !SESSAO_DE_PLANEJAMENTO_SEM_TOKEN.includes(k))
 
     expect(suspeitos).toEqual([])
   })
