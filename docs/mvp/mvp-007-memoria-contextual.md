@@ -1,6 +1,6 @@
 # MVP-007 — Memória Contextual e RAG
 
-- Status: **direção, captura, identidade/correções, persistência/retenção, recuperação e fontes iniciais aprovadas pelo PI em 2026-08-30; design em elaboração; sem fatias ou SPECs; implementação não autorizada**.
+- Status: **direção, captura, identidade/correções, persistência/retenção, recuperação, fontes iniciais e ingestão/retomada aprovadas pelo PI em 2026-08-30; design em elaboração; sem fatias ou SPECs; implementação não autorizada**.
 - Origem: recorte de memória híbrida/RAG anteriormente associado ao Corte 3.
 - Relação com a pipeline: **não bloqueia MVP-008, MVP-009 nem MVP-016**; a M16-F05 mantém escopo próprio e integração reutilizável.
 - Design em elaboração: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`.
@@ -47,13 +47,19 @@ Três entradas materializam o catálogo: projetos registrados (documentos/códig
 
 Adaptadores de leitura identificam registros/revisões, entregam alterações desde o último ponto processado e informam cobertura. A memória mantém seu progresso sem alterar originais. Núcleo inicialmente operável com projetos/documentos e conhecimento explícito; integrações operacionais entram progressivamente, sem dependência de todos os menus futuros. Históricos/agentes/serviços/vaults externos exigem integração própria, não varredura automática. Graphify organiza material fornecido sem escolher novas fontes. Detalhamento aprovado na seção 10 do design.
 
+## Ingestão e retomada aprovadas
+
+Carga inicial registra uma referência de corte para acompanhar as alterações posteriores; resultados e progresso próprio são persistidos consistentemente por fonte, permitindo retomada do último ponto confirmado. Reentrega não duplica; conteúdo divergente sob a mesma identidade/revisão gera conflito, sem sobrescrita silenciosa.
+
+Evento problemático vira pendência durável com identificação, motivo e referência para reprocessamento antes de continuar, nunca aplicação fictícia. Falhas de uma fonte não interrompem as outras nem a pipeline; retentativas usam espera progressiva e consumo limitado. Cobertura distingue carga inicial, atualização, atraso, pendências e indisponibilidade. Histórico expirado exige reconciliar o disponível e declarar lacunas, sem prometer recuperação completa. Detalhamento aprovado na seção 11 do design; mecanismos e limites técnicos ainda serão especificados.
+
 ## Regra de planejamento
 
 O MVP entra em planejamento ativo, sem mudar a fila de construção. A aprovação da direção não equivale ao aceite de um design completo ou de SPECs ainda inexistentes. Fatias, contratos e critérios serão definidos progressivamente; a numeração permanece exclusivamente no índice de `docs/STATUS.md`.
 
 ## Não decidido
 
-- formato técnico dos identificadores/revisões e schemas dos eventos, garantias de entrega/retomada e representação de cobertura para as fontes aprovadas;
+- formato técnico dos identificadores/revisões e schemas dos eventos, representação de cobertura e mecanismos de corte, confirmação, retomada, pendências e retentativas conforme a política aprovada;
 - contratos técnicos de armazenamento/compactação/reconstrução, capacidade e exclusão física conforme a política aprovada; sincronização fora deste recorte;
 - contratos técnicos de consulta/resultados, atualização incremental e valores dos limites dentro do orçamento do solicitante;
 - estratégia de atualização e contrato técnico/versionado do Graphify ou alternativa;

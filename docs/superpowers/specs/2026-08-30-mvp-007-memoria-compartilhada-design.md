@@ -1,7 +1,7 @@
 # Design em elaboração — MVP-007: Memória compartilhada JarvisOS e AgentsOS
 
-- Status: **direção, captura, identidade/correções, persistência/retenção, recuperação e fontes iniciais aprovadas pelo PI em 2026-08-30; detalhamento em elaboração**.
-- Esta revisão registra decisões parciais de escopo, captura, identidade, persistência, recuperação e fontes; **não é um design completo nem uma SPEC aprovada para construção**.
+- Status: **direção, captura, identidade/correções, persistência/retenção, recuperação, fontes iniciais e ingestão/retomada aprovadas pelo PI em 2026-08-30; detalhamento em elaboração**.
+- Esta revisão registra decisões parciais de escopo, captura, identidade, persistência, recuperação, fontes e ingestão; **não é um design completo nem uma SPEC aprovada para construção**.
 - Origem: proposta do PI de usar Graphify para memória e aprendizado transversal, acompanhada de quatro capturas dos menus futuros de JarvisOS/AgentsOS; aprovação da divisão entre MVP-007, M16-F05 e MVP-016.
 - Documento do MVP: `docs/mvp/mvp-007-memoria-contextual.md`.
 - Fatias e SPECs: ainda não definidas. Índice canônico: `docs/STATUS.md`.
@@ -11,7 +11,7 @@
 
 Compartilhar memória contextual e conhecimento entre JarvisOS e AgentsOS, abrangendo atividades e artefatos dos módulos que forem integrados, inclusive o desenvolvimento dos próprios produtos. Os consumidores recuperam contexto e relações com origem rastreável, sem manter memórias independentes e conflitantes por menu ou enviar todo o histórico a cada chamada de modelo.
 
-"Memorizar tudo" corresponde ao catálogo inicial aprovado na seção 6, com captura automática por eventos nos módulos integrados. Não constitui promessa de observar automaticamente módulos ainda inexistentes ou agentes externos sem integração. Schemas e garantias de entrega ainda serão detalhados.
+"Memorizar tudo" corresponde ao catálogo inicial aprovado na seção 6, com captura automática por eventos nos módulos integrados. Não constitui promessa de observar automaticamente módulos ainda inexistentes ou agentes externos sem integração. A política de entrega e retomada consta da seção 11; schemas e mecanismos técnicos ainda serão detalhados.
 
 ## 2. Divisão de responsabilidades aprovada
 
@@ -123,7 +123,7 @@ O PI aprovou três entradas para materializar progressivamente os quatro grupos 
 | Registros dos módulos | Tarefas, execuções de agentes, validações, falhas, workflows, automações e releases, conforme os módulos responsáveis estiverem disponíveis; cobre os grupos agentes e operações. |
 | Conhecimento explícito | Notas e orientações registradas no produto, preservando autoria e fonte. |
 
-Cada fonte entra por um adaptador de leitura que identifica registros e revisões, entrega alterações desde o último ponto processado e informa sua cobertura. A memória mantém seu próprio progresso de ingestão sem modificar os registros originais. Os contratos concretos de entrega e retomada ainda serão detalhados.
+Cada fonte entra por um adaptador de leitura que identifica registros e revisões, entrega alterações desde o último ponto processado e informa sua cobertura. A memória mantém seu próprio progresso de ingestão sem modificar os registros originais. A política de entrega e retomada segue a seção 11; seus mecanismos técnicos ainda serão detalhados.
 
 O núcleo deve funcionar inicialmente com projetos/documentos e conhecimento explícito, sem esperar todos os menus futuros. Integrações operacionais entram conforme disponíveis, com ausências visíveis. Isso não declara tais integrações implementadas nem transforma módulos futuros em pré-requisitos do núcleo.
 
@@ -131,19 +131,31 @@ Históricos externos de Claude/Codex, outros agentes, serviços externos e vault
 
 Foram afastados integrar todos os menus de uma vez, o que criaria dependências de funcionalidades ainda não construídas, e limitar permanentemente a memória a arquivos, o que perderia resultados das operações. Esta aprovação define recorte e fronteiras, sem instalar conectores, importar históricos ou executar varreduras.
 
-## 11. Decisões ainda abertas
+## 11. Ingestão, retomada e cobertura por fonte (PI, 2026-08-30)
 
-1. Garantias de entrega, carga inicial, retomada e tratamento de falhas da ingestão por fonte.
-2. Formato dos identificadores/revisões, schemas dos eventos e representação da cobertura conforme as seções 6, 7 e 10.
+O PI aprovou o seguinte modelo de continuidade da ingestão:
+
+1. **Carga inicial com referência de corte:** registrar até onde o histórico foi importado e acompanhar as alterações posteriores, evitando perder o intervalo entre histórico e novos eventos. O mecanismo depende das capacidades de cada fonte; ausência de continuidade comprovada deve aparecer na cobertura.
+2. **Ponto de retomada por fonte:** persistir resultados e progresso de forma consistente. Após reinício, retomar do último ponto confirmado, sem reconstruir todo o histórico por padrão. Esse progresso pertence à memória, não altera checkpoints nem registros dos módulos de origem.
+3. **Reentrega sem duplicação:** reconhecer eventos repetidos pela identidade aprovada na seção 7. Conteúdo divergente sob a mesma identidade/revisão é conflito, não sobrescrita silenciosa; uma nova revisão legítima segue o contrato de correções.
+4. **Pendência antes de continuar:** evento problemático exige registro durável de identificação, motivo e referência à fonte para reprocessamento antes de seguir adiante. Não marcá-lo como aplicado nem descartá-lo silenciosamente. Avanço do ponto de leitura não resolve a pendência nem comprova cobertura completa; não exige copiar indefinidamente o conteúdo original para a memória.
+5. **Falhas independentes:** indisponibilidade de uma fonte não impede as demais nem bloqueia a pipeline. Retentativas usam espera progressiva e consumo limitado, sem laço infinito. Quantidades, prazos e mecanismo técnico serão definidos nas SPECs dentro do orçamento vigente.
+6. **Cobertura explícita:** distinguir carga inicial, atualização, atraso, pendências e fonte indisponível. Se o histórico necessário já tiver expirado na origem, reconciliar o material disponível e declarar a lacuna; nunca afirmar recuperação completa sem evidência.
+
+Foram afastados reconstruir tudo a cada início, pelo custo desnecessário, e ignorar eventos problemáticos, por ocultar perda. A política não promete entrega exatamente uma vez nem recuperação de conteúdo perdido. Preserva as regras de correção, invalidação e retenção das seções 7 e 8; não executa importação ou reprocessamento nesta etapa documental.
+
+## 12. Decisões ainda abertas
+
+1. Contrato técnico/versionado do Graphify, alternativas e verificação de compatibilidade.
+2. Formato dos identificadores/revisões, schemas dos eventos, representação de cobertura e mecanismos de corte, confirmação, retomada, pendências e retentativas conforme as seções 6, 7, 10 e 11.
 3. Contratos técnicos de armazenamento/compactação/reconstrução, capacidade e exclusão física conforme a seção 8; sincronização permanece fora deste recorte.
 4. Contratos técnicos de consulta/resultados, atualização incremental e limites conforme a seção 9.
-5. Contrato técnico/versionado do Graphify, alternativas e verificação de compatibilidade.
-6. Evidências necessárias para lições fora da pipeline.
-7. Fatias, ordem, dependências, critérios de aceite e interfaces formais.
+5. Evidências necessárias para lições fora da pipeline.
+6. Fatias, ordem, dependências, critérios de aceite e interfaces formais.
 
 As perguntas serão resolvidas uma por vez. Nenhum item aberto vira implementação, gate ou regra inventada pelo agente. Novos registros de decisão devem distinguir proposta de aprovação; design completo e SPECs terão sua revisão escrita no fluxo existente, sem pedir novamente aceite da mesma revisão.
 
-## 12. Evidência e limite desta revisão
+## 13. Evidência e limite desta revisão
 
 Este registro deriva da decisão do PI nesta conversa. A documentação oficial consultada para avaliar viabilidade está no [Graphify](https://github.com/Graphify-Labs/graphify); suporte documentado não prova compatibilidade com a versão instalada nem substitui futuros testes de contrato.
 

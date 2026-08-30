@@ -198,6 +198,14 @@ Cada fonte identifica registros/revisões, entrega alterações desde o último 
 
 Contrato registrado na seção 10 do design; próxima decisão: entrega e retomada da ingestão. Não houve implementação, importação de históricos, instalação, atualização de issues ou push. Nenhuma SPEC de fatia foi criada/aprovada; contagem de 80, índice e fila preservados.
 
+### MVP-007 — ingestão e retomada aprovadas (2026-08-30)
+
+Após o registro das fontes iniciais no commit local `9be376f`, o PI aprovou carga inicial com referência de corte, persistência consistente dos resultados/progresso e retomada independente por fonte. Reentregas não duplicam; divergências na mesma identidade/revisão são conflitos. Evento problemático vira pendência durável com identificação, motivo e referência antes de continuar, sem marcar aplicação inexistente.
+
+Falhas de uma fonte não impedem outras nem a pipeline; retentativas usam espera progressiva e consumo limitado. Cobertura distingue carga inicial, atualização, atraso, pendências e indisponibilidade. Histórico expirado exige reconciliação do material disponível e declaração de lacunas; a política não promete recuperação completa sem evidência nem entrega exatamente uma vez.
+
+Contrato registrado na seção 11 do design; próxima decisão: contrato técnico opcional do Graphify. Não houve implementação, ingestão, reprocessamento, instalação, atualização de issues ou push. Nenhuma SPEC de fatia foi criada/aprovada; contagem de 80, índice e fila preservados.
+
 ## Pendências históricas preservadas
 
 - A UI de allowlist ainda exigia decisão de produto: localização, seletor nativo e remoção de `appDir`.
