@@ -53,6 +53,7 @@ import type { GithubAuthSnapshot, GithubDeviceFlowView } from '@shared/domain/gi
 import type { UserProfileRepository } from '../storage/repositories'
 import type { ProjectService } from '../projects/project-service'
 import type { WizardService } from '../projects/wizard-service'
+import type { PacoteService } from '../projects/pacote-service'
 import type {
   CandidatoDeContexto,
   ContextService,
@@ -69,6 +70,7 @@ import {
   type ProjectOutcome
 } from '@shared/domain/projects'
 import { isAutorDaDecisao, type RespostaOutcome, type VistaDoWizard } from '@shared/domain/wizard'
+import type { PacoteEstrutural, PacoteOutcome } from '@shared/domain/pacote-estrutural'
 import { isConnectorId } from '@shared/domain/connectors'
 import type { ConnectorCreditView } from '@shared/contracts/ipc'
 import {
@@ -265,6 +267,12 @@ export interface IpcDependencies {
    * projeto no disco.
    */
   readonly wizard: WizardService
+  /**
+   * O pacote estrutural (SPEC-Planejamento-04): PRD, Landscape e Convention compostos das
+   * decisões e das evidências. Serviço próprio porque a pesquisa externa, o bloqueio e a
+   * revisão imutável têm regra própria — nada disso é ciclo de vida de projeto.
+   */
+  readonly pacotes: PacoteService
   /** Vault de credenciais (SPEC-Providers-01): status para a UI, valor só dentro do main. */
   readonly credentials: CredentialService
   /** Runs persistidos, para a UI listar o histórico. */
@@ -1352,6 +1360,33 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
         workspace
       )
     }
+  )
+
+  // O pacote estrutural (SPEC-Planejamento-04). O handler valida **forma** e não decide nada:
+  // se as decisões bastam, se a pesquisa saiu e se a evidência sustenta são perguntas do
+  // serviço. Repetir a política aqui criaria uma segunda fonte que divergiria da primeira.
+  ipcMain.handle(
+    IPC_CHANNELS.pacoteGerar,
+    async (
+      _event,
+      projectId: unknown,
+      consulta: unknown,
+      workspace: unknown
+    ): Promise<PacoteOutcome> => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
+        return { reason: 'projeto-inexistente', mensagem: 'Projeto não encontrado.' }
+      }
+      return await deps.pacotes.gerar(
+        { projectId, consulta: typeof consulta === 'string' ? consulta : '' },
+        workspace
+      )
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.pacoteListar,
+    (_event, projectId: unknown): readonly PacoteEstrutural[] =>
+      typeof projectId === 'string' ? deps.pacotes.listar(projectId) : []
   )
 
   // Contexto, skills e orçamento (SPEC-Planejamento-02). O gate do critério 1 mora no serviço;
