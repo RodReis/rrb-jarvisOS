@@ -249,3 +249,32 @@ export interface RoadmapDoProjeto {
   readonly projectId: string
   readonly roadmap: Roadmap
 }
+
+/**
+ * Por que a geração do roadmap não saiu. Enum fechado: a tela decide o que mostrar a partir dele.
+ *
+ * Mora no domínio, e não no serviço, porque a **tela** o consome: o contrato do IPC precisa ser
+ * verificável sem carregar o Electron, e um tipo do main atravessando a ponte quebraria a
+ * fronteira que `shared/` existe para manter.
+ */
+export const ROADMAP_REASONS = [
+  'gerado',
+  'projeto-inexistente',
+  /** Falta a decisão de escopo ou não há jornada prototipada — não há o que compor. */
+  'sem-base',
+  /** O DAG composto tem ciclo ou dependência ausente (critério 1). */
+  'dag-invalido',
+  'falha-de-escrita'
+] as const
+
+export type RoadmapReason = (typeof ROADMAP_REASONS)[number]
+
+export interface RoadmapOutcome {
+  readonly reason: RoadmapReason
+  readonly roadmap?: Roadmap
+  /** A fatia que ganhou SPEC executável nesta geração. */
+  readonly proxima?: Slice
+  /** Em `dag-invalido`: os problemas, com os ids envolvidos. */
+  readonly problemas?: readonly { readonly mensagem: string }[]
+  readonly mensagem: string
+}

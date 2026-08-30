@@ -28,7 +28,7 @@ import type { WorkspaceId } from '@shared/domain/entities'
 import type { Approval, AprovacaoOutcome, Gate, RevisaoAprovada } from '@shared/domain/aprovacoes'
 import { aprovacaoVigente, gatesInvalidados } from '@shared/domain/aprovacoes'
 import type { MudancaDeArtefato } from '@shared/domain/aprovacoes'
-import type { Roadmap, Slice } from '@shared/domain/roadmap'
+import type { Roadmap, RoadmapOutcome, Slice } from '@shared/domain/roadmap'
 import { ordemDeExecucao, proximaFatia, validarDag } from '@shared/domain/roadmap'
 import {
   ARQUIVO_DO_ARQUIVO_HISTORICO,
@@ -50,29 +50,6 @@ import type { PacoteRepository } from './pacote-repository'
 import type { ProjectRepository } from './project-repository'
 import type { ProjectService } from './project-service'
 import type { EscopoDoRoadmap, RoadmapRepository } from './roadmap-repository'
-
-/** Por que a geração do roadmap não saiu. Enum fechado: a tela decide o que mostrar. */
-export const ROADMAP_REASONS = [
-  'gerado',
-  'projeto-inexistente',
-  /** Falta a decisão de escopo ou não há jornada prototipada — não há o que compor. */
-  'sem-base',
-  /** O DAG composto tem ciclo ou dependência ausente (critério 1). */
-  'dag-invalido',
-  'falha-de-escrita'
-] as const
-
-export type RoadmapReason = (typeof ROADMAP_REASONS)[number]
-
-export interface RoadmapOutcome {
-  readonly reason: RoadmapReason
-  readonly roadmap?: Roadmap
-  /** A fatia que ganhou SPEC executável nesta geração. */
-  readonly proxima?: Slice
-  /** Em `dag-invalido`: os problemas, com os ids envolvidos. */
-  readonly problemas?: readonly { readonly mensagem: string }[]
-  readonly mensagem: string
-}
 
 interface RoadmapDeps {
   readonly repository: RoadmapRepository

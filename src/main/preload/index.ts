@@ -52,6 +52,14 @@ import type { PacoteEstrutural, PacoteOutcome } from '@shared/domain/pacote-estr
 import type { Anexo, AnexoOutcome, TipoDeAnexo } from '@shared/domain/anexos-de-design'
 import type { ValidacaoDoPrototipo } from '@shared/domain/validacao-de-prototipo'
 import type { ArquiteturaOutcome, PacoteArquitetura } from '@shared/domain/arquitetura'
+import type { Roadmap, RoadmapOutcome } from '@shared/domain/roadmap'
+import type {
+  Approval,
+  AprovacaoOutcome,
+  Gate,
+  MudancaDeArtefato,
+  RevisaoAprovada
+} from '@shared/domain/aprovacoes'
 import type { CredentialKey, CredentialStatusView } from '@shared/domain/credentials'
 import type { BudgetLimitsInput, BudgetSnapshot } from '@shared/domain/budget'
 import type {
@@ -323,6 +331,31 @@ const bridge: JarvisBridge = {
     ipcRenderer.invoke(IPC_CHANNELS.pacoteGerar, projectId, consulta, workspace),
   listarPacotes: (projectId: string): Promise<readonly PacoteEstrutural[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.pacoteListar, projectId),
+
+  // Roadmap e gates (SPEC-Planejamento-06). `gerarRoadmap` e `aprovarGate` são métodos
+  // distintos, e a separação é a fatia: gerar propõe, aprovar aceita. **A identidade não
+  // atravessa a ponte** — ela vem da sessão no main, porque um parâmetro deixaria o renderer
+  // declarar quem aprovou.
+  gerarRoadmap: (projectId: string, workspace: WorkspaceId): Promise<RoadmapOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.roadmapGerar, projectId, workspace),
+  carregarRoadmap: (projectId: string, workspace: WorkspaceId): Promise<Roadmap> =>
+    ipcRenderer.invoke(IPC_CHANNELS.roadmapCarregar, projectId, workspace),
+  listarAprovacoes: (projectId: string, workspace: WorkspaceId): Promise<readonly Approval[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.aprovacaoListar, projectId, workspace),
+  revisoesDoGate: (
+    projectId: string,
+    gate: Gate,
+    workspace: WorkspaceId
+  ): Promise<readonly RevisaoAprovada[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.aprovacaoRevisoes, projectId, gate, workspace),
+  aprovarGate: (projectId: string, gate: Gate, workspace: WorkspaceId): Promise<AprovacaoOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.aprovacaoAprovar, projectId, gate, workspace),
+  simularMudanca: (
+    projectId: string,
+    mudancas: readonly MudancaDeArtefato[],
+    workspace: WorkspaceId
+  ): Promise<readonly Gate[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.aprovacaoSimular, projectId, mudancas, workspace),
 
   // Anexos de design e arquitetura (SPEC-Planejamento-05). Nenhum método recebe conteúdo de
   // arquivo: o renderer manda o *caminho* que o seletor nativo devolveu, e quem lê, copia e
