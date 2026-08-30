@@ -107,6 +107,12 @@ export const RECURSOS = {
       },
       settings: {
         titulo: 'Configurações',
+        // As cinco abas (decisão do PI, 2026-08-30). Nomes curtos: são régua, não frase.
+        abaGeral: 'Geral',
+        abaPermissoes: 'Permissões',
+        abaIa: 'IA',
+        abaRoteamento: 'Roteamento',
+        abaConectores: 'Conectores',
         idioma: 'Idioma',
         idiomaDescricao: 'Aplica imediatamente, sem reiniciar.',
         tema: 'Tema',
@@ -281,6 +287,11 @@ export const RECURSOS = {
       },
       settings: {
         titulo: 'Settings',
+        abaGeral: 'General',
+        abaPermissoes: 'Permissions',
+        abaIa: 'AI',
+        abaRoteamento: 'Routing',
+        abaConectores: 'Connectors',
         idioma: 'Language',
         idiomaDescricao: 'Applies immediately, no restart needed.',
         tema: 'Theme',

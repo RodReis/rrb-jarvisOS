@@ -387,18 +387,21 @@ describe('Settings (SPEC-05)', () => {
 
   it('é acessível nos dois workspaces', async () => {
     await abrirSettings()
-    expect(screen.getByLabelText('Idioma')).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Idioma' })).toBeInTheDocument()
 
     // Troca de espaço e confirma que a tela continua alcançável.
     await trocarPara('NOA')
     await userEvent.click(screen.getByRole('button', { name: 'Configurações' }))
-    expect(screen.getByLabelText('Idioma')).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Idioma' })).toBeInTheDocument()
   })
 
   it('troca o idioma e a UI muda na hora, sem reiniciar (critério 1)', async () => {
     await abrirSettings()
 
-    await userEvent.selectOptions(screen.getByLabelText('Idioma'), 'en-US')
+    // O `Select` do DS é Radix (botão + listbox), não `<select>` nativo — abrir e clicar na
+    // opção é como o usuário troca (mesmo padrão do providers.test).
+    await userEvent.click(screen.getByRole('combobox', { name: 'Idioma' }))
+    await userEvent.click(await screen.findByRole('option', { name: 'English (US)' }))
 
     // A prova da troca a quente: o próprio rótulo da tela muda de idioma.
     expect(await screen.findByLabelText('Language')).toBeInTheDocument()
@@ -448,6 +451,25 @@ describe('Settings (SPEC-05)', () => {
 
     await trocarPara('JARVIS OS')
     expect(screen.getByLabelText('Idioma')).toBeInTheDocument()
+  })
+
+  it('organiza as seções em cinco abas, com só a ativa montada', async () => {
+    await abrirSettings()
+
+    // A régua completa (decisão do PI, 2026-08-30): escopo do usuário à esquerda, escopo do
+    // espaço à direita.
+    const abas = screen.getAllByRole('tab').map((tab) => tab.textContent)
+    expect(abas).toEqual(['Geral', 'Permissões', 'IA', 'Roteamento', 'Conectores'])
+
+    // A aba padrão é Geral, e as seções das outras abas **não estão no DOM** — é o que
+    // garante que as buscas de dados das seções escopadas só disparam quando a aba abre.
+    expect(screen.getByRole('combobox', { name: 'Idioma' })).toBeInTheDocument()
+    expect(screen.queryByText('Diretórios permitidos')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Permissões' }))
+    expect(await screen.findByText('Diretórios permitidos')).toBeInTheDocument()
+    // E o Geral desmontou: uma aba por vez, nunca as cinco empilhadas — que era a tela antiga.
+    expect(screen.queryByRole('combobox', { name: 'Idioma' })).not.toBeInTheDocument()
   })
 
   it('oferece o acento por módulo com o mesmo seletor da CHOICE (SPEC-CHOICE-01, crit. 5)', async () => {
