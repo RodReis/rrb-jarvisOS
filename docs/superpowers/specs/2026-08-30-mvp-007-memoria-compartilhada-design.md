@@ -1,10 +1,11 @@
 # Design em elaboração — MVP-007: Memória compartilhada JarvisOS e AgentsOS
 
-- Status: **direção, captura, identidade/correções, persistência/retenção, recuperação, fontes iniciais, ingestão/retomada, contrato de integração opcional do Graphify e modelo de validação das lições fora da pipeline aprovados pelo PI em 2026-08-30; detalhamento em elaboração**.
-- Esta revisão registra decisões parciais de escopo, captura, identidade, persistência, recuperação, fontes, ingestão, integração do Graphify e validação de lições; **não é um design completo nem uma SPEC aprovada para construção**.
+- Status: **direção, captura, identidade/correções, persistência/retenção, recuperação, fontes iniciais, ingestão/retomada, integração opcional do Graphify, validação das lições fora da pipeline e contrato comum dos registros/eventos aprovados pelo PI em 2026-08-30; detalhamento em elaboração**.
+- Esta revisão registra decisões parciais de escopo e contratos nas seções abaixo; **não é um design completo nem uma SPEC aprovada para construção**.
 - Origem: proposta do PI de usar Graphify para memória e aprendizado transversal, acompanhada de quatro capturas dos menus futuros de JarvisOS/AgentsOS; aprovação da divisão entre MVP-007, M16-F05 e MVP-016.
 - Documento do MVP: `docs/mvp/mvp-007-memoria-contextual.md`.
 - Fatias e SPECs: ainda não definidas. Índice canônico: `docs/STATUS.md`.
+- Issues do MVP-007: ainda não criadas, conforme conferência no GitHub em 2026-08-30; a #164 pertence ao MVP-016 e não substitui esse acompanhamento.
 - Relação com a execução: planejamento paralelo, não bloqueante para MVP-008, MVP-009 ou MVP-016; fila preservada.
 
 ## 1. Objetivo aprovado
@@ -170,19 +171,32 @@ O PI aprovou separar conclusão de execução de comprovação de que uma estrat
 
 Foram afastados validar tudo manualmente, pelo trabalho recorrente, e aceitar toda conclusão de agente, por acumular falsas certezas. A automação depende dos critérios definidos pelo módulo; ausência deles não impede a captura de observações ou o uso de candidatas identificadas como tal. Permanecem para as SPECs o formato da avaliação, estados e transições, critérios concretos de cada integração e casos de teste. Esta decisão não executa avaliações, promove políticas ou inicia construção.
 
-## 14. Decisões ainda abertas
+## 14. Contrato comum dos registros e eventos (PI, 2026-08-30)
 
-1. Contrato comum dos registros/eventos: identificadores, revisões, versão do schema, operações e referências conforme as seções 6, 7 e 10.
+O PI aprovou separar o registro, sua revisão e o evento que comunica uma mudança:
+
+1. **Envelope versionado:** `schemaVersion`, tipo, origem e escopo identificam o contrato. Cada adaptador converte sua fonte para esse formato comum, sem exigir mudanças nos módulos produtores.
+2. **Identidades separadas:** `recordId` identifica o registro; `sourceRevision`, sua revisão; `eventId`, o evento, preservado nas reentregas. Os IDs ficam vinculados ao produto, escopo e fonte, sem assumir unicidade global de um identificador isolado.
+3. **Escopo explícito:** identificar o projeto quando aplicável; conhecimento do produto usa escopo próprio. Não criar projeto fictício nem misturar registros de origens diferentes. O escopo de identificação não amplia permissões de consulta ou execução.
+4. **Tempo não determina substituição:** distinguir quando o evento aconteceu de quando foi recebido. Revisões indicam a substituição comprovada; relógios e ordem de chegada não decidem qual informação prevalece. Permanecem as regras de conflito e proveniência da seção 7.
+5. **Conteúdo tipado e referenciado:** cada tipo possui campos definidos e referências às fontes. Remoção/desatualização gera invalidação explícita; fonte temporariamente indisponível é problema de cobertura, não exclusão. Invalidação não equivale a uma ordem de exclusão física do histórico.
+6. **Compatibilidade verificável:** evento incompatível vira pendência rastreável, sem aplicação fictícia, conforme a seção 11. O progresso de ingestão fica separado da identidade dos registros.
+
+Foi afastado aceitar qualquer objeto livre: facilitaria a primeira integração, mas transferiria ambiguidades para todos os consumidores. O envelope comum preserva diferenças entre fontes sem espalhá-las pelo núcleo. Representações concretas de IDs/escopo, catálogo de tipos/operações, schemas completos, limites e exemplos serão detalhados nas SPECs. Este contrato não migra dados nem reescreve contratos já aprovados do MVP-016.
+
+## 15. Decisões ainda abertas
+
+1. Fatias, ordem, dependências, critérios de aceite e organização/publicação das issues do MVP-007; ainda não há épico ou fatias publicados.
 2. Representação de cobertura e mecanismos de corte, confirmação, retomada, pendências e retentativas conforme a seção 11.
 3. Contratos técnicos de armazenamento/compactação/reconstrução, capacidade e exclusão física conforme a seção 8; sincronização permanece fora deste recorte.
 4. Contratos técnicos de consulta/resultados, atualização incremental e limites conforme a seção 9.
 5. Assinaturas, schemas, versão concreta, execução e testes de compatibilidade do adapter conforme o contrato aprovado na seção 12.
 6. Formato de avaliação, estados/transições e critérios concretos das integrações para lições fora da pipeline conforme a seção 13.
-7. Fatias, ordem, dependências, critérios de aceite e interfaces formais.
+7. Representações concretas, catálogo de tipos/operações, schemas completos, limites e exemplos do contrato comum conforme a seção 14.
 
 As perguntas serão resolvidas uma por vez. Nenhum item aberto vira implementação, gate ou regra inventada pelo agente. Novos registros de decisão devem distinguir proposta de aprovação; design completo e SPECs terão sua revisão escrita no fluxo existente, sem pedir novamente aceite da mesma revisão.
 
-## 15. Evidência e limite desta revisão
+## 16. Evidência e limite desta revisão
 
 Este registro deriva da decisão do PI nesta conversa. A documentação oficial consultada para avaliar viabilidade está no [Graphify](https://github.com/Graphify-Labs/graphify); suporte documentado não prova compatibilidade com a versão instalada nem substitui futuros testes de contrato.
 

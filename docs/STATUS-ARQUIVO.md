@@ -222,6 +222,14 @@ Validade se limita às condições e versões comprovadas, incluindo falhas e co
 
 Modelo registrado na seção 13 do design; formatos, estados e critérios concretos das integrações ainda serão especificados. Próxima decisão: contrato comum dos registros/eventos. Não houve implementação, avaliação real, promoção de políticas, atualização de issues ou push. Nenhuma SPEC de fatia foi criada/aprovada; contagem de 80, índice e fila preservados.
 
+### MVP-007 — contrato comum aprovado e conferência das issues (2026-08-30)
+
+Após o modelo de validação de lições no commit local `5067466`, o PI aprovou envelope versionado, distinção entre registro/revisão/evento, escopo explícito, tempos separados sem prevalência por chegada, conteúdo tipado com fontes e tratamento de incompatibilidade por pendência rastreável. Adaptadores convertem sem mudar produtores; indisponibilidade temporária não equivale a exclusão e progresso de ingestão não define identidade. Contrato registrado na seção 14 do design; schemas completos, representações, tipos e limites ainda serão especificados.
+
+O PI também perguntou se as issues já estavam criadas. Consulta ao GitHub, com 110 issues abertas/fechadas retornadas sem atingir o limite de paginação, confirmou: Pipeline V2 tem 24 issues (#115–#138: quatro épicos e vinte fatias); MVPs 014–016 têm 20 (#149–#168: três épicos e dezessete fatias). Nesse último grupo, quinze fatias estão em Backlog e #167–#168 permanecem Planejadas. MVP-007 não possui épico/fatias publicados; #164 é memória de falhas do MVP-016, não memória compartilhada. Também não foram encontrados épicos/fatias dos MVPs 017–018.
+
+A ausência de issues do MVP-007 é uma pendência de acompanhamento; aprovação de contratos no documento não equivale a publicação no GitHub. Próxima decisão de planejamento: organizar as fatias e a publicação das issues, com pendências explícitas e sem tratá-las como SPECs aprovadas. Não houve criação/alteração de issues, implementação, migração ou push nesta revisão. Contagem local de 80 SPECs aprovadas, índice e fila preservados.
+
 ## Pendências históricas preservadas
 
 - A UI de allowlist ainda exigia decisão de produto: localização, seletor nativo e remoção de `appDir`.

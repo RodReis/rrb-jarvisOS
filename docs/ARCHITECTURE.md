@@ -113,6 +113,8 @@ Graphify entra por adapter substituível com contrato próprio e versão compat�
 
 Fora da pipeline, o módulo responsável valida lições por critérios verificáveis de sua especificação; a memória registra afirmação, contexto, fontes, resultados e avaliação. Critérios objetivos permitem automação sem aceite duplicado; ausência de critério/evidência mantém a candidata sem bloquear desenvolvimento. Validade limita-se às condições/versões comprovadas, com falhas e contrapontos; mudanças relevantes ou contradições retiram a validade vigente até reavaliação, preservando histórico. Decisões do PI não são comprovação empírica e lições não ampliam permissões. A pipeline mantém avaliação/promoção no MVP-016.
 
+O contrato comum dos registros/eventos possui envelope versionado por tipo, origem e escopo, convertido pelos adaptadores sem mudar os produtores. `recordId`, `sourceRevision` e `eventId` separam registro, revisão e evento, vinculados ao produto/escopo/fonte; conhecimento do produto não precisa de projeto fictício. Tempos do acontecimento e da recepção não determinam substituição. Conteúdo tipado referencia fontes; invalidação por remoção/desatualização não se confunde com indisponibilidade temporária. Incompatibilidade vira pendência rastreável; progresso de ingestão fica separado da identidade.
+
 Fonte: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`.
 
 ### Pipeline V2 aprovada (não implementada)

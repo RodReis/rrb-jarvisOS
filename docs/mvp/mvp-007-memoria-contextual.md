@@ -1,9 +1,10 @@
 # MVP-007 — Memória Contextual e RAG
 
-- Status: **direção, captura, identidade/correções, persistência/retenção, recuperação, fontes iniciais, ingestão/retomada, contrato de integração opcional do Graphify e modelo de validação das lições fora da pipeline aprovados pelo PI em 2026-08-30; design em elaboração; sem fatias ou SPECs; implementação não autorizada**.
+- Status: **direção, captura, identidade/correções, persistência/retenção, recuperação, fontes iniciais, ingestão/retomada, integração opcional do Graphify, validação das lições fora da pipeline e contrato comum dos registros/eventos aprovados pelo PI em 2026-08-30; design em elaboração; sem fatias ou SPECs; implementação não autorizada**.
 - Origem: recorte de memória híbrida/RAG anteriormente associado ao Corte 3.
 - Relação com a pipeline: **não bloqueia MVP-008, MVP-009 nem MVP-016**; a M16-F05 mantém escopo próprio e integração reutilizável.
 - Design em elaboração: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`.
+- Issues: ainda não criadas para o MVP-007, conforme conferência no GitHub em 2026-08-30; a #164 trata de memória de falhas do MVP-016, não deste núcleo.
 
 ## Intenção preservada
 
@@ -65,13 +66,20 @@ Lição candidata registra afirmação, contexto, projeto, fontes e resultados o
 
 Validade se limita às condições e versões comprovadas, incluindo falhas e contrapontos, sem transformar sucesso isolado em regra universal. Mudança relevante nas fontes ou contradição retira a condição de validada vigente até reavaliação, preservando histórico. Decisão do PI não se confunde com comprovação empírica; lições orientam recomendações sem conceder novas permissões. A pipeline mantém avaliação/promoção no MVP-016. Modelo aprovado na seção 13 do design; formatos, estados e critérios concretos das integrações ainda serão especificados.
 
+## Contrato comum dos registros/eventos aprovado
+
+Envelope versionado com `schemaVersion`, tipo, origem e escopo, convertido pelos adaptadores sem mudar os produtores. `recordId`, `sourceRevision` e `eventId` distinguem registro, revisão e evento; o evento preserva sua identidade nas reentregas e os IDs se vinculam ao produto, escopo e fonte. Projeto explícito quando aplicável; conhecimento do produto possui escopo próprio, sem projeto fictício.
+
+Tempo do acontecimento e da recepção são distintos e não provam substituição entre revisões. Conteúdo tipado referencia fontes; remoção/desatualização gera invalidação explícita, enquanto indisponibilidade temporária é cobertura, não exclusão. Evento incompatível vira pendência rastreável e progresso de ingestão não é identidade do registro. Contrato aprovado na seção 14 do design; representações, catálogo de tipos, schemas completos e limites ainda serão especificados.
+
 ## Regra de planejamento
 
 O MVP entra em planejamento ativo, sem mudar a fila de construção. A aprovação da direção não equivale ao aceite de um design completo ou de SPECs ainda inexistentes. Fatias, contratos e critérios serão definidos progressivamente; a numeração permanece exclusivamente no índice de `docs/STATUS.md`.
 
 ## Não decidido
 
-- formato técnico dos identificadores/revisões e schemas dos eventos, representação de cobertura e mecanismos de corte, confirmação, retomada, pendências e retentativas conforme a política aprovada;
+- representações concretas de IDs/escopo, catálogo de tipos/operações, schemas completos e limites conforme o contrato comum aprovado;
+- representação de cobertura e mecanismos de corte, confirmação, retomada, pendências e retentativas conforme a política aprovada;
 - contratos técnicos de armazenamento/compactação/reconstrução, capacidade e exclusão física conforme a política aprovada; sincronização fora deste recorte;
 - contratos técnicos de consulta/resultados, atualização incremental e valores dos limites dentro do orçamento do solicitante;
 - assinaturas, schemas, versão concreta, execução e testes de compatibilidade do adapter conforme o contrato aprovado;
