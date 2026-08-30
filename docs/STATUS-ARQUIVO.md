@@ -260,6 +260,14 @@ Issue #180 atualizada de `proplan:planejado` para `proplan:backlog`, com aceite 
 
 Documentação de acompanhamento, arquitetura e convenções aponta para o contrato aprovado, sem reabrir decisões da pipeline/MVP-016. Validação documental confirmou 81 SPECs aprovadas, preservação do quadro Agora e das demais associações Fatia ↔ SPEC, e diff sem erros de whitespace. Próxima especificação: M7-F02 (#181), fontes iniciais, ingestão e retomada. Sem implementação, testes de produto, instalação, captura, push ou deploy; registro salvo somente em Git local.
 
+### MVP-007 — SPEC da M7-F02 redigida para revisão (2026-08-30)
+
+Após o aceite da F01 registrado em `9e897f9`, o PI solicitou prosseguir no planejamento. Redigida `docs/spec/spec-memoria-02-fontes-ingestao-retomada.md`, status `rascunho`, vinculada à #181. Proposta de três entradas: Git commitado/selecionado, decisões existentes e fonte canônica interna de notas/orientações sem UI. Contratos de corte, confirmação por prefixo com F01, cobertura, pendências, retomada, limites e vinte critérios de aceite propostos; nenhuma mudança na SPEC aprovada da F01.
+
+A inspeção somente de leitura do checkout principal encontrou ProjectRepository, DecisionRepository e GitRunner (referência observada `0799c8a`), sem presumir feed durável para decisões nem serviço Notebook existente. GitRunner retorna saída redigida/limitada; a SPEC propõe captura interna fiel pelo caminho controlado, sem alterar o resultado público ou usar texto truncado como fonte. Context7 e documentação oficial do Git consultados para leitura de objetos/árvores e recorte de ancestralidade. A carga inicial Git começa no commit de inscrição, não em todo o passado; decisões mantêm cobertura de reconciliação, e essas escolhas ainda precisam de aceite.
+
+Índice atualizado somente para associar a F02 ao rascunho. F01 permanece aprovada/Backlog, F02 Planejada e F03–F08 a redigir. Sem construção, coleta, testes de produto, instalação, push ou deploy. Esta etapa não aumenta a contagem de SPECs aprovadas.
+
 ## Pendências históricas preservadas
 
 - A UI de allowlist ainda exigia decisão de produto: localização, seletor nativo e remoção de `appDir`.

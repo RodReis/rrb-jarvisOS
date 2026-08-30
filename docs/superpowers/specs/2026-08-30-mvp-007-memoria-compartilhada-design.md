@@ -4,7 +4,7 @@
 - Esta revisão registra decisões parciais de escopo e contratos nas seções abaixo; **não é um design completo nem uma SPEC aprovada para construção**.
 - Origem: proposta do PI de usar Graphify para memória e aprendizado transversal, acompanhada de quatro capturas dos menus futuros de JarvisOS/AgentsOS; aprovação da divisão entre MVP-007, M16-F05 e MVP-016.
 - Documento do MVP: `docs/mvp/mvp-007-memoria-contextual.md`.
-- Fatias: oito recortes de planejamento, com publicação autorizada pelo PI em 2026-08-30; SPEC da F01 aprovada, F02–F08 a redigir. Permanece a orientação de não implementar agora. Índice canônico: `docs/STATUS.md`.
+- Fatias: oito recortes de planejamento, com publicação autorizada pelo PI em 2026-08-30; SPEC da F01 aprovada, F02 em rascunho para revisão, F03–F08 a redigir. Permanece a orientação de não implementar agora. Índice canônico: `docs/STATUS.md`.
 - Issues do MVP-007: épico [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179); #180 em Backlog após aceite da SPEC e #181–#187 Planejadas, conforme a seção 15. A #164 pertence ao MVP-016 e não substitui esse acompanhamento.
 - Relação com a execução: planejamento paralelo, não bloqueante para MVP-008, MVP-009 ou MVP-016; fila preservada.
 
@@ -188,7 +188,9 @@ Foi afastado aceitar qualquer objeto livre: facilitaria a primeira integração,
 
 O PI autorizou organizar as fatias por dependência e publicar o épico e suas issues de planejamento. Foram derivados oito recortes dos contratos acima: núcleo/identidade/persistência; fontes/ingestão/retomada; recuperação/orçamento; retenção/reconstrução; adapter opcional do Graphify; memória operacional/lições; Agent Memory/Notebook; resiliência/prova integrada.
 
-O plano de publicação está em `docs/superpowers/plans/2026-08-30-mvp-007-publicacao-issues.md`, com escopo, dependências, alvos de verificação e pendências por fatia. Numeração e associação às SPECs permanecem no índice canônico de `docs/STATUS.md`; a F01 está **aprovada-pi**, F02–F08 estão **a redigir**.
+O plano de publicação está em `docs/superpowers/plans/2026-08-30-mvp-007-publicacao-issues.md`, com escopo, dependências, alvos de verificação e pendências por fatia. Numeração e associação às SPECs permanecem no índice canônico de `docs/STATUS.md`; a F01 está **aprovada-pi**, F02 em **rascunho para revisão**, F03–F08 estão **a redigir**.
+
+Rascunho da F02: `docs/spec/spec-memoria-02-fontes-ingestao-retomada.md`. Propõe Git selecionado/commitado com corte e recorte de primeiros pais, reconciliação de decisões existentes, serviço canônico interno de notas sem UI e ingestão retomável com cobertura/limites explícitos. Vinte critérios propostos; não altera o contrato aprovado da F01 nem presume novas decisões do PI. #181 permanece Planejada com dependência #180.
 
 SPEC da F01: `docs/spec/spec-memoria-01-nucleo-identidade-persistencia.md`, revisão `83e952fd4e5f22850653bf81cf1d45d6c4377c84`, aprovada explicitamente pelo PI em 2026-08-30. O aceite cobre schemas/limites v1, chaves compostas, revisões com substituição comprovada, conflitos, invalidação e armazenamento no SQLite existente, com vinte critérios. As representações concretas do núcleo nas seções 7/8/14 estão resolvidas por essa SPEC. A #180 passa a Backlog; ingestão, recuperação, manutenção, Graphify, avaliações e UI continuam nas respectivas fatias. Não iniciar implementação nem alterar o `next`.
 
@@ -200,8 +202,8 @@ Publicação conferida em 2026-08-30: épico #179, oito sub-issues #180–#187 e
 
 ## 16. Decisões ainda abertas
 
-1. Redação, critérios finais e aprovação das SPECs de F02–F08; próxima: F02 (#181). F01 aprovada pela revisão exata acima, sem repetir seu aceite.
-2. Representação de cobertura e mecanismos de corte, confirmação, retomada, pendências e retentativas conforme a seção 11.
+1. Revisão/aceite do rascunho de F02 (#181); redação, critérios finais e aprovação de F03–F08. F01 aprovada pela revisão exata acima, sem repetir seu aceite.
+2. Aprovação dos adapters, recorte do histórico, fonte de notas, cobertura, corte, confirmação e retentativas propostos na F02 conforme a seção 11.
 3. Contratos de manutenção/compactação/reconstrução, capacidade e exclusão física conforme a seção 8, sobre o armazenamento básico aprovado na F01; sincronização permanece fora deste recorte.
 4. Contratos técnicos de consulta/resultados, atualização incremental e limites conforme a seção 9.
 5. Assinaturas, schemas, versão concreta, execução e testes de compatibilidade do adapter conforme o contrato aprovado na seção 12.

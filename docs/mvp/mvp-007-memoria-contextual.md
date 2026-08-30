@@ -1,6 +1,6 @@
 # MVP-007 — Memória Contextual e RAG
 
-- Status: **contratos parciais e SPEC da F01 aprovados pelo PI em 2026-08-30; F01 em Backlog, F02–F08 Planejadas/a redigir; design em elaboração; implementação não autorizada**.
+- Status: **contratos parciais e SPEC da F01 aprovados pelo PI em 2026-08-30; F01 em Backlog, F02 em rascunho/Planejada, F03–F08 Planejadas/a redigir; design em elaboração; implementação não autorizada**.
 - Origem: recorte de memória híbrida/RAG anteriormente associado ao Corte 3.
 - Relação com a pipeline: **não bloqueia MVP-008, MVP-009 nem MVP-016**; a M16-F05 mantém escopo próprio e integração reutilizável.
 - Design em elaboração: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`.
@@ -78,6 +78,8 @@ Tempo do acontecimento e da recepção são distintos e não provam substituiç�
 O MVP está em planejamento ativo, sem mudar a fila de construção. O PI autorizou organizar e publicar oito fatias como Planejadas; isso não equivale ao aceite de um design completo ou de SPECs ainda inexistentes. Contratos e critérios serão detalhados nas fatias do plano de publicação; a numeração permanece exclusivamente no índice de `docs/STATUS.md`. Busca básica, memória operacional e interface não dependem da entrega do Graphify.
 
 ## Não decidido
+
+F02 em revisão: `docs/spec/spec-memoria-02-fontes-ingestao-retomada.md` propõe adapters de Git selecionado/commitado, decisões existentes e fonte canônica mínima de notas sem UI. Detalha recorte do histórico, corte, confirmação atômica, cobertura, limites e retomada, com vinte critérios propostos. Nenhuma dessas escolhas foi aprovada por constar no rascunho; a #181 continua Planejada e depende somente de #180.
 
 A M7-F01 foi aprovada pelo PI em 2026-08-30: `docs/spec/spec-memoria-01-nucleo-identidade-persistencia.md`, revisão `83e952fd4e5f22850653bf81cf1d45d6c4377c84`, com schema v1, identidade composta, revisão/substituição, conflitos, limites, SQLite transacional e vinte critérios de aceite. Sua issue #180 passa a Backlog sem iniciar construção. As pendências abaixo se restringem às fatias seguintes; não reabrem o contrato aprovado de F01.
 

@@ -55,6 +55,8 @@ Estabelecer o contrato comum e a memória local compartilhada, distinguindo regi
 
 ### M7-F02 — Fontes iniciais, ingestão e retomada
 
+**Atualização documental (2026-08-30):** SPEC em `docs/spec/spec-memoria-02-fontes-ingestao-retomada.md`, status `rascunho`, com vinte critérios propostos. Detalha adapters/capacidades, fonte interna mínima de notas, limites, cursores/corte, cobertura e retomada. Alvos e pendências de publicação abaixo foram tratados como proposta, ainda sem aceite do PI; #181 continua Planejada, dependente de #180. Não há implementação.
+
 **Dependências diretas:** M7-F01.
 **Fonte:** seções 6, 10, 11 e 14 do design.
 
