@@ -75,6 +75,7 @@ import type { Anexo, AnexoOutcome } from '@shared/domain/anexos-de-design'
 import { EXTENSOES_DO_ANEXO, isTipoDeAnexo } from '@shared/domain/anexos-de-design'
 import type { ValidacaoDoPrototipo } from '@shared/domain/validacao-de-prototipo'
 import type { ArquiteturaOutcome, PacoteArquitetura } from '@shared/domain/arquitetura'
+import type { AlvoDaPublicacao, PublicacaoOutcome } from '@shared/domain/publicacao'
 import type { Roadmap, RoadmapOutcome } from '@shared/domain/roadmap'
 import type {
   Approval,
@@ -84,6 +85,7 @@ import type {
   RevisaoAprovada
 } from '@shared/domain/aprovacoes'
 import { NATUREZAS, isGate } from '@shared/domain/aprovacoes'
+import type { PublicacaoService } from '../projects/publicacao-service'
 import type { RoadmapService } from '../projects/roadmap-service'
 import type { AnexoService } from '../projects/anexo-service'
 import { isConnectorId } from '@shared/domain/connectors'
@@ -290,6 +292,7 @@ export interface IpcDependencies {
   readonly pacotes: PacoteService
   readonly anexos: AnexoService
   readonly roadmap: RoadmapService
+  readonly publicacao: PublicacaoService
   /** Vault de credenciais (SPEC-Providers-01): status para a UI, valor só dentro do main. */
   readonly credentials: CredentialService
   /** Runs persistidos, para a UI listar o histórico. */
@@ -1425,6 +1428,43 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
         return { mvps: [], slices: [] }
       }
       return deps.roadmap.carregar(projectId, workspace)
+    }
+  )
+
+  /**
+   * SPEC-Entrega-01: publica o repositório e o backlog aprovado.
+   *
+   * Valida a **forma** do alvo antes de agir, como todo handler desta ponte: o renderer é um
+   * processo que pode ser comprometido, e um `owner` que não é string chegaria à URL do push. O que
+   * ele **não** escolhe é o conteúdo — as issues saem do que o PI aprovou para a fila, lido aqui.
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.publicacaoPublicar,
+    async (
+      _event,
+      projectId: unknown,
+      alvo: unknown,
+      workspace: unknown
+    ): Promise<PublicacaoOutcome> => {
+      const invalido: PublicacaoOutcome = { reason: 'projeto-inexistente', criados: 0 }
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return invalido
+
+      const a = alvo as Partial<AlvoDaPublicacao> | null
+      if (
+        a === null ||
+        typeof a !== 'object' ||
+        typeof a.owner !== 'string' ||
+        typeof a.repo !== 'string' ||
+        typeof a.origem !== 'string'
+      ) {
+        return invalido
+      }
+
+      return await deps.publicacao.publicar(projectId, workspace, {
+        owner: a.owner,
+        repo: a.repo,
+        origem: a.origem
+      })
     }
   )
 

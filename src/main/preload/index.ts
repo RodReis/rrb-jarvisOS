@@ -13,6 +13,7 @@ import {
   type PreferencesSnapshot,
   type WorkspaceSwitchResult
 } from '@shared/contracts/ipc'
+import type { AlvoDaPublicacao, PublicacaoOutcome } from '@shared/domain/publicacao'
 import type { ContextPack, ContextPackOutcome, FalhaRegistrada } from '@shared/domain/context-pack'
 import type { CapacidadeResolvida } from '@shared/domain/skills'
 import type { AuthSnapshot } from '@shared/contracts/auth'
@@ -340,6 +341,14 @@ const bridge: JarvisBridge = {
     ipcRenderer.invoke(IPC_CHANNELS.roadmapGerar, projectId, workspace),
   carregarRoadmap: (projectId: string, workspace: WorkspaceId): Promise<Roadmap> =>
     ipcRenderer.invoke(IPC_CHANNELS.roadmapCarregar, projectId, workspace),
+  // O alvo atravessa a ponte; a credencial não. O token é resolvido no main, pelo mesmo cofre do
+  // conector — mandá-lo daqui exigiria que o renderer o tivesse, e ele nunca tem.
+  publicarNoGitHub: (
+    projectId: string,
+    alvo: AlvoDaPublicacao,
+    workspace: WorkspaceId
+  ): Promise<PublicacaoOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.publicacaoPublicar, projectId, alvo, workspace),
   listarAprovacoes: (projectId: string, workspace: WorkspaceId): Promise<readonly Approval[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.aprovacaoListar, projectId, workspace),
   revisoesDoGate: (

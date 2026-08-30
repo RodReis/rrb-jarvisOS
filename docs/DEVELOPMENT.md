@@ -1396,6 +1396,45 @@ Status: **entregue** — pedido direto do PI (2026-08-30, com screenshots); PR [
 
 Mesma limitação do FIX #170: sem consentimento do Google o AppShell não monta, e a verificação **visual** das abas no app rodando é do PI. A estrutura, o teclado e o conteúdo por aba têm teste de componente.
 
+## MVP-009 — Entrega Autônoma ([#100](https://github.com/RodReis/rrb-jarvisOS/issues/100))
+
+### Fatia 01 — Publicação no GitHub (`docs/spec/spec-entrega-01-publicacao-github.md`)
+
+Status: **entregue** — spec `aprovada-pi` (2026-08-29); issue [#101](https://github.com/RodReis/rrb-jarvisOS/issues/101). Depende do MVP-006 e do MVP-008. **Abre o MVP-009.**
+
+- [x] **`src/shared/domain/publicacao.ts`** — a chave externa determinística (`chaveDeMvp`, `chaveDeFatia`, `chaveDeProjeto`), `urlDePushComToken` e `redigirUrlDeRemote`
+- [x] **Três capacidades novas no adapter** — `repo.set-default-branch`, `branch.ensure-protection` e `commit.sha-for-ref`, com validação, operação e despacho
+- [x] **`GitRunner.push` e `pushComToken`** — sem `--force`; a URL entra como argumento, nunca `git remote add`
+- [x] **Redação de credencial em URL** no `redact` compartilhado e nos três `audit.append` do `TerminalEngine`
+- [x] **`PublicacaoService`** — orquestra repositório → push → branch base → proteção → issues → dependências → confirmação na origem
+- [x] **`publicacao-github`** — tipo novo de `AuditEvent`
+- [x] **Canal `publicacao:publicar`** — o renderer informa o alvo, nunca a credencial nem o que publicar
+- [x] **Testes**: 20 de integração da orquestração, 7 do push com Git real, 16 das capacidades novas, 18 de domínio
+- [x] **Emendas de 2026-08-30** (PR [#188](https://github.com/RodReis/rrb-jarvisOS/pull/188)) — as cinco que faltavam, implementadas antes de fechar a entrega:
+  - [x] **(2)** proteção recusada pela origem vira **limitação explícita** no `ExternalRef`, não bloqueio
+  - [x] **(3)** só fatia com `SLICE_ENTRY` aprovado vira issue; as demais ficam no checklist do épico
+  - [x] **(4)** `label.ensure` no adapter, com os rótulos vindo da Convention do **projeto-alvo**
+  - [x] **(5)** linha `Bloqueada por: #N` no corpo da fatia, além do `ensureSubIssue`
+  - [x] **(6)** **migration 22** (`external_ref`) e `ExternalRefRepository` — a saída que a M9-F02 e a M9-F05 consomem
+
+**A decisão que define a fatia.** O `ambienteControlado()` do MVP-004 não deixa variável de ambiente alcançar o subprocess — é a garantia da M4-F02, não um descuido, e abrir exceção criaria uma segunda lista de permissão. O PI decidiu pela **URL com token montada no ato**, passada como argumento: gravada no `.git/config`, a credencial sobreviveria ao run, ao processo e ao backup.
+
+**O teste de integração achou o vazamento onde ele estava de verdade.** A defesa óbvia era redigir o `stderr`, porque o Git ecoa a URL em `fatal: unable to access '...'`. Mas o Git **já remove a credencial do próprio eco** — aquela redação defendia contra o que não acontecia. O token vazava pelos **`args`**: o `AuditRepository` grava o payload cru e encadeado no hash, e entrando ali não sai mais sem quebrar a cadeia. A correção é no `redact` compartilhado e no `TerminalEngine`, que é o ponto por onde todo comando passa — **vale para qualquer segredo em argumento**, não só para este caso. A `ApprovalRequest` guarda o argumento real, porque é dela que a retomada reconstrói o comando.
+
+**Um contrafactual passou, e isso era lacuna de cobertura, não acerto.** Removida a redação dos args, a suíte ficou verde: o teste lia a cópia devolvida pelo runner (limpa) enquanto o banco estava sujo. O teste novo lê o `audit_event` do disco.
+
+**O seed de allowlist foi levantado e reprovado.** A decisão inicial do PI era semear o `git` ao criar projeto; ela colidia com **duas** regras escritas — a decisão 1 do MVP-008 (*"criar projeto nunca amplia a allowlist"*) e a regra do próprio MVP-004 no topo do `CommandAllowlistRepository` (*"sem default de fábrica; nenhum comando roda até o usuário permitir"*). Como `add()` classifica `permissions.change` de **alto risco**, o seed faria o app auto-conceder alto risco sem decisão humana — o que a barreira existe para impedir. Levantado ao PI, ficou o **bloqueio retomável**, que é literalmente o critério 5.
+
+**`branch.ensure-protection` é o único `ensure` que não procura antes de criar.** O `PUT` substitui a configuração inteira, então é idempotente por construção; comparar antes exigiria reproduzir a normalização que o GitHub faz nos campos aninhados, e errar essa comparação deixaria a proteção desatualizada em silêncio. `enforce_admins: false` é deliberado: o merge autônomo roda como o dono, e com `true` a proteção barraria a entrega que ela existe para proteger.
+
+**As emendas chegaram com a fatia em andamento**, e a spec instruía a lê-las antes de fechar. Duas mudaram comportamento já implementado: proteção de branch recusada **deixou de bloquear** (uma conta sem plano responde 403, e barrar deixaria o projeto sem board por configuração que não é da entrega), e a publicação passou a exigir `SLICE_ENTRY` aprovado por fatia — antes ela publicava todas as fatias do MVP na fila, o que criava board de trabalho que ninguém liberou. As outras três acrescentaram: `label.ensure`, a linha `Bloqueada por: #N` e o `ExternalRef` persistido.
+
+**O `ExternalRef` é `upsert`, não append-only** — ao contrário de `approval` e `pacote_estrutural`. Aqueles guardam o que alguém decidiu, e reescrever apagaria a decisão; este guarda **onde o recurso está**, um fato que muda quando o recurso muda. Um `INSERT` faria "qual é o número da issue desta fatia?" ter várias respostas depois de republicar.
+
+**`label.ensure` não sobrescreve rótulo existente.** O que a emenda pede é que o rótulo *exista*, não que seja nosso: um `PATCH` apagaria a cor escolhida por quem configurou o repositório, a cada publicação.
+
+**Limites:** sem tela — quem decide *quando* publicar é a M9-F02, e o canal existe para ela consumir. **Sem smoke real**: o push HTTPS autenticado não foi exercitado contra o GitHub (os testes usam bare local, que prova a mecânica do Git, não a autenticação), e isso precisa de repositório descartável com autorização do PI.
+
 ## Registro de entregas
 
 | Data | Fatia | PR | Observação |
