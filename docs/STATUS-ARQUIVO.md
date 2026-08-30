@@ -276,6 +276,14 @@ A #181 passou de `proplan:planejado` para `proplan:backlog` e o épico #179 rece
 
 Documentação de arquitetura, convenções e acompanhamento aponta para o contrato aprovado, sem reabrir F01 ou contratos da pipeline/MVP-016. Validação documental confirmou 82 SPECs aprovadas, preservação do quadro Agora e das demais associações Fatia ↔ SPEC. Próxima especificação: M7-F03 (#182), recuperação contextual e orçamento. Não houve implementação, teste de produto, instalação, captura, PR, push ou deploy; o registro permanece em Git local.
 
+### MVP-007 — SPEC da M7-F03 redigida para revisão (2026-08-30)
+
+Após o aceite da F02 registrado em `8df5990`, o PI solicitou continuar somente o planejamento. Redigida `docs/spec/spec-memoria-03-recuperacao-contextual-orcamento.md`, status `rascunho`, vinculada à #182. Propõe busca lexical local, relações opcionais, validade F01 e cobertura F02, histórico, ranking, paginação/expansão com limites compartilhados e vinte critérios. Não altera as revisões técnicas aprovadas F01/F02 nem cria dependência da pipeline sobre a memória.
+
+Inspeção somente de leitura do checkout principal `0799c8a` identificou ContextService, ContextPack e AiCallService: candidatos atuais são arquivos; o ponto de chamada verifica existência do pack, não correspondência automática entre memória e prompt. A SPEC propõe ponte interna opcional, anexo imutável versionado e teste do bloco efetivamente enviado, sem caminho fictício ou segundo seletor. Estimativas por bytes/caracteres não foram tratadas como contagem real nem garantia de economia. Context7 e documentação oficial consultados para FTS5/driver; nada foi instalado ou executado no banco do produto.
+
+O índice Fatia ↔ SPEC mudou somente na associação da F03 ao rascunho. F01–F02 permanecem aprovadas/Backlog; F03 Planejada e F04–F08 a redigir. Permanecem 82 SPECs aprovadas; aprovação não foi antecipada. Validação desta etapa é documental, não teste de produto ou prova de busca funcionando. Sem implementação, captura, chamada de modelo, alteração de fila, PR, push ou deploy.
+
 ## Pendências históricas preservadas
 
 - A UI de allowlist ainda exigia decisão de produto: localização, seletor nativo e remoção de `appDir`.

@@ -1,6 +1,6 @@
 # MVP-007 — Memória Contextual e RAG
 
-- Status: **contratos parciais e SPECs da F01–F02 aprovados pelo PI em 2026-08-30; F01–F02 em Backlog, F03–F08 Planejadas/a redigir; design em elaboração; implementação não autorizada**.
+- Status: **contratos parciais e SPECs da F01–F02 aprovados pelo PI em 2026-08-30; F01–F02 em Backlog, F03 em rascunho/Planejada, F04–F08 Planejadas/a redigir; design em elaboração; implementação não autorizada**.
 - Origem: recorte de memória híbrida/RAG anteriormente associado ao Corte 3.
 - Relação com a pipeline: **não bloqueia MVP-008, MVP-009 nem MVP-016**; a M16-F05 mantém escopo próprio e integração reutilizável.
 - Design em elaboração: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`.
@@ -84,6 +84,8 @@ A M7-F02 foi aprovada pelo PI em 2026-08-30: `docs/spec/spec-memoria-02-fontes-i
 A M7-F01 foi aprovada pelo PI em 2026-08-30: `docs/spec/spec-memoria-01-nucleo-identidade-persistencia.md`, revisão `83e952fd4e5f22850653bf81cf1d45d6c4377c84`, com schema v1, identidade composta, revisão/substituição, conflitos, limites, SQLite transacional e vinte critérios de aceite. Sua issue #180 passa a Backlog sem iniciar construção. As pendências abaixo se restringem às fatias seguintes; não reabrem o contrato aprovado de F01.
 
 ## Não decidido
+
+F03 em revisão: `docs/spec/spec-memoria-03-recuperacao-contextual-orcamento.md` propõe busca lexical local, identidade/revisão/validade com cobertura explícita, expansão limitada e orçamento compartilhado. Inclui ponte opcional para o ContextPack e prova de correspondência do bloco congelado com o prompt enviado, sem segundo seletor. Vinte critérios propostos; #182 permanece Planejada e depende somente de #181. Essas escolhas concretas não estão aprovadas por constar no rascunho.
 
 - extensões de tipos/operações, schemas e limites nas integrações futuras, preservando o núcleo v1 aprovado na F01;
 - integrações das fontes futuras além de Git, decisões e notas; cobertura, corte, confirmação, retomada, pendências e retentativas dessas três entradas estão resolvidos na F02;

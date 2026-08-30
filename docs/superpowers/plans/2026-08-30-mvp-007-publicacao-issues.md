@@ -81,6 +81,8 @@ Ingerir projetos registrados e conhecimento explícito com carga inicial, altera
 
 ### M7-F03 — Recuperação contextual e orçamento
 
+**Atualização documental (2026-08-30):** SPEC `docs/spec/spec-memoria-03-recuperacao-contextual-orcamento.md`, status `rascunho`, com vinte critérios propostos. Detalha índice lexical, consultas/histórico, cobertura/validade, ordenação, sessão/expansão, limites e ponte opcional com ContextPack/envio. Alvos e pendências abaixo foram tratados como proposta; ainda aguardam aceite da revisão escrita. #182 continua Planejada, dependente de #181; sem implementação.
+
 **Dependências diretas:** M7-F02.
 **Fonte:** seções 2, 8, 9 e 12 do design.
 
