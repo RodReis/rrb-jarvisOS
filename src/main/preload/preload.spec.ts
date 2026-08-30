@@ -55,6 +55,7 @@ describe('ponte do preload', () => {
     expect(Object.keys(bridge).sort()).toEqual([
       'addAllowedCommand',
       'addAllowedDirectory',
+      'answerWizard',
       'awaitGithubAuth',
       'buildContextPack',
       'callAi',
@@ -77,6 +78,7 @@ describe('ponte do preload', () => {
       'getProviderModels',
       'getProviderStatus',
       'getRouting',
+      'getWizardState',
       'getWorkspace',
       'importProject',
       'listAllowedCommands',

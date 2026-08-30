@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FileSearch, FolderPlus, FolderSearch, ShieldCheck } from 'lucide-react'
+import { FileSearch, FolderPlus, FolderSearch, ShieldCheck, Wand2 } from 'lucide-react'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { Project, ProjectOutcome, ProjectReason } from '@shared/domain/projects'
 import { Button, EmptyState, Field, InlineAlert, Input, LoadingState } from '@design/ui'
 import { log } from '../lib/log'
 import { ContextoDoProjeto } from './ContextoDoProjeto'
+import { WizardDoProjeto } from './WizardDoProjeto'
 
 /**
  * Projetos locais (SPEC-Planejamento-01).
@@ -86,6 +87,16 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
    * perderia a coluna que veio varrer.
    */
   const [contextoDeId, setContextoDeId] = useState<string | null>(null)
+  /**
+   * O projeto cujo wizard está aberto. **Pop-up, não painel inline** como o contexto: a spec
+   * pede uma pergunta por pop-up, e um painel na lista mostraria a pergunta ao lado de todas as
+   * outras coisas que competem por atenção.
+   */
+  const [planejandoId, setPlanejandoId] = useState<string | null>(null)
+
+  // Derivado no render, não em estado próprio: guardar o objeto do projeto duplicaria o que a
+  // lista já tem, e um rename deixaria o modal mostrando o nome antigo.
+  const projetoEmPlanejamento = projetos.find((p) => p.id === planejandoId)
 
   /*
    * A flag `ativo` tem o mesmo desenho das outras telas: sem ela, desmontar durante a promise
@@ -401,6 +412,14 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
                             </Button>
                             <Button
                               variante="secundaria"
+                              onClick={() => setPlanejandoId(projeto.id)}
+                              aria-label={t('projetos.planejarDe', { nome: projeto.nome })}
+                              iconeInicial={<Wand2 aria-hidden="true" className="size-4" />}
+                            >
+                              {t('projetos.planejar')}
+                            </Button>
+                            <Button
+                              variante="secundaria"
                               onClick={() =>
                                 setContextoDeId((atual) =>
                                   atual === projeto.id ? null : projeto.id
@@ -481,6 +500,21 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
             )
           })}
         </ul>
+      )}
+
+      {/*
+        O wizard fica **fora do `map`**: é um modal único, e montá-lo por item criaria um
+        `Dialog` por projeto na árvore — todos fechados, todos custando render a cada mudança
+        da lista. `projetoEmPlanejamento` resolve o nome a partir do id guardado.
+      */}
+      {projetoEmPlanejamento !== undefined && (
+        <WizardDoProjeto
+          workspace={workspace}
+          projectId={projetoEmPlanejamento.id}
+          nomeDoProjeto={projetoEmPlanejamento.nome}
+          aberto
+          onFechar={() => setPlanejandoId(null)}
+        />
       )}
     </section>
   )

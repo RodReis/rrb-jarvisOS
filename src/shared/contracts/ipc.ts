@@ -52,6 +52,7 @@ import type {
   Project,
   ProjectOutcome
 } from '../domain/projects'
+import type { Resposta, RespostaOutcome, VistaDoWizard } from '../domain/wizard'
 import type {
   ContextPack,
   ContextPackOutcome,
@@ -281,6 +282,21 @@ export const IPC_CHANNELS = {
   projectSession: 'project:session',
   projectSaveAnswers: 'project:save-answers',
   projectCompleteMilestone: 'project:complete-milestone',
+  /**
+   * O wizard orientado (SPEC-Planejamento-03).
+   *
+   * **Dois canais, e não um `wizard:next` que devolvesse a pergunta já respondida.** `state` lê
+   * (pergunta pendente, histórico) e `answer` escreve — a mesma divisão de `project:session` e
+   * `project:save-answers`. Um canal único faria a leitura carregar o efeito colateral de
+   * avançar, e a retomada do critério 6 depende justamente de poder **ler sem avançar**.
+   *
+   * **Não existe canal que aprove gate.** Decisão do wizard registra escolha; aprovar pacote,
+   * MVP ou fatia é gate do MVP-008 § Gates, e a invariante 3 do CONVENTION §4 proíbe que a
+   * delegação chegue lá. Um `wizard:approve` seria o caminho por onde "Decide por mim"
+   * aprovaria o que não pode.
+   */
+  wizardState: 'wizard:state',
+  wizardAnswer: 'wizard:answer',
   /**
    * Contexto, skills e orçamento (SPEC-Planejamento-02).
    *
@@ -715,6 +731,27 @@ export interface JarvisBridge {
     marco: MarcoDocumental,
     workspace: WorkspaceId
   ): Promise<MarcoOutcome | null>
+  /**
+   * O estado do wizard: a pergunta pendente (ou a conclusão) e o histórico de decisões.
+   *
+   * **Lê sem avançar.** É o que torna a retomada do critério 6 estrutural: reabrir a tela
+   * pergunta ao main onde parou, e a resposta vem do histórico gravado — não de estado que
+   * morreu junto com a janela.
+   */
+  getWizardState(projectId: string, workspace: WorkspaceId): Promise<VistaDoWizard | null>
+  /**
+   * Registra uma resposta do PI, ou a delegação ao agente.
+   *
+   * Devolve `RespostaOutcome` **inclusive nas recusas**, como `createProject`: "esta resposta
+   * muda decisões já tomadas" não é falha técnica, é o desfecho que a tela mostra junto com a
+   * decisão anterior (critério 5). Rejeitar a promise faria a contradição chegar
+   * indistinguível de um disco cheio — e o PI não teria o que aceitar.
+   */
+  answerWizard(
+    projectId: string,
+    resposta: Resposta,
+    workspace: WorkspaceId
+  ): Promise<RespostaOutcome>
   /**
    * Monta o `ContextPack` — o gate do critério 1 (SPEC-Planejamento-02).
    *
