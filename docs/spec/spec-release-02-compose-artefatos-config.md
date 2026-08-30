@@ -1,8 +1,8 @@
 # SPEC-Release-02 — Docker, artefatos e configuração
 
 - MVP/Fatia: MVP-014 · M14-F02.
-- Issue: ainda não criada.
-- Status: **aprovada-pi** (2026-08-29); implementação depende da fila e de issue ainda não criada.
+- Issue: [#151](https://github.com/RodReis/rrb-jarvisOS/issues/151).
+- Status: **aprovada-pi** (2026-08-29); issue em `proplan:backlog`; implementação depende da fila.
 - Depende de: M14-F01 aprovada e entregue.
 - Design: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v3-design.md`.
 

@@ -1,8 +1,8 @@
 # SPEC-Observabilidade-04 — Consultas, retenção, rollups e CLI
 
 - MVP/Fatia: MVP-015 · M15-F04.
-- Issue: ainda não criada.
-- Status: **aprovada-pi** (2026-08-29); implementação depende da fila e de issue ainda não criada.
+- Issue: [#159](https://github.com/RodReis/rrb-jarvisOS/issues/159).
+- Status: **aprovada-pi** (2026-08-29); issue em `proplan:backlog`; implementação depende da fila.
 - Depende de: M15-F03 aprovada e entregue.
 - Design: `docs/superpowers/specs/2026-08-29-mvp-015-observabilidade-operacional-design.md`.
 

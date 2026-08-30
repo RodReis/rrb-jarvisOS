@@ -100,6 +100,16 @@ Cada fatia recebeu `proplan:backlog`, parent nativo e um `blocked by` que preser
 
 A reconciliação pós-criação consultou as 24 issues diretamente no GitHub e confirmou zero erros de label, parent, estado ou dependência. Nenhuma issue foi marcada `proplan:next` e nenhuma implementação foi iniciada.
 
+### Publicação das issues da Pipeline V3 (2026-08-29)
+
+Por solicitação do PI, foram publicados os três MVPs já desenhados na ordem de implementação: MVP-014, épico [#149](https://github.com/RodReis/rrb-jarvisOS/issues/149) e fatias #150–#154; MVP-015, épico [#155](https://github.com/RodReis/rrb-jarvisOS/issues/155) e fatias #156–#161; MVP-016, épico [#162](https://github.com/RodReis/rrb-jarvisOS/issues/162) e fatias #163–#168.
+
+As onze fatias dos MVPs 014–015 e a M16-F01 possuem SPEC `aprovada-pi` e receberam `proplan:backlog`. As M16-F02–F06 receberam `proplan:planejado`, com declaração explícita de implementação não autorizada até a aprovação da revisão exata da SPEC. A mesma issue será atualizada quando aprovada; não será criada duplicata.
+
+Cada fatia foi vinculada como sub-issue nativa ao seu épico. Cada épico depende do anterior; a primeira fatia depende do épico anterior e as demais formam cadeia sequencial. MVP-014 parte do MVP-013 (#133). O GitHub foi consultado novamente para as 20 issues: zero erro de estado, label, parent, dependência, ordem ou conteúdo. Nenhuma nova issue recebeu `proplan:next`; o avanço paralelo da fila corrente não foi alterado por esta publicação.
+
+Os gates visuais da M15-F05 (#160) e M16-F06 (#168) permanecem: `DESIGN-SYSTEM.md` e protótipos HTML formais aprovados antes da construção. A publicação não inicia código, não dispara executor e não autoriza gasto externo.
+
 ## Pendências históricas preservadas
 
 - A UI de allowlist ainda exigia decisão de produto: localização, seletor nativo e remoção de `appDir`.

@@ -1,8 +1,8 @@
 # SPEC-Release-03 — Preview isolado por PR
 
 - MVP/Fatia: MVP-014 · M14-F03.
-- Issue: ainda não criada.
-- Status: **aprovada-pi** (2026-08-29); implementação depende da fila e de issue ainda não criada.
+- Issue: [#152](https://github.com/RodReis/rrb-jarvisOS/issues/152).
+- Status: **aprovada-pi** (2026-08-29); issue em `proplan:backlog`; implementação depende da fila.
 - Depende de: M14-F02 aprovada e entregue.
 - Design: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v3-design.md`.
 

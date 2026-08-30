@@ -3,7 +3,7 @@
 - Status: **design e seis fatias aprovados pelo PI** em 2026-08-29.
 - Pipeline: V3, depois do MVP-015.
 - Implementação: **não autorizada por este documento**.
-- Issues: não criadas.
+- Issues: épico [#162](https://github.com/RodReis/rrb-jarvisOS/issues/162); F01 #163 em `proplan:backlog`; F02–F06 #164–#168 em `proplan:planejado`.
 - SPECs: M16-F01 `aprovada-pi`; M16-F02–F06 ainda não redigidas.
 - Design predecessor: `2026-08-29-mvp-015-observabilidade-operacional-design.md`.
 
@@ -237,6 +237,6 @@ Para um projeto selecionado, uma falha recorrente é reconhecida sem esconder ca
 
 ## 17. Gates e autorização
 
-O PI aprovou o design e as seis fatias. Isso autoriza redigir as seis SPECs para revisão, mas não autoriza implementação, criação de issues, gasto, smoke externo, push ou PR.
+O PI aprovou o design e as seis fatias. Isso autoriza redigir as seis SPECs para revisão, mas não autoriza implementação, gasto, smoke externo, push ou PR. A publicação das issues foi autorizada separadamente e concluída em 2026-08-29; F01 está em backlog e F02–F06 permanecem planejadas até aprovação de suas SPECs.
 
 A implementação de cada fatia depende do aceite exato da respectiva SPEC e da fila. A M16-F06 também depende de `DESIGN-SYSTEM.md` e protótipos HTML formais aprovados. Números dos perfis, schemas IPC, migrations e divisão interna de arquivos pertencem às SPECs sem poder alterar este design.

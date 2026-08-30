@@ -1,7 +1,7 @@
 # MVP-015 — Observabilidade Operacional
 
-- Status: **design e seis SPECs aprovados pelo PI** em 2026-08-29; implementação depende da fila e de issues ainda não criadas.
-- GitHub: épico e issues ainda não criados.
+- Status: **design e seis SPECs aprovados pelo PI** em 2026-08-29; implementação depende da fila.
+- GitHub: épico [#155](https://github.com/RodReis/rrb-jarvisOS/issues/155); fatias [#156–#161](https://github.com/RodReis/rrb-jarvisOS/issues/156), estado `proplan:backlog`.
 - Depende de: MVP-014 concluído.
 - Dono do aceite: PI.
 - Design: `docs/superpowers/specs/2026-08-29-mvp-015-observabilidade-operacional-design.md`.
@@ -14,12 +14,12 @@ Dar ao PI uma visão local, correlacionada e verificável de runs, PRs, deploys,
 
 | Ordem | Fatia | SPEC | Estado |
 |---:|---|---|---|
-| 1 | Núcleo de eventos, outbox e projeções | `spec-observabilidade-01-eventos-outbox-projecoes.md` | aprovada-pi |
-| 2 | Reconciliação, saúde, custos e quotas | `spec-observabilidade-02-reconciliacao-saude-custos-quotas.md` | aprovada-pi |
-| 3 | Alertas e notificações | `spec-observabilidade-03-alertas-notificacoes.md` | aprovada-pi |
-| 4 | Consultas, retenção, rollups e CLI | `spec-observabilidade-04-consultas-retencao-cli.md` | aprovada-pi |
-| 5 | Console operacional | `spec-observabilidade-05-console-operacional.md` | aprovada-pi; gate visual pendente antes da construção |
-| 6 | Resiliência, desempenho e prova E2E | `spec-observabilidade-06-resiliencia-desempenho-e2e.md` | aprovada-pi |
+| 1 | Núcleo de eventos, outbox e projeções ([#156](https://github.com/RodReis/rrb-jarvisOS/issues/156)) | `spec-observabilidade-01-eventos-outbox-projecoes.md` | aprovada-pi |
+| 2 | Reconciliação, saúde, custos e quotas ([#157](https://github.com/RodReis/rrb-jarvisOS/issues/157)) | `spec-observabilidade-02-reconciliacao-saude-custos-quotas.md` | aprovada-pi |
+| 3 | Alertas e notificações ([#158](https://github.com/RodReis/rrb-jarvisOS/issues/158)) | `spec-observabilidade-03-alertas-notificacoes.md` | aprovada-pi |
+| 4 | Consultas, retenção, rollups e CLI ([#159](https://github.com/RodReis/rrb-jarvisOS/issues/159)) | `spec-observabilidade-04-consultas-retencao-cli.md` | aprovada-pi |
+| 5 | Console operacional ([#160](https://github.com/RodReis/rrb-jarvisOS/issues/160)) | `spec-observabilidade-05-console-operacional.md` | aprovada-pi; gate visual pendente antes da construção |
+| 6 | Resiliência, desempenho e prova E2E ([#161](https://github.com/RodReis/rrb-jarvisOS/issues/161)) | `spec-observabilidade-06-resiliencia-desempenho-e2e.md` | aprovada-pi |
 
 ## Dentro
 

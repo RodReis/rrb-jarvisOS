@@ -1,8 +1,8 @@
 # SPEC-Release-01 — Núcleo de release e fila
 
 - MVP/Fatia: MVP-014 · M14-F01.
-- Issue: ainda não criada.
-- Status: **aprovada-pi** (2026-08-29); implementação depende da fila e de issue ainda não criada.
+- Issue: [#150](https://github.com/RodReis/rrb-jarvisOS/issues/150).
+- Status: **aprovada-pi** (2026-08-29); issue em `proplan:backlog`; implementação depende da fila.
 - Depende de: MVP-013 concluído.
 - Design: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v3-design.md`.
 

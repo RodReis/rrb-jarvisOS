@@ -1,8 +1,8 @@
 # SPEC-Aprendizado-01 — Fundação e ingestão
 
 - MVP/Fatia: MVP-016 · M16-F01.
-- Issue: ainda não criada.
-- Status: **aprovada-pi** (2026-08-29); implementação depende da fila e de issue ainda não criada.
+- Issue: [#163](https://github.com/RodReis/rrb-jarvisOS/issues/163).
+- Status: **aprovada-pi** (2026-08-29); issue em `proplan:backlog`; implementação depende da fila.
 - Depende de: MVP-015 concluído.
 - Design: `docs/superpowers/specs/2026-08-29-mvp-016-aprendizado-operacional-design.md`.
 

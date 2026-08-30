@@ -1,8 +1,8 @@
 # SPEC-Observabilidade-06 — Resiliência, desempenho e prova E2E
 
 - MVP/Fatia: MVP-015 · M15-F06 — **fecha o MVP-015**.
-- Issue: ainda não criada.
-- Status: **aprovada-pi** (2026-08-29); implementação depende da fila e de issue ainda não criada.
+- Issue: [#161](https://github.com/RodReis/rrb-jarvisOS/issues/161).
+- Status: **aprovada-pi** (2026-08-29); issue em `proplan:backlog`; implementação depende da fila.
 - Depende de: M15-F05 aprovada e entregue.
 - Design: `docs/superpowers/specs/2026-08-29-mvp-015-observabilidade-operacional-design.md`.
 

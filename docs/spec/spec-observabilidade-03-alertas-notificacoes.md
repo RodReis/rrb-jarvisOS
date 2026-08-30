@@ -1,8 +1,8 @@
 # SPEC-Observabilidade-03 — Alertas e notificações
 
 - MVP/Fatia: MVP-015 · M15-F03.
-- Issue: ainda não criada.
-- Status: **aprovada-pi** (2026-08-29); implementação depende da fila e de issue ainda não criada.
+- Issue: [#158](https://github.com/RodReis/rrb-jarvisOS/issues/158).
+- Status: **aprovada-pi** (2026-08-29); issue em `proplan:backlog`; implementação depende da fila.
 - Depende de: M15-F02 aprovada e entregue.
 - Design: `docs/superpowers/specs/2026-08-29-mvp-015-observabilidade-operacional-design.md`.
 

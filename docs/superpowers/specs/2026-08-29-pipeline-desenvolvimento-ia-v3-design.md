@@ -4,6 +4,7 @@
 - Escopo deste documento: fronteira da Pipeline V3 e design detalhado do MVP-014. Os MVPs 015–016 possuem designs complementares próprios.
 - Implementação: **não autorizada por este documento**. Cada SPEC continua sujeita ao aceite pré-construção do PI.
 - Predecessora: `2026-08-29-pipeline-desenvolvimento-ia-v2-design.md`.
+- Publicação: épicos [#149](https://github.com/RodReis/rrb-jarvisOS/issues/149), [#155](https://github.com/RodReis/rrb-jarvisOS/issues/155) e [#162](https://github.com/RodReis/rrb-jarvisOS/issues/162), com 17 fatias e dependências nativas; nenhuma nova issue recebeu `next`.
 
 ## 1. Resultado da V3
 
@@ -226,6 +227,6 @@ Uma fatia mergeada percorre Preview, Staging e Produção sem novo aceite, usa o
 
 ## 17. Gates e autorização
 
-Este design autoriza as cinco SPECs do MVP-014 e remete o MVP-015 ao seu design complementar aprovado. Não autoriza implementação, criação de issues, gasto novo, push ou PR. Cada SPEC precisa de aceite pré-construção do PI antes de entrar no backlog executável.
+Este design autoriza as cinco SPECs do MVP-014 e remete os MVPs 015–016 aos seus designs complementares aprovados. Não autoriza implementação, gasto novo, push ou PR. A publicação das issues dos MVPs 014–016 foi autorizada separadamente pelo PI e concluída em 2026-08-29. Somente as doze SPECs aprovadas estão em backlog; as cinco fatias restantes do MVP-016 permanecem planejadas.
 
 Não resta questão estrutural aberta para o design do MVP-014. Nomes exatos de tipos, schemas IPC, migrations locais e divisão interna de arquivos pertencem às SPECs e não podem alterar os contratos acima.

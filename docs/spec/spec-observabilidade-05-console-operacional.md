@@ -1,8 +1,8 @@
 # SPEC-Observabilidade-05 — Console operacional
 
 - MVP/Fatia: MVP-015 · M15-F05.
-- Issue: ainda não criada.
-- Status: **aprovada-pi** (2026-08-29); implementação depende da fila, de issue ainda não criada e do gate visual abaixo.
+- Issue: [#160](https://github.com/RodReis/rrb-jarvisOS/issues/160).
+- Status: **aprovada-pi** (2026-08-29); issue em `proplan:backlog`; implementação depende da fila e do gate visual abaixo.
 - Depende de: M15-F04 aprovada e entregue; `DESIGN-SYSTEM.md` e protótipos HTML formais anexados/aprovados.
 - Design: `docs/superpowers/specs/2026-08-29-mvp-015-observabilidade-operacional-design.md`.
 - Gate visual: layout **A — console operacional** aprovado no brainstorming; não substitui os artefatos formais do PI.

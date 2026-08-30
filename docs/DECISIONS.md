@@ -65,7 +65,7 @@
 15. Custos/quotas projetam o ledger existente e declaram qualidade da origem; scraping/OCR de tela e valor inventado são proibidos.
 16. Marcos duráveis permanecem; amostras frequentes compactam após 30 dias em rollups diários permanentes.
 17. O console aprovado é por projeto e read-mostly. Visão cruzada/portfólio pertence ao MVP-018.
-18. O MVP-015 foi decomposto em seis fatias e suas seis SPECs receberam aceite exato do PI. Permanecem sem issues e fora da fila; a F05 mantém gate visual.
+18. O MVP-015 foi decomposto em seis fatias e suas seis SPECs receberam aceite exato do PI. Épico #155 e fatias #156–#161 publicados em backlog; a F05 mantém gate visual.
 19. O MVP-016 aprende entre runs e não substitui o MVP-007 nem reimplementa seleção, recuperação, revisão ou orçamento dos MVPs 008/009.
 20. Aprendizado usa camada específica por projeto e global local; a específica vence e conteúdo/regra de negócio não sobe ao global.
 21. Cada run congela `PolicySnapshot`. Promoção segue replay, shadow e canário; qualidade é guardrail anterior à eficiência.
@@ -73,4 +73,5 @@
 23. Falha usa fingerprint determinístico; similaridade semântica somente sugere associação. Claude/Codex propõem e explicam, mas não promovem por opinião.
 24. Graphify, Caveman e equivalentes são estratégias opcionais com fallback determinístico. Whole-repo continua exigindo exceção do MVP-008.
 25. `ApplicabilityKey` torna lição incompatível `stale`; indisponibilidade usa política estável/base e não bloqueia a pipeline.
-26. O MVP-016 foi decomposto em seis fatias aprovadas. A M16-F01 recebeu `aprovada-pi`; as demais SPECs e todas as issues ainda não existem. A F06 mantém gate visual. MVP-017–MVP-018 mantêm somente direção aprovada.
+26. O MVP-016 foi decomposto em seis fatias aprovadas. A M16-F01 recebeu `aprovada-pi`; as demais SPECs ainda não existem. Épico #162 publicado; #163 em backlog e #164–#168 planejadas. A F06 mantém gate visual. MVP-017–MVP-018 mantêm somente direção aprovada.
+27. Por solicitação do PI, foram publicados os MVPs 014–016 na ordem: épicos #149/#155/#162 e 17 fatias. Doze fatias com SPEC aprovada usam `proplan:backlog`; cinco sem SPEC usam `proplan:planejado`. Parents, dependências e ordem nativos foram reconciliados; nenhuma nova issue recebeu `proplan:next`.

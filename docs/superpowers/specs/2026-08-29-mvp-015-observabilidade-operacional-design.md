@@ -3,8 +3,8 @@
 - Status: **design e seis SPECs aprovados pelo PI** em 2026-08-29.
 - Pipeline: V3, depois do MVP-014.
 - Implementação: **não autorizada por este documento**.
-- Issues: não criadas.
-- SPECs: seis revisões `aprovada-pi`; implementação depende da fila e de issues ainda não criadas.
+- Issues: épico [#155](https://github.com/RodReis/rrb-jarvisOS/issues/155), fatias #156–#161 em `proplan:backlog`.
+- SPECs: seis revisões `aprovada-pi`; implementação depende da fila.
 - Design predecessor: `2026-08-29-pipeline-desenvolvimento-ia-v3-design.md`.
 
 ## 1. Resultado esperado
@@ -258,6 +258,6 @@ Para um projeto selecionado, o PI vê estado atual e histórico causal de uma jo
 
 ## 16. Gates e autorização
 
-As seis SPECs receberam aceite exato do PI. Isso não cria issues, não muda a fila e não autoriza contratação de serviço, smoke externo pago, push ou PR fora do fluxo de construção governado.
+As seis SPECs receberam aceite exato do PI. A publicação das issues foi autorizada separadamente pelo PI e concluída em 2026-08-29; não muda a fila e não autoriza contratação de serviço, smoke externo pago, push ou PR fora do fluxo de construção governado.
 
-As seis SPECs possuem aceite pré-construção, mas só entram em execução quando alcançarem a fila e possuírem issue. A F05 também depende do `DESIGN-SYSTEM.md` e dos protótipos HTML formais aprovados. Não resta questão estrutural aberta; nomes exatos de tipos, migrations e divisão de arquivos pertencem às SPECs sem poder alterar os contratos deste design.
+As seis SPECs possuem aceite pré-construção e issues em backlog, mas só entram em execução quando alcançarem a fila. A F05 também depende do `DESIGN-SYSTEM.md` e dos protótipos HTML formais aprovados. Não resta questão estrutural aberta; nomes exatos de tipos, migrations e divisão de arquivos pertencem às SPECs sem poder alterar os contratos deste design.
