@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 604 | 604 | 0 | 68.2 | — | — |
-| — | — | — | Banco | 422 | 422 | 0 | 86.9 | — | — |
-| — | — | — | Tela | 340 | 339 | 0 | 87.7 | — | — |
+| — | — | — | Regras de Negócio | 650 | 650 | 0 | 68.4 | — | — |
+| — | — | — | Banco | 464 | 464 | 0 | 87.5 | — | — |
+| — | — | — | Tela | 356 | 355 | 0 | 88.0 | — | — |
 
 ## Histórico por entrega
 
@@ -166,3 +166,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-08-30 | #172 | — | Regras de Negócio | 604 | 604 | 0 | 68.2 | #173 | [#173](https://github.com/RodReis/rrb-jarvisOS/pull/173) |
 | 2026-08-30 | #172 | — | Banco | 422 | 422 | 0 | 86.9 | #173 | [#173](https://github.com/RodReis/rrb-jarvisOS/pull/173) |
 | 2026-08-30 | #172 | — | Tela | 340 | 339 | 0 | 87.7 | #173 | [#173](https://github.com/RodReis/rrb-jarvisOS/pull/173) |
+| 2026-08-30 | #95 | spec-planejamento-02-contexto-skills-orcamento | Regras de Negócio | 650 | 650 | 0 | 68.4 | #174 | [#174](https://github.com/RodReis/rrb-jarvisOS/pull/174) |
+| 2026-08-30 | #95 | spec-planejamento-02-contexto-skills-orcamento | Banco | 464 | 464 | 0 | 87.5 | #174 | [#174](https://github.com/RodReis/rrb-jarvisOS/pull/174) |
+| 2026-08-30 | #95 | spec-planejamento-02-contexto-skills-orcamento | Tela | 356 | 355 | 0 | 88.0 | #174 | [#174](https://github.com/RodReis/rrb-jarvisOS/pull/174) |
