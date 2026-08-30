@@ -60,7 +60,7 @@ describe('migrations', () => {
     // `credential_ref`; a v13, `credential_ref.expires_at`; a v14, `user_profile.github_client_id`;
     // a v15, `project` e `planning_session`; a v16, `context_pack`, `context_item` e
     // `failure_fingerprint`; a v18, `decision`; a v19, `evidence` e `pacote_estrutural`; a v20,
-    // `design_attachment` e `pacote_arquitetura`. A v17
+    // `design_attachment` e `pacote_arquitetura`; a v21, `mvp`, `slice` e `approval`. A v17
     // só acrescenta colunas a `cost_event`, que já é derrubada inteira aqui — não há o que
     // desfazer separadamente.
     antigo.exec('ALTER TABLE user_profile DROP COLUMN theme')
@@ -90,6 +90,9 @@ describe('migrations', () => {
     antigo.exec('DROP TABLE pacote_estrutural')
     antigo.exec('DROP TABLE design_attachment')
     antigo.exec('DROP TABLE pacote_arquitetura')
+    antigo.exec('DROP TABLE mvp')
+    antigo.exec('DROP TABLE slice')
+    antigo.exec('DROP TABLE approval')
     antigo.pragma('user_version = 1')
     antigo.close()
 
