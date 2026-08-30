@@ -1,6 +1,6 @@
 # MVP-007 — Memória Contextual e RAG
 
-- Status: **direção, captura, identidade/correções, persistência/retenção, recuperação, fontes iniciais, ingestão/retomada e contrato de integração opcional do Graphify aprovados pelo PI em 2026-08-30; design em elaboração; sem fatias ou SPECs; implementação não autorizada**.
+- Status: **direção, captura, identidade/correções, persistência/retenção, recuperação, fontes iniciais, ingestão/retomada, contrato de integração opcional do Graphify e modelo de validação das lições fora da pipeline aprovados pelo PI em 2026-08-30; design em elaboração; sem fatias ou SPECs; implementação não autorizada**.
 - Origem: recorte de memória híbrida/RAG anteriormente associado ao Corte 3.
 - Relação com a pipeline: **não bloqueia MVP-008, MVP-009 nem MVP-016**; a M16-F05 mantém escopo próprio e integração reutilizável.
 - Design em elaboração: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`.
@@ -59,6 +59,12 @@ Adapter substituível sob contrato próprio dos produtos, sem definir o modelo c
 
 Saída normaliza relações com fonte, revisão e distinção entre extração e inferência; correções/remoções invalidam relações antigas antes de apresentá-las como atuais. Resultados de `save-result`/`reflect`, quando usados, são candidatos rastreáveis, não decisões do PI ou promoção automática de políticas. Ausência/incompatibilidade mantém busca básica; atualizações exigem testes de compatibilidade e não são silenciosas. Contrato aprovado na seção 12 do design; assinaturas, schemas e versão concreta ainda serão especificados, sem instalação ou implementação.
 
+## Validação das lições fora da pipeline aprovada
+
+Lição candidata registra afirmação, contexto, projeto, fontes e resultados observados; repetição da conclusão não gera novas evidências. O módulo responsável valida por critérios verificáveis definidos em sua especificação, e a memória registra o resultado sem inventar o significado de sucesso. Critérios objetivos permitem validação automática, sem aceite duplicado; ausência de critério/evidência mantém a candidata e não bloqueia desenvolvimento.
+
+Validade se limita às condições e versões comprovadas, incluindo falhas e contrapontos, sem transformar sucesso isolado em regra universal. Mudança relevante nas fontes ou contradição retira a condição de validada vigente até reavaliação, preservando histórico. Decisão do PI não se confunde com comprovação empírica; lições orientam recomendações sem conceder novas permissões. A pipeline mantém avaliação/promoção no MVP-016. Modelo aprovado na seção 13 do design; formatos, estados e critérios concretos das integrações ainda serão especificados.
+
 ## Regra de planejamento
 
 O MVP entra em planejamento ativo, sem mudar a fila de construção. A aprovação da direção não equivale ao aceite de um design completo ou de SPECs ainda inexistentes. Fatias, contratos e critérios serão definidos progressivamente; a numeração permanece exclusivamente no índice de `docs/STATUS.md`.
@@ -69,7 +75,7 @@ O MVP entra em planejamento ativo, sem mudar a fila de construção. A aprovaç�
 - contratos técnicos de armazenamento/compactação/reconstrução, capacidade e exclusão física conforme a política aprovada; sincronização fora deste recorte;
 - contratos técnicos de consulta/resultados, atualização incremental e valores dos limites dentro do orçamento do solicitante;
 - assinaturas, schemas, versão concreta, execução e testes de compatibilidade do adapter conforme o contrato aprovado;
-- critérios de validação de lições fora da pipeline;
+- formato de avaliação, estados/transições e critérios concretos das integrações para lições fora da pipeline, conforme o modelo aprovado;
 - fatias, dependências, critérios de aceite e interfaces formais.
 
 Nenhum desses itens em aberto pode ser inferido como requisito aprovado. A integração de Caveman discutida para a F05 não é automaticamente incorporada ao MVP-007.

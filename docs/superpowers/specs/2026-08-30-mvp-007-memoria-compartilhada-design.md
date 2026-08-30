@@ -1,7 +1,7 @@
 # Design em elaboração — MVP-007: Memória compartilhada JarvisOS e AgentsOS
 
-- Status: **direção, captura, identidade/correções, persistência/retenção, recuperação, fontes iniciais, ingestão/retomada e contrato de integração opcional do Graphify aprovados pelo PI em 2026-08-30; detalhamento em elaboração**.
-- Esta revisão registra decisões parciais de escopo, captura, identidade, persistência, recuperação, fontes, ingestão e integração do Graphify; **não é um design completo nem uma SPEC aprovada para construção**.
+- Status: **direção, captura, identidade/correções, persistência/retenção, recuperação, fontes iniciais, ingestão/retomada, contrato de integração opcional do Graphify e modelo de validação das lições fora da pipeline aprovados pelo PI em 2026-08-30; detalhamento em elaboração**.
+- Esta revisão registra decisões parciais de escopo, captura, identidade, persistência, recuperação, fontes, ingestão, integração do Graphify e validação de lições; **não é um design completo nem uma SPEC aprovada para construção**.
 - Origem: proposta do PI de usar Graphify para memória e aprendizado transversal, acompanhada de quatro capturas dos menus futuros de JarvisOS/AgentsOS; aprovação da divisão entre MVP-007, M16-F05 e MVP-016.
 - Documento do MVP: `docs/mvp/mvp-007-memoria-contextual.md`.
 - Fatias e SPECs: ainda não definidas. Índice canônico: `docs/STATUS.md`.
@@ -27,7 +27,7 @@ Uma visão global mantém a identidade de produto/projeto/agente e as permissõe
 
 ### Aprendizado: o que comprovadamente funciona
 
-Uma conclusão de agente não é prova de resultado. Distinguir observação, inferência e lição validada, com referência à evidência e à sua validade. Na pipeline, validação e promoção continuam no MVP-016. Outros módulos deverão definir seus critérios de sucesso; não recebem automaticamente a política experimental da pipeline nem autoridade nova por acessarem a memória.
+Uma conclusão de agente não é prova de resultado. Distinguir observação, inferência e lição validada, com referência à evidência e à sua validade. Na pipeline, validação e promoção continuam no MVP-016. Outros módulos seguem o modelo aprovado na seção 13 e definem seus critérios de sucesso nas próprias especificações; não recebem automaticamente a política experimental da pipeline nem autoridade nova por acessarem a memória.
 
 ## 3. Consumidores previstos nos anexos
 
@@ -157,18 +157,32 @@ O PI aprovou o seguinte contrato de fronteira para evitar duas memórias concorr
 
 Foi afastado acoplar o núcleo ao formato interno do Graphify: economizaria adaptação inicial, mas dificultaria substituição e controle das correções. Permanecem para as SPECs a assinatura da interface, schemas normalizados, versão concreta, mecanismo de execução, mapeamento de erros e casos de teste. A aprovação do contrato não seleciona automaticamente todos os recursos do pacote, instala o componente ou inicia sua execução.
 
-## 13. Decisões ainda abertas
+## 13. Validação das lições fora da pipeline (PI, 2026-08-30)
 
-1. Evidências necessárias para lições fora da pipeline.
-2. Formato dos identificadores/revisões, schemas dos eventos, representação de cobertura e mecanismos de corte, confirmação, retomada, pendências e retentativas conforme as seções 6, 7, 10 e 11.
+O PI aprovou separar conclusão de execução de comprovação de que uma estratégia funcionou:
+
+1. **Lição candidata rastreável:** registrar afirmação, contexto, projeto, fontes e resultados observados. Repetir a mesma conclusão não gera novas evidências; reentregas também não aumentam artificialmente a sustentação da lição.
+2. **Validação pelo módulo responsável:** usar critérios verificáveis definidos na especificação daquele módulo. A memória registra o resultado; não inventa o que significa sucesso. Concluir uma execução não comprova, por si só, atingir o objetivo da estratégia.
+3. **Automação sem aceite duplicado:** critérios objetivos permitem validação automática. Sem critério ou evidência suficiente, a lição continua candidata, sem bloquear desenvolvimento. O modelo não exige aprovação manual de cada lição nem cria novo gate de construção.
+4. **Validade limitada ao comprovado:** registrar condições e versões em que funcionou, incluindo falhas e contrapontos. Um sucesso isolado não vira regra universal; o alcance da lição não pode exceder o que as evidências sustentam.
+5. **Reavaliação quando necessário:** mudança relevante nas fontes ou evidência contraditória retira a condição de validada vigente até nova avaliação, preservando o histórico. Essa mudança não apaga a avaliação anterior nem implica alterar retrospectivamente registros de execução.
+6. **Conhecimento não autoriza ações:** orientação do PI permanece decisão, não comprovação empírica. Lições podem orientar recomendações, mas não concedem novas permissões. A pipeline continua seguindo o MVP-016, sem substituir seus mecanismos de avaliação e promoção por este modelo.
+
+Foram afastados validar tudo manualmente, pelo trabalho recorrente, e aceitar toda conclusão de agente, por acumular falsas certezas. A automação depende dos critérios definidos pelo módulo; ausência deles não impede a captura de observações ou o uso de candidatas identificadas como tal. Permanecem para as SPECs o formato da avaliação, estados e transições, critérios concretos de cada integração e casos de teste. Esta decisão não executa avaliações, promove políticas ou inicia construção.
+
+## 14. Decisões ainda abertas
+
+1. Contrato comum dos registros/eventos: identificadores, revisões, versão do schema, operações e referências conforme as seções 6, 7 e 10.
+2. Representação de cobertura e mecanismos de corte, confirmação, retomada, pendências e retentativas conforme a seção 11.
 3. Contratos técnicos de armazenamento/compactação/reconstrução, capacidade e exclusão física conforme a seção 8; sincronização permanece fora deste recorte.
 4. Contratos técnicos de consulta/resultados, atualização incremental e limites conforme a seção 9.
 5. Assinaturas, schemas, versão concreta, execução e testes de compatibilidade do adapter conforme o contrato aprovado na seção 12.
-6. Fatias, ordem, dependências, critérios de aceite e interfaces formais.
+6. Formato de avaliação, estados/transições e critérios concretos das integrações para lições fora da pipeline conforme a seção 13.
+7. Fatias, ordem, dependências, critérios de aceite e interfaces formais.
 
 As perguntas serão resolvidas uma por vez. Nenhum item aberto vira implementação, gate ou regra inventada pelo agente. Novos registros de decisão devem distinguir proposta de aprovação; design completo e SPECs terão sua revisão escrita no fluxo existente, sem pedir novamente aceite da mesma revisão.
 
-## 14. Evidência e limite desta revisão
+## 15. Evidência e limite desta revisão
 
 Este registro deriva da decisão do PI nesta conversa. A documentação oficial consultada para avaliar viabilidade está no [Graphify](https://github.com/Graphify-Labs/graphify); suporte documentado não prova compatibilidade com a versão instalada nem substitui futuros testes de contrato.
 

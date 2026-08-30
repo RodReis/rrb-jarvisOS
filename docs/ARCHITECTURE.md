@@ -111,6 +111,8 @@ Ingestão usa referência de corte na carga inicial e progresso próprio por fon
 
 Graphify entra por adapter substituível com contrato próprio e versão compatível verificada, recebendo fontes selecionadas com identidade/revisão, sem acesso ampliado ou instalação global automática. Código usa extração estrutural local; enriquecimento semântico usa executores autorizados e orçamento existente, sem migração silenciosa para API paga. Relações normalizadas distinguem extração/inferência e preservam fontes/revisões; correções/remoções invalidam relações antigas como atuais. Reflexões são candidatas rastreáveis, não memória canônica paralela nem promoção automática. Ausência/incompatibilidade mantém busca básica; atualizações exigem testes de compatibilidade. Interface, schemas e versão concreta ainda serão especificados.
 
+Fora da pipeline, o módulo responsável valida lições por critérios verificáveis de sua especificação; a memória registra afirmação, contexto, fontes, resultados e avaliação. Critérios objetivos permitem automação sem aceite duplicado; ausência de critério/evidência mantém a candidata sem bloquear desenvolvimento. Validade limita-se às condições/versões comprovadas, com falhas e contrapontos; mudanças relevantes ou contradições retiram a validade vigente até reavaliação, preservando histórico. Decisões do PI não são comprovação empírica e lições não ampliam permissões. A pipeline mantém avaliação/promoção no MVP-016.
+
 Fonte: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`.
 
 ### Pipeline V2 aprovada (não implementada)

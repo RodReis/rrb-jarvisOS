@@ -214,6 +214,14 @@ Relações normalizadas preservam fonte/revisão, distinguem extração/inferên
 
 Contrato registrado na seção 12 do design; assinaturas, schemas, versão concreta e execução ainda serão especificados. Próxima decisão: validação das lições fora da pipeline. Não houve implementação, instalação, execução do Graphify, atualização de issues ou push. Nenhuma SPEC de fatia foi criada/aprovada; contagem de 80, índice e fila preservados.
 
+### MVP-007 — validação das lições fora da pipeline aprovada (2026-08-30)
+
+Após o contrato opcional do Graphify no commit local `acf2d2a`, o PI aprovou candidatas rastreáveis com afirmação, contexto, projeto, fontes e resultados, sem contar repetição da conclusão como evidência nova. Cada módulo valida por critérios verificáveis de sua especificação; a memória registra a avaliação e não inventa sucesso. Critérios objetivos permitem automação sem aceite duplicado; ausência de critério/evidência mantém a candidata sem bloquear desenvolvimento.
+
+Validade se limita às condições e versões comprovadas, incluindo falhas e contrapontos. Mudança relevante nas fontes ou contradição retira a validade vigente até reavaliação, preservando histórico. Orientação do PI permanece decisão, não comprovação empírica; lições não concedem novas permissões e a pipeline mantém avaliação/promoção no MVP-016.
+
+Modelo registrado na seção 13 do design; formatos, estados e critérios concretos das integrações ainda serão especificados. Próxima decisão: contrato comum dos registros/eventos. Não houve implementação, avaliação real, promoção de políticas, atualização de issues ou push. Nenhuma SPEC de fatia foi criada/aprovada; contagem de 80, índice e fila preservados.
+
 ## Pendências históricas preservadas
 
 - A UI de allowlist ainda exigia decisão de produto: localização, seletor nativo e remoção de `appDir`.
