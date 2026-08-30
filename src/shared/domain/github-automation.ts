@@ -78,7 +78,8 @@ export const GITHUB_OPERATIONS = {
   getMergeState: 'pr.merge-state',
   setDefaultBranch: 'repo.set-default-branch',
   ensureBranchProtection: 'branch.ensure-protection',
-  getCommitSha: 'commit.sha-for-ref'
+  getCommitSha: 'commit.sha-for-ref',
+  ensureLabel: 'label.ensure'
 } as const
 
 export type GithubOperation = (typeof GITHUB_OPERATIONS)[keyof typeof GITHUB_OPERATIONS]
@@ -168,6 +169,12 @@ export const GITHUB_CAPABILITIES: readonly ConnectorCapability[] = [
     operation: GITHUB_OPERATIONS.getCommitSha,
     effect: 'leitura',
     descricao: 'Lê o commit para onde uma ref aponta na origem, para conferir o que foi publicado.'
+  },
+  {
+    connector: 'github',
+    operation: GITHUB_OPERATIONS.ensureLabel,
+    effect: 'mutacao',
+    descricao: 'Garante que o rótulo existe no repositório, criando-o apenas se ainda não existir.'
   }
 ]
 
@@ -227,6 +234,19 @@ export interface SquashMergeInput extends RepoAlvo {
    * cuidado do `expectedHeadSha` que a M9-F05 já previa.
    */
   readonly expectedHeadSha: string
+}
+
+/**
+ * Entrada de `label.ensure`.
+ *
+ * O rótulo é identificado **pelo nome**, que é como o GitHub o endereça — não há id estável a
+ * guardar. `cor` sem `#`, como a API espera; `descricao` é opcional porque rótulo sem descrição é
+ * legítimo, e mandar string vazia sobrescreveria uma descrição existente por nada.
+ */
+export interface EnsureLabelInput extends RepoAlvo {
+  readonly nome: string
+  readonly cor: string
+  readonly descricao?: string
 }
 
 /**
@@ -493,6 +513,14 @@ export function validarEntrada(operation: string, input: unknown): string | unde
 
     case GITHUB_OPERATIONS.getCommitSha:
       return texto('ref') ? undefined : 'Informe `ref`.'
+
+    case GITHUB_OPERATIONS.ensureLabel:
+      if (!texto('nome')) return 'Informe `nome`.'
+      // Seis hexadecimais **sem** `#`: é o formato que a API aceita, e mandar com `#` devolve
+      // 422 num lugar onde a causa já era conhecível aqui.
+      return typeof v.cor === 'string' && /^[0-9a-f]{6}$/i.test(v.cor)
+        ? undefined
+        : '`cor` precisa ser um hexadecimal de 6 dígitos, sem `#`.'
 
     default:
       return `Operação "${operation}" não pertence ao conector GitHub.`

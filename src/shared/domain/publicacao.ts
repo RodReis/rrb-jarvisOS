@@ -65,11 +65,30 @@ function pad(n: number): string {
   return String(n).padStart(2, '0')
 }
 
+/**
+ * Um rótulo da Convention do **projeto-alvo** (SPEC-Entrega-01, emenda 4).
+ *
+ * `cor` sem `#`, como a API do GitHub espera.
+ */
+export interface RotuloDoProjeto {
+  readonly nome: string
+  readonly cor: string
+  readonly descricao?: string
+}
+
 /** Onde publicar. `origem` é a URL do repositório — a mesma que o push recebe. */
 export interface AlvoDaPublicacao {
   readonly owner: string
   readonly repo: string
   readonly origem: string
+  /**
+   * Os rótulos a garantir no repositório, vindos da Convention do projeto-alvo (emenda 4).
+   *
+   * **Nunca os `proplan:` desta base**: eles são a Convention *deste* repositório, e exportá-los
+   * imporia o processo do JARVIS a um projeto que não o adotou. Ausente ou vazio, nenhum rótulo é
+   * aplicado e o estado vive só no app — que é o que a emenda determina.
+   */
+  readonly rotulos?: readonly RotuloDoProjeto[]
 }
 
 /**
@@ -98,6 +117,43 @@ export interface PublicacaoOutcome {
   /** O commit confirmado **na origem**, não o que mandamos (critério 2). */
   readonly commitPublicado?: string
   readonly bloqueio?: BloqueioExterno
+}
+
+/**
+ * O que uma referência externa aponta.
+ *
+ * Enum fechado: a M9-F02 e a M9-F05 leem por alvo, e um valor novo é mudança de contrato — não
+ * uma string que apareceu porque alguém passou outro nome.
+ */
+export const ALVOS_DE_REF = ['repositorio', 'issue', 'branch'] as const
+
+export type AlvoDeRef = (typeof ALVOS_DE_REF)[number]
+
+/**
+ * Uma referência externa persistida (CONVENTION §4; SPEC-Entrega-01, emenda 6).
+ *
+ * É a saída desta fatia que as próximas consomem: a M9-F05 precisa do número da issue para
+ * escrever `refs #N`, e a reconciliação da M9-F02 precisa dos SHAs. Sem isto, cada fatia
+ * redescobriria na origem o que esta acabou de publicar — uma chamada de rede a mais por fatia,
+ * e uma resposta que pode ter mudado no intervalo.
+ */
+export interface ReferenciaExterna {
+  readonly alvo: AlvoDeRef
+  /** A chave determinística do recurso — a mesma que o corpo da issue carrega. */
+  readonly chaveExterna: string
+  /** O id na origem: `owner/repo`, o número da issue como texto, o nome da branch. */
+  readonly refId: string
+  readonly url?: string
+  /** O SHA publicado, quando o recurso tem um. Ausente em issue. */
+  readonly sha?: string
+  /**
+   * O que **não** foi possível configurar, e por quê (emenda 2).
+   *
+   * Proteção de branch recusada pelo plano da conta é limitação registrada, não falha da
+   * publicação. Guardá-la junto do recurso é o que permite a M9-F05 saber que a branch não tem
+   * proteção sem perguntar de novo à origem — e sem confundir "não protegida" com "não publicada".
+   */
+  readonly limitacao?: string
 }
 
 /**

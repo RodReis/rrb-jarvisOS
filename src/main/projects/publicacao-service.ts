@@ -28,6 +28,7 @@ import type { BloqueioExterno } from '@shared/domain/pacote-estrutural'
 import {
   chaveDeFatia,
   chaveDeMvp,
+  chaveDeProjeto,
   type AlvoDaPublicacao,
   type PublicacaoOutcome
 } from '@shared/domain/publicacao'
@@ -37,11 +38,14 @@ import { log } from '../logging/logger'
 import type { AuditRepository } from '../storage/audit-repository'
 import { GitRunner } from './git-runner'
 import type { ProjectRepository } from './project-repository'
+import type { ExternalRefRepository } from './external-ref-repository'
 import type { RoadmapRepository } from './roadmap-repository'
 
 export interface PublicacaoDeps {
   readonly projects: ProjectRepository
   readonly roadmap: RoadmapRepository
+  /** Onde as referências publicadas ficam (emenda 6): a M9-F02 e a M9-F05 leem daqui. */
+  readonly refs: ExternalRefRepository
   readonly git: GitRunner
   readonly connectors: ConnectorService
   readonly audit: AuditRepository
@@ -55,6 +59,10 @@ const BRANCH_BASE = 'main'
 
 export class PublicacaoService {
   constructor(private readonly deps: PublicacaoDeps) {}
+
+  private get refs(): ExternalRefRepository {
+    return this.deps.refs
+  }
 
   /**
    * Publica o repositório e o backlog aprovado, de forma idempotente e retomável.
@@ -85,6 +93,16 @@ export class PublicacaoService {
     const naFila = mvps.filter((m) => m.estado === 'na-fila')
     if (naFila.length === 0) return { reason: 'sem-backlog-aprovado', criados: 0 }
 
+    // As SPECs com `SLICE_ENTRY` aprovado (emenda 3). O artefato do gate é o `specSlug` — é assim
+    // que `revisoesDoGate` o registra —, então o conjunto de slugs aprovados responde diretamente
+    // "esta fatia pode virar issue?".
+    const aprovadas = new Set(
+      this.deps.roadmap
+        .listarAprovacoes(escopo)
+        .filter((a) => a.gate === 'SLICE_ENTRY')
+        .flatMap((a) => a.revisoes.map((r) => r.artefato))
+    )
+
     let criados = 0
     const contar = (o: ConnectorOutcome): void => {
       if (this.foiCriado(o)) criados += 1
@@ -98,6 +116,13 @@ export class PublicacaoService {
     })
     if (!repo.ok) return this.bloqueado(repo, 'o repositório', criados)
     contar(repo)
+
+    this.refs.upsert(escopo, {
+      alvo: 'repositorio',
+      chaveExterna: chaveDeProjeto(projectId),
+      refId: `${alvo.owner}/${alvo.repo}`,
+      ...(this.urlDa(repo) === undefined ? {} : { url: this.urlDa(repo) as string })
+    })
 
     // 2. Os commits locais chegam à origem.
     //
@@ -143,9 +168,43 @@ export class PublicacaoService {
       // proibidos, que é o que preserva os dois lados numa divergência.
       revisoesExigidas: 0
     })
-    if (!protecao.ok) return this.bloqueado(protecao, 'a proteção da branch', criados)
 
-    // 4. As issues do MVP e das fatias, e as dependências entre elas.
+    // **Proteção recusada não bloqueia a publicação** (emenda 2 de 2026-08-30). Repositório
+    // privado em conta sem plano responde 403, e barrar aqui deixaria o projeto sem repositório e
+    // sem board por uma configuração que é da conta, não da entrega. A recusa vira **limitação
+    // explícita** no `ExternalRef` — o critério 4 pede exatamente "confirmadas ou registradas
+    // como limitação explícita" —, e a M9-F05 lê da origem quais checks são obrigatórios.
+    contar(protecao)
+    // Guardada agora, e o SHA entra no passo 6 — quando a origem confirma o que recebeu. Gravar
+    // aqui o SHA local diria "publiquei isto" antes de saber se chegou, que é o engano que o
+    // critério 2 existe para impedir.
+    const limitacaoDaBranch = protecao.ok ? undefined : this.limitacaoDe(protecao)
+    if (limitacaoDaBranch !== undefined) {
+      log.agent.warn('Proteção de branch recusada pela origem — registrada como limitação', {
+        projectId,
+        limitacao: limitacaoDaBranch
+      })
+    }
+
+    // 4. Os rótulos da Convention do projeto-alvo (emenda 4).
+    //
+    // **Vêm do projeto-alvo, nunca desta base.** Os `proplan:` daqui são a Convention deste
+    // repositório, e exportá-los imporia o processo do JARVIS a um projeto que não o adotou. Sem
+    // Convention que os defina, nenhum rótulo é aplicado e o estado vive só no app — que é o que a
+    // emenda diz, e o que evita criar rótulo que ninguém vai usar.
+    for (const rotulo of alvo.rotulos ?? []) {
+      const label = await this.chamar(GITHUB_OPERATIONS.ensureLabel, workspaceId, {
+        owner: alvo.owner,
+        repo: alvo.repo,
+        nome: rotulo.nome,
+        cor: rotulo.cor,
+        ...(rotulo.descricao === undefined ? {} : { descricao: rotulo.descricao })
+      })
+      if (!label.ok) return this.bloqueado(label, `o rótulo ${rotulo.nome}`, criados)
+      contar(label)
+    }
+
+    // 5. As issues do MVP e das fatias, e as dependências entre elas.
     const numeroDoMvp = new Map<string, number>()
 
     for (const mvp of naFila) {
@@ -167,22 +226,36 @@ export class PublicacaoService {
       // não liberou, e criar a issue anteciparia a autorização.
       if (pai === undefined) continue
 
+      // **Só fatia com `SLICE_ENTRY` aprovado vira issue** (emenda 3 de 2026-08-30). As demais
+      // ficam como checklist no corpo do épico — é a regra `card = fatia` do CONVENTION, em que
+      // a issue nasce *lazy*, quando a spec é aprovada, nunca antes. Publicar todas de uma vez
+      // criaria board de trabalho autorizado que ninguém autorizou.
+      if (!aprovadas.has(slice.specSlug)) continue
+
       const mvp = naFila.find((m) => m.id === slice.mvpId)
       const issue = await this.chamar(GITHUB_OPERATIONS.ensureIssue, workspaceId, {
         owner: alvo.owner,
         repo: alvo.repo,
         externalKey: chaveDeFatia(projectId, mvp?.numero ?? 0, slice.numero),
         title: this.tituloDaFatia(mvp, slice),
-        body: this.corpoDaFatia(slice)
+        body: this.corpoDaFatia(slice, pai)
       })
       if (!issue.ok) return this.bloqueado(issue, `a issue da fatia ${slice.numero}`, criados)
       contar(issue)
+
+      const numero = this.numeroDaIssue(issue)
+      this.refs.upsert(escopo, {
+        alvo: 'issue',
+        chaveExterna: chaveDeFatia(projectId, mvp?.numero ?? 0, slice.numero),
+        refId: String(numero),
+        ...(this.urlDa(issue) === undefined ? {} : { url: this.urlDa(issue) as string })
+      })
 
       const vinculo = await this.chamar(GITHUB_OPERATIONS.ensureIssueDependency, workspaceId, {
         owner: alvo.owner,
         repo: alvo.repo,
         parentIssue: pai,
-        childIssue: this.numeroDaIssue(issue)
+        childIssue: numero
       })
       if (!vinculo.ok) return this.bloqueado(vinculo, `o vínculo da fatia ${slice.numero}`, criados)
     }
@@ -200,6 +273,17 @@ export class PublicacaoService {
     if (!confirmacao.ok) return this.bloqueado(confirmacao, 'a confirmação do commit', criados)
 
     const commitPublicado = this.shaConfirmado(confirmacao)
+
+    // A ref da branch nasce **aqui**, com o SHA que a origem confirmou (emenda 6). Gravá-la antes,
+    // com o SHA local, diria "publiquei isto" antes de saber se chegou — o engano que o critério 2
+    // existe para impedir. A limitação da proteção viaja junto: é do mesmo recurso.
+    this.refs.upsert(escopo, {
+      alvo: 'branch',
+      chaveExterna: chaveDeProjeto(projectId),
+      refId: BRANCH_BASE,
+      sha: commitPublicado,
+      ...(limitacaoDaBranch === undefined ? {} : { limitacao: limitacaoDaBranch })
+    })
 
     this.deps.audit.append({
       user_id: userId,
@@ -339,6 +423,23 @@ export class PublicacaoService {
     return data?.numero ?? 0
   }
 
+  /** A URL do recurso, quando o conector a devolveu no `externalRef`. */
+  private urlDa(outcome: ConnectorOutcome): string | undefined {
+    return (outcome as unknown as { externalRef?: { url?: string } }).externalRef?.url
+  }
+
+  /**
+   * A limitação legível de um passo que a origem recusou (emenda 2).
+   *
+   * Guarda o código **e** a mensagem: o código é o que a M9-F05 compara, a mensagem é o que uma
+   * pessoa lê para saber que a conta precisa de plano. Só um dos dois deixaria metade da pergunta
+   * sem resposta.
+   */
+  private limitacaoDe(outcome: ConnectorOutcome): string {
+    const erro = outcome as unknown as { code?: string; mensagem?: string }
+    return `${erro.code ?? 'recusado'}: ${erro.mensagem ?? 'a origem recusou a configuração.'}`
+  }
+
   private shaConfirmado(outcome: ConnectorOutcome): string {
     const data = (outcome as unknown as { data?: { sha?: string } }).data
     return data?.sha ?? ''
@@ -368,7 +469,17 @@ export class PublicacaoService {
    * O caminho do arquivo, não só o nome: é o que permite abrir a spec a partir da issue sem
    * adivinhar onde ela mora.
    */
-  private corpoDaFatia(slice: Slice): string {
-    return [`**SPEC:** \`${slice.specSlug}\``, '', 'Aceite: PI.'].join('\n')
+  private corpoDaFatia(slice: Slice, epico: number): string {
+    // `Bloqueada por: #N` é a forma que este repositório já usa (emenda 5), e existe porque o
+    // GitHub **não tem dependência nativa** entre issues: o `ensureIssueDependency` liga a fatia ao
+    // épico como sub-issue, mas não expressa "esta espera aquela". A linha no corpo é legível por
+    // quem abre a issue; o fato de referência vive no `ExternalRef`, não neste texto.
+    return [
+      `**SPEC:** \`${slice.specSlug}\``,
+      '',
+      `Bloqueada por: #${epico}`,
+      '',
+      'Aceite: PI.'
+    ].join('\n')
   }
 }

@@ -21,6 +21,7 @@ import {
   type CheckNormalizado,
   type CommitShaInput,
   type EnsureBranchProtectionInput,
+  type EnsureLabelInput,
   type EnsureBranchRefInput,
   type EnsureIssueDependencyInput,
   type EnsureIssueInput,
@@ -637,4 +638,48 @@ export async function getCommitSha(
     },
     criado: false
   }
+}
+
+/**
+ * `label.ensure` — o rótulo existe no repositório ao final (SPEC-Entrega-01, emenda 4).
+ *
+ * Procura antes de criar, como os outros `ensure`, e o que conta como "o mesmo recurso" é o **nome**
+ * — que é como o GitHub endereça rótulo, sem id estável a guardar. `GET /labels/{nome}` responde
+ * 404 quando não existe, e aqui o 404 **é** ausência legítima: ao contrário de repositório ou issue,
+ * não há ambiguidade entre "não existe" e "existe e você não vê", porque quem lê o repositório lê
+ * seus rótulos.
+ *
+ * **Não atualiza cor nem descrição do rótulo que já existe.** Um `PATCH` aqui sobrescreveria a
+ * escolha de quem configurou o repositório à mão, a cada publicação — e o que a emenda pede é que o
+ * rótulo *exista*, não que ele seja nosso. Reconfigurar rótulo alheio é curadoria, e a fatia não a
+ * tem por escopo.
+ */
+export async function ensureLabel(
+  rest: GithubRest,
+  input: EnsureLabelInput
+): Promise<ResultadoDeOperacao<{ readonly nome: string }>> {
+  const caminho = `/repos/${input.owner}/${input.repo}/labels/${encodeURIComponent(input.nome)}`
+  const existente = await rest.request('GET', caminho)
+
+  const resultado = (criado: boolean): ResultadoDeOperacao<{ nome: string }> => ({
+    data: { nome: input.nome },
+    externalRef: {
+      id: `${input.owner}/${input.repo}/labels/${input.nome}`,
+      url: `https://github.com/${input.owner}/${input.repo}/labels/${encodeURIComponent(input.nome)}`
+    },
+    criado
+  })
+
+  if (existente.ok) return resultado(false)
+  if (existente.status !== 404) throw new FalhaRest(existente)
+
+  exigirOk(
+    await rest.request('POST', `/repos/${input.owner}/${input.repo}/labels`, {
+      name: input.nome,
+      color: input.cor,
+      ...(input.descricao === undefined ? {} : { description: input.descricao })
+    })
+  )
+
+  return resultado(true)
 }

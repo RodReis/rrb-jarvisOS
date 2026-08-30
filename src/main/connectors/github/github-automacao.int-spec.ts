@@ -53,6 +53,8 @@ interface EstadoFake {
   workflowRuns: Record<string, unknown>[]
   /** A proteção gravada por branch — o `PUT` a substitui inteira, como na API real. */
   protecoes: Map<string, Record<string, unknown>>
+  /** Os rótulos do repositório, por nome — que é como o GitHub os endereça. */
+  rotulos: Map<string, Record<string, unknown>>
   /** O commit para onde cada ref aponta na origem, para `commit.sha-for-ref`. */
   commits: Map<string, string>
 }
@@ -85,7 +87,8 @@ function estadoInicial(): EstadoFake {
     checkRuns: [],
     workflowRuns: [],
     protecoes: new Map(),
-    commits: new Map()
+    commits: new Map(),
+    rotulos: new Map()
   }
 }
 
@@ -299,6 +302,25 @@ function responder(
     // Substitui inteiro, como o `PUT` real: repetir com a mesma entrada deixa o mesmo estado.
     estado.protecoes.set(branch, corpoObj)
     return { status: 200, corpo: corpoObj }
+  }
+
+  // GET /repos/{o}/{r}/labels/{nome}  e  POST /repos/{o}/{r}/labels
+  const labelGet = /\/labels\/([^/]+)$/.exec(semQuery)
+  if (metodo === 'GET' && labelGet) {
+    const nome = decodeURIComponent(labelGet[1] ?? '')
+    const rotulo = estado.rotulos.get(nome)
+    return rotulo
+      ? { status: 200, corpo: rotulo }
+      : { status: 404, corpo: { message: 'Not Found' } }
+  }
+  if (metodo === 'POST' && /\/labels$/.test(semQuery)) {
+    const nome = String(corpoObj.name)
+    if (estado.rotulos.has(nome)) {
+      return { status: 422, corpo: { message: 'already_exists' } }
+    }
+    const rotulo = { name: nome, color: String(corpoObj.color), description: corpoObj.description }
+    estado.rotulos.set(nome, rotulo)
+    return { status: 201, corpo: rotulo }
   }
 
   // GET /repos/{o}/{r}/commits/{ref}
@@ -987,6 +1009,59 @@ describe('commit.sha-for-ref — critério 2 da M9-F01', () => {
     })) as ConnectorError
 
     expect(r.ok).toBe(false)
+  })
+})
+
+describe('label.ensure — emenda 4 da M9-F01', () => {
+  const entrada = { owner: OWNER, repo: REPO, nome: 'fatia', cor: 'a2eeef' }
+
+  beforeEach(async () => {
+    await executar(GITHUB_OPERATIONS.ensureRepository, {
+      owner: OWNER,
+      repo: REPO,
+      visibility: 'private'
+    })
+  })
+
+  it('cria o rótulo quando não existe', async () => {
+    const r = (await executar(GITHUB_OPERATIONS.ensureLabel, entrada)) as ConnectorResult
+
+    expect(r.ok).toBe(true)
+    expect(r.data).toMatchObject({ nome: 'fatia' })
+    expect(estado.rotulos.has('fatia')).toBe(true)
+  })
+
+  it('repetir NÃO duplica: o segundo ensure não faz POST nenhum', async () => {
+    await executar(GITHUB_OPERATIONS.ensureLabel, entrada)
+    requisicoes = []
+
+    const r = (await executar(GITHUB_OPERATIONS.ensureLabel, entrada)) as ConnectorResult
+
+    expect(r.ok).toBe(true)
+    expect(contar('POST', /\/labels$/)).toBe(0)
+  })
+
+  it('NÃO sobrescreve cor nem descrição de um rótulo que já existe', async () => {
+    estado.rotulos.set('fatia', { name: 'fatia', color: 'ff0000', description: 'do usuário' })
+
+    await executar(GITHUB_OPERATIONS.ensureLabel, { ...entrada, descricao: 'nossa' })
+
+    // O que a emenda pede é que o rótulo **exista**, não que ele seja nosso. Um PATCH aqui
+    // sobrescreveria a escolha de quem configurou o repositório, a cada publicação.
+    expect(estado.rotulos.get('fatia')).toMatchObject({
+      color: 'ff0000',
+      description: 'do usuário'
+    })
+  })
+
+  it('recusa cor com `#` antes de a API cobrar', async () => {
+    const r = (await executar(GITHUB_OPERATIONS.ensureLabel, {
+      ...entrada,
+      cor: '#a2eeef'
+    })) as ConnectorError
+
+    expect(r.ok).toBe(false)
+    expect(r.code).toBe('validacao-invalida')
   })
 })
 

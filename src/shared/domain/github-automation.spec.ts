@@ -60,7 +60,8 @@ describe('capacidades declaradas', () => {
       'pr.ensure',
       'pr.squash-merge',
       'repo.set-default-branch',
-      'branch.ensure-protection'
+      'branch.ensure-protection',
+      'label.ensure'
     ])
     // `commit.sha-for-ref` fica de fora de propósito: ler o commit da origem não muda nada, e
     // marcá-lo como mutação obrigaria a publicação a inventar chave de idempotência para conferir

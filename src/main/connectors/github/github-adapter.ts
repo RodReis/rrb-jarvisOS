@@ -32,6 +32,7 @@ import {
   validarEntrada,
   type CommitShaInput,
   type EnsureBranchProtectionInput,
+  type EnsureLabelInput,
   type EnsureBranchRefInput,
   type EnsureIssueDependencyInput,
   type EnsureIssueInput,
@@ -47,6 +48,7 @@ import {
   ensureBranchProtection,
   ensureBranchRef,
   ensureIssue,
+  ensureLabel,
   ensureIssueDependency,
   ensurePullRequest,
   ensureRepository,
@@ -215,6 +217,9 @@ export class GithubAdapter implements ConnectorAdapter {
 
       case GITHUB_OPERATIONS.getCommitSha:
         return await getCommitSha(rest, input as CommitShaInput)
+
+      case GITHUB_OPERATIONS.ensureLabel:
+        return await ensureLabel(rest, input as EnsureLabelInput)
 
       default:
         // Inalcançável pelo caminho normal (o registro filtra antes), mas o `default` mantém a

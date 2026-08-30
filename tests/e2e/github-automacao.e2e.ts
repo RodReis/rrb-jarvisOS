@@ -280,7 +280,7 @@ function invocar(
   )
 }
 
-test('as doze capacidades chegam ao renderer pela listagem do núcleo', async () => {
+test('as treze capacidades chegam ao renderer pela listagem do núcleo', async () => {
   const janela = await app.firstWindow()
   await janela.waitForLoadState('domcontentloaded')
 
@@ -313,7 +313,8 @@ test('as doze capacidades chegam ao renderer pela listagem do núcleo', async ()
     'pr.merge-state',
     'repo.set-default-branch',
     'branch.ensure-protection',
-    'commit.sha-for-ref'
+    'commit.sha-for-ref',
+    'label.ensure'
   ])
 })
 

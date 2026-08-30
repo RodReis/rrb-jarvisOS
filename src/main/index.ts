@@ -36,6 +36,7 @@ import { PacoteService } from './projects/pacote-service'
 import { AnexoRepository } from './projects/anexo-repository'
 import { AnexoService } from './projects/anexo-service'
 import { RoadmapRepository } from './projects/roadmap-repository'
+import { ExternalRefRepository } from './projects/external-ref-repository'
 import { PublicacaoService } from './projects/publicacao-service'
 import { RoadmapService } from './projects/roadmap-service'
 import { GitRunner } from './projects/git-runner'
@@ -402,6 +403,7 @@ if (!app.requestSingleInstanceLock()) {
     const publicacao = new PublicacaoService({
       projects: projectRepository,
       roadmap: roadmapRepository,
+      refs: new ExternalRefRepository(storage.db),
       git: gitRunner,
       connectors,
       audit: storage.audit,
