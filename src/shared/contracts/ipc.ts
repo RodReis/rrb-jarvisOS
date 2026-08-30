@@ -54,6 +54,9 @@ import type {
 } from '../domain/projects'
 import type { Resposta, RespostaOutcome, VistaDoWizard } from '../domain/wizard'
 import type { PacoteEstrutural, PacoteOutcome } from '../domain/pacote-estrutural'
+import type { Anexo, AnexoOutcome, TipoDeAnexo } from '../domain/anexos-de-design'
+import type { ValidacaoDoPrototipo } from '../domain/validacao-de-prototipo'
+import type { ArquiteturaOutcome, PacoteArquitetura } from '../domain/arquitetura'
 import type {
   ContextPack,
   ContextPackOutcome,
@@ -310,6 +313,26 @@ export const IPC_CHANNELS = {
    */
   pacoteGerar: 'pacote:gerar',
   pacoteListar: 'pacote:listar',
+  /**
+   * Anexos de design e arquitetura (SPEC-Planejamento-05).
+   *
+   * **`anexoEscolher` abre o seletor nativo e não anexa nada.** A separação é deliberada:
+   * escolher é tocar o filesystem (mesma razão do `allowlist:pick` e do `project:pick`), e
+   * anexar é o ato que conta para o gate — hasheado, auditado, com instante. Um canal só faria
+   * "o PI abriu o seletor e desistiu" ser indistinguível de "o PI anexou".
+   *
+   * **Nenhum canal recebe conteúdo de arquivo.** O renderer manda o *caminho* que o seletor
+   * devolveu; quem lê, copia e hasheia é o main. Um canal que aceitasse bytes seria um
+   * gravador de disco arbitrário no renderer — a mesma fronteira que os canais do pacote
+   * respeitam ao não aceitar texto de documento.
+   */
+  anexoEscolher: 'anexo:escolher',
+  anexoAnexar: 'anexo:anexar',
+  anexoListar: 'anexo:listar',
+  anexoRemover: 'anexo:remover',
+  anexoValidar: 'anexo:validar',
+  arquiteturaGerar: 'arquitetura:gerar',
+  arquiteturaListar: 'arquitetura:listar',
   /**
    * Contexto, skills e orçamento (SPEC-Planejamento-02).
    *
@@ -775,6 +798,46 @@ export interface JarvisBridge {
   gerarPacote(projectId: string, consulta: string, workspace: WorkspaceId): Promise<PacoteOutcome>
   /** Os pacotes já gerados do projeto, do mais recente ao mais antigo. */
   listarPacotes(projectId: string): Promise<readonly PacoteEstrutural[]>
+  /**
+   * Abre o seletor nativo e devolve o caminho escolhido — string vazia se o PI cancelou.
+   *
+   * **Escolher não é anexar.** Este canal só devolve um caminho; o ato que conta para o gate é
+   * `anexarDesign`, que copia, hasheia e audita. Fundir os dois faria "abriu e desistiu" ficar
+   * indistinguível de "anexou".
+   */
+  escolherAnexo(tipo: TipoDeAnexo): Promise<string>
+  /**
+   * O ato de anexar: copia o arquivo para dentro do projeto e hasheia no instante.
+   *
+   * Devolve `AnexoOutcome` **inclusive nas recusas**, como `createProject`: "este arquivo não é
+   * um `.html`" não é falha técnica, é desfecho que a tela mostra com o que fazer.
+   */
+  anexarDesign(
+    projectId: string,
+    tipo: TipoDeAnexo,
+    origem: string,
+    workspace: WorkspaceId
+  ): Promise<AnexoOutcome>
+  /** Os anexos do projeto, do mais antigo ao mais recente. */
+  listarAnexos(projectId: string): Promise<readonly Anexo[]>
+  /** Desregistra o anexo. **Não apaga o arquivo do disco** — destrutivo não é efeito colateral. */
+  removerAnexo(projectId: string, caminho: string, workspace: WorkspaceId): Promise<boolean>
+  /**
+   * Valida os protótipos anexados e devolve os achados (pergunta + recomendação).
+   *
+   * A tela chama isto **antes** de o PI pedir a arquitetura: descobrir que um asset está
+   * quebrado só na hora de gerar faria o PI ir e voltar sem necessidade.
+   */
+  validarPrototipos(projectId: string): Promise<readonly ValidacaoDoPrototipo[]>
+  /**
+   * Gera o pacote de arquitetura — o que o gate de anexos libera.
+   *
+   * Devolve `ArquiteturaOutcome` inclusive nas recusas: "faltam anexos" e "os protótipos têm
+   * problema" são desfechos que o PI lê com o que fazer a respeito, não erros técnicos.
+   */
+  gerarArquitetura(projectId: string, workspace: WorkspaceId): Promise<ArquiteturaOutcome>
+  /** Os pacotes de arquitetura já gerados, do mais recente ao mais antigo. */
+  listarArquiteturas(projectId: string): Promise<readonly PacoteArquitetura[]>
   /**
    * Monta o `ContextPack` — o gate do critério 1 (SPEC-Planejamento-02).
    *

@@ -71,6 +71,11 @@ import {
 } from '@shared/domain/projects'
 import { isAutorDaDecisao, type RespostaOutcome, type VistaDoWizard } from '@shared/domain/wizard'
 import type { PacoteEstrutural, PacoteOutcome } from '@shared/domain/pacote-estrutural'
+import type { Anexo, AnexoOutcome } from '@shared/domain/anexos-de-design'
+import { EXTENSOES_DO_ANEXO, isTipoDeAnexo } from '@shared/domain/anexos-de-design'
+import type { ValidacaoDoPrototipo } from '@shared/domain/validacao-de-prototipo'
+import type { ArquiteturaOutcome, PacoteArquitetura } from '@shared/domain/arquitetura'
+import type { AnexoService } from '../projects/anexo-service'
 import { isConnectorId } from '@shared/domain/connectors'
 import type { ConnectorCreditView } from '@shared/contracts/ipc'
 import {
@@ -273,6 +278,7 @@ export interface IpcDependencies {
    * revisão imutável têm regra própria — nada disso é ciclo de vida de projeto.
    */
   readonly pacotes: PacoteService
+  readonly anexos: AnexoService
   /** Vault de credenciais (SPEC-Providers-01): status para a UI, valor só dentro do main. */
   readonly credentials: CredentialService
   /** Runs persistidos, para a UI listar o histórico. */
@@ -1387,6 +1393,82 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     IPC_CHANNELS.pacoteListar,
     (_event, projectId: unknown): readonly PacoteEstrutural[] =>
       typeof projectId === 'string' ? deps.pacotes.listar(projectId) : []
+  )
+
+  // Anexos de design (SPEC-Planejamento-05). O gate mora no serviço; o handler valida a forma na
+  // fronteira e não decide nada — repetir a política aqui criaria uma segunda fonte.
+
+  // Seletor nativo de arquivo. Mesma razão do `allowlist:pick` e do `project:pick`: escolher
+  // caminho é tocar o filesystem, e a fronteira do ARCHITECTURE não abre exceção para leitura.
+  // **Não anexa**: devolve o caminho, e o ato que conta para o gate é o canal seguinte.
+  ipcMain.handle(IPC_CHANNELS.anexoEscolher, async (_event, tipo: unknown): Promise<string> => {
+    if (!isTipoDeAnexo(tipo)) return ''
+    const escolha = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [
+        {
+          name: tipo,
+          // Sem o ponto: o Electron espera a extensão nua no filtro.
+          extensions: EXTENSOES_DO_ANEXO[tipo].map((e) => e.replace(/^\./, ''))
+        }
+      ]
+    })
+    const [caminho] = escolha.filePaths
+    return !escolha.canceled && caminho ? caminho : ''
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.anexoAnexar,
+    (
+      _event,
+      projectId: unknown,
+      tipo: unknown,
+      origem: unknown,
+      workspace: unknown
+    ): AnexoOutcome => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
+        return { reason: 'projeto-inexistente', mensagem: 'Projeto não encontrado.' }
+      }
+      if (!isTipoDeAnexo(tipo) || typeof origem !== 'string' || origem === '') {
+        return { reason: 'tipo-incompativel', mensagem: 'Escolha um arquivo válido.' }
+      }
+      return deps.anexos.anexar(projectId, tipo, origem, workspace)
+    }
+  )
+
+  ipcMain.handle(IPC_CHANNELS.anexoListar, (_event, projectId: unknown): readonly Anexo[] =>
+    typeof projectId === 'string' ? deps.anexos.listar(projectId) : []
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.anexoRemover,
+    (_event, projectId: unknown, caminho: unknown, workspace: unknown): boolean => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return false
+      if (typeof caminho !== 'string') return false
+      return deps.anexos.remover(projectId, caminho, workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.anexoValidar,
+    async (_event, projectId: unknown): Promise<readonly ValidacaoDoPrototipo[]> =>
+      typeof projectId === 'string' ? await deps.anexos.validar(projectId) : []
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.arquiteturaGerar,
+    async (_event, projectId: unknown, workspace: unknown): Promise<ArquiteturaOutcome> => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
+        return { reason: 'projeto-inexistente', mensagem: 'Projeto não encontrado.' }
+      }
+      return await deps.anexos.gerarArquitetura(projectId, workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.arquiteturaListar,
+    (_event, projectId: unknown): readonly PacoteArquitetura[] =>
+      typeof projectId === 'string' ? deps.anexos.listarArquiteturas(projectId) : []
   )
 
   // Contexto, skills e orçamento (SPEC-Planejamento-02). O gate do critério 1 mora no serviço;

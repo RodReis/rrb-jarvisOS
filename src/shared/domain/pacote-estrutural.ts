@@ -122,7 +122,16 @@ export interface BloqueioExterno {
  * junto é o que permite hashear exatamente o que foi escrito no disco.
  */
 export interface DocumentoGerado {
-  readonly documento: DocumentoDoPacote
+  /**
+   * Qual documento é este.
+   *
+   * `string` e não `DocumentoDoPacote`: a M8-F05 compõe `ARCHITECTURE`/`DECISIONS`/`TESTING`/
+   * `REVIEW` com esta mesma estrutura — "documento composto, renderizado e hasheado" é a forma
+   * genérica, e os dois pacotes a compartilham. Quem restringe o conjunto é cada pacote no seu
+   * próprio enum (`DOCUMENTOS_DO_PACOTE`, `DOCUMENTOS_DA_ARQUITETURA`), no ponto em que ele
+   * decide o que gerar — não este campo, que só transporta o nome.
+   */
+  readonly documento: string
   readonly caminho: string
   readonly conteudo: string
   readonly hash: string

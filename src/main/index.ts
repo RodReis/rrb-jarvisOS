@@ -33,6 +33,8 @@ import { DecisionRepository } from './projects/decision-repository'
 import { WizardService } from './projects/wizard-service'
 import { PacoteRepository } from './projects/pacote-repository'
 import { PacoteService } from './projects/pacote-service'
+import { AnexoRepository } from './projects/anexo-repository'
+import { AnexoService } from './projects/anexo-service'
 import { GitRunner } from './projects/git-runner'
 import { ContextRepository } from './context/context-repository'
 import { ContextService } from './context/context-service'
@@ -353,6 +355,20 @@ if (!app.requestSingleInstanceLock()) {
       userId: userIdAtual
     })
 
+    // Os anexos de design e a arquitetura (SPEC-Planejamento-05). Recebe o `PacoteRepository`
+    // para ler a revisão do PRD que a arquitetura assume (critério 3) — e não o `PacoteService`:
+    // ele só precisa **ler** o pacote gerado, e depender do serviço lhe daria o poder de
+    // disparar a geração do PRD, que não é dele.
+    const anexos = new AnexoService({
+      repository: new AnexoRepository(storage.db),
+      projects: projectRepository,
+      projectService: projects,
+      decisions: new DecisionRepository(storage.db),
+      pacotes: new PacoteRepository(storage.db),
+      audit: storage.audit,
+      userId: userIdAtual
+    })
+
     registerIpcHandlers({
       audit: storage.audit,
       workspaces,
@@ -368,6 +384,7 @@ if (!app.requestSingleInstanceLock()) {
       contexts,
       wizard,
       pacotes,
+      anexos,
       credentials,
       ai,
       budget,

@@ -1237,6 +1237,53 @@ Durante a implementação o PI pediu que o `LANDSCAPE.md` pesquisasse concorrent
 - **Um evento isolado de worker do Vitest** apareceu numa execução da suíte combinada (*"Worker exited unexpectedly"*) e **não se reproduziu** em cinco execuções seguintes; os totais fecham (94 arquivos, 1655) e `--no-file-parallelism` roda limpo. Registrado como infraestrutura, não como teste — e não carimbado como número sob suspeita.
 - **A verificação visual do painel é do PI**, pelo mesmo limite de harness das fatias irmãs.
 
+### Fatia 05 — Anexos de design e arquitetura (`docs/spec/spec-planejamento-05-anexos-design-arquitetura.md`)
+
+Status: **entregue** — spec `aprovada-pi` (2026-08-29); issue [#98](https://github.com/RodReis/rrb-jarvisOS/issues/98). Depende da M8-F04.
+
+- [x] **`src/shared/domain/anexos-de-design.ts`** — `Anexo` (que **não existe sem `hash` e `anexadoEm`**), os tipos anexáveis e as regras puras do gate
+- [x] **`src/shared/domain/validacao-de-prototipo.ts`** — `AchadoDoPrototipo` com **pergunta + recomendação obrigatórias**, os quatro estados exigidos e a separação entre o que impede e o que pergunta
+- [x] **`src/shared/domain/arquitetura.ts`** — a composição dos quatro documentos; `PacoteArquitetura` carrega `pacoteEstruturalId` (critério 3) e os anexos com hash (critério 6)
+- [x] **Migration 20** (`design_attachment`, `pacote_arquitetura`) — `design_attachment` tem `UNIQUE(user_id, project_id, caminho)`; `pacote_arquitetura` é append-only com `hash` UNIQUE
+- [x] **`AnexoRepository`** — o único `update` do módulo é o `ON CONFLICT` do anexo; `pacote_arquitetura` não tem
+- [x] **`prototipo-runner.ts`** — `BrowserWindow` oculto, sem preload, rede negada, partição efêmera e timeout duro; e o parser estático de referências
+- [x] **`AnexoService`** — anexar (copia + hasheia + audita + marco) e gerar arquitetura (gate → PRD → validação → composição → escrita → marco)
+- [x] **`design-anexo`** — tipo próprio de `AuditEvent`; payload com tipo, caminho, hash e bytes, **nunca** o conteúdo
+- [x] **Sete canais** — `anexo:escolher` (só devolve caminho) separado de `anexo:anexar` (o ato); nenhum recebe bytes
+- [x] **`AnexosDeDesign.tsx`** — dentro do painel de contexto, **depois** do pacote; o que falta aparece nomeado, não como contador
+- [x] **Testes**: 28 de integração, 31 de domínio, 14 de tela e 3 E2E
+
+#### Decisões que valem registro
+
+1. **O gate conta o ato, não a presença do arquivo** (decisão do PI, 2026-08-29). O anexo entra por **seletor que copia para o projeto e hasheia no instante**, gerando `AuditEvent`. Não existe varredura de diretório, de propósito: um arquivo largado na pasta não tem instante definido, e é justamente o instante que este gate precisa ter preciso. `Anexo` não tem forma de existir sem `hash` e `anexadoEm` — é o critério 7 na forma de tipo.
+2. **Não existe origem "gerado" nos anexos**, pelo mesmo motivo que `AfirmacaoDoPacote` não tem origem "modelo". Uma variante dizendo *"o modelo produziu este DESIGN-SYSTEM"* faria o gate se satisfazer sozinho, e o ato do PI — a coisa inteira que o gate mede — viraria opcional. A IA analisa (a validação estrutural dos protótipos), mas não substitui o anexo.
+3. **`asset` é anexável mas não exigido.** Um protótipo que não referencia imagem nenhuma está completo sem nenhum asset; exigir um barraria por algo que a spec não pede. O que a spec exige sobre assets é que os **referenciados** existam — isso é validação de protótipo, não contagem de anexos.
+4. **O critério 3 é uma coluna, não uma convenção.** `pacote_arquitetura.pacote_estrutural_id` amarra a revisão do PRD que a arquitetura assume. Sem o ponteiro, *"a mesma revisão"* seria *"o PRD mais recente"*, que muda sob os pés dela: regerar o PRD faria a arquitetura passar a descrever um documento que ninguém comparou com ela.
+5. **Os anexos entram no hash da arquitetura** (critério 6). Dois pacotes gerados sobre protótipos diferentes podem produzir o mesmo texto — e colidiriam no `hash` UNIQUE, com o segundo devolvido como se fosse o primeiro, apagando a diferença que os anexos fazem.
+6. **`design_attachment` tem `update`; as tabelas de pacote não.** Um pacote é uma *revisão* (regerar insere outra, e o hash reconhece a igualdade); um anexo é um *lugar* — `docs/prototipos/home.html` é um só, e reanexar substitui o arquivo que está ali. Append-only aqui daria ao gate duas linhas para o mesmo caminho, e *"qual hash está no disco?"* teria duas respostas sendo que só uma é verdade.
+7. **A validação usa o Chromium que o app já tem** (decisão do PI, 2026-08-30). A spec pedia "Playwright nos protótipos"; trazê-lo ao runtime empacotaria um segundo navegador no Electron para observar o que o primeiro já observa. A janela é **mais restrita que a do renderer, não igual**: sem preload (a ponte não existe para HTML de terceiro), rede negada por `webRequest`, partição efêmera e timeout duro. `javascript` fica **ligado** de propósito — protótipo dinâmico sem script seria reportado como tela em branco, e o achado falso é pior que o risco, que a sandbox já contém.
+8. **O parser lê o texto do arquivo; o render lê o DOM.** As referências saem do HTML bruto, não da página carregada: o DOM já perdeu o que falhou ao carregar — uma `<img src>` quebrada vira elemento sem informação do alvo. O parser responde *"o que este arquivo pede?"*, o render responde *"o que aconteceu quando pediu"*.
+9. **Todo achado é pergunta + recomendação, as duas obrigatórias.** A spec diz literalmente *"problemas viram perguntas com recomendação"*; um achado sem recomendação devolve ao PI o trabalho de descobrir o que fazer. A severidade separa o critério 4 (asset quebrado impede prometer a tela) do critério 2 (tela ausente é mostrada, não decidida por nós).
+10. **Nenhuma chamada de IA nesta fatia.** A análise entregue é a validação estrutural — verificável. Uma chamada de modelo produziria texto sem origem no `ARCHITECTURE.md`, que é o que a M8-F04 fechou ao decidir compor em vez de gerar.
+11. **`renderizarDocumento` e `DocumentoGerado` passaram a aceitar `string`** no nome do documento. O formato do arquivo (título, preâmbulo, seções, marca de origem por item) é um só para os dois pacotes, e duplicá-lo faria divergirem na primeira mudança. Verificado por contrafactual que a M8-F04 **não** perdeu garantia: o `montarDocumento` de lá segue recusando nome fora do enum (`'INVENTADO'` reprova o typecheck).
+
+#### O que os testes pegaram
+
+1. **O contrafactual achou uma lacuna de cobertura, não um acerto.** Fazer o gate contar arquivo do disco em vez do ato **passou** com 27 verdes: o teste do "arquivo largado" media `pendencias()`, que é o que a tela chama, e não `gerarArquitetura()`, que é quem barra. Uma garantia só vale onde a decisão acontece — escrito o teste no caminho certo, o contrafactual reprova. Remover o gate inteiro deixa **3 vermelhos**.
+2. **O E2E achou um achado falso que se repetiria em todo projeto.** `telasDoPrd` comparava a seção Escopo do PRD com os headings do protótipo, mas o Escopo carrega **decisões** (`"**Escopo do projeto:** Uma fatia vertical..."`), não nomes de tela. O int-spec fabricava o PRD com `'Tela de login'` e a comparação parecia funcionar; contra o PRD que a M8-F04 realmente gera, um protótipo saudável colheu três perguntas sem sentido — exatamente o ruído que faz o PI parar de ler a lista. A comparação saiu.
+3. **O E2E achou o marco sem commit.** `design-anexado` e `arquitetura-aprovada` eram emitidos em sequência no mesmo ponto: o primeiro commit levava tudo, o segundo não tinha o que commitar, e `arquitetura-aprovada` — justo o marco que a revisão cita — voltava sem hash. `design-anexado` passou para o ato de anexar. Nos testes o `ProjectService` é dublê e sempre diz "commitado"; **só o Git real mostrou**.
+4. **O E2E achou a evidência suja.** O Chromium entrega o mesmo evento de console pelo caminho legado e pelo novo (mensagem duplicada), e o próprio Electron emite *"Electron Security Warning (Insecure CSP)"* em página sem CSP — descrevendo o protótipo do PI como problemático por uma decisão nossa de como o carregamos. Os dois são filtrados, e o E2E afirma tanto o que a evidência contém quanto o que ela **não** contém.
+5. **O teste de domínio pegou um defeito no dado dos sinais de estado.** `'vazio'` não casava com "Lista vazia" — pt-BR flexiona, e o achado falso num protótipo que *mostra* o estado ensinaria o PI a ignorar a lista inteira. Os sinais viraram radicais (`vazi`, `carregand`, `bloquead`).
+6. **O lint de React barrou o `setState` síncrono em efeito**, e **o mock de `projetos.test.tsx` cobrou os dois métodos novos** — as duas lições repetindo exatamente o que aconteceu na M8-F03 e na M8-F04. As guardas de superfície da ponte (unitária e E2E) acusaram os sete métodos novos.
+
+#### Limites registrados, não silenciados
+
+- **A comparação "tela do PRD sem protótipo" não existe hoje**, e a lista vazia é a resposta correta enquanto o PRD não tiver telas nomeadas. O critério 4 continua garantido **na origem**: `afirmacoesDosFluxos` só aceita `jornadasCobertas`, e não há caminho que produza linha de fluxo a partir de outra coisa. O que se perde é o aviso inverso — *"o PRD pede algo que você não desenhou"* —, e a assinatura de `telasDoPrd` ficou para que quem acrescentar telas ao PRD acrescente a fonte, não a comparação inteira.
+- **O `ARCHITECTURE.md` gerado descreve fluxos e decisões, não desenho técnico.** Módulos, dados e resiliência saem das decisões do wizard; um diagrama de componentes exigiria conhecimento que nenhuma decisão registrada contém — e inventá-lo seria conteúdo sem origem.
+- **O aviso `'console-message' arguments are deprecated`** aparece no stderr do Electron durante os E2E. O objeto recebido **é** o novo (`frame|level|message|lineNumber|sourceId`, com `level` string) — verificado por sonda; o aviso vem de o Electron inferir o modo legado pela aridade do listener. Ruído, não defeito.
+- **A contagem da suíte oscila em paralelo** (1715–1727) **sem jamais marcar teste como falho** — o mesmo evento de worker do Vitest registrado na M8-F03. O número carimbado é o da execução em série (`--no-file-parallelism`): **98/98 arquivos, 1727, zero erro, determinístico**. Os arquivos desta fatia passam 86/86 em cinco execuções consecutivas.
+- **A verificação visual do painel é do PI**, pelo mesmo limite de harness das fatias irmãs.
+
 ### `[FIX]` Erro de git sem saída na tela de Projetos ([#170](https://github.com/RodReis/rrb-jarvisOS/issues/170))
 
 Status: **entregue** — correção de comportamento documentado (sem spec nova); PR [#171](https://github.com/RodReis/rrb-jarvisOS/pull/171), mergeado em 2026-08-30. Reportado pelo PI ao usar a tela da M8-F01.

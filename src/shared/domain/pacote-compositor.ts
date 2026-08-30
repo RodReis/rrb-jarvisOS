@@ -188,7 +188,12 @@ function porSecao(
  * isso é o mínimo para o leitor não confundir ausência com esquecimento.
  */
 export function renderizarDocumento(
-  documento: DocumentoDoPacote,
+  // `string` e não `DocumentoDoPacote`: o parâmetro só vira o título do arquivo, e o pacote de
+  // arquitetura da M8-F05 renderiza os documentos dele com esta mesma função — o formato (título,
+  // preâmbulo, seções, marca de origem por item) é um só, e duplicá-lo faria os dois pacotes
+  // divergirem na primeira mudança de formato. Restringir ao enum da M8-F04 obrigaria o chamador
+  // a mentir no tipo para reusar o que já está certo.
+  documento: string,
   projeto: IdentidadeDoProjeto,
   afirmacoes: readonly AfirmacaoDoPacote[],
   secoesEsperadas: readonly string[],

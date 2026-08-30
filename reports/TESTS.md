@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 749 | 749 | 0 | 69.4 | — | — |
-| — | — | — | Banco | 513 | 513 | 0 | 88.1 | — | — |
-| — | — | — | Tela | 393 | 392 | 0 | 86.7 | — | — |
+| — | — | — | Regras de Negócio | 780 | 780 | 0 | 69.2 | — | — |
+| — | — | — | Banco | 541 | 541 | 0 | 87.2 | — | — |
+| — | — | — | Tela | 407 | 406 | 0 | 86.2 | — | — |
 
 ## Histórico por entrega
 
@@ -175,3 +175,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | — | #97 | spec-planejamento-04-prd-landscape-convention | Regras de Negócio | 749 | 749 | 0 | 69.4 | #176 | [#176](https://github.com/RodReis/rrb-jarvisOS/pull/176) |
 | — | #97 | spec-planejamento-04-prd-landscape-convention | Banco | 513 | 513 | 0 | 88.1 | #176 | [#176](https://github.com/RodReis/rrb-jarvisOS/pull/176) |
 | — | #97 | spec-planejamento-04-prd-landscape-convention | Tela | 393 | 392 | 0 | 86.7 | #176 | [#176](https://github.com/RodReis/rrb-jarvisOS/pull/176) |
+| 2026-08-30 | #98 | spec-planejamento-05-anexos-design-arquitetura | Regras de Negócio | 780 | 780 | 0 | 69.2 | #177 | [#177](https://github.com/RodReis/rrb-jarvisOS/pull/177) |
+| 2026-08-30 | #98 | spec-planejamento-05-anexos-design-arquitetura | Banco | 541 | 541 | 0 | 87.2 | #177 | [#177](https://github.com/RodReis/rrb-jarvisOS/pull/177) |
+| 2026-08-30 | #98 | spec-planejamento-05-anexos-design-arquitetura | Tela | 407 | 406 | 0 | 86.2 | #177 | [#177](https://github.com/RodReis/rrb-jarvisOS/pull/177) |

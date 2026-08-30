@@ -124,6 +124,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
   expect(superficie.metodos).toEqual([
     'addAllowedCommand',
     'addAllowedDirectory',
+    'anexarDesign',
     'answerWizard',
     'awaitGithubAuth',
     'buildContextPack',
@@ -136,6 +137,8 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'createAutomation',
     'createProject',
     'createWorkflow',
+    'escolherAnexo',
+    'gerarArquitetura',
     'gerarPacote',
     'getAppDirectory',
     'getAppInfo',
@@ -165,6 +168,8 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'listPendingApprovals',
     'listProjects',
     'listWorkflows',
+    'listarAnexos',
+    'listarArquiteturas',
     'listarPacotes',
     'login',
     'logout',
@@ -181,6 +186,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'removeCredential',
     'removeProject',
     'removeWorkflow',
+    'removerAnexo',
     'renameProject',
     'resolveApproval',
     'resolveFailure',
@@ -202,6 +208,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'startGithubAuth',
     'switchWorkspace',
     'updateWorkflow',
+    'validarPrototipos',
     'verifyAuditChain'
   ])
 

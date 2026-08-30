@@ -55,6 +55,7 @@ describe('ponte do preload', () => {
     expect(Object.keys(bridge).sort()).toEqual([
       'addAllowedCommand',
       'addAllowedDirectory',
+      'anexarDesign',
       'answerWizard',
       'awaitGithubAuth',
       'buildContextPack',
@@ -67,6 +68,8 @@ describe('ponte do preload', () => {
       'createAutomation',
       'createProject',
       'createWorkflow',
+      'escolherAnexo',
+      'gerarArquitetura',
       'gerarPacote',
       'getAppDirectory',
       'getAppInfo',
@@ -96,6 +99,8 @@ describe('ponte do preload', () => {
       'listPendingApprovals',
       'listProjects',
       'listWorkflows',
+      'listarAnexos',
+      'listarArquiteturas',
       'listarPacotes',
       'login',
       'logout',
@@ -112,6 +117,7 @@ describe('ponte do preload', () => {
       'removeCredential',
       'removeProject',
       'removeWorkflow',
+      'removerAnexo',
       'renameProject',
       'resolveApproval',
       'resolveFailure',
@@ -133,6 +139,7 @@ describe('ponte do preload', () => {
       'startGithubAuth',
       'switchWorkspace',
       'updateWorkflow',
+      'validarPrototipos',
       'verifyAuditChain'
     ])
   })

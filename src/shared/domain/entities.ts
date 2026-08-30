@@ -268,7 +268,16 @@ export const AUDIT_EVENT_TYPES = [
   // tentativas. **Nunca o conteúdo dos documentos nem o texto extraído** (ADR-004): a auditoria
   // responde "o que foi gerado, e a partir de quantas fontes?", e responder isso não exige
   // repetir o que foi escrito.
-  'pacote-estrutural'
+  'pacote-estrutural',
+  // SPEC-Planejamento-05: o ato de anexar design, e a arquitetura que o gate libera. Tipo
+  // próprio, e não `pacote-estrutural`, porque a pergunta que ele responde é sobre **o ato do
+  // PI**: "o que foi anexado, quando e com que hash?". É esse instante que faz um arquivo contar
+  // para o gate (critério 7) — um arquivo largado no diretório por fora não gera evento e não
+  // satisfaz o gate. Misturado com a composição do PRD, "quando o design entrou" exigiria
+  // parsear payload para descartar as gerações.
+  //
+  // O payload carrega tipo, caminho, hash e bytes — **nunca o conteúdo do anexo** (ADR-004).
+  'design-anexo'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]

@@ -8,6 +8,7 @@ import { log } from '../lib/log'
 import { ContextoDoProjeto } from './ContextoDoProjeto'
 import { WizardDoProjeto } from './WizardDoProjeto'
 import { PacoteDoProjeto } from './PacoteDoProjeto'
+import { AnexosDeDesign } from './AnexosDeDesign'
 
 /**
  * Projetos locais (SPEC-Planejamento-01).
@@ -478,6 +479,19 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
                       */}
                       <div className="mt-4 border-t border-[rgba(var(--jos-borda-rgb),0.10)] pt-4">
                         <PacoteDoProjeto
+                          workspace={workspace}
+                          projectId={projeto.id}
+                          nomeDoProjeto={projeto.nome}
+                        />
+                      </div>
+                      {/*
+                        Os anexos vêm **depois** do pacote, e a ordem é o fluxo: o PRD sai
+                        primeiro, o design é anexado sobre ele, e a arquitetura cita a revisão
+                        do PRD que assume (critério 3). Pôr os anexos acima sugeriria que se
+                        anexa antes de haver o que anexar contra.
+                      */}
+                      <div className="mt-4 border-t border-[rgba(var(--jos-borda-rgb),0.10)] pt-4">
+                        <AnexosDeDesign
                           workspace={workspace}
                           projectId={projeto.id}
                           nomeDoProjeto={projeto.nome}
