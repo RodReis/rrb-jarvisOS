@@ -128,6 +128,12 @@ O PI confirmou cinco decisões: pacote completo por mecanismo, separação entre
 
 A issue #165 permanece `proplan:planejado`, vinculada ao épico #162 e ao predecessor #164. O total de SPECs aprovadas permanece 77; F04–F06 ainda aguardam redação. Não houve implementação, alteração da fila ou chamada de executor.
 
+### M16-F03 aprovada pelo PI (2026-08-29)
+
+O PI aprovou a revisão exata da SPEC no commit `2ea2f1f`, preservando seus quinze critérios e limites. O status passa a `aprovada-pi` e a issue #165 passa a `proplan:backlog`, com predecessor #164 e parent #162 preservados. O épico passa a registrar F01–F03 aprovadas; F04–F06 permanecem Planejadas. O acervo local passa a 78 SPECs aprovadas e a Pipeline V3 a quatorze fatias em Backlog.
+
+O aceite não inicia implementação, não muda `next`, não fecha a issue nem declara entrega técnica. Esta tarefa continua no planejamento; próxima SPEC: M16-F04 (#166), experimentos e promoção.
+
 ## Pendências históricas preservadas
 
 - A UI de allowlist ainda exigia decisão de produto: localização, seletor nativo e remoção de `appDir`.

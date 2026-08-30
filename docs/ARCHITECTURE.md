@@ -155,7 +155,7 @@ Evidências ── ingestão/atributos ── memória de falhas ── candidat
 
 Política por projeto vence padrão global local. Cada run congela seu snapshot; promoção nunca altera execução em andamento. Claude/Codex podem propor hipóteses, mas guardrails e promoção são determinísticos. Falha do aprendizado mantém a última política estável ou a base e nunca bloqueia construção, merge ou release. O MVP-016 não substitui a memória/RAG do MVP-007 nem duplica os atuadores dos MVPs 008/009.
 
-A M16-F03 detalha pacotes completos por mecanismo, validação da composição e fallback conjunto do grupo afetado. O registro recebe decisões com prova da F04, não promove por simples cadastro. O snapshot autossuficiente é gravado pelo dono do run na transação de criação; índices do aprendizado são derivados. Retomada do mesmo run lê essa cópia, enquanto pausa, quotas e demais controles operacionais seguem vigentes. Fonte da revisão: `docs/spec/spec-aprendizado-03-registro-resolucao-politicas.md`.
+A M16-F03 detalha pacotes completos por mecanismo, validação da composição e fallback conjunto do grupo afetado. O registro recebe decisões com prova da F04, não promove por simples cadastro. O snapshot autossuficiente é gravado pelo dono do run na transação de criação; índices do aprendizado são derivados. Retomada do mesmo run lê essa cópia, enquanto pausa, quotas e demais controles operacionais seguem vigentes. SPEC aprovada pelo PI: `docs/spec/spec-aprendizado-03-registro-resolucao-politicas.md`.
 
 Fonte completa: `docs/superpowers/specs/2026-08-29-mvp-016-aprendizado-operacional-design.md` e `docs/mvp/mvp-016-aprendizado-operacional.md`.
 
