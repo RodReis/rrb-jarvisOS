@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 780 | 780 | 0 | 69.2 | — | — |
-| — | — | — | Banco | 541 | 541 | 0 | 87.2 | — | — |
-| — | — | — | Tela | 407 | 406 | 0 | 86.2 | — | — |
+| — | — | — | Regras de Negócio | 839 | 839 | 0 | 70.5 | — | — |
+| — | — | — | Banco | 563 | 563 | 0 | 87.6 | — | — |
+| — | — | — | Tela | 421 | 420 | 0 | 85.5 | — | — |
 
 ## Histórico por entrega
 
@@ -178,3 +178,9 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-08-30 | #98 | spec-planejamento-05-anexos-design-arquitetura | Regras de Negócio | 780 | 780 | 0 | 69.2 | #177 | [#177](https://github.com/RodReis/rrb-jarvisOS/pull/177) |
 | 2026-08-30 | #98 | spec-planejamento-05-anexos-design-arquitetura | Banco | 541 | 541 | 0 | 87.2 | #177 | [#177](https://github.com/RodReis/rrb-jarvisOS/pull/177) |
 | 2026-08-30 | #98 | spec-planejamento-05-anexos-design-arquitetura | Tela | 407 | 406 | 0 | 86.2 | #177 | [#177](https://github.com/RodReis/rrb-jarvisOS/pull/177) |
+| 2026-08-30 | #99 | spec-planejamento-06-roadmap-aprovacoes | Regras de Negócio | 839 | 839 | 0 | 70.5 | #178 | [#178](https://github.com/RodReis/rrb-jarvisOS/pull/178) |
+| 2026-08-30 | #99 | spec-planejamento-06-roadmap-aprovacoes | Banco | 563 | 546 | 0 | 87.9 | #178 | [#178](https://github.com/RodReis/rrb-jarvisOS/pull/178) |
+| 2026-08-30 | #99 | spec-planejamento-06-roadmap-aprovacoes | Tela | 421 | 420 | 0 | 85.5 | #178 | [#178](https://github.com/RodReis/rrb-jarvisOS/pull/178) |
+| 2026-08-30 | #99 | spec-planejamento-06-roadmap-aprovacoes | Regras de Negócio | 839 | 839 | 0 | 70.5 | #178 | [#178](https://github.com/RodReis/rrb-jarvisOS/pull/178) |
+| 2026-08-30 | #99 | spec-planejamento-06-roadmap-aprovacoes | Banco | 563 | 563 | 0 | 87.6 | #178 | [#178](https://github.com/RodReis/rrb-jarvisOS/pull/178) |
+| 2026-08-30 | #99 | spec-planejamento-06-roadmap-aprovacoes | Tela | 421 | 420 | 0 | 85.5 | #178 | [#178](https://github.com/RodReis/rrb-jarvisOS/pull/178) |
