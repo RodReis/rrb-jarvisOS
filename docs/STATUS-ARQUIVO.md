@@ -150,6 +150,14 @@ O PI aprovou a revisão exata da SPEC no commit `1cefc2c`, preservando requisito
 
 O aceite não inicia implementação, não muda `next`, não fecha a issue nem declara testes de código/entrega técnica. Esta tarefa continua no planejamento; próxima SPEC: M16-F05 (#167), estratégias e recomendações assistidas. Fila operacional anterior e demais trabalhos do repositório permanecem intactos; não houve push.
 
+### MVP-007: direção compartilhada aprovada (2026-08-30)
+
+Durante o detalhamento da F05, o PI propôs usar Graphify também como parte da memória e do aprendizado de JarvisOS/AgentsOS e apresentou quatro capturas dos menus futuros. Aprovou um núcleo compartilhado no MVP-007, mantendo histórico nos módulos de origem, conhecimento derivado/reconstruível e validação de aprendizado distinta. Graphify permanece opcional e substituível; visão global conserva origem por produto/projeto/agente e não transfere regras automaticamente.
+
+A decisão foi registrada em `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`. É direção aprovada com detalhamento em elaboração, não design completo ou SPEC para construção. Não existem ainda fatias do MVP-007; catálogo inicial de captura é a próxima decisão. As capturas são referências de visão, não evidência de implementação nem seleção automática de todas as integrações nelas mencionadas.
+
+A F05 permanece focada em estratégias/recomendações assistidas, com fronteira reutilizável. A #167 continua Planejada, com parent #162 e predecessor #166 verificados nesta conferência; a memória compartilhada não vira dependência obrigatória do MVP-016. As SPECs F01–F04 não mudam, a contagem permanece 80 e o índice Fatia ↔ SPEC não recebe números novos. Nenhuma implementação, instalação, chamada de executor, mudança de fila ou push foi realizada.
+
 ## Pendências históricas preservadas
 
 - A UI de allowlist ainda exigia decisão de produto: localização, seletor nativo e remoção de `appDir`.

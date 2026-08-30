@@ -13,6 +13,8 @@ O MVP-016 aprende com runs concluídos para reduzir recorrência de falhas, retr
 
 O aprendizado não substitui o MVP-007, responsável pela futura memória contextual/RAG do produto. Também não reimplementa `ContextSelector`, `RecoveryController`, roteamento, revisão ou orçamento dos MVPs 008/009. Esses mecanismos permanecem donos da execução; o MVP-016 apenas propõe e resolve configurações versionadas para eles.
 
+Em 2026-08-30, o PI aprovou detalhar o MVP-007 como memória compartilhada JarvisOS/AgentsOS, com histórico nos módulos de origem, grafo derivado/reconstruível e Graphify opcional/substituível. A F05 conserva estratégias da pipeline e um contrato reutilizável, sem incorporar o núcleo global ou depender dele. A decisão não altera as SPECs aprovadas de F01–F04 nem aprova a SPEC ainda não redigida da F05. Fonte: `2026-08-30-mvp-007-memoria-compartilhada-design.md`.
+
 ## 2. Decisões aprovadas
 
 1. O escopo é aprendizado operacional entre runs, separado da memória de produto do MVP-007.

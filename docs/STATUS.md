@@ -45,7 +45,7 @@ Planejamento atualizado em: **2026-08-30**; fila operacional preservada do regis
 | MVP-004 Execução real | [#10](https://github.com/RodReis/rrb-jarvisOS/issues/10) | F01 aceita; F02 aguardando aceite; **F03 nova** (`aprovada-pi` 2026-08-29) | 1/3 |
 | MVP-005 Providers/Vault/Budget | [#76](https://github.com/RodReis/rrb-jarvisOS/issues/76) | F01 e F02 entregues, aguardando aceite; duas SPECs no Backlog | 2/4 |
 | MVP-006 Conectores Essenciais | [#86](https://github.com/RodReis/rrb-jarvisOS/issues/86) | seis SPECs `aprovada-pi` (2026-08-29); fatias no Backlog | 0/6 |
-| MVP-007 Memória Contextual/RAG | — | slot proposto; **sem fatias e sem SPEC** — nada a aprovar até entrar em planejamento ativo | — |
+| MVP-007 Memória Contextual/RAG | — | direção compartilhada JarvisOS/AgentsOS aprovada (2026-08-30); design em elaboração; **sem fatias e sem SPEC** | — |
 | MVP-008 Planejamento Governado | [#93](https://github.com/RodReis/rrb-jarvisOS/issues/93) | seis SPECs `aprovada-pi` (2026-08-29); fatias no Backlog | 0/6 |
 | MVP-009 Entrega Autônoma | [#100](https://github.com/RodReis/rrb-jarvisOS/issues/100) | seis SPECs `aprovada-pi` (2026-08-29); fatias no Backlog | 0/6 |
 | MVP-010 Multi-executor Claude + Codex | [#115](https://github.com/RodReis/rrb-jarvisOS/issues/115) | fatias [#116–#120](https://github.com/RodReis/rrb-jarvisOS/issues/116) no Backlog | 0/5 |
@@ -67,6 +67,8 @@ Planejamento atualizado em: **2026-08-30**; fila operacional preservada do regis
 > **Pipeline V3 publicada e em especificação (2026-08-30).** MVP-014 (#149), MVP-015 (#155) e MVP-016 (#162) possuem 17 sub-issues com dependências nativas. Quinze fatias aprovadas estão em Backlog; M16-F05–F06 permanecem Planejadas. Nenhuma nova issue recebeu `next`. Detalhe e reconciliação: `docs/STATUS-ARQUIVO.md`.
 
 > **MVP-016 em especificação (2026-08-30).** M16-F01–F04 (#163–#166) estão `aprovada-pi`, em Backlog; F05–F06 (#167–#168) aguardam redação. A F06 mantém gate visual. Fonte: `docs/superpowers/specs/2026-08-29-mvp-016-aprendizado-operacional-design.md`.
+
+> **MVP-007 em detalhamento (2026-08-30).** PI aprovou memória compartilhada JarvisOS/AgentsOS, com Graphify opcional/substituível. Histórico, conhecimento e validação mantêm donos distintos; F05 continua focada e a pipeline não depende da entrega da memória. Fonte: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`.
 
 > **MVP-009 aprovado (2026-08-29).** Três decisões do PI: **o container Docker é o sandbox do executor** — o Claude Code roda nele com o worktree montado, nunca no host; **merge autônomo ligado por padrão com kill-switch por projeto**, e desligado o run termina no PR verde aguardando o PI; **Context7 é ferramenta do agente construtor** na M9-F04, fechando a pendência herdada do MVP-008. A decisão do container fecha um buraco real: o MVP-004 proibiu comando arbitrário, mas um agente que constrói software precisa exatamente disso — sem fronteira nova, o MVP-009 passaria por cima do enforcement que o MVP-004 entregou. **Docker passa a ser dependência dura**, sem fallback para o host.
 
@@ -148,11 +150,11 @@ Não existe catálogo global `SPEC-nnn`. O identificador canônico é o slug aba
 2. Fila corrente: **#110** (UI da allowlist) é o `next`. Depois dele, a ordem entre #79 (BudgetPolicy) e #80 (Multi-provider) é decisão do PI — as duas têm spec aprovada.
 3. A **F03 encaixa no ponto único** que a F02 deixou pronto: a estimativa pré-chamada já é calculada e o `CostEvent` já carrega `estimadoUsd`/`realUsd`. O gate entra entre a estimativa e o disparo do adapter — nenhuma refatoração do ponto de chamada é necessária.
 4. **Conferência documental (2026-08-30):** existem 80 SPECs com status `aprovada-pi` no acervo local, incluindo a M16-F04. Contagem por cabeçalho normalizado; quinze fatias dos MVPs 014–016 estão em Backlog.
-5. MVP-007 e MVP-017–MVP-018 ainda serão detalhados. O MVP-016 possui design, seis fatias e M16-F01–F04 aprovados; F05–F06 aguardam redação nas #167–#168, que permanecem Planejadas.
+5. MVP-007 entrou em detalhamento: próxima decisão é catálogo de atividades/fontes e captura automática; não há fatias ou SPECs aprovadas. MVP-017–MVP-018 ainda serão detalhados. O MVP-016 possui design, seis fatias e M16-F01–F04 aprovados; F05–F06 aguardam redação nas #167–#168, que permanecem Planejadas.
 6. **M4-F03 (UI da allowlist de diretórios) especificada e aprovada (2026-08-29)** — fechou a última fatia conhecida sem SPEC antes da V3. As cinco SPECs do MVP-014 também foram aprovadas e publicadas nas issues #150–#154.
 7. **Docker virou dependência dura do MVP-009** (sandbox do executor). Confirmar que a máquina de execução tem Docker antes daquele MVP entrar na fila.
 8. **Pipeline V2 publicada:** épicos #115/#121/#127/#133 e 20 fatias #116–#138, com os intervalos de épicos excluídos, estão no Backlog com sub-issues e dependências nativas. A publicação não altera o `next` atual.
-9. **Pipeline V3 publicada:** épicos #149/#155/#162 e 17 fatias, com parents e dependências reconciliados. Próxima especificação: M16-F05 (#167), após aceite exato da F04 (`1cefc2c`) em 2026-08-30. M15-F05 (#160) e M16-F06 (#168) mantêm `DESIGN-SYSTEM.md` e protótipos HTML antes da construção.
+9. **Pipeline V3 publicada:** épicos #149/#155/#162 e 17 fatias, com parents e dependências reconciliados. Próxima SPEC da V3: M16-F05 (#167); fronteira com MVP-007 definida, sem ampliar sua fatia. O detalhamento da memória compartilhada segue em paralelo no planejamento. M15-F05 (#160) e M16-F06 (#168) mantêm `DESIGN-SYSTEM.md` e protótipos HTML antes da construção.
 
 ## Roadmap
 

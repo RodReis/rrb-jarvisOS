@@ -179,3 +179,9 @@ Invariantes:
 14. Experimento fecha candidata/base, métrica, elegibilidade, coorte, critérios, prazos e consumo antes da coleta. Controle do canário é contemporâneo; retries/continuações não inflam amostra; falhas, pendências e exclusões permanecem auditáveis.
 15. `improved` exige prova suficiente, qualidade preservada e ganho/estabilidade contratados; apenas habilita a decisão de promoção. Dado desconhecido não é zero; estágio sem prova final não herda sucesso do run de baseline.
 16. `active` não significa `stable`. Estabilização exige tempo e amostra novos; prazo inconclusivo retira a política de novos runs, regressão reverte o grupo afetado, sem apagar histórico nem desfazer Git/deploy. Perfis e critérios estão na SPEC M16-F04, aprovada pelo PI na revisão `1cefc2c`.
+
+### 4.5 Direção da memória compartilhada (PI, 2026-08-30; contratos em elaboração)
+
+O MVP-007 serve JarvisOS e AgentsOS por um núcleo compartilhado: histórico referenciado nos módulos de origem, conhecimento derivado/reconstruível e lições distinguidas de inferências. Graphify é opcional e substituível; não é a única memória nem prova de aprendizado. Visão global preserva identidade por produto/projeto/agente e não transfere regras automaticamente.
+
+O MVP-016 continua dono do aprendizado operacional da pipeline; a F05 mantém estratégias/recomendações assistidas e fronteira reutilizável. Nenhum deles passa a depender obrigatoriamente do MVP-007. Catálogo de captura e critérios de aprendizado dos outros módulos ainda serão decididos, sem criar permissões ou gates adicionais. Fonte: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`.

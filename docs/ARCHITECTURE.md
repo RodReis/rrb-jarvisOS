@@ -85,13 +85,21 @@ Estrutura de diretórios: `src/main/` (electron, ipc, runtime) · `src/renderer/
 
 ## Pipeline de desenvolvimento governado (desenho aprovado; não implementado)
 
-A capacidade de desenvolvimento autônomo foi separada em três MVPs executáveis e um slot não bloqueante:
+A capacidade de desenvolvimento autônomo foi separada em três MVPs executáveis e um MVP de memória não bloqueante:
 
-`MVP-006 Conectores Essenciais → MVP-008 Planejamento Governado → MVP-009 Entrega Autônoma`; o `MVP-007 Memória Contextual/RAG` permanece proposto e não bloqueia a sequência.
+`MVP-006 Conectores Essenciais → MVP-008 Planejamento Governado → MVP-009 Entrega Autônoma`; o `MVP-007 Memória Contextual/RAG` entrou em detalhamento com direção aprovada em 2026-08-30 e não bloqueia a sequência.
 
 - **MVP-006:** runtime comum de conectores, GitHub App por Device Flow e ResearchAdapter Tavily Search+Extract.
 - **MVP-008:** projeto/SQLite/Git local, ContextPack, wizard, PRD/Landscape/Convention, anexos do PI, arquitetura, roadmap e aprovações por hash.
 - **MVP-009:** publicação GitHub, DAG/fila WIP=1, reconciliação, worktree, Claude Code, revisão, CI, squash merge e evidência.
+
+### MVP-007 — Memória compartilhada (direção aprovada; design em elaboração)
+
+JarvisOS e AgentsOS compartilham um núcleo de conhecimento, inclusive sobre o desenvolvimento dos próprios produtos. Histórico mantém os módulos de origem como donos dos fatos; o conhecimento usa relações derivadas/reconstruíveis, com Graphify opcional e substituível; aprendizado exige evidência, com validação operacional da pipeline mantida no MVP-016.
+
+Agent Memory, Notebook, centros de comando e demais superfícies previstas consultam esse núcleo; não criam memórias independentes. Visão global conserva identidade de produto/projeto/agente e não aplica regras entre projetos automaticamente. A M16-F05 mantém seu recorte e contrato reutilizável, sem depender da entrega do MVP-007. Catálogo de captura, persistência e contratos técnicos ainda serão especificados; não há implementação autorizada.
+
+Fonte: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`.
 
 ### Pipeline V2 aprovada (não implementada)
 
