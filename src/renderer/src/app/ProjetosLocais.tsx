@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FolderPlus, FolderSearch, ShieldCheck } from 'lucide-react'
+import { FileSearch, FolderPlus, FolderSearch, ShieldCheck } from 'lucide-react'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { Project, ProjectOutcome, ProjectReason } from '@shared/domain/projects'
 import { Button, EmptyState, Field, InlineAlert, Input, LoadingState } from '@design/ui'
 import { log } from '../lib/log'
+import { ContextoDoProjeto } from './ContextoDoProjeto'
 
 /**
  * Projetos locais (SPEC-Planejamento-01).
@@ -76,6 +77,15 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
    * precisa ter quando o risco for real.
    */
   const [confirmandoId, setConfirmandoId] = useState<string | null>(null)
+  /**
+   * Qual projeto teve o contexto aberto (SPEC-Planejamento-02).
+   *
+   * Expansão **inline**, não rota nova nem modal: o contexto é *do projeto*, e separá-lo numa
+   * tela própria obrigaria o usuário a levar na cabeça qual projeto estava olhando. Um por vez
+   * porque o painel é alto — dois abertos empurrariam a lista para fora da dobra e o usuário
+   * perderia a coluna que veio varrer.
+   */
+  const [contextoDeId, setContextoDeId] = useState<string | null>(null)
 
   /*
    * A flag `ativo` tem o mesmo desenho das outras telas: sem ela, desmontar durante a promise
@@ -391,6 +401,26 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
                             </Button>
                             <Button
                               variante="secundaria"
+                              onClick={() =>
+                                setContextoDeId((atual) =>
+                                  atual === projeto.id ? null : projeto.id
+                                )
+                              }
+                              /* `aria-expanded` porque o botão **alterna** uma região desta
+                                 mesma tela: sem ele, quem ouve a interface não sabe se o
+                                 painel abriu ou se a página mudou. */
+                              aria-expanded={contextoDeId === projeto.id}
+                              aria-label={
+                                contextoDeId === projeto.id
+                                  ? t('projetos.contextoFechar')
+                                  : t('projetos.contextoAbrir', { nome: projeto.nome })
+                              }
+                              iconeInicial={<FileSearch aria-hidden="true" className="size-4" />}
+                            >
+                              {t('projetos.contexto')}
+                            </Button>
+                            <Button
+                              variante="secundaria"
                               onClick={() => setConfirmandoId(projeto.id)}
                               aria-label={t('projetos.removerDe', { nome: projeto.nome })}
                             >
@@ -407,6 +437,22 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
                     Espremida à direita, ela empurrava o texto e os dois botões para fora da
                     largura do item — e a pergunta mais importante da tela era a que menos cabia.
                   */}
+                  {/*
+                    O contexto do projeto (SPEC-Planejamento-02): o manifesto, o orçamento da
+                    etapa e as falhas em aberto. Fica **dentro** do item porque é dele que o
+                    contexto é — e abrir aqui evita a viagem de ida e volta que uma tela
+                    separada custaria a cada troca de projeto.
+                  */}
+                  {contextoDeId === projeto.id && (
+                    <div className="border-t border-[rgba(var(--jos-borda-rgb),0.10)] pt-4">
+                      <ContextoDoProjeto
+                        workspace={workspace}
+                        projectId={projeto.id}
+                        nomeDoProjeto={projeto.nome}
+                      />
+                    </div>
+                  )}
+
                   {confirmando && (
                     <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--jos-raio-chip)] border border-[color-mix(in_srgb,var(--jos-cor-err)_35%,transparent)] bg-[color-mix(in_srgb,var(--jos-cor-err)_8%,transparent)] px-3 py-2.5">
                       {/* Diz o que **de fato** acontece: sai da lista, fica no disco. Um "tem

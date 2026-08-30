@@ -33,9 +33,34 @@ export interface CostEventInput {
   readonly callId: string
   readonly provider: AiProvider
   readonly model: string
-  readonly estimadoUsd: number
+  /**
+   * USD estimado na rota paga; **`null` na rota de assinatura** (SPEC-Planejamento-02,
+   * critério 1a). `null` e não zero: zero afirmaria "custou nada", `null` diz "não se converte
+   * em USD" — que é o fato da rota MAX. Converter seria número inventado, e o gate barraria com
+   * base nele (emenda do PI de 2026-08-29).
+   */
+  readonly estimadoUsd: number | null
   /** Ausente quando a chamada não chegou ao `usage` — grava NULL, não zero. */
   readonly realUsd?: number
+  /**
+   * `true` quando a rota registra uso sem valor monetário.
+   *
+   * Coluna e não dedução do `provider`: é **fato da linha**. Deduzi-lo consultando
+   * `ROTAS_UNMETERED` na leitura faria as linhas antigas mudarem de significado no dia em que
+   * a lista mudasse — e o ledger é justamente o que não pode mudar de significado depois.
+   */
+  readonly unmetered?: boolean
+  /**
+   * Tokens e tempo — **o que a rota de assinatura registra no lugar do dinheiro** (spec §
+   * Orçamento: "chamadas, tokens e tempo"). Sem eles, a linha da rota de assinatura seria uma
+   * linha de números vazios, indistinguível de erro.
+   */
+  readonly tokensEntrada?: number
+  readonly tokensSaida?: number
+  readonly latenciaTotalMs?: number
+  /** O projeto e o manifesto que originaram a chamada, quando ela veio do planejamento. */
+  readonly projectId?: string
+  readonly contextPackId?: string
 }
 
 export class BudgetRepository {
@@ -111,8 +136,9 @@ export class BudgetRepository {
     this.db
       .prepare(
         `INSERT INTO cost_event
-           (id, user_id, workspace_id, call_id, provider, model, estimado_usd, real_usd, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           (id, user_id, workspace_id, call_id, provider, model, estimado_usd, real_usd, created_at,
+            unmetered, tokens_entrada, tokens_saida, latencia_total_ms, project_id, context_pack_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         randomUUID(),
@@ -123,7 +149,13 @@ export class BudgetRepository {
         input.model,
         input.estimadoUsd,
         input.realUsd ?? null,
-        agora.toISOString()
+        agora.toISOString(),
+        input.unmetered === true ? 1 : 0,
+        input.tokensEntrada ?? null,
+        input.tokensSaida ?? null,
+        input.latenciaTotalMs ?? null,
+        input.projectId ?? null,
+        input.contextPackId ?? null
       )
   }
 
@@ -141,6 +173,12 @@ export class BudgetRepository {
    *
    * O fuso é o **UTC**, não o local: a soma tem de casar com o `created_at` gravado, e gravar
    * em UTC e recortar em local faria o dia virar em hora errada.
+   *
+   * **`unmetered = 0` é filtro explícito, não acidente** (SPEC-Planejamento-02, critério 1a).
+   * A linha da rota de assinatura já tem `real_usd` NULL, e o `SUM` a ignoraria de qualquer
+   * forma — mas depender disso faria a isenção viver num efeito colateral: no dia em que
+   * alguém preenchesse `real_usd` para "não deixar coluna vazia", o uso do MAX entraria na
+   * soma e passaria a barrar a rota que o PI decidiu não barrar. O `WHERE` diz a regra.
    */
   totals(userId: string, workspaceId: WorkspaceId, agora: Date): GastoAcumulado {
     const iso = agora.toISOString()
@@ -152,7 +190,8 @@ export class BudgetRepository {
         .prepare(
           `SELECT SUM(real_usd) AS total
              FROM cost_event
-            WHERE user_id = ? AND workspace_id = ? AND created_at LIKE ? || '%'`
+            WHERE user_id = ? AND workspace_id = ? AND created_at LIKE ? || '%'
+              AND unmetered = 0`
         )
         .get(userId, workspaceId, prefixo) as { total: number | null }
 

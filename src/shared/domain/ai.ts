@@ -181,6 +181,30 @@ export interface AiRequest {
   /** Instrução de sistema, opcional. */
   readonly system?: string
   readonly maxTokens?: number
+  /**
+   * O `ContextPack` que autoriza esta geração — **obrigatório** (SPEC-Planejamento-02,
+   * critério 1: "nenhuma geração ocorre sem ContextPack e orçamento").
+   *
+   * Campo do pedido, e não consulta opcional dentro do serviço, pela mesma razão que o
+   * `GitRunner` recebe o `TerminalEngine` e nada mais: a garantia vira **assinatura**. Não
+   * existe forma de pedir uma geração sem declarar o manifesto que a sustenta, então "nenhuma
+   * geração sem contexto" deixa de depender de alguém lembrar.
+   *
+   * Opcional no **tipo** porque o painel de teste do Settings existe para falar com um provider
+   * específico e não tem projeto nem manifesto — mas o ponto único recusa a chamada quando ele
+   * falta e a chamada não é de diagnóstico. Ver `AiCallService.call`, passo (−1).
+   */
+  readonly contextPackId?: string
+  /**
+   * `true` só para o painel de diagnóstico do Settings — a chamada que testa se o provider
+   * responde, sem gerar nada para um projeto.
+   *
+   * Existe como campo **explícito** e não como "ausência de `contextPackId`" porque a diferença
+   * precisa ser declarada por quem chama: sem isto, todo pedido que esquecesse o manifesto
+   * viraria automaticamente um diagnóstico, e o critério 1 seria contornado por omissão em vez
+   * de por decisão.
+   */
+  readonly diagnostico?: boolean
 }
 
 /**
@@ -215,6 +239,12 @@ export interface CostEvent {
   readonly latenciaPrimeiroChunkMs?: number
   /** Do início ao fim do stream. */
   readonly latenciaTotalMs: number
+  /**
+   * `true` quando a rota registra uso **sem valor monetário** (SPEC-Planejamento-02, critério
+   * 1a). A tela lê este campo para não mostrar "US$ 0,00" como se fosse custo medido: numa rota
+   * de assinatura, zero não é o preço da chamada — é a ausência de preço por chamada.
+   */
+  readonly unmetered?: boolean
 }
 
 /**

@@ -231,7 +231,21 @@ export const AUDIT_EVENT_TYPES = [
   // repositório por caminho paralelo). `project-milestone` registra a decisão de marco; o
   // `terminal-command` registra a execução dela. Dois fatos distintos, dois eventos.
   'project-lifecycle',
-  'project-milestone'
+  'project-milestone',
+  // SPEC-Planejamento-02: montagem do `ContextPack` — montado ou recusado (leitura ampla sem
+  // exceção, segredo no contexto, teto estourado). O payload carrega **caminhos e hashes,
+  // nunca conteúdo**: a auditoria responde "o que foi enviado?", e responder isso não exige
+  // repetir o que foi enviado (ADR-004).
+  //
+  // Separado de `ai-call` de propósito: o pack é montado **antes** de existir chamada, e um
+  // pack recusado nunca vira chamada nenhuma. Sob o mesmo tipo, "quantos contextos foram
+  // barrados" exigiria parsear payload para descartar as chamadas.
+  'context-pack',
+  // Falha deduplicada por fingerprint (critério 4). Tipo próprio porque a pergunta que ele
+  // responde é temporal — "esta falha já tinha acontecido?" —, e o `reason`
+  // (`nova`/`reincidente`/`resolvida`) é a resposta. Misturado com `context-pack`, a
+  // reincidência ficaria escondida entre montagens.
+  'context-failure'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]

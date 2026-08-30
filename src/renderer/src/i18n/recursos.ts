@@ -103,7 +103,65 @@ export const RECURSOS = {
         permitirGit: 'Permitir `git` e criar',
         // Diz o que o clique faz: é permissão de alto risco, auditada. O usuário merece saber
         // disso antes, não depois.
-        permitirGitAviso: 'Ação de alto risco: registra o comando na lista permitida deste espaço.'
+        permitirGitAviso: 'Ação de alto risco: registra o comando na lista permitida deste espaço.',
+        // O painel de contexto (SPEC-Planejamento-02), aninhado no projeto porque é dele que
+        // o contexto é: um `contexto.*` de topo sugeriria uma tela própria que não existe.
+        contexto: 'Contexto do projeto',
+        contextoFechar: 'Fechar contexto',
+        contextoAbrir: 'Abrir contexto de {{nome}}'
+      },
+      contexto: {
+        titulo: 'Contexto, skills e orçamento',
+        descricao:
+          'Monte o contexto antes de gerar. O manifesto registra quais revisões foram enviadas, sob qual teto e por qual rota.',
+        tarefa: 'Tarefa ou SPEC',
+        tarefaPlaceholder: 'Ex.: SPEC-Planejamento-02',
+        tarefaAjuda: 'O que esta geração precisa resolver. Vai para o manifesto.',
+        arquivos: 'Arquivos do contexto',
+        arquivosPlaceholder: 'docs/PRD.md',
+        arquivosAjuda:
+          'Caminhos relativos ao projeto, um por linha. Curinga (*) conta como leitura ampla e exige motivo.',
+        excecao: 'Motivo da leitura ampla',
+        excecaoPlaceholder: 'Ex.: regressão sem localização conhecida',
+        excecaoAjuda: 'Fica registrado no manifesto. Leitura ampla sem motivo é recusada.',
+        motivoPadrao: 'selecionado na tela',
+        montar: 'Montar contexto',
+        carregando: 'Carregando contexto…',
+        vazio: 'Nenhum contexto montado',
+        vazioDescricao: 'Selecione os arquivos da tarefa e monte o contexto antes de gerar.',
+        manifesto: 'Último manifesto',
+        hashDoPack: 'pack {{hash}}',
+        hashCompleto: 'Hash completo: {{hash}}',
+        colunaArquivo: 'Arquivo',
+        colunaOrigem: 'Origem',
+        colunaHash: 'Revisão',
+        colunaBytes: 'Bytes',
+        legendaTabela: 'Arquivos enviados no contexto de {{tarefa}}',
+        origem: {
+          explicito: 'Explícito',
+          'busca-estrutural': 'Busca',
+          'leitura-ampla': 'Ampla',
+          'decisao-aprovada': 'Decisão',
+          'evidencia-externa': 'Evidência'
+        },
+        tokensDaEtapa: 'Tokens desta etapa',
+        tokensDe: '{{usados}} de {{teto}}',
+        // A rota de assinatura não tem custo por chamada: dizer "US$ 0,00" aqui afirmaria que
+        // a chamada foi de graça, quando o fato é que esta rota não cobra por chamada.
+        rotaSemCusto:
+          'Rota {{rota}}: registra uso (chamadas, tokens e tempo), sem custo por chamada.',
+        rotaComCusto: 'Rota {{rota}}: {{valor}} estimados para esta etapa.',
+        expansao: 'Teto expandido: {{motivo}}',
+        excecaoRegistrada: 'Exceção de leitura ampla',
+        tetoDaExcecao: 'Teto autorizado: {{bytes}} bytes',
+        falhasAbertas: 'Falhas em aberto',
+        ocorrencias: '{{total}} ocorrência(s)',
+        resolver: 'Marcar resolvida',
+        resolverDe: 'Marcar resolvida: {{resumo}}',
+        capacidades: 'Como o fluxo aplica cada disciplina',
+        meioSkill: 'Skill',
+        meioDireto: 'Direto',
+        erroInesperado: 'Não foi possível montar o contexto. Tente novamente.'
       },
       settings: {
         titulo: 'Configurações',
@@ -283,7 +341,60 @@ export const RECURSOS = {
         confirmar: 'Remove from list',
         removerAviso: 'Removed from the list; folder and Git history stay on disk.',
         permitirGit: 'Allow `git` and create',
-        permitirGitAviso: 'High-risk action: records the command in this space allowed list.'
+        permitirGitAviso: 'High-risk action: records the command in this space allowed list.',
+        contexto: 'Project context',
+        contextoFechar: 'Close context',
+        contextoAbrir: 'Open context for {{nome}}'
+      },
+      contexto: {
+        titulo: 'Context, skills and budget',
+        descricao:
+          'Build the context before generating. The manifest records which revisions were sent, under which cap and through which route.',
+        tarefa: 'Task or SPEC',
+        tarefaPlaceholder: 'e.g. SPEC-Planejamento-02',
+        tarefaAjuda: 'What this generation must solve. Goes into the manifest.',
+        arquivos: 'Context files',
+        arquivosPlaceholder: 'docs/PRD.md',
+        arquivosAjuda:
+          'Paths relative to the project, one per line. A wildcard (*) counts as broad reading and requires a reason.',
+        excecao: 'Reason for broad reading',
+        excecaoPlaceholder: 'e.g. regression with no known location',
+        excecaoAjuda: 'Recorded in the manifest. Broad reading without a reason is refused.',
+        motivoPadrao: 'selected on screen',
+        montar: 'Build context',
+        carregando: 'Loading context…',
+        vazio: 'No context built yet',
+        vazioDescricao: 'Select the task files and build the context before generating.',
+        manifesto: 'Latest manifest',
+        hashDoPack: 'pack {{hash}}',
+        hashCompleto: 'Full hash: {{hash}}',
+        colunaArquivo: 'File',
+        colunaOrigem: 'Source',
+        colunaHash: 'Revision',
+        colunaBytes: 'Bytes',
+        legendaTabela: 'Files sent in the context for {{tarefa}}',
+        origem: {
+          explicito: 'Explicit',
+          'busca-estrutural': 'Search',
+          'leitura-ampla': 'Broad',
+          'decisao-aprovada': 'Decision',
+          'evidencia-externa': 'Evidence'
+        },
+        tokensDaEtapa: 'Tokens for this step',
+        tokensDe: '{{usados}} of {{teto}}',
+        rotaSemCusto: 'Route {{rota}}: records usage (calls, tokens and time), no per-call cost.',
+        rotaComCusto: 'Route {{rota}}: {{valor}} estimated for this step.',
+        expansao: 'Cap expanded: {{motivo}}',
+        excecaoRegistrada: 'Broad-reading exception',
+        tetoDaExcecao: 'Authorized cap: {{bytes}} bytes',
+        falhasAbertas: 'Open failures',
+        ocorrencias: '{{total}} occurrence(s)',
+        resolver: 'Mark resolved',
+        resolverDe: 'Mark resolved: {{resumo}}',
+        capacidades: 'How the flow applies each discipline',
+        meioSkill: 'Skill',
+        meioDireto: 'Direct',
+        erroInesperado: 'Could not build the context. Try again.'
       },
       settings: {
         titulo: 'Settings',

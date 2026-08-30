@@ -30,6 +30,8 @@ import { CommandAllowlistRepository } from './policy/command-allowlist-repositor
 import { ProjectRepository } from './projects/project-repository'
 import { ProjectService } from './projects/project-service'
 import { GitRunner } from './projects/git-runner'
+import { ContextRepository } from './context/context-repository'
+import { ContextService } from './context/context-service'
 import { CredentialService } from './credentials/credential-service'
 import { ConnectorRegistry } from './connectors/registry'
 import { ConnectorService } from './connectors/connector-service'
@@ -179,12 +181,31 @@ if (!app.requestSingleInstanceLock()) {
     // não um cliente de Git: é o que torna estruturalmente impossível existir um segundo
     // caminho de escrita de repositório fora do enforcement do MVP-004 (decisão 2 do PI). Não
     // há nada a injetar que permita contornar isso — só o terminal cabe no construtor.
+    const projectRepository = new ProjectRepository(storage.db)
     const projects = new ProjectService({
-      repository: new ProjectRepository(storage.db),
+      repository: projectRepository,
       allowlist,
       git: new GitRunner(terminal),
       audit: storage.audit,
       userId: userIdAtual
+    })
+
+    // Contexto, skills e orçamento antes da IA (SPEC-Planejamento-02). Construído **antes** do
+    // ponto único porque é dependência dele, pela mesma razão do gate de orçamento: um
+    // `AiCallService` sem verificador de contexto seria a geração sem manifesto que o critério
+    // 1 proíbe.
+    //
+    // `skills` é uma **função que devolve lista vazia** nesta fatia, e isso não é lacuna: é o
+    // critério 5 sendo exercido no caminho real. Nenhuma skill está instalada, e todas as
+    // capacidades continuam atendidas pelo procedimento direto — se o gate dependesse da skill,
+    // o app estaria rodando agora sem ele. Quando houver registro de skills, é aqui que ele
+    // entra, sem tocar no serviço.
+    const contexts = new ContextService({
+      repository: new ContextRepository(storage.db),
+      projects: projectRepository,
+      audit: storage.audit,
+      userId: userIdAtual,
+      skills: () => []
     })
 
     // Vault de credenciais (SPEC-Providers-01): a base do MVP-005. A cifra é a mesma do cofre
@@ -234,7 +255,15 @@ if (!app.requestSingleInstanceLock()) {
       storage.audit
     )
 
-    const ai = new AiCallService(adapters, credentials, policy, storage.audit, budget, routing)
+    const ai = new AiCallService(
+      adapters,
+      credentials,
+      policy,
+      storage.audit,
+      budget,
+      routing,
+      contexts
+    )
 
     // Ponto único de conectores (SPEC-Conectores-01). **Runtime separado** do ponto único de
     // IA por decisão do PI (2026-08-29): compartilham o vault, a auditoria encadeada e o
@@ -305,6 +334,7 @@ if (!app.requestSingleInstanceLock()) {
       terminal,
       commandAllowlist,
       projects,
+      contexts,
       credentials,
       ai,
       budget,
