@@ -292,6 +292,16 @@ A #182 passou de `proplan:planejado` para `proplan:backlog` e o épico #179 rece
 
 Arquitetura, convenções e acompanhamento apontam para o contrato aprovado. Validação documental confirmou 83 SPECs aprovadas, preservação do quadro Agora e das demais associações Fatia ↔ SPEC. Próxima especificação: M7-F04 (#183), retenção e reconstrução da memória. Sem implementação, testes de produto, instalação, captura, PR, push ou deploy; registro somente em Git local.
 
+### MVP-007 — SPEC da M7-F04 redigida para revisão (2026-08-30)
+
+Após o aceite da F03 registrado em `2f39389`, o PI solicitou seguir no planejamento. Redigida `docs/spec/spec-memoria-04-retencao-reconstrucao.md`, status `rascunho`, vinculada à #183, com vinte critérios propostos. Separa compactação reversível de detalhes após 30 dias, reconstrução retomável de projeções e exclusão explícita escopada. Decisões, correções, lições, referências, pendências e originais não recebem TTL universal.
+
+A revisão dos contratos identificou riscos de reingestão do que foi excluído, restos em blocos comprimidos compartilhados, troca de geração sob concorrência e falsa promessa de apagar ContextPacks/auditoria de outros donos. A proposta usa barreira durável, purga verificada por store, recomposição de blocos e publicação por fronteira/epoch; não transforma ausência de fonte em recuperação bem-sucedida. Capacidade, agenda e limites são propostas técnicas ainda não aprovadas. F04 mantém dependência única da F02; FTS/F03 e Graphify entram como integrações opcionais.
+
+Inspeção somente de leitura no checkout principal `0799c8a` confirmou SQLite/WAL/migrações existentes e imutabilidade da auditoria. Context7 e documentação oficial do SQLite consultados; nenhum banco real foi aberto para manutenção. Não propor VACUUM automático ou apagamento seguro universal num banco compartilhado.
+
+Índice atualizado somente na associação da F04 ao rascunho; quadro Agora e demais associações preservados. Corrigida no cabeçalho do MVP uma referência antiga às labels F02/F03, que já estavam em Backlog. F01–F03 permanecem aprovadas/Backlog; F04 Planejada para revisão e F05–F08 a redigir. O acervo continua com 83 SPECs aprovadas. Validação desta etapa é documental, não teste de produto. Sem implementação, exclusão, captura, instalação, alteração de fila, PR, push ou deploy.
+
 ## Pendências históricas preservadas
 
 - A UI de allowlist ainda exigia decisão de produto: localização, seletor nativo e remoção de `appDir`.

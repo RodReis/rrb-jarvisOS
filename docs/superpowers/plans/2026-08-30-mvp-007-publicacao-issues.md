@@ -1,6 +1,6 @@
 # Plano de publicação — MVP-007: Memória compartilhada
 
-- Estado: planejamento e publicação autorizados pelo PI em 2026-08-30; épico #179 e oito fatias #180–#187 publicados. F01–F03 aprovadas/Backlog; F04–F08 Planejadas.
+- Estado: planejamento e publicação autorizados pelo PI em 2026-08-30; épico #179 e oito fatias #180–#187 publicados. F01–F03 aprovadas/Backlog; F04 em rascunho para revisão, ainda Planejada; F05–F08 Planejadas/a redigir.
 - Não é SPEC aprovada, plano de execução de código nem aceite do design completo. As pendências abaixo permanecem abertas.
 - Base: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`, decisões parciais registradas até o commit local `574d359`.
 - Índice canônico Fatia ↔ SPEC e links de issues: `docs/STATUS.md`. Não criar slugs de SPEC inexistente; estado inicial: a redigir.
@@ -106,6 +106,8 @@ Entregar contexto textual rastreável e limitado por tarefa/projeto, com contrat
 - Assinaturas de integração com consumidores existentes; não duplicar o seletor do ContextPack.
 
 ### M7-F04 — Retenção e reconstrução da memória
+
+**SPEC redigida (2026-08-30):** `docs/spec/spec-memoria-04-retencao-reconstrucao.md`, rascunho para revisão do PI, com vinte critérios propostos. #183 permanece Planejada; nenhuma implementação autorizada. Propõe compactação reversível, reconstrução por gerações/journal, exclusão com supressão de reingestão e limites de capacidade/agenda. Os alvos abaixo registram a publicação inicial; seu detalhamento está na SPEC e ainda aguarda aceite.
 
 **Dependências diretas:** M7-F02.
 **Fonte:** seções 7, 8 e 11 do design.
