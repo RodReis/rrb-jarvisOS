@@ -829,6 +829,95 @@ const MIGRATIONS: readonly string[] = [
     created_at           TEXT NOT NULL
   );
   CREATE INDEX idx_arquitetura_projeto ON pacote_arquitetura(user_id, project_id, created_at);
+  `,
+
+  // SPEC-Planejamento-06: o roadmap do projeto gerado e as aprovações por revisão.
+  //
+  // "mvp" e "slice" guardam o roadmap **composto** das decisões e das jornadas — cada linha
+  // carrega "origem_tipo" e o par que a identifica, pela mesma razão da M8-F04: não existe
+  // origem "modelo", e uma linha sem origem seria um MVP que ninguém decidiu.
+  //
+  // "estado" separa "proposto" de "na-fila", que é o critério 3: MVP futuro permanece proposta
+  // até entrar na fila, e a transição é o gate MVP_ENTRY — um ato do PI, nunca consequência de
+  // gerar o roadmap. Com um campo só, "planejado" e "aprovado para execução" seriam a mesma
+  // coisa.
+  //
+  // "depende_de" é JSON de ids: um MVP pode depender de dois, e achatar isso em coluna única
+  // obrigaria a inventar uma ordem entre dependências que o PI não decidiu.
+  `
+  CREATE TABLE mvp (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    project_id   TEXT NOT NULL,
+    numero       INTEGER NOT NULL,
+    titulo       TEXT NOT NULL,
+    tese         TEXT NOT NULL,
+    -- 'proposto' | 'na-fila' | 'concluido'. O default é o critério 3.
+    estado       TEXT NOT NULL DEFAULT 'proposto',
+    -- JSON com os ids dos MVPs de que este depende.
+    depende_de   TEXT NOT NULL DEFAULT '[]',
+    -- A origem da composição: 'decisao' ou 'evidencia'. Nunca 'modelo'.
+    origem_tipo  TEXT NOT NULL,
+    origem_ref   TEXT NOT NULL,
+    origem_chave TEXT NOT NULL,
+    created_at   TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX idx_mvp_numero ON mvp(user_id, project_id, numero);
+  CREATE INDEX idx_mvp_projeto ON mvp(user_id, project_id, numero);
+
+  -- A fatia: a unidade executável. "spec_slug" é o par que a invariante 1 protege — o STATUS.md
+  -- gerado é a fonte única de Fatia ↔ SPEC, e este campo é o que ele escreve. Nenhuma outra
+  -- estrutura o guarda em paralelo, porque duas fontes divergiriam no dia em que uma mudasse.
+  --
+  -- "detalhada" marca a única fatia com SPEC executável (§ Saídas): detalhar o roadmap inteiro
+  -- produziria specs para fatias cujo contexto ainda vai mudar, e o custo não é o texto
+  -- desperdiçado — é o PI aprovando o que não vai valer.
+  CREATE TABLE slice (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    project_id   TEXT NOT NULL,
+    mvp_id       TEXT NOT NULL,
+    numero       INTEGER NOT NULL,
+    titulo       TEXT NOT NULL,
+    spec_slug    TEXT NOT NULL,
+    detalhada    INTEGER NOT NULL DEFAULT 0,
+    origem_tipo  TEXT NOT NULL,
+    origem_ref   TEXT NOT NULL,
+    origem_chave TEXT NOT NULL,
+    created_at   TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX idx_slice_numero ON slice(user_id, project_id, mvp_id, numero);
+  CREATE INDEX idx_slice_mvp ON slice(user_id, project_id, mvp_id, numero);
+
+  -- A aprovação de um gate, com o conjunto **exato** de revisões (critério 4).
+  --
+  -- "revisoes" é JSON de {artefato, hash}: é por ele que o critério 5 decide se a revisão é a
+  -- mesma. Guardar um "aprovado_em" e comparar datas responderia "algo aconteceu depois", que
+  -- não é a pergunta — o conteúdo pode ter voltado a ser o que era.
+  --
+  -- "identidade" é o usuário autenticado que aprovou (decisão cravada da spec): sem sessão
+  -- válida não há aprovação, e o gate falha fechado em vez de aprovar como anônimo.
+  --
+  -- Não há coluna "autor": o tipo do domínio admite só 'pi', e uma coluna que aceitasse
+  -- 'agente' seria o caminho por onde a delegação aprovaria gate — exatamente o que o critério
+  -- 7 e a invariante 3 proíbem. A ausência é a garantia.
+  --
+  -- Append-only, como os pacotes: reaprovar insere outra linha. Um UPDATE faria "o que o PI
+  -- aprovou" depender de ninguém ter mexido depois.
+  CREATE TABLE approval (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    project_id   TEXT NOT NULL,
+    gate         TEXT NOT NULL,
+    -- JSON: [{ artefato, hash }]. O conjunto exato aprovado.
+    revisoes     TEXT NOT NULL,
+    identidade   TEXT NOT NULL,
+    created_at   TEXT NOT NULL
+  );
+  CREATE INDEX idx_approval_gate ON approval(user_id, project_id, gate, created_at);
   `
 ]
 

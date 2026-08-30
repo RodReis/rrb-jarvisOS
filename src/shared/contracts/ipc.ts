@@ -57,6 +57,14 @@ import type { PacoteEstrutural, PacoteOutcome } from '../domain/pacote-estrutura
 import type { Anexo, AnexoOutcome, TipoDeAnexo } from '../domain/anexos-de-design'
 import type { ValidacaoDoPrototipo } from '../domain/validacao-de-prototipo'
 import type { ArquiteturaOutcome, PacoteArquitetura } from '../domain/arquitetura'
+import type { Roadmap, RoadmapOutcome } from '../domain/roadmap'
+import type {
+  Approval,
+  AprovacaoOutcome,
+  Gate,
+  MudancaDeArtefato,
+  RevisaoAprovada
+} from '../domain/aprovacoes'
 import type {
   ContextPack,
   ContextPackOutcome,
@@ -326,6 +334,23 @@ export const IPC_CHANNELS = {
    * gravador de disco arbitrário no renderer — a mesma fronteira que os canais do pacote
    * respeitam ao não aceitar texto de documento.
    */
+  /**
+   * Roadmap e gates de aprovação (SPEC-Planejamento-06).
+   *
+   * **`roadmap:gerar` e `aprovacao:aprovar` são canais distintos, e a separação é a fatia.**
+   * Gerar compõe e propõe; aprovar aceita. Um canal só faria a geração aprovar o que ela mesma
+   * propôs — exatamente o que os critérios 3 e 7 impedem.
+   *
+   * **Nenhum canal recebe conteúdo de documento nem `autor`.** O renderer pede o ato e mostra o
+   * que voltou; a identidade de quem aprova vem da sessão no main, nunca do renderer — que
+   * poderia mandar qualquer uma.
+   */
+  roadmapGerar: 'roadmap:gerar',
+  roadmapCarregar: 'roadmap:carregar',
+  aprovacaoListar: 'aprovacao:listar',
+  aprovacaoRevisoes: 'aprovacao:revisoes',
+  aprovacaoAprovar: 'aprovacao:aprovar',
+  aprovacaoSimular: 'aprovacao:simular',
   anexoEscolher: 'anexo:escolher',
   anexoAnexar: 'anexo:anexar',
   anexoListar: 'anexo:listar',
@@ -805,6 +830,37 @@ export interface JarvisBridge {
    * `anexarDesign`, que copia, hasheia e audita. Fundir os dois faria "abriu e desistiu" ficar
    * indistinguível de "anexou".
    */
+  /**
+   * Gera o roadmap: compõe, valida o DAG e escreve STATUS, histórico e a SPEC da próxima fatia.
+   *
+   * Devolve `RoadmapOutcome` **inclusive nas recusas**: "o DAG tem ciclo" é desfecho que o PI lê
+   * com o problema nomeado, não falha técnica.
+   */
+  gerarRoadmap(projectId: string, workspace: WorkspaceId): Promise<RoadmapOutcome>
+  /** O roadmap gravado do projeto. */
+  carregarRoadmap(projectId: string, workspace: WorkspaceId): Promise<Roadmap>
+  /** As aprovações registradas, da mais recente à mais antiga. */
+  listarAprovacoes(projectId: string, workspace: WorkspaceId): Promise<readonly Approval[]>
+  /** As revisões que este gate aprova hoje — os hashes exatos (critério 4). */
+  revisoesDoGate(
+    projectId: string,
+    gate: Gate,
+    workspace: WorkspaceId
+  ): Promise<readonly RevisaoAprovada[]>
+  /**
+   * Aprova um gate.
+   *
+   * **A identidade não atravessa a ponte:** ela vem da sessão autenticada no main. Um parâmetro
+   * de identidade deixaria o renderer declarar quem aprovou, e o critério 4 pergunta exatamente
+   * isso.
+   */
+  aprovarGate(projectId: string, gate: Gate, workspace: WorkspaceId): Promise<AprovacaoOutcome>
+  /** Quais gates uma mudança invalidaria — **antes** de aplicá-la (critério 6). Consulta pura. */
+  simularMudanca(
+    projectId: string,
+    mudancas: readonly MudancaDeArtefato[],
+    workspace: WorkspaceId
+  ): Promise<readonly Gate[]>
   escolherAnexo(tipo: TipoDeAnexo): Promise<string>
   /**
    * O ato de anexar: copia o arquivo para dentro do projeto e hasheia no instante.

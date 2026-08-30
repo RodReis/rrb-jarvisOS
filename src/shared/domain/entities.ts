@@ -277,7 +277,21 @@ export const AUDIT_EVENT_TYPES = [
   // parsear payload para descartar as gerações.
   //
   // O payload carrega tipo, caminho, hash e bytes — **nunca o conteúdo do anexo** (ADR-004).
-  'design-anexo'
+  'design-anexo',
+  // SPEC-Planejamento-06: a geração do roadmap — gerada ou recusada por DAG inválido. Tipo
+  // próprio pela mesma razão que separou `pacote-estrutural` de `project-milestone`: o marco é o
+  // commit, isto é a **composição do plano**, e "quantas vezes o DAG saiu inválido" exigiria
+  // parsear payload para descartar os commits.
+  //
+  // O payload carrega contagens e o slug da próxima SPEC — **nunca o conteúdo** dos documentos.
+  'roadmap',
+  // SPEC-Planejamento-06: o aceite de um gate pelo PI. Tipo próprio, e **não** `roadmap`, porque
+  // a pergunta que ele responde é a do critério 4: *quem* aceitou *o quê*, e quando. Sob o mesmo
+  // tipo da geração, "o que o PI aprovou" ficaria misturado com o que o app compôs sozinho — e é
+  // exatamente essa distinção que a invariante 3 existe para manter.
+  //
+  // O payload carrega gate, contagem de revisões e a identidade; nunca o conteúdo aprovado.
+  'approval'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]

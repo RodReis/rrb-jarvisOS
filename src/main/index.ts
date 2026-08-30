@@ -35,6 +35,8 @@ import { PacoteRepository } from './projects/pacote-repository'
 import { PacoteService } from './projects/pacote-service'
 import { AnexoRepository } from './projects/anexo-repository'
 import { AnexoService } from './projects/anexo-service'
+import { RoadmapRepository } from './projects/roadmap-repository'
+import { RoadmapService } from './projects/roadmap-service'
 import { GitRunner } from './projects/git-runner'
 import { ContextRepository } from './context/context-repository'
 import { ContextService } from './context/context-service'
@@ -369,6 +371,24 @@ if (!app.requestSingleInstanceLock()) {
       userId: userIdAtual
     })
 
+    // O roadmap e os gates (SPEC-Planejamento-06).
+    //
+    // `identidade` é o usuário **autenticado**, e não o `userIdAtual`: sem sessão o gate falha
+    // fechado (decisão cravada da spec), e `userIdAtual` cai no usuário local — que existe
+    // sempre e faria toda aprovação passar como se houvesse alguém logado. A distinção é o
+    // critério 4: a aprovação registra *quem* aceitou, e "o usuário local" não é ninguém.
+    const roadmap = new RoadmapService({
+      repository: new RoadmapRepository(storage.db),
+      projects: projectRepository,
+      projectService: projects,
+      decisions: new DecisionRepository(storage.db),
+      pacotes: new PacoteRepository(storage.db),
+      anexos,
+      audit: storage.audit,
+      userId: userIdAtual,
+      identidade: () => auth?.usuarioAtual()?.id
+    })
+
     registerIpcHandlers({
       audit: storage.audit,
       workspaces,
@@ -385,6 +405,7 @@ if (!app.requestSingleInstanceLock()) {
       wizard,
       pacotes,
       anexos,
+      roadmap,
       credentials,
       ai,
       budget,

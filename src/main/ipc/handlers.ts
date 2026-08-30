@@ -75,6 +75,16 @@ import type { Anexo, AnexoOutcome } from '@shared/domain/anexos-de-design'
 import { EXTENSOES_DO_ANEXO, isTipoDeAnexo } from '@shared/domain/anexos-de-design'
 import type { ValidacaoDoPrototipo } from '@shared/domain/validacao-de-prototipo'
 import type { ArquiteturaOutcome, PacoteArquitetura } from '@shared/domain/arquitetura'
+import type { Roadmap, RoadmapOutcome } from '@shared/domain/roadmap'
+import type {
+  Approval,
+  AprovacaoOutcome,
+  Gate,
+  MudancaDeArtefato,
+  RevisaoAprovada
+} from '@shared/domain/aprovacoes'
+import { NATUREZAS, isGate } from '@shared/domain/aprovacoes'
+import type { RoadmapService } from '../projects/roadmap-service'
 import type { AnexoService } from '../projects/anexo-service'
 import { isConnectorId } from '@shared/domain/connectors'
 import type { ConnectorCreditView } from '@shared/contracts/ipc'
@@ -279,6 +289,7 @@ export interface IpcDependencies {
    */
   readonly pacotes: PacoteService
   readonly anexos: AnexoService
+  readonly roadmap: RoadmapService
   /** Vault de credenciais (SPEC-Providers-01): status para a UI, valor só dentro do main. */
   readonly credentials: CredentialService
   /** Runs persistidos, para a UI listar o histórico. */
@@ -1393,6 +1404,86 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     IPC_CHANNELS.pacoteListar,
     (_event, projectId: unknown): readonly PacoteEstrutural[] =>
       typeof projectId === 'string' ? deps.pacotes.listar(projectId) : []
+  )
+
+  // Roadmap e gates (SPEC-Planejamento-06). O gate mora no serviço; o handler valida a forma na
+  // fronteira e não decide nada — repetir a política aqui criaria uma segunda fonte.
+  ipcMain.handle(
+    IPC_CHANNELS.roadmapGerar,
+    async (_event, projectId: unknown, workspace: unknown): Promise<RoadmapOutcome> => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
+        return { reason: 'projeto-inexistente', mensagem: 'Projeto não encontrado.' }
+      }
+      return await deps.roadmap.gerar(projectId, workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.roadmapCarregar,
+    (_event, projectId: unknown, workspace: unknown): Roadmap => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
+        return { mvps: [], slices: [] }
+      }
+      return deps.roadmap.carregar(projectId, workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.aprovacaoListar,
+    (_event, projectId: unknown, workspace: unknown): readonly Approval[] => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return []
+      return deps.roadmap.aprovacoes(projectId, workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.aprovacaoRevisoes,
+    (_event, projectId: unknown, gate: unknown, workspace: unknown): readonly RevisaoAprovada[] => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string' || !isGate(gate)) return []
+      return deps.roadmap.revisoesDoGate(projectId, gate, workspace)
+    }
+  )
+
+  // **A identidade não vem por parâmetro**: o serviço a lê da sessão autenticada. Um parâmetro
+  // aqui deixaria o renderer declarar quem aprovou — e o critério 4 pergunta exatamente isso.
+  ipcMain.handle(
+    IPC_CHANNELS.aprovacaoAprovar,
+    (_event, projectId: unknown, gate: unknown, workspace: unknown): AprovacaoOutcome => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
+        return { reason: 'projeto-inexistente', mensagem: 'Projeto não encontrado.' }
+      }
+      if (!isGate(gate)) {
+        return { reason: 'sem-revisoes', mensagem: 'Gate desconhecido.' }
+      }
+      return deps.roadmap.aprovar(projectId, gate, workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.aprovacaoSimular,
+    (_event, projectId: unknown, mudancas: unknown, workspace: unknown): readonly Gate[] => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return []
+      if (!Array.isArray(mudancas)) return []
+
+      // A natureza vem do renderer, então é validada aqui — e o **default é `semantica`**:
+      // uma natureza que não reconhecemos tem de invalidar, não passar. Fechar para o lado
+      // seguro é a mesma postura do `autor` desconhecido virando `agente` na M8-F03.
+      const validadas: MudancaDeArtefato[] = mudancas
+        .filter((m): m is Record<string, unknown> => typeof m === 'object' && m !== null)
+        .filter((m) => typeof m.artefato === 'string' && typeof m.hashNovo === 'string')
+        .map((m) => ({
+          artefato: m.artefato as string,
+          hashNovo: m.hashNovo as string,
+          natureza:
+            typeof m.natureza === 'string' &&
+            (NATUREZAS as readonly string[]).includes(m.natureza) &&
+            m.natureza === 'cosmetica'
+              ? 'cosmetica'
+              : 'semantica'
+        }))
+
+      return deps.roadmap.simularMudanca(projectId, validadas, workspace)
+    }
   )
 
   // Anexos de design (SPEC-Planejamento-05). O gate mora no serviço; o handler valida a forma na
