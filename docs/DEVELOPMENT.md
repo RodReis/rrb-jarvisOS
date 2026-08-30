@@ -1152,6 +1152,45 @@ Status: **entregue** — spec `aprovada-pi` (2026-08-29); issue [#95](https://gi
 - **`resumoAnterior` e `regras` não têm produtor.** Os campos existem no manifesto porque a spec os lista; quem os preenche são as fatias seguintes (o wizard da M8-F03 e as aprovações da M8-F06). Declará-los agora evita que cada uma acrescente coluna.
 - **Sem smoke ao vivo contra provider real.** A fatia não chama serviço externo: o que ela faz é decidir se a chamada sai. O E2E exercita o gate no app real, com o ponto único inteiro no caminho.
 
+### Fatia 03 — Wizard orientado com "Decide por mim" (`docs/spec/spec-planejamento-03-wizard-orientado.md`)
+
+Status: **entregue** — spec `aprovada-pi` (2026-08-29); issue [#96](https://github.com/RodReis/rrb-jarvisOS/issues/96). Depende da M8-F01 e da M8-F02.
+
+- [x] **`src/shared/domain/wizard.ts`** — `Pergunta`, `Decision`, `Contradicao`, `EstadoDoWizard` e as regras puras (`proximaPergunta`, `dependenciasAfetadas`, `detectarContradicoes`, `decidirPorMim`, `decisoesVigentes`). Em `shared` porque a tela renderiza a pergunta e mostra a contradição
+- [x] **`src/shared/domain/wizard-catalogo.ts`** — as cinco perguntas do contexto como **dado**, não lógica: acrescentar pergunta é editar o array, nunca o serviço nem a tela
+- [x] **Migration 18** (`decision`) — append-only por desenho; `substituiu` referencia `decision(id)` **sem** cascade, porque apagar a anterior arrancaria o elo que torna a substituição auditável
+- [x] **`DecisionRepository`** — sem `update` e sem `delete`, e a ausência é o desenho
+- [x] **`WizardService`** — valida contra o catálogo na fronteira, devolve `contradicao-pendente` **sem gravar** e audita cada decisão
+- [x] **`planning-decision`** — tipo próprio de `AuditEvent`, com `autor` no payload
+- [x] **Canais `wizard:state` e `wizard:answer`** — e **nenhum que aprove gate**
+- [x] **`WizardDoProjeto.tsx`** — pop-up com uma pergunta, opções com impacto, recomendada primeiro e sem pré-seleção
+- [x] **Testes**: 22 de integração, 30 de domínio, 24 de tela e 1 E2E
+
+#### Decisões que valem registro
+
+1. **O backend do wizard já existia e não tinha consumidor.** `abrirSessao`/`salvarRespostas`/`concluirMarco`, os canais e o preload estão prontos desde a M8-F01, e o campo `etapa` era declarado "texto livre da fatia que o define; **opaco para esta**". A fatia preencheu o buraco em vez de abrir um paralelo: nenhum canal de resposta novo foi criado.
+2. **`Decision` é tabela própria, não campo no JSON de `respostas`.** O JSON da `planning_session` é o rascunho — ele sobrescreve, e é isso que se quer dele. O que ele não guarda é **autoria por decisão** e a **decisão anterior**, e sem as duas os critérios 3 e 5 não existem: a trilha não distinguiria escolha do PI de escolha delegada, e a contradição não teria o que mostrar antes de substituir.
+3. **`podeAprovarGate` mora no domínio.** A invariante 3 do `CONVENTION.md` §4 vira função para que o gate pergunte ao domínio em vez de cada chamador lembrar da regra — mesma postura do `isRotaUnmetered` da M8-F02.
+4. **A delegabilidade é recusada no domínio, não escondida na tela.** `decidirPorMim` devolve `null` para pergunta não delegável, e o serviço recusa de novo. Se a regra fosse só o botão ausente, um caminho novo (atalho, IPC direto) delegaria o que a spec não permite — e o E2E prova a recusa chamando a ponte direto.
+5. **`autor` desconhecido no banco vira `agente`, nunca `pi`.** Linha corrompida ou gravada por versão futura não pode ganhar por acidente o único autor que aprova gate. O default fecha para o lado que não autoriza — fail-closed, como o Policy Engine.
+6. **A contradição é devolvida, não aplicada.** Seria mais curto substituir a dependente e seguir; é exatamente o que o critério 5 proíbe. O serviço só grava com `aceitarSubstituicao` explícito, e a tela reenvia **a mesma** resposta que gerou a contradição — remontá-la arriscaria mandar algo diferente do que o PI leu.
+7. **`dependenciasAfetadas` não é transitivo, de propósito.** Cada nível é confirmado pelo PI; cascata automática invalidaria decisões que ele nunca viu — que é a mesma razão pela qual a invariante 4 fala em "somente aprovações dependentes".
+8. **A recomendação vem primeiro e não vem marcada.** `opcoesOrdenadas` ordena no domínio (uma segunda superfície teria de reimplementar a regra), e a tela não pré-seleciona: marcar o radio por padrão faria a recomendação virar o caminho de menor esforço, e o critério 2 pede *distinguível, não forçada*.
+9. **Anexo de design não é delegável.** A decisão 6 do MVP-008 diz que anexo entra por seletor de arquivos do PI; delegar essa escolha ao agente decidiria por ele um caminho que exige ato dele.
+
+#### O que os testes pegaram
+
+1. **As duas guardas de enumeração da ponte acusaram os métodos novos**, no unitário e no E2E — como na M8-F01 e na M8-F02. A guarda existe para que superfície nova seja decisão, não efeito colateral.
+2. **O teste de migração de schema antigo quebrou com `table decision already exists`.** Ele simula um banco v1 derrubando o que cada migration posterior criou, e a lista precisa declarar a tabela nova. É a guarda cobrando que quem adiciona migration diga o que ela cria.
+3. **O lint de React barrou dois `setState` síncronos dentro de efeito.** O reset da escolha ao trocar de pergunta virou `key` no subcomponente — o reset idiomático, sem render em cascata —, e o `carregando` booleano virou um estado tri-valorado (`undefined` carregando, `null` falhou, objeto pronto), eliminando o `setCarregando(false)` do `finally`. A carga adotou o padrão `buscar`/`aplicar` com flag `ativo` que as outras telas já usavam.
+
+#### Limites registrados, não silenciados
+
+- **O catálogo cobre a etapa de contexto, não o wizard inteiro do MVP.** As cinco perguntas levam ao marco `contexto-aprovado`; PRD (M8-F04), anexos (M8-F05) e roadmap (M8-F06) trazem as suas. O grafo não sabe o que as perguntas significam, então acrescentá-las é editar o array.
+- **A recomendação é dado, não geração.** `justificativa` e `recomendada` vêm do catálogo; nenhuma chamada de IA acontece nesta fatia. Quando a recomendação passar a ser gerada, ela entra pelo ponto único com `contextPackId`, como a M8-F02 exige — o formato do `Decision` já a preserva.
+- **`concluirMarco` não é chamado pelo wizard.** Fechar o contexto em commit é gate, e gate é da M8-F06. Esta fatia entrega a trilha e o resumo; quem decide que o pacote está aprovado ainda não existe.
+- **Nenhum smoke ao vivo com o app rodando.** Sem consentimento do Google o AppShell não monta, e a navegação pela sidebar fica fora do alcance do E2E — o mesmo limite registrado na M8-F01 e na M8-F02. O E2E exercita a ponte real e o efeito no banco; a renderização tem suíte própria. O clique real na tela cabe na verificação do PI.
+
 ### `[FIX]` Erro de git sem saída na tela de Projetos ([#170](https://github.com/RodReis/rrb-jarvisOS/issues/170))
 
 Status: **entregue** — correção de comportamento documentado (sem spec nova); PR [#171](https://github.com/RodReis/rrb-jarvisOS/pull/171), mergeado em 2026-08-30. Reportado pelo PI ao usar a tela da M8-F01.
