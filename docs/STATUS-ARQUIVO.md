@@ -268,6 +268,14 @@ A inspeção somente de leitura do checkout principal encontrou ProjectRepositor
 
 Índice atualizado somente para associar a F02 ao rascunho. F01 permanece aprovada/Backlog, F02 Planejada e F03–F08 a redigir. Sem construção, coleta, testes de produto, instalação, push ou deploy. Esta etapa não aumenta a contagem de SPECs aprovadas.
 
+### MVP-007 — aceite exato da M7-F02 registrado (2026-08-30)
+
+O PI aprovou a revisão `e4a521c6ad2339b8a6368d183afb46b8c26b5b80` de `docs/spec/spec-memoria-02-fontes-ingestao-retomada.md`. Status atualizado para `aprovada-pi` e pergunta de revisão encerrada. O aceite cobre Git selecionado/commitado desde a inscrição, reconciliação de decisões existentes, fonte canônica interna de notas sem UI, corte/cobertura, confirmação atômica, limites, retomada e vinte critérios. Comparação com a revisão submetida preservou o corpo técnico; somente metadados e textos de aceite foram atualizados. F01 permaneceu intacta.
+
+A #181 passou de `proplan:planejado` para `proplan:backlog` e o épico #179 recebeu o aceite, sem marcar entrega. Leitura posterior confirmou os corpos, estado aberto, parent #179, dependência única #180 e a ordem original das oito filhas. F01–F02 estão em Backlog; F03–F08 continuam Planejadas. Não houve escrita de `next`, parents ou dependências, nem criação de issues duplicadas.
+
+Documentação de arquitetura, convenções e acompanhamento aponta para o contrato aprovado, sem reabrir F01 ou contratos da pipeline/MVP-016. Validação documental confirmou 82 SPECs aprovadas, preservação do quadro Agora e das demais associações Fatia ↔ SPEC. Próxima especificação: M7-F03 (#182), recuperação contextual e orçamento. Não houve implementação, teste de produto, instalação, captura, PR, push ou deploy; o registro permanece em Git local.
+
 ## Pendências históricas preservadas
 
 - A UI de allowlist ainda exigia decisão de produto: localização, seletor nativo e remoção de `appDir`.

@@ -180,9 +180,11 @@ Invariantes:
 15. `improved` exige prova suficiente, qualidade preservada e ganho/estabilidade contratados; apenas habilita a decisão de promoção. Dado desconhecido não é zero; estágio sem prova final não herda sucesso do run de baseline.
 16. `active` não significa `stable`. Estabilização exige tempo e amostra novos; prazo inconclusivo retira a política de novos runs, regressão reverte o grupo afetado, sem apagar histórico nem desfazer Git/deploy. Perfis e critérios estão na SPEC M16-F04, aprovada pelo PI na revisão `1cefc2c`.
 
-### 4.5 Direção da memória compartilhada (PI, 2026-08-30; núcleo v1 aprovado, demais contratos em elaboração)
+### 4.5 Direção da memória compartilhada (PI, 2026-08-30; núcleo v1 e ingestão inicial aprovados, demais contratos em elaboração)
 
-O contrato concreto do núcleo v1 está aprovado em `docs/spec/spec-memoria-01-nucleo-identidade-persistencia.md`, revisão `83e952fd4e5f22850653bf81cf1d45d6c4377c84`: identidade composta, envelopes, revisões/conflitos/invalidação, limites e persistência transacional. As menções abaixo a detalhamento futuro dos formatos comuns ficam resolvidas para esse recorte; extensões e integrações de F02–F08 continuam em elaboração. Esse aceite não inicia execução nem altera o contrato do MVP-016.
+O contrato concreto do núcleo v1 está aprovado em `docs/spec/spec-memoria-01-nucleo-identidade-persistencia.md`, revisão `83e952fd4e5f22850653bf81cf1d45d6c4377c84`: identidade composta, envelopes, revisões/conflitos/invalidação, limites e persistência transacional. As menções abaixo a detalhamento futuro dos formatos comuns ficam resolvidas para esse recorte; extensões e integrações de F03–F08 continuam em elaboração. Esse aceite não inicia execução nem altera o contrato do MVP-016.
+
+O contrato das fontes iniciais está aprovado em `docs/spec/spec-memoria-02-fontes-ingestao-retomada.md`, revisão `e4a521c6ad2339b8a6368d183afb46b8c26b5b80`: Git começa no commit de inscrição, decisões preservam autoria e cobertura de reconciliação, e notas têm dono canônico versionado sem UI. Aplicação, metadados, pendências e checkpoint são confirmados atomicamente; cursor avançado não comprova ausência de lacunas, e interrupção não prova exclusão. A ingestão mantém limites e retomada por fonte, sem depender de Graphify ou iniciar execução pelo aceite.
 
 O MVP-007 serve JarvisOS e AgentsOS por um núcleo compartilhado: histórico referenciado nos módulos de origem, conhecimento derivado/reconstruível e lições distinguidas de inferências. Graphify é opcional e substituível; não é a única memória nem prova de aprendizado. Visão global preserva identidade por produto/projeto/agente e não transfere regras automaticamente.
 

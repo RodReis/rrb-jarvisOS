@@ -1,6 +1,6 @@
 # Plano de publicação — MVP-007: Memória compartilhada
 
-- Estado: planejamento e publicação autorizados pelo PI em 2026-08-30; épico #179 e oito fatias #180–#187 publicados. F01 aprovada/Backlog; F02–F08 Planejadas.
+- Estado: planejamento e publicação autorizados pelo PI em 2026-08-30; épico #179 e oito fatias #180–#187 publicados. F01–F02 aprovadas/Backlog; F03–F08 Planejadas.
 - Não é SPEC aprovada, plano de execução de código nem aceite do design completo. As pendências abaixo permanecem abertas.
 - Base: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`, decisões parciais registradas até o commit local `574d359`.
 - Índice canônico Fatia ↔ SPEC e links de issues: `docs/STATUS.md`. Não criar slugs de SPEC inexistente; estado inicial: a redigir.
@@ -55,7 +55,7 @@ Estabelecer o contrato comum e a memória local compartilhada, distinguindo regi
 
 ### M7-F02 — Fontes iniciais, ingestão e retomada
 
-**Atualização documental (2026-08-30):** SPEC em `docs/spec/spec-memoria-02-fontes-ingestao-retomada.md`, status `rascunho`, com vinte critérios propostos. Detalha adapters/capacidades, fonte interna mínima de notas, limites, cursores/corte, cobertura e retomada. Alvos e pendências de publicação abaixo foram tratados como proposta, ainda sem aceite do PI; #181 continua Planejada, dependente de #180. Não há implementação.
+**Aceite documental (2026-08-30):** SPEC `docs/spec/spec-memoria-02-fontes-ingestao-retomada.md`, revisão `e4a521c6ad2339b8a6368d183afb46b8c26b5b80`, aprovada pelo PI com vinte critérios. Adapters/capacidades, fonte interna mínima de notas, limites, cursores/corte, cobertura e retomada estão resolvidos nessa revisão; alvos e pendências originais abaixo são histórico de publicação e não exigem novo aceite. #181 passa a Backlog, dependente de #180. Não há implementação.
 
 **Dependências diretas:** M7-F01.
 **Fonte:** seções 6, 10, 11 e 14 do design.

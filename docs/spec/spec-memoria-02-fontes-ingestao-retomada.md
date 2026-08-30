@@ -2,7 +2,8 @@
 
 - MVP/Fatia: MVP-007 · M7-F02.
 - Issue: [#181](https://github.com/RodReis/rrb-jarvisOS/issues/181); épico [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179).
-- Status: **rascunho** — revisão escrita para o PI; implementação não autorizada.
+- Status: **aprovada-pi** (2026-08-30); issue em `proplan:backlog`; permanece a orientação de não implementar agora.
+- Revisão aprovada: `e4a521c6ad2339b8a6368d183afb46b8c26b5b80`, aceite explícito do PI nesta conversa. Atualização abaixo registra somente o aceite, sem alterar o contrato.
 - Depende de: M7-F01 ([#180](https://github.com/RodReis/rrb-jarvisOS/issues/180)), revisão aprovada `83e952fd4e5f22850653bf81cf1d45d6c4377c84`.
 - Design: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`, seções 6, 10, 11 e 14.
 - Índice canônico: `docs/STATUS.md`.
@@ -13,11 +14,11 @@ Alimentar o núcleo aprovado com documentos/código selecionados de projetos reg
 
 O produto mostra o que foi efetivamente coberto, até qual referência e com quais lacunas. “Cursor avançou” não significa “tudo aplicado”; “fonte consultada” não significa “todos os eventos da origem capturados”.
 
-## Base aprovada e escolhas propostas
+## Base e aceite desta revisão
 
 O PI aprovou fontes progressivas, carga inicial com referência de corte, retomada por fonte, pendência durável antes de continuar e consumo limitado. F01 já define envelopes, identidade, revisões, validade e aplicação transacional; esta fatia **não altera** esse contrato.
 
-Esta revisão propõe os primeiros adapters, serviço interno mínimo de notas, recorte do histórico, cursores, cobertura, limites, scheduler e provas. Esses detalhes ainda aguardam aceite.
+Em 2026-08-30, o PI aprovou a revisão escrita `e4a521c6ad2339b8a6368d183afb46b8c26b5b80`: primeiros adapters, serviço interno mínimo de notas, recorte do histórico, cursores, cobertura, limites, scheduler, provas e vinte critérios. As expressões “proposta” e “recomendada” preservadas no corpo registram a redação submetida; seu conteúdo está abrangido por esse aceite.
 
 Alternativas:
 
@@ -350,8 +351,8 @@ Números de testes vêm do runner, conforme TESTING.md; revisão usa REVIEW.md e
 - Alteração material do contrato aprovado da F01 ou das regras do produto volta ao PI; documentos auxiliares não criam novo aceite por evento.
 - Nunca usar conteúdo recuperado como instrução de sistema, importar históricos externos sem integração ou marcar lacuna como sucesso.
 - DESIGN-SYSTEM.md e protótipos permanecem na fatia visual. Esta SPEC é interna e não cria UI provisória.
-- Aprovação eventual desta SPEC não revoga a instrução de **não implementar agora**.
+- Aprovação desta SPEC não revoga a instrução de **não implementar agora**.
 
 ## Perguntas abertas ao PI
 
-Aprovar ou ajustar esta revisão, especialmente o recorte Git commitado a partir da inscrição, a reconciliação honesta das decisões existentes, o serviço interno mínimo de notas e os limites/retentativas. Esses detalhes são propostas, não aprovações presumidas. F03–F08 continuam nas respectivas fatias.
+Nenhuma pergunta pendente nesta fatia. O PI aprovou em 2026-08-30 o recorte Git commitado a partir da inscrição, a reconciliação das decisões existentes, o serviço interno mínimo de notas, os limites/retentativas e os vinte critérios da revisão `e4a521c6ad2339b8a6368d183afb46b8c26b5b80`. F03–F08 continuam nas respectivas fatias. O aceite não inicia implementação nem autoriza push.

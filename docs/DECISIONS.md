@@ -81,6 +81,8 @@
 
 ## Memória compartilhada JarvisOS / AgentsOS (PI, 2026-08-30)
 
+**Aceite da M7-F02 (2026-08-30):** PI aprovou a revisão exata `e4a521c6ad2339b8a6368d183afb46b8c26b5b80` de `docs/spec/spec-memoria-02-fontes-ingestao-retomada.md`: Git selecionado/commitado desde a inscrição, reconciliação de decisões existentes, serviço canônico interno de notas sem UI, corte/cobertura, confirmação atômica, limites, retomada e vinte critérios. Somente registro do aceite, sem alteração técnica ou da F01. #181 passa de Planejado a Backlog, mantendo parent #179 e dependência #180; F03–F08 continuam Planejadas. Não iniciar implementação, alterar `next` ou realizar push.
+
 **Aceite da M7-F01 (2026-08-30):** PI aprovou a revisão exata `83e952fd4e5f22850653bf81cf1d45d6c4377c84` de `docs/spec/spec-memoria-01-nucleo-identidade-persistencia.md`, incluindo contrato v1, identidade composta, revisões e provas de substituição, conflitos/invalidação, limites, SQLite transacional e vinte critérios. Registra-se somente o aceite, sem mudar o conteúdo técnico. #180 passa de Planejado a Backlog, sem `next`; F02–F08 seguem Planejadas. Mantida a instrução de apenas planejar, sem código ou push. As decisões numeradas abaixo preservam o histórico dos contratos parciais anteriores.
 
 1. O MVP-007 entra em detalhamento como núcleo compartilhado de memória contextual e conhecimento dos dois produtos, incluindo seu próprio desenvolvimento. Direção aprovada não equivale a design completo, fatias ou SPECs aprovadas para construção.

@@ -4,8 +4,8 @@
 - Esta revisão registra decisões parciais de escopo e contratos nas seções abaixo; **não é um design completo nem uma SPEC aprovada para construção**.
 - Origem: proposta do PI de usar Graphify para memória e aprendizado transversal, acompanhada de quatro capturas dos menus futuros de JarvisOS/AgentsOS; aprovação da divisão entre MVP-007, M16-F05 e MVP-016.
 - Documento do MVP: `docs/mvp/mvp-007-memoria-contextual.md`.
-- Fatias: oito recortes de planejamento, com publicação autorizada pelo PI em 2026-08-30; SPEC da F01 aprovada, F02 em rascunho para revisão, F03–F08 a redigir. Permanece a orientação de não implementar agora. Índice canônico: `docs/STATUS.md`.
-- Issues do MVP-007: épico [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179); #180 em Backlog após aceite da SPEC e #181–#187 Planejadas, conforme a seção 15. A #164 pertence ao MVP-016 e não substitui esse acompanhamento.
+- Fatias: oito recortes de planejamento, com publicação autorizada pelo PI em 2026-08-30; SPECs da F01–F02 aprovadas, F03–F08 a redigir. Permanece a orientação de não implementar agora. Índice canônico: `docs/STATUS.md`.
+- Issues do MVP-007: épico [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179); #180–#181 em Backlog após aceite das SPECs e #182–#187 Planejadas, conforme a seção 15. A #164 pertence ao MVP-016 e não substitui esse acompanhamento.
 - Relação com a execução: planejamento paralelo, não bloqueante para MVP-008, MVP-009 ou MVP-016; fila preservada.
 
 ## 1. Objetivo aprovado
@@ -188,9 +188,9 @@ Foi afastado aceitar qualquer objeto livre: facilitaria a primeira integração,
 
 O PI autorizou organizar as fatias por dependência e publicar o épico e suas issues de planejamento. Foram derivados oito recortes dos contratos acima: núcleo/identidade/persistência; fontes/ingestão/retomada; recuperação/orçamento; retenção/reconstrução; adapter opcional do Graphify; memória operacional/lições; Agent Memory/Notebook; resiliência/prova integrada.
 
-O plano de publicação está em `docs/superpowers/plans/2026-08-30-mvp-007-publicacao-issues.md`, com escopo, dependências, alvos de verificação e pendências por fatia. Numeração e associação às SPECs permanecem no índice canônico de `docs/STATUS.md`; a F01 está **aprovada-pi**, F02 em **rascunho para revisão**, F03–F08 estão **a redigir**.
+O plano de publicação está em `docs/superpowers/plans/2026-08-30-mvp-007-publicacao-issues.md`, com escopo, dependências, alvos de verificação e pendências por fatia. Numeração e associação às SPECs permanecem no índice canônico de `docs/STATUS.md`; F01–F02 estão **aprovadas-pi**, F03–F08 estão **a redigir**.
 
-Rascunho da F02: `docs/spec/spec-memoria-02-fontes-ingestao-retomada.md`. Propõe Git selecionado/commitado com corte e recorte de primeiros pais, reconciliação de decisões existentes, serviço canônico interno de notas sem UI e ingestão retomável com cobertura/limites explícitos. Vinte critérios propostos; não altera o contrato aprovado da F01 nem presume novas decisões do PI. #181 permanece Planejada com dependência #180.
+SPEC da F02: `docs/spec/spec-memoria-02-fontes-ingestao-retomada.md`, revisão `e4a521c6ad2339b8a6368d183afb46b8c26b5b80`, aprovada explicitamente pelo PI em 2026-08-30. Git selecionado/commitado desde a inscrição e recorte de primeiros pais, reconciliação de decisões existentes, serviço canônico interno de notas sem UI e ingestão retomável com cobertura/limites explícitos. Os vinte critérios estão aprovados; o contrato técnico da F01 não foi alterado. #181 passa a Backlog com dependência #180. Os detalhes de fontes/corte/confirmação/retentativas das seções 10/11 estão resolvidos para essas três entradas, sem iniciar implementação.
 
 SPEC da F01: `docs/spec/spec-memoria-01-nucleo-identidade-persistencia.md`, revisão `83e952fd4e5f22850653bf81cf1d45d6c4377c84`, aprovada explicitamente pelo PI em 2026-08-30. O aceite cobre schemas/limites v1, chaves compostas, revisões com substituição comprovada, conflitos, invalidação e armazenamento no SQLite existente, com vinte critérios. As representações concretas do núcleo nas seções 7/8/14 estão resolvidas por essa SPEC. A #180 passa a Backlog; ingestão, recuperação, manutenção, Graphify, avaliações e UI continuam nas respectivas fatias. Não iniciar implementação nem alterar o `next`.
 
@@ -202,8 +202,8 @@ Publicação conferida em 2026-08-30: épico #179, oito sub-issues #180–#187 e
 
 ## 16. Decisões ainda abertas
 
-1. Revisão/aceite do rascunho de F02 (#181); redação, critérios finais e aprovação de F03–F08. F01 aprovada pela revisão exata acima, sem repetir seu aceite.
-2. Aprovação dos adapters, recorte do histórico, fonte de notas, cobertura, corte, confirmação e retentativas propostos na F02 conforme a seção 11.
+1. Redação, critérios finais e aprovação de F03–F08, começando por M7-F03 (#182). F01–F02 aprovadas pelas revisões exatas acima, sem repetir seus aceites.
+2. Integrações futuras além das três entradas iniciais; adapters, recorte do histórico, notas, cobertura, corte, confirmação e retentativas iniciais estão aprovados na F02.
 3. Contratos de manutenção/compactação/reconstrução, capacidade e exclusão física conforme a seção 8, sobre o armazenamento básico aprovado na F01; sincronização permanece fora deste recorte.
 4. Contratos técnicos de consulta/resultados, atualização incremental e limites conforme a seção 9.
 5. Assinaturas, schemas, versão concreta, execução e testes de compatibilidade do adapter conforme o contrato aprovado na seção 12.
@@ -216,4 +216,4 @@ As perguntas serão resolvidas uma por vez. Nenhum item aberto vira implementaç
 
 Este registro deriva da decisão do PI nesta conversa. A documentação oficial consultada para avaliar viabilidade está no [Graphify](https://github.com/Graphify-Labs/graphify); suporte documentado não prova compatibilidade com a versão instalada nem substitui futuros testes de contrato.
 
-Não houve instalação, execução de Graphify/Caveman, captura de atividade, implementação, alteração de fila por esta tarefa, push ou deploy. As issues foram publicadas conforme a seção 15; o aceite posterior da F01 move somente #180 para Backlog e eleva o acervo local a 81 SPECs aprovadas. Aprovação da SPEC não é evidência de entrega.
+Não houve instalação, execução de Graphify/Caveman, captura de atividade, implementação, alteração de fila por esta tarefa, push ou deploy. As issues foram publicadas conforme a seção 15; os aceites posteriores da F01 e F02 movem #180–#181 para Backlog e elevam o acervo local a 82 SPECs aprovadas. Aprovação da SPEC não é evidência de entrega.
