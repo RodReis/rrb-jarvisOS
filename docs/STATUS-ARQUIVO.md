@@ -134,6 +134,16 @@ O PI aprovou a revisão exata da SPEC no commit `2ea2f1f`, preservando seus quin
 
 O aceite não inicia implementação, não muda `next`, não fecha a issue nem declara entrega técnica. Esta tarefa continua no planejamento; próxima SPEC: M16-F04 (#166), experimentos e promoção.
 
+### M16-F04 redigida para revisão exata (2026-08-30)
+
+O PI confirmou seis blocos: contrato prévio imutável; fronteiras de replay/shadow/canário; controle contemporâneo e alocação reproduzível; perfis iniciais baixo/médio; avaliador determinístico com qualidade anterior à eficiência; e estabilização/rollback com snapshots preservados. A SPEC `docs/spec/spec-aprendizado-04-experimentos-promocao.md` consolida contratos, limites e vinte critérios de aceite, em `revisão-pi`.
+
+Os perfis de canário usam 10/10 e 20/20 unidades mínimas, exposição máxima de 50%/25%, prazo de 14/30 dias e ganho de 5%/10%. Estabilização exige 24h+10 ou 72h+20 novas unidades, com prazo máximo de 14/30 dias. Esses são mínimos operacionais, sem garantia estatística; volume/prova insuficiente produz inconclusão, não trabalho artificial ou bloqueio de desenvolvimento.
+
+A issue #166 permanece `proplan:planejado`, com predecessor #165 e parent #162, até aprovação da revisão exata. A conferência dos cabeçalhos normalizados encontrou 79 SPECs aprovadas: a contagem anterior de 78 omitia `spec-choice-01-selecao-de-espaco.md`, cujo status aprovado está também formatado como código inline. A F04 continua fora da contagem e as fatias da V3 em Backlog continuam quatorze; F05–F06 ainda não foram redigidas. Os registros históricos acima preservam os números que foram informados naquelas ocasiões.
+
+Não houve implementação, chamada de executor, mudança de fila, push ou deploy. A fila operacional do STATUS foi preservada do registro de 2026-08-29, sem apresentá-la como revalidada em 2026-08-30. O próximo marco é a revisão exata da F04; depois segue a especificação da F05.
+
 ## Pendências históricas preservadas
 
 - A UI de allowlist ainda exigia decisão de produto: localização, seletor nativo e remoção de `appDir`.

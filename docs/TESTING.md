@@ -603,3 +603,12 @@ Provas mínimas: domínio continua apesar de projetor indisponível; replay não
 - **Prova real limitada:** separada das suítes comuns, sem serviço pago obrigatório; registra executor, modelo, ambiente, amostra, consumo, versões e hashes.
 
 Provas mínimas: falha semelhante não esconde causa nova; economia não promove com guardrail violado; run mantém o snapshot inicial; override de projeto vence global; política incompatível fica `stale`; ausência do aprendizado mantém política estável/base e não bloqueia a pipeline.
+
+Detalhamento planejado da M16-F04 (`spec-aprendizado-04-experimentos-promocao.md`, em revisão-pi):
+
+- Contratos e seeds fixos provam alocação prévia, coorte completa e teto por contagem sob concorrência; retry/continuação não infla amostra.
+- Fixtures cobrem baseline zero, consumo ausente, falhas mais baratas, grupos desbalanceados, pendências, pesos/exclusões/cortes pós-resultado e diferença entre estimativa e medição.
+- Relatório diferencia prova de replay/shadow da prova real do canário; nenhum estágio simulado declara qualidade final contrafactual ou significância estatística sem método.
+- Relógio injetável prova tempo e amostra simultâneos para estabilizar, prazo inconclusivo e rollback do grupo afetado; não basta esperar o timer.
+- Crash entre reserva/alocação/snapshot/confirmação, revogação de controle, prova corrigida, retenção e reconstrução não podem duplicar efeito, alterar snapshot ou reativar decisão antiga.
+- Testar núcleo F04 e registro F03 reais com mecanismos/insumos simulados; sem CLI paga ou Git/deploy externo na suíte comum. Isso especifica verificações futuras, não relata testes já executados.

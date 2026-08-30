@@ -157,6 +157,8 @@ Política por projeto vence padrão global local. Cada run congela seu snapshot;
 
 A M16-F03 detalha pacotes completos por mecanismo, validação da composição e fallback conjunto do grupo afetado. O registro recebe decisões com prova da F04, não promove por simples cadastro. O snapshot autossuficiente é gravado pelo dono do run na transação de criação; índices do aprendizado são derivados. Retomada do mesmo run lê essa cópia, enquanto pausa, quotas e demais controles operacionais seguem vigentes. SPEC aprovada pelo PI: `docs/spec/spec-aprendizado-03-registro-resolucao-politicas.md`.
 
+A M16-F04 coordena contratos imutáveis, replay/shadow sem efeitos externos, alocação de canário com controle contemporâneo e avaliador determinístico. Produz as decisões condicionais para o registro F03 e acompanha estabilização/rollback; não cria outro executor ou dono dos efeitos. Ativa e estável são distintas, com amostra/tempo explícitos e fallback não bloqueante. SPEC em revisão-pi: `docs/spec/spec-aprendizado-04-experimentos-promocao.md`.
+
 Fonte completa: `docs/superpowers/specs/2026-08-29-mvp-016-aprendizado-operacional-design.md` e `docs/mvp/mvp-016-aprendizado-operacional.md`.
 
 ### Fontes de verdade

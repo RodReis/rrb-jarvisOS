@@ -1,6 +1,6 @@
 # MVP-016 — Aprendizado Operacional da Pipeline
 
-- Status: **design, seis fatias e M16-F01–F03 aprovados pelo PI** em 2026-08-29; implementação depende das dependências e da fila; F04–F06 aguardam redação das SPECs.
+- Status: **design, seis fatias e M16-F01–F03 aprovados pelo PI** em 2026-08-29; implementação depende das dependências e da fila. F04 em `revisão-pi` desde 2026-08-30; F05–F06 aguardam redação das SPECs.
 - GitHub: épico [#162](https://github.com/RodReis/rrb-jarvisOS/issues/162); F01 [#163](https://github.com/RodReis/rrb-jarvisOS/issues/163), F02 [#164](https://github.com/RodReis/rrb-jarvisOS/issues/164) e F03 [#165](https://github.com/RodReis/rrb-jarvisOS/issues/165) em `proplan:backlog`; F04–F06 [#166–#168](https://github.com/RodReis/rrb-jarvisOS/issues/166) em `proplan:planejado`.
 - Depende de: MVP-015 concluído.
 - Dono do aceite: PI.
@@ -17,7 +17,7 @@ Aprender com evidências de runs concluídos para reduzir recorrência, retrabal
 | 1 | Fundação e ingestão ([#163](https://github.com/RodReis/rrb-jarvisOS/issues/163)) | `spec-aprendizado-01-fundacao-ingestao.md` | aprovada-pi |
 | 2 | Memória de falhas ([#164](https://github.com/RodReis/rrb-jarvisOS/issues/164)) | `spec-aprendizado-02-memoria-falhas.md` | aprovada-pi |
 | 3 | Registro e resolução de políticas ([#165](https://github.com/RodReis/rrb-jarvisOS/issues/165)) | `spec-aprendizado-03-registro-resolucao-politicas.md` | aprovada-pi |
-| 4 | Experimentos e promoção ([#166](https://github.com/RodReis/rrb-jarvisOS/issues/166)) | a redigir | planejado; design aprovado |
+| 4 | Experimentos e promoção ([#166](https://github.com/RodReis/rrb-jarvisOS/issues/166)) | `spec-aprendizado-04-experimentos-promocao.md` | revisão-pi; issue planejada |
 | 5 | Estratégias e recomendações assistidas ([#167](https://github.com/RodReis/rrb-jarvisOS/issues/167)) | a redigir | planejado; design aprovado |
 | 6 | Interface, resiliência e prova E2E ([#168](https://github.com/RodReis/rrb-jarvisOS/issues/168)) | a redigir | planejado; gate visual antes da construção |
 

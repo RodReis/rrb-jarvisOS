@@ -4,7 +4,7 @@
 - Pipeline: V3, depois do MVP-015.
 - Implementação: **não autorizada por este documento**.
 - Issues: épico [#162](https://github.com/RodReis/rrb-jarvisOS/issues/162); F01–F03 #163–#165 em `proplan:backlog`; F04–F06 #166–#168 em `proplan:planejado`.
-- SPECs: M16-F01–F03 `aprovada-pi`; M16-F04–F06 ainda não redigidas.
+- SPECs: M16-F01–F03 `aprovada-pi`; M16-F04 em `revisão-pi` desde 2026-08-30; M16-F05–F06 ainda não redigidas.
 - Design predecessor: `2026-08-29-mvp-015-observabilidade-operacional-design.md`.
 
 ## 1. Resultado esperado
@@ -181,6 +181,18 @@ Métricas permanecem separadas:
 Não existe score composto opaco. O resultado é `improved | regressed | inconclusive`, com as métricas que sustentam a conclusão.
 
 Perfis de baixo, médio e alto impacto definem amostra, janela, melhoria mínima, guardrails e autoridade de promoção. Alto impacto sempre exige PI. Baixo/médio impacto só pode promover automaticamente quando autorizado, com kill-switch e janela de estabilização.
+
+Detalhamento confirmado para a M16-F04 em 2026-08-29–2026-08-30:
+
+- Contrato imutável antes da coleta: revisão da candidata/base, métrica principal, guardrails, elegibilidade, amostra, janela, critérios e consumo permitido.
+- Replay prova reprodução/compatibilidade dos insumos disponíveis; shadow calcula alternativa sem conduzir efeitos; canário compara resultados reais com controle contemporâneo. Nenhum estágio duplica Git/deploy para preencher amostra.
+- Distribuição prévia reproduzível, com coorte identificável, teto por contagem e tratamento contratado de falhas, pendências e exclusões. Retries/continuações não inflam a amostra independente.
+- Perfis iniciais baixo/médio possuem mínimos operacionais, não garantia estatística. Valores exatos e fórmulas ficam na SPEC; mudanças valem para experimentos futuros.
+- Avaliador determinístico preserva qualidade antes de considerar eficiência. `improved` dá elegibilidade, não publicação direta; não permite escolher o melhor corte após observar resultados.
+- Ativa não equivale a estável: estabilização exige tempo e novas unidades avaliáveis. Regressão aciona rollback do grupo afetado; prazo sem prova suficiente retira a política para novos runs como inconclusiva. Snapshot histórico e controles vivos permanecem conforme F03.
+- Outra candidata do mesmo escopo/grupo aguarda estabilização; mecanismos independentes e runs normais não aguardam essa conclusão.
+
+A revisão escrita está em `docs/spec/spec-aprendizado-04-experimentos-promocao.md`, com vinte critérios de aceite, em `revisão-pi`. A issue #166 continua Planejada até o aceite exato; não há implementação nesta tarefa.
 
 ## 10. IA assistente
 
