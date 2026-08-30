@@ -5,7 +5,7 @@
 - Origem: proposta do PI de usar Graphify para memória e aprendizado transversal, acompanhada de quatro capturas dos menus futuros de JarvisOS/AgentsOS; aprovação da divisão entre MVP-007, M16-F05 e MVP-016.
 - Documento do MVP: `docs/mvp/mvp-007-memoria-contextual.md`.
 - Fatias: oito recortes de planejamento, com publicação autorizada pelo PI em 2026-08-30; SPECs ainda a redigir, sem aceite para construção. Índice canônico: `docs/STATUS.md`.
-- Issues do MVP-007: publicação em preparação conforme a seção 15; a #164 pertence ao MVP-016 e não substitui esse acompanhamento.
+- Issues do MVP-007: épico [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179) e oito fatias #180–#187 publicadas como Planejadas, conforme a seção 15. A #164 pertence ao MVP-016 e não substitui esse acompanhamento.
 - Relação com a execução: planejamento paralelo, não bloqueante para MVP-008, MVP-009 ou MVP-016; fila preservada.
 
 ## 1. Objetivo aprovado
@@ -194,6 +194,8 @@ Graphify permanece uma ramificação opcional: busca básica, memória operacion
 
 A publicação permite acompanhar o planejamento; não é aprovação de design completo ou de SPEC inexistente, não inicia implementação nem altera o `next` do projeto.
 
+Publicação conferida em 2026-08-30: épico #179, oito sub-issues #180–#187 e dez dependências técnicas. Corpos, títulos, labels e vínculos correspondem ao plano; nenhuma fatia recebeu Backlog ou `next`. As decisões parciais e o plano foram referenciados nas issues pelo commit local `a789c804dfeb09123d9febdb414cfcb23ee2eace`, sem push. O `next` externo passou de #101 para #102 durante a tarefa, sem intervenção desta publicação.
+
 ## 16. Decisões ainda abertas
 
 1. Redação, critérios de aceite finais e aprovação das oito SPECs; a organização e publicação das issues não equivalem a esse aceite.
@@ -210,4 +212,4 @@ As perguntas serão resolvidas uma por vez. Nenhum item aberto vira implementaç
 
 Este registro deriva da decisão do PI nesta conversa. A documentação oficial consultada para avaliar viabilidade está no [Graphify](https://github.com/Graphify-Labs/graphify); suporte documentado não prova compatibilidade com a versão instalada nem substitui futuros testes de contrato.
 
-Não houve instalação, execução de Graphify/Caveman, captura de atividade, implementação, mudança de fila, push ou deploy. A publicação das issues de planejamento está autorizada conforme a seção 15. Esta revisão não aumenta a contagem de SPECs aprovadas.
+Não houve instalação, execução de Graphify/Caveman, captura de atividade, implementação, alteração de fila por esta tarefa, push ou deploy. As issues de planejamento foram publicadas conforme a seção 15. Esta revisão não aumenta a contagem de SPECs aprovadas.

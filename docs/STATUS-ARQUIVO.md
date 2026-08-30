@@ -230,6 +230,18 @@ O PI também perguntou se as issues já estavam criadas. Consulta ao GitHub, com
 
 A ausência de issues do MVP-007 é uma pendência de acompanhamento; aprovação de contratos no documento não equivale a publicação no GitHub. Próxima decisão de planejamento: organizar as fatias e a publicação das issues, com pendências explícitas e sem tratá-las como SPECs aprovadas. Não houve criação/alteração de issues, implementação, migração ou push nesta revisão. Contagem local de 80 SPECs aprovadas, índice e fila preservados.
 
+### MVP-007 — épico e oito issues Planejadas publicados (2026-08-30)
+
+O PI autorizou prosseguir com a organização por dependência e publicação do acompanhamento. Plano e índice registrados no commit local `a789c804dfeb09123d9febdb414cfcb23ee2eace`, sem push: oito recortes derivados dos contratos parciais, com escopo, alvos de verificação e pendências. Nenhuma SPEC foi redigida ou promovida a `aprovada-pi`.
+
+Publicados no GitHub o épico #179 e oito fatias #180–#187. Épico com `proplan:mvp`; filhas com apenas `proplan:planejado`. Verificação por leitura confirmou corpos/títulos exatos, estado aberto, labels, oito vínculos pai/sub-issue, dez dependências nativas e a ordem das filhas. Índice canônico Fatia ↔ SPEC em `docs/STATUS.md`, com oito entradas a redigir; demais entradas preservadas.
+
+Dependências: F01 → F02 → F03; F02 → F04; F03 + F04 → F05; F03 → F06; F04 + F06 → F07; F05 + F07 → F08. F03/F06/F07 não dependem de F05; a prova integrada cobre a integração e sua ausência em runtime. Fontes dos módulos futuros não viram pré-requisitos universais; MVP-008/009/016 e M16-F05 não recebem dependência do MVP-007. F07 preserva DESIGN-SYSTEM.md e protótipos HTML após o PRD e antes da construção.
+
+A fila remota estava em #101 no início e passou para #102 na conferência final por movimentação externa. Nenhuma issue anterior foi escrita por esta tarefa; não houve tentativa de restaurar o snapshot antigo #110 nem de reverter a nova fila. O quadro local antigo está explicitamente identificado como histórico; não foi feita reconciliação das entregas operacionais alheias a esta publicação.
+
+Próxima SPEC do MVP-007: M7-F01 (#180). Permanecem 80 SPECs aprovadas no acervo local. Sem implementação, instalação, testes de produto, PR, push ou deploy; validação desta etapa foi documental e dos registros/vínculos do GitHub.
+
 ## Pendências históricas preservadas
 
 - A UI de allowlist ainda exigia decisão de produto: localização, seletor nativo e remoção de `appDir`.

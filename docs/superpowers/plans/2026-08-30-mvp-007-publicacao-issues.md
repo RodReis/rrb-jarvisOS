@@ -1,6 +1,6 @@
 # Plano de publicação — MVP-007: Memória compartilhada
 
-- Estado: planejamento autorizado pelo PI em 2026-08-30; oito fatias organizadas para publicação como `proplan:planejado`.
+- Estado: planejamento e publicação autorizados pelo PI em 2026-08-30; épico #179 e oito fatias #180–#187 publicados, fatias em `proplan:planejado`.
 - Não é SPEC aprovada, plano de execução de código nem aceite do design completo. As pendências abaixo permanecem abertas.
 - Base: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`, decisões parciais registradas até o commit local `574d359`.
 - Índice canônico Fatia ↔ SPEC e links de issues: `docs/STATUS.md`. Não criar slugs de SPEC inexistente; estado inicial: a redigir.
@@ -220,5 +220,7 @@ Demonstrar a jornada integrada da memória compartilhada e seus limites, sem pro
 - Consolidar contratos finais e pendências das SPECs anteriores; não ampliar escopo para sincronização ou todos os menus.
 
 ## Limites de autorização
+
+Publicação verificada em 2026-08-30: corpos e títulos exatos, labels, oito vínculos pai/sub-issue, dez dependências e ordem das oito filhas. O `next` externo observado mudou de #101 para #102 durante a tarefa; nenhuma issue anterior foi alterada por esta publicação. Mapeamento dos links permanece no índice de `docs/STATUS.md`.
 
 Criar este acompanhamento não muda contratos aprovados da pipeline, não aprova novas SPECs e não inicia a fila do MVP-007. Aprovação da organização/publicação foi dada pelo PI; escolhas técnicas ainda abertas serão resolvidas nas respectivas SPECs antes da construção, sem novo aceite duplicado da mesma revisão.

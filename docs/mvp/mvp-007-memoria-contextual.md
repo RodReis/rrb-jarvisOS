@@ -4,7 +4,7 @@
 - Origem: recorte de memória híbrida/RAG anteriormente associado ao Corte 3.
 - Relação com a pipeline: **não bloqueia MVP-008, MVP-009 nem MVP-016**; a M16-F05 mantém escopo próprio e integração reutilizável.
 - Design em elaboração: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`.
-- Issues: publicação em preparação; a #164 trata de memória de falhas do MVP-016, não deste núcleo.
+- Issues publicadas: épico [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179) e oito fatias #180–#187 em `proplan:planejado`, com pais/dependências conferidos em 2026-08-30. A #164 trata de memória de falhas do MVP-016, não deste núcleo.
 - Plano de publicação: `docs/superpowers/plans/2026-08-30-mvp-007-publicacao-issues.md`; índice e links canônicos em `docs/STATUS.md`.
 
 ## Intenção preservada

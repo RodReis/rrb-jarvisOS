@@ -2,7 +2,7 @@
 
 Planejamento atualizado em: **2026-08-30**; fila operacional preservada do registro de **2026-08-29**, não revalidada nesta redação. Fonte única do índice Fatia ↔ SPEC. Histórico e ressalvas: `docs/STATUS-ARQUIVO.md`. O board GitHub vence em caso de divergência factual.
 
-> **Conferência pontual da publicação do MVP-007 (2026-08-30):** o `next` atual no GitHub é **#101**; a tabela “Agora” abaixo é o retrato histórico de 2026-08-29 e não foi reconciliada com as entregas posteriores. A publicação do MVP-007 não altera a fila remota.
+> **Conferência pontual da publicação do MVP-007 (2026-08-30):** o `next` no GitHub passou de **#101** na consulta inicial para **#102** na consulta final, sem alterações de fila por esta tarefa. A tabela “Agora” abaixo é o retrato histórico de 2026-08-29 e não foi reconciliada com as entregas posteriores; o board remoto vence.
 
 ## Agora
 
@@ -47,7 +47,7 @@ Planejamento atualizado em: **2026-08-30**; fila operacional preservada do regis
 | MVP-004 Execução real | [#10](https://github.com/RodReis/rrb-jarvisOS/issues/10) | F01 aceita; F02 aguardando aceite; **F03 nova** (`aprovada-pi` 2026-08-29) | 1/3 |
 | MVP-005 Providers/Vault/Budget | [#76](https://github.com/RodReis/rrb-jarvisOS/issues/76) | F01 e F02 entregues, aguardando aceite; duas SPECs no Backlog | 2/4 |
 | MVP-006 Conectores Essenciais | [#86](https://github.com/RodReis/rrb-jarvisOS/issues/86) | seis SPECs `aprovada-pi` (2026-08-29); fatias no Backlog | 0/6 |
-| MVP-007 Memória Contextual/RAG | publicação em preparação | oito fatias Planejadas; SPECs a redigir; sem implementação autorizada | 0/8 |
+| MVP-007 Memória Contextual/RAG | [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179) | oito fatias #180–#187 Planejadas; SPECs a redigir; sem implementação autorizada | 0/8 |
 | MVP-008 Planejamento Governado | [#93](https://github.com/RodReis/rrb-jarvisOS/issues/93) | seis SPECs `aprovada-pi` (2026-08-29); fatias no Backlog | 0/6 |
 | MVP-009 Entrega Autônoma | [#100](https://github.com/RodReis/rrb-jarvisOS/issues/100) | seis SPECs `aprovada-pi` (2026-08-29); fatias no Backlog | 0/6 |
 | MVP-010 Multi-executor Claude + Codex | [#115](https://github.com/RodReis/rrb-jarvisOS/issues/115) | fatias [#116–#120](https://github.com/RodReis/rrb-jarvisOS/issues/116) no Backlog | 0/5 |
@@ -70,7 +70,7 @@ Planejamento atualizado em: **2026-08-30**; fila operacional preservada do regis
 
 > **MVP-016 em especificação (2026-08-30).** M16-F01–F04 (#163–#166) estão `aprovada-pi`, em Backlog; F05–F06 (#167–#168) aguardam redação. A F06 mantém gate visual. Fonte: `docs/superpowers/specs/2026-08-29-mvp-016-aprendizado-operacional-design.md`.
 
-> **MVP-007 em detalhamento (2026-08-30).** Oito fatias organizadas; publicação das issues Planejadas autorizada pelo PI, em preparação. Próximo passo de especificação: M7-F01. Pipeline não depende da memória. Fonte: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`.
+> **MVP-007 publicado e em detalhamento (2026-08-30).** Épico #179 e oito fatias #180–#187 Planejadas, com vínculos pai e dez dependências nativas conferidos. Próxima SPEC: M7-F01 (#180); nenhuma das oito foi aprovada para construção. Pipeline não depende da memória. Fonte: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`.
 
 > **MVP-009 aprovado (2026-08-29).** Três decisões do PI: **o container Docker é o sandbox do executor** — o Claude Code roda nele com o worktree montado, nunca no host; **merge autônomo ligado por padrão com kill-switch por projeto**, e desligado o run termina no PR verde aguardando o PI; **Context7 é ferramenta do agente construtor** na M9-F04, fechando a pendência herdada do MVP-008. A decisão do container fecha um buraco real: o MVP-004 proibiu comando arbitrário, mas um agente que constrói software precisa exatamente disso — sem fronteira nova, o MVP-009 passaria por cima do enforcement que o MVP-004 entregou. **Docker passa a ser dependência dura**, sem fallback para o host.
 
@@ -96,14 +96,14 @@ Não existe catálogo global `SPEC-nnn`. O identificador canônico é o slug aba
 | M6-F04 | MVP-006 | Automação GitHub | `spec-conectores-04-github-automacao.md` |
 | M6-F05 | MVP-006 | Tavily Search | `spec-conectores-05-tavily-search.md` |
 | M6-F06 | MVP-006 | Tavily Extract/evidências | `spec-conectores-06-tavily-extract-evidencias.md` |
-| M7-F01 | MVP-007 | Núcleo, identidade e persistência | a redigir |
-| M7-F02 | MVP-007 | Fontes iniciais, ingestão e retomada | a redigir |
-| M7-F03 | MVP-007 | Recuperação contextual e orçamento | a redigir |
-| M7-F04 | MVP-007 | Retenção e reconstrução da memória | a redigir |
-| M7-F05 | MVP-007 | Adapter opcional do Graphify | a redigir |
-| M7-F06 | MVP-007 | Memória operacional e validação de lições | a redigir |
-| M7-F07 | MVP-007 | Agent Memory e Notebook | a redigir |
-| M7-F08 | MVP-007 | Resiliência e prova integrada | a redigir |
+| M7-F01 | MVP-007 | Núcleo, identidade e persistência ([#180](https://github.com/RodReis/rrb-jarvisOS/issues/180)) | a redigir |
+| M7-F02 | MVP-007 | Fontes iniciais, ingestão e retomada ([#181](https://github.com/RodReis/rrb-jarvisOS/issues/181)) | a redigir |
+| M7-F03 | MVP-007 | Recuperação contextual e orçamento ([#182](https://github.com/RodReis/rrb-jarvisOS/issues/182)) | a redigir |
+| M7-F04 | MVP-007 | Retenção e reconstrução da memória ([#183](https://github.com/RodReis/rrb-jarvisOS/issues/183)) | a redigir |
+| M7-F05 | MVP-007 | Adapter opcional do Graphify ([#184](https://github.com/RodReis/rrb-jarvisOS/issues/184)) | a redigir |
+| M7-F06 | MVP-007 | Memória operacional e validação de lições ([#185](https://github.com/RodReis/rrb-jarvisOS/issues/185)) | a redigir |
+| M7-F07 | MVP-007 | Agent Memory e Notebook ([#186](https://github.com/RodReis/rrb-jarvisOS/issues/186)) | a redigir |
+| M7-F08 | MVP-007 | Resiliência e prova integrada ([#187](https://github.com/RodReis/rrb-jarvisOS/issues/187)) | a redigir |
 | M8-F01 | MVP-008 | Projeto e Git local | `spec-planejamento-01-projeto-git-local.md` |
 | M8-F02 | MVP-008 | Contexto, skills e orçamento | `spec-planejamento-02-contexto-skills-orcamento.md` |
 | M8-F03 | MVP-008 | Wizard orientado | `spec-planejamento-03-wizard-orientado.md` |
@@ -160,7 +160,7 @@ Não existe catálogo global `SPEC-nnn`. O identificador canônico é o slug aba
 2. Fila corrente: **#110** (UI da allowlist) é o `next`. Depois dele, a ordem entre #79 (BudgetPolicy) e #80 (Multi-provider) é decisão do PI — as duas têm spec aprovada.
 3. A **F03 encaixa no ponto único** que a F02 deixou pronto: a estimativa pré-chamada já é calculada e o `CostEvent` já carrega `estimadoUsd`/`realUsd`. O gate entra entre a estimativa e o disparo do adapter — nenhuma refatoração do ponto de chamada é necessária.
 4. **Conferência documental (2026-08-30):** existem 80 SPECs com status `aprovada-pi` no acervo local, incluindo a M16-F04. Contagem por cabeçalho normalizado; quinze fatias dos MVPs 014–016 estão em Backlog.
-5. MVP-007 com oito fatias de planejamento e publicação autorizada, em preparação; próxima SPEC: M7-F01. Nenhuma das oito SPECs foi redigida/aprovada. MVP-017–MVP-018 ainda serão detalhados. O MVP-016 possui design, seis fatias e M16-F01–F04 aprovados; F05–F06 aguardam redação nas #167–#168, que permanecem Planejadas.
+5. MVP-007 publicado: épico #179 e oito fatias #180–#187 Planejadas; próxima SPEC: M7-F01 (#180). Nenhuma das oito SPECs foi redigida/aprovada. MVP-017–MVP-018 ainda serão detalhados. O MVP-016 possui design, seis fatias e M16-F01–F04 aprovados; F05–F06 aguardam redação nas #167–#168, que permanecem Planejadas.
 6. **M4-F03 (UI da allowlist de diretórios) especificada e aprovada (2026-08-29)** — fechou a última fatia conhecida sem SPEC antes da V3. As cinco SPECs do MVP-014 também foram aprovadas e publicadas nas issues #150–#154.
 7. **Docker virou dependência dura do MVP-009** (sandbox do executor). Confirmar que a máquina de execução tem Docker antes daquele MVP entrar na fila.
 8. **Pipeline V2 publicada:** épicos #115/#121/#127/#133 e 20 fatias #116–#138, com os intervalos de épicos excluídos, estão no Backlog com sub-issues e dependências nativas. A publicação não altera o `next` atual.
