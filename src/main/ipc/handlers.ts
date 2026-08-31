@@ -8,6 +8,7 @@ import {
   type WorkspaceSwitchResult
 } from '@shared/contracts/ipc'
 import { AUTH_MENSAGENS, type AuthSnapshot } from '@shared/contracts/auth'
+import type { PreflightService } from '../pipeline/preflight-service'
 import { parseLogInput } from '@shared/contracts/logging-input'
 import { isSensitivity, type PolicyContext, type PolicyDecision } from '@shared/policies'
 import { isWorkspaceId, type AuditEvent, type AuditEventType } from '@shared/domain/entities'
@@ -300,6 +301,7 @@ export interface IpcDependencies {
   readonly mergePolicy: MergePolicyService
   /** A fila de execução (SPEC-Entrega-02). Exposta só para leitura. */
   readonly fila: FilaService
+  readonly preflight: PreflightService
   /** Vault de credenciais (SPEC-Providers-01): status para a UI, valor só dentro do main. */
   readonly credentials: CredentialService
   /** Runs persistidos, para a UI listar o histórico. */
@@ -1484,6 +1486,12 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       return deps.fila.vista(projectId, workspace)
     }
   )
+
+  /**
+   * O estado do sandbox (SPEC-Entrega-03). Só leitura: responde "a máquina está pronta?" sem
+   * preparar nada — preparar é ato da pipeline, nunca do renderer.
+   */
+  ipcMain.handle(IPC_CHANNELS.sandboxEstado, () => deps.preflight.estado(app.getAppPath()))
 
   /**
    * O kill-switch do merge autônomo (SPEC-Entrega-02/05).

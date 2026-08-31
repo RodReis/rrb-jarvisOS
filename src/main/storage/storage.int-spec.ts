@@ -85,6 +85,7 @@ describe('migrations', () => {
     antigo.exec('DROP TABLE planning_session')
     antigo.exec('DROP TABLE context_pack')
     antigo.exec('DROP TABLE context_item')
+    antigo.exec('DROP TABLE context_pack_path')
     antigo.exec('DROP TABLE failure_fingerprint')
     antigo.exec('DROP TABLE decision')
     antigo.exec('DROP TABLE evidence')

@@ -46,6 +46,10 @@ import { PipelineRepository } from './pipeline/pipeline-repository'
 import { ReconciliacaoService } from './pipeline/reconciliacao-service'
 import { RoadmapService } from './projects/roadmap-service'
 import { GitRunner } from './projects/git-runner'
+import { DockerRunner, prepararGitMeta, TIMEOUT_DOCKER_MS } from './pipeline/docker-runner'
+import { ExecutorProxy } from './pipeline/executor-proxy'
+import { PreflightService } from './pipeline/preflight-service'
+import { verificadorDeContainer, verificadorDePorta } from './pipeline/verificadores-de-sandbox'
 import { ContextRepository } from './context/context-repository'
 import { ContextService } from './context/context-service'
 import { CredentialService } from './credentials/credential-service'
@@ -443,12 +447,65 @@ if (!app.requestSingleInstanceLock()) {
       userId: userIdAtual,
       mergeAutonomoLigado: (projectId) => mergePolicy.autonomoLigado(projectId)
     })
+    // Sandbox do executor, proxy e preflight (SPEC-Entrega-03).
+    //
+    // O `TerminalEngine` do Docker é **outra instância**, com prazo maior: o do usuário tem 30 s,
+    // e `docker run` de imagem ainda não baixada leva minutos. É a única diferença entre as
+    // duas — a mesma política, a mesma auditoria, a mesma allowlist governam ambas.
+    const terminalDocker = new TerminalEngine(
+      policy,
+      commandAllowlist,
+      allowlist,
+      runs,
+      approvals,
+      storage.audit,
+      userIdAtual,
+      TIMEOUT_DOCKER_MS
+    )
+    const docker = new DockerRunner(terminalDocker, () => workspaces.atual())
+
+    // O proxy é o **único** caminho do container até o modelo (critério 11): o container recebe
+    // só a URL, e a credencial da rota fica aqui. Sobe antes do preflight porque é ele que o
+    // preflight pergunta se está no ar.
+    const executorProxy = new ExecutorProxy({
+      ai,
+      userId: userIdAtual,
+      workspaceId: () => workspaces.atual(),
+      rota: () => 'claude-code',
+      // Preenchidos pela M9-F04, que é quem conhece o run em construção. Até lá o proxy
+      // funciona sem correlação — e o `CostEvent` registra o que sabe, nunca um run inventado.
+      contexto: () => undefined,
+      contextPackId: () => undefined
+    })
+    await executorProxy.iniciar()
+
+    const preflight = new PreflightService({
+      git: gitRunner,
+      docker,
+      leases: leaseRepository,
+      audit: storage.audit,
+      userId: userIdAtual,
+      workspaceId: () => workspaces.atual(),
+      proxyNoAr: () => executorProxy.noAr(),
+      // A derivação a partir da arquitetura aprovada é da M9-F04, que conhece o pacote do
+      // projeto-alvo. Sem ela, a SPEC precisa trazer a seção — e o preflight recusa se não vier,
+      // que é o critério 13 se comportando como projetado.
+      derivarPaths: () => undefined,
+      prepararGitMeta
+    })
+
     const reconciliacao = new ReconciliacaoService({
       runs: pipelineRepository,
       leases: leaseRepository,
       audit: storage.audit,
       userId: userIdAtual,
-      workspaceId: () => workspaces.atual()
+      workspaceId: () => workspaces.atual(),
+      // O ponto de extensão que a M9-F02 deixou pronto, agora preenchido: container e porta
+      // passam a ser consultados antes de um lease expirado cair (critério 4).
+      verificadores: [
+        verificadorDeContainer(docker, () => app.getAppPath()),
+        verificadorDePorta(docker, () => app.getAppPath())
+      ]
     })
 
     // **`reconcileAll` é bloqueante** (decisão cravada da spec): nenhum trabalho novo é adquirido
@@ -476,6 +533,7 @@ if (!app.requestSingleInstanceLock()) {
       publicacao,
       mergePolicy,
       fila,
+      preflight,
       credentials,
       ai,
       budget,

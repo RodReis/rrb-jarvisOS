@@ -72,6 +72,7 @@ describe('ponte do preload', () => {
       'createWorkflow',
       'definirPoliticaDeMerge',
       'escolherAnexo',
+      'estadoDoSandbox',
       'gerarArquitetura',
       'gerarPacote',
       'gerarRoadmap',
