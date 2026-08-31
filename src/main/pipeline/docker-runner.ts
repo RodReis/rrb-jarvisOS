@@ -128,11 +128,16 @@ export class DockerRunner {
   }
 
   /**
-   * A porta está livre? (critério 3)
+   * A porta já está publicada por algum container? (critério 3)
    *
-   * Pergunta ao Docker quais portas ele já publicou **e** tenta o bind de verdade: um container
-   * de outro projeto aparece na primeira lista, mas um processo qualquer do host não — e subir
-   * o recurso para descobrir a colisão pelo erro é justamente o que o critério proíbe.
+   * Pergunta ao Docker, e **só** a ele: um container de outro projeto aparece aqui, um processo
+   * qualquer do host não. É a metade da resposta que serve tanto ao preflight (antes de subir)
+   * quanto à reconciliação (o recurso ainda está em uso?) — e é deliberadamente conservadora:
+   * subir o recurso e descobrir a colisão pelo erro é justamente o que o critério proíbe.
+   *
+   * **Limite honesto:** não tenta o bind, então uma porta tomada por processo fora do Docker
+   * não é vista aqui. Fechar isso exige um `net.createServer` de sonda, e a M9-F03 não tem
+   * projeto que declare serviços para exercitá-lo — ver o limite registrado na entrega.
    */
   portaOcupadaPorContainer(porta: number, cwd: string): boolean {
     const execucao = this.terminal.run(

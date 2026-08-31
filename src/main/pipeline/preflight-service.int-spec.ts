@@ -94,13 +94,14 @@ function montarServico(opcoes: {
   readonly proxyNoAr?: boolean
   readonly derivados?: PathsPermitidos | undefined
   readonly chamadas?: ChamadaDocker[]
+  readonly portasOcupadas?: readonly number[]
 }): InstanceType<typeof PreflightService> {
   const chamadas = opcoes.chamadas ?? []
   return new PreflightService({
     git: gitRunnerReal() as never,
     docker: {
       disponivel: () => opcoes.dockerNoAr !== false,
-      portaOcupadaPorContainer: () => false,
+      portaOcupadaPorContainer: (porta: number) => (opcoes.portasOcupadas ?? []).includes(porta),
       containerExiste: () => false,
       subir: (montagem: Record<string, unknown>) => {
         chamadas.push({ montagem })
@@ -223,6 +224,28 @@ describe('preflight — recusas que não deixam rastro', () => {
   it('não confunde raiz irmã de nome parecido com o checkout ativo', () => {
     const irma = `${repo}-op`
     const outcome = montarServico({}).preparar(pedido({ raizOperacional: irma }))
+
+    expect(outcome.reason).toBe('liberado')
+  })
+
+  /**
+   * Critério 3: a colisão é detectada **antes** de subir recurso. Descobri-la pelo erro do
+   * `docker run` deixaria worktree e leases criados para trás — por isso a asserção mede também
+   * que a tabela `lease` continua vazia.
+   */
+  it('recusa quando uma porta de serviço declarada já está ocupada', () => {
+    const outcome = montarServico({ portasOcupadas: [5432] }).preparar(
+      pedido({ portasDeServico: [5432, 6379] })
+    )
+
+    expect(outcome.reason).toBe('recurso-ocupado')
+    expect(outcome.mensagem).toContain('5432')
+    expect(linhasDeLease()).toBe(0)
+  })
+
+  /** Projeto sem serviços declarados: o sandbox não publica porta, e nada deve ser checado. */
+  it('libera quando o projeto não declara portas de serviço', () => {
+    const outcome = montarServico({ portasOcupadas: [5432] }).preparar(pedido())
 
     expect(outcome.reason).toBe('liberado')
   })

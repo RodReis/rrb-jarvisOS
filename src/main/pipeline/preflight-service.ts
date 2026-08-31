@@ -56,6 +56,15 @@ export interface PedidoDePreflight {
   readonly base: string
   /** O escopo declarado pela SPEC, quando ela o traz (critério 13). */
   readonly pathsDaSpec?: PathsPermitidos
+  /**
+   * As portas dos serviços que o projeto-alvo declara (banco, cache) — o papel (b) do Docker.
+   *
+   * Vazio quando o projeto não declara serviços, que é o caso de todo projeto hoje: o sandbox
+   * do executor não publica porta nenhuma. A checagem existe porque o critério 3 é sobre
+   * **subir recurso**, e o dia em que a SPEC-alvo declarar um serviço a colisão tem de ser
+   * detectada antes, não pelo erro do `docker run`.
+   */
+  readonly portasDeServico?: readonly number[]
   readonly proxyUrl: string
 }
 
@@ -152,7 +161,21 @@ export class PreflightService {
       )
     }
 
-    // 5. A base resolve? O SHA é fixado **antes** de qualquer escrita (critério 2): a branch
+    // 5. Porta ocupada é detectada **antes** de subir recurso (critério 3). Descobrir a colisão
+    //    pelo erro do `docker run` deixaria worktree e leases já criados para trás.
+    const ocupada = (pedido.portasDeServico ?? []).find((porta) =>
+      this.deps.docker.portaOcupadaPorContainer(porta, pedido.raizOperacional)
+    )
+    if (ocupada !== undefined) {
+      return this.recusar(
+        pedido,
+        'recurso-ocupado',
+        `A porta ${ocupada}, declarada pelos serviços do projeto, já está publicada por outro container.`,
+        `Encerrar o container que ocupa a porta ${ocupada}, ou declarar outra porta no projeto.`
+      )
+    }
+
+    // 6. A base resolve? O SHA é fixado **antes** de qualquer escrita (critério 2): a branch
     //    tem de nascer de um ponto conhecido, não de "o que a base for quando eu olhar".
     const baseSha = this.resolverBase(pedido)
     if (baseSha === undefined) {
@@ -164,7 +187,7 @@ export class PreflightService {
       )
     }
 
-    // 6. Os recursos são deste run, ou de ninguém (critério 4). O `UNIQUE(user_id, recurso)`
+    // 7. Os recursos são deste run, ou de ninguém (critério 4). O `UNIQUE(user_id, recurso)`
     //    fecha a janela entre olhar e adquirir — o mesmo raciocínio do WIP=1 da M9-F02.
     const leaseWorktree = this.deps.leases.adquirir(
       userId,
@@ -204,7 +227,7 @@ export class PreflightService {
       )
     }
 
-    // 7. A branch nasce do SHA fixado (critério 2), num worktree fora do checkout ativo.
+    // 8. A branch nasce do SHA fixado (critério 2), num worktree fora do checkout ativo.
     const branch = nomeDaBranch(pedido.sliceId, pedido.runId)
     // `core.autocrlf=false` no ato do checkout, e isto **não é preferência de estilo**: no
     // Windows o padrão grava CRLF no disco, e o Git de dentro do container (Linux) lê cada
@@ -225,7 +248,7 @@ export class PreflightService {
       )
     }
 
-    // 8. A árvore é limpa? Modificação não commitada não é lixo — é trabalho de alguém, e
+    // 9. A árvore é limpa? Modificação não commitada não é lixo — é trabalho de alguém, e
     //    apagá-la seria a destruição que o critério 7 proíbe. Só olhamos a **nossa** árvore.
     const sujo = this.deps.git.run(['status', '--porcelain'], worktree, this.deps.workspaceId())
     if (sujo.ok && sujo.saida !== '') {
@@ -238,7 +261,7 @@ export class PreflightService {
       )
     }
 
-    // 9. O sandbox sobe com o worktree montado e nenhum segredo (critérios 8 e 9).
+    // 10. O sandbox sobe com o worktree montado e nenhum segredo (critérios 8 e 9).
     //
     // O metadado do Git vai **copiado**: o `commondir` precisa de um caminho no host e outro no
     // container, e é um arquivo só. Reescrevê-lo no original faz o host perder o worktree

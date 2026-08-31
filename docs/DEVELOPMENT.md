@@ -1482,7 +1482,7 @@ Status: **entregue** — spec `aprovada-pi` (2026-08-29, emendada em 2026-08-30 
 - [x] **Migration 24** — `context_pack_path` e as colunas `run_id`/`tentativa` no `cost_event`
 - [x] **`ContextPack` ganhou `pathsPermitidos`** — e o campo entrou no **canônico do `hashDoPack`**
 - [x] **Canal `sandbox:estado`** — só leitura, como os três da M9-F02; nenhum prepara sandbox
-- [x] **Testes**: 17 de integração (SQLite + Git real), 8 do proxy (HTTP real), 17 de domínio puro
+- [x] **Testes**: 19 de integração (SQLite + Git real), 8 do proxy (HTTP real), 17 de domínio puro
 
 **Quatro furos da spec foram medidos e levados ao PI antes de codificar.** Nenhum era opinião: cada um foi reproduzido antes de virar pergunta.
 
@@ -1503,11 +1503,13 @@ Os dois viraram teste (`deixa o Git do host funcionando` e `cria o worktree sem 
 
 **Um contrafactual passou, e era lacuna de cobertura.** Trocar a comparação por segmento por `startsWith` no guarda do critério 1 deixou os 14 testes verdes: nos caminhos exercitados as duas concordam. Faltava o caso que as separa — uma raiz **irmã** de nome parecido (`projeto-op` ao lado de `projeto`), que o prefixo recusaria e a comparação por segmento libera. Com ele, o contrafactual reprova.
 
+**A auto-revisão do diff achou um critério não implementado.** O critério 3 pede colisão de porta detectada **antes de subir recurso**, e o preflight não checava porta nenhuma: a única chamada de `portaOcupadaPorContainer` era da reconciliação. Passava despercebido porque o sandbox do executor não publica porta — mas o critério é sobre o papel (b) do Docker, os serviços do projeto-alvo. `PedidoDePreflight` ganhou `portasDeServico`, e a checagem acontece **antes** dos leases, senão a colisão deixaria worktree e leases criados para trás. O docstring do runner, que afirmava "tenta o bind de verdade", foi corrigido para o que o código faz: pergunta ao Docker, e não vê porta tomada por processo fora dele.
+
 **A prova de "nenhum segredo no container" é sobre os args reais**, não sobre o retorno: o teste inspeciona a montagem que o serviço passou ao `docker run` e reprova quando alguém acrescenta a sessão do host — e o smoke confirmou com `env` de dentro do container.
 
 **`docker stop`, nunca `docker rm`.** `rm|rmi|prune|down` casa a política de destrutivos do MVP-004 e abriria `ApprovalRequest`, travando a limpeza num gate humano. Por decisão do PI a colisão é da **M9-F06**: esta fatia não toca a política.
 
-**Limites:** **sem tela** — a fatia é infraestrutura, e `sandbox:estado` existe para o painel da M9-F06. **`derivarPaths` devolve `undefined` no boot**: a derivação a partir da arquitetura aprovada é da M9-F04, que conhece o pacote do projeto-alvo — até lá a SPEC precisa trazer a seção, e o preflight recusa se não vier, que é o critério 13 se comportando como projetado. **`contexto`/`contextPackId` do proxy são `undefined` no boot** pelo mesmo motivo: quem conhece o run em construção é a M9-F04. **Nada dispara o preflight automaticamente** ainda. **A reserva de portas de serviço do projeto não foi exercitada** — nenhum projeto declara serviços hoje; o que existe é a detecção de colisão e o lease. **`docker` precisa estar na allowlist de comandos do workspace**, e o worktree sob a allowlist de diretórios: o sandbox passa pelo mesmo enforcement do MVP-004, de propósito.
+**Limites:** **sem tela** — a fatia é infraestrutura, e `sandbox:estado` existe para o painel da M9-F06. **`derivarPaths` devolve `undefined` no boot**: a derivação a partir da arquitetura aprovada é da M9-F04, que conhece o pacote do projeto-alvo — até lá a SPEC precisa trazer a seção, e o preflight recusa se não vier, que é o critério 13 se comportando como projetado. **`contexto`/`contextPackId` do proxy são `undefined` no boot** pelo mesmo motivo: quem conhece o run em construção é a M9-F04. **Nada dispara o preflight automaticamente** ainda. **A detecção de colisão de porta existe e é testada, mas nenhum projeto declara serviços hoje** — então ela nunca roda com lista não-vazia fora do teste. E ela pergunta **só ao Docker**: uma porta tomada por processo fora do Docker não é vista, o que exigiria uma sonda de `bind` que nenhuma fatia hoje tem como exercitar. **`docker` precisa estar na allowlist de comandos do workspace**, e o worktree sob a allowlist de diretórios: o sandbox passa pelo mesmo enforcement do MVP-004, de propósito.
 
 ## Registro de entregas
 
