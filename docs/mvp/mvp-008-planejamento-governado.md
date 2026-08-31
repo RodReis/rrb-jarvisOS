@@ -31,7 +31,7 @@ A mesma revisão não volta ao PI. Mudanças invalidam somente gates dependentes
 | 5 | O app **não chama Context7**; ele é do agente construtor no MVP-009 | M8-F02, M8-F04 |
 | 6 | Anexos de design entram por **seletor de arquivos que copia e hasheia no ato** | M8-F05 |
 
-Emendas geradas por estas decisões: `spec-providers-03-budget-policy.md` e `spec-providers-04-multi-provider-roteamento.md` (rota de assinatura é `subscription_limited`: sem preço USD por chamada, mas sujeita à quota observável).
+Emendas geradas por estas decisões: `spec-providers-03-budget-policy.md` e `spec-providers-04-multi-provider-roteamento.md` (rota de assinatura é `unmetered`).
 
 ## Dependências duras registradas
 

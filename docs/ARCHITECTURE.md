@@ -129,7 +129,7 @@ Fonte: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.m
 
 ### Pipeline V3 — Release, operação e aprendizado (MVP-014–016 detalhados; não implementados)
 
-`MVP-014 Release → MVP-015 Observabilidade → MVP-016 Aprendizado operacional → MVP-017 Blueprints → MVP-018 Portfólio`.
+`MVP-014 Release → MVP-015 Observabilidade → MVP-016 Aprendizado operacional → MVP-023 Blueprints → MVP-024 Portfólio`.
 
 O MVP-014 separa dois fluxos: `PreviewRun` por PR/fatia e `ReleaseRun` após merge. O núcleo determinístico mantém fila, estados, gates, idempotência, leases e compensações; adapters híbridos e CLI-first integram Docker Compose, GHCR, Vercel e Railway.
 
@@ -208,3 +208,10 @@ O reconciliador consulta as fontes reais antes de repetir efeitos. Uma saída de
 - A pipeline não herda nem inventa classificação de saúde, finanças, documentos, LGPD ou consentimento.
 
 Documentos canônicos: `docs/mvp/mvp-006-conectores-essenciais.md`, `mvp-008-planejamento-governado.md`, `mvp-009-entrega-autonoma.md` e suas SPECs.
+
+
+### Fechamento documental da V3 (2026-08-31)
+
+V3 possui 25 SPECs: quinze previamente aprovadas (MVP-014/015 e M16-F01–F04), duas novas de aprendizado e oito novas de Blueprints/Portfólio. As dez novas são rascunho-completo. Blueprints tem catálogo/revisões, instanciação, anexos/evolução e UI; Portfólio tem consultas, controles pelos donos, custos/quotas e UI. São módulos planejados, não serviços já implementados. Designs e vínculos estão no índice canônico STATUS.
+
+MVP-005 entregue conserva seu contrato original de providers; separação de runtimes é evolução da M10-F01, não garantia retroativa. A noção de quota da assinatura é pré-requisito explícito da M9-F04 (PR #207), não entrega presumida da M5-F04. O diário de efeitos pertence à M9-F02 e sua falha real está na #209, não nas SPECs finalizadas M6-F01/F02.

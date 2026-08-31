@@ -123,6 +123,15 @@ Não existe catálogo global `SPEC-nnn`. O slug identifica a SPEC; os números a
 | M17-F03 | MVP-017 | Persona JARVIS no ponto único | `spec-voz-03-persona-ponto-unico.md` |
 | M22-F01 | MVP-022 | Menu JARVIS OS / Agents OS | `spec-shell-01-menu-jarvis-agents-os.md` |
 
+| M23-F01 | MVP-023 | Catálogo e revisões de Blueprints ([#214](https://github.com/RodReis/rrb-jarvisOS/issues/214)) | `spec-blueprints-01-catalogo-revisoes.md` — rascunho-completo |
+| M23-F02 | MVP-023 | Instanciação e wizard orientado ([#215](https://github.com/RodReis/rrb-jarvisOS/issues/215)) | `spec-blueprints-02-instanciacao-wizard.md` — rascunho-completo |
+| M23-F03 | MVP-023 | Anexos, compatibilidade e evolução ([#216](https://github.com/RodReis/rrb-jarvisOS/issues/216)) | `spec-blueprints-03-anexos-compatibilidade.md` — rascunho-completo |
+| M23-F04 | MVP-023 | Interface e prova integrada de Blueprints ([#217](https://github.com/RodReis/rrb-jarvisOS/issues/217)) | `spec-blueprints-04-interface-resiliencia-e2e.md` — rascunho-completo |
+| M24-F01 | MVP-024 | Catálogo e prontidão do portfólio ([#218](https://github.com/RodReis/rrb-jarvisOS/issues/218)) | `spec-portfolio-01-catalogo-prontidao.md` — rascunho-completo |
+| M24-F02 | MVP-024 | Prioridade e controles canônicos ([#219](https://github.com/RodReis/rrb-jarvisOS/issues/219)) | `spec-portfolio-02-prioridade-controles.md` — rascunho-completo |
+| M24-F03 | MVP-024 | Custos, quotas e capacidade do portfólio ([#220](https://github.com/RodReis/rrb-jarvisOS/issues/220)) | `spec-portfolio-03-custos-quotas.md` — rascunho-completo |
+| M24-F04 | MVP-024 | Console de portfólio e prova integrada ([#221](https://github.com/RodReis/rrb-jarvisOS/issues/221)) | `spec-portfolio-04-console-resiliencia-e2e.md` — rascunho-completo |
+
 ## Próximas ações
 
 1. Conservar `next` em #103 e a fila vigente. Corrigir #209 na execução correspondente; este planejamento não fecha a falha.

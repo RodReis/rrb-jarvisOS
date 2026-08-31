@@ -19,10 +19,10 @@ Produção é automática depois do merge e dos gates técnicos. Não existe um 
 1. **MVP-014 — Release e Deploy Governado.** Preview isolado, Staging persistente, Produção automática, compensações e evidência de release.
 2. **MVP-015 — Observabilidade Operacional.** Runs, PRs, deploys, custos, quotas, falhas, saúde dos adapters e timeline por SPEC/MVP.
 3. **MVP-016 — Aprendizado Operacional da Pipeline.** Lições e políticas versionadas, memória de falhas, replay/shadow/canário e otimização de contexto/tokens sem substituir o MVP-007 nem reimplementar os mecanismos dos MVPs 008/009.
-4. **MVP-017 — Biblioteca de Blueprints.** Padrões de PRD, arquitetura, SPEC, DESIGN-SYSTEM, protótipos e perguntas orientadas com “Decide por mim”.
-5. **MVP-018 — Gestão de Portfólio.** Vários projetos, fila global, prioridade do PI, custo/quota por projeto e prontidão de planejamento.
+4. **MVP-023 — Biblioteca de Blueprints.** Padrões de PRD, arquitetura, SPEC, DESIGN-SYSTEM, protótipos e perguntas orientadas com “Decide por mim”.
+5. **MVP-024 — Gestão de Portfólio.** Vários projetos, fila global, prioridade do PI, custo/quota por projeto e prontidão de planejamento.
 
-O MVP-014 está detalhado neste documento. O MVP-015 possui design e seis SPECs aprovadas em `2026-08-29-mvp-015-observabilidade-operacional-design.md`. O MVP-016 possui design e seis fatias aprovadas em `2026-08-29-mvp-016-aprendizado-operacional-design.md`; M16-F01–F04 estão `aprovada-pi` e F05–F06 aguardam redação. MVP-017 e MVP-018 mantêm somente direção aprovada.
+O MVP-014 está detalhado neste documento. O MVP-015 possui design e seis SPECs aprovadas em `2026-08-29-mvp-015-observabilidade-operacional-design.md`. O MVP-016 possui design e seis fatias aprovadas em `2026-08-29-mvp-016-aprendizado-operacional-design.md`; M16-F01–F04 estão `aprovada-pi` e F05–F06 estão redigidas em `rascunho-completo`. Blueprints e Portfólio foram detalhados em quatro SPECs cada, como MVP-023 e MVP-024: os números 017–022 já pertencem a Command Center/Shell. Os novos designs estão em `2026-08-31-mvp-023-blueprints-design.md` e `2026-08-31-mvp-024-portfolio-design.md`; nenhuma nova SPEC recebe aprovação presumida.
 
 ## 3. Decisões do PI para o MVP-014
 
@@ -230,3 +230,10 @@ Uma fatia mergeada percorre Preview, Staging e Produção sem novo aceite, usa o
 Este design autoriza as cinco SPECs do MVP-014 e remete os MVPs 015–016 aos seus designs complementares aprovados. Não autoriza implementação, gasto novo, push ou PR. A publicação das issues dos MVPs 014–016 foi autorizada separadamente pelo PI e concluída em 2026-08-29. Quinze SPECs aprovadas estão em backlog; as duas fatias restantes do MVP-016 permanecem planejadas.
 
 Não resta questão estrutural aberta para o design do MVP-014. Nomes exatos de tipos, schemas IPC, migrations locais e divisão interna de arquivos pertencem às SPECs e não podem alterar os contratos acima.
+
+
+## 18. Fechamento da Pipeline V3 (2026-08-31)
+
+Cinco MVPs, 25 fatias, 25 SPECs redigidas e 25 issues de fatia: MVP-014 (#149, #150–#154), MVP-015 (#155, #156–#161), MVP-016 (#162, #163–#168), MVP-023 (#212, #214–#217) e MVP-024 (#213, #218–#221). As quinze revisões já aprovadas conservam o aceite; as dez novas são rascunho-completo. A ordem operacional continua no STATUS, sem alteração do next.
+
+Este fechamento autoriza somente documentação/publicação solicitadas pelo PI e a conclusão do PR #189. As restrições anteriores de não realizar push/PR descrevem as etapas históricas, superadas para esta publicação pelo pedido explícito de finalizar o PR; não autorizam implementação ou gasto novo. O aceite de Finalizado segue a CONVENTION da main/PR #207 e não cria segundo aceite técnico de merge/deploy.

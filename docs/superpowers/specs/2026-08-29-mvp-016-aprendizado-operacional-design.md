@@ -270,3 +270,8 @@ Para um projeto selecionado, uma falha recorrente é reconhecida sem esconder ca
 O PI aprovou o design e as seis fatias. Isso autoriza redigir as seis SPECs para revisão, mas não autoriza implementação, gasto, smoke externo, push ou PR. A publicação das issues foi autorizada separadamente e concluída em 2026-08-29; F01–F04 estão em backlog após aceite exato e F05–F06 permanecem planejadas até aprovação de suas SPECs. Esta tarefa continua em planejamento.
 
 A implementação de cada fatia depende do aceite exato da respectiva SPEC e da fila. A M16-F06 também depende de `DESIGN-SYSTEM.md` e protótipos HTML formais aprovados. Números dos perfis, schemas IPC, migrations e divisão interna de arquivos pertencem às SPECs sem poder alterar este design.
+
+
+## Fechamento da redação (2026-08-31)
+
+As seis fatias possuem SPEC completa. F01–F04 conservam aceite; F05 (`spec-aprendizado-05-estrategias-recomendacoes.md`, #167) e F06 (`spec-aprendizado-06-interface-resiliencia-e2e.md`, #168) ficam em rascunho-completo para revisão. Não há fatia deste MVP a redigir; revisão de entrada e anexos visuais continuam anteriores à construção, sem implementação nesta tarefa.
