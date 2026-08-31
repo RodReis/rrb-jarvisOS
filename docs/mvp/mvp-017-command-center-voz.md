@@ -1,6 +1,6 @@
 # MVP-017 — Command Center: voz, persona e mascote
 
-- Status: épico criado em 2026-08-30; divisão aprovada pelo PI na mesma data. **SPECs da F01 (issue [#200](https://github.com/RodReis/rrb-jarvisOS/issues/200)) e F02 `aprovada-pi` em 2026-08-30**; F03–F05 seguem sem SPEC — nascimento lazy: fatia só vira issue quando a SPEC dela ficar `aprovada-pi` **e chegar à `main`**.
+- Status: épico criado em 2026-08-30; divisão aprovada pelo PI na mesma data. **SPECs da F01 (issue [#200](https://github.com/RodReis/rrb-jarvisOS/issues/200)), F02 (issue [#202](https://github.com/RodReis/rrb-jarvisOS/issues/202)) e F03 `aprovada-pi` em 2026-08-30**; F04–F05 seguem sem SPEC — nascimento lazy: fatia só vira issue quando a SPEC dela ficar `aprovada-pi` **e chegar à `main`**.
 - GitHub: épico [#193](https://github.com/RodReis/rrb-jarvisOS/issues/193).
 - Fila: **depois do MVP-009**, antes dos MVP-010–016 (decisão do PI, 2026-08-30).
 - Depende de: MVP-005 (ponto único de IA, entregue). Não depende de: MVP-006, MVP-007.
@@ -18,16 +18,17 @@ O Command Center do protótipo (voz + mascote) é a identidade do produto. Este 
 | 2 | **Home Assistant removido** do escopo do Command Center (valia para a proposta original inteira) |
 | 3 | Escuta contínua/wake word é o MVP-018; aqui o único gatilho é o push-to-talk |
 | 4 | Hardware registrado: Ryzen 7 9800X3D + RTX 5060 8GB GDDR7. Whisper `small` como default — Qwen3 8B Q4 (~5GB) + Whisper residentes encostam no teto de VRAM |
+| 5 | Conversa de voz é **só local** (Qwen3 8B via Ollama); sem fallback cloud — indisponibilidade recusa com próxima ação (SPEC-Voz-03) |
 
 ## Fatias previstas
 
-Índice `M17-Fnn`. Nomes de SPEC de F03–F05 são **previstos** — a SPEC nasce quando a fatia entrar em redação.
+Índice `M17-Fnn`. Nomes de SPEC de F04–F05 são **previstos** — a SPEC nasce quando a fatia entrar em redação.
 
 | Índice | Fatia | SPEC |
 |---|---|---|
 | M17-F01 | STT local (faster-whisper) atrás de interface Engine + push-to-talk | `spec-voz-01-stt-local-push-to-talk.md` — **`aprovada-pi` (2026-08-30)** · issue [#200](https://github.com/RodReis/rrb-jarvisOS/issues/200) |
-| M17-F02 | TTS Piper com timeline de visemes | `spec-voz-02-tts-piper-fonemas.md` — **`aprovada-pi` (2026-08-30)** |
-| M17-F03 | Persona JARVIS no ponto único de IA | `spec-voz-03-persona-ponto-unico.md` (prevista) |
+| M17-F02 | TTS Piper com timeline de visemes | `spec-voz-02-tts-piper-fonemas.md` — **`aprovada-pi` (2026-08-30)** · issue [#202](https://github.com/RodReis/rrb-jarvisOS/issues/202) |
+| M17-F03 | Persona JARVIS no ponto único de IA | `spec-voz-03-persona-ponto-unico.md` — **`aprovada-pi` (2026-08-30)** |
 | M17-F04 | Mascote com lip-sync por visemes + estados | `spec-voz-04-mascote-lipsync.md` (prevista) |
 | M17-F05 | UI do Command Center (waveform, transcript, histórico) | `spec-voz-05-ui-command-center.md` (prevista) |
 
@@ -39,6 +40,7 @@ Ordem: F01 → F02 → F03 → F04 → F05.
 - Toda chamada de LLM passa pelo ponto único de IA do MVP-005 (budget, auditoria, roteamento); nenhum caminho paralelo.
 - STT e TTS ficam atrás de interface Engine — trocar de engine é configuração, não refatoração.
 - Lip-sync por **visemes** (timing de fonemas do Piper), nunca por amplitude.
+- Conversa por voz **não executa ação**: comando de voz com efeito é fatia futura com spec própria (Policy Engine + aprovação), nunca subproduto da F03.
 
 ## Done do épico
 
@@ -46,4 +48,4 @@ Ordem: F01 → F02 → F03 → F04 → F05.
 - Boca do mascote sincronizada por visemes, com estados idle/ouvindo/pensando/falando.
 - Persona editável em Settings sem rebuild.
 
-As perguntas abertas de cada fatia são apresentadas ao PI na redação da SPEC correspondente — as da F01 (oito decisões) e da F02 (quatro decisões) foram resolvidas em 2026-08-30 e estão registradas nas próprias SPECs.
+As perguntas abertas de cada fatia são apresentadas ao PI na redação da SPEC correspondente — as da F01 (oito decisões), F02 (quatro) e F03 (quatro) foram resolvidas em 2026-08-30 e estão registradas nas próprias SPECs.

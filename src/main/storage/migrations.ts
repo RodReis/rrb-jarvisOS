@@ -958,6 +958,81 @@ const MIGRATIONS: readonly string[] = [
   );
   CREATE UNIQUE INDEX idx_external_ref_chave
     ON external_ref(user_id, project_id, alvo, chave_externa);
+  `,
+
+  // 23 — execução durável: runs, leases e o kill-switch do merge (SPEC-Entrega-02).
+  //
+  // Três tabelas, e cada uma existe por um critério distinto.
+  //
+  // `pipeline_run` é o estado da execução de uma fatia. Ele **não mora em `slice`** porque uma
+  // fatia pode ter mais de um run: bloqueio resolvido cria continuação vinculada
+  // (`continua_de`), e guardar o estado na fatia sobrescreveria a história que o critério 4
+  // precisa reconstituir. `bloqueio` é JSON com os cinco campos da CONVENTION §4 — NULL fora de
+  // `BLOCKED`, e o serviço recusa `BLOCKED` sem eles (critério 6).
+  //
+  // `lease` é a posse durável de um recurso. **O slot global de WIP é uma linha como as
+  // outras**, com `recurso = 'wip:global'` e `project_id` NULL (emenda 1 de 2026-08-30):
+  // modelá-lo à parte criaria uma segunda regra de expiração, e a esquecida seria a que trava a
+  // máquina. O `UNIQUE` sobre `(user_id, recurso)` é o que faz o WIP=1 valer no banco e não só
+  // no código — duas transações concorrentes não conseguem inserir o mesmo recurso, mesmo que a
+  // checagem em memória de ambas tenha visto o slot livre.
+  //
+  // `expira_em` e `heartbeat_em` são epoch ms (INTEGER), não texto ISO: a comparação de
+  // expiração é aritmética e roda em toda aquisição, e comparar string de data no SQLite
+  // convidaria a um bug de fuso no dia em que alguém gravasse com offset.
+  //
+  // `project_merge_policy` é o kill-switch por projeto (decisão do PI, 2026-08-30). Linha só
+  // existe quando alguém **desligou** o merge — a ausência é o default ligado, que é a tese do
+  // MVP-009. Um default gravado em toda criação de projeto significaria migrar linhas no dia em
+  // que o default mudasse; a ausência não precisa migrar.
+  `
+  CREATE TABLE pipeline_run (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    project_id   TEXT NOT NULL,
+    slice_id     TEXT NOT NULL,
+    -- 'PLANNED' | 'AWAITING_PI' | 'READY' | 'RUNNING' | 'VALIDATING' | 'PR_CI'
+    -- | 'MERGED' | 'AWAITING_MERGE' | 'BLOCKED' | 'CANCELLED'. Enum no domínio.
+    estado       TEXT NOT NULL,
+    -- O run de que este é continuação, quando houver. NULL no primeiro run da fatia.
+    continua_de  TEXT,
+    -- JSON com os cinco campos do BloqueioExterno. NULL fora de 'BLOCKED'.
+    bloqueio     TEXT,
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL
+  );
+  CREATE INDEX idx_pipeline_run_fatia
+    ON pipeline_run(user_id, project_id, slice_id, created_at);
+  CREATE INDEX idx_pipeline_run_estado ON pipeline_run(user_id, estado);
+
+  CREATE TABLE lease (
+    id            TEXT PRIMARY KEY,
+    user_id       TEXT NOT NULL,
+    -- O id do run que detém o recurso. Não existe lease sem proprietário.
+    proprietario  TEXT NOT NULL,
+    -- 'wip:global', um worktree, uma porta, um container.
+    recurso       TEXT NOT NULL,
+    -- NULL no slot global de WIP: ele é da máquina, não de um projeto.
+    project_id    TEXT,
+    heartbeat_em  INTEGER NOT NULL,
+    expira_em     INTEGER NOT NULL,
+    created_at    TEXT NOT NULL
+  );
+  -- O WIP=1 vale no banco, não só no código: duas transações não inserem o mesmo recurso.
+  CREATE UNIQUE INDEX idx_lease_recurso ON lease(user_id, recurso);
+
+  CREATE TABLE project_merge_policy (
+    project_id   TEXT NOT NULL,
+    user_id      TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    -- 0 = kill-switch acionado (merge autônomo desligado). Linha ausente = ligado.
+    autonomo     INTEGER NOT NULL,
+    -- Quem desligou/religou e quando: a mudança é ação sensível (M9-F05).
+    identidade   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL,
+    PRIMARY KEY (user_id, project_id)
+  );
   `
 ]
 

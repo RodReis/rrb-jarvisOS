@@ -38,6 +38,12 @@ import { AnexoService } from './projects/anexo-service'
 import { RoadmapRepository } from './projects/roadmap-repository'
 import { ExternalRefRepository } from './projects/external-ref-repository'
 import { PublicacaoService } from './projects/publicacao-service'
+import { FilaService } from './pipeline/fila-service'
+import { LeaseRepository } from './pipeline/lease-repository'
+import { MergePolicyRepository } from './pipeline/merge-policy-repository'
+import { MergePolicyService } from './pipeline/merge-policy-service'
+import { PipelineRepository } from './pipeline/pipeline-repository'
+import { ReconciliacaoService } from './pipeline/reconciliacao-service'
 import { RoadmapService } from './projects/roadmap-service'
 import { GitRunner } from './projects/git-runner'
 import { ContextRepository } from './context/context-repository'
@@ -79,7 +85,9 @@ if (!app.requestSingleInstanceLock()) {
     }
   })
 
-  app.whenReady().then(() => {
+  // `async` por causa da M9-F02: o `reconcileAll` do boot é **bloqueante** por decisão da spec —
+  // nenhum trabalho novo é adquirido antes de ele terminar.
+  app.whenReady().then(async () => {
     // Agrupa a janela sob a identidade correta na barra de tarefas do Windows.
     app.setAppUserModelId('com.rodrigoreis.jarvisos')
 
@@ -410,6 +418,44 @@ if (!app.requestSingleInstanceLock()) {
       userId: userIdAtual,
       token: async (userId, workspace) => await githubAuth.tokenParaUso({ userId, workspace })
     })
+
+    // Fila, leases e reconciliação (SPEC-Entrega-02).
+    //
+    // O `mergeAutonomoLigado` é injetado como **função**, e não como o `MergePolicyService`
+    // inteiro: a fila só precisa da resposta, e depender do serviço a acoplaria à auditoria da
+    // mudança de política — que é outro assunto, com outro tipo de evento.
+    const pipelineRepository = new PipelineRepository(storage.db)
+    const leaseRepository = new LeaseRepository(storage.db)
+    const mergePolicy = new MergePolicyService({
+      repository: new MergePolicyRepository(storage.db),
+      audit: storage.audit,
+      userId: userIdAtual,
+      identidade: () => auth?.usuarioAtual()?.id
+    })
+    const fila = new FilaService({
+      runs: pipelineRepository,
+      leases: leaseRepository,
+      audit: storage.audit,
+      roadmap: (escopo) => roadmapRepository.carregar(escopo),
+      aprovacoes: (escopo) => roadmapRepository.listarAprovacoes(escopo),
+      revisoesDoGate: (escopo) =>
+        roadmap.revisoesDoGate(escopo.projectId, 'SLICE_ENTRY', escopo.workspaceId),
+      userId: userIdAtual,
+      mergeAutonomoLigado: (projectId) => mergePolicy.autonomoLigado(projectId)
+    })
+    const reconciliacao = new ReconciliacaoService({
+      runs: pipelineRepository,
+      leases: leaseRepository,
+      audit: storage.audit,
+      userId: userIdAtual,
+      workspaceId: () => workspaces.atual()
+    })
+
+    // **`reconcileAll` é bloqueante** (decisão cravada da spec): nenhum trabalho novo é adquirido
+    // antes de ela terminar. Sem isso, o app pegaria a próxima fatia com um lease órfão ainda de
+    // pé — e o WIP=1 valeria para os runs que ele conhece, não para a máquina.
+    await reconciliacao.reconcileAll()
+
     registerIpcHandlers({
       audit: storage.audit,
       workspaces,
@@ -428,6 +474,8 @@ if (!app.requestSingleInstanceLock()) {
       anexos,
       roadmap,
       publicacao,
+      mergePolicy,
+      fila,
       credentials,
       ai,
       budget,
