@@ -45,6 +45,9 @@ SPEC/hashes aprovados, ContextPack, paths permitidos, comandos de validação, `
 9. **Uso da rota de assinatura é registrado sem valor monetário** (emenda da SPEC-Providers-03); atribuição por tentativa continua obrigatória. Teste.
 10. **Toda chamada ao modelo feita pelo executor passa pelo proxy do host** e chega ao `AiCallService` com `runId`/`attemptId`; o gate de orçamento do MVP-005 barra a tentativa que estouraria **antes** de ela sair. Teste com servidor que conta requisições.
 11. **`test/lint/type/build` disparados pelo app rodam no container**, nunca no host. Teste comprova que o adapter não tem caminho de execução de validação no host.
+12. **Rota de assinatura é `subscription_limited`** (emenda aprovada pelo PI em 2026-08-30): quota desconhecida **não** vira saldo infinito. O ledger registra chamadas, tokens, tempo e — quando a origem os expõe — estado de quota e reset. Rate limit tenta somente fallback já autorizado ou termina em espera/bloqueio explicável, nunca em tentativa cega. Teste.
+
+> **Dependência declarada.** O MVP-005 entregou a rota de assinatura como `unmetered` (`isRotaUnmetered`, `estimado_usd` NULL) — registro sem valor monetário, **sem noção de quota**. O critério 12 exige o estado de quota, que é código novo na camada de providers. Ele **não** foi emendado retroativamente na `spec-providers-03/04` (fatias finalizadas): entra como pré-requisito desta fatia ou como `[FIX]` próprio no MVP-005, o que vier primeiro. Enquanto não existir, o critério 12 é o que impede esta fatia de ser declarada pronta.
 
 ## Testes e evidência
 

@@ -21,6 +21,10 @@ Fechar a execução com prova verificável, atualizar somente documentação mat
 
 Confirmar `MERGED` (ou `AWAITING_MERGE`, com o kill-switch desligado) → verificar que worktree pertence ao lease → remover worktree operacional → **remover o container do executor** → liberar leases/portas/containers temporários → preservar volumes/dados persistentes → registrar resultado. Falha de limpeza não desfaz merge, mas mantém pendência reconciliável.
 
+**Cancelamento também executa limpeza segura** (emenda aprovada pelo PI em 2026-08-30), com o que preservar definido por fase: antes do executor não há efeito a desfazer; durante a execução mata a árvore de processos e preserva o snapshot; depois do push **preserva branch e PR**, converte o PR para rascunho quando possível e marca o cancelamento; durante o CI para o monitoramento e as correções; depois do merge o resultado continua `MERGED`. **Nunca apaga branch ou PR, e nunca cria revert automático** — desfazer trabalho por conta própria é o oposto do que a limpeza existe para fazer.
+
+**Retenção de artefatos extensos:** runs finalizados ou reconciliados expiram em **30 dias** ou quando a cota global passar de **5 GB**, removendo primeiro o elegível mais antigo. Item fixado e run ativo, bloqueado ou pendente **não** expiram. Metadados, hashes, auditoria e relatórios versionados permanecem — o que sai é o anexo pesado, nunca a prova.
+
 ## Interface
 
 Mostrar resultado, custo, evidência e próxima decisão. Detalhes Git/logs ficam expansíveis. Não mostrar commit/push/PR/merge como botões do PI e não pedir aceite final.
@@ -34,6 +38,8 @@ Mostrar resultado, custo, evidência e próxima decisão. Detalhes Git/logs fica
 5. Worktree, **container do executor** e demais recursos temporários são removidos ou ficam com pendência explícita reconciliável.
 6. Próxima fatia exige sua própria revisão aprovada.
 7. Estado terminal é compreensível sem ler logs técnicos.
+8. **Cancelar depois do push preserva PR/branch** e permite retomada vinculada somente após reconciliar o `head SHA`; cancelar depois do merge não muda o resultado. Teste das duas fases.
+9. **O coletor de retenção respeita idade, cota, fixação e proteção de run não resolvido**, e nunca deixa referência versionada apontando para conteúdo que ela afirme estar presente. Teste.
 
 ## Testes e evidência
 

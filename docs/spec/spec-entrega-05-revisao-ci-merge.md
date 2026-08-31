@@ -33,6 +33,7 @@ Escopo → testes/lint/type/build → code/architecture review → design review
 - **A pipeline gera `.github/workflows/ci.yml`** no projeto-alvo (decisão do PI, 2026-08-30) a partir dos **comandos de validação declarados no pacote** (`TESTING.md`/`CONVENTION.md` do projeto): os mesmos que o executor roda no container. O arquivo é criado uma vez, **no primeiro run** do projeto, dentro do mesmo PR da fatia, e só é reescrito quando os comandos declarados mudam — nunca por cosmética.
 - O conjunto de checks obrigatórios é **lido da origem** (ruleset/proteção da branch-base, M9-F01) e persistido com referência e data no `ExternalRef`. **Sem check configurado ou sem conclusão aceita pela origem no `head SHA` esperado, o gate não passa** — é bloqueio explicável (`BLOCKED_EXTERNAL`, ação: configurar/liberar Actions), nunca verde por ausência. `failure`, `cancelled`, `timed_out`, check ausente e SHA obsoleto não passam.
 - Merge queue fica fora do MVP-009: repositório que a exige termina em `AWAITING_MERGE` com a causa registrada.
+- **Snapshot do ruleset** (emenda aprovada pelo PI em 2026-08-30): o conjunto obrigatório observado na origem é persistido com referência e data no início do run. Mudança de ruleset ou de check obrigatório **durante** o run força novo snapshot e reconciliação — o gate nunca compara com uma regra que já não vale.
 
 ## Critérios de aceite
 
@@ -46,7 +47,9 @@ Escopo → testes/lint/type/build → code/architecture review → design review
 8. **Kill-switch respeitado:** com merge autônomo desligado, o run para em `AWAITING_MERGE` (M9-F02) sem mergear e sem marcar falha; com ligado, mergeia e confirma na origem. Teste dos dois caminhos.
 9. **Projeto sem CI recebe o workflow gerado no primeiro PR**, e o run seguinte o encontra e não o reescreve. Teste.
 10. **Sem check configurado não há merge:** lista vazia de checks termina em bloqueio explicável, nunca em `MERGED`. Teste.
-11. **`STATUS.md`, `STATUS-ARQUIVO.md` e o relatório de testes do projeto-alvo entram no mesmo PR, antes do merge** — nunca em commit direto na branch-base depois dele (invariante 10 da CONVENTION §4; Convention do próprio projeto-alvo). A M9-F06 só grava o `ExecutionLedger` local.
+11. **Ruleset em movimento:** mudança de ruleset/check obrigatório durante o run força novo snapshot e reconciliação; check `neutral`/`skipped` só passa quando a própria regra da origem o considerar satisfatório. Teste.
+12. **Merge queue:** repositório que a exige termina com PR verde em `AWAITING_MERGE` e bloqueio externo explicável; a pipeline **não** tenta contorná-la. Teste.
+13. **`STATUS.md`, `STATUS-ARQUIVO.md` e o relatório de testes do projeto-alvo entram no mesmo PR, antes do merge** — nunca em commit direto na branch-base depois dele (invariante 10 da CONVENTION §4; Convention do próprio projeto-alvo). A M9-F06 só grava o `ExecutionLedger` local.
 
 ## Testes e evidência
 
