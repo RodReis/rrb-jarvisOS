@@ -14,6 +14,7 @@ import {
   type WorkspaceSwitchResult
 } from '@shared/contracts/ipc'
 import type { AlvoDaPublicacao, PublicacaoOutcome } from '@shared/domain/publicacao'
+import type { MergePolicyOutcome, PoliticaDeMerge, VistaDaFila } from '@shared/domain/pipeline'
 import type { ContextPack, ContextPackOutcome, FalhaRegistrada } from '@shared/domain/context-pack'
 import type { CapacidadeResolvida } from '@shared/domain/skills'
 import type { AuthSnapshot } from '@shared/contracts/auth'
@@ -349,6 +350,16 @@ const bridge: JarvisBridge = {
     workspace: WorkspaceId
   ): Promise<PublicacaoOutcome> =>
     ipcRenderer.invoke(IPC_CHANNELS.publicacaoPublicar, projectId, alvo, workspace),
+  vistaDaFila: (projectId: string, workspace: WorkspaceId): Promise<VistaDaFila> =>
+    ipcRenderer.invoke(IPC_CHANNELS.filaVista, projectId, workspace),
+  lerPoliticaDeMerge: (projectId: string, workspace: WorkspaceId): Promise<PoliticaDeMerge> =>
+    ipcRenderer.invoke(IPC_CHANNELS.mergePolicyLer, projectId, workspace),
+  definirPoliticaDeMerge: (
+    projectId: string,
+    autonomo: boolean,
+    workspace: WorkspaceId
+  ): Promise<MergePolicyOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.mergePolicyDefinir, projectId, autonomo, workspace),
   listarAprovacoes: (projectId: string, workspace: WorkspaceId): Promise<readonly Approval[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.aprovacaoListar, projectId, workspace),
   revisoesDoGate: (

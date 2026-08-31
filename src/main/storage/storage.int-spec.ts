@@ -95,6 +95,9 @@ describe('migrations', () => {
     antigo.exec('DROP TABLE slice')
     antigo.exec('DROP TABLE approval')
     antigo.exec('DROP TABLE external_ref')
+    antigo.exec('DROP TABLE pipeline_run')
+    antigo.exec('DROP TABLE lease')
+    antigo.exec('DROP TABLE project_merge_policy')
     antigo.pragma('user_version = 1')
     antigo.close()
 

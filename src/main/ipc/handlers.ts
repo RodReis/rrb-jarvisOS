@@ -76,6 +76,7 @@ import { EXTENSOES_DO_ANEXO, isTipoDeAnexo } from '@shared/domain/anexos-de-desi
 import type { ValidacaoDoPrototipo } from '@shared/domain/validacao-de-prototipo'
 import type { ArquiteturaOutcome, PacoteArquitetura } from '@shared/domain/arquitetura'
 import type { AlvoDaPublicacao, PublicacaoOutcome } from '@shared/domain/publicacao'
+import type { MergePolicyOutcome, PoliticaDeMerge, VistaDaFila } from '@shared/domain/pipeline'
 import type { Roadmap, RoadmapOutcome } from '@shared/domain/roadmap'
 import type {
   Approval,
@@ -86,6 +87,8 @@ import type {
 } from '@shared/domain/aprovacoes'
 import { NATUREZAS, isGate } from '@shared/domain/aprovacoes'
 import type { PublicacaoService } from '../projects/publicacao-service'
+import type { MergePolicyService } from '../pipeline/merge-policy-service'
+import type { FilaService } from '../pipeline/fila-service'
 import type { RoadmapService } from '../projects/roadmap-service'
 import type { AnexoService } from '../projects/anexo-service'
 import { isConnectorId } from '@shared/domain/connectors'
@@ -293,6 +296,10 @@ export interface IpcDependencies {
   readonly anexos: AnexoService
   readonly roadmap: RoadmapService
   readonly publicacao: PublicacaoService
+  /** O kill-switch do merge autônomo (SPEC-Entrega-02/05). */
+  readonly mergePolicy: MergePolicyService
+  /** A fila de execução (SPEC-Entrega-02). Exposta só para leitura. */
+  readonly fila: FilaService
   /** Vault de credenciais (SPEC-Providers-01): status para a UI, valor só dentro do main. */
   readonly credentials: CredentialService
   /** Runs persistidos, para a UI listar o histórico. */
@@ -1465,6 +1472,45 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
         repo: a.repo,
         origem: a.origem
       })
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.filaVista,
+    (_event, projectId: unknown, workspace: unknown): VistaDaFila => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
+        return { ativos: [], concluidas: [], bloqueadas: [] }
+      }
+      return deps.fila.vista(projectId, workspace)
+    }
+  )
+
+  /**
+   * O kill-switch do merge autônomo (SPEC-Entrega-02/05).
+   *
+   * Como em todo handler desta base, a **forma** é validada aqui e a **decisão** mora no serviço:
+   * repetir a regra de identidade neste ponto criaria uma segunda fonte da política.
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.mergePolicyLer,
+    (_event, projectId: unknown, workspace: unknown): PoliticaDeMerge => {
+      // Forma inválida devolve o default ligado — o mesmo que um projeto sem decisão registrada.
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return { autonomo: true }
+      return deps.mergePolicy.politica(projectId)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.mergePolicyDefinir,
+    (_event, projectId: unknown, autonomo: unknown, workspace: unknown): MergePolicyOutcome => {
+      if (
+        !isWorkspaceId(workspace) ||
+        typeof projectId !== 'string' ||
+        typeof autonomo !== 'boolean'
+      ) {
+        return { reason: 'sem-mudanca', mensagem: 'Pedido inválido.' }
+      }
+      return deps.mergePolicy.definir(projectId, workspace, autonomo)
     }
   )
 

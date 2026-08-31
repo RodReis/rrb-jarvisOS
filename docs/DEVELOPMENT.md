@@ -1435,6 +1435,39 @@ Status: **entregue** — spec `aprovada-pi` (2026-08-29); issue [#101](https://g
 
 **Limites:** sem tela — quem decide *quando* publicar é a M9-F02, e o canal existe para ela consumir. **Sem smoke real**: o push HTTPS autenticado não foi exercitado contra o GitHub (os testes usam bare local, que prova a mecânica do Git, não a autenticação), e isso precisa de repositório descartável com autorização do PI.
 
+### Fatia 02 — DAG, fila WIP=1 global e reconciliação (`docs/spec/spec-entrega-02-dag-fila-reconciliacao.md`)
+
+Status: **entregue** — spec `aprovada-pi` (2026-08-29, emendada em 2026-08-30); issue [#102](https://github.com/RodReis/rrb-jarvisOS/issues/102). Depende da M9-F01.
+
+- [x] **`src/shared/domain/pipeline.ts`** — a máquina de estados como **tabela de transições**, `ehTerminal`, `PipelineRun`, `PoliticaDeMerge` e `VistaDaFila`
+- [x] **`src/shared/domain/lease.ts`** — `estadoDoLease` com **três** valores (`livre`/`vigente`/`expirado`), `podeAdquirir`, `RECURSO_WIP_GLOBAL`
+- [x] **`src/shared/domain/fila.ts`** — `dependenciasAbertas`: fatias anteriores do mesmo MVP + MVPs dependentes concluídos, reusando `validarDag` da M8-F06
+- [x] **Migration 23** — `pipeline_run`, `lease` (com `UNIQUE(user_id, recurso)`) e `project_merge_policy`
+- [x] **`PipelineRepository`** — compare-and-set no `transicionar`; `fatiasConcluidas` conta só `MERGED`
+- [x] **`LeaseRepository`** — `adquirir` sem `ON CONFLICT`, e `removerReconciliado` separado de `liberar`
+- [x] **`FilaService`** — ponto único de transição, aquisição do slot, `concluir` pelo kill-switch
+- [x] **`ReconciliacaoService`** — `reconcileAll` bloqueante no boot, com `VerificadorDeRecurso` plugável para a M9-F03
+- [x] **`MergePolicyService`** — o kill-switch completo (persistência, troca e `AuditEvent`)
+- [x] **Três tipos novos de `AuditEvent`** — `pipeline-transition`, `pipeline-lease`, `merge-policy-change`
+- [x] **Canais `fila:vista`, `merge-policy:ler` e `merge-policy:definir`** — os três **só de leitura ou de política**; nenhum transiciona run
+- [x] **Testes**: 28 de integração contra o SQLite real, 30 de domínio puro
+
+**Dois furos da spec foram levados ao PI antes de codificar.** O critério 1 pede DAG entre fatias e "dependências concluídas" para `READY`, mas `Slice` **não tem `dependeDe`** (só `Mvp` tem) e a tabela `slice` não tem coluna de dependência — a M8-F06 gera o roadmap sem dependência entre fatias. O PI decidiu pela **ordem implícita**: `numero` dentro do MVP + o DAG dos MVPs, que já existe e já é validado. A alternativa (`slice.depende_de`) era mais expressiva, mas nada a preencheria hoje, e uma coluna vazia daria a impressão de que a dependência estava modelada quando não estava. O segundo furo: o critério 7 exige testar merge ligado **e** desligado, mas o kill-switch não existia no código — o PI decidiu que ele entra **completo** nesta fatia, não só a leitura.
+
+**A garantia do WIP=1 é o `UNIQUE`, não o `if`.** Uma checagem em memória ("está livre? então adquire") tem uma janela entre a leitura e a escrita, e dois processos que a atravessem juntos adquirem os dois. O índice fecha a janela no banco: o segundo `INSERT` viola a restrição e a aquisição falha, mesmo com a checagem tendo passado. Por isso `adquirir` **não** faz `ON CONFLICT DO UPDATE` — sobrescrever o dono no conflito seria exatamente o roubo que o critério 3 proíbe.
+
+**Lease expirado tem estado próprio, e é isso que impede o roubo.** Um booleano `estaExpirado` daria dois caminhos, e o segundo — "expirou, então tome" — é o que o critério 3 proíbe. `estadoDoLease` devolve três valores, e só `livre` autoriza aquisição imediata; `expirado` é uma pergunta para a reconciliação, que sabe olhar o disco, o Git e (na M9-F03) o container antes de concluir que o dono morreu. Uma máquina lenta que perdeu o heartbeat por dez segundos ainda está com o worktree aberto.
+
+**O teste de integração achou um defeito real no retry de crash.** O caminho do critério 4 — crash entre gravar o lease e confirmar — deixa lease do run **e** run em `RUNNING`. A primeira versão readquiria o lease e chamava `transicionar` para `RUNNING` de novo; como `RUNNING → RUNNING` é inválida por construção, o `catch` interpretava a recusa como "o run não podia avançar" e **liberava o slot de um run que estava trabalhando**. O teste pegou pela contagem de linhas (`lease` = 0 onde devia ser 1), não pelo `reason` — a prova por efeito de novo valendo a pena. A correção detecta o estado convergido e devolve `adquirido` sem tentar transicionar.
+
+**`AWAITING_MERGE` não é bloqueio.** O kill-switch desligado é uma escolha legítima do projeto, e terminar em `BLOCKED` ensinaria a ler bloqueio como ruído — `BLOCKED` é reservado a causa externa ou risco. O terminal também **não conta como fatia concluída**: o PR está verde, mas o merge não aconteceu, e a fatia seguinte construiria sobre uma base que ainda não existe na branch-base.
+
+**Nenhum canal transiciona run.** Os três canais expostos leem a fila e mudam a política; um `transicionar` deixaria o renderer declarar que uma fatia chegou a `MERGED` — o pulo que o critério 5 existe para impedir. Quem move a pipeline é o main, a partir do que o PI aprovou no gate.
+
+**A reconciliação não mata nem avança run órfão.** Um run em `RUNNING` cujo processo morreu tem worktree e talvez container de pé; cancelar destruiria trabalho que pode estar íntegro, avançar inventaria progresso que não houve. Ele vira pendência classificada. Fail closed é o default para o que não dá para classificar — a mesma postura do Policy Engine.
+
+**Limites:** **sem tela** — a fatia é infraestrutura, e os canais existem para a M9-F03/F06 e para o painel da M9-F06 consumirem. A reconciliação de **container e portas** fica para a M9-F03, que os cria; o ponto de extensão (`VerificadorDeRecurso`) já está no lugar e testado com um dublê. **Nada dispara a fila automaticamente** ainda: quem cria run e pede slot é a M9-F03 em diante.
+
 ## Registro de entregas
 
 | Data | Fatia | PR | Observação |
