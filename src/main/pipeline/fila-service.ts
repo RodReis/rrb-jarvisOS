@@ -40,7 +40,8 @@ import {
   transicaoPermitida,
   type EstadoDoRun,
   type PipelineRun,
-  type TransicaoOutcome
+  type TransicaoOutcome,
+  type VistaDaFila
 } from '@shared/domain/pipeline'
 import type { Mvp, Slice } from '@shared/domain/roadmap'
 import { log } from '../logging/logger'
@@ -314,6 +315,29 @@ export class FilaService {
 
     if (liberou && lease !== undefined) this.auditarLease(escopo, 'liberado', lease)
     return liberou
+  }
+
+  /**
+   * O que a fila mostra: os runs ativos e as dependências abertas de cada fatia do projeto.
+   *
+   * **Só leitura.** Não existe canal que transicione run ou adquira slot a pedido do renderer —
+   * seria o renderer declarando que uma fatia chegou a `MERGED`, o pulo que o critério 5 existe
+   * para impedir. Quem move a pipeline é o main, a partir do que o PI aprovou no gate.
+   */
+  vista(projectId: string, workspaceId: WorkspaceId): VistaDaFila {
+    const escopo = this.escopo(projectId, workspaceId)
+    const { slices } = this.deps.roadmap(escopo)
+
+    return {
+      ativos: this.deps.runs.listarAtivos(escopo.userId),
+      concluidas: this.deps.runs.fatiasConcluidas(escopo).map((c) => c.sliceId),
+      bloqueadas: slices
+        .map((slice) => ({
+          sliceId: slice.id,
+          abertas: this.dependenciasDaFatia(escopo, slice.id)
+        }))
+        .filter((d) => d.abertas.length > 0)
+    }
   }
 
   /** As dependências ainda abertas de uma fatia — para a tela explicar por que ela não começa. */

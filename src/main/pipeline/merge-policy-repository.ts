@@ -12,14 +12,7 @@
 
 import type { Database } from 'better-sqlite3'
 import type { WorkspaceId } from '@shared/domain/entities'
-
-/** A política vigente de um projeto, com quem a definiu. */
-export interface PoliticaDeMerge {
-  readonly autonomo: boolean
-  /** Quem decidiu. Ausente quando nunca houve decisão (o default). */
-  readonly identidade?: string
-  readonly updated_at?: string
-}
+import type { PoliticaDeMerge } from '@shared/domain/pipeline'
 
 interface PolicyRow {
   readonly autonomo: number

@@ -22,6 +22,7 @@
  * *quando* transicionar. Só diz quais transições existem e o que um bloqueio precisa carregar.
  */
 
+import type { DependenciaAberta } from './fila'
 import type { BloqueioExterno } from './pacote-estrutural'
 
 /**
@@ -157,4 +158,57 @@ export interface TransicaoOutcome {
 /** Type guard de fronteira: o IPC recebe `unknown` e não confia no renderer. */
 export function isEstadoDoRun(valor: unknown): valor is EstadoDoRun {
   return typeof valor === 'string' && (ESTADOS_DO_RUN as readonly string[]).includes(valor)
+}
+
+/**
+ * A política de merge autônomo de um projeto — o kill-switch (M9-F05, decisão do PI 2026-08-30).
+ *
+ * Mora no domínio, e não no serviço do main, porque a **tela** a consome: o contrato do IPC
+ * precisa ser verificável sem carregar o Electron, e um tipo do main atravessando a ponte
+ * quebraria a fronteira que `shared/` existe para manter.
+ *
+ * `identidade` e `updated_at` são opcionais porque a ausência de decisão é o estado inicial:
+ * sem ninguém ter desligado, não há quem nem quando — e o merge está ligado, que é o default.
+ */
+export interface PoliticaDeMerge {
+  readonly autonomo: boolean
+  /** Quem decidiu. Ausente quando nunca houve decisão. */
+  readonly identidade?: string
+  readonly updated_at?: string
+}
+
+/** Por que a mudança de política não saiu. Enum fechado: a tela decide o que mostrar. */
+export const MERGE_POLICY_REASONS = [
+  'definido',
+  /** Sem sessão autenticada não há quem responda pela mudança. Falha fechado. */
+  'sem-identidade',
+  /** A política já era essa. Regravar geraria um `AuditEvent` sobre um não-evento. */
+  'sem-mudanca'
+] as const
+
+export type MergePolicyReason = (typeof MERGE_POLICY_REASONS)[number]
+
+export interface MergePolicyOutcome {
+  readonly reason: MergePolicyReason
+  readonly politica?: PoliticaDeMerge
+  readonly mensagem: string
+}
+
+/**
+ * O que a tela mostra da fila: os runs vivos, o que já concluiu e o que está travado.
+ *
+ * Só leitura, e de propósito: não há contrato que peça uma transição a partir do renderer. Quem
+ * move a pipeline é o main, a partir do que o PI aprovou no gate — um canal de transição
+ * deixaria o renderer declarar que uma fatia chegou a `MERGED`, que é o pulo do critério 5.
+ */
+export interface VistaDaFila {
+  /** Os runs em estado não-terminal, de todos os projetos: o WIP é da máquina. */
+  readonly ativos: readonly PipelineRun[]
+  /** As fatias com run `MERGED` neste projeto. */
+  readonly concluidas: readonly string[]
+  /** As fatias que não podem começar, e por quê. */
+  readonly bloqueadas: readonly {
+    readonly sliceId: string
+    readonly abertas: readonly DependenciaAberta[]
+  }[]
 }

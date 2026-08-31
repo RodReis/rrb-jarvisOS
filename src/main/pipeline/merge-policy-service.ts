@@ -18,9 +18,13 @@
  */
 
 import type { WorkspaceId } from '@shared/domain/entities'
+import type {
+  MergePolicyOutcome,
+  PoliticaDeMerge
+} from '@shared/domain/pipeline'
 import { log } from '../logging/logger'
 import type { AuditRepository } from '../storage/audit-repository'
-import type { MergePolicyRepository, PoliticaDeMerge } from './merge-policy-repository'
+import type { MergePolicyRepository } from './merge-policy-repository'
 
 export interface MergePolicyDeps {
   readonly repository: MergePolicyRepository
@@ -29,23 +33,6 @@ export interface MergePolicyDeps {
   /** O id da sessão autenticada. `undefined` sem sessão — e aí a mudança não acontece. */
   readonly identidade: () => string | undefined
   readonly agora?: () => number
-}
-
-/** Por que a mudança de política não saiu. Enum fechado: a tela decide o que mostrar. */
-export const MERGE_POLICY_REASONS = [
-  'definido',
-  /** Sem sessão autenticada não há quem responda pela mudança. */
-  'sem-identidade',
-  /** A política já era essa. Regravar geraria um `AuditEvent` sobre um não-evento. */
-  'sem-mudanca'
-] as const
-
-export type MergePolicyReason = (typeof MERGE_POLICY_REASONS)[number]
-
-export interface MergePolicyOutcome {
-  readonly reason: MergePolicyReason
-  readonly politica?: PoliticaDeMerge
-  readonly mensagem: string
 }
 
 export class MergePolicyService {
