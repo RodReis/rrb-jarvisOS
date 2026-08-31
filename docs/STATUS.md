@@ -77,6 +77,7 @@ Atualizado em: **2026-08-30**. Visão curta do estado corrente e fonte única do
 | MVP-009 Entrega Autônoma | [#100](https://github.com/RodReis/rrb-jarvisOS/issues/100) | seis SPECs `aprovada-pi` (2026-08-29), **emendadas pelo PI em 2026-08-30**; F01 entregue (PR [#190](https://github.com/RodReis/rrb-jarvisOS/pull/190)) | 1/6 |
 | MVP-010 a MVP-016 (Pipeline V2/V3) | [#115](https://github.com/RodReis/rrb-jarvisOS/issues/115) · [#121](https://github.com/RodReis/rrb-jarvisOS/issues/121) · [#127](https://github.com/RodReis/rrb-jarvisOS/issues/127) · [#133](https://github.com/RodReis/rrb-jarvisOS/issues/133) · [#149](https://github.com/RodReis/rrb-jarvisOS/issues/149) · [#155](https://github.com/RodReis/rrb-jarvisOS/issues/155) · [#162](https://github.com/RodReis/rrb-jarvisOS/issues/162) | 7 épicos e 35 fatias pré-criadas (#116–#168); SPECs e docs de MVP **só na branch `codex/pipeline-v2-design`** (enviada ao remoto em 2026-08-30; PR de docs pendente). Fora da fila até chegar à `main` | 0/35 |
 | MVP-017 a MVP-021 (Command Center) | [#193](https://github.com/RodReis/rrb-jarvisOS/issues/193) · [#194](https://github.com/RodReis/rrb-jarvisOS/issues/194) · [#195](https://github.com/RodReis/rrb-jarvisOS/issues/195) · [#196](https://github.com/RodReis/rrb-jarvisOS/issues/196) · [#197](https://github.com/RodReis/rrb-jarvisOS/issues/197) | 5 épicos criados em 2026-08-30, aprovados pelo PI na mesma data (HA removido; voz local Whisper+Piper): voz+persona+mascote, escuta contínua, briefing/proatividade, integrações Gmail/Agenda/Spotify, visão Frigate. Fatias lazy; SPECs da M17-F01 (#200), M17-F02 (#202) e M17-F03 `aprovada-pi` (2026-08-30), demais sem SPEC; docs em `docs/mvp/mvp-017…021` | 0/18 |
+| MVP-022 Shell de produto | [#205](https://github.com/RodReis/rrb-jarvisOS/issues/205) | menu do JARVIS/Agents OS projetado do registro de módulos; **SPEC da F01 `aprovada-pi` (2026-08-30)**, oito decisões do PI; entra depois do MVP-009 | 0/1 |
 
 > **MVP-006 aprovado (2026-08-29).** As seis SPECs passaram pelo gate de perguntas abertas e viraram `aprovada-pi`. Sete decisões do PI: runtime de conectores **separado** do ponto único de IA do MVP-005; **ledger de créditos próprio** para conector, independente da `BudgetPolicy` em USD; **GitHub App do projeto** com `client_id` embutido e override em Settings; **emenda do Vault para OAuth** (payload estruturado, `expires_at`, rotação atômica) como escopo da M6-F03, sem reabrir a M5-F01; **roteamento Context7↔Tavily removido** da M6-F05 e transferido ao MVP-008; **UI mínima dentro de cada fatia**, sem fatia dedicada; **evidência extensa no diretório de artefatos do app**. A aprovação **não muda a fila** — a cabeça continua sendo a M5-F02 (#78).
 
@@ -125,6 +126,7 @@ Não existe catálogo global `SPEC-nnn`. O identificador canônico é o slug aba
 | M17-F01 | MVP-017 | STT local + push-to-talk | `spec-voz-01-stt-local-push-to-talk.md` |
 | M17-F02 | MVP-017 | TTS Piper + timeline de visemes | `spec-voz-02-tts-piper-fonemas.md` |
 | M17-F03 | MVP-017 | Persona JARVIS no ponto único | `spec-voz-03-persona-ponto-unico.md` |
+| M22-F01 | MVP-022 | Menu JARVIS OS / Agents OS | `spec-shell-01-menu-jarvis-agents-os.md` |
 
 ## Próximas ações
 
@@ -139,6 +141,9 @@ Não existe catálogo global `SPEC-nnn`. O identificador canônico é o slug aba
 9. **#170 está `closed` com `proplan:done`** — trocar para `proplan:finalizado` (carimbo do PI) para o board projetar a coluna certa.
 10. **Corpo da #101** ainda dizia "não iniciar até `aprovada-pi`" — corrigido em 2026-08-30; as § Emendas foram lidas e implementadas antes do fechamento (PR [#190](https://github.com/RodReis/rrb-jarvisOS/pull/190)).
 
+11. **MVP-022 aprovado (2026-08-30)** — o menu passa a ser projeção do registro de módulos: item sem módulo fica oculto, HARNESSES vem dos executores registrados, Connectors/Providers/Permissões só no Settings. Entra **depois do MVP-009 fechar**.
+12. **A pergunta "o Command Center precisa de MVP?" foi respondida por um planejamento que já estava na `main`** — o MVP-017 existe com a `M17-F05 UI do Command Center`. Nenhum MVP novo foi criado, e a proposta original foi renumerada de 019 para **022** porque 019 já era o Briefing/Proatividade. **Antes de propor MVP ou número, conferir a `main`** (DECISIONS 2026-08-30 §5).
+
 ## Roadmap
 
-MVP-001 ✅ → MVP-002 ✅ → MVP-003 ✅ → MVP-004 → MVP-005 → MVP-006 → MVP-008 → MVP-009. MVP-007 é paralelo/não bloqueante. Depois do MVP-009 entra a série do Command Center: MVP-017 → MVP-018/MVP-019 (paralelos entre si) → MVP-020 → MVP-021 (decisão do PI, 2026-08-30); os MVP-010–016 permanecem fora da fila até o PR de docs da `codex/pipeline-v2-design` chegar à `main`.
+MVP-001 ✅ → MVP-002 ✅ → MVP-003 ✅ → MVP-004 → MVP-005 → MVP-006 → MVP-008 → MVP-009. MVP-007 é paralelo/não bloqueante. Depois do MVP-009 entra a série do Command Center: MVP-017 → MVP-018/MVP-019 (paralelos entre si) → MVP-020 → MVP-021 (decisão do PI, 2026-08-30); os MVP-010–016 permanecem fora da fila até o PR de docs da `codex/pipeline-v2-design` chegar à `main`. O **MVP-022** (shell/menu) entra depois do MVP-009 e não bloqueia nem é bloqueado pela série do Command Center.
