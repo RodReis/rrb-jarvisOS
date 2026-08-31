@@ -72,6 +72,17 @@ export class AnthropicAdapter implements AiAdapter {
   ) {}
 
   async *generateStream(request: AdapterRequest): AsyncIterable<AdapterChunk> {
+    // A credencial virou opcional no contrato na F04, porque Ollama e Claude Code CLI não têm
+    // nenhuma. Este provider **tem** — e a checagem é aqui, não no ponto de chamada: quem sabe
+    // se a chave é obrigatória é o adapter, e o ponto único não deve manter uma segunda lista
+    // de quem exige o quê.
+    if (request.apiKey === undefined) {
+      throw new AdapterError(
+        'Nenhuma credencial configurada para a Anthropic. Adicione a chave em Configurações.',
+        undefined
+      )
+    }
+
     const cliente = this.criarCliente(request.apiKey, request.timeoutMs)
 
     const stream = cliente.messages.stream(

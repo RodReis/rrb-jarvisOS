@@ -57,8 +57,15 @@ describe('migrations', () => {
     // marcador de versão. Cada migration nova precisa ser desfeita aqui — senão a migração
     // tenta recriar um objeto que já existe. A v2 adicionou `theme`; a v3, `allowed_directory`;
     // a v6, o acento por módulo; a v7, `approval_request`; a v8, `allowed_command`; a v9,
-    // `credential_ref`.
+    // `credential_ref`; a v13, `credential_ref.expires_at`; a v14, `user_profile.github_client_id`;
+    // a v15, `project` e `planning_session`; a v16, `context_pack`, `context_item` e
+    // `failure_fingerprint`; a v18, `decision`; a v19, `evidence` e `pacote_estrutural`; a v20,
+    // `design_attachment` e `pacote_arquitetura`; a v21, `mvp`, `slice` e `approval`; a v22,
+    // `external_ref`. A v17
+    // só acrescenta colunas a `cost_event`, que já é derrubada inteira aqui — não há o que
+    // desfazer separadamente.
     antigo.exec('ALTER TABLE user_profile DROP COLUMN theme')
+    antigo.exec('ALTER TABLE user_profile DROP COLUMN github_client_id')
     antigo.exec('ALTER TABLE user_profile DROP COLUMN accent_noa')
     antigo.exec('ALTER TABLE user_profile DROP COLUMN accent_jarvis')
     antigo.exec('DROP TABLE allowed_directory')
@@ -68,6 +75,26 @@ describe('migrations', () => {
     antigo.exec('DROP TABLE approval_request')
     antigo.exec('DROP TABLE allowed_command')
     antigo.exec('DROP TABLE credential_ref')
+    antigo.exec('DROP TABLE budget_policy')
+    antigo.exec('DROP TABLE cost_event')
+    antigo.exec('DROP TABLE provider_route')
+    antigo.exec('DROP TABLE active_model')
+    antigo.exec('DROP TABLE connector_credit_policy')
+    antigo.exec('DROP TABLE credit_event')
+    antigo.exec('DROP TABLE project')
+    antigo.exec('DROP TABLE planning_session')
+    antigo.exec('DROP TABLE context_pack')
+    antigo.exec('DROP TABLE context_item')
+    antigo.exec('DROP TABLE failure_fingerprint')
+    antigo.exec('DROP TABLE decision')
+    antigo.exec('DROP TABLE evidence')
+    antigo.exec('DROP TABLE pacote_estrutural')
+    antigo.exec('DROP TABLE design_attachment')
+    antigo.exec('DROP TABLE pacote_arquitetura')
+    antigo.exec('DROP TABLE mvp')
+    antigo.exec('DROP TABLE slice')
+    antigo.exec('DROP TABLE approval')
+    antigo.exec('DROP TABLE external_ref')
     antigo.pragma('user_version = 1')
     antigo.close()
 

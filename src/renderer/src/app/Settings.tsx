@@ -9,23 +9,39 @@ import {
   type UserPreferences,
   type WorkspaceId
 } from '@shared/domain/entities'
+import { Field, InlineAlert, RadioGroup, Select, TabPanel, Tabs } from '@design/ui'
 import { AccentSwatchSelector } from '@design/patterns'
 import { identidade } from '@design/tokens/identidade'
 import { ProvedorDeTema } from '@design/tokens/provider'
 import type { CorAcento } from '@design/tokens/acento'
 import type { Modulo } from '@design/tokens/semantic'
 import { CredenciaisDoWorkspace } from './CredenciaisDoWorkspace'
+import { OrcamentoDoWorkspace } from './OrcamentoDoWorkspace'
+import { ConectorGitHub } from './ConectorGitHub'
+import { CredenciaisDeConector } from './CredenciaisDeConector'
+import { ProvidersDoWorkspace } from './ProvidersDoWorkspace'
+import { DiretoriosPermitidos } from './DiretoriosPermitidos'
 import { ChamadaDeIa } from './ChamadaDeIa'
 
 /**
- * Tela de configurações (SPEC-Fundacao-05 + SPEC-CHOICE-01 crit. 5): idioma, tema e acento.
+ * Tela de configurações (SPEC-Fundacao-05 + SPEC-CHOICE-01 crit. 5), reorganizada em **cinco
+ * abas** por decisão do PI (2026-08-30): a tela acumulou oito seções de três MVPs num scroll
+ * único, e "muita informação numa tela" era a queixa literal.
  *
- * Acessível nos dois workspaces — é capacidade compartilhada, e as preferências são do
- * usuário, não do espaço (a spec adia preferências por workspace).
+ * O agrupamento segue o **escopo do dado**, que é a divisão que o app já pratica por baixo:
  *
- * O acento reusa o **mesmo** `AccentSwatchSelector` da CHOICE (paleta fechada, por módulo), não um
- * picker livre: mudar aqui reflete na CHOICE e vice-versa, porque ambos editam o mesmo valor no
- * `UserProfile`. É o critério 5 — um só valor, dois lugares de edição.
+ *  - **Geral** e **Permissões** são do *usuário* — idioma, tema, acento e a allowlist de
+ *    diretórios não mudam com o espaço.
+ *  - **IA**, **Roteamento** e **Conectores** são do par *usuário + espaço* — trocar de espaço
+ *    troca o que estas abas mostram.
+ *
+ * Roteamento é aba própria, separada de IA (escolha do PI entre as opções apresentadas): é a
+ * seção mais densa da tela — status por provider, ordem por tipo de tarefa — e dentro de IA ela
+ * empurrava o orçamento, que o operador consulta antes de cada chamada, para baixo da dobra.
+ *
+ * A tela também foi **re-plataformada no DS** nesta reforma: o `<select>` cru de idioma e os
+ * botões crus de tema eram anteriores ao MVP-003 e nunca migraram — eram os "combos quebrados"
+ * da queixa. Idioma usa `Select`, tema usa `RadioGroup`, erro usa `InlineAlert`.
  */
 
 interface SettingsProps {
@@ -35,12 +51,11 @@ interface SettingsProps {
   /** `uiTheme` do shell — o grupo de acento acompanha o tema da tela, não força escuro. */
   readonly uiTheme: 'light' | 'dark'
   /**
-   * Espaço ativo, para a seção de credenciais (SPEC-Providers-01).
+   * Espaço ativo, para as abas escopadas (SPEC-Providers-01).
    *
-   * Entra como prop em vez de o Settings ler `window.jarvis.getWorkspace()`: idioma, tema e
-   * acento são preferências **do usuário** e não mudam com o espaço; credencial é do par
-   * usuário+espaço. Quem já sabe qual espaço está ativo é o shell — duplicar essa leitura aqui
-   * criaria uma segunda fonte que pode divergir da que pinta o resto da tela.
+   * Entra como prop em vez de o Settings ler `window.jarvis.getWorkspace()`: quem já sabe qual
+   * espaço está ativo é o shell — duplicar a leitura criaria uma segunda fonte que pode
+   * divergir da que pinta o resto da tela.
    */
   readonly workspace: WorkspaceId
   readonly nomeDoEspaco: string
@@ -68,104 +83,119 @@ export function Settings({
   }
 
   return (
-    <section aria-label={t('settings.titulo')} className="flex max-w-xl flex-col gap-8">
-      {erro && (
-        <p role="alert" className="text-sm text-rose-400">
-          {t(erro)}
-        </p>
-      )}
+    <section aria-label={t('settings.titulo')} className="flex max-w-4xl flex-col gap-6">
+      {erro && <InlineAlert tom="err" titulo={t(erro)} />}
 
-      <div className="flex flex-col gap-2">
-        {/* Label ligada ao select por id: sem isso o leitor de tela anuncia "combobox"
-            sem dizer do quê. */}
-        <label htmlFor="settings-idioma" className="text-sm font-medium">
-          {t('settings.idioma')}
-        </label>
-        <p className="text-xs opacity-70">{t('settings.idiomaDescricao')}</p>
-        <select
-          id="settings-idioma"
-          value={preferencias.locale}
-          onChange={(e) => onSalvar({ locale: e.target.value as Locale })}
-          className="w-full rounded-md border border-current/20 bg-transparent px-3 py-2 text-sm"
-        >
-          {LOCALES.map((locale) => (
-            <option key={locale} value={locale}>
-              {ROTULO_IDIOMA[locale]}
-            </option>
-          ))}
-        </select>
-      </div>
+      <Tabs
+        padrao="geral"
+        rotulo={t('settings.titulo')}
+        abas={[
+          { valor: 'geral', rotulo: t('settings.abaGeral') },
+          { valor: 'permissoes', rotulo: t('settings.abaPermissoes') },
+          { valor: 'ia', rotulo: t('settings.abaIa') },
+          { valor: 'roteamento', rotulo: t('settings.abaRoteamento') },
+          { valor: 'conectores', rotulo: t('settings.abaConectores') }
+        ]}
+      >
+        <TabPanel valor="geral">
+          {/*
+           * Prosa e controles de preferência têm teto de medida próprio, mais estreito que o da
+           * tela: um select de idioma com a largura de quatro colunas parece um campo de busca.
+           */}
+          <div className="flex max-w-md flex-col gap-8">
+            <Field rotulo={t('settings.idioma')} descricao={t('settings.idiomaDescricao')}>
+              {(atributos) => (
+                <Select
+                  {...atributos}
+                  valor={preferencias.locale}
+                  onMudar={(valor) => onSalvar({ locale: valor as Locale })}
+                  opcoes={LOCALES.map((locale) => ({
+                    valor: locale,
+                    rotulo: ROTULO_IDIOMA[locale]
+                  }))}
+                />
+              )}
+            </Field>
 
-      <div className="flex flex-col gap-2">
-        <p className="text-sm font-medium" id="settings-tema-titulo">
-          {t('settings.tema')}
-        </p>
-        <p className="text-xs opacity-70">{t('settings.temaDescricao')}</p>
-        {/* Radiogroup: as três opções são mutuamente exclusivas. */}
-        <div
-          role="radiogroup"
-          aria-labelledby="settings-tema-titulo"
-          className="flex flex-wrap gap-2"
-        >
-          {THEME_PREFERENCES.map((tema) => {
-            const ativo = tema === preferencias.theme
-            return (
-              <button
-                key={tema}
-                type="button"
-                role="radio"
-                aria-checked={ativo}
-                onClick={() => onSalvar({ theme: tema })}
-                className={`rounded-md border px-4 py-2 text-sm transition ${
-                  ativo
-                    ? 'border-current bg-current/10 font-medium'
-                    : 'border-current/20 opacity-70'
-                }`}
-              >
-                {rotuloTema[tema]}
-              </button>
-            )
-          })}
-        </div>
-      </div>
+            <div className="flex flex-col gap-2">
+              <p className="text-sm font-medium" id="settings-tema-titulo">
+                {t('settings.tema')}
+              </p>
+              <p className="text-xs opacity-70">{t('settings.temaDescricao')}</p>
+              <RadioGroup
+                rotulo={t('settings.tema')}
+                orientacao="horizontal"
+                valor={preferencias.theme}
+                onMudar={(valor) => onSalvar({ theme: valor as ThemePreference })}
+                opcoes={THEME_PREFERENCES.map((tema) => ({
+                  valor: tema,
+                  rotulo: rotuloTema[tema]
+                }))}
+              />
+            </div>
 
-      <div className="flex flex-col gap-2">
-        <p className="text-sm font-medium" id="settings-acento-titulo">
-          {t('settings.acento')}
-        </p>
-        <p className="text-xs opacity-70">{t('settings.acentoDescricao')}</p>
-        {/*
-         * Um grupo por módulo, cada um reabrindo o provider com o seu acento — o mesmo desenho da
-         * CHOICE. Reabrir é o que faz o swatch selecionado (marcado por borda no `--jos-cor-texto`)
-         * e o rótulo lerem a identidade certa sem `if` de cor aqui.
-         */}
-        <div aria-labelledby="settings-acento-titulo" className="flex flex-col gap-4 pt-1">
-          {(['noa', 'jarvis'] as const).map((modulo) => (
-            <SeletorDeAcentoDoModulo
-              key={modulo}
-              modulo={modulo}
-              uiTheme={uiTheme}
-              valor={
-                (modulo === 'noa' ? preferencias.accentNoa : preferencias.accentJarvis) as CorAcento
-              }
-              onEscolher={(cor) =>
-                onSalvar(
-                  modulo === 'noa'
-                    ? { accentNoa: cor as AccentColor }
-                    : { accentJarvis: cor as AccentColor }
-                )
-              }
-            />
-          ))}
-        </div>
-      </div>
+            <div className="flex flex-col gap-2">
+              <p className="text-sm font-medium" id="settings-acento-titulo">
+                {t('settings.acento')}
+              </p>
+              <p className="text-xs opacity-70">{t('settings.acentoDescricao')}</p>
+              {/*
+               * Um grupo por módulo, cada um reabrindo o provider com o seu acento — o mesmo
+               * desenho da CHOICE. Reabrir é o que faz o swatch selecionado ler a identidade
+               * certa sem `if` de cor aqui.
+               */}
+              <div aria-labelledby="settings-acento-titulo" className="flex flex-col gap-4 pt-1">
+                {(['noa', 'jarvis'] as const).map((modulo) => (
+                  <SeletorDeAcentoDoModulo
+                    key={modulo}
+                    modulo={modulo}
+                    uiTheme={uiTheme}
+                    valor={
+                      (modulo === 'noa'
+                        ? preferencias.accentNoa
+                        : preferencias.accentJarvis) as CorAcento
+                    }
+                    onEscolher={(cor) =>
+                      onSalvar(
+                        modulo === 'noa'
+                          ? { accentNoa: cor as AccentColor }
+                          : { accentJarvis: cor as AccentColor }
+                      )
+                    }
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </TabPanel>
 
-      {/*
-       * Credenciais por último: é a única seção escopada ao **espaço**, não ao usuário, e vem
-       * depois das três preferências pessoais para a leitura não alternar entre os dois escopos.
-       */}
-      <CredenciaisDoWorkspace workspace={workspace} nomeDoEspaco={nomeDoEspaco} />
-      <ChamadaDeIa workspace={workspace} nomeDoEspaco={nomeDoEspaco} />
+        {/* Permissões: a allowlist de diretórios é do usuário, como as preferências — o
+            filesystem da máquina é o mesmo nos dois espaços. Aba própria, e não seção do Geral,
+            porque permitir pasta é decisão de segurança, não de aparência. */}
+        <TabPanel valor="permissoes">
+          <DiretoriosPermitidos />
+        </TabPanel>
+
+        {/* Daqui para baixo, tudo é escopado ao espaço ativo. O orçamento vem antes do painel
+            de chamada: quem vai disparar precisa ver o teto primeiro — depois, o número
+            apareceria como explicação de um bloqueio já sofrido em vez de aviso antes dele. */}
+        <TabPanel valor="ia">
+          <CredenciaisDoWorkspace workspace={workspace} nomeDoEspaco={nomeDoEspaco} />
+          <OrcamentoDoWorkspace workspace={workspace} nomeDoEspaco={nomeDoEspaco} />
+          <ChamadaDeIa workspace={workspace} nomeDoEspaco={nomeDoEspaco} />
+        </TabPanel>
+
+        <TabPanel valor="roteamento">
+          <ProvidersDoWorkspace workspace={workspace} nomeDoEspaco={nomeDoEspaco} />
+        </TabPanel>
+
+        {/* A credencial vem antes do fluxo que a usa: quem chega aqui para configurar a Tavily
+            precisa do campo de chave, não de um conector que recusa por falta dela. */}
+        <TabPanel valor="conectores">
+          <CredenciaisDeConector workspace={workspace} nomeDoEspaco={nomeDoEspaco} />
+          <ConectorGitHub workspace={workspace} nomeDoEspaco={nomeDoEspaco} />
+        </TabPanel>
+      </Tabs>
     </section>
   )
 }

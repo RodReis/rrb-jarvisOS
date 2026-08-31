@@ -6,10 +6,16 @@ import {
   IPC_SEND_CHANNELS,
   type AppInfo,
   type AuditVerification,
+  type ConnectorCreditLimitsInput,
+  type ConnectorCreditView,
+  type ContextPackRequest,
   type JarvisBridge,
   type PreferencesSnapshot,
   type WorkspaceSwitchResult
 } from '@shared/contracts/ipc'
+import type { AlvoDaPublicacao, PublicacaoOutcome } from '@shared/domain/publicacao'
+import type { ContextPack, ContextPackOutcome, FalhaRegistrada } from '@shared/domain/context-pack'
+import type { CapacidadeResolvida } from '@shared/domain/skills'
 import type { AuthSnapshot } from '@shared/contracts/auth'
 import type { LogInput } from '@shared/contracts/logging'
 import type { PolicyContext, PolicyDecision } from '@shared/policies'
@@ -23,8 +29,40 @@ import type {
 import type { ExecutionRun } from '@shared/domain/execution'
 import type { ApprovalDecision, ApprovalRequest } from '@shared/domain/execution'
 import type { CommandExecution, CommandSubmission } from '@shared/domain/terminal'
-import type { AiCallHandle, AiRequest, AiStreamEvent } from '@shared/domain/ai'
+import type { AiCallHandle, AiProvider, AiRequest, AiStreamEvent } from '@shared/domain/ai'
+import type { ProviderRoute, ProviderStatus, RoutingPolicy } from '@shared/domain/routing'
+import type {
+  ConnectorCapability,
+  ConnectorCredentialKey,
+  ConnectorCredentialStatusView,
+  ConnectorError,
+  ConnectorId,
+  ConnectorOutcome,
+  ConnectorRequest
+} from '@shared/domain/connectors'
+import type { GithubAuthSnapshot, GithubDeviceFlowView } from '@shared/domain/github-auth'
+import type {
+  MarcoDocumental,
+  MarcoOutcome,
+  PlanningSession,
+  Project,
+  ProjectOutcome
+} from '@shared/domain/projects'
+import type { Resposta, RespostaOutcome, VistaDoWizard } from '@shared/domain/wizard'
+import type { PacoteEstrutural, PacoteOutcome } from '@shared/domain/pacote-estrutural'
+import type { Anexo, AnexoOutcome, TipoDeAnexo } from '@shared/domain/anexos-de-design'
+import type { ValidacaoDoPrototipo } from '@shared/domain/validacao-de-prototipo'
+import type { ArquiteturaOutcome, PacoteArquitetura } from '@shared/domain/arquitetura'
+import type { Roadmap, RoadmapOutcome } from '@shared/domain/roadmap'
+import type {
+  Approval,
+  AprovacaoOutcome,
+  Gate,
+  MudancaDeArtefato,
+  RevisaoAprovada
+} from '@shared/domain/aprovacoes'
 import type { CredentialKey, CredentialStatusView } from '@shared/domain/credentials'
+import type { BudgetLimitsInput, BudgetSnapshot } from '@shared/domain/budget'
 import type {
   AuditEvent,
   AuditEventType,
@@ -83,6 +121,10 @@ const bridge: JarvisBridge = {
     ipcRenderer.invoke(IPC_CHANNELS.allowlistAdd, path),
   removeAllowedDirectory: (path: string): Promise<readonly string[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.allowlistRemove, path),
+  // Sem argumento: quem escolhe o caminho é o usuário, no diálogo nativo que abre no main.
+  pickAllowedDirectory: (): Promise<readonly string[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.allowlistPick),
+  getAppDirectory: (): Promise<string> => ipcRenderer.invoke(IPC_CHANNELS.allowlistAppDir),
 
   listWorkflows: (workspace: WorkspaceId): Promise<readonly Workflow[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.workflowList, workspace),
@@ -154,7 +196,219 @@ const bridge: JarvisBridge = {
     ipcRenderer.on(IPC_EVENT_CHANNELS.aiStreamEvent, wrapped)
 
     return () => ipcRenderer.removeListener(IPC_EVENT_CHANNELS.aiStreamEvent, wrapped)
-  }
+  },
+
+  getBudget: (workspace: WorkspaceId): Promise<BudgetSnapshot> =>
+    ipcRenderer.invoke(IPC_CHANNELS.budgetGet, workspace),
+  setBudgetLimits: (limites: BudgetLimitsInput, workspace: WorkspaceId): Promise<BudgetSnapshot> =>
+    ipcRenderer.invoke(IPC_CHANNELS.budgetSetLimits, limites, workspace),
+
+  getProviderStatus: (workspace: WorkspaceId): Promise<readonly ProviderStatus[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.providerStatus, workspace),
+  getProviderModels: (provider: AiProvider): Promise<readonly string[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.providerModels, provider),
+  setProviderModel: (
+    provider: AiProvider,
+    modelo: string,
+    workspace: WorkspaceId
+  ): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.providerSetModel, provider, modelo, workspace),
+  getRouting: (workspace: WorkspaceId): Promise<RoutingPolicy> =>
+    ipcRenderer.invoke(IPC_CHANNELS.routingGet, workspace),
+  setRoute: (rota: ProviderRoute, workspace: WorkspaceId): Promise<RoutingPolicy> =>
+    ipcRenderer.invoke(IPC_CHANNELS.routingSetRoute, rota, workspace),
+
+  listConnectorCapabilities: (): Promise<readonly ConnectorCapability[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.connectorsCapabilities),
+  callConnector: (request: ConnectorRequest, workspace: WorkspaceId): Promise<ConnectorOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.connectorsInvoke, request, workspace),
+  getConnectorCredits: (
+    connector: ConnectorId,
+    workspace: WorkspaceId
+  ): Promise<ConnectorCreditView> =>
+    ipcRenderer.invoke(IPC_CHANNELS.connectorCreditsGet, connector, workspace),
+  setConnectorCreditLimits: (
+    connector: ConnectorId,
+    limites: ConnectorCreditLimitsInput,
+    workspace: WorkspaceId
+  ): Promise<ConnectorCreditView> =>
+    ipcRenderer.invoke(IPC_CHANNELS.connectorCreditsSetLimits, connector, limites, workspace),
+  // Credenciais de conector (SPEC-Conectores-05, crit. 7). Como no trio de credenciais de IA, o
+  // valor entra e nunca volta: o retorno é a lista de status, sem campo onde o segredo caiba.
+  listConnectorCredentials: (
+    workspace: WorkspaceId
+  ): Promise<readonly ConnectorCredentialStatusView[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.connectorCredentialList, workspace),
+  setConnectorCredential: (
+    key: ConnectorCredentialKey,
+    value: string,
+    workspace: WorkspaceId
+  ): Promise<readonly ConnectorCredentialStatusView[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.connectorCredentialSet, key, value, workspace),
+  removeConnectorCredential: (
+    key: ConnectorCredentialKey,
+    workspace: WorkspaceId
+  ): Promise<readonly ConnectorCredentialStatusView[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.connectorCredentialRemove, key, workspace),
+  // GitHub por Device Flow (SPEC-Conectores-03). **Nenhuma destas funções devolve token** — não
+  // existe `getGithubToken` na ponte, e é essa ausência que garante o critério 2.
+  getGithubAuthStatus: (workspace: WorkspaceId): Promise<GithubAuthSnapshot> =>
+    ipcRenderer.invoke(IPC_CHANNELS.githubAuthStatus, workspace),
+  startGithubAuth: (workspace: WorkspaceId): Promise<GithubDeviceFlowView | ConnectorError> =>
+    ipcRenderer.invoke(IPC_CHANNELS.githubAuthStart, workspace),
+  awaitGithubAuth: (workspace: WorkspaceId): Promise<GithubAuthSnapshot | ConnectorError> =>
+    ipcRenderer.invoke(IPC_CHANNELS.githubAuthAwait, workspace),
+  cancelGithubAuth: (workspace: WorkspaceId): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.githubAuthCancel, workspace),
+  logoutGithub: (workspace: WorkspaceId): Promise<GithubAuthSnapshot> =>
+    ipcRenderer.invoke(IPC_CHANNELS.githubAuthLogout, workspace),
+  setGithubClientId: (clientId: string, workspace: WorkspaceId): Promise<GithubAuthSnapshot> =>
+    ipcRenderer.invoke(IPC_CHANNELS.githubSetClientId, clientId, workspace),
+
+  // Projeto local e planejamento (SPEC-Planejamento-01). Nenhum canal de Git: a UI pede
+  // projeto e marco; o Git roda no main, pelo terminal controlado (decisão 2 do PI).
+  listProjects: (workspace: WorkspaceId): Promise<readonly Project[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.projectList, workspace),
+  createProject: (
+    nome: string,
+    workspace: WorkspaceId,
+    diretorioBase?: string
+  ): Promise<ProjectOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.projectCreate, nome, workspace, diretorioBase),
+  importProject: (
+    diretorio: string,
+    workspace: WorkspaceId,
+    nomeSugerido?: string
+  ): Promise<ProjectOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.projectImport, diretorio, workspace, nomeSugerido),
+  pickProjectDirectory: (): Promise<string> =>
+    ipcRenderer.invoke(IPC_CHANNELS.projectPickDirectory),
+  renameProject: (
+    projectId: string,
+    nome: string,
+    workspace: WorkspaceId
+  ): Promise<ProjectOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.projectRename, projectId, nome, workspace),
+  removeProject: (projectId: string, workspace: WorkspaceId): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.projectRemove, projectId, workspace),
+  getPlanningSession: (
+    projectId: string,
+    workspace: WorkspaceId
+  ): Promise<PlanningSession | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.projectSession, projectId, workspace),
+  savePlanningAnswers: (
+    projectId: string,
+    etapa: string,
+    respostas: Readonly<Record<string, unknown>>,
+    workspace: WorkspaceId
+  ): Promise<PlanningSession | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.projectSaveAnswers, projectId, etapa, respostas, workspace),
+  completeMilestone: (
+    projectId: string,
+    marco: MarcoDocumental,
+    workspace: WorkspaceId
+  ): Promise<MarcoOutcome | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.projectCompleteMilestone, projectId, marco, workspace),
+
+  // O wizard orientado (SPEC-Planejamento-03). Dois métodos, como o contrato: ler o estado
+  // **não** avança, e é isso que faz a retomada do critério 6 funcionar ao reabrir a tela.
+  getWizardState: (projectId: string, workspace: WorkspaceId): Promise<VistaDoWizard | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.wizardState, projectId, workspace),
+  answerWizard: (
+    projectId: string,
+    resposta: Resposta,
+    workspace: WorkspaceId
+  ): Promise<RespostaOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.wizardAnswer, projectId, resposta, workspace),
+
+  // O pacote estrutural (SPEC-Planejamento-04). Nenhum método recebe conteúdo de documento: a
+  // tela pede a geração e mostra o que voltou; compor é do main, a partir de decisões e
+  // evidências.
+  gerarPacote: (
+    projectId: string,
+    consulta: string,
+    workspace: WorkspaceId
+  ): Promise<PacoteOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.pacoteGerar, projectId, consulta, workspace),
+  listarPacotes: (projectId: string): Promise<readonly PacoteEstrutural[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.pacoteListar, projectId),
+
+  // Roadmap e gates (SPEC-Planejamento-06). `gerarRoadmap` e `aprovarGate` são métodos
+  // distintos, e a separação é a fatia: gerar propõe, aprovar aceita. **A identidade não
+  // atravessa a ponte** — ela vem da sessão no main, porque um parâmetro deixaria o renderer
+  // declarar quem aprovou.
+  gerarRoadmap: (projectId: string, workspace: WorkspaceId): Promise<RoadmapOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.roadmapGerar, projectId, workspace),
+  carregarRoadmap: (projectId: string, workspace: WorkspaceId): Promise<Roadmap> =>
+    ipcRenderer.invoke(IPC_CHANNELS.roadmapCarregar, projectId, workspace),
+  // O alvo atravessa a ponte; a credencial não. O token é resolvido no main, pelo mesmo cofre do
+  // conector — mandá-lo daqui exigiria que o renderer o tivesse, e ele nunca tem.
+  publicarNoGitHub: (
+    projectId: string,
+    alvo: AlvoDaPublicacao,
+    workspace: WorkspaceId
+  ): Promise<PublicacaoOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.publicacaoPublicar, projectId, alvo, workspace),
+  listarAprovacoes: (projectId: string, workspace: WorkspaceId): Promise<readonly Approval[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.aprovacaoListar, projectId, workspace),
+  revisoesDoGate: (
+    projectId: string,
+    gate: Gate,
+    workspace: WorkspaceId
+  ): Promise<readonly RevisaoAprovada[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.aprovacaoRevisoes, projectId, gate, workspace),
+  aprovarGate: (projectId: string, gate: Gate, workspace: WorkspaceId): Promise<AprovacaoOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.aprovacaoAprovar, projectId, gate, workspace),
+  simularMudanca: (
+    projectId: string,
+    mudancas: readonly MudancaDeArtefato[],
+    workspace: WorkspaceId
+  ): Promise<readonly Gate[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.aprovacaoSimular, projectId, mudancas, workspace),
+
+  // Anexos de design e arquitetura (SPEC-Planejamento-05). Nenhum método recebe conteúdo de
+  // arquivo: o renderer manda o *caminho* que o seletor nativo devolveu, e quem lê, copia e
+  // hasheia é o main. Um método que aceitasse bytes seria um gravador de disco no renderer.
+  escolherAnexo: (tipo: TipoDeAnexo): Promise<string> =>
+    ipcRenderer.invoke(IPC_CHANNELS.anexoEscolher, tipo),
+  anexarDesign: (
+    projectId: string,
+    tipo: TipoDeAnexo,
+    origem: string,
+    workspace: WorkspaceId
+  ): Promise<AnexoOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.anexoAnexar, projectId, tipo, origem, workspace),
+  listarAnexos: (projectId: string): Promise<readonly Anexo[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.anexoListar, projectId),
+  removerAnexo: (projectId: string, caminho: string, workspace: WorkspaceId): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.anexoRemover, projectId, caminho, workspace),
+  validarPrototipos: (projectId: string): Promise<readonly ValidacaoDoPrototipo[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.anexoValidar, projectId),
+  gerarArquitetura: (projectId: string, workspace: WorkspaceId): Promise<ArquiteturaOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.arquiteturaGerar, projectId, workspace),
+  listarArquiteturas: (projectId: string): Promise<readonly PacoteArquitetura[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.arquiteturaListar, projectId),
+
+  // Contexto, skills e orçamento (SPEC-Planejamento-02). Nenhum método que leia arquivo: a tela
+  // indica caminhos relativos e o main lê, dentro do diretório do projeto. Um `readFile` aqui
+  // seria um leitor de disco no renderer — a fronteira que o ARCHITECTURE fecha.
+  buildContextPack: (
+    pedido: ContextPackRequest,
+    workspace: WorkspaceId
+  ): Promise<ContextPackOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.contextBuild, pedido, workspace),
+  listContextPacks: (projectId: string): Promise<readonly ContextPack[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.contextList, projectId),
+  listCapabilities: (): Promise<readonly CapacidadeResolvida[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.contextCapabilities),
+  listFailures: (projectId: string): Promise<readonly FalhaRegistrada[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.contextFailures, projectId),
+  resolveFailure: (
+    projectId: string,
+    fingerprint: string,
+    workspace: WorkspaceId
+  ): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.contextResolveFailure, projectId, fingerprint, workspace)
 }
 
 if (process.contextIsolated) {

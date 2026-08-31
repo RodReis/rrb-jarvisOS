@@ -2,7 +2,7 @@
 
 - MVP/Fatia: MVP-009 · M9-F06.
 - Issue: [#106](https://github.com/RodReis/rrb-jarvisOS/issues/106).
-- Status: **aprovada-pi** (2026-08-29) — aprovada sem pergunta estrutural aberta; a limpeza absorve o container do sandbox decidido na M9-F03.
+- Status: **aprovada-pi** (2026-08-29) — aprovada sem pergunta estrutural aberta; a limpeza absorve o container do sandbox decidido na M9-F03. **Emenda 2026-08-30:** docs do projeto-alvo saem desta fatia e entram no PR (M9-F05 critério 11); relatório em `reports/`, não em `docs/`; terminal `AWAITING_MERGE` (ver § Emendas).
 - Depende de: M9-F05.
 
 ## Objetivo
@@ -13,17 +13,17 @@ Fechar a execução com prova verificável, atualizar somente documentação mat
 
 - `ExecutionLedger`: duração, tentativas, tokens, créditos, custo e eventos.
 - `ExternalRef`: issue, branch, commits, PR, checks, head/merge SHAs.
-- relatório `docs/test-reports/<SPEC-ID>.md`.
-- `STATUS.md` curto e `STATUS-ARQUIVO.md` detalhado.
-- próxima fatia em `AWAITING_PI`, nunca iniciada automaticamente sem aprovação.
+- relatório de testes do projeto-alvo em `reports/TESTS.md` (gerado do `--json` dos runners, ADR-003/TESTING §4 — **nunca sob `docs/`**), **commitado no PR pela M9-F05**; esta fatia só o referencia por hash no `ExecutionLedger`.
+- `STATUS.md` curto e `STATUS-ARQUIVO.md` detalhado — **também escritos no PR pela M9-F05 (critério 11)**; esta fatia verifica que a versão mergeada corresponde ao run e não escreve na branch-base.
+- próxima fatia em `AWAITING_PI` (gate `SLICE_ENTRY`, M9-F02), nunca iniciada automaticamente sem aprovação.
 
 ## Limpeza
 
-Confirmar merge (ou PR verde aguardando o PI, com o kill-switch desligado) → verificar que worktree pertence ao lease → remover worktree operacional → **remover o container do executor** → liberar leases/portas/containers temporários → preservar volumes/dados persistentes → registrar resultado. Falha de limpeza não desfaz merge, mas mantém pendência reconciliável.
+Confirmar `MERGED` (ou `AWAITING_MERGE`, com o kill-switch desligado) → verificar que worktree pertence ao lease → remover worktree operacional → **remover o container do executor** → liberar leases/portas/containers temporários → preservar volumes/dados persistentes → registrar resultado. Falha de limpeza não desfaz merge, mas mantém pendência reconciliável.
 
-Cancelamento também executa limpeza segura: antes do executor não cria efeito; durante execução mata árvore/Squad e preserva snapshot; depois do push preserva branch e PR, converte o PR para draft quando possível e marca cancelamento; durante CI para monitoramento/correções; depois do merge mantém `MERGED`. Nunca apaga branch/PR ou cria revert automaticamente.
+**Cancelamento também executa limpeza segura** (emenda aprovada pelo PI em 2026-08-30), com o que preservar definido por fase: antes do executor não há efeito a desfazer; durante a execução mata a árvore de processos e preserva o snapshot; depois do push **preserva branch e PR**, converte o PR para rascunho quando possível e marca o cancelamento; durante o CI para o monitoramento e as correções; depois do merge o resultado continua `MERGED`. **Nunca apaga branch ou PR, e nunca cria revert automático** — desfazer trabalho por conta própria é o oposto do que a limpeza existe para fazer.
 
-Artefatos extensos de runs finalizados/reconciliados expiram após 30 dias ou quando a cota global ultrapassar 5 GB, removendo primeiro o elegível mais antigo. Item fixado e run ativo, bloqueado ou pendente não expiram. Metadados, hashes, auditoria e relatórios versionados permanecem.
+**Retenção de artefatos extensos:** runs finalizados ou reconciliados expiram em **30 dias** ou quando a cota global passar de **5 GB**, removendo primeiro o elegível mais antigo. Item fixado e run ativo, bloqueado ou pendente **não** expiram. Metadados, hashes, auditoria e relatórios versionados permanecem — o que sai é o anexo pesado, nunca a prova.
 
 ## Interface
 
@@ -38,8 +38,8 @@ Mostrar resultado, custo, evidência e próxima decisão. Detalhes Git/logs fica
 5. Worktree, **container do executor** e demais recursos temporários são removidos ou ficam com pendência explícita reconciliável.
 6. Próxima fatia exige sua própria revisão aprovada.
 7. Estado terminal é compreensível sem ler logs técnicos.
-8. Cancelar após push preserva PR/branch e permite retomada vinculada somente após reconciliar o `head SHA`; cancelar após merge não muda o resultado.
-9. Coletor de retenção respeita idade, cota, fixação e proteção de run não resolvido, sem deixar referência versionada apontar para conteúdo que alegue estar presente.
+8. **Cancelar depois do push preserva PR/branch** e permite retomada vinculada somente após reconciliar o `head SHA`; cancelar depois do merge não muda o resultado. Teste das duas fases.
+9. **O coletor de retenção respeita idade, cota, fixação e proteção de run não resolvido**, e nunca deixa referência versionada apontando para conteúdo que ela afirme estar presente. Teste.
 
 ## Testes e evidência
 
@@ -49,5 +49,11 @@ Playwright do painel, integração de limpeza parcial/reinício e jornada E2E re
 
 - **A jornada E2E real completa roda em projeto e repositório exclusivos e descartáveis**, fora da suíte padrão — ela cria efeitos externos e consome orçamento, então não pode disparar em todo CI.
 - **Relatório em `docs/test-reports/<SPEC-ID>.md` segue o ADR-003**: números só do `--json` dos runners, nunca escritos à mão.
-- **Estado terminal com kill-switch desligado é "PR verde aguardando o PI"**, um resultado legítimo — não `BLOCKED`, que é reservado para causa externa ou risco.
+- **Estado terminal com kill-switch desligado é `AWAITING_MERGE`** (M9-F02), um resultado legítimo — não `BLOCKED`, que é reservado para causa externa ou risco.
 - **Volume persistente nunca é apagado pela limpeza automática**, mesmo órfão: vira pendência para o usuário decidir.
+
+## Emendas (2026-08-30) — revisão de furos de spec
+
+1. **`STATUS.md`/relatório pós-merge era commit direto na branch-base** do projeto-alvo — contra a Convention gerada, contra a M9-F04 e contra a invariante 10. Movido para o PR (M9-F05 critério 11); esta fatia deixa de escrever na branch-base.
+2. **`docs/test-reports/<SPEC-ID>.md` contradizia o TESTING.md** deste repositório (`reports/TESTS.md`, gerado, nunca em `docs/`) e o ADR-003 que a própria spec cita. Corrigido.
+3. Nome do terminal alinhado à M9-F02.

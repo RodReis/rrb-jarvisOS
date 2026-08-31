@@ -22,14 +22,11 @@ Criar ou importar um projeto local, persistir seu planejamento e inicializar Git
 
 - Respostas do wizard são autosalvas no SQLite; não geram commit individual.
 - Repositório existente nunca é reinicializado ou limpo.
-- Importação **registra o repositório no lugar**. O checkout do usuário nunca é usado para escrita da pipeline; um worktree gerido nasce do `HEAD` observado.
-- Alterações não commitadas permanecem intactas e fora do worktree gerido. A UI mostra essa diferença; não copia, limpa, inclui ou commita o conteúdo automaticamente.
 - Arquivos do usuário não são sobrescritos silenciosamente.
 - Git local é fonte das revisões documentais; SQLite guarda estado de trabalho.
 - Remote, issue, PR e push ficam fora desta fatia.
 - **Git é o `git` do sistema, executado pelo terminal controlado do MVP-004** (M4-F02): comando pinado na allowlist de comandos, sem shell, cwd na allowlist, com timeout/kill, classificado pelo Policy Engine e auditado. Não existe segundo caminho de escrita em disco fora do enforcement.
 - **Ausência de `git` na máquina** é `BLOCKED_EXTERNAL` com ação concreta, nunca fallback silencioso para outra implementação.
-- **Git no host é endurecido:** hooks são desativados; pager/editor/credential helper não interativos são controlados; config do repositório capaz de executar programa (filters, drivers, fsmonitor, submodule update e equivalentes) é detectada antes do checkout. Recurso não suportado bloqueia com causa — nunca executa comando definido pelo repositório no host.
 
 ## Critérios de aceite
 
@@ -42,8 +39,6 @@ Criar ou importar um projeto local, persistir seu planejamento e inicializar Git
 7. **Projeto nasce sob `userData` sem tocar a allowlist.** Escolher diretório externo exige opt-in explícito já registrado; a criação do projeto **nunca** amplia a allowlist por conta própria. Teste dos dois caminhos.
 8. **Toda operação de Git passa pelo terminal controlado** e gera `AuditEvent`; nenhuma escrita de repositório ocorre por caminho paralelo. Teste comprova que o caminho é único.
 9. **Importar o próprio `rrb-jarvisOS`** preserva `docs/`, histórico e `STATUS.md`, e não sobrescreve nada — é o smoke da importação.
-10. Repositório sujo é importado sem modificar o checkout; o worktree gerido reflete somente o `HEAD` e a UI evidencia os arquivos locais excluídos.
-11. Fixture com hook/filtro/driver executável prova que nenhum comando controlado pelo repositório roda no host; recurso incompatível produz bloqueio explicável.
 
 ## Testes, evidência e custo
 
@@ -54,7 +49,6 @@ Integração em diretórios temporários para novo/importado/colisão/reinício/
 1. **Onde nasce o projeto:** **sob o diretório gerido pelo app** (`userData`) por padrão; diretório externo exige **opt-in explícito na allowlist**, coerente com a postura conservadora já decidida na SPEC-Execucao-03. Criar projeto **não** é caminho para ampliar permissão. **Consequência registrada:** enquanto a fatia de **UI da allowlist de diretórios** não existir (pendência aberta do MVP-004, ainda sem spec), só é possível criar projeto dentro do diretório do app. — decidido.
 2. **Execução do Git:** **`git` do sistema pelo terminal controlado do MVP-004**, não biblioteca JS embarcada. Motivo: reusa o gate que já existe (Policy Engine + `AuditEvent` + timeout/kill) em vez de abrir um segundo caminho de escrita em disco que escaparia do enforcement do próprio MVP-004. **Consequência:** esta fatia passa a depender da **M4-F02** (#75) e exige `git` instalado e pinado na allowlist de comandos. — decidido.
 3. **Escopo da importação:** o critério de aceite **inclui importar o próprio `rrb-jarvisOS`**. É a verificação mais forte disponível — o formato de `docs/` deste repositório é exatamente o que a pipeline gera; se a importação quebrar aqui, o formato está errado. — decidido.
-4. **Checkout com alterações locais:** registrar no lugar e trabalhar a partir do `HEAD`, sempre em worktree gerido. Alterações não commitadas do checkout permanecem intactas e não entram automaticamente. — decidido pelo PI em 2026-08-29.
 
 ## Decisões cravadas pelo Cowork (coerentes com decisões anteriores; PI pode vetar)
 

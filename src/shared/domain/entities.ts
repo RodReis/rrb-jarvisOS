@@ -174,7 +174,134 @@ export const AUDIT_EVENT_TYPES = [
   // fim: uma chamada que morre no meio precisa deixar rastro, e o evento de conclusão sozinho
   // perderia exatamente a que falhou. O payload carrega provider, modelo, custo e latência;
   // **nunca o prompt, a resposta ou a credencial** (ADR-004).
-  'ai-call'
+  'ai-call',
+  // SPEC-Providers-03: o gate de orçamento. **Dois tipos, não um** — pela mesma razão que
+  // separa `allowlist-change` de `policy-decision`: `budget-decision` é o veredito sobre uma
+  // chamada (permitido/alerta/bloqueado, critério 6), `budget-change` é o usuário editando o
+  // próprio limite. Sob um tipo só, "quantas vezes o orçamento barrou" exigiria parsear o
+  // payload para descartar as edições. O payload traz limite, acumulado e estimativa —
+  // números, nunca o prompt.
+  'budget-decision',
+  'budget-change',
+  // SPEC-Providers-04: o roteamento. **Dois tipos**, pela mesma razão que separa
+  // `budget-decision` de `budget-change`: `provider-selection` é o veredito sobre uma chamada
+  // (quem atendeu, e se foi fallback — critério 4), `routing-change` é o usuário editando a
+  // rota ou trocando o modelo ativo. Sob um tipo só, "com que frequência o preferido cai"
+  // exigiria parsear payload para descartar as edições.
+  'provider-selection',
+  'routing-change',
+  // SPEC-Conectores-01: chamada a conector externo (GitHub, Tavily). **Dois eventos por
+  // chamada** — `fase: 'requisicao'` antes e `fase: 'conclusao'` depois —, pela mesma razão
+  // que `ai-call` os tem: uma chamada que morre no meio precisa deixar rastro, e o evento de
+  // conclusão sozinho perderia exatamente a que falhou. Tipo próprio, e não `ai-call`: os dois
+  // runtimes são separados (decisão do PI de 2026-08-29), e "quantas vezes o GitHub falhou"
+  // exigiria parsear payload para descartar as chamadas de IA. O payload traz conector,
+  // operação, efeito, código de erro e créditos consumidos; **nunca o input, a resposta ou a
+  // credencial** (ADR-004).
+  'connector-call',
+  // SPEC-Conectores-02: o ledger de créditos de conector. **Dois tipos**, pela mesma razão que
+  // separa `budget-decision` de `budget-change`: `connector-credit-decision` é o veredito sobre
+  // uma chamada (permitido/bloqueado, critério 8), `connector-credit-change` é o usuário
+  // editando o próprio teto. Sob um tipo só, "quantas vezes a cota barrou" exigiria parsear
+  // payload para descartar as edições. **Distinto de `budget-decision`** porque os dois
+  // orçamentos são independentes (decisão do PI de 2026-08-29): um conta créditos do conector,
+  // o outro conta USD de IA — e a auditoria tem de dizer qual dos dois estourou.
+  'connector-credit-decision',
+  'connector-credit-change',
+  // SPEC-Conectores-03: o Device Flow do GitHub App. Tipo próprio, e não `credential-change`,
+  // pela mesma razão que separa `budget-decision` de `budget-change`: `credential-change` é o
+  // **usuário editando o cofre** no Settings; isto é o **protocolo de autenticação** rodando
+  // (abriu o fluxo, autorizou, renovou, saiu). Sob um tipo só, "quantas vezes a renovação
+  // falhou" exigiria parsear payload para descartar as edições manuais — e a renovação é
+  // justamente o que ninguém vê acontecer.
+  //
+  // O payload traz a fase (`inicio`/`autorizado`/`renovado`/`logout`/`falhou`), o conector e o
+  // código de erro normalizado; **nunca o device code, o user code, o token ou o refresh
+  // token** (ADR-004). O `user_code` fica de fora mesmo sendo mostrado na tela: ele é
+  // efêmero por desenho, e guardá-lo na cadeia append-only o tornaria permanente.
+  'connector-auth',
+  // SPEC-Planejamento-01: ciclo de vida de um projeto local. **Dois tipos**, pela mesma razão
+  // que separa `budget-decision` de `budget-change`: `project-lifecycle` é o projeto nascendo
+  // (criado, importado, recusado por colisão), `project-milestone` é um marco documental
+  // virando commit. Sob um tipo só, "quantos marcos foram commitados" exigiria parsear payload
+  // para descartar as criações — e o marco é justamente o que a revisão documental rastreia.
+  //
+  // O commit em si **não** ganha tipo próprio: ele roda pelo terminal controlado e já gera
+  // `terminal-command` com comando, saída e exit code (spec § Regras: nenhuma escrita de
+  // repositório por caminho paralelo). `project-milestone` registra a decisão de marco; o
+  // `terminal-command` registra a execução dela. Dois fatos distintos, dois eventos.
+  'project-lifecycle',
+  'project-milestone',
+  // SPEC-Planejamento-02: montagem do `ContextPack` — montado ou recusado (leitura ampla sem
+  // exceção, segredo no contexto, teto estourado). O payload carrega **caminhos e hashes,
+  // nunca conteúdo**: a auditoria responde "o que foi enviado?", e responder isso não exige
+  // repetir o que foi enviado (ADR-004).
+  //
+  // Separado de `ai-call` de propósito: o pack é montado **antes** de existir chamada, e um
+  // pack recusado nunca vira chamada nenhuma. Sob o mesmo tipo, "quantos contextos foram
+  // barrados" exigiria parsear payload para descartar as chamadas.
+  'context-pack',
+  // Falha deduplicada por fingerprint (critério 4). Tipo próprio porque a pergunta que ele
+  // responde é temporal — "esta falha já tinha acontecido?" —, e o `reason`
+  // (`nova`/`reincidente`/`resolvida`) é a resposta. Misturado com `context-pack`, a
+  // reincidência ficaria escondida entre montagens.
+  'context-failure',
+  // SPEC-Planejamento-03: uma decisão do wizard. Tipo próprio, e não `project-milestone`, pela
+  // mesma razão que separa `budget-decision` de `budget-change`: o marco é a **revisão
+  // documental virando commit**, a decisão é **uma escolha do PI dentro da sessão**. Sob um
+  // tipo só, "o que o PI decidiu, e o que foi delegado ao agente" exigiria parsear payload
+  // para descartar os commits.
+  //
+  // O payload carrega `autor` (`pi`/`agente`), pergunta, escolha e motivo — é ele que torna
+  // verificável a invariante 3 do CONVENTION §4 ("Decide por mim registra decisão, mas não
+  // aprova gate"): sem `autor` na cadeia, delegação e aprovação ficariam indistinguíveis
+  // depois do fato. O **autosave do wizard não gera evento** (isso é rascunho, e um evento por
+  // tecla afogaria a cadeia); só a decisão gravada gera.
+  'planning-decision',
+  // SPEC-Planejamento-04: a geração do pacote estrutural (PRD, Landscape, Convention) — gerado
+  // ou bloqueado. Tipo próprio, e não `project-milestone`, pela mesma razão que separou
+  // `planning-decision` dele: o marco é o **commit**, isto é a **revisão sendo composta**, e
+  // "quantas vezes a pesquisa bloqueou o pacote" exigiria parsear payload para descartar os
+  // commits.
+  //
+  // O payload carrega o hash do pacote, a contagem de fontes e — no bloqueio — a causa e as
+  // tentativas. **Nunca o conteúdo dos documentos nem o texto extraído** (ADR-004): a auditoria
+  // responde "o que foi gerado, e a partir de quantas fontes?", e responder isso não exige
+  // repetir o que foi escrito.
+  'pacote-estrutural',
+  // SPEC-Planejamento-05: o ato de anexar design, e a arquitetura que o gate libera. Tipo
+  // próprio, e não `pacote-estrutural`, porque a pergunta que ele responde é sobre **o ato do
+  // PI**: "o que foi anexado, quando e com que hash?". É esse instante que faz um arquivo contar
+  // para o gate (critério 7) — um arquivo largado no diretório por fora não gera evento e não
+  // satisfaz o gate. Misturado com a composição do PRD, "quando o design entrou" exigiria
+  // parsear payload para descartar as gerações.
+  //
+  // O payload carrega tipo, caminho, hash e bytes — **nunca o conteúdo do anexo** (ADR-004).
+  'design-anexo',
+  // SPEC-Planejamento-06: a geração do roadmap — gerada ou recusada por DAG inválido. Tipo
+  // próprio pela mesma razão que separou `pacote-estrutural` de `project-milestone`: o marco é o
+  // commit, isto é a **composição do plano**, e "quantas vezes o DAG saiu inválido" exigiria
+  // parsear payload para descartar os commits.
+  //
+  // O payload carrega contagens e o slug da próxima SPEC — **nunca o conteúdo** dos documentos.
+  'roadmap',
+  // SPEC-Planejamento-06: o aceite de um gate pelo PI. Tipo próprio, e **não** `roadmap`, porque
+  // a pergunta que ele responde é a do critério 4: *quem* aceitou *o quê*, e quando. Sob o mesmo
+  // tipo da geração, "o que o PI aprovou" ficaria misturado com o que o app compôs sozinho — e é
+  // exatamente essa distinção que a invariante 3 existe para manter.
+  //
+  // O payload carrega gate, contagem de revisões e a identidade; nunca o conteúdo aprovado.
+  'approval',
+  // SPEC-Entrega-01: a publicação do repositório e do backlog aprovado no GitHub. Tipo próprio, e
+  // **não** `connector-call`, porque a pergunta que ele responde é sobre o **efeito no mundo**: que
+  // repositório passou a existir, com que commit, e quantos recursos nasceram nesta execução. Sob
+  // `connector-call`, "o projeto foi publicado" viraria uma sequência de nove chamadas que alguém
+  // precisaria remontar — e o critério 1 se mede exatamente pela contagem de criações.
+  //
+  // O payload carrega o repositório, a branch, o commit confirmado **na origem** e a contagem de
+  // criados; nunca o token, que não chega a este serviço a não ser para o push (e é redigido antes
+  // de qualquer registro, pelo `argsSeguros` do terminal).
+  'publicacao-github'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]

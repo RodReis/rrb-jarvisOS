@@ -98,13 +98,39 @@ const VARIAVEIS_DE_AMBIENTE_PERMITIDAS: readonly string[] = [
   'PATHEXT'
 ]
 
-function ambienteControlado(): NodeJS.ProcessEnv {
+/**
+ * Exportada desde a F04 do MVP-005: o adapter do Claude Code CLI também roda subprocess e
+ * precisa da **mesma** lista de permissão. Duas cópias divergiriam, e a que divergisse seria a
+ * que vaza — a lição da M4-F02 (`process.env` do main não pode alcançar o processo filho) vale
+ * igual para um binário que o app invoca como sua própria dependência.
+ */
+export function ambienteControlado(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {}
   for (const chave of VARIAVEIS_DE_AMBIENTE_PERMITIDAS) {
     const valor = process.env[chave]
     if (valor !== undefined) env[chave] = valor
   }
   return env
+}
+
+/**
+ * Os argumentos como eles podem ir para a auditoria.
+ *
+ * Um argumento pode carregar segredo — a M9-F01 trouxe o caso concreto: o push da publicação leva o
+ * token na URL, porque `ambienteControlado()` não deixa variável de ambiente alcançar o subprocess.
+ * O `AuditRepository` grava o payload **cru**, então sem esta passagem o token entra no banco em
+ * claro e fica lá, encadeado no hash, sem como remover.
+ *
+ * A redação acontece aqui e não no chamador porque este é o ponto por onde todo comando passa:
+ * quem chamar o terminal de outra fatia herda a proteção sem saber que precisava dela. E acontece
+ * **só na auditoria** — a `ApprovalRequest` guarda o argumento real, porque é dela que a retomada
+ * reconstrói o comando, e um argumento redigido seria retomado quebrado.
+ */
+function argsSeguros(args: readonly string[]): string[] {
+  return args.map((arg) => {
+    const redigido = redact(arg)
+    return typeof redigido === 'string' ? redigido : String(redigido)
+  })
 }
 
 /**
@@ -376,7 +402,7 @@ export class TerminalEngine {
         marco: 'antes',
         executionId: parcial.id,
         binary: canonicalizeBinary(ctx.submission.binary),
-        args: [...ctx.submission.args],
+        args: argsSeguros(ctx.submission.args),
         cwd: ctx.cwdCanonico,
         correlationId: ctx.correlationId,
         approvedBy: ctx.approvedBy ?? null
@@ -524,7 +550,7 @@ export class TerminalEngine {
         marco: 'antes',
         executionId: execucao.id,
         binary: canonicalizeBinary(ctx.submission.binary),
-        args: [...ctx.submission.args],
+        args: argsSeguros(ctx.submission.args),
         cwd: ctx.submission.cwd,
         correlationId: ctx.correlationId
       }
@@ -656,7 +682,7 @@ export class TerminalEngine {
         marco,
         executionId: execucao.id,
         binary: execucao.binary,
-        args: [...execucao.args],
+        args: argsSeguros(execucao.args),
         cwd: execucao.cwd,
         state: execucao.state,
         reason: execucao.reason,

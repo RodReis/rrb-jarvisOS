@@ -55,48 +55,98 @@ describe('ponte do preload', () => {
     expect(Object.keys(bridge).sort()).toEqual([
       'addAllowedCommand',
       'addAllowedDirectory',
-      // SPEC-Providers-02: os três da chamada de IA. `callAi` devolve só o handle, `cancelAi`
-      // aborta e `onAiStreamEvent` assina os chunks — **nenhum** deles devolve credencial. A
-      // lista é enumerada (e não um padrão `/ai/`) pela mesma razão da F01: um padrão aceitaria
-      // um método futuro que devolvesse valor, e é justamente isso que esta guarda barra.
+      'anexarDesign',
+      'answerWizard',
+      'aprovarGate',
+      'awaitGithubAuth',
+      'buildContextPack',
       'callAi',
+      'callConnector',
       'cancelAi',
+      'cancelGithubAuth',
+      'carregarRoadmap',
       'classifyAction',
+      'completeMilestone',
       'createAutomation',
+      'createProject',
       'createWorkflow',
+      'escolherAnexo',
+      'gerarArquitetura',
+      'gerarPacote',
+      'gerarRoadmap',
+      'getAppDirectory',
       'getAppInfo',
       'getAuth',
+      'getBudget',
+      'getConnectorCredits',
+      'getGithubAuthStatus',
+      'getPlanningSession',
       'getPreferences',
+      'getProviderModels',
+      'getProviderStatus',
+      'getRouting',
+      'getWizardState',
       'getWorkspace',
+      'importProject',
       'listAllowedCommands',
       'listAllowedDirectories',
       'listAuditEvents',
       'listAutomations',
+      'listCapabilities',
+      'listConnectorCapabilities',
+      'listConnectorCredentials',
+      'listContextPacks',
       'listCredentials',
       'listExecutionRuns',
+      'listFailures',
       'listPendingApprovals',
+      'listProjects',
       'listWorkflows',
+      'listarAnexos',
+      'listarAprovacoes',
+      'listarArquiteturas',
+      'listarPacotes',
       'login',
       'logout',
+      'logoutGithub',
       'minimizeToTray',
       'onAiStreamEvent',
       'onAuthChanged',
+      'pickAllowedDirectory',
+      'pickProjectDirectory',
+      'publicarNoGitHub',
       'removeAllowedCommand',
       'removeAllowedDirectory',
       'removeAutomation',
+      'removeConnectorCredential',
       'removeCredential',
+      'removeProject',
       'removeWorkflow',
+      'removerAnexo',
+      'renameProject',
       'resolveApproval',
+      'resolveFailure',
+      'revisoesDoGate',
       'runCommand',
       'runWorkflowReal',
       'runWorkflowSimulated',
+      'savePlanningAnswers',
       'savePreferences',
       'sendLog',
       'setAutomationEnabled',
+      'setBudgetLimits',
+      'setConnectorCredential',
+      'setConnectorCreditLimits',
       'setCredential',
+      'setGithubClientId',
+      'setProviderModel',
+      'setRoute',
       'setWorkflowStatus',
+      'simularMudanca',
+      'startGithubAuth',
       'switchWorkspace',
       'updateWorkflow',
+      'validarPrototipos',
       'verifyAuditChain'
     ])
   })
@@ -166,11 +216,31 @@ describe('ponte do preload', () => {
     // palavra, ela agora enumera exatamente os três que existem — e todos gerenciam
     // *metadados* (status, origem, provider), nenhum devolve valor. Um `getCredential`
     // amanhã não entra nesta lista, e por isso quebra o teste.
-    const GESTAO_DE_CREDENCIAL_SEM_VALOR = ['listCredentials', 'setCredential', 'removeCredential']
+    //
+    // A M6-F05 trouxe o trio irmão para credencial de **conector**, e a guarda continua
+    // enumerando: seis nomes, todos de metadados. `ConnectorCredentialStatusView` não tem campo
+    // onde o segredo caiba, do mesmo modo que `CredentialStatusView` não tem.
+    const GESTAO_DE_CREDENCIAL_SEM_VALOR = [
+      'listCredentials',
+      'setCredential',
+      'removeCredential',
+      'listConnectorCredentials',
+      'setConnectorCredential',
+      'removeConnectorCredential'
+    ]
+
+    // A M8-F01 trouxe `session` num sentido **diferente** do que a guarda persegue: a
+    // `PlanningSession` é o rascunho do wizard (etapa + respostas do usuário), não uma sessão
+    // de autenticação — o tipo não tem campo onde token caiba, do mesmo modo que
+    // `CredentialStatusView` não tem. Enumerado, e não isento por regex mais frouxo: afrouxar
+    // o padrão deixaria passar o `getAuthSession` de amanhã, que é exatamente o que a guarda
+    // existe para pegar.
+    const SESSAO_DE_PLANEJAMENTO_SEM_TOKEN = ['getPlanningSession', 'savePlanningAnswers']
 
     const suspeitos = Object.keys(bridge)
       .filter((k) => /token|secret|credential|session/i.test(k))
       .filter((k) => !GESTAO_DE_CREDENCIAL_SEM_VALOR.includes(k))
+      .filter((k) => !SESSAO_DE_PLANEJAMENTO_SEM_TOKEN.includes(k))
 
     expect(suspeitos).toEqual([])
   })
@@ -189,7 +259,12 @@ describe('ponte do preload', () => {
     expect(canaisDeCredencial).toEqual([
       IPC_CHANNELS.credentialList,
       IPC_CHANNELS.credentialSet,
-      IPC_CHANNELS.credentialRemove
+      IPC_CHANNELS.credentialRemove,
+      // O trio de conector (M6-F05) roteia para status pela mesma razão e com a mesma ausência:
+      // não há `connectors:credential-read`.
+      IPC_CHANNELS.connectorCredentialList,
+      IPC_CHANNELS.connectorCredentialSet,
+      IPC_CHANNELS.connectorCredentialRemove
     ])
 
     await (bridge.listCredentials as (w: string) => Promise<unknown>)('jarvis')
@@ -234,6 +309,42 @@ describe('ponte do preload', () => {
       IPC_EVENT_CHANNELS.authChanged,
       expect.any(Function)
     )
+  })
+
+  it('não existe canal de proxy HTTP genérico (SPEC-Conectores-01, critério 6)', async () => {
+    const bridge = await carregarPonte()
+
+    // A prova é por **ausência**, como a do vault: nenhum canal do contrato aceita endereço,
+    // e nenhum método da ponte tem nome que sugira alcançar um. Se alguém adicionar um
+    // `connectors:fetch` ou um `httpRequest` amanhã, é aqui que fica vermelho — e a diferença
+    // entre o núcleo de conectores e um proxy é exatamente esta linha.
+    const canaisDeConector = Object.entries(IPC_CHANNELS)
+      .filter(([nome]) => /connector/i.test(nome))
+      .map(([, canal]) => canal)
+
+    expect(canaisDeConector).toEqual([
+      IPC_CHANNELS.connectorsCapabilities,
+      IPC_CHANNELS.connectorsInvoke,
+      // SPEC-Conectores-02: os dois do teto de créditos. Enumerados como os outros — um canal
+      // futuro que aceitasse endereço não entra nesta lista, e por isso quebra o teste.
+      IPC_CHANNELS.connectorCreditsGet,
+      IPC_CHANNELS.connectorCreditsSetLimits,
+      // SPEC-Conectores-05: os três da credencial de conector. Nenhum aceita endereço — levam
+      // chave lógica de um enum fechado e espaço —, e enumerá-los aqui é o que mantém a guarda
+      // capaz de acusar o canal que aceitasse.
+      IPC_CHANNELS.connectorCredentialList,
+      IPC_CHANNELS.connectorCredentialSet,
+      IPC_CHANNELS.connectorCredentialRemove
+    ])
+
+    expect(
+      Object.keys(bridge).filter((k) => /fetch|http|request|proxy|url|endpoint/i.test(k))
+    ).toEqual([])
+
+    // E o que o método existente leva é o pedido tipado, pelo canal nomeado.
+    const pedido = { connector: 'github', operation: 'issues.create' }
+    await (bridge.callConnector as (r: unknown, w: string) => Promise<unknown>)(pedido, 'jarvis')
+    expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.connectorsInvoke, pedido, 'jarvis')
   })
 
   it('recusa expor a ponte quando contextIsolation está desligado', async () => {

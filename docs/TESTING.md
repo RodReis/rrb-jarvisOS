@@ -163,6 +163,62 @@ processo principal (subindo o app fora do Playwright), porque o reporter o engol
 > Vitest com `include` distinto (ou 3 *projects* via `vitest.workspace.ts`), cada uma com seu
 > `outputFile` e `coverageDirectory` próprios.
 
+### 3.2 Smoke real contra serviço externo (achado da M6-F04)
+
+Servidor falso responde o que você escreveu que ele responde. **Serviço real responde o que ele
+responde** — e a diferença entre as duas coisas é o que o smoke existe para medir.
+
+**Quando escrever um.** Quando a spec pede (a SPEC-Conectores-04 pede), ou quando o adapter depende
+de um comportamento do serviço que o dublê não teria como reproduzir sozinho: latência,
+consistência eventual, códigos de erro condicionais, campos que mudam de sentido conforme o estado.
+
+**Como.** Script Node solto em `scripts/`, token via variável de ambiente (`source: env` da
+SPEC-Providers-01 — **jamais** commitado, jamais gravado no vault), **fora do CI**. Não há segredo
+no CI, e não deve haver. Roda localmente, à mão, e a evidência entra na entrega.
+
+**Efeito externo é real: use recurso descartável.** O smoke do GitHub cria issue, branch, PR e faz
+merge. Isso vai para um repositório criado para ser apagado (`RodReis/rrb-jarvisos-smoke`), nunca
+para o repositório de trabalho — issue não se deleta, e commit de lixo na `main` fica no histórico.
+Carimbo de timestamp em tudo que é criado, para rodar duas vezes não colidir.
+
+**O que a M6-F04 achou, e que motiva esta seção.** A listagem de issues do GitHub é
+**eventualmente consistente**: uma issue recém-criada leva ~4 s para aparecer em `GET /issues`.
+Consequência direta no app: dois `ensureIssue` em sequência **duplicariam** a issue — o oposto do
+critério que a fatia existia para cumprir. Nenhum teste de integração mostraria isso, porque o
+servidor falso responde instantâneo e consistente; a suíte estava verde e o comportamento, errado.
+
+**Duas lições de método que vêm daí:**
+
+1. **Asserção de smoke não pode medir latência do serviço.** A primeira versão do passo falhava com
+   espera fixa de 3 s e chamava isso de defeito nosso. Espera com tentativas, e reporte quanto
+   demorou — o número é evidência, não ruído.
+2. **Quando o smoke acha um comportamento do serviço, o dublê precisa aprender a imitá-lo.** O fake
+   ganhou um atraso de visibilidade configurável, e um contrafactual confirma que sem a correção o
+   teste cai. Sem esse passo, o achado do smoke não vira regressão detectável.
+
+### 3.3 Quando o smoke contradiz a si mesmo, sonde antes de concluir (achado da M6-F06)
+
+O smoke da Tavily afirmou que uma extração de 2 URLs custa 0 créditos. Na execução seguinte, **a
+mesma chamada custou 1**. A tentação é escolher uma das duas medições e seguir; as duas estavam
+certas, e a conclusão a tirar delas era outra.
+
+Sondando o comportamento em vez de repetir o teste — seis chamadas seguidas de **1 URL** — o padrão
+apareceu: `0,0,0,0,1,0`. A Tavily **acumula URLs entre chamadas** e cobra 1 crédito a cada 5 no
+total. Nenhuma fórmula sobre a contagem de uma chamada isolada reproduz isso.
+
+**As lições:**
+
+1. **Medição que varia entre execuções idênticas é informação, não ruído.** O primeiro impulso —
+   "ajustar o teste para aceitar 0 ou 1" — teria escondido o fato. A pergunta certa é *o que muda
+   entre as duas execuções*, e responder exige sondar, não reexecutar.
+2. **Fórmula local sobre estado remoto acumulado é sempre errada, e erra acumulando.** A conclusão
+   de projeto foi remover o cálculo: o adapter usa o número que o serviço informa, e o fallback é
+   zero — inventar um valor poluiria o ledger a cada chamada. Quem protege a cota é o gate, com
+   estimativa **para cima**, antes de a chamada sair.
+3. **O que o smoke afirma tem de ser o que é estável.** O passo final não afirma "custa 0"; afirma
+   que uma extração de 2 URLs cabe em `{0, 1}` — nunca 2, que é o que uma cobrança por URL daria.
+   Um smoke que afirma o instável falha por motivo errado e ensina a ignorá-lo.
+
 ## 4. O relatório: `reports/TESTS.md`
 
 **Local:** `reports/` na raiz — **diretório neutro**. Não vai em `docs/` (um arquivo reescrito a

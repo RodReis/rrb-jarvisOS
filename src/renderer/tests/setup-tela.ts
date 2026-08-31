@@ -33,6 +33,25 @@ if (typeof Element !== 'undefined' && Element.prototype.scrollIntoView === undef
   Element.prototype.scrollIntoView = function scrollIntoView(): void {}
 }
 
+/*
+ * A API de pointer capture, pela mesma razão e com o mesmo cuidado.
+ *
+ * O `Select` do Radix a consulta ao **abrir a lista** — antes disso a montagem passa, e é por
+ * isso que a lacuna só apareceu na F04 do MVP-005, quando um teste precisou abrir o seletor de
+ * modelo em vez de só renderizá-lo.
+ *
+ * `hasPointerCapture` devolve `false` (nada capturado) em vez de `true`: `false` é o estado de
+ * um elemento que ninguém capturou, que é a verdade num ambiente sem pointer. Devolver `true`
+ * faria o Radix acreditar numa captura que não existe.
+ */
+if (typeof Element !== 'undefined' && Element.prototype.hasPointerCapture === undefined) {
+  Element.prototype.hasPointerCapture = function hasPointerCapture(): boolean {
+    return false
+  }
+  Element.prototype.setPointerCapture = function setPointerCapture(): void {}
+  Element.prototype.releasePointerCapture = function releasePointerCapture(): void {}
+}
+
 afterEach(() => {
   cleanup()
 })

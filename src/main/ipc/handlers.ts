@@ -1,4 +1,4 @@
-import { app, ipcMain } from 'electron'
+import { app, dialog, ipcMain } from 'electron'
 import {
   IPC_CHANNELS,
   IPC_EVENT_CHANNELS,
@@ -32,6 +32,64 @@ import type { AuditRepository } from '../storage/audit-repository'
 import type { WorkspaceService } from '../workspace/workspace-service'
 import type { ApprovalRepository } from '../execution/approval-repository'
 import type { AiCallService } from '../ai/call-provider'
+import { BudgetInputError, type BudgetService } from '../budget/budget-service'
+import type { RoutingService } from '../ai/routing-service'
+import type { RoutingRepository } from '../ai/routing-repository'
+import type { ProviderStatus, RoutingPolicy } from '@shared/domain/routing'
+import { isBudgetLimitsInput, type BudgetSnapshot } from '@shared/domain/budget'
+import { isProviderRoute, isTaskType } from '@shared/domain/routing'
+import {
+  isConnectorCredentialKey,
+  isConnectorRequest,
+  type ConnectorCapability,
+  type ConnectorCredentialStatusView,
+  type ConnectorError,
+  type ConnectorOutcome
+} from '@shared/domain/connectors'
+import type { ConnectorService } from '../connectors/connector-service'
+import { CreditInputError, type CreditService } from '../connectors/credit-service'
+import type { GithubAuthService } from '../connectors/github/github-auth-service'
+import type { GithubAuthSnapshot, GithubDeviceFlowView } from '@shared/domain/github-auth'
+import type { UserProfileRepository } from '../storage/repositories'
+import type { ProjectService } from '../projects/project-service'
+import type { WizardService } from '../projects/wizard-service'
+import type { PacoteService } from '../projects/pacote-service'
+import type {
+  CandidatoDeContexto,
+  ContextService,
+  PedidoDeContexto
+} from '../context/context-service'
+import { isOrigemDeContexto } from '@shared/domain/context-pack'
+import type { ContextPack, ContextPackOutcome, FalhaRegistrada } from '@shared/domain/context-pack'
+import type { CapacidadeResolvida } from '@shared/domain/skills'
+import {
+  isMarcoDocumental,
+  type MarcoOutcome,
+  type PlanningSession,
+  type Project,
+  type ProjectOutcome
+} from '@shared/domain/projects'
+import { isAutorDaDecisao, type RespostaOutcome, type VistaDoWizard } from '@shared/domain/wizard'
+import type { PacoteEstrutural, PacoteOutcome } from '@shared/domain/pacote-estrutural'
+import type { Anexo, AnexoOutcome } from '@shared/domain/anexos-de-design'
+import { EXTENSOES_DO_ANEXO, isTipoDeAnexo } from '@shared/domain/anexos-de-design'
+import type { ValidacaoDoPrototipo } from '@shared/domain/validacao-de-prototipo'
+import type { ArquiteturaOutcome, PacoteArquitetura } from '@shared/domain/arquitetura'
+import type { AlvoDaPublicacao, PublicacaoOutcome } from '@shared/domain/publicacao'
+import type { Roadmap, RoadmapOutcome } from '@shared/domain/roadmap'
+import type {
+  Approval,
+  AprovacaoOutcome,
+  Gate,
+  MudancaDeArtefato,
+  RevisaoAprovada
+} from '@shared/domain/aprovacoes'
+import { NATUREZAS, isGate } from '@shared/domain/aprovacoes'
+import type { PublicacaoService } from '../projects/publicacao-service'
+import type { RoadmapService } from '../projects/roadmap-service'
+import type { AnexoService } from '../projects/anexo-service'
+import { isConnectorId } from '@shared/domain/connectors'
+import type { ConnectorCreditView } from '@shared/contracts/ipc'
 import {
   isAiProvider,
   type AiCallHandle,
@@ -63,6 +121,111 @@ function parsePolicyContext(value: unknown): PolicyContext {
     workspace,
     ...(sensitivity ? { sensitivity } : {}),
     ...(detail ? { detail } : {})
+  }
+}
+
+/**
+ * Valida o pedido de contexto na fronteira (SPEC-Planejamento-02; CONVENTION §2).
+ *
+ * Devolve `undefined` quando o pedido não casa o contrato. O que se valida aqui é **forma**, e
+ * só forma: se há projeto, tarefa, etapa e ao menos um candidato com caminho e origem
+ * conhecidos. A política — segredo, teto, exceção — mora no serviço, e repeti-la aqui criaria
+ * uma segunda fonte que divergiria da primeira no dia em que uma das duas mudasse.
+ *
+ * O candidato de origem desconhecida é **descartado**, não corrigido para um default: um item
+ * cuja origem o app não reconhece entraria no manifesto declarando uma procedência inventada, e
+ * a origem é justamente o que distingue "o usuário anexou" de "a busca encontrou".
+ */
+function parsePedidoDeContexto(value: unknown): PedidoDeContexto | undefined {
+  if (typeof value !== 'object' || value === null) return undefined
+  const source = value as Record<string, unknown>
+
+  const projectId = source['projectId']
+  const tarefa = source['tarefa']
+  const etapa = source['etapa']
+  const rota = source['rota']
+
+  if (
+    typeof projectId !== 'string' ||
+    typeof tarefa !== 'string' ||
+    typeof etapa !== 'string' ||
+    !isAiProvider(rota)
+  ) {
+    return undefined
+  }
+
+  const brutos = Array.isArray(source['candidatos']) ? source['candidatos'] : []
+  const candidatos: CandidatoDeContexto[] = []
+
+  for (const bruto of brutos) {
+    if (typeof bruto !== 'object' || bruto === null) continue
+    const item = bruto as Record<string, unknown>
+    const caminho = item['caminho']
+    const origem = item['origem']
+
+    if (typeof caminho !== 'string' || caminho.length === 0 || !isOrigemDeContexto(origem)) {
+      continue
+    }
+
+    const linhas = item['linhas']
+    const faixa =
+      typeof linhas === 'object' &&
+      linhas !== null &&
+      typeof (linhas as Record<string, unknown>)['de'] === 'number' &&
+      typeof (linhas as Record<string, unknown>)['ate'] === 'number'
+        ? {
+            de: (linhas as Record<string, number>)['de'] as number,
+            ate: (linhas as Record<string, number>)['ate'] as number
+          }
+        : undefined
+
+    candidatos.push({
+      caminho,
+      origem,
+      motivo: typeof item['motivo'] === 'string' ? item['motivo'] : 'selecionado na tela',
+      ...(faixa === undefined ? {} : { linhas: faixa })
+    })
+  }
+
+  if (candidatos.length === 0) return undefined
+
+  const excecao = source['excecaoDeLeituraAmpla']
+  const excecaoValida =
+    typeof excecao === 'object' &&
+    excecao !== null &&
+    typeof (excecao as Record<string, unknown>)['motivo'] === 'string' &&
+    typeof (excecao as Record<string, unknown>)['tetoDeBytes'] === 'number'
+      ? {
+          motivo: (excecao as Record<string, string>)['motivo'] as string,
+          tetoDeBytes: (excecao as Record<string, number>)['tetoDeBytes'] as number,
+          autorizadoPor:
+            typeof (excecao as Record<string, unknown>)['autorizadoPor'] === 'string'
+              ? ((excecao as Record<string, string>)['autorizadoPor'] as string)
+              : '',
+          autorizadoEm: new Date().toISOString()
+        }
+      : undefined
+
+  const regras = Array.isArray(source['regras'])
+    ? source['regras'].filter((r): r is string => typeof r === 'string')
+    : undefined
+
+  return {
+    projectId,
+    tarefa,
+    etapa,
+    candidatos,
+    rota,
+    ...(regras === undefined ? {} : { regras }),
+    ...(typeof source['resumoAnterior'] === 'string'
+      ? { resumoAnterior: source['resumoAnterior'] }
+      : {}),
+    ...(excecaoValida === undefined ? {} : { excecaoDeLeituraAmpla: excecaoValida }),
+    ...(typeof source['tetoDeTokens'] === 'number' ? { tetoDeTokens: source['tetoDeTokens'] } : {}),
+    ...(typeof source['motivoDaExpansao'] === 'string'
+      ? { motivoDaExpansao: source['motivoDaExpansao'] }
+      : {}),
+    ...(typeof source['packAnterior'] === 'string' ? { packAnterior: source['packAnterior'] } : {})
   }
 }
 
@@ -106,6 +269,30 @@ export interface IpcDependencies {
   readonly terminal: TerminalEngine
   /** Allowlist de comandos (SPEC-ExecucaoReal-02, 1ª barreira): edição de alto risco. */
   readonly commandAllowlist: CommandAllowlistRepository
+  /** Projeto local e planejamento (SPEC-Planejamento-01): Git só pelo terminal controlado. */
+  readonly projects: ProjectService
+  /**
+   * Contexto, skills e orçamento (SPEC-Planejamento-02): o manifesto que toda geração exige.
+   * A leitura de arquivo acontece **aqui dentro**, sob o diretório do projeto — nunca no
+   * renderer, que só indica caminhos.
+   */
+  readonly contexts: ContextService
+  /**
+   * O wizard orientado (SPEC-Planejamento-03): a pergunta pendente e o registro da decisão.
+   * Serviço próprio, e não um método a mais do `ProjectService`, porque a trilha de decisões
+   * tem regra própria — append-only e com autoria — que nada tem a ver com o ciclo de vida do
+   * projeto no disco.
+   */
+  readonly wizard: WizardService
+  /**
+   * O pacote estrutural (SPEC-Planejamento-04): PRD, Landscape e Convention compostos das
+   * decisões e das evidências. Serviço próprio porque a pesquisa externa, o bloqueio e a
+   * revisão imutável têm regra própria — nada disso é ciclo de vida de projeto.
+   */
+  readonly pacotes: PacoteService
+  readonly anexos: AnexoService
+  readonly roadmap: RoadmapService
+  readonly publicacao: PublicacaoService
   /** Vault de credenciais (SPEC-Providers-01): status para a UI, valor só dentro do main. */
   readonly credentials: CredentialService
   /** Runs persistidos, para a UI listar o histórico. */
@@ -116,6 +303,20 @@ export interface IpcDependencies {
   readonly auth?: AuthService
   /** Ponto único de chamada de IA (SPEC-Providers-02): classifica, estima, audita, mede. */
   readonly ai: AiCallService
+  /** Gate de orçamento (SPEC-Providers-03): a UI lê limites e acumulado, e edita limites. */
+  readonly budget: BudgetService
+  /** Roteamento e healthcheck (SPEC-Providers-04): status por provider e edição de rotas. */
+  readonly routing: RoutingService
+  /** O repositório, para a lista de modelos — leitura pura, sem passar pelo serviço. */
+  readonly routingRepo: RoutingRepository
+  /** O ponto único de conectores (SPEC-Conectores-01). */
+  readonly connectors: ConnectorService
+  /** O ledger de créditos de conector (SPEC-Conectores-02). */
+  readonly connectorCredits: CreditService
+  /** O Device Flow do GitHub App (SPEC-Conectores-03). */
+  readonly githubAuth: GithubAuthService
+  /** O override do `client_id`, lido e gravado no perfil — não é segredo, não vai ao vault. */
+  readonly profiles: UserProfileRepository
   /** Minimizar para o tray. Injetado porque a janela nasce depois dos handlers. */
   readonly minimizeToTray: () => void
 }
@@ -318,6 +519,30 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     const alvo = typeof path === 'string' ? path : ''
     if (alvo) deps.allowlist.remove(deps.userId(), alvo)
     return deps.allowlist.list(deps.userId())
+  })
+
+  // Seletor nativo de pasta (SPEC-ExecucaoReal-03, decisão 2 do PI). O diálogo abre **aqui**,
+  // não no renderer: escolher um caminho é tocar o filesystem, e a fronteira do ARCHITECTURE
+  // não abre exceção para leitura. O renderer só dispara o canal e recebe a lista de volta.
+  ipcMain.handle(IPC_CHANNELS.allowlistPick, async (): Promise<readonly string[]> => {
+    const escolha = await dialog.showOpenDialog({ properties: ['openDirectory'] })
+    const [diretorio] = escolha.filePaths
+
+    // Duas condições, não uma: `canceled` cobre o usuário fechando o diálogo, e a checagem do
+    // path cobre um retorno confirmado porém vazio — que passaria `undefined` ao repositório
+    // como se fosse escolha. Sem adicionar não há `AuditEvent`: ele nasce dentro do `add`.
+    if (!escolha.canceled && diretorio) {
+      deps.allowlist.add(deps.userId(), diretorio)
+    }
+
+    return deps.allowlist.list(deps.userId())
+  })
+
+  // O diretório do app (default de fábrica). Só-leitura, para a UI saber qual item da lista
+  // apresentar como fixo — o repositório já recusa removê-lo, este canal só torna a regra
+  // visível na tela em vez de deixá-la ser inferida por posição.
+  ipcMain.handle(IPC_CHANNELS.allowlistAppDir, (): string => {
+    return deps.allowlist.appDirectory()
   })
 
   // Registro de workflows/automações (SPEC-Execucao-04, critério 7). CRUD de definições —
@@ -581,19 +806,32 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       if (typeof request !== 'object' || request === null) return undefined
 
       const bruto = request as Partial<AiRequest>
-      // Validação na fronteira: provider fechado pelo enum e prompt não-vazio. O `model` é
-      // aceito como veio porque a tabela de preço já trata modelo desconhecido — e recusá-lo
-      // aqui exigiria manter uma segunda lista em sincronia com a primeira.
-      if (!isAiProvider(bruto.provider)) return undefined
+      // Validação na fronteira: prompt não-vazio, e **um dos dois** caminhos de escolha —
+      // provider explícito (fechado pelo enum) ou `taskType` (fechado pela taxonomia). Aceitar
+      // um pedido sem nenhum dos dois empurraria a recusa para dentro do serviço, longe de
+      // quem a causou. O `model` é aceito como veio porque a tabela de preço já trata modelo
+      // desconhecido — recusá-lo aqui exigiria uma segunda lista em sincronia com a primeira.
+      const temProvider = isAiProvider(bruto.provider)
+      const temTarefa = isTaskType(bruto.taskType)
+      if (!temProvider && !temTarefa) return undefined
+
       const prompt = typeof bruto.prompt === 'string' ? bruto.prompt.trim() : ''
       if (prompt.length === 0) return undefined
 
       const pedido: AiRequest = {
-        provider: bruto.provider,
         prompt,
+        ...(temProvider ? { provider: bruto.provider } : {}),
+        ...(temTarefa ? { taskType: bruto.taskType } : {}),
         ...(typeof bruto.model === 'string' ? { model: bruto.model } : {}),
         ...(typeof bruto.system === 'string' ? { system: bruto.system } : {}),
-        ...(typeof bruto.maxTokens === 'number' ? { maxTokens: bruto.maxTokens } : {})
+        ...(typeof bruto.maxTokens === 'number' ? { maxTokens: bruto.maxTokens } : {}),
+        // SPEC-Planejamento-02, critério 1. Este handler **reconstrói** o pedido campo a campo
+        // em vez de repassar o objeto cru — e por isso um campo novo que não seja copiado aqui
+        // some silenciosamente no caminho. Foi o que o E2E pegou: sem estas duas linhas, toda
+        // chamada vinda da UI chegava ao ponto único sem `contextPackId` e era recusada por
+        // falta de contexto, inclusive as que o declaravam.
+        ...(typeof bruto.contextPackId === 'string' ? { contextPackId: bruto.contextPackId } : {}),
+        ...(bruto.diagnostico === true ? { diagnostico: true } : {})
       }
 
       // Sem prompt no log: o texto do usuário é conteúdo, e o canal registra o fato da
@@ -601,7 +839,8 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       log.ipc.info('Chamada de IA solicitada pela interface', {
         canal: IPC_CHANNELS.aiCall,
         direction: 'in',
-        provider: pedido.provider
+        provider: pedido.provider ?? null,
+        taskType: pedido.taskType ?? null
       })
 
       const stream = deps.ai.call(pedido, { userId: deps.userId(), workspace })
@@ -637,10 +876,17 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
         }
       })()
 
+      // O handle carrega **só o que o handler sabe**. Com roteamento por `taskType`, quem
+      // atende é decidido dentro do serviço, depois deste retorno — afirmar um provider aqui
+      // seria prever a escolha, e a previsão erraria toda vez que houvesse fallback. O
+      // provider realmente usado chega no `CostEvent` do evento `fim`.
       return {
         id,
-        provider: pedido.provider,
-        model: pedido.model ?? MODELO_PADRAO[pedido.provider]
+        ...(pedido.provider === undefined ? {} : { provider: pedido.provider }),
+        ...(pedido.provider !== undefined && pedido.model === undefined
+          ? { model: MODELO_PADRAO[pedido.provider] }
+          : {}),
+        ...(pedido.model === undefined ? {} : { model: pedido.model })
       }
     }
   )
@@ -651,6 +897,767 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     // entre o clique do usuário e o fim do stream.
     deps.ai.cancel(id)
   })
+
+  // Orçamento (SPEC-Providers-03, critério 8). Leitura e edição de **limites**; a decisão do
+  // gate não tem canal — quem pergunta "cabe?" é o ponto único, de dentro do main.
+  ipcMain.handle(IPC_CHANNELS.budgetGet, (_event, workspace: unknown): BudgetSnapshot => {
+    const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+    return deps.budget.snapshot({ userId: deps.userId(), workspace: escopo })
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.budgetSetLimits,
+    (_event, limites: unknown, workspace: unknown): BudgetSnapshot => {
+      const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+      const scope = { userId: deps.userId(), workspace: escopo }
+
+      // Validação na fronteira (CONVENTION §2): o payload do IPC é entrada externa como
+      // qualquer outra. Forma errada devolve o estado corrente em vez de lançar — a tela
+      // precisa continuar mostrando um orçamento, e o erro de forma é do chamador, não do
+      // usuário.
+      if (!isBudgetLimitsInput(limites)) {
+        log.ipc.warn('Limites de orçamento descartados por não casarem com o contrato', {
+          canal: IPC_CHANNELS.budgetSetLimits
+        })
+        return deps.budget.snapshot(scope)
+      }
+
+      try {
+        return deps.budget.setLimits(scope, limites)
+      } catch (erro) {
+        // `BudgetInputError` é recusa de **valor** (limite negativo, limiar fora de 0–1), e
+        // não de forma: o usuário digitou algo que a UI deixou passar. Devolver o estado
+        // corrente mantém a tela consistente — ela mostra o que de fato vale.
+        if (erro instanceof BudgetInputError) {
+          log.ipc.warn('Limites de orçamento recusados', {
+            canal: IPC_CHANNELS.budgetSetLimits,
+            motivo: erro.message
+          })
+          return deps.budget.snapshot(scope)
+        }
+        throw erro
+      }
+    }
+  )
+
+  // Providers e roteamento (SPEC-Providers-04, critérios 5 e 8). Leitura de status e edição de
+  // rotas/modelo. **Não há canal de seleção**: quem escolhe quem atende é o ponto único, no
+  // main — um canal aqui daria ao renderer uma decisão que ele só poderia duplicar.
+  ipcMain.handle(
+    IPC_CHANNELS.providerStatus,
+    async (_event, workspace: unknown): Promise<readonly ProviderStatus[]> => {
+      const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+      return await deps.routing.status({ userId: deps.userId(), workspace: escopo })
+    }
+  )
+
+  ipcMain.handle(IPC_CHANNELS.providerModels, (_event, provider: unknown): readonly string[] => {
+    if (!isAiProvider(provider)) return []
+    return deps.routingRepo.modelosDisponiveis(provider)
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.providerSetModel,
+    (_event, provider: unknown, modelo: unknown, workspace: unknown): boolean => {
+      if (!isAiProvider(provider) || typeof modelo !== 'string') return false
+      const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+      return deps.routing.setModelo({ userId: deps.userId(), workspace: escopo }, provider, modelo)
+    }
+  )
+
+  ipcMain.handle(IPC_CHANNELS.routingGet, (_event, workspace: unknown): RoutingPolicy => {
+    const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+    return deps.routing.rotas({ userId: deps.userId(), workspace: escopo })
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.routingSetRoute,
+    (_event, rota: unknown, workspace: unknown): RoutingPolicy => {
+      const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+      const scope = { userId: deps.userId(), workspace: escopo }
+
+      // Forma errada devolve o estado corrente em vez de lançar — a tela precisa continuar
+      // mostrando rotas, e o erro de forma é do chamador, não do usuário.
+      if (!isProviderRoute(rota)) {
+        log.ipc.warn('Rota de provider descartada por não casar com o contrato', {
+          canal: IPC_CHANNELS.routingSetRoute
+        })
+        return deps.routing.rotas(scope)
+      }
+
+      return deps.routing.setRota(scope, rota)
+    }
+  )
+
+  // Conectores (SPEC-Conectores-01, critérios 5 e 6). **Dois canais, nenhum genérico**: listar
+  // o que os adapters declaram, e executar uma dessas operações. Não existe canal que receba
+  // URL — a diferença entre este par e um proxy HTTP é que o renderer nomeia uma operação de
+  // uma lista fechada, e quem sabe que endereço isso vira é o adapter, no main.
+  ipcMain.handle(IPC_CHANNELS.connectorsCapabilities, (): readonly ConnectorCapability[] =>
+    deps.connectors.capabilities()
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.connectorsInvoke,
+    async (_event, request: unknown, workspace: unknown): Promise<ConnectorOutcome> => {
+      const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+
+      // Forma errada vira `ConnectorError` em vez de exceção, pelo mesmo motivo que o desfecho
+      // do serviço é união discriminada: o renderer precisa **mostrar** a recusa, e um throw
+      // atravessando o IPC chega como erro genérico sem código estável para tratar.
+      if (!isConnectorRequest(request)) {
+        log.ipc.warn('Pedido a conector descartado por não casar com o contrato', {
+          canal: IPC_CHANNELS.connectorsInvoke
+        })
+
+        return {
+          ok: false,
+          code: 'validacao-invalida',
+          mensagem: 'O pedido não casa com o contrato de conectores.',
+          retryable: false,
+          acao: 'corrigir-entrada',
+          provenance: {
+            connector: 'github',
+            operation: 'desconhecida',
+            obtidoEm: new Date().toISOString()
+          }
+        }
+      }
+
+      log.ipc.info('Chamada a conector solicitada pela interface', {
+        correlationId: request.correlationId,
+        canal: IPC_CHANNELS.connectorsInvoke,
+        connector: request.connector,
+        operation: request.operation
+      })
+
+      return await deps.connectors.call(request, { userId: deps.userId(), workspace: escopo })
+    }
+  )
+
+  // Teto de créditos por conector (SPEC-Conectores-02, critério 8). Leitura e edição; **nenhum
+  // canal decide** se a chamada cabe — isso é do gate, no ponto único.
+  ipcMain.handle(
+    IPC_CHANNELS.connectorCreditsGet,
+    (_event, connector: unknown, workspace: unknown): ConnectorCreditView | undefined => {
+      if (!isConnectorId(connector)) return undefined
+      const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+      return deps.connectorCredits.snapshot({ userId: deps.userId(), workspace: escopo }, connector)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.connectorCreditsSetLimits,
+    (
+      _event,
+      connector: unknown,
+      limites: unknown,
+      workspace: unknown
+    ): ConnectorCreditView | undefined => {
+      if (!isConnectorId(connector)) return undefined
+      const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+      const scope = { userId: deps.userId(), workspace: escopo }
+
+      const valores = limites as { dailyLimit?: unknown; monthlyLimit?: unknown } | null
+      if (
+        valores === null ||
+        typeof valores?.dailyLimit !== 'number' ||
+        typeof valores?.monthlyLimit !== 'number'
+      ) {
+        log.ipc.warn('Teto de créditos descartado por não casar com o contrato', {
+          canal: IPC_CHANNELS.connectorCreditsSetLimits
+        })
+        return deps.connectorCredits.snapshot(scope, connector)
+      }
+
+      try {
+        return deps.connectorCredits.setLimits(scope, connector, {
+          dailyLimit: valores.dailyLimit,
+          monthlyLimit: valores.monthlyLimit
+        })
+      } catch (erro) {
+        // Entrada inválida devolve o estado corrente em vez de lançar — como o
+        // `setBudgetLimits`: a tela precisa continuar mostrando um teto, e o erro de forma é do
+        // chamador, não do usuário.
+        if (erro instanceof CreditInputError) {
+          log.ipc.warn('Teto de créditos recusado', {
+            canal: IPC_CHANNELS.connectorCreditsSetLimits,
+            motivo: erro.message
+          })
+          return deps.connectorCredits.snapshot(scope, connector)
+        }
+        throw erro
+      }
+    }
+  )
+
+  // Credenciais de conector (SPEC-Conectores-05, critério 7). Trio irmão do de credenciais de
+  // IA, com as mesmas duas garantias: o retorno nunca carrega valor, e o ator é **fixo em
+  // `usuario`** — deixá-lo vir do renderer daria ao agente uma forma de se declarar usuário e
+  // escapar da classificação de alto risco.
+  ipcMain.handle(
+    IPC_CHANNELS.connectorCredentialList,
+    (_event, workspace: unknown): readonly ConnectorCredentialStatusView[] => {
+      if (!isWorkspaceId(workspace)) return []
+      return deps.credentials.listConnectorStatus(deps.userId(), workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.connectorCredentialSet,
+    (
+      _event,
+      key: unknown,
+      value: unknown,
+      workspace: unknown
+    ): readonly ConnectorCredentialStatusView[] => {
+      if (!isWorkspaceId(workspace) || !isConnectorCredentialKey(key)) return []
+
+      // Valor vazio é ausência de entrada, não "gravar string vazia": gravá-la deixaria a
+      // credencial `present` com um valor que a Tavily recusaria. Vira no-op.
+      const segredo = typeof value === 'string' ? value.trim() : ''
+      if (segredo.length === 0)
+        return deps.credentials.listConnectorStatus(deps.userId(), workspace)
+
+      // A credencial gerida por Device Flow não entra por aqui — gravar um texto colado por
+      // cima do par access/refresh quebraria o refresh em silêncio. O serviço também recusa;
+      // a guarda aqui evita a exceção atravessar o IPC como falha genérica.
+      if (key === 'github') {
+        log.ipc.warn('Credencial do GitHub recusada: ela vem do Device Flow', {
+          canal: IPC_CHANNELS.connectorCredentialSet
+        })
+        return deps.credentials.listConnectorStatus(deps.userId(), workspace)
+      }
+
+      // Sem `ctx` com a chave: o log registra o fato e o conector, nunca o valor.
+      log.integracao.info('Credencial de conector submetida pela interface', {
+        canal: IPC_CHANNELS.connectorCredentialSet,
+        direction: 'in',
+        connector: key
+      })
+
+      return deps.credentials.setConnector(deps.userId(), workspace, key, segredo, 'usuario')
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.connectorCredentialRemove,
+    (_event, key: unknown, workspace: unknown): readonly ConnectorCredentialStatusView[] => {
+      if (!isWorkspaceId(workspace) || !isConnectorCredentialKey(key)) return []
+      return deps.credentials.removeConnector(deps.userId(), workspace, key, 'usuario')
+    }
+  )
+
+  // Autenticação do GitHub por Device Flow (SPEC-Conectores-03, critério 9).
+  //
+  // **Nenhum destes canais devolve token**, e a garantia é a forma do retorno:
+  // `GithubAuthSnapshot` e `GithubDeviceFlowView` não têm campo onde access ou refresh token
+  // caiba. É a mesma garantia estrutural do `CredentialStatusView` da M5-F01 — o renderer não
+  // recebe o segredo porque não existe caminho tipado por onde ele passe.
+  ipcMain.handle(
+    IPC_CHANNELS.githubAuthStatus,
+    (_event, workspace: unknown): GithubAuthSnapshot => {
+      const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+      return deps.githubAuth.snapshot({ userId: deps.userId(), workspace: escopo })
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.githubAuthStart,
+    async (_event, workspace: unknown): Promise<GithubDeviceFlowView | ConnectorError> => {
+      const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+      log.ipc.info('Device Flow do GitHub solicitado pela interface', {
+        canal: IPC_CHANNELS.githubAuthStart,
+        connector: 'github'
+      })
+      return await deps.githubAuth.iniciar({ userId: deps.userId(), workspace: escopo })
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.githubAuthAwait,
+    async (_event, workspace: unknown): Promise<GithubAuthSnapshot | ConnectorError> => {
+      const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+      return await deps.githubAuth.aguardarAutorizacao({ userId: deps.userId(), workspace: escopo })
+    }
+  )
+
+  ipcMain.handle(IPC_CHANNELS.githubAuthCancel, (_event, workspace: unknown): void => {
+    const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+    deps.githubAuth.cancelar({ userId: deps.userId(), workspace: escopo })
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.githubAuthLogout,
+    (_event, workspace: unknown): GithubAuthSnapshot => {
+      const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+      return deps.githubAuth.logout({ userId: deps.userId(), workspace: escopo })
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.githubSetClientId,
+    (_event, clientId: unknown, workspace: unknown): GithubAuthSnapshot => {
+      const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+      // Só texto é aceito; qualquer outra coisa vira "limpar", que é voltar ao embutido. O
+      // renderer é fronteira de confiança, e um objeto gravado aqui viraria `[object Object]`
+      // na URL do Device Flow.
+      deps.profiles.saveGithubClientId(
+        deps.userId(),
+        typeof clientId === 'string' ? clientId : undefined
+      )
+      return deps.githubAuth.snapshot({ userId: deps.userId(), workspace: escopo })
+    }
+  )
+
+  // Projeto local e planejamento (SPEC-Planejamento-01, critério 8).
+  //
+  // A validação aqui é de **forma** (fronteira de confiança), não de política: o serviço decide
+  // se o projeto pode nascer, com as checagens de nome, colisão e allowlist. Repetir a decisão
+  // aqui criaria uma segunda fonte — e duas fontes divergem.
+  //
+  // Nenhum destes canais recebe comando: a UI pede *projeto* e *marco*, e o Git é consequência
+  // disso no main, pelo terminal controlado (decisão 2 do PI).
+  ipcMain.handle(IPC_CHANNELS.projectList, (_event, workspace: unknown): readonly Project[] => {
+    if (!isWorkspaceId(workspace)) return []
+    return deps.projects.list(workspace)
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.projectCreate,
+    (_event, nome: unknown, workspace: unknown, diretorioBase: unknown): ProjectOutcome => {
+      if (!isWorkspaceId(workspace)) {
+        throw new Error('Workspace inválido.')
+      }
+
+      // `diretorioBase` ausente é o caminho comum e **correto**: o projeto nasce sob o
+      // diretório do app (decisão 1 do PI). Um valor não-string vira ausência em vez de erro —
+      // o default é seguro por construção, e recusar aqui só trocaria um caminho permitido por
+      // uma mensagem técnica.
+      const base = typeof diretorioBase === 'string' && diretorioBase ? diretorioBase : undefined
+
+      return deps.projects.criar(typeof nome === 'string' ? nome : '', workspace, base)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.projectImport,
+    (_event, diretorio: unknown, workspace: unknown, nomeSugerido: unknown): ProjectOutcome => {
+      if (!isWorkspaceId(workspace)) {
+        throw new Error('Workspace inválido.')
+      }
+
+      const nome = typeof nomeSugerido === 'string' ? nomeSugerido : undefined
+      return deps.projects.importar(typeof diretorio === 'string' ? diretorio : '', workspace, nome)
+    }
+  )
+
+  // Seletor nativo de pasta para importar. Mesma razão do `allowlist:pick`: escolher caminho é
+  // tocar o filesystem, e a fronteira do ARCHITECTURE não abre exceção para leitura. **Não**
+  // adiciona à allowlist — importar não amplia permissão (critério 7); o serviço recusa depois
+  // se a pasta escolhida estiver fora, com a ação concreta na mensagem.
+  ipcMain.handle(IPC_CHANNELS.projectPickDirectory, async (): Promise<string> => {
+    const escolha = await dialog.showOpenDialog({ properties: ['openDirectory'] })
+    const [diretorio] = escolha.filePaths
+    return !escolha.canceled && diretorio ? diretorio : ''
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.projectRename,
+    (_event, projectId: unknown, nome: unknown, workspace: unknown): ProjectOutcome => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
+        throw new Error('Parâmetros inválidos para renomear projeto.')
+      }
+      return deps.projects.renomear(projectId, typeof nome === 'string' ? nome : '', workspace)
+    }
+  )
+
+  // Desregistra sem tocar o disco. A ausência de qualquer opção de apagar arquivo é o desenho,
+  // não uma lacuna: apagar pasta do usuário é operação destrutiva, e destrutivo pertence ao
+  // fluxo de aprovação humana — não a um parâmetro opcional deste canal.
+  ipcMain.handle(
+    IPC_CHANNELS.projectRemove,
+    (_event, projectId: unknown, workspace: unknown): boolean => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return false
+      return deps.projects.remover(projectId, workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.projectSession,
+    (_event, projectId: unknown, workspace: unknown): PlanningSession | null => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return null
+      return deps.projects.abrirSessao(projectId, workspace) ?? null
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.projectSaveAnswers,
+    (
+      _event,
+      projectId: unknown,
+      etapa: unknown,
+      respostas: unknown,
+      workspace: unknown
+    ): PlanningSession | null => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return null
+
+      const mapa =
+        typeof respostas === 'object' && respostas !== null
+          ? (respostas as Record<string, unknown>)
+          : {}
+
+      return (
+        deps.projects.salvarRespostas(
+          projectId,
+          typeof etapa === 'string' ? etapa : 'inicio',
+          mapa,
+          workspace
+        ) ?? null
+      )
+    }
+  )
+
+  // O único gatilho de commit. `marco` é validado contra o enum fechado **antes** de chegar ao
+  // serviço: a mensagem de commit é derivada dele, e um valor livre produziria um commit com
+  // mensagem `undefined` num repositório do usuário.
+  ipcMain.handle(
+    IPC_CHANNELS.projectCompleteMilestone,
+    (_event, projectId: unknown, marco: unknown, workspace: unknown): MarcoOutcome | null => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string' || !isMarcoDocumental(marco)) {
+        return null
+      }
+      return deps.projects.concluirMarco(projectId, marco, workspace) ?? null
+    }
+  )
+
+  // O wizard orientado (SPEC-Planejamento-03). Como nos demais, o handler valida **forma** na
+  // fronteira e não decide política: se a pergunta existe, se a escolha é opção real e se a
+  // delegação é permitida são perguntas do serviço, que as responde contra o catálogo. Repetir
+  // a validação aqui criaria uma segunda fonte que divergiria da primeira na primeira pergunta
+  // nova.
+  ipcMain.handle(
+    IPC_CHANNELS.wizardState,
+    (_event, projectId: unknown, workspace: unknown): VistaDoWizard | null => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return null
+
+      const estado = deps.wizard.estado(projectId)
+      if (estado === undefined) return null
+
+      return { estado, historico: deps.wizard.historico(projectId) }
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.wizardAnswer,
+    (_event, projectId: unknown, resposta: unknown, workspace: unknown): RespostaOutcome => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
+        return { reason: 'projeto-inexistente', mensagem: 'Projeto não encontrado.' }
+      }
+
+      const bruta = typeof resposta === 'object' && resposta !== null ? resposta : {}
+      const { perguntaId, escolha, texto, autor, aceitarSubstituicao } = bruta as Record<
+        string,
+        unknown
+      >
+
+      if (typeof perguntaId !== 'string') {
+        return { reason: 'pergunta-desconhecida', mensagem: 'Pergunta desconhecida.' }
+      }
+
+      return deps.wizard.responder(
+        projectId,
+        {
+          perguntaId,
+          escolha: typeof escolha === 'string' ? escolha : null,
+          texto: typeof texto === 'string' ? texto : null,
+          // Autor fora do contrato vira `pi` — o valor que **não** ganha o passe da delegação.
+          // Cair para `agente` deixaria um renderer comprometido gravar decisão como se fosse
+          // delegada, e a delegação é justamente o caminho que não aprova gate.
+          autor: isAutorDaDecisao(autor) ? autor : 'pi',
+          aceitarSubstituicao: aceitarSubstituicao === true
+        },
+        workspace
+      )
+    }
+  )
+
+  // O pacote estrutural (SPEC-Planejamento-04). O handler valida **forma** e não decide nada:
+  // se as decisões bastam, se a pesquisa saiu e se a evidência sustenta são perguntas do
+  // serviço. Repetir a política aqui criaria uma segunda fonte que divergiria da primeira.
+  ipcMain.handle(
+    IPC_CHANNELS.pacoteGerar,
+    async (
+      _event,
+      projectId: unknown,
+      consulta: unknown,
+      workspace: unknown
+    ): Promise<PacoteOutcome> => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
+        return { reason: 'projeto-inexistente', mensagem: 'Projeto não encontrado.' }
+      }
+      return await deps.pacotes.gerar(
+        { projectId, consulta: typeof consulta === 'string' ? consulta : '' },
+        workspace
+      )
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.pacoteListar,
+    (_event, projectId: unknown): readonly PacoteEstrutural[] =>
+      typeof projectId === 'string' ? deps.pacotes.listar(projectId) : []
+  )
+
+  // Roadmap e gates (SPEC-Planejamento-06). O gate mora no serviço; o handler valida a forma na
+  // fronteira e não decide nada — repetir a política aqui criaria uma segunda fonte.
+  ipcMain.handle(
+    IPC_CHANNELS.roadmapGerar,
+    async (_event, projectId: unknown, workspace: unknown): Promise<RoadmapOutcome> => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
+        return { reason: 'projeto-inexistente', mensagem: 'Projeto não encontrado.' }
+      }
+      return await deps.roadmap.gerar(projectId, workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.roadmapCarregar,
+    (_event, projectId: unknown, workspace: unknown): Roadmap => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
+        return { mvps: [], slices: [] }
+      }
+      return deps.roadmap.carregar(projectId, workspace)
+    }
+  )
+
+  /**
+   * SPEC-Entrega-01: publica o repositório e o backlog aprovado.
+   *
+   * Valida a **forma** do alvo antes de agir, como todo handler desta ponte: o renderer é um
+   * processo que pode ser comprometido, e um `owner` que não é string chegaria à URL do push. O que
+   * ele **não** escolhe é o conteúdo — as issues saem do que o PI aprovou para a fila, lido aqui.
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.publicacaoPublicar,
+    async (
+      _event,
+      projectId: unknown,
+      alvo: unknown,
+      workspace: unknown
+    ): Promise<PublicacaoOutcome> => {
+      const invalido: PublicacaoOutcome = { reason: 'projeto-inexistente', criados: 0 }
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return invalido
+
+      const a = alvo as Partial<AlvoDaPublicacao> | null
+      if (
+        a === null ||
+        typeof a !== 'object' ||
+        typeof a.owner !== 'string' ||
+        typeof a.repo !== 'string' ||
+        typeof a.origem !== 'string'
+      ) {
+        return invalido
+      }
+
+      return await deps.publicacao.publicar(projectId, workspace, {
+        owner: a.owner,
+        repo: a.repo,
+        origem: a.origem
+      })
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.aprovacaoListar,
+    (_event, projectId: unknown, workspace: unknown): readonly Approval[] => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return []
+      return deps.roadmap.aprovacoes(projectId, workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.aprovacaoRevisoes,
+    (_event, projectId: unknown, gate: unknown, workspace: unknown): readonly RevisaoAprovada[] => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string' || !isGate(gate)) return []
+      return deps.roadmap.revisoesDoGate(projectId, gate, workspace)
+    }
+  )
+
+  // **A identidade não vem por parâmetro**: o serviço a lê da sessão autenticada. Um parâmetro
+  // aqui deixaria o renderer declarar quem aprovou — e o critério 4 pergunta exatamente isso.
+  ipcMain.handle(
+    IPC_CHANNELS.aprovacaoAprovar,
+    (_event, projectId: unknown, gate: unknown, workspace: unknown): AprovacaoOutcome => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
+        return { reason: 'projeto-inexistente', mensagem: 'Projeto não encontrado.' }
+      }
+      if (!isGate(gate)) {
+        return { reason: 'sem-revisoes', mensagem: 'Gate desconhecido.' }
+      }
+      return deps.roadmap.aprovar(projectId, gate, workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.aprovacaoSimular,
+    (_event, projectId: unknown, mudancas: unknown, workspace: unknown): readonly Gate[] => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return []
+      if (!Array.isArray(mudancas)) return []
+
+      // A natureza vem do renderer, então é validada aqui — e o **default é `semantica`**:
+      // uma natureza que não reconhecemos tem de invalidar, não passar. Fechar para o lado
+      // seguro é a mesma postura do `autor` desconhecido virando `agente` na M8-F03.
+      const validadas: MudancaDeArtefato[] = mudancas
+        .filter((m): m is Record<string, unknown> => typeof m === 'object' && m !== null)
+        .filter((m) => typeof m.artefato === 'string' && typeof m.hashNovo === 'string')
+        .map((m) => ({
+          artefato: m.artefato as string,
+          hashNovo: m.hashNovo as string,
+          natureza:
+            typeof m.natureza === 'string' &&
+            (NATUREZAS as readonly string[]).includes(m.natureza) &&
+            m.natureza === 'cosmetica'
+              ? 'cosmetica'
+              : 'semantica'
+        }))
+
+      return deps.roadmap.simularMudanca(projectId, validadas, workspace)
+    }
+  )
+
+  // Anexos de design (SPEC-Planejamento-05). O gate mora no serviço; o handler valida a forma na
+  // fronteira e não decide nada — repetir a política aqui criaria uma segunda fonte.
+
+  // Seletor nativo de arquivo. Mesma razão do `allowlist:pick` e do `project:pick`: escolher
+  // caminho é tocar o filesystem, e a fronteira do ARCHITECTURE não abre exceção para leitura.
+  // **Não anexa**: devolve o caminho, e o ato que conta para o gate é o canal seguinte.
+  ipcMain.handle(IPC_CHANNELS.anexoEscolher, async (_event, tipo: unknown): Promise<string> => {
+    if (!isTipoDeAnexo(tipo)) return ''
+    const escolha = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [
+        {
+          name: tipo,
+          // Sem o ponto: o Electron espera a extensão nua no filtro.
+          extensions: EXTENSOES_DO_ANEXO[tipo].map((e) => e.replace(/^\./, ''))
+        }
+      ]
+    })
+    const [caminho] = escolha.filePaths
+    return !escolha.canceled && caminho ? caminho : ''
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.anexoAnexar,
+    (
+      _event,
+      projectId: unknown,
+      tipo: unknown,
+      origem: unknown,
+      workspace: unknown
+    ): AnexoOutcome => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
+        return { reason: 'projeto-inexistente', mensagem: 'Projeto não encontrado.' }
+      }
+      if (!isTipoDeAnexo(tipo) || typeof origem !== 'string' || origem === '') {
+        return { reason: 'tipo-incompativel', mensagem: 'Escolha um arquivo válido.' }
+      }
+      return deps.anexos.anexar(projectId, tipo, origem, workspace)
+    }
+  )
+
+  ipcMain.handle(IPC_CHANNELS.anexoListar, (_event, projectId: unknown): readonly Anexo[] =>
+    typeof projectId === 'string' ? deps.anexos.listar(projectId) : []
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.anexoRemover,
+    (_event, projectId: unknown, caminho: unknown, workspace: unknown): boolean => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return false
+      if (typeof caminho !== 'string') return false
+      return deps.anexos.remover(projectId, caminho, workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.anexoValidar,
+    async (_event, projectId: unknown): Promise<readonly ValidacaoDoPrototipo[]> =>
+      typeof projectId === 'string' ? await deps.anexos.validar(projectId) : []
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.arquiteturaGerar,
+    async (_event, projectId: unknown, workspace: unknown): Promise<ArquiteturaOutcome> => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
+        return { reason: 'projeto-inexistente', mensagem: 'Projeto não encontrado.' }
+      }
+      return await deps.anexos.gerarArquitetura(projectId, workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.arquiteturaListar,
+    (_event, projectId: unknown): readonly PacoteArquitetura[] =>
+      typeof projectId === 'string' ? deps.anexos.listarArquiteturas(projectId) : []
+  )
+
+  // Contexto, skills e orçamento (SPEC-Planejamento-02). O gate do critério 1 mora no serviço;
+  // o handler valida a forma do pedido na fronteira e não decide nada — duplicar a política
+  // aqui criaria uma segunda fonte que divergiria da primeira.
+  ipcMain.handle(
+    IPC_CHANNELS.contextBuild,
+    (_event, pedido: unknown, workspace: unknown): ContextPackOutcome => {
+      if (!isWorkspaceId(workspace)) {
+        throw new Error('Workspace inválido.')
+      }
+
+      const validado = parsePedidoDeContexto(pedido)
+      if (validado === undefined) {
+        // Recusa de forma, não de política: o pedido não casa o contrato. Desfecho e não
+        // exceção, pelo mesmo motivo dos outros — a tela precisa mostrar o que houve.
+        return {
+          reason: 'contexto-vazio',
+          mensagem: 'O pedido de contexto está incompleto. Selecione ao menos um arquivo.'
+        }
+      }
+
+      return deps.contexts.montar(validado, workspace)
+    }
+  )
+
+  ipcMain.handle(IPC_CHANNELS.contextList, (_event, projectId: unknown): readonly ContextPack[] => {
+    if (typeof projectId !== 'string') return []
+    return deps.contexts.listar(projectId)
+  })
+
+  // Sem parâmetro: as capacidades são do **ambiente**, não do projeto. E devolvem sempre a
+  // lista completa — é o critério 5 valendo na fronteira também.
+  ipcMain.handle(IPC_CHANNELS.contextCapabilities, (): readonly CapacidadeResolvida[] =>
+    deps.contexts.capacidades()
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.contextFailures,
+    (_event, projectId: unknown): readonly FalhaRegistrada[] => {
+      if (typeof projectId !== 'string') return []
+      return deps.contexts.listarFalhas(projectId)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.contextResolveFailure,
+    (_event, projectId: unknown, fingerprint: unknown, workspace: unknown): boolean => {
+      if (
+        !isWorkspaceId(workspace) ||
+        typeof projectId !== 'string' ||
+        typeof fingerprint !== 'string'
+      ) {
+        return false
+      }
+      return deps.contexts.resolverFalha(projectId, workspace, fingerprint)
+    }
+  )
 
   // Só de ida: o renderer manda o registro, o main grava. Sem resposta de propósito —
   // esperar confirmação de log tornaria a UI refém do disco.

@@ -23,9 +23,7 @@ Gerar o roadmap completo, detalhar somente a próxima fatia e registrar gates po
 - `MVP_ENTRY`: revisão do MVP que entra na fila.
 - `SLICE_ENTRY`: revisão da SPEC executada.
 
-Todo arquivo alterado cria nova `ArtifactRevision`. Carry-forward de aprovação só ocorre pela matriz determinística: atualização mecânica de STATUS, histórico, evidência, relatório ou ADR que apenas registra decisão já aprovada não invalida gate; mudança em PRD, arquitetura, SPEC, Convention, Design System ou protótipo é material e invalida somente dependentes ainda não executados.
-
-O manifesto canônico usa versão de schema, path relativo normalizado com `/`, ordenação ordinal e SHA-256 dos bytes armazenados. O manifesto é serializado em JSON canônico; mudança de encoding/CRLF altera a revisão, mesmo quando a matriz permitir carry-forward auditado.
+Correção textual, STATUS, evidência e ADR registrando decisão já tomada não invalidam gates. Mudança semântica invalida somente dependentes ainda não executados.
 
 ## Critérios de aceite
 
@@ -37,8 +35,6 @@ O manifesto canônico usa versão de schema, path relativo normalizado com `/`, 
 6. Mudança estrutural exibe previamente gates invalidados.
 7. Nenhum gate aprovado automaticamente por “Decide por mim”.
 8. Conclusão cria commit documental automático.
-9. Mesmo conjunto de arquivos produz o mesmo manifesto em Windows/Linux; path traversal, colisão por case e ordem distinta são rejeitados ou normalizados deterministicamente.
-10. Carry-forward registra revisão anterior, nova revisão e regra de materialidade aplicada; não altera silenciosamente o hash guardado na aprovação original.
 
 ## Testes e evidência
 

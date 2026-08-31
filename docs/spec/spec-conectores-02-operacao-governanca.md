@@ -24,7 +24,6 @@ Adicionar ao ponto único de conectores health, timeout, retry, rate limit, cust
 - **Ledger de crédito de conector, separado e contado em créditos** (não em USD): teto por conector, verificado antes da chamada. Não converte crédito em USD nem soma à `BudgetPolicy` do MVP-005 — os dois orçamentos são independentes e estouram separado.
 - Logs usam allowlist de campos e redaction; corpo bruto não é persistido por padrão.
 - Circuit breaker impede tempestade de chamadas, mas não converte falha em sucesso.
-- Antes de mutação, o runtime persiste `intended` com fingerprint. Depois, grava `confirmed`, `ambiguous` ou `failed`; `ambiguous` consulta a origem antes de qualquer retry.
 
 ## Critérios de aceite
 
@@ -36,7 +35,6 @@ Adicionar ao ponto único de conectores health, timeout, retry, rate limit, cust
 6. Tokens, chaves e headers sensíveis não aparecem em logs, IPC ou evidências.
 7. Uso e custo são atribuídos a projeto, operação e run (`project_id` nulo até o MVP-008).
 8. Estouro do teto de créditos do conector barra a **próxima** chamada com `BLOCKED_EXTERNAL`, sem tocar o orçamento de IA do MVP-005; o inverso também vale.
-9. Crash antes/depois de mutação converge por `EffectJournal`; não duplica recurso nem reutiliza chave para payload divergente.
 
 ## Testes e evidência
 

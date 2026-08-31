@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspaceId } from '@shared/domain/entities'
 import { App } from './App'
 import { entrarPelaChoice } from './test-utils'
+import { ROTEAMENTO_PADRAO } from '@shared/domain/routing'
 
 const sendLog = vi.fn()
 const minimizeToTray = vi.fn()
@@ -18,6 +19,13 @@ const listPendingApprovals = vi.fn()
 const resolveApproval = vi.fn()
 const runWorkflowReal = vi.fn()
 const listCredentials = vi.fn()
+const getBudget = vi.fn()
+const getProviderStatus = vi.fn()
+const getProviderModels = vi.fn()
+const setProviderModel = vi.fn()
+const getRouting = vi.fn()
+const setRoute = vi.fn()
+const setBudgetLimits = vi.fn()
 const setCredential = vi.fn()
 // SPEC-Providers-02: o painel de chamada de IA vive no Settings e assina o canal de stream ao
 // montar. Sem estes no dublê, montar o Settings estoura antes de qualquer asserção.
@@ -25,6 +33,30 @@ const callAi = vi.fn()
 const cancelAi = vi.fn()
 const onAiStreamEvent = vi.fn(() => () => {})
 const removeCredential = vi.fn()
+// SPEC-ExecucaoReal-03: a seção de diretórios permitidos também consulta a ponte ao montar,
+// e as duas leituras vão num `Promise.all` — faltando qualquer uma, a seção inteira cai no
+// `catch` e põe um segundo `role="alert"` na página.
+const listAllowedDirectories = vi.fn(() => Promise.resolve([]))
+const getAppDirectory = vi.fn(() => Promise.resolve('/app/userData'))
+const pickAllowedDirectory = vi.fn(() => Promise.resolve([]))
+const removeAllowedDirectory = vi.fn(() => Promise.resolve([]))
+// SPEC-Conectores-03: o painel do GitHub consulta o estado da conexão ao montar. Sem ele o
+// Settings dos testes exercitaria um painel em estado de erro — a mesma armadilha que a M5-F04
+// registrou, e a razão de o mock ser conferido inteiro e não só no que a suíte afirma.
+const getGithubAuthStatus = vi.fn(() =>
+  Promise.resolve({ estado: 'missing' as const, renovavel: false, clientIdConfigurado: true })
+)
+const startGithubAuth = vi.fn()
+const awaitGithubAuth = vi.fn()
+// SPEC-Conectores-05: a seção de credenciais de conector consulta a ponte ao montar — mesma
+// armadilha dos anteriores, e é ela que faz o Settings dos testes cair em erro quando o dublê
+// fica para trás de um canal novo.
+const listConnectorCredentials = vi.fn(() => Promise.resolve([]))
+const setConnectorCredential = vi.fn(() => Promise.resolve([]))
+const removeConnectorCredential = vi.fn(() => Promise.resolve([]))
+const cancelGithubAuth = vi.fn()
+const logoutGithub = vi.fn()
+const setGithubClientId = vi.fn()
 
 /**
  * Perfil da sessão usada nestes testes. O `App` só monta o AppShell quando a auth está
@@ -62,10 +94,35 @@ function mockarPonte(): void {
       // este mock incompleto se manifestaria: um segundo `role="alert"` na página.
       listCredentials,
       setCredential,
+      // Mesma razão dos três acima: o painel de orçamento (SPEC-Providers-03) consulta a ponte
+      // ao montar, e sem estes dois a tela cai no `catch` e exibe o próprio alerta de erro.
+      getBudget,
+      setBudgetLimits,
+      // Mesma razão dos anteriores: a tela de providers (SPEC-Providers-04) consulta a ponte
+      // ao montar. Sem estes cinco ela cai no `catch` e o Settings dos testes exercitaria um
+      // painel em estado de erro — verde, mas não é o Settings que o usuário vê.
+      getProviderStatus,
+      getProviderModels,
+      setProviderModel,
+      getRouting,
+      setRoute,
       callAi,
       cancelAi,
       onAiStreamEvent,
       removeCredential,
+      listAllowedDirectories,
+      getAppDirectory,
+      pickAllowedDirectory,
+      removeAllowedDirectory,
+      getGithubAuthStatus,
+      listConnectorCredentials,
+      setConnectorCredential,
+      removeConnectorCredential,
+      startGithubAuth,
+      awaitGithubAuth,
+      cancelGithubAuth,
+      logoutGithub,
+      setGithubClientId,
       // Devolve a função de cancelamento, como a ponte real: sem isso o `useEffect`
       // tentaria chamar `undefined` na desmontagem e o cleanup estouraria.
       onAuthChanged: vi.fn(() => () => undefined)
@@ -86,6 +143,25 @@ async function trocarPara(nome: string): Promise<void> {
 beforeEach(() => {
   sendLog.mockClear()
   listCredentials.mockResolvedValue([])
+  const ORCAMENTO_PADRAO = {
+    policy: {
+      user_id: 'u-1',
+      workspace_id: 'jarvis' as const,
+      dailyLimit: 1,
+      monthlyLimit: 1,
+      alertThreshold: 0.8,
+      currency: 'USD' as const
+    },
+    gasto: { diaUsd: 0, mesUsd: 0 }
+  }
+  getBudget.mockResolvedValue(ORCAMENTO_PADRAO)
+  getProviderStatus.mockResolvedValue([])
+  getProviderModels.mockResolvedValue([])
+  setProviderModel.mockResolvedValue(true)
+  const ROTAS_PADRAO = { user_id: 'u-1', workspace_id: 'jarvis' as const, rotas: ROTEAMENTO_PADRAO }
+  getRouting.mockResolvedValue(ROTAS_PADRAO)
+  setRoute.mockResolvedValue(ROTAS_PADRAO)
+  setBudgetLimits.mockResolvedValue(ORCAMENTO_PADRAO)
   setCredential.mockResolvedValue([])
   onAiStreamEvent.mockReturnValue(() => {})
   removeCredential.mockResolvedValue([])
@@ -311,18 +387,21 @@ describe('Settings (SPEC-05)', () => {
 
   it('é acessível nos dois workspaces', async () => {
     await abrirSettings()
-    expect(screen.getByLabelText('Idioma')).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Idioma' })).toBeInTheDocument()
 
     // Troca de espaço e confirma que a tela continua alcançável.
     await trocarPara('NOA')
     await userEvent.click(screen.getByRole('button', { name: 'Configurações' }))
-    expect(screen.getByLabelText('Idioma')).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Idioma' })).toBeInTheDocument()
   })
 
   it('troca o idioma e a UI muda na hora, sem reiniciar (critério 1)', async () => {
     await abrirSettings()
 
-    await userEvent.selectOptions(screen.getByLabelText('Idioma'), 'en-US')
+    // O `Select` do DS é Radix (botão + listbox), não `<select>` nativo — abrir e clicar na
+    // opção é como o usuário troca (mesmo padrão do providers.test).
+    await userEvent.click(screen.getByRole('combobox', { name: 'Idioma' }))
+    await userEvent.click(await screen.findByRole('option', { name: 'English (US)' }))
 
     // A prova da troca a quente: o próprio rótulo da tela muda de idioma.
     expect(await screen.findByLabelText('Language')).toBeInTheDocument()
@@ -372,6 +451,25 @@ describe('Settings (SPEC-05)', () => {
 
     await trocarPara('JARVIS OS')
     expect(screen.getByLabelText('Idioma')).toBeInTheDocument()
+  })
+
+  it('organiza as seções em cinco abas, com só a ativa montada', async () => {
+    await abrirSettings()
+
+    // A régua completa (decisão do PI, 2026-08-30): escopo do usuário à esquerda, escopo do
+    // espaço à direita.
+    const abas = screen.getAllByRole('tab').map((tab) => tab.textContent)
+    expect(abas).toEqual(['Geral', 'Permissões', 'IA', 'Roteamento', 'Conectores'])
+
+    // A aba padrão é Geral, e as seções das outras abas **não estão no DOM** — é o que
+    // garante que as buscas de dados das seções escopadas só disparam quando a aba abre.
+    expect(screen.getByRole('combobox', { name: 'Idioma' })).toBeInTheDocument()
+    expect(screen.queryByText('Diretórios permitidos')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Permissões' }))
+    expect(await screen.findByText('Diretórios permitidos')).toBeInTheDocument()
+    // E o Geral desmontou: uma aba por vez, nunca as cinco empilhadas — que era a tela antiga.
+    expect(screen.queryByRole('combobox', { name: 'Idioma' })).not.toBeInTheDocument()
   })
 
   it('oferece o acento por módulo com o mesmo seletor da CHOICE (SPEC-CHOICE-01, crit. 5)', async () => {

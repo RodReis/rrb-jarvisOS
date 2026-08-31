@@ -30,6 +30,7 @@ import {
 import { Settings } from './Settings'
 import { AprovacoesPendentes } from './AprovacoesPendentes'
 import { TerminalControlado } from './TerminalControlado'
+import { ProjetosLocais } from './ProjetosLocais'
 
 /**
  * AppShell do renderer (SPEC-DesignSystem-04a).
@@ -114,6 +115,21 @@ export function AppShell({ perfil, onSair }: AppShellProps = {}): React.JSX.Elem
 
   const nomeEspaco = t(`espaco.${workspace}`)
   const rotaAtiva = rotaDoWorkspace(navegacao, workspace)
+
+  /**
+   * O módulo real desta rota, ou `null` quando ainda não existe um.
+   *
+   * Um mapa, e não uma pilha de `&&` no JSX: com os condicionais espalhados, o placeholder não
+   * tinha como saber que havia conteúdo abaixo dele — e por isso anunciava "conteúdo
+   * placeholder" acima de três telas já entregues. Aqui a pergunta "esta rota tem módulo?" tem
+   * uma resposta só, e o cabeçalho de placeholder passa a depender dela.
+   */
+  const MODULOS: Readonly<Record<string, React.JSX.Element>> = {
+    operacoes: <AprovacoesPendentes workspace={workspace} />,
+    projetos: <ProjetosLocais workspace={workspace} />,
+    terminal: <TerminalControlado workspace={workspace} />
+  }
+  const moduloDaRota = MODULOS[rotaAtiva] ?? null
   const uiTheme = preferencias.resolvedTheme === 'claro' ? 'light' : 'dark'
   const outroEspaco: WorkspaceId = workspace === 'jarvis' ? 'noa' : 'jarvis'
 
@@ -278,14 +294,25 @@ export function AppShell({ perfil, onSair }: AppShellProps = {}): React.JSX.Elem
           aria-label={t('conteudo.de', { rota: t(`navegacao.${rotaAtiva}`) })}
           className="rounded-[var(--jos-raio-card)] border border-[rgba(var(--jos-borda-rgb),0.12)] bg-[var(--jos-cor-superficie-elevada)] p-6"
         >
-          <p className="text-[length:var(--jos-texto-corpo)]">
-            {nomeEspaco} · {t(`navegacao.${rotaAtiva}`)}
-          </p>
-          <p className="mt-2 text-[length:var(--jos-texto-mini)] text-[var(--jos-cor-texto-suave)]">
-            {t('conteudo.placeholder')}
-          </p>
-          {rotaAtiva === 'operacoes' && <AprovacoesPendentes workspace={workspace} />}
-          {rotaAtiva === 'terminal' && <TerminalControlado workspace={workspace} />}
+          {/*
+            O cabeçalho de placeholder só aparece onde **não há** módulo — que é o que ele
+            sempre quis dizer. Incondicional, ele anunciava "conteúdo placeholder — os módulos
+            entram em fatias futuras" acima de telas que já existem, contradizendo o que estava
+            logo abaixo, e repetia num parágrafo o nome que a sidebar e o título da seção já
+            dizem. Rótulo que mente sobre o próprio conteúdo é pior que rótulo nenhum.
+          */}
+          {moduloDaRota === null ? (
+            <>
+              <p className="text-[length:var(--jos-texto-corpo)]">
+                {nomeEspaco} · {t(`navegacao.${rotaAtiva}`)}
+              </p>
+              <p className="mt-2 text-[length:var(--jos-texto-mini)] text-[var(--jos-cor-texto-suave)]">
+                {t('conteudo.placeholder')}
+              </p>
+            </>
+          ) : (
+            moduloDaRota
+          )}
         </section>
       )}
     </ShellDoDesign>

@@ -124,46 +124,98 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
   expect(superficie.metodos).toEqual([
     'addAllowedCommand',
     'addAllowedDirectory',
-    // SPEC-Providers-02: os três da chamada de IA. Enumerados um a um (e não por padrão) pela
-    // mesma razão da F01 — um padrão aceitaria um método futuro que devolvesse credencial.
+    'anexarDesign',
+    'answerWizard',
+    'aprovarGate',
+    'awaitGithubAuth',
+    'buildContextPack',
     'callAi',
+    'callConnector',
     'cancelAi',
+    'cancelGithubAuth',
+    'carregarRoadmap',
     'classifyAction',
+    'completeMilestone',
     'createAutomation',
+    'createProject',
     'createWorkflow',
+    'escolherAnexo',
+    'gerarArquitetura',
+    'gerarPacote',
+    'gerarRoadmap',
+    'getAppDirectory',
     'getAppInfo',
     'getAuth',
+    'getBudget',
+    'getConnectorCredits',
+    'getGithubAuthStatus',
+    'getPlanningSession',
     'getPreferences',
+    'getProviderModels',
+    'getProviderStatus',
+    'getRouting',
+    'getWizardState',
     'getWorkspace',
+    'importProject',
     'listAllowedCommands',
     'listAllowedDirectories',
     'listAuditEvents',
     'listAutomations',
+    'listCapabilities',
+    'listConnectorCapabilities',
+    'listConnectorCredentials',
+    'listContextPacks',
     'listCredentials',
     'listExecutionRuns',
+    'listFailures',
     'listPendingApprovals',
+    'listProjects',
     'listWorkflows',
+    'listarAnexos',
+    'listarAprovacoes',
+    'listarArquiteturas',
+    'listarPacotes',
     'login',
     'logout',
+    'logoutGithub',
     'minimizeToTray',
     'onAiStreamEvent',
     'onAuthChanged',
+    'pickAllowedDirectory',
+    'pickProjectDirectory',
+    'publicarNoGitHub',
     'removeAllowedCommand',
     'removeAllowedDirectory',
     'removeAutomation',
+    'removeConnectorCredential',
     'removeCredential',
+    'removeProject',
     'removeWorkflow',
+    'removerAnexo',
+    'renameProject',
     'resolveApproval',
+    'resolveFailure',
+    'revisoesDoGate',
     'runCommand',
     'runWorkflowReal',
     'runWorkflowSimulated',
+    'savePlanningAnswers',
     'savePreferences',
     'sendLog',
     'setAutomationEnabled',
+    'setBudgetLimits',
+    'setConnectorCredential',
+    'setConnectorCreditLimits',
     'setCredential',
+    'setGithubClientId',
+    'setProviderModel',
+    'setRoute',
     'setWorkflowStatus',
+    'simularMudanca',
+    'startGithubAuth',
     'switchWorkspace',
     'updateWorkflow',
+    'validarPrototipos',
     'verifyAuditChain'
   ])
 
@@ -173,11 +225,30 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
   // **mais** estrita: em vez de aceitar qualquer nome com a palavra, enumera exatamente os três
   // que existem — todos de *metadados* (status, origem, provider), nenhum devolve valor. Um
   // `getCredential` amanhã não entra nesta lista e quebra o teste, com o app rodando de verdade.
-  const GESTAO_SEM_VALOR = ['listCredentials', 'setCredential', 'removeCredential']
+  //
+  // A M6-F05 trouxe o trio irmão para credencial de **conector**, e a guarda continua
+  // enumerando: seis nomes, todos de metadados. `ConnectorCredentialStatusView` não tem campo
+  // onde o segredo caiba — e o teste `nada do que volta pela ponte contém a chave da Tavily`
+  // (tavily-conector.e2e.ts) mede isso com um valor real atravessando o app.
+  const GESTAO_SEM_VALOR = [
+    'listCredentials',
+    'setCredential',
+    'removeCredential',
+    'listConnectorCredentials',
+    'setConnectorCredential',
+    'removeConnectorCredential'
+  ]
+  // A M8-F01 trouxe `session` num sentido **diferente** do que a guarda persegue: a
+  // `PlanningSession` é o rascunho do wizard (etapa + respostas do usuário), não uma sessão de
+  // autenticação — o tipo não tem campo onde token caiba. Enumerado, e não isento por regex mais
+  // frouxo: afrouxar o padrão deixaria passar o `getAuthSession` de amanhã, que é exatamente o
+  // que a guarda existe para pegar. Mesma decisão da guarda gêmea em `preload.spec.ts`.
+  const SESSAO_DE_PLANEJAMENTO_SEM_TOKEN = ['getPlanningSession', 'savePlanningAnswers']
   expect(
     superficie.metodos
       .filter((m) => /token|secret|session|credential/i.test(m))
       .filter((m) => !GESTAO_SEM_VALOR.includes(m))
+      .filter((m) => !SESSAO_DE_PLANEJAMENTO_SEM_TOKEN.includes(m))
   ).toEqual([])
   expect(superficie.temRequire).toBe('undefined')
   expect(superficie.temProcess).toBe('undefined')

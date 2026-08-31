@@ -1,41 +1,18 @@
 # STATUS.md — Kanban / Roadmap
 
-Planejamento atualizado em: **2026-08-30**; fila operacional preservada do registro de **2026-08-29**, não revalidada nesta redação. Fonte única do índice Fatia ↔ SPEC. Histórico e ressalvas: `docs/STATUS-ARQUIVO.md`. O board GitHub vence em caso de divergência factual.
-
-> **Conferência pontual da publicação do MVP-007 (2026-08-30):** o `next` no GitHub passou de **#101** na consulta inicial para **#102** na consulta final, sem alterações de fila por esta tarefa. A tabela “Agora” abaixo é o retrato histórico de 2026-08-29 e não foi reconciliada com as entregas posteriores; o board remoto vence.
+Atualizado em: **2026-08-31**. Fonte única do índice Fatia ↔ SPEC. Estado remoto conferido durante o fechamento do PR #189; nenhuma prioridade alterada por esta tarefa. Histórico detalhado em `docs/STATUS-ARQUIVO.md`; o board vence divergência factual.
 
 ## Agora
 
 | Coluna | Item | Estado |
 |---|---|---|
-| Próximo | [#110](https://github.com/RodReis/rrb-jarvisOS/issues/110) · M4-F03 UI da allowlist de diretórios | `proplan:next`; `aprovada-pi` 2026-08-29; desbloqueia MVP-004 e M8-F01 |
-| Backlog | [#79](https://github.com/RodReis/rrb-jarvisOS/issues/79) · BudgetPolicy | aprovado, aguardando fila |
-| Backlog | [#80](https://github.com/RodReis/rrb-jarvisOS/issues/80) · Multi-provider | aprovado, aguardando fila |
-| Backlog | [#87–#92](https://github.com/RodReis/rrb-jarvisOS/issues/87) · MVP-006 | seis SPECs `aprovada-pi` (2026-08-29); atrás de #79/#80 na fila |
-| Backlog | [#94–#99](https://github.com/RodReis/rrb-jarvisOS/issues/94) · MVP-008 | seis SPECs `aprovada-pi` (2026-08-29); atrás do MVP-006 na fila |
-| Backlog | [#101–#106](https://github.com/RodReis/rrb-jarvisOS/issues/101) · MVP-009 | seis SPECs `aprovada-pi` (2026-08-29); fim da fila |
-| Backlog | [#116–#120](https://github.com/RodReis/rrb-jarvisOS/issues/116) · MVP-010 | cinco SPECs `aprovada-pi`; depois do MVP-009 |
-| Backlog | [#122–#126](https://github.com/RodReis/rrb-jarvisOS/issues/122) · MVP-011 | cinco SPECs `aprovada-pi`; depois do MVP-010 |
-| Backlog | [#128–#132](https://github.com/RodReis/rrb-jarvisOS/issues/128) · MVP-012 | cinco SPECs `aprovada-pi`; depois do MVP-011 |
-| Backlog | [#134–#138](https://github.com/RodReis/rrb-jarvisOS/issues/134) · MVP-013 | cinco SPECs `aprovada-pi`; depois do MVP-012 |
-| Done | [#75](https://github.com/RodReis/rrb-jarvisOS/issues/75) · MVP-004 F02 Terminal | PR [#83](https://github.com/RodReis/rrb-jarvisOS/pull/83), aguardando aceite |
-| Done | [#77](https://github.com/RodReis/rrb-jarvisOS/issues/77) · MVP-005 F01 Vault | PR [#108](https://github.com/RodReis/rrb-jarvisOS/pull/108), aguardando aceite |
-| Done | [#107](https://github.com/RodReis/rrb-jarvisOS/issues/107) · `[FIX]` overlays em portal sem tokens | PR [#109](https://github.com/RodReis/rrb-jarvisOS/pull/109), aguardando aceite |
-| Done | [#78](https://github.com/RodReis/rrb-jarvisOS/issues/78) · MVP-005 F02 Adapter Claude | PR desta entrega, aguardando aceite |
-| Done | [#84](https://github.com/RodReis/rrb-jarvisOS/issues/84) · `[FIX]` card de aprovação descreve comando como filesystem | PR [#113](https://github.com/RodReis/rrb-jarvisOS/pull/113), aguardando aceite |
-| A Fazer/Em Andamento | — | WIP = 0 |
-
-> **M5-F01 entregue (2026-08-28) — abre o MVP-005.** Os 9 critérios cobertos; **679 testes verdes** (+38: 9 Regras, 20 Banco, 9 Tela). A garantia central é **estrutural**: nenhum tipo que atravessa o IPC tem campo onde o segredo caiba, e não existe método na ponte que o peça. Verificado no app real — o segredo semeado aparece **0 vezes** em `jarvis.db`/`-wal`/`-shm` enquanto `credential_ref` aparece 3 (prova de que a busca funciona); é a prova do **DPAPI real**, já que o teste de integração usa cifra dublada. `verifyAuditChain` → `{ok: true, checked: 95}`. Detalhe em `DEVELOPMENT.md`.
->
-> **A verificação achou um defeito do design system, não da fatia** ([#107](https://github.com/RodReis/rrb-jarvisOS/issues/107)): overlays em portal renderizam **sem tokens** — modal transparente e ilegível. O `ProvedorDeTema` injeta as variáveis num `div`, o Radix monta o portal no `body`, fora dela. Atinge os 5 componentes com portal, é anterior a esta fatia. **Terceira repetição do mesmo método no projeto** (depois de #57/#58): jsdom não aplica folha de estilo, então componente visualmente quebrado passa verde.
->
-> **#107 entregue (2026-08-28).** Cada `Portal` recebe o nó do provider como `container` — preserva os providers aninhados que a CHOICE e o Settings usam, o que promover os tokens a `:root` quebraria. A verificação no app real achou um **segundo defeito com a mesma causa raiz**, escondido pelo primeiro: o painel herdava a cor de texto do `FundoDaIdentidade`, que o portal não tem, e o título caía no preto do navegador. **684 testes** (+5) e **82 provas de navegador** (+5), todos provados por contrafactual. A régua nova é em duas camadas por necessidade: jsdom só afirma topologia, o valor computado só o navegador mede — que é exatamente o buraco pelo qual este defeito passou.
-
-> **M5-F02 entregue (2026-08-29).** A IA passa a chamar de verdade. O que a fatia entrega de estrutural é o **ponto único de chamada** — a sede do gate de orçamento da F03 (ADR-001 q1); um segundo caminho até um adapter seria um caminho sem gate. O **isolamento do provider virou regra do ESLint** (barra `@anthropic-ai/*` em todo `src/main/` menos o adapter), provada por contrafactual. **732 testes** (+48) e 2 E2E novos; verificado no app real com Electron, com o log do app mostrando `correlationId`, `AuditEvent` e custo medido. A cobertura de Regras caiu para 75.5% por **diluição**, não regressão: `ai.ts` está a 100% ali, e o que cresceu (`preload`, `handlers`) é coberto por Banco e E2E.
->
-> **#84 entregue (2026-08-29).** O card da fila descrevia **toda** pendência como filesystem — uma execução de processo aparecia como "Filesystem: comando", sem binário, argumentos ou cwd, e o usuário aprovava às cegas. A correção **não inventa discriminante**: reusa o `operation.kind` que o handler de `approval:resolve` já usava para rotear a decisão entre os dois motores — o dado existia, só a apresentação o ignorava. **735 testes** (+3, todos de Tela), provados por contrafactual, e o ramo de filesystem intacto. Verificado no app real: o card lê "Executar comando: node --force" com o cwd no escopo, e **Aprovar continua executando** (`verifyAuditChain` → `{ok: true, checked: 125}`). O achado que vale registrar é de método: o componente não tinha **nenhum** teste — o defeito não passou por asserção frouxa, passou por ausência de suíte.
->
-> **Decisões do PI (2026-08-29):** três modelos na tabela de preço (Opus 5, Sonnet 5, Haiku 4.5) para dar spread à F03 e à F04; **SDK oficial** `@anthropic-ai/sdk` em vez de `fetch` cru; **painel mínimo** de teste no Settings — a tela de providers é F04, explicitamente.
+| Próximo | [#103](https://github.com/RodReis/rrb-jarvisOS/issues/103) · M9-F03 Worktree, preflight e Docker | `proplan:next` atual; preservado |
+| Backlog | [#209](https://github.com/RodReis/rrb-jarvisOS/issues/209) · correção do EffectJournal | lacuna de implementação registrada pelo PR #210; não é resolvida por este PR documental |
+| Finalizado | #99, #101 e #102 | aceite do PI registrado; M9-F02 integrada pelo PR #208 |
+| Backlog | M7-F01–F04 (#180–#183), MVPs 010–015 e M16-F01–F04 | SPECs aprovadas; publicação documental não muda fila |
+| Planejado | M16-F05/F06 (#167/#168), MVP-023 e MVP-024 | dez SPECs completas para revisão; nenhuma construção autorizada |
+| Planejado | M7-F05–F08 (#184–#187) | detalhamento fora do fechamento da V3 |
+| Roadmap preservado | Command Center (MVP-017–021) e Shell (MVP-022) | decisões e issues da main preservadas; não renumerados |
 
 ## MVPs
 
@@ -44,39 +21,27 @@ Planejamento atualizado em: **2026-08-30**; fila operacional preservada do regis
 | MVP-001 Fundação | [#1](https://github.com/RodReis/rrb-jarvisOS/issues/1) | fechado/aceito | 6/6 |
 | MVP-002 Execução local | [#9](https://github.com/RodReis/rrb-jarvisOS/issues/9) | fechado/aceito | 5/5 |
 | MVP-003 Design System | [#16](https://github.com/RodReis/rrb-jarvisOS/issues/16) | fechado/aceito | 8/8 |
-| MVP-004 Execução real | [#10](https://github.com/RodReis/rrb-jarvisOS/issues/10) | F01 aceita; F02 aguardando aceite; **F03 nova** (`aprovada-pi` 2026-08-29) | 1/3 |
-| MVP-005 Providers/Vault/Budget | [#76](https://github.com/RodReis/rrb-jarvisOS/issues/76) | F01 e F02 entregues, aguardando aceite; duas SPECs no Backlog | 2/4 |
-| MVP-006 Conectores Essenciais | [#86](https://github.com/RodReis/rrb-jarvisOS/issues/86) | seis SPECs `aprovada-pi` (2026-08-29); fatias no Backlog | 0/6 |
-| MVP-007 Memória Contextual/RAG | [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179) | F01–F04 aprovadas/Backlog; F05–F08 Planejadas/a redigir; sem implementação autorizada | 0/8 |
-| MVP-008 Planejamento Governado | [#93](https://github.com/RodReis/rrb-jarvisOS/issues/93) | seis SPECs `aprovada-pi` (2026-08-29); fatias no Backlog | 0/6 |
-| MVP-009 Entrega Autônoma | [#100](https://github.com/RodReis/rrb-jarvisOS/issues/100) | seis SPECs `aprovada-pi` (2026-08-29); fatias no Backlog | 0/6 |
+| MVP-004 Execução real | [#10](https://github.com/RodReis/rrb-jarvisOS/issues/10) | **três fatias finalizadas**; o épico aguarda o fechamento do PI | 3/3 |
+| MVP-005 Providers/Vault/Budget | [#76](https://github.com/RodReis/rrb-jarvisOS/issues/76) | quatro fatias finalizadas | 4/4 |
+| MVP-006 Conectores Essenciais | [#86](https://github.com/RodReis/rrb-jarvisOS/issues/86) | seis fatias finalizadas; o épico aguarda o fechamento do PI | 6/6 |
+| MVP-007 Memória compartilhada | [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179) | F01–F04 aprovadas/Backlog; F05–F08 Planejadas, fora do fechamento V3 | 0/8 |
+| MVP-008 Planejamento Governado | [#93](https://github.com/RodReis/rrb-jarvisOS/issues/93) | seis fatias finalizadas; o épico aguarda o fechamento do PI | 6/6 |
+| MVP-009 Entrega Autônoma | [#100](https://github.com/RodReis/rrb-jarvisOS/issues/100) | seis SPECs `aprovada-pi` (2026-08-29), **emendadas pelo PI em 2026-08-30**; F01 entregue (PR [#190](https://github.com/RodReis/rrb-jarvisOS/pull/190)) | 1/6 |
 | MVP-010 Multi-executor Claude + Codex | [#115](https://github.com/RodReis/rrb-jarvisOS/issues/115) | fatias [#116–#120](https://github.com/RodReis/rrb-jarvisOS/issues/116) no Backlog | 0/5 |
 | MVP-011 Squads limitados | [#121](https://github.com/RodReis/rrb-jarvisOS/issues/121) | fatias [#122–#126](https://github.com/RodReis/rrb-jarvisOS/issues/122) no Backlog | 0/5 |
 | MVP-012 Scheduler concorrente | [#127](https://github.com/RodReis/rrb-jarvisOS/issues/127) | fatias [#128–#132](https://github.com/RodReis/rrb-jarvisOS/issues/128) no Backlog | 0/5 |
 | MVP-013 Execução contínua | [#133](https://github.com/RodReis/rrb-jarvisOS/issues/133) | fatias [#134–#138](https://github.com/RodReis/rrb-jarvisOS/issues/134) no Backlog | 0/5 |
 | MVP-014 Release e Deploy Governado | [#149](https://github.com/RodReis/rrb-jarvisOS/issues/149) | cinco SPECs `aprovada-pi`; fatias #150–#154 em Backlog | 0/5 |
 | MVP-015 Observabilidade Operacional | [#155](https://github.com/RodReis/rrb-jarvisOS/issues/155) | seis SPECs `aprovada-pi`; fatias #156–#161 em Backlog | 0/6 |
-| MVP-016 Aprendizado Operacional da Pipeline | [#162](https://github.com/RodReis/rrb-jarvisOS/issues/162) | F01–F04 #163–#166 em Backlog; F05–F06 #167–#168 Planejadas, SPECs a redigir | 0/6 |
-| MVP-017 Biblioteca de Blueprints | — | direção aprovada; sem fatias e sem SPEC | — |
-| MVP-018 Gestão de Portfólio | — | direção aprovada; sem fatias e sem SPEC | — |
-
-> **MVP-006 aprovado (2026-08-29).** As seis SPECs passaram pelo gate de perguntas abertas e viraram `aprovada-pi`. Sete decisões do PI: runtime de conectores **separado** do ponto único de IA do MVP-005; **ledger de créditos próprio** para conector, independente da `BudgetPolicy` em USD; **GitHub App do projeto** com `client_id` embutido e override em Settings; **emenda do Vault para OAuth** (payload estruturado, `expires_at`, rotação atômica) como escopo da M6-F03, sem reabrir a M5-F01; **roteamento Context7↔Tavily removido** da M6-F05 e transferido ao MVP-008; **UI mínima dentro de cada fatia**, sem fatia dedicada; **evidência extensa no diretório de artefatos do app**. A aprovação **não muda a fila** — a cabeça continua sendo a M5-F02 (#78).
-
-> **MVP-008 aprovado (2026-08-29).** Seis decisões do PI: projeto nasce **sob `userData`** e criar projeto nunca amplia a allowlist; **Git é o `git` do sistema pelo terminal controlado do MVP-004**, sem segundo caminho de escrita fora do enforcement; **importar o próprio `rrb-jarvisOS`** é critério de aceite; a **rota de assinatura (Claude MAX via Claude Code) registra uso sem valor monetário** e a `BudgetPolicy` gateia só rota paga; o app **não chama Context7** — ele é do agente construtor no MVP-009; **anexos de design entram por seletor que copia e hasheia no ato**. Duas dependências duras ficaram registradas: a M8-F01 depende da M4-F02 (#75) e fica limitada ao diretório do app até existir a fatia de UI da allowlist. Emendas em `spec-providers-03` e `spec-providers-04`: rota de assinatura é `subscription_limited`. **A fila não mudou** — a cabeça continua sendo a M5-F02 (#78).
-
-> **Pipeline V2 aprovada e publicada (2026-08-29).** Arquitetura, quatro MVPs e vinte SPECs receberam `aprovada-pi`. Épicos #115/#121/#127/#133 e fatias #116–#120/#122–#126/#128–#132/#134–#138 foram criados com parents e bloqueios nativos na ordem de implementação. Isso adiciona backlog futuro sem furar a fila corrente. A V2 termina no merge do DAG aprovado; deploy permanece fora. Fonte: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v2-design.md`.
-
-> **Pipeline V3 publicada e em especificação (2026-08-30).** MVP-014 (#149), MVP-015 (#155) e MVP-016 (#162) possuem 17 sub-issues com dependências nativas. Quinze fatias aprovadas estão em Backlog; M16-F05–F06 permanecem Planejadas. Nenhuma nova issue recebeu `next`. Detalhe e reconciliação: `docs/STATUS-ARQUIVO.md`.
-
-> **MVP-016 em especificação (2026-08-30).** M16-F01–F04 (#163–#166) estão `aprovada-pi`, em Backlog; F05–F06 (#167–#168) aguardam redação. A F06 mantém gate visual. Fonte: `docs/superpowers/specs/2026-08-29-mvp-016-aprendizado-operacional-design.md`.
-
-> **MVP-007 publicado e em detalhamento (2026-08-30).** Épico #179 e oito fatias #180–#187. M7-F01 (#180), revisão `83e952f`, e M7-F02 (#181), revisão `e4a521c`, estão `aprovada-pi`, em Backlog. M7-F03 (#182), revisão `c3b546a`, também está `aprovada-pi`, em Backlog; M7-F04 (#183), revisão `027f827`, aprovada e em Backlog; F05–F08 a redigir. Aceite documental não inicia implementação; pipeline não depende da memória. Fonte: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`.
-
-> **MVP-009 aprovado (2026-08-29).** Três decisões do PI: **o container Docker é o sandbox do executor** — o Claude Code roda nele com o worktree montado, nunca no host; **merge autônomo ligado por padrão com kill-switch por projeto**, e desligado o run termina no PR verde aguardando o PI; **Context7 é ferramenta do agente construtor** na M9-F04, fechando a pendência herdada do MVP-008. A decisão do container fecha um buraco real: o MVP-004 proibiu comando arbitrário, mas um agente que constrói software precisa exatamente disso — sem fronteira nova, o MVP-009 passaria por cima do enforcement que o MVP-004 entregou. **Docker passa a ser dependência dura**, sem fallback para o host.
+| MVP-016 Aprendizado Operacional da Pipeline | [#162](https://github.com/RodReis/rrb-jarvisOS/issues/162) | F01–F04 #163–#166 em Backlog; F05–F06 #167–#168 Planejadas, SPECs completas para revisão | 0/6 |
+| MVP-017 a MVP-021 (Command Center) | [#193](https://github.com/RodReis/rrb-jarvisOS/issues/193) · [#194](https://github.com/RodReis/rrb-jarvisOS/issues/194) · [#195](https://github.com/RodReis/rrb-jarvisOS/issues/195) · [#196](https://github.com/RodReis/rrb-jarvisOS/issues/196) · [#197](https://github.com/RodReis/rrb-jarvisOS/issues/197) | 5 épicos criados em 2026-08-30, aprovados pelo PI na mesma data (HA removido; voz local Whisper+Piper): voz+persona+mascote, escuta contínua, briefing/proatividade, integrações Gmail/Agenda/Spotify, visão Frigate. Fatias lazy; SPECs da M17-F01 (#200), M17-F02 (#202) e M17-F03 `aprovada-pi` (2026-08-30), demais sem SPEC; docs em `docs/mvp/mvp-017…021` | 0/18 |
+| MVP-022 Shell de produto | [#205](https://github.com/RodReis/rrb-jarvisOS/issues/205) | menu do JARVIS/Agents OS projetado do registro de módulos; **SPEC da F01 `aprovada-pi` (2026-08-30)**, oito decisões do PI; entra depois do MVP-009 | 0/1 |
+| MVP-023 Biblioteca de Blueprints | [#212](https://github.com/RodReis/rrb-jarvisOS/issues/212) | quatro SPECs completas para revisão; implementação não autorizada | 0/4 |
+| MVP-024 Gestão de Portfólio | [#213](https://github.com/RodReis/rrb-jarvisOS/issues/213) | quatro SPECs completas para revisão; implementação não autorizada | 0/4 |
 
 ## Índice Fatia ↔ SPEC
 
-Não existe catálogo global `SPEC-nnn`. O identificador canônico é o slug abaixo; não inventar números.
+Não existe catálogo global `SPEC-nnn`. O slug identifica a SPEC; os números abaixo não são reaproveitados. Uma SPEC `rascunho-completo` ainda não autoriza construção.
 
 | Índice | MVP | Fatia | SPEC |
 |---|---|---|---|
@@ -151,21 +116,23 @@ Não existe catálogo global `SPEC-nnn`. O identificador canônico é o slug aba
 | M16-F02 | MVP-016 | Memória de falhas ([#164](https://github.com/RodReis/rrb-jarvisOS/issues/164)) | `spec-aprendizado-02-memoria-falhas.md` |
 | M16-F03 | MVP-016 | Registro e resolução de políticas ([#165](https://github.com/RodReis/rrb-jarvisOS/issues/165)) | `spec-aprendizado-03-registro-resolucao-politicas.md` |
 | M16-F04 | MVP-016 | Experimentos e promoção ([#166](https://github.com/RodReis/rrb-jarvisOS/issues/166)) | `spec-aprendizado-04-experimentos-promocao.md` |
-| M16-F05 | MVP-016 | Estratégias e recomendações assistidas ([#167](https://github.com/RodReis/rrb-jarvisOS/issues/167)) | a redigir |
-| M16-F06 | MVP-016 | Interface, resiliência e prova E2E ([#168](https://github.com/RodReis/rrb-jarvisOS/issues/168)) | a redigir |
+| M16-F05 | MVP-016 | Estratégias e recomendações assistidas ([#167](https://github.com/RodReis/rrb-jarvisOS/issues/167)) | `spec-aprendizado-05-estrategias-recomendacoes.md` — rascunho-completo |
+| M16-F06 | MVP-016 | Interface, resiliência e prova E2E ([#168](https://github.com/RodReis/rrb-jarvisOS/issues/168)) | `spec-aprendizado-06-interface-resiliencia-e2e.md` — rascunho-completo |
+| M17-F01 | MVP-017 | STT local + push-to-talk | `spec-voz-01-stt-local-push-to-talk.md` |
+| M17-F02 | MVP-017 | TTS Piper + timeline de visemes | `spec-voz-02-tts-piper-fonemas.md` |
+| M17-F03 | MVP-017 | Persona JARVIS no ponto único | `spec-voz-03-persona-ponto-unico.md` |
+| M22-F01 | MVP-022 | Menu JARVIS OS / Agents OS | `spec-shell-01-menu-jarvis-agents-os.md` |
 
 ## Próximas ações
 
-1. PI aceitar ou recusar as **quatro** fatias em **Done**: F02 do MVP-004 (#75), M5-F01 (#77), o `[FIX]` #107 e a M5-F02 (#78).
-2. Fila corrente: **#110** (UI da allowlist) é o `next`. Depois dele, a ordem entre #79 (BudgetPolicy) e #80 (Multi-provider) é decisão do PI — as duas têm spec aprovada.
-3. A **F03 encaixa no ponto único** que a F02 deixou pronto: a estimativa pré-chamada já é calculada e o `CostEvent` já carrega `estimadoUsd`/`realUsd`. O gate entra entre a estimativa e o disparo do adapter — nenhuma refatoração do ponto de chamada é necessária.
-4. **Conferência documental (2026-08-30):** existem 84 SPECs com status `aprovada-pi` no acervo local, incluindo a M16-F04 e as M7-F01–F04. Contagem por cabeçalho normalizado; quinze fatias dos MVPs 014–016 estão em Backlog.
-5. MVP-007 publicado: épico #179; M7-F01–F04 (#180–#183) aprovadas/Backlog; F05–F08 (#184–#187) Planejadas/a redigir. Próxima SPEC: M7-F05 (#184), adapter opcional do Graphify. Nenhuma implementação iniciada. MVP-017–MVP-018 ainda serão detalhados. O MVP-016 possui design, seis fatias e M16-F01–F04 aprovados; F05–F06 aguardam redação nas #167–#168, que permanecem Planejadas.
-6. **M4-F03 (UI da allowlist de diretórios) especificada e aprovada (2026-08-29)** — fechou a última fatia conhecida sem SPEC antes da V3. As cinco SPECs do MVP-014 também foram aprovadas e publicadas nas issues #150–#154.
-7. **Docker virou dependência dura do MVP-009** (sandbox do executor). Confirmar que a máquina de execução tem Docker antes daquele MVP entrar na fila.
-8. **Pipeline V2 publicada:** épicos #115/#121/#127/#133 e 20 fatias #116–#138, com os intervalos de épicos excluídos, estão no Backlog com sub-issues e dependências nativas. A publicação não altera o `next` atual.
-9. **Pipeline V3 publicada:** épicos #149/#155/#162 e 17 fatias, com parents e dependências reconciliados. Próxima SPEC da V3: M16-F05 (#167); fronteira com MVP-007 definida, sem ampliar sua fatia. O detalhamento da memória compartilhada segue em paralelo no planejamento. M15-F05 (#160) e M16-F06 (#168) mantêm `DESIGN-SYSTEM.md` e protótipos HTML antes da construção.
+1. Conservar `next` em #103 e a fila vigente. Corrigir #209 na execução correspondente; este planejamento não fecha a falha.
+2. Revisar as dez SPECs novas da V3, mantendo #167/#168 e as oito novas fatias em `proplan:planejado` até aceite exato.
+3. Antes das fatias visuais, anexar `DESIGN-SYSTEM.md` e HTML pelo fluxo já aprovado; texto de SPEC/template não substitui anexo do PI.
+4. M7-F05–F08 e demais fatias ainda não especificadas do Command Center seguem seus planejamentos próprios; não bloqueiam concluir a documentação V3.
+5. O relatório de fechamento do PR #189 documenta reconciliação, ordem técnica, issues e validação. Aprovações prévias são preservadas, não repetidas.
 
 ## Roadmap
 
-MVP-001 ✅ → MVP-002 ✅ → MVP-003 ✅ → MVP-004 → MVP-005 → MVP-006 → MVP-008 → MVP-009 → MVP-010 → MVP-011 → MVP-012 → MVP-013 → MVP-014 → MVP-015 → MVP-016. MVP-007 é paralelo/não bloqueante; MVP-014–015 e M16-F01–F04 estão em Backlog, aguardando dependências e fila; M16-F05–F06 estão Planejadas. MVP-017–MVP-018 têm apenas direção aprovada.
+Base entregue → MVP-009 restante → Command Center MVP-017 → MVP-018/MVP-019 → MVP-020 → MVP-021; Shell MVP-022 entra após MVP-009 conforme decisão vigente. MVP-010–016 seguem a prioridade já definida pelo PI, sem ultrapassar essa sequência por causa deste PR.
+
+V3: MVP-014 → MVP-015 → MVP-016; MVP-023 Blueprints depende de MVP-008; MVP-024 Portfólio depende de MVP-012/MVP-015. Ordem de apresentação 014, 015, 016, 023, 024 não cria dependência técnica entre Blueprints e Portfólio. MVP-007 permanece paralelo/não bloqueante.

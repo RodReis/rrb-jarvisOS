@@ -7,6 +7,13 @@ import { SafeStorageTokenVault } from './auth/token-vault'
 import { registerIpcHandlers } from './ipc/handlers'
 import { AiCallService } from './ai/call-provider'
 import { AnthropicAdapter } from './ai/anthropic-adapter'
+import { GeminiAdapter } from './ai/gemini-adapter'
+import { OllamaAdapter } from './ai/ollama-adapter'
+import { ClaudeCodeAdapter } from './ai/claude-code-adapter'
+import { RoutingService, SondaDeAdapters } from './ai/routing-service'
+import { RoutingRepository } from './ai/routing-repository'
+import { BudgetService } from './budget/budget-service'
+import { BudgetRepository } from './budget/budget-repository'
 import { AllowlistRepository } from './policy/allowlist-repository'
 import { canonicalize } from './policy/allowlist-canon'
 import { PolicyService } from './policy/policy-service'
@@ -20,7 +27,29 @@ import { ApprovalRepository } from './execution/approval-repository'
 import { RealFileSystemEngine } from './execution/real-filesystem-engine'
 import { TerminalEngine } from './execution/terminal-engine'
 import { CommandAllowlistRepository } from './policy/command-allowlist-repository'
+import { ProjectRepository } from './projects/project-repository'
+import { ProjectService } from './projects/project-service'
+import { DecisionRepository } from './projects/decision-repository'
+import { WizardService } from './projects/wizard-service'
+import { PacoteRepository } from './projects/pacote-repository'
+import { PacoteService } from './projects/pacote-service'
+import { AnexoRepository } from './projects/anexo-repository'
+import { AnexoService } from './projects/anexo-service'
+import { RoadmapRepository } from './projects/roadmap-repository'
+import { ExternalRefRepository } from './projects/external-ref-repository'
+import { PublicacaoService } from './projects/publicacao-service'
+import { RoadmapService } from './projects/roadmap-service'
+import { GitRunner } from './projects/git-runner'
+import { ContextRepository } from './context/context-repository'
+import { ContextService } from './context/context-service'
 import { CredentialService } from './credentials/credential-service'
+import { ConnectorRegistry } from './connectors/registry'
+import { ConnectorService } from './connectors/connector-service'
+import { CreditService } from './connectors/credit-service'
+import { GithubAdapter } from './connectors/github/github-adapter'
+import { TavilyAdapter } from './connectors/tavily/tavily-adapter'
+import { GithubAuthService } from './connectors/github/github-auth-service'
+import { CreditRepository } from './connectors/credit-repository'
 import { CredentialRepository } from './credentials/credential-repository'
 import { SafeStorageCipher } from './credentials/secret-vault'
 import { carregarEnv } from './env'
@@ -158,26 +187,229 @@ if (!app.requestSingleInstanceLock()) {
       userIdAtual
     )
 
+    // Projeto local e planejamento (SPEC-Planejamento-01). O `GitRunner` recebe o **terminal**,
+    // não um cliente de Git: é o que torna estruturalmente impossível existir um segundo
+    // caminho de escrita de repositório fora do enforcement do MVP-004 (decisão 2 do PI). Não
+    // há nada a injetar que permita contornar isso — só o terminal cabe no construtor.
+    const projectRepository = new ProjectRepository(storage.db)
+    // Uma instância só, compartilhada com a publicação (M9-F01): duas seriam dois objetos sobre o
+    // mesmo terminal — inofensivo hoje, mas sugeriria que existe mais de um caminho de Git.
+    const gitRunner = new GitRunner(terminal)
+    const projects = new ProjectService({
+      repository: projectRepository,
+      allowlist,
+      git: gitRunner,
+      audit: storage.audit,
+      userId: userIdAtual
+    })
+
+    // Contexto, skills e orçamento antes da IA (SPEC-Planejamento-02). Construído **antes** do
+    // ponto único porque é dependência dele, pela mesma razão do gate de orçamento: um
+    // `AiCallService` sem verificador de contexto seria a geração sem manifesto que o critério
+    // 1 proíbe.
+    //
+    // `skills` é uma **função que devolve lista vazia** nesta fatia, e isso não é lacuna: é o
+    // critério 5 sendo exercido no caminho real. Nenhuma skill está instalada, e todas as
+    // capacidades continuam atendidas pelo procedimento direto — se o gate dependesse da skill,
+    // o app estaria rodando agora sem ele. Quando houver registro de skills, é aqui que ele
+    // entra, sem tocar no serviço.
+    const contexts = new ContextService({
+      repository: new ContextRepository(storage.db),
+      projects: projectRepository,
+      audit: storage.audit,
+      userId: userIdAtual,
+      skills: () => []
+    })
+
+    // O wizard orientado (SPEC-Planejamento-03). Recebe o `ProjectService` para o autosave do
+    // rascunho: a trilha de decisões é dele, mas o `PlanningSession` continua sendo do projeto,
+    // e duplicar a escrita da sessão aqui criaria dois donos do mesmo registro.
+    //
+    // O catálogo não é injetado no boot: em produção é sempre o do contexto, e deixá-lo
+    // configurável daria ao chamador o poder de trocar as perguntas que o PI responde.
+    const wizard = new WizardService({
+      decisions: new DecisionRepository(storage.db),
+      projects: projectRepository,
+      projectService: projects,
+      audit: storage.audit,
+      userId: userIdAtual
+    })
+
     // Vault de credenciais (SPEC-Providers-01): a base do MVP-005. A cifra é a mesma do cofre
     // de tokens (`safeStorage`/DPAPI) e é construída **aqui**, no boot, e não sob demanda: se
     // o SO não oferece cifra, é melhor o app falhar cedo e visível do que na primeira vez que
     // o usuário tentar salvar uma chave.
-    const credentials = new CredentialService(
-      new CredentialRepository(storage.db, new SafeStorageCipher()),
-      storage.audit,
-      policy
-    )
+    const credentialRepository = new CredentialRepository(storage.db, new SafeStorageCipher())
+    const credentials = new CredentialService(credentialRepository, storage.audit, policy)
+
+    // Gate de orçamento (SPEC-Providers-03). Construído **antes** do ponto único porque é
+    // dependência dele: um `AiCallService` sem gate seria um caminho até o provider sem
+    // orçamento, que é exatamente o que o ponto único existe para não permitir.
+    const budget = new BudgetService(new BudgetRepository(storage.db), storage.audit)
 
     // Ponto único de chamada de IA (SPEC-Providers-02). Construído **depois** do vault porque
     // depende dele: nenhum adapter chama provider sem credencial, e o serviço a resolve por
     // escopo no instante da chamada. O mapa de adapters é onde a F04 acrescenta providers.
-    const ai = new AiCallService(
-      { anthropic: new AnthropicAdapter() },
-      credentials,
-      policy,
+    // Os quatro adapters (SPEC-Providers-04). O mapa é onde a F04 acrescentou os três novos —
+    // e o ponto de chamada não mudou por causa disso, que é o critério 1 da F02 valendo na
+    // prática. `ollama` e `claude-code` não recebem credencial: o primeiro fala com o
+    // `localhost`, o segundo usa a sessão do próprio CLI.
+    const ollamaAdapter = new OllamaAdapter()
+    const claudeCodeAdapter = new ClaudeCodeAdapter()
+    const adapters = {
+      anthropic: new AnthropicAdapter(),
+      gemini: new GeminiAdapter(),
+      ollama: ollamaAdapter,
+      'claude-code': claudeCodeAdapter
+    }
+
+    // Roteamento e healthcheck (SPEC-Providers-04). A sonda é montada aqui porque **cada
+    // provider responde a uma pergunta diferente**: os locais têm healthcheck próprio (o
+    // servidor pode não estar rodando), e os de nuvem estão indisponíveis para *este* usuário
+    // quando falta credencial — pingar a API para descobrir isso custaria uma requisição por
+    // checagem e responderia a pergunta errada.
+    const routingRepo = new RoutingRepository(storage.db)
+    const routing = new RoutingService(
+      routingRepo,
+      new SondaDeAdapters({
+        anthropic: async () =>
+          credentials.resolve(userIdAtual(), workspaces.atual(), 'anthropic') !== undefined,
+        gemini: async () =>
+          credentials.resolve(userIdAtual(), workspaces.atual(), 'gemini') !== undefined,
+        ollama: () => ollamaAdapter.disponivel(),
+        'claude-code': () => claudeCodeAdapter.disponivel()
+      }),
       storage.audit
     )
 
+    const ai = new AiCallService(
+      adapters,
+      credentials,
+      policy,
+      storage.audit,
+      budget,
+      routing,
+      contexts
+    )
+
+    // Ponto único de conectores (SPEC-Conectores-01). **Runtime separado** do ponto único de
+    // IA por decisão do PI (2026-08-29): compartilham o vault, a auditoria encadeada e o
+    // ledger de uso, e nada além disso — `ai` não aparece na construção abaixo.
+    //
+    // O registro nasce **vazio**, e é isso que a fatia entrega: os adapters concretos (GitHub
+    // na M6-F03/F04, Tavily na M6-F05/F06) se registram aqui quando existirem. Até lá, pedir
+    // por um conector conhecido devolve `connector-nao-registrado` — que é o critério 1
+    // valendo, não uma lacuna.
+    const connectorRegistry = new ConnectorRegistry()
+    // O primeiro adapter concreto (SPEC-Conectores-03): o limite que a F01 registrou
+    // ("nenhum adapter concreto existe") fecha aqui. `auth.identify` veio na F03; as nove
+    // capacidades idempotentes de automação, na F04.
+    connectorRegistry.register(new GithubAdapter())
+    // O segundo (SPEC-Conectores-05 e 06): pesquisa e extração de evidência. É o primeiro
+    // conector que **cobra** — e por isso o primeiro cujo `custoEstimado` faz o gate de créditos
+    // da F02 ter o que decidir.
+    connectorRegistry.register(new TavilyAdapter())
+
+    // O Device Flow (SPEC-Conectores-03). Lê e grava o **payload estruturado** no mesmo cofre
+    // das credenciais de IA, com `expires_at` fora da cifra e rotação atômica — a emenda ao
+    // Vault que o PI cravou como escopo desta fatia, sem reabrir a M5-F01.
+    const githubAuth = new GithubAuthService(
+      credentialRepository,
+      storage.audit,
+      // O override do `client_id` vem do perfil, não do cofre: não é segredo (é público por
+      // desenho no Device Flow), e guardá-lo cifrado o anunciaria como se fosse.
+      () => storage.profiles.findGithubClientId(userIdAtual())
+    )
+    // O gate de créditos (SPEC-Conectores-02). Construído **antes** do ponto único porque é
+    // dependência dele, como o `BudgetService` é do `AiCallService`: um `ConnectorService` sem
+    // gate seria um caminho até o conector sem teto.
+    //
+    // **Ledger separado do de USD** (decisão do PI): este conta créditos por conector, o
+    // `budget` conta dólares por espaço. Nenhum dos dois soma o outro.
+    const connectorCredits = new CreditService(new CreditRepository(storage.db), storage.audit)
+    const connectors = new ConnectorService(
+      connectorRegistry,
+      // A fonte de segredo de conector lê o **mesmo cofre** das credenciais de IA: a coluna
+      // `credential_ref.key` é texto e o índice único já endereça qualquer chave lógica. O que
+      // é separado são as taxonomias (`ConnectorCredentialKey` versus `CredentialKey`), e elas
+      // vivem nos tipos — um segundo cofre duplicaria cifra e migration por nada. O payload
+      // estruturado (access + refresh + `expires_at`) e a rotação atômica são a M6-F03.
+      {
+        // O GitHub tem caminho próprio: seu segredo é o **payload OAuth**, e entregá-lo cru ao
+        // adapter mandaria o JSON inteiro no header `Authorization`. `tokenParaUso` decifra,
+        // **renova quando está vencendo** (critério 5) e devolve só o access token. Os demais
+        // conectores seguem lendo o valor único, que é o formato deles.
+        resolve: async (userId, workspace, key) =>
+          key === 'github'
+            ? await githubAuth.tokenParaUso({ userId, workspace })
+            : credentialRepository.readSecret(userId, workspace, key)
+      },
+      policy,
+      storage.audit,
+      connectorCredits
+    )
+
+    // O pacote estrutural (SPEC-Planejamento-04). Recebe o `ConnectorService`, e **não** o
+    // `TavilyAdapter`: o gate de créditos vive dentro do `call()`, e um adapter injetado aqui
+    // seria o segundo caminho sem gate que o serviço de conectores existe para impedir.
+    const pacotes = new PacoteService({
+      repository: new PacoteRepository(storage.db),
+      projects: projectRepository,
+      projectService: projects,
+      decisions: new DecisionRepository(storage.db),
+      connectors,
+      audit: storage.audit,
+      userId: userIdAtual
+    })
+
+    // Os anexos de design e a arquitetura (SPEC-Planejamento-05). Recebe o `PacoteRepository`
+    // para ler a revisão do PRD que a arquitetura assume (critério 3) — e não o `PacoteService`:
+    // ele só precisa **ler** o pacote gerado, e depender do serviço lhe daria o poder de
+    // disparar a geração do PRD, que não é dele.
+    const anexos = new AnexoService({
+      repository: new AnexoRepository(storage.db),
+      projects: projectRepository,
+      projectService: projects,
+      decisions: new DecisionRepository(storage.db),
+      pacotes: new PacoteRepository(storage.db),
+      audit: storage.audit,
+      userId: userIdAtual
+    })
+
+    // O roadmap e os gates (SPEC-Planejamento-06).
+    //
+    // `identidade` é o usuário **autenticado**, e não o `userIdAtual`: sem sessão o gate falha
+    // fechado (decisão cravada da spec), e `userIdAtual` cai no usuário local — que existe
+    // sempre e faria toda aprovação passar como se houvesse alguém logado. A distinção é o
+    // critério 4: a aprovação registra *quem* aceitou, e "o usuário local" não é ninguém.
+    const roadmapRepository = new RoadmapRepository(storage.db)
+    const roadmap = new RoadmapService({
+      repository: roadmapRepository,
+      projects: projectRepository,
+      projectService: projects,
+      decisions: new DecisionRepository(storage.db),
+      pacotes: new PacoteRepository(storage.db),
+      anexos,
+      audit: storage.audit,
+      userId: userIdAtual,
+      identidade: () => auth?.usuarioAtual()?.id
+    })
+
+    // Publicação no GitHub (SPEC-Entrega-01). Recebe o `ConnectorService`, **não** o
+    // `GithubAdapter`: o gate de créditos, a policy e a auditoria vivem dentro do `call()`, e um
+    // adapter injetado aqui seria o segundo caminho sem gate — o mesmo erro que o `GitRunner`
+    // impede do lado do Git. O `token` é só para o push, que o terminal controlado não consegue
+    // autenticar por ambiente; o conector resolve o dele por dentro.
+    const publicacao = new PublicacaoService({
+      projects: projectRepository,
+      roadmap: roadmapRepository,
+      refs: new ExternalRefRepository(storage.db),
+      git: gitRunner,
+      connectors,
+      audit: storage.audit,
+      userId: userIdAtual,
+      token: async (userId, workspace) => await githubAuth.tokenParaUso({ userId, workspace })
+    })
     registerIpcHandlers({
       audit: storage.audit,
       workspaces,
@@ -189,8 +421,22 @@ if (!app.requestSingleInstanceLock()) {
       realExecution,
       terminal,
       commandAllowlist,
+      projects,
+      contexts,
+      wizard,
+      pacotes,
+      anexos,
+      roadmap,
+      publicacao,
       credentials,
       ai,
+      budget,
+      routing,
+      routingRepo,
+      connectors,
+      connectorCredits,
+      githubAuth,
+      profiles: storage.profiles,
       runs,
       approvals,
       userId: userIdAtual,

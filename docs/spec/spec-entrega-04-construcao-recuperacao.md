@@ -2,7 +2,7 @@
 
 - MVP/Fatia: MVP-009 · M9-F04.
 - Issue: [#104](https://github.com/RodReis/rrb-jarvisOS/issues/104).
-- Status: **aprovada-pi** (2026-08-29) — local de execução (container) e acesso a documentação técnica resolvidos pelo PI nesta data.
+- Status: **aprovada-pi** (2026-08-29) — local de execução (container) e acesso a documentação técnica resolvidos pelo PI nesta data. **Emenda 2026-08-30:** chamadas ao modelo saem pelo **proxy no host** (M9-F03); validações disparadas pelo app rodam no container; revisão é feita pelo executor (ver § Emendas).
 - Depende de: M9-F03 e adapter Claude Code do MVP-005.
 
 ## Objetivo
@@ -43,7 +43,11 @@ SPEC/hashes aprovados, ContextPack, paths permitidos, comandos de validação, `
 7. Falha terminal contém ação mínima de retomada.
 8. **Execução é containerizada:** o adapter só inicia o executor com o container pronto e o worktree montado. Teste comprova que sem container não há execução.
 9. **Uso da rota de assinatura é registrado sem valor monetário** (emenda da SPEC-Providers-03); atribuição por tentativa continua obrigatória. Teste.
-10. Rota de assinatura é `subscription_limited`: quota desconhecida não vira saldo infinito; rate limit tenta somente fallback já autorizado ou termina em espera/bloqueio explicável.
+10. **Toda chamada ao modelo feita pelo executor passa pelo proxy do host** e chega ao `AiCallService` com `runId`/`attemptId`; o gate de orçamento do MVP-005 barra a tentativa que estouraria **antes** de ela sair. Teste com servidor que conta requisições.
+11. **`test/lint/type/build` disparados pelo app rodam no container**, nunca no host. Teste comprova que o adapter não tem caminho de execução de validação no host.
+12. **Rota de assinatura é `subscription_limited`** (emenda aprovada pelo PI em 2026-08-30): quota desconhecida **não** vira saldo infinito. O ledger registra chamadas, tokens, tempo e — quando a origem os expõe — estado de quota e reset. Rate limit tenta somente fallback já autorizado ou termina em espera/bloqueio explicável, nunca em tentativa cega. Teste.
+
+> **Dependência declarada.** O MVP-005 entregou a rota de assinatura como `unmetered` (`isRotaUnmetered`, `estimado_usd` NULL) — registro sem valor monetário, **sem noção de quota**. O critério 12 exige o estado de quota, que é código novo na camada de providers. Ele **não** foi emendado retroativamente na `spec-providers-03/04` (fatias finalizadas): entra como pré-requisito desta fatia ou como `[FIX]` próprio no MVP-005, o que vier primeiro. Enquanto não existir, o critério 12 é o que impede esta fatia de ser declarada pronta.
 
 ## Testes e evidência
 
@@ -59,4 +63,9 @@ Adapter fake nas suítes comuns; fixtures de timeout/cancelamento/falha repetida
 - **O agente não fala com o GitHub.** Efeito remoto é do app (M9-F01/M9-F05); o container não recebe token.
 - **Três tentativas contam o run inteiro** (inicial + duas), não por etapa — já é regra, cravado para não virar "três por fase".
 - **Escolha técnica reversível dentro da SPEC é autônoma e registrada**; requisito de produto ausente **nunca** é inferido (invariante 9 da CONVENTION §4).
-- **Adapter consumido:** a construção usa `CodingExecutorAdapter`; Claude é a implementação V1 e Codex entra no MVP-010 sem alterar esta orquestração.
+- **Revisão (M9-F05) é uma invocação do mesmo executor, no mesmo container, com `REVIEW.md` e o diff como entrada** — não existe revisor independente no MVP-009 (isso é a M11-F04). A invocação de revisão **consome orçamento** e é atribuída ao run, mas **não consome tentativa**; só a correção que ela dispara consome.
+
+## Emendas (2026-08-30) — revisão de furos de spec
+
+1. Critérios 10 e 11 fecham dois buracos herdados da M9-F03: sem proxy o executor não tinha como chamar modelo; sem validação no container, o app rodaria no host o código que o agente acabou de escrever.
+2. A revisão não dizia quem revisa nem o que ela custa — cravado acima (Cowork, PI pode vetar).

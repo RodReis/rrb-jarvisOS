@@ -1,4 +1,13 @@
 import { mkdtempSync, rmSync } from 'node:fs'
+/**
+ * **Nota da M8-F02:** as chamadas desta suíte declaram `diagnostico: true`.
+ *
+ * Não é atalho para escapar do gate do critério 1 ("nenhuma geração sem ContextPack"): é o que
+ * elas de fato **são**. O que se prova aqui é o comportamento do ponto único — stream, gate de
+ * orçamento, roteamento —, sem projeto e sem manifesto envolvidos, que é exatamente o caso do
+ * painel de diagnóstico do Settings. O gate em si tem prova própria, com o contrafactual, em
+ * `contexto-orcamento.e2e.ts`.
+ */
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createServer, type Server } from 'node:http'
@@ -175,7 +184,10 @@ test('a chamada de IA percorre preload → main → adapter e volta em chunks', 
           resolve({ texto, fim: evento })
         })
 
-        void bridge.callAi({ provider: 'anthropic', prompt: 'qual a capital da Franca' }, 'jarvis')
+        void bridge.callAi(
+          { provider: 'anthropic', prompt: 'qual a capital da Franca', diagnostico: true },
+          'jarvis'
+        )
       }
     )
   })
@@ -224,7 +236,7 @@ test('sem credencial, a chamada falha com instrução — e o app continua de p�
       })
       // O NOA não tem credencial: o `.env` do vault não tem escopo por espaço, mas o
       // `resolve` do serviço lê o vault do espaço primeiro — e no NOA ele está vazio.
-      void bridge.callAi({ provider: 'anthropic', prompt: 'oi' }, 'noa')
+      void bridge.callAi({ provider: 'anthropic', prompt: 'oi', diagnostico: true }, 'noa')
     })
   })
 

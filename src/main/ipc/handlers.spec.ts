@@ -6,6 +6,7 @@ import { buildAppInfo, registerIpcHandlers, type IpcDependencies } from './handl
 const handle = vi.fn()
 const on = vi.fn()
 const writeLog = vi.fn()
+const showOpenDialog = vi.fn()
 const logIpc = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 
 vi.mock('electron', () => ({
@@ -17,6 +18,11 @@ vi.mock('electron', () => ({
   ipcMain: {
     handle: (...args: unknown[]) => handle(...args),
     on: (...args: unknown[]) => on(...args)
+  },
+  // O seletor nativo de pasta (SPEC-ExecucaoReal-03) é dublado: o que interessa é o que o
+  // handler faz com a escolha e com o cancelamento, não o diálogo do sistema operacional.
+  dialog: {
+    showOpenDialog: (...args: unknown[]) => showOpenDialog(...args)
   }
 }))
 
@@ -63,7 +69,8 @@ const policy = {
 const allowlist = {
   list: vi.fn(() => ['/app/userData']),
   add: vi.fn(() => ({ path: '/app/userData/x', added: true })),
-  remove: vi.fn(() => ({ path: '/app/userData/x', removed: true }))
+  remove: vi.fn(() => ({ path: '/app/userData/x', removed: true })),
+  appDirectory: vi.fn(() => '/app/userData')
 }
 
 const workflows = {
@@ -149,8 +156,26 @@ const preferences = {
   }))
 }
 
+/**
+ * O ponto único de IA, dublado. Guarda o `AiRequest` que o handler montou — é isso que o teste
+ * de regressão abaixo inspeciona.
+ *
+ * O stream devolve **um** evento `fim` porque o handler consome o primeiro para descobrir o id;
+ * um iterável vazio faria o handler devolver `undefined` e o teste passaria sem nunca ter
+ * exercitado a montagem do pedido.
+ */
+const ai = {
+  recebido: undefined as Record<string, unknown> | undefined,
+  call: vi.fn(async function* (request: Record<string, unknown>) {
+    ai.recebido = request
+    yield { tipo: 'fim', id: 'chamada-1', estado: 'concluido' }
+  }),
+  cancel: vi.fn()
+}
+
 const deps = {
   audit,
+  ai,
   workspaces,
   preferences,
   policy,
@@ -178,6 +203,19 @@ function invocar(canal: string, ...args: unknown[]): unknown {
   return fn({}, ...args)
 }
 
+/**
+ * Como `invocar`, mas com um `event` que tem `sender` — o canal de IA bombeia os eventos do
+ * stream por ele, e um `{}` vazio derrubaria o bombeamento em vez de exercitar o handler.
+ */
+async function invocarComEvento(canal: string, ...args: unknown[]): Promise<unknown> {
+  registerIpcHandlers(deps)
+  const fn = handle.mock.calls.find(([c]) => c === canal)?.[1] as (
+    evento: unknown,
+    ...rest: unknown[]
+  ) => unknown
+  return await fn({ sender: { isDestroyed: () => false, send: vi.fn() } }, ...args)
+}
+
 /** Recupera o ouvinte de um canal só de ida e o dispara, como o Electron faria. */
 function emitir(canal: string, payload?: unknown): void {
   registerIpcHandlers(deps)
@@ -198,6 +236,8 @@ beforeEach(() => {
   allowlist.list.mockClear()
   allowlist.add.mockClear()
   allowlist.remove.mockClear()
+  allowlist.appDirectory.mockClear()
+  showOpenDialog.mockReset()
   policy.classify.mockClear()
   workflows.listWorkflows.mockClear()
   workflows.createWorkflow.mockClear()
@@ -406,6 +446,45 @@ describe('canais da allowlist (SPEC-Execucao-03)', () => {
     invocar(IPC_CHANNELS.allowlistAdd, { malicioso: true })
     expect(allowlist.add).not.toHaveBeenCalled()
   })
+
+  // SPEC-ExecucaoReal-03: o seletor nativo e a identidade do `appDir`.
+  it('o seletor abre o diálogo de pasta no main e adiciona a escolha', async () => {
+    showOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/home/user/projeto'] })
+
+    await invocar(IPC_CHANNELS.allowlistPick)
+
+    // `openDirectory` é o que faz o diálogo escolher pasta e não arquivo — sem ele o
+    // usuário selecionaria um arquivo e permitiria o diretório errado.
+    expect(showOpenDialog).toHaveBeenCalledWith(
+      expect.objectContaining({ properties: ['openDirectory'] })
+    )
+    expect(allowlist.add).toHaveBeenCalledWith('local', '/home/user/projeto')
+  })
+
+  it('cancelar o seletor não toca a allowlist (critério 3)', async () => {
+    showOpenDialog.mockResolvedValue({ canceled: true, filePaths: [] })
+
+    const lista = await invocar(IPC_CHANNELS.allowlistPick)
+
+    // Nada adicionado significa nada auditado: o `AuditEvent` nasce dentro do `add`.
+    expect(allowlist.add).not.toHaveBeenCalled()
+    // Ainda assim devolve a lista, para a UI não precisar de um segundo round-trip.
+    expect(lista).toEqual(['/app/userData'])
+  })
+
+  it('diálogo confirmado sem path não adiciona nada', async () => {
+    // `canceled: false` com `filePaths` vazio é o caso que uma leitura só do `canceled`
+    // erraria — passaria `undefined` adiante como se fosse um diretório escolhido.
+    showOpenDialog.mockResolvedValue({ canceled: false, filePaths: [] })
+
+    await invocar(IPC_CHANNELS.allowlistPick)
+
+    expect(allowlist.add).not.toHaveBeenCalled()
+  })
+
+  it('devolve o diretório do app para a UI marcá-lo como fixo (critério 4)', () => {
+    expect(invocar(IPC_CHANNELS.allowlistAppDir)).toBe('/app/userData')
+  })
 })
 
 describe('canais de workflows/automações (SPEC-Execucao-04)', () => {
@@ -546,5 +625,45 @@ describe('canais do terminal controlado (SPEC-ExecucaoReal-02)', () => {
   it('ignora workspace inválido sem tocar a allowlist de comandos', () => {
     expect(invocar(IPC_CHANNELS.commandAllowlistAdd, 'git', 'inexistente')).toEqual([])
     expect(commandAllowlist.add).not.toHaveBeenCalled()
+  })
+
+  /**
+   * O handler **reconstrói** o `AiRequest` campo a campo, e é por isso que este teste existe:
+   * um campo novo que ninguém copie ali some em silêncio no caminho até o ponto único.
+   *
+   * Não é hipótese. O E2E da M8-F02 pegou exatamente isso — `contextPackId` era descartado
+   * aqui, e toda chamada vinda da UI chegava ao gate sem manifesto e era recusada por falta de
+   * contexto, inclusive as que o declaravam. O gate estava certo; o transporte é que perdia o
+   * campo, e nenhum teste unitário do serviço veria isso porque o serviço recebia o pedido já
+   * montado.
+   */
+  it('repassa `contextPackId` e `diagnostico` ao ponto único (SPEC-Planejamento-02)', async () => {
+    await invocarComEvento(
+      IPC_CHANNELS.aiCall,
+      { provider: 'anthropic', prompt: 'oi', contextPackId: 'pack-1' },
+      'jarvis'
+    )
+
+    expect(ai.recebido).toMatchObject({ prompt: 'oi', contextPackId: 'pack-1' })
+  })
+
+  it('só marca `diagnostico` quando ele vem literalmente `true`', async () => {
+    // Qualquer outro valor não vira diagnóstico: fosse truthy, uma string qualquer abriria a
+    // única exceção do critério 1 por acidente.
+    await invocarComEvento(
+      IPC_CHANNELS.aiCall,
+      { provider: 'anthropic', prompt: 'oi', diagnostico: 'sim' },
+      'jarvis'
+    )
+
+    expect(ai.recebido?.['diagnostico']).toBeUndefined()
+
+    await invocarComEvento(
+      IPC_CHANNELS.aiCall,
+      { provider: 'anthropic', prompt: 'oi', diagnostico: true },
+      'jarvis'
+    )
+
+    expect(ai.recebido?.['diagnostico']).toBe(true)
   })
 })

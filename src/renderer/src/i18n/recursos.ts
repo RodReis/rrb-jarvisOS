@@ -49,6 +49,7 @@ export const RECURSOS = {
         notas: 'Notas',
         agenda: 'Agenda',
         operacoes: 'Operações',
+        projetos: 'Projetos',
         terminal: 'Terminal',
         agentes: 'Agentes',
         settings: 'Configurações'
@@ -73,8 +74,215 @@ export const RECURSOS = {
         de: 'Conteúdo de {{rota}}',
         placeholder: 'Conteúdo placeholder — os módulos entram em fatias futuras.'
       },
+      // Projetos locais (SPEC-Planejamento-01). Sem nenhum rótulo de Git: a tela não expõe
+      // comando, e um texto de "inicializar repositório" anunciaria um controle que não existe.
+      projetos: {
+        titulo: 'Projetos locais',
+        descricao:
+          'Crie ou importe um projeto. O Git local é inicializado automaticamente; nada é publicado.',
+        nome: 'Nome do projeto',
+        nomePlaceholder: 'Ex.: Análise de Mercado',
+        nomeAjuda: 'Vira o nome da pasta do projeto, sem acentos nem espaços.',
+        criar: 'Criar projeto',
+        importar: 'Importar pasta',
+        carregando: 'Carregando projetos…',
+        vazio: 'Nenhum projeto ainda',
+        vazioDescricao: 'Crie um projeto novo ou importe uma pasta existente para começar.',
+        criado: 'Criado',
+        importado: 'Importado',
+        renomear: 'Renomear',
+        renomearDe: 'Renomear {{nome}}',
+        salvar: 'Salvar',
+        cancelar: 'Cancelar',
+        remover: 'Remover',
+        removerDe: 'Remover {{nome}} da lista',
+        confirmar: 'Remover da lista',
+        // Diz o que **de fato** acontece. Um "tem certeza?" genérico faria o usuário supor a
+        // perda dos arquivos e desistir de uma ação que é reversível por reimportação.
+        removerAviso: 'Sai da lista; a pasta e o histórico Git continuam no disco.',
+        permitirGit: 'Permitir `git` e criar',
+        // Diz o que o clique faz: é permissão de alto risco, auditada. O usuário merece saber
+        // disso antes, não depois.
+        permitirGitAviso: 'Ação de alto risco: registra o comando na lista permitida deste espaço.',
+        // O painel de contexto (SPEC-Planejamento-02), aninhado no projeto porque é dele que
+        // o contexto é: um `contexto.*` de topo sugeriria uma tela própria que não existe.
+        contexto: 'Contexto do projeto',
+        contextoFechar: 'Fechar contexto',
+        contextoAbrir: 'Abrir contexto de {{nome}}',
+        planejar: 'Planejar',
+        planejarDe: 'Planejar {{nome}}'
+      },
+      roadmap: {
+        titulo: 'Roadmap e aprovações',
+        descricao:
+          'Os MVPs de {{nome}}, compostos das decisões e das jornadas prototipadas. Gerar propõe; aprovar é seu.',
+        carregando: 'Carregando o roadmap…',
+        gerar: 'Gerar roadmap',
+        regerar: 'Regerar roadmap',
+        mvps: '{{count}} MVPs propostos',
+        estado: {
+          proposto: 'Proposto',
+          'na-fila': 'Na fila',
+          concluido: 'Concluído'
+        },
+        dependeDe: 'Depende de: {{lista}}.',
+        detalhada: 'SPEC detalhada',
+        gates: 'Centro de aprovações',
+        gate: {
+          PROJECT_PACKAGE: 'O pacote do projeto: PRD, arquitetura e os anexos de design.',
+          MVP_ENTRY: 'A revisão do MVP que entra na fila de execução.',
+          SLICE_ENTRY: 'A revisão da SPEC a executar.'
+        },
+        aprovado: 'Aprovado',
+        pendente: 'Aguardando aceite',
+        aprovar: 'Aprovar',
+        semRevisoes: 'Nada a aprovar ainda neste gate.',
+        aprovadoPor: 'Aprovado por {{identidade}}.',
+        hashCompleto: 'Hash completo: {{hash}}'
+      },
+      anexos: {
+        titulo: 'Anexos de design',
+        descricao:
+          'O design system e os protótipos de {{nome}}. A arquitetura só é gerada depois que eles chegam — anexar é um ato seu, e é ele que conta.',
+        carregando: 'Carregando anexos…',
+        tipo: {
+          'design-system': 'DESIGN-SYSTEM.md',
+          prototipo: 'Protótipo HTML',
+          asset: 'Asset'
+        },
+        anexado: 'Anexado',
+        pendente: 'Pendente',
+        anexar: 'Anexar',
+        substituir: 'Substituir',
+        remover: 'Remover',
+        removerAnexo: 'Remover {{caminho}}',
+        assets: 'Assets referenciados pelos protótipos',
+        adicionarAsset: 'Adicionar asset',
+        semAssets: 'Nenhum asset anexado. Anexe os que seus protótipos referenciam.',
+        gateAberto: 'Os anexos estão completos. A arquitetura pode ser gerada.',
+        gateFechado: 'Falta anexar: {{lista}}.',
+        validar: 'Validar protótipos',
+        gerarArquitetura: 'Gerar arquitetura',
+        pendencias: 'Faltam: {{lista}}.',
+        validacaoLimpa: 'Os protótipos não apresentaram problemas.',
+        impede: 'Impede a arquitetura',
+        recomendacao: 'Recomendação: {{texto}}',
+        revisao: 'Última arquitetura de {{count}}',
+        semCommit: 'Sem commit',
+        commitCompleto: 'Commit completo: {{hash}}',
+        afirmacoes: '{{count}} afirmações',
+        hashCompleto: 'Hash completo: {{hash}}'
+      },
+      pacote: {
+        titulo: 'Pacote estrutural',
+        descricao:
+          'PRD, Landscape e Convention de {{nome}}, compostos das decisões do planejamento e das fontes pesquisadas.',
+        consulta: 'Pesquisa de mercado',
+        consultaPlaceholder: 'Ex.: alternativas a gestores de tarefas locais',
+        consultaAjuda:
+          'O termo que busca concorrentes e alternativas. Em branco, o Landscape sai sem cenário e declara isso.',
+        gerar: 'Gerar pacote',
+        carregando: 'Carregando revisões…',
+        vazio: 'Nenhuma revisão gerada ainda.',
+        pendencias: 'Faltam: {{lista}}.',
+        revisao: 'Última revisão de {{count}}',
+        semCommit: 'Sem commit',
+        commitCompleto: 'Commit completo: {{hash}}',
+        afirmacoes: '{{count}} afirmações',
+        hashCompleto: 'Hash completo: {{hash}}',
+        bloqueio: {
+          causa: 'Causa',
+          evidencia: 'Evidência',
+          tentativas: 'Tentativas',
+          porQueNaoSeguir: 'Por que não seguir',
+          retomada: 'Como retomar'
+        }
+      },
+      wizard: {
+        titulo: 'Planejamento de {{nome}}',
+        descricao:
+          'Uma decisão por vez. A recomendação vem primeiro, mas a escolha é sua — e cada opção diz o que custa.',
+        carregando: 'Carregando o planejamento…',
+        indisponivel: 'Não foi possível abrir o planejamento deste projeto.',
+        fechar: 'Fechar',
+        restantes: '{{count}} restantes',
+        recomendada: 'Recomendada',
+        porque: 'Por quê: {{justificativa}}',
+        textoLivre: 'Outra resposta',
+        textoLivrePlaceholder: 'Descreva a sua escolha, se nenhuma opção servir',
+        decidePorMim: 'Decide por mim',
+        confirmar: 'Confirmar',
+        contradicaoTitulo: 'Esta resposta muda decisões já tomadas',
+        contradicaoItem: '{{pergunta}} — decidido antes: {{anterior}}',
+        contradicaoManter: 'Manter como está',
+        contradicaoSubstituir: 'Substituir',
+        resumo: 'Decisões',
+        jaDecidido: 'Já decidido',
+        resumoItem: '{{pergunta}}: {{escolha}}',
+        autorPi: 'Você',
+        autorAgente: 'Delegado'
+      },
+      contexto: {
+        titulo: 'Contexto, skills e orçamento',
+        descricao:
+          'Monte o contexto antes de gerar. O manifesto registra quais revisões foram enviadas, sob qual teto e por qual rota.',
+        tarefa: 'Tarefa ou SPEC',
+        tarefaPlaceholder: 'Ex.: SPEC-Planejamento-02',
+        tarefaAjuda: 'O que esta geração precisa resolver. Vai para o manifesto.',
+        arquivos: 'Arquivos do contexto',
+        arquivosPlaceholder: 'docs/PRD.md',
+        arquivosAjuda:
+          'Caminhos relativos ao projeto, um por linha. Curinga (*) conta como leitura ampla e exige motivo.',
+        excecao: 'Motivo da leitura ampla',
+        excecaoPlaceholder: 'Ex.: regressão sem localização conhecida',
+        excecaoAjuda: 'Fica registrado no manifesto. Leitura ampla sem motivo é recusada.',
+        motivoPadrao: 'selecionado na tela',
+        montar: 'Montar contexto',
+        carregando: 'Carregando contexto…',
+        vazio: 'Nenhum contexto montado',
+        vazioDescricao: 'Selecione os arquivos da tarefa e monte o contexto antes de gerar.',
+        manifesto: 'Último manifesto',
+        hashDoPack: 'pack {{hash}}',
+        hashCompleto: 'Hash completo: {{hash}}',
+        colunaArquivo: 'Arquivo',
+        colunaOrigem: 'Origem',
+        colunaHash: 'Revisão',
+        colunaBytes: 'Bytes',
+        legendaTabela: 'Arquivos enviados no contexto de {{tarefa}}',
+        origem: {
+          explicito: 'Explícito',
+          'busca-estrutural': 'Busca',
+          'leitura-ampla': 'Ampla',
+          'decisao-aprovada': 'Decisão',
+          'evidencia-externa': 'Evidência'
+        },
+        tokensDaEtapa: 'Tokens desta etapa',
+        tokensDe: '{{usados}} de {{teto}}',
+        // A rota de assinatura não tem custo por chamada: dizer "US$ 0,00" aqui afirmaria que
+        // a chamada foi de graça, quando o fato é que esta rota não cobra por chamada.
+        rotaSemCusto:
+          'Rota {{rota}}: registra uso (chamadas, tokens e tempo), sem custo por chamada.',
+        rotaComCusto: 'Rota {{rota}}: {{valor}} estimados para esta etapa.',
+        expansao: 'Teto expandido: {{motivo}}',
+        excecaoRegistrada: 'Exceção de leitura ampla',
+        tetoDaExcecao: 'Teto autorizado: {{bytes}} bytes',
+        falhasAbertas: 'Falhas em aberto',
+        ocorrencias: '{{total}} ocorrência(s)',
+        resolver: 'Marcar resolvida',
+        resolverDe: 'Marcar resolvida: {{resumo}}',
+        capacidades: 'Como o fluxo aplica cada disciplina',
+        meioSkill: 'Skill',
+        meioDireto: 'Direto',
+        erroInesperado: 'Não foi possível montar o contexto. Tente novamente.'
+      },
       settings: {
         titulo: 'Configurações',
+        // As cinco abas (decisão do PI, 2026-08-30). Nomes curtos: são régua, não frase.
+        abaGeral: 'Geral',
+        abaPermissoes: 'Permissões',
+        abaIa: 'IA',
+        abaRoteamento: 'Roteamento',
+        abaConectores: 'Conectores',
         idioma: 'Idioma',
         idiomaDescricao: 'Aplica imediatamente, sem reiniciar.',
         tema: 'Tema',
@@ -84,7 +292,30 @@ export const RECURSOS = {
         temaSistema: 'Sistema',
         acento: 'Acento',
         acentoDescricao: 'A cor de destaque de cada espaço. A mesma escolha da tela de entrada.',
-        salvo: 'Preferências salvas.'
+        salvo: 'Preferências salvas.',
+        // Diretórios permitidos (SPEC-ExecucaoReal-03). O texto diz o que a permissão
+        // alcança — filesystem **e** terminal — porque a lista governa os dois, e o usuário
+        // que a lesse como "pastas do explorador" subestimaria o que está autorizando.
+        diretorios: 'Diretórios permitidos',
+        diretoriosDescricao:
+          'As pastas que o aplicativo pode ler, escrever e usar como diretório de trabalho no terminal. Nada fora desta lista é alcançável.',
+        diretoriosAdicionar: 'Permitir uma pasta…',
+        diretoriosRemover: 'Remover',
+        diretoriosRemoverDe: 'Remover {{caminho}}',
+        diretoriosFixo: 'Fixo',
+        diretoriosFixoMotivo:
+          'A pasta do aplicativo é permitida por construção e não pode ser removida.',
+        diretoriosCarregando: 'Carregando os diretórios permitidos…',
+        diretoriosVazio: 'Só a pasta do aplicativo está permitida',
+        diretoriosVazioDescricao:
+          'Permita uma pasta para o aplicativo poder trabalhar nela — sem isso, o terminal recusa qualquer diretório de trabalho fora da pasta do app.',
+        diretoriosErro: 'Não foi possível ler os diretórios permitidos',
+        // Diz **o que fazer**, não só que falhou (PRD §14). Sem a lista, permitir ou remover
+        // pasta agiria às cegas — daí a instrução ser reabrir, e não "tente de novo".
+        diretoriosErroDescricao:
+          'Feche e reabra as configurações. Enquanto a lista não carregar, não é possível permitir nem remover pastas com segurança.',
+        diretoriosErroAdicionar: 'Não foi possível permitir essa pasta.',
+        diretoriosErroRemover: 'Não foi possível remover essa pasta.'
       },
       auth: {
         titulo: 'JARVIS OS',
@@ -177,6 +408,7 @@ export const RECURSOS = {
         notas: 'Notes',
         agenda: 'Calendar',
         operacoes: 'Operations',
+        projetos: 'Projects',
         terminal: 'Terminal',
         agentes: 'Agents',
         settings: 'Settings'
@@ -198,8 +430,203 @@ export const RECURSOS = {
         de: '{{rota}} content',
         placeholder: 'Placeholder content — modules arrive in later slices.'
       },
+      projetos: {
+        titulo: 'Local projects',
+        descricao:
+          'Create or import a project. Local Git is initialized automatically; nothing is published.',
+        nome: 'Project name',
+        nomePlaceholder: 'e.g. Market Analysis',
+        nomeAjuda: 'Becomes the project folder name, without accents or spaces.',
+        criar: 'Create project',
+        importar: 'Import folder',
+        carregando: 'Loading projects…',
+        vazio: 'No projects yet',
+        vazioDescricao: 'Create a new project or import an existing folder to get started.',
+        criado: 'Created',
+        importado: 'Imported',
+        renomear: 'Rename',
+        renomearDe: 'Rename {{nome}}',
+        salvar: 'Save',
+        cancelar: 'Cancel',
+        remover: 'Remove',
+        removerDe: 'Remove {{nome}} from the list',
+        confirmar: 'Remove from list',
+        removerAviso: 'Removed from the list; folder and Git history stay on disk.',
+        permitirGit: 'Allow `git` and create',
+        permitirGitAviso: 'High-risk action: records the command in this space allowed list.',
+        contexto: 'Project context',
+        contextoFechar: 'Close context',
+        contextoAbrir: 'Open context for {{nome}}',
+        planejar: 'Plan',
+        planejarDe: 'Plan {{nome}}'
+      },
+      roadmap: {
+        titulo: 'Roadmap and approvals',
+        descricao:
+          'The MVPs for {{nome}}, composed from decisions and prototyped journeys. Generating proposes; approving is yours.',
+        carregando: 'Loading the roadmap…',
+        gerar: 'Generate roadmap',
+        regerar: 'Regenerate roadmap',
+        mvps: '{{count}} proposed MVPs',
+        estado: {
+          proposto: 'Proposed',
+          'na-fila': 'Queued',
+          concluido: 'Done'
+        },
+        dependeDe: 'Depends on: {{lista}}.',
+        detalhada: 'Detailed SPEC',
+        gates: 'Approval center',
+        gate: {
+          PROJECT_PACKAGE: 'The project package: PRD, architecture and the design attachments.',
+          MVP_ENTRY: 'The revision of the MVP entering the execution queue.',
+          SLICE_ENTRY: 'The revision of the SPEC to execute.'
+        },
+        aprovado: 'Approved',
+        pendente: 'Awaiting approval',
+        aprovar: 'Approve',
+        semRevisoes: 'Nothing to approve in this gate yet.',
+        aprovadoPor: 'Approved by {{identidade}}.',
+        hashCompleto: 'Full hash: {{hash}}'
+      },
+      anexos: {
+        titulo: 'Design attachments',
+        descricao:
+          'The design system and prototypes for {{nome}}. Architecture is only generated once they arrive — attaching is your act, and it is what counts.',
+        carregando: 'Loading attachments…',
+        tipo: {
+          'design-system': 'DESIGN-SYSTEM.md',
+          prototipo: 'HTML prototype',
+          asset: 'Asset'
+        },
+        anexado: 'Attached',
+        pendente: 'Pending',
+        anexar: 'Attach',
+        substituir: 'Replace',
+        remover: 'Remove',
+        removerAnexo: 'Remove {{caminho}}',
+        assets: 'Assets referenced by the prototypes',
+        adicionarAsset: 'Add asset',
+        semAssets: 'No assets attached. Attach the ones your prototypes reference.',
+        gateAberto: 'Attachments are complete. Architecture can be generated.',
+        gateFechado: 'Still to attach: {{lista}}.',
+        validar: 'Validate prototypes',
+        gerarArquitetura: 'Generate architecture',
+        pendencias: 'Missing: {{lista}}.',
+        validacaoLimpa: 'The prototypes raised no issues.',
+        impede: 'Blocks architecture',
+        recomendacao: 'Recommendation: {{texto}}',
+        revisao: 'Latest architecture of {{count}}',
+        semCommit: 'No commit',
+        commitCompleto: 'Full commit: {{hash}}',
+        afirmacoes: '{{count}} statements',
+        hashCompleto: 'Full hash: {{hash}}'
+      },
+      pacote: {
+        titulo: 'Structural package',
+        descricao:
+          'PRD, Landscape and Convention for {{nome}}, composed from planning decisions and researched sources.',
+        consulta: 'Market research',
+        consultaPlaceholder: 'e.g. alternatives to local task managers',
+        consultaAjuda:
+          'The term used to find competitors and alternatives. Left blank, the Landscape ships without a scenario and says so.',
+        gerar: 'Generate package',
+        carregando: 'Loading revisions…',
+        vazio: 'No revision generated yet.',
+        pendencias: 'Missing: {{lista}}.',
+        revisao: 'Latest revision of {{count}}',
+        semCommit: 'No commit',
+        commitCompleto: 'Full commit: {{hash}}',
+        afirmacoes: '{{count}} statements',
+        hashCompleto: 'Full hash: {{hash}}',
+        bloqueio: {
+          causa: 'Cause',
+          evidencia: 'Evidence',
+          tentativas: 'Attempts',
+          porQueNaoSeguir: 'Why not proceed',
+          retomada: 'How to resume'
+        }
+      },
+      wizard: {
+        titulo: 'Planning for {{nome}}',
+        descricao:
+          'One decision at a time. The recommendation comes first, but the choice is yours — and every option states its cost.',
+        carregando: 'Loading planning…',
+        indisponivel: 'Could not open planning for this project.',
+        fechar: 'Close',
+        restantes: '{{count}} remaining',
+        recomendada: 'Recommended',
+        porque: 'Why: {{justificativa}}',
+        textoLivre: 'Another answer',
+        textoLivrePlaceholder: 'Describe your choice if no option fits',
+        decidePorMim: 'Decide for me',
+        confirmar: 'Confirm',
+        contradicaoTitulo: 'This answer changes decisions already made',
+        contradicaoItem: '{{pergunta}} — decided before: {{anterior}}',
+        contradicaoManter: 'Keep as is',
+        contradicaoSubstituir: 'Replace',
+        resumo: 'Decisions',
+        jaDecidido: 'Already decided',
+        resumoItem: '{{pergunta}}: {{escolha}}',
+        autorPi: 'You',
+        autorAgente: 'Delegated'
+      },
+      contexto: {
+        titulo: 'Context, skills and budget',
+        descricao:
+          'Build the context before generating. The manifest records which revisions were sent, under which cap and through which route.',
+        tarefa: 'Task or SPEC',
+        tarefaPlaceholder: 'e.g. SPEC-Planejamento-02',
+        tarefaAjuda: 'What this generation must solve. Goes into the manifest.',
+        arquivos: 'Context files',
+        arquivosPlaceholder: 'docs/PRD.md',
+        arquivosAjuda:
+          'Paths relative to the project, one per line. A wildcard (*) counts as broad reading and requires a reason.',
+        excecao: 'Reason for broad reading',
+        excecaoPlaceholder: 'e.g. regression with no known location',
+        excecaoAjuda: 'Recorded in the manifest. Broad reading without a reason is refused.',
+        motivoPadrao: 'selected on screen',
+        montar: 'Build context',
+        carregando: 'Loading context…',
+        vazio: 'No context built yet',
+        vazioDescricao: 'Select the task files and build the context before generating.',
+        manifesto: 'Latest manifest',
+        hashDoPack: 'pack {{hash}}',
+        hashCompleto: 'Full hash: {{hash}}',
+        colunaArquivo: 'File',
+        colunaOrigem: 'Source',
+        colunaHash: 'Revision',
+        colunaBytes: 'Bytes',
+        legendaTabela: 'Files sent in the context for {{tarefa}}',
+        origem: {
+          explicito: 'Explicit',
+          'busca-estrutural': 'Search',
+          'leitura-ampla': 'Broad',
+          'decisao-aprovada': 'Decision',
+          'evidencia-externa': 'Evidence'
+        },
+        tokensDaEtapa: 'Tokens for this step',
+        tokensDe: '{{usados}} of {{teto}}',
+        rotaSemCusto: 'Route {{rota}}: records usage (calls, tokens and time), no per-call cost.',
+        rotaComCusto: 'Route {{rota}}: {{valor}} estimated for this step.',
+        expansao: 'Cap expanded: {{motivo}}',
+        excecaoRegistrada: 'Broad-reading exception',
+        tetoDaExcecao: 'Authorized cap: {{bytes}} bytes',
+        falhasAbertas: 'Open failures',
+        ocorrencias: '{{total}} occurrence(s)',
+        resolver: 'Mark resolved',
+        resolverDe: 'Mark resolved: {{resumo}}',
+        capacidades: 'How the flow applies each discipline',
+        meioSkill: 'Skill',
+        meioDireto: 'Direct',
+        erroInesperado: 'Could not build the context. Try again.'
+      },
       settings: {
         titulo: 'Settings',
+        abaGeral: 'General',
+        abaPermissoes: 'Permissions',
+        abaIa: 'AI',
+        abaRoteamento: 'Routing',
+        abaConectores: 'Connectors',
         idioma: 'Language',
         idiomaDescricao: 'Applies immediately, no restart needed.',
         tema: 'Theme',
@@ -209,7 +636,24 @@ export const RECURSOS = {
         temaSistema: 'System',
         acento: 'Accent',
         acentoDescricao: 'The highlight color of each space. The same choice as the entry screen.',
-        salvo: 'Preferences saved.'
+        salvo: 'Preferences saved.',
+        diretorios: 'Allowed directories',
+        diretoriosDescricao:
+          'The folders the app can read, write and use as a working directory in the terminal. Nothing outside this list is reachable.',
+        diretoriosAdicionar: 'Allow a folder…',
+        diretoriosRemover: 'Remove',
+        diretoriosRemoverDe: 'Remove {{caminho}}',
+        diretoriosFixo: 'Fixed',
+        diretoriosFixoMotivo: 'The app folder is allowed by design and cannot be removed.',
+        diretoriosCarregando: 'Loading allowed directories…',
+        diretoriosVazio: 'Only the app folder is allowed',
+        diretoriosVazioDescricao:
+          'Allow a folder so the app can work in it — without one, the terminal refuses any working directory outside the app folder.',
+        diretoriosErro: 'Could not read the allowed directories',
+        diretoriosErroDescricao:
+          'Close and reopen settings. Until the list loads, allowing or removing folders is not safe.',
+        diretoriosErroAdicionar: 'Could not allow that folder.',
+        diretoriosErroRemover: 'Could not remove that folder.'
       },
       auth: {
         titulo: 'JARVIS OS',

@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 272 | 272 | 0 | 75.5 | — | — |
-| — | — | — | Banco | 209 | 209 | 0 | 88.2 | — | — |
-| — | — | — | Tela | 254 | 253 | 0 | 91.3 | — | — |
+| — | — | — | Regras de Negócio | 857 | 857 | 0 | 69.5 | — | — |
+| — | — | — | Banco | 604 | 604 | 0 | 87.9 | — | — |
+| — | — | — | Tela | 421 | 420 | 0 | 85.5 | — | — |
 
 ## Histórico por entrega
 
@@ -124,3 +124,75 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-08-29 | #84 | spec-design-system-04b-padroes-operacionais | Regras de Negócio | 272 | 272 | 0 | 75.5 | #113 | [#113](https://github.com/RodReis/rrb-jarvisOS/pull/113) |
 | 2026-08-29 | #84 | spec-design-system-04b-padroes-operacionais | Banco | 209 | 209 | 0 | 88.2 | #113 | [#113](https://github.com/RodReis/rrb-jarvisOS/pull/113) |
 | 2026-08-29 | #84 | spec-design-system-04b-padroes-operacionais | Tela | 254 | 253 | 0 | 91.3 | #113 | [#113](https://github.com/RodReis/rrb-jarvisOS/pull/113) |
+| 2026-08-29 | #110 | spec-execucao-real-03-ui-allowlist-diretorios | Regras de Negócio | 276 | 276 | 0 | 75.6 | #114 | [#114](https://github.com/RodReis/rrb-jarvisOS/pull/114) |
+| 2026-08-29 | #110 | spec-execucao-real-03-ui-allowlist-diretorios | Banco | 209 | 209 | 0 | 88.1 | #114 | [#114](https://github.com/RodReis/rrb-jarvisOS/pull/114) |
+| 2026-08-29 | #110 | spec-execucao-real-03-ui-allowlist-diretorios | Tela | 263 | 262 | 0 | 91.3 | #114 | [#114](https://github.com/RodReis/rrb-jarvisOS/pull/114) |
+| 2026-08-29 | #110 | spec-execucao-real-03-ui-allowlist-diretorios | Regras de Negócio | 276 | 276 | 0 | 75.6 | #114 | [#114](https://github.com/RodReis/rrb-jarvisOS/pull/114) |
+| 2026-08-29 | #110 | spec-execucao-real-03-ui-allowlist-diretorios | Banco | 209 | 209 | 0 | 88.1 | #114 | [#114](https://github.com/RodReis/rrb-jarvisOS/pull/114) |
+| 2026-08-29 | #110 | spec-execucao-real-03-ui-allowlist-diretorios | Tela | 265 | 264 | 0 | 91.5 | #114 | [#114](https://github.com/RodReis/rrb-jarvisOS/pull/114) |
+| 2026-08-29 | #80 | SPEC-Providers-04 | Regras de Negócio | 339 | 339 | 0 | 70.6 | #142 | [#142](https://github.com/RodReis/rrb-jarvisOS/pull/142) |
+| 2026-08-29 | #80 | SPEC-Providers-04 | Banco | 289 | 289 | 0 | 88.5 | #142 | [#142](https://github.com/RodReis/rrb-jarvisOS/pull/142) |
+| 2026-08-29 | #80 | SPEC-Providers-04 | Tela | 301 | 300 | 0 | 90.2 | #142 | [#142](https://github.com/RodReis/rrb-jarvisOS/pull/142) |
+| 2026-08-29 | #87 | spec-conectores-01-nucleo | Regras de Negócio | 363 | 363 | 0 | 70.6 | #144 | [#144](https://github.com/RodReis/rrb-jarvisOS/pull/144) |
+| 2026-08-29 | #87 | spec-conectores-01-nucleo | Banco | 304 | 304 | 0 | 88.4 | #144 | [#144](https://github.com/RodReis/rrb-jarvisOS/pull/144) |
+| 2026-08-29 | #87 | spec-conectores-01-nucleo | Tela | 301 | 300 | 0 | 90.2 | #144 | [#144](https://github.com/RodReis/rrb-jarvisOS/pull/144) |
+| 2026-08-29 | #88 | spec-conectores-02-operacao-governanca | Regras de Negócio | 402 | 402 | 0 | 68.5 | #145 | [#145](https://github.com/RodReis/rrb-jarvisOS/pull/145) |
+| 2026-08-29 | #88 | spec-conectores-02-operacao-governanca | Banco | 322 | 322 | 0 | 89.0 | #145 | [#145](https://github.com/RodReis/rrb-jarvisOS/pull/145) |
+| 2026-08-29 | #88 | spec-conectores-02-operacao-governanca | Tela | 301 | 300 | 0 | 90.2 | #145 | [#145](https://github.com/RodReis/rrb-jarvisOS/pull/145) |
+| 2026-08-29 | #89 | spec-conectores-03-github-app-autenticacao | Regras de Negócio | 451 | 451 | 0 | 70.1 | #146 | [#146](https://github.com/RodReis/rrb-jarvisOS/pull/146) |
+| 2026-08-29 | #89 | spec-conectores-03-github-app-autenticacao | Banco | 349 | 349 | 0 | 88.4 | #146 | [#146](https://github.com/RodReis/rrb-jarvisOS/pull/146) |
+| 2026-08-29 | #89 | spec-conectores-03-github-app-autenticacao | Tela | 316 | 315 | 0 | 89.2 | #146 | [#146](https://github.com/RodReis/rrb-jarvisOS/pull/146) |
+| 2026-08-29 | #90 | spec-conectores-04-github-automacao | Regras de Negócio | 495 | 495 | 0 | 64.8 | — | — |
+| 2026-08-29 | #90 | spec-conectores-04-github-automacao | Banco | 380 | 380 | 0 | 87.8 | — | — |
+| 2026-08-29 | #90 | spec-conectores-04-github-automacao | Tela | 316 | 315 | 0 | 89.2 | — | — |
+| — | #91 | spec-conectores-05-tavily-search | Regras de Negócio | 595 | 595 | 0 | 69.5 | — | — |
+| — | #91 | spec-conectores-05-tavily-search | Banco | 400 | 400 | 0 | 86.5 | — | — |
+| — | #91 | spec-conectores-05-tavily-search | Tela | 325 | 324 | 0 | 87.7 | — | — |
+| — | #92 | spec-conectores-06-tavily-extract-evidencias | Regras de Negócio | 595 | 595 | 0 | 69.5 | — | — |
+| — | #92 | spec-conectores-06-tavily-extract-evidencias | Banco | 400 | 400 | 0 | 86.5 | — | — |
+| — | #92 | spec-conectores-06-tavily-extract-evidencias | Tela | 325 | 324 | 0 | 87.7 | — | — |
+| 2026-08-30 | #94 | spec-planejamento-01-projeto-git-local | Regras de Negócio | 604 | 604 | 0 | 68.2 | #169 | [#169](https://github.com/RodReis/rrb-jarvisOS/pull/169) |
+| 2026-08-30 | #94 | spec-planejamento-01-projeto-git-local | Banco | 421 | 406 | 0 | 87.4 | #169 | [#169](https://github.com/RodReis/rrb-jarvisOS/pull/169) |
+| 2026-08-30 | #94 | spec-planejamento-01-projeto-git-local | Tela | 334 | 333 | 0 | 87.6 | #169 | [#169](https://github.com/RodReis/rrb-jarvisOS/pull/169) |
+| 2026-08-30 | #94 | spec-planejamento-01-projeto-git-local | Regras de Negócio | 604 | 604 | 0 | 68.2 | #169 | [#169](https://github.com/RodReis/rrb-jarvisOS/pull/169) |
+| 2026-08-30 | #94 | spec-planejamento-01-projeto-git-local | Banco | 421 | 421 | 0 | 87.0 | #169 | [#169](https://github.com/RodReis/rrb-jarvisOS/pull/169) |
+| 2026-08-30 | #94 | spec-planejamento-01-projeto-git-local | Tela | 334 | 333 | 0 | 87.6 | #169 | [#169](https://github.com/RodReis/rrb-jarvisOS/pull/169) |
+| 2026-08-30 | #170 | spec-planejamento-01-projeto-git-local | Regras de Negócio | 604 | 604 | 0 | 68.2 | #171 | [#171](https://github.com/RodReis/rrb-jarvisOS/pull/171) |
+| 2026-08-30 | #170 | spec-planejamento-01-projeto-git-local | Banco | 422 | 421 | 1 | — | #171 | [#171](https://github.com/RodReis/rrb-jarvisOS/pull/171) |
+| 2026-08-30 | #170 | spec-planejamento-01-projeto-git-local | Tela | 336 | 335 | 0 | 87.7 | #171 | [#171](https://github.com/RodReis/rrb-jarvisOS/pull/171) |
+| 2026-08-30 | #170 | spec-planejamento-01-projeto-git-local | Regras de Negócio | 604 | 604 | 0 | 68.2 | #171 | [#171](https://github.com/RodReis/rrb-jarvisOS/pull/171) |
+| 2026-08-30 | #170 | spec-planejamento-01-projeto-git-local | Banco | 422 | 422 | 0 | 86.9 | #171 | [#171](https://github.com/RodReis/rrb-jarvisOS/pull/171) |
+| 2026-08-30 | #170 | spec-planejamento-01-projeto-git-local | Tela | 336 | 335 | 0 | 87.7 | #171 | [#171](https://github.com/RodReis/rrb-jarvisOS/pull/171) |
+| 2026-08-30 | #172 | — | Regras de Negócio | 604 | 604 | 0 | 68.2 | #173 | [#173](https://github.com/RodReis/rrb-jarvisOS/pull/173) |
+| 2026-08-30 | #172 | — | Banco | 422 | 422 | 0 | 86.9 | #173 | [#173](https://github.com/RodReis/rrb-jarvisOS/pull/173) |
+| 2026-08-30 | #172 | — | Tela | 340 | 339 | 0 | 87.7 | #173 | [#173](https://github.com/RodReis/rrb-jarvisOS/pull/173) |
+| 2026-08-30 | #95 | spec-planejamento-02-contexto-skills-orcamento | Regras de Negócio | 650 | 650 | 0 | 68.4 | #174 | [#174](https://github.com/RodReis/rrb-jarvisOS/pull/174) |
+| 2026-08-30 | #95 | spec-planejamento-02-contexto-skills-orcamento | Banco | 464 | 464 | 0 | 87.5 | #174 | [#174](https://github.com/RodReis/rrb-jarvisOS/pull/174) |
+| 2026-08-30 | #95 | spec-planejamento-02-contexto-skills-orcamento | Tela | 356 | 355 | 0 | 88.0 | #174 | [#174](https://github.com/RodReis/rrb-jarvisOS/pull/174) |
+| — | #96 | spec-planejamento-03-wizard-orientado | Regras de Negócio | 702 | 702 | 0 | 68.6 | #175 | [#175](https://github.com/RodReis/rrb-jarvisOS/pull/175) |
+| — | #96 | spec-planejamento-03-wizard-orientado | Banco | 486 | 486 | 0 | 87.7 | #175 | [#175](https://github.com/RodReis/rrb-jarvisOS/pull/175) |
+| — | #96 | spec-planejamento-03-wizard-orientado | Tela | 380 | 379 | 0 | 86.5 | #175 | [#175](https://github.com/RodReis/rrb-jarvisOS/pull/175) |
+| — | #97 | spec-planejamento-04-prd-landscape-convention | Regras de Negócio | 749 | 749 | 0 | 69.4 | #176 | [#176](https://github.com/RodReis/rrb-jarvisOS/pull/176) |
+| — | #97 | spec-planejamento-04-prd-landscape-convention | Banco | 513 | 513 | 0 | 88.1 | #176 | [#176](https://github.com/RodReis/rrb-jarvisOS/pull/176) |
+| — | #97 | spec-planejamento-04-prd-landscape-convention | Tela | 393 | 392 | 0 | 86.7 | #176 | [#176](https://github.com/RodReis/rrb-jarvisOS/pull/176) |
+| 2026-08-30 | #98 | spec-planejamento-05-anexos-design-arquitetura | Regras de Negócio | 780 | 780 | 0 | 69.2 | #177 | [#177](https://github.com/RodReis/rrb-jarvisOS/pull/177) |
+| 2026-08-30 | #98 | spec-planejamento-05-anexos-design-arquitetura | Banco | 541 | 541 | 0 | 87.2 | #177 | [#177](https://github.com/RodReis/rrb-jarvisOS/pull/177) |
+| 2026-08-30 | #98 | spec-planejamento-05-anexos-design-arquitetura | Tela | 407 | 406 | 0 | 86.2 | #177 | [#177](https://github.com/RodReis/rrb-jarvisOS/pull/177) |
+| 2026-08-30 | #99 | spec-planejamento-06-roadmap-aprovacoes | Regras de Negócio | 839 | 839 | 0 | 70.5 | #178 | [#178](https://github.com/RodReis/rrb-jarvisOS/pull/178) |
+| 2026-08-30 | #99 | spec-planejamento-06-roadmap-aprovacoes | Banco | 563 | 546 | 0 | 87.9 | #178 | [#178](https://github.com/RodReis/rrb-jarvisOS/pull/178) |
+| 2026-08-30 | #99 | spec-planejamento-06-roadmap-aprovacoes | Tela | 421 | 420 | 0 | 85.5 | #178 | [#178](https://github.com/RodReis/rrb-jarvisOS/pull/178) |
+| 2026-08-30 | #99 | spec-planejamento-06-roadmap-aprovacoes | Regras de Negócio | 839 | 839 | 0 | 70.5 | #178 | [#178](https://github.com/RodReis/rrb-jarvisOS/pull/178) |
+| 2026-08-30 | #99 | spec-planejamento-06-roadmap-aprovacoes | Banco | 563 | 563 | 0 | 87.6 | #178 | [#178](https://github.com/RodReis/rrb-jarvisOS/pull/178) |
+| 2026-08-30 | #99 | spec-planejamento-06-roadmap-aprovacoes | Tela | 421 | 420 | 0 | 85.5 | #178 | [#178](https://github.com/RodReis/rrb-jarvisOS/pull/178) |
+| 2026-08-30 | #101 | spec-entrega-01-publicacao-github | Regras de Negócio | 857 | 857 | 0 | 69.8 | #190 | [#190](https://github.com/RodReis/rrb-jarvisOS/pull/190) |
+| 2026-08-30 | #101 | spec-entrega-01-publicacao-github | Banco | 594 | 566 | 0 | 86.7 | #190 | [#190](https://github.com/RodReis/rrb-jarvisOS/pull/190) |
+| 2026-08-30 | #101 | spec-entrega-01-publicacao-github | Tela | 421 | 420 | 0 | 85.5 | #190 | [#190](https://github.com/RodReis/rrb-jarvisOS/pull/190) |
+| 2026-08-30 | #101 | spec-entrega-01-publicacao-github | Regras de Negócio | 857 | 857 | 0 | 69.8 | #190 | [#190](https://github.com/RodReis/rrb-jarvisOS/pull/190) |
+| 2026-08-30 | #101 | spec-entrega-01-publicacao-github | Banco | 594 | 585 | 0 | 87.6 | #190 | [#190](https://github.com/RodReis/rrb-jarvisOS/pull/190) |
+| 2026-08-30 | #101 | spec-entrega-01-publicacao-github | Tela | 421 | 420 | 0 | 85.5 | #190 | [#190](https://github.com/RodReis/rrb-jarvisOS/pull/190) |
+| 2026-08-30 | #101 | spec-entrega-01-publicacao-github | Regras de Negócio | 857 | 857 | 0 | 69.8 | #190 | [#190](https://github.com/RodReis/rrb-jarvisOS/pull/190) |
+| 2026-08-30 | #101 | spec-entrega-01-publicacao-github | Banco | 594 | 594 | 0 | 87.7 | #190 | [#190](https://github.com/RodReis/rrb-jarvisOS/pull/190) |
+| 2026-08-30 | #101 | spec-entrega-01-publicacao-github | Tela | 421 | 420 | 0 | 85.5 | #190 | [#190](https://github.com/RodReis/rrb-jarvisOS/pull/190) |
+| 2026-08-30 | #101 | spec-entrega-01-publicacao-github | Regras de Negócio | 857 | 857 | 0 | 69.5 | #190 | [#190](https://github.com/RodReis/rrb-jarvisOS/pull/190) |
+| 2026-08-30 | #101 | spec-entrega-01-publicacao-github | Banco | 604 | 604 | 0 | 87.9 | #190 | [#190](https://github.com/RodReis/rrb-jarvisOS/pull/190) |
+| 2026-08-30 | #101 | spec-entrega-01-publicacao-github | Tela | 421 | 420 | 0 | 85.5 | #190 | [#190](https://github.com/RodReis/rrb-jarvisOS/pull/190) |
