@@ -373,6 +373,12 @@ export const IPC_CHANNELS = {
   mergePolicyDefinir: 'merge-policy:definir',
   /** SPEC-Entrega-02: o estado da fila — runs ativos, concluídas e o que está travado. */
   filaVista: 'fila:vista',
+  /**
+   * O estado do sandbox do executor (SPEC-Entrega-03). **Só leitura**, como os canais da
+   * M9-F02: nada aqui prepara nem derruba container — quem prepara é o preflight, chamado pela
+   * pipeline, nunca pelo renderer.
+   */
+  sandboxEstado: 'sandbox:estado',
   anexoEscolher: 'anexo:escolher',
   anexoAnexar: 'anexo:anexar',
   anexoListar: 'anexo:listar',
@@ -868,6 +874,10 @@ export interface JarvisBridge {
   ): Promise<PublicacaoOutcome>
   /** O estado da fila de execução (SPEC-Entrega-02). Só leitura: o renderer não move a pipeline. */
   vistaDaFila(projectId: string, workspace: WorkspaceId): Promise<VistaDaFila>
+  /**
+   * O estado do sandbox do executor (SPEC-Entrega-03). Só leitura — a preparação é da pipeline.
+   */
+  estadoDoSandbox(): Promise<{ readonly dockerNoAr: boolean; readonly proxyNoAr: boolean }>
   /** O kill-switch do merge autônomo do projeto (SPEC-Entrega-02/05). Ausência = ligado. */
   lerPoliticaDeMerge(projectId: string, workspace: WorkspaceId): Promise<PoliticaDeMerge>
   /**

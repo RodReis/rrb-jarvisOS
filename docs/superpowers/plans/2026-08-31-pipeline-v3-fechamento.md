@@ -3,8 +3,8 @@
 - Data: 2026-08-31.
 - Pedido: finalizar planejamento, criar/completar issues faltantes e concluir [PR #189](https://github.com/RodReis/rrb-jarvisOS/pull/189).
 - Escopo: documentação e GitHub. Nenhuma implementação de produto, instalação de provider, deploy ou fechamento de issue de entrega.
-- Base reconciliada: `2e8151f`, incluindo PRs #188, #191, #207, #208 e #210.
-- Estado: redação e publicação das issues concluídas; verificação final e integração do PR em andamento.
+- Base inicial: `2e8151f`; reconciliação final com `cae5320` após o PR #211. Inclui decisões/entregas dos PRs #188, #191, #207, #208, #210 e #211.
+- Estado documental: planejamento, issues e verificação local concluídos. Resultado final do CI e da integração é consultado na fonte viva, PR #189.
 - Índice canônico: `docs/STATUS.md`; este relatório é evidência datada, não segunda fonte da numeração/fila.
 
 ## 1. Cobertura fechada
@@ -92,3 +92,10 @@ Datas iguais ou “nenhuma pergunta aberta” não provam ausência de gate. As 
 ## 7. Condição de conclusão desta tarefa
 
 Planejamento/índice/25 issues completos, baselines preservados, PR atualizado sem rascunho, checks aceitos no head corrente e merge confirmado na origem. Questão nova de produto, mudança de proteção ou falha de CI que exija código fora do escopo não será contornada para obter verde.
+
+
+## 8. Concorrência com a main durante a validação
+
+A execução CI [33398038285](https://github.com/RodReis/rrb-jarvisOS/actions/runs/33398038285) passou os testes, mas falhou na guarda append-only: o PR #211 entrou na base durante a execução e acrescentou seis linhas ao relatório gerado. A branch foi reconciliada por merge com `cae5320`; código e `reports/TESTS.md` foram preservados exatamente da nova base. Nova validação do head é obrigatória antes do merge, sem edição de números ou bypass. Os testes locais acima pertencem à base anterior; o CI posterior valida a base integrada.
+
+STATUS foi reconciliado com a entrega da #103, next #209 e falha #222. As dez SPECs novas, revisões aceitas e 25 issues V3 não mudaram nesta reconciliação. Esta nota conclui o registro documental; resultado final verificável está no PR, não em declaração antecipada de merge.

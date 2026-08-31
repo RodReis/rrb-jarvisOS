@@ -352,6 +352,10 @@ const bridge: JarvisBridge = {
     ipcRenderer.invoke(IPC_CHANNELS.publicacaoPublicar, projectId, alvo, workspace),
   vistaDaFila: (projectId: string, workspace: WorkspaceId): Promise<VistaDaFila> =>
     ipcRenderer.invoke(IPC_CHANNELS.filaVista, projectId, workspace),
+  estadoDoSandbox: (): Promise<{
+    readonly dockerNoAr: boolean
+    readonly proxyNoAr: boolean
+  }> => ipcRenderer.invoke(IPC_CHANNELS.sandboxEstado),
   lerPoliticaDeMerge: (projectId: string, workspace: WorkspaceId): Promise<PoliticaDeMerge> =>
     ipcRenderer.invoke(IPC_CHANNELS.mergePolicyLer, projectId, workspace),
   definirPoliticaDeMerge: (

@@ -58,6 +58,16 @@ export interface CostEventInput {
   readonly tokensEntrada?: number
   readonly tokensSaida?: number
   readonly latenciaTotalMs?: number
+  /**
+   * O run e a tentativa da pipeline que originaram a chamada (SPEC-Entrega-03, critério 11).
+   *
+   * Ausentes fora de pipeline — toda chamada de IA do MVP-005 ao MVP-008 não tem run, e zero
+   * afirmaria "tentativa zero" onde o certo é "não se aplica". Correlacionar por
+   * `contextPackId` foi descartado pelo PI (emenda 7 de 2026-08-31): deixaria a atribuição
+   * indireta e a tentativa sem representação nenhuma.
+   */
+  readonly runId?: string
+  readonly tentativa?: number
   /** O projeto e o manifesto que originaram a chamada, quando ela veio do planejamento. */
   readonly projectId?: string
   readonly contextPackId?: string
@@ -137,8 +147,9 @@ export class BudgetRepository {
       .prepare(
         `INSERT INTO cost_event
            (id, user_id, workspace_id, call_id, provider, model, estimado_usd, real_usd, created_at,
-            unmetered, tokens_entrada, tokens_saida, latencia_total_ms, project_id, context_pack_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            unmetered, tokens_entrada, tokens_saida, latencia_total_ms, project_id, context_pack_id,
+            run_id, tentativa)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         randomUUID(),
@@ -155,7 +166,9 @@ export class BudgetRepository {
         input.tokensSaida ?? null,
         input.latenciaTotalMs ?? null,
         input.projectId ?? null,
-        input.contextPackId ?? null
+        input.contextPackId ?? null,
+        input.runId ?? null,
+        input.tentativa ?? null
       )
   }
 

@@ -24,6 +24,7 @@ import type {
   FalhaRegistrada,
   OrigemDeContexto
 } from '@shared/domain/context-pack'
+import type { OrigemDePaths } from '@shared/domain/preflight'
 import { log } from '../logging/logger'
 
 interface PackRow {
@@ -49,6 +50,12 @@ interface PackRow {
   readonly pack_anterior: string | null
   readonly hash: string
   readonly created_at: string
+}
+
+interface PathRow {
+  readonly caminho: string
+  readonly origem: string
+  readonly justificativa: string
 }
 
 interface ItemRow {
@@ -164,6 +171,11 @@ export class ContextRepository {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
 
+    const inserirPath = this.db.prepare(
+      `INSERT INTO context_pack_path (pack_id, caminho, origem, justificativa, ordem)
+       VALUES (?, ?, ?, ?, ?)`
+    )
+
     this.db.transaction(() => {
       inserirPack.run(
         pack.id,
@@ -200,6 +212,19 @@ export class ContextRepository {
           item.linhas?.de ?? null,
           item.linhas?.ate ?? null,
           item.motivo,
+          ordem
+        )
+      })
+
+      pack.pathsPermitidos?.paths.forEach((caminho, ordem) => {
+        inserirPath.run(
+          pack.id,
+          caminho,
+          // A origem e a justificativa se repetem por linha porque pertencem à lista, não ao
+          // path. Uma segunda tabela só para elas custaria um join em toda leitura de pack para
+          // guardar dois campos que nunca divergem dentro da mesma lista.
+          pack.pathsPermitidos?.origem ?? 'derivada',
+          pack.pathsPermitidos?.justificativa ?? '',
           ordem
         )
       })
@@ -265,6 +290,13 @@ export class ContextRepository {
       )
       .all(row.id) as readonly ItemRow[]
 
+    const paths = this.db
+      .prepare(
+        `SELECT caminho, origem, justificativa
+           FROM context_pack_path WHERE pack_id = ? ORDER BY ordem`
+      )
+      .all(row.id) as readonly PathRow[]
+
     return {
       id: row.id,
       user_id: row.user_id,
@@ -300,6 +332,18 @@ export class ContextRepository {
           }),
       rota: row.rota as AiProvider,
       ...(row.pack_anterior === null ? {} : { packAnterior: row.pack_anterior }),
+      // Lista vazia é ausência, não escopo vazio: um pack fora de pipeline não tem run, e
+      // `pathsPermitidos: { paths: [] }` afirmaria "nenhum arquivo autorizado" — o oposto de
+      // "a pergunta não se aplica". O hash canônico trata os dois casos como a mesma string.
+      ...(paths.length === 0
+        ? {}
+        : {
+            pathsPermitidos: {
+              origem: paths[0].origem as OrigemDePaths,
+              paths: paths.map((p) => p.caminho),
+              justificativa: paths[0].justificativa
+            }
+          }),
       hash: row.hash,
       created_at: row.created_at
     }

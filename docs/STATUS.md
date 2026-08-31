@@ -6,8 +6,9 @@ Atualizado em: **2026-08-31**. Fonte única do índice Fatia ↔ SPEC. Estado re
 
 | Coluna | Item | Estado |
 |---|---|---|
-| Próximo | [#103](https://github.com/RodReis/rrb-jarvisOS/issues/103) · M9-F03 Worktree, preflight e Docker | `proplan:next` atual; preservado |
-| Backlog | [#209](https://github.com/RodReis/rrb-jarvisOS/issues/209) · correção do EffectJournal | lacuna de implementação registrada pelo PR #210; não é resolvida por este PR documental |
+| Próximo | [#209](https://github.com/RodReis/rrb-jarvisOS/issues/209) · correção do EffectJournal | `proplan:next` confirmado após a integração do PR #211; fila não alterada por esta tarefa |
+| Feito | [#103](https://github.com/RodReis/rrb-jarvisOS/issues/103) · M9-F03 Worktree, preflight e Docker | entregue no PR #211; emendas e evidência preservadas |
+| Backlog | [#222](https://github.com/RodReis/rrb-jarvisOS/issues/222) · restrição de egress | falha da M9-F03 registrada na main; não resolvida por planejamento documental |
 | Finalizado | #99, #101 e #102 | aceite do PI registrado; M9-F02 integrada pelo PR #208 |
 | Backlog | M7-F01–F04 (#180–#183), MVPs 010–015 e M16-F01–F04 | SPECs aprovadas; publicação documental não muda fila |
 | Planejado | M16-F05/F06 (#167/#168), MVP-023 e MVP-024 | dez SPECs completas para revisão; nenhuma construção autorizada |
@@ -26,7 +27,7 @@ Atualizado em: **2026-08-31**. Fonte única do índice Fatia ↔ SPEC. Estado re
 | MVP-006 Conectores Essenciais | [#86](https://github.com/RodReis/rrb-jarvisOS/issues/86) | seis fatias finalizadas; o épico aguarda o fechamento do PI | 6/6 |
 | MVP-007 Memória compartilhada | [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179) | F01–F04 aprovadas/Backlog; F05–F08 Planejadas, fora do fechamento V3 | 0/8 |
 | MVP-008 Planejamento Governado | [#93](https://github.com/RodReis/rrb-jarvisOS/issues/93) | seis fatias finalizadas; o épico aguarda o fechamento do PI | 6/6 |
-| MVP-009 Entrega Autônoma | [#100](https://github.com/RodReis/rrb-jarvisOS/issues/100) | seis SPECs `aprovada-pi` (2026-08-29), **emendadas pelo PI em 2026-08-30**; F01 entregue (PR [#190](https://github.com/RodReis/rrb-jarvisOS/pull/190)) | 1/6 |
+| MVP-009 Entrega Autônoma | [#100](https://github.com/RodReis/rrb-jarvisOS/issues/100) | seis SPECs `aprovada-pi` (2026-08-29), **emendadas pelo PI em 2026-08-30 e 2026-08-31**; F01–F03 entregues | 3/6 |
 | MVP-010 Multi-executor Claude + Codex | [#115](https://github.com/RodReis/rrb-jarvisOS/issues/115) | fatias [#116–#120](https://github.com/RodReis/rrb-jarvisOS/issues/116) no Backlog | 0/5 |
 | MVP-011 Squads limitados | [#121](https://github.com/RodReis/rrb-jarvisOS/issues/121) | fatias [#122–#126](https://github.com/RodReis/rrb-jarvisOS/issues/122) no Backlog | 0/5 |
 | MVP-012 Scheduler concorrente | [#127](https://github.com/RodReis/rrb-jarvisOS/issues/127) | fatias [#128–#132](https://github.com/RodReis/rrb-jarvisOS/issues/128) no Backlog | 0/5 |
@@ -134,7 +135,7 @@ Não existe catálogo global `SPEC-nnn`. O slug identifica a SPEC; os números a
 
 ## Próximas ações
 
-1. Conservar `next` em #103 e a fila vigente. Corrigir #209 na execução correspondente; este planejamento não fecha a falha.
+1. Conservar `next` em #209 e a fila vigente. #103 foi integrada pelo PR #211; as falhas #209/#222 seguem suas issues, sem correção de produto neste planejamento.
 2. Revisar as dez SPECs novas da V3, mantendo #167/#168 e as oito novas fatias em `proplan:planejado` até aceite exato.
 3. Antes das fatias visuais, anexar `DESIGN-SYSTEM.md` e HTML pelo fluxo já aprovado; texto de SPEC/template não substitui anexo do PI.
 4. M7-F05–F08 e demais fatias ainda não especificadas do Command Center seguem seus planejamentos próprios; não bloqueiam concluir a documentação V3.

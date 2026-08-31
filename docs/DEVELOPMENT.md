@@ -1470,6 +1470,50 @@ Status: **entregue** — spec `aprovada-pi` (2026-08-29, emendada em 2026-08-30)
 
 **Limites:** **sem tela** — a fatia é infraestrutura, e os canais existem para a M9-F03/F06 e para o painel da M9-F06 consumirem. A reconciliação de **container e portas** fica para a M9-F03, que os cria; o ponto de extensão (`VerificadorDeRecurso`) já está no lugar e testado com um dublê. **Nada dispara a fila automaticamente** ainda: quem cria run e pede slot é a M9-F03 em diante. **O `EffectJournal` não entrou** — [#209](https://github.com/RodReis/rrb-jarvisOS/issues/209).
 
+### Fatia 03 — Worktree, preflight e Docker (`docs/spec/spec-entrega-03-worktree-preflight-docker.md`)
+
+Status: **entregue** — spec `aprovada-pi` (2026-08-29, emendada em 2026-08-30 e 2026-08-31); issue [#103](https://github.com/RodReis/rrb-jarvisOS/issues/103). Depende da M9-F02.
+
+- [x] **`src/shared/domain/preflight.ts`** — escopo de paths com origem (`spec`/`derivada`), `PREFLIGHT_REASONS`, `SandboxPreparado` e os nomes derivados do run
+- [x] **`PreflightService`** — a ordem das verificações, recusa com retomada, `bloqueioDe` para a fila
+- [x] **`DockerRunner`** — o sandbox pelo ponto único do terminal, numa **segunda instância** com prazo de 5 min
+- [x] **`ExecutorProxy`** — servidor `node:http` em loopback; único caminho do container até o modelo
+- [x] **`verificadores-de-sandbox.ts`** — container e porta preenchendo o `VerificadorDeRecurso` da M9-F02
+- [x] **Migration 24** — `context_pack_path` e as colunas `run_id`/`tentativa` no `cost_event`
+- [x] **`ContextPack` ganhou `pathsPermitidos`** — e o campo entrou no **canônico do `hashDoPack`**
+- [x] **Canal `sandbox:estado`** — só leitura, como os três da M9-F02; nenhum prepara sandbox
+- [x] **Testes**: 19 de integração (SQLite + Git real), 8 do proxy (HTTP real), 17 de domínio puro
+- [x] **`scripts/smoke-sandbox.mjs`** — o smoke com Docker real, 7 passos, sem efeito externo (`docs/TESTING.md` §3.4)
+
+**Quatro furos da spec foram medidos e levados ao PI antes de codificar.** Nenhum era opinião: cada um foi reproduzido antes de virar pergunta.
+
+**A montagem que a SPEC prescrevia não funcionava.** O `.git` de um worktree é um arquivo apontando para o host — isso a spec previu, e mandava reescrevê-lo. O que ela não previu é que `.git/worktrees/<lease>/commondir` é **relativo** (`../..`): dentro do container ele resolve para `/`, e o Git responde `fatal: not a git repository`. Objects e refs vivem no `.git` **principal**, que a spec proibia montar — então a montagem prescrita entregaria um container onde o `git status/diff` que ela mesma diz que o executor "roda o tempo todo" falha na primeira invocação. **Decisão do PI:** o `.git` principal entra `:ro`, e a escrita é rejeitada pelo próprio Docker (medido: `Read-only file system`). "Quem versiona é o app, no host" passa a ser garantia de **montagem**, não de instrução ao agente. O custo aceito: o executor lê todo o histórico e todas as branches.
+
+**O proxy não alcançava a rota que ele existia para servir.** A emenda 1 escolheu `ANTHROPIC_BASE_URL`, mas a rota de assinatura é **subprocess** do binário `claude`, autenticado por `~/.claude` — nenhuma variável de base URL a intercepta; só a rota paga (SDK HTTP) aceita `baseURL`. **Decisão do PI:** o proxy roteia para o `AiCallService`, que escolhe o backend; a conversa multi-turn é **achatada** em `prompt: string`, porque `AiRequest` não tem `messages[]`. A perda é real e ficou declarada como dívida — estendê-lo é código novo no MVP-005.
+
+**`runId`/`tentativa` entraram nos contratos.** O critério 11 exige custo atribuído ao run e à tentativa, e o único gancho existente era `contextPackId` — que deixaria a atribuição indireta e a *tentativa* sem representação nenhuma.
+
+**O smoke com Docker real achou dois defeitos que os dublês escondiam** — e é a lição de método da fatia, porque os 25 testes estavam verdes quando ele rodou:
+
+1. **Reescrever o `commondir` derruba o Git do host.** É **um arquivo só**, e host e container precisam de caminhos diferentes nele; depois da reescrita, `git status` no worktree responde `fatal: not a git repository` — o app perde exatamente a capacidade de versionar que a SPEC lhe reserva. A correção é **copiar** o metadado para dentro do worktree e apontar só a cópia para `/gitcommon`, com `GIT_DIR`/`GIT_WORK_TREE` no container. Nenhum teste de unidade veria isso: o preflight continuava devolvendo `liberado`.
+2. **O checkout com CRLF faz o container ler a árvore inteira como modificada.** No Windows o padrão grava CRLF; o Git de dentro (Linux) marca **todo** arquivo como sujo — e o critério 6 acusaria fuga de escopo no projeto inteiro. O worktree passa a nascer com `core.autocrlf=false`.
+
+Os dois viraram teste (`deixa o Git do host funcionando` e `cria o worktree sem conversão de fim de linha`), e os dois **reprovam** quando o defeito volta.
+
+**O hash canônico foi o risco mais provável da fatia, e foi fechado na origem.** `pathsPermitidos` entrou no `ContextPack` **e** em `hashDoPack`: fora do canônico, dois packs idênticos em conteúdo mas com allowlists diferentes colidiriam, e `findByHash` devolveria o pack antigo — o run herdaria silenciosamente o escopo de outro. O `?? ''` no fim preserva o hash dos packs já persistidos.
+
+**Um contrafactual passou, e era lacuna de cobertura.** Trocar a comparação por segmento por `startsWith` no guarda do critério 1 deixou os 14 testes verdes: nos caminhos exercitados as duas concordam. Faltava o caso que as separa — uma raiz **irmã** de nome parecido (`projeto-op` ao lado de `projeto`), que o prefixo recusaria e a comparação por segmento libera. Com ele, o contrafactual reprova.
+
+**A auto-revisão do diff achou um critério não implementado.** O critério 3 pede colisão de porta detectada **antes de subir recurso**, e o preflight não checava porta nenhuma: a única chamada de `portaOcupadaPorContainer` era da reconciliação. Passava despercebido porque o sandbox do executor não publica porta — mas o critério é sobre o papel (b) do Docker, os serviços do projeto-alvo. `PedidoDePreflight` ganhou `portasDeServico`, e a checagem acontece **antes** dos leases, senão a colisão deixaria worktree e leases criados para trás. O docstring do runner, que afirmava "tenta o bind de verdade", foi corrigido para o que o código faz: pergunta ao Docker, e não vê porta tomada por processo fora dele.
+
+**A prova de "nenhum segredo no container" é sobre os args reais**, não sobre o retorno: o teste inspeciona a montagem que o serviço passou ao `docker run` e reprova quando alguém acrescenta a sessão do host — e o smoke confirmou com `env` de dentro do container.
+
+**`docker stop`, nunca `docker rm`.** `rm|rmi|prune|down` casa a política de destrutivos do MVP-004 e abriria `ApprovalRequest`, travando a limpeza num gate humano. Por decisão do PI a colisão é da **M9-F06**: esta fatia não toca a política.
+
+**O critério 12 (egress restrito) não foi implementado, e o furo é declarado, não escondido.** A auto-revisão o encontrou e a medição confirmou: de dentro do container, `git ls-remote https://github.com/...` **funciona**. A SPEC exige que *"o executor nunca fala com o GitHub" seja garantido por rede, não por instrução ao agente* — e as duas saídas baratas foram medidas e **não servem**: `--network none` e uma rede `--internal` bloqueiam o GitHub mas cortam junto o proxy do host, porque no Docker Desktop/Windows o daemon roda numa VM e nem o IP do gateway alcança o host. Fechar de verdade exige proxy de egress com allowlist de destinos (ou sidecar com regras de firewall), que é escopo de tamanho próprio. **Decisão do PI (2026-08-31):** entregar a F03 com o limite declarado e abrir `[FIX]` citando a SPEC — [#222](https://github.com/RodReis/rrb-jarvisOS/issues/222). Hoje a garantia é **por ausência de credencial** — o container não tem token —, o que é mais fraco do que o critério pede, e é por isso que fica registrado.
+
+**Limites:** **sem tela** — a fatia é infraestrutura, e `sandbox:estado` existe para o painel da M9-F06. **`derivarPaths` devolve `undefined` no boot**: a derivação a partir da arquitetura aprovada é da M9-F04, que conhece o pacote do projeto-alvo — até lá a SPEC precisa trazer a seção, e o preflight recusa se não vier, que é o critério 13 se comportando como projetado. **`contexto`/`contextPackId` do proxy são `undefined` no boot** pelo mesmo motivo: quem conhece o run em construção é a M9-F04. **Nada dispara o preflight automaticamente** ainda. **A detecção de colisão de porta existe e é testada, mas nenhum projeto declara serviços hoje** — então ela nunca roda com lista não-vazia fora do teste. E ela pergunta **só ao Docker**: uma porta tomada por processo fora do Docker não é vista, o que exigiria uma sonda de `bind` que nenhuma fatia hoje tem como exercitar. **`docker` precisa estar na allowlist de comandos do workspace**, e o worktree sob a allowlist de diretórios: o sandbox passa pelo mesmo enforcement do MVP-004, de propósito.
+
 ## Registro de entregas
 
 | Data | Fatia | PR | Observação |

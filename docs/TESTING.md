@@ -219,6 +219,45 @@ total. Nenhuma fórmula sobre a contagem de uma chamada isolada reproduz isso.
    que uma extração de 2 URLs cabe em `{0, 1}` — nunca 2, que é o que uma cobrança por URL daria.
    Um smoke que afirma o instável falha por motivo errado e ensina a ignorá-lo.
 
+### 3.4 Smoke de **infraestrutura**: o dublê valida a decisão, não a mecânica (achado da M9-F03)
+
+O §3.2 nasceu de smoke contra **serviço externo**. A M9-F03 mostrou que a mesma lição vale para
+**infraestrutura local** — Docker, Git, filesystem — e por um motivo diferente: ali o risco é o
+serviço se comportar diferente do contrato; aqui é a **plataforma** ter detalhe que nenhum dublê
+modela (caminho relativo, fim de linha, permissão de montagem, daemon numa VM).
+
+O smoke rodou com **25 testes verdes** e achou dois defeitos:
+
+1. **Reescrever o `commondir` de um worktree derruba o Git do host.** É um arquivo só, e host e
+   container precisam de caminhos diferentes nele. O preflight continuava devolvendo `liberado` —
+   nenhuma asserção de unidade tinha como ver.
+2. **Checkout com CRLF (padrão do Windows) faz o Git do container (Linux) ler a árvore inteira
+   como modificada**, o que faria o gate de escopo acusar fuga em **todo** arquivo do projeto.
+
+Os dois viraram teste de integração que **reprova** quando o defeito volta — smoke que acha
+defeito sem virar guarda deixa a correção sem rede.
+
+**A regra prática:** fatia que toca Docker, Git ou rede exercita o **round-trip completo** com a
+infra real antes de fechar. Aqui: executor escreve no container → host vê o arquivo → host
+commita. Nenhum dos três passos isolados teria achado o defeito 1.
+
+**E leia o stream certo.** A primeira versão do passo "escrita no `.git` é rejeitada" reprovava
+com o Docker fazendo a coisa certa: a recusa do `sh` sai no **stderr**, e `execFileSync` com
+stdio piped devolve só o stdout — o `2>&1` de dentro do comando não alcança, porque o
+redirecionamento é montado antes de o `sh` tentar abrir o arquivo. É o mesmo erro de método do
+§3.3: **sonde antes de concluir** que o comportamento está errado.
+
+O script é `scripts/smoke-sandbox.mjs`, e ele **não cria efeito externo** (repositório temporário
+e container removido no fim), então pode rodar à vontade — só exige Docker no ar:
+
+```bash
+node scripts/smoke-sandbox.mjs
+```
+
+O último passo dele afirma um **limite conhecido** em vez de uma garantia: o egress ainda não é
+restrito ([#222](https://github.com/RodReis/rrb-jarvisOS/issues/222)). Smoke que registra o que
+*ainda não* vale é mais honesto do que smoke que só mede o que já funciona.
+
 ## 4. O relatório: `reports/TESTS.md`
 
 **Local:** `reports/` na raiz — **diretório neutro**. Não vai em `docs/` (um arquivo reescrito a

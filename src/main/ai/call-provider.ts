@@ -314,7 +314,9 @@ export class AiCallService {
           latenciaTotalMs: Date.now() - inicio,
           ...(latenciaPrimeiroChunkMs === undefined ? {} : { latenciaPrimeiroChunkMs }),
           estimadoUsd,
-          ...(request.contextPackId === undefined ? {} : { contextPackId: request.contextPackId })
+          ...(request.contextPackId === undefined ? {} : { contextPackId: request.contextPackId }),
+          ...(request.runId === undefined ? {} : { runId: request.runId }),
+          ...(request.tentativa === undefined ? {} : { tentativa: request.tentativa })
         })
         return
       }
@@ -328,7 +330,9 @@ export class AiCallService {
         latenciaTotalMs: Date.now() - inicio,
         ...(latenciaPrimeiroChunkMs === undefined ? {} : { latenciaPrimeiroChunkMs }),
         estimadoUsd,
-        ...(request.contextPackId === undefined ? {} : { contextPackId: request.contextPackId })
+        ...(request.contextPackId === undefined ? {} : { contextPackId: request.contextPackId }),
+        ...(request.runId === undefined ? {} : { runId: request.runId }),
+        ...(request.tentativa === undefined ? {} : { tentativa: request.tentativa })
       })
     } catch (erro) {
       yield this.finalizar(id, ctx, provider, model, {
@@ -341,7 +345,9 @@ export class AiCallService {
         latenciaTotalMs: Date.now() - inicio,
         ...(latenciaPrimeiroChunkMs === undefined ? {} : { latenciaPrimeiroChunkMs }),
         estimadoUsd,
-        ...(request.contextPackId === undefined ? {} : { contextPackId: request.contextPackId })
+        ...(request.contextPackId === undefined ? {} : { contextPackId: request.contextPackId }),
+        ...(request.runId === undefined ? {} : { runId: request.runId }),
+        ...(request.tentativa === undefined ? {} : { tentativa: request.tentativa })
       })
     } finally {
       clearTimeout(relogio)
@@ -433,6 +439,12 @@ export class AiCallService {
        * como resposta o horário da chamada.
        */
       readonly contextPackId?: string
+      /**
+       * O run e a tentativa que originaram a chamada (SPEC-Entrega-03, critério 11) — o que
+       * liga o gasto ao trabalho da pipeline, e não só ao contexto.
+       */
+      readonly runId?: string
+      readonly tentativa?: number
     }
   ): AiStreamEvent {
     const rotaSemPreco = isRotaUnmetered(provider)
@@ -484,7 +496,11 @@ export class AiCallService {
                 tokensSaida: desfecho.usage.tokensSaida
               }),
           latenciaTotalMs: desfecho.latenciaTotalMs,
-          ...(desfecho.contextPackId === undefined ? {} : { contextPackId: desfecho.contextPackId })
+          ...(desfecho.contextPackId === undefined
+            ? {}
+            : { contextPackId: desfecho.contextPackId }),
+          ...(desfecho.runId === undefined ? {} : { runId: desfecho.runId }),
+          ...(desfecho.tentativa === undefined ? {} : { tentativa: desfecho.tentativa })
         },
         { userId: ctx.userId, workspace: ctx.workspace }
       )
