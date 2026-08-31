@@ -147,8 +147,7 @@ export class PipelineRepository {
 
   buscar(runId: string): PipelineRun | undefined {
     const row = this.db.prepare('SELECT * FROM pipeline_run WHERE id = ?').get(runId) as
-      | RunRow
-      | undefined
+      RunRow | undefined
 
     return row === undefined ? undefined : toRun(row)
   }

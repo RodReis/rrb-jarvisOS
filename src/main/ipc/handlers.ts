@@ -1502,12 +1502,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 
   ipcMain.handle(
     IPC_CHANNELS.mergePolicyDefinir,
-    (
-      _event,
-      projectId: unknown,
-      autonomo: unknown,
-      workspace: unknown
-    ): MergePolicyOutcome => {
+    (_event, projectId: unknown, autonomo: unknown, workspace: unknown): MergePolicyOutcome => {
       if (
         !isWorkspaceId(workspace) ||
         typeof projectId !== 'string' ||

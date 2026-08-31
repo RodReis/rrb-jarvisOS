@@ -18,10 +18,7 @@
  */
 
 import type { WorkspaceId } from '@shared/domain/entities'
-import type {
-  MergePolicyOutcome,
-  PoliticaDeMerge
-} from '@shared/domain/pipeline'
+import type { MergePolicyOutcome, PoliticaDeMerge } from '@shared/domain/pipeline'
 import { log } from '../logging/logger'
 import type { AuditRepository } from '../storage/audit-repository'
 import type { MergePolicyRepository } from './merge-policy-repository'
@@ -64,11 +61,7 @@ export class MergePolicyService {
    * a auditoria de não-eventos, e a pergunta "quando isto foi desligado" passaria a ter várias
    * respostas iguais.
    */
-  definir(
-    projectId: string,
-    workspaceId: WorkspaceId,
-    autonomo: boolean
-  ): MergePolicyOutcome {
+  definir(projectId: string, workspaceId: WorkspaceId, autonomo: boolean): MergePolicyOutcome {
     const userId = this.deps.userId()
     const identidade = this.deps.identidade()
 

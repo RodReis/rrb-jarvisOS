@@ -44,7 +44,11 @@ export class MergePolicyRepository {
 
   /** Grava a decisão. `upsert` porque a política é um estado corrente, não um histórico. */
   definir(
-    escopo: { readonly userId: string; readonly workspaceId: WorkspaceId; readonly projectId: string },
+    escopo: {
+      readonly userId: string
+      readonly workspaceId: WorkspaceId
+      readonly projectId: string
+    },
     autonomo: boolean,
     identidade: string,
     agora: Date

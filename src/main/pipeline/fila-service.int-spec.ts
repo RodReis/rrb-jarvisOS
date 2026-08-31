@@ -58,8 +58,24 @@ const MVPS: readonly Mvp[] = [
 ]
 
 const SLICES: readonly Slice[] = [
-  { id: 'f1', mvpId: 'm1', numero: 1, titulo: 'Fatia 1', specSlug: 'spec-f1', detalhada: true, origem },
-  { id: 'f2', mvpId: 'm1', numero: 2, titulo: 'Fatia 2', specSlug: 'spec-f2', detalhada: true, origem }
+  {
+    id: 'f1',
+    mvpId: 'm1',
+    numero: 1,
+    titulo: 'Fatia 1',
+    specSlug: 'spec-f1',
+    detalhada: true,
+    origem
+  },
+  {
+    id: 'f2',
+    mvpId: 'm1',
+    numero: 2,
+    titulo: 'Fatia 2',
+    specSlug: 'spec-f2',
+    detalhada: true,
+    origem
+  }
 ]
 
 /** As revisões que o gate `SLICE_ENTRY` cobre — o mesmo formato que a M8-F06 grava. */
@@ -102,8 +118,7 @@ function leaseNoBanco(): number {
 
 function estadoNoBanco(runId: string): string | undefined {
   const row = db.prepare('SELECT estado FROM pipeline_run WHERE id = ?').get(runId) as
-    | { estado: string }
-    | undefined
+    { estado: string } | undefined
   return row?.estado
 }
 
@@ -204,8 +219,9 @@ describe('máquina de estados contra o banco', () => {
 
     expect(continuacao.continuaDe).toBe(primeiro)
     expect(estadoNoBanco(primeiro)).toBe('BLOCKED')
-    expect(runs.listarDaFatia({ userId: USER, workspaceId: WS, projectId: PROJETO_A }, 'f1'))
-      .toHaveLength(2)
+    expect(
+      runs.listarDaFatia({ userId: USER, workspaceId: WS, projectId: PROJETO_A }, 'f1')
+    ).toHaveLength(2)
   })
 })
 
@@ -222,9 +238,7 @@ describe('gate SLICE_ENTRY (critério 7)', () => {
 
   it('recusa quando a SPEC mudou depois da aprovação: o hash não bate mais', () => {
     // É o critério 4 da M8-F06 valendo aqui: aprovar o texto antigo não aprova o novo.
-    aprovacoes = [
-      { ...aprovacaoDoPi(), revisoes: [{ artefato: 'spec-f1', hash: 'hash-antigo' }] }
-    ]
+    aprovacoes = [{ ...aprovacaoDoPi(), revisoes: [{ artefato: 'spec-f1', hash: 'hash-antigo' }] }]
     const run = fila.criarRun(PROJETO_A, WS, 'f1')
     fila.transicionar(PROJETO_A, WS, run.id, 'AWAITING_PI')
 

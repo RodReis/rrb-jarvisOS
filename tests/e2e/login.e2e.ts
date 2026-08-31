@@ -139,6 +139,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'createAutomation',
     'createProject',
     'createWorkflow',
+    'definirPoliticaDeMerge',
     'escolherAnexo',
     'gerarArquitetura',
     'gerarPacote',
@@ -157,6 +158,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'getWizardState',
     'getWorkspace',
     'importProject',
+    'lerPoliticaDeMerge',
     'listAllowedCommands',
     'listAllowedDirectories',
     'listAuditEvents',
@@ -216,7 +218,8 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'switchWorkspace',
     'updateWorkflow',
     'validarPrototipos',
-    'verifyAuditChain'
+    'verifyAuditChain',
+    'vistaDaFila'
   ])
 
   // Nenhum método entrega credencial — a superfície fechada é o critério 4 em runtime.
