@@ -57,6 +57,7 @@ flowchart LR
 3. Runtime registra auditoria antes e depois de ação sensível.
 4. Toda integração externa passa por adapter; credencial vive em vault/env, nunca em UI ou log.
 5. Segredos ausentes aparecem como `missing`, sem revelar valor.
+6. **O executor autônomo roda no container, nunca no host** (decisão do PI, 2026-08-29; implementada na M9-F03). A allowlist de comandos do MVP-004 governa o terminal **do usuário**; o agente que constrói software precisa rodar comando arbitrário, e a fronteira que reconcilia os dois é o Docker. Docker ausente é `BLOCKED_EXTERNAL` — **não existe fallback para o host**, e é essa ausência que fecha o buraco. O container recebe o worktree e a URL do proxy; **nenhum segredo**: token, chave e a sessão `~/.claude` ficam no main, e o proxy do host injeta a credencial e registra uso no ponto único (`AiCallService`).
 
 ## Resiliência
 
@@ -110,7 +111,10 @@ O reconciliador consulta as fontes reais antes de repetir efeitos. Uma saída de
 - O PI anexa `DESIGN-SYSTEM.md`, HTML e assets depois do PRD; arquitetura aguarda esses anexos.
 - Context7 atende documentação técnica atual; Tavily atende mercado e web geral.
 - Conteúdo externo é dado não confiável.
-- O checkout ativo nunca é cwd do executor; cada fatia usa worktree e base SHA registrados.
+- O checkout ativo nunca é cwd do executor; cada fatia usa worktree e base SHA registrados. O cwd do executor é sempre um caminho **de dentro do container** — `SandboxPreparado` não tem campo para o par no host, de propósito.
+- **O `.git` principal é montado somente-leitura no container, e o metadado do worktree vai copiado.** Não é preferência: o `commondir` de um worktree é relativo e resolve para `/` dentro do container (`fatal: not a git repository`), e objects e refs vivem no `.git` principal. Reescrever o `commondir` original **derruba o Git do host** — os dois lados precisam de caminhos diferentes no mesmo arquivo. Ambos medidos com Docker real na M9-F03.
+- **O worktree nasce com `core.autocrlf=false`.** No Windows o checkout padrão grava CRLF e o Git do container (Linux) lê toda a árvore como modificada — o gate de escopo acusaria fuga em todo arquivo do projeto.
+- **O escopo de arquivos de um run é registrado antes da execução**, no `ContextPack`, com a origem (`spec` ou `derivada`). É a lista registrada que vale no gate de diff — nunca uma inferência no instante do commit.
 - Git após aprovação é automático; merge não cria aceite adicional.
 - Documento/ADR auxiliar não bloqueia código depois da SPEC aprovada.
 - A pipeline não herda nem inventa classificação de saúde, finanças, documentos, LGPD ou consentimento.

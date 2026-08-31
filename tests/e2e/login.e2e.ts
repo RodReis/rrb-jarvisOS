@@ -141,6 +141,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'createWorkflow',
     'definirPoliticaDeMerge',
     'escolherAnexo',
+    'estadoDoSandbox',
     'gerarArquitetura',
     'gerarPacote',
     'gerarRoadmap',

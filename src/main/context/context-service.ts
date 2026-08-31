@@ -48,6 +48,7 @@ import {
   type OrcamentoDaEtapa,
   type OrigemDeContexto
 } from '@shared/domain/context-pack'
+import type { PathsPermitidos } from '@shared/domain/preflight'
 import { detectarSegredo } from '@shared/domain/segredos'
 import {
   resolverCapacidades,
@@ -86,6 +87,11 @@ export interface PedidoDeContexto {
   readonly motivoDaExpansao?: string
   /** O pack que este expande, quando é retomada. */
   readonly packAnterior?: string
+  /**
+   * O escopo de arquivos do run (SPEC-Entrega-03, critério 13). Só a pipeline preenche — uma
+   * geração avulsa não tem run, e exigir o campo aqui quebraria todo chamador do MVP-008.
+   */
+  readonly pathsPermitidos?: PathsPermitidos
 }
 
 interface ContextServiceDeps {
@@ -140,7 +146,15 @@ export function hashDoPack(entrada: Omit<ContextPack, 'id' | 'hash' | 'created_a
     ...entrada.itens.map(
       (item) =>
         `${item.caminho}|${item.hash}|${item.origem}|${item.bytes}|${item.linhas?.de ?? ''}-${item.linhas?.ate ?? ''}`
-    )
+    ),
+    // O escopo entra no canônico, e isso é load-bearing (SPEC-Entrega-03, critério 13). Fora
+    // dele, dois packs idênticos em conteúdo mas com **allowlists diferentes** colidiriam no
+    // hash, e `findByHash` devolveria o pack antigo — o run seguinte herdaria silenciosamente o
+    // escopo de outro. O `?? ''` no fim preserva o hash dos packs já persistidos, que não têm o
+    // campo: ausência continua hasheando como ausência.
+    entrada.pathsPermitidos === undefined
+      ? ''
+      : `${entrada.pathsPermitidos.origem}|${entrada.pathsPermitidos.paths.join(',')}`
   ].join('\n')
 
   return createHash('sha256').update(canonico, 'utf8').digest('hex')
@@ -310,7 +324,8 @@ export class ContextService {
         ? {}
         : { excecaoDeLeituraAmpla: pedido.excecaoDeLeituraAmpla }),
       rota: pedido.rota,
-      ...(pedido.packAnterior === undefined ? {} : { packAnterior: pedido.packAnterior })
+      ...(pedido.packAnterior === undefined ? {} : { packAnterior: pedido.packAnterior }),
+      ...(pedido.pathsPermitidos === undefined ? {} : { pathsPermitidos: pedido.pathsPermitidos })
     }
 
     const hash = hashDoPack(semHash)

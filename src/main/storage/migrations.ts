@@ -1033,6 +1033,33 @@ const MIGRATIONS: readonly string[] = [
     updated_at   TEXT NOT NULL,
     PRIMARY KEY (user_id, project_id)
   );
+  `,
+
+  // 24 — M9-F03: paths permitidos do run e correlação de custo com run/tentativa.
+  //
+  // `context_pack_path` é tabela filha com `ordem` (o modelo de `context_item`) e não JSON numa
+  // coluna: a lista é consultada por path quando o critério 6 mede fuga de escopo, e um JSON
+  // obrigaria a ler e parsear o pack inteiro para responder "este arquivo estava autorizado?".
+  //
+  // `run_id`/`tentativa` em `cost_event` são a emenda 7 de 2026-08-31: o critério 11 exige custo
+  // atribuído ao run e à tentativa, e correlacionar por `context_pack_id` deixaria a atribuição
+  // indireta e a tentativa sem representação nenhuma. Nulos porque toda chamada de IA anterior a
+  // esta fatia — e toda chamada fora de pipeline — não tem run.
+  `
+  CREATE TABLE context_pack_path (
+    pack_id       TEXT NOT NULL,
+    -- Prefixo relativo à raiz do worktree.
+    caminho       TEXT NOT NULL,
+    -- 'spec' (a SPEC declarou) | 'derivada' (o preflight inferiu da arquitetura aprovada).
+    origem        TEXT NOT NULL,
+    justificativa TEXT NOT NULL,
+    ordem         INTEGER NOT NULL,
+    PRIMARY KEY (pack_id, ordem)
+  );
+
+  ALTER TABLE cost_event ADD COLUMN run_id TEXT;
+  ALTER TABLE cost_event ADD COLUMN tentativa INTEGER;
+  CREATE INDEX idx_cost_event_run ON cost_event(user_id, run_id);
   `
 ]
 

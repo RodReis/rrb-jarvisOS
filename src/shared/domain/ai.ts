@@ -196,6 +196,12 @@ export interface AiRequest {
    */
   readonly contextPackId?: string
   /**
+   * O run e a tentativa da pipeline, quando a chamada vem do executor (SPEC-Entrega-03,
+   * critério 11). Ausentes em toda chamada fora de pipeline.
+   */
+  readonly runId?: string
+  readonly tentativa?: number
+  /**
    * `true` só para o painel de diagnóstico do Settings — a chamada que testa se o provider
    * responde, sem gerar nada para um projeto.
    *
