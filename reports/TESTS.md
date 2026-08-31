@@ -12,8 +12,8 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 857 | 857 | 0 | 69.5 | — | — |
-| — | — | — | Banco | 604 | 604 | 0 | 87.9 | — | — |
+| — | — | — | Regras de Negócio | 887 | 887 | 0 | 69.8 | — | — |
+| — | — | — | Banco | 632 | 632 | 0 | 87.9 | — | — |
 | — | — | — | Tela | 421 | 420 | 0 | 85.5 | — | — |
 
 ## Histórico por entrega
@@ -196,3 +196,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-08-30 | #101 | spec-entrega-01-publicacao-github | Regras de Negócio | 857 | 857 | 0 | 69.5 | #190 | [#190](https://github.com/RodReis/rrb-jarvisOS/pull/190) |
 | 2026-08-30 | #101 | spec-entrega-01-publicacao-github | Banco | 604 | 604 | 0 | 87.9 | #190 | [#190](https://github.com/RodReis/rrb-jarvisOS/pull/190) |
 | 2026-08-30 | #101 | spec-entrega-01-publicacao-github | Tela | 421 | 420 | 0 | 85.5 | #190 | [#190](https://github.com/RodReis/rrb-jarvisOS/pull/190) |
+| 2026-08-30 | #102 | spec-entrega-02-dag-fila-reconciliacao | Regras de Negócio | 887 | 887 | 0 | 69.8 | #208 | [#208](https://github.com/RodReis/rrb-jarvisOS/pull/208) |
+| 2026-08-30 | #102 | spec-entrega-02-dag-fila-reconciliacao | Banco | 632 | 632 | 0 | 87.9 | #208 | [#208](https://github.com/RodReis/rrb-jarvisOS/pull/208) |
+| 2026-08-30 | #102 | spec-entrega-02-dag-fila-reconciliacao | Tela | 421 | 420 | 0 | 85.5 | #208 | [#208](https://github.com/RodReis/rrb-jarvisOS/pull/208) |
