@@ -54,13 +54,12 @@ O loop por todas as fatias não pertence à V1. Ele só entra depois de a primei
 
 ## 4. Fora do escopo da V1
 
-- Codex ou múltiplos providers em produção.
+- Codex ou múltiplos executores de código na V1; entram somente na Pipeline V2.
 - Agent, Squad e scheduler genéricos.
 - Execução concorrente de várias fatias do mesmo projeto.
 - Execução automática de todos os MVPs até o encerramento do produto.
 - Runner GitHub self-hosted controlando o computador pessoal.
 - Deploy ou publicação de produção.
-- Ingresso de repositório existente; a prova começa pela criação de projeto novo.
 - Exclusão automática do repositório remoto ao remover um projeto do JARVIS OS.
 
 ## 5. Abordagens avaliadas
@@ -102,7 +101,7 @@ O renderer não acessa segredo, Node, processo, Git ou filesystem. Toda operaç�
 
 ### 6.3 Adapters
 
-- **Claude Code Adapter**: subprocesso local app-managed, argumentos controlados, cwd controlado, saída estruturada, timeout, cancelamento e kill da árvore de processos.
+- **Coding Executor Runtime**: contrato próprio para executores com ferramentas e filesystem; Claude Code é a primeira implementação, em container, com argumentos controlados, saída estruturada, timeout, cancelamento e kill da árvore de processos.
 - **GitHub Adapter**: owner, repo, issues, dependências, branch, PR, checks, merge e referências externas.
 - **Local Tool Adapter**: Git, build e testes dentro da allowlist.
 - **Artifact Validator**: JSON Schema, links documentais, escopo do diff, arquivos de debug e critérios executáveis.
@@ -599,7 +598,7 @@ A especificação e o plano podem ser preparados antes, mas a implementação de
 ## 19. Referências técnicas verificadas
 
 - Claude Code CLI: modo não interativo com `-p` e saída `json`/`stream-json`; limite de turns e allow/disallow tools devem ser configurados pelo adapter.
-- Codex futuro: o modo não interativo é `codex exec`; eventos são JSONL com `--json`, e o resultado final pode usar `--output-schema`. Não reutilizar as flags do Claude.
+- Codex entra somente na Pipeline V2 pelo `CodexExecExecutorAdapter`; o modo não interativo é `codex exec`, os eventos são JSONL com `--json` e o resultado final usa `--output-schema`. Não reutilizar flags ou parser do Claude.
 - GitHub: runner self-hosted não é considerado ambiente efêmero confiável; a V1 mantém Claude e credenciais fora do GitHub Actions.
 - Graphify: análise estrutural local e consulta por grafo podem reduzir leitura bruta; o índice é derivado e precisa ser preso ao SHA. `https://github.com/Graphify-Labs/graphify`
 - Caveman: compressão de saída pode adicionar contexto de entrada; economia líquida deve ser medida no provider. `https://github.com/JuliusBrussee/caveman` e `https://github.com/JuliusBrussee/caveman/blob/main/docs/HONEST-NUMBERS.md`
@@ -618,6 +617,23 @@ Depois da aprovação inicial, o PI decidiu continuar a especificação antes de
 - `MVP-009 Entrega Autônoma`: seis fatias para publicação, DAG/fila, worktree/Docker, construção/recuperação, revisão/CI/merge e evidência/limpeza.
 
 O `MVP-007 Memória Contextual/RAG` é slot proposto e não bloqueante. Documentos canônicos vivem em `docs/mvp/` e `docs/spec/`; as SPECs novas estão em revisão documental e **não autorizam implementação**.
+
+## 22. Emenda aprovada — contratos transversais e Pipeline V2 (2026-08-29)
+
+Uma auditoria posterior encontrou ambiguidades que afetavam execução segura e retomável. O PI aprovou as correções abaixo, detalhadas em `2026-08-29-pipeline-desenvolvimento-ia-v2-design.md`:
+
+- importar repositório existente faz parte da V1: o checkout é preservado e a pipeline trabalha em worktree gerido a partir do `HEAD`;
+- Git no host é endurecido contra hooks, filtros, drivers e outros comandos configuráveis pelo repositório;
+- revisão aprovada usa manifesto canônico e regra determinística de materialidade;
+- efeitos externos usam diário de intenção/confirmação e reconciliação de resultado ambíguo;
+- cancelamento preserva branch/PR e nunca desfaz merge confirmado;
+- gate de CI observa as regras da branch-base no `head SHA`; merge queue fica fora da V1;
+- a V1 possui um slot global de executor; concorrência começa na V2;
+- o container recebe somente autenticação de executor/MCP por mount dedicado, nunca GitHub, Vault ou segredo do projeto;
+- artefatos extensos elegíveis seguem retenção de 30 dias ou cota global de 5 GB;
+- rota de assinatura é `subscription_limited`, não `unmetered`.
+
+A Pipeline V2 foi aprovada como quatro MVPs: `MVP-010 Multi-executor`, `MVP-011 Squads limitados`, `MVP-012 Scheduler concorrente` e `MVP-013 Execução contínua`. A aprovação arquitetural permite especificá-los, mas não autoriza implementar suas fatias.
 
 ### Correções de interpretação
 
