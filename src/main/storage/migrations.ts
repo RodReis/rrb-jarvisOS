@@ -918,6 +918,46 @@ const MIGRATIONS: readonly string[] = [
     created_at   TEXT NOT NULL
   );
   CREATE INDEX idx_approval_gate ON approval(user_id, project_id, gate, created_at);
+  `,
+
+  // 22 — referências externas da publicação (SPEC-Entrega-01, emenda 6 de 2026-08-30).
+  //
+  // O que o app publicou no GitHub, e onde. Sem esta tabela, cada fatia seguinte teria de
+  // **redescobrir na origem** o que a M9-F01 acabou de criar: a M9-F05 precisa do número da
+  // issue para escrever `refs #N`, e a reconciliação da M9-F02 precisa dos SHAs. Redescobrir
+  // é uma chamada de rede a mais por fatia e uma resposta que pode ter mudado no intervalo.
+  //
+  // `alvo` + `chave_externa` é o par que identifica o recurso: `alvo` diz **o que é**
+  // (repositório, issue, branch), `chave_externa` diz **qual** — a mesma chave determinística
+  // que o corpo da issue carrega. O `UNIQUE` sobre eles é o que faz republicar atualizar em
+  // vez de acumular linhas, e é a metade local da idempotência que o `ensure*` garante do
+  // lado do GitHub.
+  //
+  // `limitacao` guarda o que **não** foi possível fazer (emenda 2): proteção de branch recusada
+  // por plano da conta é limitação registrada, não falha da publicação. Guardá-la aqui, junto
+  // do recurso, é o que permite a M9-F05 ler "esta branch não tem proteção" sem perguntar de
+  // novo à origem — e sem confundir "não protegida" com "ainda não publicada".
+  `
+  CREATE TABLE external_ref (
+    id            TEXT PRIMARY KEY,
+    user_id       TEXT NOT NULL,
+    workspace_id  TEXT NOT NULL,
+    project_id    TEXT NOT NULL,
+    -- 'repositorio' | 'issue' | 'branch'. Enum no domínio; TEXT aqui, como o resto do schema.
+    alvo          TEXT NOT NULL,
+    chave_externa TEXT NOT NULL,
+    -- O id do recurso na origem: owner/repo, o número da issue, o nome da branch.
+    ref_id        TEXT NOT NULL,
+    url           TEXT,
+    -- O SHA publicado, quando o recurso tem um (branch). NULL para issue.
+    sha           TEXT,
+    -- O que não foi possível configurar, e por quê. NULL quando não há limitação.
+    limitacao     TEXT,
+    created_at    TEXT NOT NULL,
+    updated_at    TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX idx_external_ref_chave
+    ON external_ref(user_id, project_id, alvo, chave_externa);
   `
 ]
 

@@ -114,6 +114,7 @@ describe('ponte do preload', () => {
       'onAuthChanged',
       'pickAllowedDirectory',
       'pickProjectDirectory',
+      'publicarNoGitHub',
       'removeAllowedCommand',
       'removeAllowedDirectory',
       'removeAutomation',

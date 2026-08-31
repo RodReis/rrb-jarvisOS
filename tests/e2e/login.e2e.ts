@@ -183,6 +183,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'onAuthChanged',
     'pickAllowedDirectory',
     'pickProjectDirectory',
+    'publicarNoGitHub',
     'removeAllowedCommand',
     'removeAllowedDirectory',
     'removeAutomation',

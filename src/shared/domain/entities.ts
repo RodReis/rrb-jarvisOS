@@ -291,7 +291,17 @@ export const AUDIT_EVENT_TYPES = [
   // exatamente essa distinção que a invariante 3 existe para manter.
   //
   // O payload carrega gate, contagem de revisões e a identidade; nunca o conteúdo aprovado.
-  'approval'
+  'approval',
+  // SPEC-Entrega-01: a publicação do repositório e do backlog aprovado no GitHub. Tipo próprio, e
+  // **não** `connector-call`, porque a pergunta que ele responde é sobre o **efeito no mundo**: que
+  // repositório passou a existir, com que commit, e quantos recursos nasceram nesta execução. Sob
+  // `connector-call`, "o projeto foi publicado" viraria uma sequência de nove chamadas que alguém
+  // precisaria remontar — e o critério 1 se mede exatamente pela contagem de criações.
+  //
+  // O payload carrega o repositório, a branch, o commit confirmado **na origem** e a contagem de
+  // criados; nunca o token, que não chega a este serviço a não ser para o push (e é redigido antes
+  // de qualquer registro, pelo `argsSeguros` do terminal).
+  'publicacao-github'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]

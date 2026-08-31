@@ -30,6 +30,19 @@ Executar somente o que foi aprovado, em worktree isolado, com WIP=1, Git automá
 | 2 | **Merge autônomo ligado por padrão, com kill-switch por projeto**; desligado, o run termina no PR verde aguardando o PI | M9-F05 |
 | 3 | **Context7 é ferramenta do agente construtor** (MCP) na entrada do executor, não conector do app | M9-F04 |
 
+## Decisões estruturais do PI (2026-08-30) — revisão de furos de spec
+
+| # | Decisão | Onde |
+|---|---|---|
+| 4 | **O executor autentica por proxy no host**: o container recebe só `ANTHROPIC_BASE_URL`; o main injeta a credencial/sessão e registra no ponto único do MVP-005. "Nenhum segredo entra no container" permanece literal. O proxy é escopo da M9-F03 | M9-F03, M9-F04 |
+| 5 | **A pipeline gera o CI do projeto-alvo** (`.github/workflows/ci.yml` a partir dos comandos de validação do pacote) no primeiro PR; **sem check configurado nunca é verde** | M9-F05 |
+| 6 | **WIP=1 é slot global**, não por projeto; concorrência é o MVP-012 | M9-F02 |
+| 7 | A branch `codex/pipeline-v2-design` (MVP-7, 10–16 e emendas) foi **enviada ao remoto** e vai à `main` por PR de docs; as emendas dela ao MVP-009 que contradizem estas decisões (segredo mínimo no container, WIP global já contemplado) são resolvidas por este documento | processo |
+
+**Por que a decisão 4 importa.** A versão anterior das SPECs proibia qualquer segredo no container e, ao mesmo tempo, mandava o Claude Code rodar nele — a assinatura MAX vive em `~/.claude` do host, então o executor não teria como chamar modelo nenhum. O proxy resolve sem furar o critério: o segredo fica no main, e toda chamada passa pelo mesmo gate de orçamento e ledger das outras rotas.
+
+**Por que a decisão 5 importa.** `checksAprovam` da M6-F04 recusa lista vazia por decisão registrada (verde sem verificador é mentira). O projeto gerado pelo MVP-008 não nasce com CI; sem alguém criá-lo, nenhum run chegaria a `MERGED`.
+
 **Por que a decisão 1 importa.** O MVP-004 criou a allowlist de comandos para o app não rodar comando arbitrário. Um agente que constrói software precisa rodar comando arbitrário — a allowlist não pode governá-lo sem inviabilizá-lo. Sem uma fronteira nova, o MVP-009 seria um caminho para executar qualquer coisa na máquina, passando por cima do enforcement que o MVP-004 entregou. O container é essa fronteira.
 
 ## Dependências duras registradas
@@ -46,7 +59,9 @@ Executar somente o que foi aprovado, em worktree isolado, com WIP=1, Git automá
 - CI verde precisa corresponder ao `head SHA` mergeado.
 - Reinício não duplica commit, issue, PR ou merge.
 - Merge técnico não cria outro aceite do PI.
-- O executor roda em container; nenhum segredo entra nele e ele nunca fala com o GitHub.
+- O executor roda em container; nenhum segredo entra nele (modelo via proxy no host) e ele nunca fala com o GitHub (egress negado, não só instrução).
+- Validação disparada pelo app roda no container, nunca no host.
+- Kill-switch desligado termina em `AWAITING_MERGE`, não em `BLOCKED`.
 
 ## Done do MVP
 

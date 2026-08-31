@@ -30,6 +30,9 @@ import {
   origemDaApi,
   significadoDo404,
   validarEntrada,
+  type CommitShaInput,
+  type EnsureBranchProtectionInput,
+  type EnsureLabelInput,
   type EnsureBranchRefInput,
   type EnsureIssueDependencyInput,
   type EnsureIssueInput,
@@ -37,18 +40,23 @@ import {
   type EnsureRepositoryInput,
   type HeadShaInput,
   type PullRequestInput,
+  type SetDefaultBranchInput,
   type SquashMergeInput
 } from '@shared/domain/github-automation'
 import type { ConnectorAdapter, ConnectorExecution } from '../adapter'
 import {
+  ensureBranchProtection,
   ensureBranchRef,
   ensureIssue,
+  ensureLabel,
   ensureIssueDependency,
   ensurePullRequest,
   ensureRepository,
   getChecksForHead,
+  getCommitSha,
   getMergeState,
   getWorkflowRunsForHead,
+  setDefaultBranch,
   squashMerge,
   FalhaRest,
   type ResultadoDeOperacao
@@ -200,6 +208,18 @@ export class GithubAdapter implements ConnectorAdapter {
 
       case GITHUB_OPERATIONS.getMergeState:
         return await getMergeState(rest, input as PullRequestInput)
+
+      case GITHUB_OPERATIONS.setDefaultBranch:
+        return await setDefaultBranch(rest, input as SetDefaultBranchInput)
+
+      case GITHUB_OPERATIONS.ensureBranchProtection:
+        return await ensureBranchProtection(rest, input as EnsureBranchProtectionInput)
+
+      case GITHUB_OPERATIONS.getCommitSha:
+        return await getCommitSha(rest, input as CommitShaInput)
+
+      case GITHUB_OPERATIONS.ensureLabel:
+        return await ensureLabel(rest, input as EnsureLabelInput)
 
       default:
         // Inalcançável pelo caminho normal (o registro filtra antes), mas o `default` mantém a

@@ -12,8 +12,8 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 839 | 839 | 0 | 70.5 | — | — |
-| — | — | — | Banco | 563 | 563 | 0 | 87.6 | — | — |
+| — | — | — | Regras de Negócio | 857 | 857 | 0 | 69.5 | — | — |
+| — | — | — | Banco | 604 | 604 | 0 | 87.9 | — | — |
 | — | — | — | Tela | 421 | 420 | 0 | 85.5 | — | — |
 
 ## Histórico por entrega
@@ -184,3 +184,15 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-08-30 | #99 | spec-planejamento-06-roadmap-aprovacoes | Regras de Negócio | 839 | 839 | 0 | 70.5 | #178 | [#178](https://github.com/RodReis/rrb-jarvisOS/pull/178) |
 | 2026-08-30 | #99 | spec-planejamento-06-roadmap-aprovacoes | Banco | 563 | 563 | 0 | 87.6 | #178 | [#178](https://github.com/RodReis/rrb-jarvisOS/pull/178) |
 | 2026-08-30 | #99 | spec-planejamento-06-roadmap-aprovacoes | Tela | 421 | 420 | 0 | 85.5 | #178 | [#178](https://github.com/RodReis/rrb-jarvisOS/pull/178) |
+| 2026-08-30 | #101 | spec-entrega-01-publicacao-github | Regras de Negócio | 857 | 857 | 0 | 69.8 | #190 | [#190](https://github.com/RodReis/rrb-jarvisOS/pull/190) |
+| 2026-08-30 | #101 | spec-entrega-01-publicacao-github | Banco | 594 | 566 | 0 | 86.7 | #190 | [#190](https://github.com/RodReis/rrb-jarvisOS/pull/190) |
+| 2026-08-30 | #101 | spec-entrega-01-publicacao-github | Tela | 421 | 420 | 0 | 85.5 | #190 | [#190](https://github.com/RodReis/rrb-jarvisOS/pull/190) |
+| 2026-08-30 | #101 | spec-entrega-01-publicacao-github | Regras de Negócio | 857 | 857 | 0 | 69.8 | #190 | [#190](https://github.com/RodReis/rrb-jarvisOS/pull/190) |
+| 2026-08-30 | #101 | spec-entrega-01-publicacao-github | Banco | 594 | 585 | 0 | 87.6 | #190 | [#190](https://github.com/RodReis/rrb-jarvisOS/pull/190) |
+| 2026-08-30 | #101 | spec-entrega-01-publicacao-github | Tela | 421 | 420 | 0 | 85.5 | #190 | [#190](https://github.com/RodReis/rrb-jarvisOS/pull/190) |
+| 2026-08-30 | #101 | spec-entrega-01-publicacao-github | Regras de Negócio | 857 | 857 | 0 | 69.8 | #190 | [#190](https://github.com/RodReis/rrb-jarvisOS/pull/190) |
+| 2026-08-30 | #101 | spec-entrega-01-publicacao-github | Banco | 594 | 594 | 0 | 87.7 | #190 | [#190](https://github.com/RodReis/rrb-jarvisOS/pull/190) |
+| 2026-08-30 | #101 | spec-entrega-01-publicacao-github | Tela | 421 | 420 | 0 | 85.5 | #190 | [#190](https://github.com/RodReis/rrb-jarvisOS/pull/190) |
+| 2026-08-30 | #101 | spec-entrega-01-publicacao-github | Regras de Negócio | 857 | 857 | 0 | 69.5 | #190 | [#190](https://github.com/RodReis/rrb-jarvisOS/pull/190) |
+| 2026-08-30 | #101 | spec-entrega-01-publicacao-github | Banco | 604 | 604 | 0 | 87.9 | #190 | [#190](https://github.com/RodReis/rrb-jarvisOS/pull/190) |
+| 2026-08-30 | #101 | spec-entrega-01-publicacao-github | Tela | 421 | 420 | 0 | 85.5 | #190 | [#190](https://github.com/RodReis/rrb-jarvisOS/pull/190) |
