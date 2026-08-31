@@ -1483,6 +1483,7 @@ Status: **entregue** — spec `aprovada-pi` (2026-08-29, emendada em 2026-08-30 
 - [x] **`ContextPack` ganhou `pathsPermitidos`** — e o campo entrou no **canônico do `hashDoPack`**
 - [x] **Canal `sandbox:estado`** — só leitura, como os três da M9-F02; nenhum prepara sandbox
 - [x] **Testes**: 19 de integração (SQLite + Git real), 8 do proxy (HTTP real), 17 de domínio puro
+- [x] **`scripts/smoke-sandbox.mjs`** — o smoke com Docker real, 7 passos, sem efeito externo (`docs/TESTING.md` §3.4)
 
 **Quatro furos da spec foram medidos e levados ao PI antes de codificar.** Nenhum era opinião: cada um foi reproduzido antes de virar pergunta.
 
