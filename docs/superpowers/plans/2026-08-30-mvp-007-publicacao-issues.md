@@ -1,6 +1,6 @@
 # Plano de publicação — MVP-007: Memória compartilhada
 
-- Estado: planejamento e publicação autorizados pelo PI; épico #179 e oito fatias #180–#187 publicados. F01–F05 aprovadas/Backlog; F06–F08 Planejadas/a redigir.
+- Estado: planejamento e publicação autorizados pelo PI; épico #179 e oito fatias #180–#187 publicados. F01–F05 aprovadas/Backlog; F06 Planejada/em revisão pelo PI; F07–F08 Planejadas/a redigir.
 - Não é SPEC aprovada, plano de execução de código nem aceite do design completo. As pendências abaixo permanecem abertas.
 - Base: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`, decisões parciais registradas até o commit local `574d359`.
 - Índice canônico Fatia ↔ SPEC e links de issues: `docs/STATUS.md`. Não criar slugs de SPEC inexistente; estado inicial: a redigir.
@@ -42,7 +42,7 @@ Estabelecer o contrato comum e a memória local compartilhada, distinguindo regi
 - Persistência local existente, proveniência, deduplicação, revisões, contradições e invalidação de conhecimento atual.
 - Fronteira entre histórico referenciado, conhecimento derivado e avaliação de lições.
 
-**Alvos de verificação (a detalhar na SPEC):**
+**Alvos de verificação detalhados na SPEC em revisão:**
 
 - [ ] Reentrega idêntica não duplica; conteúdo divergente na mesma identidade/revisão gera conflito.
 - [ ] Eventos fora de ordem não tornam revisão antiga vigente; fontes semelhantes não se fundem apenas pelo texto.
@@ -176,10 +176,12 @@ Conectar registros dos módulos disponíveis e registrar avaliações de liçõe
 - [ ] Sem critério/evidência suficiente, permanece candidata e desenvolvimento continua.
 - [ ] Mudança relevante ou contradição retira validade vigente; decisão do PI não se confunde com prova empírica.
 
-**Pendências explícitas:**
+**Decisões consolidadas na SPEC em revisão:**
 
-- Primeiros módulos concretos integrados, capacidades e contrato de avaliação/estados.
-- Critérios verificáveis de cada integração; não criar todos os menus futuros nem depender de Graphify.
+- Primeiros avaliadores: expectativa de execução e gate de entrega; outras fontes declaram cobertura explícita.
+- Ledger imutável; estados derivados `candidate | validated | needs_revalidation`; critérios/dimensões pertencem ao módulo.
+- Validação limitada ao projeto de origem, fila transacional/reprocessamento auditável e recuperação filtrada pela F03.
+- Não criar menus futuros, motor genérico, chamada de modelo, generalização automática nem dependência de Graphify.
 
 ### M7-F07 — Agent Memory e Notebook
 

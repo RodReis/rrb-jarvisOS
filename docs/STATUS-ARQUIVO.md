@@ -402,3 +402,9 @@ O rascunho completo `docs/spec/spec-memoria-05-adapter-graphify.md` fixa `graphi
 O PI aprovou a revisão exata `6f8c7f66c4c582b912f17af462f3f63047ad8382` de `docs/spec/spec-memoria-05-adapter-graphify.md`, preservando os vinte critérios e limites. A #184 passa de `proplan:planejado` para `proplan:backlog`, mantendo parent #179 e dependências #182/#183; F06–F08 continuam Planejadas e nenhuma issue recebe `next`.
 
 Arquitetura, convenções, plano e índice passam a apontar para o contrato aprovado. O acervo local sobe para 85 SPECs aprovadas. O aceite não instala/executa Graphify, não inicia implementação e não altera o conteúdo técnico da revisão aceita.
+
+## 2026-09-01 — Desenho da M7-F06 aprovado e SPEC redigida para revisão
+
+O PI aprovou o desenho detalhado de memória operacional com ledger imutável, estados derivados `candidate | validated | needs_revalidation`, validação limitada ao projeto de origem, cobertura explícita e avaliadores determinísticos de expectativa de execução e gate de entrega. Critério e dimensões materiais pertencem ao módulo de origem; a memória coordena sem declarar sucesso. Repetição não aumenta evidência, aprovação do PI não vira prova empírica e PR/CI/merge não viram alegação de impacto.
+
+O rascunho `docs/spec/spec-memoria-06-validacao-licoes-operacionais.md` define fila transacional, idempotência, retries/pausa, reprocessamento auditável, limites, integração com F02/F03/F04 e vinte critérios. Módulos não integrados declaram `available | unavailable | unsupported | stale`; perda ou contradição da prova retira a validação vigente sem bloquear desenvolvimento ou ressuscitar conteúdo excluído. A #185 permanece `proplan:planejado` até aceite da revisão exata; não houve implementação, UI, chamada de modelo, Graphify, mudança de `next` ou novo gate humano.
