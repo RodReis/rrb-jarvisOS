@@ -2,7 +2,8 @@
 
 - MVP/Fatia: MVP-007 · M7-F05.
 - Issue: [#184](https://github.com/RodReis/rrb-jarvisOS/issues/184); épico [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179).
-- Status: **rascunho-completo para revisão do PI**; issue permanece em `proplan:planejado`; implementação não autorizada.
+- Status: **aprovada-pi** (2026-09-01); issue em `proplan:backlog`; implementação não iniciada.
+- Revisão aprovada: `6f8c7f66c4c582b912f17af462f3f63047ad8382`, aceite explícito do PI nesta conversa. Esta atualização registra somente o aceite, sem alterar o contrato técnico.
 - Depende de: M7-F03 (#182), revisão aprovada `c3b546a1787961bb0b9bb407cd7213d5b7046b1b`, e M7-F04 (#183), revisão aprovada `027f8274dc4e3d39a6fc24ce394ea6b53d70f986`.
 - Design: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`, seções 2, 8, 9, 12 e 18.
 - Índice canônico: `docs/STATUS.md`.
@@ -304,6 +305,6 @@ O smoke Graphify usa runtime/corpus temporários, nunca o checkout de desenvolvi
 
 ## Limites de autorização e perguntas abertas
 
-Esta revisão documenta o contrato aprovado em conversa e não instala, executa ou implementa Graphify. Não move #184 para Backlog antes do aceite explícito da revisão exata pelo PI, não altera `next` e não modifica a cadência de MVPs já aprovados.
+Esta revisão documenta o contrato aprovado em conversa e não instala, executa ou implementa Graphify. O PI aprovou a revisão exata `6f8c7f66c4c582b912f17af462f3f63047ad8382` em 2026-09-01; somente #184 passa de Planejado para Backlog, sem alteração de `next` ou da cadência dos MVPs já aprovados.
 
 Perguntas abertas para esta fatia: nenhuma. Compatibilidade real de `0.9.53` é critério de implementação/teste, não decisão documental pendente. Descoberta de incompatibilidade exige manter fallback e propor mudança de versão em nova revisão, sem escolher silenciosamente outra release.

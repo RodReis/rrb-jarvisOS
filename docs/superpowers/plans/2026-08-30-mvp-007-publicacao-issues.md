@@ -1,6 +1,6 @@
 # Plano de publicação — MVP-007: Memória compartilhada
 
-- Estado: planejamento e publicação autorizados pelo PI em 2026-08-30; épico #179 e oito fatias #180–#187 publicados. F01–F04 aprovadas/Backlog; F05–F08 Planejadas/a redigir.
+- Estado: planejamento e publicação autorizados pelo PI; épico #179 e oito fatias #180–#187 publicados. F01–F05 aprovadas/Backlog; F06–F08 Planejadas/a redigir.
 - Não é SPEC aprovada, plano de execução de código nem aceite do design completo. As pendências abaixo permanecem abertas.
 - Base: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`, decisões parciais registradas até o commit local `574d359`.
 - Índice canônico Fatia ↔ SPEC e links de issues: `docs/STATUS.md`. Não criar slugs de SPEC inexistente; estado inicial: a redigir.
@@ -133,7 +133,7 @@ Gerenciar dados duráveis e projeções compactáveis, reconstruindo derivados s
 
 ### M7-F05 — Adapter opcional do Graphify
 
-**SPEC em revisão (2026-09-01):** `docs/spec/spec-memoria-05-adapter-graphify.md`. O desenho detalhado foi aprovado pelo PI; a revisão escrita ainda não recebeu aceite exato. #184 permanece Planejada e implementação não está autorizada.
+**SPEC aprovada (2026-09-01):** `docs/spec/spec-memoria-05-adapter-graphify.md`, revisão exata `6f8c7f66c4c582b912f17af462f3f63047ad8382`, incluindo vinte critérios. #184 passa a Backlog; nenhuma implementação iniciada.
 
 **Dependências diretas:** M7-F03, M7-F04.
 **Fonte:** seções 2, 8, 9 e 12 do design.
@@ -154,8 +154,8 @@ Integrar Graphify como produtor substituível de relações derivadas, sem torn�
 
 **Pendências explícitas:**
 
-- Resolvidas no rascunho: baseline `graphifyy==0.9.53`, interface, runtime isolado, comandos lógicos/físicos, schemas, cadência, orçamento, execução não interativa, fallback e fixtures.
-- Falta somente revisão/aceite exato da SPEC; compatibilidade real da baseline será provada na implementação e não é presumida pelo documento.
+- Resolvidas na revisão aprovada: baseline `graphifyy==0.9.53`, interface, runtime isolado, comandos lógicos/físicos, schemas, cadência, orçamento, execução não interativa, fallback e fixtures.
+- Compatibilidade real da baseline será provada na implementação e não é presumida pelo aceite documental.
 
 ### M7-F06 — Memória operacional e validação de lições
 

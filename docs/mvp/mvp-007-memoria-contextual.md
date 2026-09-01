@@ -1,6 +1,6 @@
 # MVP-007 — Memória Contextual e RAG
 
-- Status: **SPECs da F01–F04 aprovadas/Backlog; desenho da F05 aprovado e SPEC em revisão; F06–F08 Planejadas/a redigir; implementação não autorizada**.
+- Status: **SPECs da F01–F05 aprovadas/Backlog; F06–F08 Planejadas/a redigir; implementação não autorizada**.
 - Origem: recorte de memória híbrida/RAG anteriormente associado ao Corte 3.
 - Relação com a pipeline: **não bloqueia MVP-008, MVP-009 nem MVP-016**; a M16-F05 mantém escopo próprio e integração reutilizável.
 - Design em elaboração: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`.
@@ -59,7 +59,7 @@ Evento problemático vira pendência durável com identificação, motivo e refe
 
 Adapter substituível sob contrato próprio dos produtos, sem definir o modelo central pelo formato interno do Graphify. Recebe apenas fontes selecionadas com identidade/revisão, sem ampliar acessos ou instalar configurações globais automaticamente. Extração estrutural local de código e enriquecimento semântico de documentos/notas pelos executores autorizados, dentro do orçamento existente, sem migração silenciosa para API paga; compatibilidade concreta ainda será verificada.
 
-Saída normaliza relações com fonte, revisão e distinção entre extração e inferência; correções/remoções invalidam relações antigas antes de apresentá-las como atuais. O desenho da M7-F05 exclui `save-result`/`reflect`, fixa runtime isolado e baseline `graphifyy==0.9.53`, mantém uma projeção local ignorada por projeto-alvo e usa atualização incremental a cada quatro PRs após a fundação. Perguntas finais são ignoradas; consulta progressiva usa delta do Git e confirma fatos no arquivo atual. Ausência/incompatibilidade mantém busca básica. Detalhes completos estão no rascunho `docs/spec/spec-memoria-05-adapter-graphify.md`, ainda sem aceite da revisão exata e sem implementação.
+Saída normaliza relações com fonte, revisão e distinção entre extração e inferência; correções/remoções invalidam relações antigas antes de apresentá-las como atuais. A M7-F05 aprovada exclui `save-result`/`reflect`, fixa runtime isolado e baseline `graphifyy==0.9.53`, mantém uma projeção local ignorada por projeto-alvo e usa atualização incremental a cada quatro PRs após a fundação. Perguntas finais são ignoradas; consulta progressiva usa delta do Git e confirma fatos no arquivo atual. Ausência/incompatibilidade mantém busca básica. Contrato completo: `docs/spec/spec-memoria-05-adapter-graphify.md`, revisão `6f8c7f6`; sem implementação.
 
 ## Validação das lições fora da pipeline aprovada
 
@@ -87,7 +87,7 @@ A M7-F01 foi aprovada pelo PI em 2026-08-30: `docs/spec/spec-memoria-01-nucleo-i
 
 A M7-F04 foi aprovada pelo PI em 2026-08-30: `docs/spec/spec-memoria-04-retencao-reconstrucao.md`, revisão `027f8274dc4e3d39a6fc24ce394ea6b53d70f986`. O aceite cobre compactação reversível após 30 dias, reconstrução por partição/geração com retomada, exclusão escopada e barreira contra reingestão, capacidade/agenda e vinte critérios. Não depende da F03 ou do Graphify e preserva os donos de originais, auditoria e ContextPacks congelados. #183 passa a Backlog, mantendo dependência única #181; nenhuma implementação iniciada.
 
-A M7-F05 possui desenho detalhado aprovado em 2026-09-01 e rascunho completo em `docs/spec/spec-memoria-05-adapter-graphify.md`. O texto fecha adapter/runtime/checkpoint, criação após a fatia marcada como fundação, atualização a cada quatro PRs, consulta progressiva, execução não interativa, expurgo, fallback e vinte critérios. A #184 permanece Planejada até o PI aprovar a revisão exata; não houve instalação ou implementação.
+A M7-F05 foi aprovada pelo PI em 2026-09-01: `docs/spec/spec-memoria-05-adapter-graphify.md`, revisão `6f8c7f66c4c582b912f17af462f3f63047ad8382`. O aceite cobre adapter/runtime/checkpoint, criação após a fatia marcada como fundação, atualização a cada quatro PRs, consulta progressiva, execução não interativa, expurgo, fallback e vinte critérios. A #184 passa a Backlog; não houve instalação ou implementação.
 
 ## Não decidido
 
@@ -95,7 +95,7 @@ A M7-F05 possui desenho detalhado aprovado em 2026-09-01 e rascunho completo em 
 - integrações das fontes futuras além de Git, decisões e notas; cobertura, corte, confirmação, retomada, pendências e retentativas dessas três entradas estão resolvidos na F02;
 - extensões futuras da manutenção além dos contratos aprovados na F04; sincronização fora deste recorte;
 - extensões futuras de consulta além do contrato inicial aprovado na F03; busca, índice incremental, sessões/expansões, limites e ponte com ContextPack estão resolvidos nessa revisão;
-- aceite da revisão exata da M7-F05; assinaturas, schemas, baseline, execução e testes já estão redigidos e não devem ser reinventados antes da revisão;
+- extensões futuras do Graphify além do contrato inicial aprovado na M7-F05; compatibilidade real da baseline continua sendo prova de implementação;
 - formato de avaliação, estados/transições e critérios concretos das integrações para lições fora da pipeline, conforme o modelo aprovado;
 - critérios de aceite finais, interfaces formais e aprovação das SPECs de F06–F08.
 
