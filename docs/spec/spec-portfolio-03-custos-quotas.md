@@ -2,11 +2,11 @@
 
 - MVP/Fatia: MVP-024 · M24-F03.
 - Issue: [#220](https://github.com/RodReis/rrb-jarvisOS/issues/220); épico [#213](https://github.com/RodReis/rrb-jarvisOS/issues/213).
-- Status: **rascunho-completo** (2026-08-31). Redação concluída; aceite exato de MVP/SPEC antes da construção ainda não presumido.
+- Status: **aprovada-pi** em 2026-08-31, revisão exata `6a6e702a4d6ced5820d3f4c7674d6278f0b2d391`.
 - Design: `docs/superpowers/specs/2026-08-31-mvp-024-portfolio-design.md`.
 - Depende de: [#218](https://github.com/RodReis/rrb-jarvisOS/issues/218), [#157](https://github.com/RodReis/rrb-jarvisOS/issues/157).
 - Rastreabilidade: P-FR03/P-FR04/P-NFR02; requisitos definidos no design, não escopo novo.
-- Implementação: não iniciada por este documento.
+- Implementação: não iniciada; o aceite habilita o Backlog, sem alterar `next` ou a fila.
 
 ## Objetivo e fronteira
 
@@ -53,4 +53,4 @@ Executar os scripts existentes de typecheck, lint, testes e build; relatório ge
 
 ## Encerramento documental
 
-Não há decisão estrutural delegada implicitamente à construção. Limites e desenhos acima são proposta completa desta revisão. Revisão/aceite de entrada do PI e anexos visuais quando aplicáveis permanecem requisitos existentes; não bloqueiam publicar este planejamento nem autorizam código por inferência.
+Não há decisão estrutural delegada implicitamente à construção. Limites e desenhos acima foram aceitos na revisão exata registrada. Dependências, fila e anexos visuais quando aplicáveis permanecem requisitos de entrada; o aceite não inicia código por inferência.

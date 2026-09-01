@@ -99,3 +99,7 @@ Planejamento/índice/25 issues completos, baselines preservados, PR atualizado s
 A execução CI [33398038285](https://github.com/RodReis/rrb-jarvisOS/actions/runs/33398038285) passou os testes, mas falhou na guarda append-only: o PR #211 entrou na base durante a execução e acrescentou seis linhas ao relatório gerado. A branch foi reconciliada por merge com `cae5320`; código e `reports/TESTS.md` foram preservados exatamente da nova base. Nova validação do head é obrigatória antes do merge, sem edição de números ou bypass. Os testes locais acima pertencem à base anterior; o CI posterior valida a base integrada.
 
 STATUS foi reconciliado com a entrega da #103, next #209 e falha #222. As dez SPECs novas, revisões aceitas e 25 issues V3 não mudaram nesta reconciliação. Esta nota conclui o registro documental; resultado final verificável está no PR, não em declaração antecipada de merge.
+
+## 9. Aceite posterior ao fechamento
+
+Em 2026-08-31, depois da integração do PR #189, o PI aprovou explicitamente as dez SPECs que este relatório havia deixado em `rascunho-completo`: M16-F05/F06, M23-F01–F04 e M24-F01–F04. A revisão aceita é `6a6e702a4d6ced5820d3f4c7674d6278f0b2d391`. O registro posterior não reescreve a evidência histórica das seções anteriores: atualiza o estado vivo para 25/25 SPECs V3 `aprovada-pi`, com as dez issues em Backlog, sem mudar `next` ou iniciar implementação. Os três gates de anexos visuais permanecem.

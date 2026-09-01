@@ -1,6 +1,6 @@
 # Design — MVP-023: Biblioteca de Blueprints
 
-- Status: **rascunho-completo** (2026-08-31); conclusão documental solicitada pelo PI, não aceite automático das novas SPECs.
+- Status: **design e quatro SPECs aprovados pelo PI** em 2026-08-31, revisão exata `6a6e702a4d6ced5820d3f4c7674d6278f0b2d391`.
 - Fonte de direção: `2026-08-29-pipeline-desenvolvimento-ia-v3-design.md`, Biblioteca de Blueprints.
 - Predecessor funcional: MVP-008. Nenhuma dependência dura do MVP-007, MVP-016 ou MVP-024.
 - Implementação: não iniciada; aprovações pré-construção preservadas.
@@ -102,4 +102,4 @@ Sem criar nova estética neste documento. F04 depende de DESIGN-SYSTEM e HTML fo
 
 Testes: contratos e hashes, fixtures Windows de paths, SQLite temporário, filesystem temporário, crash entre etapas, duplicação/replay, comparação de aprovação antes/depois e Playwright na jornada visual. Sem rede ou CLI paga para provar cópia.
 
-O planejamento fecha com estas quatro SPECs e suas issues; construção exige o aceite de entrada vigente, sem aceite duplo nem regra jurídica nova. Não há questão estrutural omitida; os anexos visuais são entrega do PI antes da fatia de UI, não artefato fictício deste documento.
+O planejamento fecha com estas quatro SPECs e suas issues, todas com aceite exato. A construção continua sujeita à fila, sem aceite duplo nem regra jurídica nova. Não há questão estrutural omitida; os anexos visuais são entrega do PI antes da fatia de UI, não artefato fictício deste documento.

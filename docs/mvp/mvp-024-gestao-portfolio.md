@@ -1,6 +1,6 @@
 # MVP-024 — Gestão de Portfólio
 
-- Status: **rascunho-completo** (2026-08-31); pacote de planejamento, sem implementação autorizada e sem aceite de SPEC presumido.
+- Status: **design e quatro SPECs aprovados pelo PI** em 2026-08-31, revisão exata `6a6e702a4d6ced5820d3f4c7674d6278f0b2d391`; implementação não iniciada e sujeita à fila.
 - GitHub: [#213](https://github.com/RodReis/rrb-jarvisOS/issues/213); fatias no índice canônico `docs/STATUS.md`.
 - Direção: Pipeline V3; design `docs/superpowers/specs/2026-08-31-mvp-024-portfolio-design.md`.
 - Dependências funcionais: MVP-012 (scheduler) e MVP-015 (observabilidade). Não depende de Blueprints ou memória.
@@ -45,4 +45,4 @@ Três projetos elegíveis e um incompleto são exibidos com evidência; o PI mud
 
 ## Antes da construção
 
-Preservar aprovação do MVP e de cada SPEC na entrada da fila. A F04 exige `DESIGN-SYSTEM.md` e protótipos HTML formais anexados pelo PI. Este planejamento define jornadas e estados, sem substituir esses anexos nem criar uma aprovação posterior ao deploy.
+O aceite das quatro SPECs habilita o Backlog, sem alterar `next`. A F04 exige `DESIGN-SYSTEM.md` e protótipos HTML formais anexados pelo PI. Este planejamento define jornadas e estados, sem substituir esses anexos nem criar uma aprovação posterior ao deploy.

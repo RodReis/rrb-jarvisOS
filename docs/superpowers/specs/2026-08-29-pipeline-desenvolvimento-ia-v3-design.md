@@ -1,8 +1,8 @@
 # Design — Pipeline V3: release, operação e aprendizado
 
-- Status: **direção da V3, designs dos MVPs 014–016, onze SPECs dos MVPs 014–015 e M16-F01–F04 aprovados pelo PI**; último aceite: F04, revisão `1cefc2c`, em 2026-08-30.
+- Status: **direção, cinco designs e 25 SPECs da V3 aprovados pelo PI**; último aceite: M16-F05/F06, MVP-023 e MVP-024, revisão exata `6a6e702a4d6ced5820d3f4c7674d6278f0b2d391`, em 2026-08-31.
 - Escopo deste documento: fronteira da Pipeline V3 e design detalhado do MVP-014. Os MVPs 015–016 possuem designs complementares próprios.
-- Implementação: **não autorizada por este documento**. Cada SPEC continua sujeita ao aceite pré-construção do PI.
+- Implementação: **não iniciada por este documento**. As 25 SPECs têm aceite exato, mas execução continua sujeita às dependências, à fila e aos gates visuais aplicáveis.
 - Predecessora: `2026-08-29-pipeline-desenvolvimento-ia-v2-design.md`.
 - Publicação: épicos [#149](https://github.com/RodReis/rrb-jarvisOS/issues/149), [#155](https://github.com/RodReis/rrb-jarvisOS/issues/155) e [#162](https://github.com/RodReis/rrb-jarvisOS/issues/162), com 17 fatias e dependências nativas; nenhuma nova issue recebeu `next`.
 
@@ -22,7 +22,7 @@ Produção é automática depois do merge e dos gates técnicos. Não existe um 
 4. **MVP-023 — Biblioteca de Blueprints.** Padrões de PRD, arquitetura, SPEC, DESIGN-SYSTEM, protótipos e perguntas orientadas com “Decide por mim”.
 5. **MVP-024 — Gestão de Portfólio.** Vários projetos, fila global, prioridade do PI, custo/quota por projeto e prontidão de planejamento.
 
-O MVP-014 está detalhado neste documento. O MVP-015 possui design e seis SPECs aprovadas em `2026-08-29-mvp-015-observabilidade-operacional-design.md`. O MVP-016 possui design e seis fatias aprovadas em `2026-08-29-mvp-016-aprendizado-operacional-design.md`; M16-F01–F04 estão `aprovada-pi` e F05–F06 estão redigidas em `rascunho-completo`. Blueprints e Portfólio foram detalhados em quatro SPECs cada, como MVP-023 e MVP-024: os números 017–022 já pertencem a Command Center/Shell. Os novos designs estão em `2026-08-31-mvp-023-blueprints-design.md` e `2026-08-31-mvp-024-portfolio-design.md`; nenhuma nova SPEC recebe aprovação presumida.
+O MVP-014 está detalhado neste documento. O MVP-015 possui design e seis SPECs aprovadas em `2026-08-29-mvp-015-observabilidade-operacional-design.md`. O MVP-016 possui design e seis SPECs `aprovada-pi` em `2026-08-29-mvp-016-aprendizado-operacional-design.md`. Blueprints e Portfólio foram detalhados e aprovados em quatro SPECs cada, como MVP-023 e MVP-024: os números 017–022 já pertencem a Command Center/Shell. Os designs estão em `2026-08-31-mvp-023-blueprints-design.md` e `2026-08-31-mvp-024-portfolio-design.md`.
 
 ## 3. Decisões do PI para o MVP-014
 
@@ -227,13 +227,13 @@ Uma fatia mergeada percorre Preview, Staging e Produção sem novo aceite, usa o
 
 ## 17. Gates e autorização
 
-Este design autoriza as cinco SPECs do MVP-014 e remete os MVPs 015–016 aos seus designs complementares aprovados. Não autoriza implementação, gasto novo, push ou PR. A publicação das issues dos MVPs 014–016 foi autorizada separadamente pelo PI e concluída em 2026-08-29. Quinze SPECs aprovadas estão em backlog; as duas fatias restantes do MVP-016 permanecem planejadas.
+Este design registra as cinco SPECs do MVP-014 e remete os demais MVPs aos designs complementares aprovados. Não inicia implementação nem gasto novo. As 25 SPECs da V3 estão aprovadas e em backlog; publicação e aceite não alteram `next`.
 
 Não resta questão estrutural aberta para o design do MVP-014. Nomes exatos de tipos, schemas IPC, migrations locais e divisão interna de arquivos pertencem às SPECs e não podem alterar os contratos acima.
 
 
 ## 18. Fechamento da Pipeline V3 (2026-08-31)
 
-Cinco MVPs, 25 fatias, 25 SPECs redigidas e 25 issues de fatia: MVP-014 (#149, #150–#154), MVP-015 (#155, #156–#161), MVP-016 (#162, #163–#168), MVP-023 (#212, #214–#217) e MVP-024 (#213, #218–#221). As quinze revisões já aprovadas conservam o aceite; as dez novas são rascunho-completo. A ordem operacional continua no STATUS, sem alteração do next.
+Cinco MVPs, 25 fatias, 25 SPECs redigidas, aprovadas e publicadas em 25 issues de fatia: MVP-014 (#149, #150–#154), MVP-015 (#155, #156–#161), MVP-016 (#162, #163–#168), MVP-023 (#212, #214–#217) e MVP-024 (#213, #218–#221). As dez últimas receberam aceite exato em 2026-08-31 sobre a revisão `6a6e702a4d6ced5820d3f4c7674d6278f0b2d391`. A ordem operacional continua no STATUS, sem alteração do `next`.
 
 Este fechamento autoriza somente documentação/publicação solicitadas pelo PI e a conclusão do PR #189. As restrições anteriores de não realizar push/PR descrevem as etapas históricas, superadas para esta publicação pelo pedido explícito de finalizar o PR; não autorizam implementação ou gasto novo. O aceite de Finalizado segue a CONVENTION da main/PR #207 e não cria segundo aceite técnico de merge/deploy.

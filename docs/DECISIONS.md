@@ -133,3 +133,7 @@ Aplicadas as decisões do PI registradas no PR #207, preservando as emendas post
 A numeração inicialmente proposta para Blueprints/Portfólio (017/018) colidiu com Command Center; a reserva local 022 também colidiu com Shell já publicado. O índice canônico passa a MVP-023 Blueprints (épico #212) e MVP-024 Portfólio (épico #213). É correção de identificação, sem mudar a prioridade operacional do PI, nem renumerar issues existentes.
 
 M16-F05/F06 e as oito SPECs dos MVPs 023/024 são detalhamento novo em rascunho-completo; não recebem aceite presumido. Aprovações anteriores mantêm referência exata. Finalizar o planejamento e o PR documental não inicia construção nem fecha issues de produto.
+
+## Aceite das dez SPECs finais da Pipeline V3 (PI, 2026-08-31)
+
+O PI aprovou explicitamente M16-F05/F06 (#167/#168), M23-F01–F04 (#214–#217) e M24-F01–F04 (#218–#221), exatamente como publicadas na revisão `6a6e702a4d6ced5820d3f4c7674d6278f0b2d391` pelo PR #189. As dez SPECs passam de `rascunho-completo` para `aprovada-pi` e suas issues de `proplan:planejado` para `proplan:backlog`. O aceite não altera `next`, não inicia construção, não fecha issue e não substitui os gates de dependência/fila. M16-F06, M23-F04 e M24-F04 ainda exigem `DESIGN-SYSTEM.md` e protótipos HTML formais aprovados antes da construção visual. Mudança técnica posterior não herda este aceite automaticamente.

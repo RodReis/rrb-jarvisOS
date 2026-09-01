@@ -1,6 +1,6 @@
 # MVP-023 — Biblioteca de Blueprints
 
-- Status: **rascunho-completo** (2026-08-31); pacote de planejamento, sem implementação autorizada e sem aceite de SPEC presumido.
+- Status: **design e quatro SPECs aprovados pelo PI** em 2026-08-31, revisão exata `6a6e702a4d6ced5820d3f4c7674d6278f0b2d391`; implementação não iniciada e sujeita à fila.
 - GitHub: [#212](https://github.com/RodReis/rrb-jarvisOS/issues/212); fatias no índice canônico `docs/STATUS.md`.
 - Direção: Pipeline V3; design `docs/superpowers/specs/2026-08-31-mvp-023-blueprints-design.md`.
 - Dependência funcional: MVP-008, planejamento governado. Não depende de memória, Graphify, aprendizado ou Portfólio.
@@ -19,7 +19,7 @@ Reutilizar padrões locais de PRD, arquitetura, SPEC, documentos operacionais e 
 | M23-F03 ([#216](https://github.com/RodReis/rrb-jarvisOS/issues/216)) | `spec-blueprints-03-anexos-compatibilidade.md` | F02; M8-F05/F06 | Anexos candidatos, evolução explícita e impacto por revisão |
 | M23-F04 ([#217](https://github.com/RodReis/rrb-jarvisOS/issues/217)) | `spec-blueprints-04-interface-resiliencia-e2e.md` | F03 | Interface, recuperação e prova integrada |
 
-As quatro SPECs são propostas técnicas completas para revisão; nenhuma recebe `aprovada-pi` por existir.
+As quatro SPECs receberam `aprovada-pi` para a revisão exata registrada; alterações técnicas posteriores exigem nova revisão.
 
 ## Dentro
 
@@ -44,4 +44,4 @@ Um PI seleciona uma revisão local, obtém rascunho editável com origem rastrea
 
 ## Antes da construção
 
-Preservar aprovação do MVP e de cada SPEC na entrada da fila. A F04 exige `DESIGN-SYSTEM.md` e protótipos HTML formais anexados pelo PI; este pacote não afirma que eles existem. Templates de design são candidatos locais, não satisfazem automaticamente o gate de anexos.
+O aceite das quatro SPECs habilita o Backlog, sem alterar `next`. A F04 exige `DESIGN-SYSTEM.md` e protótipos HTML formais anexados pelo PI; este pacote não afirma que eles existem. Templates de design são candidatos locais, não satisfazem automaticamente o gate de anexos.

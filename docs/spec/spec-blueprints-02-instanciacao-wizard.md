@@ -2,11 +2,11 @@
 
 - MVP/Fatia: MVP-023 · M23-F02.
 - Issue: [#215](https://github.com/RodReis/rrb-jarvisOS/issues/215); épico [#212](https://github.com/RodReis/rrb-jarvisOS/issues/212).
-- Status: **rascunho-completo** (2026-08-31). Redação concluída; aceite exato de MVP/SPEC antes da construção ainda não presumido.
+- Status: **aprovada-pi** em 2026-08-31, revisão exata `6a6e702a4d6ced5820d3f4c7674d6278f0b2d391`.
 - Design: `docs/superpowers/specs/2026-08-31-mvp-023-blueprints-design.md`.
 - Depende de: [#214](https://github.com/RodReis/rrb-jarvisOS/issues/214), [#96](https://github.com/RodReis/rrb-jarvisOS/issues/96).
 - Rastreabilidade: B-FR02/B-FR03/B-NFR01/B-NFR02; requisitos definidos no design, não escopo novo.
-- Implementação: não iniciada por este documento.
+- Implementação: não iniciada; o aceite habilita o Backlog, sem alterar `next` ou a fila.
 
 ## Objetivo e fronteira
 
@@ -53,4 +53,4 @@ Executar os scripts existentes de typecheck, lint, testes e build; relatório ge
 
 ## Encerramento documental
 
-Não há decisão estrutural delegada implicitamente à construção. Limites e desenhos acima são proposta completa desta revisão. Revisão/aceite de entrada do PI e anexos visuais quando aplicáveis permanecem requisitos existentes; não bloqueiam publicar este planejamento nem autorizam código por inferência.
+Não há decisão estrutural delegada implicitamente à construção. Limites e desenhos acima foram aceitos na revisão exata registrada. Dependências, fila e anexos visuais quando aplicáveis permanecem requisitos de entrada; o aceite não inicia código por inferência.

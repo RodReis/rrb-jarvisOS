@@ -1,6 +1,6 @@
 # Design — MVP-024: Gestão de Portfólio
 
-- Status: **rascunho-completo** (2026-08-31); conclusão documental solicitada pelo PI, sem implementação nem aceite automático das novas SPECs.
+- Status: **design e quatro SPECs aprovados pelo PI** em 2026-08-31, revisão exata `6a6e702a4d6ced5820d3f4c7674d6278f0b2d391`; implementação não iniciada.
 - Fonte de direção: `2026-08-29-pipeline-desenvolvimento-ia-v3-design.md`, Gestão de Portfólio.
 - Predecessores funcionais: MVP-012 e MVP-015; planejamento é lido pelos contratos existentes do MVP-008.
 - Migração de nome: a proposta V3 antes chamada MVP-018 recebe MVP-024; o MVP-018 do Command Center conserva número, escopo e issues.
