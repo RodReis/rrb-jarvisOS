@@ -2,10 +2,10 @@
 
 - MVP/Fatia: MVP-016 · M16-F06 — fecha o planejamento técnico do MVP-016.
 - Issue: [#168](https://github.com/RodReis/rrb-jarvisOS/issues/168).
-- Status: **rascunho-completo**; redação técnica concluída para revisão, sem atribuir aceite do PI ainda inexistente.
+- Status: **aprovada-pi** em 2026-08-31, revisão exata `6a6e702a4d6ced5820d3f4c7674d6278f0b2d391`.
 - Depende de: M16-F05 concluída; predecessor direto [#167](https://github.com/RodReis/rrb-jarvisOS/issues/167).
 - Design: `docs/superpowers/specs/2026-08-29-mvp-016-aprendizado-operacional-design.md`.
-- Implementação: não iniciada nem autorizada por esta redação. Antes da construção da interface, anexar e aprovar `DESIGN-SYSTEM.md` e protótipos HTML formais, conforme requisito do PI já existente.
+- Implementação: não iniciada; o aceite habilita o Backlog, sem alterar `next` ou a fila. Antes da construção da interface, anexar e aprovar `DESIGN-SYSTEM.md` e protótipos HTML formais, conforme requisito do PI já existente.
 
 ## Objetivo
 
@@ -196,4 +196,4 @@ Comandos pertencem ao projeto; não foram executados como teste de produto nesta
 - **Consultar a SPEC:** nova ação, autoridade, superfície, contrato, limiar ou cenário de prova; ajuste técnico compatível não exige aceite duplicado.
 - **Nunca:** transformar UI em motor paralelo, inventar métrica/aprovação, ocultar falha ou bloquear desenvolvimento pela ausência de aprendizado.
 
-Redação técnica completa para revisão; sem questões técnicas deixadas em aberto. Aceite exato desta revisão e artefatos visuais antes da construção permanecem evidências a obter, não fatos presumidos. Concluir esta SPEC/issue/PR documental não conclui a implementação do MVP-016.
+Redação técnica completa e aceita pelo PI na revisão exata registrada no cabeçalho. Os artefatos visuais antes da construção permanecem evidências a obter. Concluir esta SPEC/issue/PR documental não conclui a implementação do MVP-016.

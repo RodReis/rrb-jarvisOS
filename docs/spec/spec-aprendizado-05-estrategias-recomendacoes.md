@@ -2,10 +2,10 @@
 
 - MVP/Fatia: MVP-016 · M16-F05.
 - Issue: [#167](https://github.com/RodReis/rrb-jarvisOS/issues/167).
-- Status: **rascunho-completo**; redação técnica concluída para revisão, sem atribuir aceite do PI ainda inexistente.
+- Status: **aprovada-pi** em 2026-08-31, revisão exata `6a6e702a4d6ced5820d3f4c7674d6278f0b2d391`.
 - Depende de: M16-F04 concluída; predecessor direto [#166](https://github.com/RodReis/rrb-jarvisOS/issues/166).
 - Design: `docs/superpowers/specs/2026-08-29-mvp-016-aprendizado-operacional-design.md`.
-- Implementação: não iniciada nem autorizada por esta redação. MVP-007 não é dependência.
+- Implementação: não iniciada; o aceite habilita o Backlog, sem alterar `next` ou a fila. MVP-007 não é dependência.
 
 ## Objetivo
 
@@ -199,4 +199,4 @@ Contrafactuais devem falhar ao permitir compressão de regra/negação, aceitar 
 - **Consultar a SPEC:** alteração de autoridade, contrato proprietário, semântica de compressão, escopo global ou limites versionados; ajustes técnicos compatíveis não criam aceite duplicado.
 - **Nunca:** promover por opinião, inventar percentual de economia, esconder falha, copiar conteúdo extenso ou transformar ferramenta opcional em dependência obrigatória.
 
-Redação completa, sem questão técnica deixada em aberto nesta revisão. Os limites/contratos propostos ainda não possuem aceite exato do PI; este documento conclui o planejamento da fatia, não sua entrega técnica.
+Redação completa e aceita pelo PI na revisão exata registrada no cabeçalho; este documento conclui o planejamento da fatia, não sua entrega técnica.

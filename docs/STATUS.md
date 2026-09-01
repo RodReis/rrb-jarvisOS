@@ -11,7 +11,7 @@ Atualizado em: **2026-08-31**. Fonte única do índice Fatia ↔ SPEC. Estado re
 | Backlog | [#222](https://github.com/RodReis/rrb-jarvisOS/issues/222) · restrição de egress | falha da M9-F03 registrada na main; não resolvida por planejamento documental |
 | Finalizado | #99, #101 e #102 | aceite do PI registrado; M9-F02 integrada pelo PR #208 |
 | Backlog | M7-F01–F04 (#180–#183), MVPs 010–015 e M16-F01–F04 | SPECs aprovadas; publicação documental não muda fila |
-| Planejado | M16-F05/F06 (#167/#168), MVP-023 e MVP-024 | dez SPECs completas para revisão; nenhuma construção autorizada |
+| Backlog | M16-F05/F06 (#167/#168), MVP-023 e MVP-024 | dez SPECs `aprovada-pi` em 2026-08-31; aceite não altera `next` nem inicia construção fora da fila |
 | Planejado | M7-F05–F08 (#184–#187) | detalhamento fora do fechamento da V3 |
 | Roadmap preservado | Command Center (MVP-017–021) e Shell (MVP-022) | decisões e issues da main preservadas; não renumerados |
 
@@ -34,11 +34,11 @@ Atualizado em: **2026-08-31**. Fonte única do índice Fatia ↔ SPEC. Estado re
 | MVP-013 Execução contínua | [#133](https://github.com/RodReis/rrb-jarvisOS/issues/133) | fatias [#134–#138](https://github.com/RodReis/rrb-jarvisOS/issues/134) no Backlog | 0/5 |
 | MVP-014 Release e Deploy Governado | [#149](https://github.com/RodReis/rrb-jarvisOS/issues/149) | cinco SPECs `aprovada-pi`; fatias #150–#154 em Backlog | 0/5 |
 | MVP-015 Observabilidade Operacional | [#155](https://github.com/RodReis/rrb-jarvisOS/issues/155) | seis SPECs `aprovada-pi`; fatias #156–#161 em Backlog | 0/6 |
-| MVP-016 Aprendizado Operacional da Pipeline | [#162](https://github.com/RodReis/rrb-jarvisOS/issues/162) | F01–F04 #163–#166 em Backlog; F05–F06 #167–#168 Planejadas, SPECs completas para revisão | 0/6 |
+| MVP-016 Aprendizado Operacional da Pipeline | [#162](https://github.com/RodReis/rrb-jarvisOS/issues/162) | seis SPECs `aprovada-pi`; #163–#168 em Backlog | 0/6 |
 | MVP-017 a MVP-021 (Command Center) | [#193](https://github.com/RodReis/rrb-jarvisOS/issues/193) · [#194](https://github.com/RodReis/rrb-jarvisOS/issues/194) · [#195](https://github.com/RodReis/rrb-jarvisOS/issues/195) · [#196](https://github.com/RodReis/rrb-jarvisOS/issues/196) · [#197](https://github.com/RodReis/rrb-jarvisOS/issues/197) | 5 épicos criados em 2026-08-30, aprovados pelo PI na mesma data (HA removido; voz local Whisper+Piper): voz+persona+mascote, escuta contínua, briefing/proatividade, integrações Gmail/Agenda/Spotify, visão Frigate. Fatias lazy; SPECs da M17-F01 (#200), M17-F02 (#202) e M17-F03 `aprovada-pi` (2026-08-30), demais sem SPEC; docs em `docs/mvp/mvp-017…021` | 0/18 |
 | MVP-022 Shell de produto | [#205](https://github.com/RodReis/rrb-jarvisOS/issues/205) | menu do JARVIS/Agents OS projetado do registro de módulos; **SPEC da F01 `aprovada-pi` (2026-08-30)**, oito decisões do PI; entra depois do MVP-009 | 0/1 |
-| MVP-023 Biblioteca de Blueprints | [#212](https://github.com/RodReis/rrb-jarvisOS/issues/212) | quatro SPECs completas para revisão; implementação não autorizada | 0/4 |
-| MVP-024 Gestão de Portfólio | [#213](https://github.com/RodReis/rrb-jarvisOS/issues/213) | quatro SPECs completas para revisão; implementação não autorizada | 0/4 |
+| MVP-023 Biblioteca de Blueprints | [#212](https://github.com/RodReis/rrb-jarvisOS/issues/212) | quatro SPECs `aprovada-pi`; #214–#217 em Backlog | 0/4 |
+| MVP-024 Gestão de Portfólio | [#213](https://github.com/RodReis/rrb-jarvisOS/issues/213) | quatro SPECs `aprovada-pi`; #218–#221 em Backlog | 0/4 |
 
 ## Índice Fatia ↔ SPEC
 
@@ -117,26 +117,26 @@ Não existe catálogo global `SPEC-nnn`. O slug identifica a SPEC; os números a
 | M16-F02 | MVP-016 | Memória de falhas ([#164](https://github.com/RodReis/rrb-jarvisOS/issues/164)) | `spec-aprendizado-02-memoria-falhas.md` |
 | M16-F03 | MVP-016 | Registro e resolução de políticas ([#165](https://github.com/RodReis/rrb-jarvisOS/issues/165)) | `spec-aprendizado-03-registro-resolucao-politicas.md` |
 | M16-F04 | MVP-016 | Experimentos e promoção ([#166](https://github.com/RodReis/rrb-jarvisOS/issues/166)) | `spec-aprendizado-04-experimentos-promocao.md` |
-| M16-F05 | MVP-016 | Estratégias e recomendações assistidas ([#167](https://github.com/RodReis/rrb-jarvisOS/issues/167)) | `spec-aprendizado-05-estrategias-recomendacoes.md` — rascunho-completo |
-| M16-F06 | MVP-016 | Interface, resiliência e prova E2E ([#168](https://github.com/RodReis/rrb-jarvisOS/issues/168)) | `spec-aprendizado-06-interface-resiliencia-e2e.md` — rascunho-completo |
+| M16-F05 | MVP-016 | Estratégias e recomendações assistidas ([#167](https://github.com/RodReis/rrb-jarvisOS/issues/167)) | `spec-aprendizado-05-estrategias-recomendacoes.md` — aprovada-pi |
+| M16-F06 | MVP-016 | Interface, resiliência e prova E2E ([#168](https://github.com/RodReis/rrb-jarvisOS/issues/168)) | `spec-aprendizado-06-interface-resiliencia-e2e.md` — aprovada-pi; gate visual antes da construção |
 | M17-F01 | MVP-017 | STT local + push-to-talk | `spec-voz-01-stt-local-push-to-talk.md` |
 | M17-F02 | MVP-017 | TTS Piper + timeline de visemes | `spec-voz-02-tts-piper-fonemas.md` |
 | M17-F03 | MVP-017 | Persona JARVIS no ponto único | `spec-voz-03-persona-ponto-unico.md` |
 | M22-F01 | MVP-022 | Menu JARVIS OS / Agents OS | `spec-shell-01-menu-jarvis-agents-os.md` |
 
-| M23-F01 | MVP-023 | Catálogo e revisões de Blueprints ([#214](https://github.com/RodReis/rrb-jarvisOS/issues/214)) | `spec-blueprints-01-catalogo-revisoes.md` — rascunho-completo |
-| M23-F02 | MVP-023 | Instanciação e wizard orientado ([#215](https://github.com/RodReis/rrb-jarvisOS/issues/215)) | `spec-blueprints-02-instanciacao-wizard.md` — rascunho-completo |
-| M23-F03 | MVP-023 | Anexos, compatibilidade e evolução ([#216](https://github.com/RodReis/rrb-jarvisOS/issues/216)) | `spec-blueprints-03-anexos-compatibilidade.md` — rascunho-completo |
-| M23-F04 | MVP-023 | Interface e prova integrada de Blueprints ([#217](https://github.com/RodReis/rrb-jarvisOS/issues/217)) | `spec-blueprints-04-interface-resiliencia-e2e.md` — rascunho-completo |
-| M24-F01 | MVP-024 | Catálogo e prontidão do portfólio ([#218](https://github.com/RodReis/rrb-jarvisOS/issues/218)) | `spec-portfolio-01-catalogo-prontidao.md` — rascunho-completo |
-| M24-F02 | MVP-024 | Prioridade e controles canônicos ([#219](https://github.com/RodReis/rrb-jarvisOS/issues/219)) | `spec-portfolio-02-prioridade-controles.md` — rascunho-completo |
-| M24-F03 | MVP-024 | Custos, quotas e capacidade do portfólio ([#220](https://github.com/RodReis/rrb-jarvisOS/issues/220)) | `spec-portfolio-03-custos-quotas.md` — rascunho-completo |
-| M24-F04 | MVP-024 | Console de portfólio e prova integrada ([#221](https://github.com/RodReis/rrb-jarvisOS/issues/221)) | `spec-portfolio-04-console-resiliencia-e2e.md` — rascunho-completo |
+| M23-F01 | MVP-023 | Catálogo e revisões de Blueprints ([#214](https://github.com/RodReis/rrb-jarvisOS/issues/214)) | `spec-blueprints-01-catalogo-revisoes.md` — aprovada-pi |
+| M23-F02 | MVP-023 | Instanciação e wizard orientado ([#215](https://github.com/RodReis/rrb-jarvisOS/issues/215)) | `spec-blueprints-02-instanciacao-wizard.md` — aprovada-pi |
+| M23-F03 | MVP-023 | Anexos, compatibilidade e evolução ([#216](https://github.com/RodReis/rrb-jarvisOS/issues/216)) | `spec-blueprints-03-anexos-compatibilidade.md` — aprovada-pi |
+| M23-F04 | MVP-023 | Interface e prova integrada de Blueprints ([#217](https://github.com/RodReis/rrb-jarvisOS/issues/217)) | `spec-blueprints-04-interface-resiliencia-e2e.md` — aprovada-pi; gate visual antes da construção |
+| M24-F01 | MVP-024 | Catálogo e prontidão do portfólio ([#218](https://github.com/RodReis/rrb-jarvisOS/issues/218)) | `spec-portfolio-01-catalogo-prontidao.md` — aprovada-pi |
+| M24-F02 | MVP-024 | Prioridade e controles canônicos ([#219](https://github.com/RodReis/rrb-jarvisOS/issues/219)) | `spec-portfolio-02-prioridade-controles.md` — aprovada-pi |
+| M24-F03 | MVP-024 | Custos, quotas e capacidade do portfólio ([#220](https://github.com/RodReis/rrb-jarvisOS/issues/220)) | `spec-portfolio-03-custos-quotas.md` — aprovada-pi |
+| M24-F04 | MVP-024 | Console de portfólio e prova integrada ([#221](https://github.com/RodReis/rrb-jarvisOS/issues/221)) | `spec-portfolio-04-console-resiliencia-e2e.md` — aprovada-pi; gate visual antes da construção |
 
 ## Próximas ações
 
 1. Conservar `next` em #209 e a fila vigente. #103 foi integrada pelo PR #211; as falhas #209/#222 seguem suas issues, sem correção de produto neste planejamento.
-2. Revisar as dez SPECs novas da V3, mantendo #167/#168 e as oito novas fatias em `proplan:planejado` até aceite exato.
+2. Conservar #167/#168 e #214–#221 em Backlog após o aceite exato de 2026-08-31, sem promover qualquer uma a `next` por esta atualização.
 3. Antes das fatias visuais, anexar `DESIGN-SYSTEM.md` e HTML pelo fluxo já aprovado; texto de SPEC/template não substitui anexo do PI.
 4. M7-F05–F08 e demais fatias ainda não especificadas do Command Center seguem seus planejamentos próprios; não bloqueiam concluir a documentação V3.
 5. O relatório de fechamento do PR #189 documenta reconciliação, ordem técnica, issues e validação. Aprovações prévias são preservadas, não repetidas.

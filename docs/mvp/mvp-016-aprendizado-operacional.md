@@ -1,7 +1,7 @@
 # MVP-016 — Aprendizado Operacional da Pipeline
 
-- Status: **design, seis fatias e M16-F01–F04 aprovados pelo PI**; último aceite: revisão `1cefc2c` da F04 em 2026-08-30. Implementação depende das dependências e da fila; F05–F06 têm SPECs em rascunho-completo, aguardando aceite exato antes da construção.
-- GitHub: épico [#162](https://github.com/RodReis/rrb-jarvisOS/issues/162); F01–F04 [#163–#166](https://github.com/RodReis/rrb-jarvisOS/issues/163) em `proplan:backlog`; F05–F06 [#167–#168](https://github.com/RodReis/rrb-jarvisOS/issues/167) em `proplan:planejado`.
+- Status: **design, seis fatias e seis SPECs aprovados pelo PI**; último aceite: F05–F06 na revisão exata `6a6e702a4d6ced5820d3f4c7674d6278f0b2d391`, em 2026-08-31. Implementação depende das dependências e da fila.
+- GitHub: épico [#162](https://github.com/RodReis/rrb-jarvisOS/issues/162); F01–F06 [#163–#168](https://github.com/RodReis/rrb-jarvisOS/issues/163) em `proplan:backlog`, sem alterar `next`.
 - Depende de: MVP-015 concluído.
 - Dono do aceite: PI.
 - Design: `docs/superpowers/specs/2026-08-29-mvp-016-aprendizado-operacional-design.md`.
@@ -18,8 +18,8 @@ Aprender com evidências de runs concluídos para reduzir recorrência, retrabal
 | 2 | Memória de falhas ([#164](https://github.com/RodReis/rrb-jarvisOS/issues/164)) | `spec-aprendizado-02-memoria-falhas.md` | aprovada-pi |
 | 3 | Registro e resolução de políticas ([#165](https://github.com/RodReis/rrb-jarvisOS/issues/165)) | `spec-aprendizado-03-registro-resolucao-politicas.md` | aprovada-pi |
 | 4 | Experimentos e promoção ([#166](https://github.com/RodReis/rrb-jarvisOS/issues/166)) | `spec-aprendizado-04-experimentos-promocao.md` | aprovada-pi |
-| 5 | Estratégias e recomendações assistidas ([#167](https://github.com/RodReis/rrb-jarvisOS/issues/167)) | `spec-aprendizado-05-estrategias-recomendacoes.md` | planejado; redação completa |
-| 6 | Interface, resiliência e prova E2E ([#168](https://github.com/RodReis/rrb-jarvisOS/issues/168)) | `spec-aprendizado-06-interface-resiliencia-e2e.md` | planejado; redação completa, gate visual antes da construção |
+| 5 | Estratégias e recomendações assistidas ([#167](https://github.com/RodReis/rrb-jarvisOS/issues/167)) | `spec-aprendizado-05-estrategias-recomendacoes.md` | aprovada-pi |
+| 6 | Interface, resiliência e prova E2E ([#168](https://github.com/RodReis/rrb-jarvisOS/issues/168)) | `spec-aprendizado-06-interface-resiliencia-e2e.md` | aprovada-pi; gate visual antes da construção |
 
 ## Dentro
 
