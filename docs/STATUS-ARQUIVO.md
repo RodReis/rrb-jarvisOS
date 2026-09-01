@@ -390,3 +390,15 @@ Após a integração do PR #189, o PI aprovou a revisão exata `6a6e702a4d6ced58
 Após auditoria direta das sub-issues, o PI aprovou individualmente o fechamento dos quatro épicos. Os checklists remotos foram reconciliados antes do encerramento e os épicos receberam `proplan:finalizado`: MVP-004 [#10](https://github.com/RodReis/rrb-jarvisOS/issues/10), 3/3; MVP-005 [#76](https://github.com/RodReis/rrb-jarvisOS/issues/76), 4/4; MVP-006 [#86](https://github.com/RodReis/rrb-jarvisOS/issues/86), 6/6; MVP-008 [#93](https://github.com/RodReis/rrb-jarvisOS/issues/93), 6/6. Todas as dezenove fatias já estavam fechadas com aceite do PI; o fechamento dos containers não iniciou construção nem alterou a fila.
 
 Na mesma revisão, o PI fixou para M7-F05 o modelo de runtime Graphify isolado e versionado pelo JarvisOS, instalado somente por ação explícita, sem `graphify install` automático nem dependência global, com fallback para busca básica. A decisão orienta a SPEC ainda a redigir e não autoriza implementação.
+
+## 2026-09-01 — Desenho da M7-F05 aprovado e SPEC redigida para revisão
+
+O PI aprovou o desenho detalhado da integração Graphify: adapter de capacidades, projeção local por projeto-alvo, bootstrap após a fatia marcada como fundação, update incremental a cada quatro PRs, consulta antes da exploração, delta do Git, orçamento adaptativo, execução não interativa e expurgo verificável. Perguntas finais são ignoradas; `save-result`/`reflect`, grafo global, instalação global, `graphify install`, rebuild automático e alteração automática de arquivos do assistente ficam fora.
+
+O rascunho completo `docs/spec/spec-memoria-05-adapter-graphify.md` fixa `graphifyy==0.9.53` como baseline para futuro teste de compatibilidade e define vinte critérios. O índice associa M7-F05 ao rascunho, mas #184 permanece `proplan:planejado` até aceite da revisão exata. O acervo continua com 84 SPECs aprovadas. Não houve instalação, execução do Graphify, implementação, alteração de `next` ou deploy.
+
+## 2026-09-01 — Aceite exato da M7-F05 registrado
+
+O PI aprovou a revisão exata `6f8c7f66c4c582b912f17af462f3f63047ad8382` de `docs/spec/spec-memoria-05-adapter-graphify.md`, preservando os vinte critérios e limites. A #184 passa de `proplan:planejado` para `proplan:backlog`, mantendo parent #179 e dependências #182/#183; F06–F08 continuam Planejadas e nenhuma issue recebe `next`.
+
+Arquitetura, convenções, plano e índice passam a apontar para o contrato aprovado. O acervo local sobe para 85 SPECs aprovadas. O aceite não instala/executa Graphify, não inicia implementação e não altera o conteúdo técnico da revisão aceita.

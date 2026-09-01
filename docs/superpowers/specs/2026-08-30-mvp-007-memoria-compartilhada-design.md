@@ -1,11 +1,11 @@
 # Design em elaboração — MVP-007: Memória compartilhada JarvisOS e AgentsOS
 
-- Status: **direção, captura, identidade/correções, persistência/retenção, recuperação, fontes iniciais, ingestão/retomada, integração opcional do Graphify, validação das lições fora da pipeline e contrato comum dos registros/eventos aprovados pelo PI em 2026-08-30; detalhamento em elaboração**.
+- Status: **SPECs da F01–F05 aprovadas pelo PI; F06–F08 permanecem em elaboração**.
 - Esta revisão registra decisões parciais de escopo e contratos nas seções abaixo; **não é um design completo nem uma SPEC aprovada para construção**.
 - Origem: proposta do PI de usar Graphify para memória e aprendizado transversal, acompanhada de quatro capturas dos menus futuros de JarvisOS/AgentsOS; aprovação da divisão entre MVP-007, M16-F05 e MVP-016.
 - Documento do MVP: `docs/mvp/mvp-007-memoria-contextual.md`.
-- Fatias: oito recortes de planejamento, com publicação autorizada pelo PI em 2026-08-30; SPECs da F01–F04 aprovadas e F05–F08 a redigir. Permanece a orientação de não implementar agora. Índice canônico: `docs/STATUS.md`.
-- Issues do MVP-007: épico [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179); #180–#183 em Backlog após aceite das SPECs e #184–#187 Planejadas, conforme a seção 15. A #164 pertence ao MVP-016 e não substitui esse acompanhamento.
+- Fatias: oito recortes de planejamento; SPECs da F01–F05 aprovadas e F06–F08 a redigir. Permanece a orientação de não implementar agora. Índice canônico: `docs/STATUS.md`.
+- Issues do MVP-007: épico [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179); #180–#184 em Backlog e #185–#187 Planejadas. A #164 pertence ao MVP-016 e não substitui esse acompanhamento.
 - Relação com a execução: planejamento paralelo, não bloqueante para MVP-008, MVP-009 ou MVP-016; fila preservada.
 
 ## 1. Objetivo aprovado
@@ -189,7 +189,7 @@ Foi afastado aceitar qualquer objeto livre: facilitaria a primeira integração,
 
 O PI autorizou organizar as fatias por dependência e publicar o épico e suas issues de planejamento. Foram derivados oito recortes dos contratos acima: núcleo/identidade/persistência; fontes/ingestão/retomada; recuperação/orçamento; retenção/reconstrução; adapter opcional do Graphify; memória operacional/lições; Agent Memory/Notebook; resiliência/prova integrada.
 
-O plano de publicação está em `docs/superpowers/plans/2026-08-30-mvp-007-publicacao-issues.md`, com escopo, dependências, alvos de verificação e pendências por fatia. Numeração e associação às SPECs permanecem no índice canônico de `docs/STATUS.md`; F01–F04 estão **aprovadas-pi** e F05–F08 estão **a redigir**.
+O plano de publicação está em `docs/superpowers/plans/2026-08-30-mvp-007-publicacao-issues.md`, com escopo, dependências, alvos de verificação e pendências por fatia. Numeração e associação às SPECs permanecem no índice canônico de `docs/STATUS.md`; F01–F05 estão **aprovadas-pi** e F06–F08 estão **a redigir**.
 
 SPEC da F04: `docs/spec/spec-memoria-04-retencao-reconstrucao.md`, revisão `027f8274dc4e3d39a6fc24ce394ea6b53d70f986`, aprovada explicitamente pelo PI em 2026-08-30, incluindo vinte critérios. Aceite cobre compactação reversível após 30 dias, reconstrução retomável por partição/geração/journal, exclusão escopada com supressão de reingestão, capacidade e agenda. #183 passa a Backlog, dependente apenas de #181; FTS/Graphify são integrações opcionais. Originais, auditoria e ContextPacks congelados ficam com seus donos. O mecanismo inicial da seção 8 está detalhado; F01–F03 permanecem intactas. Não iniciar implementação.
 
@@ -207,11 +207,11 @@ Publicação conferida em 2026-08-30: épico #179, oito sub-issues #180–#187 e
 
 ## 16. Decisões ainda abertas
 
-1. Redação, critérios finais e aprovação de F05–F08, começando por M7-F05 (#184). F01–F04 aprovadas pelas revisões exatas acima, sem repetir seus aceites.
+1. Redação, critérios finais e aprovação de F06–F08. F01–F05 permanecem aprovadas pelas revisões exatas registradas, sem repetir seus aceites.
 2. Integrações futuras além das três entradas iniciais; adapters, recorte do histórico, notas, cobertura, corte, confirmação e retentativas iniciais estão aprovados na F02.
 3. Extensões futuras além da manutenção inicial; compactação/reconstrução, capacidade e exclusão escopada da seção 8 estão detalhadas na F04 aprovada. Sincronização permanece fora deste recorte.
 4. Extensões futuras além da recuperação inicial; contratos de consulta/resultados, atualização do índice, limites e ponte com ContextPack da seção 9 estão aprovados na F03.
-5. Assinaturas, schemas, versão concreta e testes de compatibilidade do adapter conforme o contrato e o modelo de runtime aprovados na seção 12.
+5. A M7-F05 resolveu assinaturas, schemas, baseline `graphifyy==0.9.53`, execução, cadência, orçamento e testes na revisão aprovada `6f8c7f6`; compatibilidade real continua sendo prova de implementação, não decisão aberta.
 6. Formato de avaliação, estados/transições e critérios concretos das integrações para lições fora da pipeline conforme a seção 13.
 7. Extensões do catálogo/schemas nas integrações seguintes conforme a seção 14; identidade, envelope, operações e limites do núcleo v1 estão aprovados na F01.
 
@@ -222,3 +222,18 @@ As perguntas serão resolvidas uma por vez. Nenhum item aberto vira implementaç
 Este registro deriva da decisão do PI nesta conversa. A documentação oficial consultada para avaliar viabilidade está no [Graphify](https://github.com/Graphify-Labs/graphify); suporte documentado não prova compatibilidade com a versão instalada nem substitui futuros testes de contrato.
 
 Não houve instalação, execução de Graphify/Caveman, captura de atividade ou implementação. Em 2026-08-31, o PI aprovou para M7-F05 o runtime isolado/versionado, instalação explícita, ausência de `graphify install` automático, independência da instalação global e fallback para busca básica; a decisão foi registrada na issue #184 e ainda não constitui SPEC aprovada. As issues foram publicadas conforme a seção 15; os aceites posteriores da F01–F04 movem #180–#183 para Backlog e elevam o acervo local a 84 SPECs aprovadas. Aprovação da SPEC não é evidência de entrega.
+
+## 18. Desenho detalhado da M7-F05 (PI, 2026-09-01)
+
+O PI aprovou, seção por seção, o desenho do adapter opcional do Graphify:
+
+1. **Responsabilidade separada:** M7-F05 oferece `probe`, bootstrap, consulta, update, invalidação e checkpoint. A pipeline marca a fatia de fundação, conta merges e determina a cadência; Graphify não observa PRs nem governa o workflow.
+2. **Projeção por projeto-alvo:** `graphify-out/` fica dentro da raiz local de cada projeto, entra no `.gitignore`, não sobe ao Git e é excluído da descoberta/contexto. O repositório da própria pipeline não recebe alteração automática de `CLAUDE.md` ou regra equivalente.
+3. **Cadência:** bootstrap uma vez após merge e aceite da fatia explicitamente marcada como fundação, normalmente F00/F01; projeto importado usa o preflight. Update incremental a cada quatro PRs incorporados à principal, contando qualquer autor/tipo por merge único. Entre checkpoints, usar grafo válido mais delta do Git.
+4. **Consulta econômica:** grafo localiza candidatos; fonte atual comprova fatos. Padrões configuráveis: 20 candidatos, profundidade 2, 8 arquivos e 8.000 tokens. Expansão é gradual/justificada, sem grafo ou relatório integral no ContextPack e sem percentual fixo de economia prometido.
+5. **Runtime e memória:** runtime isolado, instalação explícita, versão fixada/testada e sem CLI global, `graphify install`, hooks ou upgrade automático. `save-result`/`reflect` não são usados; resultados/lições continuam na memória canônica da plataforma.
+6. **Execução não interativa:** perguntas finais são ignoradas e nunca viram gate. Runner fecha entrada, limita saída/tempo e só aceita atualização após validar grafo, manifesto, revisão e remoções.
+7. **Consistência/expurgo:** um writer por projeto, geração parcial invisível e publicação conjunta com checkpoint. Remoção não comprovada invalida o grafo; rebuild total exige ação explícita e respeita as barreiras da F04.
+8. **Falha sem bloqueio:** ausência, incompatibilidade, corrupção, timeout ou orçamento esgotado recuam para busca textual restrita. Documento, ADR, Graphify ou pergunta interativa não bloqueiam desenvolvimento.
+
+A abordagem selecionada foi adapter de capacidades + política externa de pipeline. Foram rejeitados o adapter que controla Git/cadência e o grafo global central. A SPEC `docs/spec/spec-memoria-05-adapter-graphify.md`, revisão `6f8c7f66c4c582b912f17af462f3f63047ad8382`, foi aprovada explicitamente pelo PI em 2026-09-01 com `graphifyy==0.9.53` como baseline de teste, schemas, estados, comandos, métricas e vinte critérios. Esse baseline foi verificado como distribuição oficial atual, mas sua compatibilidade real continua sendo prova futura. #184 passa a Backlog; não houve instalação ou implementação.
