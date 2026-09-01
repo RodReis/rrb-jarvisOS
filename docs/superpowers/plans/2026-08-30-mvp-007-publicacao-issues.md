@@ -133,6 +133,8 @@ Gerenciar dados duráveis e projeções compactáveis, reconstruindo derivados s
 
 ### M7-F05 — Adapter opcional do Graphify
 
+**SPEC em revisão (2026-09-01):** `docs/spec/spec-memoria-05-adapter-graphify.md`. O desenho detalhado foi aprovado pelo PI; a revisão escrita ainda não recebeu aceite exato. #184 permanece Planejada e implementação não está autorizada.
+
 **Dependências diretas:** M7-F03, M7-F04.
 **Fonte:** seções 2, 8, 9 e 12 do design.
 
@@ -152,8 +154,8 @@ Integrar Graphify como produtor substituível de relações derivadas, sem torn�
 
 **Pendências explícitas:**
 
-- Versão concreta, interface, backend/executor compatível, mecanismo de execução e schemas normalizados.
-- Decidir o uso inicial de save-result/reflect e fixtures de compatibilidade, sem presumir suporte já testado.
+- Resolvidas no rascunho: baseline `graphifyy==0.9.53`, interface, runtime isolado, comandos lógicos/físicos, schemas, cadência, orçamento, execução não interativa, fallback e fixtures.
+- Falta somente revisão/aceite exato da SPEC; compatibilidade real da baseline será provada na implementação e não é presumida pelo documento.
 
 ### M7-F06 — Memória operacional e validação de lições
 

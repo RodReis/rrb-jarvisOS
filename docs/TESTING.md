@@ -707,3 +707,13 @@ Detalhamento aprovado da M16-F04 (`spec-aprendizado-04-experimentos-promocao.md`
 - Relógio injetável prova tempo e amostra simultâneos para estabilizar, prazo inconclusivo e rollback do grupo afetado; não basta esperar o timer.
 - Crash entre reserva/alocação/snapshot/confirmação, revogação de controle, prova corrigida, retenção e reconstrução não podem duplicar efeito, alterar snapshot ou reativar decisão antiga.
 - Testar núcleo F04 e registro F03 reais com mecanismos/insumos simulados; sem CLI paga ou Git/deploy externo na suíte comum. Isso especifica verificações futuras, não relata testes já executados.
+
+### 11.8 Projeção Graphify — M7-F05
+
+- **Unitário:** estados, schemas, limites, deduplicação, contador idempotente de merges, frescor, orçamento, invalidação e descarte da cauda interativa.
+- **Contrato simulado:** baseline `graphifyy==0.9.53`, comandos suportados, stdin fechado, timeout, versão/esquema incompatível, manifesto ausente, remoção e geração parcial.
+- **Integração local:** repositório Git temporário com fatia de fundação, `.gitignore`, bootstrap, quatro merges, update incremental, delta, lock, publicação conjunta e retomada.
+- **Regressão de contexto:** impede envio do `graph.json`/relatório integral, limita candidatos/fontes/trechos, exige justificativa de expansão e mede tokens estimados.
+- **Smoke real opt-in:** runtime fixado e corpus determinístico; sem instalação ou API paga na suíte comum. Ausência é `not_run`, não sucesso.
+
+Provas mínimas: Graphify ausente/incompatível mantém busca básica; pergunta final não recebe resposta nem cria gate; `save-result`/`reflect` não executam; o quarto PR dispara somente update; fonte removida não permanece consultável; falha parcial não publica checkpoint; consulta desatualizada inclui delta do Git; `graphify-out/` não entra no Git ou contexto e fica no `.claudeignore` quando Claude Code participa.

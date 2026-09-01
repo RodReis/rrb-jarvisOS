@@ -1,6 +1,6 @@
 # STATUS.md — Kanban / Roadmap
 
-Atualizado em: **2026-08-31**. Fonte única do índice Fatia ↔ SPEC. Estado remoto conferido durante o fechamento do PR #189; nenhuma prioridade alterada por esta tarefa. Histórico detalhado em `docs/STATUS-ARQUIVO.md`; o board vence divergência factual.
+Atualizado em: **2026-09-01**. Fonte única do índice Fatia ↔ SPEC. Estado remoto conferido durante o fechamento do PR #189; nenhuma prioridade alterada por esta tarefa. Histórico detalhado em `docs/STATUS-ARQUIVO.md`; o board vence divergência factual.
 
 ## Agora
 
@@ -12,7 +12,7 @@ Atualizado em: **2026-08-31**. Fonte única do índice Fatia ↔ SPEC. Estado re
 | Finalizado | #99, #101 e #102 | aceite do PI registrado; M9-F02 integrada pelo PR #208 |
 | Backlog | M7-F01–F04 (#180–#183), MVPs 010–015 e M16-F01–F04 | SPECs aprovadas; publicação documental não muda fila |
 | Backlog | M16-F05/F06 (#167/#168), MVP-023 e MVP-024 | dez SPECs `aprovada-pi` em 2026-08-31; aceite não altera `next` nem inicia construção fora da fila |
-| Planejado | M7-F05–F08 (#184–#187) | detalhamento fora do fechamento da V3 |
+| Planejado | M7-F05–F08 (#184–#187) | F05 com SPEC em revisão; F06–F08 a redigir; fora do fechamento da V3 |
 | Roadmap preservado | Command Center (MVP-017–021) e Shell (MVP-022) | decisões e issues da main preservadas; não renumerados |
 
 ## MVPs
@@ -25,7 +25,7 @@ Atualizado em: **2026-08-31**. Fonte única do índice Fatia ↔ SPEC. Estado re
 | MVP-004 Execução real | [#10](https://github.com/RodReis/rrb-jarvisOS/issues/10) | fechado/aceito pelo PI em 2026-08-31 | 3/3 |
 | MVP-005 Providers/Vault/Budget | [#76](https://github.com/RodReis/rrb-jarvisOS/issues/76) | fechado/aceito pelo PI em 2026-08-31 | 4/4 |
 | MVP-006 Conectores Essenciais | [#86](https://github.com/RodReis/rrb-jarvisOS/issues/86) | fechado/aceito pelo PI em 2026-08-31 | 6/6 |
-| MVP-007 Memória compartilhada | [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179) | F01–F04 aprovadas/Backlog; F05–F08 Planejadas, fora do fechamento V3 | 0/8 |
+| MVP-007 Memória compartilhada | [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179) | F01–F04 aprovadas/Backlog; F05 em revisão; F06–F08 Planejadas, fora do fechamento V3 | 0/8 |
 | MVP-008 Planejamento Governado | [#93](https://github.com/RodReis/rrb-jarvisOS/issues/93) | fechado/aceito pelo PI em 2026-08-31 | 6/6 |
 | MVP-009 Entrega Autônoma | [#100](https://github.com/RodReis/rrb-jarvisOS/issues/100) | seis SPECs `aprovada-pi` (2026-08-29), **emendadas pelo PI em 2026-08-30 e 2026-08-31**; F01–F03 entregues | 3/6 |
 | MVP-010 Multi-executor Claude + Codex | [#115](https://github.com/RodReis/rrb-jarvisOS/issues/115) | fatias [#116–#120](https://github.com/RodReis/rrb-jarvisOS/issues/116) no Backlog | 0/5 |
@@ -66,7 +66,7 @@ Não existe catálogo global `SPEC-nnn`. O slug identifica a SPEC; os números a
 | M7-F02 | MVP-007 | Fontes iniciais, ingestão e retomada ([#181](https://github.com/RodReis/rrb-jarvisOS/issues/181)) | `spec-memoria-02-fontes-ingestao-retomada.md` — aprovada-pi |
 | M7-F03 | MVP-007 | Recuperação contextual e orçamento ([#182](https://github.com/RodReis/rrb-jarvisOS/issues/182)) | `spec-memoria-03-recuperacao-contextual-orcamento.md` — aprovada-pi |
 | M7-F04 | MVP-007 | Retenção e reconstrução da memória ([#183](https://github.com/RodReis/rrb-jarvisOS/issues/183)) | `spec-memoria-04-retencao-reconstrucao.md` — aprovada-pi |
-| M7-F05 | MVP-007 | Adapter opcional do Graphify ([#184](https://github.com/RodReis/rrb-jarvisOS/issues/184)) | a redigir |
+| M7-F05 | MVP-007 | Adapter opcional do Graphify ([#184](https://github.com/RodReis/rrb-jarvisOS/issues/184)) | `spec-memoria-05-adapter-graphify.md` — rascunho-completo |
 | M7-F06 | MVP-007 | Memória operacional e validação de lições ([#185](https://github.com/RodReis/rrb-jarvisOS/issues/185)) | a redigir |
 | M7-F07 | MVP-007 | Agent Memory e Notebook ([#186](https://github.com/RodReis/rrb-jarvisOS/issues/186)) | a redigir |
 | M7-F08 | MVP-007 | Resiliência e prova integrada ([#187](https://github.com/RodReis/rrb-jarvisOS/issues/187)) | a redigir |
@@ -138,7 +138,7 @@ Não existe catálogo global `SPEC-nnn`. O slug identifica a SPEC; os números a
 1. Conservar `next` em #209 e a fila vigente. #103 foi integrada pelo PR #211; as falhas #209/#222 seguem suas issues, sem correção de produto neste planejamento.
 2. Conservar #167/#168 e #214–#221 em Backlog após o aceite exato de 2026-08-31, sem promover qualquer uma a `next` por esta atualização.
 3. Antes das fatias visuais, anexar `DESIGN-SYSTEM.md` e HTML pelo fluxo já aprovado; texto de SPEC/template não substitui anexo do PI.
-4. M7-F05–F08 e demais fatias ainda não especificadas do Command Center seguem seus planejamentos próprios; não bloqueiam concluir a documentação V3.
+4. M7-F05 está em revisão e M7-F06–F08 continuam a redigir; as fatias do Command Center seguem seus planejamentos próprios. Nenhuma delas bloqueia concluir a documentação V3.
 5. O relatório de fechamento do PR #189 documenta reconciliação, ordem técnica, issues e validação. Aprovações prévias são preservadas, não repetidas.
 
 ## Roadmap
