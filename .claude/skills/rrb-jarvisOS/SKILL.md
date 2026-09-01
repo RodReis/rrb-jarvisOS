@@ -1,247 +1,96 @@
 ---
 name: rrb-jarvisos-conventions
-description: Development conventions and patterns for rrb-jarvisOS. TypeScript project with conventional commits.
+description: Use when planning, implementing, reviewing, testing, documenting, or delivering changes in rrb-jarvisOS. Routes work through the repository's canonical product, architecture, issue, Git, and evidence contracts.
 ---
 
-# Rrb Jarvisos Conventions
+# rrb-jarvisOS — convenções do repositório
 
-> Generated from [RodReis/rrb-jarvisOS](https://github.com/RodReis/rrb-jarvisOS) on 2026-08-30
+Esta skill é um índice operacional. Ela não substitui os documentos canônicos e não transforma inferências de histórico Git em regras.
 
-## Overview
+## Fontes de verdade
 
-This skill teaches Claude the development patterns and conventions used in rrb-jarvisOS.
+Leia apenas o necessário para a tarefa, nesta ordem:
 
-## Tech Stack
+1. `CLAUDE.md` — papéis, ciclo de vida, Git e regras técnicas gerais.
+2. `docs/DEVELOPMENT.md` — ordem de execução e andamento interno.
+3. `docs/STATUS.md` — fila e índice Fatia ↔ SPEC.
+4. `docs/spec/` — contrato da fatia; implementação exige estado `aprovada-pi`.
+5. `docs/ARCHITECTURE.md` e `docs/DECISIONS.md` — desenho e decisões estruturais.
+6. `docs/CONVENTION.md` — domínio e projeção das issues.
+7. `docs/TESTING.md` — evidência e classificação dos testes.
+8. `docs/REVIEW.md` — contrato obrigatório em revisão.
 
-- **Primary Language**: TypeScript
-- **Architecture**: hybrid module organization
-- **Test Location**: colocated
-- **Test Framework**: vitest
+Se os documentos divergirem, pare no ponto material, mostre a divergência e peça decisão ao PI. Não invente escopo.
 
-## When to Use This Skill
+## Modos de trabalho
 
-Activate this skill when:
-- Making changes to this repository
-- Adding new features following established patterns
-- Writing tests that match project conventions
-- Creating commits with proper message format
+### Planejamento
 
-## Commit Conventions
+- Faça perguntas até eliminar decisões abertas.
+- Registre a revisão exata aprovada pelo PI.
+- Não implemente código durante o planejamento.
+- Uma fatia só entra no Backlog após a SPEC aprovada.
 
-Follow these commit message conventions based on 9 analyzed commits.
+### Implementação
 
-### Commit Style: Conventional Commits
+- Confirme SPEC aprovada, issue correta e base atual antes de editar.
+- Trabalhe em branch/worktree isolado; nunca faça commit direto na `main`.
+- Preserve mudanças do usuário e mantenha o delta cirúrgico.
+- Atualize a documentação exigida na mesma entrega.
+- Use `refs #N`; nunca use palavras que fechem automaticamente a issue.
 
-### Prefixes Used
+### Revisão
 
-- `feat`
-- `ci`
-- `docs`
-- `test`
+- Leia `docs/REVIEW.md` antes de classificar achados.
+- Revise o delta contra a base correta e as dependências diretas.
+- Use relatórios anteriores para não repetir falhas já resolvidas.
+- Não invente LGPD, consentimento, aceite duplo ou regra de produto.
+- Um `PASS` vale somente para o SHA efetivamente revisado.
 
-### Message Guidelines
+## Contratos técnicos essenciais
 
-- Average message length: ~48 characters
-- Keep first line concise and descriptive
-- Use imperative mood ("Add feature" not "Added feature")
+- O renderer não acessa Node, segredos ou comandos diretamente; use preload e IPC mínimo e tipado.
+- O runtime local é a fonte de verdade operacional; serviços cloud são integrações/espelhos conforme os ADRs.
+- Entidades persistidas carregam o escopo definido no contrato de domínio.
+- O Policy Engine falha fechado para ação desconhecida.
+- Mudança estrutural exige leitura de `docs/DECISIONS.md`; ADR registra a decisão, mas sua ausência não paralisa uma correção já autorizada.
 
+Não derive padrão universal de nomes, imports, exports ou tratamento de erro a partir de poucos commits. Inspecione o módulo afetado e siga o padrão local comprovado.
 
-*Commit message example*
+## Testes e evidência
 
-```text
-feat: chave externa determinística e URL de push redigida
-```
+Escolha o nível pelo comportamento alterado:
 
-*Commit message example*
+- `*.spec.ts`: regra de negócio/unidade.
+- `*.int-spec.ts`: integração e persistência real.
+- `*.test.tsx`: componente React.
+- `tests/e2e/*.e2e.ts`: fronteira Electron e fluxo vivo quando aplicável.
 
-```text
-docs: registra a M9-F01, e corrige o que o CI cobrou
-```
-
-*Commit message example*
-
-```text
-test: regenera o TESTS.md da M9-F01
-```
-
-*Commit message example*
-
-```text
-ci: dispara o CI no head atual
-```
-
-*Commit message example*
+Piso de validação da entrega:
 
 ```text
-feat: branch base, proteção e leitura de commit no GitHub Adapter
+npm run lint
+npm run typecheck
+npm test
 ```
 
-*Commit message example*
+Siga `docs/TESTING.md` para relatório, guarda anti-drift e E2E condicional. Não edite números de `reports/TESTS.md` manualmente e não declare CI verde sem consultar o estado atual.
 
-```text
-feat: push autenticado, e o token fora da auditoria
-```
+## Uso econômico de contexto
 
-*Commit message example*
+- Comece por busca dirigida e abra somente os arquivos relacionados ao fluxo.
+- Se `graphify-out/` existir e o contrato vigente mandar usá-lo, use o grafo para localizar; confirme toda afirmação no código-fonte.
+- Não faça varredura integral nem carregue relatórios inteiros sem uma razão registrada.
+- Amplie o contexto progressivamente quando a evidência inicial for insuficiente.
 
-```text
-feat: publicação do repositório e do backlog aprovado
-```
+## Entrega Git/GitHub
 
-*Commit message example*
+1. Confirme o diff e a ausência de segredo.
+2. Rode as verificações pertinentes.
+3. Faça commit em pt-BR e push do branch.
+4. Abra/atualize PR com `refs #N`.
+5. Aguarde CI e gate verdes.
+6. Faça merge conforme a política do repositório.
+7. Mova a issue para `proplan:done`; somente o PI fecha e aplica `proplan:finalizado`.
 
-```text
-ci: nova tentativa de disparo no head
-```
-
-## Architecture
-
-### Project Structure: Single Package
-
-This project uses **hybrid** module organization.
-
-### Source Layout
-
-```
-src/
-├── main/
-├── shared/
-```
-
-### Guidelines
-
-- This project uses a hybrid organization
-- Follow existing patterns when adding new code
-
-## Code Style
-
-### Language: TypeScript
-
-### Naming Conventions
-
-| Element | Convention |
-|---------|------------|
-| Files | kebab-case |
-| Functions | camelCase |
-| Classes | PascalCase |
-| Constants | SCREAMING_SNAKE_CASE |
-
-### Import Style: Relative Imports
-
-### Export Style: Named Exports
-
-
-*Preferred import style*
-
-```typescript
-// Use relative imports
-import { Button } from '../components/Button'
-import { useAuth } from './hooks/useAuth'
-```
-
-*Preferred export style*
-
-```typescript
-// Use named exports
-export function calculateTotal() { ... }
-export const TAX_RATE = 0.1
-export interface Order { ... }
-```
-
-## Testing
-
-### Test Framework: vitest
-
-### File Pattern: `*.spec.ts`
-
-### Test Types
-
-- **Unit tests**: Test individual functions and components in isolation
-- **Integration tests**: Test interactions between multiple components/services
-- **E2e tests**: Test complete user flows through the application
-
-### Mocking: vi.mock
-
-
-*Test file structure*
-
-```typescript
-import { describe, it, expect } from 'vitest'
-
-describe('MyFunction', () => {
-  it('should return expected result', () => {
-    const result = myFunction(input)
-    expect(result).toBe(expected)
-  })
-})
-```
-
-## Error Handling
-
-### Error Handling Style: Try-Catch Blocks
-
-A **global error handler** catches unhandled errors.
-
-
-*Standard error handling pattern*
-
-```typescript
-try {
-  const result = await riskyOperation()
-  return result
-} catch (error) {
-  console.error('Operation failed:', error)
-  throw new Error('User-friendly message')
-}
-```
-
-## Common Workflows
-
-These workflows were detected from analyzing commit patterns.
-
-### Feature Development
-
-Standard feature implementation workflow
-
-**Frequency**: ~17 times per month
-
-**Steps**:
-1. Add feature implementation
-2. Add tests for feature
-3. Update documentation
-
-**Files typically involved**:
-- `src/shared/domain/*`
-- `src/main/connectors/github/*`
-- `src/main/execution/*`
-- `**/*.test.*`
-
-**Example commit sequence**:
-```
-feat: chave externa determinística e URL de push redigida
-feat: branch base, proteção e leitura de commit no GitHub Adapter
-feat: push autenticado, e o token fora da auditoria
-```
-
-
-## Best Practices
-
-Based on analysis of the codebase, follow these practices:
-
-### Do
-
-- Use conventional commit format (feat:, fix:, etc.)
-- Write tests using vitest
-- Follow *.spec.ts naming pattern
-- Use kebab-case for file names
-- Prefer named exports
-
-### Don't
-
-- Don't write vague commit messages
-- Don't skip tests for new features
-- Don't deviate from established patterns without discussion
-
----
-
-*This skill was auto-generated by [ECC Tools](https://ecc.tools). Review and customize as needed for your team.*
+O merge integra a entrega; não representa aceite do PI.

@@ -1,6 +1,6 @@
 interface:
-  display_name: "Rrb JarvisOS"
-  short_description: "Repo-specific patterns and workflows for rrb-jarvisOS"
-  default_prompt: "Use the rrb-jarvisOS repo skill to follow existing architecture, testing, and workflow conventions."
+  display_name: 'rrb-jarvisOS'
+  short_description: 'Contratos de desenvolvimento do rrb-jarvisOS'
+  default_prompt: 'Use $rrb-jarvisos-conventions para executar esta tarefa conforme os contratos do repositório.'
 policy:
   allow_implicit_invocation: true

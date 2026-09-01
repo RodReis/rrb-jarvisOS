@@ -140,11 +140,6 @@
     ".agents/skills/rrb-jarvisOS/SKILL.md",
     ".agents/skills/rrb-jarvisOS/agents/openai.yaml",
     ".claude/identity.json",
-    ".codex/config.toml",
-    ".codex/AGENTS.md",
-    ".codex/agents/explorer.toml",
-    ".codex/agents/reviewer.toml",
-    ".codex/agents/docs-researcher.toml",
     ".claude/homunculus/instincts/inherited/rrb-jarvisOS-instincts.yaml",
     ".claude/commands/feature-development.md"
   ],
@@ -154,11 +149,6 @@
       ".agents/skills/rrb-jarvisOS/SKILL.md",
       ".agents/skills/rrb-jarvisOS/agents/openai.yaml",
       ".claude/identity.json",
-      ".codex/config.toml",
-      ".codex/AGENTS.md",
-      ".codex/agents/explorer.toml",
-      ".codex/agents/reviewer.toml",
-      ".codex/agents/docs-researcher.toml",
       ".claude/homunculus/instincts/inherited/rrb-jarvisOS-instincts.yaml"
     ],
     "workflow-pack": [
@@ -171,11 +161,6 @@
       ".agents/skills/rrb-jarvisOS/SKILL.md",
       ".agents/skills/rrb-jarvisOS/agents/openai.yaml",
       ".claude/identity.json",
-      ".codex/config.toml",
-      ".codex/AGENTS.md",
-      ".codex/agents/explorer.toml",
-      ".codex/agents/reviewer.toml",
-      ".codex/agents/docs-researcher.toml",
       ".claude/homunculus/instincts/inherited/rrb-jarvisOS-instincts.yaml"
     ],
     "workflow-pack": [
@@ -186,12 +171,12 @@
     {
       "moduleId": "runtime-core",
       "path": ".claude/skills/rrb-jarvisOS/SKILL.md",
-      "description": "Repository-specific Claude Code skill generated from git history."
+      "description": "Repository-specific Claude Code skill curated from canonical repository contracts."
     },
     {
       "moduleId": "runtime-core",
       "path": ".agents/skills/rrb-jarvisOS/SKILL.md",
-      "description": "Codex-facing copy of the generated repository skill."
+      "description": "Codex-facing copy of the curated repository skill."
     },
     {
       "moduleId": "runtime-core",
@@ -205,33 +190,8 @@
     },
     {
       "moduleId": "runtime-core",
-      "path": ".codex/config.toml",
-      "description": "Repo-local Codex MCP and multi-agent baseline aligned with ECC defaults."
-    },
-    {
-      "moduleId": "runtime-core",
-      "path": ".codex/AGENTS.md",
-      "description": "Codex usage guide that points at the generated repo skill and workflow bundle."
-    },
-    {
-      "moduleId": "runtime-core",
-      "path": ".codex/agents/explorer.toml",
-      "description": "Read-only explorer role config for Codex multi-agent work."
-    },
-    {
-      "moduleId": "runtime-core",
-      "path": ".codex/agents/reviewer.toml",
-      "description": "Read-only reviewer role config focused on correctness and security."
-    },
-    {
-      "moduleId": "runtime-core",
-      "path": ".codex/agents/docs-researcher.toml",
-      "description": "Read-only docs researcher role config for API verification."
-    },
-    {
-      "moduleId": "runtime-core",
       "path": ".claude/homunculus/instincts/inherited/rrb-jarvisOS-instincts.yaml",
-      "description": "Continuous-learning instincts derived from repository patterns."
+      "description": "High-confidence instincts curated from versioned repository contracts."
     },
     {
       "moduleId": "workflow-pack",
@@ -254,8 +214,6 @@
       ]
     },
     "codex": {
-      "configPath": ".codex/config.toml",
-      "agentsGuidePath": ".codex/AGENTS.md",
       "skillPath": ".agents/skills/rrb-jarvisOS/SKILL.md"
     }
   }
