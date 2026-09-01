@@ -1,11 +1,11 @@
 # Design em elaboração — MVP-007: Memória compartilhada JarvisOS e AgentsOS
 
-- Status: **SPECs da F01–F05 aprovadas pelo PI; F06 em revisão pelo PI; F07–F08 permanecem em elaboração**.
+- Status: **SPECs da F01–F06 aprovadas pelo PI; F07–F08 permanecem em elaboração**.
 - Esta revisão registra decisões parciais de escopo e contratos nas seções abaixo; **não é um design completo nem uma SPEC aprovada para construção**.
 - Origem: proposta do PI de usar Graphify para memória e aprendizado transversal, acompanhada de quatro capturas dos menus futuros de JarvisOS/AgentsOS; aprovação da divisão entre MVP-007, M16-F05 e MVP-016.
 - Documento do MVP: `docs/mvp/mvp-007-memoria-contextual.md`.
-- Fatias: oito recortes de planejamento; SPECs da F01–F05 aprovadas, F06 em revisão e F07–F08 a redigir. Permanece a orientação de não implementar agora. Índice canônico: `docs/STATUS.md`.
-- Issues do MVP-007: épico [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179); #180–#184 em Backlog e #185–#187 Planejadas. A SPEC da #185 está em revisão pelo PI, sem mudar sua label. A #164 pertence ao MVP-016 e não substitui esse acompanhamento.
+- Fatias: oito recortes de planejamento; SPECs da F01–F06 aprovadas e F07–F08 a redigir. Permanece a orientação de não implementar agora. Índice canônico: `docs/STATUS.md`.
+- Issues do MVP-007: épico [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179); #180–#185 em Backlog e #186–#187 Planejadas. A #164 pertence ao MVP-016 e não substitui esse acompanhamento.
 - Relação com a execução: planejamento paralelo, não bloqueante para MVP-008, MVP-009 ou MVP-016; fila preservada.
 
 ## 1. Objetivo aprovado
@@ -189,7 +189,7 @@ Foi afastado aceitar qualquer objeto livre: facilitaria a primeira integração,
 
 O PI autorizou organizar as fatias por dependência e publicar o épico e suas issues de planejamento. Foram derivados oito recortes dos contratos acima: núcleo/identidade/persistência; fontes/ingestão/retomada; recuperação/orçamento; retenção/reconstrução; adapter opcional do Graphify; memória operacional/lições; Agent Memory/Notebook; resiliência/prova integrada.
 
-O plano de publicação está em `docs/superpowers/plans/2026-08-30-mvp-007-publicacao-issues.md`, com escopo, dependências, alvos de verificação e pendências por fatia. Numeração e associação às SPECs permanecem no índice canônico de `docs/STATUS.md`; F01–F05 estão **aprovadas-pi**, F06 está **em revisão pelo PI** e F07–F08 estão **a redigir**.
+O plano de publicação está em `docs/superpowers/plans/2026-08-30-mvp-007-publicacao-issues.md`, com escopo, dependências, alvos de verificação e pendências por fatia. Numeração e associação às SPECs permanecem no índice canônico de `docs/STATUS.md`; F01–F06 estão **aprovadas-pi** e F07–F08 estão **a redigir**.
 
 SPEC da F04: `docs/spec/spec-memoria-04-retencao-reconstrucao.md`, revisão `027f8274dc4e3d39a6fc24ce394ea6b53d70f986`, aprovada explicitamente pelo PI em 2026-08-30, incluindo vinte critérios. Aceite cobre compactação reversível após 30 dias, reconstrução retomável por partição/geração/journal, exclusão escopada com supressão de reingestão, capacidade e agenda. #183 passa a Backlog, dependente apenas de #181; FTS/Graphify são integrações opcionais. Originais, auditoria e ContextPacks congelados ficam com seus donos. O mecanismo inicial da seção 8 está detalhado; F01–F03 permanecem intactas. Não iniciar implementação.
 
@@ -207,12 +207,12 @@ Publicação conferida em 2026-08-30: épico #179, oito sub-issues #180–#187 e
 
 ## 16. Decisões ainda abertas
 
-1. Aprovação da revisão exata da F06 e redação/critérios finais de F07–F08. F01–F05 permanecem aprovadas pelas revisões exatas registradas, sem repetir seus aceites.
+1. Redação e critérios finais de F07–F08. F01–F06 permanecem aprovadas pelas revisões exatas registradas, sem repetir seus aceites.
 2. Integrações futuras além das três entradas iniciais; adapters, recorte do histórico, notas, cobertura, corte, confirmação e retentativas iniciais estão aprovados na F02.
 3. Extensões futuras além da manutenção inicial; compactação/reconstrução, capacidade e exclusão escopada da seção 8 estão detalhadas na F04 aprovada. Sincronização permanece fora deste recorte.
 4. Extensões futuras além da recuperação inicial; contratos de consulta/resultados, atualização do índice, limites e ponte com ContextPack da seção 9 estão aprovados na F03.
 5. A M7-F05 resolveu assinaturas, schemas, baseline `graphifyy==0.9.53`, execução, cadência, orçamento e testes na revisão aprovada `6f8c7f6`; compatibilidade real continua sendo prova de implementação, não decisão aberta.
-6. Extensões futuras além dos avaliadores iniciais de execução/entrega propostos na F06; formato, estados, transições e limites iniciais estão resolvidos no desenho da seção 19, sujeitos ao aceite da SPEC exata.
+6. Extensões futuras além dos avaliadores iniciais de execução/entrega aprovados na F06; formato, estados, transições e limites iniciais estão resolvidos na revisão `4f47c12` e no desenho da seção 19.
 7. Extensões do catálogo/schemas nas integrações seguintes conforme a seção 14; identidade, envelope, operações e limites do núcleo v1 estão aprovados na F01.
 
 As perguntas serão resolvidas uma por vez. Nenhum item aberto vira implementação, gate ou regra inventada pelo agente. Novos registros de decisão devem distinguir proposta de aprovação; design completo e SPECs terão sua revisão escrita no fluxo existente, sem pedir novamente aceite da mesma revisão.
@@ -253,4 +253,4 @@ O PI aprovou, seção por seção, o desenho de memória operacional e validaç�
 9. **Reprocessamento:** interno, explícito e auditável por mudança material, nova evidência, nova versão ou comando com motivo. Reinício não zera tentativas e F06 não cria UI/IPC.
 10. **Recuperação e exclusão:** F03 serve normalmente somente validada/aplicável; candidata/revalidação exigem consulta explícita. F04 preserva histórico mínimo e impede ressuscitar evidência removida.
 
-Foram rejeitados motor central de regras e registro mutável/manual. A SPEC `docs/spec/spec-memoria-06-validacao-licoes-operacionais.md` consolida contratos, limites, testes e vinte critérios e está em revisão pelo PI. A #185 permanece Planejada até aceite do hash exato; não houve implementação, chamada de IA, Graphify ou criação de interface.
+Foram rejeitados motor central de regras e registro mutável/manual. A SPEC `docs/spec/spec-memoria-06-validacao-licoes-operacionais.md`, revisão `4f47c1273290e3ffd5319d4c9141999bba4a52f1`, foi aprovada explicitamente pelo PI em 2026-09-01 com contratos, limites, testes e vinte critérios. A #185 passa a Backlog; não houve implementação, chamada de IA, Graphify ou criação de interface.

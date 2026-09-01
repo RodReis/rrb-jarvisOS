@@ -718,7 +718,7 @@ Detalhamento aprovado da M16-F04 (`spec-aprendizado-04-experimentos-promocao.md`
 
 Provas mínimas: Graphify ausente/incompatível mantém busca básica; pergunta final não recebe resposta nem cria gate; `save-result`/`reflect` não executam; o quarto PR dispara somente update; fonte removida não permanece consultável; falha parcial não publica checkpoint; consulta desatualizada inclui delta do Git; `graphify-out/` não entra no Git ou contexto e fica no `.claudeignore` quando Claude Code participa.
 
-### 11.9 Validação de lições operacionais — M7-F06 (em revisão)
+### 11.9 Validação de lições operacionais — M7-F06
 
 - **Unitário:** identidade/revisão, estados derivados, aplicabilidade, deduplicação, compatibilidade de avaliador, cobertura e limites.
 - **Contrato:** fixtures determinísticas de `execution_expected_outcome` e `project_delivery_gate`, incluindo schema/critério inválido e versão incompatível.
@@ -726,4 +726,4 @@ Provas mínimas: Graphify ausente/incompatível mantém busca básica; pergunta 
 - **Integração F02/F03/F04:** fila compartilhada, recuperação filtrada por projeto/estado/dimensões, perda de evidência e barreira contra reativação.
 - **Regressão/contrafactual:** candidato, estado desconhecido, cobertura stale, falha técnica, redelivery ou evidência retrospectiva nunca viram validação; remover filtros/atomicidade deve reprovar teste direcionado.
 
-Provas mínimas propostas: todos os critérios obrigatórios sustentados produzem `validated`; insuficiência mantém `candidate`; contradição/perda de prova produz `needs_revalidation`; aceite do PI e merge não viram prova de impacto; reinício não zera tentativas; excesso pagina sem fingir completude; nenhuma chamada de modelo, Graphify ou serviço pago participa da avaliação. A revisão exata da SPEC ainda precisa de aceite antes de construção.
+Provas mínimas: todos os critérios obrigatórios sustentados produzem `validated`; insuficiência mantém `candidate`; contradição/perda de prova produz `needs_revalidation`; aceite do PI e merge não viram prova de impacto; reinício não zera tentativas; excesso pagina sem fingir completude; nenhuma chamada de modelo, Graphify ou serviço pago participa da avaliação. SPEC aprovada na revisão `4f47c12`; aprovação não é evidência de execução dos testes.

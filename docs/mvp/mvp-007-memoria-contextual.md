@@ -1,10 +1,10 @@
 # MVP-007 — Memória Contextual e RAG
 
-- Status: **SPECs da F01–F05 aprovadas/Backlog; F06 em revisão pelo PI; F07–F08 Planejadas/a redigir; implementação não autorizada**.
+- Status: **SPECs da F01–F06 aprovadas/Backlog; F07–F08 Planejadas/a redigir; implementação não autorizada**.
 - Origem: recorte de memória híbrida/RAG anteriormente associado ao Corte 3.
 - Relação com a pipeline: **não bloqueia MVP-008, MVP-009 nem MVP-016**; a M16-F05 mantém escopo próprio e integração reutilizável.
 - Design em elaboração: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`.
-- Issues publicadas: épico [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179); #180–#184 em `proplan:backlog` após aceite das SPECs e #185–#187 em `proplan:planejado`. A SPEC da #185 está em revisão; redação não muda a label. Pais/dependências preservados. A #164 trata de memória de falhas do MVP-016, não deste núcleo.
+- Issues publicadas: épico [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179); #180–#185 em `proplan:backlog` após aceite das SPECs e #186–#187 em `proplan:planejado`. Pais/dependências preservados. A #164 trata de memória de falhas do MVP-016, não deste núcleo.
 - Plano de publicação: `docs/superpowers/plans/2026-08-30-mvp-007-publicacao-issues.md`; índice e links canônicos em `docs/STATUS.md`.
 
 ## Intenção preservada
@@ -65,7 +65,7 @@ Saída normaliza relações com fonte, revisão e distinção entre extração e
 
 Lição candidata registra afirmação, contexto, projeto, fontes e resultados observados; repetição da conclusão não gera novas evidências. O módulo responsável valida por critérios verificáveis definidos em sua especificação, e a memória registra o resultado sem inventar o significado de sucesso. Critérios objetivos permitem validação automática, sem aceite duplicado; ausência de critério/evidência mantém a candidata e não bloqueia desenvolvimento.
 
-Validade se limita às condições e versões comprovadas, incluindo falhas e contrapontos, sem transformar sucesso isolado em regra universal. Mudança relevante nas fontes ou contradição retira a condição de validada vigente até reavaliação, preservando histórico. Decisão do PI não se confunde com comprovação empírica; lições orientam recomendações sem conceder novas permissões. A pipeline mantém avaliação/promoção no MVP-016. A M7-F06 em revisão detalha ledger imutável, estados derivados, avaliadores iniciais de execução/entrega, cobertura, fila e limites em `docs/spec/spec-memoria-06-validacao-licoes-operacionais.md`; ainda não há aceite da revisão exata nem implementação autorizada.
+Validade se limita às condições e versões comprovadas, incluindo falhas e contrapontos, sem transformar sucesso isolado em regra universal. Mudança relevante nas fontes ou contradição retira a condição de validada vigente até reavaliação, preservando histórico. Decisão do PI não se confunde com comprovação empírica; lições orientam recomendações sem conceder novas permissões. A pipeline mantém avaliação/promoção no MVP-016. A M7-F06 aprovada detalha ledger imutável, estados derivados, avaliadores iniciais de execução/entrega, cobertura, fila e limites em `docs/spec/spec-memoria-06-validacao-licoes-operacionais.md`, revisão `4f47c12`; não há implementação iniciada.
 
 ## Contrato comum dos registros/eventos aprovado
 
@@ -89,7 +89,7 @@ A M7-F04 foi aprovada pelo PI em 2026-08-30: `docs/spec/spec-memoria-04-retencao
 
 A M7-F05 foi aprovada pelo PI em 2026-09-01: `docs/spec/spec-memoria-05-adapter-graphify.md`, revisão `6f8c7f66c4c582b912f17af462f3f63047ad8382`. O aceite cobre adapter/runtime/checkpoint, criação após a fatia marcada como fundação, atualização a cada quatro PRs, consulta progressiva, execução não interativa, expurgo, fallback e vinte critérios. A #184 passa a Backlog; não houve instalação ou implementação.
 
-A M7-F06 foi redigida e está em revisão pelo PI em `docs/spec/spec-memoria-06-validacao-licoes-operacionais.md`. A proposta cobre ledger de evidências/avaliações, estados `candidate | validated | needs_revalidation`, avaliadores determinísticos de execução e entrega, escopo por projeto, cobertura explícita, fila transacional, recuperação pela F03 e vinte critérios. A #185 permanece Planejada até aceite do hash exato; não iniciar implementação.
+A M7-F06 foi aprovada pelo PI em 2026-09-01: `docs/spec/spec-memoria-06-validacao-licoes-operacionais.md`, revisão `4f47c1273290e3ffd5319d4c9141999bba4a52f1`. O aceite cobre ledger de evidências/avaliações, estados `candidate | validated | needs_revalidation`, avaliadores determinísticos de execução e entrega, escopo por projeto, cobertura explícita, fila transacional, recuperação pela F03 e vinte critérios. A #185 passa a Backlog; não iniciar implementação.
 
 ## Não decidido
 
@@ -98,7 +98,7 @@ A M7-F06 foi redigida e está em revisão pelo PI em `docs/spec/spec-memoria-06-
 - extensões futuras da manutenção além dos contratos aprovados na F04; sincronização fora deste recorte;
 - extensões futuras de consulta além do contrato inicial aprovado na F03; busca, índice incremental, sessões/expansões, limites e ponte com ContextPack estão resolvidos nessa revisão;
 - extensões futuras do Graphify além do contrato inicial aprovado na M7-F05; compatibilidade real da baseline continua sendo prova de implementação;
-- aprovação da revisão exata da F06 e extensões futuras além dos dois avaliadores iniciais propostos;
+- extensões futuras além dos dois avaliadores iniciais aprovados na F06;
 - critérios de aceite finais, interfaces formais e aprovação das SPECs de F07–F08.
 
 Nenhum desses itens em aberto pode ser inferido como requisito aprovado. A integração de Caveman discutida para a F05 não é automaticamente incorporada ao MVP-007.

@@ -408,3 +408,9 @@ Arquitetura, convenções, plano e índice passam a apontar para o contrato apro
 O PI aprovou o desenho detalhado de memória operacional com ledger imutável, estados derivados `candidate | validated | needs_revalidation`, validação limitada ao projeto de origem, cobertura explícita e avaliadores determinísticos de expectativa de execução e gate de entrega. Critério e dimensões materiais pertencem ao módulo de origem; a memória coordena sem declarar sucesso. Repetição não aumenta evidência, aprovação do PI não vira prova empírica e PR/CI/merge não viram alegação de impacto.
 
 O rascunho `docs/spec/spec-memoria-06-validacao-licoes-operacionais.md` define fila transacional, idempotência, retries/pausa, reprocessamento auditável, limites, integração com F02/F03/F04 e vinte critérios. Módulos não integrados declaram `available | unavailable | unsupported | stale`; perda ou contradição da prova retira a validação vigente sem bloquear desenvolvimento ou ressuscitar conteúdo excluído. A #185 permanece `proplan:planejado` até aceite da revisão exata; não houve implementação, UI, chamada de modelo, Graphify, mudança de `next` ou novo gate humano.
+
+## 2026-09-01 — Aceite exato da M7-F06 registrado
+
+O PI aprovou a revisão exata `4f47c1273290e3ffd5319d4c9141999bba4a52f1` de `docs/spec/spec-memoria-06-validacao-licoes-operacionais.md`, preservando os vinte critérios e limites. A #185 passa de `proplan:planejado` para `proplan:backlog`, mantendo parent #179 e dependência direta #182; F07–F08 continuam Planejadas e nenhuma issue recebe `next`.
+
+Arquitetura, convenções, plano, estratégia de testes e índice passam a apontar para o contrato aprovado. O acervo local sobe para 86 SPECs aprovadas. O aceite não inicia implementação, não cria uma issue duplicada e não altera o conteúdo técnico da revisão aceita.

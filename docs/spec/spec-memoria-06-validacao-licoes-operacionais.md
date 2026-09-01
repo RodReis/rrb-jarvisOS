@@ -2,8 +2,8 @@
 
 - MVP/Fatia: MVP-007 · M7-F06.
 - Issue: [#185](https://github.com/RodReis/rrb-jarvisOS/issues/185); épico [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179).
-- Status: **em revisão pelo PI**; issue permanece em `proplan:planejado`; implementação não autorizada.
-- Revisão submetida: será preenchida após versionar este documento. O aceite deve citar o hash exato.
+- Status: **aprovada-pi** (2026-09-01); issue em `proplan:backlog`; implementação não iniciada.
+- Revisão aprovada: `4f47c1273290e3ffd5319d4c9141999bba4a52f1`, aceite explícito do PI nesta conversa. Esta atualização registra somente o aceite, sem alterar o contrato técnico.
 - Depende de: M7-F03 (#182), revisão aprovada `c3b546a1787961bb0b9bb407cd7213d5b7046b1b`; preserva os contratos aprovados de M7-F01/F02.
 - Compatibilidade: M7-F04 (#183), revisão aprovada `027f8274dc4e3d39a6fc24ce394ea6b53d70f986`, rege retenção/exclusão; M7-F05 (#184) é opcional e não constitui dependência.
 - Design: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`, seções 13, 14 e 19.
