@@ -22,11 +22,11 @@ Atualizado em: **2026-08-31**. Fonte única do índice Fatia ↔ SPEC. Estado re
 | MVP-001 Fundação | [#1](https://github.com/RodReis/rrb-jarvisOS/issues/1) | fechado/aceito | 6/6 |
 | MVP-002 Execução local | [#9](https://github.com/RodReis/rrb-jarvisOS/issues/9) | fechado/aceito | 5/5 |
 | MVP-003 Design System | [#16](https://github.com/RodReis/rrb-jarvisOS/issues/16) | fechado/aceito | 8/8 |
-| MVP-004 Execução real | [#10](https://github.com/RodReis/rrb-jarvisOS/issues/10) | **três fatias finalizadas**; o épico aguarda o fechamento do PI | 3/3 |
-| MVP-005 Providers/Vault/Budget | [#76](https://github.com/RodReis/rrb-jarvisOS/issues/76) | quatro fatias finalizadas | 4/4 |
-| MVP-006 Conectores Essenciais | [#86](https://github.com/RodReis/rrb-jarvisOS/issues/86) | seis fatias finalizadas; o épico aguarda o fechamento do PI | 6/6 |
+| MVP-004 Execução real | [#10](https://github.com/RodReis/rrb-jarvisOS/issues/10) | fechado/aceito pelo PI em 2026-08-31 | 3/3 |
+| MVP-005 Providers/Vault/Budget | [#76](https://github.com/RodReis/rrb-jarvisOS/issues/76) | fechado/aceito pelo PI em 2026-08-31 | 4/4 |
+| MVP-006 Conectores Essenciais | [#86](https://github.com/RodReis/rrb-jarvisOS/issues/86) | fechado/aceito pelo PI em 2026-08-31 | 6/6 |
 | MVP-007 Memória compartilhada | [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179) | F01–F04 aprovadas/Backlog; F05–F08 Planejadas, fora do fechamento V3 | 0/8 |
-| MVP-008 Planejamento Governado | [#93](https://github.com/RodReis/rrb-jarvisOS/issues/93) | seis fatias finalizadas; o épico aguarda o fechamento do PI | 6/6 |
+| MVP-008 Planejamento Governado | [#93](https://github.com/RodReis/rrb-jarvisOS/issues/93) | fechado/aceito pelo PI em 2026-08-31 | 6/6 |
 | MVP-009 Entrega Autônoma | [#100](https://github.com/RodReis/rrb-jarvisOS/issues/100) | seis SPECs `aprovada-pi` (2026-08-29), **emendadas pelo PI em 2026-08-30 e 2026-08-31**; F01–F03 entregues | 3/6 |
 | MVP-010 Multi-executor Claude + Codex | [#115](https://github.com/RodReis/rrb-jarvisOS/issues/115) | fatias [#116–#120](https://github.com/RodReis/rrb-jarvisOS/issues/116) no Backlog | 0/5 |
 | MVP-011 Squads limitados | [#121](https://github.com/RodReis/rrb-jarvisOS/issues/121) | fatias [#122–#126](https://github.com/RodReis/rrb-jarvisOS/issues/122) no Backlog | 0/5 |

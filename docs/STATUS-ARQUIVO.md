@@ -384,3 +384,9 @@ O PR #211 integrou M9-F03 na main enquanto o CI documental executava. A primeira
 ## 2026-08-31 — Aceite das dez SPECs finais da V3
 
 Após a integração do PR #189, o PI aprovou a revisão exata `6a6e702a4d6ced5820d3f4c7674d6278f0b2d391` de M16-F05/F06, M23-F01–F04 e M24-F01–F04. As dez issues passam de Planejado a Backlog, sem alteração do `next` #209 e sem início de implementação. Os gates de `DESIGN-SYSTEM.md` e protótipos HTML de M16-F06, M23-F04 e M24-F04 continuam anteriores à construção visual. O planejamento da V3 passa a ter 25/25 SPECs redigidas e aprovadas.
+
+## 2026-08-31 — Fechamento dos MVPs 004, 005, 006 e 008
+
+Após auditoria direta das sub-issues, o PI aprovou individualmente o fechamento dos quatro épicos. Os checklists remotos foram reconciliados antes do encerramento e os épicos receberam `proplan:finalizado`: MVP-004 [#10](https://github.com/RodReis/rrb-jarvisOS/issues/10), 3/3; MVP-005 [#76](https://github.com/RodReis/rrb-jarvisOS/issues/76), 4/4; MVP-006 [#86](https://github.com/RodReis/rrb-jarvisOS/issues/86), 6/6; MVP-008 [#93](https://github.com/RodReis/rrb-jarvisOS/issues/93), 6/6. Todas as dezenove fatias já estavam fechadas com aceite do PI; o fechamento dos containers não iniciou construção nem alterou a fila.
+
+Na mesma revisão, o PI fixou para M7-F05 o modelo de runtime Graphify isolado e versionado pelo JarvisOS, instalado somente por ação explícita, sem `graphify install` automático nem dependência global, com fallback para busca básica. A decisão orienta a SPEC ainda a redigir e não autoriza implementação.

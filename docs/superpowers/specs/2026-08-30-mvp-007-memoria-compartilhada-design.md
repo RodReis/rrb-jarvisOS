@@ -155,8 +155,9 @@ O PI aprovou o seguinte contrato de fronteira para evitar duas memórias concorr
 4. **Saída rastreável:** normalizar relações com fonte, revisão e distinção entre extração e inferência. Correções e remoções devem invalidar relações antigas antes de apresentá-las como atuais. O estado do grafo não substitui a validade das fontes ou o histórico de correções do núcleo.
 5. **Reflexões como candidatas:** quando utilizados, resultados de `save-result`/`reflect` entram com proveniência e não substituem decisões do PI nem promovem políticas automaticamente. A disponibilidade desses recursos não cria uma segunda fonte canônica de memória nem transforma uma sugestão em lição validada. Validação operacional da pipeline permanece no MVP-016; critérios dos demais módulos ainda serão definidos.
 6. **Falha sem paralisação:** ausência ou incompatibilidade mantém a busca básica, sob os limites existentes. Atualizações do adapter exigem testes de compatibilidade; não atualizar silenciosamente. A integração opcional não bloqueia a pipeline nem torna o MVP-007 obrigatório para a F05.
+7. **Runtime isolado e versionado (PI, 2026-08-31):** o JarvisOS gerencia uma versão compatível do runtime Graphify, instalada somente por ação explícita. O produto não executa `graphify install`, não depende de instalação global e preserva a busca básica quando o runtime estiver ausente. A CLI global é apenas alternativa de desenvolvimento.
 
-Foi afastado acoplar o núcleo ao formato interno do Graphify: economizaria adaptação inicial, mas dificultaria substituição e controle das correções. Permanecem para as SPECs a assinatura da interface, schemas normalizados, versão concreta, mecanismo de execução, mapeamento de erros e casos de teste. A aprovação do contrato não seleciona automaticamente todos os recursos do pacote, instala o componente ou inicia sua execução.
+Foi afastado acoplar o núcleo ao formato interno do Graphify: economizaria adaptação inicial, mas dificultaria substituição e controle das correções. Permanecem para as SPECs a assinatura da interface, schemas normalizados, versão concreta compatível, mapeamento de erros e casos de teste. A aprovação do contrato e do modelo de runtime não seleciona automaticamente todos os recursos do pacote, instala o componente ou inicia sua execução.
 
 ## 13. Validação das lições fora da pipeline (PI, 2026-08-30)
 
@@ -210,7 +211,7 @@ Publicação conferida em 2026-08-30: épico #179, oito sub-issues #180–#187 e
 2. Integrações futuras além das três entradas iniciais; adapters, recorte do histórico, notas, cobertura, corte, confirmação e retentativas iniciais estão aprovados na F02.
 3. Extensões futuras além da manutenção inicial; compactação/reconstrução, capacidade e exclusão escopada da seção 8 estão detalhadas na F04 aprovada. Sincronização permanece fora deste recorte.
 4. Extensões futuras além da recuperação inicial; contratos de consulta/resultados, atualização do índice, limites e ponte com ContextPack da seção 9 estão aprovados na F03.
-5. Assinaturas, schemas, versão concreta, execução e testes de compatibilidade do adapter conforme o contrato aprovado na seção 12.
+5. Assinaturas, schemas, versão concreta e testes de compatibilidade do adapter conforme o contrato e o modelo de runtime aprovados na seção 12.
 6. Formato de avaliação, estados/transições e critérios concretos das integrações para lições fora da pipeline conforme a seção 13.
 7. Extensões do catálogo/schemas nas integrações seguintes conforme a seção 14; identidade, envelope, operações e limites do núcleo v1 estão aprovados na F01.
 
@@ -220,4 +221,4 @@ As perguntas serão resolvidas uma por vez. Nenhum item aberto vira implementaç
 
 Este registro deriva da decisão do PI nesta conversa. A documentação oficial consultada para avaliar viabilidade está no [Graphify](https://github.com/Graphify-Labs/graphify); suporte documentado não prova compatibilidade com a versão instalada nem substitui futuros testes de contrato.
 
-Não houve instalação, execução de Graphify/Caveman, captura de atividade, implementação, alteração de fila por esta tarefa, push ou deploy. As issues foram publicadas conforme a seção 15; os aceites posteriores da F01–F04 movem #180–#183 para Backlog e elevam o acervo local a 84 SPECs aprovadas. Aprovação da SPEC não é evidência de entrega.
+Não houve instalação, execução de Graphify/Caveman, captura de atividade ou implementação. Em 2026-08-31, o PI aprovou para M7-F05 o runtime isolado/versionado, instalação explícita, ausência de `graphify install` automático, independência da instalação global e fallback para busca básica; a decisão foi registrada na issue #184 e ainda não constitui SPEC aprovada. As issues foram publicadas conforme a seção 15; os aceites posteriores da F01–F04 movem #180–#183 para Backlog e elevam o acervo local a 84 SPECs aprovadas. Aprovação da SPEC não é evidência de entrega.
