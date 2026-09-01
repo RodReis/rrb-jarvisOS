@@ -1,7 +1,7 @@
 # MVP-006 — Conectores Essenciais
 
-- Status: **as seis SPECs `aprovada-pi` em 2026-08-29** — revisão de perguntas abertas concluída com o PI; fatias liberadas para o Backlog na ordem da fila do `STATUS.md`.
-- GitHub: épico [#86](https://github.com/RodReis/rrb-jarvisOS/issues/86); fatias [#87–#92](https://github.com/RodReis/rrb-jarvisOS/issues/87), estado `proplan:backlog`.
+- Status: **finalizado e aceito pelo PI** (2026-08-31).
+- GitHub: épico [#86](https://github.com/RodReis/rrb-jarvisOS/issues/86) fechado; seis fatias [#87–#92](https://github.com/RodReis/rrb-jarvisOS/issues/87) fechadas com `proplan:finalizado`.
 - Depende de: MVP-005 (Vault, gateway de providers e BudgetPolicy).
 - Não depende de: MVP-007.
 - Dono do aceite de construção: PI.
