@@ -1,0 +1,73 @@
+# Instintos curados a partir dos contratos versionados do rrb-jarvisOS.
+# Fontes: CLAUDE.md, docs/CONVENTION.md, docs/TESTING.md e docs/REVIEW.md.
+# Não inferir novas regras a partir deste arquivo.
+
+---
+id: rrb-jarvisos-spec-gate
+trigger: "when starting a feature slice"
+confidence: 1.0
+domain: workflow
+source: repository-contract
+---
+
+# Gate de SPEC
+
+## Action
+
+Confirme a SPEC `aprovada-pi` e sua revisão antes de implementar uma fatia. Se faltar decisão de produto, pergunte ao PI; não invente escopo.
+
+---
+id: rrb-jarvisos-git-delivery
+trigger: "when preparing a pull request or merge"
+confidence: 1.0
+domain: git
+source: repository-contract
+---
+
+# Entrega por PR
+
+## Action
+
+Trabalhe em branch/worktree, use `refs #N` e nunca use palavras que fechem automaticamente a issue. Verifique o CI atual antes do merge. Após integrar, mova para `proplan:done`; somente o PI fecha a issue.
+
+---
+id: rrb-jarvisos-test-evidence
+trigger: "when changing or reporting tests"
+confidence: 1.0
+domain: testing
+source: repository-contract
+---
+
+# Evidência de teste
+
+## Action
+
+Classifique testes pelo sufixo e pelo comportamento provado, siga `docs/TESTING.md` e não edite números de `reports/TESTS.md` manualmente. Código de saída isolado não substitui a evidência esperada.
+
+---
+id: rrb-jarvisos-review-contract
+trigger: "when reviewing a change"
+confidence: 1.0
+domain: review
+source: repository-contract
+---
+
+# Revisão governada
+
+## Action
+
+Leia `docs/REVIEW.md`, revise o delta e suas dependências diretas, deduplique relatórios anteriores e não invente LGPD, consentimento, aceite duplo ou regra de produto.
+
+---
+id: rrb-jarvisos-electron-boundary
+trigger: "when changing renderer, preload, IPC, secrets, or command execution"
+confidence: 1.0
+domain: architecture
+source: repository-contract
+---
+
+# Fronteira Electron
+
+## Action
+
+O renderer não acessa Node, segredos ou comandos diretamente. Use preload e IPC mínimo e tipado; preserve `contextIsolation`, `nodeIntegration` desativado e o Policy Engine fail-closed.
