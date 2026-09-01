@@ -22,6 +22,7 @@
 
 import type { WorkspaceId } from './entities'
 import type { AiProvider } from './ai'
+import type { PathsPermitidos } from './preflight'
 
 /**
  * De onde um item do contexto veio (spec § ContextPack: "origem das fontes").
@@ -159,6 +160,14 @@ export interface ContextPack {
   readonly rota: AiProvider
   /** O pack anterior, quando este é uma expansão dele. */
   readonly packAnterior?: string
+  /**
+   * O escopo de arquivos que o run pode alterar (SPEC-Entrega-03, critério 13).
+   *
+   * Ausente fora de pipeline: um pack montado para uma geração avulsa não tem run, e um valor
+   * vazio afirmaria "nenhum arquivo é permitido" quando o certo é "a pergunta não se aplica".
+   * Quem exige a presença é o preflight, não a montagem do pack.
+   */
+  readonly pathsPermitidos?: PathsPermitidos
   /** SHA-256 do manifesto canônico. Ver `hashDoPack` no main. */
   readonly hash: string
   readonly created_at: string

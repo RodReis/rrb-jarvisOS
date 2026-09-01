@@ -8,6 +8,7 @@ import {
   type WorkspaceSwitchResult
 } from '@shared/contracts/ipc'
 import { AUTH_MENSAGENS, type AuthSnapshot } from '@shared/contracts/auth'
+import type { PreflightService } from '../pipeline/preflight-service'
 import { parseLogInput } from '@shared/contracts/logging-input'
 import { isSensitivity, type PolicyContext, type PolicyDecision } from '@shared/policies'
 import { isWorkspaceId, type AuditEvent, type AuditEventType } from '@shared/domain/entities'
@@ -75,6 +76,8 @@ import type { Anexo, AnexoOutcome } from '@shared/domain/anexos-de-design'
 import { EXTENSOES_DO_ANEXO, isTipoDeAnexo } from '@shared/domain/anexos-de-design'
 import type { ValidacaoDoPrototipo } from '@shared/domain/validacao-de-prototipo'
 import type { ArquiteturaOutcome, PacoteArquitetura } from '@shared/domain/arquitetura'
+import type { AlvoDaPublicacao, PublicacaoOutcome } from '@shared/domain/publicacao'
+import type { MergePolicyOutcome, PoliticaDeMerge, VistaDaFila } from '@shared/domain/pipeline'
 import type { Roadmap, RoadmapOutcome } from '@shared/domain/roadmap'
 import type {
   Approval,
@@ -84,6 +87,9 @@ import type {
   RevisaoAprovada
 } from '@shared/domain/aprovacoes'
 import { NATUREZAS, isGate } from '@shared/domain/aprovacoes'
+import type { PublicacaoService } from '../projects/publicacao-service'
+import type { MergePolicyService } from '../pipeline/merge-policy-service'
+import type { FilaService } from '../pipeline/fila-service'
 import type { RoadmapService } from '../projects/roadmap-service'
 import type { AnexoService } from '../projects/anexo-service'
 import { isConnectorId } from '@shared/domain/connectors'
@@ -290,6 +296,12 @@ export interface IpcDependencies {
   readonly pacotes: PacoteService
   readonly anexos: AnexoService
   readonly roadmap: RoadmapService
+  readonly publicacao: PublicacaoService
+  /** O kill-switch do merge autônomo (SPEC-Entrega-02/05). */
+  readonly mergePolicy: MergePolicyService
+  /** A fila de execução (SPEC-Entrega-02). Exposta só para leitura. */
+  readonly fila: FilaService
+  readonly preflight: PreflightService
   /** Vault de credenciais (SPEC-Providers-01): status para a UI, valor só dentro do main. */
   readonly credentials: CredentialService
   /** Runs persistidos, para a UI listar o histórico. */
@@ -1425,6 +1437,88 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
         return { mvps: [], slices: [] }
       }
       return deps.roadmap.carregar(projectId, workspace)
+    }
+  )
+
+  /**
+   * SPEC-Entrega-01: publica o repositório e o backlog aprovado.
+   *
+   * Valida a **forma** do alvo antes de agir, como todo handler desta ponte: o renderer é um
+   * processo que pode ser comprometido, e um `owner` que não é string chegaria à URL do push. O que
+   * ele **não** escolhe é o conteúdo — as issues saem do que o PI aprovou para a fila, lido aqui.
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.publicacaoPublicar,
+    async (
+      _event,
+      projectId: unknown,
+      alvo: unknown,
+      workspace: unknown
+    ): Promise<PublicacaoOutcome> => {
+      const invalido: PublicacaoOutcome = { reason: 'projeto-inexistente', criados: 0 }
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return invalido
+
+      const a = alvo as Partial<AlvoDaPublicacao> | null
+      if (
+        a === null ||
+        typeof a !== 'object' ||
+        typeof a.owner !== 'string' ||
+        typeof a.repo !== 'string' ||
+        typeof a.origem !== 'string'
+      ) {
+        return invalido
+      }
+
+      return await deps.publicacao.publicar(projectId, workspace, {
+        owner: a.owner,
+        repo: a.repo,
+        origem: a.origem
+      })
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.filaVista,
+    (_event, projectId: unknown, workspace: unknown): VistaDaFila => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
+        return { ativos: [], concluidas: [], bloqueadas: [] }
+      }
+      return deps.fila.vista(projectId, workspace)
+    }
+  )
+
+  /**
+   * O estado do sandbox (SPEC-Entrega-03). Só leitura: responde "a máquina está pronta?" sem
+   * preparar nada — preparar é ato da pipeline, nunca do renderer.
+   */
+  ipcMain.handle(IPC_CHANNELS.sandboxEstado, () => deps.preflight.estado(app.getAppPath()))
+
+  /**
+   * O kill-switch do merge autônomo (SPEC-Entrega-02/05).
+   *
+   * Como em todo handler desta base, a **forma** é validada aqui e a **decisão** mora no serviço:
+   * repetir a regra de identidade neste ponto criaria uma segunda fonte da política.
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.mergePolicyLer,
+    (_event, projectId: unknown, workspace: unknown): PoliticaDeMerge => {
+      // Forma inválida devolve o default ligado — o mesmo que um projeto sem decisão registrada.
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return { autonomo: true }
+      return deps.mergePolicy.politica(projectId)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.mergePolicyDefinir,
+    (_event, projectId: unknown, autonomo: unknown, workspace: unknown): MergePolicyOutcome => {
+      if (
+        !isWorkspaceId(workspace) ||
+        typeof projectId !== 'string' ||
+        typeof autonomo !== 'boolean'
+      ) {
+        return { reason: 'sem-mudanca', mensagem: 'Pedido inválido.' }
+      }
+      return deps.mergePolicy.definir(projectId, workspace, autonomo)
     }
   )
 

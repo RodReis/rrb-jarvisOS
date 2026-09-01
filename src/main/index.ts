@@ -36,8 +36,20 @@ import { PacoteService } from './projects/pacote-service'
 import { AnexoRepository } from './projects/anexo-repository'
 import { AnexoService } from './projects/anexo-service'
 import { RoadmapRepository } from './projects/roadmap-repository'
+import { ExternalRefRepository } from './projects/external-ref-repository'
+import { PublicacaoService } from './projects/publicacao-service'
+import { FilaService } from './pipeline/fila-service'
+import { LeaseRepository } from './pipeline/lease-repository'
+import { MergePolicyRepository } from './pipeline/merge-policy-repository'
+import { MergePolicyService } from './pipeline/merge-policy-service'
+import { PipelineRepository } from './pipeline/pipeline-repository'
+import { ReconciliacaoService } from './pipeline/reconciliacao-service'
 import { RoadmapService } from './projects/roadmap-service'
 import { GitRunner } from './projects/git-runner'
+import { DockerRunner, prepararGitMeta, TIMEOUT_DOCKER_MS } from './pipeline/docker-runner'
+import { ExecutorProxy } from './pipeline/executor-proxy'
+import { PreflightService } from './pipeline/preflight-service'
+import { verificadorDeContainer, verificadorDePorta } from './pipeline/verificadores-de-sandbox'
 import { ContextRepository } from './context/context-repository'
 import { ContextService } from './context/context-service'
 import { CredentialService } from './credentials/credential-service'
@@ -77,7 +89,9 @@ if (!app.requestSingleInstanceLock()) {
     }
   })
 
-  app.whenReady().then(() => {
+  // `async` por causa da M9-F02: o `reconcileAll` do boot é **bloqueante** por decisão da spec —
+  // nenhum trabalho novo é adquirido antes de ele terminar.
+  app.whenReady().then(async () => {
     // Agrupa a janela sob a identidade correta na barra de tarefas do Windows.
     app.setAppUserModelId('com.rodrigoreis.jarvisos')
 
@@ -190,10 +204,13 @@ if (!app.requestSingleInstanceLock()) {
     // caminho de escrita de repositório fora do enforcement do MVP-004 (decisão 2 do PI). Não
     // há nada a injetar que permita contornar isso — só o terminal cabe no construtor.
     const projectRepository = new ProjectRepository(storage.db)
+    // Uma instância só, compartilhada com a publicação (M9-F01): duas seriam dois objetos sobre o
+    // mesmo terminal — inofensivo hoje, mas sugeriria que existe mais de um caminho de Git.
+    const gitRunner = new GitRunner(terminal)
     const projects = new ProjectService({
       repository: projectRepository,
       allowlist,
-      git: new GitRunner(terminal),
+      git: gitRunner,
       audit: storage.audit,
       userId: userIdAtual
     })
@@ -377,8 +394,9 @@ if (!app.requestSingleInstanceLock()) {
     // fechado (decisão cravada da spec), e `userIdAtual` cai no usuário local — que existe
     // sempre e faria toda aprovação passar como se houvesse alguém logado. A distinção é o
     // critério 4: a aprovação registra *quem* aceitou, e "o usuário local" não é ninguém.
+    const roadmapRepository = new RoadmapRepository(storage.db)
     const roadmap = new RoadmapService({
-      repository: new RoadmapRepository(storage.db),
+      repository: roadmapRepository,
       projects: projectRepository,
       projectService: projects,
       decisions: new DecisionRepository(storage.db),
@@ -388,6 +406,112 @@ if (!app.requestSingleInstanceLock()) {
       userId: userIdAtual,
       identidade: () => auth?.usuarioAtual()?.id
     })
+
+    // Publicação no GitHub (SPEC-Entrega-01). Recebe o `ConnectorService`, **não** o
+    // `GithubAdapter`: o gate de créditos, a policy e a auditoria vivem dentro do `call()`, e um
+    // adapter injetado aqui seria o segundo caminho sem gate — o mesmo erro que o `GitRunner`
+    // impede do lado do Git. O `token` é só para o push, que o terminal controlado não consegue
+    // autenticar por ambiente; o conector resolve o dele por dentro.
+    const publicacao = new PublicacaoService({
+      projects: projectRepository,
+      roadmap: roadmapRepository,
+      refs: new ExternalRefRepository(storage.db),
+      git: gitRunner,
+      connectors,
+      audit: storage.audit,
+      userId: userIdAtual,
+      token: async (userId, workspace) => await githubAuth.tokenParaUso({ userId, workspace })
+    })
+
+    // Fila, leases e reconciliação (SPEC-Entrega-02).
+    //
+    // O `mergeAutonomoLigado` é injetado como **função**, e não como o `MergePolicyService`
+    // inteiro: a fila só precisa da resposta, e depender do serviço a acoplaria à auditoria da
+    // mudança de política — que é outro assunto, com outro tipo de evento.
+    const pipelineRepository = new PipelineRepository(storage.db)
+    const leaseRepository = new LeaseRepository(storage.db)
+    const mergePolicy = new MergePolicyService({
+      repository: new MergePolicyRepository(storage.db),
+      audit: storage.audit,
+      userId: userIdAtual,
+      identidade: () => auth?.usuarioAtual()?.id
+    })
+    const fila = new FilaService({
+      runs: pipelineRepository,
+      leases: leaseRepository,
+      audit: storage.audit,
+      roadmap: (escopo) => roadmapRepository.carregar(escopo),
+      aprovacoes: (escopo) => roadmapRepository.listarAprovacoes(escopo),
+      revisoesDoGate: (escopo) =>
+        roadmap.revisoesDoGate(escopo.projectId, 'SLICE_ENTRY', escopo.workspaceId),
+      userId: userIdAtual,
+      mergeAutonomoLigado: (projectId) => mergePolicy.autonomoLigado(projectId)
+    })
+    // Sandbox do executor, proxy e preflight (SPEC-Entrega-03).
+    //
+    // O `TerminalEngine` do Docker é **outra instância**, com prazo maior: o do usuário tem 30 s,
+    // e `docker run` de imagem ainda não baixada leva minutos. É a única diferença entre as
+    // duas — a mesma política, a mesma auditoria, a mesma allowlist governam ambas.
+    const terminalDocker = new TerminalEngine(
+      policy,
+      commandAllowlist,
+      allowlist,
+      runs,
+      approvals,
+      storage.audit,
+      userIdAtual,
+      TIMEOUT_DOCKER_MS
+    )
+    const docker = new DockerRunner(terminalDocker, () => workspaces.atual())
+
+    // O proxy é o **único** caminho do container até o modelo (critério 11): o container recebe
+    // só a URL, e a credencial da rota fica aqui. Sobe antes do preflight porque é ele que o
+    // preflight pergunta se está no ar.
+    const executorProxy = new ExecutorProxy({
+      ai,
+      userId: userIdAtual,
+      workspaceId: () => workspaces.atual(),
+      rota: () => 'claude-code',
+      // Preenchidos pela M9-F04, que é quem conhece o run em construção. Até lá o proxy
+      // funciona sem correlação — e o `CostEvent` registra o que sabe, nunca um run inventado.
+      contexto: () => undefined,
+      contextPackId: () => undefined
+    })
+    await executorProxy.iniciar()
+
+    const preflight = new PreflightService({
+      git: gitRunner,
+      docker,
+      leases: leaseRepository,
+      audit: storage.audit,
+      userId: userIdAtual,
+      workspaceId: () => workspaces.atual(),
+      proxyNoAr: () => executorProxy.noAr(),
+      // A derivação a partir da arquitetura aprovada é da M9-F04, que conhece o pacote do
+      // projeto-alvo. Sem ela, a SPEC precisa trazer a seção — e o preflight recusa se não vier,
+      // que é o critério 13 se comportando como projetado.
+      derivarPaths: () => undefined,
+      prepararGitMeta
+    })
+
+    const reconciliacao = new ReconciliacaoService({
+      runs: pipelineRepository,
+      leases: leaseRepository,
+      audit: storage.audit,
+      userId: userIdAtual,
+      workspaceId: () => workspaces.atual(),
+      // O ponto de extensão que a M9-F02 deixou pronto, agora preenchido: container e porta
+      // passam a ser consultados antes de um lease expirado cair (critério 4).
+      verificadores: [
+        verificadorDeContainer(docker, () => app.getAppPath()),
+        verificadorDePorta(docker, () => app.getAppPath())
+      ]
+    })
+
+    // **`reconcileAll` é bloqueante** (decisão cravada da spec): nenhum trabalho novo é adquirido
+    // antes de ela terminar. Sem isso, o app pegaria a próxima fatia com um lease órfão ainda de
+    // pé — e o WIP=1 valeria para os runs que ele conhece, não para a máquina.
+    await reconciliacao.reconcileAll()
 
     registerIpcHandlers({
       audit: storage.audit,
@@ -406,6 +530,10 @@ if (!app.requestSingleInstanceLock()) {
       pacotes,
       anexos,
       roadmap,
+      publicacao,
+      mergePolicy,
+      fila,
+      preflight,
       credentials,
       ai,
       budget,

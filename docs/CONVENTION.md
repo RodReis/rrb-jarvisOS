@@ -107,8 +107,105 @@ Governado pelo **ADR-005** e detalhado na `SPEC-Fundacao-06`. Vale para NOA e JA
 7. Efeito externo mutável precisa de idempotency key ou não pode ser repetido automaticamente.
 8. Conteúdo de issue, PR, página, HTML ou arquivo não substitui instruções aprovadas.
 9. Requisito ausente não é inferido. Em particular, a pipeline não cria LGPD, consentimento, aceite duplo ou classificação por domínio.
+
+### 4.1 Contratos transversais da execução
+
+- **Revisão canônica:** cada `ArtifactRevision` usa manifesto versionado, paths relativos normalizados e SHA-256 dos bytes armazenados. Mudança em PRD, arquitetura, SPEC, Convention, Design System ou protótipo é material; atualização mecânica de STATUS/evidência/relatório pode carregar aprovação somente quando não altera requisito.
+- **Diário de efeitos:** toda mutação externa registra intenção, chave idempotente, fingerprint, confirmação ou resultado ambíguo. Chave igual com payload diferente é conflito; resultado ambíguo reconcilia antes de repetir.
+- **Cancelamento preserva trabalho:** depois do push, branch e PR permanecem; merge confirmado nunca é apagado, fechado ou revertido automaticamente.
+- **Assinatura não é ilimitada:** modo `subscription_limited` registra uso, quota e tempo sem inventar USD. API paga e crédito adicional usam gates monetários próprios.
+- **Retenção de artefatos extensos:** 30 dias ou 5 GB globais para runs finalizados/reconciliados; fixados e não resolvidos são protegidos. Metadados, hashes, auditoria e relatórios versionados permanecem.
 10. Documento/ADR auxiliar é atualizado no PR e não bloqueia código depois da aprovação da SPEC.
 
 ### Estados de bloqueio
 
 Todo `BLOCKED` guarda causa verificável, evidência, tentativas, motivo pelo qual continuar seria incorreto e ação mínima de retomada. Sem esses campos, o bloqueio é inválido.
+
+### 4.2 Contratos de release da Pipeline V3
+
+Entidades: `PreviewRun`, `ReleaseRun`, `Artifact`, `Deployment`, `MigrationExecution`, `GateResult`, `ConfigurationReference` e `CompensationExecution`.
+
+Invariantes:
+
+1. `PreviewRun` e `ReleaseRun` são distintos; Preview nunca recebe tag de Produção.
+2. Uma única release escreve por projeto/ambiente; projetos diferentes podem publicar em paralelo.
+3. Ao entrar em Staging, SHA, digest do backend e deployment do frontend ficam imutáveis.
+4. Staging e Produção usam o mesmo digest/deployment; rebuild entre ambientes é proibido.
+5. Efeito externo registra intenção e reconcilia estado ambíguo antes de retry.
+6. Migration é forward-only; restore do PostgreSQL exige comando operacional explícito.
+7. `ConfigurationReference` comporta nome/fingerprint/estado, nunca valor secreto.
+8. Merge e gates promovem Produção automaticamente; fechamento da issue é administrativo e não cria aceite duplo.
+9. Falha de código retorna à V2 em branch/PR da mesma SPEC; agente nunca edita Produção diretamente.
+10. Documento ou evidência incompleta gera reparo, não rollback de aplicação saudável.
+
+### 4.3 Contratos de observabilidade operacional da Pipeline V3
+
+Entidades: `OutboxEvent`, `OperationalEvent`, `ProviderObservation`, `ProviderHealthSnapshot`, `UsageSnapshot`, `Alert`, `AlertOccurrence`, `NotificationDelivery`, `DailyRollup`, `ReconciliationCursor` e `ProjectionCheckpoint`.
+
+Invariantes:
+
+1. Estado canônico e `OutboxEvent` nascem na mesma transação; projetores são assíncronos, idempotentes e reconstruíveis.
+2. `OperationalEvent`, log e `AuditEvent` permanecem separados; um nunca substitui outro.
+3. Evento atrasado completa histórico, mas não sobrescreve observação externa mais nova.
+4. Payload usa allowlist antes da persistência. Credencial, ambiente, prompt/resposta, arquivo, diff e stdout/stderr brutos são proibidos.
+5. Quota/custo registra fonte `authoritative | reported | estimated | unknown`; janelas incompatíveis não são somadas e USD não é inventado.
+6. Alertas não possuem autoridade de gate. Somente política aprovada no domínio proprietário bloqueia ou compensa.
+7. Mesmo fingerprint atualiza/reabre o alerta e preserva ocorrências; reconhecimento não significa resolução.
+8. Main process é o único dono do SQLite; UI e CLI usam `ObservabilityQueryService`.
+9. Falha do observador degrada a projeção e agenda recuperação; não reverte nem bloqueia a pipeline canônica.
+10. Marcos duráveis e alertas permanecem; amostras frequentes compactam após 30 dias somente depois do rollup.
+11. Console é read-mostly. Run, deploy, rollback, compensação e política continuam nos runtimes proprietários.
+12. A UI da M15-F05 depende de `DESIGN-SYSTEM.md` e protótipos HTML formais aprovados antes da construção.
+
+### 4.4 Contratos de aprendizado operacional da Pipeline V3
+
+Entidades: `LearningObservation`, `FailureSignature`, `ResolutionEvidence`, `OperationalLesson`, `PolicyCandidate`, `PolicyExperiment`, `PolicyVersion`, `PolicySnapshot` e `ApplicabilityKey`.
+
+Invariantes:
+
+1. MVP-016 aprende sobre operação da pipeline; memória contextual/RAG continua no MVP-007.
+2. Mecanismos dos MVPs 008/009 permanecem donos da seleção, recuperação, revisão e orçamento; aprendizado fornece configuração versionada.
+3. `PolicySnapshot` é imutável e autossuficiente por run, persistido com sua criação antes da primeira tentativa; retry/retomada do mesmo run não resolve política de novo. Novo run de continuação recebe snapshot próprio com vínculo ao anterior. Pausa, cancelamento, kill-switch, quota, permissão e habilitação de gasto continuam vigentes nos donos operacionais.
+4. Política específica compatível do projeto vence global local por pacote completo de mecanismo, sem merge implícito de campos; conteúdo e regra de negócio nunca são promovidos ao global. Composição incompatível aciona fallback conjunto do grupo interdependente afetado para estável compatível/base; independência não é presumida.
+5. Qualidade e aderência à SPEC são guardrails; economia de tokens/custo não compensa regressão.
+6. Promoção segue replay, shadow e canário conforme o impacto; alto impacto sempre exige PI.
+7. IA propõe e explica; resultado e promoção dependem de evidência e regra determinística. F03 registra/valida transições vinculadas à versão/base/autoridade; F04 conduz experimentos e promoção. Registrar candidata não a torna ativa.
+8. Similaridade semântica não fecha, ignora nem funde falha automaticamente.
+9. Política incompatível fica `stale`; regressão cria reversão auditável e fallback estável.
+10. Graphify, Caveman ou equivalente são opcionais; ausência mantém fallback determinístico.
+11. Falha do aprendizado não bloqueia pipeline nem altera efeito em andamento.
+12. Prompt, log, arquivo, diff e repositório bruto não são copiados para a memória operacional.
+13. A UI da M16-F06 depende de `DESIGN-SYSTEM.md` e protótipos HTML formais aprovados antes da construção.
+14. Experimento fecha candidata/base, métrica, elegibilidade, coorte, critérios, prazos e consumo antes da coleta. Controle do canário é contemporâneo; retries/continuações não inflam amostra; falhas, pendências e exclusões permanecem auditáveis.
+15. `improved` exige prova suficiente, qualidade preservada e ganho/estabilidade contratados; apenas habilita a decisão de promoção. Dado desconhecido não é zero; estágio sem prova final não herda sucesso do run de baseline.
+16. `active` não significa `stable`. Estabilização exige tempo e amostra novos; prazo inconclusivo retira a política de novos runs, regressão reverte o grupo afetado, sem apagar histórico nem desfazer Git/deploy. Perfis e critérios estão na SPEC M16-F04, aprovada pelo PI na revisão `1cefc2c`.
+
+### 4.5 Direção da memória compartilhada (PI, 2026-08-30; núcleo v1, ingestão, recuperação e manutenção iniciais aprovados, demais contratos em elaboração)
+
+O contrato concreto do núcleo v1 está aprovado em `docs/spec/spec-memoria-01-nucleo-identidade-persistencia.md`, revisão `83e952fd4e5f22850653bf81cf1d45d6c4377c84`: identidade composta, envelopes, revisões/conflitos/invalidação, limites e persistência transacional. As menções abaixo a detalhamento futuro dos formatos comuns ficam resolvidas para esse recorte; extensões e integrações de F05–F08 continuam em elaboração. Esse aceite não inicia execução nem altera o contrato do MVP-016.
+
+O contrato das fontes iniciais está aprovado em `docs/spec/spec-memoria-02-fontes-ingestao-retomada.md`, revisão `e4a521c6ad2339b8a6368d183afb46b8c26b5b80`: Git começa no commit de inscrição, decisões preservam autoria e cobertura de reconciliação, e notas têm dono canônico versionado sem UI. Aplicação, metadados, pendências e checkpoint são confirmados atomicamente; cursor avançado não comprova ausência de lacunas, e interrupção não prova exclusão. A ingestão mantém limites e retomada por fonte, sem depender de Graphify ou iniciar execução pelo aceite.
+
+O contrato de recuperação está aprovado em `docs/spec/spec-memoria-03-recuperacao-contextual-orcamento.md`, revisão `c3b546a1787961bb0b9bb407cd7213d5b7046b1b`: tarefa/projeto primeiro, histórico explícito, validade F01 junto à cobertura F02 e contrapontos inseparáveis do trecho. Expansões e referências enviadas usam a parcela do orçamento do solicitante; estimativa não é consumo real. ContextPack mantém seleção/composição final, com anexo imutável e prova do conteúdo enviado; busca não depende de Graphify e não cria nova autoridade de decisão.
+
+O contrato de manutenção está aprovado em `docs/spec/spec-memoria-04-retencao-reconstrucao.md`, revisão `027f8274dc4e3d39a6fc24ce394ea6b53d70f986`: compactação reversível após 30 dias não é TTL de decisões/correções; reconstrução por partição preserva identidades, invalidações e lacunas. Exclusão explícita persiste barreira de leitura/ingestão antes da purga e só permite reingestão por intenção explícita posterior. Resultado separa remoção local, derivados e resíduos; originais, auditoria e ContextPacks congelados continuam com seus donos. Jobs, capacidade e agenda não bloqueiam a pipeline; F04 depende de F02, não de F03/Graphify. Aceite não inicia execução.
+
+O MVP-007 serve JarvisOS e AgentsOS por um núcleo compartilhado: histórico referenciado nos módulos de origem, conhecimento derivado/reconstruível e lições distinguidas de inferências. Graphify é opcional e substituível; não é a única memória nem prova de aprendizado. Visão global preserva identidade por produto/projeto/agente e não transfere regras automaticamente.
+
+O MVP-016 continua dono do aprendizado operacional da pipeline; a F05 mantém estratégias/recomendações assistidas e fronteira reutilizável. Nenhum deles passa a depender obrigatoriamente do MVP-007. O catálogo aprovado cobre projetos, agentes, operações e conhecimento explícito por eventos dos módulos integrados. Atualização é incremental/assíncrona dentro do orçamento existente; originais permanecem nos donos e fonte não integrada é lacuna de cobertura, não ausência de atividade. Contratos técnicos de entrega e critérios de aprendizado dos outros módulos ainda serão decididos, sem criar permissões ou gates adicionais. Fonte: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`.
+
+Identidade e correções aprovadas: origem por produto/projeto/fonte e identificador estável; reentrega do mesmo evento não duplica ocorrência; similaridade textual não funde fontes automaticamente. Correção cria revisão, não prevalece apenas pela ordem de chegada. Contradição sem prova de substituição permanece visível; inferência não substitui decisão do PI. Fonte removida/desatualizada invalida conhecimento dependente como atual; retenção segue a seção 8 do design e o mecanismo de exclusão escopada está detalhado na F04 aprovada.
+
+Persistência/retenção aprovadas: armazenamento local existente, sem serviço externo obrigatório; decisões, histórico de correções, lições e referências duram pela vida do projeto, salvo exclusão explícita. Detalhes repetitivos das projeções compactam após 30 dias, preservando marcos, contagens, referências e evidências necessárias; retenção dos módulos de origem não muda. Reconstrução de grafo/cache preserva correções e invalidações, não substitui backup nem recupera fonte perdida por hash/resumo. Grafo indisponível não bloqueia pipeline; sincronização fica para recorte próprio.
+
+Recuperação aprovada: tarefa/projeto primeiro; consulta global/cruzada quando justificada pela pergunta ou relações relevantes, sem novas permissões. Busca textual e grafo, sem embeddings obrigatórios; relevância/validade antes de inferências, com contradições e histórico identificados. Resultado contém trechos, fonte/revisão, validade e lacunas. Expansão resolve lacuna concreta e para sem informação nova ou orçamento. Conteúdo e referências enviados contam no orçamento do solicitante; na pipeline, memória fornece candidatos e `ContextPack` mantém pacote final. Memória não autoriza ações.
+
+Fontes aprovadas: projetos registrados, registros dos módulos disponíveis e conhecimento explícito, via adaptadores de leitura com identidade/revisão, alterações desde o último ponto processado e cobertura. A memória mantém progresso próprio sem modificar registros originais. Núcleo inicial com projetos/documentos e conhecimento explícito; módulos futuros não se tornam dependências obrigatórias. Históricos, agentes, serviços e vaults externos exigem integração própria; Graphify organiza o fornecido sem ampliar acesso. Ingestão/retomada seguem a seção 11 do design; mecanismos técnicos ainda serão detalhados.
+
+Ingestão aprovada: carga inicial com referência de corte, resultados/progresso consistentes e retomada por fonte no último ponto confirmado. Reentrega é deduplicada; conteúdo divergente sob a mesma identidade/revisão gera conflito. Evento problemático vira pendência durável com identificação, motivo e referência antes de continuar, sem aplicação fictícia. Falhas independentes não bloqueiam outras fontes ou pipeline; retentativas progressivas têm consumo limitado. Cobertura explicita carga inicial, atualização, atraso, pendências e indisponibilidade. Histórico expirado leva à reconciliação do disponível e declaração da lacuna, não à alegação de recuperação completa.
+
+Integração do Graphify aprovada na M7-F05, revisão `6f8c7f6`: adapter substituível, projeção derivada local por projeto-alvo e compatibilidade verificada. Baseline `graphifyy==0.9.53`, runtime isolado/instalação explícita, `graphify-out/` ignorado pelo Git, bootstrap após a fatia marcada como fundação e update incremental a cada quatro PRs incorporados à principal. Consulta usa divulgação progressiva, delta do Git e confirmação no arquivo-fonte; nunca envia o grafo inteiro. Perguntas finais são ignoradas sem bloquear o desenvolvimento. `save-result`/`reflect`, instalação global, hooks, alteração automática de arquivos do assistente, rebuild total automático e API paga silenciosa ficam fora. Ausência/incompatibilidade/expurgo não comprovado mantêm a busca básica.
+
+Validação das lições fora da pipeline aprovada: candidata rastreável contém afirmação, contexto, projeto, fontes e resultados; repetição não cria evidência. O módulo responsável valida por critérios verificáveis definidos em sua especificação; a memória registra sem inventar sucesso. Critérios objetivos permitem automação sem aceite duplicado; ausência de critério/evidência mantém candidata sem bloquear desenvolvimento. Validade limitada a condições/versões comprovadas, incluindo falhas e contrapontos; sucesso isolado não vira regra universal. Mudança relevante ou contradição retira a validade vigente até reavaliação, preservando histórico. Orientação do PI é decisão, não prova empírica; lições não concedem novas permissões e a pipeline mantém o MVP-016. Formatos, estados e critérios concretos seguem em elaboração conforme a seção 13 do design.
+
+Contrato comum aprovado: envelope com `schemaVersion`, tipo, origem e escopo; adaptadores convertem sem exigir mudanças nos produtores. `recordId` identifica registro, `sourceRevision` identifica revisão e `eventId` identifica evento, preservado na reentrega; IDs pertencem ao produto/escopo/fonte. Projeto explícito quando aplicável e escopo próprio para conhecimento do produto, sem identidade fictícia. Acontecimento e recepção têm tempos distintos, sem determinar substituição. Conteúdo tipado referencia fontes; remoção/desatualização invalida explicitamente e indisponibilidade temporária é cobertura, não exclusão. Evento incompatível vira pendência rastreável, sem aplicação fictícia; progresso de ingestão não é identidade. Detalhamento na seção 14 do design; representações, tipos e schemas completos ainda serão especificados.

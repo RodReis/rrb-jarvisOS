@@ -33,6 +33,26 @@ function declaresSensitivePayload(value: Record<string, unknown>): boolean {
 }
 
 /**
+ * Remove a credencial de uma URL `https://usuario:senha@host/...`, onde quer que ela apareça.
+ *
+ * É a única redação que age sobre **conteúdo** e não sobre nome de campo, e a razão é que o segredo
+ * aqui não está num campo: ele está no meio de uma string. O caso concreto veio da M9-F01 — o push
+ * da publicação carrega o token na URL (o `ambienteControlado()` do MVP-004 não deixa variável de
+ * ambiente alcançar o subprocess), e a **linha de comando é persistida**, em `execution_run` e no
+ * `AuditEvent` do terminal. Sem esta regra o token vai para o banco em claro, e nenhuma chave por
+ * nome o alcança.
+ *
+ * Fica aqui, e não no chamador, porque é a única posição que cobre todos os call sites de uma vez:
+ * o `TerminalEngine` audita os args antes de executar, e uma redação feita depois — na cópia que o
+ * runner devolve — chegaria tarde demais para o que já foi gravado.
+ *
+ * Preserva o host e o caminho: sem eles, ninguém sabe para onde o comando falhou.
+ */
+function redigirCredencialEmUrl(texto: string): string {
+  return texto.replace(/(https?:\/\/)[^/@\s]+:[^/@\s]+@/g, `$1${REDACTED_PLACEHOLDER}@`)
+}
+
+/**
  * Devolve uma cópia sem os valores sensíveis, em qualquer profundidade.
  *
  * Estruturas cíclicas viram `'[circular]'` em vez de estourar a pilha: um erro real costuma
@@ -40,6 +60,8 @@ function declaresSensitivePayload(value: Record<string, unknown>): boolean {
  * derruba o processo ao registrar a falha é pior que a falha.
  */
 export function redact(value: unknown, seen: WeakSet<object> = new WeakSet()): unknown {
+  if (typeof value === 'string') return redigirCredencialEmUrl(value)
+
   if (value === null || typeof value !== 'object') return value
 
   if (seen.has(value)) return '[circular]'

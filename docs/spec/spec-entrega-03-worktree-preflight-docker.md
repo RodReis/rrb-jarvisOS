@@ -2,7 +2,7 @@
 
 - MVP/Fatia: MVP-009 · M9-F03.
 - Issue: [#103](https://github.com/RodReis/rrb-jarvisOS/issues/103).
-- Status: **aprovada-pi** (2026-08-29) — o Docker passa a ser o **sandbox do executor** por decisão do PI nesta data, não apenas serviço do projeto. **Emenda 2026-08-30 (PI):** autenticação do executor por **proxy no host** (critério 9 mantido literal); fonte dos paths permitidos, Git dentro do container e rede do container definidos (ver § Emendas).
+- Status: **aprovada-pi** (2026-08-29) — o Docker passa a ser o **sandbox do executor** por decisão do PI nesta data, não apenas serviço do projeto. **Emenda 2026-08-30 (PI):** autenticação do executor por **proxy no host** (critério 9 mantido literal); fonte dos paths permitidos, Git dentro do container e rede do container definidos (ver § Emendas). **Emenda 2026-08-31 (PI):** quatro furos medidos na implementação — `.git` principal montado `:ro` (a montagem anterior não funcionava), proxy atendendo também a rota de assinatura, `runId`/`tentativa` nos contratos de custo, e a colisão da limpeza adiada para a M9-F06 (ver § Emendas 2026-08-31).
 - Depende de: M9-F02 e SPEC aprovada da fatia-alvo.
 
 ## Objetivo
@@ -70,3 +70,48 @@ Integração Git real temporária, colisão de porta/container e validação de 
 2. **Paths permitidos:** a SPEC gerada não os traz; a regra passa a nomear a fonte e a exigir a lista registrada antes da execução (critério 13). **A derivação a partir da arquitetura é decisão cravada pelo Cowork, não do PI — PI pode vetar.** Alternativa: emendar a M8-F06 para a SPEC gerada nascer com `## Paths permitidos` (reabre uma fatia já entregue; vira `[FIX]` ou fatia nova).
 3. **Git no container e rede** eram lacunas técnicas que a spec tratava como triviais; agora estão escritas para o Code não ter de decidir sozinho.
 4. **Validações do app no container** — estava implícito e é a diferença entre sandbox e teatro.
+
+## Emendas (2026-08-31) — furos achados na implementação, decididos pelo PI
+
+Os quatro furos abaixo foram **medidos antes de codificar**, não inferidos. Cada um contradizia
+uma regra escrita acima; a regra contradita foi corrigida no ponto, e o texto original desta
+SPEC permanece válido em tudo o que estas emendas não tocam.
+
+5. **O repositório principal é montado somente-leitura** — a regra anterior (*"o repositório
+   principal não é montado"*) **não funciona**, e isso foi medido com Docker e worktree reais: o
+   `.git` do worktree é um arquivo apontando para o host (a SPEC já previa reescrevê-lo), mas o
+   `commondir` de `.git/worktrees/<lease>` é `../..` — **relativo** —, e dentro do container ele
+   resolve para `/`. O resultado é `fatal: not a git repository: (null)`: objects e refs vivem no
+   `.git` **principal**, e sem ele `git` não funciona de forma alguma. A montagem prescrita
+   entregaria um container onde o `git status/diff` que a própria SPEC diz que o Claude Code
+   "roda o tempo todo" falha na primeira invocação.
+   **Decisão do PI:** o `.git` principal é montado **`:ro`** e o `commondir` é reescrito para o
+   caminho dentro do container. A escrita é rejeitada pelo próprio Docker (medido:
+   `Read-only file system`), então "quem versiona é o app, no host" continua garantido — agora
+   por montagem, não por instrução ao agente.
+   **Custo declarado, aceito pelo PI:** o executor passa a **ler** todo o histórico e todas as
+   branches do repositório. Alternativas descartadas: clone raso no container (deixaria de ser
+   worktree montado e exigiria trazer commits de volta) e container sem git (inviabiliza o
+   executor).
+6. **O proxy atende as duas rotas, e a de assinatura achata a conversa.** A Emenda 1 escolheu
+   `ANTHROPIC_BASE_URL`, mas a rota de assinatura **não é HTTP**: `ClaudeCodeAdapter` é um
+   subprocess do binário `claude` no host, autenticado pela sessão em `~/.claude` — nenhuma
+   variável de base URL a intercepta. Só a rota paga (SDK HTTP) aceita `baseURL`.
+   **Decisão do PI:** o proxy no host recebe HTTP do container e roteia para o `AiCallService`;
+   quando a rota escolhida é a de assinatura, o backend é o `ClaudeCodeAdapter` (subprocess no
+   host). O critério 9 segue literal — o container recebe só a URL do proxy, nunca a sessão.
+   **Custo declarado:** `AiRequest` tem `prompt: string`, não `messages[]`, então a conversa
+   multi-turn do executor é **achatada em um prompt único**, e cada chamada vira um `claude
+   --print` one-shot, sem cache de conversa. Estender `AiRequest` com `messages[]` é a correção
+   de raiz e ficou **fora desta fatia** por ser código novo na camada de providers (MVP-005).
+7. **`runId` e `tentativa` entram no `AiRequest` e no `CostEvent`.** O critério 11 exige
+   `CostEvent`/`AuditEvent` atribuídos ao run e à tentativa, e nenhum dos dois contratos os
+   carrega — o único gancho existente é `contextPackId`. Correlacionar por ele deixaria a
+   atribuição indireta e a *tentativa* sem representação nenhuma. **Decisão do PI:** campos
+   opcionais novos, propagados até o ledger.
+8. **A colisão da limpeza com a política de destrutivos fica para a M9-F06.** `docker
+   rm|rmi|prune|down` já é classificado como destrutivo (`destructive-commands.ts`) e abre
+   `ApprovalRequest`, o que faria a limpeza automática do container parar num gate humano;
+   `docker stop` não é destrutivo. **Decisão do PI:** esta fatia registra o lease e o
+   `VerificadorDeRecurso` e **não toca** na política do MVP-004 — quem decide como remover sem
+   gate humano é a fatia de limpeza.

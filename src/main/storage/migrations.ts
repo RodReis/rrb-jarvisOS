@@ -918,6 +918,148 @@ const MIGRATIONS: readonly string[] = [
     created_at   TEXT NOT NULL
   );
   CREATE INDEX idx_approval_gate ON approval(user_id, project_id, gate, created_at);
+  `,
+
+  // 22 — referências externas da publicação (SPEC-Entrega-01, emenda 6 de 2026-08-30).
+  //
+  // O que o app publicou no GitHub, e onde. Sem esta tabela, cada fatia seguinte teria de
+  // **redescobrir na origem** o que a M9-F01 acabou de criar: a M9-F05 precisa do número da
+  // issue para escrever `refs #N`, e a reconciliação da M9-F02 precisa dos SHAs. Redescobrir
+  // é uma chamada de rede a mais por fatia e uma resposta que pode ter mudado no intervalo.
+  //
+  // `alvo` + `chave_externa` é o par que identifica o recurso: `alvo` diz **o que é**
+  // (repositório, issue, branch), `chave_externa` diz **qual** — a mesma chave determinística
+  // que o corpo da issue carrega. O `UNIQUE` sobre eles é o que faz republicar atualizar em
+  // vez de acumular linhas, e é a metade local da idempotência que o `ensure*` garante do
+  // lado do GitHub.
+  //
+  // `limitacao` guarda o que **não** foi possível fazer (emenda 2): proteção de branch recusada
+  // por plano da conta é limitação registrada, não falha da publicação. Guardá-la aqui, junto
+  // do recurso, é o que permite a M9-F05 ler "esta branch não tem proteção" sem perguntar de
+  // novo à origem — e sem confundir "não protegida" com "ainda não publicada".
+  `
+  CREATE TABLE external_ref (
+    id            TEXT PRIMARY KEY,
+    user_id       TEXT NOT NULL,
+    workspace_id  TEXT NOT NULL,
+    project_id    TEXT NOT NULL,
+    -- 'repositorio' | 'issue' | 'branch'. Enum no domínio; TEXT aqui, como o resto do schema.
+    alvo          TEXT NOT NULL,
+    chave_externa TEXT NOT NULL,
+    -- O id do recurso na origem: owner/repo, o número da issue, o nome da branch.
+    ref_id        TEXT NOT NULL,
+    url           TEXT,
+    -- O SHA publicado, quando o recurso tem um (branch). NULL para issue.
+    sha           TEXT,
+    -- O que não foi possível configurar, e por quê. NULL quando não há limitação.
+    limitacao     TEXT,
+    created_at    TEXT NOT NULL,
+    updated_at    TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX idx_external_ref_chave
+    ON external_ref(user_id, project_id, alvo, chave_externa);
+  `,
+
+  // 23 — execução durável: runs, leases e o kill-switch do merge (SPEC-Entrega-02).
+  //
+  // Três tabelas, e cada uma existe por um critério distinto.
+  //
+  // `pipeline_run` é o estado da execução de uma fatia. Ele **não mora em `slice`** porque uma
+  // fatia pode ter mais de um run: bloqueio resolvido cria continuação vinculada
+  // (`continua_de`), e guardar o estado na fatia sobrescreveria a história que o critério 4
+  // precisa reconstituir. `bloqueio` é JSON com os cinco campos da CONVENTION §4 — NULL fora de
+  // `BLOCKED`, e o serviço recusa `BLOCKED` sem eles (critério 6).
+  //
+  // `lease` é a posse durável de um recurso. **O slot global de WIP é uma linha como as
+  // outras**, com `recurso = 'wip:global'` e `project_id` NULL (emenda 1 de 2026-08-30):
+  // modelá-lo à parte criaria uma segunda regra de expiração, e a esquecida seria a que trava a
+  // máquina. O `UNIQUE` sobre `(user_id, recurso)` é o que faz o WIP=1 valer no banco e não só
+  // no código — duas transações concorrentes não conseguem inserir o mesmo recurso, mesmo que a
+  // checagem em memória de ambas tenha visto o slot livre.
+  //
+  // `expira_em` e `heartbeat_em` são epoch ms (INTEGER), não texto ISO: a comparação de
+  // expiração é aritmética e roda em toda aquisição, e comparar string de data no SQLite
+  // convidaria a um bug de fuso no dia em que alguém gravasse com offset.
+  //
+  // `project_merge_policy` é o kill-switch por projeto (decisão do PI, 2026-08-30). Linha só
+  // existe quando alguém **desligou** o merge — a ausência é o default ligado, que é a tese do
+  // MVP-009. Um default gravado em toda criação de projeto significaria migrar linhas no dia em
+  // que o default mudasse; a ausência não precisa migrar.
+  `
+  CREATE TABLE pipeline_run (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    project_id   TEXT NOT NULL,
+    slice_id     TEXT NOT NULL,
+    -- 'PLANNED' | 'AWAITING_PI' | 'READY' | 'RUNNING' | 'VALIDATING' | 'PR_CI'
+    -- | 'MERGED' | 'AWAITING_MERGE' | 'BLOCKED' | 'CANCELLED'. Enum no domínio.
+    estado       TEXT NOT NULL,
+    -- O run de que este é continuação, quando houver. NULL no primeiro run da fatia.
+    continua_de  TEXT,
+    -- JSON com os cinco campos do BloqueioExterno. NULL fora de 'BLOCKED'.
+    bloqueio     TEXT,
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL
+  );
+  CREATE INDEX idx_pipeline_run_fatia
+    ON pipeline_run(user_id, project_id, slice_id, created_at);
+  CREATE INDEX idx_pipeline_run_estado ON pipeline_run(user_id, estado);
+
+  CREATE TABLE lease (
+    id            TEXT PRIMARY KEY,
+    user_id       TEXT NOT NULL,
+    -- O id do run que detém o recurso. Não existe lease sem proprietário.
+    proprietario  TEXT NOT NULL,
+    -- 'wip:global', um worktree, uma porta, um container.
+    recurso       TEXT NOT NULL,
+    -- NULL no slot global de WIP: ele é da máquina, não de um projeto.
+    project_id    TEXT,
+    heartbeat_em  INTEGER NOT NULL,
+    expira_em     INTEGER NOT NULL,
+    created_at    TEXT NOT NULL
+  );
+  -- O WIP=1 vale no banco, não só no código: duas transações não inserem o mesmo recurso.
+  CREATE UNIQUE INDEX idx_lease_recurso ON lease(user_id, recurso);
+
+  CREATE TABLE project_merge_policy (
+    project_id   TEXT NOT NULL,
+    user_id      TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    -- 0 = kill-switch acionado (merge autônomo desligado). Linha ausente = ligado.
+    autonomo     INTEGER NOT NULL,
+    -- Quem desligou/religou e quando: a mudança é ação sensível (M9-F05).
+    identidade   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL,
+    PRIMARY KEY (user_id, project_id)
+  );
+  `,
+
+  // 24 — M9-F03: paths permitidos do run e correlação de custo com run/tentativa.
+  //
+  // `context_pack_path` é tabela filha com `ordem` (o modelo de `context_item`) e não JSON numa
+  // coluna: a lista é consultada por path quando o critério 6 mede fuga de escopo, e um JSON
+  // obrigaria a ler e parsear o pack inteiro para responder "este arquivo estava autorizado?".
+  //
+  // `run_id`/`tentativa` em `cost_event` são a emenda 7 de 2026-08-31: o critério 11 exige custo
+  // atribuído ao run e à tentativa, e correlacionar por `context_pack_id` deixaria a atribuição
+  // indireta e a tentativa sem representação nenhuma. Nulos porque toda chamada de IA anterior a
+  // esta fatia — e toda chamada fora de pipeline — não tem run.
+  `
+  CREATE TABLE context_pack_path (
+    pack_id       TEXT NOT NULL,
+    -- Prefixo relativo à raiz do worktree.
+    caminho       TEXT NOT NULL,
+    -- 'spec' (a SPEC declarou) | 'derivada' (o preflight inferiu da arquitetura aprovada).
+    origem        TEXT NOT NULL,
+    justificativa TEXT NOT NULL,
+    ordem         INTEGER NOT NULL,
+    PRIMARY KEY (pack_id, ordem)
+  );
+
+  ALTER TABLE cost_event ADD COLUMN run_id TEXT;
+  ALTER TABLE cost_event ADD COLUMN tentativa INTEGER;
+  CREATE INDEX idx_cost_event_run ON cost_event(user_id, run_id);
   `
 ]
 

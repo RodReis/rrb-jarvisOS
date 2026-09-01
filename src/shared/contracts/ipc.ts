@@ -57,6 +57,8 @@ import type { PacoteEstrutural, PacoteOutcome } from '../domain/pacote-estrutura
 import type { Anexo, AnexoOutcome, TipoDeAnexo } from '../domain/anexos-de-design'
 import type { ValidacaoDoPrototipo } from '../domain/validacao-de-prototipo'
 import type { ArquiteturaOutcome, PacoteArquitetura } from '../domain/arquitetura'
+import type { AlvoDaPublicacao, PublicacaoOutcome } from '../domain/publicacao'
+import type { MergePolicyOutcome, PoliticaDeMerge, VistaDaFila } from '../domain/pipeline'
 import type { Roadmap, RoadmapOutcome } from '../domain/roadmap'
 import type {
   Approval,
@@ -351,6 +353,32 @@ export const IPC_CHANNELS = {
   aprovacaoRevisoes: 'aprovacao:revisoes',
   aprovacaoAprovar: 'aprovacao:aprovar',
   aprovacaoSimular: 'aprovacao:simular',
+  /**
+   * SPEC-Entrega-01: publica o repositório e o backlog aprovado no GitHub.
+   *
+   * **O renderer não manda credencial nem escolhe o que publicar.** Ele pede o ato e informa o
+   * alvo; o que sai é o que o PI já aprovou para a fila, lido no main. Um canal que aceitasse a
+   * lista de issues deixaria o renderer publicar trabalho que ninguém liberou — e "nenhuma issue
+   * futura equivale a autorização de construção" é regra da spec.
+   */
+  publicacaoPublicar: 'publicacao:publicar',
+  /**
+   * SPEC-Entrega-02: lê e muda o kill-switch do merge autônomo do projeto.
+   *
+   * **Só estes dois canais**, e nenhum que transicione run ou adquira slot: quem move a pipeline
+   * é o main, a partir do que o PI aprovou no gate. Um canal `transicionar` deixaria o renderer
+   * declarar que uma fatia chegou a `MERGED` — o pulo que o critério 5 existe para impedir.
+   */
+  mergePolicyLer: 'merge-policy:ler',
+  mergePolicyDefinir: 'merge-policy:definir',
+  /** SPEC-Entrega-02: o estado da fila — runs ativos, concluídas e o que está travado. */
+  filaVista: 'fila:vista',
+  /**
+   * O estado do sandbox do executor (SPEC-Entrega-03). **Só leitura**, como os canais da
+   * M9-F02: nada aqui prepara nem derruba container — quem prepara é o preflight, chamado pela
+   * pipeline, nunca pelo renderer.
+   */
+  sandboxEstado: 'sandbox:estado',
   anexoEscolher: 'anexo:escolher',
   anexoAnexar: 'anexo:anexar',
   anexoListar: 'anexo:listar',
@@ -839,6 +867,31 @@ export interface JarvisBridge {
   gerarRoadmap(projectId: string, workspace: WorkspaceId): Promise<RoadmapOutcome>
   /** O roadmap gravado do projeto. */
   carregarRoadmap(projectId: string, workspace: WorkspaceId): Promise<Roadmap>
+  publicarNoGitHub(
+    projectId: string,
+    alvo: AlvoDaPublicacao,
+    workspace: WorkspaceId
+  ): Promise<PublicacaoOutcome>
+  /** O estado da fila de execução (SPEC-Entrega-02). Só leitura: o renderer não move a pipeline. */
+  vistaDaFila(projectId: string, workspace: WorkspaceId): Promise<VistaDaFila>
+  /**
+   * O estado do sandbox do executor (SPEC-Entrega-03). Só leitura — a preparação é da pipeline.
+   */
+  estadoDoSandbox(): Promise<{ readonly dockerNoAr: boolean; readonly proxyNoAr: boolean }>
+  /** O kill-switch do merge autônomo do projeto (SPEC-Entrega-02/05). Ausência = ligado. */
+  lerPoliticaDeMerge(projectId: string, workspace: WorkspaceId): Promise<PoliticaDeMerge>
+  /**
+   * Liga ou desliga o merge autônomo.
+   *
+   * **A identidade não atravessa a ponte**, como em `aprovarGate`: ela vem da sessão autenticada
+   * no main. É ação sensível e gera `AuditEvent` — quem mudou é parte do que o evento registra,
+   * e deixar o renderer declarar isso tornaria o registro inútil.
+   */
+  definirPoliticaDeMerge(
+    projectId: string,
+    autonomo: boolean,
+    workspace: WorkspaceId
+  ): Promise<MergePolicyOutcome>
   /** As aprovações registradas, da mais recente à mais antiga. */
   listarAprovacoes(projectId: string, workspace: WorkspaceId): Promise<readonly Approval[]>
   /** As revisões que este gate aprova hoje — os hashes exatos (critério 4). */

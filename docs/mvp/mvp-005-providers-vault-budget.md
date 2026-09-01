@@ -1,7 +1,7 @@
 # MVP-005 — Providers de IA + Vault + BudgetPolicy (Corte 3, parte 1)
 
 - Tipo: épico (`proplan:mvp`). Container de fatias — **sem spec própria**.
-- Status: **definido** (2026-07-24) — 1ª parte do **Corte 3 (Integrações reais)**, que o PI decidiu **partir em três MVPs** (2026-07-24): **MVP-005 Providers+Vault+Budget → MVP-006 Conectores externos → MVP-007 Memória híbrida+RAG**. Mesma lógica do split do Corte 2 (evitar concentrar risco num épico gigante).
+- Status: **finalizado e aceito pelo PI** (2026-08-31). Épico [#76](https://github.com/RodReis/rrb-jarvisOS/issues/76) fechado com quatro fatias entregues.
 - Base: `docs/iniciais/requisitos-agent-os.md` § Corte 3 ("Integrações reais"), RF-010 (conectores/credenciais), RF-011 (providers de IA), § "Ações Possíveis" (conectar provider = médio; alterar credenciais = alto); ADR-001 (local-first; **questão 1 resolvida: BudgetPolicy = estimativa + alerta com bloqueio no ponto único de chamada do adapter**); decisão de cifra do PI 2026-07-21 (DPAPI local / E2EE AES-256 na nuvem); ADR-004 (auditoria); ADR-005 (logging).
 - Depende de: **MVP-002 entregue** (Policy Engine, `AuditEvent`, allowlist). Satisfaz a ordem da ARCHITECTURE: "`AuditEvent` antes de providers reais" e "BudgetPolicy antes de qualquer chamada paga". **Independe do MVP-004** (execução real de FS/terminal): providers são um caminho de execução distinto (rede/adapter), gateado por Policy Engine + BudgetPolicy, não pelo FS/terminal. Pode ser **especificado em spec-ahead** agora (mesmo padrão do MVP-003).
 - Dono do aceite: PI. Só fecha quando todas as fatias-filhas fecharem.
@@ -12,14 +12,14 @@ Ligar a **IA real com custo sob controle**. Até aqui o sistema classifica, audi
 
 Fronteira dura (herdada da ARCHITECTURE § Fronteiras e RNF): **credencial vive em vault/env, nunca em UI ou log**; segredo ausente aparece como `missing` sem revelar valor; **toda chamada externa passa por adapter**; custo e latência são medidos. O renderer nunca lê segredo nem chama provider — só vê status e dispara via IPC tipado.
 
-## Checklist de fatias previstas
+## Checklist de fatias entregues
 
-Cada item vira issue-filha **somente** quando sua spec estiver `aprovada-pi` (lazy). Ainda sem spec — a divisão abaixo é a proposta do Cowork, refinável quando cada spec for escrita:
+As quatro fatias foram entregues e aceitas pelo PI:
 
-- [ ] **Fatia 01 — Vault de credenciais (`CredentialRef`):** armazenamento cifrado local (DPAPI/`safeStorage`, decisão de cifra do PI 2026-07-21), leitura **por referência** (nunca o valor cru na UI/log), segredo ausente = `missing` sem revelar valor, **fonte env + vault** (BYOK), **escopo por usuário+workspace**, edição pelo **usuário** = auditada sem aprovação e por **agente** = alto risco report-only (gate no MVP-004). Base de tudo: nenhum adapter chama sem credencial. **Spec `aprovada-pi`:** `spec-providers-01-vault-credenciais.md`.
-- [ ] **Fatia 02 — Framework de adapters + primeiro provider real:** interface de adapter **isolada** (ARCHITECTURE: "novos providers por adaptadores isolados"), **ponto único de chamada**, `AuditEvent` antes/depois, **medição de custo/latência** (`CostEvent`, **report-only** nesta fatia). Provider: **Claude API** (Anthropic Messages), **em streaming** (chunks ao renderer; custo no fim via `usage`) — decisões do PI 2026-07-24. **Spec `aprovada-pi`:** `spec-providers-02-adapter-claude-api.md`.
-- [ ] **Fatia 03 — BudgetPolicy (enforcement no ponto único):** estimativa + alerta (limiar default 80%) + **bloqueio ao bater o limite** no ponto único da F02 (ADR-001 q1: adapter recusa novas chamadas; **sem proxy**); limites separados dia/mês, escopo **usuário+workspace** (squad/agente no Corte 4), padrão USD 1 cada, ajustáveis; estouro no stream **deixa terminar e barra a próxima**; ao exceder = override por aprovação com **piso de bloqueio duro** até o MVP-004; **BYOK = melhor esforço** (bloqueio por estimativa). Decisões do PI 2026-07-24. **Spec `aprovada-pi`:** `spec-providers-03-budget-policy.md`.
-- [ ] **Fatia 04 — Multi-provider + roteamento (`ProviderRoute`):** Gemini + Ollama (adapters HTTP) + **Claude Code CLI** (subprocess app-managed, governado pelo framework de adapters — não pela allowlist do MVP-004), **roteamento por tarefa completo** (`taskType` semeado → preferência ordenada, com local/offline), fallback + healthcheck, tela de providers (status/latência/modelo/origem/troca + editor de rotas). Todos pelo ponto único da F02 (herdam o gate da F03). Decisões do PI 2026-07-24. **Spec `aprovada-pi`:** `spec-providers-04-multi-provider-roteamento.md`.
+- [x] **Fatia 01 — Vault de credenciais (`CredentialRef`):** [#77](https://github.com/RodReis/rrb-jarvisOS/issues/77), `spec-providers-01-vault-credenciais.md`.
+- [x] **Fatia 02 — Framework de adapters + primeiro provider real:** [#78](https://github.com/RodReis/rrb-jarvisOS/issues/78), `spec-providers-02-adapter-claude-api.md`.
+- [x] **Fatia 03 — BudgetPolicy (enforcement no ponto único):** [#79](https://github.com/RodReis/rrb-jarvisOS/issues/79), `spec-providers-03-budget-policy.md`.
+- [x] **Fatia 04 — Multi-provider + roteamento (`ProviderRoute`):** [#80](https://github.com/RodReis/rrb-jarvisOS/issues/80), `spec-providers-04-multi-provider-roteamento.md`.
 
 ## Ordem e dependências
 

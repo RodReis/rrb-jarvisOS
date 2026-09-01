@@ -291,7 +291,35 @@ export const AUDIT_EVENT_TYPES = [
   // exatamente essa distinção que a invariante 3 existe para manter.
   //
   // O payload carrega gate, contagem de revisões e a identidade; nunca o conteúdo aprovado.
-  'approval'
+  'approval',
+  // SPEC-Entrega-01: a publicação do repositório e do backlog aprovado no GitHub. Tipo próprio, e
+  // **não** `connector-call`, porque a pergunta que ele responde é sobre o **efeito no mundo**: que
+  // repositório passou a existir, com que commit, e quantos recursos nasceram nesta execução. Sob
+  // `connector-call`, "o projeto foi publicado" viraria uma sequência de nove chamadas que alguém
+  // precisaria remontar — e o critério 1 se mede exatamente pela contagem de criações.
+  //
+  // O payload carrega o repositório, a branch, o commit confirmado **na origem** e a contagem de
+  // criados; nunca o token, que não chega a este serviço a não ser para o push (e é redigido antes
+  // de qualquer registro, pelo `argsSeguros` do terminal).
+  'publicacao-github',
+  // SPEC-Entrega-02: transição de estado de um run da pipeline. Tipo próprio, e **não**
+  // `execution-run` (que é do motor simulado do MVP-002): a pergunta aqui é a do critério 4 —
+  // *este efeito já aconteceu?* —, e a reconciliação a responde varrendo estes eventos. Sob um
+  // tipo compartilhado com a simulação, "o run avançou" e "o workflow simulado avançou" ficariam
+  // indistinguíveis sem parsear o payload.
+  //
+  // O payload carrega o run, a fatia, os estados de origem e destino e, em `BLOCKED`, a causa;
+  // nunca o conteúdo do que está sendo construído.
+  'pipeline-transition',
+  // SPEC-Entrega-02: aquisição, renovação e liberação de lease — inclusive o slot global de WIP.
+  // Tipo próprio porque a reconciliação precisa distinguir "quem tinha o recurso" de "o que o run
+  // fez": um lease removido por reconciliação é um fato sobre a **máquina**, não sobre a fatia.
+  'pipeline-lease',
+  // SPEC-Entrega-05: mudança do kill-switch do merge autônomo. **Ação sensível** por decisão do
+  // PI (2026-08-30) — desligar o merge muda o que a pipeline pode fazer sozinha na branch-base,
+  // e é da mesma família de `allowlist-change`: uma mudança de configuração que amplia ou reduz
+  // o que a máquina faz sem perguntar. Tipo próprio para não se confundir com a transição do run.
+  'merge-policy-change'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]

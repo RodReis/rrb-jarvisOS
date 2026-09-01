@@ -219,6 +219,45 @@ total. Nenhuma fórmula sobre a contagem de uma chamada isolada reproduz isso.
    que uma extração de 2 URLs cabe em `{0, 1}` — nunca 2, que é o que uma cobrança por URL daria.
    Um smoke que afirma o instável falha por motivo errado e ensina a ignorá-lo.
 
+### 3.4 Smoke de **infraestrutura**: o dublê valida a decisão, não a mecânica (achado da M9-F03)
+
+O §3.2 nasceu de smoke contra **serviço externo**. A M9-F03 mostrou que a mesma lição vale para
+**infraestrutura local** — Docker, Git, filesystem — e por um motivo diferente: ali o risco é o
+serviço se comportar diferente do contrato; aqui é a **plataforma** ter detalhe que nenhum dublê
+modela (caminho relativo, fim de linha, permissão de montagem, daemon numa VM).
+
+O smoke rodou com **25 testes verdes** e achou dois defeitos:
+
+1. **Reescrever o `commondir` de um worktree derruba o Git do host.** É um arquivo só, e host e
+   container precisam de caminhos diferentes nele. O preflight continuava devolvendo `liberado` —
+   nenhuma asserção de unidade tinha como ver.
+2. **Checkout com CRLF (padrão do Windows) faz o Git do container (Linux) ler a árvore inteira
+   como modificada**, o que faria o gate de escopo acusar fuga em **todo** arquivo do projeto.
+
+Os dois viraram teste de integração que **reprova** quando o defeito volta — smoke que acha
+defeito sem virar guarda deixa a correção sem rede.
+
+**A regra prática:** fatia que toca Docker, Git ou rede exercita o **round-trip completo** com a
+infra real antes de fechar. Aqui: executor escreve no container → host vê o arquivo → host
+commita. Nenhum dos três passos isolados teria achado o defeito 1.
+
+**E leia o stream certo.** A primeira versão do passo "escrita no `.git` é rejeitada" reprovava
+com o Docker fazendo a coisa certa: a recusa do `sh` sai no **stderr**, e `execFileSync` com
+stdio piped devolve só o stdout — o `2>&1` de dentro do comando não alcança, porque o
+redirecionamento é montado antes de o `sh` tentar abrir o arquivo. É o mesmo erro de método do
+§3.3: **sonde antes de concluir** que o comportamento está errado.
+
+O script é `scripts/smoke-sandbox.mjs`, e ele **não cria efeito externo** (repositório temporário
+e container removido no fim), então pode rodar à vontade — só exige Docker no ar:
+
+```bash
+node scripts/smoke-sandbox.mjs
+```
+
+O último passo dele afirma um **limite conhecido** em vez de uma garantia: o egress ainda não é
+restrito ([#222](https://github.com/RodReis/rrb-jarvisOS/issues/222)). Smoke que registra o que
+*ainda não* vale é mais honesto do que smoke que só mede o que já funciona.
+
 ## 4. O relatório: `reports/TESTS.md`
 
 **Local:** `reports/` na raiz — **diretório neutro**. Não vai em `docs/` (um arquivo reescrito a
@@ -620,3 +659,61 @@ O relatório identifica SPEC, issue, revisão aprovada, run, ambiente, verifica�
 ### 11.4 Revisão
 
 `docs/REVIEW.md` governa formato e severidade. Baseline P0/P1 bloqueia; P2/P3 é registrado. Relatório anterior entra para deduplicação; somente o delta e descobertas ainda abertas são avaliados como novos.
+
+### 11.5 Release governada — MVP-014
+
+- **Unitário:** estados/transições, leases, idempotência, consolidação de SHAs, redaction e janela de estabilização.
+- **Contrato:** Docker, GHCR, Vercel e Railway com sucesso, auth, timeout, quota, estado incompatível, resposta parcial e efeito ambíguo.
+- **Integração:** SQLite, Docker Compose, PostgreSQL real, migrations e ownership de portas/containers.
+- **Fault injection:** crash entre intenção/efeito/confirmação, migration quebrada, health falho, promoção parcial, retry e compensação incompleta.
+- **Playwright:** smoke funcional nas URLs de Preview, Staging, Produção e após rollback.
+- **E2E real limitado:** projeto de prova exclusivo, nomes/recursos únicos e orçamento explícito; percorre Preview → Staging → Produção → estabilização → compensação/limpeza.
+
+Provas mínimas: mesmo digest/deployment em Staging e Produção; zero segredo persistido; reinício sem duplicação; Preview removido; banco nunca restaurado automaticamente; tag/GitHub Release somente depois de Produção estabilizada; falha de código devolvida à V2 na mesma SPEC.
+
+Smokes externos não rodam na suíte comum. Sua ausência em ambiente sem credencial é `not_run`, nunca “pass”. O relatório registra provider, ambiente, IDs, SHA/digest, duração, custo/quota observada, gates e hash das evidências extensas.
+
+### 11.6 Observabilidade operacional — MVP-015
+
+- **Unitário:** schemas/versionamento, allowlist de payload, idempotência, deduplicação, severidade, resolução, retenção e rollups.
+- **Integração SQLite:** estado + outbox atômicos, crash/replay, migrations, checkpoints e rebuild completo das projeções.
+- **Contrato:** GitHub, GHCR, Vercel, Railway, Codex e executores com sucesso, auth, timeout, rate limit, quota parcial/desconhecida e schema incompatível.
+- **Fault injection:** evento duplicado, atrasado e fora de ordem; clock skew; disco indisponível; processo encerrado; notificação falha e provedor alternando entre saudável/desconhecido.
+- **IPC:** snapshot inicial, deltas versionados, salto de versão, reconexão e paginação por cursor.
+- **Playwright/E2E:** run → PR → Preview → Release → alerta → reconhecimento → resolução → evidência, incluindo teclado/foco e `critical` com notificação nativa simulada.
+- **Carga de referência:** fixture determinística com 100 mil eventos e 10 mil ocorrências; consulta principal `p95 ≤ 500 ms`, console útil em até 2 s e evento interno visível em até 1 s. Ambiente e warm-up são registrados para evitar número sem contexto.
+- **Smoke externo:** opt-in em projetos de prova; nunca Produção e nunca na suíte comum.
+
+Provas mínimas: domínio continua apesar de projetor indisponível; replay não duplica; evento atrasado não regride estado atual; payload proibido é rejeitado antes de persistir; `quota_unknown` não vira percentual; UI e CLI retornam a mesma projeção; compactação preserva marcos, alertas abertos, auditoria e evidência.
+
+### 11.7 Aprendizado operacional — MVP-016
+
+- **Unitário:** fingerprints, aplicabilidade, estados, resolução por escopo, conflitos, guardrails e rollback.
+- **Property tests:** idempotência de ingestão, deduplicação, ordem de eventos e snapshots imutáveis.
+- **Integração SQLite:** migrations, checkpoints, concorrência de promoção, crash/replay e rebuild.
+- **Replay/diferencial:** fixtures históricas com baseline e candidata sobre casos elegíveis equivalentes; resultado `improved | regressed | inconclusive` reproduzível.
+- **Contrato:** seleção, compressão e cache opcionais; Graphify/Caveman ausentes ou falhos recuam para estratégia determinística.
+- **Fault injection:** evidência ausente/hash divergente, executor indisponível, versão-base obsoleta, canário regressivo e rollback falho.
+- **Playwright/E2E:** run → falha → resolução → candidata → replay/shadow/canário → política ativa → regressão/reversão, incluindo `Decide por mim` e teclado/foco.
+- **Prova real limitada:** separada das suítes comuns, sem serviço pago obrigatório; registra executor, modelo, ambiente, amostra, consumo, versões e hashes.
+
+Provas mínimas: falha semelhante não esconde causa nova; economia não promove com guardrail violado; run mantém o snapshot inicial; override de projeto vence global; política incompatível fica `stale`; ausência do aprendizado mantém política estável/base e não bloqueia a pipeline.
+
+Detalhamento aprovado da M16-F04 (`spec-aprendizado-04-experimentos-promocao.md`, revisão `1cefc2c`; implementação ainda não iniciada):
+
+- Contratos e seeds fixos provam alocação prévia, coorte completa e teto por contagem sob concorrência; retry/continuação não infla amostra.
+- Fixtures cobrem baseline zero, consumo ausente, falhas mais baratas, grupos desbalanceados, pendências, pesos/exclusões/cortes pós-resultado e diferença entre estimativa e medição.
+- Relatório diferencia prova de replay/shadow da prova real do canário; nenhum estágio simulado declara qualidade final contrafactual ou significância estatística sem método.
+- Relógio injetável prova tempo e amostra simultâneos para estabilizar, prazo inconclusivo e rollback do grupo afetado; não basta esperar o timer.
+- Crash entre reserva/alocação/snapshot/confirmação, revogação de controle, prova corrigida, retenção e reconstrução não podem duplicar efeito, alterar snapshot ou reativar decisão antiga.
+- Testar núcleo F04 e registro F03 reais com mecanismos/insumos simulados; sem CLI paga ou Git/deploy externo na suíte comum. Isso especifica verificações futuras, não relata testes já executados.
+
+### 11.8 Projeção Graphify — M7-F05
+
+- **Unitário:** estados, schemas, limites, deduplicação, contador idempotente de merges, frescor, orçamento, invalidação e descarte da cauda interativa.
+- **Contrato simulado:** baseline `graphifyy==0.9.53`, comandos suportados, stdin fechado, timeout, versão/esquema incompatível, manifesto ausente, remoção e geração parcial.
+- **Integração local:** repositório Git temporário com fatia de fundação, `.gitignore`, bootstrap, quatro merges, update incremental, delta, lock, publicação conjunta e retomada.
+- **Regressão de contexto:** impede envio do `graph.json`/relatório integral, limita candidatos/fontes/trechos, exige justificativa de expansão e mede tokens estimados.
+- **Smoke real opt-in:** runtime fixado e corpus determinístico; sem instalação ou API paga na suíte comum. Ausência é `not_run`, não sucesso.
+
+Provas mínimas: Graphify ausente/incompatível mantém busca básica; pergunta final não recebe resposta nem cria gate; `save-result`/`reflect` não executam; o quarto PR dispara somente update; fonte removida não permanece consultável; falha parcial não publica checkpoint; consulta desatualizada inclui delta do Git; `graphify-out/` não entra no Git ou contexto e fica no `.claudeignore` quando Claude Code participa.

@@ -1396,6 +1396,124 @@ Status: **entregue** — pedido direto do PI (2026-08-30, com screenshots); PR [
 
 Mesma limitação do FIX #170: sem consentimento do Google o AppShell não monta, e a verificação **visual** das abas no app rodando é do PI. A estrutura, o teclado e o conteúdo por aba têm teste de componente.
 
+## MVP-009 — Entrega Autônoma ([#100](https://github.com/RodReis/rrb-jarvisOS/issues/100))
+
+### Fatia 01 — Publicação no GitHub (`docs/spec/spec-entrega-01-publicacao-github.md`)
+
+Status: **entregue** — spec `aprovada-pi` (2026-08-29); issue [#101](https://github.com/RodReis/rrb-jarvisOS/issues/101). Depende do MVP-006 e do MVP-008. **Abre o MVP-009.**
+
+- [x] **`src/shared/domain/publicacao.ts`** — a chave externa determinística (`chaveDeMvp`, `chaveDeFatia`, `chaveDeProjeto`), `urlDePushComToken` e `redigirUrlDeRemote`
+- [x] **Três capacidades novas no adapter** — `repo.set-default-branch`, `branch.ensure-protection` e `commit.sha-for-ref`, com validação, operação e despacho
+- [x] **`GitRunner.push` e `pushComToken`** — sem `--force`; a URL entra como argumento, nunca `git remote add`
+- [x] **Redação de credencial em URL** no `redact` compartilhado e nos três `audit.append` do `TerminalEngine`
+- [x] **`PublicacaoService`** — orquestra repositório → push → branch base → proteção → issues → dependências → confirmação na origem
+- [x] **`publicacao-github`** — tipo novo de `AuditEvent`
+- [x] **Canal `publicacao:publicar`** — o renderer informa o alvo, nunca a credencial nem o que publicar
+- [x] **Testes**: 20 de integração da orquestração, 7 do push com Git real, 16 das capacidades novas, 18 de domínio
+- [x] **Emendas de 2026-08-30** (PR [#188](https://github.com/RodReis/rrb-jarvisOS/pull/188)) — as cinco que faltavam, implementadas antes de fechar a entrega:
+  - [x] **(2)** proteção recusada pela origem vira **limitação explícita** no `ExternalRef`, não bloqueio
+  - [x] **(3)** só fatia com `SLICE_ENTRY` aprovado vira issue; as demais ficam no checklist do épico
+  - [x] **(4)** `label.ensure` no adapter, com os rótulos vindo da Convention do **projeto-alvo**
+  - [x] **(5)** linha `Bloqueada por: #N` no corpo da fatia, além do `ensureSubIssue`
+  - [x] **(6)** **migration 22** (`external_ref`) e `ExternalRefRepository` — a saída que a M9-F02 e a M9-F05 consomem
+
+**A decisão que define a fatia.** O `ambienteControlado()` do MVP-004 não deixa variável de ambiente alcançar o subprocess — é a garantia da M4-F02, não um descuido, e abrir exceção criaria uma segunda lista de permissão. O PI decidiu pela **URL com token montada no ato**, passada como argumento: gravada no `.git/config`, a credencial sobreviveria ao run, ao processo e ao backup.
+
+**O teste de integração achou o vazamento onde ele estava de verdade.** A defesa óbvia era redigir o `stderr`, porque o Git ecoa a URL em `fatal: unable to access '...'`. Mas o Git **já remove a credencial do próprio eco** — aquela redação defendia contra o que não acontecia. O token vazava pelos **`args`**: o `AuditRepository` grava o payload cru e encadeado no hash, e entrando ali não sai mais sem quebrar a cadeia. A correção é no `redact` compartilhado e no `TerminalEngine`, que é o ponto por onde todo comando passa — **vale para qualquer segredo em argumento**, não só para este caso. A `ApprovalRequest` guarda o argumento real, porque é dela que a retomada reconstrói o comando.
+
+**Um contrafactual passou, e isso era lacuna de cobertura, não acerto.** Removida a redação dos args, a suíte ficou verde: o teste lia a cópia devolvida pelo runner (limpa) enquanto o banco estava sujo. O teste novo lê o `audit_event` do disco.
+
+**O seed de allowlist foi levantado e reprovado.** A decisão inicial do PI era semear o `git` ao criar projeto; ela colidia com **duas** regras escritas — a decisão 1 do MVP-008 (*"criar projeto nunca amplia a allowlist"*) e a regra do próprio MVP-004 no topo do `CommandAllowlistRepository` (*"sem default de fábrica; nenhum comando roda até o usuário permitir"*). Como `add()` classifica `permissions.change` de **alto risco**, o seed faria o app auto-conceder alto risco sem decisão humana — o que a barreira existe para impedir. Levantado ao PI, ficou o **bloqueio retomável**, que é literalmente o critério 5.
+
+**`branch.ensure-protection` é o único `ensure` que não procura antes de criar.** O `PUT` substitui a configuração inteira, então é idempotente por construção; comparar antes exigiria reproduzir a normalização que o GitHub faz nos campos aninhados, e errar essa comparação deixaria a proteção desatualizada em silêncio. `enforce_admins: false` é deliberado: o merge autônomo roda como o dono, e com `true` a proteção barraria a entrega que ela existe para proteger.
+
+**As emendas chegaram com a fatia em andamento**, e a spec instruía a lê-las antes de fechar. Duas mudaram comportamento já implementado: proteção de branch recusada **deixou de bloquear** (uma conta sem plano responde 403, e barrar deixaria o projeto sem board por configuração que não é da entrega), e a publicação passou a exigir `SLICE_ENTRY` aprovado por fatia — antes ela publicava todas as fatias do MVP na fila, o que criava board de trabalho que ninguém liberou. As outras três acrescentaram: `label.ensure`, a linha `Bloqueada por: #N` e o `ExternalRef` persistido.
+
+**O `ExternalRef` é `upsert`, não append-only** — ao contrário de `approval` e `pacote_estrutural`. Aqueles guardam o que alguém decidiu, e reescrever apagaria a decisão; este guarda **onde o recurso está**, um fato que muda quando o recurso muda. Um `INSERT` faria "qual é o número da issue desta fatia?" ter várias respostas depois de republicar.
+
+**`label.ensure` não sobrescreve rótulo existente.** O que a emenda pede é que o rótulo *exista*, não que seja nosso: um `PATCH` apagaria a cor escolhida por quem configurou o repositório, a cada publicação.
+
+**Limites:** sem tela — quem decide *quando* publicar é a M9-F02, e o canal existe para ela consumir. **Sem smoke real**: o push HTTPS autenticado não foi exercitado contra o GitHub (os testes usam bare local, que prova a mecânica do Git, não a autenticação), e isso precisa de repositório descartável com autorização do PI.
+
+### Fatia 02 — DAG, fila WIP=1 global e reconciliação (`docs/spec/spec-entrega-02-dag-fila-reconciliacao.md`)
+
+Status: **entregue** — spec `aprovada-pi` (2026-08-29, emendada em 2026-08-30); issue [#102](https://github.com/RodReis/rrb-jarvisOS/issues/102). Depende da M9-F01.
+
+- [x] **`src/shared/domain/pipeline.ts`** — a máquina de estados como **tabela de transições**, `ehTerminal`, `PipelineRun`, `PoliticaDeMerge` e `VistaDaFila`
+- [x] **`src/shared/domain/lease.ts`** — `estadoDoLease` com **três** valores (`livre`/`vigente`/`expirado`), `podeAdquirir`, `RECURSO_WIP_GLOBAL`
+- [x] **`src/shared/domain/fila.ts`** — `dependenciasAbertas`: fatias anteriores do mesmo MVP + MVPs dependentes concluídos, reusando `validarDag` da M8-F06
+- [x] **Migration 23** — `pipeline_run`, `lease` (com `UNIQUE(user_id, recurso)`) e `project_merge_policy`
+- [x] **`PipelineRepository`** — compare-and-set no `transicionar`; `fatiasConcluidas` conta só `MERGED`
+- [x] **`LeaseRepository`** — `adquirir` sem `ON CONFLICT`, e `removerReconciliado` separado de `liberar`
+- [x] **`FilaService`** — ponto único de transição, aquisição do slot, `concluir` pelo kill-switch
+- [x] **`ReconciliacaoService`** — `reconcileAll` bloqueante no boot, com `VerificadorDeRecurso` plugável para a M9-F03
+- [x] **`MergePolicyService`** — o kill-switch completo (persistência, troca e `AuditEvent`)
+- [x] **Três tipos novos de `AuditEvent`** — `pipeline-transition`, `pipeline-lease`, `merge-policy-change`
+- [x] **Canais `fila:vista`, `merge-policy:ler` e `merge-policy:definir`** — os três **só de leitura ou de política**; nenhum transiciona run
+- [x] **Testes**: 28 de integração contra o SQLite real, 30 de domínio puro
+
+**Dois furos da spec foram levados ao PI antes de codificar.** O critério 1 pede DAG entre fatias e "dependências concluídas" para `READY`, mas `Slice` **não tem `dependeDe`** (só `Mvp` tem) e a tabela `slice` não tem coluna de dependência — a M8-F06 gera o roadmap sem dependência entre fatias. O PI decidiu pela **ordem implícita**: `numero` dentro do MVP + o DAG dos MVPs, que já existe e já é validado. A alternativa (`slice.depende_de`) era mais expressiva, mas nada a preencheria hoje, e uma coluna vazia daria a impressão de que a dependência estava modelada quando não estava. O segundo furo: o critério 7 exige testar merge ligado **e** desligado, mas o kill-switch não existia no código — o PI decidiu que ele entra **completo** nesta fatia, não só a leitura.
+
+**A garantia do WIP=1 é o `UNIQUE`, não o `if`.** Uma checagem em memória ("está livre? então adquire") tem uma janela entre a leitura e a escrita, e dois processos que a atravessem juntos adquirem os dois. O índice fecha a janela no banco: o segundo `INSERT` viola a restrição e a aquisição falha, mesmo com a checagem tendo passado. Por isso `adquirir` **não** faz `ON CONFLICT DO UPDATE` — sobrescrever o dono no conflito seria exatamente o roubo que o critério 3 proíbe.
+
+**Lease expirado tem estado próprio, e é isso que impede o roubo.** Um booleano `estaExpirado` daria dois caminhos, e o segundo — "expirou, então tome" — é o que o critério 3 proíbe. `estadoDoLease` devolve três valores, e só `livre` autoriza aquisição imediata; `expirado` é uma pergunta para a reconciliação, que sabe olhar o disco, o Git e (na M9-F03) o container antes de concluir que o dono morreu. Uma máquina lenta que perdeu o heartbeat por dez segundos ainda está com o worktree aberto.
+
+**O teste de integração achou um defeito real no retry de crash.** O caminho do critério 4 — crash entre gravar o lease e confirmar — deixa lease do run **e** run em `RUNNING`. A primeira versão readquiria o lease e chamava `transicionar` para `RUNNING` de novo; como `RUNNING → RUNNING` é inválida por construção, o `catch` interpretava a recusa como "o run não podia avançar" e **liberava o slot de um run que estava trabalhando**. O teste pegou pela contagem de linhas (`lease` = 0 onde devia ser 1), não pelo `reason` — a prova por efeito de novo valendo a pena. A correção detecta o estado convergido e devolve `adquirido` sem tentar transicionar.
+
+**`AWAITING_MERGE` não é bloqueio.** O kill-switch desligado é uma escolha legítima do projeto, e terminar em `BLOCKED` ensinaria a ler bloqueio como ruído — `BLOCKED` é reservado a causa externa ou risco. O terminal também **não conta como fatia concluída**: o PR está verde, mas o merge não aconteceu, e a fatia seguinte construiria sobre uma base que ainda não existe na branch-base.
+
+**Nenhum canal transiciona run.** Os três canais expostos leem a fila e mudam a política; um `transicionar` deixaria o renderer declarar que uma fatia chegou a `MERGED` — o pulo que o critério 5 existe para impedir. Quem move a pipeline é o main, a partir do que o PI aprovou no gate.
+
+**A reconciliação não mata nem avança run órfão.** Um run em `RUNNING` cujo processo morreu tem worktree e talvez container de pé; cancelar destruiria trabalho que pode estar íntegro, avançar inventaria progresso que não houve. Ele vira pendência classificada. Fail closed é o default para o que não dá para classificar — a mesma postura do Policy Engine.
+
+**O `EffectJournal` ficou de fora, e é escopo desta fatia** ([#209](https://github.com/RodReis/rrb-jarvisOS/issues/209)). O PR [#207](https://github.com/RodReis/rrb-jarvisOS/pull/207) mergeou às 21:32 acrescentando a seção § Diário de efeitos à SPEC; o branch nasceu às 21:47, mas a spec foi lida do working tree ainda na `main` anterior. **Sincronizar o repositório não é revalidar a spec** — uma spec lida antes do `pull` pode já estar velha quando o branch nasce, e a checagem que faltou é reler a spec depois de sincronizar, não antes. A reconciliação entregue lê o par `fase: 'requisicao'`/`'conclusao'` do `AuditRepository` mais o `ExternalRef`, o que cobre parte do contrato; falta a chave idempotente com fingerprint, o `ambiguous` que consulta a origem antes de qualquer retry, e o conflito de payload que falha antes do I/O. Vai como `[FIX]` porque o comportamento correto já está escrito.
+
+**Limites:** **sem tela** — a fatia é infraestrutura, e os canais existem para a M9-F03/F06 e para o painel da M9-F06 consumirem. A reconciliação de **container e portas** fica para a M9-F03, que os cria; o ponto de extensão (`VerificadorDeRecurso`) já está no lugar e testado com um dublê. **Nada dispara a fila automaticamente** ainda: quem cria run e pede slot é a M9-F03 em diante. **O `EffectJournal` não entrou** — [#209](https://github.com/RodReis/rrb-jarvisOS/issues/209).
+
+### Fatia 03 — Worktree, preflight e Docker (`docs/spec/spec-entrega-03-worktree-preflight-docker.md`)
+
+Status: **entregue** — spec `aprovada-pi` (2026-08-29, emendada em 2026-08-30 e 2026-08-31); issue [#103](https://github.com/RodReis/rrb-jarvisOS/issues/103). Depende da M9-F02.
+
+- [x] **`src/shared/domain/preflight.ts`** — escopo de paths com origem (`spec`/`derivada`), `PREFLIGHT_REASONS`, `SandboxPreparado` e os nomes derivados do run
+- [x] **`PreflightService`** — a ordem das verificações, recusa com retomada, `bloqueioDe` para a fila
+- [x] **`DockerRunner`** — o sandbox pelo ponto único do terminal, numa **segunda instância** com prazo de 5 min
+- [x] **`ExecutorProxy`** — servidor `node:http` em loopback; único caminho do container até o modelo
+- [x] **`verificadores-de-sandbox.ts`** — container e porta preenchendo o `VerificadorDeRecurso` da M9-F02
+- [x] **Migration 24** — `context_pack_path` e as colunas `run_id`/`tentativa` no `cost_event`
+- [x] **`ContextPack` ganhou `pathsPermitidos`** — e o campo entrou no **canônico do `hashDoPack`**
+- [x] **Canal `sandbox:estado`** — só leitura, como os três da M9-F02; nenhum prepara sandbox
+- [x] **Testes**: 19 de integração (SQLite + Git real), 8 do proxy (HTTP real), 17 de domínio puro
+- [x] **`scripts/smoke-sandbox.mjs`** — o smoke com Docker real, 7 passos, sem efeito externo (`docs/TESTING.md` §3.4)
+
+**Quatro furos da spec foram medidos e levados ao PI antes de codificar.** Nenhum era opinião: cada um foi reproduzido antes de virar pergunta.
+
+**A montagem que a SPEC prescrevia não funcionava.** O `.git` de um worktree é um arquivo apontando para o host — isso a spec previu, e mandava reescrevê-lo. O que ela não previu é que `.git/worktrees/<lease>/commondir` é **relativo** (`../..`): dentro do container ele resolve para `/`, e o Git responde `fatal: not a git repository`. Objects e refs vivem no `.git` **principal**, que a spec proibia montar — então a montagem prescrita entregaria um container onde o `git status/diff` que ela mesma diz que o executor "roda o tempo todo" falha na primeira invocação. **Decisão do PI:** o `.git` principal entra `:ro`, e a escrita é rejeitada pelo próprio Docker (medido: `Read-only file system`). "Quem versiona é o app, no host" passa a ser garantia de **montagem**, não de instrução ao agente. O custo aceito: o executor lê todo o histórico e todas as branches.
+
+**O proxy não alcançava a rota que ele existia para servir.** A emenda 1 escolheu `ANTHROPIC_BASE_URL`, mas a rota de assinatura é **subprocess** do binário `claude`, autenticado por `~/.claude` — nenhuma variável de base URL a intercepta; só a rota paga (SDK HTTP) aceita `baseURL`. **Decisão do PI:** o proxy roteia para o `AiCallService`, que escolhe o backend; a conversa multi-turn é **achatada** em `prompt: string`, porque `AiRequest` não tem `messages[]`. A perda é real e ficou declarada como dívida — estendê-lo é código novo no MVP-005.
+
+**`runId`/`tentativa` entraram nos contratos.** O critério 11 exige custo atribuído ao run e à tentativa, e o único gancho existente era `contextPackId` — que deixaria a atribuição indireta e a *tentativa* sem representação nenhuma.
+
+**O smoke com Docker real achou dois defeitos que os dublês escondiam** — e é a lição de método da fatia, porque os 25 testes estavam verdes quando ele rodou:
+
+1. **Reescrever o `commondir` derruba o Git do host.** É **um arquivo só**, e host e container precisam de caminhos diferentes nele; depois da reescrita, `git status` no worktree responde `fatal: not a git repository` — o app perde exatamente a capacidade de versionar que a SPEC lhe reserva. A correção é **copiar** o metadado para dentro do worktree e apontar só a cópia para `/gitcommon`, com `GIT_DIR`/`GIT_WORK_TREE` no container. Nenhum teste de unidade veria isso: o preflight continuava devolvendo `liberado`.
+2. **O checkout com CRLF faz o container ler a árvore inteira como modificada.** No Windows o padrão grava CRLF; o Git de dentro (Linux) marca **todo** arquivo como sujo — e o critério 6 acusaria fuga de escopo no projeto inteiro. O worktree passa a nascer com `core.autocrlf=false`.
+
+Os dois viraram teste (`deixa o Git do host funcionando` e `cria o worktree sem conversão de fim de linha`), e os dois **reprovam** quando o defeito volta.
+
+**O hash canônico foi o risco mais provável da fatia, e foi fechado na origem.** `pathsPermitidos` entrou no `ContextPack` **e** em `hashDoPack`: fora do canônico, dois packs idênticos em conteúdo mas com allowlists diferentes colidiriam, e `findByHash` devolveria o pack antigo — o run herdaria silenciosamente o escopo de outro. O `?? ''` no fim preserva o hash dos packs já persistidos.
+
+**Um contrafactual passou, e era lacuna de cobertura.** Trocar a comparação por segmento por `startsWith` no guarda do critério 1 deixou os 14 testes verdes: nos caminhos exercitados as duas concordam. Faltava o caso que as separa — uma raiz **irmã** de nome parecido (`projeto-op` ao lado de `projeto`), que o prefixo recusaria e a comparação por segmento libera. Com ele, o contrafactual reprova.
+
+**A auto-revisão do diff achou um critério não implementado.** O critério 3 pede colisão de porta detectada **antes de subir recurso**, e o preflight não checava porta nenhuma: a única chamada de `portaOcupadaPorContainer` era da reconciliação. Passava despercebido porque o sandbox do executor não publica porta — mas o critério é sobre o papel (b) do Docker, os serviços do projeto-alvo. `PedidoDePreflight` ganhou `portasDeServico`, e a checagem acontece **antes** dos leases, senão a colisão deixaria worktree e leases criados para trás. O docstring do runner, que afirmava "tenta o bind de verdade", foi corrigido para o que o código faz: pergunta ao Docker, e não vê porta tomada por processo fora dele.
+
+**A prova de "nenhum segredo no container" é sobre os args reais**, não sobre o retorno: o teste inspeciona a montagem que o serviço passou ao `docker run` e reprova quando alguém acrescenta a sessão do host — e o smoke confirmou com `env` de dentro do container.
+
+**`docker stop`, nunca `docker rm`.** `rm|rmi|prune|down` casa a política de destrutivos do MVP-004 e abriria `ApprovalRequest`, travando a limpeza num gate humano. Por decisão do PI a colisão é da **M9-F06**: esta fatia não toca a política.
+
+**O critério 12 (egress restrito) não foi implementado, e o furo é declarado, não escondido.** A auto-revisão o encontrou e a medição confirmou: de dentro do container, `git ls-remote https://github.com/...` **funciona**. A SPEC exige que *"o executor nunca fala com o GitHub" seja garantido por rede, não por instrução ao agente* — e as duas saídas baratas foram medidas e **não servem**: `--network none` e uma rede `--internal` bloqueiam o GitHub mas cortam junto o proxy do host, porque no Docker Desktop/Windows o daemon roda numa VM e nem o IP do gateway alcança o host. Fechar de verdade exige proxy de egress com allowlist de destinos (ou sidecar com regras de firewall), que é escopo de tamanho próprio. **Decisão do PI (2026-08-31):** entregar a F03 com o limite declarado e abrir `[FIX]` citando a SPEC — [#222](https://github.com/RodReis/rrb-jarvisOS/issues/222). Hoje a garantia é **por ausência de credencial** — o container não tem token —, o que é mais fraco do que o critério pede, e é por isso que fica registrado.
+
+**Limites:** **sem tela** — a fatia é infraestrutura, e `sandbox:estado` existe para o painel da M9-F06. **`derivarPaths` devolve `undefined` no boot**: a derivação a partir da arquitetura aprovada é da M9-F04, que conhece o pacote do projeto-alvo — até lá a SPEC precisa trazer a seção, e o preflight recusa se não vier, que é o critério 13 se comportando como projetado. **`contexto`/`contextPackId` do proxy são `undefined` no boot** pelo mesmo motivo: quem conhece o run em construção é a M9-F04. **Nada dispara o preflight automaticamente** ainda. **A detecção de colisão de porta existe e é testada, mas nenhum projeto declara serviços hoje** — então ela nunca roda com lista não-vazia fora do teste. E ela pergunta **só ao Docker**: uma porta tomada por processo fora do Docker não é vista, o que exigiria uma sonda de `bind` que nenhuma fatia hoje tem como exercitar. **`docker` precisa estar na allowlist de comandos do workspace**, e o worktree sob a allowlist de diretórios: o sandbox passa pelo mesmo enforcement do MVP-004, de propósito.
+
 ## Registro de entregas
 
 | Data | Fatia | PR | Observação |

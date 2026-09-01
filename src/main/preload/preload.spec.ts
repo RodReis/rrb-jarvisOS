@@ -70,7 +70,9 @@ describe('ponte do preload', () => {
       'createAutomation',
       'createProject',
       'createWorkflow',
+      'definirPoliticaDeMerge',
       'escolherAnexo',
+      'estadoDoSandbox',
       'gerarArquitetura',
       'gerarPacote',
       'gerarRoadmap',
@@ -88,6 +90,7 @@ describe('ponte do preload', () => {
       'getWizardState',
       'getWorkspace',
       'importProject',
+      'lerPoliticaDeMerge',
       'listAllowedCommands',
       'listAllowedDirectories',
       'listAuditEvents',
@@ -114,6 +117,7 @@ describe('ponte do preload', () => {
       'onAuthChanged',
       'pickAllowedDirectory',
       'pickProjectDirectory',
+      'publicarNoGitHub',
       'removeAllowedCommand',
       'removeAllowedDirectory',
       'removeAutomation',
@@ -146,7 +150,8 @@ describe('ponte do preload', () => {
       'switchWorkspace',
       'updateWorkflow',
       'validarPrototipos',
-      'verifyAuditChain'
+      'verifyAuditChain',
+      'vistaDaFila'
     ])
   })
 

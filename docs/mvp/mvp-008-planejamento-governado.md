@@ -1,7 +1,7 @@
 # MVP-008 — Planejamento Governado
 
-- Status: **as seis SPECs `aprovada-pi` em 2026-08-29** — revisão de perguntas abertas concluída com o PI; fatias liberadas para o Backlog, atrás do MVP-005 e do MVP-006 na fila.
-- GitHub: épico [#93](https://github.com/RodReis/rrb-jarvisOS/issues/93); fatias [#94–#99](https://github.com/RodReis/rrb-jarvisOS/issues/94), estado `proplan:backlog`.
+- Status: **finalizado e aceito pelo PI** (2026-08-31).
+- GitHub: épico [#93](https://github.com/RodReis/rrb-jarvisOS/issues/93) fechado; seis fatias [#94–#99](https://github.com/RodReis/rrb-jarvisOS/issues/94) fechadas com `proplan:finalizado`.
 - Depende de: MVP-005 e MVP-006.
 - Não depende de: MVP-007.
 - Resultado: projeto local, documentação estrutural aprovada, roadmap completo e próxima SPEC pronta para aprovação.
@@ -36,7 +36,7 @@ Emendas geradas por estas decisões: `spec-providers-03-budget-policy.md` e `spe
 ## Dependências duras registradas
 
 - **M8-F01 depende da M4-F02** (#75, terminal controlado) por causa da decisão 2.
-- **M8-F01 fica limitada ao diretório do app** enquanto a fatia de **UI da allowlist de diretórios** não existir — pendência aberta do MVP-004, ainda sem spec.
+- A limitação temporária da M8-F01 ao diretório do app foi removida após a entrega da UI da allowlist de diretórios na M4-F03 ([#110](https://github.com/RodReis/rrb-jarvisOS/issues/110)).
 
 ## Fatias
 

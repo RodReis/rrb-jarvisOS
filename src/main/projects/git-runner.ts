@@ -14,6 +14,7 @@
  */
 
 import type { WorkspaceId } from '@shared/domain/entities'
+import { redigirUrlDeRemote, urlDePushComToken } from '@shared/domain/publicacao'
 import type { CommandExecution } from '@shared/domain/terminal'
 import type { TerminalEngine } from '../execution/terminal-engine'
 
@@ -66,6 +67,65 @@ export class GitRunner {
       ok: execucao.state === 'concluido',
       execucao,
       saida: execucao.stdout.trim()
+    }
+  }
+
+  /**
+   * Publica `branch` numa origem que **não exige credencial** (SPEC-Entrega-01, critério 2).
+   *
+   * A URL entra como **argumento**, nunca como `git remote add`: gravada no `.git/config`, ela
+   * sobreviveria ao run, ao processo e ao backup do diretório. Como argumento, vive o tempo do
+   * subprocess.
+   *
+   * **Sem `--force`**, e é o que faz a regra da spec — *"divergência preserva ambos os lados"* —
+   * ser garantia em vez de intenção: quando a origem andou por fora, o Git recusa o push, e os
+   * dois lados continuam inteiros. Forçar seria a única forma de perder um commit aqui.
+   */
+  push(origem: string, branch: string, cwd: string, workspaceId: WorkspaceId): GitOutcome {
+    return this.run(['push', origem, `HEAD:refs/heads/${branch}`], cwd, workspaceId)
+  }
+
+  /**
+   * O mesmo push, com a credencial embutida na URL (decisão do PI, SPEC-Entrega-01).
+   *
+   * **Por que a credencial vai na URL.** O `ambienteControlado()` do MVP-004 só repassa uma lista
+   * fechada de variáveis ao subprocess — nenhum `GITHUB_TOKEN` ou `GIT_ASKPASS` alcança o `git`, e
+   * isso é a garantia que a M4-F02 entregou, não um descuido. Abrir exceção criaria uma segunda
+   * lista de permissão, e a que divergisse seria a que vaza.
+   *
+   * **O que precisa ser redigido são os `args`, não só a saída** — e foi o teste de integração que
+   * mostrou isso. O próprio Git já remove a credencial do eco (`fatal: unable to access
+   * 'https://127.0.0.1/...'`, sem o `user:pass@`), então redigir o `stderr` era a defesa contra um
+   * vazamento que não acontecia. O vazamento real está no `CommandExecution`: o
+   * `ExecutionRepository` **persiste a linha de comando inteira**, e é ela que vai para o banco,
+   * para a auditoria e para a evidência da entrega — com o token em claro. Redigir os dois é o
+   * certo: o `stderr` porque versões futuras do Git podem ecoar mais, e os `args` porque hoje já
+   * vazam.
+   *
+   * O `redact` genérico do logging não pega nenhum dos dois: ele casa campos por nome (`token`,
+   * `authorization`), e um token dentro de uma URL não está em campo nenhum.
+   *
+   * **O que isto não resolve:** enquanto o processo vive, o token é visível na linha de comando
+   * para quem inspeciona processos na própria máquina do usuário. É o custo aceito da decisão.
+   */
+  pushComToken(
+    origem: string,
+    token: string,
+    branch: string,
+    cwd: string,
+    workspaceId: WorkspaceId
+  ): GitOutcome {
+    const bruto = this.push(urlDePushComToken(origem, token), branch, cwd, workspaceId)
+
+    return {
+      ...bruto,
+      saida: redigirUrlDeRemote(bruto.saida),
+      execucao: {
+        ...bruto.execucao,
+        args: bruto.execucao.args.map(redigirUrlDeRemote),
+        stdout: redigirUrlDeRemote(bruto.execucao.stdout),
+        stderr: redigirUrlDeRemote(bruto.execucao.stderr)
+      }
     }
   }
 

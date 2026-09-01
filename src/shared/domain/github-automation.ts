@@ -75,7 +75,11 @@ export const GITHUB_OPERATIONS = {
   getChecksForHead: 'checks.for-head',
   getWorkflowRunsForHead: 'actions.runs-for-head',
   squashMerge: 'pr.squash-merge',
-  getMergeState: 'pr.merge-state'
+  getMergeState: 'pr.merge-state',
+  setDefaultBranch: 'repo.set-default-branch',
+  ensureBranchProtection: 'branch.ensure-protection',
+  getCommitSha: 'commit.sha-for-ref',
+  ensureLabel: 'label.ensure'
 } as const
 
 export type GithubOperation = (typeof GITHUB_OPERATIONS)[keyof typeof GITHUB_OPERATIONS]
@@ -147,6 +151,30 @@ export const GITHUB_CAPABILITIES: readonly ConnectorCapability[] = [
     operation: GITHUB_OPERATIONS.getMergeState,
     effect: 'leitura',
     descricao: 'Consulta na origem se o pull request está mesmo mergeado, e com qual commit.'
+  },
+  {
+    connector: 'github',
+    operation: GITHUB_OPERATIONS.setDefaultBranch,
+    effect: 'mutacao',
+    descricao: 'Define a branch base do repositório, quando ela ainda não é a informada.'
+  },
+  {
+    connector: 'github',
+    operation: GITHUB_OPERATIONS.ensureBranchProtection,
+    effect: 'mutacao',
+    descricao: 'Garante a proteção da branch base com a revisão exigida antes do merge.'
+  },
+  {
+    connector: 'github',
+    operation: GITHUB_OPERATIONS.getCommitSha,
+    effect: 'leitura',
+    descricao: 'Lê o commit para onde uma ref aponta na origem, para conferir o que foi publicado.'
+  },
+  {
+    connector: 'github',
+    operation: GITHUB_OPERATIONS.ensureLabel,
+    effect: 'mutacao',
+    descricao: 'Garante que o rótulo existe no repositório, criando-o apenas se ainda não existir.'
   }
 ]
 
@@ -206,6 +234,57 @@ export interface SquashMergeInput extends RepoAlvo {
    * cuidado do `expectedHeadSha` que a M9-F05 já previa.
    */
   readonly expectedHeadSha: string
+}
+
+/**
+ * Entrada de `label.ensure`.
+ *
+ * O rótulo é identificado **pelo nome**, que é como o GitHub o endereça — não há id estável a
+ * guardar. `cor` sem `#`, como a API espera; `descricao` é opcional porque rótulo sem descrição é
+ * legítimo, e mandar string vazia sobrescreveria uma descrição existente por nada.
+ */
+export interface EnsureLabelInput extends RepoAlvo {
+  readonly nome: string
+  readonly cor: string
+  readonly descricao?: string
+}
+
+/**
+ * Entrada de `repo.set-default-branch`.
+ *
+ * A branch precisa **existir** na origem antes: o GitHub recusa apontar a default para uma ref que
+ * não está lá, e é por isso que a publicação define a base depois do primeiro push, não antes.
+ */
+export interface SetDefaultBranchInput extends RepoAlvo {
+  readonly branch: string
+}
+
+/**
+ * Entrada de `branch.ensure-protection`.
+ *
+ * `revisoesExigidas: 0` é legítimo e diferente de "sem proteção": mantém o gate de checks e a
+ * proibição de force-push, sem exigir um revisor humano — que é a configuração de um repositório
+ * cujo merge é autônomo (decisão 2 do MVP-009). Quem quer revisor pede 1 ou mais.
+ */
+export interface EnsureBranchProtectionInput extends RepoAlvo {
+  readonly branch: string
+  readonly revisoesExigidas: number
+  /**
+   * Os checks que precisam passar. Vazio significa "nenhum check exigido" — e não é o mesmo que
+   * omitir: omitido, o GitHub mantém o que já estava configurado; vazio, ele limpa a lista.
+   */
+  readonly checksExigidos?: readonly string[]
+}
+
+/**
+ * Entrada de `commit.sha-for-ref`: a ref cujo commit se quer ler na origem.
+ *
+ * Aceita nome de branch (`main`), tag ou SHA — é o que `GET /commits/{ref}` aceita. Serve ao
+ * critério 2 (*"commits locais aprovados correspondem à branch remota"*): sem ler o que está lá, a
+ * correspondência seria afirmada a partir do que mandamos, e um push parcial passaria por completo.
+ */
+export interface CommitShaInput extends RepoAlvo {
+  readonly ref: string
 }
 
 /** Entrada de `pr.merge-state`. */
@@ -418,6 +497,30 @@ export function validarEntrada(operation: string, input: unknown): string | unde
 
     case GITHUB_OPERATIONS.getMergeState:
       return inteiroPositivo('pullRequest') ? undefined : 'Informe `pullRequest` como número.'
+
+    case GITHUB_OPERATIONS.setDefaultBranch:
+      return texto('branch') ? undefined : 'Informe `branch`.'
+
+    case GITHUB_OPERATIONS.ensureBranchProtection:
+      if (!texto('branch')) return 'Informe `branch`.'
+      // Zero é válido (merge autônomo sem revisor humano); negativo e fracionário não são, e um
+      // deles passaria para a API virar 422 num lugar onde a causa já era conhecível aqui.
+      return typeof v.revisoesExigidas === 'number' &&
+        Number.isInteger(v.revisoesExigidas) &&
+        v.revisoesExigidas >= 0
+        ? undefined
+        : '`revisoesExigidas` precisa ser um inteiro não negativo.'
+
+    case GITHUB_OPERATIONS.getCommitSha:
+      return texto('ref') ? undefined : 'Informe `ref`.'
+
+    case GITHUB_OPERATIONS.ensureLabel:
+      if (!texto('nome')) return 'Informe `nome`.'
+      // Seis hexadecimais **sem** `#`: é o formato que a API aceita, e mandar com `#` devolve
+      // 422 num lugar onde a causa já era conhecível aqui.
+      return typeof v.cor === 'string' && /^[0-9a-f]{6}$/i.test(v.cor)
+        ? undefined
+        : '`cor` precisa ser um hexadecimal de 6 dígitos, sem `#`.'
 
     default:
       return `Operação "${operation}" não pertence ao conector GitHub.`

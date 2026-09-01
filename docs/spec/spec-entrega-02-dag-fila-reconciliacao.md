@@ -28,7 +28,13 @@ Transição inválida é rejeitada. `MERGED`, `AWAITING_MERGE`, `BLOCKED` e `CAN
 
 ## Reconciliação
 
-Consultar SQLite, filesystem, Git, GitHub, container e portas do lease. Completar evento pendente quando o efeito já existir; repetir somente operação segura/idempotente; bloquear quando houver risco ao trabalho existente.
+Consultar SQLite, filesystem, Git, GitHub, container e portas do lease. **A fonte da intenção é o `EffectJournal`** (abaixo). Completar evento pendente quando o efeito já existir; repetir somente operação segura/idempotente; bloquear quando houver risco ao trabalho existente.
+
+## Diário de efeitos (`EffectJournal`)
+
+Toda mutação externa registra, **antes** de sair, uma entrada com chave idempotente, fingerprint da entrada, alvo e intenção; depois, a confirmação (`confirmed`, `ambiguous` ou `failed`) e o `ExternalRef` resultante. Resultado `ambiguous` **consulta a origem antes de qualquer retry**; chave igual com payload diferente é conflito e falha **antes** do I/O.
+
+**O `EffectJournal` é construído aqui, nesta fatia** (decisão do PI, 2026-08-30). A proposta original o acrescentava por emenda à `spec-conectores-01` — fatia **finalizada** (M6-F01), cujo código não o tem: emendar spec entregue não faz o código existir, só cria spec que mente sobre o que foi entregue. O contrato vive junto de quem o consome — a reconciliação — e o núcleo de conectores o adota quando houver fatia que o implemente lá.
 
 ## Critérios de aceite
 
