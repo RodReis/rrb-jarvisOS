@@ -1,14 +1,15 @@
 # STATUS.md — Kanban / Roadmap
 
-Atualizado em: **2026-09-02**. Fonte única do índice Fatia ↔ SPEC. Estado remoto conferido no fechamento do PR #227; nenhuma outra prioridade alterada por esta tarefa. Histórico detalhado em `docs/STATUS-ARQUIVO.md`; o board vence divergência factual.
+Atualizado em: **2026-09-02**. Fonte única do índice Fatia ↔ SPEC. Estado remoto conferido no fechamento do PR #231 (M9-F04 mergeada, `9005423`). Histórico detalhado em `docs/STATUS-ARQUIVO.md`; o board vence divergência factual.
 
 ## Agora
 
 | Coluna | Item | Estado |
 |---|---|---|
-| Em Andamento | [#104](https://github.com/RodReis/rrb-jarvisOS/issues/104) · M9-F04 Construção/recuperação | construído em `feat/m9-f04-construcao-recuperacao` (14 tasks + fix wave da revisão final); ainda não tem PR aberto — aguardando abertura para virar `proplan:done` |
+| Feito | [#104](https://github.com/RodReis/rrb-jarvisOS/issues/104) · M9-F04 Construção/recuperação | entregue no PR #231 (`9005423`), CI verde; `proplan:done`, aguardando aceite do PI. **Limites declarados:** correlação `runId`/`tentativa` do proxy fica para a M9-F05 (rota do executor não operacional em produção até lá); smoke real em `not_run` porque a imagem do sandbox não traz o binário `claude`; cancelamento cooperativo com latência até o timeout do passo. **Pendência do PI:** fail-open do `verificarEscopo` quando o `git status` do container falha |
 | Feito | [#209](https://github.com/RodReis/rrb-jarvisOS/issues/209) · correção do EffectJournal | entregue no PR #227 (`66623b8`); `proplan:done`, aguardando aceite do PI |
-| Próximo | [#222](https://github.com/RodReis/rrb-jarvisOS/issues/222) · restrição de egress do container | `proplan:next` — única fila explícita restante em Backlog após #209; falha da M9-F03 registrada na main |
+| Backlog | [#232](https://github.com/RodReis/rrb-jarvisOS/issues/232) · `[INFRA][FIX]` worker morto no pool do Vitest | criado em 2026-09-02 na entrega da M9-F04: execução perde arquivo inteiro e ainda relata verde, o que é fechamento frágil produzido pela infra (`docs/TESTING.md` §1). Não entra na fila por si — o PI decide quando |
+| Finalizado | [#222](https://github.com/RodReis/rrb-jarvisOS/issues/222) · restrição de egress do container | aceite do PI registrado; entregue no PR #228 |
 | Feito | [#103](https://github.com/RodReis/rrb-jarvisOS/issues/103) · M9-F03 Worktree, preflight e Docker | entregue no PR #211; emendas e evidência preservadas |
 | Finalizado | #99, #101 e #102 | aceite do PI registrado; M9-F02 integrada pelo PR #208 |
 | Backlog | M7-F01–F06 (#180–#185), MVPs 010–015 e M16-F01–F04 | SPECs aprovadas; publicação documental não muda fila |
@@ -136,8 +137,8 @@ Não existe catálogo global `SPEC-nnn`. O slug identifica a SPEC; os números a
 
 ## Próximas ações
 
-1. #209 entregue pelo PR #227; `next` avança para #222 (única fila explícita restante). #103 foi integrada pelo PR #211.
-2. Conservar #167/#168 e #214–#221 em Backlog após o aceite exato de 2026-08-31, sem promover qualquer uma a `next` por esta atualização.
+1. **#104 (M9-F04) entregue pelo PR #231 e aguardando aceite do PI.** Nenhum `proplan:next` está marcado — a fila explícita do MVP-009 esgotou: F01–F04 entregues, restam F05 (revisão/CI/merge) e F06 (evidência/limpeza), cujas SPECs já são `aprovada-pi`. Promover a próxima é decisão do PI. **A M9-F05 herda uma dependência concreta:** é ela quem liga o `ConstrutorService` ao boot e preenche `contexto`/`contextPackId` do `ExecutorProxy` — até lá a rota do executor não opera em produção (ver `docs/STATUS-ARQUIVO.md` item 14, emendado, e `docs/DEVELOPMENT.md` § Fatia 04).
+2. Conservar #167/#168 e #214–#221 em Backlog após o aceite exato de 2026-08-31, sem promover qualquer uma a `next` por esta atualização. #232 (`[INFRA][FIX]` do pool de testes) também nasce em Backlog, sem entrar na fila por conta própria.
 3. Antes das fatias visuais, anexar `DESIGN-SYSTEM.md` e HTML pelo fluxo já aprovado; texto de SPEC/template não substitui anexo do PI.
 4. M7-F05/F06 estão aprovadas/Backlog e M7-F07–F08 continuam a redigir; as fatias do Command Center seguem seus planejamentos próprios. Nenhuma delas bloqueia concluir a documentação V3.
 5. O relatório de fechamento do PR #189 documenta reconciliação, ordem técnica, issues e validação. Aprovações prévias são preservadas, não repetidas.
