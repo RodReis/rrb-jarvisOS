@@ -16,6 +16,7 @@
  */
 
 import type { WorkspaceId } from '@shared/domain/entities'
+import type { ComandosDeValidacao } from '@shared/domain/ci-workflow'
 import type { BloqueioExterno } from '@shared/domain/pacote-estrutural'
 import { fugasDoEscopo, type SandboxPreparado } from '@shared/domain/preflight'
 import {
@@ -29,13 +30,14 @@ import { log } from '../logging/logger'
 import type { DockerRunner, ExecucaoNoContainer } from './docker-runner'
 import type { PipelineRepository } from './pipeline-repository'
 
-/** Os quatro comandos de validação, no vocabulário do projeto-alvo (spec: "test/lint/type/build"). */
-export interface ComandosDeValidacao {
-  readonly test: readonly string[]
-  readonly lint: readonly string[]
-  readonly typecheck: readonly string[]
-  readonly build: readonly string[]
-}
+/**
+ * Os quatro comandos de validação, no vocabulário do projeto-alvo (spec: "test/lint/type/build").
+ *
+ * Definidos em `@shared/domain/ci-workflow` porque o gerador do workflow de CI (M9-F05) também
+ * os consome, e `src/shared` não pode importar de `src/main`. Reexportados aqui para quem já
+ * os importava deste módulo.
+ */
+export type { ComandosDeValidacao } from '@shared/domain/ci-workflow'
 
 export interface PedidoDeConstrucao {
   readonly runId: string
