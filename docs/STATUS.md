@@ -1,11 +1,12 @@
 # STATUS.md — Kanban / Roadmap
 
-Atualizado em: **2026-09-02**. Fonte única do índice Fatia ↔ SPEC. Estado remoto conferido no fechamento do PR #231 (M9-F04 mergeada, `9005423`). Histórico detalhado em `docs/STATUS-ARQUIVO.md`; o board vence divergência factual.
+Atualizado em: **2026-09-02**. Fonte única do índice Fatia ↔ SPEC. Estado remoto conferido no fechamento do PR #234; a M9-F05 (#105) foi promovida a `proplan:next` pelo PI em 2026-09-02. Histórico detalhado em `docs/STATUS-ARQUIVO.md`; o board vence divergência factual.
 
 ## Agora
 
 | Coluna | Item | Estado |
 |---|---|---|
+| Próximo | [#105](https://github.com/RodReis/rrb-jarvisOS/issues/105) · M9-F05 Revisão, CI e squash merge automático | `proplan:next` — promovida pelo PI em 2026-09-02; SPEC `spec-entrega-05-revisao-ci-merge.md` é `aprovada-pi` (2026-08-29, emendada em 2026-08-30). Herda a dependência declarada na M9-F04: ligar o `ConstrutorService` ao boot e preencher `contexto`/`contextPackId` do `ExecutorProxy` |
 | Finalizado | [#104](https://github.com/RodReis/rrb-jarvisOS/issues/104) · M9-F04 Construção/recuperação | **aceite do PI registrado em 2026-09-02**; entregue no PR #231 (`9005423`), CI verde. **Limites declarados:** correlação `runId`/`tentativa` do proxy fica para a M9-F05 (rota do executor não operacional em produção até lá); smoke real em `not_run` porque a imagem do sandbox não traz o binário `claude`; cancelamento cooperativo com latência até o timeout do passo. **Pendência do PI:** fail-open do `verificarEscopo` quando o `git status` do container falha |
 | Feito | [#209](https://github.com/RodReis/rrb-jarvisOS/issues/209) · correção do EffectJournal | entregue no PR #227 (`66623b8`); `proplan:done`, aguardando aceite do PI |
 | Backlog | [#232](https://github.com/RodReis/rrb-jarvisOS/issues/232) · `[INFRA][FIX]` worker morto no pool do Vitest | criado em 2026-09-02 na entrega da M9-F04: execução perde arquivo inteiro e ainda relata verde, o que é fechamento frágil produzido pela infra (`docs/TESTING.md` §1). Não entra na fila por si — o PI decide quando |
@@ -137,7 +138,7 @@ Não existe catálogo global `SPEC-nnn`. O slug identifica a SPEC; os números a
 
 ## Próximas ações
 
-1. **#104 (M9-F04) entregue pelo PR #231 e aceita pelo PI em 2026-09-02** — MVP-009 em 4/6. Nenhum `proplan:next` está marcado: restam F05 (revisão/CI/merge) e F06 (evidência/limpeza), cujas SPECs já são `aprovada-pi`. Promover a próxima é decisão do PI. **A M9-F05 herda uma dependência concreta:** é ela quem liga o `ConstrutorService` ao boot e preenche `contexto`/`contextPackId` do `ExecutorProxy` — até lá a rota do executor não opera em produção (ver `docs/STATUS-ARQUIVO.md` item 14, emendado, e `docs/DEVELOPMENT.md` § Fatia 04).
+1. **#104 (M9-F04) entregue pelo PR #231 e aceita pelo PI em 2026-09-02** — MVP-009 em 4/6. **A F05 (#105) foi promovida a `proplan:next` pelo PI em 2026-09-02** e entrou em construção; resta a F06 (evidência/limpeza) em Backlog, com SPEC `aprovada-pi`. **A M9-F05 herda uma dependência concreta:** é ela quem liga o `ConstrutorService` ao boot e preenche `contexto`/`contextPackId` do `ExecutorProxy` — até lá a rota do executor não opera em produção (ver `docs/STATUS-ARQUIVO.md` item 14, emendado, e `docs/DEVELOPMENT.md` § Fatia 04).
 2. Conservar #167/#168 e #214–#221 em Backlog após o aceite exato de 2026-08-31, sem promover qualquer uma a `next` por esta atualização. #232 (`[INFRA][FIX]` do pool de testes) também nasce em Backlog, sem entrar na fila por conta própria.
 3. Antes das fatias visuais, anexar `DESIGN-SYSTEM.md` e HTML pelo fluxo já aprovado; texto de SPEC/template não substitui anexo do PI.
 4. M7-F05/F06 estão aprovadas/Backlog e M7-F07–F08 continuam a redigir; as fatias do Command Center seguem seus planejamentos próprios. Nenhuma delas bloqueia concluir a documentação V3.
