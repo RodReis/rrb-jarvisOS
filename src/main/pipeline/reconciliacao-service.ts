@@ -6,9 +6,17 @@
  *
  * É a pergunta que o critério 4 faz — *"crash antes/depois de efeito converge para um único
  * resultado"* —, e ela só tem resposta porque cada fronteira registra intenção **antes** e
- * confirmação **depois** (o par `fase: 'requisicao'`/`'conclusao'` do `ConnectorService`, e o
- * `ExternalRef` que a M9-F01 grava). Um evento só no fim perderia toda chamada que morreu no
- * meio, e é justamente essa que a reconciliação existe para resolver.
+ * confirmação **depois**. **A fonte da intenção é o `EffectJournal`** (spec § Diário de
+ * efeitos; issue #209) — antes dele existir, a reconciliação teria de reinterpretar o par de
+ * auditoria `fase: 'requisicao'`/`'conclusao'` do `ConnectorService`, que não tem chave nem
+ * fingerprint para dizer se duas linhas são a mesma intenção ou duas intenções em conflito.
+ *
+ * Toda entrada `pendente` sobrevivendo a um reinício é **bloqueada**, nunca completada ou
+ * repetida automaticamente aqui: decidir se o efeito já aconteceu exige consultar a origem
+ * (GitHub, Tavily), e essa consulta é específica de cada conector — fora do escopo desta fatia
+ * (spec § decisões cravadas: o diário nasce aqui, o núcleo de conectores o adota "quando houver
+ * fatia que o implemente lá"). É a mesma postura fail-closed de `reconciliarRun`: a pendência
+ * vira decisão explícita para quem sabe verificar, nunca inferência otimista.
  *
  * **Três desfechos, e a escolha entre eles é a regra inteira** (§ Reconciliação):
  *
@@ -36,6 +44,7 @@ import { estadoDoLease, RECURSO_WIP_GLOBAL, type Lease } from '@shared/domain/le
 import { ehTerminal, type PipelineRun } from '@shared/domain/pipeline'
 import { log } from '../logging/logger'
 import type { AuditRepository } from '../storage/audit-repository'
+import type { EffectJournalRepository } from './effect-journal-repository'
 import type { LeaseRepository } from './lease-repository'
 import type { PipelineRepository } from './pipeline-repository'
 
@@ -72,6 +81,8 @@ export interface ReconciliacaoDeps {
   readonly runs: PipelineRepository
   readonly leases: LeaseRepository
   readonly audit: AuditRepository
+  /** A fonte da intenção (spec § Diário de efeitos). Opcional: fatias que ainda não têm efeito externo não precisam do diário. */
+  readonly effectJournal?: EffectJournalRepository
   readonly userId: () => string
   readonly workspaceId: () => WorkspaceId
   /** Verificadores de recurso externo. A M9-F03 registra os dela aqui. */
@@ -96,6 +107,14 @@ export class ReconciliacaoService {
   async reconcileAll(): Promise<readonly AchadoDaReconciliacao[]> {
     const userId = this.deps.userId()
     const achados: AchadoDaReconciliacao[] = []
+
+    for (const entrada of this.deps.effectJournal?.listarPendentes(userId) ?? []) {
+      achados.push({
+        recurso: `efeito:${entrada.chaveIdempotente}`,
+        decisao: 'bloqueado',
+        motivo: `Intenção "${entrada.alvo}" (correlação ${entrada.correlationId}) sobreviveu a um reinício sem confirmar. Verificar na origem antes de repetir.`
+      })
+    }
 
     for (const run of this.deps.runs.listarAtivos(userId)) {
       achados.push(this.reconciliarRun(run))

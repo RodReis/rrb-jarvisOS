@@ -34,6 +34,7 @@ import { ConnectorRegistry } from './registry'
 import { ConnectorService, type ConnectorSecretSource } from './connector-service'
 import { CreditService } from './credit-service'
 import { CreditRepository } from './credit-repository'
+import { EffectJournalRepository } from '../pipeline/effect-journal-repository'
 import type { ConnectorAdapter, ConnectorExecution } from './adapter'
 
 const USUARIO = 'user-teste'
@@ -104,6 +105,7 @@ let audit: InstanceType<typeof AuditRepository>
 let registry: ConnectorRegistry
 let segredos: ConnectorSecretSource & { readonly pedidas: string[] }
 let credits: CreditService
+let effectJournal: EffectJournalRepository
 let esperas: number[]
 let service: ConnectorService
 
@@ -131,6 +133,7 @@ beforeEach(() => {
   }
 
   credits = new CreditService(new CreditRepository(db), audit)
+  effectJournal = new EffectJournalRepository(db)
   // Espera dublada: o que o teste do backoff precisa afirmar é **quanto** se esperou, não que
   // se esperou de verdade — segundos de relógio real não provariam nada a mais.
   esperas = []
@@ -139,6 +142,7 @@ beforeEach(() => {
     segredos,
     new PolicyService(audit, () => USUARIO),
     audit,
+    effectJournal,
     credits,
     async (ms) => {
       esperas.push(ms)
@@ -374,11 +378,14 @@ describe('erros equivalentes de adapters diferentes (critério 4)', () => {
     )
 
     const desfechos: readonly ConnectorOutcome[] = [
-      await service.call(pedido(), { userId: USUARIO, workspace: 'jarvis' }),
-      await service.call(pedido({ connector: 'github', operation: 'issues.list' }), {
+      await service.call(pedido({ correlationId: 'corr-tavily' }), {
         userId: USUARIO,
         workspace: 'jarvis'
-      })
+      }),
+      await service.call(
+        pedido({ connector: 'github', operation: 'issues.list', correlationId: 'corr-github' }),
+        { userId: USUARIO, workspace: 'jarvis' }
+      )
     ]
 
     // Um `switch` sobre `code` é o que o orquestrador escreve. Se cada adapter devolvesse o
@@ -462,5 +469,180 @@ describe('auditoria — dois eventos por chamada que sai', () => {
     })
 
     expect(JSON.stringify(eventosDeConector())).not.toContain('busca-confidencial-do-usuario')
+  })
+})
+
+describe('diário de efeitos — intenção antes do I/O, confirmação depois (issue #209)', () => {
+  it('registra a intenção antes de o adapter ser chamado, com chave e fingerprint', async () => {
+    const github = new AdapterFake(
+      'github',
+      [capacidade('github', 'issues.create', 'mutacao')],
+      () => {
+        // No instante em que o adapter é chamado, a intenção já está no diário como pendente.
+        const entrada = effectJournal.buscarPorChave(USUARIO, 'idem-1')
+        expect(entrada?.estado).toBe('pendente')
+        return {
+          ok: true,
+          data: { numero: 7 },
+          provenance: {
+            connector: 'github',
+            operation: 'issues.create',
+            obtidoEm: '2026-08-29T00:00:00Z'
+          },
+          usage: { creditos: 0, latenciaMs: 5 },
+          externalRef: { id: 'issue-7' }
+        }
+      }
+    )
+    registry.register(github)
+
+    await service.call(
+      pedido({ connector: 'github', operation: 'issues.create', idempotencyKey: 'idem-1' }),
+      { userId: USUARIO, workspace: 'jarvis' }
+    )
+
+    expect(github.chamadas).toHaveLength(1)
+  })
+
+  it('confirma a entrada com o ExternalRef quando a chamada sai bem', async () => {
+    const github = new AdapterFake(
+      'github',
+      [capacidade('github', 'issues.create', 'mutacao')],
+      () => ({
+        ok: true,
+        data: { numero: 7 },
+        provenance: {
+          connector: 'github',
+          operation: 'issues.create',
+          obtidoEm: '2026-08-29T00:00:00Z'
+        },
+        usage: { creditos: 0, latenciaMs: 5 },
+        externalRef: { id: 'issue-7' }
+      })
+    )
+    registry.register(github)
+
+    await service.call(
+      pedido({ connector: 'github', operation: 'issues.create', idempotencyKey: 'idem-1' }),
+      { userId: USUARIO, workspace: 'jarvis' }
+    )
+
+    const entrada = effectJournal.buscarPorChave(USUARIO, 'idem-1')
+    expect(entrada?.estado).toBe('confirmed')
+    expect(entrada?.externalRefId).toBe('issue-7')
+    expect(effectJournal.listarPendentes(USUARIO)).toEqual([])
+  })
+
+  it('chave igual com payload diferente falha antes do I/O — nenhuma requisição sai (critério 3)', async () => {
+    const github = new AdapterFake('github', [capacidade('github', 'issues.create', 'mutacao')], OK)
+    registry.register(github)
+
+    const primeira = await service.call(
+      pedido({
+        connector: 'github',
+        operation: 'issues.create',
+        idempotencyKey: 'idem-1',
+        input: { titulo: 'A' }
+      }),
+      { userId: USUARIO, workspace: 'jarvis' }
+    )
+    expect(primeira.ok).toBe(true)
+
+    const segunda = await service.call(
+      pedido({
+        connector: 'github',
+        operation: 'issues.create',
+        idempotencyKey: 'idem-1',
+        input: { titulo: 'B — payload diferente' }
+      }),
+      { userId: USUARIO, workspace: 'jarvis' }
+    )
+
+    expect(segunda.ok).toBe(false)
+    expect((segunda as ConnectorError).code).toBe('validacao-invalida')
+    // A prova do critério 3: só a primeira chamada chegou ao adapter.
+    expect(github.chamadas).toHaveLength(1)
+  })
+
+  it('marca ambiguous quando indisponivel/timeout atinge uma mutação — consulta a origem antes de retentar (critério 4)', async () => {
+    const github = new AdapterFake(
+      'github',
+      [capacidade('github', 'issues.create', 'mutacao')],
+      () => ({
+        ok: false,
+        code: 'indisponivel',
+        mensagem: 'O serviço externo falhou de forma inesperada.',
+        retryable: true,
+        acao: 'retentar',
+        provenance: {
+          connector: 'github',
+          operation: 'issues.create',
+          obtidoEm: '2026-08-29T00:00:00Z'
+        }
+      })
+    )
+    registry.register(github)
+
+    await service.call(
+      pedido({
+        connector: 'github',
+        operation: 'issues.create',
+        idempotencyKey: 'idem-1',
+        input: { titulo: 'A' }
+      }),
+      { userId: USUARIO, workspace: 'jarvis' }
+    )
+
+    expect(effectJournal.buscarPorChave(USUARIO, 'idem-1')?.estado).toBe('ambiguous')
+  })
+
+  it('marca failed para um erro definitivo — não é ambiguidade sobre o que o serviço fez', async () => {
+    const github = new AdapterFake(
+      'github',
+      [capacidade('github', 'issues.create', 'mutacao')],
+      () => ({
+        ok: false,
+        code: 'credencial-recusada',
+        mensagem: 'Token inválido.',
+        retryable: false,
+        acao: 'reautenticar',
+        provenance: {
+          connector: 'github',
+          operation: 'issues.create',
+          obtidoEm: '2026-08-29T00:00:00Z'
+        }
+      })
+    )
+    registry.register(github)
+
+    await service.call(
+      pedido({
+        connector: 'github',
+        operation: 'issues.create',
+        idempotencyKey: 'idem-1',
+        input: { titulo: 'A' }
+      }),
+      { userId: USUARIO, workspace: 'jarvis' }
+    )
+
+    expect(effectJournal.buscarPorChave(USUARIO, 'idem-1')?.estado).toBe('failed')
+  })
+
+  it('leitura sem idempotencyKey usa o correlationId como chave, e nunca colide entre chamadas', async () => {
+    registry.register(
+      new AdapterFake('tavily', [capacidade('tavily', 'search.query', 'leitura')], OK)
+    )
+
+    await service.call(pedido({ correlationId: 'corr-a' }), {
+      userId: USUARIO,
+      workspace: 'jarvis'
+    })
+    await service.call(pedido({ correlationId: 'corr-b' }), {
+      userId: USUARIO,
+      workspace: 'jarvis'
+    })
+
+    expect(effectJournal.buscarPorChave(USUARIO, 'corr-a')?.estado).toBe('confirmed')
+    expect(effectJournal.buscarPorChave(USUARIO, 'corr-b')?.estado).toBe('confirmed')
   })
 })

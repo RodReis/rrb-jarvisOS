@@ -1060,6 +1060,48 @@ const MIGRATIONS: readonly string[] = [
   ALTER TABLE cost_event ADD COLUMN run_id TEXT;
   ALTER TABLE cost_event ADD COLUMN tentativa INTEGER;
   CREATE INDEX idx_cost_event_run ON cost_event(user_id, run_id);
+  `,
+
+  // 25 — EffectJournal: intenção antes do I/O, confirmação depois (SPEC-Entrega-02, § Diário de
+  // efeitos; issue #209).
+  //
+  // `chave_idempotente` é o `idempotencyKey` do request, ou o `correlation_id` quando ausente
+  // (leitura, que não tem chave repetível) — a mesma uniformidade que já existia no par de
+  // auditoria `fase: 'requisicao'`/`'conclusao'`. `UNIQUE(user_id, chave_idempotente)` é o que
+  // faz "chave igual, payload diferente" um conflito detectável **antes** do I/O: o segundo
+  // `INSERT` para a mesma chave falha aqui, não depois de uma segunda chamada de rede.
+  //
+  // `fingerprint` é o hash de `connector:operation` + `input` normalizado. É o que distingue
+  // "mesma intenção, repetida com segurança" (mesma chave, mesmo fingerprint — completa sem
+  // repetir I/O) de "conflito" (mesma chave, fingerprint diferente — falha antes de sair).
+  //
+  // Sem `ON CONFLICT DO UPDATE`, pela mesma razão do `lease`: sobrescrever silenciosamente uma
+  // intenção existente esconderia o conflito que o critério 3 pede para falhar alto. Quem decide
+  // o que fazer com o conflito é o serviço, a partir da violação do `UNIQUE`.
+  //
+  // `estado` nasce `'pendente'` no INSERT da intenção; a conclusão faz UPDATE para
+  // `'confirmed'` | `'ambiguous'` | `'failed'`, com `external_ref_id` quando houver referência.
+  // Não é append-only como `audit_event`: esta tabela guarda **o estado atual de uma intenção**,
+  // não uma trilha — é a reconciliação, lendo por `estado = 'pendente'`, que decide o que fazer
+  // com o que não chegou a confirmar.
+  `
+  CREATE TABLE effect_journal (
+    id                TEXT PRIMARY KEY,
+    user_id           TEXT NOT NULL,
+    workspace_id      TEXT NOT NULL,
+    chave_idempotente TEXT NOT NULL,
+    fingerprint       TEXT NOT NULL,
+    -- 'connector:operation'.
+    alvo              TEXT NOT NULL,
+    correlation_id    TEXT NOT NULL,
+    -- 'pendente' | 'confirmed' | 'ambiguous' | 'failed'. Enum no domínio.
+    estado            TEXT NOT NULL,
+    external_ref_id   TEXT,
+    created_at        TEXT NOT NULL,
+    updated_at        TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX idx_effect_journal_chave ON effect_journal(user_id, chave_idempotente);
+  CREATE INDEX idx_effect_journal_estado ON effect_journal(user_id, estado);
   `
 ]
 

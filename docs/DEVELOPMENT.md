@@ -1468,7 +1468,30 @@ Status: **entregue** — spec `aprovada-pi` (2026-08-29, emendada em 2026-08-30)
 
 **O `EffectJournal` ficou de fora, e é escopo desta fatia** ([#209](https://github.com/RodReis/rrb-jarvisOS/issues/209)). O PR [#207](https://github.com/RodReis/rrb-jarvisOS/pull/207) mergeou às 21:32 acrescentando a seção § Diário de efeitos à SPEC; o branch nasceu às 21:47, mas a spec foi lida do working tree ainda na `main` anterior. **Sincronizar o repositório não é revalidar a spec** — uma spec lida antes do `pull` pode já estar velha quando o branch nasce, e a checagem que faltou é reler a spec depois de sincronizar, não antes. A reconciliação entregue lê o par `fase: 'requisicao'`/`'conclusao'` do `AuditRepository` mais o `ExternalRef`, o que cobre parte do contrato; falta a chave idempotente com fingerprint, o `ambiguous` que consulta a origem antes de qualquer retry, e o conflito de payload que falha antes do I/O. Vai como `[FIX]` porque o comportamento correto já está escrito.
 
-**Limites:** **sem tela** — a fatia é infraestrutura, e os canais existem para a M9-F03/F06 e para o painel da M9-F06 consumirem. A reconciliação de **container e portas** fica para a M9-F03, que os cria; o ponto de extensão (`VerificadorDeRecurso`) já está no lugar e testado com um dublê. **Nada dispara a fila automaticamente** ainda: quem cria run e pede slot é a M9-F03 em diante. **O `EffectJournal` não entrou** — [#209](https://github.com/RodReis/rrb-jarvisOS/issues/209).
+**Limites:** **sem tela** — a fatia é infraestrutura, e os canais existem para a M9-F03/F06 e para o painel da M9-F06 consumirem. A reconciliação de **container e portas** fica para a M9-F03, que os cria; o ponto de extensão (`VerificadorDeRecurso`) já está no lugar e testado com um dublê. **Nada dispara a fila automaticamente** ainda: quem cria run e pede slot é a M9-F03 em diante. ~~**O `EffectJournal` não entrou**~~ — corrigido pelo [FIX #209](https://github.com/RodReis/rrb-jarvisOS/issues/209), abaixo.
+
+#### `[FIX]` EffectJournal — intenção antes do I/O, confirmação depois ([#209](https://github.com/RodReis/rrb-jarvisOS/issues/209))
+
+Status: **entregue**. Comportamento já definido em `docs/spec/spec-entrega-02-dag-fila-reconciliacao.md` § Diário de efeitos; correção, não fatia nova (CLAUDE.md § *Fatia exige spec. Correção de bug documentado, não*).
+
+- [x] **`src/shared/domain/effect-journal.ts`** — `EntradaDoDiario`, `EstadoDoEfeito` (`pendente`/`confirmed`/`ambiguous`/`failed`), `ResultadoDoRegistro`
+- [x] **Migration 25** — `effect_journal`, com `UNIQUE(user_id, chave_idempotente)`
+- [x] **`EffectJournalRepository`** — `registrarIntencao` (três desfechos: `registrada`/`repetida`/`conflito`), `concluir`, `listarPendentes`
+- [x] **`ConnectorService.call()`** — registra a intenção no mesmo instante do `audit.append('requisicao')` (depois de circuito/créditos/credencial, antes do I/O real); conflito de fingerprint recusa como `validacao-invalida` antes de chamar o adapter; conclui o diário no mesmo instante do `audit.append('conclusao')`
+- [x] **`ReconciliacaoService`** — `reconcileAll` lê `effectJournal.listarPendentes` como a fonte da intenção (spec: "a fonte da intenção é o `EffectJournal`"); toda entrada pendente sobrevivendo a um reinício vira achado `bloqueado` — decidir se o efeito já aconteceu exige consultar a origem por conector, fora do escopo desta fatia
+- [x] **Testes**: 12 de integração no repositório (SQLite real), 7 no fluxo do `ConnectorService`, 3 na reconciliação
+
+**Toda chamada entra no diário, não só mutação** (decisão do PI, 2026-09-02, revisitando a leitura inicial da spec). Leitura usa o `correlationId` como chave quando não há `idempotencyKey` — nunca colide, porque cada chamada tem correlação nova. Isso expôs um teste existente (`erros equivalentes de adapters diferentes`) que reusava o mesmo `correlationId` default para duas chamadas de fato distintas; o teste foi corrigido para dar correlação própria a cada uma — o comportamento do diário estava certo, o fixture é que emprestava uma coincidência que não deveria existir.
+
+**A garantia de conflito é o `UNIQUE`, não um `if` do serviço** — mesma lição do `LeaseRepository` da F02: uma checagem em memória tem janela de corrida, o índice não.
+
+**`ambiguous` é `indisponivel`/`timeout` numa mutação**, e só nesse caso — é quando a chamada pode ter saído sem confirmar. Qualquer outro erro é `failed`: ou nunca saiu (recusado antes do I/O), ou saiu e o serviço recusou de forma definitiva. `ConnectorErrorCode` não tem um código "ambíguo" próprio; o diário deriva o estado do par (`effect`, `code`), não de um campo novo no contrato — evita reabrir `SPEC-Conectores-01` para uma decisão que cabe inteira do lado de quem consome o desfecho.
+
+**A reconciliação não tenta adivinhar se o efeito aconteceu.** Verificar isso exige perguntar à origem (GitHub, Tavily), e essa pergunta é específica de cada conector — a spec crava que o diário "nasce aqui" e o núcleo de conectores o adota "quando houver fatia que o implemente lá". Bloquear é o mesmo fail-closed de `reconciliarRun`: a pendência vira decisão explícita para quem sabe verificar.
+
+**`effectJournal` é opcional nas deps de `ReconciliacaoService`**, como `verificadores`: testes que não tocam conector (a máquina de estados pura da fila) não precisam de um dublê à toa. Toda instalação real do app passa a mesma instância usada pelo `ConnectorService`.
+
+**Limites:** o diário registra **intenção**, não faz cache de resposta — uma repetição (mesma chave, mesmo fingerprint) não bloqueia nova tentativa de I/O; quem impede o efeito duplicado do lado do serviço externo é a própria `idempotencyKey`, do jeito que GitHub e Tavily já a tratam. **A reconciliação de entrada pendente não consulta a origem** nesta fatia — fica pendência bloqueada, e resolvê-la de fato (consultar GitHub/Tavily e completar ou repetir) é trabalho futuro do núcleo de conectores.
 
 ### Fatia 03 — Worktree, preflight e Docker (`docs/spec/spec-entrega-03-worktree-preflight-docker.md`)
 
