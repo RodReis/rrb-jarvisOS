@@ -83,6 +83,13 @@ export interface PedidoDeEntrega {
   readonly issue: number
   readonly titulo: string
   readonly promptInicial: string
+  /**
+   * O manifesto que autorizou a construção.
+   *
+   * Sem ele o gate de ContextPack (`call-provider.ts`) recusa **toda** chamada do executor — é o
+   * que mantinha a rota inoperante enquanto o boot passava `contextPackId: () => undefined`.
+   */
+  readonly contextPackId?: string
   readonly comandosDeValidacao: ComandosDeValidacao
   /** Documentos do projeto-alvo que entram no mesmo PR, antes do merge (critério 13). */
   readonly docsDoProjeto?: readonly string[]
@@ -155,7 +162,11 @@ export class EntregaService {
   }
 
   async entregar(pedido: PedidoDeEntrega): Promise<ResultadoDaEntrega> {
-    this.runCorrente = { runId: pedido.runId, tentativa: 1 }
+    this.runCorrente = {
+      runId: pedido.runId,
+      tentativa: 1,
+      ...(pedido.contextPackId === undefined ? {} : { contextPackId: pedido.contextPackId })
+    }
 
     try {
       return await this.executar(pedido)
@@ -188,7 +199,8 @@ export class EntregaService {
 
     this.runCorrente = {
       runId: pedido.runId,
-      tentativa: construcao.tentativas.length === 0 ? 1 : construcao.tentativas.length
+      tentativa: construcao.tentativas.length === 0 ? 1 : construcao.tentativas.length,
+      ...(pedido.contextPackId === undefined ? {} : { contextPackId: pedido.contextPackId })
     }
 
     // (3) Revisão do delta. P0/P1 abertos bloqueiam o merge mesmo com o kill-switch ligado.

@@ -502,4 +502,86 @@ describe('EntregaService — correlação do run (pendência da M9-F04)', () => 
     expect(durante).toMatchObject({ runId: 'run-1' })
     expect(service.contextoDoRun()).toBeUndefined()
   })
+
+  it('propaga o contextPackId do pedido — sem ele o gate recusa toda chamada do executor', async () => {
+    // O gate de ContextPack em `call-provider.ts` recusa geração sem manifesto. Enquanto o boot
+    // passava `contextPackId: () => undefined`, **toda** chamada do executor voltava "Esta geração
+    // precisa de um contexto montado", e a rota não operava em produção.
+    let durante: unknown
+    const service = new EntregaService({
+      construtor: {
+        construir: vi.fn(async () => {
+          durante = service.contextoDoRun()
+          return construcao
+        })
+      } as never,
+      connectors: connectorFalso() as never,
+      git: {
+        run: vi.fn(() => ({ ok: true })),
+        push: vi.fn(() => ({ ok: true })),
+        pushComToken: vi.fn(() => ({ ok: true }))
+      } as never,
+      fila: { concluir: vi.fn(() => ({ reason: 'transicionado' })) } as never,
+      mergePolicy: { autonomoLigado: vi.fn(() => true) } as never,
+      ruleset,
+      audit: { append: vi.fn() } as never,
+      userId: () => USER,
+      revisar: async () => [],
+      token: async () => undefined,
+      dormir: async (ms: number) => {
+        relogio += ms
+      },
+      agora: () => relogio
+    })
+
+    await service.entregar({ ...pedido(), contextPackId: 'pack-9' })
+
+    expect(durante).toMatchObject({ runId: 'run-1', contextPackId: 'pack-9' })
+  })
+
+  it('a tentativa corrente acompanha a recuperação, não fica presa em 1', async () => {
+    // O `CostEvent` de uma segunda tentativa precisa dizer que é a segunda: preso em 1, o custo da
+    // recuperação apareceria como se fosse do primeiro esforço, e a pergunta "quanto custou
+    // recuperar" deixaria de ter resposta.
+    construcao = {
+      estadoFinal: 'PR_CI',
+      tentativas: [
+        { numero: 1, runId: 'run-1' },
+        { numero: 2, runId: 'run-1' }
+      ]
+    }
+
+    // Lido **depois** da construção e antes do fim da entrega: é a janela em que o revisor roda,
+    // e o custo dele pertence à tentativa que produziu o código revisado.
+    let duranteARevisao: unknown
+    const service = new EntregaService({
+      construtor: { construir: vi.fn(async () => construcao) } as never,
+      connectors: connectorFalso() as never,
+      git: {
+        run: vi.fn(() => ({ ok: true })),
+        push: vi.fn(() => ({ ok: true })),
+        pushComToken: vi.fn(() => ({ ok: true }))
+      } as never,
+      fila: { concluir: vi.fn(() => ({ reason: 'transicionado' })) } as never,
+      mergePolicy: { autonomoLigado: vi.fn(() => true) } as never,
+      ruleset,
+      audit: { append: vi.fn() } as never,
+      userId: () => USER,
+      revisar: async () => {
+        duranteARevisao = service.contextoDoRun()
+        return []
+      },
+      token: async () => undefined,
+      dormir: async (ms: number) => {
+        relogio += ms
+      },
+      agora: () => relogio
+    })
+
+    await service.entregar(pedido())
+
+    expect(duranteARevisao).toMatchObject({ runId: 'run-1', tentativa: 2 })
+    // Fora da entrega o contexto é limpo: o proxy não deve atribuir custo a um run que acabou.
+    expect(service.contextoDoRun()).toBeUndefined()
+  })
 })
