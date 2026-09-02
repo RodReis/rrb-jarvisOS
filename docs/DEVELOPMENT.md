@@ -1579,7 +1579,7 @@ Status: **construída, ainda sem PR aberto** — spec `aprovada-pi` (2026-08-29,
 
 **`listaDePathsValida` recusa path com glob (`src/**`, `src/*`).** `caminhoDentroDoEscopo` compara por segmento exato, e um escopo escrito com glob — notação natural para um humano escrever numa SPEC — nunca casava segmento nenhum: todo arquivo virava fuga e o run bloqueava inteiro, sem mensagem que explicasse por quê. Decisão: **recusar com diagnóstico** (fail-closed explicado) em vez de normalizar silenciosamente — o preflight passa a recusar pela mesma razão `sem-paths-permitidos`, com mensagem que nomeia o formato esperado.
 
-**O fail-open de `verificarEscopo` (`if (!status.ok) return { ok: true }`) permanece, e o comentário deixou de soar como conclusão fechada.** É postura deliberada pendente de decisão do PI — o fail-closed equivalente bloquearia com causa `externo` — e não foi mudada unilateralmente nesta wave.
+**O fail-open de `verificarEscopo` ficou pendente nesta fatia e foi resolvido na M9-F05.** A postura era deliberada — não mudar unilateralmente o que o PI ainda não decidira —, e o PI decidiu em 2026-09-02 pelo **fail-closed com causa `externo`** (ver `docs/STATUS.md` § Decisões do PI na M9-F05). O `git status` ilegível passa a bloquear: a `ARCHITECTURE.md` § Segurança já decidia o princípio, e fail-open deixava um container degradado publicar sem ninguém ter verificado o escopo.
 
 ## Registro de entregas
 

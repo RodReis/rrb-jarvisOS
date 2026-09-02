@@ -6,7 +6,7 @@ Atualizado em: **2026-09-02**. Fonte única do índice Fatia ↔ SPEC. Estado re
 
 | Coluna | Item | Estado |
 |---|---|---|
-| Próximo | [#105](https://github.com/RodReis/rrb-jarvisOS/issues/105) · M9-F05 Revisão, CI e squash merge automático | `proplan:next` — promovida pelo PI em 2026-09-02; SPEC `spec-entrega-05-revisao-ci-merge.md` é `aprovada-pi` (2026-08-29, emendada em 2026-08-30). Herda a dependência declarada na M9-F04: ligar o `ConstrutorService` ao boot e preencher `contexto`/`contextPackId` do `ExecutorProxy` |
+| Em Andamento | [#105](https://github.com/RodReis/rrb-jarvisOS/issues/105) · M9-F05 Revisão, CI e squash merge automático | `proplan:doing` — promovida pelo PI em 2026-09-02; SPEC `spec-entrega-05-revisao-ci-merge.md` é `aprovada-pi` (2026-08-29, emendada em 2026-08-30). Herda a dependência declarada na M9-F04: ligar o `ConstrutorService` ao boot e preencher `contexto`/`contextPackId` do `ExecutorProxy`. **Três decisões do PI em 2026-09-02** (ver § Decisões do PI na M9-F05) |
 | Finalizado | [#104](https://github.com/RodReis/rrb-jarvisOS/issues/104) · M9-F04 Construção/recuperação | **aceite do PI registrado em 2026-09-02**; entregue no PR #231 (`9005423`), CI verde. **Limites declarados:** correlação `runId`/`tentativa` do proxy fica para a M9-F05 (rota do executor não operacional em produção até lá); smoke real em `not_run` porque a imagem do sandbox não traz o binário `claude`; cancelamento cooperativo com latência até o timeout do passo. **Pendência do PI:** fail-open do `verificarEscopo` quando o `git status` do container falha |
 | Feito | [#209](https://github.com/RodReis/rrb-jarvisOS/issues/209) · correção do EffectJournal | entregue no PR #227 (`66623b8`); `proplan:done`, aguardando aceite do PI |
 | Backlog | [#232](https://github.com/RodReis/rrb-jarvisOS/issues/232) · `[INFRA][FIX]` worker morto no pool do Vitest | criado em 2026-09-02 na entrega da M9-F04: execução perde arquivo inteiro e ainda relata verde, o que é fechamento frágil produzido pela infra (`docs/TESTING.md` §1). Não entra na fila por si — o PI decide quando |
@@ -135,6 +135,16 @@ Não existe catálogo global `SPEC-nnn`. O slug identifica a SPEC; os números a
 | M24-F02 | MVP-024 | Prioridade e controles canônicos ([#219](https://github.com/RodReis/rrb-jarvisOS/issues/219)) | `spec-portfolio-02-prioridade-controles.md` — aprovada-pi |
 | M24-F03 | MVP-024 | Custos, quotas e capacidade do portfólio ([#220](https://github.com/RodReis/rrb-jarvisOS/issues/220)) | `spec-portfolio-03-custos-quotas.md` — aprovada-pi |
 | M24-F04 | MVP-024 | Console de portfólio e prova integrada ([#221](https://github.com/RodReis/rrb-jarvisOS/issues/221)) | `spec-portfolio-04-console-resiliencia-e2e.md` — aprovada-pi; gate visual antes da construção |
+
+## Decisões do PI na M9-F05 (2026-09-02)
+
+Três pontos abertos foram levantados durante a construção e **decididos pelo PI**, que delegou a escolha ao Code pedindo "o melhor para o desenvolvimento autônomo com agents". Registradas aqui porque mudam comportamento e não podem virar escolha silenciosa de implementação.
+
+1. **`verificarEscopo` passa a falhar fechado, com causa `externo`.** O fail-open (`if (!status.ok) return { ok: true }`) ficou pendente na M9-F04 e colide com o critério 1 desta fatia — com o `git status` do container falhando, o escopo não é verificado e o push sai. **Não é escopo novo:** a `ARCHITECTURE.md` § Segurança já decide *"fail closed: ação não reconhecida pela política é bloqueada, não permitida"*, e um `git status` que não responde é exatamente isso. A causa é `externo`, não `risco-usuario`: a distinção governa a retomada — `risco-usuario` diz que o agente escreveu fora do escopo, `externo` diz que a ferramenta falhou, e rotular errado mandaria procurar um arquivo indevido que não existe. Em desenvolvimento autônomo, fail-open significa um container degradado publicando sem ninguém ter verificado o escopo.
+
+2. **Teto de espera do CI: configurável por projeto, padrão 30 minutos, terminando em `AWAITING_MERGE`.** A SPEC não fixa quanto o gate aguarda checks pendentes. Estourar o teto não é falha do código — é CI mais lenta que o esperado —, e `BLOCKED` ensinaria a ler bloqueio como ruído, pela mesma razão que a M9-F02 recusou `BLOCKED` para o kill-switch desligado. O PR fica verde ou pendente e o run termina explicável, o que mantém a fila girando: com WIP=1 global, um run preso esperando CI eterna trava todos os outros.
+
+3. **O check obrigatório é `validacao`, e a pipeline o exige na proteção no mesmo run em que gera o workflow.** Correção ao plano original, que previa terminar em bloqueio quando a proteção não exigisse o nome gerado: a M9-F01 já escreve a proteção via `branch.ensure-protection`, que aceita `checksExigidos`. Então a pipeline não inventa nome nem depende de alguém ter configurado à mão — ela declara `validacao` como obrigatório junto com o workflow, fechando os critérios 9 e 10 sem intervenção humana, que é o requisito do desenvolvimento autônomo. Contexts que o projeto já exija **somam**, não são substituídos, e o gate espera por todos.
 
 ## Próximas ações
 

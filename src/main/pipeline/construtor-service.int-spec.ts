@@ -571,6 +571,57 @@ describe('ConstrutorService — alteração fora do escopo bloqueia (critério 4
 
     expect(resultado.estadoFinal).toBe('PR_CI')
   })
+
+  it('git status ilegível bloqueia com causa externo — falha fechado (decisão do PI, 2026-09-02)', async () => {
+    // O fail-open anterior (`if (!status.ok) return { ok: true }`) deixava um container degradado
+    // publicar sem ninguém ter verificado o escopo, o que colide com o critério 1 da M9-F05.
+    // A `ARCHITECTURE.md` § Segurança já decidia o princípio: ação não reconhecida pela política é
+    // bloqueada, não permitida — e um `git status` que não responde é exatamente isso.
+    //
+    // A causa é `externo`, não `risco-usuario`: a distinção governa a retomada. `risco-usuario`
+    // afirmaria que o agente escreveu fora do escopo, mandando procurar um arquivo indevido que
+    // não existe; `externo` diz o que houve — a ferramenta falhou.
+    const docker = {
+      exec: vi.fn((_container: string, comando: readonly string[]) => {
+        if (comando[0] === 'git' && comando.includes('status')) {
+          return {
+            ok: false,
+            stdout: '',
+            stderr: 'fatal: not a git repository',
+            exitCode: 128,
+            timeoutExcedido: false
+          }
+        }
+        return { ok: true, stdout: 'ok', stderr: '', exitCode: 0, timeoutExcedido: false }
+      }),
+      matarProcesso: vi.fn()
+    } as unknown as DockerRunner
+    const sandboxComEscopo: SandboxPreparado = {
+      ...sandbox,
+      pathsPermitidos: { paths: ['src'], origem: 'spec', justificativa: 'teste' }
+    }
+    const service = new ConstrutorService(
+      docker,
+      repoDuble(),
+      auditDuble(),
+      () => 'u1',
+      () => 'ws1' as never
+    )
+
+    const resultado = await service.construir({
+      runId: 'run-1',
+      sandbox: sandboxComEscopo,
+      promptInicial: 'x',
+      comandosDeValidacao
+    })
+
+    expect(resultado.estadoFinal).toBe('BLOCKED')
+    expect(resultado.bloqueio?.causa).toBe('externo')
+    // A evidência precisa dizer que o escopo não foi **verificado**, não que houve fuga: são
+    // diagnósticos diferentes e levam a ações diferentes.
+    expect(resultado.bloqueio?.evidencia).toMatch(/não foi possível verificar o escopo/i)
+    expect(resultado.bloqueio?.evidencia).toContain('not a git repository')
+  })
 })
 
 describe('ConstrutorService — verificação de escopo contra Git real (critical #1)', () => {
