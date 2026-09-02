@@ -6,7 +6,7 @@ Atualizado em: **2026-09-02**. Fonte única do índice Fatia ↔ SPEC. Estado re
 
 | Coluna | Item | Estado |
 |---|---|---|
-| Feito | [#104](https://github.com/RodReis/rrb-jarvisOS/issues/104) · M9-F04 Construção/recuperação | entregue no PR #231 (`9005423`), CI verde; `proplan:done`, aguardando aceite do PI. **Limites declarados:** correlação `runId`/`tentativa` do proxy fica para a M9-F05 (rota do executor não operacional em produção até lá); smoke real em `not_run` porque a imagem do sandbox não traz o binário `claude`; cancelamento cooperativo com latência até o timeout do passo. **Pendência do PI:** fail-open do `verificarEscopo` quando o `git status` do container falha |
+| Finalizado | [#104](https://github.com/RodReis/rrb-jarvisOS/issues/104) · M9-F04 Construção/recuperação | **aceite do PI registrado em 2026-09-02**; entregue no PR #231 (`9005423`), CI verde. **Limites declarados:** correlação `runId`/`tentativa` do proxy fica para a M9-F05 (rota do executor não operacional em produção até lá); smoke real em `not_run` porque a imagem do sandbox não traz o binário `claude`; cancelamento cooperativo com latência até o timeout do passo. **Pendência do PI:** fail-open do `verificarEscopo` quando o `git status` do container falha |
 | Feito | [#209](https://github.com/RodReis/rrb-jarvisOS/issues/209) · correção do EffectJournal | entregue no PR #227 (`66623b8`); `proplan:done`, aguardando aceite do PI |
 | Backlog | [#232](https://github.com/RodReis/rrb-jarvisOS/issues/232) · `[INFRA][FIX]` worker morto no pool do Vitest | criado em 2026-09-02 na entrega da M9-F04: execução perde arquivo inteiro e ainda relata verde, o que é fechamento frágil produzido pela infra (`docs/TESTING.md` §1). Não entra na fila por si — o PI decide quando |
 | Finalizado | [#222](https://github.com/RodReis/rrb-jarvisOS/issues/222) · restrição de egress do container | aceite do PI registrado; entregue no PR #228 |
@@ -29,7 +29,7 @@ Atualizado em: **2026-09-02**. Fonte única do índice Fatia ↔ SPEC. Estado re
 | MVP-006 Conectores Essenciais | [#86](https://github.com/RodReis/rrb-jarvisOS/issues/86) | fechado/aceito pelo PI em 2026-08-31 | 6/6 |
 | MVP-007 Memória compartilhada | [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179) | F01–F06 aprovadas/Backlog; F07–F08 Planejadas, fora do fechamento V3 | 0/8 |
 | MVP-008 Planejamento Governado | [#93](https://github.com/RodReis/rrb-jarvisOS/issues/93) | fechado/aceito pelo PI em 2026-08-31 | 6/6 |
-| MVP-009 Entrega Autônoma | [#100](https://github.com/RodReis/rrb-jarvisOS/issues/100) | seis SPECs `aprovada-pi` (2026-08-29), **emendadas pelo PI em 2026-08-30 e 2026-08-31**; F01–F03 entregues | 3/6 |
+| MVP-009 Entrega Autônoma | [#100](https://github.com/RodReis/rrb-jarvisOS/issues/100) | seis SPECs `aprovada-pi` (2026-08-29), **emendadas pelo PI em 2026-08-30 e 2026-08-31**; F01–F04 entregues e aceitas. Restam F05 (revisão/CI/merge) e F06 (evidência/limpeza) | 4/6 |
 | MVP-010 Multi-executor Claude + Codex | [#115](https://github.com/RodReis/rrb-jarvisOS/issues/115) | fatias [#116–#120](https://github.com/RodReis/rrb-jarvisOS/issues/116) no Backlog | 0/5 |
 | MVP-011 Squads limitados | [#121](https://github.com/RodReis/rrb-jarvisOS/issues/121) | fatias [#122–#126](https://github.com/RodReis/rrb-jarvisOS/issues/122) no Backlog | 0/5 |
 | MVP-012 Scheduler concorrente | [#127](https://github.com/RodReis/rrb-jarvisOS/issues/127) | fatias [#128–#132](https://github.com/RodReis/rrb-jarvisOS/issues/128) no Backlog | 0/5 |
@@ -137,7 +137,7 @@ Não existe catálogo global `SPEC-nnn`. O slug identifica a SPEC; os números a
 
 ## Próximas ações
 
-1. **#104 (M9-F04) entregue pelo PR #231 e aguardando aceite do PI.** Nenhum `proplan:next` está marcado — a fila explícita do MVP-009 esgotou: F01–F04 entregues, restam F05 (revisão/CI/merge) e F06 (evidência/limpeza), cujas SPECs já são `aprovada-pi`. Promover a próxima é decisão do PI. **A M9-F05 herda uma dependência concreta:** é ela quem liga o `ConstrutorService` ao boot e preenche `contexto`/`contextPackId` do `ExecutorProxy` — até lá a rota do executor não opera em produção (ver `docs/STATUS-ARQUIVO.md` item 14, emendado, e `docs/DEVELOPMENT.md` § Fatia 04).
+1. **#104 (M9-F04) entregue pelo PR #231 e aceita pelo PI em 2026-09-02** — MVP-009 em 4/6. Nenhum `proplan:next` está marcado: restam F05 (revisão/CI/merge) e F06 (evidência/limpeza), cujas SPECs já são `aprovada-pi`. Promover a próxima é decisão do PI. **A M9-F05 herda uma dependência concreta:** é ela quem liga o `ConstrutorService` ao boot e preenche `contexto`/`contextPackId` do `ExecutorProxy` — até lá a rota do executor não opera em produção (ver `docs/STATUS-ARQUIVO.md` item 14, emendado, e `docs/DEVELOPMENT.md` § Fatia 04).
 2. Conservar #167/#168 e #214–#221 em Backlog após o aceite exato de 2026-08-31, sem promover qualquer uma a `next` por esta atualização. #232 (`[INFRA][FIX]` do pool de testes) também nasce em Backlog, sem entrar na fila por conta própria.
 3. Antes das fatias visuais, anexar `DESIGN-SYSTEM.md` e HTML pelo fluxo já aprovado; texto de SPEC/template não substitui anexo do PI.
 4. M7-F05/F06 estão aprovadas/Backlog e M7-F07–F08 continuam a redigir; as fatias do Command Center seguem seus planejamentos próprios. Nenhuma delas bloqueia concluir a documentação V3.
