@@ -1123,6 +1123,34 @@ const MIGRATIONS: readonly string[] = [
     atualizado_em TEXT NOT NULL,
     PRIMARY KEY (user_id, workspace_id, provider)
   );
+  `,
+
+  // 27 — M9-F05: snapshot do conjunto obrigatório observado na origem (SPEC-Entrega-05, crit. 11).
+  //
+  // **Append-only**, ao contrário de `project_merge_policy`: cada observação é uma linha nova.
+  // Sobrescrever daria o estado corrente e apagaria a prova de que a regra mudou no meio do run —
+  // e é essa prova que a reconciliação do critério 11 existe para produzir. Por isso não há chave
+  // primária composta que force upsert: a identidade da linha é a observação, não o run.
+  //
+  // `contexts` é JSON num TEXT porque a lista é lida e escrita inteira, nunca consultada por
+  // elemento; uma tabela filha só para isso daria join sem pergunta que o justifique.
+  `
+  CREATE TABLE ruleset_snapshot (
+    id                  TEXT PRIMARY KEY,
+    user_id             TEXT NOT NULL,
+    workspace_id        TEXT NOT NULL,
+    project_id          TEXT NOT NULL,
+    run_id              TEXT NOT NULL,
+    branch              TEXT NOT NULL,
+    -- JSON: array de strings com os contexts exigidos.
+    contexts            TEXT NOT NULL,
+    strict              INTEGER NOT NULL,
+    protegida           INTEGER NOT NULL,
+    merge_queue_exigida INTEGER NOT NULL,
+    ref                 TEXT NOT NULL,
+    observado_em        TEXT NOT NULL
+  );
+  CREATE INDEX idx_ruleset_snapshot_run ON ruleset_snapshot(user_id, run_id, observado_em);
   `
 ]
 
