@@ -203,3 +203,25 @@ describe('ConstrutorService — comando do executor é sempre dentro do containe
     expect(chamadas[0]?.[0]).toBe('claude')
   })
 })
+
+describe('ConstrutorService — sem container não há execução (critério 8)', () => {
+  it('todo comando de claude e validação passa pelo DockerRunner.exec com o nome do container do sandbox — nunca um caminho de execução direta no host', async () => {
+    const containersUsados = new Set<string>()
+    const docker = {
+      exec: vi.fn((container: string) => {
+        containersUsados.add(container)
+        return { ok: true, stdout: 'ok', stderr: '', exitCode: 0, timeoutExcedido: false }
+      }),
+      matarProcesso: vi.fn()
+    } as unknown as DockerRunner
+    const service = new ConstrutorService(docker, repoDuble(), auditDuble(), () => 'u1', () => 'ws1' as never)
+
+    await service.construir({ runId: 'run-1', sandbox, promptInicial: 'x', comandosDeValidacao })
+
+    // Cinco chamadas (claude + 4 validadores), todas no mesmo container — nunca vazio, nunca
+    // um segundo caminho que ignore o sandbox.
+    expect(docker.exec).toHaveBeenCalledTimes(5)
+    expect(containersUsados.size).toBe(1)
+    expect(containersUsados.has(sandbox.containerNome)).toBe(true)
+  })
+})
