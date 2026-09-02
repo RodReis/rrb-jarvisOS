@@ -12,6 +12,7 @@ import { OllamaAdapter } from './ai/ollama-adapter'
 import { ClaudeCodeAdapter } from './ai/claude-code-adapter'
 import { RoutingService, SondaDeAdapters } from './ai/routing-service'
 import { RoutingRepository } from './ai/routing-repository'
+import { QuotaRepository } from './ai/quota-repository'
 import { BudgetService } from './budget/budget-service'
 import { BudgetRepository } from './budget/budget-repository'
 import { AllowlistRepository } from './policy/allowlist-repository'
@@ -295,6 +296,11 @@ if (!app.requestSingleInstanceLock()) {
       storage.audit
     )
 
+    // Estado de quota das rotas subscription_limited (SPEC-Entrega-04, critério 12). Construído
+    // aqui pela mesma razão do `budget`: é dependência do ponto único, não consulta opcional —
+    // sem ele o gate de quota do `claude-code` fica sempre "desconhecido" em produção.
+    const quota = new QuotaRepository(storage.db)
+
     const ai = new AiCallService(
       adapters,
       credentials,
@@ -302,7 +308,8 @@ if (!app.requestSingleInstanceLock()) {
       storage.audit,
       budget,
       routing,
-      contexts
+      contexts,
+      quota
     )
 
     // Ponto único de conectores (SPEC-Conectores-01). **Runtime separado** do ponto único de

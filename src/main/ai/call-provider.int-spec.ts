@@ -936,7 +936,9 @@ describe('AiCallService — gate de quota subscription_limited (SPEC-Entrega-04,
       )
     )
 
-    expect(eventos.at(-1)?.tipo === 'fim' ? (eventos.at(-1) as { estado: string }).estado : undefined).toBe('concluido')
+    expect(
+      eventos.at(-1)?.tipo === 'fim' ? (eventos.at(-1) as { estado: string }).estado : undefined
+    ).toBe('concluido')
   })
 })
 
@@ -949,7 +951,13 @@ describe('AiCallService — rota claude-code registra uso sem valor monetário, 
 
     await coletar(
       service.call(
-        { provider: 'claude-code', prompt: 'oi', contextPackId: PACK, runId: 'run-9', tentativa: 2 },
+        {
+          provider: 'claude-code',
+          prompt: 'oi',
+          contextPackId: PACK,
+          runId: 'run-9',
+          tentativa: 2
+        },
         { userId: USUARIO, workspace: 'jarvis' }
       )
     )

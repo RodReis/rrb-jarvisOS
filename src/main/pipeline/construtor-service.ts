@@ -18,7 +18,12 @@
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { BloqueioExterno } from '@shared/domain/pacote-estrutural'
 import { fugasDoEscopo, type SandboxPreparado } from '@shared/domain/preflight'
-import { classificarFalha, proximaTentativaPermitida, type ClassificacaoDeFalha, type Tentativa } from '@shared/domain/attempt'
+import {
+  classificarFalha,
+  proximaTentativaPermitida,
+  type ClassificacaoDeFalha,
+  type Tentativa
+} from '@shared/domain/attempt'
 import type { AuditRepository } from '../storage/audit-repository'
 import { log } from '../logging/logger'
 import type { DockerRunner, ExecucaoNoContainer } from './docker-runner'
@@ -45,7 +50,11 @@ export interface PedidoDeConstrucao {
 export interface ResultadoDaConstrucao {
   readonly estadoFinal: 'PR_CI' | 'BLOCKED'
   readonly tentativas: readonly Tentativa[]
-  readonly bloqueio?: { readonly causa: ClassificacaoDeFalha; readonly evidencia: string; readonly retomada: string }
+  readonly bloqueio?: {
+    readonly causa: ClassificacaoDeFalha
+    readonly evidencia: string
+    readonly retomada: string
+  }
 }
 
 export class ConstrutorService {
@@ -66,7 +75,13 @@ export class ConstrutorService {
     for (;;) {
       if (pedido.signal?.aborted === true) {
         this.docker.matarProcesso(pedido.sandbox.containerNome, pedido.sandbox.worktreeNoHost)
-        return this.bloquear(pedido.runId, 'RUNNING', tentativas, 'externo', 'Cancelado pelo usuário.')
+        return this.bloquear(
+          pedido.runId,
+          'RUNNING',
+          tentativas,
+          'externo',
+          'Cancelado pelo usuário.'
+        )
       }
 
       // (1) Invoca o `claude` dentro do container — o único ponto por onde o prompt entra.
@@ -78,7 +93,12 @@ export class ConstrutorService {
 
       if (!execucaoClaude.ok) {
         const causa = classificarFalha(execucaoClaude)
-        tentativas.push({ numero, runId: pedido.runId, classificacao: causa, diagnostico: execucaoClaude.stderr })
+        tentativas.push({
+          numero,
+          runId: pedido.runId,
+          classificacao: causa,
+          diagnostico: execucaoClaude.stderr
+        })
         // Ainda em RUNNING aqui: a transição para VALIDATING (abaixo) não aconteceu.
         return this.bloquear(pedido.runId, 'RUNNING', tentativas, causa, execucaoClaude.stderr)
       }
@@ -90,8 +110,19 @@ export class ConstrutorService {
       if (validacao.ok) {
         const escopo = this.verificarEscopo(pedido.sandbox)
         if (!escopo.ok) {
-          tentativas.push({ numero, runId: pedido.runId, classificacao: 'risco-usuario', diagnostico: escopo.evidencia })
-          return this.bloquear(pedido.runId, 'VALIDATING', tentativas, 'risco-usuario', escopo.evidencia)
+          tentativas.push({
+            numero,
+            runId: pedido.runId,
+            classificacao: 'risco-usuario',
+            diagnostico: escopo.evidencia
+          })
+          return this.bloquear(
+            pedido.runId,
+            'VALIDATING',
+            tentativas,
+            'risco-usuario',
+            escopo.evidencia
+          )
         }
 
         tentativas.push({ numero, runId: pedido.runId })
@@ -100,11 +131,22 @@ export class ConstrutorService {
       }
 
       if (validacao.cancelado) {
-        return this.bloquear(pedido.runId, 'VALIDATING', tentativas, 'externo', 'Cancelado pelo usuário.')
+        return this.bloquear(
+          pedido.runId,
+          'VALIDATING',
+          tentativas,
+          'externo',
+          'Cancelado pelo usuário.'
+        )
       }
 
       const causa = classificarFalha(validacao.falha)
-      tentativas.push({ numero, runId: pedido.runId, classificacao: causa, diagnostico: validacao.falha.stderr })
+      tentativas.push({
+        numero,
+        runId: pedido.runId,
+        classificacao: causa,
+        diagnostico: validacao.falha.stderr
+      })
 
       // Falha externa não gasta ciclo de correção: recuperar com o mesmo código não muda o
       // desfecho de um serviço fora do ar (spec § Classificação).
@@ -132,7 +174,12 @@ export class ConstrutorService {
     | { readonly ok: true }
     | { readonly ok: false; readonly cancelado: true }
     | { readonly ok: false; readonly cancelado?: false; readonly falha: ExecucaoNoContainer } {
-    const passos: readonly (readonly string[])[] = [comandos.test, comandos.lint, comandos.typecheck, comandos.build]
+    const passos: readonly (readonly string[])[] = [
+      comandos.test,
+      comandos.lint,
+      comandos.typecheck,
+      comandos.build
+    ]
 
     for (const passo of passos) {
       if (signal?.aborted === true) {
@@ -179,7 +226,9 @@ export class ConstrutorService {
    * a raiz do repo, então mexer no `.gitignore` da raiz já cai fora do escopo e bloqueia por
    * essa via.
    */
-  private verificarEscopo(sandbox: SandboxPreparado): { readonly ok: true } | { readonly ok: false; readonly evidencia: string } {
+  private verificarEscopo(
+    sandbox: SandboxPreparado
+  ): { readonly ok: true } | { readonly ok: false; readonly evidencia: string } {
     const status = this.docker.exec(
       sandbox.containerNome,
       ['git', 'status', '--porcelain', '--untracked-files=all'],
@@ -193,7 +242,10 @@ export class ConstrutorService {
     const foraDoEscopo = fugasDoEscopo(arquivos, sandbox.pathsPermitidos)
 
     if (foraDoEscopo.length > 0) {
-      return { ok: false, evidencia: `Alteração fora do escopo declarado: ${foraDoEscopo.join(', ')}` }
+      return {
+        ok: false,
+        evidencia: `Alteração fora do escopo declarado: ${foraDoEscopo.join(', ')}`
+      }
     }
     return { ok: true }
   }
@@ -273,7 +325,10 @@ function porQueNaoSeguirPara(causa: ClassificacaoDeFalha): string {
  */
 function promptDeRecuperacao(falha: ExecucaoNoContainer, historico: readonly Tentativa[]): string {
   const tentativasAnteriores = historico
-    .map((t) => `Tentativa ${t.numero}: ${t.classificacao ?? 'validação falhou'} — ${t.diagnostico ?? ''}`)
+    .map(
+      (t) =>
+        `Tentativa ${t.numero}: ${t.classificacao ?? 'validação falhou'} — ${t.diagnostico ?? ''}`
+    )
     .join('\n')
 
   return [
@@ -299,7 +354,10 @@ function promptDeRecuperacao(falha: ExecucaoNoContainer, historico: readonly Ten
  *   que o `core.quotepath` do Git usa.
  */
 function arquivosTocados(saidaPorcelain: string): readonly string[] {
-  const linhas = saidaPorcelain.split('\n').map((l) => l.replace(/\r$/, '')).filter((l) => l !== '')
+  const linhas = saidaPorcelain
+    .split('\n')
+    .map((l) => l.replace(/\r$/, ''))
+    .filter((l) => l !== '')
   const arquivos: string[] = []
 
   for (const linha of linhas) {

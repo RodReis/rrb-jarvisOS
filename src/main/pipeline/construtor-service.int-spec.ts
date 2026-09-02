@@ -21,7 +21,13 @@ const sandbox: SandboxPreparado = {
 }
 
 function dockerDuble(
-  roteiro: (comando: readonly string[]) => { ok: boolean; stdout: string; stderr: string; exitCode: number | null; timeoutExcedido: boolean }
+  roteiro: (comando: readonly string[]) => {
+    ok: boolean
+    stdout: string
+    stderr: string
+    exitCode: number | null
+    timeoutExcedido: boolean
+  }
 ): DockerRunner {
   return {
     exec: vi.fn((_container: string, comando: readonly string[]) => roteiro(comando)),
@@ -68,7 +74,13 @@ describe('ConstrutorService — tentativa única bem-sucedida', () => {
     })
     const pipeline = repoDuble()
     const audit = auditDuble()
-    const service = new ConstrutorService(docker, pipeline, audit, () => 'u1', () => 'ws1' as never)
+    const service = new ConstrutorService(
+      docker,
+      pipeline,
+      audit,
+      () => 'u1',
+      () => 'ws1' as never
+    )
 
     const resultado = await service.construir({
       runId: 'run-1',
@@ -80,8 +92,20 @@ describe('ConstrutorService — tentativa única bem-sucedida', () => {
     expect(resultado.estadoFinal).toBe('PR_CI')
     expect(resultado.tentativas).toHaveLength(1)
     expect(resultado.tentativas[0]?.numero).toBe(1)
-    expect(pipeline.transicionar).toHaveBeenCalledWith('run-1', 'RUNNING', 'VALIDATING', expect.any(Date), undefined)
-    expect(pipeline.transicionar).toHaveBeenCalledWith('run-1', 'VALIDATING', 'PR_CI', expect.any(Date), undefined)
+    expect(pipeline.transicionar).toHaveBeenCalledWith(
+      'run-1',
+      'RUNNING',
+      'VALIDATING',
+      expect.any(Date),
+      undefined
+    )
+    expect(pipeline.transicionar).toHaveBeenCalledWith(
+      'run-1',
+      'VALIDATING',
+      'PR_CI',
+      expect.any(Date),
+      undefined
+    )
   })
 })
 
@@ -89,7 +113,8 @@ describe('ConstrutorService — recuperação corrigível', () => {
   it('validação falha corrigível na 1ª tentativa, passa na 2ª: run termina em PR_CI com 2 tentativas', async () => {
     let chamadasDeValidacao = 0
     const docker = dockerDuble((comando) => {
-      if (comando[0] === 'claude') return { ok: true, stdout: '', stderr: '', exitCode: 0, timeoutExcedido: false }
+      if (comando[0] === 'claude')
+        return { ok: true, stdout: '', stderr: '', exitCode: 0, timeoutExcedido: false }
       if (comando[0] === 'git' && comando.includes('status')) {
         return { ok: true, stdout: '', stderr: '', exitCode: 0, timeoutExcedido: false }
       }
@@ -97,13 +122,25 @@ describe('ConstrutorService — recuperação corrigível', () => {
       if (comando.includes('test')) {
         chamadasDeValidacao += 1
         if (chamadasDeValidacao === 1) {
-          return { ok: false, stdout: 'FAIL src/foo.spec.ts', stderr: '', exitCode: 1, timeoutExcedido: false }
+          return {
+            ok: false,
+            stdout: 'FAIL src/foo.spec.ts',
+            stderr: '',
+            exitCode: 1,
+            timeoutExcedido: false
+          }
         }
       }
       return { ok: true, stdout: 'ok', stderr: '', exitCode: 0, timeoutExcedido: false }
     })
     const pipeline = repoDuble()
-    const service = new ConstrutorService(docker, pipeline, auditDuble(), () => 'u1', () => 'ws1' as never)
+    const service = new ConstrutorService(
+      docker,
+      pipeline,
+      auditDuble(),
+      () => 'u1',
+      () => 'ws1' as never
+    )
 
     const resultado = await service.construir({
       runId: 'run-1',
@@ -115,19 +152,33 @@ describe('ConstrutorService — recuperação corrigível', () => {
     expect(resultado.estadoFinal).toBe('PR_CI')
     expect(resultado.tentativas).toHaveLength(2)
     expect(resultado.tentativas[0]?.classificacao).toBe('corrigivel')
-    expect(pipeline.transicionar).toHaveBeenCalledWith('run-1', 'VALIDATING', 'RUNNING', expect.any(Date), undefined)
+    expect(pipeline.transicionar).toHaveBeenCalledWith(
+      'run-1',
+      'VALIDATING',
+      'RUNNING',
+      expect.any(Date),
+      undefined
+    )
   })
 })
 
 describe('ConstrutorService — três tentativas esgotadas', () => {
   it('validação falha corrigível nas três tentativas: run termina BLOCKED', async () => {
     const docker = dockerDuble((comando) => {
-      if (comando[0] === 'claude') return { ok: true, stdout: '', stderr: '', exitCode: 0, timeoutExcedido: false }
-      if (comando.includes('test')) return { ok: false, stdout: 'FAIL sempre', stderr: '', exitCode: 1, timeoutExcedido: false }
+      if (comando[0] === 'claude')
+        return { ok: true, stdout: '', stderr: '', exitCode: 0, timeoutExcedido: false }
+      if (comando.includes('test'))
+        return { ok: false, stdout: 'FAIL sempre', stderr: '', exitCode: 1, timeoutExcedido: false }
       return { ok: true, stdout: 'ok', stderr: '', exitCode: 0, timeoutExcedido: false }
     })
     const pipeline = repoDuble()
-    const service = new ConstrutorService(docker, pipeline, auditDuble(), () => 'u1', () => 'ws1' as never)
+    const service = new ConstrutorService(
+      docker,
+      pipeline,
+      auditDuble(),
+      () => 'u1',
+      () => 'ws1' as never
+    )
 
     const resultado = await service.construir({
       runId: 'run-1',
@@ -139,7 +190,13 @@ describe('ConstrutorService — três tentativas esgotadas', () => {
     expect(resultado.estadoFinal).toBe('BLOCKED')
     expect(resultado.tentativas).toHaveLength(3)
     expect(resultado.bloqueio?.causa).toBe('corrigivel')
-    expect(pipeline.transicionar).toHaveBeenCalledWith('run-1', 'VALIDATING', 'BLOCKED', expect.any(Date), expect.anything())
+    expect(pipeline.transicionar).toHaveBeenCalledWith(
+      'run-1',
+      'VALIDATING',
+      'BLOCKED',
+      expect.any(Date),
+      expect.anything()
+    )
   })
 })
 
@@ -147,12 +204,24 @@ describe('ConstrutorService — falha externa não gasta tentativa de correção
   it('erro de rede na chamada ao claude bloqueia sem tentar recuperação', async () => {
     const docker = dockerDuble((comando) => {
       if (comando[0] === 'claude') {
-        return { ok: false, stdout: '', stderr: 'ETIMEDOUT: connection timed out', exitCode: 1, timeoutExcedido: false }
+        return {
+          ok: false,
+          stdout: '',
+          stderr: 'ETIMEDOUT: connection timed out',
+          exitCode: 1,
+          timeoutExcedido: false
+        }
       }
       return { ok: true, stdout: 'ok', stderr: '', exitCode: 0, timeoutExcedido: false }
     })
     const pipeline = repoDuble()
-    const service = new ConstrutorService(docker, pipeline, auditDuble(), () => 'u1', () => 'ws1' as never)
+    const service = new ConstrutorService(
+      docker,
+      pipeline,
+      auditDuble(),
+      () => 'u1',
+      () => 'ws1' as never
+    )
 
     const resultado = await service.construir({
       runId: 'run-1',
@@ -171,12 +240,24 @@ describe('ConstrutorService — bloqueio por falha do claude sai de RUNNING, nã
   it('erro de rede na chamada ao claude transiciona RUNNING -> BLOCKED (nunca VALIDATING -> BLOCKED)', async () => {
     const docker = dockerDuble((comando) => {
       if (comando[0] === 'claude') {
-        return { ok: false, stdout: '', stderr: 'ETIMEDOUT: connection timed out', exitCode: 1, timeoutExcedido: false }
+        return {
+          ok: false,
+          stdout: '',
+          stderr: 'ETIMEDOUT: connection timed out',
+          exitCode: 1,
+          timeoutExcedido: false
+        }
       }
       return { ok: true, stdout: 'ok', stderr: '', exitCode: 0, timeoutExcedido: false }
     })
     const pipeline = repoDuble()
-    const service = new ConstrutorService(docker, pipeline, auditDuble(), () => 'u1', () => 'ws1' as never)
+    const service = new ConstrutorService(
+      docker,
+      pipeline,
+      auditDuble(),
+      () => 'u1',
+      () => 'ws1' as never
+    )
 
     const resultado = await service.construir({
       runId: 'run-1',
@@ -190,8 +271,20 @@ describe('ConstrutorService — bloqueio por falha do claude sai de RUNNING, nã
     // VALIDATING -> BLOCKED aqui (o bug do finding #1), a chamada seria recusada (`de` não bate
     // com o estado real do run, que nunca saiu de RUNNING) e o resultado devolvido seria
     // inconsistente com o banco — exatamente o que este teste existe para pegar.
-    expect(pipeline.transicionar).toHaveBeenCalledWith('run-1', 'RUNNING', 'BLOCKED', expect.any(Date), expect.anything())
-    expect(pipeline.transicionar).not.toHaveBeenCalledWith('run-1', 'VALIDATING', 'BLOCKED', expect.any(Date), expect.anything())
+    expect(pipeline.transicionar).toHaveBeenCalledWith(
+      'run-1',
+      'RUNNING',
+      'BLOCKED',
+      expect.any(Date),
+      expect.anything()
+    )
+    expect(pipeline.transicionar).not.toHaveBeenCalledWith(
+      'run-1',
+      'VALIDATING',
+      'BLOCKED',
+      expect.any(Date),
+      expect.anything()
+    )
   })
 })
 
@@ -206,7 +299,13 @@ describe('ConstrutorService — comando do executor é sempre dentro do containe
       }),
       matarProcesso: vi.fn()
     } as unknown as DockerRunner
-    const service = new ConstrutorService(docker, repoDuble(), auditDuble(), () => 'u1', () => 'ws1' as never)
+    const service = new ConstrutorService(
+      docker,
+      repoDuble(),
+      auditDuble(),
+      () => 'u1',
+      () => 'ws1' as never
+    )
 
     await service.construir({ runId: 'run-1', sandbox, promptInicial: 'x', comandosDeValidacao })
 
@@ -228,7 +327,13 @@ describe('ConstrutorService — sem container não há execução (critério 8)'
       }),
       matarProcesso: vi.fn()
     } as unknown as DockerRunner
-    const service = new ConstrutorService(docker, repoDuble(), auditDuble(), () => 'u1', () => 'ws1' as never)
+    const service = new ConstrutorService(
+      docker,
+      repoDuble(),
+      auditDuble(),
+      () => 'u1',
+      () => 'ws1' as never
+    )
 
     await service.construir({ runId: 'run-1', sandbox, promptInicial: 'x', comandosDeValidacao })
 
@@ -253,7 +358,13 @@ describe('ConstrutorService — cancelamento mata a árvore de processos (crité
       matarProcesso: vi.fn()
     } as unknown as DockerRunner
     const pipeline = repoDuble()
-    const service = new ConstrutorService(docker, pipeline, auditDuble(), () => 'u1', () => 'ws1' as never)
+    const service = new ConstrutorService(
+      docker,
+      pipeline,
+      auditDuble(),
+      () => 'u1',
+      () => 'ws1' as never
+    )
 
     const resultado = await service.construir({
       runId: 'run-1',
@@ -271,7 +382,13 @@ describe('ConstrutorService — cancelamento mata a árvore de processos (crité
 
   it('cancelar() explícito mata processos sem esperar o próximo passo', () => {
     const docker = { exec: vi.fn(), matarProcesso: vi.fn() } as unknown as DockerRunner
-    const service = new ConstrutorService(docker, repoDuble(), auditDuble(), () => 'u1', () => 'ws1' as never)
+    const service = new ConstrutorService(
+      docker,
+      repoDuble(),
+      auditDuble(),
+      () => 'u1',
+      () => 'ws1' as never
+    )
 
     service.cancelar('run-1', sandbox)
 
@@ -284,7 +401,13 @@ describe('ConstrutorService — alteração fora do escopo bloqueia (critério 4
     const docker = {
       exec: vi.fn((_container: string, comando: readonly string[]) => {
         if (comando[0] === 'git' && comando.includes('status')) {
-          return { ok: true, stdout: ' M src/foo.ts\n?? segredo/fora-do-escopo.ts\n', stderr: '', exitCode: 0, timeoutExcedido: false }
+          return {
+            ok: true,
+            stdout: ' M src/foo.ts\n?? segredo/fora-do-escopo.ts\n',
+            stderr: '',
+            exitCode: 0,
+            timeoutExcedido: false
+          }
         }
         return { ok: true, stdout: 'ok', stderr: '', exitCode: 0, timeoutExcedido: false }
       }),
@@ -294,7 +417,13 @@ describe('ConstrutorService — alteração fora do escopo bloqueia (critério 4
       ...sandbox,
       pathsPermitidos: { paths: ['src'], origem: 'spec', justificativa: 'teste' }
     }
-    const service = new ConstrutorService(docker, repoDuble(), auditDuble(), () => 'u1', () => 'ws1' as never)
+    const service = new ConstrutorService(
+      docker,
+      repoDuble(),
+      auditDuble(),
+      () => 'u1',
+      () => 'ws1' as never
+    )
 
     const resultado = await service.construir({
       runId: 'run-1',
@@ -314,7 +443,13 @@ describe('ConstrutorService — alteração fora do escopo bloqueia (critério 4
         if (comando[0] === 'git' && comando.includes('status')) {
           // Só `??`, sem nenhum arquivo modificado: exatamente o estado que `git diff
           // --name-only` (sem `git add` prévio) NUNCA reportaria, e que era o bug do critical #1.
-          return { ok: true, stdout: '?? segredo/backdoor.ts\n', stderr: '', exitCode: 0, timeoutExcedido: false }
+          return {
+            ok: true,
+            stdout: '?? segredo/backdoor.ts\n',
+            stderr: '',
+            exitCode: 0,
+            timeoutExcedido: false
+          }
         }
         return { ok: true, stdout: 'ok', stderr: '', exitCode: 0, timeoutExcedido: false }
       }),
@@ -324,7 +459,13 @@ describe('ConstrutorService — alteração fora do escopo bloqueia (critério 4
       ...sandbox,
       pathsPermitidos: { paths: ['src'], origem: 'spec', justificativa: 'teste' }
     }
-    const service = new ConstrutorService(docker, repoDuble(), auditDuble(), () => 'u1', () => 'ws1' as never)
+    const service = new ConstrutorService(
+      docker,
+      repoDuble(),
+      auditDuble(),
+      () => 'u1',
+      () => 'ws1' as never
+    )
 
     const resultado = await service.construir({
       runId: 'run-1',
@@ -342,7 +483,13 @@ describe('ConstrutorService — alteração fora do escopo bloqueia (critério 4
     const docker = {
       exec: vi.fn((_container: string, comando: readonly string[]) => {
         if (comando[0] === 'git' && comando.includes('status')) {
-          return { ok: true, stdout: ' M src/foo.ts\n?? src/bar.ts\n', stderr: '', exitCode: 0, timeoutExcedido: false }
+          return {
+            ok: true,
+            stdout: ' M src/foo.ts\n?? src/bar.ts\n',
+            stderr: '',
+            exitCode: 0,
+            timeoutExcedido: false
+          }
         }
         return { ok: true, stdout: 'ok', stderr: '', exitCode: 0, timeoutExcedido: false }
       }),
@@ -352,7 +499,13 @@ describe('ConstrutorService — alteração fora do escopo bloqueia (critério 4
       ...sandbox,
       pathsPermitidos: { paths: ['src'], origem: 'spec', justificativa: 'teste' }
     }
-    const service = new ConstrutorService(docker, repoDuble(), auditDuble(), () => 'u1', () => 'ws1' as never)
+    const service = new ConstrutorService(
+      docker,
+      repoDuble(),
+      auditDuble(),
+      () => 'u1',
+      () => 'ws1' as never
+    )
 
     const resultado = await service.construir({
       runId: 'run-1',
@@ -379,7 +532,10 @@ describe('ConstrutorService — verificação de escopo contra Git real (critica
     const dir = mkdtempSync(join(tmpdir(), 'jarvis-construtor-'))
     try {
       execFileSync('git', ['init', '--initial-branch=main', dir], { encoding: 'utf8' })
-      execFileSync('git', ['config', 'user.email', 'teste@exemplo.com'], { cwd: dir, encoding: 'utf8' })
+      execFileSync('git', ['config', 'user.email', 'teste@exemplo.com'], {
+        cwd: dir,
+        encoding: 'utf8'
+      })
       execFileSync('git', ['config', 'user.name', 'Teste'], { cwd: dir, encoding: 'utf8' })
       mkdirSync(join(dir, 'src'), { recursive: true })
       writeFileSync(join(dir, 'src', 'a.ts'), 'a\n')
@@ -397,7 +553,8 @@ describe('ConstrutorService — verificação de escopo contra Git real (critica
           // Só o comando `git` desta checagem roda de verdade — claude e os 4 validadores
           // seguem dublados, porque o que este teste mede é a semântica do `git status`, não o
           // resto do pipeline (já coberto pelos outros testes deste arquivo).
-          if (comando[0] !== 'git') return { ok: true, stdout: 'ok', stderr: '', exitCode: 0, timeoutExcedido: false }
+          if (comando[0] !== 'git')
+            return { ok: true, stdout: 'ok', stderr: '', exitCode: 0, timeoutExcedido: false }
           const stdout = execFileSync('git', [...comando.slice(1)], { cwd: dir, encoding: 'utf8' })
           return { ok: true, stdout, stderr: '', exitCode: 0, timeoutExcedido: false }
         }),
@@ -407,7 +564,13 @@ describe('ConstrutorService — verificação de escopo contra Git real (critica
         ...sandbox,
         pathsPermitidos: { paths: ['src'], origem: 'spec', justificativa: 'teste' }
       }
-      const service = new ConstrutorService(docker, repoDuble(), auditDuble(), () => 'u1', () => 'ws1' as never)
+      const service = new ConstrutorService(
+        docker,
+        repoDuble(),
+        auditDuble(),
+        () => 'u1',
+        () => 'ws1' as never
+      )
 
       const resultado = await service.construir({
         runId: 'run-1',
@@ -428,23 +591,53 @@ describe('ConstrutorService — verificação de escopo contra Git real (critica
 describe('ConstrutorService — bloqueio traz ação mínima de retomada (critério 7)', () => {
   it('bloqueio corrigível esgotado traz retomada acionável', async () => {
     const docker = dockerDuble((comando) => {
-      if (comando[0] === 'claude') return { ok: true, stdout: '', stderr: '', exitCode: 0, timeoutExcedido: false }
-      if (comando.includes('test')) return { ok: false, stdout: 'FAIL sempre', stderr: '', exitCode: 1, timeoutExcedido: false }
+      if (comando[0] === 'claude')
+        return { ok: true, stdout: '', stderr: '', exitCode: 0, timeoutExcedido: false }
+      if (comando.includes('test'))
+        return { ok: false, stdout: 'FAIL sempre', stderr: '', exitCode: 1, timeoutExcedido: false }
       return { ok: true, stdout: 'ok', stderr: '', exitCode: 0, timeoutExcedido: false }
     })
-    const service = new ConstrutorService(docker, repoDuble(), auditDuble(), () => 'u1', () => 'ws1' as never)
+    const service = new ConstrutorService(
+      docker,
+      repoDuble(),
+      auditDuble(),
+      () => 'u1',
+      () => 'ws1' as never
+    )
 
-    const resultado = await service.construir({ runId: 'run-1', sandbox, promptInicial: 'x', comandosDeValidacao })
+    const resultado = await service.construir({
+      runId: 'run-1',
+      sandbox,
+      promptInicial: 'x',
+      comandosDeValidacao
+    })
 
     expect(resultado.bloqueio?.retomada).toBeTruthy()
     expect(resultado.bloqueio?.retomada.length).toBeGreaterThan(10)
   })
 
   it('bloqueio externo traz retomada distinta do corrigível', async () => {
-    const docker = dockerDuble(() => ({ ok: false, stdout: '', stderr: 'ETIMEDOUT', exitCode: 1, timeoutExcedido: false }))
-    const service = new ConstrutorService(docker, repoDuble(), auditDuble(), () => 'u1', () => 'ws1' as never)
+    const docker = dockerDuble(() => ({
+      ok: false,
+      stdout: '',
+      stderr: 'ETIMEDOUT',
+      exitCode: 1,
+      timeoutExcedido: false
+    }))
+    const service = new ConstrutorService(
+      docker,
+      repoDuble(),
+      auditDuble(),
+      () => 'u1',
+      () => 'ws1' as never
+    )
 
-    const resultado = await service.construir({ runId: 'run-1', sandbox, promptInicial: 'x', comandosDeValidacao })
+    const resultado = await service.construir({
+      runId: 'run-1',
+      sandbox,
+      promptInicial: 'x',
+      comandosDeValidacao
+    })
 
     expect(resultado.bloqueio?.causa).toBe('externo')
     expect(resultado.bloqueio?.retomada).toMatch(/conectividade|rede|externo|serviço/i)
@@ -454,14 +647,27 @@ describe('ConstrutorService — bloqueio traz ação mínima de retomada (crité
 describe('ConstrutorService — bloqueio persiste os cinco campos do BloqueioExterno (CONVENTION §4)', () => {
   it('transicionar para BLOCKED recebe causa, evidencia, tentativas, porQueNaoSeguir e retomada', async () => {
     const docker = dockerDuble((comando) => {
-      if (comando[0] === 'claude') return { ok: true, stdout: '', stderr: '', exitCode: 0, timeoutExcedido: false }
-      if (comando.includes('test')) return { ok: false, stdout: 'FAIL sempre', stderr: '', exitCode: 1, timeoutExcedido: false }
+      if (comando[0] === 'claude')
+        return { ok: true, stdout: '', stderr: '', exitCode: 0, timeoutExcedido: false }
+      if (comando.includes('test'))
+        return { ok: false, stdout: 'FAIL sempre', stderr: '', exitCode: 1, timeoutExcedido: false }
       return { ok: true, stdout: 'ok', stderr: '', exitCode: 0, timeoutExcedido: false }
     })
     const pipeline = repoDuble()
-    const service = new ConstrutorService(docker, pipeline, auditDuble(), () => 'u1', () => 'ws1' as never)
+    const service = new ConstrutorService(
+      docker,
+      pipeline,
+      auditDuble(),
+      () => 'u1',
+      () => 'ws1' as never
+    )
 
-    const resultado = await service.construir({ runId: 'run-1', sandbox, promptInicial: 'x', comandosDeValidacao })
+    const resultado = await service.construir({
+      runId: 'run-1',
+      sandbox,
+      promptInicial: 'x',
+      comandosDeValidacao
+    })
 
     expect(resultado.estadoFinal).toBe('BLOCKED')
     expect(pipeline.transicionar).toHaveBeenCalledWith(

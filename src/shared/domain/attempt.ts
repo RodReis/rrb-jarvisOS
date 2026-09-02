@@ -35,7 +35,10 @@ export interface Tentativa {
  * Padrões de rede/auth/quota são `externo` porque recuperar tentando de novo com o mesmo código
  * não muda o desfecho — o problema não está no código gerado.
  */
-export function classificarFalha(saida: { readonly stdout: string; readonly stderr: string }): ClassificacaoDeFalha {
+export function classificarFalha(saida: {
+  readonly stdout: string
+  readonly stderr: string
+}): ClassificacaoDeFalha {
   const texto = `${saida.stdout}\n${saida.stderr}`.toLowerCase()
 
   const padroesExternos = [

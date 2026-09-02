@@ -3,17 +3,23 @@ import { classificarFalha, proximaTentativaPermitida } from './attempt'
 
 describe('classificarFalha', () => {
   it('timeout de rede é externo', () => {
-    expect(classificarFalha({ stdout: '', stderr: 'ETIMEDOUT: connection timed out' })).toBe('externo')
+    expect(classificarFalha({ stdout: '', stderr: 'ETIMEDOUT: connection timed out' })).toBe(
+      'externo'
+    )
   })
 
   it('erro de autenticação/quota é externo', () => {
-    expect(classificarFalha({ stdout: '', stderr: '401 Unauthorized: invalid api key' })).toBe('externo')
+    expect(classificarFalha({ stdout: '', stderr: '401 Unauthorized: invalid api key' })).toBe(
+      'externo'
+    )
     expect(classificarFalha({ stdout: '', stderr: 'rate limit exceeded' })).toBe('externo')
   })
 
   it('teste/lint/type/build falhando é corrigível por default', () => {
     expect(classificarFalha({ stdout: 'FAIL src/foo.spec.ts', stderr: '' })).toBe('corrigivel')
-    expect(classificarFalha({ stdout: '', stderr: 'error TS2345: Argument of type' })).toBe('corrigivel')
+    expect(classificarFalha({ stdout: '', stderr: 'error TS2345: Argument of type' })).toBe(
+      'corrigivel'
+    )
   })
 
   it('saída vazia ou irreconhecível ainda é corrigível, nunca pi por default', () => {
