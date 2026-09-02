@@ -210,6 +210,13 @@ export class ConstrutorService {
    * função do preflight) para não ter duas implementações divergentes da mesma regra de match
    * de path.
    *
+   * **`-c core.quotepath=false`:** com `core.quotepath` ligado (padrão do Git), um path com
+   * caractere non-ASCII sai quotado e escapado em octal (`"src/a\303\247\303\243o.ts"`).
+   * `JSON.parse` em `desaspar` não entende esse escape, o `catch` devolve a string crua **com
+   * as aspas**, e a aspa vira o primeiro segmento do path — que passa a não bater com nenhum
+   * prefixo do escopo e é reportado como fuga espúria. Desligar `quotepath` faz o Git emitir o
+   * path cru em UTF-8, sem quoting.
+   *
    * **Por que `status`, não `diff`:** o worktree do run nunca passa por `git add` — nada em
    * `ConstrutorService` faz isso. `git diff --name-only` só enxerga arquivo **modificado e
    * rastreado**; um arquivo **novo e não commitado** (o caso mais natural de um agente
@@ -231,11 +238,12 @@ export class ConstrutorService {
   ): { readonly ok: true } | { readonly ok: false; readonly evidencia: string } {
     const status = this.docker.exec(
       sandbox.containerNome,
-      ['git', 'status', '--porcelain', '--untracked-files=all'],
+      ['git', '-c', 'core.quotepath=false', 'status', '--porcelain', '--untracked-files=all'],
       sandbox.worktreeNoHost
     )
-    // Sem status legível não há como acusar fuga — trata como dentro do escopo; erro de leitura
-    // aqui não é o que o critério 4 pede para bloquear.
+    // Sem status legível, hoje trata como dentro do escopo (fail-open) — postura deliberada,
+    // pendente de decisão do PI. O fail-closed equivalente seria bloquear com causa 'externo';
+    // não mudar unilateralmente (fora do escopo desta fatia, ver relatório final da M9-F04).
     if (!status.ok) return { ok: true }
 
     const arquivos = arquivosTocados(status.stdout)

@@ -159,8 +159,8 @@ export class PreflightService {
       return this.recusar(
         pedido,
         'sem-paths-permitidos',
-        'Nenhuma lista de paths permitidos foi declarada nem pôde ser derivada da arquitetura aprovada.',
-        'Declarar a seção "## Paths permitidos" na SPEC da fatia.'
+        'Nenhuma lista de paths permitidos foi declarada, não pôde ser derivada da arquitetura aprovada, ou contém um path com "*" (glob não é aceito — prefixo de diretório, não padrão).',
+        'Declarar a seção "## Paths permitidos" na SPEC da fatia com prefixos de diretório (ex.: "src", não "src/**" ou "src/*").'
       )
     }
 

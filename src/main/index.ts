@@ -485,8 +485,15 @@ if (!app.requestSingleInstanceLock()) {
       userId: userIdAtual,
       workspaceId: () => workspaces.atual(),
       rota: () => 'claude-code',
-      // Preenchidos pela M9-F04, que é quem conhece o run em construção. Até lá o proxy
-      // funciona sem correlação — e o `CostEvent` registra o que sabe, nunca um run inventado.
+      // A M9-F04 entregou o `ConstrutorService` que conhece o run em construção, mas ele não
+      // foi instanciado aqui — sem consumidor até a M9-F05 (Revisão/CI/merge), instanciá-lo
+      // seria código morto (decisão registrada em docs/DEVELOPMENT.md). Por isso este
+      // preenchimento continua pendente da M9-F05, que liga o `ConstrutorService` ao boot.
+      //
+      // **Consequência em produção, não só ausência de correlação:** com `contextPackId`
+      // sempre `undefined`, o gate de ContextPack em `call-provider.ts` recusa toda chamada
+      // do executor ("Esta geração precisa de um contexto montado") — a rota do executor não
+      // está operacional até a M9-F05 preencher isto de verdade.
       contexto: () => undefined,
       contextPackId: () => undefined
     })

@@ -33,6 +33,24 @@ describe('listaDePathsValida', () => {
   it('aceita lista com ao menos um path real', () => {
     expect(listaDePathsValida(escopo(['src/main']))).toBe(true)
   })
+
+  /**
+   * `caminhoDentroDoEscopo` compara por segmento exato — `src/**` nunca casa nenhum arquivo sob
+   * `src` (o segmento `**` não é igual a `foo.ts`), então um escopo escrito assim bloquearia
+   * TODO arquivo silenciosamente. Recusar aqui, em vez de aceitar e deixar o preflight bloquear
+   * sem explicação, dá ao PI o diagnóstico no momento em que o formato é inválido.
+   */
+  it('recusa path com glob (**), que caminhoDentroDoEscopo nunca casaria', () => {
+    expect(listaDePathsValida(escopo(['src/**']))).toBe(false)
+  })
+
+  it('recusa path com glob (*) de um único nível', () => {
+    expect(listaDePathsValida(escopo(['src/*']))).toBe(false)
+  })
+
+  it('recusa a lista inteira quando um único path entre vários tem glob', () => {
+    expect(listaDePathsValida(escopo(['src/main', 'docs/**']))).toBe(false)
+  })
 })
 
 describe('caminhoDentroDoEscopo', () => {

@@ -58,9 +58,21 @@ export interface PathsPermitidos {
  *
  * Tratar vazio como "pode tudo" inverteria o fail closed no exato ponto em que ele mais importa
  * — é o mesmo raciocínio de `isPathAllowed`, onde allowlist vazia não permite nada.
+ *
+ * **Recusa glob (`src/**`, `src/*`) em vez de normalizar.** `caminhoDentroDoEscopo` compara por
+ * segmento exato, então um path com `**`/`*` escrito numa SPEC — notação natural para um humano
+ * pedir "tudo sob src" — nunca casa segmento nenhum: todo arquivo vira fuga e o run bloqueia
+ * inteiro, sem mensagem que explique por quê. Normalizar silenciosamente escolheria por conta
+ * própria o que "tudo sob src" significa; recusar aqui, com o preflight explicando o formato
+ * esperado (prefixo de diretório, sem glob), é fail-closed **com diagnóstico** em vez de
+ * silencioso — o mesmo padrão de `sem-paths-permitidos`.
  */
 export function listaDePathsValida(lista: PathsPermitidos | undefined): lista is PathsPermitidos {
-  return lista !== undefined && lista.paths.length > 0 && lista.paths.every((p) => p.trim() !== '')
+  return (
+    lista !== undefined &&
+    lista.paths.length > 0 &&
+    lista.paths.every((p) => p.trim() !== '' && !p.includes('*'))
+  )
 }
 
 /**

@@ -160,6 +160,61 @@ describe('ConstrutorService — recuperação corrigível', () => {
       undefined
     )
   })
+
+  /**
+   * Critério 3 ("recuperação não repete descoberta resolvida") e a regra da SPEC ("recuperação
+   * recebe diff atual, erros novos e histórico resumido") não tinham teste algum: trocar
+   * `promptDaVez = promptDeRecuperacao(...)` por `promptDaVez = pedido.promptInicial` deixava
+   * os 16 testes anteriores verdes. Este teste captura o prompt de cada chamada ao `claude` e
+   * afirma que a segunda é DIFERENTE da primeira e carrega o stderr da falha anterior.
+   */
+  it('a 2ª chamada ao claude recebe prompt de recuperação, diferente do inicial, com o erro anterior', async () => {
+    const promptsDoClaude: string[] = []
+    let chamadasDeValidacao = 0
+    const docker = dockerDuble((comando) => {
+      if (comando[0] === 'claude') {
+        promptsDoClaude.push(comando[2] ?? '')
+        return { ok: true, stdout: '', stderr: '', exitCode: 0, timeoutExcedido: false }
+      }
+      if (comando[0] === 'git' && comando.includes('status')) {
+        return { ok: true, stdout: '', stderr: '', exitCode: 0, timeoutExcedido: false }
+      }
+      if (comando.includes('test')) {
+        chamadasDeValidacao += 1
+        if (chamadasDeValidacao === 1) {
+          return {
+            ok: false,
+            stdout: '',
+            stderr: 'TypeError: erro específico da tentativa 1',
+            exitCode: 1,
+            timeoutExcedido: false
+          }
+        }
+      }
+      return { ok: true, stdout: 'ok', stderr: '', exitCode: 0, timeoutExcedido: false }
+    })
+    const service = new ConstrutorService(
+      docker,
+      repoDuble(),
+      auditDuble(),
+      () => 'u1',
+      () => 'ws1' as never
+    )
+
+    const resultado = await service.construir({
+      runId: 'run-1',
+      sandbox,
+      promptInicial: 'Implemente a SPEC.',
+      comandosDeValidacao
+    })
+
+    expect(resultado.estadoFinal).toBe('PR_CI')
+    expect(promptsDoClaude).toHaveLength(2)
+    expect(promptsDoClaude[0]).toBe('Implemente a SPEC.')
+    expect(promptsDoClaude[1]).not.toBe('Implemente a SPEC.')
+    expect(promptsDoClaude[1]).toContain('TypeError: erro específico da tentativa 1')
+    expect(promptsDoClaude[1]).toMatch(/Tentativa 1/)
+  })
 })
 
 describe('ConstrutorService — três tentativas esgotadas', () => {
@@ -582,6 +637,64 @@ describe('ConstrutorService — verificação de escopo contra Git real (critica
       expect(resultado.estadoFinal).toBe('BLOCKED')
       expect(resultado.bloqueio?.causa).toBe('risco-usuario')
       expect(resultado.bloqueio?.evidencia).toContain('segredo/backdoor.ts')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  /**
+   * Com `core.quotepath` ligado (padrão do Git), um path non-ASCII sai quotado/escapado em
+   * octal. Sem `-c core.quotepath=false` no comando, `desaspar` falha o `JSON.parse` e devolve
+   * a string crua com aspas — a aspa vira o primeiro segmento e o arquivo, que está DENTRO do
+   * escopo, é reportado como fuga espúria (falso bloqueio num projeto pt-BR).
+   */
+  it('arquivo com acento dentro do escopo não é reportado como fuga (core.quotepath)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'jarvis-construtor-quotepath-'))
+    try {
+      execFileSync('git', ['init', '--initial-branch=main', dir], { encoding: 'utf8' })
+      execFileSync('git', ['config', 'user.email', 'teste@exemplo.com'], {
+        cwd: dir,
+        encoding: 'utf8'
+      })
+      execFileSync('git', ['config', 'user.name', 'Teste'], { cwd: dir, encoding: 'utf8' })
+      mkdirSync(join(dir, 'src'), { recursive: true })
+      writeFileSync(join(dir, 'src', 'a.ts'), 'a\n')
+      execFileSync('git', ['add', '.'], { cwd: dir, encoding: 'utf8' })
+      execFileSync('git', ['commit', '-m', 'inicial'], { cwd: dir, encoding: 'utf8' })
+
+      // Arquivo novo, non-ASCII, DENTRO do escopo declarado (src) — sem git add, como o
+      // worktree do run está de verdade quando ConstrutorService roda.
+      writeFileSync(join(dir, 'src', 'ação.ts'), 'ação\n')
+
+      const docker = {
+        exec: vi.fn((_container: string, comando: readonly string[]) => {
+          if (comando[0] !== 'git')
+            return { ok: true, stdout: 'ok', stderr: '', exitCode: 0, timeoutExcedido: false }
+          const stdout = execFileSync('git', [...comando.slice(1)], { cwd: dir, encoding: 'utf8' })
+          return { ok: true, stdout, stderr: '', exitCode: 0, timeoutExcedido: false }
+        }),
+        matarProcesso: vi.fn()
+      } as unknown as DockerRunner
+      const sandboxComEscopo: SandboxPreparado = {
+        ...sandbox,
+        pathsPermitidos: { paths: ['src'], origem: 'spec', justificativa: 'teste' }
+      }
+      const service = new ConstrutorService(
+        docker,
+        repoDuble(),
+        auditDuble(),
+        () => 'u1',
+        () => 'ws1' as never
+      )
+
+      const resultado = await service.construir({
+        runId: 'run-1',
+        sandbox: sandboxComEscopo,
+        promptInicial: 'x',
+        comandosDeValidacao
+      })
+
+      expect(resultado.estadoFinal).toBe('PR_CI')
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
