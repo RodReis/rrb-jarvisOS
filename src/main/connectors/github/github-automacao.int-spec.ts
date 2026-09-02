@@ -304,6 +304,16 @@ function responder(
     return { status: 200, corpo: corpoObj }
   }
 
+  // GET /repos/{o}/{r}/branches/{branch}/protection — 404 quando a branch existe e não tem
+  // proteção, que é como a API real responde e o estado normal de repositório recém-criado.
+  if (metodo === 'GET' && protMatch) {
+    const branch = protMatch[1] ?? ''
+    const protecao = estado.protecoes.get(branch)
+    return protecao === undefined
+      ? { status: 404, corpo: { message: 'Branch not protected' } }
+      : { status: 200, corpo: protecao }
+  }
+
   // GET /repos/{o}/{r}/labels/{nome}  e  POST /repos/{o}/{r}/labels
   const labelGet = /\/labels\/([^/]+)$/.exec(semQuery)
   if (metodo === 'GET' && labelGet) {
@@ -961,6 +971,87 @@ describe('branch.ensure-protection — M9-F01', () => {
     // `null` é como a API distingue "não mexa nisso" de "esvazie" — e confundir os dois apagaria
     // a exigência de CI de um repositório que a tinha.
     expect(estado.protecoes.get('main')?.required_status_checks).toBeNull()
+  })
+})
+
+describe('checks.required-for-branch — critério 11 da M9-F05', () => {
+  beforeEach(async () => {
+    await executar(GITHUB_OPERATIONS.ensureRepository, {
+      owner: OWNER,
+      repo: REPO,
+      visibility: 'private'
+    })
+    estado.refs.set('heads/main', SHA)
+  })
+
+  it('branch sem proteção devolve protegida:false, não erro', async () => {
+    // O 404 deste endpoint é o caso normal de repositório recém-criado: a branch existe e não tem
+    // proteção. Tratá-lo como erro faria o gate falhar onde a resposta certa é "não há regra".
+    const r = (await executar(GITHUB_OPERATIONS.getRequiredChecks, {
+      owner: OWNER,
+      repo: REPO,
+      branch: 'main'
+    })) as ConnectorResult
+
+    expect(r.ok).toBe(true)
+    expect(r.data).toMatchObject({ protegida: false, contexts: [], mergeQueueExigida: false })
+  })
+
+  it('lê os contexts e o strict que a origem exige', async () => {
+    await executar(GITHUB_OPERATIONS.ensureBranchProtection, {
+      owner: OWNER,
+      repo: REPO,
+      branch: 'main',
+      revisoesExigidas: 0,
+      checksExigidos: ['validacao']
+    })
+
+    const r = (await executar(GITHUB_OPERATIONS.getRequiredChecks, {
+      owner: OWNER,
+      repo: REPO,
+      branch: 'main'
+    })) as ConnectorResult
+
+    expect(r.ok).toBe(true)
+    expect(r.data).toMatchObject({ protegida: true, contexts: ['validacao'], strict: true })
+  })
+
+  it('proteção sem exigência de check devolve lista vazia, e não "sem proteção"', async () => {
+    // A diferença importa para o gate: `protegida: true` com `contexts: []` é uma branch protegida
+    // que ninguém mandou verificar — e o critério 10 a barra do mesmo jeito, mas por outra causa.
+    await executar(GITHUB_OPERATIONS.ensureBranchProtection, {
+      owner: OWNER,
+      repo: REPO,
+      branch: 'main',
+      revisoesExigidas: 1
+    })
+
+    const r = (await executar(GITHUB_OPERATIONS.getRequiredChecks, {
+      owner: OWNER,
+      repo: REPO,
+      branch: 'main'
+    })) as ConnectorResult
+
+    expect(r.ok).toBe(true)
+    expect(r.data).toMatchObject({ protegida: true, contexts: [], strict: false })
+  })
+
+  it('reconhece a merge queue exigida pela origem (critério 12)', async () => {
+    // Gravado direto no estado do servidor: nenhuma operação nossa configura merge queue, e é
+    // exatamente esse o ponto — a pipeline a encontra na origem e não tenta contorná-la.
+    estado.protecoes.set('main', {
+      required_status_checks: { strict: true, contexts: ['validacao'] },
+      required_merge_queue: {}
+    })
+
+    const r = (await executar(GITHUB_OPERATIONS.getRequiredChecks, {
+      owner: OWNER,
+      repo: REPO,
+      branch: 'main'
+    })) as ConnectorResult
+
+    expect(r.ok).toBe(true)
+    expect(r.data).toMatchObject({ mergeQueueExigida: true })
   })
 })
 

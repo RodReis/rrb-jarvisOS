@@ -49,7 +49,10 @@ import { ReconciliacaoService } from './pipeline/reconciliacao-service'
 import { RoadmapService } from './projects/roadmap-service'
 import { GitRunner } from './projects/git-runner'
 import { DockerRunner, prepararGitMeta, TIMEOUT_DOCKER_MS } from './pipeline/docker-runner'
+import { ConstrutorService } from './pipeline/construtor-service'
+import { EntregaService } from './pipeline/entrega-service'
 import { ExecutorProxy } from './pipeline/executor-proxy'
+import { RulesetRepository } from './pipeline/ruleset-repository'
 import { PreflightService } from './pipeline/preflight-service'
 import { verificadorDeContainer, verificadorDePorta } from './pipeline/verificadores-de-sandbox'
 import { ContextRepository } from './context/context-repository'
@@ -477,6 +480,31 @@ if (!app.requestSingleInstanceLock()) {
     )
     const docker = new DockerRunner(terminalDocker, () => workspaces.atual())
 
+    // A entrega da fatia (SPEC-Entrega-05): construção, revisão, CI e squash merge no mesmo PR.
+    //
+    // O `ConstrutorService` ganha aqui o consumidor que a M9-F04 dizia faltar — era por não tê-lo
+    // que instanciá-lo teria sido código morto. `revisar` devolve lista vazia por enquanto: o
+    // revisor é o próprio executor em invocação separada no container, e a M9-F06 é quem o liga;
+    // até lá nenhum achado bloqueia, e o gate segue barrando por CI e por regra da origem.
+    const entrega = new EntregaService({
+      construtor: new ConstrutorService(
+        docker,
+        pipelineRepository,
+        storage.audit,
+        userIdAtual,
+        () => workspaces.atual()
+      ),
+      connectors,
+      git: gitRunner,
+      fila,
+      mergePolicy,
+      ruleset: new RulesetRepository(storage.db),
+      audit: storage.audit,
+      userId: userIdAtual,
+      revisar: async () => [],
+      token: async (userId, workspace) => await githubAuth.tokenParaUso({ userId, workspace })
+    })
+
     // O proxy é o **único** caminho do container até o modelo (critério 11): o container recebe
     // só a URL, e a credencial da rota fica aqui. Sobe antes do preflight porque é ele que o
     // preflight pergunta se está no ar.
@@ -485,17 +513,19 @@ if (!app.requestSingleInstanceLock()) {
       userId: userIdAtual,
       workspaceId: () => workspaces.atual(),
       rota: () => 'claude-code',
-      // A M9-F04 entregou o `ConstrutorService` que conhece o run em construção, mas ele não
-      // foi instanciado aqui — sem consumidor até a M9-F05 (Revisão/CI/merge), instanciá-lo
-      // seria código morto (decisão registrada em docs/DEVELOPMENT.md). Por isso este
-      // preenchimento continua pendente da M9-F05, que liga o `ConstrutorService` ao boot.
+      // O run corrente vem do `EntregaService` (M9-F05), que só é construído abaixo — o proxy
+      // precisa subir antes porque é ele que o preflight pergunta se está no ar. A indireção por
+      // função resolve o ciclo: quando o executor chama, o serviço já existe.
       //
-      // **Consequência em produção, não só ausência de correlação:** com `contextPackId`
-      // sempre `undefined`, o gate de ContextPack em `call-provider.ts` recusa toda chamada
-      // do executor ("Esta geração precisa de um contexto montado") — a rota do executor não
-      // está operacional até a M9-F05 preencher isto de verdade.
-      contexto: () => undefined,
-      contextPackId: () => undefined
+      // **Não é só correlação de custo:** com `contextPackId` sempre `undefined`, o gate de
+      // ContextPack em `call-provider.ts` recusava toda chamada do executor ("Esta geração
+      // precisa de um contexto montado"), e a rota não operava em produção. Era a pendência que
+      // a M9-F04 declarou e esta fatia fecha.
+      contexto: () => {
+        const run = entrega?.contextoDoRun()
+        return run === undefined ? undefined : { runId: run.runId, tentativa: run.tentativa }
+      },
+      contextPackId: () => entrega?.contextoDoRun()?.contextPackId
     })
     await executorProxy.iniciar()
 

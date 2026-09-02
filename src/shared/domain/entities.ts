@@ -319,7 +319,16 @@ export const AUDIT_EVENT_TYPES = [
   // PI (2026-08-30) — desligar o merge muda o que a pipeline pode fazer sozinha na branch-base,
   // e é da mesma família de `allowlist-change`: uma mudança de configuração que amplia ou reduz
   // o que a máquina faz sem perguntar. Tipo próprio para não se confundir com a transição do run.
-  'merge-policy-change'
+  'merge-policy-change',
+  // SPEC-Entrega-05: a pipeline mergeou um pull request na branch-base. **Ação sensível**: é o
+  // único momento em que a máquina escreve na base sem aceite humano no ato, e a
+  // `ARCHITECTURE.md` exige `AuditEvent` para ação sensível.
+  //
+  // Tipo próprio, e não `pipeline-transition`: aquele registra o run mudando de estado, e o run
+  // chega a `MERGED` também quando o merge foi confirmado como já feito. A pergunta que este
+  // responde é outra — *nós mergeamos, com qual commit?* —, e a resposta precisa do `mergeSha`
+  // confirmado na origem, nunca do que o merge respondeu.
+  'pipeline-merge'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]

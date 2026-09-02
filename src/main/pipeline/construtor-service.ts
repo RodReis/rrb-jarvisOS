@@ -16,6 +16,7 @@
  */
 
 import type { WorkspaceId } from '@shared/domain/entities'
+import type { ComandosDeValidacao } from '@shared/domain/ci-workflow'
 import type { BloqueioExterno } from '@shared/domain/pacote-estrutural'
 import { fugasDoEscopo, type SandboxPreparado } from '@shared/domain/preflight'
 import {
@@ -29,13 +30,14 @@ import { log } from '../logging/logger'
 import type { DockerRunner, ExecucaoNoContainer } from './docker-runner'
 import type { PipelineRepository } from './pipeline-repository'
 
-/** Os quatro comandos de validação, no vocabulário do projeto-alvo (spec: "test/lint/type/build"). */
-export interface ComandosDeValidacao {
-  readonly test: readonly string[]
-  readonly lint: readonly string[]
-  readonly typecheck: readonly string[]
-  readonly build: readonly string[]
-}
+/**
+ * Os quatro comandos de validação, no vocabulário do projeto-alvo (spec: "test/lint/type/build").
+ *
+ * Definidos em `@shared/domain/ci-workflow` porque o gerador do workflow de CI (M9-F05) também
+ * os consome, e `src/shared` não pode importar de `src/main`. Reexportados aqui para quem já
+ * os importava deste módulo.
+ */
+export type { ComandosDeValidacao } from '@shared/domain/ci-workflow'
 
 export interface PedidoDeConstrucao {
   readonly runId: string
@@ -110,19 +112,17 @@ export class ConstrutorService {
       if (validacao.ok) {
         const escopo = this.verificarEscopo(pedido.sandbox)
         if (!escopo.ok) {
+          // Escopo lido com fuga é `risco-usuario` (o agente escreveu fora do declarado); escopo
+          // que não pôde ser lido é `externo` (a ferramenta falhou). A distinção governa a
+          // retomada, e trocá-las mandaria procurar um arquivo indevido que não existe.
+          const causa: ClassificacaoDeFalha = escopo.verificavel ? 'risco-usuario' : 'externo'
           tentativas.push({
             numero,
             runId: pedido.runId,
-            classificacao: 'risco-usuario',
+            classificacao: causa,
             diagnostico: escopo.evidencia
           })
-          return this.bloquear(
-            pedido.runId,
-            'VALIDATING',
-            tentativas,
-            'risco-usuario',
-            escopo.evidencia
-          )
+          return this.bloquear(pedido.runId, 'VALIDATING', tentativas, causa, escopo.evidencia)
         }
 
         tentativas.push({ numero, runId: pedido.runId })
@@ -233,18 +233,36 @@ export class ConstrutorService {
    * a raiz do repo, então mexer no `.gitignore` da raiz já cai fora do escopo e bloqueia por
    * essa via.
    */
-  private verificarEscopo(
-    sandbox: SandboxPreparado
-  ): { readonly ok: true } | { readonly ok: false; readonly evidencia: string } {
+  private verificarEscopo(sandbox: SandboxPreparado):
+    | { readonly ok: true }
+    | {
+        readonly ok: false
+        /** `false` quando o escopo não pôde ser lido; `true` quando foi lido e há fuga. */
+        readonly verificavel: boolean
+        readonly evidencia: string
+      } {
     const status = this.docker.exec(
       sandbox.containerNome,
       ['git', '-c', 'core.quotepath=false', 'status', '--porcelain', '--untracked-files=all'],
       sandbox.worktreeNoHost
     )
-    // Sem status legível, hoje trata como dentro do escopo (fail-open) — postura deliberada,
-    // pendente de decisão do PI. O fail-closed equivalente seria bloquear com causa 'externo';
-    // não mudar unilateralmente (fora do escopo desta fatia, ver relatório final da M9-F04).
-    if (!status.ok) return { ok: true }
+    // **Sem status legível, bloqueia** (decisão do PI, 2026-09-02; era fail-open, pendente desde a
+    // M9-F04). A `ARCHITECTURE.md` § Segurança já decidia o princípio — "ação não reconhecida pela
+    // política é bloqueada, não permitida" —, e um `git status` que não responde é exatamente isso:
+    // não se sabe o que o agente tocou. Fail-open deixava um container degradado publicar sem
+    // ninguém ter verificado o escopo, o oposto do critério 1 da M9-F05.
+    //
+    // Quem classifica como `externo` é o chamador, pelo campo `verificavel`: a ferramenta falhou,
+    // o agente não errou. Rotular de `risco-usuario` mandaria procurar um arquivo indevido que não
+    // existe.
+    if (!status.ok) {
+      return {
+        ok: false,
+        verificavel: false,
+        evidencia:
+          `Não foi possível verificar o escopo: o git status do container falhou. ${status.stderr}`.trim()
+      }
+    }
 
     const arquivos = arquivosTocados(status.stdout)
     const foraDoEscopo = fugasDoEscopo(arquivos, sandbox.pathsPermitidos)
@@ -252,6 +270,7 @@ export class ConstrutorService {
     if (foraDoEscopo.length > 0) {
       return {
         ok: false,
+        verificavel: true,
         evidencia: `Alteração fora do escopo declarado: ${foraDoEscopo.join(', ')}`
       }
     }

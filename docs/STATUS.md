@@ -1,11 +1,12 @@
 # STATUS.md — Kanban / Roadmap
 
-Atualizado em: **2026-09-02**. Fonte única do índice Fatia ↔ SPEC. Estado remoto conferido no fechamento do PR #231 (M9-F04 mergeada, `9005423`). Histórico detalhado em `docs/STATUS-ARQUIVO.md`; o board vence divergência factual.
+Atualizado em: **2026-09-02**. Fonte única do índice Fatia ↔ SPEC. Estado remoto conferido no fechamento do PR #234; a M9-F05 (#105) foi promovida a `proplan:next` pelo PI em 2026-09-02. Histórico detalhado em `docs/STATUS-ARQUIVO.md`; o board vence divergência factual.
 
 ## Agora
 
 | Coluna | Item | Estado |
 |---|---|---|
+| Feito | [#105](https://github.com/RodReis/rrb-jarvisOS/issues/105) · M9-F05 Revisão, CI e squash merge automático | entregue por PR; SPEC `aprovada-pi` (2026-08-29, emendada em 2026-08-30). Fecha a pendência da M9-F04: o `ConstrutorService` ganhou consumidor e o `ExecutorProxy` recebe `contexto`/`contextPackId` de verdade — a rota do executor passa a operar. **Três decisões do PI em 2026-09-02** (ver § Decisões do PI na M9-F05). **Limite:** `revisar` devolve lista vazia até a M9-F06 ligar o revisor |
 | Finalizado | [#104](https://github.com/RodReis/rrb-jarvisOS/issues/104) · M9-F04 Construção/recuperação | **aceite do PI registrado em 2026-09-02**; entregue no PR #231 (`9005423`), CI verde. **Limites declarados:** correlação `runId`/`tentativa` do proxy fica para a M9-F05 (rota do executor não operacional em produção até lá); smoke real em `not_run` porque a imagem do sandbox não traz o binário `claude`; cancelamento cooperativo com latência até o timeout do passo. **Pendência do PI:** fail-open do `verificarEscopo` quando o `git status` do container falha |
 | Feito | [#209](https://github.com/RodReis/rrb-jarvisOS/issues/209) · correção do EffectJournal | entregue no PR #227 (`66623b8`); `proplan:done`, aguardando aceite do PI |
 | Backlog | [#232](https://github.com/RodReis/rrb-jarvisOS/issues/232) · `[INFRA][FIX]` worker morto no pool do Vitest | criado em 2026-09-02 na entrega da M9-F04: execução perde arquivo inteiro e ainda relata verde, o que é fechamento frágil produzido pela infra (`docs/TESTING.md` §1). Não entra na fila por si — o PI decide quando |
@@ -29,7 +30,7 @@ Atualizado em: **2026-09-02**. Fonte única do índice Fatia ↔ SPEC. Estado re
 | MVP-006 Conectores Essenciais | [#86](https://github.com/RodReis/rrb-jarvisOS/issues/86) | fechado/aceito pelo PI em 2026-08-31 | 6/6 |
 | MVP-007 Memória compartilhada | [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179) | F01–F06 aprovadas/Backlog; F07–F08 Planejadas, fora do fechamento V3 | 0/8 |
 | MVP-008 Planejamento Governado | [#93](https://github.com/RodReis/rrb-jarvisOS/issues/93) | fechado/aceito pelo PI em 2026-08-31 | 6/6 |
-| MVP-009 Entrega Autônoma | [#100](https://github.com/RodReis/rrb-jarvisOS/issues/100) | seis SPECs `aprovada-pi` (2026-08-29), **emendadas pelo PI em 2026-08-30 e 2026-08-31**; F01–F04 entregues e aceitas. Restam F05 (revisão/CI/merge) e F06 (evidência/limpeza) | 4/6 |
+| MVP-009 Entrega Autônoma | [#100](https://github.com/RodReis/rrb-jarvisOS/issues/100) | seis SPECs `aprovada-pi` (2026-08-29), **emendadas pelo PI em 2026-08-30 e 2026-08-31**; F01–F04 aceitas, F05 entregue aguardando aceite. Resta F06 (evidência/limpeza) | 5/6 |
 | MVP-010 Multi-executor Claude + Codex | [#115](https://github.com/RodReis/rrb-jarvisOS/issues/115) | fatias [#116–#120](https://github.com/RodReis/rrb-jarvisOS/issues/116) no Backlog | 0/5 |
 | MVP-011 Squads limitados | [#121](https://github.com/RodReis/rrb-jarvisOS/issues/121) | fatias [#122–#126](https://github.com/RodReis/rrb-jarvisOS/issues/122) no Backlog | 0/5 |
 | MVP-012 Scheduler concorrente | [#127](https://github.com/RodReis/rrb-jarvisOS/issues/127) | fatias [#128–#132](https://github.com/RodReis/rrb-jarvisOS/issues/128) no Backlog | 0/5 |
@@ -135,9 +136,19 @@ Não existe catálogo global `SPEC-nnn`. O slug identifica a SPEC; os números a
 | M24-F03 | MVP-024 | Custos, quotas e capacidade do portfólio ([#220](https://github.com/RodReis/rrb-jarvisOS/issues/220)) | `spec-portfolio-03-custos-quotas.md` — aprovada-pi |
 | M24-F04 | MVP-024 | Console de portfólio e prova integrada ([#221](https://github.com/RodReis/rrb-jarvisOS/issues/221)) | `spec-portfolio-04-console-resiliencia-e2e.md` — aprovada-pi; gate visual antes da construção |
 
+## Decisões do PI na M9-F05 (2026-09-02)
+
+Três pontos abertos foram levantados durante a construção e **decididos pelo PI**, que delegou a escolha ao Code pedindo "o melhor para o desenvolvimento autônomo com agents". Registradas aqui porque mudam comportamento e não podem virar escolha silenciosa de implementação.
+
+1. **`verificarEscopo` passa a falhar fechado, com causa `externo`.** O fail-open (`if (!status.ok) return { ok: true }`) ficou pendente na M9-F04 e colide com o critério 1 desta fatia — com o `git status` do container falhando, o escopo não é verificado e o push sai. **Não é escopo novo:** a `ARCHITECTURE.md` § Segurança já decide *"fail closed: ação não reconhecida pela política é bloqueada, não permitida"*, e um `git status` que não responde é exatamente isso. A causa é `externo`, não `risco-usuario`: a distinção governa a retomada — `risco-usuario` diz que o agente escreveu fora do escopo, `externo` diz que a ferramenta falhou, e rotular errado mandaria procurar um arquivo indevido que não existe. Em desenvolvimento autônomo, fail-open significa um container degradado publicando sem ninguém ter verificado o escopo.
+
+2. **Teto de espera do CI: configurável por projeto, padrão 30 minutos, terminando em `AWAITING_MERGE`.** A SPEC não fixa quanto o gate aguarda checks pendentes. Estourar o teto não é falha do código — é CI mais lenta que o esperado —, e `BLOCKED` ensinaria a ler bloqueio como ruído, pela mesma razão que a M9-F02 recusou `BLOCKED` para o kill-switch desligado. O PR fica verde ou pendente e o run termina explicável, o que mantém a fila girando: com WIP=1 global, um run preso esperando CI eterna trava todos os outros.
+
+3. **O check obrigatório é `validacao`, e a pipeline o exige na proteção no mesmo run em que gera o workflow.** Correção ao plano original, que previa terminar em bloqueio quando a proteção não exigisse o nome gerado: a M9-F01 já escreve a proteção via `branch.ensure-protection`, que aceita `checksExigidos`. Então a pipeline não inventa nome nem depende de alguém ter configurado à mão — ela declara `validacao` como obrigatório junto com o workflow, fechando os critérios 9 e 10 sem intervenção humana, que é o requisito do desenvolvimento autônomo. Contexts que o projeto já exija **somam**, não são substituídos, e o gate espera por todos.
+
 ## Próximas ações
 
-1. **#104 (M9-F04) entregue pelo PR #231 e aceita pelo PI em 2026-09-02** — MVP-009 em 4/6. Nenhum `proplan:next` está marcado: restam F05 (revisão/CI/merge) e F06 (evidência/limpeza), cujas SPECs já são `aprovada-pi`. Promover a próxima é decisão do PI. **A M9-F05 herda uma dependência concreta:** é ela quem liga o `ConstrutorService` ao boot e preenche `contexto`/`contextPackId` do `ExecutorProxy` — até lá a rota do executor não opera em produção (ver `docs/STATUS-ARQUIVO.md` item 14, emendado, e `docs/DEVELOPMENT.md` § Fatia 04).
+1. **#104 (M9-F04) entregue pelo PR #231 e aceita pelo PI em 2026-09-02** — MVP-009 em 4/6. **A F05 (#105) foi promovida a `proplan:next` pelo PI em 2026-09-02** e entrou em construção; resta a F06 (evidência/limpeza) em Backlog, com SPEC `aprovada-pi`. **A M9-F05 herda uma dependência concreta:** é ela quem liga o `ConstrutorService` ao boot e preenche `contexto`/`contextPackId` do `ExecutorProxy` — até lá a rota do executor não opera em produção (ver `docs/STATUS-ARQUIVO.md` item 14, emendado, e `docs/DEVELOPMENT.md` § Fatia 04).
 2. Conservar #167/#168 e #214–#221 em Backlog após o aceite exato de 2026-08-31, sem promover qualquer uma a `next` por esta atualização. #232 (`[INFRA][FIX]` do pool de testes) também nasce em Backlog, sem entrar na fila por conta própria.
 3. Antes das fatias visuais, anexar `DESIGN-SYSTEM.md` e HTML pelo fluxo já aprovado; texto de SPEC/template não substitui anexo do PI.
 4. M7-F05/F06 estão aprovadas/Backlog e M7-F07–F08 continuam a redigir; as fatias do Command Center seguem seus planejamentos próprios. Nenhuma delas bloqueia concluir a documentação V3.

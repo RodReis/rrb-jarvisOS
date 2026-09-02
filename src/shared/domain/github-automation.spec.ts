@@ -68,6 +68,15 @@ describe('capacidades declaradas', () => {
     // o que acabou de publicar.
   })
 
+  it('ler o conjunto obrigatório é leitura, não mutação', () => {
+    // Consultar a proteção da branch não muda nada — ao contrário de `branch.ensure-protection`,
+    // que a escreve. Marcá-la como mutação obrigaria o gate a inventar chave de idempotência para
+    // fazer a pergunta que o critério 11 exige antes de cada merge.
+    const cap = GITHUB_CAPABILITIES.find((c) => c.operation === GITHUB_OPERATIONS.getRequiredChecks)
+    expect(cap).toBeDefined()
+    expect(cap?.effect).toBe('leitura')
+  })
+
   it('toda capacidade é do conector github e tem descrição', () => {
     for (const cap of GITHUB_CAPABILITIES) {
       expect(cap.connector).toBe('github')
@@ -375,6 +384,18 @@ describe('validarEntrada', () => {
         expect(validarEntrada(operation, { ...REPO, sha: 'HEAD' })).toMatch(/SHA/)
       }
     )
+  })
+
+  describe('checks.required-for-branch — critério 11', () => {
+    it('exige a branch cuja regra será lida', () => {
+      expect(validarEntrada(GITHUB_OPERATIONS.getRequiredChecks, { ...REPO })).toMatch(/branch/)
+      expect(validarEntrada(GITHUB_OPERATIONS.getRequiredChecks, { ...REPO, branch: '' })).toMatch(
+        /branch/
+      )
+      expect(
+        validarEntrada(GITHUB_OPERATIONS.getRequiredChecks, { ...REPO, branch: 'main' })
+      ).toBeUndefined()
+    })
   })
 })
 

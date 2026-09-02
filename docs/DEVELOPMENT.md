@@ -1579,7 +1579,43 @@ Status: **construída, ainda sem PR aberto** — spec `aprovada-pi` (2026-08-29,
 
 **`listaDePathsValida` recusa path com glob (`src/**`, `src/*`).** `caminhoDentroDoEscopo` compara por segmento exato, e um escopo escrito com glob — notação natural para um humano escrever numa SPEC — nunca casava segmento nenhum: todo arquivo virava fuga e o run bloqueava inteiro, sem mensagem que explicasse por quê. Decisão: **recusar com diagnóstico** (fail-closed explicado) em vez de normalizar silenciosamente — o preflight passa a recusar pela mesma razão `sem-paths-permitidos`, com mensagem que nomeia o formato esperado.
 
-**O fail-open de `verificarEscopo` (`if (!status.ok) return { ok: true }`) permanece, e o comentário deixou de soar como conclusão fechada.** É postura deliberada pendente de decisão do PI — o fail-closed equivalente bloquearia com causa `externo` — e não foi mudada unilateralmente nesta wave.
+**O fail-open de `verificarEscopo` ficou pendente nesta fatia e foi resolvido na M9-F05.** A postura era deliberada — não mudar unilateralmente o que o PI ainda não decidira —, e o PI decidiu em 2026-09-02 pelo **fail-closed com causa `externo`** (ver `docs/STATUS.md` § Decisões do PI na M9-F05). O `git status` ilegível passa a bloquear: a `ARCHITECTURE.md` § Segurança já decidia o princípio, e fail-open deixava um container degradado publicar sem ninguém ter verificado o escopo.
+
+### Fatia 05 — Revisão, CI e squash merge automático (`docs/spec/spec-entrega-05-revisao-ci-merge.md`)
+
+Status: **construída, ainda sem PR aberto** — spec `aprovada-pi` (2026-08-29, emendada 2026-08-30); issue [#105](https://github.com/RodReis/rrb-jarvisOS/issues/105). Depende da M9-F04. Plano: `docs/superpowers/plans/2026-09-02-m9-f05-revisao-ci-merge.md` (7 tasks).
+
+- [x] **`checks.required-for-branch`** (`github-automation.ts` + `github-operations.ts`) — a **leitura** do conjunto obrigatório que faltava: o adapter escrevia a proteção desde a M9-F01 e nunca a lia
+- [x] **`src/shared/domain/ruleset.ts` + migration 27** — o snapshot append-only por run e `rulesetMudou` (critério 11)
+- [x] **`src/shared/domain/gate-de-merge.ts`** — o gate puro que decide entre mergear, esperar e bloquear (critérios 2, 3, 4, 10, 11, 12)
+- [x] **`src/shared/domain/ci-workflow.ts`** — o workflow gerado a partir dos comandos declarados no pacote (critério 9)
+- [x] **`EntregaService`** (`src/main/pipeline/entrega-service.ts`) — a orquestração: workflow → construção → revisão → push → PR com `refs #N` → proteção → gate → merge confirmado na origem
+- [x] **`verificarEscopo` falha fechado** com causa `externo` — a pendência que a M9-F04 deixou, decidida pelo PI em 2026-09-02
+- [x] **Boot** (`src/main/index.ts`) — `ConstrutorService` ganha consumidor e o `ExecutorProxy` recebe `contexto`/`contextPackId` de verdade
+- [x] **Testes**: 23 do gate, 14 do workflow, 8 do ruleset, 7 do repositório, 22 de integração da orquestração, 4 do adapter, smoke opt-in (`entrega-service.smoke.int-spec.ts`)
+
+**Três decisões do PI, em 2026-09-02** (registradas em `docs/STATUS.md` § Decisões do PI na M9-F05): fail-closed do `verificarEscopo`; teto de espera do CI configurável terminando em `AWAITING_MERGE`; e o check obrigatório `validacao` exigido na proteção **pela própria pipeline**, no mesmo run em que o workflow é gerado.
+
+**O dublê no formato do adapter real pegou um defeito que o typecheck não pega.** `checks.for-head` devolve o **array** direto, e o serviço lia `data.checks`. O cast compila, porque `data` é `unknown`, e devolveria lista vazia para sempre — e lista vazia nunca aprova, então **todo run bloquearia por "ausência de regra" com os checks verdes na tela**. Um fake no formato do consumidor teria concordado com o erro. O contrafactual que reintroduz a leitura errada derruba 5 testes.
+
+**Um laço travado revelou um defeito de produção.** A primeira execução da suíte de integração não terminou em 300 s. A causa imediata era do teste — um `dormir` que não avançava o relógio simulado —, mas ao investigar apareceu o defeito real: `headShaEsperado` recebia o valor lido da origem **na mesma volta**, então os dois lados da comparação eram iguais por construção e o critério 4 era letra morta. Um push de terceiro entre a verificação e o merge passaria despercebido. Agora o head verificado é fixado antes do laço, e `stale` reconcilia adotando o commit novo em vez de mergear o antigo.
+
+**A ordenação do snapshot não era testável só com datas empatadas.** O índice `(user_id, run_id, observado_em)` faz o SQLite varrer na ordem física, e `rowid` e `observado_em` coincidem por acidente do plano de consulta — o contrafactual que troca um pelo outro passou verde. O teste que separa os dois insere a última observação com data **mais antiga**, o que acontece de verdade quando o relógio da origem recua (troca de nó, ajuste de NTP). O que o snapshot afirma é "a última coisa que observamos", não "a de data maior".
+
+**`skipped` e `neutral` de check obrigatório não satisfazem o gate.** A distinção mora em `gate-de-merge.ts`, não em `checksAprovam` — que trata `skipped` como não-falho, continua certo para check **opcional** e tem outros chamadores. Um obrigatório que decidiu não rodar não verificou nada.
+
+**A pipeline exige o check que ela mesma gerou.** O projeto do MVP-008 nasce sem CI e sem proteção; sem declarar o context obrigatório, o gate barraria por ausência de regra para sempre e nenhum run fecharia. Contexts que a origem já exija **somam**, nunca são substituídos.
+
+**Os argumentos do workflow são escapados, não concatenados.** `join(' ')` ingênuo transformaria `['npm','run','test','--grep','dois casos']` num `run:` em que o runner vê dois argumentos onde o comando declarado tem um — container e origem passariam a rodar coisas diferentes, que é o que o critério 9 existe para impedir.
+
+**Duas guardas cobraram a atualização, como foram escritas para fazer:** a lista de capacidades do `github-adapter.spec.ts` (segunda lista de contrato, além da do domínio) e a guarda de schema antigo do `storage.int-spec.ts`.
+
+**Limites declarados:**
+
+- **`revisar` devolve lista vazia.** O revisor é o próprio executor em invocação separada no container, e ligá-lo é da M9-F06. Até lá nenhum achado P0/P1 bloqueia na prática — o gate segue barrando por CI e por regra da origem, e o caminho do bloqueio por achado está provado em teste.
+- **O smoke real fica em `not_run`.** Exige `JARVIS_SMOKE_GITHUB_ENTREGA=1`, token e repositório descartável; ausente é skip declarado, nunca `pass`. Ele cobre **leitura e configuração**, sem mergear: mergear a cada execução deixaria lixo no repositório de teste.
+- **O critério 13 é provado sobre os docs declarados no pedido**, não sobre uma varredura do projeto-alvo: quem decide *quais* documentos a fatia atualiza é quem monta o pedido, e inferir isso aqui seria escopo assumido.
+- **Nenhuma UI.** A fatia não tem tela; quem a exercita é o boot.
 
 ## Registro de entregas
 
