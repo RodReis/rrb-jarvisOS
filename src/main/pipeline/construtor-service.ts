@@ -71,7 +71,8 @@ export class ConstrutorService {
       if (!execucaoClaude.ok) {
         const causa = classificarFalha(execucaoClaude)
         tentativas.push({ numero, runId: pedido.runId, classificacao: causa, diagnostico: execucaoClaude.stderr })
-        return this.bloquear(pedido.runId, tentativas, causa, execucaoClaude.stderr)
+        // Ainda em RUNNING aqui: a transição para VALIDATING (abaixo) não aconteceu.
+        return this.bloquear(pedido.runId, 'RUNNING', tentativas, causa, execucaoClaude.stderr)
       }
 
       // (2) Move para VALIDATING e roda test/lint/type/build — **sempre no container** (critério 11).
@@ -90,11 +91,11 @@ export class ConstrutorService {
       // Falha externa não gasta ciclo de correção: recuperar com o mesmo código não muda o
       // desfecho de um serviço fora do ar (spec § Classificação).
       if (causa !== 'corrigivel') {
-        return this.bloquear(pedido.runId, tentativas, causa, validacao.falha.stderr)
+        return this.bloquear(pedido.runId, 'VALIDATING', tentativas, causa, validacao.falha.stderr)
       }
 
       if (!proximaTentativaPermitida(numero)) {
-        return this.bloquear(pedido.runId, tentativas, causa, validacao.falha.stderr)
+        return this.bloquear(pedido.runId, 'VALIDATING', tentativas, causa, validacao.falha.stderr)
       }
 
       // (3) Recuperação: volta a RUNNING com prompt resumido (delta + erro novo), nunca releitura
@@ -121,11 +122,12 @@ export class ConstrutorService {
 
   private bloquear(
     runId: string,
+    de: Parameters<PipelineRepository['transicionar']>[1],
     tentativas: readonly Tentativa[],
     causa: ClassificacaoDeFalha,
     evidencia: string
   ): ResultadoDaConstrucao {
-    this.transicionar(runId, 'VALIDATING', 'BLOCKED')
+    this.transicionar(runId, de, 'BLOCKED')
     return { estadoFinal: 'BLOCKED', tentativas, bloqueio: { causa, evidencia } }
   }
 

@@ -25,8 +25,20 @@ function dockerDuble(
   } as unknown as DockerRunner
 }
 
-function repoDuble(): PipelineRepository {
-  return { transicionar: vi.fn(() => true) } as unknown as PipelineRepository
+/**
+ * Simula o compare-and-set real de `PipelineRepository.transicionar`: só aplica (e retorna
+ * `true`) quando `de` bate com o estado atual simulado; senão recusa (`false`) sem mudar nada.
+ * Um double que sempre retorna `true` esconderia exatamente o bug do finding #1.
+ */
+function repoDuble(estadoInicial: string = 'RUNNING'): PipelineRepository {
+  let estadoAtual = estadoInicial
+  return {
+    transicionar: vi.fn((_runId: string, de: string, para: string) => {
+      if (de !== estadoAtual) return false
+      estadoAtual = para
+      return true
+    })
+  } as unknown as PipelineRepository
 }
 
 function auditDuble(): AuditRepository {
@@ -141,6 +153,34 @@ describe('ConstrutorService — falha externa não gasta tentativa de correção
     expect(resultado.estadoFinal).toBe('BLOCKED')
     expect(resultado.bloqueio?.causa).toBe('externo')
     expect(resultado.tentativas).toHaveLength(1)
+  })
+})
+
+describe('ConstrutorService — bloqueio por falha do claude sai de RUNNING, não de VALIDATING', () => {
+  it('erro de rede na chamada ao claude transiciona RUNNING -> BLOCKED (nunca VALIDATING -> BLOCKED)', async () => {
+    const docker = dockerDuble((comando) => {
+      if (comando[0] === 'claude') {
+        return { ok: false, stdout: '', stderr: 'ETIMEDOUT: connection timed out', exitCode: 1, timeoutExcedido: false }
+      }
+      return { ok: true, stdout: 'ok', stderr: '', exitCode: 0, timeoutExcedido: false }
+    })
+    const pipeline = repoDuble()
+    const service = new ConstrutorService(docker, pipeline, auditDuble(), () => 'u1', () => 'ws1' as never)
+
+    const resultado = await service.construir({
+      runId: 'run-1',
+      sandbox,
+      promptInicial: 'Implemente a SPEC.',
+      comandosDeValidacao
+    })
+
+    expect(resultado.estadoFinal).toBe('BLOCKED')
+    // Com o double simulando compare-and-set de verdade: se o serviço tentasse
+    // VALIDATING -> BLOCKED aqui (o bug do finding #1), a chamada seria recusada (`de` não bate
+    // com o estado real do run, que nunca saiu de RUNNING) e o resultado devolvido seria
+    // inconsistente com o banco — exatamente o que este teste existe para pegar.
+    expect(pipeline.transicionar).toHaveBeenCalledWith('run-1', 'RUNNING', 'BLOCKED', expect.any(Date))
+    expect(pipeline.transicionar).not.toHaveBeenCalledWith('run-1', 'VALIDATING', 'BLOCKED', expect.any(Date))
   })
 })
 
