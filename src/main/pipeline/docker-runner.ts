@@ -68,6 +68,15 @@ export const GITCOMMON_NO_CONTAINER = '/gitcommon'
  */
 export const IMAGEM_DO_PROXY_DE_EGRESS = 'alpine/socat:1.8.0.1'
 
+/** O resultado de um comando rodado dentro do container (critério 11). */
+export interface ExecucaoNoContainer {
+  readonly ok: boolean
+  readonly stdout: string
+  readonly stderr: string
+  readonly exitCode: number | null
+  readonly timeoutExcedido: boolean
+}
+
 export interface MontagemDoSandbox {
   readonly worktreeNoHost: string
   /**
@@ -383,5 +392,41 @@ export class DockerRunner {
       this.workspaceId()
     )
     return execucao.state === 'concluido'
+  }
+
+  /**
+   * Roda um comando **dentro** do container já em pé (SPEC-Entrega-04, critérios 1 e 11).
+   *
+   * `docker exec`, e não um segundo `docker run`: o container já está montado com o worktree e
+   * a rede de egress corretos (M9-F03) — um novo `run` duplicaria o sandbox. Passa pelo
+   * `TerminalEngine`, nunca `spawn` direto, para manter a auditoria e a allowlist num ponto só.
+   */
+  exec(container: string, comando: readonly string[], cwd: string): ExecucaoNoContainer {
+    const execucao = this.terminal.run(
+      { binary: BINARIO_DOCKER, args: ['exec', container, ...comando], cwd },
+      this.workspaceId()
+    )
+
+    return {
+      ok: execucao.state === 'concluido' && execucao.exitCode === 0,
+      stdout: execucao.stdout,
+      stderr: execucao.stderr,
+      exitCode: execucao.exitCode,
+      timeoutExcedido: execucao.reason === 'timeout-excedido'
+    }
+  }
+
+  /**
+   * Mata os processos do usuário dentro do container, **sem parar o container** (critério 5).
+   *
+   * Cancelamento de uma tentativa não pode derrubar o sandbox inteiro: o worktree montado nele
+   * é o mesmo entre tentativas, e `docker stop` obrigaria a M9-F04 a refazer todo o preflight
+   * para a tentativa seguinte. `pkill -u` mata só o que o executor rodou.
+   */
+  matarProcesso(container: string, cwd: string): void {
+    this.terminal.run(
+      { binary: BINARIO_DOCKER, args: ['exec', container, 'pkill', '-u', 'root'], cwd },
+      this.workspaceId()
+    )
   }
 }
