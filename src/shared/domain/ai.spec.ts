@@ -9,6 +9,8 @@ import {
   estimarCustoUsd,
   isAiProvider,
   isRotaUnmetered,
+  isRotaSubscriptionLimited,
+  ROTAS_SUBSCRIPTION_LIMITED,
   type AiProvider
 } from './ai'
 import { CREDENTIAL_KEYS } from './credentials'
@@ -175,5 +177,21 @@ describe('guarda de tipo', () => {
     expect(isAiProvider('openai')).toBe(false)
     expect(isAiProvider(undefined)).toBe(false)
     expect(isAiProvider(42)).toBe(false)
+  })
+})
+
+describe('isRotaSubscriptionLimited', () => {
+  it('claude-code é subscription_limited, não unmetered puro', () => {
+    expect(isRotaSubscriptionLimited('claude-code')).toBe(true)
+    expect(ROTAS_SUBSCRIPTION_LIMITED).toContain('claude-code')
+  })
+
+  it('anthropic e gemini não são subscription_limited', () => {
+    expect(isRotaSubscriptionLimited('anthropic')).toBe(false)
+    expect(isRotaSubscriptionLimited('gemini')).toBe(false)
+  })
+
+  it('ollama não é subscription_limited (é unmetered por rodar local, não por assinatura)', () => {
+    expect(isRotaSubscriptionLimited('ollama')).toBe(false)
   })
 })
