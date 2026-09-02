@@ -35,6 +35,7 @@ import { ConnectorRegistry } from './registry'
 import { ConnectorService } from './connector-service'
 import { CreditService } from './credit-service'
 import { CreditRepository } from './credit-repository'
+import { EffectJournalRepository } from '../pipeline/effect-journal-repository'
 import type { ConnectorAdapter, ConnectorExecution } from './adapter'
 
 const USUARIO = 'user-teste'
@@ -157,6 +158,7 @@ function montar(base: string, creditos = 1): ConnectorService {
     { resolve: () => 'segredo-do-teste' },
     new PolicyService(audit, () => USUARIO),
     audit,
+    new EffectJournalRepository(db),
     credits,
     async (ms) => {
       esperas.push(ms)

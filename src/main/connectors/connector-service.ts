@@ -31,6 +31,7 @@
  * nunca houve.
  */
 
+import { createHash } from 'node:crypto'
 import {
   ROTULO_DO_CONECTOR,
   validarConnectorRequest,
@@ -46,6 +47,7 @@ import type { WorkspaceId } from '@shared/domain/entities'
 import { log } from '../logging/logger'
 import type { AuditRepository } from '../storage/audit-repository'
 import type { PolicyService } from '../policy/policy-service'
+import type { EffectJournalRepository } from '../pipeline/effect-journal-repository'
 import type { ConnectorRegistry } from './registry'
 import {
   CIRCUITO_FECHADO,
@@ -106,6 +108,8 @@ export class ConnectorService {
     private readonly secrets: ConnectorSecretSource,
     private readonly policy: PolicyService,
     private readonly audit: AuditRepository,
+    /** O diário de efeitos (SPEC-Entrega-02, § Diário de efeitos): intenção antes do I/O, confirmação depois. */
+    private readonly effectJournal: EffectJournalRepository,
     /**
      * O gate de créditos (SPEC-Conectores-02). Entra no construtor, e não como consulta
      * opcional dentro do fluxo, pela mesma razão do `BudgetService` no `AiCallService`: é
@@ -260,6 +264,40 @@ export class ConnectorService {
       }
     })
 
+    // O diário de efeitos (SPEC-Entrega-02, § Diário de efeitos): a intenção é registrada **no
+    // mesmo instante** que a auditoria de requisição — imediatamente antes do I/O de rede real,
+    // depois de circuito/créditos/credencial já terem passado. Chave igual com fingerprint
+    // diferente é conflito e falha aqui, antes de qualquer chamada sair.
+    //
+    // Uma repetição (mesma chave, mesmo fingerprint) **não** é bloqueada aqui: quem impede o
+    // efeito duplicado do lado do serviço é a própria `idempotencyKey`, do jeito que o GitHub e
+    // a Tavily já a tratam. O diário existe para a **reconciliação** reconhecer, depois de um
+    // crash, que uma intenção pendente já tem `ExternalRef` — e completar sem repetir I/O
+    // (critério 6 da issue). Bloquear a repetição aqui, sem saber se o efeito já aconteceu,
+    // impediria um retry legítimo de uma chamada que nunca chegou a sair.
+    const chaveDoEfeito =
+      (request.idempotencyKey ?? '').trim() !== ''
+        ? (request.idempotencyKey as string)
+        : request.correlationId
+    const fingerprint = fingerprintDoPedido(request)
+    const registro = this.effectJournal.registrarIntencao({
+      userId: ctx.userId,
+      workspaceId: ctx.workspace,
+      chaveIdempotente: chaveDoEfeito,
+      fingerprint,
+      alvo: `${request.connector}:${request.operation}`,
+      correlationId: request.correlationId
+    })
+
+    if (registro.tipo === 'conflito') {
+      return this.recusar(
+        request,
+        'validacao-invalida',
+        'A chave de idempotência já foi usada com um pedido diferente. Use uma chave nova para uma operação diferente.',
+        'corrigir-entrada'
+      )
+    }
+
     log.ai.info('Chamada a conector iniciada', {
       correlationId: request.correlationId,
       direction: 'in',
@@ -298,6 +336,23 @@ export class ConnectorService {
     // própria cota dizem respeito a nós.
     const contra = !desfecho.ok && contaContraOBreaker(desfecho.code)
     this.circuitos.set(request.connector, proximoCircuito(circuito, contra, this.agora()))
+
+    // Conclui a entrada do diário: `confirmed` no sucesso; `ambiguous` quando o desfecho é
+    // `indisponivel`/`timeout` numa mutação — a chamada pode ter saído sem resposta confirmada,
+    // e é exatamente esse caso que exige consultar a origem antes de qualquer retry (critério 4
+    // da issue). Qualquer outro erro é `failed`: ou nunca chegou a sair (validação, circuito,
+    // crédito, credencial — já recusados antes deste ponto), ou saiu e foi recusado de forma
+    // definitiva pelo serviço.
+    this.effectJournal.concluir(
+      registro.entrada.id,
+      desfecho.ok
+        ? 'confirmed'
+        : capability.effect === 'mutacao' &&
+            (desfecho.code === 'indisponivel' || desfecho.code === 'timeout')
+          ? 'ambiguous'
+          : 'failed',
+      desfecho.ok ? desfecho.externalRef?.id : undefined
+    )
 
     this.audit.append({
       user_id: ctx.userId,
@@ -521,4 +576,19 @@ export class ConnectorService {
 
     return { ok: false, code, mensagem, retryable, acao, provenance }
   }
+}
+
+/**
+ * O fingerprint de um pedido: o que faz "mesma chave, payload diferente" detectável.
+ *
+ * `connector:operation` entra porque a mesma `idempotencyKey` usada para duas operações
+ * diferentes é claramente dois pedidos, não um retry. `input` entra serializado — determinístico
+ * o bastante para esta finalidade: o `JSON.stringify` de um objeto vindo do mesmo chamador, com
+ * as mesmas chaves, produz a mesma string. O que ele não pega é ordem de chave diferente para o
+ * mesmo conteúdo lógico, que é o mesmo limite de `hash_conteudo` em `evidencia.ts`.
+ */
+function fingerprintDoPedido(request: ConnectorRequest): string {
+  return createHash('sha256')
+    .update(`${request.connector}:${request.operation}:${JSON.stringify(request.input)}`)
+    .digest('hex')
 }

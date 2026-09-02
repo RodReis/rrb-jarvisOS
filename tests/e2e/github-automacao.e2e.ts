@@ -248,14 +248,24 @@ async function autenticado(): Promise<import('@playwright/test').Page> {
   return janela
 }
 
-/** Chama uma capacidade pelo canal real `connectors:invoke`. */
+/**
+ * Chama uma capacidade pelo canal real `connectors:invoke`.
+ *
+ * `idempotencyKey` tem override porque o `EffectJournal` (issue #209) recusa como conflito uma
+ * segunda chamada com a mesma chave e payload diferente — a mesma regra que protege contra
+ * duplicar um efeito real. Um teste que **de propósito** manda dois payloads distintos para a
+ * mesma operação (ex.: tentar o merge com o SHA errado, depois com o certo) representa duas
+ * intenções do usuário, não um retry da mesma — e por isso precisa de chaves distintas, como o
+ * app real geraria em cada tentativa nova.
+ */
 function invocar(
   janela: import('@playwright/test').Page,
   operation: string,
-  input: unknown
+  input: unknown,
+  idempotencyKey?: string
 ): Promise<Record<string, unknown>> {
   return janela.evaluate(
-    async ([op, entrada]: [string, unknown]) => {
+    async ([op, entrada, idemKey]: [string, unknown, string]) => {
       const bridge = (
         window as unknown as {
           jarvis: { callConnector: (r: unknown, w: string) => Promise<Record<string, unknown>> }
@@ -267,16 +277,16 @@ function invocar(
           contractVersion: 1,
           connector: 'github',
           operation: op,
-          correlationId: `e2e-${op}`,
+          correlationId: `e2e-${op}-${idemKey}`,
           timeoutMs: 15_000,
-          idempotencyKey: `idem-${op}`,
+          idempotencyKey: idemKey,
           credential: { key: 'github', user_id: 'local', workspace_id: 'jarvis' },
           input: entrada
         },
         'jarvis'
       )
     },
-    [operation, input] as [string, unknown]
+    [operation, input, idempotencyKey ?? `idem-${operation}`] as [string, unknown, string]
   )
 }
 
@@ -365,23 +375,23 @@ test('o merge exige o head esperado, e o head divergente é barrado', async () =
     body: ''
   })
 
-  const barrado = await invocar(janela, 'pr.squash-merge', {
-    owner: OWNER,
-    repo: REPO,
-    pullRequest: 1,
-    expectedHeadSha: OUTRO_SHA
-  })
+  const barrado = await invocar(
+    janela,
+    'pr.squash-merge',
+    { owner: OWNER, repo: REPO, pullRequest: 1, expectedHeadSha: OUTRO_SHA },
+    'idem-merge-tentativa-1'
+  )
 
   expect(barrado.ok).toBe(false)
   expect(barrado.code).toBe('validacao-invalida')
   expect(pulls[0]?.merged).toBe(false)
 
-  const mergeado = await invocar(janela, 'pr.squash-merge', {
-    owner: OWNER,
-    repo: REPO,
-    pullRequest: 1,
-    expectedHeadSha: SHA
-  })
+  const mergeado = await invocar(
+    janela,
+    'pr.squash-merge',
+    { owner: OWNER, repo: REPO, pullRequest: 1, expectedHeadSha: SHA },
+    'idem-merge-tentativa-2'
+  )
 
   expect(mergeado.ok).toBe(true)
   expect((mergeado.data as { mergeSha: string }).mergeSha).toBe(

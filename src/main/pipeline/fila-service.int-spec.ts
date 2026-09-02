@@ -40,6 +40,7 @@ const { openDatabase } = await import('../storage/database')
 const { AuditRepository } = await import('../storage/audit-repository')
 const { PipelineRepository } = await import('./pipeline-repository')
 const { LeaseRepository } = await import('./lease-repository')
+const { EffectJournalRepository } = await import('./effect-journal-repository')
 const { FilaService } = await import('./fila-service')
 const { ReconciliacaoService } = await import('./reconciliacao-service')
 const { MergePolicyRepository } = await import('./merge-policy-repository')
@@ -421,6 +422,81 @@ describe('convergência depois de crash (critério 4)', () => {
 
     expect(achados.find((a) => a.recurso === RECURSO_WIP_GLOBAL)?.decisao).toBe('bloqueado')
     expect(leaseNoBanco()).toBe(1)
+  })
+
+  it('lê o EffectJournal como fonte da intenção: entrada pendente bloqueia (critério 5, issue #209)', async () => {
+    const efeitos = new EffectJournalRepository(db)
+    efeitos.registrarIntencao(
+      {
+        userId: USER,
+        workspaceId: WS,
+        chaveIdempotente: 'idem-orfa',
+        fingerprint: 'fp-1',
+        alvo: 'github:issues.create',
+        correlationId: 'corr-1'
+      },
+      () => new Date(relogio).toISOString()
+    )
+
+    const reconciliacao = new ReconciliacaoService({
+      runs,
+      leases,
+      audit: new AuditRepository(db, 'chave-de-teste'),
+      effectJournal: efeitos,
+      userId: () => USER,
+      workspaceId: () => WS,
+      agora: () => relogio
+    })
+
+    const achados = await reconciliacao.reconcileAll()
+
+    expect(achados.find((a) => a.recurso === 'efeito:idem-orfa')?.decisao).toBe('bloqueado')
+    // A entrada continua pendente — a reconciliação não decide sozinha se o efeito aconteceu.
+    expect(efeitos.buscarPorChave(USER, 'idem-orfa')?.estado).toBe('pendente')
+  })
+
+  it('reconciliação roda duas vezes sobre uma entrada pendente do diário e converge (critério 4)', async () => {
+    const efeitos = new EffectJournalRepository(db)
+    efeitos.registrarIntencao(
+      {
+        userId: USER,
+        workspaceId: WS,
+        chaveIdempotente: 'idem-orfa',
+        fingerprint: 'fp-1',
+        alvo: 'github:issues.create',
+        correlationId: 'corr-1'
+      },
+      () => new Date(relogio).toISOString()
+    )
+
+    const reconciliacao = new ReconciliacaoService({
+      runs,
+      leases,
+      audit: new AuditRepository(db, 'chave-de-teste'),
+      effectJournal: efeitos,
+      userId: () => USER,
+      workspaceId: () => WS,
+      agora: () => relogio
+    })
+
+    const primeira = await reconciliacao.reconcileAll()
+    const segunda = await reconciliacao.reconcileAll()
+
+    expect(primeira.filter((a) => a.recurso === 'efeito:idem-orfa')).toHaveLength(1)
+    expect(segunda.filter((a) => a.recurso === 'efeito:idem-orfa')).toHaveLength(1)
+  })
+
+  it('sem effectJournal nas deps, a reconciliação continua funcionando (fatias sem efeito externo)', async () => {
+    const reconciliacao = new ReconciliacaoService({
+      runs,
+      leases,
+      audit: new AuditRepository(db, 'chave-de-teste'),
+      userId: () => USER,
+      workspaceId: () => WS,
+      agora: () => relogio
+    })
+
+    await expect(reconciliacao.reconcileAll()).resolves.toBeDefined()
   })
 })
 

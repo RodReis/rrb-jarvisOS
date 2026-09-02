@@ -39,6 +39,7 @@ import { RoadmapRepository } from './projects/roadmap-repository'
 import { ExternalRefRepository } from './projects/external-ref-repository'
 import { PublicacaoService } from './projects/publicacao-service'
 import { FilaService } from './pipeline/fila-service'
+import { EffectJournalRepository } from './pipeline/effect-journal-repository'
 import { LeaseRepository } from './pipeline/lease-repository'
 import { MergePolicyRepository } from './pipeline/merge-policy-repository'
 import { MergePolicyService } from './pipeline/merge-policy-service'
@@ -339,6 +340,10 @@ if (!app.requestSingleInstanceLock()) {
     // **Ledger separado do de USD** (decisão do PI): este conta créditos por conector, o
     // `budget` conta dólares por espaço. Nenhum dos dois soma o outro.
     const connectorCredits = new CreditService(new CreditRepository(storage.db), storage.audit)
+    // O diário de efeitos (SPEC-Entrega-02, § Diário de efeitos; issue #209). Construído antes
+    // do ponto único porque é dependência dele — a reconciliação, mais abaixo, reusa a mesma
+    // instância para ler as intenções pendentes.
+    const effectJournal = new EffectJournalRepository(storage.db)
     const connectors = new ConnectorService(
       connectorRegistry,
       // A fonte de segredo de conector lê o **mesmo cofre** das credenciais de IA: a coluna
@@ -358,6 +363,7 @@ if (!app.requestSingleInstanceLock()) {
       },
       policy,
       storage.audit,
+      effectJournal,
       connectorCredits
     )
 
@@ -498,6 +504,7 @@ if (!app.requestSingleInstanceLock()) {
       runs: pipelineRepository,
       leases: leaseRepository,
       audit: storage.audit,
+      effectJournal,
       userId: userIdAtual,
       workspaceId: () => workspaces.atual(),
       // O ponto de extensão que a M9-F02 deixou pronto, agora preenchido: container e porta
