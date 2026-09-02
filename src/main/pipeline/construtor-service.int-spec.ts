@@ -12,7 +12,7 @@ const sandbox: SandboxPreparado = {
   baseSha: 'abc123',
   branch: 'feat/run-1',
   worktreeNoHost: '/host/worktree',
-  pathsPermitidos: { paths: ['src/**'], origem: 'spec', justificativa: 'SPEC-Entrega-04 §Entrada' },
+  pathsPermitidos: { paths: ['src'], origem: 'spec', justificativa: 'SPEC-Entrega-04 §Entrada' },
   proxyUrl: 'http://172.20.0.2:8080'
 }
 
@@ -54,8 +54,12 @@ const comandosDeValidacao = {
 
 describe('ConstrutorService — tentativa única bem-sucedida', () => {
   it('claude roda, validação passa, run vai para PR_CI numa tentativa só', async () => {
-    const docker = dockerDuble((_comando) => {
-      // Todo comando (claude e os 4 de validação) responde ok nesta suíte.
+    const docker = dockerDuble((comando) => {
+      // git diff vazio: nenhum arquivo mudou, dentro do escopo por vacuidade.
+      if (comando[0] === 'git' && comando.includes('diff')) {
+        return { ok: true, stdout: '', stderr: '', exitCode: 0, timeoutExcedido: false }
+      }
+      // Todo outro comando (claude e os 4 de validação) responde ok nesta suíte.
       return { ok: true, stdout: 'ok', stderr: '', exitCode: 0, timeoutExcedido: false }
     })
     const pipeline = repoDuble()
@@ -82,6 +86,9 @@ describe('ConstrutorService — recuperação corrigível', () => {
     let chamadasDeValidacao = 0
     const docker = dockerDuble((comando) => {
       if (comando[0] === 'claude') return { ok: true, stdout: '', stderr: '', exitCode: 0, timeoutExcedido: false }
+      if (comando[0] === 'git' && comando.includes('diff')) {
+        return { ok: true, stdout: '', stderr: '', exitCode: 0, timeoutExcedido: false }
+      }
       // Só a validação de teste falha, e só na primeira passagem.
       if (comando.includes('test')) {
         chamadasDeValidacao += 1
@@ -208,8 +215,11 @@ describe('ConstrutorService — sem container não há execução (critério 8)'
   it('todo comando de claude e validação passa pelo DockerRunner.exec com o nome do container do sandbox — nunca um caminho de execução direta no host', async () => {
     const containersUsados = new Set<string>()
     const docker = {
-      exec: vi.fn((container: string) => {
+      exec: vi.fn((container: string, comando: readonly string[]) => {
         containersUsados.add(container)
+        if (comando[0] === 'git' && comando.includes('diff')) {
+          return { ok: true, stdout: '', stderr: '', exitCode: 0, timeoutExcedido: false }
+        }
         return { ok: true, stdout: 'ok', stderr: '', exitCode: 0, timeoutExcedido: false }
       }),
       matarProcesso: vi.fn()
@@ -218,9 +228,9 @@ describe('ConstrutorService — sem container não há execução (critério 8)'
 
     await service.construir({ runId: 'run-1', sandbox, promptInicial: 'x', comandosDeValidacao })
 
-    // Cinco chamadas (claude + 4 validadores), todas no mesmo container — nunca vazio, nunca
-    // um segundo caminho que ignore o sandbox.
-    expect(docker.exec).toHaveBeenCalledTimes(5)
+    // Seis chamadas (claude + 4 validadores + git diff de verificação de escopo), todas no
+    // mesmo container — nunca vazio, nunca um segundo caminho que ignore o sandbox.
+    expect(docker.exec).toHaveBeenCalledTimes(6)
     expect(containersUsados.size).toBe(1)
     expect(containersUsados.has(sandbox.containerNome)).toBe(true)
   })
@@ -262,5 +272,61 @@ describe('ConstrutorService — cancelamento mata a árvore de processos (crité
     service.cancelar('run-1', sandbox)
 
     expect(docker.matarProcesso).toHaveBeenCalledWith(sandbox.containerNome, sandbox.worktreeNoHost)
+  })
+})
+
+describe('ConstrutorService — alteração fora do escopo bloqueia (critério 4)', () => {
+  it('diff com arquivo fora de pathsPermitidos bloqueia antes de PR_CI, mesmo com validação verde', async () => {
+    const docker = {
+      exec: vi.fn((_container: string, comando: readonly string[]) => {
+        if (comando[0] === 'git' && comando.includes('diff')) {
+          return { ok: true, stdout: 'src/foo.ts\nsegredo/fora-do-escopo.ts\n', stderr: '', exitCode: 0, timeoutExcedido: false }
+        }
+        return { ok: true, stdout: 'ok', stderr: '', exitCode: 0, timeoutExcedido: false }
+      }),
+      matarProcesso: vi.fn()
+    } as unknown as DockerRunner
+    const sandboxComEscopo: SandboxPreparado = {
+      ...sandbox,
+      pathsPermitidos: { paths: ['src'], origem: 'spec', justificativa: 'teste' }
+    }
+    const service = new ConstrutorService(docker, repoDuble(), auditDuble(), () => 'u1', () => 'ws1' as never)
+
+    const resultado = await service.construir({
+      runId: 'run-1',
+      sandbox: sandboxComEscopo,
+      promptInicial: 'x',
+      comandosDeValidacao
+    })
+
+    expect(resultado.estadoFinal).toBe('BLOCKED')
+    expect(resultado.bloqueio?.causa).toBe('risco-usuario')
+    expect(resultado.bloqueio?.evidencia).toContain('segredo/fora-do-escopo.ts')
+  })
+
+  it('diff inteiramente dentro do escopo segue para PR_CI normalmente', async () => {
+    const docker = {
+      exec: vi.fn((_container: string, comando: readonly string[]) => {
+        if (comando[0] === 'git' && comando.includes('diff')) {
+          return { ok: true, stdout: 'src/foo.ts\nsrc/bar.ts\n', stderr: '', exitCode: 0, timeoutExcedido: false }
+        }
+        return { ok: true, stdout: 'ok', stderr: '', exitCode: 0, timeoutExcedido: false }
+      }),
+      matarProcesso: vi.fn()
+    } as unknown as DockerRunner
+    const sandboxComEscopo: SandboxPreparado = {
+      ...sandbox,
+      pathsPermitidos: { paths: ['src'], origem: 'spec', justificativa: 'teste' }
+    }
+    const service = new ConstrutorService(docker, repoDuble(), auditDuble(), () => 'u1', () => 'ws1' as never)
+
+    const resultado = await service.construir({
+      runId: 'run-1',
+      sandbox: sandboxComEscopo,
+      promptInicial: 'x',
+      comandosDeValidacao
+    })
+
+    expect(resultado.estadoFinal).toBe('PR_CI')
   })
 })

@@ -16,7 +16,7 @@
  */
 
 import type { WorkspaceId } from '@shared/domain/entities'
-import type { SandboxPreparado } from '@shared/domain/preflight'
+import { fugasDoEscopo, type SandboxPreparado } from '@shared/domain/preflight'
 import { classificarFalha, proximaTentativaPermitida, type ClassificacaoDeFalha, type Tentativa } from '@shared/domain/attempt'
 import type { AuditRepository } from '../storage/audit-repository'
 import { log } from '../logging/logger'
@@ -87,6 +87,12 @@ export class ConstrutorService {
       const validacao = this.validar(pedido.sandbox, pedido.comandosDeValidacao, pedido.signal)
 
       if (validacao.ok) {
+        const escopo = this.verificarEscopo(pedido.sandbox)
+        if (!escopo.ok) {
+          tentativas.push({ numero, runId: pedido.runId, classificacao: 'risco-usuario', diagnostico: escopo.evidencia })
+          return this.bloquear(pedido.runId, 'VALIDATING', tentativas, 'risco-usuario', escopo.evidencia)
+        }
+
         tentativas.push({ numero, runId: pedido.runId })
         this.transicionar(pedido.runId, 'VALIDATING', 'PR_CI')
         return { estadoFinal: 'PR_CI', tentativas }
@@ -146,6 +152,32 @@ export class ConstrutorService {
    */
   cancelar(_runId: string, sandbox: SandboxPreparado): void {
     this.docker.matarProcesso(sandbox.containerNome, sandbox.worktreeNoHost)
+  }
+
+  /**
+   * O diff ficou dentro do escopo declarado no preflight? (critério 4)
+   *
+   * `git diff --name-only` roda **dentro do container** — mesma fronteira do critério 8, sem
+   * caminho de leitura no host. Reusa `fugasDoEscopo` (mesma função do preflight) para não ter
+   * duas implementações divergentes da mesma regra de match de path.
+   */
+  private verificarEscopo(sandbox: SandboxPreparado): { readonly ok: true } | { readonly ok: false; readonly evidencia: string } {
+    const diff = this.docker.exec(
+      sandbox.containerNome,
+      ['git', 'diff', '--name-only', sandbox.baseSha],
+      sandbox.worktreeNoHost
+    )
+    // Sem diff legível não há como acusar fuga — trata como dentro do escopo; erro de leitura
+    // aqui não é o que o critério 4 pede para bloquear.
+    if (!diff.ok) return { ok: true }
+
+    const arquivos = diff.stdout.split('\n').map((l) => l.trim()).filter((l) => l !== '')
+    const foraDoEscopo = fugasDoEscopo(arquivos, sandbox.pathsPermitidos)
+
+    if (foraDoEscopo.length > 0) {
+      return { ok: false, evidencia: `Alteração fora do escopo declarado: ${foraDoEscopo.join(', ')}` }
+    }
+    return { ok: true }
   }
 
   private bloquear(
