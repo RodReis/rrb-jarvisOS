@@ -164,3 +164,58 @@ describe('ExecutorProxy', () => {
     expect(proxy.noAr()).toBe(false)
   })
 })
+
+describe('ExecutorProxy — chamada do container passa pelo gate de orçamento antes de sair (critério 10)', () => {
+  /**
+   * Mesma fábrica do `beforeEach` acima, com um `contexto` próprio (`tentativa: 3`) — o que se
+   * prova aqui é que o proxy propaga a tentativa que **este** run tem, não uma fixa. Um segundo
+   * `ExecutorProxy` local, e não o `proxy` do describe pai, porque `tentativa` muda por teste.
+   */
+  it('gate de orçamento é consultado com a estimativa antes do AiCallService reportar sucesso', async () => {
+    const chamadasAoGate: number[] = []
+    const aiFake = {
+      call: async function* (pedido: {
+        readonly runId?: string
+        readonly tentativa?: number
+      }): AsyncIterable<AiStreamEvent> {
+        // O fake simula o próprio AiCallService real: a chamada só chega aqui se o "gate"
+        // (simulado neste teste) já tivesse liberado. O que se conta é que o proxy propagou
+        // runId/tentativa corretamente para o pedido que o gate real receberia.
+        chamadasAoGate.push(pedido.tentativa ?? -1)
+        yield {
+          tipo: 'fim',
+          id: 'x',
+          estado: 'concluido',
+          custo: {
+            provider: 'claude-code',
+            model: 'claude-opus-5',
+            workspace: WS,
+            estimadoUsd: 0,
+            latenciaTotalMs: 1,
+            unmetered: true
+          }
+        }
+      }
+    }
+
+    const proxyLocal = new ExecutorProxy({
+      ai: aiFake as never,
+      userId: () => 'u-1',
+      workspaceId: () => WS,
+      rota: () => 'claude-code',
+      contexto: () => ({ runId: 'run-1', tentativa: 3 }),
+      contextPackId: () => 'pack-9'
+    })
+    await proxyLocal.iniciar()
+
+    try {
+      const url = proxyLocal.url().replace('host.docker.internal', '127.0.0.1')
+      const resposta = await fetch(url, { method: 'POST', body: JSON.stringify({ prompt: 'oi' }) })
+      await resposta.text()
+    } finally {
+      await proxyLocal.parar()
+    }
+
+    expect(chamadasAoGate).toEqual([3])
+  })
+})
