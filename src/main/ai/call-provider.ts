@@ -33,11 +33,13 @@ import {
   TIMEOUT_PADRAO_MS,
   calcularCustoUsd,
   estimarCustoUsd,
+  isRotaSubscriptionLimited,
   isRotaUnmetered,
   type AiProvider,
   type AiRequest,
   type AiStreamEvent,
-  type CostEvent
+  type CostEvent,
+  type QuotaState
 } from '@shared/domain/ai'
 import type { WorkspaceId } from '@shared/domain/entities'
 import { log } from '../logging/logger'
@@ -69,6 +71,17 @@ export interface VerificadorDeContexto {
   buscar(packId: string): { readonly id: string } | undefined
 }
 
+/**
+ * O que o ponto único precisa saber sobre quota: **o estado atual da rota**, quando ela é
+ * `subscription_limited` (SPEC-Entrega-04, critério 12).
+ *
+ * Interface mínima, como `VerificadorDeContexto`: o gate só lê, nunca decide onde/como a quota
+ * é atualizada — isso é responsabilidade de quem grava (fora do escopo desta chamada).
+ */
+export interface VerificadorDeQuota {
+  ler(userId: string, workspace: WorkspaceId, provider: AiProvider): QuotaState | undefined
+}
+
 export class AiCallService {
   constructor(
     /**
@@ -98,7 +111,13 @@ export class AiCallService {
      * pela mesma razão do gate de orçamento: é **obrigatório**. Um `AiCallService` sem ele
      * seria o caminho de geração sem manifesto que a fatia existe para fechar.
      */
-    private readonly contextPacks: VerificadorDeContexto
+    private readonly contextPacks: VerificadorDeContexto,
+    /**
+     * O estado de quota da rota de assinatura (SPEC-Entrega-04, critério 12). Opcional para não
+     * quebrar todo call site existente do MVP-005 ao MVP-008 — nenhum deles usa `claude-code`
+     * hoje. Ausente, o gate de quota simplesmente não roda (equivalente a "sempre desconhecida").
+     */
+    private readonly quota?: VerificadorDeQuota
   ) {}
 
   /**
@@ -219,6 +238,30 @@ export class AiCallService {
         naoSaiu: true
       })
       return
+    }
+
+    // (3b) O gate de **quota** (SPEC-Entrega-04, critério 12). Só corre para rota
+    // subscription_limited, e só barra quando o restante é **conhecido e zerado** com reset no
+    // futuro — quota desconhecida não vira saldo infinito, mas também não vira bloqueio por
+    // omissão: a spec pede melhor esforço, não recusa por falta de dado.
+    if (isRotaSubscriptionLimited(provider) && this.quota !== undefined) {
+      const estado = this.quota.ler(ctx.userId, ctx.workspace, provider)
+      const zerada =
+        estado !== undefined &&
+        estado.restante === 0 &&
+        estado.resetEm !== undefined &&
+        new Date(estado.resetEm).getTime() > Date.now()
+
+      if (zerada) {
+        yield this.finalizar(id, ctx, provider, model, {
+          estado: 'falhou',
+          erro: `Quota da rota de assinatura esgotada. Reinicia em ${estado.resetEm}.`,
+          latenciaTotalMs: 0,
+          estimadoUsd,
+          naoSaiu: true
+        })
+        return
+      }
     }
 
     // (1) Classificação — `api.external-call` é tier **médio** na taxonomia semeada

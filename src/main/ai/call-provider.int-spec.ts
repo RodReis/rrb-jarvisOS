@@ -43,6 +43,7 @@ type AdapterChunk = import('./adapter').AdapterChunk
 type AiAdapter = import('./adapter').AiAdapter
 type AdapterRequest = import('./adapter').AdapterRequest
 type AiStreamEvent = import('@shared/domain/ai').AiStreamEvent
+type VerificadorDeQuota = import('./call-provider').VerificadorDeQuota
 
 /** Cifra dublada — mesma do vault: XOR, para o byte gravado não ser o original. */
 const MASCARA = 0x5a
@@ -131,8 +132,10 @@ function gate(limites?: Partial<BudgetLimitsInput>, agora?: () => Date): BudgetS
 
 function servico(
   adapter: AiAdapter,
-  budget: BudgetService = gate({ dailyLimit: 1000, monthlyLimit: 1000 })
+  budget?: BudgetService,
+  overrides?: { quota?: VerificadorDeQuota }
 ): InstanceType<typeof AiCallService> {
+  const orcamento = budget ?? gate({ dailyLimit: 1000, monthlyLimit: 1000 })
   return new AiCallService(
     // Os quatro do contrato. Os três da F04 recebem o mesmo dublê: esta suíte é sobre o
     // **ponto único**, e o que ela precisa é que todo provider passe por ele — não que cada
@@ -141,7 +144,7 @@ function servico(
     credentials,
     new PolicyService(audit, () => USUARIO),
     audit,
-    budget,
+    orcamento,
     // Roteamento com todos os providers disponíveis: esta suíte testa o **ponto único**, e
     // pedidos com provider explícito nem chegam a consultá-lo. Os testes de rota têm suíte
     // própria.
@@ -150,8 +153,19 @@ function servico(
     // `PACK`, e nada mais: os pedidos desta suíte o declaram, e o teste do gate em si passa um
     // id inexistente. Um dublê que aceitasse qualquer id faria o gate passar sempre — e a suíte
     // ficaria verde sobre um gate que não gateia.
-    { buscar: (packId: string) => (packId === PACK ? { id: PACK } : undefined) }
+    { buscar: (packId: string) => (packId === PACK ? { id: PACK } : undefined) },
+    // O verificador de quota (SPEC-Entrega-04, critério 12). Ausente por padrão — os testes
+    // desta suíte não são sobre quota, e o gate deve ser opcional. Só entra quando o teste o
+    // passa explicitamente via override.
+    overrides?.quota
   )
+}
+
+/** Fábrica local usada pelos testes de quota (nome pedido pelo brief da Task 3). */
+function criarServico(overrides?: {
+  quota?: VerificadorDeQuota
+}): InstanceType<typeof AiCallService> {
+  return servico(adapterFalso(ROTEIRO_OK), gate({ dailyLimit: 1000, monthlyLimit: 1000 }), overrides)
 }
 
 beforeEach(() => {
@@ -844,5 +858,69 @@ describe('contexto e rota (SPEC-Planejamento-02, critérios 1 e 1a)', () => {
     )
 
     expect(depois.at(-1)).toMatchObject({ estado: 'concluido' })
+  })
+})
+
+describe('AiCallService — gate de quota subscription_limited (SPEC-Entrega-04, critério 12)', () => {
+  it('rota claude-code com quota zerada e reset futuro é barrada antes de sair', async () => {
+    const quotaZerada = {
+      ler: () => ({
+        provider: 'claude-code' as const,
+        origem: 'medida' as const,
+        restante: 0,
+        limite: 100,
+        resetEm: new Date(Date.now() + 60_000).toISOString(),
+        atualizadoEm: new Date().toISOString()
+      })
+    }
+    const service = criarServico({ quota: quotaZerada })
+
+    const eventos = await coletar(
+      service.call(
+        { provider: 'claude-code', prompt: 'oi', contextPackId: PACK },
+        { userId: USUARIO, workspace: 'jarvis' }
+      )
+    )
+
+    const fim = eventos.at(-1)
+    expect(fim?.tipo).toBe('fim')
+    expect(fim?.tipo === 'fim' ? fim.estado : undefined).toBe('falhou')
+    expect(fim?.tipo === 'fim' ? fim.erro : '').toMatch(/quota/i)
+  })
+
+  it('quota desconhecida não barra a chamada (melhor esforço, não saldo negativo)', async () => {
+    const quotaDesconhecida = { ler: () => undefined }
+    const service = criarServico({ quota: quotaDesconhecida })
+
+    const eventos = await coletar(
+      service.call(
+        { provider: 'claude-code', prompt: 'oi', contextPackId: PACK },
+        { userId: USUARIO, workspace: 'jarvis' }
+      )
+    )
+
+    const fim = eventos.at(-1)
+    expect(fim?.tipo === 'fim' ? fim.estado : undefined).toBe('concluido')
+  })
+
+  it('quota com restante > 0 segue normalmente', async () => {
+    const quotaOk = {
+      ler: () => ({
+        provider: 'claude-code' as const,
+        origem: 'medida' as const,
+        restante: 10,
+        atualizadoEm: new Date().toISOString()
+      })
+    }
+    const service = criarServico({ quota: quotaOk })
+
+    const eventos = await coletar(
+      service.call(
+        { provider: 'claude-code', prompt: 'oi', contextPackId: PACK },
+        { userId: USUARIO, workspace: 'jarvis' }
+      )
+    )
+
+    expect(eventos.at(-1)?.tipo === 'fim' ? (eventos.at(-1) as { estado: string }).estado : undefined).toBe('concluido')
   })
 })
