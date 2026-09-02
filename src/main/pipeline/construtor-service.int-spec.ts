@@ -80,8 +80,8 @@ describe('ConstrutorService — tentativa única bem-sucedida', () => {
     expect(resultado.estadoFinal).toBe('PR_CI')
     expect(resultado.tentativas).toHaveLength(1)
     expect(resultado.tentativas[0]?.numero).toBe(1)
-    expect(pipeline.transicionar).toHaveBeenCalledWith('run-1', 'RUNNING', 'VALIDATING', expect.any(Date))
-    expect(pipeline.transicionar).toHaveBeenCalledWith('run-1', 'VALIDATING', 'PR_CI', expect.any(Date))
+    expect(pipeline.transicionar).toHaveBeenCalledWith('run-1', 'RUNNING', 'VALIDATING', expect.any(Date), undefined)
+    expect(pipeline.transicionar).toHaveBeenCalledWith('run-1', 'VALIDATING', 'PR_CI', expect.any(Date), undefined)
   })
 })
 
@@ -115,7 +115,7 @@ describe('ConstrutorService — recuperação corrigível', () => {
     expect(resultado.estadoFinal).toBe('PR_CI')
     expect(resultado.tentativas).toHaveLength(2)
     expect(resultado.tentativas[0]?.classificacao).toBe('corrigivel')
-    expect(pipeline.transicionar).toHaveBeenCalledWith('run-1', 'VALIDATING', 'RUNNING', expect.any(Date))
+    expect(pipeline.transicionar).toHaveBeenCalledWith('run-1', 'VALIDATING', 'RUNNING', expect.any(Date), undefined)
   })
 })
 
@@ -139,7 +139,7 @@ describe('ConstrutorService — três tentativas esgotadas', () => {
     expect(resultado.estadoFinal).toBe('BLOCKED')
     expect(resultado.tentativas).toHaveLength(3)
     expect(resultado.bloqueio?.causa).toBe('corrigivel')
-    expect(pipeline.transicionar).toHaveBeenCalledWith('run-1', 'VALIDATING', 'BLOCKED', expect.any(Date))
+    expect(pipeline.transicionar).toHaveBeenCalledWith('run-1', 'VALIDATING', 'BLOCKED', expect.any(Date), expect.anything())
   })
 })
 
@@ -190,8 +190,8 @@ describe('ConstrutorService — bloqueio por falha do claude sai de RUNNING, nã
     // VALIDATING -> BLOCKED aqui (o bug do finding #1), a chamada seria recusada (`de` não bate
     // com o estado real do run, que nunca saiu de RUNNING) e o resultado devolvido seria
     // inconsistente com o banco — exatamente o que este teste existe para pegar.
-    expect(pipeline.transicionar).toHaveBeenCalledWith('run-1', 'RUNNING', 'BLOCKED', expect.any(Date))
-    expect(pipeline.transicionar).not.toHaveBeenCalledWith('run-1', 'VALIDATING', 'BLOCKED', expect.any(Date))
+    expect(pipeline.transicionar).toHaveBeenCalledWith('run-1', 'RUNNING', 'BLOCKED', expect.any(Date), expect.anything())
+    expect(pipeline.transicionar).not.toHaveBeenCalledWith('run-1', 'VALIDATING', 'BLOCKED', expect.any(Date), expect.anything())
   })
 })
 
@@ -422,5 +422,60 @@ describe('ConstrutorService — verificação de escopo contra Git real (critica
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('ConstrutorService — bloqueio traz ação mínima de retomada (critério 7)', () => {
+  it('bloqueio corrigível esgotado traz retomada acionável', async () => {
+    const docker = dockerDuble((comando) => {
+      if (comando[0] === 'claude') return { ok: true, stdout: '', stderr: '', exitCode: 0, timeoutExcedido: false }
+      if (comando.includes('test')) return { ok: false, stdout: 'FAIL sempre', stderr: '', exitCode: 1, timeoutExcedido: false }
+      return { ok: true, stdout: 'ok', stderr: '', exitCode: 0, timeoutExcedido: false }
+    })
+    const service = new ConstrutorService(docker, repoDuble(), auditDuble(), () => 'u1', () => 'ws1' as never)
+
+    const resultado = await service.construir({ runId: 'run-1', sandbox, promptInicial: 'x', comandosDeValidacao })
+
+    expect(resultado.bloqueio?.retomada).toBeTruthy()
+    expect(resultado.bloqueio?.retomada.length).toBeGreaterThan(10)
+  })
+
+  it('bloqueio externo traz retomada distinta do corrigível', async () => {
+    const docker = dockerDuble(() => ({ ok: false, stdout: '', stderr: 'ETIMEDOUT', exitCode: 1, timeoutExcedido: false }))
+    const service = new ConstrutorService(docker, repoDuble(), auditDuble(), () => 'u1', () => 'ws1' as never)
+
+    const resultado = await service.construir({ runId: 'run-1', sandbox, promptInicial: 'x', comandosDeValidacao })
+
+    expect(resultado.bloqueio?.causa).toBe('externo')
+    expect(resultado.bloqueio?.retomada).toMatch(/conectividade|rede|externo|serviço/i)
+  })
+})
+
+describe('ConstrutorService — bloqueio persiste os cinco campos do BloqueioExterno (CONVENTION §4)', () => {
+  it('transicionar para BLOCKED recebe causa, evidencia, tentativas, porQueNaoSeguir e retomada', async () => {
+    const docker = dockerDuble((comando) => {
+      if (comando[0] === 'claude') return { ok: true, stdout: '', stderr: '', exitCode: 0, timeoutExcedido: false }
+      if (comando.includes('test')) return { ok: false, stdout: 'FAIL sempre', stderr: '', exitCode: 1, timeoutExcedido: false }
+      return { ok: true, stdout: 'ok', stderr: '', exitCode: 0, timeoutExcedido: false }
+    })
+    const pipeline = repoDuble()
+    const service = new ConstrutorService(docker, pipeline, auditDuble(), () => 'u1', () => 'ws1' as never)
+
+    const resultado = await service.construir({ runId: 'run-1', sandbox, promptInicial: 'x', comandosDeValidacao })
+
+    expect(resultado.estadoFinal).toBe('BLOCKED')
+    expect(pipeline.transicionar).toHaveBeenCalledWith(
+      'run-1',
+      'VALIDATING',
+      'BLOCKED',
+      expect.any(Date),
+      expect.objectContaining({
+        causa: 'corrigivel',
+        evidencia: expect.any(String),
+        tentativas: 3,
+        porQueNaoSeguir: expect.any(String),
+        retomada: expect.any(String)
+      })
+    )
   })
 })

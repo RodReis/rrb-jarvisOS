@@ -16,6 +16,7 @@
  */
 
 import type { WorkspaceId } from '@shared/domain/entities'
+import type { BloqueioExterno } from '@shared/domain/pacote-estrutural'
 import { fugasDoEscopo, type SandboxPreparado } from '@shared/domain/preflight'
 import { classificarFalha, proximaTentativaPermitida, type ClassificacaoDeFalha, type Tentativa } from '@shared/domain/attempt'
 import type { AuditRepository } from '../storage/audit-repository'
@@ -44,7 +45,7 @@ export interface PedidoDeConstrucao {
 export interface ResultadoDaConstrucao {
   readonly estadoFinal: 'PR_CI' | 'BLOCKED'
   readonly tentativas: readonly Tentativa[]
-  readonly bloqueio?: { readonly causa: ClassificacaoDeFalha; readonly evidencia: string }
+  readonly bloqueio?: { readonly causa: ClassificacaoDeFalha; readonly evidencia: string; readonly retomada: string }
 }
 
 export class ConstrutorService {
@@ -204,12 +205,25 @@ export class ConstrutorService {
     causa: ClassificacaoDeFalha,
     evidencia: string
   ): ResultadoDaConstrucao {
-    this.transicionar(runId, de, 'BLOCKED')
-    return { estadoFinal: 'BLOCKED', tentativas, bloqueio: { causa, evidencia } }
+    const retomada = retomadaPara(causa)
+    const bloqueio: BloqueioExterno = {
+      causa,
+      evidencia,
+      tentativas: tentativas.length,
+      porQueNaoSeguir: porQueNaoSeguirPara(causa),
+      retomada
+    }
+    this.transicionar(runId, de, 'BLOCKED', bloqueio)
+    return { estadoFinal: 'BLOCKED', tentativas, bloqueio: { causa, evidencia, retomada } }
   }
 
-  private transicionar(runId: string, de: Parameters<PipelineRepository['transicionar']>[1], para: Parameters<PipelineRepository['transicionar']>[2]): void {
-    const ok = this.pipeline.transicionar(runId, de, para, this.agora())
+  private transicionar(
+    runId: string,
+    de: Parameters<PipelineRepository['transicionar']>[1],
+    para: Parameters<PipelineRepository['transicionar']>[2],
+    bloqueio?: BloqueioExterno
+  ): void {
+    const ok = this.pipeline.transicionar(runId, de, para, this.agora(), bloqueio)
     this.audit.append({
       user_id: this.userId(),
       workspace_id: this.workspaceId(),
@@ -219,6 +233,34 @@ export class ConstrutorService {
     if (!ok) {
       log.agent.warn('Transição de pipeline recusada pelo compare-and-set', { runId, de, para })
     }
+  }
+}
+
+/** A ação mínima que destrava o bloqueio, por classificação (critério 7). */
+function retomadaPara(causa: ClassificacaoDeFalha): string {
+  switch (causa) {
+    case 'corrigivel':
+      return 'As três tentativas esgotaram sem passar na validação. Revisar o diagnóstico da última tentativa e decidir se a SPEC precisa de ajuste antes de retomar.'
+    case 'externo':
+      return 'Falha de conectividade, autenticação ou quota externa. Verificar o serviço e retomar a fatia quando ele responder.'
+    case 'pi':
+      return 'A construção encontrou uma decisão de produto não coberta pela SPEC. Aguardar orientação do PI antes de retomar.'
+    case 'risco-usuario':
+      return 'A alteração saiu do escopo declarado. Revisar o diff e decidir se o escopo da SPEC precisa mudar, ou se o executor deve ser retomado com o escopo original.'
+  }
+}
+
+/** Por que seguir em frente seria incorreto, por classificação — o quinto campo do BloqueioExterno. */
+function porQueNaoSeguirPara(causa: ClassificacaoDeFalha): string {
+  switch (causa) {
+    case 'corrigivel':
+      return 'Seguir sem passar na validação publicaria código que não atende ao próprio critério que a fatia definiu como pronto.'
+    case 'externo':
+      return 'Sem o serviço externo respondendo, uma nova tentativa reproduz a mesma falha — não há o que o código consiga corrigir sozinho.'
+    case 'pi':
+      return 'A decisão pendente é de produto, não de implementação — decidir sozinho aqui seria inventar escopo que a SPEC não definiu.'
+    case 'risco-usuario':
+      return 'A alteração já saiu do escopo declarado no preflight; continuar arriscaria sobrescrever trabalho fora da fronteira autorizada.'
   }
 }
 
