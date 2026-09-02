@@ -1151,6 +1151,65 @@ const MIGRATIONS: readonly string[] = [
     observado_em        TEXT NOT NULL
   );
   CREATE INDEX idx_ruleset_snapshot_run ON ruleset_snapshot(user_id, run_id, observado_em);
+  `,
+  // 28 — ExecutionLedger (SPEC-Entrega-06, critérios 1 e 2). A prova de que um run aconteceu.
+  //
+  // `UNIQUE(user_id, run_id)`: a prova é **uma** por run. Ao contrário de `external_ref`, que
+  // guarda onde o recurso está (um fato que muda) e por isso faz upsert, este guarda o que
+  // aconteceu — e regravar apagaria a evidência. Retomada cria run novo (`continuaDe`), nunca
+  // reescreve o anterior. O `UNIQUE` põe a regra no banco em vez de confiar no chamador.
+  `
+  CREATE TABLE execution_ledger (
+    id            TEXT PRIMARY KEY,
+    user_id       TEXT NOT NULL,
+    project_id    TEXT NOT NULL,
+    run_id        TEXT NOT NULL,
+    estado_final  TEXT NOT NULL,
+    duracao_ms    INTEGER NOT NULL,
+    tentativas    INTEGER NOT NULL,
+    tokens        INTEGER NOT NULL,
+    creditos      REAL NOT NULL,
+    custo_usd     REAL NOT NULL,
+    eventos       TEXT NOT NULL,
+    head_sha      TEXT,
+    merge_sha     TEXT,
+    checks        TEXT NOT NULL,
+    artefatos     TEXT NOT NULL,
+    encerrado_em  TEXT NOT NULL,
+    UNIQUE(user_id, run_id)
+  );
+  CREATE INDEX idx_execution_ledger_run ON execution_ledger(user_id, run_id);
+  `,
+  // 29 — retenção e pendência de limpeza (SPEC-Entrega-06, critérios 5 e 9).
+  //
+  // `expirado_em` em vez de DELETE: expirar tira o **anexo pesado**, não a prova. Hash, bytes e
+  // data continuam na linha, porque é o hash que o ledger referencia — apagar a linha deixaria
+  // uma referência versionada apontando para o nada, que é o que o critério 9 proíbe.
+  `
+  CREATE TABLE artefato_retido (
+    id            TEXT PRIMARY KEY,
+    user_id       TEXT NOT NULL,
+    run_id        TEXT NOT NULL,
+    hash          TEXT NOT NULL,
+    bytes         INTEGER NOT NULL,
+    criado_em     TEXT NOT NULL,
+    fixado        INTEGER NOT NULL,
+    estado_do_run TEXT NOT NULL,
+    expirado_em   TEXT
+  );
+  CREATE INDEX idx_artefato_retido_user ON artefato_retido(user_id, criado_em);
+
+  CREATE TABLE pendencia_de_limpeza (
+    id            TEXT PRIMARY KEY,
+    user_id       TEXT NOT NULL,
+    run_id        TEXT NOT NULL,
+    recurso       TEXT NOT NULL,
+    identificador TEXT NOT NULL,
+    motivo        TEXT NOT NULL,
+    em            TEXT NOT NULL,
+    resolvida_em  TEXT
+  );
+  CREATE INDEX idx_pendencia_limpeza_user ON pendencia_de_limpeza(user_id, em);
   `
 ]
 
