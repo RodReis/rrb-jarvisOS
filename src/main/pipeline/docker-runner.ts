@@ -59,6 +59,15 @@ export const RAIZ_NO_CONTAINER = '/work'
 export const GITMETA_NO_CONTAINER = `${RAIZ_NO_CONTAINER}/.gitmeta`
 export const GITCOMMON_NO_CONTAINER = '/gitcommon'
 
+/**
+ * A imagem do sidecar de egress (critério 12).
+ *
+ * `alpine/socat`, e não a imagem do executor: o sidecar não roda código do agente, só encaminha
+ * uma porta — trazer `node:22-bookworm` para isso seria centenas de MB para uma tarefa de rede
+ * pura. Pinada por tag, pela mesma razão da `IMAGEM_PADRAO`.
+ */
+export const IMAGEM_DO_PROXY_DE_EGRESS = 'alpine/socat:1.8.0.1'
+
 export interface MontagemDoSandbox {
   readonly worktreeNoHost: string
   /**
@@ -73,7 +82,15 @@ export interface MontagemDoSandbox {
   /** O `.git` principal. Montado **somente-leitura** (emenda 5 de 2026-08-31). */
   readonly gitCommonNoHost: string
   readonly containerNome: string
-  /** A URL do proxy do host. Única forma de o executor alcançar modelo. */
+  /**
+   * A rede de egress do run (critério 12). O executor se conecta **só** a ela — nunca à `bridge`
+   * padrão, que teria rota de saída para a internet.
+   */
+  readonly redeDeEgress: string
+  /**
+   * A URL do proxy que o container recebe: o sidecar de egress, não o proxy do host diretamente.
+   * O executor não tem rota nenhuma até `host.docker.internal` de dentro da rede `--internal`.
+   */
   readonly proxyUrl: string
   readonly imagem?: string
 }
@@ -176,6 +193,11 @@ export class DockerRunner {
    *
    * O ambiente carrega **só** `ANTHROPIC_BASE_URL`. Nenhum token, nenhuma chave, nenhum
    * `~/.claude`: a credencial fica no main e o proxy a injeta (critérios 9 e 11).
+   *
+   * **`--network` é a única rede do container** (critério 12) — nada de `--add-host
+   * host.docker.internal`: medido com Docker real, essa entrada dá rota até o host por fora da
+   * rede `--internal`, o que reabriria exatamente o caminho que o sandbox de egress existe para
+   * fechar. O container só alcança quem estiver na `redeDeEgress` — hoje, só o sidecar.
    */
   subir(montagem: MontagemDoSandbox, cwd: string): boolean {
     const execucao = this.terminal.run(
@@ -186,6 +208,8 @@ export class DockerRunner {
           '--detach',
           '--name',
           montagem.containerNome,
+          '--network',
+          montagem.redeDeEgress,
           '--volume',
           `${montagem.worktreeNoHost}:${RAIZ_NO_CONTAINER}`,
           '--volume',
@@ -200,10 +224,6 @@ export class DockerRunner {
           `GIT_DIR=${GITMETA_NO_CONTAINER}`,
           '--env',
           `GIT_WORK_TREE=${RAIZ_NO_CONTAINER}`,
-          // O proxy do host visto de dentro do container. É o único destino de rede que o
-          // executor precisa alcançar além do registro de pacotes do projeto.
-          '--add-host',
-          'host.docker.internal:host-gateway',
           '--env',
           `ANTHROPIC_BASE_URL=${montagem.proxyUrl}`,
           montagem.imagem ?? IMAGEM_PADRAO,
@@ -223,6 +243,131 @@ export class DockerRunner {
       return false
     }
     return true
+  }
+
+  /**
+   * A rede de egress do run existe? Base da reutilização/reconciliação, como `containerExiste`.
+   */
+  redeDeEgressExiste(nome: string, cwd: string): boolean {
+    const execucao = this.terminal.run(
+      { binary: BINARIO_DOCKER, args: ['network', 'inspect', nome], cwd },
+      this.workspaceId()
+    )
+    return execucao.state === 'concluido'
+  }
+
+  /**
+   * Cria a rede `--internal` do run (critério 12).
+   *
+   * `--internal` é a garantia inteira: sem ela, a rede teria rota de saída e `api.github.com`
+   * continuaria alcançável — medido com Docker real. Devolve `true` também quando a rede já
+   * existe (o `docker network create` idempotente do lado do app): retomar um run cujo preflight
+   * morreu depois de criar a rede não deve falhar por "já existe".
+   */
+  criarRedeDeEgress(nome: string, cwd: string): boolean {
+    if (this.redeDeEgressExiste(nome, cwd)) return true
+
+    const execucao = this.terminal.run(
+      { binary: BINARIO_DOCKER, args: ['network', 'create', '--internal', nome], cwd },
+      this.workspaceId()
+    )
+    if (execucao.state !== 'concluido') {
+      log.agent.warn('Rede de egress não subiu', { rede: nome, estado: execucao.state })
+      return false
+    }
+    return true
+  }
+
+  /**
+   * Sobe o sidecar de egress: a ponte entre a rede `--internal` do run e o proxy do host.
+   *
+   * **Duas redes, uma conexão de cada vez** — `docker run --network` só aceita uma rede na
+   * criação; a segunda entra por `docker network connect` logo depois (medido: é o padrão que
+   * funciona). O sidecar nasce na rede de egress do run — onde o executor está — e depois se
+   * conecta à `bridge` padrão, que tem rota até `host.docker.internal`. É esse segundo pé que
+   * fecha o circuito sem dar ao executor rota nenhuma para fora da rede `--internal`.
+   *
+   * `socat TCP-LISTEN:porta,fork,reuseaddr TCP:host.docker.internal:portaDoProxy` é encaminhamento
+   * puro — não interpreta, não decide, só repassa bytes de uma ponta a outra.
+   */
+  subirProxyDeEgress(
+    dados: {
+      readonly nome: string
+      readonly redeDeEgress: string
+      readonly porta: number
+      readonly proxyDoHost: string
+      readonly imagem?: string
+    },
+    cwd: string
+  ): boolean {
+    const subiu = this.terminal.run(
+      {
+        binary: BINARIO_DOCKER,
+        args: [
+          'run',
+          '--detach',
+          '--name',
+          dados.nome,
+          '--network',
+          dados.redeDeEgress,
+          // A imagem já tem `socat` como entrypoint (medido: repeti-lo aqui duplica o comando e
+          // o container morre com "exactly 2 addresses required (there are 3)"). Os dois
+          // argumentos seguintes são os endereços do `socat`, não um comando a executar.
+          dados.imagem ?? IMAGEM_DO_PROXY_DE_EGRESS,
+          `TCP-LISTEN:${dados.porta},fork,reuseaddr`,
+          `TCP:${dados.proxyDoHost}`
+        ],
+        cwd
+      },
+      this.workspaceId()
+    )
+    if (subiu.state !== 'concluido') {
+      log.agent.warn('Sidecar de egress não subiu', { sidecar: dados.nome, estado: subiu.state })
+      return false
+    }
+
+    const conectou = this.terminal.run(
+      { binary: BINARIO_DOCKER, args: ['network', 'connect', 'bridge', dados.nome], cwd },
+      this.workspaceId()
+    )
+    if (conectou.state !== 'concluido') {
+      log.agent.warn('Sidecar de egress não alcançou a bridge padrão', {
+        sidecar: dados.nome,
+        estado: conectou.state
+      })
+      return false
+    }
+    return true
+  }
+
+  /**
+   * O IP do sidecar **na rede de egress** — não o nome.
+   *
+   * Medido com Docker real: o DNS embutido do Docker (`127.0.0.11`) não resolve nome de
+   * container dentro de uma rede `--internal`, mesmo entre dois membros dela — toda consulta
+   * volta `SERVFAIL`. O executor recebe este IP como `ANTHROPIC_BASE_URL`, nunca o nome do
+   * sidecar; um hostname ali seria uma URL que o próprio container não consegue resolver.
+   */
+  ipDoProxyNaRedeDeEgress(
+    nomeDoSidecar: string,
+    redeDeEgress: string,
+    cwd: string
+  ): string | undefined {
+    const execucao = this.terminal.run(
+      {
+        binary: BINARIO_DOCKER,
+        args: [
+          'inspect',
+          '--format',
+          `{{(index .NetworkSettings.Networks "${redeDeEgress}").IPAddress}}`,
+          nomeDoSidecar
+        ],
+        cwd
+      },
+      this.workspaceId()
+    )
+    const ip = execucao.stdout.trim()
+    return execucao.state === 'concluido' && ip !== '' ? ip : undefined
   }
 
   /**

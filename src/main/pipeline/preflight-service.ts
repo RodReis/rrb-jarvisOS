@@ -30,7 +30,10 @@ import type { BloqueioExterno } from '@shared/domain/pacote-estrutural'
 import {
   listaDePathsValida,
   nomeDaBranch,
+  nomeDaRedeDeEgress,
   nomeDoContainer,
+  nomeDoProxyDeEgress,
+  PORTA_DO_PROXY_DE_EGRESS,
   recursoDoContainer,
   recursoDoWorktree,
   type PathsPermitidos,
@@ -261,7 +264,61 @@ export class PreflightService {
       )
     }
 
-    // 10. O sandbox sobe com o worktree montado e nenhum segredo (critérios 8 e 9).
+    // 10. A rede de egress e o sidecar (critério 12). Antes do container do executor: ele nasce
+    //     já preso à rede `--internal`, nunca com uma janela de rede aberta enquanto se prepara.
+    const redeDeEgress = nomeDaRedeDeEgress(pedido.runId)
+    const redeCriada = this.deps.docker.criarRedeDeEgress(redeDeEgress, pedido.raizOperacional)
+    if (!redeCriada) {
+      this.liberarRecursos(userId, pedido.runId)
+      return this.recusar(
+        pedido,
+        'docker-indisponivel',
+        `A rede de egress ${redeDeEgress} não subiu.`,
+        'Conferir o Docker Desktop e retomar a fatia.'
+      )
+    }
+
+    const nomeProxy = nomeDoProxyDeEgress(pedido.runId)
+    const proxySubiu = this.deps.docker.subirProxyDeEgress(
+      {
+        nome: nomeProxy,
+        redeDeEgress,
+        porta: PORTA_DO_PROXY_DE_EGRESS,
+        proxyDoHost: pedido.proxyUrl
+      },
+      pedido.raizOperacional
+    )
+    if (!proxySubiu) {
+      this.liberarRecursos(userId, pedido.runId)
+      return this.recusar(
+        pedido,
+        'proxy-indisponivel',
+        `O sidecar de egress ${nomeProxy} não subiu.`,
+        'Conferir o Docker Desktop e retomar a fatia.'
+      )
+    }
+
+    // A URL que o executor recebe é a do sidecar **por IP**, nunca por nome: o DNS embutido do
+    // Docker não resolve nome de container dentro de uma rede `--internal` (medido — SERVFAIL
+    // mesmo entre dois membros da mesma rede). E nunca a URL real do proxy: o executor não tem
+    // rota nenhuma até `host.docker.internal` de dentro dessa rede.
+    const ipDoProxy = this.deps.docker.ipDoProxyNaRedeDeEgress(
+      nomeProxy,
+      redeDeEgress,
+      pedido.raizOperacional
+    )
+    if (ipDoProxy === undefined) {
+      this.liberarRecursos(userId, pedido.runId)
+      return this.recusar(
+        pedido,
+        'proxy-indisponivel',
+        `Não foi possível obter o IP do sidecar de egress ${nomeProxy} na rede ${redeDeEgress}.`,
+        'Conferir o Docker Desktop e retomar a fatia.'
+      )
+    }
+    const proxyUrlDoExecutor = `http://${ipDoProxy}:${PORTA_DO_PROXY_DE_EGRESS}`
+
+    // 11. O sandbox sobe com o worktree montado e nenhum segredo (critérios 8 e 9).
     //
     // O metadado do Git vai **copiado**: o `commondir` precisa de um caminho no host e outro no
     // container, e é um arquivo só. Reescrevê-lo no original faz o host perder o worktree
@@ -286,7 +343,8 @@ export class PreflightService {
         gitMetaNoHost: gitMeta,
         gitCommonNoHost: `${pedido.repositorio}/.git`,
         containerNome: nomeContainer,
-        proxyUrl: pedido.proxyUrl
+        redeDeEgress,
+        proxyUrl: proxyUrlDoExecutor
       },
       pedido.raizOperacional
     )
@@ -308,7 +366,7 @@ export class PreflightService {
       branch,
       worktreeNoHost: worktree,
       pathsPermitidos: paths,
-      proxyUrl: pedido.proxyUrl
+      proxyUrl: proxyUrlDoExecutor
     }
 
     this.deps.audit.append({
@@ -404,6 +462,13 @@ export class PreflightService {
     return { reason, mensagem, retomada }
   }
 
+  /**
+   * Solta os leases do run. **Não para nem remove container, rede ou sidecar** — a mesma postura
+   * que já valia para o container do executor antes desta fatia: um recurso Docker órfão de
+   * preflight que falhou no meio é para a reconciliação encontrar e classificar (M9-F02), e para
+   * a limpeza da M9-F06 remover. Um `docker stop`/`network rm` daqui seria um segundo caminho de
+   * remoção fora do que essas fatias já cravaram.
+   */
   private liberarRecursos(userId: string, runId: string): void {
     this.deps.leases.liberar(userId, recursoDoWorktree(runId), runId)
     this.deps.leases.liberar(userId, recursoDoContainer(runId), runId)
