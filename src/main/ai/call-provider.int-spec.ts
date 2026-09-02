@@ -164,8 +164,23 @@ function servico(
 /** Fábrica local usada pelos testes de quota (nome pedido pelo brief da Task 3). */
 function criarServico(overrides?: {
   quota?: VerificadorDeQuota
+  /**
+   * Espiona o `record` do `BudgetService` real (SQLite de verdade por baixo), sem substituir o
+   * gate por um dublê: `vi.spyOn` com `mockImplementation` que chama através preserva o
+   * comportamento real e só entrega ao teste o que foi gravado (critério 9).
+   */
+  budgetRecord?: (input: unknown) => void
 }): InstanceType<typeof AiCallService> {
-  return servico(adapterFalso(ROTEIRO_OK), gate({ dailyLimit: 1000, monthlyLimit: 1000 }), overrides)
+  const orcamento = gate({ dailyLimit: 1000, monthlyLimit: 1000 })
+  if (overrides?.budgetRecord !== undefined) {
+    const espiao = overrides.budgetRecord
+    const original = orcamento.record.bind(orcamento)
+    vi.spyOn(orcamento, 'record').mockImplementation((input, scope) => {
+      espiao(input)
+      return original(input, scope)
+    })
+  }
+  return servico(adapterFalso(ROTEIRO_OK), orcamento, overrides)
 }
 
 beforeEach(() => {
@@ -922,5 +937,34 @@ describe('AiCallService — gate de quota subscription_limited (SPEC-Entrega-04,
     )
 
     expect(eventos.at(-1)?.tipo === 'fim' ? (eventos.at(-1) as { estado: string }).estado : undefined).toBe('concluido')
+  })
+})
+
+describe('AiCallService — rota claude-code registra uso sem valor monetário, por tentativa (critério 9)', () => {
+  it('CostEvent da rota claude-code tem unmetered=true, estimadoUsd/realUsd null, runId e tentativa presentes', async () => {
+    const recordCalls: unknown[] = []
+    const service = criarServico({
+      budgetRecord: (input: unknown) => recordCalls.push(input)
+    })
+
+    await coletar(
+      service.call(
+        { provider: 'claude-code', prompt: 'oi', contextPackId: PACK, runId: 'run-9', tentativa: 2 },
+        { userId: USUARIO, workspace: 'jarvis' }
+      )
+    )
+
+    expect(recordCalls).toHaveLength(1)
+    const gravado = recordCalls[0] as {
+      unmetered: boolean
+      estimadoUsd: number | null
+      realUsd?: number | null
+      runId?: string
+      tentativa?: number
+    }
+    expect(gravado.unmetered).toBe(true)
+    expect(gravado.estimadoUsd).toBeNull()
+    expect(gravado.runId).toBe('run-9')
+    expect(gravado.tentativa).toBe(2)
   })
 })
