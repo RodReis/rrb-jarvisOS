@@ -12,7 +12,8 @@ import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Database as Db } from 'better-sqlite3'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
+import type { WorkspaceId } from '@shared/domain/entities'
 import type { FaseDeCancelamento } from '@shared/domain/limpeza'
 import type { EstadoDoRun } from '@shared/domain/pipeline'
 import { recursoDaPorta, recursoDoContainer, recursoDoWorktree } from '@shared/domain/preflight'
@@ -41,24 +42,28 @@ function sandbox(): SandboxPreparado {
     baseSha: 'a'.repeat(40),
     branch: 'feat/x',
     worktreeNoHost: worktree,
-    pathsPermitidos: { origem: 'spec', paths: ['src/**'] },
+    pathsPermitidos: {
+      origem: 'spec',
+      paths: ['src/**'],
+      justificativa: 'Escopo declarado na SPEC da fatia.'
+    },
     proxyUrl: 'http://sidecar:8080'
   }
 }
 
-function montar(over: {
-  parar?: ReturnType<typeof vi.fn>
-  matarProcesso?: ReturnType<typeof vi.fn>
-  git?: ReturnType<typeof vi.fn>
-}): {
+type PararFalso = Mock<(nome: string, cwd: string) => boolean>
+type MatarFalso = Mock<(container: string, cwd: string) => void>
+type GitFalso = Mock<(args: readonly string[], cwd: string, ws: WorkspaceId) => { ok: boolean }>
+
+function montar(over: { parar?: PararFalso; matarProcesso?: MatarFalso; git?: GitFalso }): {
   servico: LimpezaService
-  parar: ReturnType<typeof vi.fn>
-  matarProcesso: ReturnType<typeof vi.fn>
-  git: ReturnType<typeof vi.fn>
+  parar: PararFalso
+  matarProcesso: MatarFalso
+  git: GitFalso
 } {
-  const parar = over.parar ?? vi.fn().mockReturnValue(true)
-  const matarProcesso = over.matarProcesso ?? vi.fn()
-  const git = over.git ?? vi.fn().mockReturnValue({ ok: true, saida: '' })
+  const parar: PararFalso = over.parar ?? vi.fn(() => true)
+  const matarProcesso: MatarFalso = over.matarProcesso ?? vi.fn()
+  const git: GitFalso = over.git ?? vi.fn(() => ({ ok: true }))
 
   const servico = new LimpezaService({
     docker: { parar, matarProcesso },
@@ -161,7 +166,7 @@ describe('LimpezaService', () => {
   it('falha de remoção do container vira pendência reconciliável, não exceção', () => {
     leases.adquirir(USER, { proprietario: RUN, recurso: recursoDoContainer(RUN) }, agora)
 
-    const { servico } = montar({ parar: vi.fn().mockReturnValue(false) })
+    const { servico } = montar({ parar: vi.fn(() => false) })
     const resultado = servico.limpar(pedido('depois-do-merge', 'MERGED'))
 
     expect(resultado.removidos).not.toContain('container')
@@ -172,7 +177,7 @@ describe('LimpezaService', () => {
   it('lease de container preservado quando a remoção falha — a reconciliação ainda o encontra', () => {
     leases.adquirir(USER, { proprietario: RUN, recurso: recursoDoContainer(RUN) }, agora)
 
-    const { servico } = montar({ parar: vi.fn().mockReturnValue(false) })
+    const { servico } = montar({ parar: vi.fn(() => false) })
     servico.limpar(pedido('depois-do-merge', 'MERGED'))
 
     expect(leases.buscar(USER, recursoDoContainer(RUN))).toBeDefined()

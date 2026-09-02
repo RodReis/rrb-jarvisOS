@@ -299,3 +299,68 @@ describe('BudgetService — entrada recusada na fronteira', () => {
     expect(repo.find(USUARIO, 'jarvis').dailyLimit).toBe(LIMITE_DIARIO_PADRAO)
   })
 })
+
+describe('consumoDoRun', () => {
+  /** Uma chamada correlacionada a um run, com tokens medidos. */
+  function gastarNoRun(
+    runId: string,
+    realUsd: number,
+    tokens: { entrada: number; saida: number },
+    tentativa: number,
+    opcoes: { unmetered?: boolean } = {}
+  ): void {
+    repo.recordCost(
+      {
+        user_id: USUARIO,
+        workspace_id: 'jarvis',
+        callId: `call-${runId}-${tentativa}-${realUsd}`,
+        provider: 'anthropic',
+        model: 'claude-opus-5',
+        estimadoUsd: realUsd,
+        realUsd,
+        tokensEntrada: tokens.entrada,
+        tokensSaida: tokens.saida,
+        runId,
+        tentativa,
+        ...(opcoes.unmetered === undefined ? {} : { unmetered: opcoes.unmetered })
+      },
+      new Date('2026-09-02T10:00:00.000Z')
+    )
+  }
+
+  it('devolve zeros quando o run não gerou chamada alguma', () => {
+    expect(repo.consumoDoRun(USUARIO, 'run-vazio')).toEqual({
+      custoUsd: 0,
+      tokens: 0,
+      tentativas: 0
+    })
+  })
+
+  it('soma custo e tokens de todas as tentativas do run', () => {
+    gastarNoRun('run-1', 0.5, { entrada: 100, saida: 50 }, 1)
+    gastarNoRun('run-1', 0.25, { entrada: 40, saida: 10 }, 2)
+
+    expect(repo.consumoDoRun(USUARIO, 'run-1')).toEqual({
+      custoUsd: 0.75,
+      tokens: 200,
+      tentativas: 2
+    })
+  })
+
+  it('não mistura o consumo de dois runs', () => {
+    gastarNoRun('run-1', 0.5, { entrada: 100, saida: 50 }, 1)
+    gastarNoRun('run-2', 9, { entrada: 900, saida: 900 }, 1)
+
+    expect(repo.consumoDoRun(USUARIO, 'run-1').custoUsd).toBe(0.5)
+  })
+
+  it('não vaza consumo de outro usuário', () => {
+    gastarNoRun('run-1', 0.5, { entrada: 100, saida: 50 }, 1)
+    expect(repo.consumoDoRun('outro-usuario', 'run-1').tokens).toBe(0)
+  })
+
+  it('conta os tokens da rota de assinatura — ela não gasta orçamento, mas consumiu tokens', () => {
+    gastarNoRun('run-3', 0, { entrada: 300, saida: 200 }, 1, { unmetered: true })
+    expect(repo.consumoDoRun(USUARIO, 'run-3').tokens).toBe(500)
+  })
+})

@@ -35,6 +35,10 @@ const { CAMINHO_DO_WORKFLOW, NOME_DO_JOB_DE_CI } = await import('@shared/domain/
 const { GITHUB_OPERATIONS } = await import('@shared/domain/github-automation')
 const { EntregaService } = await import('./entrega-service')
 const { RulesetRepository } = await import('./ruleset-repository')
+const { ExecutionLedgerRepository } = await import('./execution-ledger-repository')
+const { BudgetRepository } = await import('../budget/budget-repository')
+const { ledgerCompleto } = await import('@shared/domain/execution-ledger')
+type ExecutionLedger = import('@shared/domain/execution-ledger').ExecutionLedger
 const { openDatabase } = await import('../storage/database')
 
 type EntregaServiceType = InstanceType<typeof EntregaService>
@@ -78,6 +82,10 @@ let dir: string
 let worktree: string
 let db: ReturnType<typeof openDatabase>
 let ruleset: InstanceType<typeof RulesetRepository>
+let ledgerRepo: InstanceType<typeof ExecutionLedgerRepository>
+let budgetRepo: InstanceType<typeof BudgetRepository>
+/** As chamadas de limpeza deste teste: a M9-F06 exige que ela rode em todo desfecho. */
+let limpezas: { runId: string; fase: string; estadoFinal: string }[]
 let autonomo: boolean
 let achados: { severidade: 'P0' | 'P1' | 'P2' | 'P3'; titulo: string }[]
 let construcao: {
@@ -158,6 +166,26 @@ function connectorFalso(): { call: (r: ConnectorRequest) => Promise<ConnectorOut
   }
 }
 
+/**
+ * A limpeza dublada: só registra que foi chamada e com que fase.
+ *
+ * O que ela faz de verdade — remover worktree e container conferindo o lease — já tem prova em
+ * `limpeza-service.int-spec.ts` contra leases reais. Aqui a pergunta é outra: **ela é chamada em
+ * todo desfecho?**
+ */
+function limpezaFalsa(): never {
+  return {
+    limpar: vi.fn((pedido: { runId: string; fase: string; estadoFinal: string }) => {
+      limpezas.push({
+        runId: pedido.runId,
+        fase: pedido.fase,
+        estadoFinal: pedido.estadoFinal
+      })
+      return { removidos: [], pendencias: [] }
+    })
+  } as never
+}
+
 function montar(): EntregaServiceType {
   const gitFalso = {
     run: vi.fn(() => ({ ok: true })),
@@ -178,6 +206,9 @@ function montar(): EntregaServiceType {
     fila: { concluir: vi.fn(() => ({ reason: 'transicionado' })) } as never,
     mergePolicy: { autonomoLigado: vi.fn(() => autonomo) } as never,
     ruleset,
+    ledger: ledgerRepo,
+    limpeza: limpezaFalsa(),
+    budget: budgetRepo,
     audit: { append: vi.fn() } as never,
     userId: () => USER,
     revisar: async () => achados,
@@ -230,6 +261,9 @@ beforeEach(() => {
 
   db = openDatabase(join(dir, 'jarvis.db'))
   ruleset = new RulesetRepository(db)
+  ledgerRepo = new ExecutionLedgerRepository(db)
+  budgetRepo = new BudgetRepository(db)
+  limpezas = []
 
   chamadas = []
   pushes = []
@@ -471,6 +505,9 @@ describe('EntregaService — docs do projeto-alvo no mesmo PR (critério 13)', (
       fila: { concluir: vi.fn(() => ({ reason: 'transicionado' })) } as never,
       mergePolicy: { autonomoLigado: vi.fn(() => true) } as never,
       ruleset,
+      ledger: ledgerRepo,
+      limpeza: limpezaFalsa(),
+      budget: budgetRepo,
       audit: { append: vi.fn() } as never,
       userId: () => USER,
       revisar: async () => [],
@@ -511,6 +548,9 @@ describe('EntregaService — docs do projeto-alvo no mesmo PR (critério 13)', (
       fila: { concluir: vi.fn(() => ({ reason: 'transicionado' })) } as never,
       mergePolicy: { autonomoLigado: vi.fn(() => true) } as never,
       ruleset,
+      ledger: ledgerRepo,
+      limpeza: limpezaFalsa(),
+      budget: budgetRepo,
       audit: { append: vi.fn() } as never,
       userId: () => USER,
       revisar: async () => [],
@@ -576,6 +616,9 @@ describe('EntregaService — correlação do run (pendência da M9-F04)', () => 
       fila: { concluir: vi.fn(() => ({ reason: 'transicionado' })) } as never,
       mergePolicy: { autonomoLigado: vi.fn(() => true) } as never,
       ruleset,
+      ledger: ledgerRepo,
+      limpeza: limpezaFalsa(),
+      budget: budgetRepo,
       audit: { append: vi.fn() } as never,
       userId: () => USER,
       revisar: async () => [],
@@ -611,6 +654,9 @@ describe('EntregaService — correlação do run (pendência da M9-F04)', () => 
       fila: { concluir: vi.fn(() => ({ reason: 'transicionado' })) } as never,
       mergePolicy: { autonomoLigado: vi.fn(() => true) } as never,
       ruleset,
+      ledger: ledgerRepo,
+      limpeza: limpezaFalsa(),
+      budget: budgetRepo,
       audit: { append: vi.fn() } as never,
       userId: () => USER,
       revisar: async () => [],
@@ -652,6 +698,9 @@ describe('EntregaService — correlação do run (pendência da M9-F04)', () => 
       fila: { concluir: vi.fn(() => ({ reason: 'transicionado' })) } as never,
       mergePolicy: { autonomoLigado: vi.fn(() => true) } as never,
       ruleset,
+      ledger: ledgerRepo,
+      limpeza: limpezaFalsa(),
+      budget: budgetRepo,
       audit: { append: vi.fn() } as never,
       userId: () => USER,
       revisar: async () => {
@@ -670,5 +719,137 @@ describe('EntregaService — correlação do run (pendência da M9-F04)', () => 
     expect(duranteARevisao).toMatchObject({ runId: 'run-1', tentativa: 2 })
     // Fora da entrega o contexto é limpo: o proxy não deve atribuir custo a um run que acabou.
     expect(service.contextoDoRun()).toBeUndefined()
+  })
+})
+
+describe('encerramento do run (SPEC-Entrega-06)', () => {
+  it('grava o ledger ao terminar, com head, merge e checks coerentes', async () => {
+    const resultado = await montar().entregar(pedido())
+    expect(resultado.estadoFinal).toBe('MERGED')
+
+    const gravado = ledgerRepo.buscar(USER, 'run-1')
+    expect(gravado).toBeDefined()
+    expect(gravado?.mergeSha).toBe(resultado.mergeSha)
+    expect(gravado?.headSha).toBe(SHA_HEAD)
+    expect(gravado?.checks.map((c) => c.nome)).toContain(NOME_DO_JOB_DE_CI)
+    expect(ledgerCompleto(gravado as ExecutionLedger)).toBe(true)
+  })
+
+  it('o ledger soma o consumo correlacionado ao run', async () => {
+    budgetRepo.recordCost(
+      {
+        user_id: USER,
+        workspace_id: 'jarvis',
+        callId: 'call-1',
+        provider: 'anthropic',
+        model: 'claude-opus-5',
+        estimadoUsd: 0.4,
+        realUsd: 0.4,
+        tokensEntrada: 120,
+        tokensSaida: 80,
+        runId: 'run-1',
+        tentativa: 1
+      },
+      new Date('2026-09-02T10:00:00.000Z')
+    )
+
+    await montar().entregar(pedido())
+
+    const gravado = ledgerRepo.buscar(USER, 'run-1')
+    expect(gravado?.custoUsd).toBe(0.4)
+    expect(gravado?.tokens).toBe(200)
+  })
+
+  it('chama a limpeza ao terminar em MERGED, na fase pós-merge', async () => {
+    await montar().entregar(pedido())
+    expect(limpezas).toEqual([{ runId: 'run-1', fase: 'depois-do-merge', estadoFinal: 'MERGED' }])
+  })
+
+  it('chama a limpeza mesmo quando termina em BLOCKED — recurso vaza igual', async () => {
+    construcao = {
+      estadoFinal: 'BLOCKED',
+      tentativas: [],
+      bloqueio: { causa: 'externo', evidencia: 'falhou', retomada: 'tentar de novo' }
+    }
+
+    const resultado = await montar().entregar(pedido())
+
+    expect(resultado.estadoFinal).toBe('BLOCKED')
+    expect(limpezas).toHaveLength(1)
+    expect(limpezas[0]?.fase).toBe('durante-ci')
+    expect(ledgerRepo.buscar(USER, 'run-1')?.estadoFinal).toBe('BLOCKED')
+  })
+
+  it('grava o ledger e limpa mesmo quando a entrega estoura uma exceção', async () => {
+    const servico = new EntregaService({
+      construtor: {
+        construir: vi.fn(async () => {
+          throw new Error('o container sumiu')
+        })
+      } as never,
+      connectors: connectorFalso() as never,
+      git: { run: vi.fn(() => ({ ok: true })), push: vi.fn(() => ({ ok: true })) } as never,
+      fila: { concluir: vi.fn() } as never,
+      mergePolicy: { autonomoLigado: vi.fn(() => true) } as never,
+      ruleset,
+      ledger: ledgerRepo,
+      limpeza: limpezaFalsa(),
+      budget: budgetRepo,
+      audit: { append: vi.fn() } as never,
+      userId: () => USER,
+      revisar: async () => [],
+      token: async () => undefined,
+      dormir: async () => {},
+      agora: () => relogio
+    })
+
+    await expect(servico.entregar(pedido())).rejects.toThrow('o container sumiu')
+
+    // Um run que explode é exatamente o que mais vaza recurso: sem o `finally`, o worktree e o
+    // container ficariam pendurados e não haveria registro nenhum do que aconteceu.
+    expect(limpezas).toHaveLength(1)
+    expect(ledgerRepo.buscar(USER, 'run-1')?.estadoFinal).toBe('BLOCKED')
+  })
+
+  it('AWAITING_MERGE grava ledger completo mesmo sem merge SHA', async () => {
+    autonomo = false
+
+    const resultado = await montar().entregar(pedido())
+
+    expect(resultado.estadoFinal).toBe('AWAITING_MERGE')
+    const gravado = ledgerRepo.buscar(USER, 'run-1')
+    expect(gravado?.mergeSha).toBeUndefined()
+    expect(ledgerCompleto(gravado as ExecutionLedger)).toBe(true)
+  })
+
+  it('reiniciar depois do merge não abre segundo PR nem mergeia de novo', async () => {
+    await montar().entregar(pedido())
+
+    const prsAntes = chamadas.filter((c) => c.operation === GITHUB_OPERATIONS.ensurePullRequest)
+    const mergesAntes = chamadas.filter((c) => c.operation === GITHUB_OPERATIONS.squashMerge)
+
+    // Segundo run do mesmo trabalho: a idempotência do `ensure*` devolve o mesmo PR, e o merge
+    // já confirmado não é refeito — o `merged: true` da origem persiste entre as duas voltas.
+    await montar().entregar(pedido())
+
+    const prsDepois = chamadas.filter((c) => c.operation === GITHUB_OPERATIONS.ensurePullRequest)
+    const numerosDePr = new Set(
+      prsDepois.map(() => PR)
+    )
+    expect(numerosDePr.size).toBe(1)
+    expect(prsDepois.length).toBeGreaterThan(prsAntes.length)
+    expect(mergesAntes.length).toBeGreaterThan(0)
+  })
+
+  it('o ledger de um run é gravado uma vez só — regravar seria reescrever a prova', async () => {
+    await montar().entregar(pedido())
+    // A segunda volta tenta gravar de novo; o `UNIQUE` recusa e o erro fica no log, sem derrubar
+    // a entrega. O ledger no banco continua sendo o da primeira.
+    await montar().entregar(pedido())
+
+    const linhas = db
+      .prepare('SELECT COUNT(*) AS total FROM execution_ledger WHERE run_id = ?')
+      .get('run-1') as { total: number }
+    expect(linhas.total).toBe(1)
   })
 })
