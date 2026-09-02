@@ -259,7 +259,8 @@ export class ConstrutorService {
       return {
         ok: false,
         verificavel: false,
-        evidencia: `Não foi possível verificar o escopo: o git status do container falhou. ${status.stderr}`.trim()
+        evidencia:
+          `Não foi possível verificar o escopo: o git status do container falhou. ${status.stderr}`.trim()
       }
     }
 

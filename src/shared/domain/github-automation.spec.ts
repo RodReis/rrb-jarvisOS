@@ -389,9 +389,9 @@ describe('validarEntrada', () => {
   describe('checks.required-for-branch — critério 11', () => {
     it('exige a branch cuja regra será lida', () => {
       expect(validarEntrada(GITHUB_OPERATIONS.getRequiredChecks, { ...REPO })).toMatch(/branch/)
-      expect(
-        validarEntrada(GITHUB_OPERATIONS.getRequiredChecks, { ...REPO, branch: '' })
-      ).toMatch(/branch/)
+      expect(validarEntrada(GITHUB_OPERATIONS.getRequiredChecks, { ...REPO, branch: '' })).toMatch(
+        /branch/
+      )
       expect(
         validarEntrada(GITHUB_OPERATIONS.getRequiredChecks, { ...REPO, branch: 'main' })
       ).toBeUndefined()

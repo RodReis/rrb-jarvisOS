@@ -443,6 +443,93 @@ describe('EntregaService — construção bloqueada não publica (critério 1)',
   })
 })
 
+describe('EntregaService — docs do projeto-alvo no mesmo PR (critério 13)', () => {
+  it('os documentos declarados são commitados antes do push, nunca depois do merge', async () => {
+    // A invariante 10 da CONVENTION: documento auxiliar é atualizado **no PR**. Depois do merge só
+    // caberia commit direto na branch-base, que é o que a invariante existe para impedir — e que
+    // este repositório também proíbe a si mesmo.
+    const statusRepo = join(worktree, 'docs')
+    mkdirSync(statusRepo, { recursive: true })
+    writeFileSync(join(statusRepo, 'STATUS.md'), '# STATUS do projeto-alvo', 'utf8')
+
+    const comandosGit: string[][] = []
+    const service = new EntregaService({
+      construtor: { construir: vi.fn(async () => construcao) } as never,
+      connectors: connectorFalso() as never,
+      git: {
+        run: vi.fn((args: string[]) => {
+          comandosGit.push(args)
+          return { ok: true }
+        }),
+        push: vi.fn((_o: string, branch: string) => {
+          // No momento do push, tudo que o run produziu já precisa estar commitado.
+          pushes.push(branch)
+          return { ok: true }
+        }),
+        pushComToken: vi.fn(() => ({ ok: true }))
+      } as never,
+      fila: { concluir: vi.fn(() => ({ reason: 'transicionado' })) } as never,
+      mergePolicy: { autonomoLigado: vi.fn(() => true) } as never,
+      ruleset,
+      audit: { append: vi.fn() } as never,
+      userId: () => USER,
+      revisar: async () => [],
+      token: async () => undefined,
+      dormir: async (ms: number) => {
+        relogio += ms
+      },
+      agora: () => relogio
+    })
+
+    await service.entregar({ ...pedido(), docsDoProjeto: ['docs/STATUS.md'] })
+
+    // O `add` precisa nomear o doc, e vir antes do commit — que vem antes do push.
+    const indiceDoAdd = comandosGit.findIndex((a) => a[0] === 'add')
+    const indiceDoCommit = comandosGit.findIndex((a) => a[0] === 'commit')
+    expect(indiceDoAdd).toBeGreaterThanOrEqual(0)
+    expect(indiceDoCommit).toBeGreaterThan(indiceDoAdd)
+    expect(comandosGit[indiceDoAdd]).toContain('docs/STATUS.md')
+    expect(pushes).toHaveLength(1)
+  })
+
+  it('não commita na branch-base em momento nenhum', async () => {
+    const comandosGit: string[][] = []
+    const service = new EntregaService({
+      construtor: { construir: vi.fn(async () => construcao) } as never,
+      connectors: connectorFalso() as never,
+      git: {
+        run: vi.fn((args: string[]) => {
+          comandosGit.push(args)
+          return { ok: true }
+        }),
+        push: vi.fn((_o: string, branch: string) => {
+          pushes.push(branch)
+          return { ok: true }
+        }),
+        pushComToken: vi.fn(() => ({ ok: true }))
+      } as never,
+      fila: { concluir: vi.fn(() => ({ reason: 'transicionado' })) } as never,
+      mergePolicy: { autonomoLigado: vi.fn(() => true) } as never,
+      ruleset,
+      audit: { append: vi.fn() } as never,
+      userId: () => USER,
+      revisar: async () => [],
+      token: async () => undefined,
+      dormir: async (ms: number) => {
+        relogio += ms
+      },
+      agora: () => relogio
+    })
+
+    const r = await service.entregar(pedido())
+
+    expect(r.estadoFinal).toBe('MERGED')
+    // Nenhum checkout/push para `main`: o único branch empurrado é o da fatia.
+    expect(comandosGit.some((a) => a[0] === 'checkout' && a.includes('main'))).toBe(false)
+    expect(pushes).toEqual(['feat/fatia'])
+  })
+})
+
 describe('EntregaService — o corpo do PR não fecha a issue', () => {
   it('usa refs e nunca closes/fixes/resolves', async () => {
     // `closes #N` fecharia a issue no merge e forjaria o aceite do PI — proibido em letra pela

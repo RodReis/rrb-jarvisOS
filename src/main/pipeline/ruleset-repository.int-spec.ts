@@ -107,8 +107,14 @@ describe('RulesetRepository', () => {
     // antiga, e o relógio da origem pode de fato voltar (troca de nó, ajuste de NTP).
     //
     // O que o snapshot afirma é "a última coisa que observamos", não "a de data maior".
-    repo.registrar(ESCOPO, snapshot({ contexts: ['antiga'], observadoEm: '2026-09-02T12:00:00.000Z' }))
-    repo.registrar(ESCOPO, snapshot({ contexts: ['recente'], observadoEm: '2026-09-02T09:00:00.000Z' }))
+    repo.registrar(
+      ESCOPO,
+      snapshot({ contexts: ['antiga'], observadoEm: '2026-09-02T12:00:00.000Z' })
+    )
+    repo.registrar(
+      ESCOPO,
+      snapshot({ contexts: ['recente'], observadoEm: '2026-09-02T09:00:00.000Z' })
+    )
 
     expect(repo.ultimo(ESCOPO.userId, RUN)?.contexts).toEqual(['recente'])
     expect(repo.todos(ESCOPO.userId, RUN).map((s) => s.contexts[0])).toEqual(['antiga', 'recente'])

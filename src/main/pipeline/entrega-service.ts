@@ -247,12 +247,18 @@ export class EntregaService {
   private async publicar(
     pedido: PedidoDeEntrega
   ): Promise<
-    { readonly ok: true; readonly pullRequest: number } | { readonly ok: false; readonly bloqueio: ResultadoDaEntrega }
+    | { readonly ok: true; readonly pullRequest: number }
+    | { readonly ok: false; readonly bloqueio: ResultadoDaEntrega }
   > {
     const { worktreeNoHost } = pedido.sandbox
     const ws = pedido.workspaceId
 
-    this.deps.git.run(['add', '--all'], worktreeNoHost, ws)
+    // Os documentos do projeto-alvo entram **nomeados**, não só pelo `--all` (critério 13). O
+    // `--all` os pegaria por estarem no worktree, mas nomeá-los torna a intenção verificável: um
+    // doc que a fatia devia atualizar e não atualizou some do commit sem ninguém notar, e a
+    // invariante 10 da CONVENTION viraria acidente de varredura.
+    const docs = pedido.docsDoProjeto ?? []
+    this.deps.git.run(['add', '--all', ...docs], worktreeNoHost, ws)
     // `--allow-empty` não entra: um run que não mudou nada não deve produzir commit vazio e seguir
     // como se tivesse entregue. O `commit` falha, e o push não acontece.
     this.deps.git.run(
