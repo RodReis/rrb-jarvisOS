@@ -33,6 +33,24 @@ describe('listaDePathsValida', () => {
   it('aceita lista com ao menos um path real', () => {
     expect(listaDePathsValida(escopo(['src/main']))).toBe(true)
   })
+
+  /**
+   * `caminhoDentroDoEscopo` compara por segmento exato — `src/**` nunca casa nenhum arquivo sob
+   * `src` (o segmento `**` não é igual a `foo.ts`), então um escopo escrito assim bloquearia
+   * TODO arquivo silenciosamente. Recusar aqui, em vez de aceitar e deixar o preflight bloquear
+   * sem explicação, dá ao PI o diagnóstico no momento em que o formato é inválido.
+   */
+  it('recusa path com glob (**), que caminhoDentroDoEscopo nunca casaria', () => {
+    expect(listaDePathsValida(escopo(['src/**']))).toBe(false)
+  })
+
+  it('recusa path com glob (*) de um único nível', () => {
+    expect(listaDePathsValida(escopo(['src/*']))).toBe(false)
+  })
+
+  it('recusa a lista inteira quando um único path entre vários tem glob', () => {
+    expect(listaDePathsValida(escopo(['src/main', 'docs/**']))).toBe(false)
+  })
 })
 
 describe('caminhoDentroDoEscopo', () => {
@@ -67,6 +85,15 @@ describe('caminhoDentroDoEscopo', () => {
 
   it('recusa quando o escopo é mais fundo que o caminho', () => {
     expect(caminhoDentroDoEscopo('src', escopo(['src/main']))).toBe(false)
+  })
+
+  /**
+   * `..` nunca é segmento legítimo de um caminho que o Git relata — um matcher de segurança
+   * que o deixasse passar (filtrando só `''`/`'.'`) seria contornável por travessia de
+   * diretório: `src/../etc/passwd` tem prefixo `src`, mas não está sob `src` de verdade.
+   */
+  it('recusa caminho com travessia de diretório (..), mesmo com prefixo de escopo válido', () => {
+    expect(caminhoDentroDoEscopo('src/../etc/passwd', escopo(['src']))).toBe(false)
   })
 })
 

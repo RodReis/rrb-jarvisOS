@@ -12,8 +12,8 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 904 | 904 | 0 | 70.0 | — | — |
-| — | — | — | Banco | 681 | 681 | 0 | 87.1 | — | — |
+| — | — | — | Regras de Negócio | 918 | 918 | 0 | 70.2 | — | — |
+| — | — | — | Banco | 715 | 713 | 0 | 87.5 | — | — |
 | — | — | — | Tela | 421 | 420 | 0 | 85.5 | — | — |
 
 ## Histórico por entrega
@@ -214,3 +214,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | — | #222 | spec-entrega-03-worktree-preflight-docker | Regras de Negócio | 904 | 904 | 0 | 70.0 | #228 | [#228](https://github.com/RodReis/rrb-jarvisOS/pull/228) |
 | — | #222 | spec-entrega-03-worktree-preflight-docker | Banco | 681 | 681 | 0 | 87.1 | #228 | [#228](https://github.com/RodReis/rrb-jarvisOS/pull/228) |
 | — | #222 | spec-entrega-03-worktree-preflight-docker | Tela | 421 | 420 | 0 | 85.5 | #228 | [#228](https://github.com/RodReis/rrb-jarvisOS/pull/228) |
+| 2026-09-02 | #104 | spec-entrega-04-construcao-recuperacao | Regras de Negócio | 918 | 918 | 0 | 70.2 | #231 | [#231](https://github.com/RodReis/rrb-jarvisOS/pull/231) |
+| 2026-09-02 | #104 | spec-entrega-04-construcao-recuperacao | Banco | 715 | 713 | 0 | 87.5 | #231 | [#231](https://github.com/RodReis/rrb-jarvisOS/pull/231) |
+| 2026-09-02 | #104 | spec-entrega-04-construcao-recuperacao | Tela | 421 | 420 | 0 | 85.5 | #231 | [#231](https://github.com/RodReis/rrb-jarvisOS/pull/231) |

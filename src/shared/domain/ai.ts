@@ -100,6 +100,51 @@ export function isRotaUnmetered(provider: AiProvider): boolean {
 }
 
 /**
+ * As rotas cujo custo **não é dinheiro por chamada, mas quota de assinatura** (SPEC-Entrega-04,
+ * critério 12; emenda do PI de 2026-08-30).
+ *
+ * Distinta de `ROTAS_UNMETERED`: `unmetered` diz "sem USD a somar", que continua verdade — o
+ * gate de orçamento (`BudgetService`) segue sem barrar `claude-code`. `subscription_limited`
+ * diz uma coisa a mais: **existe um teto**, só que ele não é monetário. Quota desconhecida não
+ * é o mesmo que quota infinita — a distinção que este critério existe para não deixar a rota
+ * MAX se comportar como "sempre disponível" quando na verdade pode estar rate-limited.
+ */
+export const ROTAS_SUBSCRIPTION_LIMITED: readonly AiProvider[] = ['claude-code']
+
+/** `true` quando a rota tem teto de uso por assinatura, não por dólar (critério 12). */
+export function isRotaSubscriptionLimited(provider: AiProvider): boolean {
+  return ROTAS_SUBSCRIPTION_LIMITED.includes(provider)
+}
+
+/**
+ * De onde veio o número de quota reportado.
+ *
+ * `medida`: o CLI/API expôs o dado real (ex.: header de rate limit). `estimada`: derivado de
+ * heurística local (ex.: contagem de chamadas na janela). `desconhecida`: nenhuma fonte
+ * disponível — e é o estado inicial, honesto, em vez de inventar um número (spec: "quando a
+ * origem os expõe").
+ */
+export const QUOTA_ORIGENS = ['medida', 'estimada', 'desconhecida'] as const
+export type QuotaOrigem = (typeof QUOTA_ORIGENS)[number]
+
+/**
+ * O estado de quota conhecido de uma rota `subscription_limited`, para um escopo.
+ *
+ * Uma linha por `(provider, workspace)`, sobrescrita a cada atualização — como `BudgetPolicy`,
+ * e não como `CostEvent`: isto é **status atual**, não histórico de eventos.
+ */
+export interface QuotaState {
+  readonly provider: AiProvider
+  readonly origem: QuotaOrigem
+  /** Chamadas/tokens restantes na janela atual, quando a origem os expõe. */
+  readonly restante?: number
+  readonly limite?: number
+  /** ISO 8601. Quando a janela de quota reseta, quando conhecido. */
+  readonly resetEm?: string
+  readonly atualizadoEm: string
+}
+
+/**
  * De onde o provider responde (RF-011: "origem local/cloud" na tela de providers).
  *
  * Não é detalhe cosmético: é o insumo da preferência "local/offline quando viável" do

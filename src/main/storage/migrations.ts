@@ -1102,6 +1102,27 @@ const MIGRATIONS: readonly string[] = [
   );
   CREATE UNIQUE INDEX idx_effect_journal_chave ON effect_journal(user_id, chave_idempotente);
   CREATE INDEX idx_effect_journal_estado ON effect_journal(user_id, estado);
+  `,
+
+  // 26 — M9-F04: estado de quota das rotas subscription_limited (SPEC-Entrega-04, critério 12).
+  //
+  // Uma linha por (user_id, workspace_id, provider), sobrescrita — como `budget_policy` e não
+  // como `cost_event`: isto é o status atual da quota, não um evento financeiro. Ausência de
+  // linha é `origem = 'desconhecida'` em código, não uma linha semeada — mesmo raciocínio do
+  // `BudgetRepository.find`: nenhum boot precisa migrar dado para o default valer.
+  `
+  CREATE TABLE provider_quota_state (
+    user_id      TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    provider     TEXT NOT NULL,
+    -- 'medida' | 'estimada' | 'desconhecida'. Enum no domínio.
+    origem       TEXT NOT NULL,
+    restante     INTEGER,
+    limite       INTEGER,
+    reset_em     TEXT,
+    atualizado_em TEXT NOT NULL,
+    PRIMARY KEY (user_id, workspace_id, provider)
+  );
   `
 ]
 

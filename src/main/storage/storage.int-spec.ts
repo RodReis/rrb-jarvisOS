@@ -63,7 +63,7 @@ describe('migrations', () => {
     // `design_attachment` e `pacote_arquitetura`; a v21, `mvp`, `slice` e `approval`; a v22,
     // `external_ref`. A v17
     // só acrescenta colunas a `cost_event`, que já é derrubada inteira aqui — não há o que
-    // desfazer separadamente. A v25 acrescentou `effect_journal`.
+    // desfazer separadamente. A v25 acrescentou `effect_journal`. A v26 acrescenta `provider_quota_state`.
     antigo.exec('ALTER TABLE user_profile DROP COLUMN theme')
     antigo.exec('ALTER TABLE user_profile DROP COLUMN github_client_id')
     antigo.exec('ALTER TABLE user_profile DROP COLUMN accent_noa')
@@ -100,6 +100,7 @@ describe('migrations', () => {
     antigo.exec('DROP TABLE lease')
     antigo.exec('DROP TABLE project_merge_policy')
     antigo.exec('DROP TABLE effect_journal')
+    antigo.exec('DROP TABLE provider_quota_state')
     antigo.pragma('user_version = 1')
     antigo.close()
 

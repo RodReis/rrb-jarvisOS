@@ -12,6 +12,7 @@ import { OllamaAdapter } from './ai/ollama-adapter'
 import { ClaudeCodeAdapter } from './ai/claude-code-adapter'
 import { RoutingService, SondaDeAdapters } from './ai/routing-service'
 import { RoutingRepository } from './ai/routing-repository'
+import { QuotaRepository } from './ai/quota-repository'
 import { BudgetService } from './budget/budget-service'
 import { BudgetRepository } from './budget/budget-repository'
 import { AllowlistRepository } from './policy/allowlist-repository'
@@ -295,6 +296,11 @@ if (!app.requestSingleInstanceLock()) {
       storage.audit
     )
 
+    // Estado de quota das rotas subscription_limited (SPEC-Entrega-04, critério 12). Construído
+    // aqui pela mesma razão do `budget`: é dependência do ponto único, não consulta opcional —
+    // sem ele o gate de quota do `claude-code` fica sempre "desconhecido" em produção.
+    const quota = new QuotaRepository(storage.db)
+
     const ai = new AiCallService(
       adapters,
       credentials,
@@ -302,7 +308,8 @@ if (!app.requestSingleInstanceLock()) {
       storage.audit,
       budget,
       routing,
-      contexts
+      contexts,
+      quota
     )
 
     // Ponto único de conectores (SPEC-Conectores-01). **Runtime separado** do ponto único de
@@ -478,8 +485,15 @@ if (!app.requestSingleInstanceLock()) {
       userId: userIdAtual,
       workspaceId: () => workspaces.atual(),
       rota: () => 'claude-code',
-      // Preenchidos pela M9-F04, que é quem conhece o run em construção. Até lá o proxy
-      // funciona sem correlação — e o `CostEvent` registra o que sabe, nunca um run inventado.
+      // A M9-F04 entregou o `ConstrutorService` que conhece o run em construção, mas ele não
+      // foi instanciado aqui — sem consumidor até a M9-F05 (Revisão/CI/merge), instanciá-lo
+      // seria código morto (decisão registrada em docs/DEVELOPMENT.md). Por isso este
+      // preenchimento continua pendente da M9-F05, que liga o `ConstrutorService` ao boot.
+      //
+      // **Consequência em produção, não só ausência de correlação:** com `contextPackId`
+      // sempre `undefined`, o gate de ContextPack em `call-provider.ts` recusa toda chamada
+      // do executor ("Esta geração precisa de um contexto montado") — a rota do executor não
+      // está operacional até a M9-F05 preencher isto de verdade.
       contexto: () => undefined,
       contextPackId: () => undefined
     })
