@@ -1,13 +1,13 @@
 # STATUS.md — Kanban / Roadmap
 
-Atualizado em: **2026-09-02**. Fonte única do índice Fatia ↔ SPEC. Estado remoto conferido no fechamento do PR #227; nenhuma outra prioridade alterada por esta tarefa. Histórico detalhado em `docs/STATUS-ARQUIVO.md`; o board vence divergência factual.
+Atualizado em: **2026-09-02**. Fonte única do índice Fatia ↔ SPEC. Estado remoto conferido no fechamento do PR #228; PI promoveu #167 a `next` nesta atualização. Histórico detalhado em `docs/STATUS-ARQUIVO.md`; o board vence divergência factual.
 
 ## Agora
 
 | Coluna | Item | Estado |
 |---|---|---|
-| Feito | [#209](https://github.com/RodReis/rrb-jarvisOS/issues/209) · correção do EffectJournal | entregue no PR #227 (`66623b8`); `proplan:done`, aguardando aceite do PI |
-| Próximo | [#222](https://github.com/RodReis/rrb-jarvisOS/issues/222) · restrição de egress do container | `proplan:next` — única fila explícita restante em Backlog após #209; falha da M9-F03 registrada na main |
+| Feito | [#222](https://github.com/RodReis/rrb-jarvisOS/issues/222) · restrição de egress do container | entregue no PR #228 (`786ca98`); `proplan:done`, aguardando aceite do PI |
+| Próximo | [#167](https://github.com/RodReis/rrb-jarvisOS/issues/167) · M16-F05 Estratégias e recomendações assistidas | `proplan:next` — decisão do PI (2026-09-02); #168 (M16-F06) segue em Backlog logo atrás, depende de F05 |
 | Feito | [#103](https://github.com/RodReis/rrb-jarvisOS/issues/103) · M9-F03 Worktree, preflight e Docker | entregue no PR #211; emendas e evidência preservadas |
 | Finalizado | #99, #101 e #102 | aceite do PI registrado; M9-F02 integrada pelo PR #208 |
 | Backlog | M7-F01–F06 (#180–#185), MVPs 010–015 e M16-F01–F04 | SPECs aprovadas; publicação documental não muda fila |
@@ -135,8 +135,8 @@ Não existe catálogo global `SPEC-nnn`. O slug identifica a SPEC; os números a
 
 ## Próximas ações
 
-1. #209 entregue pelo PR #227; `next` avança para #222 (única fila explícita restante). #103 foi integrada pelo PR #211.
-2. Conservar #167/#168 e #214–#221 em Backlog após o aceite exato de 2026-08-31, sem promover qualquer uma a `next` por esta atualização.
+1. #222 entregue pelo PR #228; `next` avança para #167 (decisão do PI em 2026-09-02). #103 foi integrada pelo PR #211.
+2. Conservar #168 e #214–#221 em Backlog; #168 (M16-F06) só promove a `next` depois de #167 (M16-F05) concluída — F06 tem gate visual antes da construção.
 3. Antes das fatias visuais, anexar `DESIGN-SYSTEM.md` e HTML pelo fluxo já aprovado; texto de SPEC/template não substitui anexo do PI.
 4. M7-F05/F06 estão aprovadas/Backlog e M7-F07–F08 continuam a redigir; as fatias do Command Center seguem seus planejamentos próprios. Nenhuma delas bloqueia concluir a documentação V3.
 5. O relatório de fechamento do PR #189 documenta reconciliação, ordem técnica, issues e validação. Aprovações prévias são preservadas, não repetidas.
