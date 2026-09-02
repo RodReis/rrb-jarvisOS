@@ -225,3 +225,42 @@ describe('ConstrutorService — sem container não há execução (critério 8)'
     expect(containersUsados.has(sandbox.containerNome)).toBe(true)
   })
 })
+
+describe('ConstrutorService — cancelamento mata a árvore de processos (critério 5)', () => {
+  it('sinal abortado entre passos interrompe o laço e chama matarProcesso, sem completar a construção', async () => {
+    const controle = new AbortController()
+    let chamadasExec = 0
+    const docker = {
+      exec: vi.fn(() => {
+        chamadasExec += 1
+        if (chamadasExec === 1) controle.abort() // aborta depois do primeiro passo (claude)
+        return { ok: true, stdout: 'ok', stderr: '', exitCode: 0, timeoutExcedido: false }
+      }),
+      matarProcesso: vi.fn()
+    } as unknown as DockerRunner
+    const pipeline = repoDuble()
+    const service = new ConstrutorService(docker, pipeline, auditDuble(), () => 'u1', () => 'ws1' as never)
+
+    const resultado = await service.construir({
+      runId: 'run-1',
+      sandbox,
+      promptInicial: 'x',
+      comandosDeValidacao,
+      signal: controle.signal
+    })
+
+    expect(resultado.estadoFinal).toBe('BLOCKED')
+    expect(docker.matarProcesso).toHaveBeenCalledWith(sandbox.containerNome, sandbox.worktreeNoHost)
+    // Não chegou a rodar os 4 validadores inteiros — parou no meio.
+    expect(chamadasExec).toBeLessThan(5)
+  })
+
+  it('cancelar() explícito mata processos sem esperar o próximo passo', () => {
+    const docker = { exec: vi.fn(), matarProcesso: vi.fn() } as unknown as DockerRunner
+    const service = new ConstrutorService(docker, repoDuble(), auditDuble(), () => 'u1', () => 'ws1' as never)
+
+    service.cancelar('run-1', sandbox)
+
+    expect(docker.matarProcesso).toHaveBeenCalledWith(sandbox.containerNome, sandbox.worktreeNoHost)
+  })
+})

@@ -37,6 +37,8 @@ export interface PedidoDeConstrucao {
   /** O prompt da tentativa inicial — SPEC/hashes, ContextPack, paths, orçamento (spec § Entrada). */
   readonly promptInicial: string
   readonly comandosDeValidacao: ComandosDeValidacao
+  /** Cancelamento cooperativo: checado entre passos (critério 5). Ausente = não cancelável. */
+  readonly signal?: AbortSignal
 }
 
 export interface ResultadoDaConstrucao {
@@ -61,6 +63,11 @@ export class ConstrutorService {
     let numero = 1
 
     for (;;) {
+      if (pedido.signal?.aborted === true) {
+        this.docker.matarProcesso(pedido.sandbox.containerNome, pedido.sandbox.worktreeNoHost)
+        return this.bloquear(pedido.runId, 'RUNNING', tentativas, 'externo', 'Cancelado pelo usuário.')
+      }
+
       // (1) Invoca o `claude` dentro do container — o único ponto por onde o prompt entra.
       const execucaoClaude = this.docker.exec(
         pedido.sandbox.containerNome,
@@ -77,12 +84,16 @@ export class ConstrutorService {
 
       // (2) Move para VALIDATING e roda test/lint/type/build — **sempre no container** (critério 11).
       this.transicionar(pedido.runId, 'RUNNING', 'VALIDATING')
-      const validacao = this.validar(pedido.sandbox, pedido.comandosDeValidacao)
+      const validacao = this.validar(pedido.sandbox, pedido.comandosDeValidacao, pedido.signal)
 
       if (validacao.ok) {
         tentativas.push({ numero, runId: pedido.runId })
         this.transicionar(pedido.runId, 'VALIDATING', 'PR_CI')
         return { estadoFinal: 'PR_CI', tentativas }
+      }
+
+      if (validacao.cancelado) {
+        return this.bloquear(pedido.runId, 'VALIDATING', tentativas, 'externo', 'Cancelado pelo usuário.')
       }
 
       const causa = classificarFalha(validacao.falha)
@@ -108,16 +119,33 @@ export class ConstrutorService {
 
   private validar(
     sandbox: SandboxPreparado,
-    comandos: ComandosDeValidacao
-  ): { readonly ok: true } | { readonly ok: false; readonly falha: ExecucaoNoContainer } {
+    comandos: ComandosDeValidacao,
+    signal?: AbortSignal
+  ):
+    | { readonly ok: true }
+    | { readonly ok: false; readonly cancelado: true }
+    | { readonly ok: false; readonly cancelado?: false; readonly falha: ExecucaoNoContainer } {
     const passos: readonly (readonly string[])[] = [comandos.test, comandos.lint, comandos.typecheck, comandos.build]
 
     for (const passo of passos) {
+      if (signal?.aborted === true) {
+        this.docker.matarProcesso(sandbox.containerNome, sandbox.worktreeNoHost)
+        return { ok: false, cancelado: true }
+      }
       const execucao = this.docker.exec(sandbox.containerNome, passo, sandbox.worktreeNoHost)
       if (!execucao.ok) return { ok: false, falha: execucao }
     }
 
     return { ok: true }
+  }
+
+  /**
+   * Cancela a construção em andamento: mata os processos do container, sem parar o sandbox.
+   * O laço em `construir` também checa `signal` entre passos — este método é para quem não
+   * está esperando o próximo passo (ex.: handler de IPC do botão "Cancelar" na tela).
+   */
+  cancelar(_runId: string, sandbox: SandboxPreparado): void {
+    this.docker.matarProcesso(sandbox.containerNome, sandbox.worktreeNoHost)
   }
 
   private bloquear(
