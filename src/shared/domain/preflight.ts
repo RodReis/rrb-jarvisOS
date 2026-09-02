@@ -72,6 +72,11 @@ export function listaDePathsValida(lista: PathsPermitidos | undefined): lista is
  */
 export function caminhoDentroDoEscopo(caminho: string, lista: PathsPermitidos): boolean {
   const alvo = segmentos(caminho)
+  // `..` no caminho nunca é legítimo vindo do Git — rejeita o caminho inteiro em vez de só
+  // filtrar o segmento: um matcher de segurança que normalizasse `..` silenciosamente ainda
+  // teria que provar que a normalização é correta em todo separador e SO; recusar é mais barato
+  // e mais seguro (fail closed).
+  if (alvo.includes('..')) return false
   return lista.paths.some((permitido) => {
     const base = segmentos(permitido)
     if (base.length === 0 || base.length > alvo.length) return false

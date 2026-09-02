@@ -68,6 +68,15 @@ describe('caminhoDentroDoEscopo', () => {
   it('recusa quando o escopo é mais fundo que o caminho', () => {
     expect(caminhoDentroDoEscopo('src', escopo(['src/main']))).toBe(false)
   })
+
+  /**
+   * `..` nunca é segmento legítimo de um caminho que o Git relata — um matcher de segurança
+   * que o deixasse passar (filtrando só `''`/`'.'`) seria contornável por travessia de
+   * diretório: `src/../etc/passwd` tem prefixo `src`, mas não está sob `src` de verdade.
+   */
+  it('recusa caminho com travessia de diretório (..), mesmo com prefixo de escopo válido', () => {
+    expect(caminhoDentroDoEscopo('src/../etc/passwd', escopo(['src']))).toBe(false)
+  })
 })
 
 describe('fugasDoEscopo', () => {

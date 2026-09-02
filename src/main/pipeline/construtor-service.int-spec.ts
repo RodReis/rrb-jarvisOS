@@ -1,3 +1,7 @@
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, it, expect, vi } from 'vitest'
 import { ConstrutorService } from './construtor-service'
 import type { DockerRunner } from './docker-runner'
@@ -55,8 +59,8 @@ const comandosDeValidacao = {
 describe('ConstrutorService — tentativa única bem-sucedida', () => {
   it('claude roda, validação passa, run vai para PR_CI numa tentativa só', async () => {
     const docker = dockerDuble((comando) => {
-      // git diff vazio: nenhum arquivo mudou, dentro do escopo por vacuidade.
-      if (comando[0] === 'git' && comando.includes('diff')) {
+      // git status vazio: nenhum arquivo tocado, dentro do escopo por vacuidade.
+      if (comando[0] === 'git' && comando.includes('status')) {
         return { ok: true, stdout: '', stderr: '', exitCode: 0, timeoutExcedido: false }
       }
       // Todo outro comando (claude e os 4 de validação) responde ok nesta suíte.
@@ -86,7 +90,7 @@ describe('ConstrutorService — recuperação corrigível', () => {
     let chamadasDeValidacao = 0
     const docker = dockerDuble((comando) => {
       if (comando[0] === 'claude') return { ok: true, stdout: '', stderr: '', exitCode: 0, timeoutExcedido: false }
-      if (comando[0] === 'git' && comando.includes('diff')) {
+      if (comando[0] === 'git' && comando.includes('status')) {
         return { ok: true, stdout: '', stderr: '', exitCode: 0, timeoutExcedido: false }
       }
       // Só a validação de teste falha, e só na primeira passagem.
@@ -217,7 +221,7 @@ describe('ConstrutorService — sem container não há execução (critério 8)'
     const docker = {
       exec: vi.fn((container: string, comando: readonly string[]) => {
         containersUsados.add(container)
-        if (comando[0] === 'git' && comando.includes('diff')) {
+        if (comando[0] === 'git' && comando.includes('status')) {
           return { ok: true, stdout: '', stderr: '', exitCode: 0, timeoutExcedido: false }
         }
         return { ok: true, stdout: 'ok', stderr: '', exitCode: 0, timeoutExcedido: false }
@@ -228,7 +232,7 @@ describe('ConstrutorService — sem container não há execução (critério 8)'
 
     await service.construir({ runId: 'run-1', sandbox, promptInicial: 'x', comandosDeValidacao })
 
-    // Seis chamadas (claude + 4 validadores + git diff de verificação de escopo), todas no
+    // Seis chamadas (claude + 4 validadores + git status de verificação de escopo), todas no
     // mesmo container — nunca vazio, nunca um segundo caminho que ignore o sandbox.
     expect(docker.exec).toHaveBeenCalledTimes(6)
     expect(containersUsados.size).toBe(1)
@@ -276,11 +280,11 @@ describe('ConstrutorService — cancelamento mata a árvore de processos (crité
 })
 
 describe('ConstrutorService — alteração fora do escopo bloqueia (critério 4)', () => {
-  it('diff com arquivo fora de pathsPermitidos bloqueia antes de PR_CI, mesmo com validação verde', async () => {
+  it('status com arquivo fora de pathsPermitidos bloqueia antes de PR_CI, mesmo com validação verde', async () => {
     const docker = {
       exec: vi.fn((_container: string, comando: readonly string[]) => {
-        if (comando[0] === 'git' && comando.includes('diff')) {
-          return { ok: true, stdout: 'src/foo.ts\nsegredo/fora-do-escopo.ts\n', stderr: '', exitCode: 0, timeoutExcedido: false }
+        if (comando[0] === 'git' && comando.includes('status')) {
+          return { ok: true, stdout: ' M src/foo.ts\n?? segredo/fora-do-escopo.ts\n', stderr: '', exitCode: 0, timeoutExcedido: false }
         }
         return { ok: true, stdout: 'ok', stderr: '', exitCode: 0, timeoutExcedido: false }
       }),
@@ -304,11 +308,41 @@ describe('ConstrutorService — alteração fora do escopo bloqueia (critério 4
     expect(resultado.bloqueio?.evidencia).toContain('segredo/fora-do-escopo.ts')
   })
 
-  it('diff inteiramente dentro do escopo segue para PR_CI normalmente', async () => {
+  it('arquivo novo não rastreado (?? no status) fora do escopo também bloqueia — o vetor do critical #1', async () => {
     const docker = {
       exec: vi.fn((_container: string, comando: readonly string[]) => {
-        if (comando[0] === 'git' && comando.includes('diff')) {
-          return { ok: true, stdout: 'src/foo.ts\nsrc/bar.ts\n', stderr: '', exitCode: 0, timeoutExcedido: false }
+        if (comando[0] === 'git' && comando.includes('status')) {
+          // Só `??`, sem nenhum arquivo modificado: exatamente o estado que `git diff
+          // --name-only` (sem `git add` prévio) NUNCA reportaria, e que era o bug do critical #1.
+          return { ok: true, stdout: '?? segredo/backdoor.ts\n', stderr: '', exitCode: 0, timeoutExcedido: false }
+        }
+        return { ok: true, stdout: 'ok', stderr: '', exitCode: 0, timeoutExcedido: false }
+      }),
+      matarProcesso: vi.fn()
+    } as unknown as DockerRunner
+    const sandboxComEscopo: SandboxPreparado = {
+      ...sandbox,
+      pathsPermitidos: { paths: ['src'], origem: 'spec', justificativa: 'teste' }
+    }
+    const service = new ConstrutorService(docker, repoDuble(), auditDuble(), () => 'u1', () => 'ws1' as never)
+
+    const resultado = await service.construir({
+      runId: 'run-1',
+      sandbox: sandboxComEscopo,
+      promptInicial: 'x',
+      comandosDeValidacao
+    })
+
+    expect(resultado.estadoFinal).toBe('BLOCKED')
+    expect(resultado.bloqueio?.causa).toBe('risco-usuario')
+    expect(resultado.bloqueio?.evidencia).toContain('segredo/backdoor.ts')
+  })
+
+  it('status inteiramente dentro do escopo segue para PR_CI normalmente', async () => {
+    const docker = {
+      exec: vi.fn((_container: string, comando: readonly string[]) => {
+        if (comando[0] === 'git' && comando.includes('status')) {
+          return { ok: true, stdout: ' M src/foo.ts\n?? src/bar.ts\n', stderr: '', exitCode: 0, timeoutExcedido: false }
         }
         return { ok: true, stdout: 'ok', stderr: '', exitCode: 0, timeoutExcedido: false }
       }),
@@ -328,5 +362,65 @@ describe('ConstrutorService — alteração fora do escopo bloqueia (critério 4
     })
 
     expect(resultado.estadoFinal).toBe('PR_CI')
+  })
+})
+
+describe('ConstrutorService — verificação de escopo contra Git real (critical #1)', () => {
+  /**
+   * `git diff --name-only` (o comando original desta checagem) NUNCA enxerga um arquivo novo e
+   * não commitado — e o worktree do run nunca passa por `git add`. Um agente que cria
+   * `segredo/backdoor.ts` sem tocar em arquivo já rastreado escaparia da checagem por completo.
+   * Este teste roda o `docker.exec` double contra um repositório Git de verdade (sem `git add`
+   * do arquivo novo, replicando o estado real do worktree) para provar que o comando trocado
+   * (`git status --porcelain --untracked-files=all`) realmente vê o que o `git diff` não via —
+   * nenhum path é fabricado pelo double, só o resultado real do comando.
+   */
+  it('arquivo novo não commitado fora do escopo é visto pelo comando real e bloqueia', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'jarvis-construtor-'))
+    try {
+      execFileSync('git', ['init', '--initial-branch=main', dir], { encoding: 'utf8' })
+      execFileSync('git', ['config', 'user.email', 'teste@exemplo.com'], { cwd: dir, encoding: 'utf8' })
+      execFileSync('git', ['config', 'user.name', 'Teste'], { cwd: dir, encoding: 'utf8' })
+      mkdirSync(join(dir, 'src'), { recursive: true })
+      writeFileSync(join(dir, 'src', 'a.ts'), 'a\n')
+      execFileSync('git', ['add', '.'], { cwd: dir, encoding: 'utf8' })
+      execFileSync('git', ['commit', '-m', 'inicial'], { cwd: dir, encoding: 'utf8' })
+
+      // Modifica um arquivo rastreado (dentro do escopo) e cria um arquivo novo fora do
+      // escopo — sem `git add`, exatamente o estado do worktree quando o ConstrutorService roda.
+      writeFileSync(join(dir, 'src', 'a.ts'), 'a\nb\n')
+      mkdirSync(join(dir, 'segredo'), { recursive: true })
+      writeFileSync(join(dir, 'segredo', 'backdoor.ts'), 'backdoor\n')
+
+      const docker = {
+        exec: vi.fn((_container: string, comando: readonly string[]) => {
+          // Só o comando `git` desta checagem roda de verdade — claude e os 4 validadores
+          // seguem dublados, porque o que este teste mede é a semântica do `git status`, não o
+          // resto do pipeline (já coberto pelos outros testes deste arquivo).
+          if (comando[0] !== 'git') return { ok: true, stdout: 'ok', stderr: '', exitCode: 0, timeoutExcedido: false }
+          const stdout = execFileSync('git', [...comando.slice(1)], { cwd: dir, encoding: 'utf8' })
+          return { ok: true, stdout, stderr: '', exitCode: 0, timeoutExcedido: false }
+        }),
+        matarProcesso: vi.fn()
+      } as unknown as DockerRunner
+      const sandboxComEscopo: SandboxPreparado = {
+        ...sandbox,
+        pathsPermitidos: { paths: ['src'], origem: 'spec', justificativa: 'teste' }
+      }
+      const service = new ConstrutorService(docker, repoDuble(), auditDuble(), () => 'u1', () => 'ws1' as never)
+
+      const resultado = await service.construir({
+        runId: 'run-1',
+        sandbox: sandboxComEscopo,
+        promptInicial: 'x',
+        comandosDeValidacao
+      })
+
+      expect(resultado.estadoFinal).toBe('BLOCKED')
+      expect(resultado.bloqueio?.causa).toBe('risco-usuario')
+      expect(resultado.bloqueio?.evidencia).toContain('segredo/backdoor.ts')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })

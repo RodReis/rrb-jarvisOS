@@ -155,23 +155,40 @@ export class ConstrutorService {
   }
 
   /**
-   * O diff ficou dentro do escopo declarado no preflight? (critério 4)
+   * O trabalho do agente ficou dentro do escopo declarado no preflight? (critério 4)
    *
-   * `git diff --name-only` roda **dentro do container** — mesma fronteira do critério 8, sem
-   * caminho de leitura no host. Reusa `fugasDoEscopo` (mesma função do preflight) para não ter
-   * duas implementações divergentes da mesma regra de match de path.
+   * `git status --porcelain --untracked-files=all` roda **dentro do container** — mesma
+   * fronteira do critério 8, sem caminho de leitura no host. Reusa `fugasDoEscopo` (mesma
+   * função do preflight) para não ter duas implementações divergentes da mesma regra de match
+   * de path.
+   *
+   * **Por que `status`, não `diff`:** o worktree do run nunca passa por `git add` — nada em
+   * `ConstrutorService` faz isso. `git diff --name-only` só enxerga arquivo **modificado e
+   * rastreado**; um arquivo **novo e não commitado** (o caso mais natural de um agente
+   * escrevendo código fora do escopo, ex.: `segredo/backdoor.ts`) fica fora do diff e passaria
+   * a checagem sem ser visto. `git status --porcelain` cobre modificado + novo + staged na
+   * mesma chamada. Verificado com Git real (ver `construtor-service.int-spec.ts`).
+   *
+   * **`.gitignore` não é explicitamente excluído** (sem `--ignored`): `git status --porcelain`
+   * já omite arquivo ignorado por padrão, então não há flag extra a decidir aqui — ao contrário
+   * de `git ls-files --others`, que precisaria de `--exclude-standard` para o mesmo efeito.
+   * Isso significa que um agente que escreve no próprio `.gitignore` para esconder um arquivo
+   * da checagem escreveria uma alteração no `.gitignore`, e o `.gitignore` em si só está fora
+   * de vista se ele próprio estiver dentro do escopo permitido — um escopo como `src` não cobre
+   * a raiz do repo, então mexer no `.gitignore` da raiz já cai fora do escopo e bloqueia por
+   * essa via.
    */
   private verificarEscopo(sandbox: SandboxPreparado): { readonly ok: true } | { readonly ok: false; readonly evidencia: string } {
-    const diff = this.docker.exec(
+    const status = this.docker.exec(
       sandbox.containerNome,
-      ['git', 'diff', '--name-only', sandbox.baseSha],
+      ['git', 'status', '--porcelain', '--untracked-files=all'],
       sandbox.worktreeNoHost
     )
-    // Sem diff legível não há como acusar fuga — trata como dentro do escopo; erro de leitura
+    // Sem status legível não há como acusar fuga — trata como dentro do escopo; erro de leitura
     // aqui não é o que o critério 4 pede para bloquear.
-    if (!diff.ok) return { ok: true }
+    if (!status.ok) return { ok: true }
 
-    const arquivos = diff.stdout.split('\n').map((l) => l.trim()).filter((l) => l !== '')
+    const arquivos = arquivosTocados(status.stdout)
     const foraDoEscopo = fugasDoEscopo(arquivos, sandbox.pathsPermitidos)
 
     if (foraDoEscopo.length > 0) {
@@ -226,4 +243,42 @@ function promptDeRecuperacao(falha: ExecucaoNoContainer, historico: readonly Ten
     'Histórico de tentativas nesta fatia:',
     tentativasAnteriores
   ].join('\n')
+}
+
+/**
+ * Extrai os paths tocados de `git status --porcelain --untracked-files=all`.
+ *
+ * Formato de cada linha: 2 caracteres de status + espaço + path (`XY path`). Trata dois casos
+ * fora do comum:
+ * - **Rename** (`R  origem -> destino`): reporta os dois lados — a origem também "tocou" o
+ *   diff (deixou de existir onde estava), e é mais seguro nomear os dois do que só o destino.
+ * - **Path entre aspas**: o Git aspa e escapa o path quando ele tem caractere especial
+ *   (espaço, unicode incomum); `JSON.parse` desfaz o escape porque o formato é o mesmo do C
+ *   que o `core.quotepath` do Git usa.
+ */
+function arquivosTocados(saidaPorcelain: string): readonly string[] {
+  const linhas = saidaPorcelain.split('\n').map((l) => l.replace(/\r$/, '')).filter((l) => l !== '')
+  const arquivos: string[] = []
+
+  for (const linha of linhas) {
+    // XY + espaço obrigatório antes do path (formato `--porcelain` v1, estável entre versões).
+    const resto = linha.slice(3)
+    const partes = resto.split(' -> ')
+    for (const parte of partes) {
+      arquivos.push(desaspar(parte))
+    }
+  }
+
+  return arquivos
+}
+
+function desaspar(path: string): string {
+  if (path.startsWith('"') && path.endsWith('"')) {
+    try {
+      return JSON.parse(path) as string
+    } catch {
+      return path
+    }
+  }
+  return path
 }
