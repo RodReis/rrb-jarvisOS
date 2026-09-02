@@ -215,6 +215,11 @@ export class DockerRunner {
         args: [
           'run',
           '--detach',
+          // `--rm` é o que permite a limpeza da M9-F06 **remover** o container sem `docker rm`:
+          // aquele comando casa a política de destrutivos do MVP-004 e abriria `ApprovalRequest`,
+          // travando a limpeza automática num gate humano. Com a flag na criação, `docker stop`
+          // já remove. Decisão do PI em 2026-09-02.
+          '--rm',
           '--name',
           montagem.containerNome,
           '--network',
@@ -315,6 +320,9 @@ export class DockerRunner {
         args: [
           'run',
           '--detach',
+          // Mesma razão do container do executor: `--rm` é o que deixa `stop` remover o sidecar
+          // sem nenhum comando destrutivo na allowlist.
+          '--rm',
           '--name',
           dados.nome,
           '--network',
@@ -383,8 +391,9 @@ export class DockerRunner {
    * Encerra o container do run.
    *
    * `stop` e não `rm`: `docker rm|rmi|prune|down` casa a política de destrutivos do MVP-004 e
-   * abriria `ApprovalRequest`, travando a limpeza num gate humano. Remover é escopo da M9-F06,
-   * que decide como fazê-lo (emenda 8 de 2026-08-31) — aqui só paramos.
+   * abriria `ApprovalRequest`, travando a limpeza num gate humano. **Parar já remove**, porque o
+   * container nasce com `--rm` (ver `subir`) — foi assim que a M9-F06 fechou o critério 5 sem
+   * pôr um comando destrutivo na allowlist (decisão do PI, 2026-09-02).
    */
   parar(nome: string, cwd: string): boolean {
     const execucao = this.terminal.run(
