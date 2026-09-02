@@ -91,6 +91,9 @@ function gitRunnerReal(): {
 function montarServico(opcoes: {
   readonly dockerNoAr?: boolean
   readonly containerSobe?: boolean
+  readonly redeSobe?: boolean
+  readonly proxyDeEgressSobe?: boolean
+  readonly ipDoProxyDisponivel?: boolean
   readonly proxyNoAr?: boolean
   readonly derivados?: PathsPermitidos | undefined
   readonly chamadas?: ChamadaDocker[]
@@ -103,6 +106,11 @@ function montarServico(opcoes: {
       disponivel: () => opcoes.dockerNoAr !== false,
       portaOcupadaPorContainer: (porta: number) => (opcoes.portasOcupadas ?? []).includes(porta),
       containerExiste: () => false,
+      redeDeEgressExiste: () => false,
+      criarRedeDeEgress: () => opcoes.redeSobe !== false,
+      subirProxyDeEgress: () => opcoes.proxyDeEgressSobe !== false,
+      ipDoProxyNaRedeDeEgress: () =>
+        opcoes.ipDoProxyDisponivel === false ? undefined : '192.168.16.2',
       subir: (montagem: Record<string, unknown>) => {
         chamadas.push({ montagem })
         return opcoes.containerSobe !== false
@@ -287,17 +295,32 @@ describe('preflight — liberação', () => {
    * Critério 9: nenhum segredo entra no container. Medido nos **argumentos reais** do
    * `docker run` que o serviço montou — inspecionar o retorno não provaria nada.
    */
-  it('não passa segredo algum ao container, só a URL do proxy', () => {
+  it('não passa segredo algum ao container, só a URL do sidecar de egress (critério 12)', () => {
     const chamadas: ChamadaDocker[] = []
-    montarServico({ chamadas }).preparar(pedido())
+    const outcome = montarServico({ chamadas }).preparar(pedido())
 
     const montagem = chamadas[0]?.montagem ?? {}
     const serializado = JSON.stringify(montagem)
 
-    expect(montagem.proxyUrl).toBe(PROXY)
+    // A URL que o executor recebe é a do sidecar, nunca a URL real do proxy do host: dentro da
+    // rede `--internal` o container não tem rota até `host.docker.internal` (medido).
+    expect(montagem.proxyUrl).toBe(outcome.sandbox?.proxyUrl)
+    expect(montagem.proxyUrl).not.toBe(PROXY)
+    // Por IP, não por nome: o DNS embutido do Docker não resolve nome de container dentro de
+    // uma rede `--internal` (medido — SERVFAIL mesmo entre dois membros dela).
+    expect(montagem.proxyUrl).toBe('http://192.168.16.2:8080')
     expect(serializado).not.toMatch(/token|apiKey|api_key|secret|senha|ANTHROPIC_API_KEY/i)
     // A sessão do host jamais é montada: é dela que a emenda 6 tira o executor.
     expect(serializado).not.toContain('.claude')
+  })
+
+  /** Critério 12: o executor sobe preso à rede de egress do run, nunca à `bridge` padrão. */
+  it('sobe o container do executor conectado à rede de egress do run', () => {
+    const chamadas: ChamadaDocker[] = []
+    montarServico({ chamadas }).preparar(pedido())
+
+    const montagem = chamadas[0]?.montagem ?? {}
+    expect(montagem.redeDeEgress).toBe(`jarvisos-egress-${RUN}`)
   })
 
   /**
@@ -374,6 +397,45 @@ describe('preflight — falha tardia não deixa recurso preso', () => {
 
     expect(outcome.reason).toBe('docker-indisponivel')
     expect(linhasDeLease()).toBe(0)
+  })
+
+  /**
+   * Critério 12: sem a rede de egress não há isolamento nenhum, e o preflight recusa **antes**
+   * de tocar o container do executor — não é seguro subi-lo sem a fronteira de rede pronta.
+   */
+  it('recusa quando a rede de egress não sobe, sem tocar o container do executor', () => {
+    const chamadas: ChamadaDocker[] = []
+    const outcome = montarServico({ redeSobe: false, chamadas }).preparar(pedido())
+
+    expect(outcome.reason).toBe('docker-indisponivel')
+    expect(linhasDeLease()).toBe(0)
+    expect(chamadas).toEqual([])
+  })
+
+  /**
+   * Sem o sidecar, o executor subiria numa rede `--internal` sem nenhum caminho até o proxy —
+   * moreria na primeira chamada, com worktree e leases já criados. O preflight recusa antes.
+   */
+  it('recusa quando o sidecar de egress não sobe, sem tocar o container do executor', () => {
+    const chamadas: ChamadaDocker[] = []
+    const outcome = montarServico({ proxyDeEgressSobe: false, chamadas }).preparar(pedido())
+
+    expect(outcome.reason).toBe('proxy-indisponivel')
+    expect(linhasDeLease()).toBe(0)
+    expect(chamadas).toEqual([])
+  })
+
+  /**
+   * Sem o IP do sidecar não há para onde apontar `ANTHROPIC_BASE_URL` — um nome ali seria uma
+   * URL que o próprio executor não consegue resolver (medido: DNS falha em rede `--internal`).
+   */
+  it('recusa quando o IP do sidecar não é obtido, sem tocar o container do executor', () => {
+    const chamadas: ChamadaDocker[] = []
+    const outcome = montarServico({ ipDoProxyDisponivel: false, chamadas }).preparar(pedido())
+
+    expect(outcome.reason).toBe('proxy-indisponivel')
+    expect(linhasDeLease()).toBe(0)
+    expect(chamadas).toEqual([])
   })
 
   /** Critério 4: o segundo run não rouba o recurso do primeiro — o `UNIQUE` decide, não o `if`. */

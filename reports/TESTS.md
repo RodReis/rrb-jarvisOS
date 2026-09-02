@@ -13,7 +13,7 @@ Totais da última execução (regenerado, não acumulado):
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
 | — | — | — | Regras de Negócio | 904 | 904 | 0 | 70.0 | — | — |
-| — | — | — | Banco | 676 | 676 | 0 | 87.5 | — | — |
+| — | — | — | Banco | 681 | 681 | 0 | 87.1 | — | — |
 | — | — | — | Tela | 421 | 420 | 0 | 85.5 | — | — |
 
 ## Histórico por entrega
@@ -211,3 +211,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | — | #209 | spec-entrega-02-dag-fila-reconciliacao | Regras de Negócio | 904 | 904 | 0 | 70.0 | #227 | [#227](https://github.com/RodReis/rrb-jarvisOS/pull/227) |
 | — | #209 | spec-entrega-02-dag-fila-reconciliacao | Banco | 676 | 676 | 0 | 87.5 | #227 | [#227](https://github.com/RodReis/rrb-jarvisOS/pull/227) |
 | — | #209 | spec-entrega-02-dag-fila-reconciliacao | Tela | 421 | 420 | 0 | 85.5 | #227 | [#227](https://github.com/RodReis/rrb-jarvisOS/pull/227) |
+| — | #222 | spec-entrega-03-worktree-preflight-docker | Regras de Negócio | 904 | 904 | 0 | 70.0 | #228 | [#228](https://github.com/RodReis/rrb-jarvisOS/pull/228) |
+| — | #222 | spec-entrega-03-worktree-preflight-docker | Banco | 681 | 681 | 0 | 87.1 | #228 | [#228](https://github.com/RodReis/rrb-jarvisOS/pull/228) |
+| — | #222 | spec-entrega-03-worktree-preflight-docker | Tela | 421 | 420 | 0 | 85.5 | #228 | [#228](https://github.com/RodReis/rrb-jarvisOS/pull/228) |

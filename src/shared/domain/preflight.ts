@@ -146,7 +146,12 @@ export interface SandboxPreparado {
   /** Caminho do worktree no host — para o app versionar; nunca vai ao executor como cwd. */
   readonly worktreeNoHost: string
   readonly pathsPermitidos: PathsPermitidos
-  /** A URL do proxy que o container recebe. Loopback, sem credencial embutida. */
+  /**
+   * A URL do proxy que o container recebe — sem credencial embutida.
+   *
+   * Aponta para o **sidecar de egress do run** (critério 12), não direto para o proxy do host: o
+   * executor só está na rede `--internal` do run, e o sidecar é o único outro membro dela.
+   */
   readonly proxyUrl: string
 }
 
@@ -165,6 +170,35 @@ export const RECURSO_PORTA = 'porta:'
 export function nomeDoContainer(runId: string): string {
   return `jarvisos-run-${sanitizar(runId)}`
 }
+
+/**
+ * A rede de egress do run — a fronteira do critério 12.
+ *
+ * `--internal`, sem rota de saída: é ela que faz `api.github.com` genuinamente inalcançável,
+ * não uma instrução ao agente. O executor só se conecta a esta rede; o único outro membro é o
+ * sidecar de proxy, que também tem pé na rede `bridge` padrão do Docker (a que alcança
+ * `host.docker.internal`) — ver `nomeDoProxyDeEgress`.
+ */
+export function nomeDaRedeDeEgress(runId: string): string {
+  return `jarvisos-egress-${sanitizar(runId)}`
+}
+
+/**
+ * O sidecar dual-homed que faz o executor alcançar o proxy do host sem alcançar mais nada.
+ *
+ * Medido com Docker real: uma rede `--internal` bloqueia `api.github.com` (o que o critério 12
+ * pede), mas bloqueia **também** `host.docker.internal` — a rota que o Docker Desktop usa para
+ * alcançar o host depende de saída externa, que `--internal` corta por igual. Dois containers na
+ * mesma rede `--internal` **se enxergam** entre si mesmo sem essa rota; por isso o sidecar entra
+ * nas duas redes e encaminha uma porta fixa para o proxy real, sem nunca expor rota nenhuma para
+ * fora da rede de egress.
+ */
+export function nomeDoProxyDeEgress(runId: string): string {
+  return `jarvisos-proxy-${sanitizar(runId)}`
+}
+
+/** A porta que o sidecar escuta, do lado da rede de egress. Fixa: o sidecar só encaminha 1:1. */
+export const PORTA_DO_PROXY_DE_EGRESS = 8080
 
 export function nomeDaBranch(sliceId: string, runId: string): string {
   return `feat/${sanitizar(sliceId)}-${sanitizar(runId).slice(0, 8)}`
