@@ -70,10 +70,11 @@ function adapter(devolver: () => Response): {
 }
 
 describe('capacidades', () => {
-  it('declara auth.identify, as nove da M6-F04 e as quatro da M9-F01', () => {
+  it('declara auth.identify, as nove da M6-F04, as quatro da M9-F01 e a leitura da M9-F05', () => {
     // O teste da F03 afirmava `['auth.identify']` e nada mais — e foi ele que cobrou esta
     // atualização quando a F04 chegou, que era o ponto de tê-lo escrito assim. Cobrou de novo
-    // na M9-F01, quando a publicação precisou de branch base, proteção e leitura de commit.
+    // na M9-F01, quando a publicação precisou de branch base, proteção e leitura de commit, e
+    // outra vez na M9-F05, quando o gate de merge precisou **ler** a proteção que a F01 escreve.
     const caps = new GithubAdapter().capacidades()
     expect(caps.map((c) => c.operation)).toEqual([
       'auth.identify',
@@ -89,7 +90,8 @@ describe('capacidades', () => {
       'repo.set-default-branch',
       'branch.ensure-protection',
       'commit.sha-for-ref',
-      'label.ensure'
+      'label.ensure',
+      'checks.required-for-branch'
     ])
     expect(caps[0]).toMatchObject({ connector: 'github', effect: 'leitura' })
   })

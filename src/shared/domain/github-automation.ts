@@ -79,7 +79,8 @@ export const GITHUB_OPERATIONS = {
   setDefaultBranch: 'repo.set-default-branch',
   ensureBranchProtection: 'branch.ensure-protection',
   getCommitSha: 'commit.sha-for-ref',
-  ensureLabel: 'label.ensure'
+  ensureLabel: 'label.ensure',
+  getRequiredChecks: 'checks.required-for-branch'
 } as const
 
 export type GithubOperation = (typeof GITHUB_OPERATIONS)[keyof typeof GITHUB_OPERATIONS]
@@ -175,6 +176,12 @@ export const GITHUB_CAPABILITIES: readonly ConnectorCapability[] = [
     operation: GITHUB_OPERATIONS.ensureLabel,
     effect: 'mutacao',
     descricao: 'Garante que o rótulo existe no repositório, criando-o apenas se ainda não existir.'
+  },
+  {
+    connector: 'github',
+    operation: GITHUB_OPERATIONS.getRequiredChecks,
+    effect: 'leitura',
+    descricao: 'Lê da origem quais checks a proteção da branch exige antes de permitir o merge.'
   }
 ]
 
@@ -318,6 +325,33 @@ export interface WorkflowRunNormalizado {
   readonly status: string
   readonly conclusao?: string
   readonly url?: string
+}
+
+/** Entrada de `checks.required-for-branch`. */
+export interface RequiredChecksInput extends RepoAlvo {
+  readonly branch: string
+}
+
+/**
+ * O conjunto obrigatório de checks **lido da origem** (critério 11 da SPEC-Entrega-05).
+ *
+ * Existe porque o gate de merge não pode comparar com a regra que *nós* escrevemos num run
+ * anterior: entre o início do run e o merge, alguém pode acrescentar um check obrigatório, e um
+ * snapshot tirado da nossa própria escrita nunca veria essa mudança.
+ *
+ * **`protegida: false` não é "sem exigência"** — é ausência de regra, e quem decide o que fazer com
+ * ela é o gate, que a trata como bloqueio explicável. Verde por omissão é exatamente o que o
+ * critério 10 existe para impedir.
+ */
+export interface RequiredChecksNormalizado {
+  readonly branch: string
+  /** Os *contexts* que a proteção exige. Vazio quando a branch não tem proteção. */
+  readonly contexts: readonly string[]
+  /** A origem exige que o branch esteja atualizado com a base antes do merge? */
+  readonly strict: boolean
+  readonly protegida: boolean
+  /** A origem exige merge queue? Nesse caso a pipeline não tenta contorná-la (critério 12). */
+  readonly mergeQueueExigida: boolean
 }
 
 /** O que `pr.merge-state` devolve — **consultado na origem**, nunca deduzido. */
@@ -513,6 +547,9 @@ export function validarEntrada(operation: string, input: unknown): string | unde
 
     case GITHUB_OPERATIONS.getCommitSha:
       return texto('ref') ? undefined : 'Informe `ref`.'
+
+    case GITHUB_OPERATIONS.getRequiredChecks:
+      return texto('branch') ? undefined : 'Informe `branch`.'
 
     case GITHUB_OPERATIONS.ensureLabel:
       if (!texto('nome')) return 'Informe `nome`.'

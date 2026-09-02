@@ -30,6 +30,8 @@ import {
   type HeadShaInput,
   type MergeStateNormalizado,
   type PullRequestInput,
+  type RequiredChecksInput,
+  type RequiredChecksNormalizado,
   type SetDefaultBranchInput,
   type SquashMergeInput,
   type WorkflowRunNormalizado
@@ -636,6 +638,75 @@ export async function getCommitSha(
       id: sha,
       url: `https://github.com/${input.owner}/${input.repo}/commit/${sha}`
     },
+    criado: false
+  }
+}
+
+/**
+ * `checks.required-for-branch` — o conjunto obrigatório **lido da origem** (critério 11 da M9-F05).
+ *
+ * Ao contrário de `branch.ensure-protection`, que escreve, esta função lê. A diferença é o ponto:
+ * o gate de merge precisa comparar com a regra que vale **na origem agora**, não com a que nós
+ * escrevemos no início do run. Um snapshot tirado da nossa própria escrita não detectaria alguém
+ * acrescentando um check obrigatório no meio do caminho — que é exatamente a mudança que o critério
+ * existe para pegar.
+ *
+ * **O 404 aqui é ausência de proteção, não ambiguidade** — e por isso não passa por
+ * `significadoDo404`. Aquele raciocínio vale para recurso cuja existência o GitHub esconde de quem
+ * não tem acesso; este endpoint responde 404 para branch existente e desprotegida, que é o estado
+ * normal de repositório recém-criado. Quem decide o que fazer com `protegida: false` é o gate, que
+ * a trata como bloqueio explicável: verde por ausência de regra é o que o critério 10 proíbe.
+ */
+export async function getRequiredChecksForBranch(
+  rest: GithubRest,
+  input: RequiredChecksInput
+): Promise<ResultadoDeOperacao<RequiredChecksNormalizado>> {
+  const resposta = await rest.request(
+    'GET',
+    `/repos/${input.owner}/${input.repo}/branches/${input.branch}/protection`
+  )
+
+  const referencia = {
+    id: `${input.owner}/${input.repo}/protection/${input.branch}`,
+    url: `https://github.com/${input.owner}/${input.repo}/settings/branches`
+  }
+
+  if (resposta.status === 404) {
+    return {
+      data: {
+        branch: input.branch,
+        contexts: [],
+        strict: false,
+        protegida: false,
+        mergeQueueExigida: false
+      },
+      externalRef: referencia,
+      criado: false
+    }
+  }
+
+  const corpo = exigirOk(resposta).corpo as
+    | {
+        required_status_checks?: { strict?: unknown; contexts?: unknown } | null
+        required_merge_queue?: unknown
+      }
+    | undefined
+
+  const rsc = corpo?.required_status_checks
+  const contexts = Array.isArray(rsc?.contexts)
+    ? rsc.contexts.filter((c): c is string => typeof c === 'string')
+    : []
+
+  return {
+    data: {
+      branch: input.branch,
+      contexts,
+      strict: rsc?.strict === true,
+      protegida: true,
+      mergeQueueExigida:
+        corpo?.required_merge_queue !== undefined && corpo.required_merge_queue !== null
+    },
+    externalRef: referencia,
     criado: false
   }
 }

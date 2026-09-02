@@ -40,6 +40,7 @@ import {
   type EnsureRepositoryInput,
   type HeadShaInput,
   type PullRequestInput,
+  type RequiredChecksInput,
   type SetDefaultBranchInput,
   type SquashMergeInput
 } from '@shared/domain/github-automation'
@@ -55,6 +56,7 @@ import {
   getChecksForHead,
   getCommitSha,
   getMergeState,
+  getRequiredChecksForBranch,
   getWorkflowRunsForHead,
   setDefaultBranch,
   squashMerge,
@@ -220,6 +222,9 @@ export class GithubAdapter implements ConnectorAdapter {
 
       case GITHUB_OPERATIONS.ensureLabel:
         return await ensureLabel(rest, input as EnsureLabelInput)
+
+      case GITHUB_OPERATIONS.getRequiredChecks:
+        return await getRequiredChecksForBranch(rest, input as RequiredChecksInput)
 
       default:
         // Inalcançável pelo caminho normal (o registro filtra antes), mas o `default` mantém a
