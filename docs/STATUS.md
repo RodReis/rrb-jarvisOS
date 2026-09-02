@@ -6,6 +6,7 @@ Atualizado em: **2026-09-02**. Fonte única do índice Fatia ↔ SPEC. Estado re
 
 | Coluna | Item | Estado |
 |---|---|---|
+| Em Andamento | [#104](https://github.com/RodReis/rrb-jarvisOS/issues/104) · M9-F04 Construção/recuperação | construído em `feat/m9-f04-construcao-recuperacao` (14 tasks + fix wave da revisão final); ainda não tem PR aberto — aguardando abertura para virar `proplan:done` |
 | Feito | [#209](https://github.com/RodReis/rrb-jarvisOS/issues/209) · correção do EffectJournal | entregue no PR #227 (`66623b8`); `proplan:done`, aguardando aceite do PI |
 | Próximo | [#222](https://github.com/RodReis/rrb-jarvisOS/issues/222) · restrição de egress do container | `proplan:next` — única fila explícita restante em Backlog após #209; falha da M9-F03 registrada na main |
 | Feito | [#103](https://github.com/RodReis/rrb-jarvisOS/issues/103) · M9-F03 Worktree, preflight e Docker | entregue no PR #211; emendas e evidência preservadas |
