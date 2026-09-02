@@ -1,17 +1,17 @@
 # STATUS.md — Kanban / Roadmap
 
-Atualizado em: **2026-09-02**. Fonte única do índice Fatia ↔ SPEC. Estado remoto conferido no fechamento do PR #227; nenhuma outra prioridade alterada por esta tarefa. Histórico detalhado em `docs/STATUS-ARQUIVO.md`; o board vence divergência factual.
+Atualizado em: **2026-09-02**. Fonte única do índice Fatia ↔ SPEC. Estado remoto conferido no fechamento do PR #228. **Correção nesta atualização:** `next` havia sido movido para #167 (M16-F05) sem base documentada — nenhum comentário de aprovação no board, e o movimento contraria a ordem F01→F06 do próprio épico #162, a dependência explícita "M16-F05 depende de M16-F04 concluída" na SPEC de #167, a dependência do MVP-016 no MVP-015 (0/6 entregue) e a regra de `docs/DECISIONS.md` linha 143 ("O aceite não altera `next`... não substitui os gates de dependência/fila"). Revertido para #104 (M9-F04), a fatia seguinte já em curso no MVP-009. Histórico detalhado em `docs/STATUS-ARQUIVO.md`; o board vence divergência factual.
 
 ## Agora
 
 | Coluna | Item | Estado |
 |---|---|---|
-| Feito | [#209](https://github.com/RodReis/rrb-jarvisOS/issues/209) · correção do EffectJournal | entregue no PR #227 (`66623b8`); `proplan:done`, aguardando aceite do PI |
-| Próximo | [#222](https://github.com/RodReis/rrb-jarvisOS/issues/222) · restrição de egress do container | `proplan:next` — única fila explícita restante em Backlog após #209; falha da M9-F03 registrada na main |
+| Finalizado | [#222](https://github.com/RodReis/rrb-jarvisOS/issues/222) · restrição de egress do container | aceite do PI registrado; entregue no PR #228 (`786ca98`) |
+| Próximo | [#104](https://github.com/RodReis/rrb-jarvisOS/issues/104) · M9-F04 Construção e recuperação com Claude Code | `proplan:next` — próxima fatia da fila do MVP-009 (F01–F03 entregues, F04 nunca foi construída); `subscription_limited` já é acréscimo aceito na própria SPEC (DECISIONS.md item 3), não bloqueio externo |
 | Feito | [#103](https://github.com/RodReis/rrb-jarvisOS/issues/103) · M9-F03 Worktree, preflight e Docker | entregue no PR #211; emendas e evidência preservadas |
 | Finalizado | #99, #101 e #102 | aceite do PI registrado; M9-F02 integrada pelo PR #208 |
 | Backlog | M7-F01–F06 (#180–#185), MVPs 010–015 e M16-F01–F04 | SPECs aprovadas; publicação documental não muda fila |
-| Backlog | M16-F05/F06 (#167/#168), MVP-023 e MVP-024 | dez SPECs `aprovada-pi` em 2026-08-31; aceite não altera `next` nem inicia construção fora da fila |
+| Backlog | M16-F05/F06 (#167/#168), MVP-023 e MVP-024 | dez SPECs `aprovada-pi` em 2026-08-31; aceite não altera `next` nem inicia construção fora da fila — M16-F05 permanece atrás de M16-F01–F04 (#163–166, nenhuma construída) e do MVP-015 (épico #155, 0/6), como o próprio épico #162 declara ("Ordem: F01 → F02 → F03 → F04 → F05 → F06. Depende do MVP-015") |
 | Planejado | M7-F07–F08 (#186–#187) a redigir | Fora do fechamento da V3; redação não autoriza construção |
 | Roadmap preservado | Command Center (MVP-017–021) e Shell (MVP-022) | decisões e issues da main preservadas; não renumerados |
 
@@ -135,8 +135,8 @@ Não existe catálogo global `SPEC-nnn`. O slug identifica a SPEC; os números a
 
 ## Próximas ações
 
-1. #209 entregue pelo PR #227; `next` avança para #222 (única fila explícita restante). #103 foi integrada pelo PR #211.
-2. Conservar #167/#168 e #214–#221 em Backlog após o aceite exato de 2026-08-31, sem promover qualquer uma a `next` por esta atualização.
+1. #222 finalizado (aceite do PI); MVP-009 retoma sua própria fila — `next` = #104 (M9-F04), corrigindo o desvio para #167 que não tinha decisão registrada e contrariava a ordem do épico #162 e a regra de `DECISIONS.md` item 143. #103 foi integrada pelo PR #211.
+2. Conservar #167/#168 e #214–#221 em Backlog; M16-F05/F06 só entram na fila depois de M16-F01–F04 e do MVP-015 concluídos, ordem que o próprio épico #162 já declara — SPEC `aprovada-pi` não é gate de dependência.
 3. Antes das fatias visuais, anexar `DESIGN-SYSTEM.md` e HTML pelo fluxo já aprovado; texto de SPEC/template não substitui anexo do PI.
 4. M7-F05/F06 estão aprovadas/Backlog e M7-F07–F08 continuam a redigir; as fatias do Command Center seguem seus planejamentos próprios. Nenhuma delas bloqueia concluir a documentação V3.
 5. O relatório de fechamento do PR #189 documenta reconciliação, ordem técnica, issues e validação. Aprovações prévias são preservadas, não repetidas.
