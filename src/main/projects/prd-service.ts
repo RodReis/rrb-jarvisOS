@@ -431,7 +431,8 @@ export class PrdService {
         workspaceId,
         userId,
         contextPackId,
-        rota: rota.decisao
+        rota: rota.decisao,
+        commitarMarco: true
       })
     }
 
@@ -488,7 +489,8 @@ export class PrdService {
       workspaceId,
       userId,
       contextPackId: atual.contextPackId,
-      rota: 'corte'
+      rota: 'corte',
+      commitarMarco: false
     })
 
     this.audit.append({
@@ -519,6 +521,15 @@ export class PrdService {
       readonly userId: string
       readonly contextPackId: string | null
       readonly rota: string
+      /**
+       * Commitar o marco `prd-aprovado`? **Só na geração.**
+       *
+       * O corte de um `proposto` grava revisão nova e reescreve os arquivos — o disco tem de
+       * acompanhar a revisão vigente —, mas não é um marco: commitar a cada item cortado encheria
+       * o histórico de revisões intermediárias que o PI nem terminou de revisar. O marco é da
+       * geração, e o aceite é do PI.
+       */
+      readonly commitarMarco: boolean
     }
   ): PrdOutcome {
     const { projeto, workspaceId, userId } = contexto
@@ -594,7 +605,9 @@ export class PrdService {
 
     // (7) O marco vira commit pelo caminho único da M8-F01. Falha aqui **não** perde a revisão:
     // ela já está no banco e no disco, e a retomada é gerar de novo (critério 8).
-    const marco = this.projectService.concluirMarco(conteudo.projectId, 'prd-aprovado', workspaceId)
+    const marco = contexto.commitarMarco
+      ? this.projectService.concluirMarco(conteudo.projectId, 'prd-aprovado', workspaceId)
+      : undefined
 
     if (marco?.commitado === true && marco.commitHash !== undefined) {
       this.repository.marcarCommit(userId, registrado.id, marco.commitHash)
@@ -609,10 +622,7 @@ export class PrdService {
     return {
       resultado: 'gerado',
       prd: { ...registrado, commitHash: marco?.commitHash ?? null },
-      mensagem:
-        marco?.commitado === true
-          ? 'Documentos gerados e commitados.'
-          : 'Documentos gerados. O commit do marco falhou e pode ser retomado.'
+      mensagem: mensagemDoDesfecho(contexto.commitarMarco, marco?.commitado === true)
     }
   }
 
@@ -774,6 +784,21 @@ export class PrdService {
       input
     }
   }
+}
+
+/**
+ * A mensagem do desfecho bem-sucedido.
+ *
+ * Três casos, e o terceiro é a razão de a função existir: quando o marco nem foi tentado (corte
+ * de um `proposto`), dizer "o commit falhou" seria relatar uma falha que não houve — e mandaria
+ * o PI procurar um problema no Git que não existe.
+ */
+function mensagemDoDesfecho(tentouCommitar: boolean, commitado: boolean): string {
+  if (!tentouCommitar) return 'Revisão atualizada.'
+
+  return commitado
+    ? 'Documentos gerados e commitados.'
+    : 'Documentos gerados. O commit do marco falhou e pode ser retomado.'
 }
 
 /**

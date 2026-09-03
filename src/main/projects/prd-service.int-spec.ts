@@ -75,6 +75,8 @@ let respostaDaBusca: ConnectorOutcome
 let respostaDaExtracao: ConnectorOutcome
 /** Se `montarContexto` devolve um pack. */
 let packDisponivel: boolean
+/** Quantos marcos documentais foram concluídos — prova que o corte não commita. */
+let marcosConcluidos: number
 
 const URL_A = 'https://exemplo.dev/a'
 
@@ -160,6 +162,7 @@ beforeEach(() => {
   briefAceito = brief([{ id: 'b-1', texto: 'Organiza leituras.' }])
   commitFunciona = true
   packDisponivel = true
+  marcosConcluidos = 0
   respostas = [[afirmacao()]]
 
   respostaDaBusca = {
@@ -192,8 +195,10 @@ beforeEach(() => {
     pacotes,
     projects: projetos,
     projectService: {
-      concluirMarco: () =>
-        commitFunciona ? { commitado: true, commitHash: 'abc1234' } : { commitado: false }
+      concluirMarco: () => {
+        marcosConcluidos += 1
+        return commitFunciona ? { commitado: true, commitHash: 'abc1234' } : { commitado: false }
+      }
     } as never,
     connectors: {
       call: async (pedido: { operation: string }) => {
@@ -528,6 +533,15 @@ describe('corte de proposto no gate', () => {
     service.cortarProposto(PROJETO, 'a-1', WS)
 
     expect(revisoesNoBanco()).toBe(1)
+  })
+
+  it('cortar NÃO commita marco: o marco é da geração, o aceite é do PI', () => {
+    marcosConcluidos = 0
+    service.cortarProposto(PROJETO, 'p-1', WS)
+
+    // Commitar a cada item cortado encheria o histórico de revisões intermediárias que o PI
+    // nem terminou de revisar.
+    expect(marcosConcluidos).toBe(0)
   })
 
   it('o corte reescreve os arquivos: o disco acompanha a revisão vigente', () => {
