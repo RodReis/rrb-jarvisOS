@@ -243,6 +243,73 @@ export const RECURSOS = {
           'falha-de-escrita': 'Não foi possível escrever os documentos'
         }
       },
+      arquitetura: {
+        titulo: 'Arquitetura, decisões, testes e revisão',
+        descricao:
+          'O que o app derivou do PRD aceito e dos protótipos de {{nome}}. Cada afirmação diz o que a sustenta; fluxo só é prometido com a tela que o desenhou.',
+        carregando: 'Carregando os documentos…',
+        vazio: 'Nenhum documento ainda',
+        vazioDescricao:
+          'Com os anexos completos e o PRD aceito, gere a arquitetura, as decisões, os testes e a revisão.',
+        gerar: 'Gerar os documentos',
+        regerar: 'Gerar de novo',
+        documentoVazio: 'Nenhuma afirmação nesta revisão.',
+        cortar: 'Cortar',
+        cortarEsta: 'Cortar a afirmação: {{texto}}',
+        descartar: 'Descartar',
+        descartarEste: 'Descartar o ajuste: {{texto}}',
+        propostosTitulo: '{{count}} afirmações propostas pela IA',
+        propostosDescricao:
+          'Ninguém disse isto — a IA inferiu. Corte o que não faz sentido antes de aceitar.',
+        // Os ajustes são propostas sobre o **seu** desenho. O texto diz o que o app não faz:
+        // ele não mexe no protótipo, e descartar é a única ação daqui.
+        ajustesTitulo: '{{count}} ajustes propostos pela IA',
+        ajustesDescricao:
+          'A IA leu seus protótipos contra o PRD. Nada foi alterado nos anexos: mudar o desenho é ato seu, e descartar só tira o ajuste desta revisão.',
+        recomendacao: 'Recomendação: {{texto}}',
+        aceitar: 'Aceitar o pacote',
+        aceiteTitulo: 'Aceite do pacote',
+        aceiteDescricao:
+          'Aceitar congela esta revisão — PRD, anexos, arquitetura, testes e revisão — como base do roadmap. Gerar de novo depois cria outra revisão e reabre este aceite.',
+        aceiteFalhou: 'Não foi possível registrar o aceite. Tente de novo.',
+        origem: {
+          prd: 'do PRD aceito',
+          prototipo: 'do protótipo que você desenhou',
+          decisao: 'da sua decisão',
+          proposto: 'proposto pela IA'
+        },
+        ajustes: {
+          telaSemRequisito: 'tela sem requisito',
+          requisitoSemTela: 'requisito sem tela',
+          estadoAusente: 'estado ausente'
+        },
+        documentos: {
+          ARCHITECTURE: 'Arquitetura',
+          DECISIONS: 'Decisões',
+          TESTING: 'Testes',
+          REVIEW: 'Revisão'
+        },
+        descricoes: {
+          ARCHITECTURE:
+            'Módulos, dados, fronteiras e resiliência. Os fluxos citam a tela do protótipo que os desenhou.',
+          DECISIONS:
+            'As decisões estruturais como ADRs. As propostas pela IA aparecem como proposta, não como decisão tomada.',
+          TESTING:
+            'A estratégia de evidência deste projeto, derivada dos requisitos e das jornadas prototipadas.',
+          REVIEW: 'Como revisar o código deste projeto — nada importado de outro.'
+        },
+        resultados: {
+          gerada: 'Documentos gerados',
+          'projeto-inexistente': 'Projeto não encontrado',
+          'anexos-pendentes': 'Faltam anexos do design',
+          'prd-ausente': 'Gere o PRD primeiro',
+          'prototipos-invalidos': 'Os protótipos têm problemas a resolver',
+          'bloqueado-sem-rota': 'Nenhuma rota de geração disponível',
+          'saida-invalida': 'A saída do modelo foi recusada',
+          'sem-contexto': 'O contexto do projeto não pôde ser montado',
+          'falha-de-escrita': 'Não foi possível escrever os documentos'
+        }
+      },
       refinamento: {
         titulo: 'Refinamento',
         // Diz o que o refinamento faz e o que ele cobra: decisões, não formulário.
@@ -335,7 +402,6 @@ export const RECURSOS = {
         gateAberto: 'Os anexos estão completos. A arquitetura pode ser gerada.',
         gateFechado: 'Falta anexar: {{lista}}.',
         validar: 'Validar protótipos',
-        gerarArquitetura: 'Gerar arquitetura',
         pendencias: 'Faltam: {{lista}}.',
         validacaoLimpa: 'Os protótipos não apresentaram problemas.',
         impede: 'Impede a arquitetura',
@@ -751,6 +817,71 @@ export const RECURSOS = {
           'falha-de-escrita': 'Could not write the documents'
         }
       },
+      arquitetura: {
+        titulo: 'Architecture, decisions, testing and review',
+        descricao:
+          'What the app derived from the accepted PRD and the prototypes of {{nome}}. Every statement says what backs it; a flow is only promised with the screen that drew it.',
+        carregando: 'Loading the documents…',
+        vazio: 'No documents yet',
+        vazioDescricao:
+          'With the attachments complete and the PRD accepted, generate the architecture, decisions, testing and review.',
+        gerar: 'Generate the documents',
+        regerar: 'Generate again',
+        documentoVazio: 'No statements in this revision.',
+        cortar: 'Cut',
+        cortarEsta: 'Cut the statement: {{texto}}',
+        descartar: 'Dismiss',
+        descartarEste: 'Dismiss the adjustment: {{texto}}',
+        propostosTitulo: '{{count}} statements proposed by AI',
+        propostosDescricao:
+          'Nobody said this — the AI inferred it. Cut what does not make sense before accepting.',
+        ajustesTitulo: '{{count}} adjustments proposed by AI',
+        ajustesDescricao:
+          'The AI read your prototypes against the PRD. Nothing was changed in the attachments: changing the design is your act, and dismissing only removes the adjustment from this revision.',
+        recomendacao: 'Recommendation: {{texto}}',
+        aceitar: 'Accept the package',
+        aceiteTitulo: 'Package acceptance',
+        aceiteDescricao:
+          'Accepting freezes this revision — PRD, attachments, architecture, testing and review — as the basis for the roadmap. Generating again later creates another revision and reopens this acceptance.',
+        aceiteFalhou: 'The acceptance could not be recorded. Try again.',
+        origem: {
+          prd: 'from the accepted PRD',
+          prototipo: 'from the prototype you drew',
+          decisao: 'from your decision',
+          proposto: 'proposed by AI'
+        },
+        ajustes: {
+          telaSemRequisito: 'screen without requirement',
+          requisitoSemTela: 'requirement without screen',
+          estadoAusente: 'missing state'
+        },
+        documentos: {
+          ARCHITECTURE: 'Architecture',
+          DECISIONS: 'Decisions',
+          TESTING: 'Testing',
+          REVIEW: 'Review'
+        },
+        descricoes: {
+          ARCHITECTURE:
+            'Modules, data, boundaries and resilience. Flows cite the prototype screen that drew them.',
+          DECISIONS:
+            'The structural decisions as ADRs. The ones proposed by AI appear as proposals, not as decisions taken.',
+          TESTING:
+            'The evidence strategy for this project, derived from the requirements and the prototyped journeys.',
+          REVIEW: 'How to review the code of this project — nothing imported from another.'
+        },
+        resultados: {
+          gerada: 'Documents generated',
+          'projeto-inexistente': 'Project not found',
+          'anexos-pendentes': 'Design attachments are missing',
+          'prd-ausente': 'Generate the PRD first',
+          'prototipos-invalidos': 'The prototypes have problems to solve',
+          'bloqueado-sem-rota': 'No generation route available',
+          'saida-invalida': 'The model output was refused',
+          'sem-contexto': 'The project context could not be assembled',
+          'falha-de-escrita': 'The documents could not be written'
+        }
+      },
       refinamento: {
         titulo: 'Refinement',
         descricao: 'The AI asks what the prompt for {{nome}} left out. One decision at a time.',
@@ -836,7 +967,6 @@ export const RECURSOS = {
         gateAberto: 'Attachments are complete. Architecture can be generated.',
         gateFechado: 'Still to attach: {{lista}}.',
         validar: 'Validate prototypes',
-        gerarArquitetura: 'Generate architecture',
         pendencias: 'Missing: {{lista}}.',
         validacaoLimpa: 'The prototypes raised no issues.',
         impede: 'Blocks architecture',

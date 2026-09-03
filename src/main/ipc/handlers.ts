@@ -76,7 +76,7 @@ import type { PacoteEstrutural, PacoteOutcome } from '@shared/domain/pacote-estr
 import type { Anexo, AnexoOutcome } from '@shared/domain/anexos-de-design'
 import { EXTENSOES_DO_ANEXO, isTipoDeAnexo } from '@shared/domain/anexos-de-design'
 import type { ValidacaoDoPrototipo } from '@shared/domain/validacao-de-prototipo'
-import type { ArquiteturaOutcome, PacoteArquitetura } from '@shared/domain/arquitetura'
+import type { PacoteArquitetura } from '@shared/domain/arquitetura'
 import type { AlvoDaPublicacao, PublicacaoOutcome } from '@shared/domain/publicacao'
 import type { ExecutionLedger } from '@shared/domain/execution-ledger'
 import type { PendenciaDeLimpeza } from '@shared/domain/limpeza'
@@ -97,11 +97,16 @@ import type { RoadmapService } from '../projects/roadmap-service'
 import type { JornadaService } from '../projects/jornada-service'
 import type { BriefService } from '../projects/brief-service'
 import type { PrdService } from '../projects/prd-service'
+import type { ArquiteturaService } from '../projects/arquitetura-service'
 import type { RefinamentoService } from '../projects/refinamento-service'
 import type { GeracaoDePerguntasOutcome } from '@shared/domain/refinamento'
 import type { Decision, EstadoDoWizard, Resposta } from '@shared/domain/wizard'
 import type { BriefRegistrado, GeracaoOutcome, PromptDoProjeto } from '@shared/domain/brief'
 import type { PrdOutcome, PrdRegistrado } from '@shared/domain/prd'
+import type {
+  ArquiteturaGeradaOutcome,
+  ArquiteturaRegistrada
+} from '@shared/domain/arquitetura-gerada'
 import type { ResultadoDaRota } from '@shared/domain/rota-de-geracao'
 import type { EstadoDaJornada, TransicaoOutcome } from '@shared/domain/jornada'
 import type { AnexoService } from '../projects/anexo-service'
@@ -312,6 +317,7 @@ export interface IpcDependencies {
   readonly jornada: JornadaService
   readonly brief: BriefService
   readonly prd: PrdService
+  readonly arquitetura: ArquiteturaService
   readonly refinamento: RefinamentoService
   readonly publicacao: PublicacaoService
   /** O kill-switch do merge autônomo (SPEC-Entrega-02/05). */
@@ -1647,6 +1653,69 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     }
   )
 
+  /*
+   * A arquitetura, as decisões, os testes e a revisão gerados por IA (SPEC-Jornada-04).
+   *
+   * O gate de anexos, o validador de âncora e a análise de coerência moram no serviço; o handler
+   * valida a forma do pedido na fronteira e não decide nada — duplicar a política aqui criaria
+   * uma segunda fonte que divergiria da primeira.
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.arquiteturaGerarPorIa,
+    async (_event, projectId: unknown, workspace: unknown): Promise<ArquiteturaGeradaOutcome> => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
+        return { resultado: 'projeto-inexistente', mensagem: 'Projeto não encontrado.' }
+      }
+      return await deps.arquitetura.gerar(projectId, workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.arquiteturaCarregar,
+    (_event, projectId: unknown, workspace: unknown): ArquiteturaRegistrada | null => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return null
+      return deps.arquitetura.carregar(projectId) ?? null
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.arquiteturaCortarProposto,
+    (
+      _event,
+      projectId: unknown,
+      afirmacaoId: unknown,
+      workspace: unknown
+    ): ArquiteturaRegistrada | null => {
+      if (
+        !isWorkspaceId(workspace) ||
+        typeof projectId !== 'string' ||
+        typeof afirmacaoId !== 'string'
+      ) {
+        return null
+      }
+      return deps.arquitetura.cortarProposto(projectId, afirmacaoId, workspace) ?? null
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.arquiteturaDescartarAjuste,
+    (
+      _event,
+      projectId: unknown,
+      ajusteId: unknown,
+      workspace: unknown
+    ): ArquiteturaRegistrada | null => {
+      if (
+        !isWorkspaceId(workspace) ||
+        typeof projectId !== 'string' ||
+        typeof ajusteId !== 'string'
+      ) {
+        return null
+      }
+      return deps.arquitetura.descartarAjuste(projectId, ajusteId, workspace) ?? null
+    }
+  )
+
   /**
    * O refinamento por perguntas geradas (SPEC-Jornada-02).
    *
@@ -1938,16 +2007,6 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     IPC_CHANNELS.anexoValidar,
     async (_event, projectId: unknown): Promise<readonly ValidacaoDoPrototipo[]> =>
       typeof projectId === 'string' ? await deps.anexos.validar(projectId) : []
-  )
-
-  ipcMain.handle(
-    IPC_CHANNELS.arquiteturaGerar,
-    async (_event, projectId: unknown, workspace: unknown): Promise<ArquiteturaOutcome> => {
-      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
-        return { reason: 'projeto-inexistente', mensagem: 'Projeto não encontrado.' }
-      }
-      return await deps.anexos.gerarArquitetura(projectId, workspace)
-    }
   )
 
   ipcMain.handle(

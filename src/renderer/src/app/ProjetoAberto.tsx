@@ -9,6 +9,7 @@ import { log } from '../lib/log'
 import { TrilhaDaJornada } from './TrilhaDaJornada'
 import { WizardDoProjeto } from './WizardDoProjeto'
 import { AnexosDeDesign } from './AnexosDeDesign'
+import { ArquiteturaDoProjeto } from './ArquiteturaDoProjeto'
 import { RoadmapDoProjeto } from './RoadmapDoProjeto'
 import { PromptDoProjeto } from './PromptDoProjeto'
 import { BriefDoProjeto } from './BriefDoProjeto'
@@ -288,11 +289,25 @@ function ConteudoDaEtapa({
         />
       )
 
+    // Os anexos do PI: o gate que a arquitetura espera. Continua sendo a tela desta etapa, sem
+    // o botão de gerar — a geração migrou para a etapa seguinte, que tem tela própria.
     case 'design':
+      return (
+        <AnexosDeDesign workspace={workspace} projectId={projeto.id} nomeDoProjeto={projeto.nome} />
+      )
+
+    // A arquitetura, as decisões, os testes e a revisão gerados por IA, com o gate do pacote
+    // (SPEC-Jornada-04). Substitui a composição da M8-F05: os quatro documentos são os mesmos,
+    // mas agora nascem do PRD aceito e dos protótipos, com origem por afirmação.
     case 'arquitetura':
     case 'pacote-aceito':
       return (
-        <AnexosDeDesign workspace={workspace} projectId={projeto.id} nomeDoProjeto={projeto.nome} />
+        <ArquiteturaDoProjeto
+          workspace={workspace}
+          projectId={projeto.id}
+          nomeDoProjeto={projeto.nome}
+          onAceito={onRecarregar}
+        />
       )
 
     case 'roadmap':

@@ -52,6 +52,8 @@ import { JornadaService } from './projects/jornada-service'
 import { BriefService } from './projects/brief-service'
 import { BriefRepository } from './projects/brief-repository'
 import { PrdService } from './projects/prd-service'
+import { ArquiteturaService } from './projects/arquitetura-service'
+import { ArquiteturaRepository } from './projects/arquitetura-repository'
 import { PrdRepository } from './projects/prd-repository'
 import { RefinamentoService } from './projects/refinamento-service'
 import { PerguntaGeradaRepository } from './projects/pergunta-gerada-repository'
@@ -75,6 +77,14 @@ import {
   promptDoPrd,
   promptDoTermo
 } from '@shared/domain/prd-schema'
+import {
+  SISTEMA_DA_ARQUITETURA,
+  SISTEMA_DA_COERENCIA,
+  lerAjustesDoModelo,
+  lerArquiteturaDoModelo,
+  promptDaArquitetura,
+  promptDaCoerencia
+} from '@shared/domain/arquitetura-schema'
 import { ordemDaEtapa } from '@shared/domain/jornada'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { AiProvider, AiStreamEvent } from '@shared/domain/ai'
@@ -414,11 +424,16 @@ if (!app.requestSingleInstanceLock()) {
       connectorCredits
     )
 
+    // Compartilhado com o `PrdService` e com o `ArquiteturaService`: os três leem e escrevem a
+    // mesma tabela `pacote_estrutural`, que é onde a revisão do PRD que a arquitetura assume
+    // (`pacoteEstruturalId`) mora desde a M8-F05.
+    const pacoteRepository = new PacoteRepository(storage.db)
+
     // O pacote estrutural (SPEC-Planejamento-04). Recebe o `ConnectorService`, e **não** o
     // `TavilyAdapter`: o gate de créditos vive dentro do `call()`, e um adapter injetado aqui
     // seria o segundo caminho sem gate que o serviço de conectores existe para impedir.
     const pacotes = new PacoteService({
-      repository: new PacoteRepository(storage.db),
+      repository: pacoteRepository,
       projects: projectRepository,
       projectService: projects,
       decisions: new DecisionRepository(storage.db),
@@ -431,12 +446,16 @@ if (!app.requestSingleInstanceLock()) {
     // para ler a revisão do PRD que a arquitetura assume (critério 3) — e não o `PacoteService`:
     // ele só precisa **ler** o pacote gerado, e depender do serviço lhe daria o poder de
     // disparar a geração do PRD, que não é dele.
+    // O repositório é **compartilhado** com o `ArquiteturaService`: os dois leem os mesmos
+    // anexos (o gate) e escrevem o mesmo `pacote_arquitetura` (a revisão que o gate
+    // `PROJECT_PACKAGE` aprova). Duas instâncias sobre o mesmo banco funcionariam, mas a
+    // ligação entre os dois serviços ficaria implícita — e é ela que o critério 5 depende.
+    const anexoRepository = new AnexoRepository(storage.db)
+
     const anexos = new AnexoService({
-      repository: new AnexoRepository(storage.db),
+      repository: anexoRepository,
       projects: projectRepository,
       projectService: projects,
-      decisions: new DecisionRepository(storage.db),
-      pacotes: new PacoteRepository(storage.db),
       audit: storage.audit,
       userId: userIdAtual
     })
@@ -453,7 +472,7 @@ if (!app.requestSingleInstanceLock()) {
       projects: projectRepository,
       projectService: projects,
       decisions: new DecisionRepository(storage.db),
-      pacotes: new PacoteRepository(storage.db),
+      pacotes: pacoteRepository,
       anexos,
       audit: storage.audit,
       userId: userIdAtual,
@@ -651,7 +670,7 @@ if (!app.requestSingleInstanceLock()) {
      */
     const prd = new PrdService({
       repository: new PrdRepository(storage.db),
-      pacotes: new PacoteRepository(storage.db),
+      pacotes: pacoteRepository,
       projects: projectRepository,
       projectService: projects,
       connectors,
@@ -728,6 +747,81 @@ if (!app.requestSingleInstanceLock()) {
         if (texto === undefined) return {}
         const contradicoes = lerContradicoesDoModelo(texto)
         return contradicoes === undefined ? {} : { contradicoes }
+      }
+    })
+
+    /*
+     * A arquitetura, as decisões, os testes e a revisão gerados por IA (SPEC-Jornada-04).
+     *
+     * Substitui a composição da M8-F05: os quatro documentos são os mesmos, mas agora nascem do
+     * PRD aceito e dos protótipos, com origem por afirmação e âncora no protótipo que desenhou
+     * cada fluxo. O gate de anexos daquela fatia permanece **intacto e anterior** a tudo aqui.
+     *
+     * Recebe o `anexoRepository` — o mesmo do `AnexoService` — porque a revisão é gravada nas
+     * **duas** tabelas: o conteúdo verificável em `project_architecture`, e os documentos
+     * renderizados em `pacote_arquitetura`, que é onde o gate `PROJECT_PACKAGE` procura o que o
+     * PI aprova (critério 5). Gravar só na tabela nova quebraria o gate do pacote.
+     *
+     * A validação dos protótipos vem do `AnexoService`, que continua dona dela: a leitura
+     * semântica do modelo **acrescenta** e nunca substitui a validação determinística.
+     */
+    const arquitetura = new ArquiteturaService({
+      repository: new ArquiteturaRepository(storage.db),
+      anexos: anexoRepository,
+      projects: projectRepository,
+      projectService: projects,
+      audit: storage.audit,
+      userId: userIdAtual,
+      prdVigente: (projectId) => prd.carregar(projectId),
+      /*
+       * A revisão do PRD que a arquitetura cita (critério 3), lida de `pacote_estrutural` — a
+       * mesma fonte que a M8-F05 usava. O `PrdService` grava nas duas tabelas com o mesmo hash,
+       * então a revisão mais recente ali corresponde à que `prdVigente` devolve.
+       */
+      pacoteEstruturalId: (projectId) =>
+        pacoteRepository.listarPacotes(userIdAtual(), projectId)[0]?.id,
+      validarPrototipos: (projectId) => anexos.validar(projectId),
+      decisoesDoRefinamento: (projectId) => refinamento.decisoesParaOBrief(projectId),
+      montarContexto: montarContextoDoPrompt,
+      estadoDasRotas: estadoDasRotasDoProjeto,
+      /*
+       * As duas chamadas passam pelo **ponto único** (`ai.call`), nunca pelo adapter direto, e
+       * `provider` é a rota **já decidida** — deixar o roteamento escolher de novo aqui poderia
+       * cair na rota paga que ninguém autorizou.
+       */
+      gerarDocumentos: async ({ workspace, rota, contextPackId, ...entrada }) => {
+        const texto = await coletarTexto(
+          ai.call(
+            {
+              provider: rota,
+              system: SISTEMA_DA_ARQUITETURA,
+              prompt: promptDaArquitetura(entrada),
+              contextPackId
+            },
+            { userId: userIdAtual(), workspace }
+          )
+        )
+
+        if (texto === undefined) return {}
+        const afirmacoes = lerArquiteturaDoModelo(texto)
+        return afirmacoes === undefined ? {} : { afirmacoes }
+      },
+      analisarCoerencia: async ({ workspace, rota, contextPackId, requisitos, jornadas }) => {
+        const texto = await coletarTexto(
+          ai.call(
+            {
+              provider: rota,
+              system: SISTEMA_DA_COERENCIA,
+              prompt: promptDaCoerencia({ requisitos, jornadas }),
+              contextPackId
+            },
+            { userId: userIdAtual(), workspace }
+          )
+        )
+
+        if (texto === undefined) return {}
+        const ajustes = lerAjustesDoModelo(texto)
+        return ajustes === undefined ? {} : { ajustes }
       }
     })
 
@@ -905,6 +999,7 @@ if (!app.requestSingleInstanceLock()) {
       jornada,
       brief,
       prd,
+      arquitetura,
       refinamento,
       publicacao,
       mergePolicy,

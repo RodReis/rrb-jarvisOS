@@ -62,11 +62,15 @@ import type { GeracaoDePerguntasOutcome } from '@shared/domain/refinamento'
 import type { PacoteEstrutural, PacoteOutcome } from '@shared/domain/pacote-estrutural'
 import type { Anexo, AnexoOutcome, TipoDeAnexo } from '@shared/domain/anexos-de-design'
 import type { ValidacaoDoPrototipo } from '@shared/domain/validacao-de-prototipo'
-import type { ArquiteturaOutcome, PacoteArquitetura } from '@shared/domain/arquitetura'
+import type { PacoteArquitetura } from '@shared/domain/arquitetura'
 import type { Roadmap, RoadmapOutcome } from '@shared/domain/roadmap'
 import type { EstadoDaJornada, TransicaoOutcome } from '@shared/domain/jornada'
 import type { BriefRegistrado, GeracaoOutcome, PromptDoProjeto } from '@shared/domain/brief'
 import type { PrdOutcome, PrdRegistrado } from '@shared/domain/prd'
+import type {
+  ArquiteturaGeradaOutcome,
+  ArquiteturaRegistrada
+} from '@shared/domain/arquitetura-gerada'
 import type { ResultadoDaRota } from '@shared/domain/rota-de-geracao'
 import type {
   Approval,
@@ -409,6 +413,30 @@ const bridge: JarvisBridge = {
     workspace: WorkspaceId
   ): Promise<PrdRegistrado | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.prdCortarProposto, projectId, afirmacaoId, workspace),
+  // A arquitetura, as decisões, os testes e a revisão (SPEC-Jornada-04). Descartar um ajuste é
+  // canal próprio, e não um "aplicar": nenhum destes escreve no anexo do PI (critério 4).
+  gerarArquiteturaPorIa: (
+    projectId: string,
+    workspace: WorkspaceId
+  ): Promise<ArquiteturaGeradaOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.arquiteturaGerarPorIa, projectId, workspace),
+  carregarArquitetura: (
+    projectId: string,
+    workspace: WorkspaceId
+  ): Promise<ArquiteturaRegistrada | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.arquiteturaCarregar, projectId, workspace),
+  cortarPropostoDaArquitetura: (
+    projectId: string,
+    afirmacaoId: string,
+    workspace: WorkspaceId
+  ): Promise<ArquiteturaRegistrada | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.arquiteturaCortarProposto, projectId, afirmacaoId, workspace),
+  descartarAjusteDaArquitetura: (
+    projectId: string,
+    ajusteId: string,
+    workspace: WorkspaceId
+  ): Promise<ArquiteturaRegistrada | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.arquiteturaDescartarAjuste, projectId, ajusteId, workspace),
   // O refinamento: gerar as perguntas, ler o estado, responder e consultar a trilha. Nenhum
   // canal recebe o enunciado de volta — só o id da pergunta que já está no banco.
   gerarPerguntasDeRefinamento: (
@@ -493,8 +521,6 @@ const bridge: JarvisBridge = {
     ipcRenderer.invoke(IPC_CHANNELS.anexoRemover, projectId, caminho, workspace),
   validarPrototipos: (projectId: string): Promise<readonly ValidacaoDoPrototipo[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.anexoValidar, projectId),
-  gerarArquitetura: (projectId: string, workspace: WorkspaceId): Promise<ArquiteturaOutcome> =>
-    ipcRenderer.invoke(IPC_CHANNELS.arquiteturaGerar, projectId, workspace),
   listarArquiteturas: (projectId: string): Promise<readonly PacoteArquitetura[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.arquiteturaListar, projectId),
 
