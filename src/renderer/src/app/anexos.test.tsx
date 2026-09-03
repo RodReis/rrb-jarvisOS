@@ -21,7 +21,6 @@ const escolherAnexo = vi.fn()
 const anexarDesign = vi.fn()
 const removerAnexo = vi.fn()
 const validarPrototipos = vi.fn()
-const gerarArquitetura = vi.fn()
 const sendLog = vi.fn()
 
 function anexo(over: Record<string, unknown> = {}): Record<string, unknown> {
@@ -58,7 +57,6 @@ beforeEach(() => {
   anexarDesign.mockReset()
   removerAnexo.mockReset().mockResolvedValue(true)
   validarPrototipos.mockReset().mockResolvedValue([])
-  gerarArquitetura.mockReset()
   sendLog.mockReset()
 
   Object.defineProperty(window, 'jarvis', {
@@ -69,7 +67,6 @@ beforeEach(() => {
       anexarDesign,
       removerAnexo,
       validarPrototipos,
-      gerarArquitetura,
       sendLog
     },
     configurable: true,
@@ -96,22 +93,36 @@ describe('o gate na tela', () => {
     expect(screen.getByText('Pendente')).toBeInTheDocument()
   })
 
-  it('desabilita gerar arquitetura enquanto o gate estiver fechado', async () => {
+  it('com o gate fechado, diz o que falta em vez de dizer que está pronto', async () => {
     listarAnexos.mockResolvedValue([anexo()])
 
     renderizar()
     await screen.findByText('Anexado')
 
-    expect(screen.getByRole('button', { name: 'Gerar arquitetura' })).toBeDisabled()
+    expect(screen.getByText(/Falta anexar/)).toBeInTheDocument()
   })
 
-  it('habilita gerar arquitetura quando as duas exigências estão atendidas', async () => {
+  it('com as duas exigências atendidas, anuncia que a arquitetura pode ser gerada', async () => {
     listarAnexos.mockResolvedValue([anexo(), PROTOTIPO])
 
     renderizar()
 
     expect(await screen.findByText(/Os anexos estão completos/)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Gerar arquitetura' })).toBeEnabled()
+  })
+
+  /**
+   * **A geração saiu desta tela** (SPEC-Jornada-04). Ela agora nasce do PRD aceito e dos
+   * protótipos, com origem por afirmação, e tem tela própria na etapa seguinte. O teste existe
+   * para que reintroduzir o botão aqui quebre: dois lugares oferecendo o mesmo ato com estados
+   * diferentes é exatamente o que a separação evita.
+   */
+  it('não oferece gerar a arquitetura: isso é da etapa seguinte', async () => {
+    listarAnexos.mockResolvedValue([anexo(), PROTOTIPO])
+
+    renderizar()
+    await screen.findByText(/Os anexos estão completos/)
+
+    expect(screen.queryByRole('button', { name: /gerar arquitetura/i })).not.toBeInTheDocument()
   })
 })
 
@@ -230,23 +241,7 @@ describe('os achados da validação', () => {
   })
 })
 
-describe('a geração da arquitetura', () => {
-  it('mostra a recusa com o que falta, sem tom de erro', async () => {
-    const usuario = userEvent.setup()
-    listarAnexos.mockResolvedValue([anexo(), PROTOTIPO])
-    gerarArquitetura.mockResolvedValue({
-      reason: 'prd-ausente',
-      mensagem: 'Gere o PRD antes da arquitetura: ela precisa citar a revisão que assume.'
-    })
-
-    renderizar()
-    await screen.findByText(/Os anexos estão completos/)
-
-    await usuario.click(screen.getByRole('button', { name: 'Gerar arquitetura' }))
-
-    expect(await screen.findByText(/Gere o PRD antes da arquitetura/)).toBeInTheDocument()
-  })
-
+describe('a revisão de arquitetura já gerada', () => {
   it('mostra os quatro documentos gerados com hash e commit', async () => {
     listarAnexos.mockResolvedValue([anexo(), PROTOTIPO])
     listarArquiteturas.mockResolvedValue([

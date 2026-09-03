@@ -4,11 +4,7 @@ import { FileCheck2, FileCode2, Image, Paperclip } from 'lucide-react'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { Anexo, TipoDeAnexo } from '@shared/domain/anexos-de-design'
 import type { AchadoDoPrototipo, ValidacaoDoPrototipo } from '@shared/domain/validacao-de-prototipo'
-import type {
-  ArquiteturaOutcome,
-  ArquiteturaReason,
-  PacoteArquitetura
-} from '@shared/domain/arquitetura'
+import type { PacoteArquitetura } from '@shared/domain/arquitetura'
 import { Badge, Button, InlineAlert, LoadingState, Separator, Tag } from '@design/ui'
 import { log } from '../lib/log'
 
@@ -38,23 +34,6 @@ interface AnexosDeDesignProps {
   readonly nomeDoProjeto: string
 }
 
-/**
- * Tom por desfecho. Mapa fechado, como nas telas irmãs: um motivo novo no contrato quebra a
- * compilação aqui em vez de cair num default silencioso.
- *
- * `anexos-pendentes` e `prototipos-invalidos` são **`warn`, não `err`**: nada quebrou, falta um
- * passo — e os dois dizem qual. Pintar de vermelho ensinaria a ler um estado normal do fluxo
- * como falha.
- */
-const TOM_POR_MOTIVO: Readonly<Record<ArquiteturaReason, 'ok' | 'err' | 'warn'>> = {
-  gerada: 'ok',
-  'projeto-inexistente': 'err',
-  'anexos-pendentes': 'warn',
-  'prd-ausente': 'warn',
-  'prototipos-invalidos': 'warn',
-  'falha-de-escrita': 'err'
-}
-
 /** O ícone de cada tipo. Mesmo vocabulário de ícone em toda a superfície (register product). */
 const ICONE_DO_TIPO: Readonly<Record<TipoDeAnexo, typeof FileCheck2>> = {
   'design-system': FileCheck2,
@@ -76,8 +55,11 @@ export function AnexosDeDesign({
   const { t } = useTranslation()
   const [anexos, setAnexos] = useState<readonly Anexo[] | undefined>(undefined)
   const [validacoes, setValidacoes] = useState<readonly ValidacaoDoPrototipo[]>([])
-  const [ocupado, setOcupado] = useState<'nao' | 'anexando' | 'validando' | 'gerando'>('nao')
-  const [desfecho, setDesfecho] = useState<ArquiteturaOutcome | null>(null)
+  /* A recusa do **ato de anexar** — extensão incompatível, arquivo inexistente, grande demais.
+     Estado próprio desde a SPEC-Jornada-04: antes ela viajava no desfecho da arquitetura, que
+     saiu desta tela. Fundi-los fazia uma recusa de anexo parecer um problema da geração. */
+  const [falhaAoAnexar, setFalhaAoAnexar] = useState<string | null>(null)
+  const [ocupado, setOcupado] = useState<'nao' | 'anexando' | 'validando'>('nao')
   const [arquiteturas, setArquiteturas] = useState<readonly PacoteArquitetura[]>([])
 
   /**
@@ -137,9 +119,9 @@ export function AnexosDeDesign({
         aplicar(await buscar())
         // O anexo mudou: a validação anterior descreve outro conjunto de arquivos.
         setValidacoes([])
-        setDesfecho(null)
+        setFalhaAoAnexar(null)
       } else {
-        setDesfecho({ reason: 'anexos-pendentes', mensagem: resultado.mensagem })
+        setFalhaAoAnexar(resultado.mensagem)
       }
     } catch (causa: unknown) {
       log.ui.error('Falha ao anexar', {
@@ -156,7 +138,7 @@ export function AnexosDeDesign({
       await window.jarvis.removerAnexo(projectId, caminho, workspace)
       aplicar(await buscar())
       setValidacoes([])
-      setDesfecho(null)
+      setFalhaAoAnexar(null)
     } catch (causa: unknown) {
       log.ui.error('Falha ao remover anexo', {
         projectId,
@@ -171,22 +153,6 @@ export function AnexosDeDesign({
       setValidacoes(await window.jarvis.validarPrototipos(projectId))
     } catch (causa: unknown) {
       log.ui.error('Falha ao validar os protótipos', {
-        projectId,
-        stack: causa instanceof Error ? causa.stack : undefined
-      })
-    } finally {
-      setOcupado('nao')
-    }
-  }
-
-  async function gerar(): Promise<void> {
-    setOcupado('gerando')
-    try {
-      const resultado = await window.jarvis.gerarArquitetura(projectId, workspace)
-      setDesfecho(resultado)
-      if (resultado.reason === 'gerada') aplicar(await buscar())
-    } catch (causa: unknown) {
-      log.ui.error('Falha ao gerar a arquitetura', {
         projectId,
         stack: causa instanceof Error ? causa.stack : undefined
       })
@@ -291,46 +257,25 @@ export function AnexosDeDesign({
                   })}
             </p>
             <div className="flex gap-2">
+              {/* A conferência é a ação desta tela. **Gerar a arquitetura saiu daqui** com a
+                  SPEC-Jornada-04: a etapa seguinte tem tela própria, e manter o botão aqui
+                  ofereceria o mesmo ato em dois lugares com estados diferentes. */}
               <Button
-                variante="secundaria"
+                variante="primaria"
                 onClick={() => void validar()}
                 carregando={ocupado === 'validando'}
                 desabilitado={trabalhando || !lista.some((a) => a.tipo === 'prototipo')}
               >
                 {t('anexos.validar')}
               </Button>
-              {/* A ação que **avança a etapa**: gerar a arquitetura é o que fecha os anexos e
-                  move a jornada. Validar é conferência, e segue secundária. */}
-              <Button
-                variante="primaria"
-                onClick={() => void gerar()}
-                carregando={ocupado === 'gerando'}
-                // Desabilitado pelo gate: o botão que não pode dar certo não deve convidar ao
-                // clique. A recusa continua existindo no serviço — a tela não é a garantia.
-                desabilitado={trabalhando || !gateAberto}
-              >
-                {t('anexos.gerarArquitetura')}
-              </Button>
             </div>
           </div>
 
-          {desfecho !== null && (
-            <InlineAlert tom={TOM_POR_MOTIVO[desfecho.reason]} titulo={desfecho.mensagem}>
-              {desfecho.pendencias !== undefined && desfecho.pendencias.length > 0 && (
-                <p className="text-[length:var(--jos-texto-micro)]">
-                  {t('anexos.pendencias', {
-                    lista: desfecho.pendencias
-                      .map((p) => t(`anexos.tipo.${p}`, { defaultValue: p }))
-                      .join(', ')
-                  })}
-                </p>
-              )}
-            </InlineAlert>
+          {falhaAoAnexar !== null && (
+            <InlineAlert tom="warn" titulo={falhaAoAnexar} />
           )}
 
-          {(desfecho?.achados ?? achados).length > 0 && (
-            <Achados achados={desfecho?.achados ?? achados} />
-          )}
+          {achados.length > 0 && <Achados achados={achados} />}
 
           {validacoes.length > 0 && achados.length === 0 && (
             <InlineAlert tom="ok" titulo={t('anexos.validacaoLimpa')} />

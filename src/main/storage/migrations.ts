@@ -1363,6 +1363,49 @@ const MIGRATIONS: readonly string[] = [
     created_at      TEXT NOT NULL
   );
   CREATE INDEX idx_project_prd ON project_prd(user_id, project_id, created_at);
+  `,
+
+  // 34 — a arquitetura, as decisões, os testes e a revisão gerados por IA (SPEC-Jornada-04).
+  //
+  // **Tabela própria, e não mais colunas em "pacote_arquitetura"**, pela mesma razão que a 33
+  // separou "project_prd" de "pacote_estrutural": aquela guarda os quatro documentos
+  // *compostos* das decisões do wizard, esta guarda os *gerados*, com quatro origens e âncora no
+  // protótipo. O que a M8-F05 gravava lá continua sendo lido por quem já lia — o gate
+  // "PROJECT_PACKAGE" monta as revisões a partir de "pacote_arquitetura" —, e o serviço grava
+  // nas duas com o mesmo hash ligando-as.
+  //
+  // "anexos" é o congelamento do gate no instante da geração (critério 5): os hashes de todos os
+  // anexos, como estavam. É o que permite ao validador dizer, depois, que uma âncora aponta para
+  // conteúdo que mudou — sem essa cópia, "o protótipo que sustentou este fluxo" seria sempre o
+  // arquivo de agora, e a âncora envelheceria em silêncio.
+  //
+  // "ajustes" guarda a análise de coerência (critério 4). Eles vivem na revisão, e não numa
+  // tabela de sugestões, porque são fato *sobre aquela revisão*: regerar produz outra análise,
+  // e misturar as duas faria o PI autorizar um ajuste que já não descreve o que está no disco.
+  //
+  // Append-only, a sétima vez com esta postura. Regenerar insere outra linha; o hash UNIQUE
+  // reconhece quando o conteúdo é o mesmo. Regenerar depois do aceite cria revisão nova e
+  // reabre o gate — nunca substitui a aceita (critério 6).
+  `
+  CREATE TABLE project_architecture (
+    id                   TEXT PRIMARY KEY,
+    user_id              TEXT NOT NULL,
+    workspace_id         TEXT NOT NULL,
+    project_id           TEXT NOT NULL,
+    -- A revisao do PRD que esta arquitetura assume (criterio 3).
+    pacote_estrutural_id TEXT NOT NULL,
+    -- JSON das afirmacoes, cada uma com documento, secao, texto e origem obrigatoria.
+    afirmacoes           TEXT NOT NULL,
+    -- JSON dos ajustes propostos pela analise de coerencia; nunca aplicados ao anexo.
+    ajustes              TEXT NOT NULL,
+    -- JSON dos anexos com hash, como estavam quando a arquitetura saiu (criterio 5).
+    anexos               TEXT NOT NULL,
+    hash                 TEXT NOT NULL UNIQUE,
+    commit_hash          TEXT,
+    context_pack_id      TEXT,
+    created_at           TEXT NOT NULL
+  );
+  CREATE INDEX idx_project_architecture ON project_architecture(user_id, project_id, created_at);
   `
 ]
 

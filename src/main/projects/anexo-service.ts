@@ -24,7 +24,7 @@
  */
 
 import { createHash, randomUUID } from 'node:crypto'
-import { copyFileSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { copyFileSync, mkdirSync, readFileSync, statSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { Anexo, AnexoOutcome, TipoDeAnexo } from '@shared/domain/anexos-de-design'
@@ -35,34 +35,11 @@ import {
   pendenciasDoGate
 } from '@shared/domain/anexos-de-design'
 import type { AchadoDoPrototipo, ValidacaoDoPrototipo } from '@shared/domain/validacao-de-prototipo'
-import {
-  achadosQueImpedem,
-  analisarPrototipo,
-  jornadasCobertas
-} from '@shared/domain/validacao-de-prototipo'
-import type { ArquiteturaOutcome, PacoteArquitetura } from '@shared/domain/arquitetura'
-import {
-  ARQUIVO_DA_ARQUITETURA,
-  DOCUMENTOS_DA_ARQUITETURA,
-  PREAMBULO_DA_ARQUITETURA,
-  SECOES_DA_ARQUITETURA,
-  afirmacoesDaEvidencia,
-  afirmacoesDaRevisao,
-  afirmacoesDasDecisoes,
-  afirmacoesDasQuestoes,
-  afirmacoesDeTeste,
-  afirmacoesDosFluxos
-} from '@shared/domain/arquitetura'
-import type { AfirmacaoDoPacote, DocumentoGerado } from '@shared/domain/pacote-estrutural'
-import { renderizarDocumento } from '@shared/domain/pacote-compositor'
-import type { Pergunta } from '@shared/domain/wizard'
-import { decisoesVigentes } from '@shared/domain/wizard'
-import { CATALOGO_DO_CONTEXTO } from '@shared/domain/wizard-catalogo'
+import { analisarPrototipo } from '@shared/domain/validacao-de-prototipo'
+import type { PacoteArquitetura } from '@shared/domain/arquitetura'
 import { log } from '../logging/logger'
 import type { AuditRepository } from '../storage/audit-repository'
 import type { AnexoRepository } from './anexo-repository'
-import type { DecisionRepository } from './decision-repository'
-import type { PacoteRepository } from './pacote-repository'
 import type { ProjectRepository } from './project-repository'
 import type { ProjectService } from './project-service'
 import { carregarPrototipo, lerHtml, referenciasDoHtml } from './prototipo-runner'
@@ -74,11 +51,8 @@ interface AnexoDeps {
   readonly repository: AnexoRepository
   readonly projects: ProjectRepository
   readonly projectService: ProjectService
-  readonly decisions: DecisionRepository
-  readonly pacotes: PacoteRepository
   readonly audit: AuditRepository
   readonly userId: () => string
-  readonly catalogo?: readonly Pergunta[]
   /**
    * Como um protótipo é carregado. Injetável **só** para o teste: em produção é sempre o
    * `BrowserWindow` oculto. Sem a costura, todo teste do serviço precisaria de Electron vivo, e
@@ -91,22 +65,16 @@ export class AnexoService {
   private readonly repository: AnexoRepository
   private readonly projects: ProjectRepository
   private readonly projectService: ProjectService
-  private readonly decisions: DecisionRepository
-  private readonly pacotes: PacoteRepository
   private readonly audit: AuditRepository
   private readonly userId: () => string
-  private readonly catalogo: readonly Pergunta[]
   private readonly carregar: typeof carregarPrototipo
 
   constructor(deps: AnexoDeps) {
     this.repository = deps.repository
     this.projects = deps.projects
     this.projectService = deps.projectService
-    this.decisions = deps.decisions
-    this.pacotes = deps.pacotes
     this.audit = deps.audit
     this.userId = deps.userId
-    this.catalogo = deps.catalogo ?? CATALOGO_DO_CONTEXTO
     this.carregar = deps.carregar ?? carregarPrototipo
   }
 
@@ -272,151 +240,6 @@ export class AnexoService {
     return validacoes
   }
 
-  /**
-   * Gera o pacote de arquitetura. A ordem das recusas é a garantia:
-   *
-   *   1. **Projeto existe?** A checagem que não escreve vem primeiro.
-   *   2. **O gate abriu?** Não ⇒ recusa **nomeando o que falta** (critério 1). A arquitetura não
-   *      é gerada antes dos anexos completos, e não há caminho aqui que a produza sem eles.
-   *   3. **Há PRD?** Não ⇒ recusa. Sem revisão a que se referir, o critério 3 não teria como
-   *      valer — e gerar assim mesmo produziria uma arquitetura ligada a nada.
-   *   4. **Os protótipos abrem?** Achado `impede-arquitetura` ⇒ recusa **com as perguntas**
-   *      (critério 2). Um protótipo que não carrega não delimita fluxo nenhum, e prosseguir
-   *      escreveria uma arquitetura que promete o que ninguém viu.
-   *   5. **Compõe, escreve, hasheia, persiste** e commita `arquitetura-aprovada`.
-   */
-  async gerarArquitetura(projectId: string, workspaceId: WorkspaceId): Promise<ArquiteturaOutcome> {
-    const userId = this.userId()
-    const projeto = this.projects.findById(userId, projectId)
-    if (projeto === undefined) {
-      return { reason: 'projeto-inexistente', mensagem: 'Projeto não encontrado.' }
-    }
-
-    const anexos = this.repository.listar(userId, projectId)
-    const pendencias = pendenciasDoGate(anexos)
-    if (pendencias.length > 0) {
-      return {
-        reason: 'anexos-pendentes',
-        pendencias,
-        mensagem: `Faltam anexos do design: ${pendencias.join(', ')}.`
-      }
-    }
-
-    const [prd] = this.pacotes.listarPacotes(userId, projectId)
-    if (prd === undefined) {
-      return {
-        reason: 'prd-ausente',
-        mensagem: 'Gere o PRD antes da arquitetura: ela precisa citar a revisão que assume.'
-      }
-    }
-
-    const validacoes = await this.validar(projectId)
-    const impedem = achadosQueImpedem(validacoes)
-    if (impedem.length > 0) {
-      this.audit.append({
-        user_id: userId,
-        workspace_id: workspaceId,
-        type: 'design-anexo',
-        payload: { projectId, fase: 'bloqueado', achados: impedem.length }
-      })
-      return {
-        reason: 'prototipos-invalidos',
-        achados: impedem,
-        mensagem:
-          'Os protótipos anexados têm problemas que impedem descrever os fluxos. Resolva-os e gere de novo.'
-      }
-    }
-
-    const decisoes = decisoesVigentes(this.decisions.listar(userId, projectId))
-    const superficie = decisoes.superficie
-    const jornadas = jornadasCobertas(validacoes)
-    const todosOsAchados = validacoes.flatMap((v) => v.achados)
-
-    const documentos = [
-      this.montarDocumento('ARCHITECTURE', projeto.nome, [
-        ...afirmacoesDosFluxos(jornadas, superficie),
-        ...afirmacoesDasDecisoes(this.catalogo, decisoes).map((a) => ({
-          ...a,
-          secao: 'Módulos e fronteiras'
-        }))
-      ]),
-      this.montarDocumento('DECISIONS', projeto.nome, [
-        ...afirmacoesDasDecisoes(this.catalogo, decisoes),
-        ...afirmacoesDasQuestoes(todosOsAchados, superficie)
-      ]),
-      this.montarDocumento('TESTING', projeto.nome, [
-        ...afirmacoesDeTeste(jornadas, superficie),
-        ...afirmacoesDaEvidencia(anexos, superficie)
-      ]),
-      this.montarDocumento(
-        'REVIEW',
-        projeto.nome,
-        afirmacoesDaRevisao(prd.documentos, todosOsAchados, superficie)
-      )
-    ]
-
-    const escrita = this.escrever(projeto.diretorio, documentos)
-    if (!escrita.ok) {
-      return { reason: 'falha-de-escrita', mensagem: escrita.mensagem }
-    }
-
-    const pacote = this.repository.registrarArquitetura({
-      id: randomUUID(),
-      user_id: userId,
-      workspace_id: workspaceId,
-      projectId,
-      pacoteEstruturalId: prd.id,
-      documentos,
-      anexos,
-      hash: hashDaArquitetura(documentos, anexos),
-      commitHash: null,
-      created_at: new Date().toISOString()
-    })
-
-    this.audit.append({
-      user_id: userId,
-      workspace_id: workspaceId,
-      type: 'design-anexo',
-      payload: {
-        projectId,
-        fase: 'arquitetura-gerada',
-        pacoteId: pacote.id,
-        hash: pacote.hash,
-        pacoteEstruturalId: prd.id,
-        anexos: anexos.length,
-        jornadas: jornadas.length
-      }
-    })
-
-    // **Um marco aqui, não dois.** `design-anexado` mora no ato de anexar, onde os arquivos do
-    // PI de fato entram no repositório; aqui sai `arquitetura-aprovada`, que é o que esta
-    // operação produz. Os dois em sequência no mesmo ponto foi o desenho inicial e estava
-    // errado: o primeiro commit levava tudo, o segundo não tinha o que commitar, e
-    // `arquitetura-aprovada` — justo o marco que a revisão precisa citar — voltava sem hash.
-    // O E2E foi quem mostrou; nos testes o `ProjectService` é dublê e sempre diz "commitado".
-    const marco = this.projectService.concluirMarco(projectId, 'arquitetura-aprovada', workspaceId)
-    if (marco?.commitado === true && marco.commitHash !== undefined) {
-      this.repository.marcarCommit(userId, pacote.id, marco.commitHash)
-    }
-
-    log.agent.info('Pacote de arquitetura gerado', {
-      projectId,
-      commitado: marco?.commitado === true
-    })
-
-    return {
-      reason: 'gerada',
-      pacote: { ...pacote, commitHash: marco?.commitHash ?? null },
-      // Os achados que **não** impedem seguem junto: eles entraram no `DECISIONS.md` como
-      // questões em aberto, e o PI precisa saber que foram registrados.
-      achados: todosOsAchados.filter((a) => a.severidade === 'pergunta'),
-      mensagem:
-        marco?.commitado === true
-          ? 'Arquitetura gerada e commitada.'
-          : 'Arquitetura gerada. O commit do marco falhou e pode ser retomado.'
-    }
-  }
-
   /** Os pacotes de arquitetura já gerados. */
   listarArquiteturas(projectId: string): readonly PacoteArquitetura[] {
     return this.repository.listarArquiteturas(this.userId(), projectId)
@@ -425,96 +248,24 @@ export class AnexoService {
   /**
    * As telas que o PRD menciona — hoje, **nenhuma**, e a lista vazia é a resposta correta.
    *
-   * A intenção era o outro lado do critério 4: além de "a arquitetura não promete fluxo ausente
-   * dos protótipos", avisar quando o PRD cita uma tela que ninguém prototipou. Mas o PRD da
-   * M8-F04 **não tem telas** — a seção Escopo carrega decisões (`"**Escopo do projeto:** Uma
-   * fatia vertical funcionando ponta a ponta"`), compostas do título da pergunta e da opção
-   * escolhida no wizard. Comparar isso com os headings de um protótipo é categoria errada, e
-   * produz achado falso **em todo projeto**: as três decisões nunca aparecem como título de tela.
+   * A intenção era comparar "o PRD cita uma tela que ninguém prototipou" de forma literal, por
+   * texto. Isso foi desligado na M8-F05 porque produzia achado falso em todo projeto: o PRD
+   * composto não tinha telas nomeadas, e comparar os headings do protótipo com decisões do
+   * wizard é categoria errada.
    *
-   * O E2E foi quem mostrou. O int-spec fabricava o PRD com `'Tela de login'` no Escopo, e por
-   * isso a comparação parecia funcionar; contra o PRD que a M8-F04 realmente gera, o mesmo
-   * protótipo saudável colheu três perguntas sem sentido — exatamente o ruído que faz o PI
-   * parar de ler a lista.
+   * **A comparação voltou na SPEC-Jornada-04, e por outro caminho.** Ela agora é semântica e
+   * roda no `ArquiteturaService`: a IA lê os requisitos e as telas e devolve `AjusteProposto` —
+   * tela sem requisito, requisito sem tela, estado ausente —, que o PI autoriza item a item e
+   * que **nunca** altera o anexo. Aqui fica só a validação determinística, que é o que o gate
+   * mede; a leitura semântica acrescenta e não substitui.
    *
-   * **A lista vazia não enfraquece o critério 4.** O que ele exige é que a arquitetura não
-   * prometa fluxo ausente dos protótipos, e isso é garantido na origem: `afirmacoesDosFluxos`
-   * só aceita `jornadasCobertas`, e não há caminho que produza linha de fluxo a partir de outra
-   * coisa. O aviso que se perde é o inverso — "o PRD pede algo que você não desenhou" —, e ele
-   * volta quando o PRD tiver telas nomeadas para comparar. A assinatura fica: quem as
-   * acrescentar acrescenta a fonte aqui, não a comparação inteira.
+   * A assinatura fica: quem quiser reativar a comparação literal acrescenta a fonte aqui, não a
+   * comparação inteira.
    */
   private telasDoPrd(_userId: string, _projectId: string): readonly string[] {
     return []
   }
 
-  private montarDocumento(
-    documento: (typeof DOCUMENTOS_DA_ARQUITETURA)[number],
-    nomeDoProjeto: string,
-    afirmacoes: readonly AfirmacaoDoPacote[]
-  ): DocumentoGerado {
-    // `renderizarDocumento` é da M8-F04 e serve os dois pacotes: o formato do arquivo (título,
-    // preâmbulo, seções, marca de origem por item) é o mesmo, e duplicá-lo faria os dois
-    // pacotes divergirem na primeira mudança de formato.
-    const conteudo = renderizarDocumento(
-      documento,
-      { nome: nomeDoProjeto, slug: '' },
-      afirmacoes,
-      SECOES_DA_ARQUITETURA[documento],
-      PREAMBULO_DA_ARQUITETURA[documento]
-    )
-    return {
-      documento,
-      caminho: ARQUIVO_DA_ARQUITETURA[documento],
-      conteudo,
-      hash: createHash('sha256').update(conteudo, 'utf8').digest('hex'),
-      afirmacoes
-    }
-  }
-
-  /** Escreve os quatro arquivos. Caminhos constantes, como na M8-F04. */
-  private escrever(
-    diretorio: string,
-    documentos: readonly DocumentoGerado[]
-  ): { readonly ok: boolean; readonly mensagem: string } {
-    const raiz = resolve(diretorio)
-    try {
-      for (const doc of documentos) {
-        const alvo = resolve(join(raiz, doc.caminho))
-        if (relative(raiz, alvo).startsWith('..')) {
-          return { ok: false, mensagem: 'Caminho de documento fora do projeto.' }
-        }
-        mkdirSync(dirname(alvo), { recursive: true })
-        writeFileSync(alvo, doc.conteudo, 'utf8')
-      }
-      return { ok: true, mensagem: 'Documentos escritos.' }
-    } catch (causa) {
-      log.agent.error('Falha ao escrever o pacote de arquitetura', {
-        stack: causa instanceof Error ? causa.stack : undefined
-      })
-      return { ok: false, mensagem: 'Não foi possível escrever os documentos no projeto.' }
-    }
-  }
-}
-
-/**
- * O hash canônico da arquitetura: os quatro documentos **e os anexos**, na ordem.
- *
- * Os anexos entram porque é o critério 6 (*"o pacote registra hashes de todos os anexos e
- * saídas"*) e porque, sem eles, dois pacotes gerados sobre protótipos diferentes que produzissem
- * o mesmo texto colidiriam no `hash` UNIQUE — e o segundo seria devolvido como se fosse o
- * primeiro, apagando a diferença que os anexos fazem.
- */
-export function hashDaArquitetura(
-  documentos: readonly DocumentoGerado[],
-  anexos: readonly Anexo[]
-): string {
-  const dosDocumentos = documentos.map((d) => `${d.documento}:${d.hash}`).join('|')
-  const dosAnexos = [...anexos]
-    .map((a) => `${a.caminho}:${a.hash}`)
-    .sort()
-    .join('|')
-  return createHash('sha256').update(`${dosDocumentos}#${dosAnexos}`, 'utf8').digest('hex')
 }
 
 export type { AchadoDoPrototipo }

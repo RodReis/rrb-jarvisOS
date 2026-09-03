@@ -63,7 +63,7 @@ import type { GeracaoDePerguntasOutcome } from '../domain/refinamento'
 import type { PacoteEstrutural, PacoteOutcome } from '../domain/pacote-estrutural'
 import type { Anexo, AnexoOutcome, TipoDeAnexo } from '../domain/anexos-de-design'
 import type { ValidacaoDoPrototipo } from '../domain/validacao-de-prototipo'
-import type { ArquiteturaOutcome, PacoteArquitetura } from '../domain/arquitetura'
+import type { PacoteArquitetura } from '../domain/arquitetura'
 import type { AlvoDaPublicacao, PublicacaoOutcome } from '../domain/publicacao'
 import type { ExecutionLedger } from '../domain/execution-ledger'
 import type { PendenciaDeLimpeza } from '../domain/limpeza'
@@ -72,6 +72,10 @@ import type { Roadmap, RoadmapOutcome } from '../domain/roadmap'
 import type { EstadoDaJornada, TransicaoOutcome } from '../domain/jornada'
 import type { BriefRegistrado, GeracaoOutcome, PromptDoProjeto } from '../domain/brief'
 import type { PrdOutcome, PrdRegistrado } from '../domain/prd'
+import type {
+  ArquiteturaGeradaOutcome,
+  ArquiteturaRegistrada
+} from '../domain/arquitetura-gerada'
 import type { ResultadoDaRota } from '../domain/rota-de-geracao'
 import type {
   Approval,
@@ -418,6 +422,10 @@ export const IPC_CHANNELS = {
   prdGerar: 'prd:gerar',
   prdCarregar: 'prd:carregar',
   prdCortarProposto: 'prd:cortar-proposto',
+  arquiteturaGerarPorIa: 'arquitetura:gerar-por-ia',
+  arquiteturaCarregar: 'arquitetura:carregar',
+  arquiteturaCortarProposto: 'arquitetura:cortar-proposto',
+  arquiteturaDescartarAjuste: 'arquitetura:descartar-ajuste',
   /**
    * O refinamento por perguntas geradas (SPEC-Jornada-02, § Refinamento).
    *
@@ -474,7 +482,6 @@ export const IPC_CHANNELS = {
   anexoListar: 'anexo:listar',
   anexoRemover: 'anexo:remover',
   anexoValidar: 'anexo:validar',
-  arquiteturaGerar: 'arquitetura:gerar',
   arquiteturaListar: 'arquitetura:listar',
   /**
    * Contexto, skills e orçamento (SPEC-Planejamento-02).
@@ -1039,6 +1046,39 @@ export interface JarvisBridge {
     workspace: WorkspaceId
   ): Promise<PrdRegistrado | null>
   /**
+   * Gera a arquitetura, as decisões, os testes e a revisão por IA (SPEC-Jornada-04).
+   *
+   * Devolve o desfecho **inclusive nas recusas**: "faltam anexos", "os protótipos têm problema" e
+   * "nenhuma rota autorizada" são desfechos que o PI lê com o que fazer a respeito, não erros
+   * técnicos. O gate de anexos da M8-F05 é conferido antes de qualquer chamada ao modelo.
+   */
+  gerarArquiteturaPorIa(
+    projectId: string,
+    workspace: WorkspaceId
+  ): Promise<ArquiteturaGeradaOutcome>
+  /** A revisão vigente da arquitetura, ou `null` enquanto nenhuma foi gerada. */
+  carregarArquitetura(
+    projectId: string,
+    workspace: WorkspaceId
+  ): Promise<ArquiteturaRegistrada | null>
+  /** Corta um `proposto` no gate. Recebe **um id**, como no PRD e pela mesma razão. */
+  cortarPropostoDaArquitetura(
+    projectId: string,
+    afirmacaoId: string,
+    workspace: WorkspaceId
+  ): Promise<ArquiteturaRegistrada | null>
+  /**
+   * Descarta um ajuste da análise de coerência (SPEC-Jornada-04, critério 4).
+   *
+   * **Descartar é a única operação sobre um ajuste.** Autorizar um deles é um ato do PI sobre o
+   * protótipo — reabrir, redesenhar, reanexar —, e nenhum canal aqui escreve no anexo.
+   */
+  descartarAjusteDaArquitetura(
+    projectId: string,
+    ajusteId: string,
+    workspace: WorkspaceId
+  ): Promise<ArquiteturaRegistrada | null>
+  /**
    * Gera as perguntas de refinamento para os blocos ainda sem resposta.
    *
    * Devolve o desfecho **inclusive nas recusas**: "nenhuma rota autorizada" e "nada a
@@ -1139,13 +1179,6 @@ export interface JarvisBridge {
    * quebrado só na hora de gerar faria o PI ir e voltar sem necessidade.
    */
   validarPrototipos(projectId: string): Promise<readonly ValidacaoDoPrototipo[]>
-  /**
-   * Gera o pacote de arquitetura — o que o gate de anexos libera.
-   *
-   * Devolve `ArquiteturaOutcome` inclusive nas recusas: "faltam anexos" e "os protótipos têm
-   * problema" são desfechos que o PI lê com o que fazer a respeito, não erros técnicos.
-   */
-  gerarArquitetura(projectId: string, workspace: WorkspaceId): Promise<ArquiteturaOutcome>
   /** Os pacotes de arquitetura já gerados, do mais recente ao mais antigo. */
   listarArquiteturas(projectId: string): Promise<readonly PacoteArquitetura[]>
   /**

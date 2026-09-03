@@ -358,7 +358,14 @@ export const AUDIT_EVENT_TYPES = [
   // Tipo próprio, e não `brief-generation`: as duas gerações são fatias diferentes, com gates
   // diferentes, e fundi-las faria a auditoria de "quando o PRD foi gerado" ter de filtrar por
   // um campo de payload — que é adivinhação, não consulta.
-  'prd-generation'
+  'prd-generation',
+  // SPEC-Jornada-04: a geração da arquitetura, das decisões, dos testes e da revisão — início,
+  // saída recusada pelo validador de âncora, bloqueio por falta de rota e desfecho.
+  //
+  // Tipo próprio pela mesma razão que separou `prd-generation` de `brief-generation`, e mais
+  // uma: esta geração é a única com um gate **anterior** a ela (os anexos da M8-F05), e a
+  // pergunta "a arquitetura saiu, e sobre quais protótipos?" precisa de uma consulta própria.
+  'arquitetura-generation'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]
