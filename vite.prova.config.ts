@@ -6,10 +6,14 @@ import tailwindcss from '@tailwindcss/vite'
 /**
  * Servidor da galeria de prova (SPEC-DesignSystem-03a).
  *
- * Mora na **raiz**, e não em `src/design/prova/`, porque a fronteira do DS (Fatia 01) proíbe
- * importar `node:*` de dentro de `src/design/` — e um config de build precisa de `node:path`.
- * A regra está certa: este arquivo é ferramental de build, não código de runtime do design
- * system. Quem se move é o arquivo, não a regra.
+ * Mora na **raiz** porque um config de build precisa de `node:path`, e a fronteira do DS
+ * (Fatia 01) proíbe `node:*` dentro de `src/design/`. A regra está certa: este arquivo é
+ * ferramental de build, não código de runtime. Quem se move é o arquivo, não a regra.
+ *
+ * **A galeria migrou para `src/renderer/src/prova/` na M25-F01**, pela mesma lógica. O gate
+ * visual daquela fatia precisa capturar a trilha **do produto**, e uma galeria dentro de
+ * `src/design/` não pode importar do renderer nem do domínio — a fronteira proíbe, e proíbe
+ * com razão. Redesenhar a trilha na galeria provaria a cópia, não a tela que o PI vai usar.
  *
  * Config **separado** do `electron.vite.config.ts` de propósito: a galeria não é parte do app.
  * Misturá-la ao renderer arrastaria uma rota de teste para dentro do bundle de produção, e a
@@ -20,7 +24,7 @@ import tailwindcss from '@tailwindcss/vite'
  * estiver ocupada, é melhor falhar do que capturar a tela de outro processo.
  */
 export default defineConfig({
-  root: resolve(__dirname, 'src/design/prova'),
+  root: resolve(__dirname, 'src/renderer/src/prova'),
   plugins: [react(), tailwindcss()],
   /**
    * O alias `@design`, que os outros três configs (`electron.vite.config.ts`, `tsconfig.web.json`,
@@ -33,7 +37,14 @@ export default defineConfig({
    * sintoma foi a prova visual inteira falhando de uma vez, com a página sem carregar.
    */
   resolve: {
-    alias: { '@design': resolve(__dirname, 'src/design') }
+    alias: {
+      '@design': resolve(__dirname, 'src/design'),
+      // `@shared` e `@renderer`: a galeria monta a trilha do produto, que importa o domínio.
+      // Faltavam aqui pela mesma razão que `@design` faltava antes da F06 — cada ferramenta
+      // tem o seu próprio mapa de alias, e o desta só quebra na hora da captura.
+      '@shared': resolve(__dirname, 'src/shared'),
+      '@renderer': resolve(__dirname, 'src/renderer/src')
+    }
   },
   server: {
     port: 5181,

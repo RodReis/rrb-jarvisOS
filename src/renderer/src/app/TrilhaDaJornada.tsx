@@ -102,7 +102,7 @@ export function TrilhaDaJornada({
         */}
         <span
           aria-hidden="true"
-          className="absolute bottom-[1.625rem] left-[0.625rem] top-[1.625rem] w-px -translate-x-1/2 bg-[rgba(var(--jos-borda-rgb),0.16)]"
+          className="absolute bottom-[1.625rem] left-[0.625rem] top-[1.625rem] w-px -translate-x-1/2 bg-[rgba(var(--jos-borda-rgb),0.28)]"
         />
 
         {estado.trilha.map((etapa) => {
@@ -122,27 +122,38 @@ export function TrilhaDaJornada({
               <Marcador posicao={etapa.posicao} />
 
               <div className="flex min-w-0 flex-1 flex-col gap-1">
-                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                  <span
-                    className={
-                      atual
-                        ? 'text-[length:var(--jos-texto-corpo)] font-[var(--jos-peso-semi)] text-[var(--jos-cor-texto)]'
-                        : concluida
-                          ? 'text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto-secundario)]'
-                          : 'text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto-suave)]'
-                    }
-                  >
-                    {t(`jornada.etapas.${etapa.etapa}`)}
-                  </span>
+                <span
+                  className={
+                    atual
+                      ? 'text-[length:var(--jos-texto-corpo)] font-[var(--jos-peso-semi)] text-[var(--jos-cor-texto)]'
+                      : concluida
+                        ? 'text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto-secundario)]'
+                        : 'text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto-suave)]'
+                  }
+                >
+                  {t(`jornada.etapas.${etapa.etapa}`)}
+                </span>
 
-                  {/* Só a etapa atual carrega ação. Ver crítica no cabeçalho: alvo morto em
-                      cada linha futura seria ruído, não informação. */}
-                  {atual && (
+                {/*
+                  O botão fica **abaixo** do rótulo, não à direita dele.
+
+                  A trilha é uma coluna de 19rem, e ao lado de um rótulo o botão só cabia
+                  quebrando a linha — o que a captura mostrou como um degrau solto entre a etapa
+                  atual e a seguinte. Empilhar é a decisão honesta para esta largura: a ação
+                  ganha a própria linha e o topo do bloco continua alinhado ao marcador.
+
+                  O espaçamento vive na `div` que o embrulha, e não numa `className` no próprio
+                  `Button`: o DS não aceita classe de fora (`PropsDeComposicao`), e é a regra
+                  certa — um componente que aceitasse estilo arbitrário deixaria de ter forma
+                  própria. Quem posiciona é o layout, não o controle.
+                */}
+                {atual && (
+                  <div className="mt-1 flex">
                     <Button onClick={onAgir} desabilitado={ocupado} carregando={ocupado}>
                       {etapa.cta}
                     </Button>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 {/*
                   O que falta, dito em texto (critério 4). Fica sob o nome da etapa e em micro:

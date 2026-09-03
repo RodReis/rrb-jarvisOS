@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { ProvedorDeTema } from '../tokens/provider'
-import type { CorAcento } from '../tokens/acento'
-import type { ModoUi, Modulo } from '../tokens/semantic'
-import { Button, Card } from '../ui'
+import { ProvedorDeTema } from '@design/tokens/provider'
+import type { CorAcento } from '@design/tokens/acento'
+import type { ModoUi, Modulo } from '@design/tokens/semantic'
+import { Button, Card } from '@design/ui'
 import {
   ApprovalDialog,
   LogViewer,
@@ -18,7 +18,7 @@ import {
   type AcaoSensivel,
   type EstadoOperacional,
   type EstadoSync
-} from '../patterns'
+} from '@design/patterns'
 
 /**
  * Galeria de prova dos padrões operacionais (SPEC-DesignSystem-04b).

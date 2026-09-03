@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { FolderOpen } from 'lucide-react'
-import { ProvedorDeTema } from '../tokens/provider'
-import type { CorAcento } from '../tokens/acento'
-import type { ModoUi, Modulo } from '../tokens/semantic'
+import { ProvedorDeTema } from '@design/tokens/provider'
+import type { CorAcento } from '@design/tokens/acento'
+import type { ModoUi, Modulo } from '@design/tokens/semantic'
 import {
   AlertDialog,
   Avatar,
@@ -30,7 +30,7 @@ import {
   useToast,
   type Coluna,
   type TomSemantico
-} from '../ui'
+} from '@design/ui'
 
 /**
  * Galeria de prova de dados, overlays e feedback (SPEC-DesignSystem-03b).
@@ -367,6 +367,12 @@ function Overlays({ cena }: { readonly cena: Cena }): React.JSX.Element | null {
    */
   const [aberto, setAberto] = useState(false)
   useEffect(() => {
+    // A regra está certa no geral e errada aqui: o efeito **é** o gatilho da transição que o
+    // Radix precisa ver. Não é estado derivado de estado — é a simulação do clique que o
+    // usuário daria, e sem ela a captura registra um foco que ninguém vê. A regra passou a
+    // valer para este arquivo quando a galeria migrou para o renderer na M25-F01; o
+    // comportamento e o motivo dele são os mesmos desde a F03b.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAberto(true)
   }, [])
 
