@@ -1766,6 +1766,8 @@ Status: **entregue** — spec `aprovada-pi` (2026-09-03); issue [#240](https://g
 - **A tela do pacote composto foi removida** (`PacoteDoProjeto` e `pacote.test.tsx`). O `PacoteService` e seus canais IPC **permanecem**: a M8-F05 lê a tabela para amarrar a revisão do PRD, e removê-los seria mudança estrutural fora do escopo desta fatia.
 - **`DocumentoGerado.afirmacoes` vai vazio** no `pacote_estrutural`. Aquele tipo só admite duas origens; converter as quatro perderia `fontes`, e o Landscape existe para carregá-las. A lista vazia é honesta — a origem por afirmação vive em `project_prd`.
 
+**A ponte tem duas listas de contrato, e as duas são ordenadas.** Método novo no preload entra em `preload.spec.ts` **e** em `tests/e2e/login.e2e.ts` — e em ambas por ordem alfabética, porque as duas comparam contra `Object.keys(...).sort()`. Inserir no fim passa na suíte local (o `preload.spec.ts` roda no `npm test`) e **quebra só no CI**, onde o E2E roda: foi o que aconteceu nesta fatia, com as quatro entradas novas no lugar errado. A quarta vez que o projeto tropeça na fronteira da ponte.
+
 **O que o teste de integração achou, e o retorno do serviço esconderia:**
 
 - **`ok` do conector não garante forma.** O dublê respondendo com a operação errada fez `busca.data.fontes` estourar e derrubar a geração inteira — quando o desfecho certo era o mesmo de "não achei fonte", que já existia. Payload inesperado agora cai no bloqueio, não numa exceção.
