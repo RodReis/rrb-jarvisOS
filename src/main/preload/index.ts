@@ -66,6 +66,7 @@ import type { ArquiteturaOutcome, PacoteArquitetura } from '@shared/domain/arqui
 import type { Roadmap, RoadmapOutcome } from '@shared/domain/roadmap'
 import type { EstadoDaJornada, TransicaoOutcome } from '@shared/domain/jornada'
 import type { BriefRegistrado, GeracaoOutcome, PromptDoProjeto } from '@shared/domain/brief'
+import type { PrdOutcome, PrdRegistrado } from '@shared/domain/prd'
 import type { ResultadoDaRota } from '@shared/domain/rota-de-geracao'
 import type {
   Approval,
@@ -394,6 +395,20 @@ const bridge: JarvisBridge = {
     workspace: WorkspaceId
   ): Promise<BriefRegistrado | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.briefCortarProposto, projectId, afirmacaoId, workspace),
+  // O PRD, o Landscape e a Convention (SPEC-Jornada-03). Propor o termo e gerar são canais
+  // separados: a pesquisa não roda sem o PI confirmar o que será buscado (critério 3).
+  proporTermoDePesquisa: (projectId: string, workspace: WorkspaceId): Promise<string | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.prdProporTermo, projectId, workspace),
+  gerarPrd: (projectId: string, termo: string, workspace: WorkspaceId): Promise<PrdOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.prdGerar, projectId, termo, workspace),
+  carregarPrd: (projectId: string, workspace: WorkspaceId): Promise<PrdRegistrado | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.prdCarregar, projectId, workspace),
+  cortarPropostoDoPrd: (
+    projectId: string,
+    afirmacaoId: string,
+    workspace: WorkspaceId
+  ): Promise<PrdRegistrado | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.prdCortarProposto, projectId, afirmacaoId, workspace),
   // O refinamento: gerar as perguntas, ler o estado, responder e consultar a trilha. Nenhum
   // canal recebe o enunciado de volta — só o id da pergunta que já está no banco.
   gerarPerguntasDeRefinamento: (

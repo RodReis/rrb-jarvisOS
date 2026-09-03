@@ -1326,6 +1326,43 @@ const MIGRATIONS: readonly string[] = [
     created_at    TEXT NOT NULL
   );
   CREATE INDEX idx_pergunta_gerada_projeto ON pergunta_gerada(user_id, project_id, created_at);
+  `,
+
+  // 33 — o PRD, o Landscape e a Convention gerados por IA (SPEC-Jornada-03).
+  //
+  // **Tabela própria, e não mais linhas em "pacote_estrutural".** As duas respondem perguntas
+  // diferentes: aquela guarda documentos *compostos*, com origem em duas variantes (decisão e
+  // evidência); esta guarda documentos *gerados*, com quatro origens e âncora no brief. Enfiar
+  // as quatro origens no JSON da tabela antiga faria toda leitura dela ter de adivinhar qual
+  // formato está lendo — e a M8-F05 lê aquela tabela para amarrar a revisão do PRD que a
+  // arquitetura assume. O serviço grava nas duas: aqui o conteúdo verificável, lá a revisão
+  // que a arquitetura cita, com o mesmo hash ligando as duas.
+  //
+  // **Append-only, a sexta vez com esta postura.** Regenerar insere outra linha; o hash UNIQUE
+  // reconhece quando o conteúdo é o mesmo. Regenerar depois do aceite cria revisão nova e
+  // reabre o gate — nunca substitui a aceita (regra da spec, § Regras).
+  //
+  // "brief_hash" é a revisão do brief que originou estes documentos, e não o id: o aceite é por
+  // revisão exata, e um id apontaria para uma linha cujo conteúdo o PI não necessariamente leu.
+  `
+  CREATE TABLE project_prd (
+    id              TEXT PRIMARY KEY,
+    user_id         TEXT NOT NULL,
+    workspace_id    TEXT NOT NULL,
+    project_id      TEXT NOT NULL,
+    brief_hash      TEXT NOT NULL,
+    -- JSON das afirmacoes, cada uma com documento, secao, texto e origem obrigatoria.
+    afirmacoes      TEXT NOT NULL,
+    -- JSON das contradicoes detectadas; nao vazia bloqueia o aceite (criterio 6).
+    contradicoes    TEXT NOT NULL,
+    -- JSON do BloqueioExterno quando a pesquisa nao saiu. NULL quando o Landscape foi gerado.
+    bloqueio        TEXT,
+    hash            TEXT NOT NULL UNIQUE,
+    commit_hash     TEXT,
+    context_pack_id TEXT,
+    created_at      TEXT NOT NULL
+  );
+  CREATE INDEX idx_project_prd ON project_prd(user_id, project_id, created_at);
   `
 ]
 

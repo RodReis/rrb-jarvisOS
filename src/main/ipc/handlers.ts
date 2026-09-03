@@ -96,10 +96,12 @@ import type { FilaService } from '../pipeline/fila-service'
 import type { RoadmapService } from '../projects/roadmap-service'
 import type { JornadaService } from '../projects/jornada-service'
 import type { BriefService } from '../projects/brief-service'
+import type { PrdService } from '../projects/prd-service'
 import type { RefinamentoService } from '../projects/refinamento-service'
 import type { GeracaoDePerguntasOutcome } from '@shared/domain/refinamento'
 import type { Decision, EstadoDoWizard, Resposta } from '@shared/domain/wizard'
 import type { BriefRegistrado, GeracaoOutcome, PromptDoProjeto } from '@shared/domain/brief'
+import type { PrdOutcome, PrdRegistrado } from '@shared/domain/prd'
 import type { ResultadoDaRota } from '@shared/domain/rota-de-geracao'
 import type { EstadoDaJornada, TransicaoOutcome } from '@shared/domain/jornada'
 import type { AnexoService } from '../projects/anexo-service'
@@ -309,6 +311,7 @@ export interface IpcDependencies {
   readonly roadmap: RoadmapService
   readonly jornada: JornadaService
   readonly brief: BriefService
+  readonly prd: PrdService
   readonly refinamento: RefinamentoService
   readonly publicacao: PublicacaoService
   /** O kill-switch do merge autônomo (SPEC-Entrega-02/05). */
@@ -1580,6 +1583,67 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
         return null
       }
       return deps.brief.cortarProposto(projectId, afirmacaoId, workspace) ?? null
+    }
+  )
+
+  /**
+   * O PRD, o Landscape e a Convention (SPEC-Jornada-03).
+   *
+   * **Propor o termo e gerar são handlers separados**, e é o critério 3 na fronteira: a pesquisa
+   * só roda com o termo que o PI confirmou. Um handler único faria a chamada à Tavily acontecer
+   * antes de o PI ver o que seria buscado — e gastaria crédito numa busca que ele talvez
+   * recusasse.
+   *
+   * **Nenhum handler recebe afirmação nem texto de documento**, mesma postura dos do brief.
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.prdProporTermo,
+    async (_event, projectId: unknown, workspace: unknown): Promise<string | null> => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return null
+      return (await deps.prd.proporTermo(projectId, workspace)) ?? null
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.prdGerar,
+    async (_event, projectId: unknown, termo: unknown, workspace: unknown): Promise<PrdOutcome> => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
+        return { resultado: 'projeto-inexistente', mensagem: 'Projeto não encontrado.' }
+      }
+
+      // Termo não textual vira string vazia, que é o caminho legítimo de "gerar sem pesquisa":
+      // rejeitar aqui trataria como erro o que o critério 4 define como desfecho válido.
+      return await deps.prd.gerar(
+        { projectId, termo: typeof termo === 'string' ? termo : '' },
+        workspace
+      )
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.prdCarregar,
+    (_event, projectId: unknown, workspace: unknown): PrdRegistrado | null => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return null
+      return deps.prd.carregar(projectId) ?? null
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.prdCortarProposto,
+    (
+      _event,
+      projectId: unknown,
+      afirmacaoId: unknown,
+      workspace: unknown
+    ): PrdRegistrado | null => {
+      if (
+        !isWorkspaceId(workspace) ||
+        typeof projectId !== 'string' ||
+        typeof afirmacaoId !== 'string'
+      ) {
+        return null
+      }
+      return deps.prd.cortarProposto(projectId, afirmacaoId, workspace) ?? null
     }
   )
 

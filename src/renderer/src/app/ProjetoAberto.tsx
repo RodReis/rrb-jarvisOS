@@ -8,11 +8,11 @@ import { Button, ErrorState, LoadingState } from '@design/ui'
 import { log } from '../lib/log'
 import { TrilhaDaJornada } from './TrilhaDaJornada'
 import { WizardDoProjeto } from './WizardDoProjeto'
-import { PacoteDoProjeto } from './PacoteDoProjeto'
 import { AnexosDeDesign } from './AnexosDeDesign'
 import { RoadmapDoProjeto } from './RoadmapDoProjeto'
 import { PromptDoProjeto } from './PromptDoProjeto'
 import { BriefDoProjeto } from './BriefDoProjeto'
+import { PrdDoProjeto } from './PrdDoProjeto'
 import { RefinamentoDoProjeto } from './RefinamentoDoProjeto'
 
 /**
@@ -274,13 +274,17 @@ function ConteudoDaEtapa({
         />
       )
 
+    // O PRD, o Landscape e a Convention gerados por IA, com o gate (SPEC-Jornada-03). Substitui
+    // o painel do pacote composto da M8-F04: os três documentos são os mesmos, mas agora nascem
+    // do brief aceito com origem por afirmação — e o aceite deles é o que abre a etapa `design`.
     case 'prd':
     case 'prd-aceito':
       return (
-        <PacoteDoProjeto
+        <PrdDoProjeto
           workspace={workspace}
           projectId={projeto.id}
           nomeDoProjeto={projeto.nome}
+          onAceito={onRecarregar}
         />
       )
 
