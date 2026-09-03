@@ -1,39 +1,31 @@
 /**
- * A composição do roadmap e do `STATUS.md` (SPEC-Planejamento-06).
+ * Os arquivos que o roadmap gerado escreve: `STATUS.md`, o histórico, o documento do MVP e a
+ * SPEC da primeira fatia (SPEC-Jornada-05).
  *
- * A pergunta que este arquivo responde: **como as decisões do wizard e as jornadas dos
- * protótipos viram MVPs e fatias sem passar por um modelo?**
+ * A pergunta que este arquivo responde: **como o roadmap gerado vira os arquivos que o MVP-009
+ * lê?**
  *
- * Por composição, e a escolha é a mesma da M8-F04 (decisão do PI, 2026-08-30). Cada MVP e cada
- * fatia carrega `origem` obrigatória, e as origens são as duas de sempre: `decisao` e
- * `evidencia`. **Não existe origem "modelo"** — e é isso que impede o roadmap de propor um MVP
- * que ninguém decidiu.
+ * **A composição saiu daqui** (decisão do PI de 2026-09-03, mesma da F04 com a arquitetura). Até
+ * a M8-F06 este arquivo *montava* os MVPs a partir da decisão de escopo e das jornadas
+ * prototipadas; agora quem os propõe é o modelo, verificado por `roadmap-gerado.ts`. Dois
+ * caminhos para o mesmo `STATUS.md` produziriam dois roadmaps com garantias diferentes, e só um
+ * deles passa pelo validador de origem — então sobrou um.
  *
- * **A regra de composição é o escopo decidido.** A pergunta `escopo` do wizard tem duas opções
- * mutuamente exclusivas, e elas descrevem *estratégias de roadmap diferentes*:
+ * O que permanece, e é o que o MVP-009 consome:
  *
- *  - **`fatia-vertical`** — um MVP por jornada prototipada, cada um entregando aquela jornada de
- *    ponta a ponta. É o que "fatia vertical" significa: valor completo, escopo estreito.
- *  - **`fundacao-ampla`** — um MVP de fundação primeiro, e as jornadas depois, dependendo dele.
- *    O DAG reflete literalmente a escolha: tudo depende da fundação.
- *
- * Isso é o oposto de inventar: as duas formas **já estavam** na decisão, e o roadmap só as
- * escreve. Uma terceira estratégia exigiria uma terceira opção no wizard — não uma heurística
- * aqui.
- *
- * **O `STATUS.md` gerado espelha o formato deste repositório** (decisão cravada da spec), porque
- * é o formato que o MVP-009 lê. E é ele a **fonte única** do par Fatia ↔ SPEC (invariante 1): o
- * índice sai daqui, e nenhuma outra estrutura o duplica.
+ *  - **O `STATUS.md` é a fonte única do par Fatia ↔ SPEC** (invariante 1, mantida da M8-F06). O
+ *    índice sai daqui, e nenhuma outra estrutura o duplica.
+ *  - **O formato espelha o deste repositório**, porque é o formato que o MVP-009 lê.
+ *  - **A SPEC nasce `rascunho` com as perguntas abertas visíveis.** A aprovação é o gate
+ *    `SLICE_ENTRY`, ato do PI; uma spec que nascesse aprovada faria a geração aprovar a si mesma.
  *
  * **O que este arquivo não faz:** não escreve arquivo, não calcula hash de disco, não consulta
- * banco. Só monta texto e estrutura a partir do que recebe.
+ * banco, não chama modelo. Só monta texto a partir do que recebe.
  */
 
-import type { Decision, DecisoesPorPergunta, Pergunta } from './wizard'
-import type { OrigemDaAfirmacao } from './pacote-estrutural'
 import type { Mvp, Roadmap, Slice } from './roadmap'
 import { ordemDeExecucao } from './roadmap'
-import { textoDaDecisao } from './pacote-compositor'
+import type { MvpGerado, OrigemDoRoadmap, SpecGerada } from './roadmap-gerado'
 
 /** Os arquivos que esta fatia escreve, na raiz de `docs/` do projeto gerado. */
 export const ARQUIVO_DO_STATUS = 'docs/STATUS.md'
@@ -42,120 +34,44 @@ export const ARQUIVO_DO_ARQUIVO_HISTORICO = 'docs/STATUS-ARQUIVO.md'
 /** Onde a SPEC da próxima fatia é escrita. Um diretório, como neste repositório. */
 export const DIRETORIO_DAS_SPECS = 'docs/spec'
 
-/** A origem de uma decisão, no formato que MVP e fatia carregam. */
-function origemDaDecisao(decisao: Decision): OrigemDaAfirmacao {
-  return { tipo: 'decisao', decisaoId: decisao.id, perguntaId: decisao.perguntaId }
+/** Onde o documento de cada MVP é escrito. Um diretório, como neste repositório. */
+export const DIRETORIO_DOS_MVPS = 'docs/mvp'
+
+/**
+ * O rótulo de cada origem no texto dos documentos.
+ *
+ * **Texto, não símbolo nem cor**: o arquivo é lido em qualquer editor, e um marcador que
+ * dependesse de renderização perderia a informação justo onde ela precisa sobreviver — no
+ * arquivo commitado que outra pessoa abre depois.
+ */
+export const MARCA_DA_ORIGEM: Readonly<Record<OrigemDoRoadmap, string>> = {
+  prd: 'PRD',
+  arquitetura: 'ARQUITETURA',
+  proposto: 'PROPOSTO PELA IA'
 }
 
-/** Transforma texto em slug — o mesmo formato de `spec-<mvp>-<nn>-<slug>.md`. */
-export function slugificar(texto: string): string {
-  return texto
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 60)
+/** A marca de origem de um MVP ou fatia, com a referência quando ela existe. */
+function marcaDeOrigem(origem: OrigemDoRoadmap, referencia: string | undefined): string {
+  const marca = MARCA_DA_ORIGEM[origem]
+  return referencia === undefined ? `_origem: ${marca}_` : `_origem: ${marca} (${referencia})_`
 }
 
 /**
- * Compõe o roadmap das decisões e das jornadas cobertas.
+ * O caminho do documento de um MVP, derivado do número e do título.
  *
- * **Sem decisão de escopo não há roadmap.** Devolve vazio em vez de assumir uma estratégia: a
- * escolha entre fatia vertical e fundação ampla é do PI, e escolher por ele seria o oposto do
- * que a M8-F03 construiu.
- *
- * **Sem jornada não há MVP.** Um roadmap de projeto cujos protótipos não mostram tela nenhuma
- * descreveria trabalho que ninguém desenhou — e o critério 4 da M8-F05 já recusou prometer
- * fluxo ausente dos protótipos. A mesma recusa vale aqui.
+ * O número entra com dois dígitos porque é ele que ordena a listagem do diretório — sem o zero à
+ * esquerda, o MVP 10 apareceria antes do 2.
  */
-export function comporRoadmap(
-  catalogo: readonly Pergunta[],
-  decisoes: DecisoesPorPergunta,
-  jornadas: readonly string[]
-): Roadmap {
-  const decisaoDeEscopo = decisoes.escopo
-  if (decisaoDeEscopo === undefined || jornadas.length === 0) {
-    return { mvps: [], slices: [] }
-  }
-
-  const origem = origemDaDecisao(decisaoDeEscopo)
-  const perguntaDeEscopo = catalogo.find((p) => p.id === 'escopo')
-  const escolha = decisaoDeEscopo.escolha
-
-  const mvps: Mvp[] = []
-  const slices: Slice[] = []
-
-  // A estratégia "fundação ampla": um MVP de fundação, e as jornadas dependendo dele. O DAG
-  // reflete a decisão literalmente.
-  const comFundacao = escolha === 'fundacao-ampla'
-  if (comFundacao) {
-    mvps.push({
-      id: 'mvp-fundacao',
-      numero: 1,
-      titulo: 'Fundação',
-      tese:
-        perguntaDeEscopo !== undefined
-          ? `${perguntaDeEscopo.titulo}: ${textoDaDecisao(perguntaDeEscopo, decisaoDeEscopo)}`
-          : 'Fundação ampla antes de qualquer fluxo completo.',
-      estado: 'proposto',
-      dependeDe: [],
-      origem
-    })
-
-    slices.push({
-      id: 'slice-fundacao-1',
-      mvpId: 'mvp-fundacao',
-      numero: 1,
-      titulo: 'Estrutura, dados e fronteiras',
-      specSlug: `${DIRETORIO_DAS_SPECS}/spec-fundacao-01-estrutura.md`,
-      detalhada: false,
-      origem
-    })
-  }
-
-  const deslocamento = comFundacao ? 1 : 0
-
-  for (const [i, jornada] of jornadas.entries()) {
-    const numero = i + 1 + deslocamento
-    const slug = slugificar(jornada)
-    const mvpId = `mvp-${slug}`
-
-    mvps.push({
-      id: mvpId,
-      numero,
-      titulo: jornada,
-      // A tese cita a jornada **e** a decisão que a enquadra: as duas metades vêm de fato
-      // registrado, e nenhuma frase é inventada entre elas.
-      tese: `Entregar a jornada "${jornada}" de ponta a ponta.`,
-      estado: 'proposto',
-      dependeDe: comFundacao ? ['mvp-fundacao'] : [],
-      origem
-    })
-
-    // Uma fatia por MVP nesta composição. Fatiar mais fino exigiria saber o que a jornada tem
-    // dentro — conhecimento que nenhuma decisão registrada contém, e inventá-lo seria conteúdo
-    // sem origem.
-    slices.push({
-      id: `slice-${slug}-1`,
-      mvpId,
-      numero: 1,
-      titulo: jornada,
-      specSlug: `${DIRETORIO_DAS_SPECS}/spec-${slug}-01-${slug}.md`,
-      detalhada: false,
-      origem
-    })
-  }
-
-  return { mvps, slices }
+export function arquivoDoMvp(mvp: Pick<MvpGerado, 'numero' | 'titulo'>, slug: string): string {
+  return `${DIRETORIO_DOS_MVPS}/mvp-${String(mvp.numero).padStart(2, '0')}-${slug}.md`
 }
 
 /**
  * Renderiza o `STATUS.md` do projeto gerado.
  *
- * O formato espelha o deste repositório (decisão cravada da spec) porque é o que o MVP-009 lê:
- * **Agora**, **MVPs** e **Índice Fatia ↔ SPEC**. O índice é a invariante 1 tomando forma de
- * arquivo — é *aqui* que o par Fatia ↔ SPEC vive, e em nenhum outro lugar.
+ * O formato espelha o deste repositório porque é o que o MVP-009 lê: **Agora**, **MVPs** e
+ * **Índice Fatia ↔ SPEC**. O índice é a invariante 1 tomando forma de arquivo — é *aqui* que o
+ * par Fatia ↔ SPEC vive, e em nenhum outro lugar.
  */
 export function renderizarStatus(
   nomeDoProjeto: string,
@@ -256,37 +172,142 @@ export function renderizarArquivoHistorico(
 }
 
 /**
- * Renderiza a SPEC executável da próxima fatia (§ Saídas).
+ * Renderiza o documento de um MVP: a tese, o resultado, as dependências e o **checklist** das
+ * fatias previstas (§ 1 e § Regras).
  *
- * O cabeçalho obrigatório é o que a `CONVENTION.md` § Specs exige: MVP pai, status e
- * dependências. Nasce como **`rascunho`**, e não `aprovada-pi`: a aprovação é o gate
- * `SLICE_ENTRY`, um ato do PI. Uma spec que nascesse aprovada faria a geração aprovar a si
- * mesma — o mesmo erro que o critério 3 impede no MVP.
+ * **O checklist é o que faz o MVP ser container e não fatia.** As fatias existem aqui como texto
+ * até que uma delas ganhe SPEC — é a mesma hierarquia deste repositório, onde a issue-épico nasce
+ * com o checklist e as filhas só viram issue quando a spec é aprovada.
+ *
+ * A origem aparece em cada linha porque é o que o gate `MVP_ENTRY` pede ao PI que leia: um MVP
+ * `proposto` é uma inferência do modelo, e escolhê-lo para a fila é aceitar essa inferência.
  */
-export function renderizarSpec(fatia: Slice, mvp: Mvp | undefined, geradoEm: string): string {
+export function renderizarDocumentoDoMvp(
+  mvp: MvpGerado,
+  nomeDoProjeto: string,
+  dependencias: readonly { readonly id: string; readonly titulo: string }[],
+  geradoEm: string
+): string {
+  const titulosDasDependencias = mvp.dependeDe.map(
+    (id) => dependencias.find((d) => d.id === id)?.titulo ?? id
+  )
+
   return [
-    `# SPEC — ${fatia.titulo}`,
+    `# MVP-${String(mvp.numero).padStart(2, '0')} — ${mvp.titulo}`,
     '',
-    `- MVP: ${mvp?.titulo ?? fatia.mvpId}.`,
-    `- Status: **rascunho** (${geradoEm}) — a aprovação é o gate \`SLICE_ENTRY\`, ato do PI.`,
-    `- Depende de: ${(mvp?.dependeDe ?? []).length === 0 ? '—' : (mvp?.dependeDe ?? []).join(', ')}.`,
+    `Projeto: ${nomeDoProjeto}. Gerado em: **${geradoEm}**.`,
+    '',
+    marcaDeOrigem(mvp.origem, mvp.referencia),
+    '',
+    '## Tese',
+    '',
+    mvp.tese,
+    '',
+    '## Resultado',
+    '',
+    mvp.resultado,
+    '',
+    '## Depende de',
+    '',
+    titulosDasDependencias.length === 0
+      ? '_Nada. Este MVP pode começar._'
+      : titulosDasDependencias.map((t) => `- ${t}`).join('\n'),
+    '',
+    '## Fatias previstas',
+    '',
+    // Checklist, e não lista: é o formato que marca progresso, e o MVP fecha quando todas as
+    // fatias fecham.
+    ...mvp.fatias.map((f) => `- [ ] ${f.titulo} — ${marcaDeOrigem(f.origem, f.referencia)}`),
+    '',
+    'Só a próxima fatia recebe especificação executável. As demais existem aqui como checklist',
+    'até chegarem a vez delas.',
+    ''
+  ].join('\n')
+}
+
+/**
+ * Renderiza a SPEC executável da primeira fatia (§ 5).
+ *
+ * **Nasce `rascunho`, e as perguntas abertas vêm com ela.** A aprovação é o gate `SLICE_ENTRY`,
+ * um ato do PI — e o critério 4 recusa o aceite enquanto houver pergunta sem resposta. Escrever
+ * a resposta no arquivo é o que torna a decisão parte do documento commitado, e não um estado
+ * que só o banco conhece.
+ */
+export function renderizarSpecGerada(
+  spec: SpecGerada,
+  mvp: MvpGerado | undefined,
+  geradoEm: string
+): string {
+  const linhas: string[] = [
+    `# SPEC — ${spec.titulo}`,
+    '',
+    `- MVP: ${mvp?.titulo ?? '—'}.`,
+    `- Status: **rascunho** (${geradoEm}) — a aprovação é o gate \`SLICE_ENTRY\`, ato do dono do projeto.`,
     '',
     '## Objetivo',
     '',
-    mvp?.tese ?? fatia.titulo,
-    '',
-    '## Escopo',
-    '',
-    `Dentro: a jornada "${fatia.titulo}", como os protótipos anexados a mostram.`,
-    '',
-    'Fora: o que não aparece nos protótipos desta revisão.',
-    '',
-    '## Perguntas abertas ao PI',
-    '',
-    // A spec nasce com a pergunta em aberto de propósito: a `CONVENTION.md` exige que ela seja
-    // resolvida antes de virar `aprovada-pi`, e nascer sem nenhuma sugeriria que não há nada a
-    // decidir — que é exatamente o que a geração não sabe.
-    '- O recorte desta fatia está correto, ou ela deve ser dividida?',
+    spec.objetivo,
     ''
-  ].join('\n')
+  ]
+
+  linhas.push(...secao('Fluxo', spec.fluxo, true))
+  linhas.push(...secao('Regras', spec.regras, false))
+  linhas.push(...secao('Critérios de aceite', spec.criteriosDeAceite, true))
+  linhas.push(...secao('Testes e evidência', spec.testes, false))
+
+  linhas.push('## Perguntas abertas', '')
+
+  if (spec.perguntas.length === 0) {
+    // Não deveria acontecer: o validador recusa SPEC sem pergunta. A linha existe para o arquivo
+    // nunca sair com uma seção muda se um caminho futuro escapar do validador.
+    linhas.push('_Nenhuma registrada._', '')
+  }
+
+  for (const pergunta of spec.perguntas) {
+    linhas.push(`### ${pergunta.enunciado}`, '')
+
+    for (const opcao of pergunta.opcoes) {
+      const recomendada = opcao.id === pergunta.recomendada ? ' **(recomendada)**' : ''
+      linhas.push(`- **${opcao.rotulo}**${recomendada} — ${opcao.impacto}`)
+    }
+
+    linhas.push('', `_Por que a recomendada:_ ${pergunta.justificativa}`, '')
+
+    const escolhida = pergunta.opcoes.find((o) => o.id === pergunta.resposta)
+    linhas.push(
+      pergunta.resposta === undefined || pergunta.resposta.trim().length === 0
+        ? '**Resposta:** _pendente. A SPEC não pode ser aceita enquanto esta pergunta estiver aberta._'
+        : `**Resposta:** ${escolhida?.rotulo ?? pergunta.resposta}`,
+      ''
+    )
+  }
+
+  return linhas.join('\n')
+}
+
+/** Uma seção de lista da SPEC. Numerada quando a ordem importa (fluxo, critérios). */
+function secao(titulo: string, itens: readonly string[], numerada: boolean): readonly string[] {
+  if (itens.length === 0) return [`## ${titulo}`, '', '_Sem conteúdo nesta revisão._', '']
+
+  return [
+    `## ${titulo}`,
+    '',
+    ...itens.map((item, i) => (numerada ? `${i + 1}. ${item}` : `- ${item}`)),
+    ''
+  ]
+}
+
+/** A próxima fatia a detalhar dentro de um MVP: a de menor número. */
+export function primeiraFatiaDo(mvp: MvpGerado): MvpGerado['fatias'][number] | undefined {
+  return [...mvp.fatias].sort((a, b) => a.numero - b.numero)[0]
+}
+
+/** Os MVPs do roadmap gravado, na ordem em que a execução os permite. */
+export function mvpsNaOrdem(roadmap: Roadmap): readonly Mvp[] {
+  const ordem = ordemDeExecucao(roadmap.mvps)
+  if (ordem === undefined) return [...roadmap.mvps].sort((a, b) => a.numero - b.numero)
+
+  return ordem
+    .map((id) => roadmap.mvps.find((m) => m.id === id))
+    .filter((m): m is Mvp => m !== undefined)
 }

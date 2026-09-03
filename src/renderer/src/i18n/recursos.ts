@@ -355,11 +355,55 @@ export const RECURSOS = {
       roadmap: {
         titulo: 'Roadmap e aprovações',
         descricao:
-          'Os MVPs de {{nome}}, compostos das decisões e das jornadas prototipadas. Gerar propõe; aprovar é seu.',
+          'Os MVPs de {{nome}}, propostos a partir do PRD aceito e da arquitetura aprovada. Gerar propõe; escolher e aprovar são seus.',
         carregando: 'Carregando o roadmap…',
         gerar: 'Gerar roadmap',
         regerar: 'Regerar roadmap',
+        vazio: 'Nenhum roadmap gerado ainda',
+        vazioDescricao:
+          'Os MVPs nascem do PRD aceito e da arquitetura aprovada. Gerar propõe o mapa; qual MVP entra na fila é sua escolha.',
         mvps: '{{count}} MVPs propostos',
+        resultado: 'Resultado: {{texto}}',
+        naFila: 'Na fila',
+        escolher: 'Colocar na fila',
+        escolherEste: 'Colocar "{{titulo}}" na fila',
+        inelegivel: 'Depende de um MVP que ainda não foi entregue.',
+        origem: {
+          prd: 'PRD',
+          arquitetura: 'Arquitetura',
+          proposto: 'Proposto pela IA'
+        },
+        resultados: {
+          gerado: 'Roadmap gerado',
+          'projeto-inexistente': 'Projeto não encontrado',
+          'pacote-ausente': 'Falta o pacote do projeto',
+          'bloqueado-sem-rota': 'Nenhuma rota autorizada',
+          'sem-contexto': 'O contexto não pôde ser montado',
+          'saida-invalida': 'O roadmap proposto não passou no validador',
+          'mvp-nao-escolhido': 'Nenhum MVP na fila ainda',
+          'mvp-inelegivel': 'Este MVP ainda não pode entrar na fila',
+          'falha-de-escrita': 'Não foi possível escrever os documentos'
+        },
+        specTitulo: 'SPEC — {{titulo}}',
+        specDescricao:
+          'A primeira fatia de {{mvp}}. Nasce em rascunho: o aceite é seu, e depende das perguntas abaixo.',
+        spec: {
+          objetivo: 'Objetivo',
+          fluxo: 'Fluxo',
+          regras: 'Regras',
+          criterios: 'Critérios de aceite',
+          testes: 'Testes e evidência'
+        },
+        perguntasTitulo: '{{count}} decisões em aberto',
+        perguntasDescricao:
+          'A SPEC não pode ser aceita enquanto houver pergunta sem resposta. São decisões suas, não da IA.',
+        perguntasRespondidas: 'Todas as decisões foram tomadas',
+        perguntasRespondidasDescricao: 'A SPEC pode ser aceita no gate abaixo.',
+        recomendada: 'Recomendada',
+        escolhida: 'Escolhida',
+        responder: 'Escolher',
+        responderCom: 'Escolher "{{rotulo}}"',
+        justificativa: 'Por que a recomendada: {{texto}}',
         estado: {
           proposto: 'Proposto',
           'na-fila': 'Na fila',
@@ -920,11 +964,55 @@ export const RECURSOS = {
       roadmap: {
         titulo: 'Roadmap and approvals',
         descricao:
-          'The MVPs for {{nome}}, composed from decisions and prototyped journeys. Generating proposes; approving is yours.',
+          'The MVPs for {{nome}}, proposed from the accepted PRD and the approved architecture. Generating proposes; choosing and approving are yours.',
         carregando: 'Loading the roadmap…',
         gerar: 'Generate roadmap',
         regerar: 'Regenerate roadmap',
+        vazio: 'No roadmap generated yet',
+        vazioDescricao:
+          'MVPs come from the accepted PRD and the approved architecture. Generating proposes the map; which MVP is queued is your call.',
         mvps: '{{count}} proposed MVPs',
+        resultado: 'Outcome: {{texto}}',
+        naFila: 'Queued',
+        escolher: 'Queue this MVP',
+        escolherEste: 'Queue "{{titulo}}"',
+        inelegivel: 'Depends on an MVP that has not been delivered yet.',
+        origem: {
+          prd: 'PRD',
+          arquitetura: 'Architecture',
+          proposto: 'Proposed by AI'
+        },
+        resultados: {
+          gerado: 'Roadmap generated',
+          'projeto-inexistente': 'Project not found',
+          'pacote-ausente': 'The project package is missing',
+          'bloqueado-sem-rota': 'No authorized route',
+          'sem-contexto': 'The context could not be assembled',
+          'saida-invalida': 'The proposed roadmap failed validation',
+          'mvp-nao-escolhido': 'No MVP queued yet',
+          'mvp-inelegivel': 'This MVP cannot be queued yet',
+          'falha-de-escrita': 'The documents could not be written'
+        },
+        specTitulo: 'SPEC — {{titulo}}',
+        specDescricao:
+          'The first slice of {{mvp}}. It starts as a draft: accepting is yours, and it depends on the questions below.',
+        spec: {
+          objetivo: 'Objective',
+          fluxo: 'Flow',
+          regras: 'Rules',
+          criterios: 'Acceptance criteria',
+          testes: 'Tests and evidence'
+        },
+        perguntasTitulo: '{{count}} open decisions',
+        perguntasDescricao:
+          'The SPEC cannot be accepted while a question is unanswered. These are your decisions, not the model’s.',
+        perguntasRespondidas: 'Every decision has been made',
+        perguntasRespondidasDescricao: 'The SPEC can be accepted at the gate below.',
+        recomendada: 'Recommended',
+        escolhida: 'Chosen',
+        responder: 'Choose',
+        responderCom: 'Choose "{{rotulo}}"',
+        justificativa: 'Why the recommendation: {{texto}}',
         estado: {
           proposto: 'Proposed',
           'na-fila': 'Queued',

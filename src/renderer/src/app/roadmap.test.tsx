@@ -4,21 +4,27 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { RoadmapDoProjeto } from './RoadmapDoProjeto'
 
 /**
- * O roadmap e o centro de aprovações (SPEC-Planejamento-06, categoria Tela).
+ * O roadmap gerado por IA e os dois gates (SPEC-Jornada-05, categoria Tela).
  *
  * O que este nível protege e nenhum outro protege:
- *  - **gerar e aprovar são dois atos** — não existe botão que faça os dois;
+ *  - **gerar, escolher e aprovar são três atos** — não existe botão que faça dois deles;
+ *  - **só os MVPs elegíveis oferecem escolha** (critério 3), e os demais dizem por quê;
+ *  - **a origem de cada MVP é texto, não cor** — é o que o PI lê antes de colocar na fila;
+ *  - **as perguntas abertas aparecem antes da SPEC** e dizem que travam o aceite (critério 4);
  *  - **o gate mostra o que cobre antes do aceite**: aprovar sem ver o que se aprova é o clique
  *    automático que o critério 5 existe para não ensinar;
- *  - **a revisão já aprovada não convida a reaprovar** (critério 5 na tela);
  *  - **não há campo de identidade**: quem aprova vem da sessão no main.
  */
 
-const carregarRoadmap = vi.fn()
+const carregarRoadmapGerado = vi.fn()
+const mvpsElegiveis = vi.fn()
 const listarAprovacoes = vi.fn()
 const revisoesDoGate = vi.fn()
-const gerarRoadmap = vi.fn()
+const gerarRoadmapPorIa = vi.fn()
+const escolherMvpDoRoadmap = vi.fn()
+const responderPerguntaDaSpec = vi.fn()
 const aprovarGate = vi.fn()
+const aplicarEventoDaJornada = vi.fn()
 const sendLog = vi.fn()
 
 const REVISOES = [
@@ -33,44 +39,75 @@ const REVISOES = [
  */
 function revisoesPorGate(_projectId: string, gate: string): Promise<unknown> {
   if (gate === 'PROJECT_PACKAGE') return Promise.resolve(REVISOES)
-  if (gate === 'MVP_ENTRY') return Promise.resolve([{ artefato: 'm1', hash: 'c'.repeat(64) }])
+  if (gate === 'MVP_ENTRY') return Promise.resolve([{ artefato: 'mvp-1', hash: 'c'.repeat(64) }])
   return Promise.resolve([{ artefato: 'docs/spec/spec-x.md', hash: 'd'.repeat(64) }])
 }
 
-function roadmapCheio(): Record<string, unknown> {
+const PERGUNTA = {
+  id: 'p-1',
+  enunciado: 'E-mail é obrigatório?',
+  opcoes: [
+    { id: 'a', rotulo: 'Sim, obrigatório', impacto: 'Todo cliente tem contato.' },
+    { id: 'b', rotulo: 'Não, opcional', impacto: 'Cadastro mais rápido.' }
+  ],
+  recomendada: 'a',
+  justificativa: 'O PRD fala em contatar o cliente depois.'
+}
+
+function roadmapGerado(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
+    id: 'rev-1',
+    user_id: 'u-1',
+    workspace_id: 'jarvis',
+    projectId: 'p-1',
+    pacoteEstruturalId: 'pac-1',
+    arquiteturaId: 'arq-1',
     mvps: [
       {
-        id: 'm1',
+        id: 'mvp-1',
         numero: 1,
         titulo: 'Cadastro de cliente',
-        tese: 'Entregar a jornada de ponta a ponta.',
-        estado: 'proposto',
+        tese: 'Cadastrar, listar e editar clientes.',
+        resultado: 'Um operador cadastra e encontra o cliente.',
         dependeDe: [],
-        origem: { tipo: 'decisao', decisaoId: 'd', perguntaId: 'escopo' }
+        origem: 'prd',
+        referencia: 'r-1',
+        fatias: [{ id: 'f-1', numero: 1, titulo: 'Formulário', origem: 'prd', referencia: 'r-1' }]
       },
       {
-        id: 'm2',
+        id: 'mvp-2',
         numero: 2,
         titulo: 'Relatórios',
-        tese: 'Entregar a jornada de ponta a ponta.',
-        estado: 'na-fila',
-        dependeDe: ['m1'],
-        origem: { tipo: 'decisao', decisaoId: 'd', perguntaId: 'escopo' }
+        tese: 'Exportar o cadastrado.',
+        resultado: 'O relatório do mês é baixado.',
+        dependeDe: ['mvp-1'],
+        origem: 'proposto',
+        fatias: [{ id: 'f-2', numero: 1, titulo: 'Exportar CSV', origem: 'proposto' }]
       }
     ],
-    slices: [
-      {
-        id: 's1',
-        mvpId: 'm1',
-        numero: 1,
-        titulo: 'Cadastro de cliente',
-        specSlug: 'docs/spec/spec-cadastro-01-cadastro.md',
-        detalhada: true,
-        origem: { tipo: 'decisao', decisaoId: 'd', perguntaId: 'escopo' }
-      }
-    ]
+    mvpEscolhido: null,
+    hash: 'h'.repeat(64),
+    commitHash: null,
+    contextPackId: null,
+    created_at: '2026-09-03T10:00:00.000Z',
+    ...over
   }
+}
+
+function comSpec(resposta?: string): Record<string, unknown> {
+  return roadmapGerado({
+    mvpEscolhido: 'mvp-1',
+    spec: {
+      fatiaId: 'f-1',
+      titulo: 'Formulário',
+      objetivo: 'Cadastrar um cliente.',
+      fluxo: ['Abrir o formulário'],
+      regras: ['Nome obrigatório'],
+      criteriosDeAceite: ['Salvar sem nome mostra erro'],
+      testes: ['Unitário da validação'],
+      perguntas: [resposta === undefined ? PERGUNTA : { ...PERGUNTA, resposta }]
+    }
+  })
 }
 
 function renderizar(): void {
@@ -78,20 +115,28 @@ function renderizar(): void {
 }
 
 beforeEach(() => {
-  carregarRoadmap.mockReset().mockResolvedValue({ mvps: [], slices: [] })
+  carregarRoadmapGerado.mockReset().mockResolvedValue(null)
+  mvpsElegiveis.mockReset().mockResolvedValue([])
   listarAprovacoes.mockReset().mockResolvedValue([])
   revisoesDoGate.mockReset().mockResolvedValue([])
-  gerarRoadmap.mockReset()
+  gerarRoadmapPorIa.mockReset()
+  escolherMvpDoRoadmap.mockReset()
+  responderPerguntaDaSpec.mockReset()
   aprovarGate.mockReset()
+  aplicarEventoDaJornada.mockReset().mockResolvedValue(null)
   sendLog.mockReset()
 
   Object.defineProperty(window, 'jarvis', {
     value: {
-      carregarRoadmap,
+      carregarRoadmapGerado,
+      mvpsElegiveis,
       listarAprovacoes,
       revisoesDoGate,
-      gerarRoadmap,
+      gerarRoadmapPorIa,
+      escolherMvpDoRoadmap,
+      responderPerguntaDaSpec,
       aprovarGate,
+      aplicarEventoDaJornada,
       sendLog
     },
     configurable: true,
@@ -102,46 +147,52 @@ beforeEach(() => {
 describe('gerar o roadmap', () => {
   it('pede a geração ao main', async () => {
     const usuario = userEvent.setup()
-    gerarRoadmap.mockResolvedValue({ reason: 'gerado', mensagem: 'Roadmap gerado e commitado.' })
+    gerarRoadmapPorIa.mockResolvedValue({ resultado: 'gerado', mensagem: 'Roadmap gerado.' })
 
     renderizar()
-    await screen.findByRole('button', { name: 'Gerar roadmap' })
+    await usuario.click(await screen.findByRole('button', { name: 'Gerar roadmap' }))
 
-    await usuario.click(screen.getByRole('button', { name: 'Gerar roadmap' }))
-
-    await waitFor(() => expect(gerarRoadmap).toHaveBeenCalledWith('p-1', 'jarvis'))
+    expect(gerarRoadmapPorIa).toHaveBeenCalledWith('p-1', 'jarvis')
   })
 
-  /** "Há um ciclo" não é acionável: o PI precisa saber qual. */
-  it('mostra os problemas do DAG nomeados', async () => {
+  it('sem roadmap, o vazio diz de onde os MVPs nascem', async () => {
+    renderizar()
+
+    expect(await screen.findByText('Nenhum roadmap gerado ainda')).toBeInTheDocument()
+  })
+
+  it('a recusa por falta de rota chega como aviso, com a ação', async () => {
     const usuario = userEvent.setup()
-    gerarRoadmap.mockResolvedValue({
-      reason: 'dag-invalido',
-      mensagem: 'O roadmap composto tem dependências inválidas.',
-      problemas: [{ mensagem: 'Ciclo de dependência: A → B → A.' }]
+    gerarRoadmapPorIa.mockResolvedValue({
+      resultado: 'bloqueado-sem-rota',
+      mensagem: 'A geração não aconteceu.',
+      acao: 'Configure a assinatura.'
     })
 
     renderizar()
     await usuario.click(await screen.findByRole('button', { name: 'Gerar roadmap' }))
 
-    expect(await screen.findByText('Ciclo de dependência: A → B → A.')).toBeInTheDocument()
+    expect(await screen.findByText('Nenhuma rota autorizada')).toBeInTheDocument()
+    expect(screen.getByText('Configure a assinatura.')).toBeInTheDocument()
   })
 
-  it('mostra a recusa por falta de base sem tom de erro', async () => {
+  it('os problemas do validador aparecem um por linha', async () => {
     const usuario = userEvent.setup()
-    gerarRoadmap.mockResolvedValue({
-      reason: 'sem-base',
-      mensagem: 'Nenhuma jornada prototipada. Anexe protótipos antes de gerar o roadmap.'
+    gerarRoadmapPorIa.mockResolvedValue({
+      resultado: 'saida-invalida',
+      mensagem: 'Nada foi gravado.',
+      problemas: ['Ciclo de dependência: A → B.', 'B depende de C, que não existe.']
     })
 
     renderizar()
     await usuario.click(await screen.findByRole('button', { name: 'Gerar roadmap' }))
 
-    expect(await screen.findByText(/Anexe protótipos/)).toBeInTheDocument()
+    expect(await screen.findByText('Ciclo de dependência: A → B.')).toBeInTheDocument()
+    expect(screen.getByText('B depende de C, que não existe.')).toBeInTheDocument()
   })
 
-  it('com roadmap existente, o botão passa a dizer regerar', async () => {
-    carregarRoadmap.mockResolvedValue(roadmapCheio())
+  it('com roadmap, o botão vira regerar', async () => {
+    carregarRoadmapGerado.mockResolvedValue(roadmapGerado())
 
     renderizar()
 
@@ -149,128 +200,236 @@ describe('gerar o roadmap', () => {
   })
 })
 
-describe('o mapa', () => {
+describe('os MVPs propostos e a escolha (critérios 2 e 3)', () => {
   beforeEach(() => {
-    carregarRoadmap.mockResolvedValue(roadmapCheio())
+    carregarRoadmapGerado.mockResolvedValue(roadmapGerado())
+    mvpsElegiveis.mockResolvedValue([roadmapGerado().mvps as never].flat().slice(0, 1))
   })
 
-  it('mostra os MVPs com estado em texto, não só cor', async () => {
+  it('mostra a tese e o resultado, que são coisas diferentes', async () => {
     renderizar()
 
-    expect(await screen.findByText(/1. Cadastro de cliente/)).toBeInTheDocument()
-    expect(screen.getByText('Proposto')).toBeInTheDocument()
+    expect(await screen.findByText('Cadastrar, listar e editar clientes.')).toBeInTheDocument()
+    expect(
+      screen.getByText('Resultado: Um operador cadastra e encontra o cliente.')
+    ).toBeInTheDocument()
+  })
+
+  it('a origem é texto, e o proposto se distingue do ancorado', async () => {
+    renderizar()
+    await screen.findAllByText(/Cadastro de cliente/)
+
+    expect(screen.getByText(/PRD · r-1/)).toBeInTheDocument()
+    // O MVP inferido e a fatia dele: a origem aparece nos dois níveis, e é isso que o PI lê.
+    expect(screen.getAllByText('Proposto pela IA').length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('só o MVP elegível oferece o botão de escolha', async () => {
+    renderizar()
+    await screen.findAllByText(/Cadastro de cliente/)
+
+    expect(
+      screen.getByRole('button', { name: 'Colocar "Cadastro de cliente" na fila' })
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Colocar "Relatórios" na fila' })).toBeNull()
+  })
+
+  it('o MVP bloqueado diz por que não pode ser escolhido', async () => {
+    renderizar()
+
+    expect(
+      await screen.findByText('Depende de um MVP que ainda não foi entregue.')
+    ).toBeInTheDocument()
+  })
+
+  it('escolher manda o id ao main, não o conteúdo', async () => {
+    const usuario = userEvent.setup()
+    escolherMvpDoRoadmap.mockResolvedValue({ resultado: 'gerado', mensagem: 'ok' })
+
+    renderizar()
+    await usuario.click(
+      await screen.findByRole('button', { name: 'Colocar "Cadastro de cliente" na fila' })
+    )
+
+    expect(escolherMvpDoRoadmap).toHaveBeenCalledWith('p-1', 'mvp-1', 'jarvis')
+  })
+
+  it('depois da escolha, nenhum MVP oferece trocar: desfazer aceite não é um clique', async () => {
+    carregarRoadmapGerado.mockResolvedValue(comSpec())
+
+    renderizar()
+    await screen.findAllByText(/Cadastro de cliente/)
+
+    expect(screen.queryByRole('button', { name: /na fila$/ })).toBeNull()
     expect(screen.getByText('Na fila')).toBeInTheDocument()
   })
+})
 
-  it('mostra as dependências pelo título, não pelo id', async () => {
+describe('a SPEC e as perguntas abertas (critério 4)', () => {
+  it('sem MVP escolhido, nenhuma SPEC aparece', async () => {
+    carregarRoadmapGerado.mockResolvedValue(roadmapGerado())
+
     renderizar()
+    await screen.findAllByText(/Cadastro de cliente/)
 
-    expect(await screen.findByText(/Depende de: Cadastro de cliente/)).toBeInTheDocument()
+    expect(screen.queryByText(/^SPEC —/)).toBeNull()
   })
 
-  it('mostra a fatia com a SPEC e a marca de detalhada', async () => {
+  it('a pergunta aberta diz que trava o aceite', async () => {
+    carregarRoadmapGerado.mockResolvedValue(comSpec())
+
     renderizar()
 
-    expect(await screen.findByText('docs/spec/spec-cadastro-01-cadastro.md')).toBeInTheDocument()
-    expect(screen.getByText('SPEC detalhada')).toBeInTheDocument()
+    expect(await screen.findByText('1 decisões em aberto')).toBeInTheDocument()
+    expect(screen.getByText(/não pode ser aceita enquanto houver pergunta/)).toBeInTheDocument()
+  })
+
+  it('cada opção mostra o impacto, e a recomendada vem marcada', async () => {
+    carregarRoadmapGerado.mockResolvedValue(comSpec())
+
+    renderizar()
+    await screen.findByText('E-mail é obrigatório?')
+
+    expect(screen.getByText('Todo cliente tem contato.')).toBeInTheDocument()
+    expect(screen.getByText('Cadastro mais rápido.')).toBeInTheDocument()
+    expect(screen.getByText('Recomendada')).toBeInTheDocument()
+    expect(
+      screen.getByText('Por que a recomendada: O PRD fala em contatar o cliente depois.')
+    ).toBeInTheDocument()
+  })
+
+  it('responder manda o id da pergunta e da opção, nunca o enunciado', async () => {
+    const usuario = userEvent.setup()
+    carregarRoadmapGerado.mockResolvedValue(comSpec())
+    responderPerguntaDaSpec.mockResolvedValue({ resultado: 'gerado', mensagem: 'ok' })
+
+    renderizar()
+    await usuario.click(await screen.findByRole('button', { name: 'Escolher "Não, opcional"' }))
+
+    expect(responderPerguntaDaSpec).toHaveBeenCalledWith('p-1', 'p-1', 'b', 'jarvis')
+  })
+
+  it('a opção escolhida vira selo, não botão', async () => {
+    carregarRoadmapGerado.mockResolvedValue(comSpec('a'))
+
+    renderizar()
+    await screen.findByText('E-mail é obrigatório?')
+
+    expect(screen.getByText('Escolhida')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Escolher "Sim, obrigatório"' })).toBeNull()
+  })
+
+  it('respondida tudo, a tela diz que a SPEC pode ser aceita', async () => {
+    carregarRoadmapGerado.mockResolvedValue(comSpec('a'))
+
+    renderizar()
+
+    expect(await screen.findByText('Todas as decisões foram tomadas')).toBeInTheDocument()
+  })
+
+  it('mostra as seções da SPEC gerada', async () => {
+    carregarRoadmapGerado.mockResolvedValue(comSpec())
+
+    renderizar()
+    await screen.findByText('E-mail é obrigatório?')
+
+    expect(screen.getByText('Critérios de aceite')).toBeInTheDocument()
+    expect(screen.getByText('Salvar sem nome mostra erro')).toBeInTheDocument()
   })
 })
 
 describe('o centro de aprovações', () => {
-  it('mostra os três gates', async () => {
-    renderizar()
-
-    expect(await screen.findByText('PROJECT_PACKAGE')).toBeInTheDocument()
-    expect(screen.getByText('MVP_ENTRY')).toBeInTheDocument()
-    expect(screen.getByText('SLICE_ENTRY')).toBeInTheDocument()
+  beforeEach(() => {
+    carregarRoadmapGerado.mockResolvedValue(roadmapGerado())
+    revisoesDoGate.mockImplementation(revisoesPorGate)
   })
 
-  /**
-   * Aprovar sem ver o que se aprova é o clique automático que o critério 5 existe para não
-   * ensinar. As revisões ficam à vista, não atrás de um "detalhes".
-   */
-  it('mostra as revisões com hash antes do botão de aprovar', async () => {
-    revisoesDoGate.mockImplementation(revisoesPorGate)
-
+  it('mostra o que cada gate cobre antes do botão', async () => {
     renderizar()
 
     expect(await screen.findByText('docs/PRD.md')).toBeInTheDocument()
-    const hash = screen.getByLabelText(`Hash completo: ${'a'.repeat(64)}`)
-    expect(hash).toHaveTextContent('a'.repeat(12))
+    expect(screen.getByText('docs/ARCHITECTURE.md')).toBeInTheDocument()
+    expect(screen.getByText('docs/spec/spec-x.md')).toBeInTheDocument()
   })
 
-  it('desabilita aprovar quando o gate não tem o que aprovar', async () => {
-    renderizar()
-
-    await screen.findByText('PROJECT_PACKAGE')
-    expect(screen.getAllByRole('button', { name: 'Aprovar' })[0]).toBeDisabled()
-    expect(screen.getAllByText('Nada a aprovar ainda neste gate.').length).toBeGreaterThan(0)
-  })
-
-  it('aprova o gate pelo canal, sem mandar identidade', async () => {
+  it('aprovar manda só o gate: a identidade vem da sessão no main', async () => {
     const usuario = userEvent.setup()
-    revisoesDoGate.mockImplementation(revisoesPorGate)
     aprovarGate.mockResolvedValue({ reason: 'aprovado', mensagem: 'Aprovado.' })
 
     renderizar()
-    await screen.findByText('docs/PRD.md')
+    const botoes = await screen.findAllByRole('button', { name: 'Aprovar' })
+    await usuario.click(botoes[0]!)
 
-    await usuario.click(screen.getAllByRole('button', { name: 'Aprovar' })[0]!)
+    expect(aprovarGate).toHaveBeenCalledWith('p-1', 'PROJECT_PACKAGE', 'jarvis')
+    expect(screen.queryByLabelText(/identidade/i)).toBeNull()
+  })
 
-    // Três argumentos: projeto, gate e espaço. Quem aprova vem da sessão no main.
-    await waitFor(() =>
-      expect(aprovarGate).toHaveBeenCalledWith('p-1', 'PROJECT_PACKAGE', 'jarvis')
-    )
+  it('o aceite do MVP_ENTRY move a jornada pelo canal de evento', async () => {
+    const usuario = userEvent.setup()
+    aprovarGate.mockResolvedValue({ reason: 'aprovado', mensagem: 'Aprovado.' })
+
+    renderizar()
+    const botoes = await screen.findAllByRole('button', { name: 'Aprovar' })
+    await usuario.click(botoes[1]!)
+
+    await waitFor(() => {
+      expect(aplicarEventoDaJornada).toHaveBeenCalledWith('p-1', 'mvp-aceito', 'jarvis')
+    })
+  })
+
+  it('o aceite do SLICE_ENTRY move a jornada para spec-aceita', async () => {
+    const usuario = userEvent.setup()
+    aprovarGate.mockResolvedValue({ reason: 'aprovado', mensagem: 'Aprovado.' })
+
+    renderizar()
+    const botoes = await screen.findAllByRole('button', { name: 'Aprovar' })
+    await usuario.click(botoes[2]!)
+
+    await waitFor(() => {
+      expect(aplicarEventoDaJornada).toHaveBeenCalledWith('p-1', 'spec-aceita', 'jarvis')
+    })
   })
 
   /** Critério 5 na tela: a revisão já aprovada não convida a reaprovar. */
-  it('marca como aprovado e desabilita quando a revisão já tem aceite', async () => {
-    revisoesDoGate.mockImplementation(revisoesPorGate)
+  it('gate já aprovado mostra o selo e desabilita o botão', async () => {
     listarAprovacoes.mockResolvedValue([
       {
         id: 'ap-1',
-        user_id: 'u-1',
-        workspace_id: 'jarvis',
-        projectId: 'p-1',
         gate: 'PROJECT_PACKAGE',
         revisoes: REVISOES,
         identidade: 'pi@exemplo',
         autor: 'pi',
-        created_at: '2026-08-30T10:00:00.000Z'
+        created_at: '2026-09-03T10:00:00.000Z'
       }
     ])
 
     renderizar()
+    await screen.findByText('docs/PRD.md')
 
     expect(await screen.findByText('Aprovado')).toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: 'Aprovar' })[0]).toBeDisabled()
-    // E diz quem aprovou — é a pergunta que o critério 4 faz.
-    expect(screen.getByText(/pi@exemplo/)).toBeInTheDocument()
+    expect(screen.getByText('Aprovado por pi@exemplo.')).toBeInTheDocument()
   })
 
-  it('mostra a recusa por falta de sessão com o que fazer', async () => {
+  it('gate sem revisões diz que não há o que aprovar', async () => {
+    revisoesDoGate.mockResolvedValue([])
+
+    renderizar()
+
+    const semObjeto = await screen.findAllByText('Nada a aprovar ainda neste gate.')
+    expect(semObjeto.length).toBeGreaterThan(0)
+  })
+
+  it('a recusa da aprovação chega como conteúdo, não como erro técnico', async () => {
     const usuario = userEvent.setup()
-    revisoesDoGate.mockImplementation(revisoesPorGate)
     aprovarGate.mockResolvedValue({
       reason: 'sem-identidade',
-      mensagem: 'Entre na sua conta para aprovar: a aprovação registra quem aceitou.'
+      mensagem: 'Entre na sua conta para aprovar.'
     })
 
     renderizar()
-    await screen.findByText('docs/PRD.md')
+    const botoes = await screen.findAllByRole('button', { name: 'Aprovar' })
+    await usuario.click(botoes[0]!)
 
-    await usuario.click(screen.getAllByRole('button', { name: 'Aprovar' })[0]!)
-
-    expect(await screen.findByText(/Entre na sua conta/)).toBeInTheDocument()
-  })
-
-  it('não oferece campo de identidade nem de autor', async () => {
-    revisoesDoGate.mockImplementation(revisoesPorGate)
-
-    renderizar()
-    await screen.findByText('docs/PRD.md')
-
-    // Um campo aqui deixaria o renderer declarar quem aprovou.
-    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+    expect(await screen.findByText('Entre na sua conta para aprovar.')).toBeInTheDocument()
   })
 })

@@ -1,26 +1,27 @@
 /**
- * O roadmap e os gates contra o SQLite e o disco reais (SPEC-Planejamento-06, Banco).
+ * Os gates de aprovação contra o SQLite real (SPEC-Planejamento-06 § gates; SPEC-Jornada-05).
  *
  * A prova é **por efeito**, como nas fatias irmãs: não basta o serviço dizer que recusou — o
- * disco tem de confirmar que nenhum arquivo foi escrito e o banco que nenhuma linha foi gravada.
+ * banco tem de confirmar que nenhuma linha de aprovação foi gravada.
  *
- * As garantias que só este nível alcança:
- *  - **DAG inválido não escreve nada** (critério 1) — a recusa acontece antes do disco.
- *  - **Gerar não promove nem aprova** (critérios 3 e 7): os MVPs continuam `proposto` e não há
- *    `approval` no banco depois de gerar.
+ * **A composição saiu deste serviço** (decisão do PI de 2026-09-03): quem propõe o roadmap agora
+ * é o `RoadmapGeradoService`, com suíte própria. O que sobrou aqui é o aceite, e é o que estes
+ * testes cobrem:
+ *
  *  - **Sem identidade, o gate falha fechado** — e nenhuma linha de aprovação aparece.
  *  - **Mesma revisão não pede novo aceite** (critério 5), medido no caminho que decide.
- *
- * O `AnexoService` é dublado porque o que se exercita aqui é a decisão desta fatia, não a
- * validação de protótipo — que tem suíte própria na M8-F05.
+ *  - **`MVP_ENTRY` promove o MVP que o PI escolheu**, e não o primeiro da ordem topológica
+ *    (pergunta 1 da SPEC-Jornada-05, resolvida pelo PI em 2026-09-03).
+ *  - **`SLICE_ENTRY` não tem objeto enquanto houver pergunta aberta** (critério 4) — a lista de
+ *    revisões vazia é o que faz `aprovar` recusar.
  */
 
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Database as Db } from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Pergunta } from '@shared/domain/wizard'
+import type { MvpGerado, RoadmapRegistrado, SpecGerada } from '@shared/domain/roadmap-gerado'
 
 const logCat = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 vi.mock('../logging/logger', () => ({
@@ -31,7 +32,6 @@ vi.mock('../logging/logger', () => ({
 const { openDatabase } = await import('../storage/database')
 const { AuditRepository } = await import('../storage/audit-repository')
 const { ProjectRepository } = await import('./project-repository')
-const { DecisionRepository } = await import('./decision-repository')
 const { PacoteRepository } = await import('./pacote-repository')
 const { RoadmapRepository } = await import('./roadmap-repository')
 const { RoadmapService } = await import('./roadmap-service')
@@ -40,56 +40,114 @@ const USER = 'u-1'
 const PROJETO = 'p-1'
 const WS = 'jarvis' as const
 
-const CATALOGO: readonly Pergunta[] = [
-  {
-    id: 'escopo',
-    etapa: 'contexto',
-    titulo: 'Escopo do projeto',
-    enunciado: 'Como começar?',
-    opcoes: [
-      { id: 'fatia-vertical', rotulo: 'Fatia vertical', impacto: 'impacto A' },
-      { id: 'fundacao-ampla', rotulo: 'Fundação ampla', impacto: 'impacto B' }
-    ],
-    recomendada: 'fatia-vertical',
-    justificativa: 'porque sim',
-    aceitaTextoLivre: true,
-    delegavel: true
-  }
-]
-
 let dir: string
 let raiz: string
 let db: Db
 let audit: InstanceType<typeof AuditRepository>
 let projects: InstanceType<typeof ProjectRepository>
-let decisions: InstanceType<typeof DecisionRepository>
 let pacotes: InstanceType<typeof PacoteRepository>
 let repository: InstanceType<typeof RoadmapRepository>
 let service: InstanceType<typeof RoadmapService>
-let marcos: string[]
 /** O que o dublê do `AnexoService` devolve. */
-let jornadas: string[]
 let anexosDoProjeto: { caminho: string; hash: string }[]
 let arquiteturas: { documentos: { caminho: string; hash: string }[] }[]
 let identidadeAtual: string | undefined
+/** A revisão gerada que os gates do roadmap aprovam. */
+let gerado: RoadmapRegistrado | undefined
 
-function decidirEscopo(escolha = 'fatia-vertical'): void {
-  decisions.registrar({
-    id: 'd-escopo',
+function mvp(over: Partial<MvpGerado> = {}): MvpGerado {
+  return {
+    id: 'mvp-1',
+    numero: 1,
+    titulo: 'Cadastro',
+    tese: 'Cadastrar clientes.',
+    resultado: 'Um cliente aparece na lista.',
+    dependeDe: [],
+    origem: 'proposto',
+    fatias: [{ id: 'f-1', numero: 1, titulo: 'Formulário', origem: 'proposto' }],
+    ...over
+  }
+}
+
+function spec(over: Partial<SpecGerada> = {}): SpecGerada {
+  return {
+    fatiaId: 'f-1',
+    titulo: 'Formulário',
+    objetivo: 'Cadastrar um cliente.',
+    fluxo: ['Abrir'],
+    regras: ['Nome obrigatório'],
+    criteriosDeAceite: ['Salvar sem nome mostra erro'],
+    testes: ['Unitário'],
+    perguntas: [
+      {
+        id: 'p-1',
+        enunciado: 'E-mail é obrigatório?',
+        opcoes: [
+          { id: 'a', rotulo: 'Sim', impacto: 'Todo cliente tem contato.' },
+          { id: 'b', rotulo: 'Não', impacto: 'Cadastro mais rápido.' }
+        ],
+        recomendada: 'a',
+        justificativa: 'O PRD fala em contatar depois.'
+      }
+    ],
+    ...over
+  }
+}
+
+function revisao(over: Partial<RoadmapRegistrado> = {}): RoadmapRegistrado {
+  return {
+    id: 'rev-1',
     user_id: USER,
     workspace_id: WS,
     projectId: PROJETO,
-    perguntaId: 'escopo',
-    etapa: 'contexto',
-    escolha,
-    texto: null,
-    recomendacao: 'fatia-vertical',
-    justificativa: 'porque sim',
-    autor: 'pi',
-    motivo: 'escolhida',
-    substituiu: null,
-    created_at: '2026-08-30T10:00:00.000Z'
-  })
+    pacoteEstruturalId: 'pac-1',
+    arquiteturaId: 'arq-1',
+    mvps: [
+      mvp(),
+      mvp({
+        id: 'mvp-2',
+        numero: 2,
+        titulo: 'Relatórios',
+        dependeDe: ['mvp-1'],
+        fatias: [{ id: 'f-2', numero: 1, titulo: 'Exportar', origem: 'proposto' }]
+      })
+    ],
+    mvpEscolhido: null,
+    hash: 'h'.repeat(64),
+    commitHash: null,
+    contextPackId: null,
+    created_at: new Date().toISOString(),
+    ...over
+  }
+}
+
+/** A projeção que o `STATUS.md` e o `SLICE_ENTRY` leem, gravada a partir da revisão. */
+function gravarProjecao(): void {
+  repository.salvarRoadmap(
+    { userId: USER, workspaceId: WS, projectId: PROJETO },
+    {
+      mvps: (gerado?.mvps ?? []).map((m) => ({
+        id: m.id,
+        numero: m.numero,
+        titulo: m.titulo,
+        tese: m.tese,
+        estado: 'proposto' as const,
+        dependeDe: m.dependeDe,
+        origem: { tipo: 'decisao' as const, decisaoId: m.id, perguntaId: 'roadmap-gerado' }
+      })),
+      slices: (gerado?.mvps ?? []).flatMap((m) =>
+        m.fatias.map((f) => ({
+          id: f.id,
+          mvpId: m.id,
+          numero: f.numero,
+          titulo: f.titulo,
+          specSlug: `docs/spec/spec-${m.id}-0${f.numero}-${f.id}.md`,
+          detalhada: f.id === gerado?.spec?.fatiaId,
+          origem: { tipo: 'decisao' as const, decisaoId: f.id, perguntaId: 'roadmap-gerado' }
+        }))
+      )
+    }
+  )
 }
 
 function gravarPrd(): string {
@@ -115,10 +173,6 @@ function gravarPrd(): string {
   return id
 }
 
-function mvpsNoBanco(): number {
-  return (db.prepare('SELECT COUNT(*) AS n FROM mvp').get() as { n: number }).n
-}
-
 function aprovacoesNoBanco(): number {
   return (db.prepare('SELECT COUNT(*) AS n FROM approval').get() as { n: number }).n
 }
@@ -129,14 +183,12 @@ beforeEach(() => {
   db = openDatabase(join(dir, 'jarvis.db'))
   audit = new AuditRepository(db, 'chave-de-teste')
   projects = new ProjectRepository(db)
-  decisions = new DecisionRepository(db)
   pacotes = new PacoteRepository(db)
   repository = new RoadmapRepository(db)
-  marcos = []
-  jornadas = ['Cadastro de cliente', 'Relatórios']
   anexosDoProjeto = [{ caminho: 'docs/prototipos/home.html', hash: 'a'.repeat(64) }]
   arquiteturas = [{ documentos: [{ caminho: 'docs/ARCHITECTURE.md', hash: 'b'.repeat(64) }] }]
   identidadeAtual = 'pi@exemplo'
+  gerado = revisao()
 
   projects.save({
     id: PROJETO,
@@ -153,28 +205,17 @@ beforeEach(() => {
   service = new RoadmapService({
     repository,
     projects,
-    projectService: {
-      concluirMarco: (_id: string, marco: string) => {
-        marcos.push(marco)
-        return { marco, commitado: true, mensagem: 'ok', commitHash: 'c0ffee' }
-      }
-    } as never,
-    decisions,
     pacotes,
     anexos: {
-      // As jornadas chegam pelo mesmo caminho da M8-F05: a validação dos protótipos.
-      validar: () =>
-        Promise.resolve(
-          jornadas.map((j) => ({ prototipo: 'x', jornadasCobertas: [j], achados: [] }))
-        ),
       listar: () => anexosDoProjeto,
       listarArquiteturas: () => arquiteturas
     } as never,
     audit,
     userId: () => USER,
     identidade: () => identidadeAtual,
-    catalogo: CATALOGO
+    roadmapGerado: () => gerado
   })
+
   vi.clearAllMocks()
 })
 
@@ -183,173 +224,102 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true })
 })
 
-describe('gerar o roadmap', () => {
-  it('escreve STATUS, histórico e a SPEC da próxima fatia', async () => {
-    decidirEscopo()
-
-    const r = await service.gerar(PROJETO, WS)
-
-    expect(r.reason).toBe('gerado')
-    expect(existsSync(join(raiz, 'docs/STATUS.md'))).toBe(true)
-    expect(existsSync(join(raiz, 'docs/STATUS-ARQUIVO.md'))).toBe(true)
-    expect(existsSync(join(raiz, r.proxima?.specSlug ?? ''))).toBe(true)
+describe('revisoesDoGate — o que cada gate cobre', () => {
+  beforeEach(() => {
+    gravarPrd()
+    gravarProjecao()
   })
 
-  it('o STATUS traz o índice Fatia ↔ SPEC de todas as fatias (invariante 1)', async () => {
-    decidirEscopo()
+  it('PROJECT_PACKAGE lista o PRD, a arquitetura e os anexos', () => {
+    const revisoes = service.revisoesDoGate(PROJETO, 'PROJECT_PACKAGE', WS)
+    const artefatos = revisoes.map((r) => r.artefato)
 
-    const r = await service.gerar(PROJETO, WS)
-    const status = readFileSync(join(raiz, 'docs/STATUS.md'), 'utf8')
-
-    expect(status).toContain('Índice Fatia ↔ SPEC')
-    for (const slice of r.roadmap?.slices ?? []) {
-      expect(status).toContain(slice.specSlug)
-    }
+    expect(artefatos).toContain('docs/PRD.md')
+    expect(artefatos).toContain('docs/ARCHITECTURE.md')
+    expect(artefatos).toContain('docs/prototipos/home.html')
   })
 
-  /** § Saídas literal: SPEC executável **somente** da próxima fatia. */
-  it('detalha uma fatia só, mesmo com várias no roadmap', async () => {
-    decidirEscopo()
-
-    const r = await service.gerar(PROJETO, WS)
-
-    expect((r.roadmap?.slices.length ?? 0) > 1).toBe(true)
-    expect(r.roadmap?.slices.filter((s) => s.detalhada)).toHaveLength(1)
+  it('MVP_ENTRY sem escolha não tem o que aprovar', () => {
+    expect(service.revisoesDoGate(PROJETO, 'MVP_ENTRY', WS)).toEqual([])
   })
 
-  /**
-   * O critério 3: gerar propõe, nunca promove. Se a geração pusesse um MVP na fila, ela estaria
-   * aprovando o que ela mesma propôs.
-   */
-  it('os MVPs nascem propostos, e gerar não cria aprovação nenhuma', async () => {
-    decidirEscopo()
+  it('MVP_ENTRY cobre só o MVP escolhido, não a lista inteira', () => {
+    gerado = revisao({ mvpEscolhido: 'mvp-1' })
 
-    await service.gerar(PROJETO, WS)
+    const revisoes = service.revisoesDoGate(PROJETO, 'MVP_ENTRY', WS)
 
-    expect(service.carregar(PROJETO, WS).mvps.every((m) => m.estado === 'proposto')).toBe(true)
-    expect(aprovacoesNoBanco()).toBe(0)
+    expect(revisoes).toHaveLength(1)
+    expect(revisoes[0]?.artefato).toBe('mvp-1')
   })
 
-  it('conclui o marco roadmap-aprovado', async () => {
-    decidirEscopo()
+  it('mudar a tese do MVP escolhido muda o hash do gate', () => {
+    gerado = revisao({ mvpEscolhido: 'mvp-1' })
+    const antes = service.revisoesDoGate(PROJETO, 'MVP_ENTRY', WS)[0]?.hash
 
-    await service.gerar(PROJETO, WS)
-
-    expect(marcos).toEqual(['roadmap-aprovado'])
-  })
-
-  it('sem decisão de escopo, recusa sem escrever nada', async () => {
-    const r = await service.gerar(PROJETO, WS)
-
-    expect(r.reason).toBe('sem-base')
-    expect(r.mensagem).toContain('escopo')
-    expect(existsSync(join(raiz, 'docs/STATUS.md'))).toBe(false)
-    expect(mvpsNoBanco()).toBe(0)
-  })
-
-  it('sem jornada prototipada, recusa sem escrever nada', async () => {
-    decidirEscopo()
-    jornadas = []
-
-    const r = await service.gerar(PROJETO, WS)
-
-    expect(r.reason).toBe('sem-base')
-    expect(r.mensagem).toContain('protótipos')
-    expect(existsSync(join(raiz, 'docs/STATUS.md'))).toBe(false)
-  })
-
-  it('regerar preserva o estado de um MVP já promovido (critério 3)', async () => {
-    decidirEscopo()
-    await service.gerar(PROJETO, WS)
-    service.aprovar(PROJETO, 'MVP_ENTRY', WS)
-
-    const promovidoAntes = service.carregar(PROJETO, WS).mvps.find((m) => m.estado === 'na-fila')
-    expect(promovidoAntes).toBeDefined()
-
-    await service.gerar(PROJETO, WS)
-
-    // Apagar a promoção ao regerar faria o roadmap desfazer uma aprovação.
-    expect(service.carregar(PROJETO, WS).mvps.some((m) => m.estado === 'na-fila')).toBe(true)
-  })
-
-  /**
-   * O critério 1 no caminho que decide: DAG inválido recusa **antes de tocar o disco**.
-   *
-   * O compositor de produção nunca gera ciclo (só produz `[]` ou `['mvp-fundacao']`), então a
-   * guarda seria inalcançável sem esta costura. Ela não é código morto: protege contra o
-   * compositor mudar e contra roadmap corrompido vindo do banco — o que faltava era só o
-   * caminho para provocá-la.
-   */
-  it('DAG com ciclo recusa sem escrever arquivo nem gravar linha (critério 1)', async () => {
-    decidirEscopo()
-    const ciclico = new RoadmapService({
-      repository,
-      projects,
-      projectService: { concluirMarco: () => undefined } as never,
-      decisions,
-      pacotes,
-      anexos: {
-        validar: () => Promise.resolve([{ prototipo: 'x', jornadasCobertas: ['A'], achados: [] }]),
-        listar: () => [],
-        listarArquiteturas: () => []
-      } as never,
-      audit,
-      userId: () => USER,
-      identidade: () => 'pi@exemplo',
-      catalogo: CATALOGO,
-      compor: () => ({
-        mvps: [
-          {
-            id: 'a',
-            numero: 1,
-            titulo: 'A',
-            tese: 't',
-            estado: 'proposto',
-            dependeDe: ['b'],
-            origem: { tipo: 'decisao', decisaoId: 'd', perguntaId: 'escopo' }
-          },
-          {
-            id: 'b',
-            numero: 2,
-            titulo: 'B',
-            tese: 't',
-            estado: 'proposto',
-            dependeDe: ['a'],
-            origem: { tipo: 'decisao', decisaoId: 'd', perguntaId: 'escopo' }
-          }
-        ],
-        slices: []
-      })
+    gerado = revisao({
+      mvpEscolhido: 'mvp-1',
+      mvps: [mvp({ tese: 'Outra coisa.' }), ...revisao().mvps.slice(1)]
     })
 
-    const r = await ciclico.gerar(PROJETO, WS)
-
-    expect(r.reason).toBe('dag-invalido')
-    // A recusa nomeia o problema: "há um ciclo" não é acionável.
-    expect(r.problemas?.[0]?.mensagem).toContain('Ciclo')
-    // E acontece antes do disco e do banco.
-    expect(existsSync(join(raiz, 'docs/STATUS.md'))).toBe(false)
-    expect(mvpsNoBanco()).toBe(0)
+    expect(service.revisoesDoGate(PROJETO, 'MVP_ENTRY', WS)[0]?.hash).not.toBe(antes)
   })
 
-  it('a fundação ampla produz um DAG em que tudo depende da fundação', async () => {
-    decidirEscopo('fundacao-ampla')
+  it('SLICE_ENTRY sem SPEC não tem o que aprovar', () => {
+    gerado = revisao({ mvpEscolhido: 'mvp-1' })
 
-    const r = await service.gerar(PROJETO, WS)
-    const fundacao = r.roadmap?.mvps.find((m) => m.titulo === 'Fundação')
+    expect(service.revisoesDoGate(PROJETO, 'SLICE_ENTRY', WS)).toEqual([])
+  })
 
-    expect(fundacao).toBeDefined()
-    expect(
-      r.roadmap?.mvps.filter((m) => m.id !== fundacao?.id).every((m) => m.dependeDe.length > 0)
-    ).toBe(true)
+  /** Critério 4 na forma que o gate mede: pergunta aberta ⇒ gate sem objeto. */
+  it('SLICE_ENTRY com pergunta aberta não tem o que aprovar', () => {
+    gerado = revisao({ mvpEscolhido: 'mvp-1', spec: spec() })
+    gravarProjecao()
+
+    expect(service.revisoesDoGate(PROJETO, 'SLICE_ENTRY', WS)).toEqual([])
+  })
+
+  it('SLICE_ENTRY com todas as perguntas respondidas cobre a SPEC', () => {
+    gerado = revisao({
+      mvpEscolhido: 'mvp-1',
+      spec: spec({ perguntas: [{ ...spec().perguntas[0]!, resposta: 'a' }] })
+    })
+    gravarProjecao()
+
+    const revisoes = service.revisoesDoGate(PROJETO, 'SLICE_ENTRY', WS)
+
+    expect(revisoes).toHaveLength(1)
+    expect(revisoes[0]?.artefato).toContain('docs/spec/')
+  })
+
+  /** Responder **é** mudança da SPEC: um hash cego às respostas aprovaria outro documento. */
+  it('a resposta escolhida entra no hash do SLICE_ENTRY', () => {
+    gerado = revisao({
+      mvpEscolhido: 'mvp-1',
+      spec: spec({ perguntas: [{ ...spec().perguntas[0]!, resposta: 'a' }] })
+    })
+    gravarProjecao()
+    const comA = service.revisoesDoGate(PROJETO, 'SLICE_ENTRY', WS)[0]?.hash
+
+    gerado = revisao({
+      mvpEscolhido: 'mvp-1',
+      spec: spec({ perguntas: [{ ...spec().perguntas[0]!, resposta: 'b' }] })
+    })
+
+    expect(service.revisoesDoGate(PROJETO, 'SLICE_ENTRY', WS)[0]?.hash).not.toBe(comA)
+  })
+
+  it('sem roadmap gerado, os dois gates ficam sem objeto', () => {
+    gerado = undefined
+
+    expect(service.revisoesDoGate(PROJETO, 'MVP_ENTRY', WS)).toEqual([])
+    expect(service.revisoesDoGate(PROJETO, 'SLICE_ENTRY', WS)).toEqual([])
   })
 })
 
-describe('aprovar um gate', () => {
-  beforeEach(async () => {
-    decidirEscopo()
+describe('aprovar — o aceite do PI', () => {
+  beforeEach(() => {
     gravarPrd()
-    await service.gerar(PROJETO, WS)
+    gravarProjecao()
   })
 
   it('registra a aprovação com as revisões exatas e a identidade (critério 4)', () => {
@@ -359,10 +329,7 @@ describe('aprovar um gate', () => {
     expect(r.approval?.identidade).toBe('pi@exemplo')
     expect(r.approval?.autor).toBe('pi')
     expect(r.approval?.revisoes.every((rev) => rev.hash.length === 64)).toBe(true)
-    // O PRD, a arquitetura e os anexos — o gate os lista literalmente.
     expect(r.approval?.revisoes.map((rev) => rev.artefato)).toContain('docs/PRD.md')
-    expect(r.approval?.revisoes.map((rev) => rev.artefato)).toContain('docs/ARCHITECTURE.md')
-    expect(r.approval?.revisoes.map((rev) => rev.artefato)).toContain('docs/prototipos/home.html')
   })
 
   /** Critério 5, medido no caminho que decide: o serviço, não a função pura. */
@@ -373,7 +340,6 @@ describe('aprovar um gate', () => {
     expect(primeira.reason).toBe('aprovado')
     expect(segunda.reason).toBe('ja-aprovado')
     expect(segunda.vigente?.id).toBe(primeira.approval?.id)
-    // E não gravou uma segunda linha.
     expect(aprovacoesNoBanco()).toBe(1)
   })
 
@@ -406,18 +372,46 @@ describe('aprovar um gate', () => {
     expect(service.aprovar(PROJETO, 'PROJECT_PACKAGE', WS).reason).toBe('sem-identidade')
   })
 
-  it('gate sem objeto recusa em vez de aprovar o vazio', () => {
-    // SLICE_ENTRY sem fatia detalhada não teria o que aprovar; aqui há uma, então usamos um
-    // projeto sem roadmap para o caso vazio.
-    const r = service.aprovar('projeto-inexistente', 'PROJECT_PACKAGE', WS)
-    expect(r.reason).toBe('projeto-inexistente')
+  it('projeto inexistente recusa', () => {
+    expect(service.aprovar('projeto-inexistente', 'PROJECT_PACKAGE', WS).reason).toBe(
+      'projeto-inexistente'
+    )
   })
 
-  it('MVP_ENTRY promove o primeiro MVP da ordem — e só ele (critério 3)', () => {
+  /** Critério 4 da SPEC-Jornada-05: pergunta sem resposta ⇒ aceite recusado. */
+  it('SLICE_ENTRY com pergunta aberta recusa por falta de objeto', () => {
+    gerado = revisao({ mvpEscolhido: 'mvp-1', spec: spec() })
+    gravarProjecao()
+
+    const r = service.aprovar(PROJETO, 'SLICE_ENTRY', WS)
+
+    expect(r.reason).toBe('sem-revisoes')
+    expect(aprovacoesNoBanco()).toBe(0)
+  })
+
+  it('SLICE_ENTRY com a pergunta respondida aprova', () => {
+    gerado = revisao({
+      mvpEscolhido: 'mvp-1',
+      spec: spec({ perguntas: [{ ...spec().perguntas[0]!, resposta: 'a' }] })
+    })
+    gravarProjecao()
+
+    expect(service.aprovar(PROJETO, 'SLICE_ENTRY', WS).reason).toBe('aprovado')
+  })
+
+  /**
+   * A promoção segue a **escolha do PI**, e não a ordem topológica: é a pergunta 1 da spec,
+   * resolvida em 2026-09-03. Aqui o escolhido é o segundo da ordem, e é ele que entra na fila.
+   */
+  it('MVP_ENTRY promove o MVP escolhido, não o primeiro da ordem', () => {
+    gerado = revisao({ mvpEscolhido: 'mvp-2' })
+
     service.aprovar(PROJETO, 'MVP_ENTRY', WS)
 
     const naFila = service.carregar(PROJETO, WS).mvps.filter((m) => m.estado === 'na-fila')
+
     expect(naFila).toHaveLength(1)
+    expect(naFila[0]?.id).toBe('mvp-2')
   })
 
   it('PROJECT_PACKAGE não promove MVP nenhum', () => {
@@ -431,6 +425,7 @@ describe('aprovar um gate', () => {
 
     const evento = audit.list(USER).find((e) => e.type === 'approval')
     const payload = JSON.stringify(evento?.payload ?? {})
+
     expect(payload).toContain('PROJECT_PACKAGE')
     expect(payload).toContain('pi@exemplo')
     // Nunca o conteúdo aprovado (ADR-004).
@@ -444,11 +439,10 @@ describe('aprovar um gate', () => {
   })
 })
 
-describe('simularMudanca — critério 6', () => {
-  beforeEach(async () => {
-    decidirEscopo()
+describe('simularMudanca — o custo antes da mudança', () => {
+  beforeEach(() => {
     gravarPrd()
-    await service.gerar(PROJETO, WS)
+    gravarProjecao()
     service.aprovar(PROJETO, 'PROJECT_PACKAGE', WS)
   })
 
@@ -472,5 +466,19 @@ describe('simularMudanca — critério 6', () => {
     )
 
     expect(invalidados).toEqual([])
+  })
+})
+
+describe('aprovacoes — a leitura', () => {
+  it('lista as aprovações do projeto, da mais recente à mais antiga', () => {
+    gravarPrd()
+    gravarProjecao()
+    service.aprovar(PROJETO, 'PROJECT_PACKAGE', WS)
+
+    expect(service.aprovacoes(PROJETO, WS)).toHaveLength(1)
+  })
+
+  it('projeto sem aprovação devolve lista vazia', () => {
+    expect(service.aprovacoes(PROJETO, WS)).toEqual([])
   })
 })

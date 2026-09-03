@@ -365,7 +365,16 @@ export const AUDIT_EVENT_TYPES = [
   // Tipo próprio pela mesma razão que separou `prd-generation` de `brief-generation`, e mais
   // uma: esta geração é a única com um gate **anterior** a ela (os anexos da M8-F05), e a
   // pergunta "a arquitetura saiu, e sobre quais protótipos?" precisa de uma consulta própria.
-  'arquitetura-generation'
+  'arquitetura-generation',
+  // SPEC-Jornada-05: a geração do roadmap, do documento do MVP e da SPEC da primeira fatia —
+  // início, saída recusada pelo validador de DAG e de origem, bloqueio por falta de rota, a
+  // escolha do MVP no `MVP_ENTRY` e o desfecho.
+  //
+  // Tipo próprio, e **não** `roadmap`: aquele registra o roadmap composto da M8-F06, e continua
+  // registrando o que o `RoadmapService` faz com os gates. A pergunta que este responde é a da
+  // geração — *quantas vezes o modelo foi recusado pelo validador de DAG antes de acertar?* —,
+  // e sob o tipo antigo ela exigiria filtrar por um campo de payload.
+  'roadmap-generation'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]

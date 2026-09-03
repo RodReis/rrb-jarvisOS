@@ -111,6 +111,7 @@ describe('migrations', () => {
     antigo.exec('DROP TABLE pergunta_gerada')
     antigo.exec('DROP TABLE project_prd')
     antigo.exec('DROP TABLE project_architecture')
+    antigo.exec('DROP TABLE project_roadmap')
     antigo.pragma('user_version = 1')
     antigo.close()
 

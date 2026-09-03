@@ -68,7 +68,8 @@ import type { AlvoDaPublicacao, PublicacaoOutcome } from '../domain/publicacao'
 import type { ExecutionLedger } from '../domain/execution-ledger'
 import type { PendenciaDeLimpeza } from '../domain/limpeza'
 import type { MergePolicyOutcome, PoliticaDeMerge, VistaDaFila } from '../domain/pipeline'
-import type { Roadmap, RoadmapOutcome } from '../domain/roadmap'
+import type { Roadmap } from '../domain/roadmap'
+import type { MvpGerado, RoadmapGeradoOutcome, RoadmapRegistrado } from '../domain/roadmap-gerado'
 import type { EstadoDaJornada, TransicaoOutcome } from '../domain/jornada'
 import type { BriefRegistrado, GeracaoOutcome, PromptDoProjeto } from '../domain/brief'
 import type { PrdOutcome, PrdRegistrado } from '../domain/prd'
@@ -361,8 +362,25 @@ export const IPC_CHANNELS = {
    * que voltou; a identidade de quem aprova vem da sessão no main, nunca do renderer — que
    * poderia mandar qualquer uma.
    */
-  roadmapGerar: 'roadmap:gerar',
   roadmapCarregar: 'roadmap:carregar',
+  /**
+   * O roadmap gerado por IA (SPEC-Jornada-05).
+   *
+   * **Quatro canais, e a separação entre eles é a fatia.** `gerar-por-ia` propõe os MVPs;
+   * `escolher-mvp` registra a escolha do PI no `MVP_ENTRY` e produz a SPEC da primeira fatia;
+   * `responder-pergunta` recolhe as decisões que a SPEC deixou abertas; `carregar-gerado` lê. Um
+   * canal só faria a geração escolher o que ela mesma propôs — exatamente o que os critérios 3
+   * e 4 impedem.
+   *
+   * **Nenhum canal recebe conteúdo de roadmap, de MVP ou de SPEC.** O renderer manda o *ato* e o
+   * *id*; quem produz e valida é o main. Um canal que aceitasse os MVPs prontos seria o caminho
+   * por onde um MVP sem origem entraria.
+   */
+  roadmapGerarPorIa: 'roadmap:gerar-por-ia',
+  roadmapCarregarGerado: 'roadmap:carregar-gerado',
+  roadmapEscolherMvp: 'roadmap:escolher-mvp',
+  roadmapResponderPergunta: 'roadmap:responder-pergunta',
+  roadmapElegiveis: 'roadmap:elegiveis',
   aprovacaoListar: 'aprovacao:listar',
   aprovacaoRevisoes: 'aprovacao:revisoes',
   aprovacaoAprovar: 'aprovacao:aprovar',
@@ -952,15 +970,53 @@ export interface JarvisBridge {
    * `anexarDesign`, que copia, hasheia e audita. Fundir os dois faria "abriu e desistiu" ficar
    * indistinguível de "anexou".
    */
-  /**
-   * Gera o roadmap: compõe, valida o DAG e escreve STATUS, histórico e a SPEC da próxima fatia.
-   *
-   * Devolve `RoadmapOutcome` **inclusive nas recusas**: "o DAG tem ciclo" é desfecho que o PI lê
-   * com o problema nomeado, não falha técnica.
-   */
-  gerarRoadmap(projectId: string, workspace: WorkspaceId): Promise<RoadmapOutcome>
-  /** O roadmap gravado do projeto. */
+  /** O roadmap gravado do projeto — a projeção que o `STATUS.md` e os gates leem. */
   carregarRoadmap(projectId: string, workspace: WorkspaceId): Promise<Roadmap>
+  /**
+   * Gera o roadmap por IA: propõe os MVPs, valida o DAG e escreve STATUS, histórico e os
+   * documentos dos MVPs (SPEC-Jornada-05).
+   *
+   * Devolve o desfecho **inclusive nas recusas**: "falta o PRD ou a arquitetura", "nenhuma rota
+   * autorizada" e "o roadmap proposto não passou no validador" são desfechos que o PI lê com o
+   * que fazer a respeito, não erros técnicos.
+   */
+  gerarRoadmapPorIa(projectId: string, workspace: WorkspaceId): Promise<RoadmapGeradoOutcome>
+  /** A revisão vigente do roadmap gerado, ou `null` enquanto nenhuma foi gerada. */
+  carregarRoadmapGerado(
+    projectId: string,
+    workspace: WorkspaceId
+  ): Promise<RoadmapRegistrado | null>
+  /**
+   * Os MVPs que o PI pode escolher no `MVP_ENTRY` — só os sem dependência pendente (critério 3).
+   *
+   * Existe como leitura própria porque a tela precisa dela **antes** do gate: oferecer a lista
+   * inteira e recusar depois faria o PI escolher um MVP bloqueado para descobrir que não podia.
+   */
+  mvpsElegiveis(projectId: string, workspace: WorkspaceId): Promise<readonly MvpGerado[]>
+  /**
+   * Registra qual MVP entra na fila e gera a SPEC da primeira fatia dele (critérios 3 e 5).
+   *
+   * **Escolher não é aprovar.** Este canal grava a escolha e produz o objeto que o gate vai
+   * aprovar; o `Approval` continua vindo de `aprovacao:aprovar`, e fundir os dois faria a
+   * escolha aprovar a si mesma.
+   */
+  escolherMvpDoRoadmap(
+    projectId: string,
+    mvpId: string,
+    workspace: WorkspaceId
+  ): Promise<RoadmapGeradoOutcome>
+  /**
+   * Responde uma pergunta aberta da SPEC gerada (critério 4).
+   *
+   * **Não recebe a pergunta, só o id dela e a resposta.** O enunciado vive na revisão desde que
+   * foi gerado; aceitá-lo de volta deixaria o renderer reescrever o que o modelo perguntou.
+   */
+  responderPerguntaDaSpec(
+    projectId: string,
+    perguntaId: string,
+    resposta: string,
+    workspace: WorkspaceId
+  ): Promise<RoadmapGeradoOutcome>
   /**
    * O estado da jornada do projeto: etapa atual, CTA único e a trilha (SPEC-Jornada-01).
    *
