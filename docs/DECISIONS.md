@@ -141,3 +141,14 @@ M16-F05/F06 e as oito SPECs dos MVPs 023/024 são detalhamento novo em rascunho-
 ## Aceite das dez SPECs finais da Pipeline V3 (PI, 2026-08-31)
 
 O PI aprovou explicitamente M16-F05/F06 (#167/#168), M23-F01–F04 (#214–#217) e M24-F01–F04 (#218–#221), exatamente como publicadas na revisão `6a6e702a4d6ced5820d3f4c7674d6278f0b2d391` pelo PR #189. As dez SPECs passam de `rascunho-completo` para `aprovada-pi` e suas issues de `proplan:planejado` para `proplan:backlog`. O aceite não altera `next`, não inicia construção, não fecha issue e não substitui os gates de dependência/fila. M16-F06, M23-F04 e M24-F04 ainda exigem `DESIGN-SYSTEM.md` e protótipos HTML formais aprovados antes da construção visual. Mudança técnica posterior não herda este aceite automaticamente.
+
+## Emenda ao design da pipeline: jornada de planejamento por IA (PI, 2026-09-03)
+
+O PI testou o fluxo entregue pelo MVP-008 e constatou que ele não corresponde ao design de 2026-08-28: não há prompt, não há geração por IA (documentos compostos das respostas) e a tela acumula as fatias sem etapa atual. A causa está registrada em `docs/mvp/mvp-025-jornada-planejamento-ia.md`. Decisões:
+
+1. **Decisão 2 do design de 2026-08-28 é emendada:** em vez de um aceite único do pacote PRD+arquitetura, há três — `BRIEF_ACCEPTED`, `PRD_ACCEPTED` e `PROJECT_PACKAGE` (arquitetura + anexos). Não é aceite duplo (decisão 11): são revisões distintas de artefatos distintos; a mesma revisão continua não voltando ao PI.
+2. **§8 do design ganha etapas:** o passo 3 ("Wizard A refina o prompt") vira *Prompt → Refinamento por IA → aceite do brief*; o passo 4 ("gera o PRD preliminar") ganha aceite próprio antes dos anexos. Os passos 5–10 ficam como estão.
+3. **"Compor em vez de gerar" (M8-F04, decisão do Code aceita no fechamento do MVP-008) é revertido** para todos os documentos do planejamento. A garantia estrutural que ele dava (nenhuma afirmação sem origem) é preservada por saída estruturada com origem por afirmação, validador de saída (inclusive invariante 9 da CONVENTION) e `proposto` marcado e cortado item a item pelo PI.
+4. **Rota de assinatura (Claude MAX via Claude Code CLI) é a rota da geração do planejamento** — decisão 4 do MVP-008 levada à consequência: sem valor monetário no ledger, e rota paga nunca como fallback.
+5. **Fila:** MVP-025 entra logo após o MVP-009, antes do MVP-022 e do Command Center — altera a ordem registrada em 2026-08-30 para esses dois.
+6. O aceite do MVP-008 **não é reaberto**: suas fatias permanecem válidas como infraestrutura (Git local, `Decision`, anexos por ato, gates por hash). O que muda entra por fatias novas com SPEC própria, nunca por emenda a spec finalizada (regra consolidada em 2026-08-30).
