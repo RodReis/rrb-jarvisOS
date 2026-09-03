@@ -123,7 +123,11 @@ export interface AjusteProposto {
  * O que a análise de coerência sabe apontar. Enum fechado: a tela agrupa por tipo, e um tipo
  * novo quebra a compilação em vez de cair num rótulo genérico.
  */
-export const TIPOS_DE_AJUSTE = ['tela-sem-requisito', 'requisito-sem-tela', 'estado-ausente'] as const
+export const TIPOS_DE_AJUSTE = [
+  'tela-sem-requisito',
+  'requisito-sem-tela',
+  'estado-ausente'
+] as const
 
 export type TipoDeAjuste = (typeof TIPOS_DE_AJUSTE)[number]
 
@@ -236,14 +240,13 @@ export interface ContextoDaValidacaoDaArquitetura {
 }
 
 export function isDocumentoDaArquitetura(valor: unknown): valor is DocumentoDaArquitetura {
-  return typeof valor === 'string' && (DOCUMENTOS_DA_ARQUITETURA as readonly string[]).includes(valor)
+  return (
+    typeof valor === 'string' && (DOCUMENTOS_DA_ARQUITETURA as readonly string[]).includes(valor)
+  )
 }
 
 /** A seção promete fluxo, e por isso exige âncora em protótipo? */
-export function exigeAncoraEmPrototipo(
-  documento: DocumentoDaArquitetura,
-  secao: string
-): boolean {
+export function exigeAncoraEmPrototipo(documento: DocumentoDaArquitetura, secao: string): boolean {
   return (SECOES_DE_FLUXO[documento] ?? []).includes(secao)
 }
 

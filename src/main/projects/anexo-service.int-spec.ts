@@ -36,7 +36,6 @@ const { AnexoService } = await import('./anexo-service')
 const USER = 'u-1'
 const PROJETO = 'p-1'
 
-
 let dir: string
 let raiz: string
 let externo: string
@@ -67,12 +66,9 @@ function arquivoExterno(nome: string, conteudo = 'conteúdo'): string {
   return caminho
 }
 
-
-
 function anexosNoBanco(): number {
   return (db.prepare('SELECT COUNT(*) AS n FROM design_attachment').get() as { n: number }).n
 }
-
 
 /** Anexa design system + um protótipo: o mínimo que abre o gate. */
 function anexarOMinimo(htmlDoPrototipo = '<h1>Início</h1>'): void {

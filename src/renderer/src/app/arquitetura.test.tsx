@@ -176,9 +176,7 @@ describe('os propostos, por documento (§ Gate)', () => {
   })
 
   it('lista os propostos do documento em bloco próprio', async () => {
-    carregarArquitetura.mockResolvedValue(
-      arquitetura({ afirmacoes: [doPrototipo(), PROPOSTO] })
-    )
+    carregarArquitetura.mockResolvedValue(arquitetura({ afirmacoes: [doPrototipo(), PROPOSTO] }))
     montar()
 
     expect(await screen.findByText(/1 afirmações propostas pela IA/i)).toBeInTheDocument()
@@ -186,9 +184,7 @@ describe('os propostos, por documento (§ Gate)', () => {
 
   it('só o proposto tem botão de cortar, e o corte manda o id', async () => {
     const user = userEvent.setup()
-    carregarArquitetura.mockResolvedValue(
-      arquitetura({ afirmacoes: [doPrototipo(), PROPOSTO] })
-    )
+    carregarArquitetura.mockResolvedValue(arquitetura({ afirmacoes: [doPrototipo(), PROPOSTO] }))
     montar()
 
     const cortar = await screen.findAllByRole('button', { name: /cortar a afirmação/i })

@@ -72,10 +72,7 @@ import type { Roadmap, RoadmapOutcome } from '../domain/roadmap'
 import type { EstadoDaJornada, TransicaoOutcome } from '../domain/jornada'
 import type { BriefRegistrado, GeracaoOutcome, PromptDoProjeto } from '../domain/brief'
 import type { PrdOutcome, PrdRegistrado } from '../domain/prd'
-import type {
-  ArquiteturaGeradaOutcome,
-  ArquiteturaRegistrada
-} from '../domain/arquitetura-gerada'
+import type { ArquiteturaGeradaOutcome, ArquiteturaRegistrada } from '../domain/arquitetura-gerada'
 import type { ResultadoDaRota } from '../domain/rota-de-geracao'
 import type {
   Approval,

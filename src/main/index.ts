@@ -424,11 +424,16 @@ if (!app.requestSingleInstanceLock()) {
       connectorCredits
     )
 
+    // Compartilhado com o `PrdService` e com o `ArquiteturaService`: os três leem e escrevem a
+    // mesma tabela `pacote_estrutural`, que é onde a revisão do PRD que a arquitetura assume
+    // (`pacoteEstruturalId`) mora desde a M8-F05.
+    const pacoteRepository = new PacoteRepository(storage.db)
+
     // O pacote estrutural (SPEC-Planejamento-04). Recebe o `ConnectorService`, e **não** o
     // `TavilyAdapter`: o gate de créditos vive dentro do `call()`, e um adapter injetado aqui
     // seria o segundo caminho sem gate que o serviço de conectores existe para impedir.
     const pacotes = new PacoteService({
-      repository: new PacoteRepository(storage.db),
+      repository: pacoteRepository,
       projects: projectRepository,
       projectService: projects,
       decisions: new DecisionRepository(storage.db),
@@ -467,7 +472,7 @@ if (!app.requestSingleInstanceLock()) {
       projects: projectRepository,
       projectService: projects,
       decisions: new DecisionRepository(storage.db),
-      pacotes: new PacoteRepository(storage.db),
+      pacotes: pacoteRepository,
       anexos,
       audit: storage.audit,
       userId: userIdAtual,
@@ -665,7 +670,7 @@ if (!app.requestSingleInstanceLock()) {
      */
     const prd = new PrdService({
       repository: new PrdRepository(storage.db),
-      pacotes: new PacoteRepository(storage.db),
+      pacotes: pacoteRepository,
       projects: projectRepository,
       projectService: projects,
       connectors,
@@ -774,7 +779,7 @@ if (!app.requestSingleInstanceLock()) {
        * então a revisão mais recente ali corresponde à que `prdVigente` devolve.
        */
       pacoteEstruturalId: (projectId) =>
-        new PacoteRepository(storage.db).listarPacotes(userIdAtual(), projectId)[0]?.id,
+        pacoteRepository.listarPacotes(userIdAtual(), projectId)[0]?.id,
       validarPrototipos: (projectId) => anexos.validar(projectId),
       decisoesDoRefinamento: (projectId) => refinamento.decisoesParaOBrief(projectId),
       montarContexto: montarContextoDoPrompt,

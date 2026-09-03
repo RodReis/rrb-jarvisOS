@@ -271,9 +271,7 @@ export function AnexosDeDesign({
             </div>
           </div>
 
-          {falhaAoAnexar !== null && (
-            <InlineAlert tom="warn" titulo={falhaAoAnexar} />
-          )}
+          {falhaAoAnexar !== null && <InlineAlert tom="warn" titulo={falhaAoAnexar} />}
 
           {achados.length > 0 && <Achados achados={achados} />}
 

@@ -1,26 +1,25 @@
 /**
- * Os anexos de design e a arquitetura que eles liberam (SPEC-Planejamento-05).
+ * Os anexos de design do PI e a validação dos protótipos (SPEC-Planejamento-05).
  *
- * Duas operações, e a ordem entre elas é a fatia inteira:
+ * Duas operações, e a ordem entre elas é o gate inteiro:
  *
  *   1. **`anexar`** — o ato. Copia o arquivo escolhido para dentro do projeto e hasheia **no
  *      instante**, gerando `AuditEvent`. É isto, e só isto, que faz um arquivo contar para o
  *      gate (critério 7). Não existe varredura de diretório neste serviço, de propósito: um
  *      arquivo largado na pasta por fora não tem instante definido, e o gate precisa ter esse
  *      instante preciso.
- *   2. **`gerarArquitetura`** — o que o gate libera. Recusa enquanto faltar anexo (critério 1),
- *      valida os protótipos, e só então compõe `ARCHITECTURE`, `DECISIONS`, `TESTING` e `REVIEW`.
+ *   2. **`validar`** — carrega cada protótipo no `BrowserWindow` oculto e analisa o que ele
+ *      mostrou. Determinístico e verificável, e é o que o gate mede.
  *
- * **A IA não aparece em lugar nenhum deste arquivo, e isso é a decisão.** A spec diz que *"a IA
- * analisa e propõe ajustes, mas não substitui o anexo"* — a análise que esta fatia entrega é a
- * validação estrutural dos protótipos (parser + render), que é verificável. Uma chamada de
- * modelo aqui produziria texto sem origem no `ARCHITECTURE.md`, que é exatamente o que a M8-F04
- * fechou ao decidir compor em vez de gerar.
+ * **A IA não aparece em lugar nenhum deste arquivo, e isso continua sendo a decisão.** A
+ * SPEC-Jornada-04 moveu a *geração* da arquitetura para o `ArquiteturaService`, que chama o
+ * modelo — mas a validação que aqui vive **não é substituída por ela**: roda antes, e a leitura
+ * semântica do modelo acrescenta ajustes propostos, nunca troca o que este parser e este render
+ * responderam.
  *
- * **O critério 3 é resolvido por ponteiro, não por proximidade temporal.** A arquitetura registra
- * o `pacoteEstruturalId` da revisão do PRD que assume; sem ele, "a mesma revisão" seria "o PRD
- * mais recente", e regerar o PRD faria a arquitetura passar a descrever um documento que ninguém
- * comparou com ela.
+ * **O critério 3 saiu junto com a geração.** O `pacoteEstruturalId` — a revisão do PRD que a
+ * arquitetura assume — é gravado pelo `ArquiteturaService`, que é quem produz o pacote. Aqui
+ * ficaram os anexos, que são o que aquele serviço lê para saber se o gate abriu.
  */
 
 import { createHash, randomUUID } from 'node:crypto'
@@ -265,7 +264,6 @@ export class AnexoService {
   private telasDoPrd(_userId: string, _projectId: string): readonly string[] {
     return []
   }
-
 }
 
 export type { AchadoDoPrototipo }

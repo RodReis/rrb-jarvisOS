@@ -110,10 +110,7 @@ describe('validarArquitetura — origem obrigatória (critério 2)', () => {
   })
 
   it('recusa seção que não existe no documento', () => {
-    const r = validarArquitetura(
-      conteudo([{ ...DO_PRD, secao: 'Considerações finais' }]),
-      CONTEXTO
-    )
+    const r = validarArquitetura(conteudo([{ ...DO_PRD, secao: 'Considerações finais' }]), CONTEXTO)
 
     expect(r.problemas[0]?.recusa).toBe('secao-desconhecida')
   })

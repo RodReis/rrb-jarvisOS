@@ -156,23 +156,23 @@ test('o gate barra sem anexo, e arquivo largado no disco não conta', async () =
         jarvis: {
           getWorkspace: () => Promise<string>
           listarAnexos: (p: string) => Promise<readonly unknown[]>
-          gerarArquitetura: (
+          gerarArquiteturaPorIa: (
             p: string,
             w: string
-          ) => Promise<{ reason: string; pendencias?: readonly string[] }>
+          ) => Promise<{ resultado: string; pendencias?: readonly string[] }>
         }
       }
     ).jarvis
     const workspace = await bridge.getWorkspace()
     return {
       anexos: (await bridge.listarAnexos(id)).length,
-      arquitetura: await bridge.gerarArquitetura(id, workspace)
+      arquitetura: await bridge.gerarArquiteturaPorIa(id, workspace)
     }
   }, projectId)
 
   // O ato não aconteceu: nenhum anexo registrado, e o gate barra nomeando os dois.
   expect(resultado.anexos).toBe(0)
-  expect(resultado.arquitetura.reason).toBe('anexos-pendentes')
+  expect(resultado.arquitetura.resultado).toBe('anexos-pendentes')
   expect(resultado.arquitetura.pendencias).toEqual(['design-system', 'prototipo'])
   // E nada foi escrito.
   expect(existsSync(join(diretorio, 'docs/ARCHITECTURE.md'))).toBe(false)
@@ -211,17 +211,10 @@ test('anexar copia e hasheia, o protótipo é carregado de verdade, e a arquitet
             ) => Promise<
               readonly { jornadasCobertas: readonly string[]; achados: readonly unknown[] }[]
             >
-            gerarArquitetura: (
+            gerarArquiteturaPorIa: (
               p: string,
               w: string
-            ) => Promise<{
-              reason: string
-              pacote?: {
-                commitHash: string | null
-                pacoteEstruturalId: string
-                anexos: readonly { hash: string }[]
-              }
-            }>
+            ) => Promise<{ resultado: string; pendencias?: readonly string[] }>
             gerarPacote: (p: string, c: string, w: string) => Promise<{ reason: string }>
             verifyAuditChain: () => Promise<{ ok: boolean }>
           }
@@ -239,7 +232,9 @@ test('anexar copia e hasheia, o protótipo é carregado de verdade, e a arquitet
       // A validação carrega o protótipo no `BrowserWindow` oculto — Chromium de verdade.
       const validacoes = await bridge.validarPrototipos(id ?? '')
 
-      const arquitetura = await bridge.gerarArquitetura(id ?? '', workspace)
+      // Com o gate aberto, a geração passa dele e chega **na rota** — que neste ambiente não
+      // existe. É o desfecho que se pode provar aqui sem chamar um modelo de verdade.
+      const arquitetura = await bridge.gerarArquiteturaPorIa(id ?? '', workspace)
 
       return {
         prd: prd.reason,
@@ -272,26 +267,27 @@ test('anexar copia e hasheia, o protótipo é carregado de verdade, e a arquitet
   // Protótipo saudável: sem achado que impeça.
   expect(resultado.achados).toBe(0)
 
-  // (3) A arquitetura saiu, com os quatro arquivos no disco.
-  expect(resultado.arquitetura.reason).toBe('gerada')
-  for (const arquivo of ['ARCHITECTURE', 'DECISIONS', 'TESTING', 'REVIEW']) {
-    expect(existsSync(join(diretorio, `docs/${arquivo}.md`))).toBe(true)
+  /*
+   * (3) **O gate abriu.** Desde a SPEC-Jornada-04 a arquitetura é gerada por modelo, e este
+   * ambiente não tem rota autorizada — então o desfecho provável aqui é `bloqueado-sem-rota`, e
+   * **é justamente ele que prova o que interessa**: a geração passou do gate de anexos e do PRD,
+   * e parou na rota. `anexos-pendentes` ou `prd-ausente` aqui significariam que o gate não
+   * reconheceu o que acabou de ser anexado.
+   *
+   * O que a geração faz depois da rota tem prova própria no `arquitetura-service.int-spec.ts`,
+   * com o modelo dublado; o que **só** este nível alcança é o Chromium carregando o protótipo,
+   * medido em (2).
+   */
+  expect(['bloqueado-sem-rota', 'gerada']).toContain(resultado.arquitetura.resultado)
+  expect(resultado.arquitetura.pendencias).toBeUndefined()
+
+  // (4) Nada foi escrito quando a geração não aconteceu — a recusa não deixa arquivo pela metade.
+  if (resultado.arquitetura.resultado === 'bloqueado-sem-rota') {
+    expect(existsSync(join(diretorio, 'docs/ARCHITECTURE.md'))).toBe(false)
   }
 
-  // (4) Cada afirmação carrega a marca de origem **no arquivo**, não em memória.
-  expect(readFileSync(join(diretorio, 'docs/ARCHITECTURE.md'), 'utf8')).toContain('<!-- origem:')
-  // O fluxo prometido é o que o protótipo mostrou (critério 4).
-  expect(readFileSync(join(diretorio, 'docs/ARCHITECTURE.md'), 'utf8')).toContain('Início')
-
-  // (5) O critério 3 é um ponteiro, e ele aponta para a revisão real do PRD.
-  expect(resultado.arquitetura.pacote?.pacoteEstruturalId).toBeTruthy()
-  // O critério 6: os hashes dos anexos vão no pacote.
-  expect(resultado.arquitetura.pacote?.anexos.every((a) => a.hash.length === 64)).toBe(true)
-
-  // (6) O marco virou commit.
-  expect(resultado.arquitetura.pacote?.commitHash).toBeTruthy()
-
-  // (7) A cadeia de auditoria continua íntegra.
+  // (5) A cadeia de auditoria continua íntegra — inclusive com o evento do bloqueio, que é
+  // registrado **antes** de qualquer chamada.
   expect(resultado.auditoria.ok).toBe(true)
 })
 
@@ -322,11 +318,11 @@ test('protótipo que abre em branco é detectado e impede a arquitetura', async 
             getWorkspace: () => Promise<string>
             anexarDesign: (p: string, t: string, o: string, w: string) => Promise<unknown>
             gerarPacote: (p: string, c: string, w: string) => Promise<{ reason: string }>
-            gerarArquitetura: (
+            gerarArquiteturaPorIa: (
               p: string,
               w: string
             ) => Promise<{
-              reason: string
+              resultado: string
               achados?: readonly { pergunta: string; recomendacao: string; evidencia: string }[]
             }>
           }
@@ -336,14 +332,14 @@ test('protótipo que abre em branco é detectado e impede a arquitetura', async 
       await bridge.gerarPacote(id ?? '', '', workspace)
       await bridge.anexarDesign(id ?? '', 'design-system', ds ?? '', workspace)
       await bridge.anexarDesign(id ?? '', 'prototipo', proto ?? '', workspace)
-      return await bridge.gerarArquitetura(id ?? '', workspace)
+      return await bridge.gerarArquiteturaPorIa(id ?? '', workspace)
     },
     [projectId, origemDs, origemProto]
   )
 
   // O gate de anexos abriu (os dois estão lá), e mesmo assim a arquitetura não sai: o protótipo
   // não delimita fluxo nenhum, e prosseguir escreveria o que ninguém viu.
-  expect(resultado.reason).toBe('prototipos-invalidos')
+  expect(resultado.resultado).toBe('prototipos-invalidos')
   expect(resultado.achados?.length ?? 0).toBeGreaterThan(0)
   // O achado é pergunta + recomendação, como a spec pede.
   expect(resultado.achados?.[0]?.pergunta).toContain('?')

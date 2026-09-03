@@ -97,7 +97,9 @@ export const SISTEMA_DA_ARQUITETURA = [
 function documentosESecoes(): readonly string[] {
   return [
     'Seções válidas por documento:',
-    ...Object.entries(SECOES_DA_ARQUITETURA).map(([doc, secoes]) => `- ${doc}: ${secoes.join(', ')}.`),
+    ...Object.entries(SECOES_DA_ARQUITETURA).map(
+      ([doc, secoes]) => `- ${doc}: ${secoes.join(', ')}.`
+    ),
     '',
     'Origens admitidas por documento:',
     ...Object.entries(ORIGENS_POR_DOCUMENTO_DA_ARQUITETURA).map(
@@ -163,7 +165,9 @@ export function promptDaArquitetura(entrada: {
     )
   } else {
     partes.push(
-      ...entrada.jornadas.map((j) => `- jornada: "${j.jornada}" | anexo: ${j.anexo} | hash: ${j.hash}`)
+      ...entrada.jornadas.map(
+        (j) => `- jornada: "${j.jornada}" | anexo: ${j.anexo} | hash: ${j.hash}`
+      )
     )
   }
 

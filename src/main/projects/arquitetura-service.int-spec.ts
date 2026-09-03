@@ -170,7 +170,9 @@ beforeEach(() => {
   })
 
   // O gate aberto: design system e protótipo, como a M8-F05 exige.
-  anexos.registrar(anexo({ tipo: 'design-system', caminho: 'DESIGN-SYSTEM.md', hash: 'b'.repeat(64) }))
+  anexos.registrar(
+    anexo({ tipo: 'design-system', caminho: 'DESIGN-SYSTEM.md', hash: 'b'.repeat(64) })
+  )
   anexos.registrar(anexo())
 
   rotas = {

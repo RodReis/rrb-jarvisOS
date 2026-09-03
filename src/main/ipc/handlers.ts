@@ -1662,11 +1662,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
    */
   ipcMain.handle(
     IPC_CHANNELS.arquiteturaGerarPorIa,
-    async (
-      _event,
-      projectId: unknown,
-      workspace: unknown
-    ): Promise<ArquiteturaGeradaOutcome> => {
+    async (_event, projectId: unknown, workspace: unknown): Promise<ArquiteturaGeradaOutcome> => {
       if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
         return { resultado: 'projeto-inexistente', mensagem: 'Projeto não encontrado.' }
       }

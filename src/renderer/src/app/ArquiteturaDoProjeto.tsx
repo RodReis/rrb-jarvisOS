@@ -474,10 +474,7 @@ export function ArquiteturaDoProjeto({
       )}
 
       {arquitetura === null ? (
-        <EmptyState
-          titulo={t('arquitetura.vazio')}
-          descricao={t('arquitetura.vazioDescricao')}
-        />
+        <EmptyState titulo={t('arquitetura.vazio')} descricao={t('arquitetura.vazioDescricao')} />
       ) : (
         <>
           {/*
