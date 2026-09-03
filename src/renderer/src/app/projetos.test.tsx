@@ -43,6 +43,11 @@ const revisoesDoGate = vi.fn()
 // abaixo, não um acidente.
 const jornadaDeVarios = vi.fn()
 const estadoDaJornada = vi.fn()
+// A etapa `prompt` passou a montar `PromptDoProjeto` (M25-F02): abrir o projeto na primeira
+// etapa monta a tela do prompt, e sem estes dois o teste quebraria por falta de dublê, não pelo
+// que investiga. É a mesma cadeia que o painel de contexto criou na M8-F04.
+const lerPromptDoProjeto = vi.fn()
+const rotaDaGeracao = vi.fn()
 
 function projeto(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -78,6 +83,8 @@ beforeEach(() => {
   revisoesDoGate.mockReset().mockResolvedValue([])
   jornadaDeVarios.mockReset().mockResolvedValue([])
   estadoDaJornada.mockReset().mockResolvedValue(null)
+  lerPromptDoProjeto.mockReset().mockResolvedValue(null)
+  rotaDaGeracao.mockReset().mockResolvedValue({ decisao: 'assinatura' })
   listProjects.mockResolvedValue([])
 
   Object.defineProperty(window, 'jarvis', {
@@ -100,6 +107,8 @@ beforeEach(() => {
       revisoesDoGate,
       jornadaDeVarios,
       estadoDaJornada,
+      lerPromptDoProjeto,
+      rotaDaGeracao,
       // A ponte real sempre tem `sendLog`; aqui ele existe porque o caminho de falha **loga**,
       // e sem o método o próprio logger estouraria — mascarando a resiliência que se testa.
       sendLog: vi.fn()

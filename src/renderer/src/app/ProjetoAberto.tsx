@@ -11,6 +11,8 @@ import { WizardDoProjeto } from './WizardDoProjeto'
 import { PacoteDoProjeto } from './PacoteDoProjeto'
 import { AnexosDeDesign } from './AnexosDeDesign'
 import { RoadmapDoProjeto } from './RoadmapDoProjeto'
+import { PromptDoProjeto } from './PromptDoProjeto'
+import { BriefDoProjeto } from './BriefDoProjeto'
 
 /**
  * Um projeto aberto: a trilha da jornada e o conteúdo da etapa atual (SPEC-Jornada-01).
@@ -163,7 +165,12 @@ export function ProjetoAberto({
             data-jos-conteudo-da-etapa
             className="flex min-w-0 flex-1 flex-col gap-4 border-t border-[rgba(var(--jos-borda-rgb),0.10)] pt-6 lg:border-l lg:border-t-0 lg:pl-10 lg:pt-0"
           >
-            <ConteudoDaEtapa workspace={workspace} projeto={projeto} estado={estado} />
+            <ConteudoDaEtapa
+              workspace={workspace}
+              projeto={projeto}
+              estado={estado}
+              onRecarregar={() => void carregar()}
+            />
           </div>
         </div>
       )}
@@ -196,18 +203,38 @@ export function ProjetoAberto({
 function ConteudoDaEtapa({
   workspace,
   projeto,
-  estado
+  estado,
+  onRecarregar
 }: {
   readonly workspace: WorkspaceId
   readonly projeto: Project
   readonly estado: EstadoDaJornada
+  /** Relê a jornada depois de um ato que a move — sem isso a trilha ficaria na etapa velha. */
+  readonly onRecarregar: () => void
 }): React.JSX.Element {
   const { t } = useTranslation()
 
   switch (estado.etapa) {
+    // O prompt é a etapa que faltava: em nenhum momento do MVP-008 o PI dizia o que o projeto
+    // é (SPEC-Jornada-02, critério 1).
+    case 'prompt':
+      return (
+        <PromptDoProjeto
+          workspace={workspace}
+          projectId={projeto.id}
+          nomeDoProjeto={projeto.nome}
+          onAvancar={onRecarregar}
+        />
+      )
+
+    // O gate do brief: é aqui que o PI vê o que a IA inferiu e corta item a item.
+    case 'brief-aceito':
+      return (
+        <BriefDoProjeto workspace={workspace} projectId={projeto.id} nomeDoProjeto={projeto.nome} />
+      )
+
     case 'prd':
     case 'prd-aceito':
-    case 'brief-aceito':
       return (
         <PacoteDoProjeto
           workspace={workspace}

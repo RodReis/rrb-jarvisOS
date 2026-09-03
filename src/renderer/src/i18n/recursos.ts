@@ -110,6 +110,54 @@ export const RECURSOS = {
         abrir: 'Abrir {{nome}}',
         voltar: 'Voltar aos projetos'
       },
+      prompt: {
+        titulo: 'O prompt do projeto',
+        // Diz o que fazer e o que acontece depois. O PI escreve melhor sabendo que o texto vira
+        // perguntas, não um documento final.
+        descricao:
+          'Descreva {{nome}} como você contaria a alguém. A IA vai perguntar o que faltar.',
+        rotulo: 'O que você quer construir',
+        ajuda: 'Escreva livremente. Não precisa de estrutura nem de termos técnicos.',
+        placeholder: 'Ex.: um app que organiza minhas leituras e me lembra do que parei no meio…',
+        carregando: 'Carregando o prompt…',
+        gerar: 'Gerar o brief',
+        escrevaAlgo: 'Escreva o prompt para continuar.',
+        semRota: 'A geração está indisponível',
+        naoGerou: 'O brief não foi gerado',
+        falha: 'Não foi possível gerar o brief. Tente de novo.'
+      },
+      brief: {
+        titulo: 'Brief do projeto',
+        descricao:
+          'O que o app entendeu sobre {{nome}}. Cada afirmação diz de onde veio; corte o que não serve antes de aceitar.',
+        carregando: 'Carregando o brief…',
+        vazio: 'Nenhum brief ainda',
+        vazioDescricao: 'Escreva o prompt e gere o brief para ver o que o app entendeu.',
+        cortar: 'Cortar',
+        cortarEsta: 'Cortar a afirmação: {{texto}}',
+        pendenciaMaterial: 'Falta decidir antes de aceitar',
+        propostosTitulo: '{{count}} afirmações propostas pela IA',
+        // Diz o que distingue estas das outras: ninguém as disse, foram inferidas.
+        propostosDescricao:
+          'Ninguém disse isto — a IA inferiu a partir do prompt. Corte o que não faz sentido.',
+        origem: {
+          prompt: 'do seu prompt',
+          decisao: 'da sua decisão',
+          proposto: 'proposto pela IA'
+        },
+        blocos: {
+          identidade: 'Identidade',
+          'problema-usuarios-resultado': 'Problema, usuários e resultado',
+          'escopo-e-metricas': 'Escopo e métricas',
+          jornadas: 'Jornadas',
+          'dominio-e-dados': 'Domínio e dados',
+          integracoes: 'Integrações',
+          'stack-e-restricoes': 'Stack e restrições',
+          'nao-funcionais-e-testes': 'Não funcionais e testes',
+          'politica-git-provider-orcamento': 'Política, provider e orçamento',
+          'riscos-e-decisoes-abertas': 'Riscos e decisões abertas'
+        }
+      },
       jornada: {
         titulo: 'Jornada de planejamento',
         // Diz o que a trilha é e o que ela cobra. "Uma etapa por vez" é a regra visível: o PI
@@ -476,6 +524,50 @@ export const RECURSOS = {
         permitirGitAviso: 'High-risk action: records the command in this space allowed list.',
         abrir: 'Open {{nome}}',
         voltar: 'Back to projects'
+      },
+      prompt: {
+        titulo: 'The project prompt',
+        descricao: 'Describe {{nome}} as you would to a person. The AI will ask what is missing.',
+        rotulo: 'What you want to build',
+        ajuda: 'Write freely. No structure or technical terms needed.',
+        placeholder: 'e.g. an app that organizes my reading and reminds me what I left halfway…',
+        carregando: 'Loading the prompt…',
+        gerar: 'Generate the brief',
+        escrevaAlgo: 'Write the prompt to continue.',
+        semRota: 'Generation is unavailable',
+        naoGerou: 'The brief was not generated',
+        falha: 'Could not generate the brief. Try again.'
+      },
+      brief: {
+        titulo: 'Project brief',
+        descricao:
+          'What the app understood about {{nome}}. Every statement says where it came from; cut what does not fit before accepting.',
+        carregando: 'Loading the brief…',
+        vazio: 'No brief yet',
+        vazioDescricao: 'Write the prompt and generate the brief to see what the app understood.',
+        cortar: 'Cut',
+        cortarEsta: 'Cut the statement: {{texto}}',
+        pendenciaMaterial: 'Decide this before accepting',
+        propostosTitulo: '{{count}} statements proposed by the AI',
+        propostosDescricao:
+          'Nobody said this — the AI inferred it from the prompt. Cut what does not make sense.',
+        origem: {
+          prompt: 'from your prompt',
+          decisao: 'from your decision',
+          proposto: 'proposed by the AI'
+        },
+        blocos: {
+          identidade: 'Identity',
+          'problema-usuarios-resultado': 'Problem, users and outcome',
+          'escopo-e-metricas': 'Scope and metrics',
+          jornadas: 'Journeys',
+          'dominio-e-dados': 'Domain and data',
+          integracoes: 'Integrations',
+          'stack-e-restricoes': 'Stack and constraints',
+          'nao-funcionais-e-testes': 'Non-functional and tests',
+          'politica-git-provider-orcamento': 'Policy, provider and budget',
+          'riscos-e-decisoes-abertas': 'Risks and open decisions'
+        }
       },
       jornada: {
         titulo: 'Planning journey',
