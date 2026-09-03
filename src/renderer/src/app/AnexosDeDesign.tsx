@@ -299,7 +299,10 @@ export function AnexosDeDesign({
               >
                 {t('anexos.validar')}
               </Button>
+              {/* A ação que **avança a etapa**: gerar a arquitetura é o que fecha os anexos e
+                  move a jornada. Validar é conferência, e segue secundária. */}
               <Button
+                variante="primaria"
                 onClick={() => void gerar()}
                 carregando={ocupado === 'gerando'}
                 // Desabilitado pelo gate: o botão que não pode dar certo não deve convidar ao
