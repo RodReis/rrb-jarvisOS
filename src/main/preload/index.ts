@@ -57,6 +57,7 @@ import type { Anexo, AnexoOutcome, TipoDeAnexo } from '@shared/domain/anexos-de-
 import type { ValidacaoDoPrototipo } from '@shared/domain/validacao-de-prototipo'
 import type { ArquiteturaOutcome, PacoteArquitetura } from '@shared/domain/arquitetura'
 import type { Roadmap, RoadmapOutcome } from '@shared/domain/roadmap'
+import type { EstadoDaJornada, TransicaoOutcome } from '@shared/domain/jornada'
 import type {
   Approval,
   AprovacaoOutcome,
@@ -344,6 +345,21 @@ const bridge: JarvisBridge = {
     ipcRenderer.invoke(IPC_CHANNELS.roadmapGerar, projectId, workspace),
   carregarRoadmap: (projectId: string, workspace: WorkspaceId): Promise<Roadmap> =>
     ipcRenderer.invoke(IPC_CHANNELS.roadmapCarregar, projectId, workspace),
+  // A jornada: duas leituras e uma escrita. Nenhuma recebe etapa — só evento nomeado, porque
+  // onde o projeto está é conclusão do main a partir dos fatos, não afirmação do renderer.
+  estadoDaJornada: (projectId: string, workspace: WorkspaceId): Promise<EstadoDaJornada | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.jornadaEstado, projectId, workspace),
+  jornadaDeVarios: (
+    projectIds: readonly string[],
+    workspace: WorkspaceId
+  ): Promise<readonly EstadoDaJornada[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.jornadaEstadoDeVarios, projectIds, workspace),
+  aplicarEventoDaJornada: (
+    projectId: string,
+    evento: string,
+    workspace: WorkspaceId
+  ): Promise<TransicaoOutcome | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.jornadaEvento, projectId, evento, workspace),
   // O alvo atravessa a ponte; a credencial não. O token é resolvido no main, pelo mesmo cofre do
   // conector — mandá-lo daqui exigiria que o renderer o tivesse, e ele nunca tem.
   publicarNoGitHub: (

@@ -288,3 +288,50 @@ export function oQueFaltaPara(etapa: Etapa, atual: Etapa): string | null {
   if (posicaoNaTrilha(etapa, atual) !== 'futura') return null
   return `Conclua "${CTA_DA_ETAPA[atual]}" para chegar aqui.`
 }
+
+/**
+ * Uma etapa como a trilha a desenha (critérios 3 e 4).
+ *
+ * Mora aqui, e não no serviço do main, porque atravessa a ponte IPC: o contrato de
+ * `contracts/ipc.ts` precisa do tipo, e ele não pode importar do processo principal.
+ */
+export interface EtapaNaTrilha {
+  readonly etapa: Etapa
+  readonly posicao: PosicaoNaTrilha
+  /** O rótulo do CTA. Presente sempre; só a etapa atual o oferece como ação. */
+  readonly cta: string
+  /** O que falta para chegar aqui — preenchido só em etapa futura. */
+  readonly oQueFalta: string | null
+  /** `true` só na etapa atual: nenhuma outra aceita ação (critério 4). */
+  readonly acionavel: boolean
+}
+
+/** O estado completo da jornada de um projeto — o que a tela consome. */
+export interface EstadoDaJornada {
+  readonly projectId: string
+  readonly etapa: Etapa
+  /** O CTA único da etapa atual (critério 3). */
+  readonly cta: string
+  readonly trilha: readonly EtapaNaTrilha[]
+  /** Por que a jornada regrediu, quando regrediu (critério 7). */
+  readonly motivoDaRegressao: string | null
+  /** `true` quando a etapa persistida discordava dos fatos e foi recalculada (critério 2). */
+  readonly recalculada: boolean
+}
+
+/**
+ * A trilha inteira em relação à etapa atual. Pura: quem tem a etapa desenha a trilha sem
+ * precisar do banco, e é o que permite o renderer montá-la a partir do estado recebido.
+ */
+export function montarTrilha(atual: Etapa): readonly EtapaNaTrilha[] {
+  return ETAPAS.map((etapa) => {
+    const posicao = posicaoNaTrilha(etapa, atual)
+    return {
+      etapa,
+      posicao,
+      cta: CTA_DA_ETAPA[etapa],
+      oQueFalta: oQueFaltaPara(etapa, atual),
+      acionavel: posicao === 'atual'
+    }
+  })
+}

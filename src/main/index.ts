@@ -47,6 +47,7 @@ import { MergePolicyService } from './pipeline/merge-policy-service'
 import { PipelineRepository } from './pipeline/pipeline-repository'
 import { ReconciliacaoService } from './pipeline/reconciliacao-service'
 import { RoadmapService } from './projects/roadmap-service'
+import { JornadaService } from './projects/jornada-service'
 import { GitRunner } from './projects/git-runner'
 import { DockerRunner, prepararGitMeta, TIMEOUT_DOCKER_MS } from './pipeline/docker-runner'
 import { ConstrutorService } from './pipeline/construtor-service'
@@ -428,6 +429,19 @@ if (!app.requestSingleInstanceLock()) {
       identidade: () => auth?.usuarioAtual()?.id
     })
 
+    // A jornada de planejamento (SPEC-Jornada-01).
+    //
+    // Recebe o `RoadmapRepository` porque é lá que as aprovações de gate moram: a etapa é
+    // derivada delas e dos marcos commitados, nunca declarada. `userIdAtual` basta aqui — o
+    // serviço **lê** aprovações para derivar a etapa, e não registra nenhuma; quem exige a
+    // identidade autenticada é o gate, no `RoadmapService` acima.
+    const jornada = new JornadaService({
+      repository: projectRepository,
+      roadmap: roadmapRepository,
+      audit: storage.audit,
+      userId: userIdAtual
+    })
+
     // Publicação no GitHub (SPEC-Entrega-01). Recebe o `ConnectorService`, **não** o
     // `GithubAdapter`: o gate de créditos, a policy e a auditoria vivem dentro do `call()`, e um
     // adapter injetado aqui seria o segundo caminho sem gate — o mesmo erro que o `GitRunner`
@@ -599,6 +613,7 @@ if (!app.requestSingleInstanceLock()) {
       pacotes,
       anexos,
       roadmap,
+      jornada,
       publicacao,
       mergePolicy,
       fila,

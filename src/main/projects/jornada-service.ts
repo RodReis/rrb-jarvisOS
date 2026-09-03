@@ -19,7 +19,13 @@ import type { WorkspaceId } from '@shared/domain/entities'
 import type { Approval } from '@shared/domain/aprovacoes'
 import { gatesInvalidados } from '@shared/domain/aprovacoes'
 import type { MudancaDeArtefato } from '@shared/domain/aprovacoes'
-import type { Etapa, EventoDeJornada, TransicaoOutcome } from '@shared/domain/jornada'
+import type {
+  EstadoDaJornada,
+  Etapa,
+  EtapaNaTrilha,
+  EventoDeJornada,
+  TransicaoOutcome
+} from '@shared/domain/jornada'
 import {
   CTA_DA_ETAPA,
   ETAPAS,
@@ -27,9 +33,8 @@ import {
   avancar,
   etapaDerivada,
   exigeAceiteDoPi,
-  oQueFaltaPara,
+  montarTrilha,
   ordemDaEtapa,
-  posicaoNaTrilha,
   regredir
 } from '@shared/domain/jornada'
 import type { MarcoDocumental } from '@shared/domain/projects'
@@ -51,31 +56,6 @@ const EVENTO_DO_MARCO: Readonly<Partial<Record<MarcoDocumental, EventoDeJornada>
   'design-anexado': 'design-anexado',
   'arquitetura-aprovada': 'arquitetura-gerada',
   'roadmap-aprovado': 'roadmap-gerado'
-}
-
-/** Uma etapa como a trilha a desenha (critérios 3 e 4). */
-export interface EtapaNaTrilha {
-  readonly etapa: Etapa
-  readonly posicao: 'concluida' | 'atual' | 'futura'
-  /** O rótulo do CTA. Presente sempre; só a etapa atual o oferece como ação. */
-  readonly cta: string
-  /** O que falta para chegar aqui — preenchido só em etapa futura. */
-  readonly oQueFalta: string | null
-  /** `true` só na etapa atual: nenhuma outra aceita ação (critério 4). */
-  readonly acionavel: boolean
-}
-
-/** O estado completo da jornada de um projeto — o que a tela consome. */
-export interface EstadoDaJornada {
-  readonly projectId: string
-  readonly etapa: Etapa
-  /** O CTA único da etapa atual (critério 3). */
-  readonly cta: string
-  readonly trilha: readonly EtapaNaTrilha[]
-  /** Por que a jornada regrediu, quando regrediu (critério 7). */
-  readonly motivoDaRegressao: string | null
-  /** `true` quando a etapa persistida discordava dos fatos e foi recalculada (critério 2). */
-  readonly recalculada: boolean
 }
 
 export interface JornadaDeps {
@@ -188,16 +168,7 @@ export class JornadaService {
 
   /** A trilha inteira em relação à etapa atual. Etapa futura não é acionável (critério 4). */
   private trilha(atual: Etapa): readonly EtapaNaTrilha[] {
-    return ETAPAS.map((etapa) => {
-      const posicao = posicaoNaTrilha(etapa, atual)
-      return {
-        etapa,
-        posicao,
-        cta: CTA_DA_ETAPA[etapa],
-        oQueFalta: oQueFaltaPara(etapa, atual),
-        acionavel: posicao === 'atual'
-      }
-    })
+    return montarTrilha(atual)
   }
 
   /**

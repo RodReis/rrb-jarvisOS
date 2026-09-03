@@ -173,9 +173,21 @@ const ai = {
   cancel: vi.fn()
 }
 
+/**
+ * Dublê da jornada (SPEC-Jornada-01). O que se exercita aqui é a **fronteira**: a validação de
+ * forma antes de chamar o serviço. A decisão da máquina de etapas tem suíte própria em
+ * `jornada-service.int-spec.ts`, contra o banco real.
+ */
+const jornada = {
+  estado: vi.fn(() => undefined),
+  estadoDeVarios: vi.fn(() => []),
+  aplicarEvento: vi.fn(() => undefined)
+}
+
 const deps = {
   audit,
   ai,
+  jornada,
   workspaces,
   preferences,
   policy,
@@ -665,5 +677,75 @@ describe('canais do terminal controlado (SPEC-ExecucaoReal-02)', () => {
     )
 
     expect(ai.recebido?.['diagnostico']).toBe(true)
+  })
+})
+
+/**
+ * A fronteira da jornada (SPEC-Jornada-01).
+ *
+ * O que se prova aqui é o que a ponte **recusa**: forma inválida não chega ao serviço. O
+ * renderer é processo que pode ser comprometido, e um `projectId` que não é string chegaria à
+ * consulta do banco.
+ *
+ * A ausência mais importante é a de um canal que receba etapa — ela é verificada em
+ * `preload.spec.ts`, na lista fechada de métodos da ponte.
+ */
+describe('jornada de planejamento', () => {
+  beforeEach(() => {
+    jornada.estado.mockClear()
+    jornada.estadoDeVarios.mockClear()
+    jornada.aplicarEvento.mockClear()
+  })
+
+  it('lê o estado quando projeto e espaço têm a forma certa', () => {
+    invocar(IPC_CHANNELS.jornadaEstado, 'p-1', 'jarvis')
+
+    expect(jornada.estado).toHaveBeenCalledWith('p-1', 'jarvis')
+  })
+
+  it('recusa espaço inválido sem chamar o serviço', () => {
+    expect(invocar(IPC_CHANNELS.jornadaEstado, 'p-1', 'espaco-inventado')).toBeNull()
+    expect(jornada.estado).not.toHaveBeenCalled()
+  })
+
+  it('recusa projectId que não é string', () => {
+    expect(invocar(IPC_CHANNELS.jornadaEstado, 42, 'jarvis')).toBeNull()
+    expect(jornada.estado).not.toHaveBeenCalled()
+  })
+
+  it('devolve null, e não undefined, quando o projeto não tem jornada', () => {
+    // A ponte serializa: `undefined` atravessaria o IPC como ausência de valor, e o renderer
+    // não distinguiria "não existe" de "o canal não respondeu".
+    expect(invocar(IPC_CHANNELS.jornadaEstado, 'p-1', 'jarvis')).toBeNull()
+  })
+
+  it('filtra ids que não são string antes de consultar', () => {
+    invocar(IPC_CHANNELS.jornadaEstadoDeVarios, ['p-1', 7, null, 'p-2'], 'jarvis')
+
+    expect(jornada.estadoDeVarios).toHaveBeenCalledWith(['p-1', 'p-2'], 'jarvis')
+  })
+
+  it('recusa lista que não é array', () => {
+    expect(invocar(IPC_CHANNELS.jornadaEstadoDeVarios, 'p-1', 'jarvis')).toEqual([])
+    expect(jornada.estadoDeVarios).not.toHaveBeenCalled()
+  })
+
+  it('aplica evento nomeado', () => {
+    invocar(IPC_CHANNELS.jornadaEvento, 'p-1', 'prompt-salvo', 'jarvis')
+
+    expect(jornada.aplicarEvento).toHaveBeenCalledWith('p-1', 'prompt-salvo', 'jarvis')
+  })
+
+  it('recusa evento que não é string sem chamar o serviço', () => {
+    expect(invocar(IPC_CHANNELS.jornadaEvento, 'p-1', { etapa: 'roadmap' }, 'jarvis')).toBeNull()
+    expect(jornada.aplicarEvento).not.toHaveBeenCalled()
+  })
+
+  it('repassa evento desconhecido ao serviço, que é quem recusa', () => {
+    // A ponte valida **forma**, não vocabulário: decidir que um evento não existe é da máquina
+    // de etapas. Barrar aqui duplicaria a lista de eventos em dois lugares que divergiriam.
+    invocar(IPC_CHANNELS.jornadaEvento, 'p-1', 'evento-inventado', 'jarvis')
+
+    expect(jornada.aplicarEvento).toHaveBeenCalledWith('p-1', 'evento-inventado', 'jarvis')
   })
 })
