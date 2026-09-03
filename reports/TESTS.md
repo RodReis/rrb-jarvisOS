@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 1133 | 1133 | 0 | 72.6 | — | — |
-| — | — | — | Banco | 880 | 875 | 0 | 88.0 | — | — |
-| — | — | — | Tela | 458 | 457 | 0 | 82.1 | — | — |
+| — | — | — | Regras de Negócio | 1175 | 1175 | 0 | 73.1 | — | — |
+| — | — | — | Banco | 920 | 915 | 0 | 88.0 | — | — |
+| — | — | — | Tela | 464 | 463 | 0 | 79.5 | — | — |
 
 ## Histórico por entrega
 
@@ -235,3 +235,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | — | #239 | SPEC-Jornada-02 | Regras de Negócio | 1133 | 1133 | 0 | 72.6 | #246 | [#246](https://github.com/RodReis/rrb-jarvisOS/pull/246) |
 | — | #239 | SPEC-Jornada-02 | Banco | 880 | 875 | 0 | 88.0 | #246 | [#246](https://github.com/RodReis/rrb-jarvisOS/pull/246) |
 | — | #239 | SPEC-Jornada-02 | Tela | 458 | 457 | 0 | 82.1 | #246 | [#246](https://github.com/RodReis/rrb-jarvisOS/pull/246) |
+| 2026-09-03 | #240 | SPEC-Jornada-03 | Regras de Negócio | 1175 | 1175 | 0 | 73.1 | #247 | [#247](https://github.com/RodReis/rrb-jarvisOS/pull/247) |
+| 2026-09-03 | #240 | SPEC-Jornada-03 | Banco | 920 | 915 | 0 | 88.0 | #247 | [#247](https://github.com/RodReis/rrb-jarvisOS/pull/247) |
+| 2026-09-03 | #240 | SPEC-Jornada-03 | Tela | 464 | 463 | 0 | 79.5 | #247 | [#247](https://github.com/RodReis/rrb-jarvisOS/pull/247) |
