@@ -411,6 +411,10 @@ export class ProjectService {
       workspace_id: workspaceId,
       projectId,
       etapa: 'inicio',
+      // Projeto novo nasce no começo da jornada (SPEC-Jornada-01). Coincide com o cálculo de
+      // `etapaDerivada([])`, então não há divergência a auditar na primeira leitura.
+      etapaDaJornada: 'prompt',
+      motivoDaRegressao: null,
       respostas: {},
       ultimoMarco: null,
       updated_at: agora,

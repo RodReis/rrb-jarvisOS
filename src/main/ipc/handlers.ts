@@ -94,6 +94,8 @@ import type { PublicacaoService } from '../projects/publicacao-service'
 import type { MergePolicyService } from '../pipeline/merge-policy-service'
 import type { FilaService } from '../pipeline/fila-service'
 import type { RoadmapService } from '../projects/roadmap-service'
+import type { JornadaService } from '../projects/jornada-service'
+import type { EstadoDaJornada, TransicaoOutcome } from '@shared/domain/jornada'
 import type { AnexoService } from '../projects/anexo-service'
 import { isConnectorId } from '@shared/domain/connectors'
 import type { ConnectorCreditView } from '@shared/contracts/ipc'
@@ -299,6 +301,7 @@ export interface IpcDependencies {
   readonly pacotes: PacoteService
   readonly anexos: AnexoService
   readonly roadmap: RoadmapService
+  readonly jornada: JornadaService
   readonly publicacao: PublicacaoService
   /** O kill-switch do merge autônomo (SPEC-Entrega-02/05). */
   readonly mergePolicy: MergePolicyService
@@ -1442,6 +1445,52 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
         return { mvps: [], slices: [] }
       }
       return deps.roadmap.carregar(projectId, workspace)
+    }
+  )
+
+  /**
+   * A jornada de planejamento (SPEC-Jornada-01).
+   *
+   * **Três canais, e nenhum recebe uma etapa.** É o critério 1 na fronteira: a única escrita é
+   * por evento nomeado, e o serviço recusa o que não reconhece. Um handler que aceitasse a
+   * etapa deixaria o renderer declarar onde o projeto está — decisão que é do main, que tem os
+   * fatos.
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.jornadaEstado,
+    (_event, projectId: unknown, workspace: unknown): EstadoDaJornada | null => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return null
+      return deps.jornada.estado(projectId, workspace) ?? null
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.jornadaEstadoDeVarios,
+    (_event, projectIds: unknown, workspace: unknown): readonly EstadoDaJornada[] => {
+      if (!isWorkspaceId(workspace) || !Array.isArray(projectIds)) return []
+      // Filtra a forma antes de agir: um id que não é string chegaria à consulta do banco, e a
+      // ponte valida forma em todo handler pela mesma razão — o renderer é processo que pode
+      // ser comprometido.
+      const ids = projectIds.filter((id): id is string => typeof id === 'string')
+      return deps.jornada.estadoDeVarios(ids, workspace)
+    }
+  )
+
+  /**
+   * Aplica um evento. Devolve o desfecho **inclusive na recusa**: "este evento sai de outra
+   * etapa" é resposta legítima que a tela mostra, não erro a rejeitar.
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.jornadaEvento,
+    (_event, projectId: unknown, evento: unknown, workspace: unknown): TransicaoOutcome | null => {
+      if (
+        !isWorkspaceId(workspace) ||
+        typeof projectId !== 'string' ||
+        typeof evento !== 'string'
+      ) {
+        return null
+      }
+      return deps.jornada.aplicarEvento(projectId, evento, workspace) ?? null
     }
   )
 

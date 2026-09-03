@@ -62,6 +62,7 @@ import type { ExecutionLedger } from '../domain/execution-ledger'
 import type { PendenciaDeLimpeza } from '../domain/limpeza'
 import type { MergePolicyOutcome, PoliticaDeMerge, VistaDaFila } from '../domain/pipeline'
 import type { Roadmap, RoadmapOutcome } from '../domain/roadmap'
+import type { EstadoDaJornada, TransicaoOutcome } from '../domain/jornada'
 import type {
   Approval,
   AprovacaoOutcome,
@@ -355,6 +356,21 @@ export const IPC_CHANNELS = {
   aprovacaoRevisoes: 'aprovacao:revisoes',
   aprovacaoAprovar: 'aprovacao:aprovar',
   aprovacaoSimular: 'aprovacao:simular',
+  /**
+   * A jornada de planejamento (SPEC-Jornada-01).
+   *
+   * **Não existe canal que receba uma etapa.** É o critério 1 na forma de contrato: a etapa só
+   * se move por evento nomeado, e um `jornada:definir-etapa` seria exatamente a via de edição
+   * direta que a spec proíbe. O renderer diz *o que aconteceu*, nunca *onde o projeto está* —
+   * decidir isso é do main, que tem os fatos.
+   *
+   * `estado` lê e `evento` escreve, a mesma divisão de `project:session` e
+   * `project:save-answers`. Ler recalcula a etapa a partir das aprovações e dos marcos, mas
+   * isso é correção de cache, não avanço: a leitura nunca move a jornada para frente.
+   */
+  jornadaEstado: 'jornada:estado',
+  jornadaEstadoDeVarios: 'jornada:estado-de-varios',
+  jornadaEvento: 'jornada:evento',
   /**
    * SPEC-Entrega-01: publica o repositório e o backlog aprovado no GitHub.
    *
@@ -879,6 +895,31 @@ export interface JarvisBridge {
   gerarRoadmap(projectId: string, workspace: WorkspaceId): Promise<RoadmapOutcome>
   /** O roadmap gravado do projeto. */
   carregarRoadmap(projectId: string, workspace: WorkspaceId): Promise<Roadmap>
+  /**
+   * O estado da jornada do projeto: etapa atual, CTA único e a trilha (SPEC-Jornada-01).
+   *
+   * Ler **recalcula** a etapa a partir dos fatos e corrige a coluna quando ela discorda
+   * (critério 2). Isso é conserto de cache, não avanço — a leitura nunca move a jornada para
+   * frente, e é por isso que ela pode acontecer a cada abertura da tela.
+   */
+  estadoDaJornada(projectId: string, workspace: WorkspaceId): Promise<EstadoDaJornada | null>
+  /** O estado da jornada de vários projetos — o que a lista de Projetos consome (critério 3). */
+  jornadaDeVarios(
+    projectIds: readonly string[],
+    workspace: WorkspaceId
+  ): Promise<readonly EstadoDaJornada[]>
+  /**
+   * Aplica um evento nomeado à jornada — a **única** via de escrita (critério 1).
+   *
+   * Devolve `TransicaoOutcome` inclusive nas recusas: "este evento sai de outra etapa" é
+   * desfecho que a tela mostra, não falha técnica. Rejeitar a promise faria a recusa legítima
+   * chegar à UI como erro.
+   */
+  aplicarEventoDaJornada(
+    projectId: string,
+    evento: string,
+    workspace: WorkspaceId
+  ): Promise<TransicaoOutcome | null>
   publicarNoGitHub(
     projectId: string,
     alvo: AlvoDaPublicacao,

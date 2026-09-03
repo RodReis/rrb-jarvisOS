@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { Search, User } from 'lucide-react'
-import { ProvedorDeTema } from '../tokens/provider'
-import type { CorAcento } from '../tokens/acento'
-import type { ModoUi, Modulo } from '../tokens/semantic'
+import { ProvedorDeTema } from '@design/tokens/provider'
+import type { CorAcento } from '@design/tokens/acento'
+import type { ModoUi, Modulo } from '@design/tokens/semantic'
 import {
   Alternador,
   Button,
@@ -18,7 +18,7 @@ import {
   Select,
   Slider,
   Textarea
-} from '../ui'
+} from '@design/ui'
 
 /**
  * Galeria de prova dos controles (SPEC-DesignSystem-03a).

@@ -328,7 +328,22 @@ export const AUDIT_EVENT_TYPES = [
   // chega a `MERGED` também quando o merge foi confirmado como já feito. A pergunta que este
   // responde é outra — *nós mergeamos, com qual commit?* —, e a resposta precisa do `mergeSha`
   // confirmado na origem, nunca do que o merge respondeu.
-  'pipeline-merge'
+  'pipeline-merge',
+  // SPEC-Jornada-01: a jornada de planejamento avançou — ou a transição foi recusada. Registra
+  // as duas, porque a tentativa barrada é o fato interessante para quem inspeciona depois:
+  // guardar só o que passou faria sumir exatamente o que se quer ver.
+  //
+  // Tipo próprio, e **não** `project-milestone`: aquele registra um commit no Git, e a
+  // transição pode acontecer sem commit nenhum (prompt salvo, refinamento respondido).
+  'journey-transition',
+  // SPEC-Jornada-01, critério 2: a etapa persistida discordava dos fatos e foi recalculada.
+  // Tipo próprio porque isto é um **desvio**, não uma transição: ninguém pediu a mudança, e a
+  // pergunta que ele responde é "por que a etapa mudou sozinha?".
+  'journey-stage-recalculated',
+  // SPEC-Jornada-01, critério 7: invalidação de gate regrediu a jornada. Separado do recálculo
+  // porque a causa é outra — um documento a montante mudou semanticamente —, e a tela precisa
+  // dizer o motivo ao PI.
+  'journey-stage-regressed'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]

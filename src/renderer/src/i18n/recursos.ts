@@ -104,13 +104,33 @@ export const RECURSOS = {
         // Diz o que o clique faz: é permissão de alto risco, auditada. O usuário merece saber
         // disso antes, não depois.
         permitirGitAviso: 'Ação de alto risco: registra o comando na lista permitida deste espaço.',
-        // O painel de contexto (SPEC-Planejamento-02), aninhado no projeto porque é dele que
-        // o contexto é: um `contexto.*` de topo sugeriria uma tela própria que não existe.
-        contexto: 'Contexto do projeto',
-        contextoFechar: 'Fechar contexto',
-        contextoAbrir: 'Abrir contexto de {{nome}}',
-        planejar: 'Planejar',
-        planejarDe: 'Planejar {{nome}}'
+        // A jornada substituiu "Planejar" e "Contexto do projeto" (SPEC-Jornada-01): abrir o
+        // projeto **é** planejar, e o pacote de contexto virou pré-condição de geração, não
+        // tarefa do PI. Duas portas para o mesmo lugar era a confusão que a fatia corrige.
+        abrir: 'Abrir {{nome}}',
+        voltar: 'Voltar aos projetos'
+      },
+      jornada: {
+        titulo: 'Jornada de planejamento',
+        // Diz o que a trilha é e o que ela cobra. "Uma etapa por vez" é a regra visível: o PI
+        // não escolhe por onde começar, e saber disso evita procurar um atalho que não existe.
+        descricao: 'Uma etapa por vez. Aceites são seus; o resto o app prepara.',
+        carregando: 'Carregando a jornada…',
+        regrediu: 'A jornada voltou uma etapa',
+        etapas: {
+          prompt: 'Prompt inicial',
+          refinamento: 'Refinamento',
+          'brief-aceito': 'Aceite do brief',
+          prd: 'PRD',
+          'prd-aceito': 'Aceite do PRD',
+          design: 'Anexos de design',
+          arquitetura: 'Arquitetura',
+          'pacote-aceito': 'Aceite do pacote',
+          roadmap: 'Roadmap',
+          'mvp-aceito': 'Aceite do MVP',
+          'spec-aceita': 'Aceite da SPEC',
+          construcao: 'Construção'
+        }
       },
       roadmap: {
         titulo: 'Roadmap e aprovações',
@@ -454,11 +474,28 @@ export const RECURSOS = {
         removerAviso: 'Removed from the list; folder and Git history stay on disk.',
         permitirGit: 'Allow `git` and create',
         permitirGitAviso: 'High-risk action: records the command in this space allowed list.',
-        contexto: 'Project context',
-        contextoFechar: 'Close context',
-        contextoAbrir: 'Open context for {{nome}}',
-        planejar: 'Plan',
-        planejarDe: 'Plan {{nome}}'
+        abrir: 'Open {{nome}}',
+        voltar: 'Back to projects'
+      },
+      jornada: {
+        titulo: 'Planning journey',
+        descricao: 'One step at a time. Approvals are yours; the app prepares the rest.',
+        carregando: 'Loading the journey…',
+        regrediu: 'The journey moved back a step',
+        etapas: {
+          prompt: 'Initial prompt',
+          refinamento: 'Refinement',
+          'brief-aceito': 'Brief approval',
+          prd: 'PRD',
+          'prd-aceito': 'PRD approval',
+          design: 'Design attachments',
+          arquitetura: 'Architecture',
+          'pacote-aceito': 'Package approval',
+          roadmap: 'Roadmap',
+          'mvp-aceito': 'MVP approval',
+          'spec-aceita': 'Spec approval',
+          construcao: 'Build'
+        }
       },
       roadmap: {
         titulo: 'Roadmap and approvals',

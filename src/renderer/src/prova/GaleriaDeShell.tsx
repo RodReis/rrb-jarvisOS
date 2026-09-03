@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Grid3x3, LogOut, Target } from 'lucide-react'
-import type { CorAcento } from '../tokens/acento'
-import type { ModoUi, Modulo } from '../tokens/semantic'
+import type { CorAcento } from '@design/tokens/acento'
+import type { ModoUi, Modulo } from '@design/tokens/semantic'
 import {
   AppShell,
   NavigationGroup,
@@ -11,8 +11,8 @@ import {
   TopBar,
   WorkspaceSwitcher,
   GRID
-} from '../patterns'
-import { VoiceMascot } from '../ui'
+} from '@design/patterns'
+import { VoiceMascot } from '@design/ui'
 
 /**
  * Galeria de prova do shell (SPEC-DesignSystem-04a).

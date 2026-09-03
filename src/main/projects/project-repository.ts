@@ -20,6 +20,7 @@ import type {
   ProjectOrigin
 } from '@shared/domain/projects'
 import { isMarcoDocumental } from '@shared/domain/projects'
+import { isEtapa } from '@shared/domain/jornada'
 import { log } from '../logging/logger'
 
 interface ProjectRow {
@@ -40,6 +41,8 @@ interface SessionRow {
   readonly workspace_id: string
   readonly project_id: string
   readonly etapa: string
+  readonly etapa_da_jornada: string
+  readonly motivo_da_regressao: string | null
   readonly respostas: string
   readonly ultimo_marco: string | null
   readonly updated_at: string
@@ -88,6 +91,12 @@ function toSession(row: SessionRow): PlanningSession {
     workspace_id: row.workspace_id as WorkspaceId,
     projectId: row.project_id,
     etapa: row.etapa,
+    // Etapa fora do enum (gravada por uma versão futura, ou lixo) vira `prompt`, não a string
+    // crua: o tipo promete uma `Etapa`, e devolver algo fora dele faria a trilha renderizar uma
+    // posição que não existe. Cair no início é o lado seguro — a etapa é recalculada dos fatos
+    // logo na leitura do serviço, então o projeto não fica preso ali por causa da coerção.
+    etapaDaJornada: isEtapa(row.etapa_da_jornada) ? row.etapa_da_jornada : 'prompt',
+    motivoDaRegressao: row.motivo_da_regressao,
     respostas: parseRespostas(row.respostas),
     // Marco desconhecido (gravado por uma versão futura, ou lixo) vira `null`, não a string
     // crua: o tipo promete um `MarcoDocumental`, e devolver algo fora do enum faria o mapa de
@@ -241,14 +250,16 @@ export class ProjectRepository {
     this.db
       .prepare(
         `INSERT INTO planning_session
-           (id, user_id, workspace_id, project_id, etapa, respostas, ultimo_marco,
-            updated_at, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+           (id, user_id, workspace_id, project_id, etapa, etapa_da_jornada,
+            motivo_da_regressao, respostas, ultimo_marco, updated_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(project_id) DO UPDATE SET
-           etapa        = excluded.etapa,
-           respostas    = excluded.respostas,
-           ultimo_marco = excluded.ultimo_marco,
-           updated_at   = excluded.updated_at`
+           etapa               = excluded.etapa,
+           etapa_da_jornada    = excluded.etapa_da_jornada,
+           motivo_da_regressao = excluded.motivo_da_regressao,
+           respostas           = excluded.respostas,
+           ultimo_marco        = excluded.ultimo_marco,
+           updated_at          = excluded.updated_at`
       )
       .run(
         session.id,
@@ -256,6 +267,8 @@ export class ProjectRepository {
         session.workspace_id,
         session.projectId,
         session.etapa,
+        session.etapaDaJornada,
+        session.motivoDaRegressao,
         JSON.stringify(session.respostas),
         session.ultimoMarco,
         session.updated_at,

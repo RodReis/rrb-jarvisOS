@@ -1210,6 +1210,29 @@ const MIGRATIONS: readonly string[] = [
     resolvida_em  TEXT
   );
   CREATE INDEX idx_pendencia_limpeza_user ON pendencia_de_limpeza(user_id, em);
+  `,
+
+  // 30 — a etapa da jornada de planejamento (SPEC-Jornada-01, critérios 1, 2 e 6).
+  //
+  // **Coluna nova, e não reaproveitamento da `etapa` existente.** Aquela guarda a etapa do
+  // *wizard* (`inicio`, `contexto`) — qual grupo de perguntas o catálogo preenche —, que é
+  // outro conceito: não é posição numa trilha. Reusá-la faria o wizard e a jornada disputarem
+  // um campo só, e o primeiro a escrever apagaria a leitura do outro.
+  //
+  // **`DEFAULT 'prompt'` é a migração inteira** (critério 6). Projeto existente não tem brief
+  // nem origem de modelo, então nenhum evento da jornada consta e a etapa derivada dele é
+  // `prompt` de qualquer forma — o default coincide com o cálculo, e não há dado a converter.
+  // Nada é apagado: as respostas do wizard e as decisões gravadas continuam onde estão.
+  //
+  // A coluna é **cache**, não fonte de verdade: quando ela discorda do que as aprovações e os
+  // marcos sustentam, o serviço recalcula e audita o desvio (critério 2).
+  `
+  ALTER TABLE planning_session ADD COLUMN etapa_da_jornada TEXT NOT NULL DEFAULT 'prompt';
+
+  -- O motivo da última regressão por invalidação de gate (critério 7). NULL enquanto nenhuma
+  -- aconteceu: a tela só mostra o motivo quando há um, e uma string vazia obrigaria todo call
+  -- site a distinguir "não regrediu" de "regrediu sem motivo".
+  ALTER TABLE planning_session ADD COLUMN motivo_da_regressao TEXT;
   `
 ]
 

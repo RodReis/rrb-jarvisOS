@@ -240,6 +240,11 @@ export function variaveisDoTema({
     // O peso participa da hierarquia de ação (F03a): primária e perigo são mais pesadas que
     // secundária, e peso sobrevive a qualquer acento — cor sozinha não sobrevive.
     '--jos-peso-medio': PESO.medio,
+    // `semi` faltava aqui, e a `PESO` sempre a teve. Quem escrevia `font-[var(--jos-peso-semi)]`
+    // — Avatar, Feedback, Tabs e a trilha da jornada — caía silenciosamente em 400: variável CSS
+    // indefinida não é erro, é ausência, e `font-weight` volta ao herdado. O sintoma só apareceu
+    // quando a prova visual da M25-F01 mediu o peso **computado** em vez de conferir a classe.
+    '--jos-peso-semi': PESO.semi,
     '--jos-peso-forte': PESO.forte,
     '--jos-camada-overlay': String(CAMADA.overlay),
     '--jos-camada-modal': String(CAMADA.modal),

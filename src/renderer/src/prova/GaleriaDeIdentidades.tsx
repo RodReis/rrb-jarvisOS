@@ -1,7 +1,7 @@
-import { ProvedorDeTema, FundoDaIdentidade } from '../tokens/provider'
-import type { CorAcento } from '../tokens/acento'
-import type { ModoUi, Modulo } from '../tokens/semantic'
-import { Badge, Button, Card, InlineAlert, VoiceMascot } from '../ui'
+import { ProvedorDeTema, FundoDaIdentidade } from '@design/tokens/provider'
+import type { CorAcento } from '@design/tokens/acento'
+import type { ModoUi, Modulo } from '@design/tokens/semantic'
+import { Badge, Button, Card, InlineAlert, VoiceMascot } from '@design/ui'
 
 /**
  * Galeria de prova das identidades (SPEC-DesignSystem-05).

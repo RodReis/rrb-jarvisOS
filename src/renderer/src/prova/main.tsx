@@ -6,8 +6,13 @@ import { GaleriaDeIdentidades } from './GaleriaDeIdentidades'
 import { GaleriaDeShell } from './GaleriaDeShell'
 import { GaleriaDeOperacionais, type CenaOperacional } from './GaleriaDeOperacionais'
 import { Jornada, type TelaDaJornada } from './jornada/Jornada'
-import type { ModoUi, Modulo } from '../tokens/semantic'
-import type { CorAcento } from '../tokens/acento'
+import {
+  GaleriaDaJornadaDePlanejamento,
+  type CenaDaJornada
+} from './GaleriaDaJornadaDePlanejamento'
+import { initI18n } from '@renderer/i18n'
+import type { ModoUi, Modulo } from '@design/tokens/semantic'
+import type { CorAcento } from '@design/tokens/acento'
 import './prova.css'
 
 /**
@@ -41,7 +46,9 @@ const CENAS_POR_GALERIA: Readonly<Record<string, readonly string[]>> = {
   dados: ['estatica', 'dialog', 'alert', 'drawer', 'toasts'],
   operacionais: ['estatica', 'aprovacao', 'remocao'],
   // A jornada da F06: cada 'cena' é uma tela do percurso.
-  jornada: ['choice', 'noa', 'jarvis']
+  jornada: ['choice', 'noa', 'jarvis'],
+  // A trilha de planejamento (M25-F01): cada cena é um estado da trilha, não uma tela.
+  planejamento: ['inicio', 'meio', 'regressao']
 }
 
 const cenaBruta = params.get('cena')
@@ -81,6 +88,14 @@ const GALERIAS = {
     />
   ),
   jornada: () => <Jornada telaInicial={(cenaBruta ?? 'choice') as TelaDaJornada} uiTheme={modo} />,
+  planejamento: () => (
+    <GaleriaDaJornadaDePlanejamento
+      modo={modo}
+      modulo={modulo}
+      acento={acento ?? undefined}
+      cena={(cenaBruta ?? 'meio') as CenaDaJornada}
+    />
+  ),
   controles: () => <GaleriaDeControles modo={modo} modulo={modulo} acento={acento ?? undefined} />
 } as const
 
@@ -106,5 +121,16 @@ if (cenaBruta !== null) {
 }
 
 const galeria = GALERIAS[qual as keyof typeof GALERIAS]()
+
+/*
+ * A galeria de planejamento monta o componente do produto, que traduz por `useTranslation` —
+ * sem i18n inicializado ele renderizaria a **chave crua** e a captura registraria
+ * `jornada.etapas.prompt` no lugar do rótulo. As outras galerias não precisam: elas recebem
+ * texto por prop.
+ *
+ * `await` no topo: o Vite serve como ESM, e renderizar antes de o i18next resolver deixaria o
+ * primeiro frame com as chaves — exatamente o que a captura pegaria.
+ */
+if (qual === 'planejamento') await initI18n('pt-BR')
 
 createRoot(raiz).render(<StrictMode>{galeria}</StrictMode>)

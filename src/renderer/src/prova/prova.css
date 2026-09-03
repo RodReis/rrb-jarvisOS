@@ -8,7 +8,7 @@
  * `@font-face` estivesse quebrado, o teste em jsdom nunca acusaria.
  */
 
-@import '../tokens/fontes.css';
+@import '../../../design/tokens/fontes.css';
 
 /*
  * Fonte de classes explícita.
@@ -20,8 +20,8 @@
  * Foi o primeiro defeito que a captura pegou, e exatamente do tipo que só um navegador revela:
  * os testes em jsdom continuavam verdes, porque consultam papel ARIA e não pintura.
  */
-@source '../ui';
-@source '../tokens';
+@source '../../../design/ui';
+@source '../../../design/tokens';
 /*
  * `../patterns` faltava — a camada nasceu na F04a, depois deste bloco, e ninguém a acrescentou.
  *
@@ -35,7 +35,19 @@
  * tão bem quanto um de 28px. É o mesmo defeito que motivou este bloco na F03a, repetido numa
  * camada nova — e a lição é que `@source` é uma lista que precisa crescer junto com as camadas.
  */
-@source '../patterns';
+@source '../../../design/patterns';
+/*
+ * `../app` — a terceira vez que esta lista fica para trás, e pelo mesmo motivo.
+ *
+ * A galeria da jornada (SPEC-Jornada-01) monta a **trilha do produto**, que mora no renderer:
+ * uma cópia aqui provaria a cópia, não a tela. Sem esta linha os marcadores `size-5` (20px)
+ * renderizavam a 2px — pontinhos —, repetindo à risca o sintoma que o bloco acima descreve
+ * para os swatches da CHOICE.
+ *
+ * Os testes de tela seguiam verdes: `getByRole` acha um marcador de 2px tão bem quanto um de
+ * 20px. Quem pegou foi a captura, que é exatamente para isso que o gate visual existe.
+ */
+@source '../app';
 
 body {
   margin: 0;
