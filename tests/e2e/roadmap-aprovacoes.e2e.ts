@@ -79,9 +79,17 @@ test.beforeEach(async () => {
 })
 
 test.afterEach(async () => {
-  await app.evaluate(({ app: electronApp }) => {
-    electronApp.exit(0)
-  })
+  /*
+   * `exit(0)` **pede** o encerramento; `close()` **espera** por ele.
+   *
+   * Sem a espera, o `rmSync` corre contra um processo que ainda está fechando o SQLite, e no
+   * Linux isso estoura `ENOTEMPTY` no diretório de dados. O teste do caminho feliz, que existia
+   * antes desta fatia, era lento o bastante para o processo já ter morrido; os desta fatia
+   * terminam em menos de um segundo, e a corrida passou a acontecer. A espera é a mesma dos
+   * demais E2E deste repositório, e `catch` porque um app já morto rejeita as duas chamadas.
+   */
+  await app?.evaluate(({ app: electronApp }) => electronApp.exit(0)).catch(() => undefined)
+  await app?.close().catch(() => undefined)
   rmSync(userData, { recursive: true, force: true })
   rmSync(externo, { recursive: true, force: true })
 })
