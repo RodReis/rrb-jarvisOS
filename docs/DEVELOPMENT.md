@@ -1738,6 +1738,28 @@ Status: **entregue** — spec `aprovada-pi` (2026-09-03); issue [#239](https://g
 - **O desabilitado larga o acento** (decisão do PI, 2026-09-03): o `opacity-45` compartilhado levava o rótulo a 1.51:1, e a cor da identidade não deve pintar um alvo que não aceita clique.
 - **O índice de projetos não tinha gate visual** — por isso acumulou o ziguezague das colunas (medido em 584px, 602px e 530px) com 255 testes de tela verdes. Papel ARIA não mede rank visual.
 
+### Polimento do fluxo prompt → construção (UX/UI, sem fatia própria)
+
+Pedido do PI em 2026-09-03, depois da M25-F02: *"melhorar o layout, UX e UI — destacando os aceites, os anexos e os pontos de atenção do fluxo"*. Não é fatia (não há comportamento novo a decidir); é a correção de defeitos de forma que o gate visual expôs, com as decisões de produto levadas ao PI antes de codificar.
+
+**As três decisões que o PI tomou:**
+
+1. **Exemplos para ler, não para clicar** (tela do prompt). A página em branco é o problema real: o campo grande e vazio chega quando o PI tem menos ideia do que escrever. Mas cartão que preenche o campo faria ele partir do texto da IA em vez do problema dele — e a decisão registrada de *"um campo, e nada mais"* existe para a tela não virar formulário. Duas frases curtas, sem controle nenhum, e um teste trava a fronteira: nenhum ancestral clicável, e o campo segue vazio depois do clique.
+2. **A rota é dita antes do clique**, com peso diferente por rota. Gerar gasta uma chamada, e na rota paga gasta dinheiro; as telas mostravam o bloqueio quando **não havia** rota e ficavam mudas quando havia. Assinatura vira uma linha em mono (alerta que aparece sempre para de ser lido); a paga vira `InlineAlert`, porque é o único caso em que a consequência do botão muda de natureza. Bloqueada, nenhum selo aparece.
+3. **O desabilitado larga o acento** (registrado na F02). O `opacity-45` compartilhado levava o rótulo a 1.51:1, e a cor da identidade não deve pintar um alvo que não aceita clique.
+
+**Os defeitos de forma corrigidos**, todos invisíveis em JSDOM e verdes na suíte:
+
+- **Nenhuma tela do fluxo nomeava sua ação primária**, e o default do `Button` é `secundaria`. Criar projeto, abrir a jornada, gerar o brief, gerar as perguntas, responder, anexar, aprovar um gate e gerar a arquitetura saíam todas com o mesmo peso — e o acento escolhido nas configurações não aparecia em tela nenhuma do fluxo. **Aprovar um gate é o aceite do PI**, o ato mais consequente da linha, e era o mais discreto.
+- **A ação primária não tinha aresta** — medida e corrigida no DS, com teste nos 8 acentos × 2 módulos × 2 modos.
+- **O gate de aceite do brief não existia** na tela.
+- **O refinamento não dizia qual é a próxima decisão**, só quantas faltam — o estado já carregava a pergunta inteira, e o número sozinho pedia um compromisso às cegas.
+- **O índice de projetos ziguezagueava**: "Renomear" começava em 584px, 602px e 530px nos três cards, porque o rótulo do CTA vem da etapa e varia.
+
+**Duas telas ganharam galeria de prova** — o índice de projetos e o refinamento. Nenhuma das duas tinha, e é exatamente por isso que os defeitos acima atravessaram 255 testes de tela verdes: **papel ARIA não mede rank visual**. Terceira vez que o projeto aprende isso, depois dos marcadores de 20px a 2px na F01 e do colapso da ação primária na SPEC-DS-03a.
+
+**Limite:** os anexos continuam na etapa `design`, depois do PRD. Oferecê-los na etapa do prompt seria escopo novo, sem spec — o que a tela do prompt ganhou foi o exemplo legível, não um controle de anexo.
+
 ## Registro de entregas
 
 | Data | Fatia | PR | Observação |
