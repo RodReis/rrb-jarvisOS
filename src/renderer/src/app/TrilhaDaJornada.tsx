@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { Check } from 'lucide-react'
 import type { EstadoDaJornada, EtapaNaTrilha } from '@shared/domain/jornada'
+import { exigeAceiteDoPi } from '@shared/domain/jornada'
 import { Button, InlineAlert } from '@design/ui'
 
 /**
@@ -117,7 +118,23 @@ export function TrilhaDaJornada({
               /* `aria-current="step"` é o que faz "você está aqui" existir para quem ouve a
                  interface — sem ele, a etapa atual seria só mais um item da lista. */
               aria-current={atual ? 'step' : undefined}
-              className="flex items-start gap-3 py-2.5"
+              /*
+                A etapa atual ganha superfície própria; as outras onze ficam sobre o fundo.
+                Doze linhas com a mesma densidade obrigavam a **procurar** onde a jornada
+                está — o marcador sozinho carregava esse trabalho num ponto de 20px. O bloco
+                estende o sinal do marcador ao rótulo e à ação, que é o que o olho varre.
+
+                O recuo negativo compensa o padding para o marcador não sair do prumo da
+                espinha: o realce não pode deslocar a coluna que ele destaca.
+              */
+              className={
+                atual
+                  ? // `relative` + fundo opaco: a espinha passa **atrás** de todos os itens, e
+                    // num bloco translúcido ela riscava a caixa de ponta a ponta. Opaco, o
+                    // bloco a interrompe — que é o que "você está aqui" significa numa linha.
+                    'relative -mx-3 flex items-start gap-3 rounded-[var(--jos-raio-card)] border border-[color-mix(in_srgb,var(--jos-cor-acento)_28%,transparent)] bg-[color-mix(in_srgb,var(--jos-cor-acento)_7%,var(--jos-cor-superficie))] px-3 py-3'
+                  : 'flex items-start gap-3 py-2.5'
+              }
             >
               <Marcador posicao={etapa.posicao} />
 
@@ -135,6 +152,27 @@ export function TrilhaDaJornada({
                 </span>
 
                 {/*
+                  As etapas de aceite ficam marcadas **na trilha inteira**, e não só quando
+                  chegam: saber de antemão onde a jornada vai parar para pedir a decisão do PI
+                  é o que separa uma trilha de uma barra de progresso. São cinco das doze.
+
+                  Em mono maiúsculo — a mesma forma que o resto do app usa para metadado — e
+                  não um ícone colorido: é texto, então atravessa daltonismo, escala de cinza e
+                  leitor de tela sem depender de legenda.
+                */}
+                {exigeAceiteDoPi(etapa.etapa) && !concluida && (
+                  <span
+                    className={
+                      atual
+                        ? 'font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] uppercase tracking-[2px] text-[var(--jos-cor-acento-leitura)]'
+                        : 'font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] uppercase tracking-[2px] text-[var(--jos-cor-texto-suave)]'
+                    }
+                  >
+                    {t('jornada.pedeAceite')}
+                  </span>
+                )}
+
+                {/*
                   O botão fica **abaixo** do rótulo, não à direita dele.
 
                   A trilha é uma coluna de 19rem, e ao lado de um rótulo o botão só cabia
@@ -149,7 +187,16 @@ export function TrilhaDaJornada({
                 */}
                 {atual && (
                   <div className="mt-1 flex">
-                    <Button onClick={onAgir} desabilitado={ocupado} carregando={ocupado}>
+                    {/* `primaria`: é o próximo passo da jornada, o único botão da coluna e a
+                        razão de a trilha existir. No default `secundaria` ele saía contornado
+                        e leve — o mesmo peso do "Voltar" — e o acento do usuário, que já pinta
+                        o marcador desta etapa, não chegava à ação que o marcador aponta. */}
+                    <Button
+                      variante="primaria"
+                      onClick={onAgir}
+                      desabilitado={ocupado}
+                      carregando={ocupado}
+                    >
                       {etapa.cta}
                     </Button>
                   </div>

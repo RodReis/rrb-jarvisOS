@@ -1233,6 +1233,99 @@ const MIGRATIONS: readonly string[] = [
   -- aconteceu: a tela só mostra o motivo quando há um, e uma string vazia obrigaria todo call
   -- site a distinguir "não regrediu" de "regrediu sem motivo".
   ALTER TABLE planning_session ADD COLUMN motivo_da_regressao TEXT;
+  `,
+
+  // 31 — o prompt do PI e o brief refinado (SPEC-Jornada-02).
+  //
+  // **Duas tabelas, e a separação é o critério 1.** O prompt é o que o PI escreveu: texto dele,
+  // que vira revisão `PROMPT.md` no Git. O brief é o que a IA produziu a partir dele. Guardá-los
+  // juntos faria "o que o PI disse" e "o que o modelo inferiu" compartilharem uma linha — e é
+  // exatamente essa distinção que a origem por afirmação existe para manter.
+  //
+  // **Append-only nas duas, como `pacote_estrutural`.** Não há `UPDATE`: editar o prompt insere
+  // outra linha, e regenerar o brief insere outro. O critério 4 pede reproduzir *qual* revisão
+  // o PI aceitou, e uma linha editável descreveria um brief que talvez não seja o que ele leu.
+  //
+  // `afirmacoes` e `pendencias` em JSON pelo mesmo motivo que os documentos do pacote: são lidos
+  // e escritos sempre inteiros, junto com o brief, e nunca consultados por campo. Uma tabela por
+  // afirmação só pagaria a junção se alguém quisesse buscar afirmação isolada — ninguém quer.
+  `
+  CREATE TABLE project_prompt (
+    id            TEXT PRIMARY KEY,
+    user_id       TEXT NOT NULL,
+    workspace_id  TEXT NOT NULL,
+    project_id    TEXT NOT NULL,
+    texto         TEXT NOT NULL,
+    -- Hash do conteúdo: é por ele que a revisão é citada e que a invalidação de gate compara.
+    hash          TEXT NOT NULL,
+    -- Commit do marco documental, quando houve. NULL enquanto o prompt não virou revisão.
+    commit_hash   TEXT,
+    created_at    TEXT NOT NULL
+  );
+  CREATE INDEX idx_project_prompt ON project_prompt(user_id, project_id, created_at);
+
+  CREATE TABLE project_brief (
+    id            TEXT PRIMARY KEY,
+    user_id       TEXT NOT NULL,
+    workspace_id  TEXT NOT NULL,
+    project_id    TEXT NOT NULL,
+    -- O prompt que originou este brief. Sem ele, um brief seria texto sem procedência.
+    prompt_id     TEXT NOT NULL,
+    -- JSON das afirmações, cada uma com bloco, texto e origem obrigatória.
+    afirmacoes    TEXT NOT NULL,
+    -- JSON das pendências declaradas; material bloqueia o aceite.
+    pendencias    TEXT NOT NULL,
+    hash          TEXT NOT NULL UNIQUE,
+    commit_hash   TEXT,
+    -- O ContextPack que gerou este brief (SPEC-Planejamento-02): é o manifesto do que foi
+    -- enviado ao modelo, e o critério 7 exige poder reproduzi-lo. (Sem crase no comentário: a
+    -- migration é template literal, e um backtick aqui fecharia a string — o mesmo defeito que
+    -- a M8-F04 registrou.)
+    context_pack_id TEXT,
+    created_at    TEXT NOT NULL
+  );
+  CREATE INDEX idx_project_brief ON project_brief(user_id, project_id, created_at);
+  `,
+
+  // 32 — as perguntas de refinamento geradas por IA (SPEC-Jornada-02, § Refinamento).
+  //
+  // **Por que não é o `decision` sozinho.** `decision` guarda a *resposta*; ele não guarda a
+  // *pergunta* quando ela não vem de um catálogo fixo em código. A M8-F03 podia deixar a
+  // pergunta implícita porque `CATALOGO_DO_CONTEXTO` é código versionado — reabrir o wizard
+  // relia o mesmo array. Aqui a pergunta é gerada por projeto, a partir do prompt daquele
+  // projeto: sem persisti-la, reabrir o projeto no meio do refinamento perderia o enunciado, as
+  // opções e a justificativa que o PI estava lendo.
+  //
+  // **Append-only, a quinta vez com esta postura.** Regenerar recalcula os blocos ainda vazios
+  // e insere as perguntas que faltam; nunca edita uma já feita — se o PI já a respondeu, ela
+  // não deveria mudar de baixo dele.
+  //
+  // `opcoes` em JSON: são sempre lidas e escritas inteiras junto com a pergunta, nunca uma
+  // opção isolada — mesma razão de `afirmacoes` em `project_brief`.
+  `
+  CREATE TABLE pergunta_gerada (
+    id            TEXT PRIMARY KEY,
+    user_id       TEXT NOT NULL,
+    workspace_id  TEXT NOT NULL,
+    project_id    TEXT NOT NULL,
+    -- O brief cuja lacuna esta pergunta preenche.
+    bloco         TEXT NOT NULL,
+    -- Por que o modelo está perguntando isto — mostrado ao PI como justificativa (design §9.1).
+    por_que       TEXT NOT NULL,
+    titulo        TEXT NOT NULL,
+    enunciado     TEXT NOT NULL,
+    -- JSON de OpcaoDaPergunta[]: id, rótulo e impacto por opção.
+    opcoes        TEXT NOT NULL,
+    recomendada   TEXT NOT NULL,
+    justificativa TEXT NOT NULL,
+    aceita_texto_livre INTEGER NOT NULL,
+    delegavel     INTEGER NOT NULL,
+    -- 'pendente' até o PI responder; então vira 'respondida'. Uma pergunta 'respondida' não
+    -- volta a ser oferecida, mesmo que o refinamento seja retomado.
+    estado        TEXT NOT NULL DEFAULT 'pendente',
+    created_at    TEXT NOT NULL
+  );
+  CREATE INDEX idx_pergunta_gerada_projeto ON pergunta_gerada(user_id, project_id, created_at);
   `
 ]
 

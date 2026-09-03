@@ -169,6 +169,7 @@ export function RoadmapDoProjeto({
         <>
           <div className="flex justify-end">
             <Button
+              variante="primaria"
               onClick={() => void gerar()}
               carregando={ocupado === 'gerando'}
               desabilitado={trabalhando}

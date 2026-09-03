@@ -1,4 +1,5 @@
-import { join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { app, BrowserWindow, nativeTheme, shell } from 'electron'
 import { IPC_EVENT_CHANNELS } from '@shared/contracts/ipc'
 import { AuthService } from './auth/auth-service'
@@ -48,6 +49,22 @@ import { PipelineRepository } from './pipeline/pipeline-repository'
 import { ReconciliacaoService } from './pipeline/reconciliacao-service'
 import { RoadmapService } from './projects/roadmap-service'
 import { JornadaService } from './projects/jornada-service'
+import { BriefService } from './projects/brief-service'
+import { BriefRepository } from './projects/brief-repository'
+import { RefinamentoService } from './projects/refinamento-service'
+import { PerguntaGeradaRepository } from './projects/pergunta-gerada-repository'
+import {
+  SISTEMA_DAS_PERGUNTAS,
+  SISTEMA_DO_BRIEF,
+  lerPerguntasDoModelo,
+  lerSaidaDoModelo,
+  promptDaGeracao,
+  promptDasPerguntas
+} from '@shared/domain/brief-schema'
+import { ARQUIVO_DO_PROMPT } from '@shared/domain/brief'
+import type { WorkspaceId } from '@shared/domain/entities'
+import type { AiProvider } from '@shared/domain/ai'
+import type { EstadoDasRotas } from '@shared/domain/rota-de-geracao'
 import { GitRunner } from './projects/git-runner'
 import { DockerRunner, prepararGitMeta, TIMEOUT_DOCKER_MS } from './pipeline/docker-runner'
 import { ConstrutorService } from './pipeline/construtor-service'
@@ -442,6 +459,171 @@ if (!app.requestSingleInstanceLock()) {
       userId: userIdAtual
     })
 
+    // O prompt e o brief refinado (SPEC-Jornada-02).
+    //
+    // **O estado das rotas é lido aqui, e não dentro do serviço**, porque quem sabe se a
+    // assinatura está no ar é o adapter, e quem sabe da quota é o repositório — o serviço só
+    // decide a partir do fato. Injetar a leitura mantém a decisão testável sem Electron.
+    //
+    // `optInDeRotaPaga` é **false fixo por enquanto**: nenhuma superfície o habilita ainda, e o
+    // default tem de ser o que não gasta. Quando a M25-F03 trouxer a preferência por projeto,
+    // é esta linha que passa a lê-la — até lá, a rota paga simplesmente não é alcançável, que é
+    // o comportamento seguro do critério 6.
+    /*
+     * As duas leituras que o brief e o refinamento compartilham — extraídas para constantes
+     * porque as duas gerações atravessam exatamente as mesmas barreiras: a rota decide se o
+     * orçamento é USD ou uso, e o `ContextPack` é a pré-condição de qualquer chamada. Duplicá-las
+     * deixaria as duas gerações divergirem no dia em que uma das cópias mudasse.
+     */
+    const estadoDasRotasDoProjeto = async (
+      _projectId: string,
+      workspace: WorkspaceId
+    ): Promise<EstadoDasRotas> => {
+      const quotaDaAssinatura = quota.ler(userIdAtual(), workspace, 'claude-code')
+      return {
+        assinaturaDisponivel: await claudeCodeAdapter.disponivel(),
+        assinaturaEsgotada: quotaDaAssinatura?.restante === 0,
+        rotaPagaConfigurada:
+          credentials.resolve(userIdAtual(), workspace, 'anthropic') !== undefined,
+        optInDeRotaPaga: false
+      }
+    }
+
+    const montarContextoDoPrompt = (
+      projectId: string,
+      workspace: WorkspaceId,
+      rota: AiProvider
+    ): string | undefined =>
+      contexts.montar(
+        {
+          projectId,
+          tarefa: 'Gerar o brief a partir do prompt do PI',
+          etapa: 'prompt',
+          candidatos: [
+            { caminho: ARQUIVO_DO_PROMPT, origem: 'explicito', motivo: 'Prompt do projeto' }
+          ],
+          rota
+        },
+        workspace
+      ).pack?.id
+
+    const briefRepository = new BriefRepository(storage.db)
+
+    /*
+     * O refinamento vem **antes** do brief porque o brief cita as decisões dele: sem as
+     * respostas do PI no pedido, toda afirmação vinda de uma escolha viraria `proposto`, e a
+     * distinção entre "o PI decidiu" e "a IA inferiu" sumiria justo onde ela mais importa.
+     */
+    const refinamento = new RefinamentoService({
+      perguntas: new PerguntaGeradaRepository(storage.db),
+      decisions: new DecisionRepository(storage.db),
+      projects: projectRepository,
+      audit: storage.audit,
+      userId: userIdAtual,
+      promptVigente: (projectId) => briefRepository.promptVigente(userIdAtual(), projectId)?.texto,
+      estadoDasRotas: estadoDasRotasDoProjeto,
+      montarContexto: montarContextoDoPrompt,
+      gerar: async ({ workspace, prompt, blocosEmAberto, rota, contextPackId }) => {
+        let texto = ''
+
+        for await (const evento of ai.call(
+          {
+            provider: rota,
+            system: SISTEMA_DAS_PERGUNTAS,
+            prompt: promptDasPerguntas(prompt, blocosEmAberto),
+            contextPackId
+          },
+          { userId: userIdAtual(), workspace }
+        )) {
+          if (evento.tipo === 'chunk') {
+            texto += evento.texto
+            continue
+          }
+          if (evento.estado !== 'concluido') return {}
+        }
+
+        const perguntas = lerPerguntasDoModelo(texto)
+        return perguntas === undefined ? {} : { perguntas }
+      }
+    })
+
+    const brief = new BriefService({
+      repository: briefRepository,
+      audit: storage.audit,
+      userId: userIdAtual,
+      decisoesDoRefinamento: (projectId) => refinamento.decisoesParaOBrief(projectId),
+      /*
+       * Escreve `docs/PROMPT.md` e commita como marco documental — mesma sequência do
+       * `PacoteService`: persistir primeiro (já feito no `BriefService`), escrever depois, git
+       * por último, sempre pelo `ProjectService.concluirMarco` (M8-F01, o único gatilho de
+       * commit). Sem isto o prompt nunca vira revisão, e `montarContexto` abaixo não teria o
+       * que citar — a geração ficaria presa em "sem ContextPack" para sempre.
+       */
+      registrarPromptNoDisco: (projectId, texto, workspace) => {
+        const projeto = projectRepository.findById(userIdAtual(), projectId)
+        if (projeto === undefined) return undefined
+
+        const alvo = resolve(join(projeto.diretorio, ARQUIVO_DO_PROMPT))
+        const raiz = resolve(projeto.diretorio)
+        // Mesma barreira de contenção do `PacoteService`: o caminho é constante, nunca vem do
+        // chamador, mas a checagem custa uma linha e constante hoje não é constante para sempre.
+        if (!alvo.startsWith(raiz)) return undefined
+
+        mkdirSync(dirname(alvo), { recursive: true })
+        writeFileSync(alvo, texto, 'utf8')
+
+        const marco = projects.concluirMarco(projectId, 'prompt-registrado', workspace)
+        return marco === undefined
+          ? undefined
+          : { ...(marco.commitHash === undefined ? {} : { commitHash: marco.commitHash }) }
+      },
+      /*
+       * Monta o `ContextPack` a partir do `PROMPT.md` já commitado (SPEC-Planejamento-02,
+       * critério 1) — a mesma barreira que qualquer outra geração do produto atravessa. O
+       * candidato é `explicito`: é o caminho preferencial da spec, o que a própria geração
+       * pediu para ler, não algo que uma busca estrutural encontrou.
+       */
+      montarContexto: montarContextoDoPrompt,
+      estadoDasRotas: estadoDasRotasDoProjeto,
+      /*
+       * A geração, pelo **ponto único** — nunca chamando o adapter direto.
+       *
+       * É a mesma fronteira que o `PublicacaoService` respeita com o `ConnectorService`: o gate
+       * de orçamento, a policy, o registro de custo e a auditoria vivem dentro do `call()`, e um
+       * adapter injetado aqui seria o segundo caminho sem gate.
+       *
+       * `provider` explícito, e não `taskType`: a rota já **foi decidida** pelo serviço, com o
+       * bloqueio do critério 6 aplicado antes. Deixar o roteamento escolher de novo aqui
+       * desfaria essa decisão — e poderia cair na rota paga que ninguém autorizou.
+       */
+      gerar: async ({ workspace, prompt, rota, contextPackId, decisoes, correcao }) => {
+        let texto = ''
+
+        for await (const evento of ai.call(
+          {
+            provider: rota,
+            system: SISTEMA_DO_BRIEF,
+            prompt: promptDaGeracao(prompt, decisoes, correcao),
+            contextPackId
+          },
+          { userId: userIdAtual(), workspace }
+        )) {
+          if (evento.tipo === 'chunk') {
+            texto += evento.texto
+            continue
+          }
+
+          // `fim` fecha o stream. Estado diferente de concluído devolve saída ausente: a
+          // distinção entre "a chamada falhou" e "veio inválida" é o que o serviço usa para
+          // decidir se vale corrigir.
+          if (evento.estado !== 'concluido') return {}
+        }
+
+        const saida = lerSaidaDoModelo(texto)
+        return saida === undefined ? {} : { saida }
+      }
+    })
+
     // Publicação no GitHub (SPEC-Entrega-01). Recebe o `ConnectorService`, **não** o
     // `GithubAdapter`: o gate de créditos, a policy e a auditoria vivem dentro do `call()`, e um
     // adapter injetado aqui seria o segundo caminho sem gate — o mesmo erro que o `GitRunner`
@@ -614,6 +796,8 @@ if (!app.requestSingleInstanceLock()) {
       anexos,
       roadmap,
       jornada,
+      brief,
+      refinamento,
       publicacao,
       mergePolicy,
       fila,

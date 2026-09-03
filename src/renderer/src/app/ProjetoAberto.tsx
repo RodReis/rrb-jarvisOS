@@ -11,6 +11,9 @@ import { WizardDoProjeto } from './WizardDoProjeto'
 import { PacoteDoProjeto } from './PacoteDoProjeto'
 import { AnexosDeDesign } from './AnexosDeDesign'
 import { RoadmapDoProjeto } from './RoadmapDoProjeto'
+import { PromptDoProjeto } from './PromptDoProjeto'
+import { BriefDoProjeto } from './BriefDoProjeto'
+import { RefinamentoDoProjeto } from './RefinamentoDoProjeto'
 
 /**
  * Um projeto aberto: a trilha da jornada e o conteúdo da etapa atual (SPEC-Jornada-01).
@@ -163,7 +166,13 @@ export function ProjetoAberto({
             data-jos-conteudo-da-etapa
             className="flex min-w-0 flex-1 flex-col gap-4 border-t border-[rgba(var(--jos-borda-rgb),0.10)] pt-6 lg:border-l lg:border-t-0 lg:pl-10 lg:pt-0"
           >
-            <ConteudoDaEtapa workspace={workspace} projeto={projeto} estado={estado} />
+            <ConteudoDaEtapa
+              workspace={workspace}
+              projeto={projeto}
+              estado={estado}
+              onRecarregar={() => void carregar()}
+              onAbrirPerguntas={() => setRespondendo(true)}
+            />
           </div>
         </div>
       )}
@@ -174,10 +183,29 @@ export function ProjetoAberto({
           projectId={projeto.id}
           nomeDoProjeto={projeto.nome}
           aberto
+          /*
+           * O refinamento tem fonte própria (M25-F02): as perguntas são geradas por projeto, não
+           * lidas do catálogo estático. A tela é a mesma de propósito — a decisão que ela conduz
+           * é idêntica, e duplicá-la criaria duas superfícies que divergiriam na primeira
+           * correção feita só numa delas.
+           */
+          fonte={{
+            ler: async () => {
+              const [estadoDoRefinamento, historico] = await Promise.all([
+                window.jarvis.estadoDoRefinamento(projeto.id, workspace),
+                window.jarvis.historicoDoRefinamento(projeto.id, workspace)
+              ])
+              return estadoDoRefinamento === null
+                ? null
+                : { estado: estadoDoRefinamento, historico }
+            },
+            responder: (resposta) =>
+              window.jarvis.responderRefinamento(projeto.id, resposta, workspace)
+          }}
           onFechar={() => {
             setRespondendo(false)
-            // Reler ao fechar: responder o wizard é o que sustenta os eventos de prompt e
-            // refinamento, e a trilha ficaria mostrando a etapa velha até um F5.
+            // Reler ao fechar: responder o refinamento é o que sustenta os eventos da jornada,
+            // e a trilha ficaria mostrando a etapa velha até um F5.
             void carregar()
           }}
         />
@@ -196,18 +224,58 @@ export function ProjetoAberto({
 function ConteudoDaEtapa({
   workspace,
   projeto,
-  estado
+  estado,
+  onRecarregar,
+  onAbrirPerguntas
 }: {
   readonly workspace: WorkspaceId
   readonly projeto: Project
   readonly estado: EstadoDaJornada
+  /** Relê a jornada depois de um ato que a move — sem isso a trilha ficaria na etapa velha. */
+  readonly onRecarregar: () => void
+  /** Abre o pop-up de perguntas. A tela de refinamento pede; quem monta o pop-up é o pai. */
+  readonly onAbrirPerguntas: () => void
 }): React.JSX.Element {
   const { t } = useTranslation()
 
   switch (estado.etapa) {
+    // O prompt é a etapa que faltava: em nenhum momento do MVP-008 o PI dizia o que o projeto
+    // é (SPEC-Jornada-02, critério 1).
+    case 'prompt':
+      return (
+        <PromptDoProjeto
+          workspace={workspace}
+          projectId={projeto.id}
+          nomeDoProjeto={projeto.nome}
+          onAvancar={onRecarregar}
+        />
+      )
+
+    // O refinamento: a IA pergunta o que o prompt não respondeu, uma decisão por vez.
+    case 'refinamento':
+      return (
+        <RefinamentoDoProjeto
+          workspace={workspace}
+          projectId={projeto.id}
+          nomeDoProjeto={projeto.nome}
+          onResponder={onAbrirPerguntas}
+          onRecarregar={onRecarregar}
+        />
+      )
+
+    // O gate do brief: é aqui que o PI vê o que a IA inferiu e corta item a item.
+    case 'brief-aceito':
+      return (
+        <BriefDoProjeto
+          workspace={workspace}
+          projectId={projeto.id}
+          nomeDoProjeto={projeto.nome}
+          onAceito={onRecarregar}
+        />
+      )
+
     case 'prd':
     case 'prd-aceito':
-    case 'brief-aceito':
       return (
         <PacoteDoProjeto
           workspace={workspace}

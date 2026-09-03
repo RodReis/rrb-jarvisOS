@@ -95,6 +95,12 @@ import type { MergePolicyService } from '../pipeline/merge-policy-service'
 import type { FilaService } from '../pipeline/fila-service'
 import type { RoadmapService } from '../projects/roadmap-service'
 import type { JornadaService } from '../projects/jornada-service'
+import type { BriefService } from '../projects/brief-service'
+import type { RefinamentoService } from '../projects/refinamento-service'
+import type { GeracaoDePerguntasOutcome } from '@shared/domain/refinamento'
+import type { Decision, EstadoDoWizard, Resposta } from '@shared/domain/wizard'
+import type { BriefRegistrado, GeracaoOutcome, PromptDoProjeto } from '@shared/domain/brief'
+import type { ResultadoDaRota } from '@shared/domain/rota-de-geracao'
 import type { EstadoDaJornada, TransicaoOutcome } from '@shared/domain/jornada'
 import type { AnexoService } from '../projects/anexo-service'
 import { isConnectorId } from '@shared/domain/connectors'
@@ -302,6 +308,8 @@ export interface IpcDependencies {
   readonly anexos: AnexoService
   readonly roadmap: RoadmapService
   readonly jornada: JornadaService
+  readonly brief: BriefService
+  readonly refinamento: RefinamentoService
   readonly publicacao: PublicacaoService
   /** O kill-switch do merge autônomo (SPEC-Entrega-02/05). */
   readonly mergePolicy: MergePolicyService
@@ -1491,6 +1499,160 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
         return null
       }
       return deps.jornada.aplicarEvento(projectId, evento, workspace) ?? null
+    }
+  )
+
+  /**
+   * O prompt e o brief (SPEC-Jornada-02).
+   *
+   * **Nenhum handler recebe afirmação nem texto de brief.** O renderer pede o ato; o conteúdo é
+   * produzido e validado no main. Um canal que aceitasse o brief pronto seria o caminho por onde
+   * uma afirmação sem origem entraria — o que os critérios 3 e 4 existem para impedir.
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.briefSalvarPrompt,
+    (_event, projectId: unknown, texto: unknown, workspace: unknown): PromptDoProjeto | null => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string' || typeof texto !== 'string') {
+        return null
+      }
+      return deps.brief.salvarPrompt(projectId, texto, workspace) ?? null
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.briefLerPrompt,
+    (_event, projectId: unknown, workspace: unknown): PromptDoProjeto | null => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return null
+      return deps.brief.lerPrompt(projectId) ?? null
+    }
+  )
+
+  /**
+   * Gera o brief. Devolve o desfecho **inclusive nas recusas**: "nenhuma rota autorizada" é
+   * resposta legítima que o PI lê com a ação nomeada, não erro a rejeitar.
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.briefGerar,
+    async (_event, projectId: unknown, workspace: unknown): Promise<GeracaoOutcome> => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
+        return { resultado: 'projeto-inexistente', mensagem: 'Projeto não encontrado.' }
+      }
+      return await deps.brief.gerarBrief(projectId, workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.briefCarregar,
+    (_event, projectId: unknown, workspace: unknown): BriefRegistrado | null => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return null
+      return deps.brief.carregar(projectId) ?? null
+    }
+  )
+
+  /** A rota que seria usada agora, sem gerar. É o que deixa a tela mostrar o bloqueio antes. */
+  ipcMain.handle(
+    IPC_CHANNELS.briefRota,
+    async (_event, projectId: unknown, workspace: unknown): Promise<ResultadoDaRota> => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
+        return {
+          decisao: 'bloqueado',
+          motivo: 'sem-rota-alguma',
+          acao: 'Projeto não encontrado.'
+        }
+      }
+      return await deps.brief.rotaAtual(projectId, workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.briefCortarProposto,
+    (
+      _event,
+      projectId: unknown,
+      afirmacaoId: unknown,
+      workspace: unknown
+    ): BriefRegistrado | null => {
+      if (
+        !isWorkspaceId(workspace) ||
+        typeof projectId !== 'string' ||
+        typeof afirmacaoId !== 'string'
+      ) {
+        return null
+      }
+      return deps.brief.cortarProposto(projectId, afirmacaoId, workspace) ?? null
+    }
+  )
+
+  /**
+   * O refinamento por perguntas geradas (SPEC-Jornada-02).
+   *
+   * **Nenhum handler recebe o enunciado da pergunta.** A pergunta vive no banco desde que foi
+   * gerada; aceitá-la de volta deixaria o renderer reescrever o que o PI leu, e a decisão
+   * gravada citaria uma pergunta que talvez nunca tenha sido feita.
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.refinamentoGerar,
+    async (_event, projectId: unknown, workspace: unknown): Promise<GeracaoDePerguntasOutcome> => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
+        return { resultado: 'sem-prompt', mensagem: 'Projeto não encontrado.' }
+      }
+      return await deps.refinamento.gerarPerguntas(projectId, workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.refinamentoEstado,
+    (_event, projectId: unknown, workspace: unknown): EstadoDoWizard | null => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return null
+      return deps.refinamento.estado(projectId) ?? null
+    }
+  )
+
+  /**
+   * Registra a resposta. A **forma** é validada aqui; o vocabulário (a escolha ser uma opção
+   * real, a delegação ser permitida) é do serviço — barrar aqui duplicaria a regra em dois
+   * lugares que divergiriam.
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.refinamentoResponder,
+    (_event, projectId: unknown, resposta: unknown, workspace: unknown): RespostaOutcome => {
+      const invalida: RespostaOutcome = {
+        reason: 'projeto-inexistente',
+        mensagem: 'Projeto não encontrado.'
+      }
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return invalida
+
+      const r = resposta as Partial<Resposta> | null
+      if (
+        r === null ||
+        typeof r !== 'object' ||
+        typeof r.perguntaId !== 'string' ||
+        (r.escolha !== null && typeof r.escolha !== 'string') ||
+        (r.texto !== null && typeof r.texto !== 'string') ||
+        (r.autor !== 'pi' && r.autor !== 'agente')
+      ) {
+        return { reason: 'escolha-invalida', mensagem: 'Resposta com forma inválida.' }
+      }
+
+      return deps.refinamento.responder(
+        projectId,
+        {
+          perguntaId: r.perguntaId,
+          escolha: r.escolha ?? null,
+          texto: r.texto ?? null,
+          autor: r.autor,
+          ...(r.aceitarSubstituicao === true ? { aceitarSubstituicao: true } : {})
+        },
+        workspace
+      )
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.refinamentoHistorico,
+    (_event, projectId: unknown, workspace: unknown): readonly Decision[] => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return []
+      return deps.refinamento.historico(projectId)
     }
   )
 

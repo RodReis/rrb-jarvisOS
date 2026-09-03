@@ -110,8 +110,82 @@ export const RECURSOS = {
         abrir: 'Abrir {{nome}}',
         voltar: 'Voltar aos projetos'
       },
+      prompt: {
+        titulo: 'O prompt do projeto',
+        // Diz o que fazer e o que acontece depois. O PI escreve melhor sabendo que o texto vira
+        // perguntas, não um documento final.
+        descricao:
+          'Descreva {{nome}} como você contaria a alguém. A IA vai perguntar o que faltar.',
+        rotulo: 'O que você quer construir',
+        ajuda: 'Escreva livremente. Não precisa de estrutura nem de termos técnicos.',
+        placeholder: 'Ex.: um app que organiza minhas leituras e me lembra do que parei no meio…',
+        carregando: 'Carregando o prompt…',
+        gerar: 'Gerar o brief',
+        escrevaAlgo: 'Escreva o prompt para continuar.',
+        semRota: 'A geração está indisponível',
+        naoGerou: 'O brief não foi gerado',
+        falha: 'Não foi possível gerar o brief. Tente de novo.'
+      },
+      brief: {
+        titulo: 'Brief do projeto',
+        descricao:
+          'O que o app entendeu sobre {{nome}}. Cada afirmação diz de onde veio; corte o que não serve antes de aceitar.',
+        carregando: 'Carregando o brief…',
+        vazio: 'Nenhum brief ainda',
+        vazioDescricao: 'Escreva o prompt e gere o brief para ver o que o app entendeu.',
+        cortar: 'Cortar',
+        cortarEsta: 'Cortar a afirmação: {{texto}}',
+        pendenciaMaterial: 'Falta decidir antes de aceitar',
+        // O aceite do brief (SPEC-Jornada-02, critério 5). O rótulo diz o que o clique
+        // faz — congela o documento e libera a próxima etapa —, não um "OK" genérico.
+        aceitar: 'Aceitar o brief',
+        aceiteTitulo: 'Aceite do brief',
+        aceiteDescricao:
+          'Aceitar congela este brief como base do PRD. Corte o que não serve antes: depois do aceite, mudar exige refazer a etapa.',
+        aceiteBloqueado: 'Resolva as pendências acima para aceitar.',
+        aceiteFalhou: 'Não foi possível registrar o aceite. Tente de novo.',
+        propostosTitulo: '{{count}} afirmações propostas pela IA',
+        // Diz o que distingue estas das outras: ninguém as disse, foram inferidas.
+        propostosDescricao:
+          'Ninguém disse isto — a IA inferiu a partir do prompt. Corte o que não faz sentido.',
+        origem: {
+          prompt: 'do seu prompt',
+          decisao: 'da sua decisão',
+          proposto: 'proposto pela IA'
+        },
+        blocos: {
+          identidade: 'Identidade',
+          'problema-usuarios-resultado': 'Problema, usuários e resultado',
+          'escopo-e-metricas': 'Escopo e métricas',
+          jornadas: 'Jornadas',
+          'dominio-e-dados': 'Domínio e dados',
+          integracoes: 'Integrações',
+          'stack-e-restricoes': 'Stack e restrições',
+          'nao-funcionais-e-testes': 'Não funcionais e testes',
+          'politica-git-provider-orcamento': 'Política, provider e orçamento',
+          'riscos-e-decisoes-abertas': 'Riscos e decisões abertas'
+        }
+      },
+      refinamento: {
+        titulo: 'Refinamento',
+        // Diz o que o refinamento faz e o que ele cobra: decisões, não formulário.
+        descricao: 'A IA pergunta o que o prompt de {{nome}} não respondeu. Uma decisão por vez.',
+        carregando: 'Carregando o refinamento…',
+        gerar: 'Gerar as perguntas',
+        gerarMais: 'Procurar o que ainda falta',
+        responder: 'Responder a próxima',
+        // O número diz ao PI se ele começa agora ou depois. Um botão sem essa conta pediria
+        // um compromisso de duração desconhecida.
+        restantes: '{{count}} decisões pendentes.',
+        concluido: 'Todas as perguntas foram respondidas.',
+        semRota: 'A geração está indisponível',
+        naoGerou: 'As perguntas não foram geradas',
+        falha: 'Não foi possível gerar as perguntas. Tente de novo.'
+      },
       jornada: {
         titulo: 'Jornada de planejamento',
+        // Marca as cinco etapas que param para a decisão do PI. Curto porque repete na coluna.
+        pedeAceite: 'Pede seu aceite',
         // Diz o que a trilha é e o que ela cobra. "Uma etapa por vez" é a regra visível: o PI
         // não escolhe por onde começar, e saber disso evita procurar um atalho que não existe.
         descricao: 'Uma etapa por vez. Aceites são seus; o resto o app prepara.',
@@ -477,8 +551,72 @@ export const RECURSOS = {
         abrir: 'Open {{nome}}',
         voltar: 'Back to projects'
       },
+      prompt: {
+        titulo: 'The project prompt',
+        descricao: 'Describe {{nome}} as you would to a person. The AI will ask what is missing.',
+        rotulo: 'What you want to build',
+        ajuda: 'Write freely. No structure or technical terms needed.',
+        placeholder: 'e.g. an app that organizes my reading and reminds me what I left halfway…',
+        carregando: 'Loading the prompt…',
+        gerar: 'Generate the brief',
+        escrevaAlgo: 'Write the prompt to continue.',
+        semRota: 'Generation is unavailable',
+        naoGerou: 'The brief was not generated',
+        falha: 'Could not generate the brief. Try again.'
+      },
+      brief: {
+        titulo: 'Project brief',
+        descricao:
+          'What the app understood about {{nome}}. Every statement says where it came from; cut what does not fit before accepting.',
+        carregando: 'Loading the brief…',
+        vazio: 'No brief yet',
+        vazioDescricao: 'Write the prompt and generate the brief to see what the app understood.',
+        cortar: 'Cut',
+        cortarEsta: 'Cut the statement: {{texto}}',
+        pendenciaMaterial: 'Decide this before accepting',
+        aceitar: 'Accept the brief',
+        aceiteTitulo: 'Brief acceptance',
+        aceiteDescricao:
+          'Accepting freezes this brief as the basis for the PRD. Cut what does not belong first: after acceptance, changing it means redoing the stage.',
+        aceiteBloqueado: 'Resolve the pending items above to accept.',
+        aceiteFalhou: 'Could not record the acceptance. Try again.',
+        propostosTitulo: '{{count}} statements proposed by the AI',
+        propostosDescricao:
+          'Nobody said this — the AI inferred it from the prompt. Cut what does not make sense.',
+        origem: {
+          prompt: 'from your prompt',
+          decisao: 'from your decision',
+          proposto: 'proposed by the AI'
+        },
+        blocos: {
+          identidade: 'Identity',
+          'problema-usuarios-resultado': 'Problem, users and outcome',
+          'escopo-e-metricas': 'Scope and metrics',
+          jornadas: 'Journeys',
+          'dominio-e-dados': 'Domain and data',
+          integracoes: 'Integrations',
+          'stack-e-restricoes': 'Stack and constraints',
+          'nao-funcionais-e-testes': 'Non-functional and tests',
+          'politica-git-provider-orcamento': 'Policy, provider and budget',
+          'riscos-e-decisoes-abertas': 'Risks and open decisions'
+        }
+      },
+      refinamento: {
+        titulo: 'Refinement',
+        descricao: 'The AI asks what the prompt for {{nome}} left out. One decision at a time.',
+        carregando: 'Loading refinement…',
+        gerar: 'Generate the questions',
+        gerarMais: 'Look for what is still missing',
+        responder: 'Answer the next one',
+        restantes: '{{count}} decisions pending.',
+        concluido: 'All questions have been answered.',
+        semRota: 'Generation is unavailable',
+        naoGerou: 'The questions were not generated',
+        falha: 'Could not generate the questions. Try again.'
+      },
       jornada: {
         titulo: 'Planning journey',
+        pedeAceite: 'Needs your acceptance',
         descricao: 'One step at a time. Approvals are yours; the app prepares the rest.',
         carregando: 'Loading the journey…',
         regrediu: 'The journey moved back a step',

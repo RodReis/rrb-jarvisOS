@@ -323,6 +323,7 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
             // ação que não pode ser executada onde é lida não é a próxima ação, é uma referência.
             <div className="mt-1 flex flex-wrap items-center gap-2">
               <Button
+                variante="primaria"
                 onClick={() => void permitirGit()}
                 carregando={ocupado}
                 desabilitado={ocupado}
@@ -372,7 +373,12 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
               pousarem na altura do input. Valor derivado da estrutura do `Field`, não um número
               escolhido a olho: rótulo em micro (~1rem de caixa) + `gap-2`. */}
           <div className="flex flex-wrap gap-2 pt-[calc(1rem+0.5rem)]">
+            {/* `primaria`: criar é a tarefa dominante da tela, e o acento escolhido nas
+                configurações é o que diz isso. Sem variante, o botão caía no default
+                `secundaria` — a ação que o fluxo espera ficava com o mesmo peso de "Importar",
+                e a paleta do usuário não aparecia em lugar nenhum da tela. */}
             <Button
+              variante="primaria"
               onClick={() => void criar()}
               desabilitado={ocupado || nome.trim().length === 0}
               carregando={ocupado && !podeCorrigirGit}
@@ -437,8 +443,15 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
                       {/* Origem em mono maiúsculo: metadado de máquina, e o DS já usa essa forma
                           para o mesmo papel em Providers e Orçamento. Repetir a convenção é o
                           que faz a tela nova parecer parte do app, e não um enxerto. */}
+                      {/*
+                        A origem tem largura fixa para as colunas de botão **alinharem entre os
+                        cards**. Sem isso, "CRIADO" e "IMPORTADO" têm larguras diferentes e
+                        empurram os três botões de cada linha para uma posição distinta: a pilha
+                        vira um ziguezague, e o olho perde a coluna que ele varre para achar o
+                        próximo passo. `text-right` mantém o rótulo colado no que vem depois.
+                      */}
                       {!editando && !confirmando && (
-                        <span className="font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] uppercase tracking-[2px] text-[var(--jos-cor-acento-leitura)]">
+                        <span className="w-[5.5rem] shrink-0 text-right font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] uppercase tracking-[2px] text-[var(--jos-cor-acento-leitura)]">
                           {projeto.origem === 'criado'
                             ? t('projetos.criado')
                             : t('projetos.importado')}
@@ -448,6 +461,7 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
                       {editando ? (
                         <>
                           <Button
+                            variante="primaria"
                             onClick={() => void renomear(projeto.id, projeto.nome)}
                             desabilitado={ocupado}
                           >
@@ -487,14 +501,30 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
                               "Aceitar o brief" —, então o card diz o próximo passo em vez de um
                               "Abrir" genérico que obrigaria a entrar para descobrir.
                             */}
-                            <Button
-                              onClick={() => setProjetoAbertoId(projeto.id)}
-                              aria-label={t('projetos.abrir', { nome: projeto.nome })}
-                              iconeInicial={<Wand2 aria-hidden="true" className="size-4" />}
-                            >
-                              {jornadaPorProjeto.get(projeto.id)?.cta ??
-                                t('projetos.abrir', { nome: projeto.nome })}
-                            </Button>
+                            {/*
+                              O CTA fica numa caixa de largura mínima porque o rótulo vem da
+                              etapa e varia muito — "Escrever o prompt" contra "Acompanhar a
+                              construção". Sem piso, cada card empurrava a fileira inteira para
+                              uma posição diferente: medido, "Renomear" começava em 584px, 602px
+                              e 530px nos três cards. O piso é o CTA mais largo que as doze
+                              etapas produzem — "Acompanhar a construção", 273px — arredondado
+                              para cima; `justify-end` mantém o botão colado na borda.
+
+                              A largura mora no wrapper e não numa classe do `Button`: o DS não
+                              aceita estilo de fora, e é a regra certa — quem posiciona é o
+                              layout, não o controle.
+                            */}
+                            <div className="flex min-w-[17.5rem] justify-end">
+                              <Button
+                                variante="primaria"
+                                onClick={() => setProjetoAbertoId(projeto.id)}
+                                aria-label={t('projetos.abrir', { nome: projeto.nome })}
+                                iconeInicial={<Wand2 aria-hidden="true" className="size-4" />}
+                              >
+                                {jornadaPorProjeto.get(projeto.id)?.cta ??
+                                  t('projetos.abrir', { nome: projeto.nome })}
+                              </Button>
+                            </div>
                           </>
                         )
                       )}

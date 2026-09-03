@@ -51,13 +51,22 @@ import type {
   Project,
   ProjectOutcome
 } from '@shared/domain/projects'
-import type { Resposta, RespostaOutcome, VistaDoWizard } from '@shared/domain/wizard'
+import type {
+  Decision,
+  EstadoDoWizard,
+  Resposta,
+  RespostaOutcome,
+  VistaDoWizard
+} from '@shared/domain/wizard'
+import type { GeracaoDePerguntasOutcome } from '@shared/domain/refinamento'
 import type { PacoteEstrutural, PacoteOutcome } from '@shared/domain/pacote-estrutural'
 import type { Anexo, AnexoOutcome, TipoDeAnexo } from '@shared/domain/anexos-de-design'
 import type { ValidacaoDoPrototipo } from '@shared/domain/validacao-de-prototipo'
 import type { ArquiteturaOutcome, PacoteArquitetura } from '@shared/domain/arquitetura'
 import type { Roadmap, RoadmapOutcome } from '@shared/domain/roadmap'
 import type { EstadoDaJornada, TransicaoOutcome } from '@shared/domain/jornada'
+import type { BriefRegistrado, GeracaoOutcome, PromptDoProjeto } from '@shared/domain/brief'
+import type { ResultadoDaRota } from '@shared/domain/rota-de-geracao'
 import type {
   Approval,
   AprovacaoOutcome,
@@ -360,6 +369,54 @@ const bridge: JarvisBridge = {
     workspace: WorkspaceId
   ): Promise<TransicaoOutcome | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.jornadaEvento, projectId, evento, workspace),
+  // O prompt e o brief (SPEC-Jornada-02). Nenhum canal aceita afirmação nem texto de brief: a
+  // tela pede o ato e mostra o que voltou, e o conteúdo é validado no main antes de gravar.
+  salvarPromptDoProjeto: (
+    projectId: string,
+    texto: string,
+    workspace: WorkspaceId
+  ): Promise<PromptDoProjeto | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.briefSalvarPrompt, projectId, texto, workspace),
+  lerPromptDoProjeto: (
+    projectId: string,
+    workspace: WorkspaceId
+  ): Promise<PromptDoProjeto | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.briefLerPrompt, projectId, workspace),
+  gerarBrief: (projectId: string, workspace: WorkspaceId): Promise<GeracaoOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.briefGerar, projectId, workspace),
+  carregarBrief: (projectId: string, workspace: WorkspaceId): Promise<BriefRegistrado | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.briefCarregar, projectId, workspace),
+  rotaDaGeracao: (projectId: string, workspace: WorkspaceId): Promise<ResultadoDaRota> =>
+    ipcRenderer.invoke(IPC_CHANNELS.briefRota, projectId, workspace),
+  cortarPropostoDoBrief: (
+    projectId: string,
+    afirmacaoId: string,
+    workspace: WorkspaceId
+  ): Promise<BriefRegistrado | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.briefCortarProposto, projectId, afirmacaoId, workspace),
+  // O refinamento: gerar as perguntas, ler o estado, responder e consultar a trilha. Nenhum
+  // canal recebe o enunciado de volta — só o id da pergunta que já está no banco.
+  gerarPerguntasDeRefinamento: (
+    projectId: string,
+    workspace: WorkspaceId
+  ): Promise<GeracaoDePerguntasOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.refinamentoGerar, projectId, workspace),
+  estadoDoRefinamento: (
+    projectId: string,
+    workspace: WorkspaceId
+  ): Promise<EstadoDoWizard | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.refinamentoEstado, projectId, workspace),
+  responderRefinamento: (
+    projectId: string,
+    resposta: Resposta,
+    workspace: WorkspaceId
+  ): Promise<RespostaOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.refinamentoResponder, projectId, resposta, workspace),
+  historicoDoRefinamento: (
+    projectId: string,
+    workspace: WorkspaceId
+  ): Promise<readonly Decision[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.refinamentoHistorico, projectId, workspace),
   // O alvo atravessa a ponte; a credencial não. O token é resolvido no main, pelo mesmo cofre do
   // conector — mandá-lo daqui exigiria que o renderer o tivesse, e ele nunca tem.
   publicarNoGitHub: (

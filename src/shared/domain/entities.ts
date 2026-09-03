@@ -343,7 +343,15 @@ export const AUDIT_EVENT_TYPES = [
   // SPEC-Jornada-01, critério 7: invalidação de gate regrediu a jornada. Separado do recálculo
   // porque a causa é outra — um documento a montante mudou semanticamente —, e a tela precisa
   // dizer o motivo ao PI.
-  'journey-stage-regressed'
+  'journey-stage-regressed',
+  // SPEC-Jornada-02: a geração do brief por modelo — prompt salvo, início, saída recusada,
+  // perguntas barradas pelo validador, bloqueio por falta de rota e desfecho.
+  //
+  // Tipo próprio, e **não** `ai-call`: aquele registra que uma chamada aconteceu. A pergunta que
+  // este responde é outra e é a do critério 6 — *a geração aconteceu, e por qual rota?* O
+  // bloqueio é o caso que prova a diferença: ele é um evento **sem** chamada nenhuma, e sob um
+  // tipo de chamada ele não teria onde existir.
+  'brief-generation'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]

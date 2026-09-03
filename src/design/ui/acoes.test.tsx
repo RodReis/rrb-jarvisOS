@@ -2,6 +2,9 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { Button, ButtonGroup, IconButton, Link } from './index'
+import { contraste, PALETA_ACENTO } from '../tokens/acento'
+import { bordaRgb, papeis } from '../tokens/semantic'
+import type { ModoUi, Modulo } from '../tokens/semantic'
 
 /**
  * Ações (SPEC-DesignSystem-03a, critérios 1, 2 e 6; PRD §11.1).
@@ -158,5 +161,57 @@ describe('Link', () => {
     expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'))
     // O aviso é texto, não só a setinha — ícone sozinho não chega a quem não o vê.
     expect(link).toHaveTextContent(/abre em nova aba/i)
+  })
+})
+
+/**
+ * A aresta da ação primária (WCAG 2.2 — limite de componente, 3:1).
+ *
+ * Nasceu de um defeito real, achado na captura clara do gate do brief: a borda repetia o
+ * acento, e repetindo não acrescentava aresta nenhuma. Cinco dos oito swatches deixavam o
+ * botão primário como um bloco sem contorno sobre a página clara — `#FFFFE3` mede 1.07:1
+ * contra o fundo, `#2CFF05` 1.25:1 e `#C4C4C4`, **o default de fábrica**, 1.60:1. O
+ * desabilitado ficava indistinguível do ativo.
+ *
+ * O teste mede a borda **composta sobre o acento**, que é o que o olho vê: `rgba()` sobre o
+ * preenchimento, e o resultado contra o fundo da página. Afirmar a string da classe passaria
+ * verde com qualquer alfa — inclusive um que voltasse a apagar a aresta.
+ */
+describe('borda da ação primária', () => {
+  const ALFA = 0.6
+  const MODULOS: readonly Modulo[] = ['jarvis', 'noa']
+  const MODOS: readonly ModoUi[] = ['dark', 'light']
+
+  /** O fundo real do app, lido do token — aproximá-lo por um literal mediria outra tela. */
+  const fundo = (modulo: Modulo, modo: ModoUi): string => papeis(modulo, modo).surface
+
+  /** Compõe `rgba(rgb, alfa)` sobre uma cor sólida — o que o navegador pinta. */
+  function compor(rgb: string, alfa: number, sobre: string): string {
+    const [r, g, b] = rgb.split(',').map(Number)
+    const base = [1, 3, 5].map((i) => Number.parseInt(sobre.slice(i, i + 2), 16))
+    const canal = (v: number, i: number): string =>
+      Math.round(v * alfa + base[i] * (1 - alfa))
+        .toString(16)
+        .padStart(2, '0')
+    return `#${canal(r, 0)}${canal(g, 1)}${canal(b, 2)}`
+  }
+
+  for (const modulo of MODULOS) {
+    for (const modo of MODOS) {
+      it(`tem aresta visível em ${modulo} ${modo}, nos 8 acentos`, () => {
+        for (const acento of PALETA_ACENTO) {
+          const borda = compor(bordaRgb(modulo, modo), ALFA, acento)
+          expect(contraste(borda, fundo(modulo, modo))).toBeGreaterThanOrEqual(3)
+        }
+      })
+    }
+  }
+
+  it('o alfa escolhido tem margem — abaixo de 0.55 a aresta some', () => {
+    // Trava o motivo do número: 0.5 falha, e o teste falharia junto se alguém o baixasse.
+    const claroDemais = PALETA_ACENTO[5]
+    const pior = compor(bordaRgb('noa', 'light'), 0.5, claroDemais)
+    expect(contraste(pior, fundo('noa', 'light'))).toBeLessThan(3)
+    expect(ALFA).toBeGreaterThanOrEqual(0.55)
   })
 })

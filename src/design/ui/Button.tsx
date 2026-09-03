@@ -62,11 +62,35 @@ const POR_VARIANTE: Readonly<Record<VarianteBotao, string>> = {
   // Preenchimento sólido: é o que separa a ação primária de todas as outras, independentemente
   // da cor escolhida. O rótulo lê por `--jos-cor-acento-contraste`, calculado contra o próprio
   // acento (preto ou branco, o que der contraste) — não contra o fundo da tela.
+  // A borda **não** repete o acento: repetindo, ela não acrescentava nada, e cinco dos oito
+  // swatches deixavam a ação primária sem contorno visível no modo claro — `#FFFFE3` mede
+  // 1.07:1 contra o fundo, `#2CFF05` 1.25:1 e `#C4C4C4` (o default de fábrica) 1.60:1, contra
+  // os 3:1 que a WCAG 2.2 pede para limite de componente. O botão existia como um bloco
+  // flutuando sem aresta, e o desabilitado ficava indistinguível do ativo.
+  //
+  // O contorno vem de `--jos-borda-rgb`, o mesmo token que a variante secundária usa: ele é
+  // definido **por modo** (claro sobre fundo escuro, escuro sobre fundo claro), então a aresta
+  // contrasta com a página em vez de com o preenchimento. Derivá-la do próprio acento não
+  // resolve — a borda tenderia à cor do rótulo, e um contorno escuro sumiria no modo escuro.
+  //
+  // `0.6` é medido, não escolhido: composta sobre os 8 acentos × 2 módulos × 2 modos, a borda
+  // fica em 3.73:1 no pior caso (`#FFFFE3` no claro) contra os 3:1 da WCAG 2.2 para limite de
+  // componente. Abaixo de `0.55` esse caso cai para menos de 3:1 e o botão volta a não ter
+  // aresta. O teste em `acoes.test.tsx` trava a régua.
+  //
+  // **Desabilitada, a primária larga o acento.** O `opacity-45` do token compartilhado lavava o
+  // preenchimento contra o fundo e levava o rótulo a 1.51:1 no pior acento — o PI via um bloco
+  // oliva sem conseguir ler o que o botão faria. A cor da identidade também não deveria pintar
+  // um alvo que não aceita clique: acento é o que o fluxo espera, e aqui o fluxo não espera
+  // nada. Neutra, ela lê como as outras desabilitadas e o rótulo volta a ser legível.
   primaria: cx(
-    'border-[var(--jos-cor-acento)] bg-[var(--jos-cor-acento)]',
+    'border-[rgba(var(--jos-borda-rgb),0.6)]',
+    'bg-[var(--jos-cor-acento)]',
     'text-[var(--jos-cor-acento-contraste)] font-[var(--jos-peso-forte)]',
     'hover:brightness-110',
-    'hover:shadow-[0_0_24px_-12px_var(--jos-cor-acento)]'
+    'hover:shadow-[0_0_24px_-12px_var(--jos-cor-acento)]',
+    'disabled:border-[rgba(var(--jos-borda-rgb),0.16)] disabled:bg-[var(--jos-cor-superficie-elevada)]',
+    'disabled:text-[var(--jos-cor-texto-secundario)] disabled:shadow-none'
   ),
   secundaria: cx(
     BORDA,
@@ -116,7 +140,9 @@ export function Button({
         POR_VARIANTE[variante],
         FOCO,
         TRANSICAO,
-        DESABILITADO
+        // A primária tem tratamento próprio de desabilitada (acima): o `opacity-45` do token
+        // compartilhado lavaria justamente o neutro que ela adota. O cursor é comum às duas.
+        variante === 'primaria' ? 'disabled:cursor-not-allowed' : DESABILITADO
       )}
     >
       {/*
