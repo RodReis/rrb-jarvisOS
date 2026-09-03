@@ -180,10 +180,36 @@ describe('bloqueio antes de rota paga (critério 6)', () => {
     expect(correcoesRecebidas).toEqual([])
   })
 
-  it('rotaAtual antecipa o bloqueio sem gerar nada', () => {
+  it('rotaAtual antecipa o bloqueio sem gerar nada', async () => {
     rotas = { ...rotas, assinaturaDisponivel: false }
 
-    expect(service.rotaAtual(PROJETO, WS).decisao).toBe('bloqueado')
+    expect((await service.rotaAtual(PROJETO, WS)).decisao).toBe('bloqueado')
+    expect(chamadas).toBe(0)
+  })
+
+  it('a disponibilidade da assinatura é aguardada, não avaliada como objeto', async () => {
+    // O typecheck pegou isto: com a leitura síncrona, a `Promise` do healthcheck entrava no
+    // campo booleano — e objeto é sempre truthy. A assinatura pareceria disponível **sempre**,
+    // mesmo com o Claude Code fora do ar, e o bloqueio do critério 6 nunca dispararia.
+    const lento = new BriefService({
+      repository: repo,
+      audit: new AuditRepository(db, 'chave-de-teste'),
+      userId: () => USER,
+      estadoDasRotas: async () => ({
+        assinaturaDisponivel: false,
+        assinaturaEsgotada: false,
+        rotaPagaConfigurada: true,
+        optInDeRotaPaga: false
+      }),
+      gerar: async () => {
+        chamadas += 1
+        return {}
+      }
+    })
+
+    const r = await lento.gerarBrief(PROJETO, WS)
+
+    expect(r.resultado).toBe('bloqueado-sem-rota')
     expect(chamadas).toBe(0)
   })
 })

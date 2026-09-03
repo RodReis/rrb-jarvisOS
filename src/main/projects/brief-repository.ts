@@ -17,32 +17,8 @@
 
 import type { Database } from 'better-sqlite3'
 import type { WorkspaceId } from '@shared/domain/entities'
-import type { Afirmacao, Brief, Pendencia } from '@shared/domain/brief'
+import type { Afirmacao, BriefRegistrado, Pendencia, PromptDoProjeto } from '@shared/domain/brief'
 import { log } from '../logging/logger'
-
-/** O prompt do PI, como linha do banco. */
-export interface PromptDoProjeto {
-  readonly id: string
-  readonly user_id: string
-  readonly workspace_id: WorkspaceId
-  readonly projectId: string
-  readonly texto: string
-  readonly hash: string
-  readonly commitHash: string | null
-  readonly created_at: string
-}
-
-/** O brief gerado, com a procedência: qual prompt e qual pacote de contexto o originaram. */
-export interface BriefRegistrado extends Brief {
-  readonly id: string
-  readonly user_id: string
-  readonly workspace_id: WorkspaceId
-  readonly promptId: string
-  readonly hash: string
-  readonly commitHash: string | null
-  readonly contextPackId: string | null
-  readonly created_at: string
-}
 
 interface PromptRow {
   readonly id: string
@@ -120,6 +96,8 @@ function toBrief(row: BriefRow): BriefRegistrado {
     created_at: row.created_at
   }
 }
+
+export type { BriefRegistrado, PromptDoProjeto }
 
 export class BriefRepository {
   constructor(private readonly db: Database) {}

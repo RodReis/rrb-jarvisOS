@@ -63,6 +63,8 @@ import type { PendenciaDeLimpeza } from '../domain/limpeza'
 import type { MergePolicyOutcome, PoliticaDeMerge, VistaDaFila } from '../domain/pipeline'
 import type { Roadmap, RoadmapOutcome } from '../domain/roadmap'
 import type { EstadoDaJornada, TransicaoOutcome } from '../domain/jornada'
+import type { BriefRegistrado, GeracaoOutcome, PromptDoProjeto } from '../domain/brief'
+import type { ResultadoDaRota } from '../domain/rota-de-geracao'
 import type {
   Approval,
   AprovacaoOutcome,
@@ -371,6 +373,27 @@ export const IPC_CHANNELS = {
   jornadaEstado: 'jornada:estado',
   jornadaEstadoDeVarios: 'jornada:estado-de-varios',
   jornadaEvento: 'jornada:evento',
+  /**
+   * O prompt e o brief refinado (SPEC-Jornada-02).
+   *
+   * **`brief:rota` existe para a tela poder mostrar o bloqueio antes do clique.** Sem ele, o PI
+   * só descobriria que não há rota autorizada depois de pedir a geração — a mesma fricção que o
+   * critério 6 evita do lado do custo, repetida do lado da atenção.
+   *
+   * **Nenhum canal recebe afirmação nem texto de brief.** A tela pede a geração e mostra o que
+   * voltou; o conteúdo é produzido no main, validado lá, e só então gravado. Um canal que
+   * aceitasse o brief pronto seria o caminho por onde uma afirmação sem origem entraria — o que
+   * os critérios 3 e 4 existem para impedir. É a mesma postura dos canais do pacote na M8-F04.
+   *
+   * `brief:cortar-proposto` recebe **um id**, não a lista do que sobra: mandar a lista faria o
+   * renderer decidir o conteúdo final, e um erro dele apagaria afirmação que veio do PI.
+   */
+  briefSalvarPrompt: 'brief:salvar-prompt',
+  briefLerPrompt: 'brief:ler-prompt',
+  briefGerar: 'brief:gerar',
+  briefCarregar: 'brief:carregar',
+  briefRota: 'brief:rota',
+  briefCortarProposto: 'brief:cortar-proposto',
   /**
    * SPEC-Entrega-01: publica o repositório e o backlog aprovado no GitHub.
    *
@@ -920,6 +943,39 @@ export interface JarvisBridge {
     evento: string,
     workspace: WorkspaceId
   ): Promise<TransicaoOutcome | null>
+  /**
+   * Salva o prompt do PI (SPEC-Jornada-02, critério 1). Prompt vazio devolve `null` em vez de
+   * rejeitar: "não escreveu nada ainda" é estado, não falha.
+   */
+  salvarPromptDoProjeto(
+    projectId: string,
+    texto: string,
+    workspace: WorkspaceId
+  ): Promise<PromptDoProjeto | null>
+  /** O prompt vigente. As revisões anteriores continuam no banco. */
+  lerPromptDoProjeto(projectId: string, workspace: WorkspaceId): Promise<PromptDoProjeto | null>
+  /**
+   * Gera o brief. Devolve `GeracaoOutcome` **inclusive nas recusas**: "nenhuma rota autorizada"
+   * é desfecho que o PI lê com a ação nomeada, não falha técnica.
+   */
+  gerarBrief(projectId: string, workspace: WorkspaceId): Promise<GeracaoOutcome>
+  /** O brief vigente, ou `null` enquanto nenhum foi gerado. */
+  carregarBrief(projectId: string, workspace: WorkspaceId): Promise<BriefRegistrado | null>
+  /**
+   * A rota que seria usada agora, **sem gerar nada**. É o que permite à tela mostrar o bloqueio
+   * antes do clique, em vez de depois da tentativa.
+   */
+  rotaDaGeracao(projectId: string, workspace: WorkspaceId): Promise<ResultadoDaRota>
+  /**
+   * Corta um `proposto` no gate (critério 5). Recebe **um id**, não a lista do que sobra:
+   * mandar a lista faria o renderer decidir o conteúdo final, e um erro dele apagaria
+   * afirmação que veio do PI.
+   */
+  cortarPropostoDoBrief(
+    projectId: string,
+    afirmacaoId: string,
+    workspace: WorkspaceId
+  ): Promise<BriefRegistrado | null>
   publicarNoGitHub(
     projectId: string,
     alvo: AlvoDaPublicacao,

@@ -48,6 +48,8 @@ import { PipelineRepository } from './pipeline/pipeline-repository'
 import { ReconciliacaoService } from './pipeline/reconciliacao-service'
 import { RoadmapService } from './projects/roadmap-service'
 import { JornadaService } from './projects/jornada-service'
+import { BriefService } from './projects/brief-service'
+import { BriefRepository } from './projects/brief-repository'
 import { GitRunner } from './projects/git-runner'
 import { DockerRunner, prepararGitMeta, TIMEOUT_DOCKER_MS } from './pipeline/docker-runner'
 import { ConstrutorService } from './pipeline/construtor-service'
@@ -442,6 +444,36 @@ if (!app.requestSingleInstanceLock()) {
       userId: userIdAtual
     })
 
+    // O prompt e o brief refinado (SPEC-Jornada-02).
+    //
+    // **O estado das rotas é lido aqui, e não dentro do serviço**, porque quem sabe se a
+    // assinatura está no ar é o adapter, e quem sabe da quota é o repositório — o serviço só
+    // decide a partir do fato. Injetar a leitura mantém a decisão testável sem Electron.
+    //
+    // `optInDeRotaPaga` é **false fixo por enquanto**: nenhuma superfície o habilita ainda, e o
+    // default tem de ser o que não gasta. Quando a M25-F03 trouxer a preferência por projeto,
+    // é esta linha que passa a lê-la — até lá, a rota paga simplesmente não é alcançável, que é
+    // o comportamento seguro do critério 6.
+    const brief = new BriefService({
+      repository: new BriefRepository(storage.db),
+      audit: storage.audit,
+      userId: userIdAtual,
+      estadoDasRotas: async (_projectId, workspace) => {
+        const quotaDaAssinatura = quota.ler(userIdAtual(), workspace, 'claude-code')
+        return {
+          assinaturaDisponivel: await claudeCodeAdapter.disponivel(),
+          assinaturaEsgotada: quotaDaAssinatura?.restante === 0,
+          rotaPagaConfigurada:
+            credentials.resolve(userIdAtual(), workspace, 'anthropic') !== undefined,
+          optInDeRotaPaga: false
+        }
+      },
+      // A geração real chega na própria M25-F02, quando o prompt do sistema e o schema de saída
+      // forem escritos. Até lá o serviço existe inteiro e **bloqueia**: devolver saída vazia é
+      // o que faz a fatia não fingir que gerou algo.
+      gerar: async () => ({})
+    })
+
     // Publicação no GitHub (SPEC-Entrega-01). Recebe o `ConnectorService`, **não** o
     // `GithubAdapter`: o gate de créditos, a policy e a auditoria vivem dentro do `call()`, e um
     // adapter injetado aqui seria o segundo caminho sem gate — o mesmo erro que o `GitRunner`
@@ -614,6 +646,7 @@ if (!app.requestSingleInstanceLock()) {
       anexos,
       roadmap,
       jornada,
+      brief,
       publicacao,
       mergePolicy,
       fila,

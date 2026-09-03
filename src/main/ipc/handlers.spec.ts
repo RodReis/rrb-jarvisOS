@@ -184,10 +184,25 @@ const jornada = {
   aplicarEvento: vi.fn(() => undefined)
 }
 
+/**
+ * Dublê do brief (SPEC-Jornada-02). O que se exercita aqui é a **fronteira**: a validação de
+ * forma antes de chamar o serviço. A decisão de rota e o validador de saída têm suíte própria em
+ * `brief-service.int-spec.ts`, contra o banco real.
+ */
+const brief = {
+  salvarPrompt: vi.fn(() => undefined),
+  lerPrompt: vi.fn(() => undefined),
+  gerarBrief: vi.fn(async () => ({ resultado: 'gerado', mensagem: 'ok' })),
+  carregar: vi.fn(() => undefined),
+  rotaAtual: vi.fn(async () => ({ decisao: 'assinatura' })),
+  cortarProposto: vi.fn(() => undefined)
+}
+
 const deps = {
   audit,
   ai,
   jornada,
+  brief,
   workspaces,
   preferences,
   policy,
@@ -747,5 +762,68 @@ describe('jornada de planejamento', () => {
     invocar(IPC_CHANNELS.jornadaEvento, 'p-1', 'evento-inventado', 'jarvis')
 
     expect(jornada.aplicarEvento).toHaveBeenCalledWith('p-1', 'evento-inventado', 'jarvis')
+  })
+})
+
+/**
+ * A fronteira do brief (SPEC-Jornada-02).
+ *
+ * O que se prova aqui é o que a ponte **recusa**: forma inválida não chega ao serviço. A
+ * ausência mais importante — nenhum canal que receba afirmação ou texto de brief — é verificada
+ * em `preload.spec.ts`, na lista fechada de métodos da ponte.
+ */
+describe('prompt e brief', () => {
+  beforeEach(() => {
+    brief.salvarPrompt.mockClear()
+    brief.lerPrompt.mockClear()
+    brief.gerarBrief.mockClear()
+    brief.carregar.mockClear()
+    brief.rotaAtual.mockClear()
+    brief.cortarProposto.mockClear()
+  })
+
+  it('salva o prompt quando projeto, texto e espaço têm a forma certa', () => {
+    invocar(IPC_CHANNELS.briefSalvarPrompt, 'p-1', 'Um app de leituras.', 'jarvis')
+
+    expect(brief.salvarPrompt).toHaveBeenCalledWith('p-1', 'Um app de leituras.', 'jarvis')
+  })
+
+  it('recusa texto que não é string sem chamar o serviço', () => {
+    expect(invocar(IPC_CHANNELS.briefSalvarPrompt, 'p-1', { texto: 'x' }, 'jarvis')).toBeNull()
+    expect(brief.salvarPrompt).not.toHaveBeenCalled()
+  })
+
+  it('recusa espaço inválido em todos os canais do brief', () => {
+    expect(invocar(IPC_CHANNELS.briefLerPrompt, 'p-1', 'inventado')).toBeNull()
+    expect(invocar(IPC_CHANNELS.briefCarregar, 'p-1', 'inventado')).toBeNull()
+    expect(brief.lerPrompt).not.toHaveBeenCalled()
+    expect(brief.carregar).not.toHaveBeenCalled()
+  })
+
+  it('gerar com forma inválida devolve desfecho, não rejeita', async () => {
+    // "Projeto não encontrado" é resposta que a tela mostra, não erro a estourar na ponte.
+    const r = (await invocar(IPC_CHANNELS.briefGerar, 42, 'jarvis')) as { resultado: string }
+
+    expect(r.resultado).toBe('projeto-inexistente')
+    expect(brief.gerarBrief).not.toHaveBeenCalled()
+  })
+
+  it('a rota inválida devolve bloqueado — nunca uma rota utilizável', async () => {
+    // Fail closed na fronteira: se a forma não confere, o default não pode ser "pode gerar".
+    const r = (await invocar(IPC_CHANNELS.briefRota, 42, 'jarvis')) as { decisao: string }
+
+    expect(r.decisao).toBe('bloqueado')
+    expect(brief.rotaAtual).not.toHaveBeenCalled()
+  })
+
+  it('cortar exige o id da afirmação como string', () => {
+    expect(invocar(IPC_CHANNELS.briefCortarProposto, 'p-1', ['a-1'], 'jarvis')).toBeNull()
+    expect(brief.cortarProposto).not.toHaveBeenCalled()
+  })
+
+  it('cortar repassa um id só — a tela não decide o conteúdo final', () => {
+    invocar(IPC_CHANNELS.briefCortarProposto, 'p-1', 'a-2', 'jarvis')
+
+    expect(brief.cortarProposto).toHaveBeenCalledWith('p-1', 'a-2', 'jarvis')
   })
 })

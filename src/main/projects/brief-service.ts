@@ -22,15 +22,22 @@
 import { createHash, randomUUID } from 'node:crypto'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { AiProvider } from '@shared/domain/ai'
-import type { Afirmacao, Brief, Pendencia } from '@shared/domain/brief'
-import { validarBrief } from '@shared/domain/brief'
+import type {
+  Afirmacao,
+  Brief,
+  BriefRegistrado,
+  GeracaoOutcome,
+  Pendencia,
+  PromptDoProjeto
+} from '@shared/domain/brief'
+import { cortarProposto, validarBrief } from '@shared/domain/brief'
 import type { PerguntaGerada } from '@shared/domain/pergunta-gerada'
 import { separarPerguntasValidas } from '@shared/domain/pergunta-gerada'
 import type { EstadoDasRotas, ResultadoDaRota } from '@shared/domain/rota-de-geracao'
 import { escolherRota } from '@shared/domain/rota-de-geracao'
 import { log } from '../logging/logger'
 import type { AuditRepository } from '../storage/audit-repository'
-import type { BriefRepository, BriefRegistrado, PromptDoProjeto } from './brief-repository'
+import type { BriefRepository } from './brief-repository'
 
 /**
  * Quantas vezes o serviço pede correção ao modelo antes de desistir.
@@ -49,27 +56,6 @@ const PROVIDER_DA_ROTA: Readonly<Record<'assinatura' | 'paga', AiProvider>> = {
   paga: 'anthropic'
 }
 
-/** Por que a geração não produziu brief. Fechado: a tela decide o que mostrar a partir dele. */
-export const RESULTADOS_DA_GERACAO = [
-  'gerado',
-  'bloqueado-sem-rota',
-  'saida-invalida',
-  'projeto-inexistente',
-  'sem-prompt'
-] as const
-
-export type ResultadoDaGeracao = (typeof RESULTADOS_DA_GERACAO)[number]
-
-export interface GeracaoOutcome {
-  readonly resultado: ResultadoDaGeracao
-  readonly brief?: BriefRegistrado
-  readonly mensagem: string
-  /** O que o PI faz para destravar, quando bloqueou. */
-  readonly acao?: string
-  /** Os problemas do validador, quando a saída foi recusada. */
-  readonly problemas?: readonly string[]
-}
-
 /** O que o modelo devolve. Estruturado, nunca prosa — é o que torna a origem verificável. */
 export interface SaidaDoModelo {
   readonly afirmacoes: readonly Afirmacao[]
@@ -80,8 +66,18 @@ export interface BriefServiceDeps {
   readonly repository: BriefRepository
   readonly audit: AuditRepository
   readonly userId: () => string
-  /** O estado das rotas, resolvido por quem conhece credenciais e quota. */
-  readonly estadoDasRotas: (projectId: string, workspace: WorkspaceId) => EstadoDasRotas
+  /**
+   * O estado das rotas, resolvido por quem conhece credenciais e quota.
+   *
+   * **Assíncrono porque a disponibilidade da assinatura é um healthcheck**, não uma leitura de
+   * memória. O typecheck pegou isto: com a assinatura síncrona, a `Promise` do adapter entrava
+   * no campo booleano e um objeto é sempre truthy — a rota pareceria disponível **sempre**,
+   * inclusive com o Claude Code fora do ar, e o bloqueio do critério 6 nunca dispararia.
+   */
+  readonly estadoDasRotas: (
+    projectId: string,
+    workspace: WorkspaceId
+  ) => EstadoDasRotas | Promise<EstadoDasRotas>
   /**
    * Gera pelo ponto único. Recebe a rota **decidida**, nunca a escolhe.
    *
@@ -172,8 +168,8 @@ export class BriefService {
    * Existe para a tela poder mostrar o bloqueio **antes** de o PI clicar: descobrir que não há
    * rota depois de pedir a geração seria a mesma fricção que o critério 6 evita no custo.
    */
-  rotaAtual(projectId: string, workspaceId: WorkspaceId): ResultadoDaRota {
-    return escolherRota(this.estadoDasRotas(projectId, workspaceId))
+  async rotaAtual(projectId: string, workspaceId: WorkspaceId): Promise<ResultadoDaRota> {
+    return escolherRota(await this.estadoDasRotas(projectId, workspaceId))
   }
 
   /**
@@ -194,7 +190,7 @@ export class BriefService {
       }
     }
 
-    const rota = escolherRota(this.estadoDasRotas(projectId, workspaceId))
+    const rota = escolherRota(await this.estadoDasRotas(projectId, workspaceId))
 
     if (rota.decisao === 'bloqueado') {
       // Auditado **antes** de qualquer chamada, e é isso que o critério 6 pede provar: o
@@ -334,6 +330,69 @@ export class BriefService {
         'A saída do modelo não passou no validador, nem depois da correção. Nada foi gravado.',
       problemas
     }
+  }
+
+  /** O prompt vigente do projeto. As revisões anteriores continuam no banco. */
+  lerPrompt(projectId: string): PromptDoProjeto | undefined {
+    return this.repository.promptVigente(this.userId(), projectId)
+  }
+
+  /** O brief vigente do projeto, ou `undefined` enquanto nenhum foi gerado. */
+  carregar(projectId: string): BriefRegistrado | undefined {
+    return this.repository.briefVigente(this.userId(), projectId)
+  }
+
+  /**
+   * Corta um `proposto` no gate (critério 5) — item a item, decisão do PI de 2026-09-03.
+   *
+   * **Grava uma revisão nova, não edita a atual.** O brief que o PI leu continua no banco: se o
+   * corte editasse a linha, o hash passaria a descrever um conteúdo diferente do que foi
+   * mostrado, e o aceite por revisão exata deixaria de significar algo.
+   *
+   * Corte que não muda nada devolve o brief como está — sem revisão nova. É o caso do id errado
+   * ou de uma afirmação que não é `proposto`: o domínio já se recusa a cortá-la, e criar
+   * revisão idêntica só encheria o histórico.
+   */
+  cortarProposto(
+    projectId: string,
+    afirmacaoId: string,
+    workspaceId: WorkspaceId
+  ): BriefRegistrado | undefined {
+    const userId = this.userId()
+    const atual = this.repository.briefVigente(userId, projectId)
+    if (atual === undefined) return undefined
+
+    const cortado = cortarProposto(atual, afirmacaoId)
+
+    if (cortado.afirmacoes.length === atual.afirmacoes.length) {
+      return atual
+    }
+
+    const hash = hashDoBrief(cortado.afirmacoes, cortado.pendencias)
+
+    const novo = this.repository.registrarBrief({
+      id: randomUUID(),
+      user_id: userId,
+      workspace_id: workspaceId,
+      projectId,
+      promptId: atual.promptId,
+      afirmacoes: cortado.afirmacoes,
+      pendencias: cortado.pendencias,
+      hash,
+      commitHash: null,
+      contextPackId: atual.contextPackId,
+      created_at: new Date().toISOString()
+    })
+
+    this.audit.append({
+      user_id: userId,
+      workspace_id: workspaceId,
+      type: 'brief-generation',
+      payload: { projectId, fase: 'proposto-cortado', afirmacaoId, briefHash: hash }
+    })
+
+    log.agent.info('Proposto cortado pelo PI', { projectId, afirmacaoId })
+    return novo
   }
 
   /**

@@ -50,7 +50,14 @@ test.beforeEach(async () => {
   app = await electron.launch({
     executablePath: electronPath as unknown as string,
     chromiumSandbox: true,
-    args: ['.', `--user-data-dir=${userData}`],
+    args: [
+      'carregarBrief',
+      'cortarPropostoDoBrief',
+      'gerarBrief',
+      'lerPromptDoProjeto',
+      'rotaDaGeracao',
+      'salvarPromptDoProjeto'
+    ],
     env: {
       ...ambiente,
       NODE_ENV: 'development',

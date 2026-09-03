@@ -24,6 +24,8 @@
  * no gate, e a regra precisa ser verificável sem carregar o Electron.
  */
 
+import type { WorkspaceId } from './entities'
+
 /**
  * Os dez blocos do `ProjectBriefSchema` (design §9.2, enumerados na spec).
  *
@@ -120,6 +122,57 @@ export interface Brief {
   readonly projectId: string
   readonly afirmacoes: readonly Afirmacao[]
   readonly pendencias: readonly Pendencia[]
+}
+
+/**
+ * O prompt do PI, como o banco o guarda.
+ *
+ * Mora aqui, e não no repositório do main, porque atravessa a ponte IPC: o contrato de
+ * `contracts/ipc.ts` precisa do tipo e não pode importar do processo principal — mesma razão
+ * pela qual `EstadoDaJornada` desceu para o domínio na M25-F01.
+ */
+export interface PromptDoProjeto {
+  readonly id: string
+  readonly user_id: string
+  readonly workspace_id: WorkspaceId
+  readonly projectId: string
+  readonly texto: string
+  readonly hash: string
+  readonly commitHash: string | null
+  readonly created_at: string
+}
+
+/** O brief gravado, com a procedência: qual prompt e qual pacote de contexto o originaram. */
+export interface BriefRegistrado extends Brief {
+  readonly id: string
+  readonly user_id: string
+  readonly workspace_id: WorkspaceId
+  readonly promptId: string
+  readonly hash: string
+  readonly commitHash: string | null
+  readonly contextPackId: string | null
+  readonly created_at: string
+}
+
+/** Por que a geração não produziu brief. Fechado: a tela decide o que mostrar a partir dele. */
+export const RESULTADOS_DA_GERACAO = [
+  'gerado',
+  'bloqueado-sem-rota',
+  'saida-invalida',
+  'projeto-inexistente',
+  'sem-prompt'
+] as const
+
+export type ResultadoDaGeracao = (typeof RESULTADOS_DA_GERACAO)[number]
+
+export interface GeracaoOutcome {
+  readonly resultado: ResultadoDaGeracao
+  readonly brief?: BriefRegistrado
+  readonly mensagem: string
+  /** O que o PI faz para destravar, quando bloqueou. */
+  readonly acao?: string
+  /** Os problemas do validador, quando a saída foi recusada. */
+  readonly problemas?: readonly string[]
 }
 
 /**
