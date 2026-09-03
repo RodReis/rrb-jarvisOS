@@ -28,7 +28,10 @@ const listCapabilities = vi.fn()
 const listFailures = vi.fn()
 // O painel do pacote (M8-F04) é filho do painel de contexto: abrir o contexto monta os dois, e
 // sem este método o teste do contexto quebraria por falta de mock, não pelo que investiga.
-const listarPacotes = vi.fn()
+// A etapa `prd` monta o gate da SPEC-Jornada-03, que lê a revisão e pede o termo proposto ao
+// abrir. Sem os dois métodos aqui a tela estoura no efeito, e a falha aparece longe da causa.
+const carregarPrd = vi.fn()
+const proporTermoDePesquisa = vi.fn()
 // Mesma razão, um nível abaixo: o painel de anexos (M8-F05) também é filho do de contexto, e
 // monta junto. Sem os dois métodos, o teste do contexto quebraria por falta de mock.
 const listarAnexos = vi.fn()
@@ -75,7 +78,8 @@ beforeEach(() => {
   listContextPacks.mockReset().mockResolvedValue([])
   listCapabilities.mockReset().mockResolvedValue([])
   listFailures.mockReset().mockResolvedValue([])
-  listarPacotes.mockReset().mockResolvedValue([])
+  carregarPrd.mockReset().mockResolvedValue(null)
+  proporTermoDePesquisa.mockReset().mockResolvedValue(null)
   listarAnexos.mockReset().mockResolvedValue([])
   listarArquiteturas.mockReset().mockResolvedValue([])
   carregarRoadmap.mockReset().mockResolvedValue({ mvps: [], slices: [] })
@@ -99,7 +103,8 @@ beforeEach(() => {
       listContextPacks,
       listCapabilities,
       listFailures,
-      listarPacotes,
+      carregarPrd,
+      proporTermoDePesquisa,
       listarAnexos,
       listarArquiteturas,
       carregarRoadmap,

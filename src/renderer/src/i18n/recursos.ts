@@ -181,6 +181,68 @@ export const RECURSOS = {
           'riscos-e-decisoes-abertas': 'Riscos e decisões abertas'
         }
       },
+      prd: {
+        titulo: 'PRD, Landscape e Convention',
+        descricao:
+          'O que o app derivou do brief aceito de {{nome}}. Cada afirmação diz o que a sustenta; corte o que não serve antes de aceitar.',
+        carregando: 'Carregando os documentos…',
+        vazio: 'Nenhum documento ainda',
+        vazioDescricao:
+          'Confirme o termo de pesquisa (ou deixe vazio) e gere o PRD, o Landscape e a Convention.',
+        // O termo é proposto pela IA e editado pelo PI — a busca não roda sem confirmação
+        // (critério 3). O texto de ajuda diz a consequência de deixá-lo vazio.
+        termo: 'Termo de pesquisa de mercado',
+        termoAjuda:
+          'A IA propôs este termo a partir do brief. Ajuste-o antes de gerar; a busca só acontece quando você gerar.',
+        termoPlaceholder: 'ex.: ferramentas de planejamento para times pequenos',
+        semTermo: 'Sem termo, o Landscape sai pendente e o PRD segue.',
+        gerar: 'Gerar os documentos',
+        regerar: 'Gerar de novo',
+        documentoVazio: 'Nenhuma afirmação nesta revisão.',
+        cortar: 'Cortar',
+        cortarEsta: 'Cortar a afirmação: {{texto}}',
+        landscapeBloqueado: 'Landscape pendente: a pesquisa não saiu',
+        propostosTitulo: '{{count}} afirmações propostas pela IA',
+        propostosDescricao:
+          'Ninguém disse isto — a IA inferiu. Corte o que não faz sentido antes de aceitar.',
+        contradicoesTitulo: '{{count}} contradições a resolver',
+        contradicoesDescricao:
+          'Duas afirmações não podem valer ao mesmo tempo. Decida e gere de novo; nada foi corrigido sozinho.',
+        recomendacao: 'Recomendação: {{texto}}',
+        aceitar: 'Aceitar o PRD',
+        aceiteTitulo: 'Aceite do PRD',
+        aceiteDescricao:
+          'Aceitar congela esta revisão dos três documentos como base da arquitetura. Gerar de novo depois cria outra revisão e reabre este aceite.',
+        aceiteBloqueado: 'Resolva as contradições acima para aceitar.',
+        aceiteFalhou: 'Não foi possível registrar o aceite. Tente de novo.',
+        origem: {
+          brief: 'do brief aceito',
+          decisao: 'da sua decisão',
+          evidencia: 'de fonte pesquisada',
+          proposto: 'proposto pela IA'
+        },
+        documentos: {
+          PRD: 'PRD',
+          LANDSCAPE: 'Landscape',
+          CONVENTION: 'Convention'
+        },
+        descricoes: {
+          PRD: 'Problema, usuários, escopo e critérios de sucesso — derivados do brief que você aceitou.',
+          LANDSCAPE:
+            'O cenário e as alternativas. Toda afirmação sobre terceiros cita a fonte de onde saiu.',
+          CONVENTION:
+            'As entidades, os estados e o vocabulário deste projeto — nada importado de outro.'
+        },
+        resultados: {
+          gerado: 'Documentos gerados',
+          'bloqueado-sem-rota': 'Nenhuma rota de geração disponível',
+          'saida-invalida': 'A saída do modelo foi recusada',
+          'projeto-inexistente': 'Projeto não encontrado',
+          'brief-nao-aceito': 'Aceite o brief primeiro',
+          'sem-contexto': 'O contexto do projeto não pôde ser montado',
+          'falha-de-escrita': 'Não foi possível escrever os documentos'
+        }
+      },
       refinamento: {
         titulo: 'Refinamento',
         // Diz o que o refinamento faz e o que ele cobra: decisões, não formulário.
@@ -627,6 +689,66 @@ export const RECURSOS = {
           'nao-funcionais-e-testes': 'Non-functional and tests',
           'politica-git-provider-orcamento': 'Policy, provider and budget',
           'riscos-e-decisoes-abertas': 'Risks and open decisions'
+        }
+      },
+      prd: {
+        titulo: 'PRD, Landscape and Convention',
+        descricao:
+          'What the app derived from the accepted brief of {{nome}}. Every statement says what backs it; cut what does not fit before accepting.',
+        carregando: 'Loading the documents…',
+        vazio: 'No documents yet',
+        vazioDescricao:
+          'Confirm the research term (or leave it empty) and generate the PRD, Landscape and Convention.',
+        termo: 'Market research term',
+        termoAjuda:
+          'The AI proposed this term from the brief. Adjust it before generating; the search only runs when you generate.',
+        termoPlaceholder: 'e.g. planning tools for small teams',
+        semTermo: 'Without a term, the Landscape stays pending and the PRD moves on.',
+        gerar: 'Generate the documents',
+        regerar: 'Generate again',
+        documentoVazio: 'No statements in this revision.',
+        cortar: 'Cut',
+        cortarEsta: 'Cut the statement: {{texto}}',
+        landscapeBloqueado: 'Landscape pending: the research did not run',
+        propostosTitulo: '{{count}} statements proposed by the AI',
+        propostosDescricao:
+          'Nobody said this — the AI inferred it. Cut what does not make sense before accepting.',
+        contradicoesTitulo: '{{count}} contradictions to resolve',
+        contradicoesDescricao:
+          'Two statements cannot hold at once. Decide and generate again; nothing was fixed on its own.',
+        recomendacao: 'Recommendation: {{texto}}',
+        aceitar: 'Accept the PRD',
+        aceiteTitulo: 'PRD acceptance',
+        aceiteDescricao:
+          'Accepting freezes this revision of the three documents as the basis for the architecture. Generating again creates another revision and reopens this acceptance.',
+        aceiteBloqueado: 'Resolve the contradictions above to accept.',
+        aceiteFalhou: 'Could not record the acceptance. Try again.',
+        origem: {
+          brief: 'from the accepted brief',
+          decisao: 'from your decision',
+          evidencia: 'from a researched source',
+          proposto: 'proposed by the AI'
+        },
+        documentos: {
+          PRD: 'PRD',
+          LANDSCAPE: 'Landscape',
+          CONVENTION: 'Convention'
+        },
+        descricoes: {
+          PRD: 'Problem, users, scope and success criteria — derived from the brief you accepted.',
+          LANDSCAPE:
+            'The landscape and the alternatives. Every statement about third parties cites its source.',
+          CONVENTION:
+            'The entities, states and vocabulary of this project — nothing imported from another.'
+        },
+        resultados: {
+          gerado: 'Documents generated',
+          'bloqueado-sem-rota': 'No generation route available',
+          'saida-invalida': 'The model output was rejected',
+          'projeto-inexistente': 'Project not found',
+          'brief-nao-aceito': 'Accept the brief first',
+          'sem-contexto': 'The project context could not be assembled',
+          'falha-de-escrita': 'Could not write the documents'
         }
       },
       refinamento: {

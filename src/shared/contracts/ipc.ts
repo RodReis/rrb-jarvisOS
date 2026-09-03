@@ -71,6 +71,7 @@ import type { MergePolicyOutcome, PoliticaDeMerge, VistaDaFila } from '../domain
 import type { Roadmap, RoadmapOutcome } from '../domain/roadmap'
 import type { EstadoDaJornada, TransicaoOutcome } from '../domain/jornada'
 import type { BriefRegistrado, GeracaoOutcome, PromptDoProjeto } from '../domain/brief'
+import type { PrdOutcome, PrdRegistrado } from '../domain/prd'
 import type { ResultadoDaRota } from '../domain/rota-de-geracao'
 import type {
   Approval,
@@ -401,6 +402,22 @@ export const IPC_CHANNELS = {
   briefCarregar: 'brief:carregar',
   briefRota: 'brief:rota',
   briefCortarProposto: 'brief:cortar-proposto',
+  /**
+   * O PRD, o Landscape e a Convention gerados (SPEC-Jornada-03).
+   *
+   * **`prd:propor-termo` e `prd:gerar` são canais separados, e a separação é o critério 3.** O
+   * termo é proposto pela IA, exibido e editado pelo PI, e só então confirmado — a pesquisa não
+   * roda sem confirmação. Um canal só, que propusesse e buscasse na mesma chamada, faria a
+   * chamada à Tavily acontecer antes de o PI ver o que seria buscado.
+   *
+   * **Nenhum canal recebe afirmação nem texto de documento**, mesma postura dos canais do brief:
+   * a tela pede o ato, e o conteúdo é produzido e validado no main. Um canal que aceitasse o PRD
+   * pronto seria o caminho por onde uma afirmação sem origem entraria.
+   */
+  prdProporTermo: 'prd:propor-termo',
+  prdGerar: 'prd:gerar',
+  prdCarregar: 'prd:carregar',
+  prdCortarProposto: 'prd:cortar-proposto',
   /**
    * O refinamento por perguntas geradas (SPEC-Jornada-02, § Refinamento).
    *
@@ -998,6 +1015,29 @@ export interface JarvisBridge {
     afirmacaoId: string,
     workspace: WorkspaceId
   ): Promise<BriefRegistrado | null>
+  /**
+   * Propõe o termo de pesquisa de mercado a partir do brief aceito (SPEC-Jornada-03, critério 3).
+   *
+   * Devolve `null` quando não há brief aceito, quando a rota está bloqueada ou quando a chamada
+   * falhou: a tela cai no campo vazio e o PI escreve o dele. **Propor não pesquisa** — a busca
+   * só acontece em `gerarPrd`, com o termo que o PI confirmou.
+   */
+  proporTermoDePesquisa(projectId: string, workspace: WorkspaceId): Promise<string | null>
+  /**
+   * Gera o PRD, o Landscape e a Convention. Devolve o desfecho **inclusive nas recusas**.
+   *
+   * `termo` vazio é escolha legítima: nenhuma busca acontece e o Landscape declara a lacuna,
+   * enquanto PRD e Convention seguem (decisão do PI, 2026-09-03).
+   */
+  gerarPrd(projectId: string, termo: string, workspace: WorkspaceId): Promise<PrdOutcome>
+  /** A revisão vigente, ou `null` enquanto nenhuma foi gerada. */
+  carregarPrd(projectId: string, workspace: WorkspaceId): Promise<PrdRegistrado | null>
+  /** Corta um `proposto` no gate. Recebe **um id**, como no brief e pela mesma razão. */
+  cortarPropostoDoPrd(
+    projectId: string,
+    afirmacaoId: string,
+    workspace: WorkspaceId
+  ): Promise<PrdRegistrado | null>
   /**
    * Gera as perguntas de refinamento para os blocos ainda sem resposta.
    *

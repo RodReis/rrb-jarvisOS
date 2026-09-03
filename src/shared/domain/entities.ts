@@ -351,7 +351,14 @@ export const AUDIT_EVENT_TYPES = [
   // este responde é outra e é a do critério 6 — *a geração aconteceu, e por qual rota?* O
   // bloqueio é o caso que prova a diferença: ele é um evento **sem** chamada nenhuma, e sob um
   // tipo de chamada ele não teria onde existir.
-  'brief-generation'
+  'brief-generation',
+  // SPEC-Jornada-03: a geração do PRD, do Landscape e da Convention — termo proposto, início,
+  // saída recusada, bloqueio por falta de rota, corte de proposto e desfecho.
+  //
+  // Tipo próprio, e não `brief-generation`: as duas gerações são fatias diferentes, com gates
+  // diferentes, e fundi-las faria a auditoria de "quando o PRD foi gerado" ter de filtrar por
+  // um campo de payload — que é adivinhação, não consulta.
+  'prd-generation'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]

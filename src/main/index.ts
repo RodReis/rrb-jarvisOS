@@ -51,6 +51,8 @@ import { RoadmapService } from './projects/roadmap-service'
 import { JornadaService } from './projects/jornada-service'
 import { BriefService } from './projects/brief-service'
 import { BriefRepository } from './projects/brief-repository'
+import { PrdService } from './projects/prd-service'
+import { PrdRepository } from './projects/prd-repository'
 import { RefinamentoService } from './projects/refinamento-service'
 import { PerguntaGeradaRepository } from './projects/pergunta-gerada-repository'
 import {
@@ -62,8 +64,20 @@ import {
   promptDasPerguntas
 } from '@shared/domain/brief-schema'
 import { ARQUIVO_DO_PROMPT } from '@shared/domain/brief'
+import {
+  SISTEMA_DAS_CONTRADICOES,
+  SISTEMA_DO_PRD,
+  SISTEMA_DO_TERMO,
+  lerContradicoesDoModelo,
+  lerDocumentosDoModelo,
+  lerTermoDoModelo,
+  promptDasContradicoes,
+  promptDoPrd,
+  promptDoTermo
+} from '@shared/domain/prd-schema'
+import { ordemDaEtapa } from '@shared/domain/jornada'
 import type { WorkspaceId } from '@shared/domain/entities'
-import type { AiProvider } from '@shared/domain/ai'
+import type { AiProvider, AiStreamEvent } from '@shared/domain/ai'
 import type { EstadoDasRotas } from '@shared/domain/rota-de-geracao'
 import { GitRunner } from './projects/git-runner'
 import { DockerRunner, prepararGitMeta, TIMEOUT_DOCKER_MS } from './pipeline/docker-runner'
@@ -624,6 +638,99 @@ if (!app.requestSingleInstanceLock()) {
       }
     })
 
+    /*
+     * O PRD, o Landscape e a Convention gerados por IA (SPEC-Jornada-03).
+     *
+     * Recebe o `PacoteRepository` além do seu próprio: a revisão gerada é gravada nas **duas**
+     * tabelas, porque a M8-F05 procura em `pacote_estrutural` a revisão do PRD que a arquitetura
+     * assume (`pacoteEstruturalId`). Gravar só na tabela nova quebraria o gate de anexos da
+     * fatia seguinte; gravar só na antiga perderia a origem por afirmação.
+     *
+     * Recebe o `ConnectorService`, e **não** o `TavilyAdapter`, pela mesma razão do
+     * `PacoteService`: o gate de créditos vive dentro do `call()`.
+     */
+    const prd = new PrdService({
+      repository: new PrdRepository(storage.db),
+      pacotes: new PacoteRepository(storage.db),
+      projects: projectRepository,
+      projectService: projects,
+      connectors,
+      audit: storage.audit,
+      userId: userIdAtual,
+      /*
+       * O brief **aceito**: o vigente, e só quando a jornada já passou da etapa `brief-aceito`.
+       *
+       * A etapa é a resposta certa porque ela é derivada dos fatos (M25-F01) — perguntar ao
+       * `BriefRepository` diria apenas que existe um brief, não que o PI o aceitou, e o
+       * critério 1 exige a revisão **aceita** como âncora.
+       */
+      briefAceito: (projectId, workspace) => {
+        const estado = jornada.estado(projectId, workspace)
+        if (estado === undefined) return undefined
+        if (ordemDaEtapa(estado.etapa) < ordemDaEtapa('prd')) return undefined
+        return brief.carregar(projectId)
+      },
+      decisoesDoRefinamento: (projectId) => refinamento.decisoesParaOBrief(projectId),
+      montarContexto: montarContextoDoPrompt,
+      estadoDasRotas: estadoDasRotasDoProjeto,
+      /*
+       * As três chamadas passam pelo **ponto único** (`ai.call`), nunca pelo adapter direto — a
+       * mesma fronteira do `BriefService`, e `provider` é a rota **já decidida**: deixar o
+       * roteamento escolher de novo aqui poderia cair na rota paga que ninguém autorizou.
+       */
+      gerarTermo: async ({ workspace, rota, contextPackId, afirmacoesDoBrief }) => {
+        const texto = await coletarTexto(
+          ai.call(
+            {
+              provider: rota,
+              system: SISTEMA_DO_TERMO,
+              prompt: promptDoTermo(afirmacoesDoBrief),
+              contextPackId
+            },
+            { userId: userIdAtual(), workspace }
+          )
+        )
+
+        if (texto === undefined) return {}
+        const termo = lerTermoDoModelo(texto)
+        return termo === undefined ? {} : { termo }
+      },
+      gerarDocumentos: async ({ workspace, rota, contextPackId, ...entrada }) => {
+        const texto = await coletarTexto(
+          ai.call(
+            {
+              provider: rota,
+              system: SISTEMA_DO_PRD,
+              prompt: promptDoPrd(entrada),
+              contextPackId
+            },
+            { userId: userIdAtual(), workspace }
+          )
+        )
+
+        if (texto === undefined) return {}
+        const afirmacoes = lerDocumentosDoModelo(texto)
+        return afirmacoes === undefined ? {} : { afirmacoes }
+      },
+      detectarContradicoes: async ({ workspace, rota, contextPackId, afirmacoes }) => {
+        const texto = await coletarTexto(
+          ai.call(
+            {
+              provider: rota,
+              system: SISTEMA_DAS_CONTRADICOES,
+              prompt: promptDasContradicoes(afirmacoes),
+              contextPackId
+            },
+            { userId: userIdAtual(), workspace }
+          )
+        )
+
+        if (texto === undefined) return {}
+        const contradicoes = lerContradicoesDoModelo(texto)
+        return contradicoes === undefined ? {} : { contradicoes }
+      }
+    })
+
     // Publicação no GitHub (SPEC-Entrega-01). Recebe o `ConnectorService`, **não** o
     // `GithubAdapter`: o gate de créditos, a policy e a auditoria vivem dentro do `call()`, e um
     // adapter injetado aqui seria o segundo caminho sem gate — o mesmo erro que o `GitRunner`
@@ -797,6 +904,7 @@ if (!app.requestSingleInstanceLock()) {
       roadmap,
       jornada,
       brief,
+      prd,
       refinamento,
       publicacao,
       mergePolicy,
@@ -845,6 +953,30 @@ if (!app.requestSingleInstanceLock()) {
  * fica indisponível (documentado no `.env.example`). Derrubar o boot por falta de um
  * projeto Supabase impediria qualquer um de clonar o repo e rodar.
  */
+/**
+ * Consome um stream de geração e devolve o texto inteiro, ou `undefined` quando a chamada não
+ * chegou ao fim.
+ *
+ * Existe porque as três chamadas da SPEC-Jornada-03 (termo, documentos, contradições) repetem o
+ * mesmo laço, e a **distinção que ele preserva é a que importa**: "a chamada falhou" devolve
+ * `undefined`, "veio texto que não parseia" devolve a string — e é sobre essa diferença que o
+ * `PrdService` decide se vale gastar a rodada de correção.
+ */
+async function coletarTexto(stream: AsyncIterable<AiStreamEvent>): Promise<string | undefined> {
+  let texto = ''
+
+  for await (const evento of stream) {
+    if (evento.tipo === 'chunk') {
+      texto += evento.texto
+      continue
+    }
+
+    if (evento.estado !== 'concluido') return undefined
+  }
+
+  return texto
+}
+
 function criarAuthService(
   userDataDir: string,
   storage: ReturnType<typeof initStorage>,
