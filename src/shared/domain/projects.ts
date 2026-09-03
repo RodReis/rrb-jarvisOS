@@ -24,6 +24,7 @@
  */
 
 import type { WorkspaceId } from './entities'
+import type { Etapa } from './jornada'
 
 /**
  * Como o projeto passou a existir. Enum fechado, e não um booleano `importado`: os dois
@@ -150,6 +151,17 @@ export interface PlanningSession {
   readonly projectId: string
   /** Onde o wizard parou. Texto livre da fatia que o define; opaco para esta. */
   readonly etapa: string
+  /**
+   * Onde a **jornada de planejamento** parou (SPEC-Jornada-01). Campo distinto de `etapa`, que
+   * guarda a etapa do wizard: são dois conceitos: `etapa` diz qual grupo de perguntas o
+   * catálogo preenche, `etapaDaJornada` diz em que ponto da trilha o projeto está.
+   *
+   * **É cache, não fonte de verdade.** Quando discorda do que as aprovações e os marcos
+   * sustentam, o serviço recalcula e audita o desvio (critério 2).
+   */
+  readonly etapaDaJornada: Etapa
+  /** Por que a jornada regrediu da última vez, ou `null` se nunca regrediu (critério 7). */
+  readonly motivoDaRegressao: string | null
   readonly respostas: Readonly<Record<string, unknown>>
   /** Último marco documental já commitado, ou `null` enquanto nenhum foi atingido. */
   readonly ultimoMarco: MarcoDocumental | null
