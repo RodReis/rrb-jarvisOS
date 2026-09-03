@@ -136,7 +136,12 @@ export function PacoteDoProjeto({
       </Field>
 
       <div className="flex justify-end">
-        <Button onClick={() => void gerar()} carregando={gerando} desabilitado={gerando}>
+        <Button
+          variante="primaria"
+          onClick={() => void gerar()}
+          carregando={gerando}
+          desabilitado={gerando}
+        >
           {t('pacote.gerar')}
         </Button>
       </div>

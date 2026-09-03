@@ -266,7 +266,12 @@ function ConteudoDaEtapa({
     // O gate do brief: é aqui que o PI vê o que a IA inferiu e corta item a item.
     case 'brief-aceito':
       return (
-        <BriefDoProjeto workspace={workspace} projectId={projeto.id} nomeDoProjeto={projeto.nome} />
+        <BriefDoProjeto
+          workspace={workspace}
+          projectId={projeto.id}
+          nomeDoProjeto={projeto.nome}
+          onAceito={onRecarregar}
+        />
       )
 
     case 'prd':

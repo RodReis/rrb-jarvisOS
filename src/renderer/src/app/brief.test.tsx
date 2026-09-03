@@ -25,6 +25,7 @@ const gerarBrief = vi.fn()
 const rotaDaGeracao = vi.fn()
 const carregarBrief = vi.fn()
 const cortarPropostoDoBrief = vi.fn()
+const aplicarEventoDaJornada = vi.fn()
 
 function afirmacao(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -60,6 +61,7 @@ beforeEach(() => {
   rotaDaGeracao.mockReset().mockResolvedValue({ decisao: 'assinatura' })
   carregarBrief.mockReset().mockResolvedValue(null)
   cortarPropostoDoBrief.mockReset().mockResolvedValue(null)
+  aplicarEventoDaJornada.mockReset().mockResolvedValue({ resultado: 'avancou' })
 
   Object.defineProperty(window, 'jarvis', {
     value: {
@@ -69,6 +71,7 @@ beforeEach(() => {
       rotaDaGeracao,
       carregarBrief,
       cortarPropostoDoBrief,
+      aplicarEventoDaJornada,
       sendLog: vi.fn()
     },
     configurable: true,
@@ -308,5 +311,90 @@ describe('BriefDoProjeto', () => {
     // Dez cabeçalhos com "nenhuma afirmação" seriam ruído que esconde o conteúdo real.
     expect(screen.queryByText('Jornadas')).toBeNull()
     expect(screen.getByText('Problema, usuários e resultado')).toBeInTheDocument()
+  })
+
+  /*
+   * O gate de aceite (critério 5).
+   *
+   * Antes destes testes a tela **calculava** `podeAceitar` e não renderizava botão algum: a
+   * jornada não tinha como sair do brief pela interface. Um teste de "mostra os propostos"
+   * passava verde sobre esse buraco, porque ninguém perguntava pela saída.
+   */
+  it('oferece o aceite quando nada material está pendente', async () => {
+    carregarBrief.mockResolvedValue(brief())
+
+    render(<BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" />)
+
+    expect(await screen.findByRole('button', { name: /Aceitar o brief/ })).toBeEnabled()
+  })
+
+  it('pendência material desabilita o aceite e diz por quê', async () => {
+    carregarBrief.mockResolvedValue(
+      brief({
+        pendencias: [{ bloco: 'escopo-e-metricas', pergunta: 'Qual a métrica?', material: true }]
+      })
+    )
+
+    render(<BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" />)
+
+    // Alvo morto sem explicação faria o PI procurar o defeito no próprio brief.
+    expect(await screen.findByRole('button', { name: /Aceitar o brief/ })).toBeDisabled()
+    expect(screen.getByText(/Resolva as pendências acima/)).toBeInTheDocument()
+  })
+
+  it('bloqueado, o aceite não move a jornada', async () => {
+    carregarBrief.mockResolvedValue(
+      brief({
+        pendencias: [{ bloco: 'escopo-e-metricas', pergunta: 'Qual a métrica?', material: true }]
+      })
+    )
+
+    render(<BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" />)
+    await screen.findByRole('button', { name: /Aceitar o brief/ })
+
+    expect(aplicarEventoDaJornada).not.toHaveBeenCalled()
+  })
+
+  it('aceitar vai pelo canal de evento da jornada, não por um canal próprio', async () => {
+    const usuario = userEvent.setup()
+    carregarBrief.mockResolvedValue(brief())
+
+    render(<BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" />)
+    await usuario.click(await screen.findByRole('button', { name: /Aceitar o brief/ }))
+
+    // Uma segunda via de escrita da etapa escaparia da checagem de ordem que o evento faz.
+    await waitFor(() =>
+      expect(aplicarEventoDaJornada).toHaveBeenCalledWith('p-1', 'brief-aceito', 'jarvis')
+    )
+  })
+
+  it('aceitar avisa o pai — a trilha ficaria na etapa velha', async () => {
+    const usuario = userEvent.setup()
+    const onAceito = vi.fn()
+    carregarBrief.mockResolvedValue(brief())
+
+    render(
+      <BriefDoProjeto
+        workspace="jarvis"
+        projectId="p-1"
+        nomeDoProjeto="Leituras"
+        onAceito={onAceito}
+      />
+    )
+    await usuario.click(await screen.findByRole('button', { name: /Aceitar o brief/ }))
+
+    await waitFor(() => expect(onAceito).toHaveBeenCalled())
+  })
+
+  it('falha técnica no aceite vira mensagem, não silêncio', async () => {
+    const usuario = userEvent.setup()
+    carregarBrief.mockResolvedValue(brief())
+    aplicarEventoDaJornada.mockRejectedValue(new Error('ponte caiu'))
+
+    render(<BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" />)
+    await usuario.click(await screen.findByRole('button', { name: /Aceitar o brief/ }))
+
+    // Sem isto o PI clica, nada acontece, e ele não sabe se aceitou.
+    expect(await screen.findByText(/Não foi possível registrar o aceite/)).toBeInTheDocument()
   })
 })

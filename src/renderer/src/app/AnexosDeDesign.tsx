@@ -379,7 +379,14 @@ function ExigenciaDoGate({
           <Badge tom={atendida ? 'ok' : 'warn'}>
             {atendida ? t('anexos.anexado') : t('anexos.pendente')}
           </Badge>
-          <Button variante="secundaria" onClick={onAnexar} desabilitado={desabilitado}>
+          {/* Anexar o que falta é a ação da linha; substituir o que já está lá não é. A
+              variante segue o estado em vez de ser fixa, para o acento marcar exatamente as
+              pendências — uma fileira toda em primária destacaria também o que está pronto. */}
+          <Button
+            variante={atendida ? 'secundaria' : 'primaria'}
+            onClick={onAnexar}
+            desabilitado={desabilitado}
+          >
             {atendida ? t('anexos.substituir') : t('anexos.anexar')}
           </Button>
         </span>

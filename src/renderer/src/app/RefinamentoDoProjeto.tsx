@@ -159,6 +159,7 @@ export function RefinamentoDoProjeto({
       <div className="flex flex-wrap items-center gap-3">
         {temPergunta ? (
           <Button
+            variante="primaria"
             onClick={onResponder}
             iconeInicial={<MessagesSquare aria-hidden="true" className="size-4" />}
           >
@@ -169,6 +170,7 @@ export function RefinamentoDoProjeto({
              respondê-la, e oferecer "gerar mais" convidaria a acumular perguntas sem responder
              nenhuma. */
           <Button
+            variante="primaria"
             onClick={() => void gerar()}
             desabilitado={ocupado || bloqueado}
             carregando={ocupado}

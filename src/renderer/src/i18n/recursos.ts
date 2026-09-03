@@ -136,6 +136,14 @@ export const RECURSOS = {
         cortar: 'Cortar',
         cortarEsta: 'Cortar a afirmação: {{texto}}',
         pendenciaMaterial: 'Falta decidir antes de aceitar',
+        // O aceite do brief (SPEC-Jornada-02, critério 5). O rótulo diz o que o clique
+        // faz — congela o documento e libera a próxima etapa —, não um "OK" genérico.
+        aceitar: 'Aceitar o brief',
+        aceiteTitulo: 'Aceite do brief',
+        aceiteDescricao:
+          'Aceitar congela este brief como base do PRD. Corte o que não serve antes: depois do aceite, mudar exige refazer a etapa.',
+        aceiteBloqueado: 'Resolva as pendências acima para aceitar.',
+        aceiteFalhou: 'Não foi possível registrar o aceite. Tente de novo.',
         propostosTitulo: '{{count}} afirmações propostas pela IA',
         // Diz o que distingue estas das outras: ninguém as disse, foram inferidas.
         propostosDescricao:
@@ -176,6 +184,8 @@ export const RECURSOS = {
       },
       jornada: {
         titulo: 'Jornada de planejamento',
+        // Marca as cinco etapas que param para a decisão do PI. Curto porque repete na coluna.
+        pedeAceite: 'Pede seu aceite',
         // Diz o que a trilha é e o que ela cobra. "Uma etapa por vez" é a regra visível: o PI
         // não escolhe por onde começar, e saber disso evita procurar um atalho que não existe.
         descricao: 'Uma etapa por vez. Aceites são seus; o resto o app prepara.',
@@ -564,6 +574,12 @@ export const RECURSOS = {
         cortar: 'Cut',
         cortarEsta: 'Cut the statement: {{texto}}',
         pendenciaMaterial: 'Decide this before accepting',
+        aceitar: 'Accept the brief',
+        aceiteTitulo: 'Brief acceptance',
+        aceiteDescricao:
+          'Accepting freezes this brief as the basis for the PRD. Cut what does not belong first: after acceptance, changing it means redoing the stage.',
+        aceiteBloqueado: 'Resolve the pending items above to accept.',
+        aceiteFalhou: 'Could not record the acceptance. Try again.',
         propostosTitulo: '{{count}} statements proposed by the AI',
         propostosDescricao:
           'Nobody said this — the AI inferred it from the prompt. Cut what does not make sense.',
@@ -600,6 +616,7 @@ export const RECURSOS = {
       },
       jornada: {
         titulo: 'Planning journey',
+        pedeAceite: 'Needs your acceptance',
         descricao: 'One step at a time. Approvals are yours; the app prepares the rest.',
         carregando: 'Loading the journey…',
         regrediu: 'The journey moved back a step',

@@ -378,6 +378,7 @@ function PerguntaAtual({
           </Button>
         )}
         <Button
+          variante="primaria"
           onClick={() =>
             onResponder({
               perguntaId: pergunta.id,

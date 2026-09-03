@@ -142,6 +142,7 @@ export function PromptDoProjeto({
 
       <div className="flex flex-wrap items-center gap-3">
         <Button
+          variante="primaria"
           onClick={() => void salvarEGerar()}
           desabilitado={ocupado || vazio || bloqueado}
           carregando={ocupado}

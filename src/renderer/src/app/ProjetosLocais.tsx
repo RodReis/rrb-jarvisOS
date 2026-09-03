@@ -323,6 +323,7 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
             // ação que não pode ser executada onde é lida não é a próxima ação, é uma referência.
             <div className="mt-1 flex flex-wrap items-center gap-2">
               <Button
+                variante="primaria"
                 onClick={() => void permitirGit()}
                 carregando={ocupado}
                 desabilitado={ocupado}
@@ -372,7 +373,12 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
               pousarem na altura do input. Valor derivado da estrutura do `Field`, não um número
               escolhido a olho: rótulo em micro (~1rem de caixa) + `gap-2`. */}
           <div className="flex flex-wrap gap-2 pt-[calc(1rem+0.5rem)]">
+            {/* `primaria`: criar é a tarefa dominante da tela, e o acento escolhido nas
+                configurações é o que diz isso. Sem variante, o botão caía no default
+                `secundaria` — a ação que o fluxo espera ficava com o mesmo peso de "Importar",
+                e a paleta do usuário não aparecia em lugar nenhum da tela. */}
             <Button
+              variante="primaria"
               onClick={() => void criar()}
               desabilitado={ocupado || nome.trim().length === 0}
               carregando={ocupado && !podeCorrigirGit}
@@ -448,6 +454,7 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
                       {editando ? (
                         <>
                           <Button
+                            variante="primaria"
                             onClick={() => void renomear(projeto.id, projeto.nome)}
                             desabilitado={ocupado}
                           >
@@ -488,6 +495,7 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
                               "Abrir" genérico que obrigaria a entrar para descobrir.
                             */}
                             <Button
+                              variante="primaria"
                               onClick={() => setProjetoAbertoId(projeto.id)}
                               aria-label={t('projetos.abrir', { nome: projeto.nome })}
                               iconeInicial={<Wand2 aria-hidden="true" className="size-4" />}

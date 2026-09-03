@@ -126,6 +126,9 @@ function instalarPonte(cena: CenaDoBrief): void {
             }
           : BRIEF,
       cortarPropostoDoBrief: async (): Promise<BriefRegistrado> => BRIEF,
+      // O gate de aceite chama o canal de evento da jornada — sem ele a captura pegaria a
+      // tela em falha em vez do botão em repouso.
+      aplicarEventoDaJornada: async () => ({ resultado: 'avancou' as const }),
       sendLog: (): void => {}
     },
     configurable: true,

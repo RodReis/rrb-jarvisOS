@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X } from 'lucide-react'
+import { ShieldCheck, X } from 'lucide-react'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type {
   Afirmacao,
@@ -38,6 +38,11 @@ interface BriefDoProjetoProps {
   readonly workspace: WorkspaceId
   readonly projectId: string
   readonly nomeDoProjeto: string
+  /**
+   * Relê a jornada depois do aceite — aceitar o brief move a etapa, e sem isto a trilha
+   * ficaria mostrando "Aceitar o brief" num brief já aceito.
+   */
+  readonly onAceito?: () => void
 }
 
 /**
@@ -106,12 +111,14 @@ function LinhaDaAfirmacao({
 export function BriefDoProjeto({
   workspace,
   projectId,
-  nomeDoProjeto
+  nomeDoProjeto,
+  onAceito
 }: BriefDoProjetoProps): React.JSX.Element {
   const { t } = useTranslation()
   const [brief, setBrief] = useState<BriefRegistrado | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [ocupado, setOcupado] = useState(false)
+  const [falhaNoAceite, setFalhaNoAceite] = useState(false)
 
   const carregar = useCallback(async (): Promise<void> => {
     try {
@@ -142,6 +149,32 @@ export function BriefDoProjeto({
       ativo = false
     }
   }, [projectId, workspace])
+
+  /**
+   * O aceite do brief (critério 5).
+   *
+   * Vai pelo **mesmo canal de evento** que move toda a jornada, e não por um canal próprio:
+   * `aplicarEventoDaJornada` é a única via de escrita da etapa, e abrir uma segunda entrada
+   * só para o brief criaria um caminho que escapa da checagem de ordem que ela faz.
+   *
+   * A recusa por ordem é desfecho, não exceção — o outcome volta e a tela só relê. O que
+   * vira mensagem é a falha técnica, porque aí o PI clicou e nada aconteceu.
+   */
+  async function aceitar(): Promise<void> {
+    setOcupado(true)
+    setFalhaNoAceite(false)
+
+    try {
+      await window.jarvis.aplicarEventoDaJornada(projectId, 'brief-aceito', workspace)
+      await carregar()
+      onAceito?.()
+    } catch (error: unknown) {
+      log.ui.error('Falha ao aceitar o brief', { error })
+      setFalhaNoAceite(true)
+    } finally {
+      setOcupado(false)
+    }
+  }
 
   async function cortar(afirmacaoId: string): Promise<void> {
     setOcupado(true)
@@ -186,6 +219,12 @@ export function BriefDoProjeto({
       {!liberado && (
         <InlineAlert tom="warn" titulo={t('brief.pendenciaMaterial')}>
           {materiais.map((p) => p.pergunta).join(' · ')}
+        </InlineAlert>
+      )}
+
+      {falhaNoAceite && (
+        <InlineAlert tom="err" titulo={t('brief.aceiteFalhou')}>
+          {t('brief.aceiteDescricao')}
         </InlineAlert>
       )}
 
@@ -247,6 +286,51 @@ export function BriefDoProjeto({
           </section>
         )
       })}
+
+      {/*
+        O aceite (critério 5) — a soleira do documento, e por isso ele fica **no fim**: aceitar
+        é o que se faz depois de ler, e um botão no topo convidaria a aceitar sem descer.
+
+        Marcado por uma régua e um bloco recuado, não por um cartão: o brief inteiro já é uma
+        pilha de seções, e mais uma caixa faria o aceite competir com os blocos em vez de
+        encerrá-los. A régua diz "o documento acabou aqui" com o material mais barato que existe.
+
+        O botão desabilitado vem **com a razão ao lado**, nunca sozinho: um alvo morto sem
+        explicação faz o PI procurar o defeito no próprio brief.
+      */}
+      <section
+        data-jos-aceite="brief"
+        aria-labelledby="brief-aceite"
+        className="mt-1 flex flex-col gap-2 border-t border-[rgba(var(--jos-borda-rgb),0.16)] pt-5"
+      >
+        <h4
+          id="brief-aceite"
+          className="text-[length:var(--jos-texto-corpo)] font-[var(--jos-peso-semi)] text-[var(--jos-cor-texto)]"
+        >
+          {t('brief.aceiteTitulo')}
+        </h4>
+        <p className="max-w-[62ch] text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-secundario)]">
+          {t('brief.aceiteDescricao')}
+        </p>
+
+        <div className="mt-1 flex flex-wrap items-center gap-3">
+          <Button
+            variante="primaria"
+            onClick={() => void aceitar()}
+            desabilitado={ocupado || !liberado}
+            carregando={ocupado}
+            iconeInicial={<ShieldCheck aria-hidden="true" className="size-4" />}
+          >
+            {t('brief.aceitar')}
+          </Button>
+
+          {!liberado && (
+            <span className="text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-secundario)]">
+              {t('brief.aceiteBloqueado')}
+            </span>
+          )}
+        </div>
+      </section>
     </div>
   )
 }
