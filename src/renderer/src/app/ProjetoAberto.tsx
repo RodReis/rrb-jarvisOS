@@ -13,6 +13,7 @@ import { AnexosDeDesign } from './AnexosDeDesign'
 import { RoadmapDoProjeto } from './RoadmapDoProjeto'
 import { PromptDoProjeto } from './PromptDoProjeto'
 import { BriefDoProjeto } from './BriefDoProjeto'
+import { RefinamentoDoProjeto } from './RefinamentoDoProjeto'
 
 /**
  * Um projeto aberto: a trilha da jornada e o conteúdo da etapa atual (SPEC-Jornada-01).
@@ -170,6 +171,7 @@ export function ProjetoAberto({
               projeto={projeto}
               estado={estado}
               onRecarregar={() => void carregar()}
+              onAbrirPerguntas={() => setRespondendo(true)}
             />
           </div>
         </div>
@@ -181,10 +183,29 @@ export function ProjetoAberto({
           projectId={projeto.id}
           nomeDoProjeto={projeto.nome}
           aberto
+          /*
+           * O refinamento tem fonte própria (M25-F02): as perguntas são geradas por projeto, não
+           * lidas do catálogo estático. A tela é a mesma de propósito — a decisão que ela conduz
+           * é idêntica, e duplicá-la criaria duas superfícies que divergiriam na primeira
+           * correção feita só numa delas.
+           */
+          fonte={{
+            ler: async () => {
+              const [estadoDoRefinamento, historico] = await Promise.all([
+                window.jarvis.estadoDoRefinamento(projeto.id, workspace),
+                window.jarvis.historicoDoRefinamento(projeto.id, workspace)
+              ])
+              return estadoDoRefinamento === null
+                ? null
+                : { estado: estadoDoRefinamento, historico }
+            },
+            responder: (resposta) =>
+              window.jarvis.responderRefinamento(projeto.id, resposta, workspace)
+          }}
           onFechar={() => {
             setRespondendo(false)
-            // Reler ao fechar: responder o wizard é o que sustenta os eventos de prompt e
-            // refinamento, e a trilha ficaria mostrando a etapa velha até um F5.
+            // Reler ao fechar: responder o refinamento é o que sustenta os eventos da jornada,
+            // e a trilha ficaria mostrando a etapa velha até um F5.
             void carregar()
           }}
         />
@@ -204,13 +225,16 @@ function ConteudoDaEtapa({
   workspace,
   projeto,
   estado,
-  onRecarregar
+  onRecarregar,
+  onAbrirPerguntas
 }: {
   readonly workspace: WorkspaceId
   readonly projeto: Project
   readonly estado: EstadoDaJornada
   /** Relê a jornada depois de um ato que a move — sem isso a trilha ficaria na etapa velha. */
   readonly onRecarregar: () => void
+  /** Abre o pop-up de perguntas. A tela de refinamento pede; quem monta o pop-up é o pai. */
+  readonly onAbrirPerguntas: () => void
 }): React.JSX.Element {
   const { t } = useTranslation()
 
@@ -224,6 +248,18 @@ function ConteudoDaEtapa({
           projectId={projeto.id}
           nomeDoProjeto={projeto.nome}
           onAvancar={onRecarregar}
+        />
+      )
+
+    // O refinamento: a IA pergunta o que o prompt não respondeu, uma decisão por vez.
+    case 'refinamento':
+      return (
+        <RefinamentoDoProjeto
+          workspace={workspace}
+          projectId={projeto.id}
+          nomeDoProjeto={projeto.nome}
+          onResponder={onAbrirPerguntas}
+          onRecarregar={onRecarregar}
         />
       )
 

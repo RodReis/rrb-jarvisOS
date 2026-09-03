@@ -54,6 +54,18 @@ interface WizardDoProjetoProps {
   readonly nomeDoProjeto: string
   readonly aberto: boolean
   readonly onFechar: () => void
+  /**
+   * De onde vêm a pergunta e o histórico. Ausente = o wizard do catálogo (M8-F03).
+   *
+   * **Parametrizado, e não duplicado.** O refinamento da M25-F02 conduz a mesma decisão com a
+   * mesma mecânica — contradição, delegação, retomada —, e a única diferença é a origem da
+   * pergunta: lá o catálogo é código versionado, aqui é gerado por projeto. Copiar a tela
+   * criaria duas superfícies que divergiriam na primeira correção feita só numa delas.
+   */
+  readonly fonte?: {
+    readonly ler: () => Promise<VistaDoWizard | null>
+    readonly responder: (resposta: Resposta) => Promise<RespostaOutcome>
+  }
 }
 
 /**
@@ -77,7 +89,8 @@ export function WizardDoProjeto({
   projectId,
   nomeDoProjeto,
   aberto,
-  onFechar
+  onFechar,
+  fonte
 }: WizardDoProjetoProps): React.JSX.Element {
   const { t } = useTranslation()
   /**
@@ -101,8 +114,9 @@ export function WizardDoProjeto({
    * que morreu quando a janela fechou.
    */
   const buscar = useCallback(
-    (): Promise<VistaDoWizard | null> => window.jarvis.getWizardState(projectId, workspace),
-    [projectId, workspace]
+    (): Promise<VistaDoWizard | null> =>
+      fonte?.ler() ?? window.jarvis.getWizardState(projectId, workspace),
+    [projectId, workspace, fonte]
   )
 
   const aplicar = useCallback((vista: VistaDoWizard | null): void => {
@@ -141,7 +155,8 @@ export function WizardDoProjeto({
     setEnviando(true)
     setPendente(resposta)
     try {
-      const resultado = await window.jarvis.answerWizard(projectId, resposta, workspace)
+      const resultado = await (fonte?.responder(resposta) ??
+        window.jarvis.answerWizard(projectId, resposta, workspace))
       setDesfecho(resultado)
       // Só recarrega quando algo foi gravado. Em `contradicao-pendente` nada mudou no banco, e
       // recarregar apagaria da tela a contradição que o PI precisa ler para decidir.

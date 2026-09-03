@@ -158,6 +158,22 @@ export const RECURSOS = {
           'riscos-e-decisoes-abertas': 'Riscos e decisões abertas'
         }
       },
+      refinamento: {
+        titulo: 'Refinamento',
+        // Diz o que o refinamento faz e o que ele cobra: decisões, não formulário.
+        descricao: 'A IA pergunta o que o prompt de {{nome}} não respondeu. Uma decisão por vez.',
+        carregando: 'Carregando o refinamento…',
+        gerar: 'Gerar as perguntas',
+        gerarMais: 'Procurar o que ainda falta',
+        responder: 'Responder a próxima',
+        // O número diz ao PI se ele começa agora ou depois. Um botão sem essa conta pediria
+        // um compromisso de duração desconhecida.
+        restantes: '{{count}} decisões pendentes.',
+        concluido: 'Todas as perguntas foram respondidas.',
+        semRota: 'A geração está indisponível',
+        naoGerou: 'As perguntas não foram geradas',
+        falha: 'Não foi possível gerar as perguntas. Tente de novo.'
+      },
       jornada: {
         titulo: 'Jornada de planejamento',
         // Diz o que a trilha é e o que ela cobra. "Uma etapa por vez" é a regra visível: o PI
@@ -568,6 +584,19 @@ export const RECURSOS = {
           'politica-git-provider-orcamento': 'Policy, provider and budget',
           'riscos-e-decisoes-abertas': 'Risks and open decisions'
         }
+      },
+      refinamento: {
+        titulo: 'Refinement',
+        descricao: 'The AI asks what the prompt for {{nome}} left out. One decision at a time.',
+        carregando: 'Loading refinement…',
+        gerar: 'Generate the questions',
+        gerarMais: 'Look for what is still missing',
+        responder: 'Answer the next one',
+        restantes: '{{count}} decisions pending.',
+        concluido: 'All questions have been answered.',
+        semRota: 'Generation is unavailable',
+        naoGerou: 'The questions were not generated',
+        falha: 'Could not generate the questions. Try again.'
       },
       jornada: {
         titulo: 'Planning journey',
