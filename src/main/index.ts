@@ -603,6 +603,7 @@ if (!app.requestSingleInstanceLock()) {
       mergePolicy,
       fila,
       preflight,
+      executionLedger,
       credentials,
       ai,
       budget,

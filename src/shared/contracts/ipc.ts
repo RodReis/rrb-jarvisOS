@@ -58,6 +58,8 @@ import type { Anexo, AnexoOutcome, TipoDeAnexo } from '../domain/anexos-de-desig
 import type { ValidacaoDoPrototipo } from '../domain/validacao-de-prototipo'
 import type { ArquiteturaOutcome, PacoteArquitetura } from '../domain/arquitetura'
 import type { AlvoDaPublicacao, PublicacaoOutcome } from '../domain/publicacao'
+import type { ExecutionLedger } from '../domain/execution-ledger'
+import type { PendenciaDeLimpeza } from '../domain/limpeza'
 import type { MergePolicyOutcome, PoliticaDeMerge, VistaDaFila } from '../domain/pipeline'
 import type { Roadmap, RoadmapOutcome } from '../domain/roadmap'
 import type {
@@ -379,6 +381,16 @@ export const IPC_CHANNELS = {
    * pipeline, nunca pelo renderer.
    */
   sandboxEstado: 'sandbox:estado',
+  /**
+   * A prova de um run encerrado e as pendências de limpeza (SPEC-Entrega-06).
+   *
+   * **Só leitura, como os canais da M9-F02/F03.** Não existe canal que encerre run, dispare
+   * limpeza ou registre aceite: a spec é explícita em que o painel *"não mostra commit/push/PR/
+   * merge como botões do PI e não pede aceite final"*, e a forma de garantir isso é não oferecer
+   * o canal. O aceite continua sendo ato do PI no board, fora do app.
+   */
+  ledgerDoRun: 'ledger:do-run',
+  limpezaPendencias: 'limpeza:pendencias',
   anexoEscolher: 'anexo:escolher',
   anexoAnexar: 'anexo:anexar',
   anexoListar: 'anexo:listar',
@@ -878,6 +890,16 @@ export interface JarvisBridge {
    * O estado do sandbox do executor (SPEC-Entrega-03). Só leitura — a preparação é da pipeline.
    */
   estadoDoSandbox(): Promise<{ readonly dockerNoAr: boolean; readonly proxyNoAr: boolean }>
+  /**
+   * A prova de um run encerrado (SPEC-Entrega-06). `undefined` enquanto o run não terminou.
+   *
+   * Só leitura: o ledger é escrito pelo `EntregaService` ao encerrar, nunca pelo renderer — uma
+   * via de escrita deixaria a UI fabricar evidência, o mesmo motivo pelo qual a auditoria da
+   * M1-F04 também é só leitura pela ponte.
+   */
+  ledgerDoRun(runId: string): Promise<ExecutionLedger | undefined>
+  /** O que a limpeza não conseguiu remover e segue reconciliável (SPEC-Entrega-06, critério 5). */
+  pendenciasDeLimpeza(): Promise<readonly PendenciaDeLimpeza[]>
   /** O kill-switch do merge autônomo do projeto (SPEC-Entrega-02/05). Ausência = ligado. */
   lerPoliticaDeMerge(projectId: string, workspace: WorkspaceId): Promise<PoliticaDeMerge>
   /**

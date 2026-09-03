@@ -14,6 +14,8 @@ import {
   type WorkspaceSwitchResult
 } from '@shared/contracts/ipc'
 import type { AlvoDaPublicacao, PublicacaoOutcome } from '@shared/domain/publicacao'
+import type { ExecutionLedger } from '@shared/domain/execution-ledger'
+import type { PendenciaDeLimpeza } from '@shared/domain/limpeza'
 import type { MergePolicyOutcome, PoliticaDeMerge, VistaDaFila } from '@shared/domain/pipeline'
 import type { ContextPack, ContextPackOutcome, FalhaRegistrada } from '@shared/domain/context-pack'
 import type { CapacidadeResolvida } from '@shared/domain/skills'
@@ -356,6 +358,10 @@ const bridge: JarvisBridge = {
     readonly dockerNoAr: boolean
     readonly proxyNoAr: boolean
   }> => ipcRenderer.invoke(IPC_CHANNELS.sandboxEstado),
+  ledgerDoRun: (runId: string): Promise<ExecutionLedger | undefined> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ledgerDoRun, runId),
+  pendenciasDeLimpeza: (): Promise<readonly PendenciaDeLimpeza[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.limpezaPendencias),
   lerPoliticaDeMerge: (projectId: string, workspace: WorkspaceId): Promise<PoliticaDeMerge> =>
     ipcRenderer.invoke(IPC_CHANNELS.mergePolicyLer, projectId, workspace),
   definirPoliticaDeMerge: (
