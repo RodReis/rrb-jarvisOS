@@ -166,11 +166,65 @@ test.describe('a etapa do prompt', () => {
     await expect(page.locator('input')).toHaveCount(0)
   })
 
+  /*
+   * Os exemplos existem para resolver a página em branco — o campo vazio chega quando o PI tem
+   * menos ideia do que escrever. Mas eles são para **ler**: um cartão que preenchesse o campo
+   * faria o PI partir do texto da IA em vez do problema dele, e é contra isso que a decisão de
+   * "um campo, e nada mais" existe. O teste trava a fronteira entre ajudar e preencher.
+   */
+  test('os exemplos são para ler, não para clicar', async ({ page }) => {
+    await abrir(page, 'prompt-vazio', 'dark')
+
+    const exemplo = page.getByText(/Organiza minhas leituras/)
+    await expect(exemplo).toBeVisible()
+
+    // Nenhum ancestral clicável: o exemplo não é botão, link nem alvo de clique.
+    const clicavel = await exemplo.evaluate(
+      (el) => el.closest('button, a, [role="button"], [onclick]') !== null
+    )
+    expect(clicavel).toBe(false)
+
+    // E o campo continua vazio depois de clicar nele — nada preenche por engano.
+    await exemplo.click()
+    await expect(page.locator('textarea')).toHaveValue('')
+  })
+
   test('o campo tem altura para um parágrafo, não para uma linha', async ({ page }) => {
     await abrir(page, 'prompt-vazio', 'dark')
 
     // Um campo de uma linha convida a uma frase; o prompt pede um parágrafo.
     const caixa = await page.locator('textarea').boundingBox()
     expect(caixa!.height).toBeGreaterThan(150)
+  })
+})
+
+/*
+ * Por onde a geração sai, dito **antes** do clique (decisão do PI, 2026-09-03).
+ *
+ * As telas mostravam o bloqueio quando **não havia** rota, mas ficavam mudas quando havia: o PI
+ * clicava sem saber se aquilo consumia a assinatura dele ou o provedor pago do workspace. As
+ * duas rotas não são o mesmo fato — uma gasta dinheiro —, e a forma acompanha o peso.
+ */
+test.describe('a rota é dita antes do clique', () => {
+  test('assinatura é uma linha, não um alerta', async ({ page }) => {
+    await abrir(page, 'refinamento-vazio', 'dark')
+
+    await expect(page.locator('[data-jos-rota="assinatura"]')).toBeVisible()
+    // Alerta que aparece sempre para de ser lido: o caso normal não grita.
+    await expect(page.getByRole('alert')).toHaveCount(0)
+  })
+
+  test('a rota paga vira alerta, porque o clique passa a custar', async ({ page }) => {
+    await abrir(page, 'refinamento-rota-paga', 'dark')
+
+    await expect(page.getByText('Esta geração usa a rota paga')).toBeVisible()
+    await expect(page.locator('[data-jos-rota="paga"]')).toBeVisible()
+  })
+
+  test('bloqueada, nenhum selo anuncia rota — o botão não gera', async ({ page }) => {
+    await abrir(page, 'prompt-bloqueado', 'dark')
+
+    // Anunciar por onde a geração sairia descreveria algo que não vai acontecer.
+    await expect(page.locator('[data-jos-rota]')).toHaveCount(0)
   })
 })

@@ -5,6 +5,7 @@ import type { Afirmacao, BriefRegistrado, PromptDoProjeto } from '@shared/domain
 import type { ResultadoDaRota } from '@shared/domain/rota-de-geracao'
 import { PromptDoProjeto as TelaDoPrompt } from '../app/PromptDoProjeto'
 import { BriefDoProjeto } from '../app/BriefDoProjeto'
+import { RefinamentoDoProjeto } from '../app/RefinamentoDoProjeto'
 
 /**
  * Galeria de prova do prompt e do gate do brief (SPEC-Jornada-02, § Testes).
@@ -22,7 +23,17 @@ import { BriefDoProjeto } from '../app/BriefDoProjeto'
  * produto, e injetar dado por prop faria a captura provar um componente diferente do que roda.
  */
 
-export type CenaDoBrief = 'prompt-vazio' | 'prompt-bloqueado' | 'brief-propostos' | 'brief-travado'
+export type CenaDoBrief =
+  | 'prompt-vazio'
+  | 'prompt-bloqueado'
+  | 'brief-propostos'
+  | 'brief-travado'
+  // O refinamento: sem perguntas (o convite a gerar) e com pergunta na fila (o próximo passo
+  // é respondê-la, não gerar mais).
+  | 'refinamento-vazio'
+  | 'refinamento-pendente'
+  // A rota paga: o clique passa a custar dinheiro, e a tela precisa dizer isso antes.
+  | 'refinamento-rota-paga'
 
 interface GaleriaProps {
   readonly modo: ModoUi
@@ -88,6 +99,7 @@ const PROMPT: PromptDoProjeto = {
 }
 
 const ROTA_OK: ResultadoDaRota = { decisao: 'assinatura' }
+const ROTA_PAGA: ResultadoDaRota = { decisao: 'paga' }
 
 const ROTA_BLOQUEADA: ResultadoDaRota = {
   decisao: 'bloqueado',
@@ -109,7 +121,8 @@ function instalarPonte(cena: CenaDoBrief): void {
     value: {
       lerPromptDoProjeto: async (): Promise<PromptDoProjeto | null> =>
         cena === 'prompt-vazio' ? null : PROMPT,
-      rotaDaGeracao: async (): Promise<ResultadoDaRota> => (bloqueado ? ROTA_BLOQUEADA : ROTA_OK),
+      rotaDaGeracao: async (): Promise<ResultadoDaRota> =>
+        bloqueado ? ROTA_BLOQUEADA : cena === 'refinamento-rota-paga' ? ROTA_PAGA : ROTA_OK,
       salvarPromptDoProjeto: async (): Promise<PromptDoProjeto> => PROMPT,
       gerarBrief: async () => ({ resultado: 'gerado' as const, mensagem: 'ok' }),
       carregarBrief: async (): Promise<BriefRegistrado> =>
@@ -126,6 +139,30 @@ function instalarPonte(cena: CenaDoBrief): void {
             }
           : BRIEF,
       cortarPropostoDoBrief: async (): Promise<BriefRegistrado> => BRIEF,
+      estadoDoRefinamento: async () =>
+        cena === 'refinamento-pendente'
+          ? {
+              tipo: 'pergunta' as const,
+              restantes: 4,
+              pergunta: {
+                id: 'q-1',
+                etapa: 'refinamento',
+                titulo: 'Alcance da primeira versão',
+                enunciado: 'Até onde vai a primeira entrega?',
+                opcoes: [
+                  { id: 'a', rotulo: 'Fatia vertical', impacto: 'ponta a ponta, estreita' },
+                  { id: 'b', rotulo: 'Fundação', impacto: 'base ampla, sem uso ainda' }
+                ],
+                recomendada: 'a',
+                justificativa: 'Valida antes de investir.',
+                aceitaTextoLivre: true,
+                delegavel: true
+              }
+            }
+          : null,
+      gerarPerguntasDeRefinamento: async () => ({ resultado: 'geradas' as const, mensagem: 'ok' }),
+      historicoDoRefinamento: async () => [],
+      responderRefinamento: async () => ({ resultado: 'registrada' as const }),
       // O gate de aceite chama o canal de evento da jornada — sem ele a captura pegaria a
       // tela em falha em vez do botão em repouso.
       aplicarEventoDaJornada: async () => ({ resultado: 'avancou' as const }),
@@ -145,6 +182,10 @@ export function GaleriaDoBrief({
   instalarPonte(cena)
 
   const ehPrompt = cena === 'prompt-vazio' || cena === 'prompt-bloqueado'
+  const ehRefinamento =
+    cena === 'refinamento-vazio' ||
+    cena === 'refinamento-pendente' ||
+    cena === 'refinamento-rota-paga'
 
   return (
     <ProvedorDeTema
@@ -164,6 +205,14 @@ export function GaleriaDoBrief({
               projectId="p-1"
               nomeDoProjeto="Leituras"
               onAvancar={() => {}}
+            />
+          ) : ehRefinamento ? (
+            <RefinamentoDoProjeto
+              workspace="jarvis"
+              projectId="p-1"
+              nomeDoProjeto="Leituras"
+              onResponder={() => {}}
+              onRecarregar={() => {}}
             />
           ) : (
             <BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" />

@@ -401,8 +401,16 @@ function LinhaDoGate({
           ) : (
             <Badge tom="warn">{t('roadmap.pendente')}</Badge>
           )}
+          {/*
+            Aprovar é **o aceite do PI** — o ato mais consequente da linha, e o único que move
+            a jornada. Como `secundaria` ele saía com o mesmo peso de um botão de manutenção,
+            e a paleta escolhida nas configurações não chegava ao gate.
+
+            A variante segue o estado em vez de ser fixa: um gate já aprovado não pede novo
+            aceite, e destacar o que não pode ser clicado gastaria o acento à toa.
+          */}
           <Button
-            variante="secundaria"
+            variante={vigente === undefined && revisoes.length > 0 ? 'primaria' : 'secundaria'}
             onClick={() => onAprovar(gate)}
             carregando={aprovando}
             // Um gate sem revisões não tem o que aprovar, e um já aprovado não pede novo aceite:

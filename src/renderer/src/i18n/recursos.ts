@@ -110,6 +110,14 @@ export const RECURSOS = {
         abrir: 'Abrir {{nome}}',
         voltar: 'Voltar aos projetos'
       },
+      rota: {
+        // Qual rota a geração vai usar. Dito **antes** do clique: gerar gasta uma chamada, e na
+        // rota paga gasta dinheiro — descobrir isso depois é tarde.
+        viaAssinatura: 'Via assinatura Claude',
+        viaPaga: 'Via rota paga',
+        pagaTitulo: 'Esta geração usa a rota paga',
+        pagaDescricao: 'A chamada é cobrada no provedor configurado para este workspace.'
+      },
       prompt: {
         titulo: 'O prompt do projeto',
         // Diz o que fazer e o que acontece depois. O PI escreve melhor sabendo que o texto vira
@@ -118,6 +126,13 @@ export const RECURSOS = {
           'Descreva {{nome}} como você contaria a alguém. A IA vai perguntar o que faltar.',
         rotulo: 'O que você quer construir',
         ajuda: 'Escreva livremente. Não precisa de estrutura nem de termos técnicos.',
+        // Exemplos para **ler**, não para clicar: mostram o que faz um prompt render sem
+        // empurrar o PI a copiar um texto que não é o problema dele.
+        exemplosTitulo: 'Um prompt rende mais quando diz o problema e para quem',
+        exemploA: 'Organiza minhas leituras e me lembra onde parei em cada uma.',
+        exemploAPorque: 'problema e resultado',
+        exemploB: 'Painel de custos por projeto, para eu ver quanto cada cliente consome.',
+        exemploBPorque: 'quem usa e para quê',
         placeholder: 'Ex.: um app que organiza minhas leituras e me lembra do que parei no meio…',
         carregando: 'Carregando o prompt…',
         gerar: 'Gerar o brief',
@@ -177,6 +192,8 @@ export const RECURSOS = {
         // O número diz ao PI se ele começa agora ou depois. Um botão sem essa conta pediria
         // um compromisso de duração desconhecida.
         restantes: '{{count}} decisões pendentes.',
+        // Diz **qual** é a próxima decisão. O número sozinho pede um compromisso às cegas.
+        aSeguir: 'A próxima',
         concluido: 'Todas as perguntas foram respondidas.',
         semRota: 'A geração está indisponível',
         naoGerou: 'As perguntas não foram geradas',
@@ -551,11 +568,22 @@ export const RECURSOS = {
         abrir: 'Open {{nome}}',
         voltar: 'Back to projects'
       },
+      rota: {
+        viaAssinatura: 'Via Claude subscription',
+        viaPaga: 'Via paid route',
+        pagaTitulo: 'This generation uses the paid route',
+        pagaDescricao: 'The call is billed to the provider configured for this workspace.'
+      },
       prompt: {
         titulo: 'The project prompt',
         descricao: 'Describe {{nome}} as you would to a person. The AI will ask what is missing.',
         rotulo: 'What you want to build',
         ajuda: 'Write freely. No structure or technical terms needed.',
+        exemplosTitulo: 'A prompt goes further when it says the problem and who it is for',
+        exemploA: 'Organizes my reading and reminds me where I left off in each one.',
+        exemploAPorque: 'problem and outcome',
+        exemploB: 'Cost panel per project, so I can see how much each client consumes.',
+        exemploBPorque: 'who uses it and what for',
         placeholder: 'e.g. an app that organizes my reading and reminds me what I left halfway…',
         carregando: 'Loading the prompt…',
         gerar: 'Generate the brief',
@@ -609,6 +637,7 @@ export const RECURSOS = {
         gerarMais: 'Look for what is still missing',
         responder: 'Answer the next one',
         restantes: '{{count}} decisions pending.',
+        aSeguir: 'Up next',
         concluido: 'All questions have been answered.',
         semRota: 'Generation is unavailable',
         naoGerou: 'The questions were not generated',

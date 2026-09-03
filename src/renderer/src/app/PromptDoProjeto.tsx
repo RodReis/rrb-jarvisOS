@@ -5,6 +5,7 @@ import type { WorkspaceId } from '@shared/domain/entities'
 import type { ResultadoDaRota } from '@shared/domain/rota-de-geracao'
 import { Button, Field, InlineAlert, LoadingState, Textarea } from '@design/ui'
 import { log } from '../lib/log'
+import { AvisoDaRotaPaga, SeloDaRota } from './RotaDaGeracao'
 
 /**
  * A etapa do prompt (SPEC-Jornada-02, critério 1).
@@ -121,6 +122,8 @@ export function PromptDoProjeto({
         </InlineAlert>
       )}
 
+      <AvisoDaRotaPaga rota={rota} />
+
       {erro !== null && (
         <InlineAlert tom="err" titulo={t('prompt.naoGerou')}>
           {erro}
@@ -140,6 +143,45 @@ export function PromptDoProjeto({
         )}
       </Field>
 
+      {/*
+        Exemplos para **ler**, não para clicar (decisão do PI, 2026-09-03).
+
+        A página em branco é o problema real desta tela: o campo grande e vazio chega no momento
+        em que o PI tem menos ideia do que escrever. Mas cartão que preenche o campo faria ele
+        partir do texto da IA em vez do problema dele — e a decisão de "um campo, e nada mais"
+        existe justamente para a tela não virar formulário.
+
+        Por isso são duas frases curtas, sem controle nenhum: não há clique, não há `input`, e a
+        prova visual que trava "um `textarea`, zero `input`" continua valendo. O que cada exemplo
+        ensina vem ao lado dele em mono — o padrão que o resto do app usa para metadado —,
+        porque o exemplo sem o motivo vira texto a copiar.
+
+        Fica **abaixo** do campo: acima, seria moldura antes da pergunta; depois do botão,
+        chegaria tarde demais para ajudar.
+      */}
+      <div className="-mt-1 flex flex-col gap-2 pb-1">
+        <p className="text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-secundario)]">
+          {t('prompt.exemplosTitulo')}
+        </p>
+
+        <ul className="flex flex-col gap-1">
+          {[
+            { texto: t('prompt.exemploA'), porque: t('prompt.exemploAPorque') },
+            { texto: t('prompt.exemploB'), porque: t('prompt.exemploBPorque') }
+          ].map((exemplo) => (
+            <li
+              key={exemplo.porque}
+              className="flex flex-wrap items-baseline gap-x-2.5 text-[length:var(--jos-texto-micro)]"
+            >
+              <span className="text-[var(--jos-cor-texto)]">“{exemplo.texto}”</span>
+              <span className="font-[family-name:var(--jos-fonte-mono)] uppercase tracking-[2px] text-[var(--jos-cor-texto-suave)]">
+                {exemplo.porque}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
       <div className="flex flex-wrap items-center gap-3">
         <Button
           variante="primaria"
@@ -153,10 +195,14 @@ export function PromptDoProjeto({
 
         {/* Diz **por que** o botão está desabilitado. Um alvo morto sem explicação faz o PI
             procurar o defeito na própria escrita. */}
-        {vazio && !bloqueado && (
+        {vazio && !bloqueado ? (
           <span className="text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-suave)]">
             {t('prompt.escrevaAlgo')}
           </span>
+        ) : (
+          // Por onde a geração sai. Só aparece quando o botão de fato gera: com o campo vazio,
+          // o que o PI precisa saber é o que falta, não a rota.
+          <SeloDaRota rota={rota} />
         )}
       </div>
     </div>

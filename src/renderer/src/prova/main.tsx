@@ -53,7 +53,15 @@ const CENAS_POR_GALERIA: Readonly<Record<string, readonly string[]>> = {
   // A trilha de planejamento (M25-F01): cada cena é um estado da trilha, não uma tela.
   planejamento: ['inicio', 'meio', 'regressao'],
   // O prompt e o gate do brief (M25-F02): as cenas são os estados que mudam a decisão do PI.
-  brief: ['prompt-vazio', 'prompt-bloqueado', 'brief-propostos', 'brief-travado'],
+  brief: [
+    'prompt-vazio',
+    'prompt-bloqueado',
+    'brief-propostos',
+    'brief-travado',
+    'refinamento-vazio',
+    'refinamento-pendente',
+    'refinamento-rota-paga'
+  ],
   // O índice de projetos: a lista com jornadas distintas e o primeiro uso.
   projetos: ['lista', 'vazio']
 }

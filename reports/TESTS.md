@@ -232,3 +232,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | — | #239 | SPEC-Jornada-02 | Regras de Negócio | 1133 | 1133 | 0 | 72.6 | #245 | [#245](https://github.com/RodReis/rrb-jarvisOS/pull/245) |
 | — | #239 | SPEC-Jornada-02 | Banco | 880 | 875 | 0 | 88.0 | #245 | [#245](https://github.com/RodReis/rrb-jarvisOS/pull/245) |
 | — | #239 | SPEC-Jornada-02 | Tela | 458 | 457 | 0 | 82.1 | #245 | [#245](https://github.com/RodReis/rrb-jarvisOS/pull/245) |
+| — | #239 | SPEC-Jornada-02 | Regras de Negócio | 1133 | 1133 | 0 | 72.6 | #246 | [#246](https://github.com/RodReis/rrb-jarvisOS/pull/246) |
+| — | #239 | SPEC-Jornada-02 | Banco | 880 | 875 | 0 | 88.0 | #246 | [#246](https://github.com/RodReis/rrb-jarvisOS/pull/246) |
+| — | #239 | SPEC-Jornada-02 | Tela | 458 | 457 | 0 | 82.1 | #246 | [#246](https://github.com/RodReis/rrb-jarvisOS/pull/246) |
