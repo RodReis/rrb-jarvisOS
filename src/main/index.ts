@@ -51,6 +51,8 @@ import { GitRunner } from './projects/git-runner'
 import { DockerRunner, prepararGitMeta, TIMEOUT_DOCKER_MS } from './pipeline/docker-runner'
 import { ConstrutorService } from './pipeline/construtor-service'
 import { EntregaService } from './pipeline/entrega-service'
+import { ExecutionLedgerRepository } from './pipeline/execution-ledger-repository'
+import { LimpezaService } from './pipeline/limpeza-service'
 import { ExecutorProxy } from './pipeline/executor-proxy'
 import { RulesetRepository } from './pipeline/ruleset-repository'
 import { PreflightService } from './pipeline/preflight-service'
@@ -262,7 +264,10 @@ if (!app.requestSingleInstanceLock()) {
     // Gate de orçamento (SPEC-Providers-03). Construído **antes** do ponto único porque é
     // dependência dele: um `AiCallService` sem gate seria um caminho até o provider sem
     // orçamento, que é exatamente o que o ponto único existe para não permitir.
-    const budget = new BudgetService(new BudgetRepository(storage.db), storage.audit)
+    // O repositório sai da expressão porque a M9-F06 também o consome: o `ExecutionLedger`
+    // soma o consumo do run por `run_id`, correlação que a M9-F05 passou a gravar.
+    const budgetRepository = new BudgetRepository(storage.db)
+    const budget = new BudgetService(budgetRepository, storage.audit)
 
     // Ponto único de chamada de IA (SPEC-Providers-02). Construído **depois** do vault porque
     // depende dele: nenhum adapter chama provider sem credencial, e o serviço a resolve por
@@ -480,6 +485,10 @@ if (!app.requestSingleInstanceLock()) {
     )
     const docker = new DockerRunner(terminalDocker, () => workspaces.atual())
 
+    // A prova e a limpeza de cada run (SPEC-Entrega-06). O mesmo repositório serve aos dois: o
+    // ledger grava o desfecho, e a limpeza registra nele a pendência do que não pôde ser removido.
+    const executionLedger = new ExecutionLedgerRepository(storage.db)
+
     // A entrega da fatia (SPEC-Entrega-05): construção, revisão, CI e squash merge no mesmo PR.
     //
     // O `ConstrutorService` ganha aqui o consumidor que a M9-F04 dizia faltar — era por não tê-lo
@@ -499,6 +508,15 @@ if (!app.requestSingleInstanceLock()) {
       fila,
       mergePolicy,
       ruleset: new RulesetRepository(storage.db),
+      ledger: executionLedger,
+      limpeza: new LimpezaService({
+        docker,
+        git: gitRunner,
+        leases: leaseRepository,
+        ledger: executionLedger,
+        workspaceId: () => workspaces.atual()
+      }),
+      budget: budgetRepository,
       audit: storage.audit,
       userId: userIdAtual,
       revisar: async () => [],
@@ -585,6 +603,7 @@ if (!app.requestSingleInstanceLock()) {
       mergePolicy,
       fila,
       preflight,
+      executionLedger,
       credentials,
       ai,
       budget,

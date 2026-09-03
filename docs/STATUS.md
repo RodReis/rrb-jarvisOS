@@ -1,12 +1,13 @@
 # STATUS.md — Kanban / Roadmap
 
-Atualizado em: **2026-09-02**. Fonte única do índice Fatia ↔ SPEC. Estado remoto conferido no fechamento do PR #234; a M9-F05 (#105) foi promovida a `proplan:next` pelo PI em 2026-09-02. Histórico detalhado em `docs/STATUS-ARQUIVO.md`; o board vence divergência factual.
+Atualizado em: **2026-09-02**. Fonte única do índice Fatia ↔ SPEC. Estado remoto conferido na entrega da M9-F06; a M9-F05 (#105) foi **aceita pelo PI** e a M9-F06 (#106) — a última fatia do MVP-009 — está em construção. Histórico detalhado em `docs/STATUS-ARQUIVO.md`; o board vence divergência factual.
 
 ## Agora
 
 | Coluna | Item | Estado |
 |---|---|---|
-| Feito | [#105](https://github.com/RodReis/rrb-jarvisOS/issues/105) · M9-F05 Revisão, CI e squash merge automático | entregue por PR; SPEC `aprovada-pi` (2026-08-29, emendada em 2026-08-30). Fecha a pendência da M9-F04: o `ConstrutorService` ganhou consumidor e o `ExecutorProxy` recebe `contexto`/`contextPackId` de verdade — a rota do executor passa a operar. **Três decisões do PI em 2026-09-02** (ver § Decisões do PI na M9-F05). **Limite:** `revisar` devolve lista vazia até a M9-F06 ligar o revisor |
+| Em Andamento | [#106](https://github.com/RodReis/rrb-jarvisOS/issues/106) · M9-F06 Evidência, limpeza e continuidade | **a última fatia do MVP-009**. SPEC `aprovada-pi` (2026-08-29, emendada em 2026-08-30). Entrega o `ExecutionLedger`, o `LimpezaService`, o coletor de retenção e o painel do estado terminal. **Decisão do PI em 2026-09-02:** o container passa a nascer com `--rm` (parar já remove, sem `docker rm` na allowlist de destrutivos), e a jornada E2E real completa **não roda** nesta entrega — o limite fica declarado |
+| Finalizado | [#105](https://github.com/RodReis/rrb-jarvisOS/issues/105) · M9-F05 Revisão, CI e squash merge automático | **aceite do PI registrado**; entregue no PR #235 (`6bade77`). SPEC `aprovada-pi` (2026-08-29, emendada em 2026-08-30). Fechou a pendência da M9-F04: o `ConstrutorService` ganhou consumidor e a rota do executor passou a operar. **Três decisões do PI em 2026-09-02** (ver § Decisões do PI na M9-F05) |
 | Finalizado | [#104](https://github.com/RodReis/rrb-jarvisOS/issues/104) · M9-F04 Construção/recuperação | **aceite do PI registrado em 2026-09-02**; entregue no PR #231 (`9005423`), CI verde. **Limites declarados:** correlação `runId`/`tentativa` do proxy fica para a M9-F05 (rota do executor não operacional em produção até lá); smoke real em `not_run` porque a imagem do sandbox não traz o binário `claude`; cancelamento cooperativo com latência até o timeout do passo. **Pendência do PI:** fail-open do `verificarEscopo` quando o `git status` do container falha |
 | Feito | [#209](https://github.com/RodReis/rrb-jarvisOS/issues/209) · correção do EffectJournal | entregue no PR #227 (`66623b8`); `proplan:done`, aguardando aceite do PI |
 | Backlog | [#232](https://github.com/RodReis/rrb-jarvisOS/issues/232) · `[INFRA][FIX]` worker morto no pool do Vitest | criado em 2026-09-02 na entrega da M9-F04: execução perde arquivo inteiro e ainda relata verde, o que é fechamento frágil produzido pela infra (`docs/TESTING.md` §1). Não entra na fila por si — o PI decide quando |
@@ -136,6 +137,14 @@ Não existe catálogo global `SPEC-nnn`. O slug identifica a SPEC; os números a
 | M24-F03 | MVP-024 | Custos, quotas e capacidade do portfólio ([#220](https://github.com/RodReis/rrb-jarvisOS/issues/220)) | `spec-portfolio-03-custos-quotas.md` — aprovada-pi |
 | M24-F04 | MVP-024 | Console de portfólio e prova integrada ([#221](https://github.com/RodReis/rrb-jarvisOS/issues/221)) | `spec-portfolio-04-console-resiliencia-e2e.md` — aprovada-pi; gate visual antes da construção |
 
+## Decisões do PI na M9-F06 (2026-09-02)
+
+Dois pontos abertos foram levantados **antes** de codificar e decididos pelo PI. Os dois mudavam o trabalho, então nenhum foi assumido.
+
+1. **O container do executor passa a nascer com `--rm`.** O critério 5 da SPEC-Entrega-06 exige remover o container, mas `docker rm|rmi|prune|down` casa a política de destrutivos do MVP-004 e abriria `ApprovalRequest` — travando a limpeza automática num gate humano, que é o oposto do desenvolvimento autônomo que esta fatia entrega. Com a flag na criação, `docker stop` já remove, sem tocar a allowlist. As alternativas oferecidas eram liberar `docker rm` (rejeitada: reintroduz o gate humano) e apenas parar, deixando pendência (rejeitada: containers parados acumulariam até alguém limpar à mão). Antes de aplicar, foi verificado que nada na M9-F03 lê logs do container depois que ele para.
+
+2. **A jornada E2E real completa não roda nesta entrega.** A spec a pede em projeto e repositório exclusivos e descartáveis, com orçamento limitado e fora da suíte padrão — o que exige autorização e um repositório do PI. O limite fica **declarado** no `docs/DEVELOPMENT.md`, na mesma postura que a M9-F01 adotou para o smoke real do push autenticado. Marcar como feito o que não rodou seria o fechamento frágil que o processo existe para impedir.
+
 ## Decisões do PI na M9-F05 (2026-09-02)
 
 Três pontos abertos foram levantados durante a construção e **decididos pelo PI**, que delegou a escolha ao Code pedindo "o melhor para o desenvolvimento autônomo com agents". Registradas aqui porque mudam comportamento e não podem virar escolha silenciosa de implementação.
@@ -148,7 +157,7 @@ Três pontos abertos foram levantados durante a construção e **decididos pelo 
 
 ## Próximas ações
 
-1. **#104 (M9-F04) entregue pelo PR #231 e aceita pelo PI em 2026-09-02** — MVP-009 em 4/6. **A F05 (#105) foi promovida a `proplan:next` pelo PI em 2026-09-02** e entrou em construção; resta a F06 (evidência/limpeza) em Backlog, com SPEC `aprovada-pi`. **A M9-F05 herda uma dependência concreta:** é ela quem liga o `ConstrutorService` ao boot e preenche `contexto`/`contextPackId` do `ExecutorProxy` — até lá a rota do executor não opera em produção (ver `docs/STATUS-ARQUIVO.md` item 14, emendado, e `docs/DEVELOPMENT.md` § Fatia 04).
+1. **#106 (M9-F06) entregue por PR — a última fatia do MVP-009.** Com o aceite do PI, o MVP-009 fecha em 6/6 e o épico [#100](https://github.com/RodReis/rrb-jarvisOS/issues/100) pode ser fechado pelo PI. **#105 (M9-F05) foi aceita em 2026-09-02** e entregue no PR #235. Os limites declarados da F06 estão no `docs/DEVELOPMENT.md` § Fatia 06 — o principal é a jornada E2E real completa, que **não rodou** por decisão do PI e continua exigindo repositório descartável e orçamento autorizado.
 2. Conservar #167/#168 e #214–#221 em Backlog após o aceite exato de 2026-08-31, sem promover qualquer uma a `next` por esta atualização. #232 (`[INFRA][FIX]` do pool de testes) também nasce em Backlog, sem entrar na fila por conta própria.
 3. Antes das fatias visuais, anexar `DESIGN-SYSTEM.md` e HTML pelo fluxo já aprovado; texto de SPEC/template não substitui anexo do PI.
 4. M7-F05/F06 estão aprovadas/Backlog e M7-F07–F08 continuam a redigir; as fatias do Command Center seguem seus planejamentos próprios. Nenhuma delas bloqueia concluir a documentação V3.

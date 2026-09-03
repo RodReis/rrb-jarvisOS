@@ -42,7 +42,13 @@ import {
   type SeveridadeDeAchado,
   type VeredictoDoGate
 } from '@shared/domain/gate-de-merge'
+import {
+  ledgerCompleto,
+  type CheckDoLedger,
+  type ExecutionLedger
+} from '@shared/domain/execution-ledger'
 import { GITHUB_OPERATIONS, type CheckNormalizado } from '@shared/domain/github-automation'
+import type { EstadoDoRun } from '@shared/domain/pipeline'
 import type { SandboxPreparado } from '@shared/domain/preflight'
 import { rulesetMudou, type SnapshotDeRuleset } from '@shared/domain/ruleset'
 import type { ConnectorService } from '../connectors/connector-service'
@@ -52,6 +58,9 @@ import type { ConstrutorService } from './construtor-service'
 import type { FilaService } from './fila-service'
 import type { GitRunner } from '../projects/git-runner'
 import type { MergePolicyService } from './merge-policy-service'
+import type { BudgetRepository } from '../budget/budget-repository'
+import type { ExecutionLedgerRepository } from './execution-ledger-repository'
+import type { LimpezaService } from './limpeza-service'
 import type { RulesetRepository } from './ruleset-repository'
 
 /** O teto padrão de espera por checks pendentes (decisão do PI, 2026-09-02). */
@@ -100,6 +109,15 @@ export interface ResultadoDaEntrega {
   readonly estadoFinal: 'MERGED' | 'AWAITING_MERGE' | 'BLOCKED'
   readonly pullRequest?: number
   readonly mergeSha?: string
+  /**
+   * O head que a pipeline verificou na origem.
+   *
+   * Sai daqui para o `ExecutionLedger` (M9-F06, critério 1): sem ele, `MERGED` não teria contra o
+   * que comparar o merge, e a coerência exigida pelo critério seria indemonstrável.
+   */
+  readonly headSha?: string
+  /** Os checks observados naquele head. Também exigidos pelo critério 1 em `MERGED`. */
+  readonly checks?: readonly CheckDoLedger[]
   readonly bloqueio?: {
     readonly causa: string
     readonly acao: string
@@ -121,6 +139,12 @@ export interface EntregaDeps {
   readonly fila: FilaService
   readonly mergePolicy: MergePolicyService
   readonly ruleset: RulesetRepository
+  /** Onde a prova do run é gravada ao encerrar (M9-F06, critério 1). */
+  readonly ledger: ExecutionLedgerRepository
+  /** Devolve worktree, container e portas ao sistema — em todo desfecho (M9-F06, critério 5). */
+  readonly limpeza: LimpezaService
+  /** A soma do que o run consumiu, correlacionada por `run_id` desde a M9-F05. */
+  readonly budget: BudgetRepository
   readonly audit: AuditRepository
   readonly userId: () => string
   /**
@@ -168,11 +192,113 @@ export class EntregaService {
       ...(pedido.contextPackId === undefined ? {} : { contextPackId: pedido.contextPackId })
     }
 
+    const iniciadoEm = this.agora()
+    let resultado: ResultadoDaEntrega | undefined
+
     try {
-      return await this.executar(pedido)
+      resultado = await this.executar(pedido)
+      return resultado
     } finally {
+      const tentativa = this.runCorrente?.tentativa ?? 1
       this.runCorrente = undefined
+      this.encerrar(pedido, resultado, iniciadoEm, tentativa)
     }
+  }
+
+  /**
+   * Grava a prova e devolve os recursos — em **todo** desfecho (M9-F06, critérios 1 e 5).
+   *
+   * No `finally`, e não depois do `return`: `BLOCKED` vaza worktree e container igual a `MERGED`,
+   * e uma exceção inesperada vazaria os dois sem deixar registro nenhum. Um run que termina sem
+   * ledger é um run que não pode ser auditado.
+   *
+   * **Nada aqui pode derrubar a entrega.** O merge já aconteceu quando este método roda; deixar
+   * uma falha de limpeza propagar transformaria uma sobra de container em erro de entrega, e o
+   * chamador veria falha onde houve sucesso.
+   */
+  private encerrar(
+    pedido: PedidoDeEntrega,
+    resultado: ResultadoDaEntrega | undefined,
+    iniciadoEm: number,
+    tentativa: number
+  ): void {
+    const estadoFinal = resultado?.estadoFinal ?? 'BLOCKED'
+
+    try {
+      this.gravarLedger(pedido, resultado, iniciadoEm, tentativa, estadoFinal)
+    } catch (erro) {
+      log.agent.error('Ledger do run não pôde ser gravado', {
+        runId: pedido.runId,
+        motivo: erro instanceof Error ? erro.message : 'desconhecido'
+      })
+    }
+
+    try {
+      this.deps.limpeza.limpar({
+        runId: pedido.runId,
+        userId: this.deps.userId(),
+        projectId: pedido.projectId,
+        repositorio: pedido.sandbox.worktreeNoHost,
+        sandbox: pedido.sandbox,
+        // `MERGED` é fase pós-merge; os demais terminais pararam durante o CI, e nas duas a
+        // limpeza preserva branch e PR — o que muda é só o monitoramento.
+        fase: estadoFinal === 'MERGED' ? 'depois-do-merge' : 'durante-ci',
+        estadoFinal
+      })
+    } catch (erro) {
+      log.agent.error('Limpeza do run falhou; recursos ficam para a reconciliação', {
+        runId: pedido.runId,
+        motivo: erro instanceof Error ? erro.message : 'desconhecido'
+      })
+    }
+  }
+
+  /**
+   * Monta e grava o `ExecutionLedger`.
+   *
+   * **Ledger incompleto ainda é gravado**, com um `error` no log dizendo qual campo falta. A
+   * alternativa — recusar a gravação — trocaria uma prova imperfeita por prova nenhuma, e é a
+   * prova nenhuma que impede auditar o que aconteceu.
+   */
+  private gravarLedger(
+    pedido: PedidoDeEntrega,
+    resultado: ResultadoDaEntrega | undefined,
+    iniciadoEm: number,
+    tentativa: number,
+    estadoFinal: EstadoDoRun
+  ): void {
+    const userId = this.deps.userId()
+    const consumo = this.deps.budget.consumoDoRun(userId, pedido.runId)
+
+    const ledger: ExecutionLedger = {
+      runId: pedido.runId,
+      userId,
+      projectId: pedido.projectId,
+      estadoFinal,
+      duracaoMs: Math.max(0, this.agora() - iniciadoEm),
+      tentativas: Math.max(consumo.tentativas, tentativa),
+      tokens: consumo.tokens,
+      creditos: 0,
+      custoUsd: consumo.custoUsd,
+      eventos: [
+        { em: new Date(iniciadoEm).toISOString(), oQue: 'entrega-iniciada' },
+        { em: new Date(this.agora()).toISOString(), oQue: `entrega-${estadoFinal}` }
+      ],
+      ...(resultado?.headSha === undefined ? {} : { headSha: resultado.headSha }),
+      ...(resultado?.mergeSha === undefined ? {} : { mergeSha: resultado.mergeSha }),
+      checks: resultado?.checks ?? [],
+      artefatos: [],
+      encerradoEm: new Date(this.agora()).toISOString()
+    }
+
+    if (!ledgerCompleto(ledger)) {
+      log.agent.error('Ledger do run está incompleto para o estado declarado', {
+        runId: pedido.runId,
+        estado: estadoFinal
+      })
+    }
+
+    this.deps.ledger.registrar(ledger)
   }
 
   private async executar(pedido: PedidoDeEntrega): Promise<ResultadoDaEntrega> {
@@ -392,7 +518,13 @@ export class EntregaService {
         achadosAbertos: achados
       })
 
-      const desfecho = await this.aplicarVeredicto(pedido, pullRequest, veredicto, headShaEsperado)
+      const desfecho = await this.aplicarVeredicto(
+        pedido,
+        pullRequest,
+        veredicto,
+        headShaEsperado,
+        checks.map((check) => ({ nome: check.nome, conclusao: check.conclusao ?? 'pendente' }))
+      )
       if (desfecho !== undefined) return desfecho
 
       // Reconciliação do head: alguém publicou depois da nossa verificação. O run passa a
@@ -405,7 +537,7 @@ export class EntregaService {
           runId: pedido.runId,
           pullRequest
         })
-        return { estadoFinal: 'AWAITING_MERGE', pullRequest }
+        return { estadoFinal: 'AWAITING_MERGE', pullRequest, headSha: headShaEsperado }
       }
 
       await this.dormir(INTERVALO_DE_CONSULTA_MS)
@@ -417,7 +549,8 @@ export class EntregaService {
     pedido: PedidoDeEntrega,
     pullRequest: number,
     veredicto: VeredictoDoGate,
-    headSha: string
+    headSha: string,
+    checks: readonly CheckDoLedger[]
   ): Promise<ResultadoDaEntrega | undefined> {
     if (veredicto.reason === 'aguardando') return undefined
 
@@ -433,16 +566,18 @@ export class EntregaService {
       // queue (critério 12). Termina em `AWAITING_MERGE`, como o kill-switch desligado.
       if (veredicto.acao.includes('merge queue')) {
         this.deps.fila.concluir(pedido.projectId, pedido.workspaceId, pedido.runId)
-        return { estadoFinal: 'AWAITING_MERGE', pullRequest }
+        return { estadoFinal: 'AWAITING_MERGE', pullRequest, headSha, checks }
       }
 
       return {
         ...this.bloqueado('externo', veredicto.acao, veredicto.mensagem),
-        pullRequest
+        pullRequest,
+        headSha,
+        checks
       }
     }
 
-    return await this.mergear(pedido, pullRequest, headSha)
+    return await this.mergear(pedido, pullRequest, headSha, checks)
   }
 
   /**
@@ -454,7 +589,8 @@ export class EntregaService {
   private async mergear(
     pedido: PedidoDeEntrega,
     pullRequest: number,
-    headSha: string
+    headSha: string,
+    checks: readonly CheckDoLedger[]
   ): Promise<ResultadoDaEntrega> {
     if (!this.deps.mergePolicy.autonomoLigado(pedido.projectId)) {
       this.deps.fila.concluir(pedido.projectId, pedido.workspaceId, pedido.runId)
@@ -462,7 +598,7 @@ export class EntregaService {
         runId: pedido.runId,
         pullRequest
       })
-      return { estadoFinal: 'AWAITING_MERGE', pullRequest }
+      return { estadoFinal: 'AWAITING_MERGE', pullRequest, headSha, checks }
     }
 
     await this.chamar(GITHUB_OPERATIONS.squashMerge, pedido.workspaceId, {
@@ -490,7 +626,7 @@ export class EntregaService {
         runId: pedido.runId,
         pullRequest
       })
-      return { estadoFinal: 'AWAITING_MERGE', pullRequest }
+      return { estadoFinal: 'AWAITING_MERGE', pullRequest, headSha, checks }
     }
 
     this.deps.fila.concluir(pedido.projectId, pedido.workspaceId, pedido.runId)
@@ -501,7 +637,13 @@ export class EntregaService {
       payload: { runId: pedido.runId, pullRequest, mergeSha: confirmado.mergeSha }
     })
 
-    return { estadoFinal: 'MERGED', pullRequest, mergeSha: confirmado.mergeSha }
+    return {
+      estadoFinal: 'MERGED',
+      pullRequest,
+      mergeSha: confirmado.mergeSha,
+      headSha,
+      checks
+    }
   }
 
   /** Lê a regra da origem e registra o snapshot quando ela mudou (ou quando é o primeiro). */

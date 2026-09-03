@@ -8,6 +8,7 @@ import {
   type WorkspaceSwitchResult
 } from '@shared/contracts/ipc'
 import { AUTH_MENSAGENS, type AuthSnapshot } from '@shared/contracts/auth'
+import type { ExecutionLedgerRepository } from '../pipeline/execution-ledger-repository'
 import type { PreflightService } from '../pipeline/preflight-service'
 import { parseLogInput } from '@shared/contracts/logging-input'
 import { isSensitivity, type PolicyContext, type PolicyDecision } from '@shared/policies'
@@ -77,6 +78,8 @@ import { EXTENSOES_DO_ANEXO, isTipoDeAnexo } from '@shared/domain/anexos-de-desi
 import type { ValidacaoDoPrototipo } from '@shared/domain/validacao-de-prototipo'
 import type { ArquiteturaOutcome, PacoteArquitetura } from '@shared/domain/arquitetura'
 import type { AlvoDaPublicacao, PublicacaoOutcome } from '@shared/domain/publicacao'
+import type { ExecutionLedger } from '@shared/domain/execution-ledger'
+import type { PendenciaDeLimpeza } from '@shared/domain/limpeza'
 import type { MergePolicyOutcome, PoliticaDeMerge, VistaDaFila } from '@shared/domain/pipeline'
 import type { Roadmap, RoadmapOutcome } from '@shared/domain/roadmap'
 import type {
@@ -302,6 +305,8 @@ export interface IpcDependencies {
   /** A fila de execução (SPEC-Entrega-02). Exposta só para leitura. */
   readonly fila: FilaService
   readonly preflight: PreflightService
+  /** A prova dos runs e as pendências de limpeza (SPEC-Entrega-06). Leitura apenas. */
+  readonly executionLedger: ExecutionLedgerRepository
   /** Vault de credenciais (SPEC-Providers-01): status para a UI, valor só dentro do main. */
   readonly credentials: CredentialService
   /** Runs persistidos, para a UI listar o histórico. */
@@ -1492,6 +1497,26 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
    * preparar nada — preparar é ato da pipeline, nunca do renderer.
    */
   ipcMain.handle(IPC_CHANNELS.sandboxEstado, () => deps.preflight.estado(app.getAppPath()))
+
+  /**
+   * A prova de um run encerrado (SPEC-Entrega-06, critério 7).
+   *
+   * O `userId` vem da sessão no main, nunca do renderer: um `userId` atravessando a ponte
+   * deixaria a UI ler o ledger de outro usuário só pedindo. Mesma postura de todo handler
+   * escopado desta base.
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.ledgerDoRun,
+    (_event, runId: unknown): ExecutionLedger | undefined => {
+      if (typeof runId !== 'string' || runId === '') return undefined
+      return deps.executionLedger.buscar(deps.userId(), runId)
+    }
+  )
+
+  /** O que a limpeza não removeu e segue reconciliável (SPEC-Entrega-06, critério 5). */
+  ipcMain.handle(IPC_CHANNELS.limpezaPendencias, (): readonly PendenciaDeLimpeza[] =>
+    deps.executionLedger.listarPendencias(deps.userId())
+  )
 
   /**
    * O kill-switch do merge autônomo (SPEC-Entrega-02/05).

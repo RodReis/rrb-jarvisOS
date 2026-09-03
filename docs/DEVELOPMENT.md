@@ -1617,6 +1617,51 @@ Status: **construída, ainda sem PR aberto** — spec `aprovada-pi` (2026-08-29,
 - **O critério 13 é provado sobre os docs declarados no pedido**, não sobre uma varredura do projeto-alvo: quem decide *quais* documentos a fatia atualiza é quem monta o pedido, e inferir isso aqui seria escopo assumido.
 - **Nenhuma UI.** A fatia não tem tela; quem a exercita é o boot.
 
+### Fatia 06 — Evidência, limpeza e continuidade (`docs/spec/spec-entrega-06-evidencia-limpeza-continuidade.md`)
+
+Status: **construída, ainda sem PR aberto** — spec `aprovada-pi` (2026-08-29, emendada 2026-08-30); issue [#106](https://github.com/RodReis/rrb-jarvisOS/issues/106). Depende da M9-F05. **Fecha o MVP-009.** Plano: `docs/superpowers/plans/2026-09-02-m9-f06-evidencia-limpeza-continuidade.md` (9 tasks).
+
+- [x] **`src/shared/domain/execution-ledger.ts`** — o contrato da prova: duração, tentativas, tokens, créditos, custo, eventos, head/merge SHA, checks e artefatos **por hash** (critérios 1 e 2)
+- [x] **`src/shared/domain/limpeza.ts`** — a tabela do que cada fase de cancelamento preserva (critério 8)
+- [x] **`src/shared/domain/retencao.ts`** — idade, cota, fixação e proteção de run não resolvido (critério 9)
+- [x] **Migrations 28 e 29** — `execution_ledger` (com `UNIQUE(user_id, run_id)`), `artefato_retido` e `pendencia_de_limpeza`
+- [x] **`ExecutionLedgerRepository`** — a persistência da prova e das pendências, escopada por `user_id`
+- [x] **`LimpezaService`** — verifica a posse pelo lease antes de remover; falha vira pendência reconciliável (critério 5)
+- [x] **`RetencaoService`** — marca a linha **antes** de apagar o anexo (critério 9)
+- [x] **`BudgetRepository.consumoDoRun`** — a leitura da correlação `run_id` que a M9-F05 passou a gravar
+- [x] **Encerramento no `EntregaService`** — grava o ledger e chama a limpeza no `finally`, em todo desfecho
+- [x] **Canais `ledger:do-run` e `limpeza:pendencias`** — só leitura, como os da M9-F02/F03
+- [x] **`PainelDeEntrega`** — resultado, custo, evidência e próxima decisão; Git e eventos num expansor (critério 7)
+- [x] **Testes**: 7 do ledger, 8 do plano de limpeza, 8 da retenção, 11 do repositório, 10 da limpeza, 9 do coletor, 5 do consumo por run, 8 do encerramento, 12 do painel
+
+**Decisões técnicas desta fatia:**
+
+1. **O container do executor nasce com `--rm`, e é isso que faz `docker stop` removê-lo.** O critério 5 pede a remoção do container; `docker rm` casa a política de destrutivos do MVP-004 e abriria `ApprovalRequest`, travando a limpeza automática num gate humano — o oposto do desenvolvimento autônomo desta fatia. A flag na criação resolve sem tocar a allowlist. **Decisão do PI em 2026-09-02**, entre as três alternativas levantadas (`--rm`, liberar `docker rm`, ou deixar tudo como pendência). Verificado antes de aplicar que nada na M9-F03 lê logs do container depois que ele para — não há chamada a `docker logs` no código.
+
+2. **`AWAITING_MERGE` e `BLOCKED` são protegidos da retenção, apesar de terminais.** Terminal na máquina de estados não é o mesmo que resolvido para quem precisa olhar: no primeiro o PI ainda vai avaliar aquele PR, e o anexo é o que ele lê; no segundo o anexo é a evidência da causa. Expirar qualquer um dos dois apagaria justamente o material de quem tem uma decisão pendente.
+
+3. **O protegido não entra na conta da cota.** Um run travado pode sozinho passar dos 5 GB. Se ele contasse, o coletor tentaria caber apagando tudo o mais — e apagaria artefato recente e legítimo por causa de um vizinho que ele nem pode tocar. A cota governa o que já acabou. Há teste com um protegido de 10 GB provando que o vizinho novo sobrevive.
+
+4. **O coletor marca a linha antes de apagar o anexo.** Marcada e não apagada, a linha diz que o anexo saiu e ele ainda está lá: desperdício de disco. Apagada e não marcada, a referência versionada afirma que o conteúdo está presente quando ele já sumiu — que é literalmente o que o critério 9 proíbe. Entre os dois modos de falhar, só um destrói evidência. **O teste da ordem foi verificado por contrafactual**: com as duas linhas trocadas, ele fica vermelho.
+
+5. **O encerramento roda no `finally`, não depois do `return`.** `BLOCKED` vaza worktree e container igual a `MERGED`, e uma exceção inesperada vazaria os dois sem deixar registro nenhum. **Verificado por contrafactual**: restringir o encerramento a `MERGED` derruba três testes, inclusive o do run que estoura exceção.
+
+6. **Ledger incompleto ainda é gravado**, com um `error` no log dizendo o que falta. Recusar a gravação trocaria uma prova imperfeita por prova nenhuma — e é a prova nenhuma que impede auditar o que aconteceu. `ledgerCompleto` é predicado, não exceção, exatamente para permitir essa escolha no call site.
+
+7. **`ResultadoDaEntrega` passou a carregar `headSha` e `checks`.** Sem eles o ledger não teria como satisfazer o critério 1 (`MERGED` com head, checks e merge coerentes): os valores existiam dentro do laço de espera e morriam ali. Propagá-los pelos retornos foi menor do que reler a origem no encerramento — e reler daria um valor de outro instante, que não é o que a pipeline verificou.
+
+8. **A limpeza recebe interfaces mínimas (`DockerDaLimpeza`, `GitDaLimpeza`), não as classes concretas.** É o que mantém o teste sem Docker nem Git reais e o que impede o serviço alcançar `criarRede`, `subir` ou qualquer coisa que ele não deve fazer. O tipo é a fronteira.
+
+9. **Ausência de lease não é pendência; dono diferente é.** O preflight pode ter falhado antes de adquirir o lease, e nesse caso não há o que remover nem o que reclamar. Já um recurso cujo lease pertence a outro run é trabalho vivo: removê-lo seria a destruição que a spec proíbe, então vira pendência para alguém olhar.
+
+**Limites declarados:**
+
+- **A jornada E2E real completa não rodou.** A spec a pede em projeto e repositório exclusivos e descartáveis, com orçamento limitado, fora da suíte padrão. Isso exige autorização e um repositório do PI — **decisão do PI em 2026-09-02: não roda nesta entrega, o limite fica declarado.** Mesma postura do smoke real da M9-F01.
+- **O ledger não registra créditos de conector.** O campo existe no contrato e é gravado como zero: a soma por run vem do `cost_event`, que mede tokens e USD, e os créditos da Tavily/GitHub não têm hoje correlação por `run_id`. Ligar isso é trabalho de quem instrumentar o `ConnectorService` com o run corrente.
+- **O ledger não registra artefatos.** O contrato os carrega por hash e o painel os exibe, mas nenhum call site os preenche ainda: quem sabe o hash do `reports/TESTS.md` é a M9-F05, que o commita no PR. A tabela `artefato_retido` e o coletor estão prontos e testados; falta o produtor.
+- **O painel não está montado em nenhuma rota.** Ele é componente testado com props, como os das fatias anteriores — quem o monta é a tela de Mission Control, que nenhuma spec desta fatia define. Os dois canais IPC existem para ela consumir.
+- **A limpeza não converte o PR para rascunho.** O plano por fase declara `convertePrParaRascunho` e o `LimpezaService` o respeita ao decidir o que fazer, mas a chamada ao GitHub não foi implementada: o `EntregaService` só cancela nas fases terminais, onde a flag é falsa. Cancelamento explícito durante o CI é fluxo que nenhum call site dispara hoje.
+
 ## Registro de entregas
 
 | Data | Fatia | PR | Observação |

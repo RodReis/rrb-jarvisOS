@@ -213,4 +213,47 @@ export class BudgetRepository {
 
     return { diaUsd: somar(dia), mesUsd: somar(mes) }
   }
+
+  /**
+   * O consumo de um run inteiro, para o `ExecutionLedger` (SPEC-Entrega-06).
+   *
+   * A correlação existe desde a M9-F05, que passou a preencher `run_id` e `tentativa` no
+   * `CostEvent` — esta é a leitura que faltava. Soma **todas** as tentativas: o custo de um run
+   * é o que ele consumiu até terminar, e descontar as tentativas que falharam mostraria a
+   * entrega mais barata do que foi.
+   *
+   * `unmetered` **entra** aqui, ao contrário de `totals`. Lá a pergunta é "quanto do orçamento
+   * foi gasto", e a rota de assinatura por definição não gasta. Aqui é "quanto este run
+   * consumiu", e uma chamada pela rota de assinatura consumiu tokens de verdade — omiti-la
+   * faria o ledger declarar zero token num run que rodou.
+   */
+  consumoDoRun(userId: string, runId: string): ConsumoDoRun {
+    const row = this.db
+      .prepare(
+        `SELECT SUM(real_usd) AS custo,
+                SUM(COALESCE(tokens_entrada, 0) + COALESCE(tokens_saida, 0)) AS tokens,
+                MAX(COALESCE(tentativa, 1)) AS tentativas
+           FROM cost_event
+          WHERE user_id = ? AND run_id = ?`
+      )
+      .get(userId, runId) as {
+      custo: number | null
+      tokens: number | null
+      tentativas: number | null
+    }
+
+    return {
+      custoUsd: row.custo ?? 0,
+      tokens: row.tokens ?? 0,
+      tentativas: row.tentativas ?? 0
+    }
+  }
+}
+
+/** O que um run consumiu, somando todas as suas tentativas. */
+export interface ConsumoDoRun {
+  readonly custoUsd: number
+  readonly tokens: number
+  /** A maior tentativa registrada. Zero quando o run não gerou nenhuma chamada. */
+  readonly tentativas: number
 }
