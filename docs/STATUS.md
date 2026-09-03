@@ -1,12 +1,14 @@
 # STATUS.md — Kanban / Roadmap
 
-Atualizado em: **2026-09-02**. Fonte única do índice Fatia ↔ SPEC. Estado remoto conferido na entrega da M9-F06; a M9-F05 (#105) foi **aceita pelo PI** e a M9-F06 (#106) — a última fatia do MVP-009 — está em construção. Histórico detalhado em `docs/STATUS-ARQUIVO.md`; o board vence divergência factual.
+Atualizado em: **2026-09-03**. Fonte única do índice Fatia ↔ SPEC. Estado remoto conferido nesta revisão: a M9-F06 (#106) foi entregue pelo PR #236 e o PI declarou o MVP-009 **finalizado** (falta só o fechamento do épico #100, ato dele). **MVP-025 criado** (épico #237) para corrigir o fluxo inicial do planejamento; a M25-F01 (#238) é a nova cabeça da fila (`proplan:next`). Histórico detalhado em `docs/STATUS-ARQUIVO.md`; o board vence divergência factual.
 
 ## Agora
 
 | Coluna | Item | Estado |
 |---|---|---|
-| Em Andamento | [#106](https://github.com/RodReis/rrb-jarvisOS/issues/106) · M9-F06 Evidência, limpeza e continuidade | **a última fatia do MVP-009**. SPEC `aprovada-pi` (2026-08-29, emendada em 2026-08-30). Entrega o `ExecutionLedger`, o `LimpezaService`, o coletor de retenção e o painel do estado terminal. **Decisão do PI em 2026-09-02:** o container passa a nascer com `--rm` (parar já remove, sem `docker rm` na allowlist de destrutivos), e a jornada E2E real completa **não roda** nesta entrega — o limite fica declarado |
+| Backlog · `next` | [#238](https://github.com/RodReis/rrb-jarvisOS/issues/238) · M25-F01 Estado do projeto e jornada única | **cabeça da fila** por decisão do PI (2026-09-03): entra logo após o MVP-009, antes do MVP-022 e do Command Center. SPEC `aprovada-pi`; gate visual antes de fechar |
+| Backlog | [#239](https://github.com/RodReis/rrb-jarvisOS/issues/239) · [#240](https://github.com/RodReis/rrb-jarvisOS/issues/240) · [#241](https://github.com/RodReis/rrb-jarvisOS/issues/241) · [#242](https://github.com/RodReis/rrb-jarvisOS/issues/242) · M25-F02–F05 | SPECs `aprovada-pi` em 2026-09-03; encadeadas (F02 depende de F01, e assim por diante). Rota de assinatura obrigatória para toda geração |
+| Feito | [#106](https://github.com/RodReis/rrb-jarvisOS/issues/106) · M9-F06 Evidência, limpeza e continuidade | **a última fatia do MVP-009**, entregue no PR #236 (`2ac721d`); o PI declarou o MVP-009 finalizado em 2026-09-03 — aceite formal e fechamento de #100 são atos dele. SPEC `aprovada-pi` (2026-08-29, emendada em 2026-08-30). Entrega o `ExecutionLedger`, o `LimpezaService`, o coletor de retenção e o painel do estado terminal. **Decisão do PI em 2026-09-02:** o container passa a nascer com `--rm` (parar já remove, sem `docker rm` na allowlist de destrutivos), e a jornada E2E real completa **não roda** nesta entrega — o limite fica declarado |
 | Finalizado | [#105](https://github.com/RodReis/rrb-jarvisOS/issues/105) · M9-F05 Revisão, CI e squash merge automático | **aceite do PI registrado**; entregue no PR #235 (`6bade77`). SPEC `aprovada-pi` (2026-08-29, emendada em 2026-08-30). Fechou a pendência da M9-F04: o `ConstrutorService` ganhou consumidor e a rota do executor passou a operar. **Três decisões do PI em 2026-09-02** (ver § Decisões do PI na M9-F05) |
 | Finalizado | [#104](https://github.com/RodReis/rrb-jarvisOS/issues/104) · M9-F04 Construção/recuperação | **aceite do PI registrado em 2026-09-02**; entregue no PR #231 (`9005423`), CI verde. **Limites declarados:** correlação `runId`/`tentativa` do proxy fica para a M9-F05 (rota do executor não operacional em produção até lá); smoke real em `not_run` porque a imagem do sandbox não traz o binário `claude`; cancelamento cooperativo com latência até o timeout do passo. **Pendência do PI:** fail-open do `verificarEscopo` quando o `git status` do container falha |
 | Feito | [#209](https://github.com/RodReis/rrb-jarvisOS/issues/209) · correção do EffectJournal | entregue no PR #227 (`66623b8`); `proplan:done`, aguardando aceite do PI |
@@ -31,7 +33,7 @@ Atualizado em: **2026-09-02**. Fonte única do índice Fatia ↔ SPEC. Estado re
 | MVP-006 Conectores Essenciais | [#86](https://github.com/RodReis/rrb-jarvisOS/issues/86) | fechado/aceito pelo PI em 2026-08-31 | 6/6 |
 | MVP-007 Memória compartilhada | [#179](https://github.com/RodReis/rrb-jarvisOS/issues/179) | F01–F06 aprovadas/Backlog; F07–F08 Planejadas, fora do fechamento V3 | 0/8 |
 | MVP-008 Planejamento Governado | [#93](https://github.com/RodReis/rrb-jarvisOS/issues/93) | fechado/aceito pelo PI em 2026-08-31 | 6/6 |
-| MVP-009 Entrega Autônoma | [#100](https://github.com/RodReis/rrb-jarvisOS/issues/100) | seis SPECs `aprovada-pi` (2026-08-29), **emendadas pelo PI em 2026-08-30 e 2026-08-31**; F01–F04 aceitas, F05 entregue aguardando aceite. Resta F06 (evidência/limpeza) | 5/6 |
+| MVP-009 Entrega Autônoma | [#100](https://github.com/RodReis/rrb-jarvisOS/issues/100) | seis SPECs `aprovada-pi` (2026-08-29), **emendadas pelo PI em 2026-08-30 e 2026-08-31**; F01–F05 aceitas, F06 entregue no PR #236. **PI declarou o MVP finalizado em 2026-09-03**; fechamento de #100 é ato dele | 6/6 |
 | MVP-010 Multi-executor Claude + Codex | [#115](https://github.com/RodReis/rrb-jarvisOS/issues/115) | fatias [#116–#120](https://github.com/RodReis/rrb-jarvisOS/issues/116) no Backlog | 0/5 |
 | MVP-011 Squads limitados | [#121](https://github.com/RodReis/rrb-jarvisOS/issues/121) | fatias [#122–#126](https://github.com/RodReis/rrb-jarvisOS/issues/122) no Backlog | 0/5 |
 | MVP-012 Scheduler concorrente | [#127](https://github.com/RodReis/rrb-jarvisOS/issues/127) | fatias [#128–#132](https://github.com/RodReis/rrb-jarvisOS/issues/128) no Backlog | 0/5 |
@@ -43,6 +45,7 @@ Atualizado em: **2026-09-02**. Fonte única do índice Fatia ↔ SPEC. Estado re
 | MVP-022 Shell de produto | [#205](https://github.com/RodReis/rrb-jarvisOS/issues/205) | menu do JARVIS/Agents OS projetado do registro de módulos; **SPEC da F01 `aprovada-pi` (2026-08-30)**, oito decisões do PI; entra depois do MVP-009 | 0/1 |
 | MVP-023 Biblioteca de Blueprints | [#212](https://github.com/RodReis/rrb-jarvisOS/issues/212) | quatro SPECs `aprovada-pi`; #214–#217 em Backlog | 0/4 |
 | MVP-024 Gestão de Portfólio | [#213](https://github.com/RodReis/rrb-jarvisOS/issues/213) | quatro SPECs `aprovada-pi`; #218–#221 em Backlog | 0/4 |
+| MVP-025 Jornada de planejamento por IA | [#237](https://github.com/RodReis/rrb-jarvisOS/issues/237) | criado em 2026-09-03; corrige o fluxo inicial do MVP-008 (prompt, refinamento e geração por IA, jornada única). Cinco SPECs `aprovada-pi`; #238–#242 em Backlog, #238 `next`; doc em `docs/mvp/mvp-025-jornada-planejamento-ia.md` | 0/5 |
 
 ## Índice Fatia ↔ SPEC
 
@@ -136,6 +139,22 @@ Não existe catálogo global `SPEC-nnn`. O slug identifica a SPEC; os números a
 | M24-F02 | MVP-024 | Prioridade e controles canônicos ([#219](https://github.com/RodReis/rrb-jarvisOS/issues/219)) | `spec-portfolio-02-prioridade-controles.md` — aprovada-pi |
 | M24-F03 | MVP-024 | Custos, quotas e capacidade do portfólio ([#220](https://github.com/RodReis/rrb-jarvisOS/issues/220)) | `spec-portfolio-03-custos-quotas.md` — aprovada-pi |
 | M24-F04 | MVP-024 | Console de portfólio e prova integrada ([#221](https://github.com/RodReis/rrb-jarvisOS/issues/221)) | `spec-portfolio-04-console-resiliencia-e2e.md` — aprovada-pi; gate visual antes da construção |
+| M25-F01 | MVP-025 | Estado do projeto e jornada única ([#238](https://github.com/RodReis/rrb-jarvisOS/issues/238)) | `spec-jornada-01-estado-e-jornada-unica.md` — aprovada-pi; **next**; gate visual antes de fechar |
+| M25-F02 | MVP-025 | Prompt e brief refinado por IA ([#239](https://github.com/RodReis/rrb-jarvisOS/issues/239)) | `spec-jornada-02-prompt-e-brief-por-ia.md` — aprovada-pi |
+| M25-F03 | MVP-025 | PRD, Landscape e Convention por IA ([#240](https://github.com/RodReis/rrb-jarvisOS/issues/240)) | `spec-jornada-03-prd-landscape-convention-por-ia.md` — aprovada-pi |
+| M25-F04 | MVP-025 | Arquitetura por IA após os anexos ([#241](https://github.com/RodReis/rrb-jarvisOS/issues/241)) | `spec-jornada-04-arquitetura-por-ia.md` — aprovada-pi |
+| M25-F05 | MVP-025 | Roadmap, MVPs e SPEC por IA ([#242](https://github.com/RodReis/rrb-jarvisOS/issues/242)) | `spec-jornada-05-roadmap-mvp-spec-por-ia.md` — aprovada-pi |
+
+## Decisões do PI no MVP-025 (2026-09-03)
+
+Levantadas depois de o PI testar o app (`projeto1`) e constatar que o fluxo inicial não era o desenhado em 2026-08-28. Detalhe e causa em `docs/mvp/mvp-025-jornada-planejamento-ia.md`; emenda ao design em `docs/DECISIONS.md`.
+
+1. **Toda geração do planejamento é por IA** (brief, PRD/Landscape/Convention, arquitetura, roadmap e SPEC), com origem por afirmação e `proposto` marcado e cortado item a item pelo PI. Reverte o "compor em vez de gerar" da M8-F04.
+2. **Três aceites antes da construção:** `BRIEF_ACCEPTED`, `PRD_ACCEPTED` e `PROJECT_PACKAGE`. Landscape e Convention saem com o PRD; arquitetura só depois dos anexos (decisão 9 do design mantida).
+3. **Prompt é a primeira etapa após criar o projeto**; projeto sem brief (inclusive `projeto1`) volta para ela sem perder decisões gravadas.
+4. **Rota de assinatura (Claude MAX via Claude Code CLI) é a rota da geração**, sem valor monetário no ledger; rota paga só por opt-in explícito, nunca fallback.
+5. **Fila:** logo após o MVP-009 fechar, antes do MVP-022 e do Command Center. `proplan:next` em #238.
+6. Projeto aberto tem **rota própria**; blocos 1 e 9 do `ProjectBriefSchema` pré-preenchidos; PRD aceitável sem pesquisa de mercado (Landscape pendente e visível); termo de pesquisa proposto pela IA e confirmado pelo PI; `DECISIONS.md` gerado registra decisões do PI e propostas da IA como ADRs; no `MVP_ENTRY` o PI escolhe entre os MVPs elegíveis.
 
 ## Decisões do PI na M9-F06 (2026-09-02)
 
@@ -157,14 +176,16 @@ Três pontos abertos foram levantados durante a construção e **decididos pelo 
 
 ## Próximas ações
 
-1. **#106 (M9-F06) entregue por PR — a última fatia do MVP-009.** Com o aceite do PI, o MVP-009 fecha em 6/6 e o épico [#100](https://github.com/RodReis/rrb-jarvisOS/issues/100) pode ser fechado pelo PI. **#105 (M9-F05) foi aceita em 2026-09-02** e entregue no PR #235. Os limites declarados da F06 estão no `docs/DEVELOPMENT.md` § Fatia 06 — o principal é a jornada E2E real completa, que **não rodou** por decisão do PI e continua exigindo repositório descartável e orçamento autorizado.
-2. Conservar #167/#168 e #214–#221 em Backlog após o aceite exato de 2026-08-31, sem promover qualquer uma a `next` por esta atualização. #232 (`[INFRA][FIX]` do pool de testes) também nasce em Backlog, sem entrar na fila por conta própria.
-3. Antes das fatias visuais, anexar `DESIGN-SYSTEM.md` e HTML pelo fluxo já aprovado; texto de SPEC/template não substitui anexo do PI.
-4. M7-F05/F06 estão aprovadas/Backlog e M7-F07–F08 continuam a redigir; as fatias do Command Center seguem seus planejamentos próprios. Nenhuma delas bloqueia concluir a documentação V3.
-5. O relatório de fechamento do PR #189 documenta reconciliação, ordem técnica, issues e validação. Aprovações prévias são preservadas, não repetidas.
+1. **MVP-009 declarado finalizado pelo PI (2026-09-03)** — o épico [#100](https://github.com/RodReis/rrb-jarvisOS/issues/100) fecha por ato dele. Com isso a cabeça da fila é **#238 (M25-F01)**: o Code puxa quando o PI der o sinal; F02–F05 seguem encadeadas. **MVP-022 e Command Center passam para depois do MVP-025.**
+2. **Risco registrado:** a SPEC-Blueprints-02 (M23-F02) referencia o wizard da M8-F03, que a M25-F02 substitui por perguntas geradas — emenda a fazer quando o MVP-023 entrar na fila.
+3. **#106 (M9-F06) entregue por PR — a última fatia do MVP-009.** Aceite formal do PI pendente na issue. **#105 (M9-F05) foi aceita em 2026-09-02** e entregue no PR #235. Os limites declarados da F06 estão no `docs/DEVELOPMENT.md` § Fatia 06 — o principal é a jornada E2E real completa, que **não rodou** por decisão do PI e continua exigindo repositório descartável e orçamento autorizado.
+4. Conservar #167/#168 e #214–#221 em Backlog após o aceite exato de 2026-08-31, sem promover qualquer uma a `next` por esta atualização. #232 (`[INFRA][FIX]` do pool de testes) também nasce em Backlog, sem entrar na fila por conta própria.
+5. Antes das fatias visuais, anexar `DESIGN-SYSTEM.md` e HTML pelo fluxo já aprovado; texto de SPEC/template não substitui anexo do PI.
+6. M7-F05/F06 estão aprovadas/Backlog e M7-F07–F08 continuam a redigir; as fatias do Command Center seguem seus planejamentos próprios. Nenhuma delas bloqueia concluir a documentação V3.
+7. O relatório de fechamento do PR #189 documenta reconciliação, ordem técnica, issues e validação. Aprovações prévias são preservadas, não repetidas.
 
 ## Roadmap
 
-Base entregue → MVP-009 restante → Command Center MVP-017 → MVP-018/MVP-019 → MVP-020 → MVP-021; Shell MVP-022 entra após MVP-009 conforme decisão vigente. MVP-010–016 seguem a prioridade já definida pelo PI, sem ultrapassar essa sequência por causa deste PR.
+Base entregue → MVP-009 (finalizado) → **MVP-025 Jornada de planejamento por IA** → Shell MVP-022 → Command Center MVP-017 → MVP-018/MVP-019 → MVP-020 → MVP-021 (decisão do PI de 2026-09-03: o MVP-025 passa na frente do Shell e do Command Center). MVP-010–016 seguem a prioridade já definida pelo PI, sem ultrapassar essa sequência por causa deste PR.
 
 V3: MVP-014 → MVP-015 → MVP-016; MVP-023 Blueprints depende de MVP-008; MVP-024 Portfólio depende de MVP-012/MVP-015. Ordem de apresentação 014, 015, 016, 023, 024 não cria dependência técnica entre Blueprints e Portfólio. MVP-007 permanece paralelo/não bloqueante.
