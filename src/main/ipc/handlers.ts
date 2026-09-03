@@ -1514,9 +1514,8 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
   )
 
   /** O que a limpeza não removeu e segue reconciliável (SPEC-Entrega-06, critério 5). */
-  ipcMain.handle(
-    IPC_CHANNELS.limpezaPendencias,
-    (): readonly PendenciaDeLimpeza[] => deps.executionLedger.listarPendencias(deps.userId())
+  ipcMain.handle(IPC_CHANNELS.limpezaPendencias, (): readonly PendenciaDeLimpeza[] =>
+    deps.executionLedger.listarPendencias(deps.userId())
   )
 
   /**

@@ -79,8 +79,7 @@ describe('RetencaoService', () => {
     servico(() => caminho).coletar(USER)
 
     const row = db.prepare('SELECT hash FROM artefato_retido WHERE id = ?').get('art-1') as
-      | { hash: string }
-      | undefined
+      { hash: string } | undefined
     expect(row?.hash).toBe('h'.repeat(64))
   })
 

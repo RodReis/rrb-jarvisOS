@@ -31,11 +31,7 @@ import type {
 import { planoDeLimpeza } from '@shared/domain/limpeza'
 import type { EstadoDoRun } from '@shared/domain/pipeline'
 import type { SandboxPreparado } from '@shared/domain/preflight'
-import {
-  RECURSO_PORTA,
-  recursoDoContainer,
-  recursoDoWorktree
-} from '@shared/domain/preflight'
+import { RECURSO_PORTA, recursoDoContainer, recursoDoWorktree } from '@shared/domain/preflight'
 import type { WorkspaceId } from '@shared/domain/entities'
 import { log } from '../logging/logger'
 import type { ExecutionLedgerRepository } from './execution-ledger-repository'

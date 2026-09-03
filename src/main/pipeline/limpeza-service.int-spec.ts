@@ -119,11 +119,7 @@ describe('LimpezaService', () => {
     expect(resultado.removidos).toContain('container')
     expect(resultado.pendencias).toEqual([])
     expect(parar).toHaveBeenCalledWith(CONTAINER, dir)
-    expect(git).toHaveBeenCalledWith(
-      ['worktree', 'remove', '--force', worktree],
-      dir,
-      'jarvis'
-    )
+    expect(git).toHaveBeenCalledWith(['worktree', 'remove', '--force', worktree], dir, 'jarvis')
   })
 
   it('libera os leases dos recursos que removeu', () => {
@@ -148,11 +144,7 @@ describe('LimpezaService', () => {
   })
 
   it('não remove worktree cujo lease é de outro run — remover apagaria trabalho vivo', () => {
-    leases.adquirir(
-      USER,
-      { proprietario: 'run-OUTRO', recurso: recursoDoWorktree(RUN) },
-      agora
-    )
+    leases.adquirir(USER, { proprietario: 'run-OUTRO', recurso: recursoDoWorktree(RUN) }, agora)
 
     const { servico, git } = montar({})
     const resultado = servico.limpar(pedido('depois-do-merge', 'MERGED'))

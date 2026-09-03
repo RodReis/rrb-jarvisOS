@@ -37,7 +37,10 @@ interface PainelDeEntregaProps {
  * propósito — o kill-switch desligado é configuração legítima do projeto, não um problema.
  */
 const DESFECHOS: Readonly<
-  Record<EstadoDoRun, { readonly rotulo: string; readonly tom: TomSemantico; readonly decisao: string }>
+  Record<
+    EstadoDoRun,
+    { readonly rotulo: string; readonly tom: TomSemantico; readonly decisao: string }
+  >
 > = {
   MERGED: {
     rotulo: 'Mergeado',

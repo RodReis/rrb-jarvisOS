@@ -833,9 +833,7 @@ describe('encerramento do run (SPEC-Entrega-06)', () => {
     await montar().entregar(pedido())
 
     const prsDepois = chamadas.filter((c) => c.operation === GITHUB_OPERATIONS.ensurePullRequest)
-    const numerosDePr = new Set(
-      prsDepois.map(() => PR)
-    )
+    const numerosDePr = new Set(prsDepois.map(() => PR))
     expect(numerosDePr.size).toBe(1)
     expect(prsDepois.length).toBeGreaterThan(prsAntes.length)
     expect(mergesAntes.length).toBeGreaterThan(0)
