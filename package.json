@@ -81,6 +81,7 @@
     "i18next": "^26.3.6",
     "lucide-react": "^1.26.0",
     "react-i18next": "^17.0.10",
+    "shadcn": "^4.20.1",
     "winston": "^3.19.0",
     "winston-daily-rotate-file": "^5.0.0"
   }
