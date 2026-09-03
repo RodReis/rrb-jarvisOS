@@ -1,15 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FileSearch, FolderPlus, FolderSearch, ShieldCheck, Wand2 } from 'lucide-react'
+import { FolderPlus, FolderSearch, ShieldCheck, Wand2 } from 'lucide-react'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { Project, ProjectOutcome, ProjectReason } from '@shared/domain/projects'
+import type { EstadoDaJornada } from '@shared/domain/jornada'
 import { Button, EmptyState, Field, InlineAlert, Input, LoadingState } from '@design/ui'
 import { log } from '../lib/log'
-import { ContextoDoProjeto } from './ContextoDoProjeto'
-import { WizardDoProjeto } from './WizardDoProjeto'
-import { PacoteDoProjeto } from './PacoteDoProjeto'
-import { AnexosDeDesign } from './AnexosDeDesign'
-import { RoadmapDoProjeto } from './RoadmapDoProjeto'
+import { ProjetoAberto } from './ProjetoAberto'
 
 /**
  * Projetos locais (SPEC-Planejamento-01).
@@ -82,24 +79,25 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
    */
   const [confirmandoId, setConfirmandoId] = useState<string | null>(null)
   /**
-   * Qual projeto teve o contexto aberto (SPEC-Planejamento-02).
+   * Qual projeto está aberto (SPEC-Jornada-01). `null` = a lista é o índice.
    *
-   * Expansão **inline**, não rota nova nem modal: o contexto é *do projeto*, e separá-lo numa
-   * tela própria obrigaria o usuário a levar na cabeça qual projeto estava olhando. Um por vez
-   * porque o painel é alto — dois abertos empurrariam a lista para fora da dobra e o usuário
-   * perderia a coluna que veio varrer.
+   * Tela própria, e não expansão inline: a trilha tem doze posições e o conteúdo da etapa é
+   * alto — os dois espremidos num item da lista empurrariam a coluna que o PI veio varrer para
+   * fora da dobra. Decisão do PI em 2026-09-03.
    */
-  const [contextoDeId, setContextoDeId] = useState<string | null>(null)
+  const [projetoAbertoId, setProjetoAbertoId] = useState<string | null>(null)
   /**
-   * O projeto cujo wizard está aberto. **Pop-up, não painel inline** como o contexto: a spec
-   * pede uma pergunta por pop-up, e um painel na lista mostraria a pergunta ao lado de todas as
-   * outras coisas que competem por atenção.
+   * O CTA de cada projeto, indexado por id. Vem do main: o rótulo é derivado da etapa, e
+   * calculá-lo aqui exigiria o renderer conhecer os fatos que definem a etapa — que ele não tem
+   * e não deve ter.
    */
-  const [planejandoId, setPlanejandoId] = useState<string | null>(null)
+  const [jornadaPorProjeto, setJornadaPorProjeto] = useState<ReadonlyMap<string, EstadoDaJornada>>(
+    new Map()
+  )
 
   // Derivado no render, não em estado próprio: guardar o objeto do projeto duplicaria o que a
-  // lista já tem, e um rename deixaria o modal mostrando o nome antigo.
-  const projetoEmPlanejamento = projetos.find((p) => p.id === planejandoId)
+  // lista já tem, e um rename deixaria a tela aberta mostrando o nome antigo.
+  const projetoAberto = projetos.find((p) => p.id === projetoAbertoId)
 
   /*
    * A flag `ativo` tem o mesmo desenho das outras telas: sem ela, desmontar durante a promise
@@ -124,6 +122,51 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
       ativo = false
     }
   }, [workspace])
+
+  /**
+   * O CTA de cada projeto (critério 3).
+   *
+   * Uma chamada para a lista inteira, não uma por card: doze projetos dariam doze viagens pela
+   * ponte para montar uma tela só, e a leitura recalcula a etapa — o custo se multiplicaria
+   * junto.
+   */
+  useEffect(() => {
+    // Lista vazia não consulta e **não limpa o mapa por `setState`**: um estado velho aqui não
+    // aparece — sem projeto não há card para carregar rótulo. Zerá-lo por efeito seria escrever
+    // estado a partir de estado, que é a forma de laço que o React proíbe justamente por isso.
+    if (projetos.length === 0) return
+
+    let ativo = true
+
+    /*
+     * `try` em volta da chamada, e não só `.catch()`: uma ponte sem este método lança
+     * **sincronamente**, antes de existir promise, e o `.catch()` sozinho não pega — a exceção
+     * sobe pelo efeito e derruba a lista inteira.
+     *
+     * Falhar aqui não pode derrubar nada: sem CTA o card cai no rótulo genérico, e o PI ainda
+     * renomeia, remove e abre o projeto. Perder a tela toda por causa do rótulo de um botão
+     * custaria muito mais do que o que se perdeu.
+     */
+    try {
+      window.jarvis
+        .jornadaDeVarios(
+          projetos.map((p) => p.id),
+          workspace
+        )
+        .then((estados) => {
+          if (ativo) setJornadaPorProjeto(new Map(estados.map((e) => [e.projectId, e])))
+        })
+        .catch((error: unknown) => {
+          if (ativo) log.ui.error('Falha ao carregar as jornadas dos projetos', { error })
+        })
+    } catch (error: unknown) {
+      log.ui.error('Ponte sem o canal da jornada', { error })
+    }
+
+    return () => {
+      ativo = false
+    }
+  }, [projetos, workspace])
 
   async function recarregar(): Promise<void> {
     setProjetos(await window.jarvis.listProjects(workspace))
@@ -238,6 +281,23 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
   // O único desfecho cuja correção cabe **nesta** tela. Os outros ou são do texto digitado
   // (nome inválido, colisão) ou pedem uma decisão que não é daqui (permitir um diretório).
   const podeCorrigirGit = desfecho?.reason === 'git-indisponivel'
+
+  /*
+   * Projeto aberto ocupa a tela; a lista fica sendo o índice (SPEC-Jornada-01).
+   *
+   * O retorno antecipado é o que impede a lista de continuar montada por trás: mantê-la
+   * renderizada custaria a consulta das jornadas a cada mudança na tela do projeto, para
+   * desenhar algo que ninguém está vendo.
+   */
+  if (projetoAberto !== undefined) {
+    return (
+      <ProjetoAberto
+        workspace={workspace}
+        projeto={projetoAberto}
+        onVoltar={() => setProjetoAbertoId(null)}
+      />
+    )
+  }
 
   return (
     <section aria-labelledby="projetos-titulo" className="flex flex-col gap-6">
@@ -415,38 +475,25 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
                             </Button>
                             <Button
                               variante="secundaria"
-                              onClick={() => setPlanejandoId(projeto.id)}
-                              aria-label={t('projetos.planejarDe', { nome: projeto.nome })}
-                              iconeInicial={<Wand2 aria-hidden="true" className="size-4" />}
-                            >
-                              {t('projetos.planejar')}
-                            </Button>
-                            <Button
-                              variante="secundaria"
-                              onClick={() =>
-                                setContextoDeId((atual) =>
-                                  atual === projeto.id ? null : projeto.id
-                                )
-                              }
-                              /* `aria-expanded` porque o botão **alterna** uma região desta
-                                 mesma tela: sem ele, quem ouve a interface não sabe se o
-                                 painel abriu ou se a página mudou. */
-                              aria-expanded={contextoDeId === projeto.id}
-                              aria-label={
-                                contextoDeId === projeto.id
-                                  ? t('projetos.contextoFechar')
-                                  : t('projetos.contextoAbrir', { nome: projeto.nome })
-                              }
-                              iconeInicial={<FileSearch aria-hidden="true" className="size-4" />}
-                            >
-                              {t('projetos.contexto')}
-                            </Button>
-                            <Button
-                              variante="secundaria"
                               onClick={() => setConfirmandoId(projeto.id)}
                               aria-label={t('projetos.removerDe', { nome: projeto.nome })}
                             >
                               {t('projetos.remover')}
+                            </Button>
+                            {/*
+                              O **único** CTA do card (critério 3), e o único primário da linha:
+                              Renomear e Remover são manutenção do registro, e a jornada é o que
+                              o PI veio fazer. O rótulo vem da etapa — "Escrever o prompt",
+                              "Aceitar o brief" —, então o card diz o próximo passo em vez de um
+                              "Abrir" genérico que obrigaria a entrar para descobrir.
+                            */}
+                            <Button
+                              onClick={() => setProjetoAbertoId(projeto.id)}
+                              aria-label={t('projetos.abrir', { nome: projeto.nome })}
+                              iconeInicial={<Wand2 aria-hidden="true" className="size-4" />}
+                            >
+                              {jornadaPorProjeto.get(projeto.id)?.cta ??
+                                t('projetos.abrir', { nome: projeto.nome })}
                             </Button>
                           </>
                         )
@@ -459,60 +506,6 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
                     Espremida à direita, ela empurrava o texto e os dois botões para fora da
                     largura do item — e a pergunta mais importante da tela era a que menos cabia.
                   */}
-                  {/*
-                    O contexto do projeto (SPEC-Planejamento-02): o manifesto, o orçamento da
-                    etapa e as falhas em aberto. Fica **dentro** do item porque é dele que o
-                    contexto é — e abrir aqui evita a viagem de ida e volta que uma tela
-                    separada custaria a cada troca de projeto.
-                  */}
-                  {contextoDeId === projeto.id && (
-                    <div className="border-t border-[rgba(var(--jos-borda-rgb),0.10)] pt-4">
-                      <ContextoDoProjeto
-                        workspace={workspace}
-                        projectId={projeto.id}
-                        nomeDoProjeto={projeto.nome}
-                      />
-                      {/*
-                        O pacote estrutural mora no **mesmo painel** do contexto, e não num
-                        terceiro botão: os dois são do projeto e se leem juntos — o contexto diz
-                        o que foi enviado à IA, o pacote diz o que virou documento. Separá-los
-                        obrigaria o PI a alternar entre painéis para ver o mesmo projeto.
-                      */}
-                      <div className="mt-4 border-t border-[rgba(var(--jos-borda-rgb),0.10)] pt-4">
-                        <PacoteDoProjeto
-                          workspace={workspace}
-                          projectId={projeto.id}
-                          nomeDoProjeto={projeto.nome}
-                        />
-                      </div>
-                      {/*
-                        Os anexos vêm **depois** do pacote, e a ordem é o fluxo: o PRD sai
-                        primeiro, o design é anexado sobre ele, e a arquitetura cita a revisão
-                        do PRD que assume (critério 3). Pôr os anexos acima sugeriria que se
-                        anexa antes de haver o que anexar contra.
-                      */}
-                      <div className="mt-4 border-t border-[rgba(var(--jos-borda-rgb),0.10)] pt-4">
-                        <AnexosDeDesign
-                          workspace={workspace}
-                          projectId={projeto.id}
-                          nomeDoProjeto={projeto.nome}
-                        />
-                      </div>
-                      {/*
-                        O roadmap fecha a sequência, e a ordem é o fluxo do MVP-008: contexto →
-                        PRD → design e arquitetura → roadmap. Ele depende das jornadas que os
-                        protótipos mostram, então vir antes deles proporia MVPs sobre telas que
-                        ninguém desenhou.
-                      */}
-                      <div className="mt-4 border-t border-[rgba(var(--jos-borda-rgb),0.10)] pt-4">
-                        <RoadmapDoProjeto
-                          workspace={workspace}
-                          projectId={projeto.id}
-                          nomeDoProjeto={projeto.nome}
-                        />
-                      </div>
-                    </div>
-                  )}
 
                   {confirmando && (
                     <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--jos-raio-chip)] border border-[color-mix(in_srgb,var(--jos-cor-err)_35%,transparent)] bg-[color-mix(in_srgb,var(--jos-cor-err)_8%,transparent)] px-3 py-2.5">
@@ -542,21 +535,6 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
             )
           })}
         </ul>
-      )}
-
-      {/*
-        O wizard fica **fora do `map`**: é um modal único, e montá-lo por item criaria um
-        `Dialog` por projeto na árvore — todos fechados, todos custando render a cada mudança
-        da lista. `projetoEmPlanejamento` resolve o nome a partir do id guardado.
-      */}
-      {projetoEmPlanejamento !== undefined && (
-        <WizardDoProjeto
-          workspace={workspace}
-          projectId={projetoEmPlanejamento.id}
-          nomeDoProjeto={projetoEmPlanejamento.nome}
-          aberto
-          onFechar={() => setPlanejandoId(null)}
-        />
       )}
     </section>
   )

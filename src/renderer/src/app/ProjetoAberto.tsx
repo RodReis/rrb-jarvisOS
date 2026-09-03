@@ -1,0 +1,252 @@
+import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { ArrowLeft } from 'lucide-react'
+import type { WorkspaceId } from '@shared/domain/entities'
+import type { Project } from '@shared/domain/projects'
+import type { EstadoDaJornada } from '@shared/domain/jornada'
+import { Button, ErrorState, LoadingState } from '@design/ui'
+import { log } from '../lib/log'
+import { TrilhaDaJornada } from './TrilhaDaJornada'
+import { WizardDoProjeto } from './WizardDoProjeto'
+import { PacoteDoProjeto } from './PacoteDoProjeto'
+import { AnexosDeDesign } from './AnexosDeDesign'
+import { RoadmapDoProjeto } from './RoadmapDoProjeto'
+
+/**
+ * Um projeto aberto: a trilha da jornada e o conteúdo da etapa atual (SPEC-Jornada-01).
+ *
+ * **A lista virou índice e o projeto ganhou tela própria** — pergunta resolvida pelo PI em
+ * 2026-09-03. Expandir dentro da lista foi descartado: a trilha tem doze posições e o conteúdo
+ * da etapa é alto, e os dois espremidos num item empurrariam a coluna que o PI veio varrer para
+ * fora da dobra.
+ *
+ * **Os painéis do MVP-008 viraram conteúdo de etapa.** Eles não sumiram nem ganharam botão
+ * próprio: cada um aparece **só** na etapa a que pertence. É a diferença entre um menu de
+ * quatro portas — que obrigava a adivinhar por onde começar — e uma jornada com um próximo
+ * passo por vez.
+ *
+ * A composição é de duas colunas em tela larga: a trilha à esquerda fixa o "onde estou", o
+ * conteúdo à direita responde "o que faço agora". Em tela estreita elas empilham, com a trilha
+ * primeiro — a orientação vem antes da ação.
+ */
+
+interface ProjetoAbertoProps {
+  readonly workspace: WorkspaceId
+  readonly projeto: Project
+  readonly onVoltar: () => void
+}
+
+export function ProjetoAberto({
+  workspace,
+  projeto,
+  onVoltar
+}: ProjetoAbertoProps): React.JSX.Element {
+  const { t } = useTranslation()
+  const [estado, setEstado] = useState<EstadoDaJornada | null>(null)
+  const [carregando, setCarregando] = useState(true)
+  const [falhou, setFalhou] = useState(false)
+  /**
+   * O wizard abre em pop-up, como no MVP-008: a spec pede uma pergunta por vez, e um painel
+   * inline mostraria a pergunta ao lado de tudo que compete por atenção.
+   */
+  const [respondendo, setRespondendo] = useState(false)
+
+  const carregar = useCallback(async (): Promise<void> => {
+    try {
+      const atual = await window.jarvis.estadoDaJornada(projeto.id, workspace)
+      setEstado(atual)
+      setFalhou(atual === null)
+    } catch (error: unknown) {
+      log.ui.error('Falha ao carregar a jornada', { error })
+      setFalhou(true)
+    } finally {
+      setCarregando(false)
+    }
+  }, [projeto.id, workspace])
+
+  useEffect(() => {
+    let ativo = true
+
+    window.jarvis
+      .estadoDaJornada(projeto.id, workspace)
+      .then((atual) => {
+        if (!ativo) return
+        setEstado(atual)
+        setFalhou(atual === null)
+      })
+      .catch((error: unknown) => {
+        if (!ativo) return
+        log.ui.error('Falha ao carregar a jornada', { error })
+        setFalhou(true)
+      })
+      .finally(() => {
+        if (ativo) setCarregando(false)
+      })
+
+    return () => {
+      ativo = false
+    }
+  }, [projeto.id, workspace])
+
+  /**
+   * O CTA da etapa atual. Cada etapa tem uma ação e só uma; o que ela faz depende de onde a
+   * jornada está, e é por isso que o mapa mora aqui e não no componente da trilha — a trilha
+   * desenha, esta tela decide.
+   *
+   * As etapas de geração por IA (`prd`, `arquitetura`, `roadmap`) e os aceites são das fatias
+   * F02–F05: aqui elas mostram o painel correspondente, que já sabe gerar e aprovar. Esta fatia
+   * dá a **ordem**, não a geração.
+   */
+  function agir(): void {
+    if (estado === null) return
+
+    if (estado.etapa === 'prompt' || estado.etapa === 'refinamento') {
+      setRespondendo(true)
+      return
+    }
+
+    // Nas demais etapas o conteúdo já está na tela, e o CTA rola até ele em vez de abrir outra
+    // superfície: mandar o PI para um pop-up sobre um painel que ele já está vendo seria uma
+    // porta a mais para o mesmo lugar — o erro que esta fatia corrige.
+    document.querySelector('[data-jos-conteudo-da-etapa]')?.scrollIntoView({ block: 'nearest' })
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-3">
+        <div>
+          {/* O voltar vem **antes** do título e alinhado à esquerda: é a saída da tela, e
+              escondê-lo à direita faria o PI procurar por onde sair de um lugar em que ele
+              acabou de entrar. */}
+          <Button
+            variante="secundaria"
+            onClick={onVoltar}
+            iconeInicial={<ArrowLeft aria-hidden="true" className="size-4" />}
+          >
+            {t('projetos.voltar')}
+          </Button>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <h2 className="font-[family-name:var(--jos-fonte-display)] text-[length:var(--jos-texto-secao)] tracking-[var(--jos-tracking-display)] text-[var(--jos-cor-texto)]">
+            {projeto.nome}
+          </h2>
+          {/* O caminho em mono, mesma convenção do índice: é endereço de disco, e fonte
+              proporcional esconde a diferença entre `l`/`1` e `O`/`0`. */}
+          <span className="break-all font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-suave)]">
+            {projeto.diretorio}
+          </span>
+        </div>
+      </div>
+
+      {carregando ? (
+        <LoadingState rotulo={t('jornada.carregando')} />
+      ) : falhou || estado === null ? (
+        <ErrorState
+          titulo={t('jornada.titulo')}
+          descricao={t('jornada.carregando')}
+          onTentarNovamente={() => {
+            setCarregando(true)
+            setFalhou(false)
+            void carregar()
+          }}
+        />
+      ) : (
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-10">
+          {/* A trilha não estica: ela é uma coluna de leitura, e alargá-la afastaria o marcador
+              do rótulo até a linha deixar de se ler como uma unidade. */}
+          <div className="lg:w-[19rem] lg:shrink-0">
+            <TrilhaDaJornada estado={estado} onAgir={agir} />
+          </div>
+
+          <div
+            data-jos-conteudo-da-etapa
+            className="flex min-w-0 flex-1 flex-col gap-4 border-t border-[rgba(var(--jos-borda-rgb),0.10)] pt-6 lg:border-l lg:border-t-0 lg:pl-10 lg:pt-0"
+          >
+            <ConteudoDaEtapa workspace={workspace} projeto={projeto} estado={estado} />
+          </div>
+        </div>
+      )}
+
+      {respondendo && (
+        <WizardDoProjeto
+          workspace={workspace}
+          projectId={projeto.id}
+          nomeDoProjeto={projeto.nome}
+          aberto
+          onFechar={() => {
+            setRespondendo(false)
+            // Reler ao fechar: responder o wizard é o que sustenta os eventos de prompt e
+            // refinamento, e a trilha ficaria mostrando a etapa velha até um F5.
+            void carregar()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+/**
+ * O painel da etapa atual — e **só** dele (critério 4).
+ *
+ * Um `switch` sobre a etapa, e não quatro painéis empilhados com um deles destacado: mostrar
+ * todos de uma vez é exatamente o que o MVP-008 fazia, e é o que fazia o PI não saber por onde
+ * começar. Etapa futura não tem painel porque não tem ação.
+ */
+function ConteudoDaEtapa({
+  workspace,
+  projeto,
+  estado
+}: {
+  readonly workspace: WorkspaceId
+  readonly projeto: Project
+  readonly estado: EstadoDaJornada
+}): React.JSX.Element {
+  const { t } = useTranslation()
+
+  switch (estado.etapa) {
+    case 'prd':
+    case 'prd-aceito':
+    case 'brief-aceito':
+      return (
+        <PacoteDoProjeto
+          workspace={workspace}
+          projectId={projeto.id}
+          nomeDoProjeto={projeto.nome}
+        />
+      )
+
+    case 'design':
+    case 'arquitetura':
+    case 'pacote-aceito':
+      return (
+        <AnexosDeDesign workspace={workspace} projectId={projeto.id} nomeDoProjeto={projeto.nome} />
+      )
+
+    case 'roadmap':
+    case 'mvp-aceito':
+    case 'spec-aceita':
+    case 'construcao':
+      return (
+        <RoadmapDoProjeto
+          workspace={workspace}
+          projectId={projeto.id}
+          nomeDoProjeto={projeto.nome}
+        />
+      )
+
+    // `prompt` e `refinamento`: o conteúdo é o wizard, que abre em pop-up pelo CTA. Aqui fica
+    // só a orientação — um painel vazio seria pior que o texto que diz o que o botão faz.
+    default:
+      return (
+        <div className="flex flex-col gap-2">
+          <h3 className="text-[length:var(--jos-texto-realce)] font-[var(--jos-peso-semi)] text-[var(--jos-cor-texto)]">
+            {t('jornada.titulo')}
+          </h3>
+          <p className="max-w-[60ch] text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto-secundario)]">
+            {t('jornada.descricao')}
+          </p>
+        </div>
+      )
+  }
+}

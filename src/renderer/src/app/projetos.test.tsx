@@ -38,6 +38,11 @@ const listarArquiteturas = vi.fn()
 const carregarRoadmap = vi.fn()
 const listarAprovacoes = vi.fn()
 const revisoesDoGate = vi.fn()
+// A jornada (SPEC-Jornada-01): o CTA de cada card vem do main, e a tela do projeto aberto lê o
+// estado dele. Sem os dois, a lista monta com o rótulo genérico — que é o fallback testado
+// abaixo, não um acidente.
+const jornadaDeVarios = vi.fn()
+const estadoDaJornada = vi.fn()
 
 function projeto(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -71,6 +76,8 @@ beforeEach(() => {
   carregarRoadmap.mockReset().mockResolvedValue({ mvps: [], slices: [] })
   listarAprovacoes.mockReset().mockResolvedValue([])
   revisoesDoGate.mockReset().mockResolvedValue([])
+  jornadaDeVarios.mockReset().mockResolvedValue([])
+  estadoDaJornada.mockReset().mockResolvedValue(null)
   listProjects.mockResolvedValue([])
 
   Object.defineProperty(window, 'jarvis', {
@@ -90,7 +97,12 @@ beforeEach(() => {
       listarArquiteturas,
       carregarRoadmap,
       listarAprovacoes,
-      revisoesDoGate
+      revisoesDoGate,
+      jornadaDeVarios,
+      estadoDaJornada,
+      // A ponte real sempre tem `sendLog`; aqui ele existe porque o caminho de falha **loga**,
+      // e sem o método o próprio logger estouraria — mascarando a resiliência que se testa.
+      sendLog: vi.fn()
     },
     configurable: true,
     writable: true
@@ -329,42 +341,163 @@ describe('ProjetosLocais', () => {
     expect(runCommand).not.toHaveBeenCalled()
   })
 
-  it('abre o contexto do projeto no próprio item, e o botão declara o estado', async () => {
-    const usuario = userEvent.setup()
+  it('mostra um CTA por projeto, com o rótulo da etapa (critério 3)', async () => {
     listProjects.mockResolvedValue([projeto()])
+    jornadaDeVarios.mockResolvedValue([
+      {
+        projectId: 'p-1',
+        etapa: 'prompt',
+        cta: 'Escrever o prompt',
+        trilha: [],
+        motivoDaRegressao: null,
+        recalculada: false
+      }
+    ])
 
     render(<ProjetosLocais workspace="jarvis" />)
 
-    const abrir = await screen.findByRole('button', { name: /Abrir contexto de Projeto Alfa/ })
-    // `aria-expanded` porque o botão alterna uma região desta mesma tela: sem ele, quem ouve
-    // a interface não sabe se o painel abriu ou se a página mudou.
-    expect(abrir).toHaveAttribute('aria-expanded', 'false')
-
-    await usuario.click(abrir)
-
-    expect(await screen.findByText('Contexto, skills e orçamento')).toBeInTheDocument()
-    expect(listContextPacks).toHaveBeenCalledWith('p-1')
-    expect(screen.getByRole('button', { name: 'Fechar contexto' })).toHaveAttribute(
-      'aria-expanded',
-      'true'
+    // O rótulo vem da etapa, não de um "Abrir" genérico: o card diz o próximo passo sem que o
+    // PI precise entrar para descobrir qual é.
+    //
+    // `waitFor` e não uma leitura única: o card monta com o rótulo de fallback e recebe o CTA
+    // quando a jornada chega. Afirmar no primeiro render testaria o instante errado — e passaria
+    // ou falharia conforme a máquina estivesse mais ou menos carregada.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Abrir Projeto Alfa/ })).toHaveTextContent(
+        'Escrever o prompt'
+      )
     )
+    expect(jornadaDeVarios).toHaveBeenCalledWith(['p-1'], 'jarvis')
   })
 
-  it('mostra o contexto de um projeto por vez', async () => {
-    const usuario = userEvent.setup()
+  it('pede as jornadas numa chamada só, não uma por card', async () => {
     listProjects.mockResolvedValue([projeto(), projeto({ id: 'p-2', nome: 'Projeto Beta' })])
 
     render(<ProjetosLocais workspace="jarvis" />)
 
-    await usuario.click(
-      await screen.findByRole('button', { name: /Abrir contexto de Projeto Alfa/ })
-    )
-    await usuario.click(
-      await screen.findByRole('button', { name: /Abrir contexto de Projeto Beta/ })
-    )
+    await screen.findByText('Projeto Beta')
 
-    // Dois painéis abertos empurrariam a lista para fora da dobra e o usuário perderia a
-    // coluna que veio varrer.
-    expect(screen.getAllByText('Contexto, skills e orçamento')).toHaveLength(1)
+    // Uma viagem pela ponte por tela, não por item: a leitura recalcula a etapa, e o custo se
+    // multiplicaria junto com a lista.
+    await waitFor(() => expect(jornadaDeVarios).toHaveBeenCalledTimes(1))
+    expect(jornadaDeVarios).toHaveBeenCalledWith(['p-1', 'p-2'], 'jarvis')
+  })
+
+  it('a lista sobrevive a uma ponte sem o canal da jornada', async () => {
+    // A exceção é **síncrona**: uma ponte sem o método lança antes de existir promise, e um
+    // `.catch()` sozinho não a pegaria. Sem a guarda, o card perderia a tela inteira por causa
+    // do rótulo de um botão.
+    jornadaDeVarios.mockImplementation(() => {
+      throw new TypeError('window.jarvis.jornadaDeVarios is not a function')
+    })
+    listProjects.mockResolvedValue([projeto()])
+
+    render(<ProjetosLocais workspace="jarvis" />)
+
+    expect(await screen.findByText('Projeto Alfa')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Abrir Projeto Alfa/ })).toBeInTheDocument()
+  })
+
+  it('abrir o projeto troca o índice pela jornada, e voltar desfaz', async () => {
+    const usuario = userEvent.setup()
+    listProjects.mockResolvedValue([projeto()])
+    estadoDaJornada.mockResolvedValue({
+      projectId: 'p-1',
+      etapa: 'prompt',
+      cta: 'Escrever o prompt',
+      trilha: [
+        {
+          etapa: 'prompt',
+          posicao: 'atual',
+          cta: 'Escrever o prompt',
+          oQueFalta: null,
+          acionavel: true
+        },
+        {
+          etapa: 'refinamento',
+          posicao: 'futura',
+          cta: 'Responder o refinamento',
+          oQueFalta: 'Conclua "Escrever o prompt" para chegar aqui.',
+          acionavel: false
+        }
+      ],
+      motivoDaRegressao: null,
+      recalculada: false
+    })
+
+    render(<ProjetosLocais workspace="jarvis" />)
+
+    await usuario.click(await screen.findByRole('button', { name: /Abrir Projeto Alfa/ }))
+
+    // O índice sai de cena: mantê-lo montado custaria a consulta das jornadas a cada mudança
+    // na tela do projeto, para desenhar algo que ninguém está vendo.
+    expect(await screen.findByText('Prompt inicial')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Criar projeto' })).not.toBeInTheDocument()
+
+    await usuario.click(screen.getByRole('button', { name: 'Voltar aos projetos' }))
+
+    expect(await screen.findByRole('button', { name: 'Criar projeto' })).toBeInTheDocument()
+  })
+
+  it('etapa futura não oferece ação e diz o que falta (critério 4)', async () => {
+    const usuario = userEvent.setup()
+    listProjects.mockResolvedValue([projeto()])
+    estadoDaJornada.mockResolvedValue({
+      projectId: 'p-1',
+      etapa: 'prompt',
+      cta: 'Escrever o prompt',
+      trilha: [
+        {
+          etapa: 'prompt',
+          posicao: 'atual',
+          cta: 'Escrever o prompt',
+          oQueFalta: null,
+          acionavel: true
+        },
+        {
+          etapa: 'refinamento',
+          posicao: 'futura',
+          cta: 'Responder o refinamento',
+          oQueFalta: 'Conclua "Escrever o prompt" para chegar aqui.',
+          acionavel: false
+        }
+      ],
+      motivoDaRegressao: null,
+      recalculada: false
+    })
+
+    render(<ProjetosLocais workspace="jarvis" />)
+    await usuario.click(await screen.findByRole('button', { name: /Abrir Projeto Alfa/ }))
+
+    await screen.findByText('Prompt inicial')
+
+    // Ausência, não desabilitação: um alvo morto em cada linha futura seria ruído. E o que
+    // falta é **dito**, porque a etapa futura ainda precisa se explicar.
+    expect(
+      screen.queryByRole('button', { name: 'Responder o refinamento' })
+    ).not.toBeInTheDocument()
+    expect(screen.getByText('Conclua "Escrever o prompt" para chegar aqui.')).toBeInTheDocument()
+  })
+
+  it('a trilha mostra o motivo quando a jornada regrediu (critério 7)', async () => {
+    const usuario = userEvent.setup()
+    listProjects.mockResolvedValue([projeto()])
+    estadoDaJornada.mockResolvedValue({
+      projectId: 'p-1',
+      etapa: 'prd',
+      cta: 'Gerar o PRD',
+      trilha: [
+        { etapa: 'prd', posicao: 'atual', cta: 'Gerar o PRD', oQueFalta: null, acionavel: true }
+      ],
+      motivoDaRegressao: 'O PRD mudou semanticamente',
+      recalculada: false
+    })
+
+    render(<ProjetosLocais workspace="jarvis" />)
+    await usuario.click(await screen.findByRole('button', { name: /Abrir Projeto Alfa/ }))
+
+    // O motivo aparece acima da trilha: o PI precisa saber por que a jornada andou para trás
+    // antes de procurar onde ela parou.
+    expect(await screen.findByText('O PRD mudou semanticamente')).toBeInTheDocument()
   })
 })
