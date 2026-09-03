@@ -10,6 +10,8 @@ import {
   GaleriaDaJornadaDePlanejamento,
   type CenaDaJornada
 } from './GaleriaDaJornadaDePlanejamento'
+import { GaleriaDeProjetos } from './GaleriaDeProjetos'
+import type { CenaDeProjetos } from './GaleriaDeProjetos'
 import { GaleriaDoBrief, type CenaDoBrief } from './GaleriaDoBrief'
 import { initI18n } from '@renderer/i18n'
 import type { ModoUi, Modulo } from '@design/tokens/semantic'
@@ -51,7 +53,9 @@ const CENAS_POR_GALERIA: Readonly<Record<string, readonly string[]>> = {
   // A trilha de planejamento (M25-F01): cada cena é um estado da trilha, não uma tela.
   planejamento: ['inicio', 'meio', 'regressao'],
   // O prompt e o gate do brief (M25-F02): as cenas são os estados que mudam a decisão do PI.
-  brief: ['prompt-vazio', 'prompt-bloqueado', 'brief-propostos', 'brief-travado']
+  brief: ['prompt-vazio', 'prompt-bloqueado', 'brief-propostos', 'brief-travado'],
+  // O índice de projetos: a lista com jornadas distintas e o primeiro uso.
+  projetos: ['lista', 'vazio']
 }
 
 const cenaBruta = params.get('cena')
@@ -99,6 +103,14 @@ const GALERIAS = {
       cena={(cenaBruta ?? 'brief-propostos') as CenaDoBrief}
     />
   ),
+  projetos: () => (
+    <GaleriaDeProjetos
+      modo={modo}
+      modulo={modulo}
+      acento={acento ?? undefined}
+      cena={(cenaBruta ?? 'lista') as CenaDeProjetos}
+    />
+  ),
   planejamento: () => (
     <GaleriaDaJornadaDePlanejamento
       modo={modo}
@@ -142,6 +154,7 @@ const galeria = GALERIAS[qual as keyof typeof GALERIAS]()
  * `await` no topo: o Vite serve como ESM, e renderizar antes de o i18next resolver deixaria o
  * primeiro frame com as chaves — exatamente o que a captura pegaria.
  */
-if (qual === 'planejamento' || qual === 'brief') await initI18n('pt-BR')
+const TRADUZ_POR_I18N: readonly string[] = ['planejamento', 'brief', 'projetos']
+if (TRADUZ_POR_I18N.includes(qual)) await initI18n('pt-BR')
 
 createRoot(raiz).render(<StrictMode>{galeria}</StrictMode>)
