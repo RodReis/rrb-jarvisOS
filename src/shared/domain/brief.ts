@@ -27,6 +27,14 @@
 import type { WorkspaceId } from './entities'
 
 /**
+ * Onde o prompt do PI vira revisão no disco (SPEC-Jornada-02, critério 1).
+ *
+ * Caminho relativo e constante, mesma convenção de `ARQUIVO_DO_DOCUMENTO` do pacote
+ * estrutural: nunca vem do chamador, e é por isso que não há como a escrita sair do projeto.
+ */
+export const ARQUIVO_DO_PROMPT = 'docs/PROMPT.md'
+
+/**
  * Os dez blocos do `ProjectBriefSchema` (design §9.2, enumerados na spec).
  *
  * Ordenados: o índice é a ordem de leitura do documento, e um segundo mapa de ordem divergiria

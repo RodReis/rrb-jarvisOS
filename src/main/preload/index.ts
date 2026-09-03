@@ -51,7 +51,14 @@ import type {
   Project,
   ProjectOutcome
 } from '@shared/domain/projects'
-import type { Resposta, RespostaOutcome, VistaDoWizard } from '@shared/domain/wizard'
+import type {
+  Decision,
+  EstadoDoWizard,
+  Resposta,
+  RespostaOutcome,
+  VistaDoWizard
+} from '@shared/domain/wizard'
+import type { GeracaoDePerguntasOutcome } from '@shared/domain/refinamento'
 import type { PacoteEstrutural, PacoteOutcome } from '@shared/domain/pacote-estrutural'
 import type { Anexo, AnexoOutcome, TipoDeAnexo } from '@shared/domain/anexos-de-design'
 import type { ValidacaoDoPrototipo } from '@shared/domain/validacao-de-prototipo'
@@ -387,6 +394,29 @@ const bridge: JarvisBridge = {
     workspace: WorkspaceId
   ): Promise<BriefRegistrado | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.briefCortarProposto, projectId, afirmacaoId, workspace),
+  // O refinamento: gerar as perguntas, ler o estado, responder e consultar a trilha. Nenhum
+  // canal recebe o enunciado de volta — só o id da pergunta que já está no banco.
+  gerarPerguntasDeRefinamento: (
+    projectId: string,
+    workspace: WorkspaceId
+  ): Promise<GeracaoDePerguntasOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.refinamentoGerar, projectId, workspace),
+  estadoDoRefinamento: (
+    projectId: string,
+    workspace: WorkspaceId
+  ): Promise<EstadoDoWizard | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.refinamentoEstado, projectId, workspace),
+  responderRefinamento: (
+    projectId: string,
+    resposta: Resposta,
+    workspace: WorkspaceId
+  ): Promise<RespostaOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.refinamentoResponder, projectId, resposta, workspace),
+  historicoDoRefinamento: (
+    projectId: string,
+    workspace: WorkspaceId
+  ): Promise<readonly Decision[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.refinamentoHistorico, projectId, workspace),
   // O alvo atravessa a ponte; a credencial não. O token é resolvido no main, pelo mesmo cofre do
   // conector — mandá-lo daqui exigiria que o renderer o tivesse, e ele nunca tem.
   publicarNoGitHub: (

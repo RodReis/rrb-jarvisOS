@@ -33,6 +33,7 @@ import type {
 import { cortarProposto, validarBrief } from '@shared/domain/brief'
 import type { PerguntaGerada } from '@shared/domain/pergunta-gerada'
 import { separarPerguntasValidas } from '@shared/domain/pergunta-gerada'
+import type { DecisaoDoRefinamento } from '@shared/domain/brief-schema'
 import type { EstadoDasRotas, ResultadoDaRota } from '@shared/domain/rota-de-geracao'
 import { escolherRota } from '@shared/domain/rota-de-geracao'
 import { log } from '../logging/logger'
@@ -67,6 +68,40 @@ export interface BriefServiceDeps {
   readonly audit: AuditRepository
   readonly userId: () => string
   /**
+   * Escreve o `PROMPT.md` no disco e commita como marco documental (SPEC-Jornada-02, critério
+   * 1). **O único gatilho de commit** continua sendo o `ProjectService` (M8-F01, spec § Fluxo
+   * 6) — este serviço nunca chama Git direto, mesma fronteira que `PacoteService` respeita.
+   *
+   * Devolve `undefined` quando o projeto não existe; a escrita em si não falha silenciosamente
+   * porque quem implementa isto no main já propaga a falha do `ProjectService.concluirMarco`
+   * (que audita e devolve `commitado: false` em vez de estourar).
+   */
+  readonly registrarPromptNoDisco: (
+    projectId: string,
+    texto: string,
+    workspace: WorkspaceId
+  ) => { readonly commitHash?: string } | undefined
+  /**
+   * Monta o `ContextPack` a partir do `PROMPT.md` já commitado (SPEC-Planejamento-02, critério
+   * 1). **Sem isto, `ai.call` recusa toda geração** — "nenhuma chamada sem contexto montado"
+   * não é exceção desta fatia, é a mesma barreira que qualquer geração do produto atravessa.
+   *
+   * Devolve `undefined` quando a montagem falha (segredo detectado, projeto não encontrado): o
+   * chamador trata como "sem contexto disponível", não como exceção a propagar.
+   */
+  readonly montarContexto: (
+    projectId: string,
+    workspace: WorkspaceId,
+    rota: AiProvider
+  ) => string | undefined
+  /**
+   * As decisões que o PI tomou no refinamento, prontas para o modelo citar.
+   *
+   * Injetado, e não lido do `DecisionRepository` aqui, pela mesma razão que `estadoDasRotas` é:
+   * quem sabe casar decisão com a pergunta que a originou é o refinamento, não este serviço.
+   */
+  readonly decisoesDoRefinamento: (projectId: string) => readonly DecisaoDoRefinamento[]
+  /**
    * O estado das rotas, resolvido por quem conhece credenciais e quota.
    *
    * **Assíncrono porque a disponibilidade da assinatura é um healthcheck**, não uma leitura de
@@ -89,8 +124,15 @@ export interface BriefServiceDeps {
     readonly workspace: WorkspaceId
     readonly prompt: string
     readonly rota: AiProvider
+    /** O manifesto já montado — a chamada real recebe isto, nunca monta o próprio contexto. */
+    readonly contextPackId: string
+    /**
+     * O que o PI decidiu no refinamento, com os ids. É o que permite ao modelo usar origem
+     * `decisao` e preencher `referencia` — sem isto, toda resposta do PI viraria `proposto`.
+     */
+    readonly decisoes: readonly DecisaoDoRefinamento[]
     readonly correcao?: readonly string[]
-  }) => Promise<{ readonly saida?: SaidaDoModelo; readonly contextPackId?: string }>
+  }) => Promise<{ readonly saida?: SaidaDoModelo }>
 }
 
 /** Hash canônico do conteúdo. É por ele que o brief é citado e que a reaprovação compara. */
@@ -113,6 +155,9 @@ export class BriefService {
   private readonly repository: BriefRepository
   private readonly audit: AuditRepository
   private readonly userId: () => string
+  private readonly registrarPromptNoDisco: BriefServiceDeps['registrarPromptNoDisco']
+  private readonly montarContexto: BriefServiceDeps['montarContexto']
+  private readonly decisoesDoRefinamento: BriefServiceDeps['decisoesDoRefinamento']
   private readonly estadoDasRotas: BriefServiceDeps['estadoDasRotas']
   private readonly gerar: BriefServiceDeps['gerar']
 
@@ -120,15 +165,28 @@ export class BriefService {
     this.repository = deps.repository
     this.audit = deps.audit
     this.userId = deps.userId
+    this.registrarPromptNoDisco = deps.registrarPromptNoDisco
+    this.montarContexto = deps.montarContexto
+    this.decisoesDoRefinamento = deps.decisoesDoRefinamento
     this.estadoDasRotas = deps.estadoDasRotas
     this.gerar = deps.gerar
   }
 
   /**
-   * Salva o prompt do PI (critério 1).
+   * Salva o prompt do PI (critério 1) e vira revisão no Git.
    *
    * Prompt vazio não avança — e a recusa vem antes de qualquer escrita, então não há linha
    * parcial a limpar. Mesma postura da criação de projeto.
+   *
+   * **O commit acontece aqui, não em `gerarBrief`.** A spec é literal: "salvar o prompt cria a
+   * revisão `PROMPT.md`... e avança para `refinamento`" — o marco documental é efeito de
+   * salvar, não de gerar. É também o que faz `montarContexto` ter algo para citar assim que a
+   * tela pedir a rota: sem a revisão no disco antes da geração, o gate do critério 1 da
+   * SPEC-Planejamento-02 bloquearia toda tentativa por falta de `ContextPack`.
+   *
+   * **Falha ao commitar não perde o prompt.** A linha no banco já existe quando o commit é
+   * tentado — mesma ordem do `PacoteService`: persistir primeiro, git depois, porque um Git
+   * indisponível não pode apagar o que o PI acabou de escrever.
    */
   salvarPrompt(
     projectId: string,
@@ -159,6 +217,16 @@ export class BriefService {
     })
 
     log.agent.info('Prompt do projeto salvo', { projectId })
+
+    // O marco é best-effort: o prompt já está persistido acima, e um Git indisponível não pode
+    // apagar o que o PI escreveu — só a citação em `ContextPack` fica adiada até o próximo
+    // marco bem-sucedido.
+    const marco = this.registrarPromptNoDisco(projectId, texto, workspaceId)
+    if (marco?.commitHash !== undefined) {
+      this.repository.marcarCommitDoPrompt(userId, prompt.id, marco.commitHash)
+      return { ...prompt, commitHash: marco.commitHash }
+    }
+
     return prompt
   }
 
@@ -216,11 +284,35 @@ export class BriefService {
 
     const provider = PROVIDER_DA_ROTA[rota.decisao]
 
+    // O pacote de contexto (SPEC-Planejamento-02, critério 1) — montado **depois** de saber a
+    // rota, porque é ela que decide se o orçamento é em USD ou em uso, e **antes** de gerar,
+    // porque `ai.call` recusa toda chamada sem `ContextPack`. Sem manifesto, esta é a mesma
+    // "chamada que não devia existir" que o comentário do gate descreve — a fatia não abre uma
+    // exceção para si mesma.
+    const contextPackId = this.montarContexto(projectId, workspaceId, provider)
+    if (contextPackId === undefined) {
+      this.audit.append({
+        user_id: userId,
+        workspace_id: workspaceId,
+        type: 'brief-generation',
+        payload: { projectId, fase: 'sem-contexto' }
+      })
+
+      log.agent.error('Geração do brief sem ContextPack — o prompt ainda não virou revisão', {
+        projectId
+      })
+
+      return {
+        resultado: 'saida-invalida',
+        mensagem: 'O prompt ainda não virou revisão no Git; salve o prompt de novo antes de gerar.'
+      }
+    }
+
     this.audit.append({
       user_id: userId,
       workspace_id: workspaceId,
       type: 'brief-generation',
-      payload: { projectId, fase: 'inicio', rota: rota.decisao, provider }
+      payload: { projectId, fase: 'inicio', rota: rota.decisao, provider, contextPackId }
     })
 
     let problemas: readonly string[] = []
@@ -232,6 +324,8 @@ export class BriefService {
         workspace: workspaceId,
         prompt: prompt.texto,
         rota: provider,
+        contextPackId,
+        decisoes: this.decisoesDoRefinamento(projectId),
         // Na primeira volta não há o que corrigir; na segunda, o modelo recebe exatamente o que
         // o validador recusou — pedir "tente de novo" sem dizer o quê é jogar dado.
         ...(problemas.length > 0 ? { correcao: problemas } : {})
@@ -287,7 +381,7 @@ export class BriefService {
         pendencias: candidato.pendencias,
         hash,
         commitHash: null,
-        contextPackId: resposta.contextPackId ?? null,
+        contextPackId,
         created_at: new Date().toISOString()
       })
 
@@ -300,7 +394,7 @@ export class BriefService {
           fase: 'gerado',
           rota: rota.decisao,
           briefHash: hash,
-          contextPackId: resposta.contextPackId ?? null,
+          contextPackId,
           afirmacoes: candidato.afirmacoes.length
         }
       })

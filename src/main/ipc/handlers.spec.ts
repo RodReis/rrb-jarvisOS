@@ -198,8 +198,21 @@ const brief = {
   cortarProposto: vi.fn(() => undefined)
 }
 
+/**
+ * Dublê do refinamento (SPEC-Jornada-02). O que se exercita aqui é a **fronteira**: a validação
+ * de forma antes de chamar o serviço. A mecânica de contradição, delegação e retomada tem suíte
+ * própria em `refinamento-service.int-spec.ts`, contra o banco real.
+ */
+const refinamento = {
+  gerarPerguntas: vi.fn(async () => ({ resultado: 'geradas', mensagem: 'ok' })),
+  estado: vi.fn(() => undefined),
+  responder: vi.fn(() => ({ reason: 'registrada', mensagem: 'ok' })),
+  historico: vi.fn(() => [])
+}
+
 const deps = {
   audit,
+  refinamento,
   ai,
   jornada,
   brief,
@@ -825,5 +838,86 @@ describe('prompt e brief', () => {
     invocar(IPC_CHANNELS.briefCortarProposto, 'p-1', 'a-2', 'jarvis')
 
     expect(brief.cortarProposto).toHaveBeenCalledWith('p-1', 'a-2', 'jarvis')
+  })
+})
+
+/**
+ * A fronteira do refinamento (SPEC-Jornada-02).
+ *
+ * O que se prova aqui é o que a ponte **recusa**. A ausência mais importante — nenhum canal que
+ * receba o enunciado da pergunta de volta — é verificada em `preload.spec.ts`, na lista fechada.
+ */
+describe('refinamento', () => {
+  beforeEach(() => {
+    refinamento.gerarPerguntas.mockClear()
+    refinamento.estado.mockClear()
+    refinamento.responder.mockClear()
+    refinamento.historico.mockClear()
+  })
+
+  it('gera as perguntas quando projeto e espaço têm a forma certa', async () => {
+    await invocar(IPC_CHANNELS.refinamentoGerar, 'p-1', 'jarvis')
+
+    expect(refinamento.gerarPerguntas).toHaveBeenCalledWith('p-1', 'jarvis')
+  })
+
+  it('gerar com forma inválida devolve desfecho, não rejeita', async () => {
+    const r = (await invocar(IPC_CHANNELS.refinamentoGerar, 42, 'jarvis')) as {
+      resultado: string
+    }
+
+    expect(r.resultado).toBe('sem-prompt')
+    expect(refinamento.gerarPerguntas).not.toHaveBeenCalled()
+  })
+
+  it('recusa espaço inválido ao ler o estado', () => {
+    expect(invocar(IPC_CHANNELS.refinamentoEstado, 'p-1', 'inventado')).toBeNull()
+    expect(refinamento.estado).not.toHaveBeenCalled()
+  })
+
+  it('responder exige a forma da resposta — sem ela, nada chega ao serviço', () => {
+    const r = invocar(IPC_CHANNELS.refinamentoResponder, 'p-1', { escolha: 'a' }, 'jarvis') as {
+      reason: string
+    }
+
+    // `perguntaId` ausente: o serviço nunca é chamado, porque a decisão citaria uma pergunta
+    // que ninguém identificou.
+    expect(r.reason).toBe('escolha-invalida')
+    expect(refinamento.responder).not.toHaveBeenCalled()
+  })
+
+  it('responder recusa autor fora do enum', () => {
+    // `autor` é o que distingue escolha do PI de escolha delegada (invariante 3 do CONVENTION
+    // §4). Um valor livre aqui deixaria a fronteira gravar autoria inventada.
+    const r = invocar(
+      IPC_CHANNELS.refinamentoResponder,
+      'p-1',
+      { perguntaId: 'q-1', escolha: 'a', texto: null, autor: 'terceiro' },
+      'jarvis'
+    ) as { reason: string }
+
+    expect(r.reason).toBe('escolha-invalida')
+    expect(refinamento.responder).not.toHaveBeenCalled()
+  })
+
+  it('responder repassa a resposta bem formada', () => {
+    invocar(
+      IPC_CHANNELS.refinamentoResponder,
+      'p-1',
+      { perguntaId: 'q-1', escolha: 'a', texto: null, autor: 'pi' },
+      'jarvis'
+    )
+
+    expect(refinamento.responder).toHaveBeenCalledWith(
+      'p-1',
+      { perguntaId: 'q-1', escolha: 'a', texto: null, autor: 'pi' },
+      'jarvis'
+    )
+  })
+
+  it('o histórico inválido devolve lista vazia, nunca undefined', () => {
+    // A ponte serializa: `undefined` atravessaria como ausência de valor, e a tela não
+    // distinguiria "sem histórico" de "o canal não respondeu".
+    expect(invocar(IPC_CHANNELS.refinamentoHistorico, 42, 'jarvis')).toEqual([])
   })
 })

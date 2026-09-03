@@ -73,6 +73,10 @@ export type ProjectReason = (typeof PROJECT_REASONS)[number]
  */
 export const MARCOS_DOCUMENTAIS = [
   'estrutura-inicial',
+  // SPEC-Jornada-02, critério 1: o prompt do PI vira `PROMPT.md` e o commit é o que dá ao
+  // brief algo para citar como `ContextPack` — sem revisão no disco, a geração não teria o que
+  // ler (SPEC-Planejamento-02, critério 1: nenhuma chamada sem contexto montado).
+  'prompt-registrado',
   'contexto-aprovado',
   'prd-aprovado',
   'design-anexado',
@@ -92,6 +96,7 @@ export type MarcoDocumental = (typeof MARCOS_DOCUMENTAIS)[number]
  */
 export const MENSAGEM_DO_MARCO: Readonly<Record<MarcoDocumental, string>> = {
   'estrutura-inicial': 'docs: estrutura documental inicial do projeto',
+  'prompt-registrado': 'docs: prompt do projeto',
   'contexto-aprovado': 'docs: contexto e escopo aprovados',
   'prd-aprovado': 'docs: PRD aprovado',
   'design-anexado': 'docs: anexos de design do PI',

@@ -1285,6 +1285,47 @@ const MIGRATIONS: readonly string[] = [
     created_at    TEXT NOT NULL
   );
   CREATE INDEX idx_project_brief ON project_brief(user_id, project_id, created_at);
+  `,
+
+  // 32 — as perguntas de refinamento geradas por IA (SPEC-Jornada-02, § Refinamento).
+  //
+  // **Por que não é o `decision` sozinho.** `decision` guarda a *resposta*; ele não guarda a
+  // *pergunta* quando ela não vem de um catálogo fixo em código. A M8-F03 podia deixar a
+  // pergunta implícita porque `CATALOGO_DO_CONTEXTO` é código versionado — reabrir o wizard
+  // relia o mesmo array. Aqui a pergunta é gerada por projeto, a partir do prompt daquele
+  // projeto: sem persisti-la, reabrir o projeto no meio do refinamento perderia o enunciado, as
+  // opções e a justificativa que o PI estava lendo.
+  //
+  // **Append-only, a quinta vez com esta postura.** Regenerar recalcula os blocos ainda vazios
+  // e insere as perguntas que faltam; nunca edita uma já feita — se o PI já a respondeu, ela
+  // não deveria mudar de baixo dele.
+  //
+  // `opcoes` em JSON: são sempre lidas e escritas inteiras junto com a pergunta, nunca uma
+  // opção isolada — mesma razão de `afirmacoes` em `project_brief`.
+  `
+  CREATE TABLE pergunta_gerada (
+    id            TEXT PRIMARY KEY,
+    user_id       TEXT NOT NULL,
+    workspace_id  TEXT NOT NULL,
+    project_id    TEXT NOT NULL,
+    -- O brief cuja lacuna esta pergunta preenche.
+    bloco         TEXT NOT NULL,
+    -- Por que o modelo está perguntando isto — mostrado ao PI como justificativa (design §9.1).
+    por_que       TEXT NOT NULL,
+    titulo        TEXT NOT NULL,
+    enunciado     TEXT NOT NULL,
+    -- JSON de OpcaoDaPergunta[]: id, rótulo e impacto por opção.
+    opcoes        TEXT NOT NULL,
+    recomendada   TEXT NOT NULL,
+    justificativa TEXT NOT NULL,
+    aceita_texto_livre INTEGER NOT NULL,
+    delegavel     INTEGER NOT NULL,
+    -- 'pendente' até o PI responder; então vira 'respondida'. Uma pergunta 'respondida' não
+    -- volta a ser oferecida, mesmo que o refinamento seja retomado.
+    estado        TEXT NOT NULL DEFAULT 'pendente',
+    created_at    TEXT NOT NULL
+  );
+  CREATE INDEX idx_pergunta_gerada_projeto ON pergunta_gerada(user_id, project_id, created_at);
   `
 ]
 

@@ -49,6 +49,14 @@ let chamadas: number
 let respostas: ({ afirmacoes: readonly Afirmacao[]; pendencias: [] } | undefined)[]
 /** As correções que o dublê recebeu — prova que o problema é dito, não só "tente de novo". */
 let correcoesRecebidas: (readonly string[] | undefined)[]
+/** Quantas vezes o prompt virou revisão no disco — prova que `salvarPrompt` commita. */
+let commits: number
+/** Se `montarContexto` devolve um pack. `undefined` simula "prompt ainda não commitado". */
+let packDisponivel: boolean
+/** As rotas que `montarContexto` recebeu — prova que ele é chamado com a rota já decidida. */
+let rotasRecebidasNoContexto: string[]
+/** As decisões do refinamento que o brief deve citar. */
+let decisoesDoRefinamento: readonly { id: string; pergunta: string; resposta: string }[]
 
 function afirmacao(over: Partial<Afirmacao> = {}): Afirmacao {
   return {
@@ -85,18 +93,31 @@ beforeEach(() => {
   }
   chamadas = 0
   correcoesRecebidas = []
+  commits = 0
+  packDisponivel = true
+  rotasRecebidasNoContexto = []
+  decisoesDoRefinamento = []
   respostas = [{ afirmacoes: [afirmacao()], pendencias: [] }]
 
   service = new BriefService({
     repository: repo,
     audit: new AuditRepository(db, 'chave-de-teste'),
     userId: () => USER,
+    registrarPromptNoDisco: () => {
+      commits += 1
+      return { commitHash: 'abc1234' }
+    },
+    montarContexto: (_projectId, _workspace, rota) => {
+      rotasRecebidasNoContexto.push(rota)
+      return packDisponivel ? 'pack-1' : undefined
+    },
+    decisoesDoRefinamento: () => decisoesDoRefinamento,
     estadoDasRotas: () => rotas,
     gerar: async (entrada) => {
       chamadas += 1
       correcoesRecebidas.push(entrada.correcao)
       const saida = respostas.shift()
-      return saida === undefined ? {} : { saida, contextPackId: 'pack-1' }
+      return saida === undefined ? {} : { saida }
     }
   })
 
@@ -195,6 +216,9 @@ describe('bloqueio antes de rota paga (critério 6)', () => {
       repository: repo,
       audit: new AuditRepository(db, 'chave-de-teste'),
       userId: () => USER,
+      registrarPromptNoDisco: () => ({ commitHash: 'abc1234' }),
+      montarContexto: () => 'pack-1',
+      decisoesDoRefinamento: () => [],
       estadoDasRotas: async () => ({
         assinaturaDisponivel: false,
         assinaturaEsgotada: false,
@@ -211,6 +235,54 @@ describe('bloqueio antes de rota paga (critério 6)', () => {
 
     expect(r.resultado).toBe('bloqueado-sem-rota')
     expect(chamadas).toBe(0)
+  })
+})
+
+describe('o prompt vira revisão no Git (critério 1)', () => {
+  it('salvar o prompt commita o marco documental', () => {
+    const p = service.salvarPrompt(PROJETO, 'Um app de leituras.', WS)
+
+    expect(commits).toBe(1)
+    expect(p?.commitHash).toBe('abc1234')
+  })
+
+  it('o commitHash fica gravado no banco, não só no retorno', () => {
+    service.salvarPrompt(PROJETO, 'Um app de leituras.', WS)
+
+    expect(repo.promptVigente(USER, PROJETO)?.commitHash).toBe('abc1234')
+  })
+})
+
+describe('o ContextPack (SPEC-Planejamento-02, critério 1)', () => {
+  beforeEach(() => {
+    service.salvarPrompt(PROJETO, 'Um app de leituras.', WS)
+  })
+
+  it('é montado com a rota já decidida, não antes', async () => {
+    await service.gerarBrief(PROJETO, WS)
+
+    // A rota decide se o orçamento é USD ou uso — montar antes dela existir aplicaria o teto
+    // errado.
+    expect(rotasRecebidasNoContexto).toEqual(['claude-code'])
+  })
+
+  it('sem contexto disponível, a geração recusa sem chamar o modelo', async () => {
+    // O prompt existe no banco mas ainda não virou revisão (ex.: falha de Git anterior) — é o
+    // mesmo gate que qualquer outra geração do produto atravessa, sem exceção para esta fatia.
+    packDisponivel = false
+
+    const r = await service.gerarBrief(PROJETO, WS)
+
+    expect(r.resultado).toBe('saida-invalida')
+    expect(chamadas).toBe(0)
+  })
+
+  it('sem contexto, o desfecho é auditado como fase própria', async () => {
+    packDisponivel = false
+    await service.gerarBrief(PROJETO, WS)
+
+    expect(eventos('sem-contexto')).toBe(1)
+    expect(eventos('inicio')).toBe(0)
   })
 })
 

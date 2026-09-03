@@ -52,7 +52,14 @@ import type {
   Project,
   ProjectOutcome
 } from '../domain/projects'
-import type { Resposta, RespostaOutcome, VistaDoWizard } from '../domain/wizard'
+import type {
+  Decision,
+  EstadoDoWizard,
+  Resposta,
+  RespostaOutcome,
+  VistaDoWizard
+} from '../domain/wizard'
+import type { GeracaoDePerguntasOutcome } from '../domain/refinamento'
 import type { PacoteEstrutural, PacoteOutcome } from '../domain/pacote-estrutural'
 import type { Anexo, AnexoOutcome, TipoDeAnexo } from '../domain/anexos-de-design'
 import type { ValidacaoDoPrototipo } from '../domain/validacao-de-prototipo'
@@ -394,6 +401,21 @@ export const IPC_CHANNELS = {
   briefCarregar: 'brief:carregar',
   briefRota: 'brief:rota',
   briefCortarProposto: 'brief:cortar-proposto',
+  /**
+   * O refinamento por perguntas geradas (SPEC-Jornada-02, § Refinamento).
+   *
+   * **`refinamento:responder` não recebe a pergunta, só o id dela.** A pergunta vive no banco
+   * desde que foi gerada; aceitar o enunciado de volta deixaria o renderer reescrever o que o
+   * PI leu — e a decisão gravada citaria uma pergunta que talvez nunca tenha sido feita.
+   *
+   * `gerar` e `estado` são canais distintos pela mesma razão que `project:session` e
+   * `project:save-answers` são: ler não pode ter o efeito colateral de gerar. Reabrir a tela
+   * chama `estado`, e uma geração por abertura custaria uma chamada de modelo a cada F5.
+   */
+  refinamentoGerar: 'refinamento:gerar',
+  refinamentoEstado: 'refinamento:estado',
+  refinamentoResponder: 'refinamento:responder',
+  refinamentoHistorico: 'refinamento:historico',
   /**
    * SPEC-Entrega-01: publica o repositório e o backlog aprovado no GitHub.
    *
@@ -976,6 +998,26 @@ export interface JarvisBridge {
     afirmacaoId: string,
     workspace: WorkspaceId
   ): Promise<BriefRegistrado | null>
+  /**
+   * Gera as perguntas de refinamento para os blocos ainda sem resposta.
+   *
+   * Devolve o desfecho **inclusive nas recusas**: "nenhuma rota autorizada" e "nada a
+   * perguntar" são respostas legítimas que a tela mostra, não falhas técnicas.
+   */
+  gerarPerguntasDeRefinamento(
+    projectId: string,
+    workspace: WorkspaceId
+  ): Promise<GeracaoDePerguntasOutcome>
+  /** A pergunta pendente, a conclusão ou o bloqueio — calculado do banco a cada chamada. */
+  estadoDoRefinamento(projectId: string, workspace: WorkspaceId): Promise<EstadoDoWizard | null>
+  /** Registra a resposta do PI (ou a delegação). Contradição volta sem gravar. */
+  responderRefinamento(
+    projectId: string,
+    resposta: Resposta,
+    workspace: WorkspaceId
+  ): Promise<RespostaOutcome>
+  /** O histórico completo, com as substituídas — a trilha de quem decidiu o quê. */
+  historicoDoRefinamento(projectId: string, workspace: WorkspaceId): Promise<readonly Decision[]>
   publicarNoGitHub(
     projectId: string,
     alvo: AlvoDaPublicacao,
