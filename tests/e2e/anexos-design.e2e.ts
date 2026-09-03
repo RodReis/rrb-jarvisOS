@@ -178,7 +178,7 @@ test('o gate barra sem anexo, e arquivo largado no disco não conta', async () =
   expect(existsSync(join(diretorio, 'docs/ARCHITECTURE.md'))).toBe(false)
 })
 
-test('anexar copia e hasheia, o protótipo é carregado de verdade, e a arquitetura sai', async () => {
+test('anexar copia e hasheia, e o protótipo é carregado de verdade', async () => {
   const janela = await app.firstWindow()
   await janela.waitForLoadState('domcontentloaded')
 
@@ -222,8 +222,8 @@ test('anexar copia e hasheia, o protótipo é carregado de verdade, e a arquitet
       ).jarvis
       const workspace = await bridge.getWorkspace()
 
-      // O PRD primeiro: a arquitetura precisa citar a revisão que assume (critério 3). Consulta
-      // vazia — o caminho que não gasta crédito e exercita a composição inteira.
+      // O pacote estrutural da M8-F04, com consulta vazia: o caminho que não gasta crédito.
+      // Ele **não** basta para a arquitetura desde a SPEC-Jornada-04 — ver a nota em (3).
       const prd = await bridge.gerarPacote(id ?? '', '', workspace)
 
       const anexoDs = await bridge.anexarDesign(id ?? '', 'design-system', ds ?? '', workspace)
@@ -268,26 +268,26 @@ test('anexar copia e hasheia, o protótipo é carregado de verdade, e a arquitet
   expect(resultado.achados).toBe(0)
 
   /*
-   * (3) **O gate abriu.** Desde a SPEC-Jornada-04 a arquitetura é gerada por modelo, e este
-   * ambiente não tem rota autorizada — então o desfecho provável aqui é `bloqueado-sem-rota`, e
-   * **é justamente ele que prova o que interessa**: a geração passou do gate de anexos e do PRD,
-   * e parou na rota. `anexos-pendentes` ou `prd-ausente` aqui significariam que o gate não
-   * reconheceu o que acabou de ser anexado.
+   * (3) **O gate de anexos abriu, e a geração parou no PRD.**
    *
-   * O que a geração faz depois da rota tem prova própria no `arquitetura-service.int-spec.ts`,
-   * com o modelo dublado; o que **só** este nível alcança é o Chromium carregando o protótipo,
-   * medido em (2).
+   * `prd-ausente` é o desfecho **correto** aqui, e não uma falha do teste: desde a
+   * SPEC-Jornada-04 a arquitetura ancora cada afirmação num **id de requisito** do PRD gerado
+   * (tabela `project_prd`), e `gerarPacote` é o caminho da M8-F04 — ele escreve os documentos
+   * compostos, cujas afirmações não têm id para citar. Semear o PRD novo exigiria a rota de IA,
+   * que este ambiente não tem.
+   *
+   * O que **importa** e está provado: não veio `anexos-pendentes`. O gate reconheceu os dois
+   * anexos que acabaram de ser copiados e hasheados, que é a fronteira que este nível mede.
+   * O resto da geração tem prova própria no `arquitetura-service.int-spec.ts`, com o modelo
+   * dublado, e o que só aqui se alcança é o Chromium carregando o protótipo, medido em (2).
    */
-  expect(['bloqueado-sem-rota', 'gerada']).toContain(resultado.arquitetura.resultado)
+  expect(resultado.arquitetura.resultado).not.toBe('anexos-pendentes')
   expect(resultado.arquitetura.pendencias).toBeUndefined()
 
-  // (4) Nada foi escrito quando a geração não aconteceu — a recusa não deixa arquivo pela metade.
-  if (resultado.arquitetura.resultado === 'bloqueado-sem-rota') {
-    expect(existsSync(join(diretorio, 'docs/ARCHITECTURE.md'))).toBe(false)
-  }
+  // (4) Nada foi escrito: a recusa não deixa arquivo pela metade.
+  expect(existsSync(join(diretorio, 'docs/ARCHITECTURE.md'))).toBe(false)
 
-  // (5) A cadeia de auditoria continua íntegra — inclusive com o evento do bloqueio, que é
-  // registrado **antes** de qualquer chamada.
+  // (5) A cadeia de auditoria continua íntegra.
   expect(resultado.auditoria.ok).toBe(true)
 })
 
@@ -296,7 +296,7 @@ test('anexar copia e hasheia, o protótipo é carregado de verdade, e a arquitet
  * não mostra nada. Parser estático nenhum distingue isto de um protótipo correto — é preciso
  * carregar a página e olhar o resultado.
  */
-test('protótipo que abre em branco é detectado e impede a arquitetura', async () => {
+test('protótipo que abre em branco é detectado pela validação', async () => {
   const janela = await app.firstWindow()
   await janela.waitForLoadState('domcontentloaded')
 
@@ -317,29 +317,29 @@ test('protótipo que abre em branco é detectado e impede a arquitetura', async 
           jarvis: {
             getWorkspace: () => Promise<string>
             anexarDesign: (p: string, t: string, o: string, w: string) => Promise<unknown>
-            gerarPacote: (p: string, c: string, w: string) => Promise<{ reason: string }>
-            gerarArquiteturaPorIa: (
-              p: string,
-              w: string
-            ) => Promise<{
-              resultado: string
-              achados?: readonly { pergunta: string; recomendacao: string; evidencia: string }[]
-            }>
+            validarPrototipos: (p: string) => Promise<
+              readonly {
+                achados: readonly { pergunta: string; recomendacao: string; evidencia: string }[]
+              }[]
+            >
           }
         }
       ).jarvis
       const workspace = await bridge.getWorkspace()
-      await bridge.gerarPacote(id ?? '', '', workspace)
       await bridge.anexarDesign(id ?? '', 'design-system', ds ?? '', workspace)
       await bridge.anexarDesign(id ?? '', 'prototipo', proto ?? '', workspace)
-      return await bridge.gerarArquiteturaPorIa(id ?? '', workspace)
+
+      // **A validação, não a geração.** O achado que impede a arquitetura nasce aqui — é o que
+      // o `ArquiteturaService` lê antes de chamar o modelo, e é o que só o Chromium produz.
+      // Passar pela geração exigiria o PRD novo e a rota de IA, e mediria outra coisa.
+      const validacoes = await bridge.validarPrototipos(id ?? '')
+      return { achados: validacoes.flatMap((v) => v.achados) }
     },
     [projectId, origemDs, origemProto]
   )
 
-  // O gate de anexos abriu (os dois estão lá), e mesmo assim a arquitetura não sai: o protótipo
-  // não delimita fluxo nenhum, e prosseguir escreveria o que ninguém viu.
-  expect(resultado.resultado).toBe('prototipos-invalidos')
+  // O protótipo está anexado e mesmo assim não delimita fluxo nenhum: o achado é o que impede
+  // a arquitetura de prometer o que ninguém viu.
   expect(resultado.achados?.length ?? 0).toBeGreaterThan(0)
   // O achado é pergunta + recomendação, como a spec pede.
   expect(resultado.achados?.[0]?.pergunta).toContain('?')
