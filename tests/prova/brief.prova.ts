@@ -166,6 +166,29 @@ test.describe('a etapa do prompt', () => {
     await expect(page.locator('input')).toHaveCount(0)
   })
 
+  /*
+   * Os exemplos existem para resolver a página em branco — o campo vazio chega quando o PI tem
+   * menos ideia do que escrever. Mas eles são para **ler**: um cartão que preenchesse o campo
+   * faria o PI partir do texto da IA em vez do problema dele, e é contra isso que a decisão de
+   * "um campo, e nada mais" existe. O teste trava a fronteira entre ajudar e preencher.
+   */
+  test('os exemplos são para ler, não para clicar', async ({ page }) => {
+    await abrir(page, 'prompt-vazio', 'dark')
+
+    const exemplo = page.getByText(/Organiza minhas leituras/)
+    await expect(exemplo).toBeVisible()
+
+    // Nenhum ancestral clicável: o exemplo não é botão, link nem alvo de clique.
+    const clicavel = await exemplo.evaluate(
+      (el) => el.closest('button, a, [role="button"], [onclick]') !== null
+    )
+    expect(clicavel).toBe(false)
+
+    // E o campo continua vazio depois de clicar nele — nada preenche por engano.
+    await exemplo.click()
+    await expect(page.locator('textarea')).toHaveValue('')
+  })
+
   test('o campo tem altura para um parágrafo, não para uma linha', async ({ page }) => {
     await abrir(page, 'prompt-vazio', 'dark')
 
