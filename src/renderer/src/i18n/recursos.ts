@@ -110,6 +110,14 @@ export const RECURSOS = {
         abrir: 'Abrir {{nome}}',
         voltar: 'Voltar aos projetos'
       },
+      rota: {
+        // Qual rota a geração vai usar. Dito **antes** do clique: gerar gasta uma chamada, e na
+        // rota paga gasta dinheiro — descobrir isso depois é tarde.
+        viaAssinatura: 'Via assinatura Claude',
+        viaPaga: 'Via rota paga',
+        pagaTitulo: 'Esta geração usa a rota paga',
+        pagaDescricao: 'A chamada é cobrada no provedor configurado para este workspace.'
+      },
       prompt: {
         titulo: 'O prompt do projeto',
         // Diz o que fazer e o que acontece depois. O PI escreve melhor sabendo que o texto vira
@@ -184,6 +192,8 @@ export const RECURSOS = {
         // O número diz ao PI se ele começa agora ou depois. Um botão sem essa conta pediria
         // um compromisso de duração desconhecida.
         restantes: '{{count}} decisões pendentes.',
+        // Diz **qual** é a próxima decisão. O número sozinho pede um compromisso às cegas.
+        aSeguir: 'A próxima',
         concluido: 'Todas as perguntas foram respondidas.',
         semRota: 'A geração está indisponível',
         naoGerou: 'As perguntas não foram geradas',
@@ -558,6 +568,12 @@ export const RECURSOS = {
         abrir: 'Open {{nome}}',
         voltar: 'Back to projects'
       },
+      rota: {
+        viaAssinatura: 'Via Claude subscription',
+        viaPaga: 'Via paid route',
+        pagaTitulo: 'This generation uses the paid route',
+        pagaDescricao: 'The call is billed to the provider configured for this workspace.'
+      },
       prompt: {
         titulo: 'The project prompt',
         descricao: 'Describe {{nome}} as you would to a person. The AI will ask what is missing.',
@@ -621,6 +637,7 @@ export const RECURSOS = {
         gerarMais: 'Look for what is still missing',
         responder: 'Answer the next one',
         restantes: '{{count}} decisions pending.',
+        aSeguir: 'Up next',
         concluido: 'All questions have been answered.',
         semRota: 'Generation is unavailable',
         naoGerou: 'The questions were not generated',

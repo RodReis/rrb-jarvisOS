@@ -6,6 +6,7 @@ import type { EstadoDoWizard } from '@shared/domain/wizard'
 import type { ResultadoDaRota } from '@shared/domain/rota-de-geracao'
 import { Button, InlineAlert, LoadingState } from '@design/ui'
 import { log } from '../lib/log'
+import { AvisoDaRotaPaga, SeloDaRota } from './RotaDaGeracao'
 
 /**
  * A etapa do refinamento (SPEC-Jornada-02, § Refinamento).
@@ -133,6 +134,8 @@ export function RefinamentoDoProjeto({
         </InlineAlert>
       )}
 
+      <AvisoDaRotaPaga rota={rota} />
+
       {erro !== null && (
         <InlineAlert tom="err" titulo={t('refinamento.naoGerou')}>
           {erro}
@@ -145,9 +148,26 @@ export function RefinamentoDoProjeto({
         de duração desconhecida.
       */}
       {temPergunta && estado.tipo === 'pergunta' && (
-        <p className="text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto)]">
-          {t('refinamento.restantes', { count: estado.restantes })}
-        </p>
+        <div className="flex flex-col gap-1.5">
+          <p className="text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto)]">
+            {t('refinamento.restantes', { count: estado.restantes })}
+          </p>
+
+          {/*
+            **Qual** é a próxima decisão, e não só quantas faltam. O número sozinho pede um
+            compromisso às cegas: o PI clicava sem saber se o pop-up ia perguntar sobre stack,
+            prazo ou público. O estado já carregava a pergunta inteira — a tela só não a usava.
+
+            O enunciado fica de fora de propósito: quem pergunta é o pop-up, uma decisão por vez.
+            Aqui vai o assunto, que é o que decide entre "começo agora" e "começo depois".
+          */}
+          <p className="flex flex-wrap items-baseline gap-x-2 text-[length:var(--jos-texto-micro)]">
+            <span className="font-[family-name:var(--jos-fonte-mono)] uppercase tracking-[2px] text-[var(--jos-cor-texto-suave)]">
+              {t('refinamento.aSeguir')}
+            </span>
+            <span className="text-[var(--jos-cor-texto-secundario)]">{estado.pergunta.titulo}</span>
+          </p>
+        </div>
       )}
 
       {concluido && (
@@ -169,15 +189,21 @@ export function RefinamentoDoProjeto({
           /* Gerar só quando não há pergunta pendente: com uma na fila, o próximo passo é
              respondê-la, e oferecer "gerar mais" convidaria a acumular perguntas sem responder
              nenhuma. */
-          <Button
-            variante="primaria"
-            onClick={() => void gerar()}
-            desabilitado={ocupado || bloqueado}
-            carregando={ocupado}
-            iconeInicial={<Sparkles aria-hidden="true" className="size-4" />}
-          >
-            {concluido ? t('refinamento.gerarMais') : t('refinamento.gerar')}
-          </Button>
+          <>
+            <Button
+              variante="primaria"
+              onClick={() => void gerar()}
+              desabilitado={ocupado || bloqueado}
+              carregando={ocupado}
+              iconeInicial={<Sparkles aria-hidden="true" className="size-4" />}
+            >
+              {concluido ? t('refinamento.gerarMais') : t('refinamento.gerar')}
+            </Button>
+
+            {/* Por onde a geração sai. Só acompanha o botão que gera — "responder a próxima"
+                não chama o modelo, e um selo ali anunciaria um custo que não existe. */}
+            <SeloDaRota rota={rota} />
+          </>
         )}
       </div>
     </div>

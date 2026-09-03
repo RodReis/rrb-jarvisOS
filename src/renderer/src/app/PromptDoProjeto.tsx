@@ -5,6 +5,7 @@ import type { WorkspaceId } from '@shared/domain/entities'
 import type { ResultadoDaRota } from '@shared/domain/rota-de-geracao'
 import { Button, Field, InlineAlert, LoadingState, Textarea } from '@design/ui'
 import { log } from '../lib/log'
+import { AvisoDaRotaPaga, SeloDaRota } from './RotaDaGeracao'
 
 /**
  * A etapa do prompt (SPEC-Jornada-02, critério 1).
@@ -121,6 +122,8 @@ export function PromptDoProjeto({
         </InlineAlert>
       )}
 
+      <AvisoDaRotaPaga rota={rota} />
+
       {erro !== null && (
         <InlineAlert tom="err" titulo={t('prompt.naoGerou')}>
           {erro}
@@ -192,10 +195,14 @@ export function PromptDoProjeto({
 
         {/* Diz **por que** o botão está desabilitado. Um alvo morto sem explicação faz o PI
             procurar o defeito na própria escrita. */}
-        {vazio && !bloqueado && (
+        {vazio && !bloqueado ? (
           <span className="text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-suave)]">
             {t('prompt.escrevaAlgo')}
           </span>
+        ) : (
+          // Por onde a geração sai. Só aparece quando o botão de fato gera: com o campo vazio,
+          // o que o PI precisa saber é o que falta, não a rota.
+          <SeloDaRota rota={rota} />
         )}
       </div>
     </div>

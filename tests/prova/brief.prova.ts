@@ -197,3 +197,34 @@ test.describe('a etapa do prompt', () => {
     expect(caixa!.height).toBeGreaterThan(150)
   })
 })
+
+/*
+ * Por onde a geração sai, dito **antes** do clique (decisão do PI, 2026-09-03).
+ *
+ * As telas mostravam o bloqueio quando **não havia** rota, mas ficavam mudas quando havia: o PI
+ * clicava sem saber se aquilo consumia a assinatura dele ou o provedor pago do workspace. As
+ * duas rotas não são o mesmo fato — uma gasta dinheiro —, e a forma acompanha o peso.
+ */
+test.describe('a rota é dita antes do clique', () => {
+  test('assinatura é uma linha, não um alerta', async ({ page }) => {
+    await abrir(page, 'refinamento-vazio', 'dark')
+
+    await expect(page.locator('[data-jos-rota="assinatura"]')).toBeVisible()
+    // Alerta que aparece sempre para de ser lido: o caso normal não grita.
+    await expect(page.getByRole('alert')).toHaveCount(0)
+  })
+
+  test('a rota paga vira alerta, porque o clique passa a custar', async ({ page }) => {
+    await abrir(page, 'refinamento-rota-paga', 'dark')
+
+    await expect(page.getByText('Esta geração usa a rota paga')).toBeVisible()
+    await expect(page.locator('[data-jos-rota="paga"]')).toBeVisible()
+  })
+
+  test('bloqueada, nenhum selo anuncia rota — o botão não gera', async ({ page }) => {
+    await abrir(page, 'prompt-bloqueado', 'dark')
+
+    // Anunciar por onde a geração sairia descreveria algo que não vai acontecer.
+    await expect(page.locator('[data-jos-rota]')).toHaveCount(0)
+  })
+})
