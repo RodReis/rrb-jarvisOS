@@ -12,6 +12,7 @@
  */
 
 import type { AiUsage } from '@shared/domain/ai'
+import type { GenerationEvent } from '@shared/domain/geracao'
 
 /** O que o adapter recebe. Já resolvido: modelo escolhido, teto definido, credencial em mãos. */
 export interface AdapterRequest {
@@ -35,6 +36,20 @@ export interface AdapterRequest {
   readonly timeoutMs: number
   /** Aborta o stream (timeout, ou o usuário fechando a tela). */
   readonly signal?: AbortSignal
+  /**
+   * Onde o adapter deposita os eventos do **console da geração** (SPEC-Fases-03).
+   *
+   * Callback e não um terceiro caso de `AdapterChunk`: o console é um **consumidor a mais**, não
+   * um caminho novo. Acrescentar `ferramenta-inicio` à união obrigaria todo consumidor do stream
+   * — inclusive os que só querem o texto — a tratar um caso que não lhes diz respeito, e o texto
+   * final continua sendo montado dos chunks como sempre foi.
+   *
+   * Opcional porque a maioria das chamadas não tem console (o painel de teste do Settings, os
+   * usos internos). Ausente, o adapter não gasta trabalho nenhum produzindo evento que ninguém
+   * lê. **Nunca lança** de volta para o adapter — quem o fornece é quem trata as próprias falhas,
+   * porque uma exceção do consumidor derrubaria a geração que ele apenas observa.
+   */
+  readonly onEvento?: (evento: GenerationEvent) => void
 }
 
 /**

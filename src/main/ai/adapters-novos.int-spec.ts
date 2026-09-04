@@ -15,6 +15,7 @@ import type { AddressInfo } from 'node:net'
 import { spawn } from 'node:child_process'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { AdapterChunk } from './adapter'
+import type { GenerationEvent } from '@shared/domain/geracao'
 import { AdapterError } from './anthropic-adapter'
 import { GeminiAdapter, extrairEventos } from './gemini-adapter'
 import { OllamaAdapter, extrairLinhas } from './ollama-adapter'
@@ -320,10 +321,38 @@ describe('Claude Code CLI — subprocess app-managed (critério 2)', () => {
     return new ClaudeCodeAdapter(process.cwd(), spawnDuble)
   }
 
-  it('emite o texto do stdout em chunks e fecha com usage aproximado', async () => {
+  /** Uma linha de `assistant` com texto, no formato que o CLI emite em `stream-json`. */
+  const linhaDeTexto = (texto: string): string =>
+    JSON.stringify({
+      type: 'assistant',
+      message: { role: 'assistant', content: [{ type: 'text', text: texto }] }
+    })
+
+  /** O `result` final, com o `usage` que o CLI mede. */
+  const linhaDeResult = (entrada: number, saida: number): string =>
+    JSON.stringify({
+      type: 'result',
+      subtype: 'success',
+      duration_api_ms: 1234,
+      usage: { input_tokens: entrada, output_tokens: saida }
+    })
+
+  /** Um script Node que despeja as linhas dadas no stdout como NDJSON. */
+  const scriptQueEmite = (...linhas: readonly string[]): string =>
+    `process.stdin.on("data",()=>{});${linhas
+      .map((l) => `process.stdout.write(${JSON.stringify(l + '\n')});`)
+      .join('')}process.exit(0)`
+
+  const juntarTexto = (chunks: readonly AdapterChunk[]): string =>
+    chunks
+      .filter((c) => c.tipo === 'texto')
+      .map((c) => (c.tipo === 'texto' ? c.texto : ''))
+      .join('')
+
+  it('monta o texto a partir das linhas de stream-json e fecha com o usage medido', async () => {
     const chunks = await coletar(
       comBinarioDuble(
-        'process.stdin.on("data",()=>{});process.stdout.write("Paris");process.stdout.write(" é a capital.");process.exit(0)'
+        scriptQueEmite(linhaDeTexto('Paris'), linhaDeTexto(' é a capital.'), linhaDeResult(7, 11))
       ).generateStream({
         model: 'claude-opus-5',
         prompt: 'qual a capital da França',
@@ -332,17 +361,153 @@ describe('Claude Code CLI — subprocess app-managed (critério 2)', () => {
       })
     )
 
-    const texto = chunks
-      .filter((c) => c.tipo === 'texto')
-      .map((c) => (c.tipo === 'texto' ? c.texto : ''))
-      .join('')
+    expect(juntarTexto(chunks)).toBe('Paris é a capital.')
 
-    expect(texto).toBe('Paris é a capital.')
     const fim = chunks.at(-1)
     expect(fim?.tipo).toBe('fim')
-    // Aproximado (~4 caracteres por token) porque o CLI não reporta `usage`. É aceitável
-    // **porque** a rota é `unmetered` e nenhuma decisão de orçamento consome este número.
+    // Medido, não aproximado: com `stream-json` o CLI reporta `usage` no `result`, e o número
+    // do ledger deixa de ser a divisão por `CARACTERES_POR_TOKEN`.
+    expect(fim?.tipo === 'fim' ? fim.usage : undefined).toEqual({
+      tokensEntrada: 7,
+      tokensSaida: 11
+    })
+  })
+
+  it('cai na aproximação quando o CLI não reporta usage', async () => {
+    // Versão antiga do CLI, ou stream cortado antes do `result`. O número fica pior, mas existe
+    // — e a rota é `unmetered`, então nenhuma decisão de orçamento o consome.
+    const chunks = await coletar(
+      comBinarioDuble(scriptQueEmite(linhaDeTexto('resposta sem result'))).generateStream({
+        model: 'claude-opus-5',
+        prompt: 'oi',
+        maxTokens: 100,
+        timeoutMs: 5_000
+      })
+    )
+
+    const fim = chunks.at(-1)
     expect(fim?.tipo === 'fim' ? fim.usage.tokensSaida : 0).toBeGreaterThan(0)
+  })
+
+  it('lê a última linha mesmo sem quebra de linha no fim', async () => {
+    // O `result` é a última coisa que o CLI escreve, e ele pode não terminar em '\n'. Descartar
+    // o resto do buffer perderia justamente o `usage`.
+    const chunks = await coletar(
+      comBinarioDuble(
+        `process.stdin.on("data",()=>{});process.stdout.write(${JSON.stringify(
+          linhaDeTexto('oi') + '\n' + linhaDeResult(3, 5)
+        )});process.exit(0)`
+      ).generateStream({
+        model: 'claude-opus-5',
+        prompt: 'oi',
+        maxTokens: 100,
+        timeoutMs: 5_000
+      })
+    )
+
+    expect(juntarTexto(chunks)).toBe('oi')
+    const fim = chunks.at(-1)
+    expect(fim?.tipo === 'fim' ? fim.usage : undefined).toEqual({
+      tokensEntrada: 3,
+      tokensSaida: 5
+    })
+  })
+
+  it('entrega ferramentas e uso ao console, na ordem em que o CLI as emitiu (critério 1)', async () => {
+    const eventos: GenerationEvent[] = []
+
+    const chunks = await coletar(
+      comBinarioDuble(
+        scriptQueEmite(
+          linhaDeTexto('vou ler o arquivo'),
+          JSON.stringify({
+            type: 'assistant',
+            message: {
+              role: 'assistant',
+              content: [
+                { type: 'tool_use', id: 'toolu_1', name: 'Read', input: { file_path: '/tmp/a.ts' } }
+              ]
+            }
+          }),
+          JSON.stringify({
+            type: 'user',
+            message: {
+              role: 'user',
+              content: [{ tool_use_id: 'toolu_1', type: 'tool_result', content: 'conteúdo' }]
+            }
+          }),
+          linhaDeTexto(' pronto'),
+          linhaDeResult(10, 20)
+        )
+      ).generateStream({
+        model: 'claude-opus-5',
+        prompt: 'leia o arquivo',
+        maxTokens: 100,
+        timeoutMs: 5_000,
+        onEvento: (evento) => eventos.push(evento)
+      })
+    )
+
+    expect(eventos.map((e) => e.tipo)).toEqual([
+      'texto',
+      'ferramenta-inicio',
+      'ferramenta-fim',
+      'texto',
+      'uso'
+    ])
+    expect(eventos[1]).toEqual({
+      tipo: 'ferramenta-inicio',
+      chamadaId: 'toolu_1',
+      nome: 'Read',
+      resumoDoArgumento: '/tmp/a.ts'
+    })
+    // O texto do documento continua igual — o console é um consumidor a mais, não um caminho novo.
+    expect(juntarTexto(chunks)).toBe('vou ler o arquivo pronto')
+  })
+
+  it('linha corrompida vira erro de parser e o texto continua chegando (critério 5)', async () => {
+    const eventos: GenerationEvent[] = []
+
+    const chunks = await coletar(
+      comBinarioDuble(
+        scriptQueEmite(
+          linhaDeTexto('antes'),
+          '{"type":"assistant","message":{"content":[{"type":"tex',
+          linhaDeTexto(' depois'),
+          linhaDeResult(1, 2)
+        )
+      ).generateStream({
+        model: 'claude-opus-5',
+        prompt: 'oi',
+        maxTokens: 100,
+        timeoutMs: 5_000,
+        onEvento: (evento) => eventos.push(evento)
+      })
+    )
+
+    expect(eventos.some((e) => e.tipo === 'erro')).toBe(true)
+    // O documento é o produto; o console é evidência. O parser falha aberto para o texto.
+    expect(juntarTexto(chunks)).toBe('antes depois')
+  })
+
+  it('falha do console não derruba a geração', async () => {
+    // Quem passa `onEvento` escreve no banco. Disco cheio ali não pode matar a geração que o
+    // console apenas observa — seria a inversão que a spec proíbe.
+    const chunks = await coletar(
+      comBinarioDuble(
+        scriptQueEmite(linhaDeTexto('resiste'), linhaDeResult(1, 2))
+      ).generateStream({
+        model: 'claude-opus-5',
+        prompt: 'oi',
+        maxTokens: 100,
+        timeoutMs: 5_000,
+        onEvento: () => {
+          throw new Error('banco travado')
+        }
+      })
+    )
+
+    expect(juntarTexto(chunks)).toBe('resiste')
   })
 
   it('o prompt chega por stdin, não como argumento', async () => {
@@ -350,7 +515,7 @@ describe('Claude Code CLI — subprocess app-managed (critério 2)', () => {
     // de linha de comando do SO com prompt longo.
     const chunks = await coletar(
       comBinarioDuble(
-        'let d="";process.stdin.on("data",c=>d+=c);process.stdin.on("end",()=>{process.stdout.write("recebi:"+d);process.exit(0)})'
+        'let d="";process.stdin.on("data",c=>d+=c);process.stdin.on("end",()=>{process.stdout.write(JSON.stringify({type:"assistant",message:{role:"assistant",content:[{type:"text",text:"recebi:"+d}]}})+"\\n");process.exit(0)})'
       ).generateStream({
         model: 'claude-opus-5',
         prompt: 'texto-do-prompt',
@@ -359,12 +524,38 @@ describe('Claude Code CLI — subprocess app-managed (critério 2)', () => {
       })
     )
 
-    const texto = chunks
-      .filter((c) => c.tipo === 'texto')
-      .map((c) => (c.tipo === 'texto' ? c.texto : ''))
-      .join('')
+    expect(juntarTexto(chunks)).toBe('recebi:texto-do-prompt')
+  })
 
-    expect(texto).toBe('recebi:texto-do-prompt')
+  it('pede stream-json e verbose ao CLI', async () => {
+    // `--verbose` não é enfeite: sem ele o CLI recusa `stream-json` junto com `--print`.
+    let argsRecebidos: readonly string[] = []
+    const adapter = new ClaudeCodeAdapter(process.cwd(), ((
+      _binario: string,
+      args: readonly string[],
+      opcoes: object
+    ) => {
+      argsRecebidos = args
+      return spawn(process.execPath, ['-e', scriptQueEmite(linhaDeResult(1, 1))], opcoes)
+    }) as typeof spawn)
+
+    await coletar(
+      adapter.generateStream({
+        model: 'claude-opus-5',
+        prompt: 'oi',
+        maxTokens: 10,
+        timeoutMs: 5_000
+      })
+    )
+
+    expect(argsRecebidos).toEqual([
+      '--print',
+      '--model',
+      'claude-opus-5',
+      '--output-format',
+      'stream-json',
+      '--verbose'
+    ])
   })
 
   it('processo pendurado é morto pelo timeout (critério 2)', async () => {
@@ -464,7 +655,7 @@ describe('Claude Code CLI — subprocess app-managed (critério 2)', () => {
     try {
       const chunks = await coletar(
         comBinarioDuble(
-          'process.stdin.on("data",()=>{});process.stdout.write(String(process.env.SEGREDO_DO_MAIN));process.exit(0)'
+          'process.stdin.on("data",()=>{});process.stdout.write(JSON.stringify({type:"assistant",message:{role:"assistant",content:[{type:"text",text:String(process.env.SEGREDO_DO_MAIN)}]}})+"\\n");process.exit(0)'
         ).generateStream({
           model: 'claude-opus-5',
           prompt: 'oi',
@@ -473,12 +664,7 @@ describe('Claude Code CLI — subprocess app-managed (critério 2)', () => {
         })
       )
 
-      const texto = chunks
-        .filter((c) => c.tipo === 'texto')
-        .map((c) => (c.tipo === 'texto' ? c.texto : ''))
-        .join('')
-
-      expect(texto).toBe('undefined')
+      expect(juntarTexto(chunks)).toBe('undefined')
     } finally {
       delete process.env.SEGREDO_DO_MAIN
     }

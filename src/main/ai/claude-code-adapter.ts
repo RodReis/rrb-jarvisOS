@@ -28,6 +28,8 @@ import { spawn } from 'node:child_process'
 import type { AdapterChunk, AdapterRequest, AiAdapter } from './adapter'
 import { AdapterError } from './anthropic-adapter'
 import { ambienteControlado } from '../execution/terminal-engine'
+import { extrairLinhas, parsearLinha } from './stream-json-parser'
+import type { GenerationEvent } from '@shared/domain/geracao'
 
 /**
  * O binário, **pinado**. Constante e não configuração: o dia em que este nome vier de fora é o
@@ -101,7 +103,11 @@ export class ClaudeCodeAdapter implements AiAdapter {
       BINARIO,
       // Args fixos e montados aqui — nada vem de entrada do usuário além do **modelo**, que é
       // validado contra a tabela de preço antes de chegar ao adapter. O prompt vai por stdin.
-      ['--print', '--model', request.model],
+      //
+      // `stream-json` + `verbose` (SPEC-Fases-03 § Adapter): é o formato que traz as ferramentas
+      // e o `usage` medido. `--verbose` não é opcional — sem ele o CLI recusa `stream-json` com
+      // `--print`. O texto continua saindo igual; o que muda é que agora ele vem etiquetado.
+      ['--print', '--model', request.model, '--output-format', 'stream-json', '--verbose'],
       {
         cwd: this.cwd,
         env: ambienteControlado(),
@@ -141,6 +147,10 @@ export class ClaudeCodeAdapter implements AiAdapter {
     let falha: string | undefined
     let saidaDeErro = ''
     let caracteresEmitidos = 0
+    /** O `usage` que o CLI **mediu**, quando ele chega. Ver `CARACTERES_POR_TOKEN`. */
+    let usoMedido: { tokensEntrada: number; tokensSaida: number } | undefined
+    /** O pedaço de linha que ainda não fechou entre dois `data` do stdout. */
+    let resto = ''
 
     const empurrar = (texto: string): void => {
       fila.push(texto)
@@ -148,7 +158,44 @@ export class ClaudeCodeAdapter implements AiAdapter {
       acordar = undefined
     }
 
-    processo.stdout?.on('data', (pedaco: Buffer) => empurrar(pedaco.toString('utf8')))
+    /**
+     * Entrega o evento ao console **sem deixar o console derrubar a geração**.
+     *
+     * O `try/catch` não é paranoia: quem passa `onEvento` é o ponto único, que dele escreve no
+     * banco em lote. Um erro de escrita ali (disco cheio, banco travado) chegaria aqui como
+     * exceção no meio do `for await` do stdout e mataria a geração — que é exatamente a inversão
+     * que a spec proíbe: o documento é o produto, o console é evidência.
+     */
+    const publicar = (evento: GenerationEvent): void => {
+      try {
+        request.onEvento?.(evento)
+      } catch {
+        // O console falhou. A geração, não.
+      }
+    }
+
+    processo.stdout?.on('data', (pedaco: Buffer) => {
+      const extracao = extrairLinhas(resto + pedaco.toString('utf8'))
+      resto = extracao.resto
+
+      for (const linha of extracao.linhas) {
+        for (const evento of parsearLinha(linha)) {
+          publicar(evento)
+
+          // O texto do documento sai **daqui**, dos eventos de texto — é o mesmo conteúdo de
+          // antes, agora desembrulhado do JSON em vez de repassado cru. Sem isto, o `--print`
+          // com `stream-json` faria o documento nascer como um despejo de NDJSON.
+          if (evento.tipo === 'texto') empurrar(evento.delta)
+
+          // O CLI **reporta** `usage` no `result`. Preferir o número medido à aproximação é o
+          // ganho de graça desta fatia: `CARACTERES_POR_TOKEN` deixa de ser o que vai ao ledger
+          // sempre que o CLI disser o número de verdade.
+          if (evento.tipo === 'uso') {
+            usoMedido = { tokensEntrada: evento.tokensEntrada, tokensSaida: evento.tokensSaida }
+          }
+        }
+      }
+    })
     // O stderr é acumulado, não emitido: é diagnóstico, não resposta. Emiti-lo como texto
     // misturaria aviso do CLI com o conteúdo que o usuário pediu.
     processo.stderr?.on('data', (pedaco: Buffer) => {
@@ -167,6 +214,19 @@ export class ClaudeCodeAdapter implements AiAdapter {
     })
 
     processo.on('close', (codigo, sinal) => {
+      // A última linha pode não ter terminado em '\n'. Descartá-la perderia justamente o
+      // `result` — a linha que carrega o `usage` medido, que o CLI emite por último.
+      if (resto.trim() !== '') {
+        for (const evento of parsearLinha(resto)) {
+          publicar(evento)
+          if (evento.tipo === 'texto') fila.push(evento.delta)
+          if (evento.tipo === 'uso') {
+            usoMedido = { tokensEntrada: evento.tokensEntrada, tokensSaida: evento.tokensSaida }
+          }
+        }
+        resto = ''
+      }
+
       if (sinal === 'SIGKILL' && falha === undefined) {
         falha = 'A chamada ao Claude Code CLI excedeu o tempo limite ou foi interrompida.'
       } else if (codigo !== 0 && falha === undefined) {
@@ -199,11 +259,12 @@ export class ClaudeCodeAdapter implements AiAdapter {
         throw new AdapterError(falha, saidaDeErro === '' ? undefined : new Error('stderr'))
       }
 
-      // `usage` aproximado — o CLI não o reporta. Ver o comentário de `CARACTERES_POR_TOKEN`:
-      // é aceitável **porque** a rota é `unmetered` e nenhuma decisão de orçamento o consome.
+      // O `usage` **medido**, quando o CLI o reportou no `result`; a aproximação só cobre o
+      // caso em que ele não chegou (versão antiga do CLI, ou stream cortado antes do fim).
+      // Ver o comentário de `CARACTERES_POR_TOKEN` para por que aproximar é aceitável aqui.
       yield {
         tipo: 'fim',
-        usage: {
+        usage: usoMedido ?? {
           tokensEntrada: Math.ceil(request.prompt.length / CARACTERES_POR_TOKEN),
           tokensSaida: Math.ceil(caracteresEmitidos / CARACTERES_POR_TOKEN)
         }
