@@ -34,6 +34,12 @@ import type { ApprovalDecision, ApprovalRequest } from '@shared/domain/execution
 import type { CommandExecution, CommandSubmission } from '@shared/domain/terminal'
 import type { AiCallHandle, AiProvider, AiRequest, AiStreamEvent } from '@shared/domain/ai'
 import type { ProviderRoute, ProviderStatus, RoutingPolicy } from '@shared/domain/routing'
+import type { Fase } from '@shared/domain/fase'
+import type {
+  PhaseModelPolicy,
+  ProjectModelOverride,
+  RotaComModelo
+} from '@shared/domain/modelo-da-fase'
 import type {
   ConnectorCapability,
   ConnectorCredentialKey,
@@ -241,6 +247,33 @@ const bridge: JarvisBridge = {
     ipcRenderer.invoke(IPC_CHANNELS.routingGet, workspace),
   setRoute: (rota: ProviderRoute, workspace: WorkspaceId): Promise<RoutingPolicy> =>
     ipcRenderer.invoke(IPC_CHANNELS.routingSetRoute, rota, workspace),
+  getPhaseModels: (workspace: WorkspaceId): Promise<PhaseModelPolicy> =>
+    ipcRenderer.invoke(IPC_CHANNELS.phaseModelGet, workspace),
+  setPhaseModel: (
+    fase: Fase,
+    rota: RotaComModelo,
+    provider: AiProvider,
+    modelo: string,
+    workspace: WorkspaceId
+  ): Promise<PhaseModelPolicy | undefined> =>
+    ipcRenderer.invoke(IPC_CHANNELS.phaseModelSet, fase, rota, provider, modelo, workspace),
+  getPhaseModelOverrides: (
+    projectId: string,
+    workspace: WorkspaceId
+  ): Promise<readonly ProjectModelOverride[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.phaseModelOverrides, projectId, workspace),
+  setPhaseModelOverride: (
+    override: ProjectModelOverride,
+    workspace: WorkspaceId
+  ): Promise<ProjectModelOverride | undefined> =>
+    ipcRenderer.invoke(IPC_CHANNELS.phaseModelSetOverride, override, workspace),
+  clearPhaseModelOverride: (
+    projectId: string,
+    fase: Fase,
+    rota: RotaComModelo,
+    workspace: WorkspaceId
+  ): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.phaseModelClearOverride, projectId, fase, rota, workspace),
 
   listConnectorCapabilities: (): Promise<readonly ConnectorCapability[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.connectorsCapabilities),

@@ -34,6 +34,12 @@ import type { AiCallHandle, AiProvider, AiRequest, AiStreamEvent } from '../doma
 import type { ApprovalDecision, ApprovalRequest } from '../domain/execution'
 import type { BudgetLimitsInput, BudgetSnapshot } from '@shared/domain/budget'
 import type { ProviderRoute, ProviderStatus, RoutingPolicy } from '@shared/domain/routing'
+import type { Fase } from '@shared/domain/fase'
+import type {
+  PhaseModelPolicy,
+  ProjectModelOverride,
+  RotaComModelo
+} from '@shared/domain/modelo-da-fase'
 import type {
   ConnectorCapability,
   ConnectorCredentialKey,
@@ -226,6 +232,16 @@ export const IPC_CHANNELS = {
   providerSetModel: 'provider:set-model',
   routingGet: 'routing:get',
   routingSetRoute: 'routing:set-route',
+  /**
+   * Modelo por fase (SPEC-Fases-02). O renderer le a politica e os overrides, e **edita** os
+   * dois; quem resolve a heranca numa geracao e o `PhaseModelService`, no main. Nao ha canal
+   * que peca a resolucao: o renderer nao decide qual modelo gera.
+   */
+  phaseModelGet: 'phase-model:get',
+  phaseModelSet: 'phase-model:set',
+  phaseModelOverrides: 'phase-model:overrides',
+  phaseModelSetOverride: 'phase-model:set-override',
+  phaseModelClearOverride: 'phase-model:clear-override',
   /**
    * Conectores externos (SPEC-Conectores-01, critérios 5 e 6). **Dois canais nomeados, e
    * nenhum genérico**: `connectors:capabilities` lista o que os adapters registrados declaram
@@ -808,6 +824,43 @@ export interface JarvisBridge {
   getRouting(workspace: WorkspaceId): Promise<RoutingPolicy>
   /** Edita a rota de um tipo de tarefa e devolve o conjunto resultante. */
   setRoute(rota: ProviderRoute, workspace: WorkspaceId): Promise<RoutingPolicy>
+
+  /**
+   * O modelo de cada fase no workspace, com o padrao preenchendo o que nunca foi editado
+   * (SPEC-Fases-02, criterio 2).
+   */
+  getPhaseModels(workspace: WorkspaceId): Promise<PhaseModelPolicy>
+  /**
+   * Troca o modelo de uma fase no workspace e devolve a politica resultante.
+   *
+   * `undefined` quando o par nao existe no catalogo daquele provider — e nenhuma chamada sai
+   * (criterio 4). Devolver `undefined` em vez de lancar mantem a tela mostrando a politica que
+   * continua valendo.
+   */
+  setPhaseModel(
+    fase: Fase,
+    rota: RotaComModelo,
+    provider: AiProvider,
+    modelo: string,
+    workspace: WorkspaceId
+  ): Promise<PhaseModelPolicy | undefined>
+  /** Os overrides de um projeto — o que a tela marca como divergente do workspace. */
+  getPhaseModelOverrides(
+    projectId: string,
+    workspace: WorkspaceId
+  ): Promise<readonly ProjectModelOverride[]>
+  /** Grava o override do projeto. `undefined` quando o par nao existe no catalogo. */
+  setPhaseModelOverride(
+    override: ProjectModelOverride,
+    workspace: WorkspaceId
+  ): Promise<ProjectModelOverride | undefined>
+  /** "Voltar ao padrao do workspace". `false` quando nao havia override a remover. */
+  clearPhaseModelOverride(
+    projectId: string,
+    fase: Fase,
+    rota: RotaComModelo,
+    workspace: WorkspaceId
+  ): Promise<boolean>
 
   /**
    * Conectores externos (SPEC-Conectores-01, critério 5).
