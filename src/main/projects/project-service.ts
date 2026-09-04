@@ -37,7 +37,12 @@ import type {
   Project,
   ProjectOutcome
 } from '@shared/domain/projects'
-import { MENSAGEM_DO_MARCO, isNomeDeProjetoValido, slugificar } from '@shared/domain/projects'
+import {
+  MENSAGEM_DO_MARCO,
+  isNomeDeProjetoValido,
+  registraDecisaoSemArquivo,
+  slugificar
+} from '@shared/domain/projects'
 import { log } from '../logging/logger'
 import { canonicalize } from '../policy/allowlist-canon'
 import type { AllowlistRepository } from '../policy/allowlist-repository'
@@ -478,7 +483,20 @@ export class ProjectService {
       return this.falharMarco(userId, workspaceId, projectId, marco, adicionado.execucao)
     }
 
-    const commitado = this.git.run(['commit', '-m', mensagem], project.diretorio, workspaceId)
+    /*
+     * `--allow-empty` **só** para os marcos de decisão (correção #259): o aceite do brief e o do
+     * PRD não mudam arquivo — o documento já foi commitado quando foi gerado, e o que o aceite
+     * acrescenta é o registro de que o PI concordou. Sem a flag, dois aceites seguidos travariam
+     * a jornada com uma falha de Git que não descreve problema nenhum.
+     *
+     * Os outros cinco marcos continuam exigindo mudança: um commit vazio ali esconderia que a
+     * geração não produziu o documento que devia.
+     */
+    const argumentosDoCommit = registraDecisaoSemArquivo(marco)
+      ? ['commit', '--allow-empty', '-m', mensagem]
+      : ['commit', '-m', mensagem]
+
+    const commitado = this.git.run(argumentosDoCommit, project.diretorio, workspaceId)
     if (!commitado.ok) {
       return this.falharMarco(userId, workspaceId, projectId, marco, commitado.execucao)
     }

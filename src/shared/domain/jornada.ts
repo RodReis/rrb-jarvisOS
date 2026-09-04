@@ -137,7 +137,15 @@ export const RESULTADOS_DE_TRANSICAO = [
   'avancou',
   'evento-desconhecido',
   'evento-fora-de-ordem',
-  'aceite-ausente'
+  'aceite-ausente',
+  /**
+   * O aceite documental não pôde ser commitado (correção #259).
+   *
+   * Desfecho, não exceção: Git indisponível ou repositório travado é situação que o PI resolve
+   * e repete. Mover a etapa sem a evidência produziria o defeito que esta correção conserta —
+   * uma coluna adiante dos fatos, desfeita na leitura seguinte.
+   */
+  'marco-nao-commitado'
 ] as const
 
 export type ResultadoDeTransicao = (typeof RESULTADOS_DE_TRANSICAO)[number]

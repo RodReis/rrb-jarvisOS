@@ -509,7 +509,17 @@ if (!app.requestSingleInstanceLock()) {
       // O modelo que a próxima geração usaria — a **mesma** fonte que a geração consulta, e é o
       // que faz o card e o selo nunca discordarem (SPEC-Fases-01, critério 4).
       modeloAtivo: (workspace, provider) =>
-        routingRepo.modeloAtivo(userIdAtual(), workspace, provider)
+        routingRepo.modeloAtivo(userIdAtual(), workspace, provider),
+      /*
+       * O aceite documental deixa marco no Git (#259). Passa pelo `ProjectService` porque ele é
+       * o **único gatilho de commit** do produto (M8-F01) — um segundo caminho até o Git faria
+       * dois lugares decidirem o que entra no histórico do projeto.
+       *
+       * `commitado` é o que a jornada precisa saber: falha vira recusa da transição, e não uma
+       * etapa adiante de uma evidência que não existe.
+       */
+      concluirMarco: (projectId, marco, workspace) =>
+        projects.concluirMarco(projectId, marco, workspace)?.commitado ?? false
     })
 
     // O prompt e o brief refinado (SPEC-Jornada-02).

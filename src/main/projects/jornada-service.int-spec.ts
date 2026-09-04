@@ -520,3 +520,137 @@ describe('resumo do projeto para o card (SPEC-Fases-01)', () => {
     expect(servicoCom(ROTAS_OK).resumoDoProjeto('nao-existe', WS)).toBeUndefined()
   })
 })
+
+/**
+ * O aceite documental deixa marco (#259).
+ *
+ * O defeito que estes testes fecham: `brief-aceito` e `prd-aceito` moviam a coluna e **a leitura
+ * seguinte desfazia**, porque `eventosObservados` não tinha como vê-los — não há marco nem gate
+ * que os comprove. Na prática nenhum projeto passava de `prd-aceito`, e as fases Especificação e
+ * Construção eram inalcançáveis.
+ *
+ * A correção decidida pelo PI (2026-09-04) é dar **marco documental** aos dois, de modo que a
+ * evidência exista no Git como já existe para os outros cinco. Foram descartados o gate próprio
+ * em `aprovacoes.ts` (contraria a decisão da SPEC-Jornada-01 de manter três gates fechados) e a
+ * coluna prevalecer nesses dois casos (abriria exceção no critério 2, que é o que impede a
+ * coluna de virar segunda fonte de verdade).
+ *
+ * O que se mede é a **sobrevivência ao recálculo**: avançar e reler tem de devolver a etapa
+ * nova. Um teste que só olhasse o retorno de `aplicarEvento` passaria com o defeito presente —
+ * ele sempre devolveu `avancou`; quem desfazia era a leitura seguinte.
+ */
+describe('aceite documental deixa marco (#259)', () => {
+  /** Registra o marco como o `ProjectService` faria, sem Git: aqui o alvo é a jornada. */
+  function servicoComMarco(): {
+    servico: InstanceType<typeof JornadaService>
+    marcados: string[]
+  } {
+    const marcados: string[] = []
+
+    const servico = new JornadaService({
+      repository: projects,
+      roadmap,
+      audit,
+      userId: () => USER,
+      concluirMarco: (projectId, marco) => {
+        marcados.push(marco)
+        projects.marcarMarco(USER, projectId, marco)
+        return true
+      }
+    })
+
+    return { servico, marcados }
+  }
+
+  it('o aceite do brief sobrevive ao recálculo da leitura seguinte', () => {
+    criarProjetoComSessao()
+    responderWizard()
+
+    const { servico, marcados } = servicoComMarco()
+    expect(servico.estado(PROJETO, WS)?.etapa).toBe('brief-aceito')
+
+    const outcome = servico.aplicarEvento(PROJETO, 'brief-aceito', WS)
+
+    expect(outcome?.resultado).toBe('avancou')
+    expect(marcados).toContain('brief-aceito-pelo-pi')
+    // A prova do defeito: antes, esta releitura devolvia `brief-aceito` de novo.
+    expect(servico.estado(PROJETO, WS)?.etapa).toBe('prd')
+  })
+
+  it('o aceite do PRD sobrevive ao recálculo, e a jornada alcança a Especificação', () => {
+    criarProjetoComSessao()
+    responderWizard()
+    db.prepare('UPDATE planning_session SET ultimo_marco = ? WHERE project_id = ?').run(
+      'roadmap-aprovado',
+      PROJETO
+    )
+    aprovar('PROJECT_PACKAGE')
+
+    const { servico } = servicoComMarco()
+    // `estado()` sincroniza a coluna com os fatos; `aplicarEvento` lê a coluna, não a derivada.
+    servico.estado(PROJETO, WS)
+    servico.aplicarEvento(PROJETO, 'brief-aceito', WS)
+    servico.aplicarEvento(PROJETO, 'prd-aceito', WS)
+
+    // O teto que o defeito impunha era `prd-aceito`; agora a cadeia segue até onde os fatos
+    // sustentam, e a fase acompanha.
+    const etapa = servico.estado(PROJETO, WS)?.etapa
+    expect(etapa).toBeDefined()
+    expect(faseDaEtapa(etapa!)).toBe('especificacao')
+  })
+
+  it('transição recusada não commita marco: não há aceite a registrar', () => {
+    criarProjetoComSessao()
+
+    const { servico, marcados } = servicoComMarco()
+    // O projeto está em `prompt`; `prd-aceito` sai de outra etapa.
+    const outcome = servico.aplicarEvento(PROJETO, 'prd-aceito', WS)
+
+    expect(outcome?.resultado).toBe('evento-fora-de-ordem')
+    expect(marcados).toEqual([])
+  })
+
+  it('evento sem marco correspondente não inventa commit', () => {
+    criarProjetoComSessao()
+
+    const { servico, marcados } = servicoComMarco()
+    servico.aplicarEvento(PROJETO, 'prompt-salvo', WS)
+
+    // `prompt-salvo` não é aceite documental: quem o comprova são as respostas do wizard.
+    expect(marcados).toEqual([])
+  })
+
+  it('falha ao commitar o marco não move a jornada', () => {
+    criarProjetoComSessao()
+    responderWizard()
+
+    const servico = new JornadaService({
+      repository: projects,
+      roadmap,
+      audit,
+      userId: () => USER,
+      // Git indisponível, disco cheio, repositório travado: o commit não sai.
+      concluirMarco: () => false
+    })
+
+    servico.estado(PROJETO, WS)
+    const outcome = servico.aplicarEvento(PROJETO, 'brief-aceito', WS)
+
+    // Mover a etapa sem a evidência produziria exatamente o estado que este FIX conserta: uma
+    // coluna adiante dos fatos, desfeita na leitura seguinte. Recusar é o desfecho honesto.
+    expect(outcome?.resultado).toBe('marco-nao-commitado')
+    expect(etapaNoBanco()).toBe('brief-aceito')
+  })
+
+  it('sem a dep de marco o aceite documental é recusado, não silenciosamente perdido', () => {
+    criarProjetoComSessao()
+    responderWizard()
+
+    // Serviço montado sem `concluirMarco` — o caso de um call site que só lê a jornada.
+    service.estado(PROJETO, WS)
+    const outcome = service.aplicarEvento(PROJETO, 'brief-aceito', WS)
+
+    expect(outcome?.resultado).toBe('marco-nao-commitado')
+    expect(etapaNoBanco()).toBe('brief-aceito')
+  })
+})

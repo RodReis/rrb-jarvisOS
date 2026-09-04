@@ -14,6 +14,7 @@
  */
 
 import { _electron as electron, expect, test, type ElectronApplication } from '@playwright/test'
+import { execFileSync, execSync } from 'node:child_process'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -256,4 +257,85 @@ test('o resumo do card vem composto do main, numa leitura por projeto', async ()
     expect(resumo.modelo).toBeTruthy()
     expect(resumo.bloqueio).toBeNull()
   }
+})
+
+/**
+ * O aceite documental deixa marco no Git (#259).
+ *
+ * O que este teste prova e nenhum teste de integração consegue: **o commit sai de verdade**. No
+ * int-spec o `concluirMarco` é dublado — grava a coluna e devolve `true` sem tocar em Git. Um
+ * dublê não prova que `git add -A && git commit` roda pelo terminal controlado, que a allowlist
+ * deixa, nem que a mensagem do marco novo chega ao histórico.
+ *
+ * O caminho da jornada até o aceite depende do wizard respondido, e montá-lo aqui testaria o
+ * wizard. O que se mede é o elo que a correção acrescentou: **o marco novo commita**.
+ */
+test('o marco do aceite documental produz commit real no repositório', async () => {
+  const janela = await app.firstWindow()
+  await janela.waitForLoadState('domcontentloaded')
+
+  const preparo = await janela.evaluate(async () => {
+    const bridge = (
+      window as unknown as {
+        jarvis: {
+          getWorkspace: () => Promise<string>
+          addAllowedCommand: (b: string, w: string) => Promise<readonly string[]>
+          createProject: (n: string, w: string) => Promise<OutcomeDaPonte>
+          listProjects: (w: string) => Promise<readonly { id: string }[]>
+        }
+      }
+    ).jarvis
+
+    const workspace = await bridge.getWorkspace()
+    await bridge.addAllowedCommand('git', workspace)
+    const criado = await bridge.createProject('Projeto Marco', workspace)
+
+    const projetos = await bridge.listProjects(workspace)
+
+    return { id: projetos[0]?.id ?? '', diretorio: criado.project?.diretorio ?? '' }
+  })
+
+  // Identidade de Git local ao repositório: o runner de CI pode não ter uma global, e o commit
+  // do marco falharia por motivo alheio ao que se testa (mesma lição do `anexos-design.e2e.ts`).
+  execFileSync('git', ['config', 'user.email', 'teste@jarvis'], { cwd: preparo.diretorio })
+  execFileSync('git', ['config', 'user.name', 'Teste'], { cwd: preparo.diretorio })
+
+  const resultado = await janela.evaluate(async (id: string) => {
+    const bridge = (
+      window as unknown as {
+        jarvis: {
+          getWorkspace: () => Promise<string>
+          completeMilestone: (
+            p: string,
+            m: string,
+            w: string
+          ) => Promise<{ commitado: boolean; commitHash?: string } | null>
+        }
+      }
+    ).jarvis
+
+    const workspace = await bridge.getWorkspace()
+
+    return {
+      // Os dois marcos novos desta correção, pelo mesmo canal que a jornada usa.
+      brief: await bridge.completeMilestone(id, 'brief-aceito-pelo-pi', workspace),
+      prd: await bridge.completeMilestone(id, 'prd-aceito-pelo-pi', workspace)
+    }
+  }, preparo.id)
+
+  // Marco desconhecido pelo `MENSAGEM_DO_MARCO` produziria commit sem mensagem ou falha: os dois
+  // saírem commitados é o que prova que o vocabulário novo chegou ao produto inteiro.
+  expect(resultado.brief?.commitado).toBe(true)
+  expect(resultado.prd?.commitado).toBe(true)
+  expect(resultado.brief?.commitHash).toBeTruthy()
+  expect(resultado.prd?.commitHash).toBeTruthy()
+
+  // O histórico no disco, que é o que nenhum dublê produziria.
+  const historico = execSync('git log --format=%s -3', {
+    cwd: preparo.diretorio,
+    encoding: 'utf8'
+  })
+
+  expect(historico).toContain('docs: PRD aceito pelo PI')
+  expect(historico).toContain('docs: brief aceito pelo PI')
 })

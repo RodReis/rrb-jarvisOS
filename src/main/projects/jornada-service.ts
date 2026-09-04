@@ -58,10 +58,33 @@ import type { RoadmapRepository } from './roadmap-repository'
  */
 const EVENTO_DO_MARCO: Readonly<Partial<Record<MarcoDocumental, EventoDeJornada>>> = {
   'contexto-aprovado': 'brief-aceito',
+  // Os dois aceites documentais (correção #259). A ordem do objeto é a ordem da jornada, porque
+  // `eventosObservados` percorre estas entradas até o último marco do projeto — uma entrada fora
+  // de lugar faria a cadeia incluir um evento que ainda não aconteceu.
+  'brief-aceito-pelo-pi': 'brief-aceito',
   'prd-aprovado': 'prd-gerado',
+  'prd-aceito-pelo-pi': 'prd-aceito',
   'design-anexado': 'design-anexado',
   'arquitetura-aprovada': 'arquitetura-gerada',
   'roadmap-aprovado': 'roadmap-gerado'
+}
+
+/**
+ * O marco que comprova cada aceite **documental** (correção #259).
+ *
+ * Os dois eventos que faltavam: `brief-aceito` e `prd-aceito` não têm gate em `aprovacoes.ts`
+ * (decisão da SPEC-Jornada-01, que mantém três gates fechados) nem marco próprio antes desta
+ * correção. Sem evidência, `etapaDerivada` não os enxergava e a coluna que `aplicarEvento`
+ * gravava era desfeita na leitura seguinte.
+ *
+ * Separado de `EVENTO_DO_MARCO` de propósito: aquele traduz marco → evento na **leitura** dos
+ * fatos, este traduz evento → marco na **escrita**. Fundi-los faria um mapa que se lê nas duas
+ * direções e mente numa delas — os cinco marcos daquele são commitados por outros serviços, não
+ * pela jornada.
+ */
+const MARCO_DO_ACEITE_DOCUMENTAL: Readonly<Partial<Record<EventoDeJornada, MarcoDocumental>>> = {
+  'brief-aceito': 'brief-aceito-pelo-pi',
+  'prd-aceito': 'prd-aceito-pelo-pi'
 }
 
 export interface JornadaDeps {
@@ -82,6 +105,18 @@ export interface JornadaDeps {
   ) => EstadoDasRotas | undefined
   /** O modelo ativo de um provider. Mesma fonte que a geração consulta (critério 4). */
   readonly modeloAtivo?: (workspaceId: WorkspaceId, provider: AiProvider) => string
+  /**
+   * Commita o marco documental de um aceite (correção #259). `false` quando o commit não saiu.
+   *
+   * Injetado, e não construído aqui: commitar exige Git e o `ProjectService`, que a jornada não
+   * conhece — e um serviço que montasse os dois para gravar uma etapa acabaria dono de um
+   * repositório Git por acidente. Opcional porque só os dois aceites documentais o usam.
+   */
+  readonly concluirMarco?: (
+    projectId: string,
+    marco: MarcoDocumental,
+    workspaceId: WorkspaceId
+  ) => boolean
 }
 
 export class JornadaService {
@@ -91,6 +126,7 @@ export class JornadaService {
   private readonly userId: () => string
   private readonly estadoDasRotas?: JornadaDeps['estadoDasRotas']
   private readonly modeloAtivo?: JornadaDeps['modeloAtivo']
+  private readonly concluirMarco?: JornadaDeps['concluirMarco']
 
   constructor(deps: JornadaDeps) {
     this.repository = deps.repository
@@ -99,6 +135,7 @@ export class JornadaService {
     this.userId = deps.userId
     this.estadoDasRotas = deps.estadoDasRotas
     this.modeloAtivo = deps.modeloAtivo
+    this.concluirMarco = deps.concluirMarco
   }
 
   /**
@@ -229,8 +266,61 @@ export class JornadaService {
       return outcome
     }
 
+    /*
+     * O aceite documental precisa deixar rastro **antes** de a etapa se mover (correção #259).
+     *
+     * A ordem importa: gravar a coluna primeiro e commitar depois deixaria, quando o commit
+     * falhasse, exatamente o estado que este FIX conserta — uma etapa adiante dos fatos, que a
+     * próxima leitura desfaz em silêncio. Commitar primeiro faz a falha ser visível e a
+     * retomada honesta: o PI resolve o Git e clica de novo.
+     *
+     * Sem a dep, recusa em vez de avançar. Um `?? true` aqui deixaria o call site que esqueceu
+     * de injetá-la avançar sem evidência, e o defeito voltaria por uma porta nova.
+     */
+    const marco = MARCO_DO_ACEITE_DOCUMENTAL[evento as EventoDeJornada]
+
+    if (marco) {
+      const commitado = this.concluirMarco?.(projectId, marco, workspaceId) ?? false
+
+      if (!commitado) {
+        this.audit.append({
+          user_id: userId,
+          workspace_id: workspaceId,
+          type: 'journey-transition',
+          payload: {
+            projectId,
+            evento,
+            de: atual,
+            para: atual,
+            resultado: 'marco-nao-commitado',
+            marco
+          }
+        })
+
+        log.agent.warn('Aceite documental sem marco commitado; jornada não avançou', {
+          projectId,
+          evento,
+          marco
+        })
+
+        return {
+          resultado: 'marco-nao-commitado',
+          etapa: atual,
+          mensagem: `O aceite de "${atual}" precisa de um commit no repositório do projeto, e ele não foi concluído.`
+        }
+      }
+    }
+
+    /*
+     * Relê a sessão antes de gravar: commitar o marco escreveu `ultimo_marco` no banco, e
+     * espalhar o `sessao` lido lá em cima devolveria o valor **anterior** ao commit — a evidência
+     * que acabou de ser criada seria apagada pela mesma transição que a criou, e a leitura
+     * seguinte desfaria a etapa. É o defeito desta issue reaparecendo por dentro da correção.
+     */
+    const atualizada = this.repository.findSession(userId, projectId) ?? sessao
+
     this.repository.saveSession({
-      ...sessao,
+      ...atualizada,
       etapaDaJornada: outcome.etapa,
       // Avançar limpa o motivo da regressão anterior: ele descreve por que a jornada voltou, e
       // manter o texto velho faria a tela explicar uma volta que já foi superada.
