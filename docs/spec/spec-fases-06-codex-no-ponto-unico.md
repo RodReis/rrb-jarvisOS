@@ -1,8 +1,8 @@
 # SPEC-Fases-06 — Codex como provider do ponto único
 
 - MVP/Fatia: MVP-026 · M26-F06.
-- Issue: [#256](https://github.com/RodReis/rrb-jarvisOS/issues/256); épico [#250](https://github.com/RodReis/rrb-jarvisOS/issues/250).
-- Status: **rascunho-completo** — uma pergunta aberta ao PI (abaixo). Vira `aprovada-pi` quando respondida.
+- Issue: [#256](https://github.com/RodReis/rrb-jarvisOS/issues/256) (`proplan:backlog`); épico [#250](https://github.com/RodReis/rrb-jarvisOS/issues/250).
+- Status: **aprovada-pi** (2026-09-04) — a pergunta aberta foi respondida pelo PI nesta data (opção a).
 - Depende de: M26-F02 (catálogo e modelo por fase); M26-F03 (console, `GenerationEvent`); **M10-F02** (autenticação e perfil isolado do Codex — puxada para a frente da fila por este MVP).
 
 ## Objetivo
@@ -41,9 +41,9 @@ Permitir que Planejamento e Especificação gerem pelo **Codex** (`gpt-5.6-sol`)
 
 Contract test do adapter (o mesmo que os quatro existentes passam); unitários do parser com fixtures reais de `codex exec --json`; teste de `escolherRota` com duas assinaturas; int-spec do healthcheck com perfil fake; Playwright da fase Planejamento com Sol e adapter fake; smoke real com `codex-cli 0.149.0` fora da suíte padrão, sem registrar segredo. Relatório `SPEC-Fases-06`.
 
-## Pergunta aberta ao PI
+## Perguntas resolvidas pelo PI (2026-09-04)
 
-1. **A M10-F02 declara "Depende de: F01 aprovada e entregue" (runtime de executores em container).** O que esta fatia precisa dela — `CODEX_HOME` dedicado, login/logout pelo PI, health, modos de cobrança sem transição silenciosa, redaction — **não precisa do runtime em container**; o mount no container é a parte que serve ao MVP-010. Opções: **(a) Recomendada:** emendar a M10-F02 para que a dependência da M10-F01 valha só para o mount no container; a parte de host entra antes desta fatia. **(b)** Puxar também a M10-F01 (runtime), aumentando o escopo à frente do Shell. **(c)** Esta fatia entrega o perfil isolado no host por conta própria e a M10-F02 reaproveita — cria dois donos do `CODEX_HOME`, que eu desaconselho.
+1. **A M10-F02 é emendada (opção a):** a dependência da M10-F01 vale **só para o mount no container** (critério 2 daquela SPEC). A parte de host — `CODEX_HOME` dedicado, login/logout pelo PI, health, modos de cobrança sem transição silenciosa, redaction — não depende do runtime e é entregue antes desta fatia. Descartado puxar a M10-F01 (escopo à frente do Shell) e descartado esta fatia criar o perfil sozinha (dois donos do `CODEX_HOME`). — decidido. Emenda registrada na própria SPEC-Multi-Executor-02 e em `docs/DECISIONS.md`.
 
 ## Decisões cravadas pelo Cowork (PI pode vetar)
 
