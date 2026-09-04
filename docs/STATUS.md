@@ -11,7 +11,7 @@ Atualizado em: **2026-09-04**. Fonte única do índice Fatia ↔ SPEC. Estado re
 | Backlog | [#253](https://github.com/RodReis/rrb-jarvisOS/issues/253) · M26-F03 Console da geração | SPEC `aprovada-pi` (2026-09-04). Trace persistido por geração, `stream-json`, painel retrátil na etapa |
 | Backlog | [#254](https://github.com/RodReis/rrb-jarvisOS/issues/254) · M26-F04 Marcos Git e gate da construção | SPEC `aprovada-pi` (2026-09-04). Painel de marcos + bloqueio no `SLICE_ENTRY` |
 | Backlog | [#255](https://github.com/RodReis/rrb-jarvisOS/issues/255) · M26-F05 Modelo da fase no run | SPEC `aprovada-pi` (2026-09-04). `--model` da fase Construção no Claude Code do container; ledger |
-| Planejado | [#256](https://github.com/RodReis/rrb-jarvisOS/issues/256) · M26-F06 Codex no ponto único | SPEC `rascunho-completo`, **uma pergunta aberta** (dependência M10-F02 → M10-F01). Depende de [#117](https://github.com/RodReis/rrb-jarvisOS/issues/117). Nunca recebe `next` enquanto `proplan:planejado` |
+| Backlog | [#256](https://github.com/RodReis/rrb-jarvisOS/issues/256) · M26-F06 Codex no ponto único | SPEC `aprovada-pi` (2026-09-04). Provider `codex` pela assinatura do Codex; depende de [#117](https://github.com/RodReis/rrb-jarvisOS/issues/117) (M10-F02, **emendada**: dependência da M10-F01 só para o mount no container) |
 | Finalizado | [#238](https://github.com/RodReis/rrb-jarvisOS/issues/238) a [#242](https://github.com/RodReis/rrb-jarvisOS/issues/242) · M25-F01–F05 | **aceite do PI registrado em 2026-09-03**; as cinco em `proplan:finalizado`. Fechamento do épico [#237](https://github.com/RodReis/rrb-jarvisOS/issues/237) é ato do PI. Detalhe das entregas em `docs/STATUS-ARQUIVO.md` |
 | Feito | [#106](https://github.com/RodReis/rrb-jarvisOS/issues/106) · M9-F06 Evidência, limpeza e continuidade | **a última fatia do MVP-009**, entregue no PR #236 (`2ac721d`); o PI declarou o MVP-009 finalizado em 2026-09-03 — aceite formal e fechamento de #100 são atos dele. SPEC `aprovada-pi` (2026-08-29, emendada em 2026-08-30). Entrega o `ExecutionLedger`, o `LimpezaService`, o coletor de retenção e o painel do estado terminal. **Decisão do PI em 2026-09-02:** o container passa a nascer com `--rm` (parar já remove, sem `docker rm` na allowlist de destrutivos), e a jornada E2E real completa **não roda** nesta entrega — o limite fica declarado |
 | Finalizado | [#105](https://github.com/RodReis/rrb-jarvisOS/issues/105) · M9-F05 Revisão, CI e squash merge automático | **aceite do PI registrado**; entregue no PR #235 (`6bade77`). SPEC `aprovada-pi` (2026-08-29, emendada em 2026-08-30). Fechou a pendência da M9-F04: o `ConstrutorService` ganhou consumidor e a rota do executor passou a operar. **Três decisões do PI em 2026-09-02** (ver § Decisões do PI na M9-F05) |
@@ -51,7 +51,7 @@ Atualizado em: **2026-09-04**. Fonte única do índice Fatia ↔ SPEC. Estado re
 | MVP-023 Biblioteca de Blueprints | [#212](https://github.com/RodReis/rrb-jarvisOS/issues/212) | quatro SPECs `aprovada-pi`; #214–#217 em Backlog | 0/4 |
 | MVP-024 Gestão de Portfólio | [#213](https://github.com/RodReis/rrb-jarvisOS/issues/213) | quatro SPECs `aprovada-pi`; #218–#221 em Backlog | 0/4 |
 | MVP-025 Jornada de planejamento por IA | [#237](https://github.com/RodReis/rrb-jarvisOS/issues/237) | corrige o fluxo inicial do MVP-008. **M25-F01 a F05 aceitas pelo PI em 2026-09-03** (`proplan:finalizado`); fechamento do épico é ato dele; doc em `docs/mvp/mvp-025-jornada-planejamento-ia.md` | 5/5 |
-| MVP-026 Fases, modelo por fase e console da geração | [#250](https://github.com/RodReis/rrb-jarvisOS/issues/250) | criado em 2026-09-04; corrige a superfície do MVP-025 (fase no card, modelo por fase, console com ferramentas, marcos Git antes da Construção, Codex no ponto único). F01–F05 `aprovada-pi`, F06 `rascunho-completo`; doc em `docs/mvp/mvp-026-fases-modelos-e-console.md` | 0/6 |
+| MVP-026 Fases, modelo por fase e console da geração | [#250](https://github.com/RodReis/rrb-jarvisOS/issues/250) | criado em 2026-09-04; corrige a superfície do MVP-025 (fase no card, modelo por fase, console com ferramentas, marcos Git antes da Construção, Codex no ponto único). seis SPECs `aprovada-pi`; doc em `docs/mvp/mvp-026-fases-modelos-e-console.md` | 0/6 |
 
 ## Índice Fatia ↔ SPEC
 
@@ -96,7 +96,7 @@ Não existe catálogo global `SPEC-nnn`. O slug identifica a SPEC; os números a
 | M9-F05 | MVP-009 | Revisão/CI/merge | `spec-entrega-05-revisao-ci-merge.md` |
 | M9-F06 | MVP-009 | Evidência/limpeza | `spec-entrega-06-evidencia-limpeza-continuidade.md` |
 | M10-F01 | MVP-010 | Runtime de executores ([#116](https://github.com/RodReis/rrb-jarvisOS/issues/116)) | `spec-multi-executor-01-runtime.md` |
-| M10-F02 | MVP-010 | Autenticação Codex ([#117](https://github.com/RodReis/rrb-jarvisOS/issues/117)) | `spec-multi-executor-02-autenticacao-codex.md` |
+| M10-F02 | MVP-010 | Autenticação Codex ([#117](https://github.com/RodReis/rrb-jarvisOS/issues/117)) | `spec-multi-executor-02-autenticacao-codex.md` — aprovada-pi; **emendada em 2026-09-04** (dependência da F01 só para o mount; sobe para antes da M26-F06) |
 | M10-F03 | MVP-010 | Codex Exec Adapter ([#118](https://github.com/RodReis/rrb-jarvisOS/issues/118)) | `spec-multi-executor-03-codex-exec-adapter.md` |
 | M10-F04 | MVP-010 | Roteamento e revisão cruzada ([#119](https://github.com/RodReis/rrb-jarvisOS/issues/119)) | `spec-multi-executor-04-roteamento-revisao-cruzada.md` |
 | M10-F05 | MVP-010 | UI e prova operacional ([#120](https://github.com/RodReis/rrb-jarvisOS/issues/120)) | `spec-multi-executor-05-ui-prova-operacional.md` |
@@ -155,7 +155,7 @@ Não existe catálogo global `SPEC-nnn`. O slug identifica a SPEC; os números a
 | M26-F03 | MVP-026 | Console da geração ([#253](https://github.com/RodReis/rrb-jarvisOS/issues/253)) | `spec-fases-03-console-da-geracao.md` — aprovada-pi |
 | M26-F04 | MVP-026 | Marcos Git visíveis e gate da construção ([#254](https://github.com/RodReis/rrb-jarvisOS/issues/254)) | `spec-fases-04-marcos-git-e-gate-da-construcao.md` — aprovada-pi |
 | M26-F05 | MVP-026 | Modelo da fase Construção no run ([#255](https://github.com/RodReis/rrb-jarvisOS/issues/255)) | `spec-fases-05-modelo-da-fase-no-run.md` — aprovada-pi |
-| M26-F06 | MVP-026 | Codex como provider do ponto único ([#256](https://github.com/RodReis/rrb-jarvisOS/issues/256)) | `spec-fases-06-codex-no-ponto-unico.md` — rascunho-completo; depende da M10-F02 |
+| M26-F06 | MVP-026 | Codex como provider do ponto único ([#256](https://github.com/RodReis/rrb-jarvisOS/issues/256)) | `spec-fases-06-codex-no-ponto-unico.md` — aprovada-pi; depende da M10-F02 |
 
 ## Decisões do PI no MVP-026 (2026-09-04)
 
@@ -171,6 +171,7 @@ Levantadas depois de o PI usar o app com o MVP-025 aceito. Detalhe em `docs/mvp/
 8. **Fila:** MVP-026 antes do MVP-022 e do Command Center; [#251](https://github.com/RodReis/rrb-jarvisOS/issues/251) recebe `proplan:next`.
 9. "Roteamento por tipo de tarefa" (SPEC-Providers-04) **não é removido** — vira "Avançado"; a jornada não o consome, MVP-007/017/021 consumirão.
 10. Ids confirmados: `claude-fable-5-1`; `qwen3:8b`; `gpt-5.6-sol`, `gpt-5.5`, `gpt-5.4` (Codex CLI 0.149.0).
+11. **SPEC-Multi-Executor-02 emendada:** a dependência da M10-F01 vale só para o mount no container; a parte de host entra antes da M26-F06. Descartado puxar a M10-F01 e descartado a F06 criar o perfil sozinha.
 
 ## Decisões do PI no MVP-025 (2026-09-03)
 
@@ -203,7 +204,7 @@ Três pontos abertos foram levantados durante a construção e **decididos pelo 
 
 ## Próximas ações
 
-1. **Cabeça da fila: [#251](https://github.com/RodReis/rrb-jarvisOS/issues/251) (M26-F01)**, `proplan:next` por decisão do PI de 2026-09-04. Ordem do MVP-026: F01 → F02 → F03 → F04 → F05 → M10-F02 ([#117](https://github.com/RodReis/rrb-jarvisOS/issues/117)) → F06 ([#256](https://github.com/RodReis/rrb-jarvisOS/issues/256), ainda `proplan:planejado` até o PI responder a pergunta da SPEC-Fases-06). MVP-025: filhas `proplan:finalizado`; fechamento do épico #237 é ato do PI. MVP-022 e Command Center vêm depois do MVP-026.
+1. **Cabeça da fila: [#251](https://github.com/RodReis/rrb-jarvisOS/issues/251) (M26-F01)**, `proplan:next` por decisão do PI de 2026-09-04. Ordem do MVP-026: F01 → F02 → F03 → F04 → F05 → M10-F02 ([#117](https://github.com/RodReis/rrb-jarvisOS/issues/117)) → F06 ([#256](https://github.com/RodReis/rrb-jarvisOS/issues/256)). Todas em Backlog. MVP-025: filhas `proplan:finalizado`; fechamento do épico #237 é ato do PI. MVP-022 e Command Center vêm depois do MVP-026.
 2. **Risco registrado:** a SPEC-Blueprints-02 (M23-F02) referencia o wizard da M8-F03, que a M25-F02 substitui por perguntas geradas — emenda a fazer quando o MVP-023 entrar na fila.
 3. **#106 (M9-F06) entregue por PR — a última fatia do MVP-009.** Aceite formal do PI pendente na issue. **#105 (M9-F05) foi aceita em 2026-09-02** e entregue no PR #235. Os limites declarados da F06 estão no `docs/DEVELOPMENT.md` § Fatia 06 — o principal é a jornada E2E real completa, que **não rodou** por decisão do PI e continua exigindo repositório descartável e orçamento autorizado.
 4. Conservar #167/#168 e #214–#221 em Backlog após o aceite exato de 2026-08-31, sem promover qualquer uma a `next` por esta atualização. #232 (`[INFRA][FIX]` do pool de testes) também nasce em Backlog, sem entrar na fila por conta própria.
