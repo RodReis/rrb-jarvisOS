@@ -78,7 +78,12 @@ beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'jarvis-console-'))
   db = openDatabase(join(dir, 'teste.db'))
   audit = new AuditRepository(db, 'chave-de-teste')
-  credentials = new CredentialService(new CredentialRepository(db, cipherFalso), audit)
+  credentials = new CredentialService(
+    new CredentialRepository(db, cipherFalso),
+    audit,
+    new PolicyService(audit, () => USUARIO),
+    {} as NodeJS.ProcessEnv
+  )
   logCat.warn.mockClear()
 })
 
@@ -290,7 +295,7 @@ describe('o desfecho gravado é o desfecho real', () => {
       adapterFalso(() =>
         (async function* (): AsyncIterable<AdapterChunk> {
           await Promise.resolve()
-          throw new AdapterError('provider fora do ar')
+          throw new AdapterError('provider fora do ar', undefined)
         })()
       ),
       espiao
