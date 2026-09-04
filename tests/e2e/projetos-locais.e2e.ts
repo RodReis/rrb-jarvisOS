@@ -14,7 +14,7 @@
  */
 
 import { _electron as electron, expect, test, type ElectronApplication } from '@playwright/test'
-import { execSync } from 'node:child_process'
+import { execFileSync, execSync } from 'node:child_process'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -274,7 +274,7 @@ test('o marco do aceite documental produz commit real no repositório', async ()
   const janela = await app.firstWindow()
   await janela.waitForLoadState('domcontentloaded')
 
-  const resultado = await janela.evaluate(async () => {
+  const preparo = await janela.evaluate(async () => {
     const bridge = (
       window as unknown as {
         jarvis: {
@@ -282,6 +282,29 @@ test('o marco do aceite documental produz commit real no repositório', async ()
           addAllowedCommand: (b: string, w: string) => Promise<readonly string[]>
           createProject: (n: string, w: string) => Promise<OutcomeDaPonte>
           listProjects: (w: string) => Promise<readonly { id: string }[]>
+        }
+      }
+    ).jarvis
+
+    const workspace = await bridge.getWorkspace()
+    await bridge.addAllowedCommand('git', workspace)
+    const criado = await bridge.createProject('Projeto Marco', workspace)
+
+    const projetos = await bridge.listProjects(workspace)
+
+    return { id: projetos[0]?.id ?? '', diretorio: criado.project?.diretorio ?? '' }
+  })
+
+  // Identidade de Git local ao repositório: o runner de CI pode não ter uma global, e o commit
+  // do marco falharia por motivo alheio ao que se testa (mesma lição do `anexos-design.e2e.ts`).
+  execFileSync('git', ['config', 'user.email', 'teste@jarvis'], { cwd: preparo.diretorio })
+  execFileSync('git', ['config', 'user.name', 'Teste'], { cwd: preparo.diretorio })
+
+  const resultado = await janela.evaluate(async (id: string) => {
+    const bridge = (
+      window as unknown as {
+        jarvis: {
+          getWorkspace: () => Promise<string>
           completeMilestone: (
             p: string,
             m: string,
@@ -292,19 +315,13 @@ test('o marco do aceite documental produz commit real no repositório', async ()
     ).jarvis
 
     const workspace = await bridge.getWorkspace()
-    await bridge.addAllowedCommand('git', workspace)
-    const criado = await bridge.createProject('Projeto Marco', workspace)
-
-    const projetos = await bridge.listProjects(workspace)
-    const id = projetos[0]?.id ?? ''
 
     return {
-      diretorio: criado.project?.diretorio ?? '',
       // Os dois marcos novos desta correção, pelo mesmo canal que a jornada usa.
       brief: await bridge.completeMilestone(id, 'brief-aceito-pelo-pi', workspace),
       prd: await bridge.completeMilestone(id, 'prd-aceito-pelo-pi', workspace)
     }
-  })
+  }, preparo.id)
 
   // Marco desconhecido pelo `MENSAGEM_DO_MARCO` produziria commit sem mensagem ou falha: os dois
   // saírem commitados é o que prova que o vocabulário novo chegou ao produto inteiro.
@@ -315,7 +332,7 @@ test('o marco do aceite documental produz commit real no repositório', async ()
 
   // O histórico no disco, que é o que nenhum dublê produziria.
   const historico = execSync('git log --format=%s -3', {
-    cwd: resultado.diretorio,
+    cwd: preparo.diretorio,
     encoding: 'utf8'
   })
 
