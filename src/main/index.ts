@@ -519,8 +519,21 @@ if (!app.requestSingleInstanceLock()) {
       userId: userIdAtual,
       // O modelo que a próxima geração usaria — a **mesma** fonte que a geração consulta, e é o
       // que faz o card e o selo nunca discordarem (SPEC-Fases-01, critério 4).
-      modeloAtivo: (workspace, provider) =>
-        routingRepo.modeloAtivo(userIdAtual(), workspace, provider),
+      /*
+       * O modelo do card e o da geracao sao **a mesma leitura** (SPEC-Fases-01, criterio 4).
+       *
+       * Ate a SPEC-Fases-02 era o modelo ativo do provider; agora e o da fase, com o override do
+       * projeto. Deixar o `routingRepo.modeloAtivo` aqui faria o card anunciar Opus enquanto a
+       * geracao sai por Fable — duas leituras "certas" em fontes diferentes, sem erro a
+       * investigar.
+       */
+      modeloAtivo: (workspace, provider, fase, projectId) => {
+        const rota = ROTA_DO_PROVIDER[provider]
+        if (rota === undefined) return routingRepo.modeloAtivo(userIdAtual(), workspace, provider)
+
+        return phaseModels.resolver({ userId: userIdAtual(), workspace }, fase, rota, projectId)
+          .modelo
+      },
       /*
        * O aceite documental deixa marco no Git (#259). Passa pelo `ProjectService` porque ele é
        * o **único gatilho de commit** do produto (M8-F01) — um segundo caminho até o Git faria

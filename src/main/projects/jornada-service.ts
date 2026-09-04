@@ -37,7 +37,7 @@ import {
   ordemDaEtapa,
   regredir
 } from '@shared/domain/jornada'
-import type { ResumoDoProjeto } from '@shared/domain/fase'
+import type { Fase, ResumoDoProjeto } from '@shared/domain/fase'
 import { ROTULO_DA_FASE, faseDaEtapa, progressoNaFase } from '@shared/domain/fase'
 import type { EstadoDasRotas, ResultadoDaRota } from '@shared/domain/rota-de-geracao'
 import { PROVIDER_DA_ROTA, escolherRota } from '@shared/domain/rota-de-geracao'
@@ -103,8 +103,22 @@ export interface JornadaDeps {
     projectId: string,
     workspaceId: WorkspaceId
   ) => EstadoDasRotas | undefined
-  /** O modelo ativo de um provider. Mesma fonte que a geração consulta (critério 4). */
-  readonly modeloAtivo?: (workspaceId: WorkspaceId, provider: AiProvider) => string
+  /**
+   * O modelo que a próxima geração usaria — **a mesma fonte que a geração consulta**
+   * (SPEC-Fases-01, critério 4).
+   *
+   * Recebe a fase desde a SPEC-Fases-02: o modelo deixou de ser um por provider e passou a ser
+   * um por fase, com override do projeto. Continuar lendo o modelo ativo do provider faria o
+   * card anunciar um modelo e a geração usar outro — exatamente o que o critério 4 proíbe, e
+   * sem erro nenhum a investigar, porque as duas leituras estariam "certas" cada uma na sua
+   * fonte.
+   */
+  readonly modeloAtivo?: (
+    workspaceId: WorkspaceId,
+    provider: AiProvider,
+    fase: Fase,
+    projectId: string
+  ) => string
   /**
    * Commita o marco documental de um aceite (correção #259). `false` quando o commit não saiu.
    *
@@ -457,7 +471,7 @@ export class JornadaService {
       gates: this.gatesAceitos(projectId, workspaceId),
       dataDoUltimoEvento: this.dataDoUltimoEvento(projectId, workspaceId),
       rota,
-      modelo: this.modeloDaRota(rota, workspaceId),
+      modelo: this.modeloDaRota(rota, workspaceId, fase, projectId),
       bloqueio: this.bloqueioDaRota(rota)
     }
   }
@@ -504,9 +518,16 @@ export class JornadaService {
    * descreveria uma geração que não vai acontecer — a mesma razão pela qual o `SeloDaRota` não
    * renderiza nada quando a rota bloqueia.
    */
-  private modeloDaRota(rota: ResultadoDaRota | null, workspaceId: WorkspaceId): string | null {
+  private modeloDaRota(
+    rota: ResultadoDaRota | null,
+    workspaceId: WorkspaceId,
+    fase: Fase,
+    projectId: string
+  ): string | null {
     if (!rota || rota.decisao === 'bloqueado') return null
-    return this.modeloAtivo?.(workspaceId, PROVIDER_DA_ROTA[rota.decisao]) ?? null
+    return (
+      this.modeloAtivo?.(workspaceId, PROVIDER_DA_ROTA[rota.decisao], fase, projectId) ?? null
+    )
   }
 
   /** O bloqueio, quando existe. Sem bloqueio não há bloco: alerta permanente deixa de ser lido. */
