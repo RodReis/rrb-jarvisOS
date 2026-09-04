@@ -45,6 +45,7 @@ const revisoesDoGate = vi.fn()
 // estado dele. Sem os dois, a lista monta com o rótulo genérico — que é o fallback testado
 // abaixo, não um acidente.
 const jornadaDeVarios = vi.fn()
+const resumoDeVarios = vi.fn()
 const estadoDaJornada = vi.fn()
 // A etapa `prompt` passou a montar `PromptDoProjeto` (M25-F02): abrir o projeto na primeira
 // etapa monta a tela do prompt, e sem estes dois o teste quebraria por falta de dublê, não pelo
@@ -86,6 +87,7 @@ beforeEach(() => {
   listarAprovacoes.mockReset().mockResolvedValue([])
   revisoesDoGate.mockReset().mockResolvedValue([])
   jornadaDeVarios.mockReset().mockResolvedValue([])
+  resumoDeVarios.mockReset().mockResolvedValue([])
   estadoDaJornada.mockReset().mockResolvedValue(null)
   lerPromptDoProjeto.mockReset().mockResolvedValue(null)
   rotaDaGeracao.mockReset().mockResolvedValue({ decisao: 'assinatura' })
@@ -111,6 +113,7 @@ beforeEach(() => {
       listarAprovacoes,
       revisoesDoGate,
       jornadaDeVarios,
+      resumoDeVarios,
       estadoDaJornada,
       lerPromptDoProjeto,
       rotaDaGeracao,
@@ -357,14 +360,21 @@ describe('ProjetosLocais', () => {
 
   it('mostra um CTA por projeto, com o rótulo da etapa (critério 3)', async () => {
     listProjects.mockResolvedValue([projeto()])
-    jornadaDeVarios.mockResolvedValue([
+    // O CTA passou a vir junto do resumo (SPEC-Fases-01, critério 7): é o mesmo fato do mesmo
+    // cálculo, e um segundo canal só para o rótulo daria duas viagens pela ponte por tela.
+    resumoDeVarios.mockResolvedValue([
       {
         projectId: 'p-1',
         etapa: 'prompt',
+        fase: 'planejamento',
+        rotuloDaFase: 'Planejamento',
+        progresso: { posicao: 1, total: 8 },
         cta: 'Escrever o prompt',
-        trilha: [],
-        motivoDaRegressao: null,
-        recalculada: false
+        gates: { aceitos: 0, total: 5 },
+        dataDoUltimoEvento: null,
+        rota: null,
+        modelo: null,
+        bloqueio: null
       }
     ])
 
@@ -381,10 +391,10 @@ describe('ProjetosLocais', () => {
         'Escrever o prompt'
       )
     )
-    expect(jornadaDeVarios).toHaveBeenCalledWith(['p-1'], 'jarvis')
+    expect(resumoDeVarios).toHaveBeenCalledWith(['p-1'], 'jarvis')
   })
 
-  it('pede as jornadas numa chamada só, não uma por card', async () => {
+  it('pede os resumos numa chamada só, não uma por card', async () => {
     listProjects.mockResolvedValue([projeto(), projeto({ id: 'p-2', nome: 'Projeto Beta' })])
 
     render(<ProjetosLocais workspace="jarvis" />)
@@ -393,16 +403,16 @@ describe('ProjetosLocais', () => {
 
     // Uma viagem pela ponte por tela, não por item: a leitura recalcula a etapa, e o custo se
     // multiplicaria junto com a lista.
-    await waitFor(() => expect(jornadaDeVarios).toHaveBeenCalledTimes(1))
-    expect(jornadaDeVarios).toHaveBeenCalledWith(['p-1', 'p-2'], 'jarvis')
+    await waitFor(() => expect(resumoDeVarios).toHaveBeenCalledTimes(1))
+    expect(resumoDeVarios).toHaveBeenCalledWith(['p-1', 'p-2'], 'jarvis')
   })
 
   it('a lista sobrevive a uma ponte sem o canal da jornada', async () => {
     // A exceção é **síncrona**: uma ponte sem o método lança antes de existir promise, e um
     // `.catch()` sozinho não a pegaria. Sem a guarda, o card perderia a tela inteira por causa
     // do rótulo de um botão.
-    jornadaDeVarios.mockImplementation(() => {
-      throw new TypeError('window.jarvis.jornadaDeVarios is not a function')
+    resumoDeVarios.mockImplementation(() => {
+      throw new TypeError('window.jarvis.resumoDeVarios is not a function')
     })
     listProjects.mockResolvedValue([projeto()])
 
@@ -513,5 +523,115 @@ describe('ProjetosLocais', () => {
     // O motivo aparece acima da trilha: o PI precisa saber por que a jornada andou para trás
     // antes de procurar onde ela parou.
     expect(await screen.findByText('O PRD mudou semanticamente')).toBeInTheDocument()
+  })
+
+  /**
+   * O card completo (SPEC-Fases-01, critérios 2 a 5).
+   *
+   * O que estes testes protegem é a **ausência do bloco de bloqueio** quando não há bloqueio. Um
+   * card que sempre mostra um "status" ensina o olho a pular aquela região, e aí o aviso que
+   * importa chega invisível. O bloco existe só quando tem o que dizer.
+   */
+  describe('card completo (SPEC-Fases-01)', () => {
+    function resumo(over: Record<string, unknown> = {}): Record<string, unknown> {
+      return {
+        projectId: 'p-1',
+        etapa: 'prd-aceito',
+        fase: 'planejamento',
+        rotuloDaFase: 'Planejamento',
+        progresso: { posicao: 5, total: 8 },
+        cta: 'Aceitar o PRD',
+        gates: { aceitos: 1, total: 5 },
+        dataDoUltimoEvento: '2026-09-04T10:00:00.000Z',
+        rota: { decisao: 'assinatura' },
+        modelo: 'claude-sonnet-5',
+        bloqueio: null,
+        ...over
+      }
+    }
+
+    it('mostra fase, etapa e progresso dentro da fase (critério 2)', async () => {
+      listProjects.mockResolvedValue([projeto()])
+      resumoDeVarios.mockResolvedValue([resumo()])
+
+      render(<ProjetosLocais workspace="jarvis" />)
+
+      // A linha da fase, não o botão: "Aceitar o PRD" aparece nos dois, e é assim que deve ser
+      // — a fase contextualiza a etapa, e o CTA é a ação. Buscar solto casaria com qualquer um.
+      const linhaDaFase = await screen.findByText(/Planejamento · Aceitar o PRD/)
+      expect(linhaDaFase).toHaveAttribute('data-jos-fase', 'planejamento')
+      expect(screen.getByText(/5\s*\/\s*8/)).toBeInTheDocument()
+    })
+
+    it('conta os gates aceitos e mostra a data do último evento (critério 3)', async () => {
+      listProjects.mockResolvedValue([projeto()])
+      resumoDeVarios.mockResolvedValue([resumo({ gates: { aceitos: 3, total: 5 } })])
+
+      render(<ProjetosLocais workspace="jarvis" />)
+
+      await screen.findByText(/3\s*\/\s*5/)
+    })
+
+    it('mostra a rota e o modelo da próxima geração (critério 4)', async () => {
+      listProjects.mockResolvedValue([projeto()])
+      resumoDeVarios.mockResolvedValue([resumo({ modelo: 'claude-opus-5' })])
+
+      render(<ProjetosLocais workspace="jarvis" />)
+
+      await screen.findByText(/claude-opus-5/)
+    })
+
+    it('mostra motivo e ação quando o projeto está bloqueado (critério 5)', async () => {
+      listProjects.mockResolvedValue([projeto()])
+      resumoDeVarios.mockResolvedValue([
+        resumo({
+          rota: { decisao: 'bloqueado', motivo: 'sem-rota-alguma' },
+          modelo: null,
+          bloqueio: {
+            motivo: 'sem-rota-alguma',
+            acao: 'Conecte a assinatura do Claude em Providers.'
+          }
+        })
+      ])
+
+      render(<ProjetosLocais workspace="jarvis" />)
+
+      await screen.findByText(/Conecte a assinatura do Claude em Providers/)
+    })
+
+    it('não mostra o bloco de bloqueio quando não há bloqueio (critério 5)', async () => {
+      listProjects.mockResolvedValue([projeto()])
+      resumoDeVarios.mockResolvedValue([resumo()])
+
+      render(<ProjetosLocais workspace="jarvis" />)
+
+      await screen.findByText(/PLANEJAMENTO/i)
+      // A ausência é o teste: um bloco de status permanente treina o olho a ignorá-lo.
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    })
+
+    it('pede os resumos numa chamada só, não uma por card (critério 7)', async () => {
+      listProjects.mockResolvedValue([projeto(), projeto({ id: 'p-2', nome: 'Projeto Beta' })])
+
+      render(<ProjetosLocais workspace="jarvis" />)
+
+      await screen.findByText('Projeto Beta')
+
+      await waitFor(() => expect(resumoDeVarios).toHaveBeenCalledTimes(1))
+      expect(resumoDeVarios).toHaveBeenCalledWith(['p-1', 'p-2'], 'jarvis')
+    })
+
+    it('a lista sobrevive a uma ponte sem o canal do resumo', async () => {
+      listProjects.mockResolvedValue([projeto()])
+      resumoDeVarios.mockImplementation(() => {
+        throw new TypeError('window.jarvis.resumoDeVarios is not a function')
+      })
+
+      render(<ProjetosLocais workspace="jarvis" />)
+
+      // Sem resumo o card perde os quatro blocos, mas o PI ainda renomeia, remove e abre o
+      // projeto. Perder a tela toda por causa de um bloco custaria muito mais.
+      expect(await screen.findByText('Projeto Alfa')).toBeInTheDocument()
+    })
   })
 })
