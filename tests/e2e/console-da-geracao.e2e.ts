@@ -339,7 +339,7 @@ test('a geração do Refinamento empurra o conjunto completo de eventos, na orde
 
   // O documento saiu: as perguntas foram lidas e gravadas. É o que garante que o resto das
   // asserções fala de uma geração que **aconteceu**, e não do trace de uma falha.
-  expect(colhido.resultado).toBe('gerado')
+  expect(colhido.resultado).toBe('geradas')
 
   // Uma geração, um trace (critério 6: é ele que o painel usa para separar uma da seguinte).
   expect(colhido.traceIds).toHaveLength(1)
@@ -403,7 +403,7 @@ test('a geração vai para o histórico da etapa, e reabri-la devolve a mesma tr
 
   const { projectId } = await projetoComPrompt(janela)
   const aoVivo = await gerarColhendoEventos(janela, projectId)
-  expect(aoVivo.resultado).toBe('gerado')
+  expect(aoVivo.resultado).toBe('geradas')
 
   const doHistorico = await janela.evaluate(async (id: string) => {
     const bridge = (
