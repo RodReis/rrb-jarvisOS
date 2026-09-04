@@ -499,7 +499,9 @@ test.describe('divulgação progressiva', () => {
     expect(estilo.listStyle).toBe('none')
     // `flex` (ou qualquer coisa que não seja `list-item`) é o que impede o marcador de nascer.
     expect(estilo.display).not.toBe('list-item')
-    expect(estilo.conteudo === 'none' || estilo.conteudo === 'normal' || estilo.conteudo === '').toBe(true)
+    expect(
+      estilo.conteudo === 'none' || estilo.conteudo === 'normal' || estilo.conteudo === ''
+    ).toBe(true)
   })
 
   test('o chevron gira ao abrir — o estado tem sinal de forma, não só de cor', async ({ page }) => {

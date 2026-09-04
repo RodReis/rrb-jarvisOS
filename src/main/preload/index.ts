@@ -36,11 +36,7 @@ import type { AiCallHandle, AiProvider, AiRequest, AiStreamEvent } from '@shared
 import type { ProviderRoute, ProviderStatus, RoutingPolicy } from '@shared/domain/routing'
 import type { Fase } from '@shared/domain/fase'
 import type { Etapa } from '@shared/domain/jornada'
-import type {
-  EventoDaGeracao,
-  GenerationEvent,
-  GenerationTrace
-} from '@shared/domain/geracao'
+import type { EventoDaGeracao, GenerationEvent, GenerationTrace } from '@shared/domain/geracao'
 import type {
   PhaseModelPolicy,
   ProjectModelOverride,

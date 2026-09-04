@@ -51,7 +51,9 @@ describe('resumoDoArgumento', () => {
 
   it('usa o termo para WebSearch e a URL para WebFetch', () => {
     expect(resumoDoArgumento('WebSearch', { query: 'electron ipc' })).toBe('electron ipc')
-    expect(resumoDoArgumento('WebFetch', { url: 'https://exemplo.dev' })).toBe('https://exemplo.dev')
+    expect(resumoDoArgumento('WebFetch', { url: 'https://exemplo.dev' })).toBe(
+      'https://exemplo.dev'
+    )
   })
 
   it('cai no JSON cortado para ferramenta desconhecida', () => {

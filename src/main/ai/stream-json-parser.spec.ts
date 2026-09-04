@@ -174,7 +174,11 @@ describe('parsearLinha — a geração', () => {
       message: {
         role: 'user',
         content: [
-          { tool_use_id: 'toolu_1', type: 'tool_result', content: 'x'.repeat(LIMITE_RESUMO_BYTES * 2) }
+          {
+            tool_use_id: 'toolu_1',
+            type: 'tool_result',
+            content: 'x'.repeat(LIMITE_RESUMO_BYTES * 2)
+          }
         ]
       }
     })

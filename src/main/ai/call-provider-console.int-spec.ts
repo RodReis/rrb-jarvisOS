@@ -292,12 +292,13 @@ describe('o desfecho gravado é o desfecho real', () => {
   it('falhou quando o adapter lança', async () => {
     const espiao = consoleFalso()
     const service = servico(
-      adapterFalso(() =>
-        (async function* (): AsyncIterable<AdapterChunk> {
-          await Promise.resolve()
-          throw new AdapterError('provider fora do ar', undefined)
-        })()
-      ),
+      // Um `AsyncIterable` que lança ao ser iterado, sem ser gerador: um `async function*` que
+      // só lança não tem `yield`, e o lint recusa com razão.
+      adapterFalso(() => ({
+        [Symbol.asyncIterator]: (): AsyncIterator<AdapterChunk> => ({
+          next: () => Promise.reject(new AdapterError('provider fora do ar', undefined))
+        })
+      })),
       espiao
     )
 
@@ -311,10 +312,7 @@ describe('o desfecho gravado é o desfecho real', () => {
 
   it('falhou quando o stream corta antes do fim', async () => {
     const espiao = consoleFalso()
-    const service = servico(
-      adapterFalso([{ tipo: 'texto', texto: 'comecei' }]),
-      espiao
-    )
+    const service = servico(adapterFalso([{ tipo: 'texto', texto: 'comecei' }]), espiao)
 
     const eventos = await coletar(
       service.call(PEDIDO_COM_CONSOLE, { userId: USUARIO, workspace: 'jarvis' })
@@ -363,12 +361,13 @@ describe('o desfecho gravado é o desfecho real', () => {
       espiao
     )
 
-    for await (const _evento of service.call(PEDIDO_COM_CONSOLE, {
-      userId: USUARIO,
-      workspace: 'jarvis'
-    })) {
-      break
-    }
+    // Consome o primeiro evento e **abandona** o stream, que é o que um `break` num `for await`
+    // faz por baixo: `.return()` no iterador. Escrito assim em vez do laço porque o laço com
+    // `break` imediato precisa de uma variável que nunca é lida.
+    const stream = service.call(PEDIDO_COM_CONSOLE, { userId: USUARIO, workspace: 'jarvis' })
+    const iterador = stream[Symbol.asyncIterator]()
+    await iterador.next()
+    await iterador.return?.(undefined)
 
     expect(espiao.desfechos).toHaveLength(1)
   })

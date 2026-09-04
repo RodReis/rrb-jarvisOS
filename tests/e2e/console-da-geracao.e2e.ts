@@ -139,12 +139,19 @@ const LINHAS: readonly string[] = [
   // Ruído de sessão que o parser ignora por omissão. Está aqui porque o CLI real o emite, e um
   // dublê limpo demais esconderia um parser que virasse `erro` diante dele.
   JSON.stringify({ type: 'system', subtype: 'init', tools: ['Read', 'Bash'] }),
-  linhaDeTexto('Vou ler o manifesto antes de perguntar.'),
   linhaDeFerramenta('call-1', 'Read', { file_path: ARQUIVO_LIDO }),
   linhaDeResultado('call-1', RESULTADO_GRANDE),
   linhaDeFerramenta('call-2', 'Bash', { command: `curl -H "Authorization: ${SEGREDO}" /health` }),
   linhaDeResultado('call-2', 'exit 1', true),
   '{ isto nao e json',
+  // **O único `texto` do roteiro, e ele é o documento inteiro.**
+  //
+  // A primeira versão emitia uma frase ("Vou ler o manifesto antes de perguntar.") antes deste
+  // JSON, imitando um modelo que comenta o que vai fazer. Mas o texto do documento é a
+  // **concatenação de todos os `texto`** — é assim que o adapter o monta —, e
+  // `lerPerguntasDoModelo` faz `JSON.parse` do resultado inteiro. A frase antes fazia o parse
+  // falhar, e a geração terminava em `saida-invalida`: comportamento correto do app, defeito do
+  // dublê. Só o CI pegou, porque no Windows este arquivo é pulado.
   linhaDeTexto(JSON.stringify(PERGUNTAS)),
   linhaDeResult
 ]
@@ -337,10 +344,9 @@ test('a geração do Refinamento empurra o conjunto completo de eventos, na orde
   // Uma geração, um trace (critério 6: é ele que o painel usa para separar uma da seguinte).
   expect(colhido.traceIds).toHaveLength(1)
 
-  // **A ordem** (critério 1): texto, ferramenta, resultado, ferramenta, resultado, erro de
-  // parser, texto, uso. A linha `system/init` não aparece — é ruído de sessão, não a geração.
+  // **A ordem** (critério 1): ferramenta, resultado, ferramenta, resultado, erro de parser,
+  // texto, uso. A linha `system/init` não aparece — é ruído de sessão, não a geração.
   expect(colhido.eventos.map((e) => e.tipo)).toEqual([
-    'texto',
     'ferramenta-inicio',
     'ferramenta-fim',
     'ferramenta-inicio',
@@ -351,26 +357,25 @@ test('a geração do Refinamento empurra o conjunto completo de eventos, na orde
   ])
 
   // A linha de ferramenta que o painel desenha: `nome · resumo · status`.
-  const inicioDoRead = colhido.eventos[1]
-  expect(inicioDoRead).toMatchObject({ nome: 'Read', resumoDoArgumento: ARQUIVO_LIDO })
+  expect(colhido.eventos[0]).toMatchObject({ nome: 'Read', resumoDoArgumento: ARQUIVO_LIDO })
 
-  const fimDoRead = colhido.eventos[2] as { status: string; resumoDoResultado: string }
+  const fimDoRead = colhido.eventos[1] as { status: string; resumoDoResultado: string }
   expect(fimDoRead.status).toBe('ok')
   // Critério 4: o resultado de 5000 bytes chegou truncado nos 2 KB, com o tamanho original ao
   // lado — é o que o painel mostra como "Resumo de N".
   expect(fimDoRead.resumoDoResultado.length).toBe(2048)
-  expect(colhido.eventos[2]).toMatchObject({ tamanhoOriginal: RESULTADO_GRANDE.length })
+  expect(colhido.eventos[1]).toMatchObject({ tamanhoOriginal: RESULTADO_GRANDE.length })
 
   // A ferramenta que falhou é `erro`, não silêncio.
-  expect(colhido.eventos[4]).toMatchObject({ status: 'erro', resumoDoResultado: 'exit 1' })
+  expect(colhido.eventos[3]).toMatchObject({ status: 'erro', resumoDoResultado: 'exit 1' })
 
   // Critério 5: a linha corrompida virou `erro` de parser **e a geração continuou** — o texto
   // seguinte (o JSON das perguntas) chegou depois dela, e o `resultado` acima é `gerado`.
-  expect(colhido.eventos[5]).toMatchObject({ tipo: 'erro' })
+  expect(colhido.eventos[4]).toMatchObject({ tipo: 'erro' })
 
   // Tokens e duração ao fim. `1200 + 300` de cache: o parser soma o cache na entrada, e o painel
   // mostra o número somado.
-  expect(colhido.eventos[7]).toEqual({
+  expect(colhido.eventos[6]).toEqual({
     tipo: 'uso',
     tokensEntrada: 1500,
     tokensSaida: 340,
@@ -451,20 +456,16 @@ test('a geração vai para o histórico da etapa, e reabri-la devolve a mesma tr
   // trace seria uma segunda contabilidade de uso, paralela ao ledger.
   expect(trace?.ledgerEntryId).toBeTruthy()
 
-  // Critério 6, a metade que só o banco prova: reabrir do histórico devolve **a mesma trilha**.
-  // A ida e volta pelo SQLite preserva a ordem (`seq`) e cada payload.
-  expect(doHistorico.eventos.map((e) => e.tipo)).toEqual(aoVivo.eventos.map((e) => e.tipo))
-  expect(doHistorico.eventos[0]).toEqual(aoVivo.eventos[0])
-  expect(doHistorico.eventos[1]).toEqual(aoVivo.eventos[1])
-  expect(doHistorico.eventos[2]).toEqual(aoVivo.eventos[2])
-  expect(doHistorico.eventos[5]).toEqual(aoVivo.eventos[5])
-  expect(doHistorico.eventos[6]).toEqual(aoVivo.eventos[6])
-  expect(doHistorico.eventos[7]).toEqual(aoVivo.eventos[7])
+  // Critério 6, a metade que só o banco prova: reabrir do histórico devolve **a mesma trilha**,
+  // evento por evento. A ida e volta pelo SQLite preserva a ordem (`seq`) e cada payload.
+  //
+  // Comparação inteira, e não evento a evento com índices escolhidos: a igualdade completa é a
+  // afirmação que interessa, e uma lista de índices deixa de fora justamente o que ninguém
+  // pensou em conferir. Ela só é possível porque a redação agora roda na **entrada** do coletor
+  // — antes, o ao vivo trazia o token e o gravado não, e os dois nunca batiam.
+  expect(doHistorico.eventos).toEqual(aoVivo.eventos)
 
-  // Critério 3: o token do `Bash` **não** sobreviveu à persistência. É o único evento que difere
-  // entre o ao vivo e o gravado, e a diferença é exatamente a redação — os dois redatores rodam
-  // em `eventoSeguro`, antes do `INSERT`.
+  // Critério 3: o token do `Bash` não está em nenhum dos dois lados.
   expect(JSON.stringify(doHistorico.eventos)).not.toContain(SEGREDO)
-  expect(doHistorico.eventos[3]).not.toEqual(aoVivo.eventos[3])
-  expect(doHistorico.eventos[3]).toMatchObject({ nome: 'Bash' })
+  expect(doHistorico.eventos[2]).toMatchObject({ nome: 'Bash' })
 })

@@ -221,7 +221,10 @@ export class GenerationTraceRepository {
       try {
         eventos.push(JSON.parse(linha.payload) as GenerationEvent)
       } catch {
-        log.db.warn('Evento de geração ignorado por payload ilegível', { traceId, tipo: linha.tipo })
+        log.db.warn('Evento de geração ignorado por payload ilegível', {
+          traceId,
+          tipo: linha.tipo
+        })
       }
     }
 
@@ -291,7 +294,14 @@ export class GenerationTraceRepository {
           const resumo = [...porFerramenta.entries()]
             .map(([nome, vezes]) => `${nome} ×${vezes}`)
             .join(', ')
-          resumir.run(id, -1, JSON.stringify({ tipo: 'erro', mensagem: `Detalhe compactado. Ferramentas: ${resumo}.` }))
+          resumir.run(
+            id,
+            -1,
+            JSON.stringify({
+              tipo: 'erro',
+              mensagem: `Detalhe compactado. Ferramentas: ${resumo}.`
+            })
+          )
         } else {
           resumir.run(
             id,

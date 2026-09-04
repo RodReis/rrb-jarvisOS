@@ -1150,7 +1150,12 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
   // pedido — o renderer não escolhe de quem é a trilha que lê.
   ipcMain.handle(
     IPC_CHANNELS.generationHistory,
-    (_event, projectId: unknown, etapa: unknown, workspace: unknown): readonly GenerationTrace[] => {
+    (
+      _event,
+      projectId: unknown,
+      etapa: unknown,
+      workspace: unknown
+    ): readonly GenerationTrace[] => {
       if (typeof projectId !== 'string' || projectId.length === 0 || !isEtapa(etapa)) return []
       const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
 

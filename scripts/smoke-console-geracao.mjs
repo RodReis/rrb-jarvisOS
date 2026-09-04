@@ -150,7 +150,8 @@ function relatar({ eventos, linhasIgnoradas, codigo, stderr, duracaoMs }) {
     console.log(`[smoke] ERRO DE PARSER: ${evento.mensagem}`)
   }
 
-  if (stderr.trim() !== '') console.log(`\n[smoke] stderr do CLI (não vai para a tela): ${stderr.slice(0, 300)}`)
+  if (stderr.trim() !== '')
+    console.log(`\n[smoke] stderr do CLI (não vai para a tela): ${stderr.slice(0, 300)}`)
 
   // O que o smoke afirma. Cada falha aponta um defeito diferente:
   const faltando = []

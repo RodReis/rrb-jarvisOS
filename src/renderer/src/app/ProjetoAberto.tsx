@@ -182,11 +182,7 @@ export function ProjetoAberto({
               geração da etapa corrente, que é justamente o que este contêiner delimita. Sete
               cópias divergiriam na primeira correção feita só numa delas.
             */}
-            <ConsoleDaGeracao
-              projectId={projeto.id}
-              workspace={workspace}
-              etapa={estado.etapa}
-            />
+            <ConsoleDaGeracao projectId={projeto.id} workspace={workspace} etapa={estado.etapa} />
           </div>
         </div>
       )}

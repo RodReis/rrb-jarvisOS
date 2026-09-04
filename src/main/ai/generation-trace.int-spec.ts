@@ -17,9 +17,8 @@ const logDb = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 vi.mock('../logging/logger', () => ({ log: new Proxy({}, { get: () => logDb }) }))
 
 const { openDatabase } = await import('../storage/database')
-const { GenerationTraceRepository, INTERVALO_DE_LOTE_MS, EVENTOS_POR_LOTE } = await import(
-  './generation-trace-repository'
-)
+const { GenerationTraceRepository, INTERVALO_DE_LOTE_MS, EVENTOS_POR_LOTE } =
+  await import('./generation-trace-repository')
 const { GenerationTraceService } = await import('./generation-trace-service')
 
 const ESCOPO = { userId: 'u1', workspace: 'jarvis' } as const

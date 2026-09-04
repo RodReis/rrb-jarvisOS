@@ -494,9 +494,7 @@ describe('Claude Code CLI — subprocess app-managed (critério 2)', () => {
     // Quem passa `onEvento` escreve no banco. Disco cheio ali não pode matar a geração que o
     // console apenas observa — seria a inversão que a spec proíbe.
     const chunks = await coletar(
-      comBinarioDuble(
-        scriptQueEmite(linhaDeTexto('resiste'), linhaDeResult(1, 2))
-      ).generateStream({
+      comBinarioDuble(scriptQueEmite(linhaDeTexto('resiste'), linhaDeResult(1, 2))).generateStream({
         model: 'claude-opus-5',
         prompt: 'oi',
         maxTokens: 100,

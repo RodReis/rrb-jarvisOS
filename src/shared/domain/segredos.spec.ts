@@ -113,7 +113,9 @@ describe('redigirSegredos', () => {
   it('preserva o que o comando diz fazer — o redator não pode cegar a evidência', () => {
     // O ponto do console é o PI ver **o quê** a IA rodou. Redigir a linha inteira entregaria um
     // painel que só diz "aconteceu algo".
-    const redigido = redigirSegredos('curl -H "Authorization: Bearer sk-ant-api03-abcdefghijkl" https://api.exemplo.dev/v1/status')
+    const redigido = redigirSegredos(
+      'curl -H "Authorization: Bearer sk-ant-api03-abcdefghijkl" https://api.exemplo.dev/v1/status'
+    )
 
     expect(redigido).toContain('curl')
     expect(redigido).toContain('https://api.exemplo.dev/v1/status')
