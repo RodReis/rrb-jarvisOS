@@ -20,6 +20,7 @@
  */
 
 import type { Etapa } from './jornada'
+import type { MotivoDeBloqueio, ResultadoDaRota } from './rota-de-geracao'
 import { ETAPAS, ordemDaEtapa } from './jornada'
 
 /**
@@ -93,4 +94,55 @@ export function progressoNaFase(etapa: Etapa): ProgressoNaFase {
   const posicao = daFase.findIndex((e) => ordemDaEtapa(e) === ordemDaEtapa(etapa)) + 1
 
   return { posicao, total: daFase.length }
+}
+
+/** Por que o projeto não anda, e o que o PI faz a respeito (critério 5). */
+export interface BloqueioDoProjeto {
+  readonly motivo: MotivoDeBloqueio | string
+  /** A ação concreta que destrava. Um bloqueio sem ação é um beco sem saída. */
+  readonly acao: string
+}
+
+/** Quantos dos gates de aceite já foram aprovados (critério 3). */
+export interface GatesDoProjeto {
+  readonly aceitos: number
+  readonly total: number
+}
+
+/**
+ * O que o card da tela Projetos mostra — **uma leitura por projeto** (critério 7).
+ *
+ * Os quatro blocos vêm compostos do main de propósito. Eles nascem em lugares diferentes (a
+ * etapa nos eventos, os gates nas aprovações, a rota no estado dos providers, o modelo no
+ * roteamento), e deixar o renderer buscar cada um daria quatro viagens por card e permitiria
+ * que dois discordassem — a rota do card diferente da rota do selo é o que o critério 4 proíbe.
+ *
+ * Mora aqui, e não no serviço do main, porque atravessa a ponte IPC: `contracts/ipc.ts` precisa
+ * do tipo e não pode importar do processo principal. Mesma razão de `EtapaNaTrilha`.
+ */
+export interface ResumoDoProjeto {
+  readonly projectId: string
+  readonly etapa: Etapa
+  readonly fase: Fase
+  /** O rótulo pt-BR, resolvido aqui para o renderer não repetir o mapa. */
+  readonly rotuloDaFase: string
+  /** Onde a etapa está dentro da fase — "3 de 8", não "3 de 12". */
+  readonly progresso: ProgressoNaFase
+  /** O CTA único da etapa atual (SPEC-Jornada-01, critério 3). */
+  readonly cta: string
+  readonly gates: GatesDoProjeto
+  /** ISO do último evento de transição do projeto; `null` quando ainda não houve nenhum. */
+  readonly dataDoUltimoEvento: string | null
+  /** Por onde a próxima geração sai. `null` quando o estado das rotas não pôde ser lido. */
+  readonly rota: ResultadoDaRota | null
+  /**
+   * O modelo que a próxima geração usaria.
+   *
+   * `null` quando a rota bloqueia: anunciar um modelo ali descreveria uma chamada que não vai
+   * acontecer. Até a M26-F02 é o modelo ativo do provider da rota; a F02 troca a fonte pelo
+   * modelo da fase **sem mudar este campo**.
+   */
+  readonly modelo: string | null
+  /** Preenchido só quando existe (critério 5): alerta permanente deixa de ser lido. */
+  readonly bloqueio: BloqueioDoProjeto | null
 }

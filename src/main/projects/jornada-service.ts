@@ -37,6 +37,12 @@ import {
   ordemDaEtapa,
   regredir
 } from '@shared/domain/jornada'
+import type { ResumoDoProjeto } from '@shared/domain/fase'
+import { ROTULO_DA_FASE, faseDaEtapa, progressoNaFase } from '@shared/domain/fase'
+import type { EstadoDasRotas, ResultadoDaRota } from '@shared/domain/rota-de-geracao'
+import { PROVIDER_DA_ROTA, escolherRota } from '@shared/domain/rota-de-geracao'
+import type { AiProvider } from '@shared/domain/ai'
+import { ETAPAS_DE_ACEITE } from '@shared/domain/jornada'
 import type { MarcoDocumental } from '@shared/domain/projects'
 import { log } from '../logging/logger'
 import type { AuditRepository } from '../storage/audit-repository'
@@ -63,6 +69,19 @@ export interface JornadaDeps {
   readonly roadmap: RoadmapRepository
   readonly audit: AuditRepository
   readonly userId: () => string
+  /**
+   * O estado das rotas do projeto — injetado, como nos serviços de geração, porque depende de
+   * adapters e credenciais que o domínio da jornada não conhece.
+   *
+   * Opcional: só o resumo do card precisa dele, e os call sites que só leem a etapa não devem
+   * ser obrigados a montar o mundo dos providers para isso.
+   */
+  readonly estadoDasRotas?: (
+    projectId: string,
+    workspaceId: WorkspaceId
+  ) => EstadoDasRotas | undefined
+  /** O modelo ativo de um provider. Mesma fonte que a geração consulta (critério 4). */
+  readonly modeloAtivo?: (workspaceId: WorkspaceId, provider: AiProvider) => string
 }
 
 export class JornadaService {
@@ -70,12 +89,16 @@ export class JornadaService {
   private readonly roadmap: RoadmapRepository
   private readonly audit: AuditRepository
   private readonly userId: () => string
+  private readonly estadoDasRotas?: JornadaDeps['estadoDasRotas']
+  private readonly modeloAtivo?: JornadaDeps['modeloAtivo']
 
   constructor(deps: JornadaDeps) {
     this.repository = deps.repository
     this.roadmap = deps.roadmap
     this.audit = deps.audit
     this.userId = deps.userId
+    this.estadoDasRotas = deps.estadoDasRotas
+    this.modeloAtivo = deps.modeloAtivo
   }
 
   /**
@@ -311,6 +334,115 @@ export class JornadaService {
    * Um CTA por projeto, e nada mais: a lista é índice, e a trilha mora na rota do projeto
    * aberto (pergunta resolvida pelo PI em 2026-09-03).
    */
+  /**
+   * O resumo que o card da tela Projetos consome — **uma leitura por projeto** (critério 7).
+   *
+   * Compõe aqui, e não no renderer, porque os quatro blocos nascem em lugares diferentes: a
+   * etapa nos eventos, os gates nas aprovações, a rota no estado dos providers, o modelo no
+   * roteamento. Deixar a tela buscar cada um daria quatro viagens por card e — o defeito que
+   * importa — permitiria que a rota do card discordasse da rota do selo, que é o mesmo fato
+   * dito duas vezes (critério 4).
+   *
+   * Reusa `estado()` em vez de recalcular: é lá que a etapa derivada e a correção do cache
+   * vivem, e um segundo cálculo aqui poderia divergir do que a tela do projeto aberto mostra.
+   */
+  resumoDoProjeto(projectId: string, workspaceId: WorkspaceId): ResumoDoProjeto | undefined {
+    const estado = this.estado(projectId, workspaceId)
+    if (!estado) return undefined
+
+    const rota = this.rotaDoProjeto(projectId, workspaceId)
+    const fase = faseDaEtapa(estado.etapa)
+
+    return {
+      projectId,
+      etapa: estado.etapa,
+      fase,
+      rotuloDaFase: ROTULO_DA_FASE[fase],
+      progresso: progressoNaFase(estado.etapa),
+      cta: estado.cta,
+      gates: this.gatesAceitos(projectId, workspaceId),
+      dataDoUltimoEvento: this.dataDoUltimoEvento(projectId, workspaceId),
+      rota,
+      modelo: this.modeloDaRota(rota, workspaceId),
+      bloqueio: this.bloqueioDaRota(rota)
+    }
+  }
+
+  /** O resumo de vários projetos — o que a lista consome, uma leitura por card (critério 7). */
+  resumoDeVarios(
+    projectIds: readonly string[],
+    workspaceId: WorkspaceId
+  ): readonly ResumoDoProjeto[] {
+    return projectIds
+      .map((id) => this.resumoDoProjeto(id, workspaceId))
+      .filter((r): r is ResumoDoProjeto => r !== undefined)
+      .sort((a, b) => ordemDaEtapa(a.etapa) - ordemDaEtapa(b.etapa))
+  }
+
+  /**
+   * Por onde a próxima geração sai.
+   *
+   * Devolve `null` quando a dep não foi injetada: um card sem o bloco da rota é degradação
+   * legítima, e inventar `bloqueado` diria ao PI que há um problema de configuração onde só há
+   * um serviço montado sem a dep opcional.
+   */
+  private rotaDoProjeto(projectId: string, workspaceId: WorkspaceId): ResultadoDaRota | null {
+    const estado = this.estadoDasRotas?.(projectId, workspaceId)
+    return estado ? escolherRota(estado) : null
+  }
+
+  /**
+   * O modelo que a próxima geração usaria.
+   *
+   * `null` na rota bloqueada de propósito: ali nenhuma chamada sai, e anunciar um modelo
+   * descreveria uma geração que não vai acontecer — a mesma razão pela qual o `SeloDaRota` não
+   * renderiza nada quando a rota bloqueia.
+   */
+  private modeloDaRota(rota: ResultadoDaRota | null, workspaceId: WorkspaceId): string | null {
+    if (!rota || rota.decisao === 'bloqueado') return null
+    return this.modeloAtivo?.(workspaceId, PROVIDER_DA_ROTA[rota.decisao]) ?? null
+  }
+
+  /** O bloqueio, quando existe. Sem bloqueio não há bloco: alerta permanente deixa de ser lido. */
+  private bloqueioDaRota(rota: ResultadoDaRota | null): ResumoDoProjeto['bloqueio'] {
+    if (rota?.decisao !== 'bloqueado' || !rota.motivo || !rota.acao) return null
+    return { motivo: rota.motivo, acao: rota.acao }
+  }
+
+  /**
+   * Quantos dos cinco gates de aceite já têm aprovação registrada (critério 3).
+   *
+   * Conta sobre `ETAPAS_DE_ACEITE`, não sobre a lista de aprovações: as etapas de aceite
+   * **documental** (`brief-aceito`, `prd-aceito`) não têm gate próprio em `aprovacoes.ts`, e
+   * contar aprovações daria 3 de 5 no melhor caso. O denominador é o contrato; o numerador é o
+   * quanto dele já foi cumprido.
+   */
+  private gatesAceitos(projectId: string, workspaceId: WorkspaceId): ResumoDoProjeto['gates'] {
+    const eventos = new Set(this.eventosObservados(projectId, workspaceId))
+    const aceitos = ETAPAS_DE_ACEITE.filter((etapa) => eventos.has(etapa)).length
+
+    return { aceitos, total: ETAPAS_DE_ACEITE.length }
+  }
+
+  /**
+   * Quando a jornada deste projeto se mexeu pela última vez.
+   *
+   * Lê da trilha de auditoria porque é lá que toda transição fica registrada — inclusive as
+   * recusadas e as regressões. `null` quando nada aconteceu ainda: um projeto recém-criado não
+   * tem data para mostrar, e exibir a data de criação no lugar responderia outra pergunta.
+   */
+  private dataDoUltimoEvento(projectId: string, workspaceId: WorkspaceId): string | null {
+    const doProjeto = this.audit
+      .list(this.userId(), workspaceId)
+      .filter(
+        (e) =>
+          e.type.startsWith('journey-') &&
+          (e.payload as { projectId?: string } | null)?.projectId === projectId
+      )
+
+    return doProjeto.length > 0 ? doProjeto[doProjeto.length - 1].created_at : null
+  }
+
   estadoDeVarios(
     projectIds: readonly string[],
     workspaceId: WorkspaceId
