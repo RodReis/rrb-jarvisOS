@@ -91,6 +91,7 @@ import type {
   MudancaDeArtefato,
   RevisaoAprovada
 } from '../domain/aprovacoes'
+import type { VistaDeMarcos } from '../domain/marcos'
 import type {
   ContextPack,
   ContextPackOutcome,
@@ -411,6 +412,15 @@ export const IPC_CHANNELS = {
   aprovacaoRevisoes: 'aprovacao:revisoes',
   aprovacaoAprovar: 'aprovacao:aprovar',
   aprovacaoSimular: 'aprovacao:simular',
+  /**
+   * O painel de marcos (SPEC-Fases-04). **Só leitura.**
+   *
+   * Não existe `marcos:commitar`: o botão "Commitar marco" do painel chama
+   * `projectCompleteMilestone`, que é a retomada da M8-F01. Um canal próprio de commit seria o
+   * segundo caminho de escrita no Git que a M9-F01 cravou não existir — e o teste do critério 3
+   * é literalmente a ausência deste canal.
+   */
+  marcosVista: 'marcos:vista',
   /**
    * A jornada de planejamento (SPEC-Jornada-01).
    *
@@ -1325,6 +1335,13 @@ export interface JarvisBridge {
     mudancas: readonly MudancaDeArtefato[],
     workspace: WorkspaceId
   ): Promise<readonly Gate[]>
+  /**
+   * O painel de marcos: o que está versionado e o estado do repositório (SPEC-Fases-04).
+   *
+   * Uma leitura por chamada — a tela decide quando repetir ("Verificar de novo"), e não a cada
+   * render. Não há contraparte de escrita: commitar é `concluirMarco`.
+   */
+  marcosDoProjeto(projectId: string, workspace: WorkspaceId): Promise<VistaDeMarcos>
   escolherAnexo(tipo: TipoDeAnexo): Promise<string>
   /**
    * O ato de anexar: copia o arquivo para dentro do projeto e hasheia no instante.

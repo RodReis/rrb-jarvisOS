@@ -207,6 +207,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'login',
     'logout',
     'logoutGithub',
+    'marcosDoProjeto',
     'minimizeToTray',
     'mvpsElegiveis',
     'onAiStreamEvent',

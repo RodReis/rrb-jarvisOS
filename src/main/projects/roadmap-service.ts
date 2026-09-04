@@ -25,6 +25,7 @@ import type { WorkspaceId } from '@shared/domain/entities'
 import type { Approval, AprovacaoOutcome, Gate, RevisaoAprovada } from '@shared/domain/aprovacoes'
 import { aprovacaoVigente, gatesInvalidados } from '@shared/domain/aprovacoes'
 import type { MudancaDeArtefato } from '@shared/domain/aprovacoes'
+import type { ResultadoDaVerificacao } from '@shared/domain/marcos'
 import type { Roadmap } from '@shared/domain/roadmap'
 import type { RoadmapRegistrado } from '@shared/domain/roadmap-gerado'
 import { specPodeSerAceita } from '@shared/domain/roadmap-gerado'
@@ -53,6 +54,18 @@ interface RoadmapDeps {
    * pergunta, e o gate poderia aprovar uma revisão diferente da que a tela mostrou.
    */
   readonly roadmapGerado: (projectId: string) => RoadmapRegistrado | undefined
+  /**
+   * A verificação de marcos do `SLICE_ENTRY` (SPEC-Fases-04, critério 4).
+   *
+   * Injetada como função, e não como serviço, pela mesma razão de `roadmapGerado`: este arquivo
+   * decide *o que o resultado significa para o gate*, e não como ler Git.
+   *
+   * **Obrigatória de propósito.** Um campo opcional aqui teria duas leituras — "não verifica" e
+   * "esqueceram de ligar" — indistinguíveis em runtime, e a segunda abriria a Construção sem
+   * verificação nenhuma. Sendo obrigatória, o compilador aponta todo ponto de montagem, e um
+   * `SLICE_ENTRY` sem gate deixa de ser possível por construção.
+   */
+  readonly verificarMarcos: (projectId: string, workspaceId: WorkspaceId) => ResultadoDaVerificacao
 }
 
 export class RoadmapService {
@@ -64,6 +77,10 @@ export class RoadmapService {
   private readonly userId: () => string
   private readonly identidade: () => string | undefined
   private readonly roadmapGerado: (projectId: string) => RoadmapRegistrado | undefined
+  private readonly verificarMarcos: (
+    projectId: string,
+    workspaceId: WorkspaceId
+  ) => ResultadoDaVerificacao
 
   constructor(deps: RoadmapDeps) {
     this.repository = deps.repository
@@ -74,6 +91,7 @@ export class RoadmapService {
     this.userId = deps.userId
     this.identidade = deps.identidade
     this.roadmapGerado = deps.roadmapGerado
+    this.verificarMarcos = deps.verificarMarcos
   }
 
   /** O roadmap gravado do projeto. */
@@ -218,6 +236,22 @@ export class RoadmapService {
         reason: 'ja-aprovado',
         vigente,
         mensagem: 'Esta mesma revisão já foi aprovada. Nada mudou desde então.'
+      }
+    }
+
+    // O gate da Construção (SPEC-Fases-04, critério 4). **Antes** do `Approval`, e não depois:
+    // registrar a aprovação e então descobrir que os documentos não estão versionados deixaria um
+    // aceite gravado para um estado que o PI não aprovaria — e o aceite é o que a jornada lê para
+    // avançar. Só o `SLICE_ENTRY` verifica: é o gate que abre a Construção.
+    if (gate === 'SLICE_ENTRY') {
+      const marcos = this.verificarMarcos(projectId, workspaceId)
+      if (!marcos.ok) {
+        return {
+          reason: 'marcos-pendentes',
+          problemas: marcos.pendencias.map((p) => ({ mensagem: p.mensagem, acao: p.acao })),
+          mensagem:
+            'Os documentos do planejamento precisam estar versionados no Git antes da Construção.'
+        }
       }
     }
 
