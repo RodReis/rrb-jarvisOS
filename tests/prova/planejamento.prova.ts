@@ -181,8 +181,11 @@ test.describe('critério 7 — a regressão diz o motivo', () => {
     // Acima da lista, medido por posição real: o PI precisa saber **por que** a jornada andou
     // para trás antes de procurar onde ela parou. Enterrado numa linha, o motivo competiria
     // com o próximo passo.
+    //
+    // `first()`: desde a SPEC-Fases-01 a trilha tem uma `ol` por fase (três blocos), e o que se
+    // mede é o motivo estar acima de **onde a trilha começa** — a primeira delas.
     const caixaMotivo = await motivo.boundingBox()
-    const caixaTrilha = await page.locator('ol').boundingBox()
+    const caixaTrilha = await page.locator('ol').first().boundingBox()
     expect(caixaMotivo!.y).toBeLessThan(caixaTrilha!.y)
   })
 })
