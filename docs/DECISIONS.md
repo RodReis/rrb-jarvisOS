@@ -166,3 +166,4 @@ O PI usou o app com o MVP-025 aceito e apontou que o card não diz a fase, que o
 7. **Fila:** MVP-026 antes do MVP-022 e do Command Center — altera a ordem registrada em 2026-09-03 para esses dois.
 8. **SPEC-Providers-04 não é reaberta:** o editor por tipo de tarefa vira "Avançado" e continua sendo o roteamento de chamadas fora da jornada (MVP-007, 017, 021).
 9. O aceite do MVP-025 **não é reaberto**; o que muda entra por fatias novas com SPEC própria (regra de 2026-08-30).
+10. **SPEC-Multi-Executor-02 (M10-F02, aprovada em 2026-08-29, não construída) é emendada:** a dependência da M10-F01 vale só para o mount no container (critério 2); a parte de host (`CODEX_HOME`, login, health, modos, redaction) é entregue antes da M26-F06. Emenda legítima pela regra de 2026-08-30 (fatia não construída). Descartado puxar a M10-F01 e descartado a M26-F06 criar um segundo dono do `CODEX_HOME`.
