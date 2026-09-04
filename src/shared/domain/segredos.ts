@@ -87,6 +87,37 @@ export function conteudoTemSegredo(texto: string): boolean {
   return PADROES_DE_SEGREDO.some((padrao) => padrao.test(texto))
 }
 
+/** O que substitui o trecho reconhecido como segredo. */
+export const SEGREDO_REDIGIDO = '[redigido]'
+
+/**
+ * Substitui os segredos reconhecíveis do texto pelo marcador (SPEC-Fases-03, critério 3).
+ *
+ * O irmão de `conteudoTemSegredo`: um **detecta**, o outro **remove**. Nasceu com o console da
+ * geração, onde o texto não pode ser recusado — um comando com token no meio é evidência que o
+ * PI precisa ver, e barrá-lo esconderia a ferramenta inteira em vez de esconder o segredo dela.
+ *
+ * Mora aqui e não no repositório do trace porque os padrões moram aqui: uma segunda lista, na
+ * camada de persistência, seria a que fica para trás quando um formato novo de token for
+ * acrescentado — e a que fica para trás é a que vaza.
+ *
+ * **Não substitui o redator de auditoria** (`redact` em `logging-redaction`), que age sobre
+ * *nome de campo* — os dois são complementares e o chamador usa os dois: um pega
+ * `{ authorization: ... }`, o outro pega `sk-ant-…` solto no meio de uma linha de comando.
+ */
+export function redigirSegredos(texto: string): string {
+  let saida = texto
+
+  for (const padrao of PADROES_DE_SEGREDO) {
+    // Os padrões da constante não têm a flag `g` (eles servem a `.test`, que com `g` guardaria
+    // `lastIndex` entre chamadas e passaria a pular ocorrências). Recriar com `g` aqui é o que
+    // faz o replace alcançar **todas** as ocorrências da linha, e não só a primeira.
+    saida = saida.replace(new RegExp(padrao.source, `${padrao.flags}g`), SEGREDO_REDIGIDO)
+  }
+
+  return saida
+}
+
 /**
  * Examina um candidato a item de contexto.
  *
