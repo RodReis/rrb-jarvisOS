@@ -505,7 +505,10 @@ if (!app.requestSingleInstanceLock()) {
       repository: projectRepository,
       roadmap: roadmapRepository,
       audit: storage.audit,
-      userId: userIdAtual
+      userId: userIdAtual,
+      // O modelo que a próxima geração usaria — a **mesma** fonte que a geração consulta, e é o
+      // que faz o card e o selo nunca discordarem (SPEC-Fases-01, critério 4).
+      modeloAtivo: (workspace, provider) => routingRepo.modeloAtivo(userIdAtual(), workspace, provider)
     })
 
     // O prompt e o brief refinado (SPEC-Jornada-02).
@@ -524,6 +527,9 @@ if (!app.requestSingleInstanceLock()) {
      * orçamento é USD ou uso, e o `ContextPack` é a pré-condição de qualquer chamada. Duplicá-las
      * deixaria as duas gerações divergirem no dia em que uma das cópias mudasse.
      */
+    /** O card da lista pergunta pelo ambiente, não por um projeto. */
+    const SEM_PROJETO = ''
+
     const estadoDasRotasDoProjeto = async (
       _projectId: string,
       workspace: WorkspaceId
@@ -1090,6 +1096,13 @@ if (!app.requestSingleInstanceLock()) {
       roadmap,
       roadmapGerado,
       jornada,
+      /*
+       * O card não tem projeto único: o estado das rotas é do ambiente, e uma medição serve a
+       * lista inteira. O `projectId` da assinatura é ignorado pela função (o opt-in de rota paga
+       * ainda não é por projeto), então qualquer valor serviria — `SEM_PROJETO` diz isso em vez
+       * de esconder um `''` no meio da chamada.
+       */
+      estadoDasRotas: (workspace) => estadoDasRotasDoProjeto(SEM_PROJETO, workspace),
       brief,
       prd,
       arquitetura,

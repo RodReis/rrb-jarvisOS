@@ -153,6 +153,7 @@ describe('ponte do preload', () => {
       'resolveFailure',
       'responderPerguntaDaSpec',
       'responderRefinamento',
+      'resumoDeVarios',
       'revisoesDoGate',
       'rotaDaGeracao',
       'runCommand',

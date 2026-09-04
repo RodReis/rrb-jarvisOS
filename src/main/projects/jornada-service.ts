@@ -346,11 +346,15 @@ export class JornadaService {
    * Reusa `estado()` em vez de recalcular: é lá que a etapa derivada e a correção do cache
    * vivem, e um segundo cálculo aqui poderia divergir do que a tela do projeto aberto mostra.
    */
-  resumoDoProjeto(projectId: string, workspaceId: WorkspaceId): ResumoDoProjeto | undefined {
+  resumoDoProjeto(
+    projectId: string,
+    workspaceId: WorkspaceId,
+    rotas?: EstadoDasRotas
+  ): ResumoDoProjeto | undefined {
     const estado = this.estado(projectId, workspaceId)
     if (!estado) return undefined
 
-    const rota = this.rotaDoProjeto(projectId, workspaceId)
+    const rota = this.rotaDoProjeto(projectId, workspaceId, rotas)
     const fase = faseDaEtapa(estado.etapa)
 
     return {
@@ -368,13 +372,21 @@ export class JornadaService {
     }
   }
 
-  /** O resumo de vários projetos — o que a lista consome, uma leitura por card (critério 7). */
+  /**
+   * O resumo de vários projetos — o que a lista consome, uma leitura por card (critério 7).
+   *
+   * A disponibilidade da assinatura é medida **uma vez por lote**, não por card: medi-la custa
+   * um `spawn` do CLI, e doze projetos dariam doze processos para desenhar uma tela só. O estado
+   * das rotas é o mesmo para todos os cards da lista — é propriedade do ambiente, não do
+   * projeto — então medir por card pagaria N vezes por um fato único.
+   */
   resumoDeVarios(
     projectIds: readonly string[],
-    workspaceId: WorkspaceId
+    workspaceId: WorkspaceId,
+    rotas?: EstadoDasRotas
   ): readonly ResumoDoProjeto[] {
     return projectIds
-      .map((id) => this.resumoDoProjeto(id, workspaceId))
+      .map((id) => this.resumoDoProjeto(id, workspaceId, rotas))
       .filter((r): r is ResumoDoProjeto => r !== undefined)
       .sort((a, b) => ordemDaEtapa(a.etapa) - ordemDaEtapa(b.etapa))
   }
@@ -386,8 +398,12 @@ export class JornadaService {
    * legítima, e inventar `bloqueado` diria ao PI que há um problema de configuração onde só há
    * um serviço montado sem a dep opcional.
    */
-  private rotaDoProjeto(projectId: string, workspaceId: WorkspaceId): ResultadoDaRota | null {
-    const estado = this.estadoDasRotas?.(projectId, workspaceId)
+  private rotaDoProjeto(
+    projectId: string,
+    workspaceId: WorkspaceId,
+    medido?: EstadoDasRotas
+  ): ResultadoDaRota | null {
+    const estado = medido ?? this.estadoDasRotas?.(projectId, workspaceId)
     return estado ? escolherRota(estado) : null
   }
 
