@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LinhaDeMarco, VistaDeMarcos } from '@shared/domain/marcos'
 import { MarcosDoProjeto } from './MarcosDoProjeto'
 
@@ -47,10 +47,16 @@ beforeEach(() => {
     mensagem: 'docs: PRD aprovado'
   })
 
-  Object.defineProperty(window, 'jarvis', {
-    value: { marcosDoProjeto, completeMilestone, sendLog: vi.fn() },
-    configurable: true
-  })
+  // `stubGlobal` + `unstubAllGlobals`, e não `defineProperty`: é o padrão do
+  // `console-da-geracao.test.tsx`, e misturar os dois quebra no CI. Uma ponte definida por
+  // `defineProperty` sobrevive ao `unstubAllGlobals` do vizinho, e o stub dele passa a
+  // sobrescrever a nossa — a falha aparece só quando os arquivos correm juntos, com o erro num
+  // teste que não tem nada a ver (`Cannot read properties of undefined`).
+  vi.stubGlobal('jarvis', { marcosDoProjeto, completeMilestone, sendLog: vi.fn() })
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
 })
 
 function montar(): void {
