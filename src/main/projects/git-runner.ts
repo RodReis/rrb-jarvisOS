@@ -60,8 +60,28 @@ export interface GitOutcome {
 export class GitRunner {
   constructor(private readonly terminal: TerminalEngine) {}
 
-  run(args: readonly string[], cwd: string, workspaceId: WorkspaceId): GitOutcome {
-    const execucao = this.terminal.run({ binary: BINARIO_GIT, args, cwd }, workspaceId)
+  /**
+   * `saidaEhConteudo` marca o comando cuja saída é **o arquivo do usuário**, e não evidência —
+   * hoje só `git show <sha>:<caminho>` (SPEC-Fases-04). Sem a marca, o texto inteiro do
+   * documento vai para o `AuditEvent`, onde o `redact()` não o alcança: ele age sobre nome de
+   * campo, e um documento não tem campo a reconhecer. O chamador continua recebendo a saída
+   * real; o que muda é o que a auditoria guarda.
+   */
+  run(
+    args: readonly string[],
+    cwd: string,
+    workspaceId: WorkspaceId,
+    opcoes: { readonly saidaEhConteudo?: boolean } = {}
+  ): GitOutcome {
+    const execucao = this.terminal.run(
+      {
+        binary: BINARIO_GIT,
+        args,
+        cwd,
+        ...(opcoes.saidaEhConteudo === true ? { saidaEhConteudo: true } : {})
+      },
+      workspaceId
+    )
 
     return {
       ok: execucao.state === 'concluido',

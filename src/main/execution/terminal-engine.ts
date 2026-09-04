@@ -134,6 +134,27 @@ function argsSeguros(args: readonly string[]): string[] {
 }
 
 /**
+ * O que aparece no lugar do corpo do arquivo, quando ele não pode virar evidência.
+ *
+ * Um marcador, e não string vazia: quem lê a auditoria precisa distinguir "o comando não
+ * imprimiu nada" de "o que ele imprimiu foi omitido de propósito". As duas leituras levam a
+ * investigações diferentes.
+ */
+export const SAIDA_OMITIDA = '[conteúdo de arquivo omitido da evidência]'
+
+/**
+ * A execução como a auditoria deve guardá-la.
+ *
+ * Só o `stdout` sai, e só quando o chamador declarou `saidaEhConteudo`. Binário, argumentos,
+ * cwd, exit code, duração, `stderr` e o par antes/depois continuam — o que se protege é o corpo
+ * do arquivo do usuário (ADR-004), não o rastro de que o comando rodou.
+ */
+function semConteudo(execucao: CommandExecution, submission: CommandSubmission): CommandExecution {
+  if (submission.saidaEhConteudo !== true) return execucao
+  return { ...execucao, stdout: SAIDA_OMITIDA }
+}
+
+/**
  * Redige e trunca uma saída antes de ela virar evidência ou chegar à tela.
  *
  * A ordem importa: **redige primeiro, trunca depois**. Truncar antes poderia cortar um token
@@ -493,7 +514,13 @@ export class TerminalEngine {
       durationMs
     }
 
-    this.auditar(execucao, exitCode === 0 ? 'depois' : 'erro')
+    /*
+     * A auditoria recebe a execução **sem o corpo do arquivo** quando o chamador declarou que a
+     * saída é conteúdo (`saidaEhConteudo`). O retorno acima segue com o texto real, porque é
+     * para isso que quem chamou rodou o comando; o que não pode é o documento virar evidência
+     * persistida. Ver `CommandSubmission.saidaEhConteudo`.
+     */
+    this.auditar(semConteudo(execucao, ctx.submission), exitCode === 0 ? 'depois' : 'erro')
     log.agent.info('Comando executado no terminal controlado', {
       executionId: execucao.id,
       exitCode,

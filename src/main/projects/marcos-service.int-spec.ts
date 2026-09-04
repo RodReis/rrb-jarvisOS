@@ -313,4 +313,23 @@ comGit('MarcosService — verificação do gate', () => {
     expect(comandos.length).toBeGreaterThan(0)
     expect(JSON.stringify(comandos)).toContain('status')
   })
+
+  /**
+   * **O conteúdo do documento não pode chegar à auditoria** (ADR-004, critério 2).
+   *
+   * `git show <sha>:<caminho>` existe para devolver o arquivo inteiro no `stdout`, e o
+   * `TerminalEngine` persiste `stdout` em todo `AuditEvent` de `terminal-command`. Era o único
+   * comando desta fatia cujo propósito é despejar conteúdo — e o teste do critério 6 acima não
+   * pegava, porque afirmava só a **presença** do rastro, nunca a ausência do texto.
+   */
+  it('não grava o conteúdo do documento na auditoria de comandos (ADR-004)', () => {
+    const segredo = '# PRD\n\nCHAVE-DO-CLIENTE-NAO-PUBLICADA-42\n'
+    documentos = [{ caminho: PRD, hash: commitar(PRD, segredo) }]
+
+    service.vista(PROJETO, WS)
+
+    const auditoria = JSON.stringify(audit.list(USER, WS))
+
+    expect(auditoria).not.toContain('CHAVE-DO-CLIENTE-NAO-PUBLICADA-42')
+  })
 })

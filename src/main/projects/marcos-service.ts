@@ -259,7 +259,12 @@ export class MarcosService {
     diretorio: string,
     workspaceId: WorkspaceId
   ): { readonly hashDoBlob: string } | undefined {
-    const blob = this.deps.git.run(['show', `${commit}:${caminho}`], diretorio, workspaceId)
+    // `saidaEhConteudo`: este é o único comando da fatia cujo propósito é despejar o arquivo
+    // inteiro, e sem a marca o texto do documento viraria evidência persistida no `AuditEvent`
+    // (ADR-004). O hash é calculado aqui, com a saída real; a auditoria guarda o marcador.
+    const blob = this.deps.git.run(['show', `${commit}:${caminho}`], diretorio, workspaceId, {
+      saidaEhConteudo: true
+    })
     if (!blob.ok) return undefined
 
     // `execucao.stdout` cru, não `saida`: `saida` vem com `trim()`, e um documento que termina em
