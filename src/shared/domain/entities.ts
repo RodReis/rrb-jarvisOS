@@ -190,6 +190,14 @@ export const AUDIT_EVENT_TYPES = [
   // exigiria parsear payload para descartar as edições.
   'provider-selection',
   'routing-change',
+  // SPEC-Fases-02: o PI editando qual modelo gera cada fase, no workspace ou no projeto.
+  //
+  // Tipo proprio e nao `routing-change`, pela mesma razao que separa aquele de
+  // `provider-selection`: a pergunta "qual modelo o PI escolheu para a Construcao" nao pode
+  // exigir parsear payload para descartar as edicoes de rota por tipo de tarefa, que respondem
+  // a outra pergunta e mudam por outro motivo. O payload traz fase, rota, escopo e o par
+  // antes/depois — nunca prompt nem credencial (ADR-004).
+  'phase-model-change',
   // SPEC-Conectores-01: chamada a conector externo (GitHub, Tavily). **Dois eventos por
   // chamada** — `fase: 'requisicao'` antes e `fase: 'conclusao'` depois —, pela mesma razão
   // que `ai-call` os tem: uma chamada que morre no meio precisa deixar rastro, e o evento de

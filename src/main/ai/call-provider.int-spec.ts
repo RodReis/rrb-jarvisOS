@@ -385,6 +385,42 @@ describe('auditoria (critério 5)', () => {
       tokensSaida: 500
     })
   })
+
+  /*
+   * O `model` do pedido chega ao ledger (SPEC-Fases-02, criterio 2).
+   *
+   * O campo existia no `AiRequest` desde a F04 ("ausente = o modelo ativo do provider"), mas o
+   * caminho de provider explicito o descartava e devolvia `MODELO_PADRAO` sempre. Com a jornada
+   * resolvendo o modelo da fase antes de chamar, esse descarte deixaria a escolha do PI sem
+   * efeito **em silencio**: a geracao sairia por Opus com o ledger registrando Opus, sem erro
+   * nenhum a investigar. Por isso o teste olha o ledger, e nao so o retorno.
+   */
+  it('o modelo pedido chega ao ledger, e nao o padrao do provider', async () => {
+    await coletar(
+      servico(adapterFalso(ROTEIRO_OK)).call(
+        {
+          provider: 'anthropic',
+          model: 'claude-sonnet-5',
+          prompt: PROMPT,
+          contextPackId: PACK
+        },
+        { userId: USUARIO, workspace: 'jarvis' }
+      )
+    )
+
+    expect(eventosDeIa().at(-1)?.payload).toMatchObject({ model: 'claude-sonnet-5' })
+  })
+
+  it('sem `model`, continua caindo no padrao do provider', async () => {
+    await coletar(
+      servico(adapterFalso(ROTEIRO_OK)).call(
+        { provider: 'anthropic', prompt: PROMPT, contextPackId: PACK },
+        { userId: USUARIO, workspace: 'jarvis' }
+      )
+    )
+
+    expect(eventosDeIa().at(-1)?.payload).toMatchObject({ model: 'claude-opus-5' })
+  })
 })
 
 describe('log `ai` com entrada e saída casadas (critério 6)', () => {

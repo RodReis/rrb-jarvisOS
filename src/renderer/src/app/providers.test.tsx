@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AiProvider } from '@shared/domain/ai'
 import { ROTEAMENTO_PADRAO, type ProviderStatus, type RoutingPolicy } from '@shared/domain/routing'
+import type { PhaseModelPolicy } from '@shared/domain/modelo-da-fase'
+import { POLITICA_DE_MODELO_PADRAO } from '@shared/domain/modelo-da-fase'
 import { ProvidersDoWorkspace } from './ProvidersDoWorkspace'
 
 /**
@@ -22,6 +24,8 @@ const getProviderModels = vi.fn()
 const setProviderModel = vi.fn()
 const getRouting = vi.fn()
 const setRoute = vi.fn()
+const getPhaseModels = vi.fn()
+const setPhaseModel = vi.fn()
 const sendLog = vi.fn()
 
 function statusDe(provider: AiProvider, parcial: Partial<ProviderStatus> = {}): ProviderStatus {
@@ -49,11 +53,19 @@ const ROTAS_PADRAO: RoutingPolicy = {
   rotas: ROTEAMENTO_PADRAO
 }
 
+const POLITICA_PADRAO: PhaseModelPolicy = {
+  user_id: 'user-1',
+  workspace_id: 'jarvis',
+  fases: POLITICA_DE_MODELO_PADRAO
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   getProviderStatus.mockResolvedValue(STATUS_PADRAO)
   getRouting.mockResolvedValue(ROTAS_PADRAO)
   setRoute.mockResolvedValue(ROTAS_PADRAO)
+  getPhaseModels.mockResolvedValue(POLITICA_PADRAO)
+  setPhaseModel.mockResolvedValue(POLITICA_PADRAO)
   setProviderModel.mockResolvedValue(true)
   getProviderModels.mockImplementation(async (p: AiProvider) =>
     p === 'anthropic' ? ['claude-opus-5', 'claude-haiku-4-5'] : ['gemini-2.5-pro', 'llama3.1']
@@ -66,6 +78,8 @@ beforeEach(() => {
       setProviderModel,
       getRouting,
       setRoute,
+      getPhaseModels,
+      setPhaseModel,
       sendLog
     },
     configurable: true,
@@ -131,9 +145,13 @@ describe('status por provider (critérios 5 e 6)', () => {
     // "Roda na minha máquina" e "não cobra por chamada" são fatos que o usuário precisa ler.
     await montar()
 
-    expect(screen.getAllByText('Local').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Nuvem').length).toBeGreaterThan(0)
-    expect(screen.getAllByText(/sem custo por chamada/i).length).toBe(2)
+    // Escopado a lista de providers: desde a SPEC-Fases-02 as combos de modelo por fase mostram
+    // as mesmas Tags, e uma contagem sobre a aba inteira mediria as duas superficies juntas.
+    const lista = within(screen.getByRole('group', { name: /providers deste espaço/i }))
+
+    expect(lista.getAllByText('Local').length).toBeGreaterThan(0)
+    expect(lista.getAllByText('Nuvem').length).toBeGreaterThan(0)
+    expect(lista.getAllByText(/sem custo por chamada/i).length).toBe(2)
   })
 
   it('mostra a latência medida pelo main', async () => {
@@ -362,5 +380,129 @@ describe('operável por teclado (critério 5)', () => {
         name: /Subir Google Gemini em Conversa/i
       })
     ).toBeInTheDocument()
+  })
+})
+
+/**
+ * A aba Modelos (SPEC-Fases-02, critérios 1, 6 e 7).
+ *
+ * O que estes testes protegem não é o layout: é a **promessa do catálogo**. Um combo que oferece
+ * Fable na rota paga é uma tela mentindo, e o erro só apareceria quando alguém escolhesse — na
+ * fronteira, longe daqui.
+ */
+describe('modelos por fase (SPEC-Fases-02)', () => {
+  /**
+   * A combo de uma fase numa rota.
+   *
+   * Por `data-jos-*` e não por rótulo: os rótulos das combos se repetem nas três fases, e um
+   * `getByLabelText` acharia três elementos. O `Select` do DS é Radix (botão + listbox em
+   * portal), então esta função devolve o **gatilho** — abrir e clicar na opção é o caminho que
+   * o usuário percorre e o único que `userEvent` alcança.
+   */
+  function combo(fase: string, rota: string): HTMLElement {
+    const alvo = document.querySelector(
+      `[data-jos-fase="${fase}"][data-jos-rota="${rota}"]`
+    ) as HTMLElement | null
+
+    expect(alvo).not.toBeNull()
+    return alvo as HTMLElement
+  }
+
+  /** As opções que uma combo oferece, com a listbox aberta. */
+  async function opcoesDe(fase: string, rota: string): Promise<readonly string[]> {
+    await userEvent.click(combo(fase, rota))
+    const listbox = await screen.findByRole('listbox')
+    return within(listbox)
+      .getAllByRole('option')
+      .map((o) => o.textContent ?? '')
+  }
+
+  it('lista as três fases com o rótulo em português', async () => {
+    await montar()
+
+    for (const rotulo of ['Planejamento', 'Especificação', 'Construção']) {
+      expect(screen.getByRole('heading', { name: rotulo, level: 4 })).toBeInTheDocument()
+    }
+  })
+
+  it('Fable aparece na rota de assinatura (critério 1)', async () => {
+    await montar()
+
+    expect(await opcoesDe('planejamento', 'assinatura')).toContain('Fable 5.1 · claude-fable-5-1')
+  })
+
+  it('Fable NÃO aparece na rota paga: o catálogo resolve, não o runtime (critério 1)', async () => {
+    await montar()
+
+    const opcoes = await opcoesDe('planejamento', 'paga')
+
+    expect(opcoes.some((o) => o.includes('claude-fable-5-1'))).toBe(false)
+    // A combo não fica vazia por causa da ausência: a rota paga tem catálogo próprio.
+    expect(opcoes).toContain('Opus 5 · claude-opus-5')
+  })
+
+  it('a combo mostra rótulo e id juntos, para casar com o ledger', async () => {
+    await montar()
+
+    expect(await opcoesDe('construcao', 'assinatura')).toContain('Opus 5 · claude-opus-5')
+  })
+
+  it('o padrão do PI aparece: Fable no Planejamento, Opus na Construção', async () => {
+    await montar()
+
+    expect(combo('planejamento', 'assinatura')).toHaveTextContent('Fable 5.1')
+    expect(combo('construcao', 'assinatura')).toHaveTextContent('Opus 5')
+  })
+
+  it('trocar grava a fase, a rota e o provider daquela rota', async () => {
+    const usuario = userEvent.setup()
+    await montar()
+
+    await usuario.click(combo('construcao', 'assinatura'))
+    await usuario.click(await screen.findByRole('option', { name: /Sonnet 5/ }))
+
+    await waitFor(() =>
+      expect(setPhaseModel).toHaveBeenCalledWith(
+        'construcao',
+        'assinatura',
+        'claude-code',
+        'claude-sonnet-5',
+        'jarvis'
+      )
+    )
+  })
+
+  it('recusa na fronteira vira aviso legível, e a política mostrada não muda', async () => {
+    // `undefined` é o main dizendo que o par não existe no catálogo (critério 4). Aplicar a
+    // escolha localmente aqui esconderia que ela não pegou.
+    setPhaseModel.mockResolvedValueOnce(undefined)
+    const usuario = userEvent.setup()
+    await montar()
+
+    await usuario.click(combo('construcao', 'assinatura'))
+    await usuario.click(await screen.findByRole('option', { name: /Sonnet 5/ }))
+
+    expect(await screen.findByText(/não está disponível nesta rota/i)).toBeInTheDocument()
+    expect(combo('construcao', 'assinatura')).toHaveTextContent('Opus 5')
+  })
+
+  it('o roteamento por tarefa continua na aba, sob Avançado e recolhido (critério 7)', async () => {
+    await montar()
+
+    const avancado = screen.getByText(/Avançado · Roteamento por tipo de tarefa/i)
+    expect(avancado.closest('details')).not.toHaveAttribute('open')
+
+    // Recolhido, mas presente: a SPEC-Providers-04 continua valendo, e MVP-007/017/021 vão
+    // consumir o `ProviderRoute`.
+    expect(
+      screen.getByRole('button', { name: /Subir Google Gemini em Conversa/i })
+    ).toBeInTheDocument()
+  })
+
+  it('diz que a jornada não passa pelo roteamento por tarefa', async () => {
+    // Duas listas de modelo na mesma aba sem esta frase fariam o PI editar a errada.
+    await montar()
+
+    expect(screen.getByText(/A geração de brief, PRD, arquitetura/i)).toBeInTheDocument()
   })
 })

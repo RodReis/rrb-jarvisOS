@@ -69,14 +69,24 @@ export const TABELA_DE_PRECO: Readonly<
   // "local/offline quando viável" do RF-011 valendo na conta.
   ollama: {
     'llama3.1': { entrada: 0, saida: 0 },
-    'qwen2.5-coder': { entrada: 0, saida: 0 }
+    'qwen2.5-coder': { entrada: 0, saida: 0 },
+    // Pedido do PI no MVP-026. **Soma, não substitui**: a tag existe no `ollama list` de quem
+    // já a baixou, e remover uma das outras invalidaria a escolha de modelo de quem a usa.
+    'qwen3:8b': { entrada: 0, saida: 0 }
   },
   // Rota de **assinatura** (plano Claude MAX pelo CLI), `unmetered` por emenda do PI de
   // 2026-08-29: registra uso sem valor monetário. Zero aqui não é "de graça" — é "não se
   // converte em USD". Converter seria número inventado, e o gate barraria com base nele.
   'claude-code': {
     'claude-opus-5': { entrada: 0, saida: 0 },
-    'claude-sonnet-5': { entrada: 0, saida: 0 }
+    'claude-sonnet-5': { entrada: 0, saida: 0 },
+    // **Só aqui, nunca em `anthropic`** (decisao 4 do MVP-026, SPEC-Fases-02 § Catalogo).
+    //
+    // Fable pela API paga nao e recusado em runtime: ele **nao existe como opcao**. A diferenca
+    // importa — uma recusa em runtime seria um combo que oferece o que nao atende, e o erro so
+    // apareceria depois da chamada sair. Ausencia no catalogo faz `modelosDisponiveis('anthropic')`
+    // nunca listar Fable, e o guard de fronteira recusar antes de qualquer chamada.
+    'claude-fable-5-1': { entrada: 0, saida: 0 }
   }
 }
 
@@ -158,6 +168,20 @@ export const ORIGEM_DO_PROVIDER: Readonly<Record<AiProvider, 'local' | 'cloud'>>
   // Anthropic por dentro, mas quem o app executa é um binário local — e é isso que a tela
   // precisa dizer para o usuário entender o que está acontecendo no computador dele.
   'claude-code': 'local'
+}
+
+/**
+ * O rótulo pt-BR de cada provider, para as telas.
+ *
+ * Sobe para o domínio na SPEC-Fases-02 porque **duas telas passam a lê-lo**: a lista de
+ * providers e as combos de modelo por fase. Uma cópia local em cada uma divergiria na primeira
+ * renomeação, e as duas telas mostrariam nomes diferentes para o mesmo provider.
+ */
+export const ROTULO_DO_PROVIDER: Readonly<Record<AiProvider, string>> = {
+  anthropic: 'Anthropic (Claude API)',
+  gemini: 'Google Gemini',
+  ollama: 'Ollama (local)',
+  'claude-code': 'Claude Code CLI'
 }
 
 /** O modelo usado quando o chamador não escolhe. */

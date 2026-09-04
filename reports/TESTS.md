@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 1308 | 1308 | 0 | 74.5 | — | — |
-| — | — | — | Banco | 981 | 976 | 0 | 87.8 | — | — |
-| — | — | — | Tela | 506 | 505 | 0 | 74.0 | — | — |
+| — | — | — | Regras de Negócio | 1328 | 1328 | 0 | 74.0 | — | — |
+| — | — | — | Banco | 1002 | 997 | 0 | 87.6 | — | — |
+| — | — | — | Tela | 520 | 519 | 0 | 73.8 | — | — |
 
 ## Histórico por entrega
 
@@ -253,3 +253,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-04 | #259 | spec-jornada-01-estado-e-jornada-unica | Regras de Negócio | 1308 | 1308 | 0 | 74.5 | — | — |
 | 2026-09-04 | #259 | spec-jornada-01-estado-e-jornada-unica | Banco | 981 | 976 | 0 | 87.8 | — | — |
 | 2026-09-04 | #259 | spec-jornada-01-estado-e-jornada-unica | Tela | 506 | 505 | 0 | 74.0 | — | — |
+| 2026-09-04 | #252 | SPEC-Fases-02 | Regras de Negócio | 1328 | 1328 | 0 | 74.0 | #262 | [#262](https://github.com/RodReis/rrb-jarvisOS/pull/262) |
+| 2026-09-04 | #252 | SPEC-Fases-02 | Banco | 1002 | 997 | 0 | 87.6 | #262 | [#262](https://github.com/RodReis/rrb-jarvisOS/pull/262) |
+| 2026-09-04 | #252 | SPEC-Fases-02 | Tela | 520 | 519 | 0 | 73.8 | #262 | [#262](https://github.com/RodReis/rrb-jarvisOS/pull/262) |

@@ -1,7 +1,9 @@
 import { useTranslation } from 'react-i18next'
 import type { ResumoDoProjeto } from '@shared/domain/fase'
+import type { WorkspaceId } from '@shared/domain/entities'
 import type { Etapa } from '@shared/domain/jornada'
 import { InlineAlert } from '@design/ui'
+import { TrocaDeModeloDoProjeto } from './TrocaDeModeloDoProjeto'
 
 /**
  * Os quatro blocos do card de projeto (SPEC-Fases-01, critérios 2 a 5).
@@ -38,10 +40,21 @@ function nomeDaEtapa(etapa: Etapa, t: (chave: string) => string): string {
 
 interface ResumoDoCardProps {
   readonly resumo: ResumoDoProjeto | undefined
+  /**
+   * A troca de modelo deste projeto (SPEC-Fases-02, criterio 3). Opcional: o card e usado em
+   * contexto sem workspace nos testes de unidade, e o selo sem troca continua sendo o da F01.
+   */
+  readonly workspace?: WorkspaceId
+  /** Recarrega o resumo depois da troca — o modelo exibido e o que o **main** confirma. */
+  readonly aoTrocarModelo?: () => void
 }
 
 /** A linha de metadado do card: fase, etapa e progresso dentro da fase (critério 2). */
-export function ResumoDoCard({ resumo }: ResumoDoCardProps): React.JSX.Element | null {
+export function ResumoDoCard({
+  resumo,
+  workspace,
+  aoTrocarModelo
+}: ResumoDoCardProps): React.JSX.Element | null {
   const { t, i18n } = useTranslation()
 
   // Sem resumo o card fica com nome, caminho e CTA — degradação legítima, e não uma tela quebrada.
@@ -110,10 +123,26 @@ export function ResumoDoCard({ resumo }: ResumoDoCardProps): React.JSX.Element |
         {resumo.rota && resumo.rota.decisao !== 'bloqueado' && resumo.modelo && (
           <span
             data-jos-rota={resumo.rota.decisao}
-            className={`${mono} text-[var(--jos-cor-texto-suave)]`}
+            className={`${mono} flex items-center gap-1 text-[var(--jos-cor-texto-suave)]`}
           >
             {resumo.rota.decisao === 'paga' ? t('rota.viaPaga') : t('rota.viaAssinatura')} ·{' '}
-            {resumo.modelo}
+            {/*
+             * O modelo vira gatilho quando o card sabe o espaco (SPEC-Fases-02, criterio 3).
+             * Sem `workspace` continua sendo texto — a F01 nao deixa de funcionar por causa da
+             * F02, e o card em contexto sem espaco nao ganha um botao que nao teria o que gravar.
+             */}
+            {workspace === undefined || aoTrocarModelo === undefined ? (
+              resumo.modelo
+            ) : (
+              <TrocaDeModeloDoProjeto
+                projectId={resumo.projectId}
+                fase={resumo.fase}
+                decisao={resumo.rota.decisao}
+                modelo={resumo.modelo}
+                workspace={workspace}
+                aoTrocar={aoTrocarModelo}
+              />
+            )}
           </span>
         )}
       </div>

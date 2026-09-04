@@ -40,6 +40,14 @@ import type { RoutingRepository } from '../ai/routing-repository'
 import type { ProviderStatus, RoutingPolicy } from '@shared/domain/routing'
 import { isBudgetLimitsInput, type BudgetSnapshot } from '@shared/domain/budget'
 import { isProviderRoute, isTaskType } from '@shared/domain/routing'
+import type { PhaseModelService } from '../ai/phase-model-service'
+import type { PhaseModelPolicy, ProjectModelOverride } from '@shared/domain/modelo-da-fase'
+import {
+  isModeloEscolhido,
+  isProjectModelOverride,
+  isRotaComModelo
+} from '@shared/domain/modelo-da-fase'
+import { isFase } from '@shared/domain/fase'
 import {
   isConnectorCredentialKey,
   isConnectorRequest,
@@ -361,6 +369,8 @@ export interface IpcDependencies {
   readonly routing: RoutingService
   /** O repositório, para a lista de modelos — leitura pura, sem passar pelo serviço. */
   readonly routingRepo: RoutingRepository
+  /** O modelo de cada fase (SPEC-Fases-02): política do workspace e overrides por projeto. */
+  readonly phaseModels: PhaseModelService
   /** O ponto único de conectores (SPEC-Conectores-01). */
   readonly connectors: ConnectorService
   /** O ledger de créditos de conector (SPEC-Conectores-02). */
@@ -1038,6 +1048,92 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       }
 
       return deps.routing.setRota(scope, rota)
+    }
+  )
+
+  /*
+   * Modelo por fase (SPEC-Fases-02, criterios 2, 3 e 4).
+   *
+   * A fronteira recusa o par fora do catalogo **antes** de gravar, e e isso que o criterio 4
+   * pede provar: nenhuma chamada sai. `isModeloEscolhido` checa conteudo e nao so forma — e o
+   * que impede `{ anthropic, claude-fable-5-1 }`, que tem a forma certa e e exatamente o que a
+   * decisao 4 do MVP-026 proibe.
+   */
+  ipcMain.handle(IPC_CHANNELS.phaseModelGet, (_event, workspace: unknown): PhaseModelPolicy => {
+    const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+    return deps.phaseModels.politica({ userId: deps.userId(), workspace: escopo })
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.phaseModelSet,
+    (
+      _event,
+      fase: unknown,
+      rota: unknown,
+      provider: unknown,
+      modelo: unknown,
+      workspace: unknown
+    ): PhaseModelPolicy | undefined => {
+      const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+      const scope = { userId: deps.userId(), workspace: escopo }
+
+      // `isModeloEscolhido` sobre o par inteiro, e não `isAiProvider` + `typeof modelo`: só o
+      // guard do par sabe que `claude-fable-5-1` é válido em `claude-code` e proibido em
+      // `anthropic`. Validar os dois campos separados aceitaria a combinação que não existe.
+      const par = { provider, modelo }
+
+      if (!isFase(fase) || !isRotaComModelo(rota) || !isModeloEscolhido(par)) {
+        log.ipc.warn('Modelo de fase descartado por não casar com o contrato', {
+          canal: IPC_CHANNELS.phaseModelSet
+        })
+        return undefined
+      }
+
+      return deps.phaseModels.setModeloDaFase(scope, fase, rota, par.provider, par.modelo)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.phaseModelOverrides,
+    (_event, projectId: unknown, workspace: unknown): readonly ProjectModelOverride[] => {
+      if (typeof projectId !== 'string' || projectId.length === 0) return []
+      const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+      return deps.phaseModels.overrides({ userId: deps.userId(), workspace: escopo }, projectId)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.phaseModelSetOverride,
+    (_event, override: unknown, workspace: unknown): ProjectModelOverride | undefined => {
+      const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+
+      if (!isProjectModelOverride(override)) {
+        log.ipc.warn('Override de modelo descartado por não casar com o contrato', {
+          canal: IPC_CHANNELS.phaseModelSetOverride
+        })
+        return undefined
+      }
+
+      return deps.phaseModels.setOverrideDoProjeto(
+        { userId: deps.userId(), workspace: escopo },
+        override
+      )
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.phaseModelClearOverride,
+    (_event, projectId: unknown, fase: unknown, rota: unknown, workspace: unknown): boolean => {
+      const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+
+      if (typeof projectId !== 'string' || !isFase(fase) || !isRotaComModelo(rota)) return false
+
+      return deps.phaseModels.removerOverride(
+        { userId: deps.userId(), workspace: escopo },
+        projectId,
+        fase,
+        rota
+      )
     }
   )
 
