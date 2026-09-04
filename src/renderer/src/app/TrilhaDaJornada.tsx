@@ -147,9 +147,27 @@ export function TrilhaDaJornada({
               etapas continuam lá, legíveis e na ordem.
             */}
             <ol className={eAtual ? 'relative flex flex-col' : 'relative flex flex-col opacity-70'}>
+              {/*
+                A espinha do bloco, ancorada no **centro do primeiro e do último marcador**.
+
+                O recuo era fixo em `1.625rem` de cada ponta, medida da altura de uma linha
+                uniforme. Depois do agrupamento as alturas deixaram de ser uniformes — a etapa
+                atual virou bloco elevado, e as futuras ganharam o texto do que falta —, e a
+                captura do gate visual mostrou a espinha parando antes da última etapa. Ancorar
+                nos marcadores mantém a linha correta em qualquer altura de item.
+
+                `first:` e `last:` no `li` não serviriam: quem precisa saber onde o primeiro e o
+                último marcador estão é a linha, e ela é irmã deles, não filha.
+              */}
               <span
                 aria-hidden="true"
-                className="absolute bottom-[1.625rem] left-[0.625rem] top-[1.625rem] w-px -translate-x-1/2 bg-[rgba(var(--jos-borda-rgb),0.28)]"
+                className="absolute bottom-[var(--jos-espinha-recuo,1.625rem)] left-[0.625rem] top-[var(--jos-espinha-recuo,1.625rem)] w-px -translate-x-1/2 bg-[rgba(var(--jos-borda-rgb),0.28)]"
+                style={{
+                  // O centro do marcador: `py` do item (0.625rem) + metade da altura do
+                  // marcador (0.625rem). Na fase atual o primeiro item pode ser o bloco
+                  // elevado, cujo padding é maior — daí a medida vir do item, não do bloco.
+                  ['--jos-espinha-recuo' as string]: '1.25rem'
+                }}
               />
 
               {daFase.map((etapa) => {

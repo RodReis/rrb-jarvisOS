@@ -14,7 +14,7 @@ Totais da última execução (regenerado, não acumulado):
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
 | — | — | — | Regras de Negócio | 1305 | 1305 | 0 | 74.5 | — | — |
 | — | — | — | Banco | 975 | 970 | 0 | 87.7 | — | — |
-| — | — | — | Tela | 505 | 504 | 0 | 74.0 | — | — |
+| — | — | — | Tela | 506 | 505 | 0 | 74.0 | — | — |
 
 ## Histórico por entrega
 
@@ -247,3 +247,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-04 | #251 | spec-fases-01-fase-e-card-do-projeto | Regras de Negócio | 1305 | 1305 | 0 | 74.5 | #258 | [#258](https://github.com/RodReis/rrb-jarvisOS/pull/258) |
 | 2026-09-04 | #251 | spec-fases-01-fase-e-card-do-projeto | Banco | 975 | 970 | 0 | 87.7 | #258 | [#258](https://github.com/RodReis/rrb-jarvisOS/pull/258) |
 | 2026-09-04 | #251 | spec-fases-01-fase-e-card-do-projeto | Tela | 505 | 504 | 0 | 74.0 | #258 | [#258](https://github.com/RodReis/rrb-jarvisOS/pull/258) |
+| 2026-09-04 | #251 | spec-fases-01-fase-e-card-do-projeto | Regras de Negócio | 1305 | 1305 | 0 | 74.5 | #258 | [#258](https://github.com/RodReis/rrb-jarvisOS/pull/258) |
+| 2026-09-04 | #251 | spec-fases-01-fase-e-card-do-projeto | Banco | 975 | 970 | 0 | 87.7 | #258 | [#258](https://github.com/RodReis/rrb-jarvisOS/pull/258) |
+| 2026-09-04 | #251 | spec-fases-01-fase-e-card-do-projeto | Tela | 506 | 505 | 0 | 74.0 | #258 | [#258](https://github.com/RodReis/rrb-jarvisOS/pull/258) |

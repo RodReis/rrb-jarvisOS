@@ -4,7 +4,7 @@ import { FolderPlus, FolderSearch, ShieldCheck, Wand2 } from 'lucide-react'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { Project, ProjectOutcome, ProjectReason } from '@shared/domain/projects'
 import type { ResumoDoProjeto } from '@shared/domain/fase'
-import { ResumoDoCard } from './ResumoDoCard'
+import { BloqueioDoCard, ResumoDoCard } from './ResumoDoCard'
 import { Button, EmptyState, Field, InlineAlert, Input, LoadingState } from '@design/ui'
 import { log } from '../lib/log'
 import { ProjetoAberto } from './ProjetoAberto'
@@ -570,6 +570,18 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
                         </Button>
                       </div>
                     </div>
+                  )}
+
+                  {/*
+                    O bloqueio ocupa a **largura do card**, e não a coluna dos metadados: ele é o
+                    aviso que decide se vale abrir o projeto, e a captura do gate visual o mostrou
+                    espremido em meia largura por herdar o `flex-1` da coluna do nome.
+
+                    Escondido durante edição e confirmação, como o resto dos metadados: ali o card
+                    é formulário, e um alerta competiria com a decisão em curso.
+                  */}
+                  {!editando && !confirmando && (
+                    <BloqueioDoCard resumo={resumoPorProjeto.get(projeto.id)} />
                   )}
                 </article>
               </li>

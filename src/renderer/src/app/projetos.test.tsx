@@ -556,11 +556,32 @@ describe('ProjetosLocais', () => {
 
       render(<ProjetosLocais workspace="jarvis" />)
 
-      // A linha da fase, não o botão: "Aceitar o PRD" aparece nos dois, e é assim que deve ser
-      // — a fase contextualiza a etapa, e o CTA é a ação. Buscar solto casaria com qualquer um.
-      const linhaDaFase = await screen.findByText(/Planejamento · Aceitar o PRD/)
+      // A linha nomeia a **etapa**, não repete o CTA: o gate visual mostrou "PLANEJAMENTO ·
+      // GERAR O PRD" a poucos centímetros do botão "Gerar o PRD", gastando a linha sem informar
+      // onde o projeto está.
+      const linhaDaFase = await screen.findByText(/Planejamento · Aceite do PRD/)
       expect(linhaDaFase).toHaveAttribute('data-jos-fase', 'planejamento')
       expect(screen.getByText(/5\s*\/\s*8/)).toBeInTheDocument()
+    })
+
+    it('não repete a palavra quando fase e etapa têm o mesmo nome', async () => {
+      listProjects.mockResolvedValue([projeto()])
+      resumoDeVarios.mockResolvedValue([
+        resumo({
+          etapa: 'construcao',
+          fase: 'construcao',
+          rotuloDaFase: 'Construção',
+          progresso: { posicao: 1, total: 1 },
+          cta: 'Acompanhar a construção'
+        })
+      ])
+
+      render(<ProjetosLocais workspace="jarvis" />)
+
+      // O gate visual mostrou "CONSTRUÇÃO · CONSTRUÇÃO": a fase Construção tem uma etapa só, e
+      // ela leva o mesmo nome. Repetir a palavra gasta a linha sem informar.
+      const linha = await screen.findByText('Construção')
+      expect(linha).toHaveAttribute('data-jos-fase', 'construcao')
     })
 
     it('conta os gates aceitos e mostra a data do último evento (critério 3)', async () => {

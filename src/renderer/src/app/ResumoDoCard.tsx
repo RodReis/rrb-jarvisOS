@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import type { ResumoDoProjeto } from '@shared/domain/fase'
-import { CTA_DA_ETAPA } from '@shared/domain/jornada'
+import type { Etapa } from '@shared/domain/jornada'
 import { InlineAlert } from '@design/ui'
 
 /**
@@ -24,6 +24,18 @@ import { InlineAlert } from '@design/ui'
  * discordar da tela do projeto aberto no dia em que um dos dois mudasse.
  */
 
+/**
+ * O **nome** da etapa, não o rótulo do CTA.
+ *
+ * A primeira versão usava `CTA_DA_ETAPA` aqui, e a captura do gate visual mostrou o defeito: a
+ * linha dizia "PLANEJAMENTO · GERAR O PRD" a poucos centímetros de um botão "Gerar o PRD". O
+ * card repetia a ação e não dizia *onde o projeto está* — que é a pergunta do bloco. As chaves
+ * são as mesmas que a trilha usa, então os dois lugares nomeiam a etapa igual.
+ */
+function nomeDaEtapa(etapa: Etapa, t: (chave: string) => string): string {
+  return t(`jornada.etapas.${etapa}`)
+}
+
 interface ResumoDoCardProps {
   readonly resumo: ResumoDoProjeto | undefined
 }
@@ -45,10 +57,17 @@ export function ResumoDoCard({ resumo }: ResumoDoCardProps): React.JSX.Element |
           data-jos-fase={resumo.fase}
           className={`${mono} text-[var(--jos-cor-acento-leitura)]`}
         >
-          {t('projetos.faseEtapa', {
-            fase: resumo.rotuloDaFase,
-            etapa: CTA_DA_ETAPA[resumo.etapa]
-          })}
+          {/*
+            Fase e etapa juntas, **exceto quando dizem a mesma coisa**: a fase Construção tem
+            uma etapa só, e ela se chama Construção — "CONSTRUÇÃO · CONSTRUÇÃO" foi o que a
+            captura do gate visual mostrou. Repetir a palavra gasta a linha sem informar.
+          */}
+          {nomeDaEtapa(resumo.etapa, t) === resumo.rotuloDaFase
+            ? resumo.rotuloDaFase
+            : t('projetos.faseEtapa', {
+                fase: resumo.rotuloDaFase,
+                etapa: nomeDaEtapa(resumo.etapa, t)
+              })}
         </span>
 
         {/*
@@ -98,13 +117,30 @@ export function ResumoDoCard({ resumo }: ResumoDoCardProps): React.JSX.Element |
           </span>
         )}
       </div>
-
-      {/* O bloco só existe quando há o que dizer (critério 5). */}
-      {resumo.bloqueio && (
-        <InlineAlert tom="warn" titulo={t('projetos.bloqueioTitulo')}>
-          {resumo.bloqueio.acao}
-        </InlineAlert>
-      )}
     </div>
+  )
+}
+
+/**
+ * O bloqueio do projeto (critério 5), **fora da coluna do nome**.
+ *
+ * Componente separado do `ResumoDoCard` por causa do layout: os metadados vivem numa coluna que
+ * divide a linha com os botões de ação, e a captura do gate visual mostrou o aviso mais
+ * importante do card nascendo como o elemento mais estreito dele. Uma margem negativa não
+ * resolveria — a largura vem do `flex-1`, não do padding. O bloqueio precisa ser irmão da linha,
+ * e é o card quem o posiciona.
+ *
+ * Continua só existindo quando há bloqueio: um card que sempre reserva a faixa ensina o olho a
+ * pular aquela região.
+ */
+export function BloqueioDoCard({ resumo }: ResumoDoCardProps): React.JSX.Element | null {
+  const { t } = useTranslation()
+
+  if (!resumo?.bloqueio) return null
+
+  return (
+    <InlineAlert tom="warn" titulo={t('projetos.bloqueioTitulo')}>
+      {resumo.bloqueio.acao}
+    </InlineAlert>
   )
 }
