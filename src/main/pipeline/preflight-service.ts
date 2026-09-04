@@ -26,6 +26,8 @@
  */
 
 import type { WorkspaceId } from '@shared/domain/entities'
+import type { ModeloEscolhido } from '@shared/domain/modelo-da-fase'
+import { modeloExisteNoCatalogo } from '@shared/domain/modelo-da-fase'
 import type { BloqueioExterno } from '@shared/domain/pacote-estrutural'
 import {
   listaDePathsValida,
@@ -83,6 +85,19 @@ export interface PreflightDeps {
    * exige que o preflight falhe — não que o run descubra isso na primeira chamada.
    */
   readonly proxyNoAr: () => boolean
+  /**
+   * O par `{ provider, modelo }` da fase Construção deste projeto (SPEC-Fases-05, critérios 1 e 2).
+   *
+   * **Obrigatória, e não opcional**, pela razão que a M26-F04 cravou em `verificarMarcos`: um
+   * campo opcional teria duas leituras indistinguíveis em runtime — "este run não usa modelo por
+   * fase" e "esqueceram de ligar a dependência" — e a segunda mandaria todo run para o default
+   * do CLI sem erro nenhum aparecer, que é exatamente o comportamento que esta fatia existe para
+   * terminar.
+   *
+   * Injetada porque a herança (override do projeto vence o workspace) mora no
+   * `PhaseModelService`, que fala com o banco; o preflight decide *quando* resolver, não como.
+   */
+  readonly modeloDaConstrucao: (projectId: string) => ModeloEscolhido
   /**
    * A derivação do escopo quando a SPEC não traz a seção (emenda 2 de 2026-08-30).
    *
@@ -164,7 +179,21 @@ export class PreflightService {
       )
     }
 
-    // 5. Porta ocupada é detectada **antes** de subir recurso (critério 3). Descobrir a colisão
+    // 5. O modelo da fase Construção resolve e existe no catálogo (SPEC-Fases-05, critério 4).
+    //    **Antes de criar container**, e por isso aqui e não no `ConstrutorService`: recusar
+    //    depois deixaria sandbox de pé para um run que nunca poderia chamar o modelo. O par
+    //    resolvido aqui é o que o run inteiro usa — ver `modeloDaConstrucao` no sandbox.
+    const modeloDaConstrucao = this.deps.modeloDaConstrucao(pedido.projectId)
+    if (!modeloExisteNoCatalogo(modeloDaConstrucao.provider, modeloDaConstrucao.modelo)) {
+      return this.recusar(
+        pedido,
+        'modelo-fora-do-catalogo',
+        `O modelo "${modeloDaConstrucao.modelo}" não existe no catálogo do provider "${modeloDaConstrucao.provider}". O executor receberia um id que o provider recusa.`,
+        'Escolher outro modelo para a fase Construção em Modelos por fase, no workspace ou neste projeto.'
+      )
+    }
+
+    // 6. Porta ocupada é detectada **antes** de subir recurso (critério 3). Descobrir a colisão
     //    pelo erro do `docker run` deixaria worktree e leases já criados para trás.
     const ocupada = (pedido.portasDeServico ?? []).find((porta) =>
       this.deps.docker.portaOcupadaPorContainer(porta, pedido.raizOperacional)
@@ -178,7 +207,7 @@ export class PreflightService {
       )
     }
 
-    // 6. A base resolve? O SHA é fixado **antes** de qualquer escrita (critério 2): a branch
+    // 7. A base resolve? O SHA é fixado **antes** de qualquer escrita (critério 2): a branch
     //    tem de nascer de um ponto conhecido, não de "o que a base for quando eu olhar".
     const baseSha = this.resolverBase(pedido)
     if (baseSha === undefined) {
@@ -190,7 +219,7 @@ export class PreflightService {
       )
     }
 
-    // 7. Os recursos são deste run, ou de ninguém (critério 4). O `UNIQUE(user_id, recurso)`
+    // 8. Os recursos são deste run, ou de ninguém (critério 4). O `UNIQUE(user_id, recurso)`
     //    fecha a janela entre olhar e adquirir — o mesmo raciocínio do WIP=1 da M9-F02.
     const leaseWorktree = this.deps.leases.adquirir(
       userId,
@@ -230,7 +259,7 @@ export class PreflightService {
       )
     }
 
-    // 8. A branch nasce do SHA fixado (critério 2), num worktree fora do checkout ativo.
+    // 9. A branch nasce do SHA fixado (critério 2), num worktree fora do checkout ativo.
     const branch = nomeDaBranch(pedido.sliceId, pedido.runId)
     // `core.autocrlf=false` no ato do checkout, e isto **não é preferência de estilo**: no
     // Windows o padrão grava CRLF no disco, e o Git de dentro do container (Linux) lê cada
@@ -251,7 +280,7 @@ export class PreflightService {
       )
     }
 
-    // 9. A árvore é limpa? Modificação não commitada não é lixo — é trabalho de alguém, e
+    // 10. A árvore é limpa? Modificação não commitada não é lixo — é trabalho de alguém, e
     //    apagá-la seria a destruição que o critério 7 proíbe. Só olhamos a **nossa** árvore.
     const sujo = this.deps.git.run(['status', '--porcelain'], worktree, this.deps.workspaceId())
     if (sujo.ok && sujo.saida !== '') {
@@ -366,7 +395,8 @@ export class PreflightService {
       branch,
       worktreeNoHost: worktree,
       pathsPermitidos: paths,
-      proxyUrl: proxyUrlDoExecutor
+      proxyUrl: proxyUrlDoExecutor,
+      modeloDaConstrucao
     }
 
     this.deps.audit.append({
@@ -381,7 +411,12 @@ export class PreflightService {
         container: nomeContainer,
         // A lista registrada é a que vale no critério 6 — nunca uma inferência no commit.
         pathsPermitidos: paths.paths,
-        origemDosPaths: paths.origem
+        origemDosPaths: paths.origem,
+        // O par congelado entra na evidência pela mesma razão dos paths: quem lê a auditoria
+        // depois precisa saber com que modelo o run começou, e não com qual a política estava
+        // configurada quando ele foi lido (SPEC-Fases-05, critério 3).
+        provider: modeloDaConstrucao.provider,
+        modelo: modeloDaConstrucao.modelo
       }
     })
 

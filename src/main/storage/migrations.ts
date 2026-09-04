@@ -1550,6 +1550,23 @@ const MIGRATIONS: readonly string[] = [
     payload    TEXT NOT NULL,
     PRIMARY KEY (trace_id, seq)
   );
+  `,
+
+  // 38 - provider e modelo do run no ledger (SPEC-Fases-05, criterio 5).
+  //
+  // Coluna no `execution_ledger`, e nao tabela nova: o par e **um por run** - congelado pelo
+  // preflight antes do container subir, e o mesmo nas tres tentativas por decisao da fatia
+  // (criterio 3). Uma tabela por tentativa modelaria uma variacao que o congelamento existe para
+  // impedir, e a primeira leitura teria de explicar por que as linhas sao sempre iguais.
+  //
+  // **Anulaveis, ao contrario de `ledger_entry_id` na 37.** Nao e a mesma situacao: aqui ha runs
+  // ja gravados por versoes anteriores desta coluna, e `NOT NULL` sem default os tornaria
+  // ilegiveis. Nulo aqui significa "run anterior a esta fatia", um fato historico honesto - e
+  // nao o orfao que a 37 proibia, porque nenhum run novo passa sem o par (o preflight nao libera
+  // sandbox sem ele).
+  `
+  ALTER TABLE execution_ledger ADD COLUMN provider TEXT;
+  ALTER TABLE execution_ledger ADD COLUMN modelo TEXT;
   `
 ]
 

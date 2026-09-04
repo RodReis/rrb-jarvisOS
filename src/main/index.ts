@@ -1214,6 +1214,26 @@ if (!app.requestSingleInstanceLock()) {
       // projeto-alvo. Sem ela, a SPEC precisa trazer a seção — e o preflight recusa se não vier,
       // que é o critério 13 se comportando como projetado.
       derivarPaths: () => undefined,
+      /*
+       * O modelo da fase Construção deste run (SPEC-Fases-05, critérios 1 e 2).
+       *
+       * **Rota fixa em `assinatura`**, e não uma segunda chamada a `escolherRota`: o executor
+       * roda com `rota: () => 'claude-code'` (ver o `ExecutorProxy` acima), então a rota da
+       * Construção já está decidida pela composição do boot. Resolvê-la de novo aqui abriria a
+       * possibilidade de o preflight congelar o par da rota paga enquanto o proxy chama pela
+       * assinatura — as duas discordando sobre o mesmo run, que é o risco que a nota de
+       * `modelo-da-fase.ts` registra sobre um segundo `escolherRota`.
+       *
+       * O `projectId` entra porque o override do projeto vence o workspace (critério 2); é o
+       * `resolver` que aplica a herança.
+       */
+      modeloDaConstrucao: (projectId) =>
+        phaseModels.resolver(
+          { userId: userIdAtual(), workspace: workspaces.atual() },
+          'construcao',
+          'assinatura',
+          projectId
+        ),
       prepararGitMeta
     })
 

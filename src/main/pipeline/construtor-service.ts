@@ -87,9 +87,16 @@ export class ConstrutorService {
       }
 
       // (1) Invoca o `claude` dentro do container — o único ponto por onde o prompt entra.
+      //
+      // `--model` carrega o modelo da fase Construção (SPEC-Fases-05, critério 1). O id vem do
+      // sandbox, **congelado pelo preflight** e já validado contra o catálogo — nunca de entrada
+      // do usuário, e nunca resolvido aqui: resolver por tentativa faria uma edição de política
+      // no meio do run trocar o modelo entre a tentativa 1 e a 2, e o ledger descreveria um run
+      // que não aconteceu (critério 3). Por variável de ambiente não é possível: o
+      // `ambienteControlado()` do MVP-004 não deixa variável alcançar o subprocess.
       const execucaoClaude = this.docker.exec(
         pedido.sandbox.containerNome,
-        ['claude', '--print', promptDaVez],
+        ['claude', '--model', pedido.sandbox.modeloDaConstrucao.modelo, '--print', promptDaVez],
         pedido.sandbox.worktreeNoHost
       )
 

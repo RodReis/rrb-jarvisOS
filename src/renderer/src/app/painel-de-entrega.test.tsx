@@ -66,6 +66,48 @@ describe('PainelDeEntrega', () => {
     expect(screen.getByText('2')).toBeInTheDocument()
   })
 
+  /**
+   * SPEC-Fases-05, critério 5: o painel mostra o modelo que executou.
+   *
+   * Na primeira leitura, sem expandir: quem escolheu o modelo por fase é o PI, e a pergunta
+   * "qual rodou?" é sobre o resultado. Esconder atrás do expansor custaria um clique justamente
+   * a quem fez a escolha.
+   */
+  it('mostra o modelo que executou o run, sem precisar expandir', () => {
+    render(
+      <PainelDeEntrega
+        ledger={ledger({ provider: 'claude-code', modelo: 'claude-opus-5' })}
+        pendencias={[]}
+      />
+    )
+    expect(screen.getByText('claude-opus-5')).toBeInTheDocument()
+  })
+
+  /** O provider é rastro, como head e merge: fica nos detalhes técnicos. */
+  it('revela o provider ao expandir os detalhes', async () => {
+    render(
+      <PainelDeEntrega
+        ledger={ledger({ provider: 'claude-code', modelo: 'claude-opus-5' })}
+        pendencias={[]}
+      />
+    )
+
+    expect(screen.queryByText('claude-code')).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: /detalhes técnicos/i }))
+    expect(screen.getByText('claude-code')).toBeInTheDocument()
+  })
+
+  /**
+   * Run gravado antes desta fatia não tem o par, e a medida **some** em vez de mostrar vazio.
+   *
+   * Um "—" no lugar afirmaria que não houve modelo, quando o fato é que não foi registrado. É a
+   * mesma distinção que `headSha` ausente já faz no painel.
+   */
+  it('não inventa um campo de modelo em run que não o registrou', () => {
+    render(<PainelDeEntrega ledger={ledger()} pendencias={[]} />)
+    expect(screen.queryByText(/^Modelo$/i)).toBeNull()
+  })
+
   it('não oferece botão de commit, push, PR, merge ou aceite', () => {
     render(<PainelDeEntrega ledger={ledger()} pendencias={[PENDENCIA]} />)
     for (const proibido of [/commit/i, /push/i, /pull request/i, /mergear/i, /aceitar/i]) {

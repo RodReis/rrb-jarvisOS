@@ -47,7 +47,8 @@ function sandbox(): SandboxPreparado {
       paths: ['src/**'],
       justificativa: 'Escopo declarado na SPEC da fatia.'
     },
-    proxyUrl: 'http://sidecar:8080'
+    proxyUrl: 'http://sidecar:8080',
+    modeloDaConstrucao: { provider: 'claude-code', modelo: 'claude-opus-5' }
   }
 }
 

@@ -183,6 +183,18 @@ export function PainelDeEntrega({ ledger, pendencias }: PainelDeEntregaProps): R
           <Medida rotulo="Duração" valor={duracao(ledger.duracaoMs)} />
           <Medida rotulo="Tentativas" valor={String(ledger.tentativas)} />
           <Medida rotulo="Tokens" valor={ledger.tokens.toLocaleString('pt-BR')} />
+          {/*
+           * O modelo que executou (SPEC-Fases-05, critério 5).
+           *
+           * Na grade visível e não nos detalhes técnicos: o PI escolheu o modelo por fase, e a
+           * pergunta "qual rodou?" é sobre o resultado, não sobre o rastro interno. Escondê-lo
+           * atrás do expansor faria a resposta custar um clique justamente para quem acabou de
+           * fazer a escolha.
+           *
+           * Ausente em run gravado antes desta fatia — a medida some em vez de mostrar vazio,
+           * porque "—" afirmaria que não houve modelo.
+           */}
+          {ledger.modelo !== undefined && <Medida rotulo="Modelo" valor={ledger.modelo} />}
         </dl>
 
         {ledger.artefatos.length > 0 && (
@@ -232,6 +244,14 @@ export function PainelDeEntrega({ ledger, pendencias }: PainelDeEntregaProps): R
               )}
               {ledger.mergeSha !== undefined && (
                 <LinhaTecnica rotulo="Merge confirmado" valor={ledger.mergeSha} />
+              )}
+              {/*
+               * O provider fica aqui, e o modelo na grade acima: quem lê o painel reconhece o
+               * modelo (foi ele que escolheu); o provider é a rota que o atendeu — rastro, como
+               * head e merge.
+               */}
+              {ledger.provider !== undefined && (
+                <LinhaTecnica rotulo="Provider" valor={ledger.provider} />
               )}
               <LinhaTecnica rotulo="Encerrado em" valor={ledger.encerradoEm} />
             </dl>

@@ -25,6 +25,7 @@ import { join } from 'node:path'
 import type { Database as Db } from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspaceId } from '@shared/domain/entities'
+import type { ModeloEscolhido } from '@shared/domain/modelo-da-fase'
 import type { PathsPermitidos } from '@shared/domain/preflight'
 import { recursoDoContainer, recursoDoWorktree } from '@shared/domain/preflight'
 
@@ -43,6 +44,7 @@ const { prepararGitMeta } = await import('./docker-runner')
 const USER = 'u-1'
 const WS: WorkspaceId = 'jarvis'
 const RUN = 'run-1'
+const PROJETO = 'p-1'
 const AGORA = 1_700_000_000_000
 const PROXY = 'http://host.docker.internal:8790'
 
@@ -98,6 +100,8 @@ function montarServico(opcoes: {
   readonly derivados?: PathsPermitidos | undefined
   readonly chamadas?: ChamadaDocker[]
   readonly portasOcupadas?: readonly number[]
+  /** O par que o `PhaseModelService` devolveria. Omitido = o padrão da Construção. */
+  readonly modelo?: ModeloEscolhido
 }): InstanceType<typeof PreflightService> {
   const chamadas = opcoes.chamadas ?? []
   return new PreflightService({
@@ -123,6 +127,7 @@ function montarServico(opcoes: {
     workspaceId: () => WS,
     proxyNoAr: () => opcoes.proxyNoAr !== false,
     derivarPaths: () => opcoes.derivados,
+    modeloDaConstrucao: () => opcoes.modelo ?? { provider: 'claude-code', modelo: 'claude-opus-5' },
     // O real, não um dublê: é a função que o smoke provou, e é ela que não pode reescrever o
     // `commondir` do host. Um dublê aqui esconderia justamente o defeito que o smoke achou.
     prepararGitMeta,
@@ -133,7 +138,7 @@ function montarServico(opcoes: {
 function pedido(extra: Record<string, unknown> = {}): never {
   return {
     runId: RUN,
-    projectId: 'p-1',
+    projectId: PROJETO,
     sliceId: 'm9-f03',
     raizOperacional: raiz,
     repositorio: repo,
@@ -215,6 +220,38 @@ describe('preflight — recusas que não deixam rastro', () => {
     expect(outcome.reason).toBe('sem-paths-permitidos')
   })
 
+  /**
+   * SPEC-Fases-05, critério 4: modelo fora do catálogo recusa **antes de criar container**.
+   *
+   * A prova por efeito (`linhasDeLease() === 0`) é o que distingue esta recusa de uma feita mais
+   * tarde: recusar depois deixaria worktree, leases e container de pé para um run que jamais
+   * poderia chamar o modelo. É por isso que a checagem mora no preflight e não no
+   * `ConstrutorService`, que só roda com o sandbox já montado (decisão do PI, 2026-09-04).
+   */
+  it('recusa modelo fora do catálogo antes de criar qualquer recurso', () => {
+    const outcome = montarServico({
+      modelo: { provider: 'claude-code', modelo: 'claude-modelo-que-nao-existe' }
+    }).preparar(pedido())
+
+    expect(outcome.reason).toBe('modelo-fora-do-catalogo')
+    expect(outcome.retomada).toContain('Modelos por fase')
+    expect(linhasDeLease()).toBe(0)
+  })
+
+  /**
+   * O contrafactual do teste acima: o par **certo** não pode ser recusado pela mesma barreira.
+   *
+   * Sem ele, uma checagem invertida (`if (modeloExisteNoCatalogo(...))`) passaria no teste da
+   * recusa e bloquearia todo run legítimo — o defeito ficaria escondido atrás de um teste verde.
+   */
+  it('libera quando o modelo da Construção existe no catálogo do provider', () => {
+    const outcome = montarServico({
+      modelo: { provider: 'claude-code', modelo: 'claude-opus-5' }
+    }).preparar(pedido())
+
+    expect(outcome.reason).toBe('liberado')
+  })
+
   /** Critério 1: o executor nunca recebe o checkout ativo — nem por um worktree criado dentro dele. */
   it('recusa quando o worktree cairia dentro do checkout ativo', () => {
     const outcome = montarServico({}).preparar(pedido({ raizOperacional: join(repo, 'interno') }))
@@ -278,6 +315,126 @@ describe('preflight — liberação', () => {
     // Prova no Git, não no retorno: a branch existe e aponta para o mesmo commit.
     const branch = outcome.sandbox?.branch ?? ''
     expect(git(['rev-parse', branch], repo)).toBe(shaEsperado)
+  })
+
+  /**
+   * SPEC-Fases-05, critério 3: o par resolvido é **congelado** no sandbox.
+   *
+   * O que o teste trava é a origem do dado: o par que sai no sandbox é o que a dependência
+   * devolveu, e não um default do preflight. Sem esta asserção, um serviço que ignorasse
+   * `modeloDaConstrucao` e escrevesse o padrão da política passaria em todos os outros testes.
+   */
+  it('congela no sandbox o par que a política resolveu', () => {
+    const outcome = montarServico({
+      modelo: { provider: 'claude-code', modelo: 'claude-fable-5-1' }
+    }).preparar(pedido())
+
+    expect(outcome.sandbox?.modeloDaConstrucao).toEqual({
+      provider: 'claude-code',
+      modelo: 'claude-fable-5-1'
+    })
+  })
+
+  /**
+   * SPEC-Fases-05, critério 2: o override do projeto vence o workspace **neste run**.
+   *
+   * A herança em si é do `PhaseModelService` e já tem cobertura em
+   * `phase-model-repository.int-spec.ts`. O que falta travar é o elo: o preflight tem de passar o
+   * `projectId` do pedido para a resolução. Sem ele, a dependência resolveria só pelo workspace e
+   * o override do projeto simplesmente não valeria no run — sem erro nenhum aparecer.
+   */
+  it('resolve o modelo com o projectId do run, para o override do projeto valer', () => {
+    const projectIdsVistos: string[] = []
+    const servico = new PreflightService({
+      git: gitRunnerReal() as never,
+      docker: {
+        disponivel: () => true,
+        portaOcupadaPorContainer: () => false,
+        containerExiste: () => false,
+        redeDeEgressExiste: () => false,
+        criarRedeDeEgress: () => true,
+        subirProxyDeEgress: () => true,
+        ipDoProxyNaRedeDeEgress: () => '192.168.16.2',
+        subir: () => true,
+        parar: () => true
+      } as never,
+      leases,
+      audit,
+      userId: () => USER,
+      workspaceId: () => WS,
+      proxyNoAr: () => true,
+      derivarPaths: () => undefined,
+      modeloDaConstrucao: (projectId) => {
+        projectIdsVistos.push(projectId)
+        return { provider: 'claude-code', modelo: 'claude-opus-5' }
+      },
+      prepararGitMeta,
+      agora: () => AGORA
+    })
+
+    servico.preparar(pedido())
+
+    expect(projectIdsVistos).toEqual([PROJETO])
+  })
+
+  /**
+   * SPEC-Fases-05, critério 6: o par congelado nunca é o de uma rota paga sem opt-in.
+   *
+   * A garantia real é de composição — o boot resolve com a rota `assinatura` fixa, a mesma que o
+   * `ExecutorProxy` usa (`rota: () => 'claude-code'`). Este teste trava o efeito no ponto em que
+   * ele é observável: o provider que chega ao sandbox é o da assinatura, e um provider de rota
+   * paga (`anthropic`) não aparece por si.
+   *
+   * Sem esta asserção, trocar o `'assinatura'` do boot por um `escolherRota` compilaria e passaria
+   * em todos os outros testes, e o preflight congelaria a rota paga enquanto o proxy continuaria
+   * chamando pela assinatura — as duas discordando sobre o mesmo run.
+   */
+  it('congela o provider da assinatura, nunca o de uma rota paga', () => {
+    const outcome = montarServico({}).preparar(pedido())
+
+    expect(outcome.sandbox?.modeloDaConstrucao.provider).toBe('claude-code')
+    expect(outcome.sandbox?.modeloDaConstrucao.provider).not.toBe('anthropic')
+  })
+
+  /**
+   * Critério 3, a metade que importa: **editar a política depois não move a tentativa em curso.**
+   *
+   * A dependência muda de resposta entre a primeira e a segunda leitura — é o que aconteceria se
+   * o PI trocasse o modelo com o run em andamento. O sandbox tem de continuar com o par do
+   * instante em que foi montado. Um serviço que guardasse a função em vez do valor (resolvendo a
+   * cada leitura) falharia aqui e passaria no teste acima.
+   */
+  it('não muda o par do sandbox quando a política é editada depois', () => {
+    let modeloAtual: ModeloEscolhido = { provider: 'claude-code', modelo: 'claude-opus-5' }
+    const servico = new PreflightService({
+      git: gitRunnerReal() as never,
+      docker: {
+        disponivel: () => true,
+        portaOcupadaPorContainer: () => false,
+        containerExiste: () => false,
+        redeDeEgressExiste: () => false,
+        criarRedeDeEgress: () => true,
+        subirProxyDeEgress: () => true,
+        ipDoProxyNaRedeDeEgress: () => '192.168.16.2',
+        subir: () => true,
+        parar: () => true
+      } as never,
+      leases,
+      audit,
+      userId: () => USER,
+      workspaceId: () => WS,
+      proxyNoAr: () => true,
+      derivarPaths: () => undefined,
+      modeloDaConstrucao: () => modeloAtual,
+      prepararGitMeta,
+      agora: () => AGORA
+    })
+
+    const outcome = servico.preparar(pedido())
+    // O PI troca o modelo com o run já preparado.
+    modeloAtual = { provider: 'claude-code', modelo: 'claude-fable-5-1' }
+
+    expect(outcome.sandbox?.modeloDaConstrucao.modelo).toBe('claude-opus-5')
   })
 
   /**

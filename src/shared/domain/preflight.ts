@@ -26,6 +26,8 @@
  * Ele decide *o que conta como pronto*; quem executa mora no main.
  */
 
+import type { ModeloEscolhido } from './modelo-da-fase'
+
 /**
  * De onde veio a lista de paths que o run pode alterar (critério 13).
  *
@@ -130,7 +132,19 @@ export const PREFLIGHT_REASONS = [
   /** Sem lista de paths registrada não há como medir fuga de escopo (critério 13). */
   'sem-paths-permitidos',
   /** O cwd pedido é o checkout ativo (critério 1) ou está fora da raiz operacional. */
-  'cwd-invalido'
+  'cwd-invalido',
+  /**
+   * O modelo da fase Construção não existe no catálogo do provider da rota (SPEC-Fases-05,
+   * critério 4).
+   *
+   * **Segunda barreira, e não a primeira.** `modeloDaFase` cai no padrão do workspace quando a
+   * política guardada traz um id morto, e a fronteira IPC recusa antes de gravar — então o
+   * estado que este motivo barra só nasce por escrita direta no banco ou por um segundo call
+   * site que resolva o par por outro caminho. É a mesma postura de `setModeloDaFase`, que valida
+   * embora o IPC também valide: a checagem custa uma comparação e cobre o dia em que a primeira
+   * barreira deixar de ser a única porta.
+   */
+  'modelo-fora-do-catalogo'
 ] as const
 
 export type PreflightReason = (typeof PREFLIGHT_REASONS)[number]
@@ -170,6 +184,20 @@ export interface SandboxPreparado {
    * executor só está na rede `--internal` do run, e o sidecar é o único outro membro dela.
    */
   readonly proxyUrl: string
+  /**
+   * O par que atende a fase Construção deste run, **congelado** (SPEC-Fases-05, critério 3).
+   *
+   * Resolvido uma vez, no preflight, e lido daqui em diante. O congelamento é a decisão da
+   * fatia: um run que resolvesse o modelo a cada tentativa mudaria de modelo no meio se o PI
+   * editasse a política, e o ledger descreveria um run que não foi o que aconteceu. Trocar a
+   * política durante o run vale na próxima — nunca na tentativa em andamento.
+   *
+   * Mora no sandbox, e não no `ConstrutorService`, porque o critério 4 pede a recusa **antes de
+   * criar container**: quem valida tem de ser quem roda antes dele. O construtor lê um par que
+   * já passou pela barreira, e não tem como resolvê-lo por conta própria (decisão do PI,
+   * 2026-09-04).
+   */
+  readonly modeloDaConstrucao: ModeloEscolhido
 }
 
 /** Prefixos de lease desta fatia. O `UNIQUE(user_id, recurso)` faz o resto. */
