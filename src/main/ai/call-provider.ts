@@ -51,6 +51,9 @@ import type { BudgetService } from '../budget/budget-service'
 import type { RoutingService } from './routing-service'
 import { AdapterError } from './anthropic-adapter'
 import type { AiAdapter } from './adapter'
+import type { Etapa } from '@shared/domain/jornada'
+import type { StatusDoTrace } from '@shared/domain/geracao'
+import type { ColetorDaGeracao } from './generation-trace-service'
 
 /** Quem chama: usuário e espaço, para escopo de credencial, auditoria e (na F03) orçamento. */
 export interface AiCallContext {
@@ -80,6 +83,25 @@ export interface VerificadorDeContexto {
  */
 export interface VerificadorDeQuota {
   ler(userId: string, workspace: WorkspaceId, provider: AiProvider): QuotaState | undefined
+}
+
+/**
+ * O que o ponto único precisa do console: **abrir um coletor**.
+ *
+ * Interface mínima, como `VerificadorDeContexto` e `VerificadorDeQuota` — o ponto único não lê
+ * histórico nem compacta retenção, e depender do `GenerationTraceService` inteiro daria a ele
+ * poderes que não usa (e ao teste, um banco que ele não precisa).
+ */
+export interface AberturaDoConsole {
+  abrir(abertura: {
+    readonly traceId: string
+    readonly escopo: { readonly userId: string; readonly workspace: WorkspaceId }
+    readonly projectId: string
+    readonly ledgerEntryId: string
+    readonly etapa: Etapa
+    readonly provider: string
+    readonly modelo: string
+  }): ColetorDaGeracao
 }
 
 export class AiCallService {
@@ -117,7 +139,19 @@ export class AiCallService {
      * quebrar todo call site existente do MVP-005 ao MVP-008 — nenhum deles usa `claude-code`
      * hoje. Ausente, o gate de quota simplesmente não roda (equivalente a "sempre desconhecida").
      */
-    private readonly quota?: VerificadorDeQuota
+    private readonly quota?: VerificadorDeQuota,
+    /**
+     * O console da geração (SPEC-Fases-03). Opcional, e é a última dependência de propósito:
+     * toda chamada anterior a esta fatia continua compilando sem ele, e uma geração sem console
+     * não é uma geração degradada — é uma chamada que não pertence a etapa nenhuma (o painel de
+     * teste do Settings, os usos internos).
+     *
+     * Abre aqui, e não no chamador, porque **é aqui que o `call_id` existe**: o `ledgerEntryId`
+     * do trace é o `id` desta chamada, o mesmo que vai ao `cost_event`, à auditoria e ao log
+     * (decisão do PI de 2026-09-04). Aberto no call site, o trace teria de inventar o próprio
+     * identificador — e seria a segunda contabilidade que o critério 2 proíbe.
+     */
+    private readonly console?: AberturaDoConsole
   ) {}
 
   /**
@@ -328,10 +362,38 @@ export class AiCallService {
     let latenciaPrimeiroChunkMs: number | undefined
     const controle = new AbortController()
     this.emVoo.set(id, controle)
+
+    // O console (SPEC-Fases-03). Aberto **depois** dos gates: um trace de chamada que não saiu
+    // registraria uma geração que não houve, e o `ledgerEntryId` apontaria para uma linha de
+    // `cost_event` que o próprio gate impediu de existir (`naoSaiu`).
+    //
+    // Falha ao abrir não impede a geração — mesma ordem de prioridade do resto da fatia: o
+    // documento é o produto, o console é evidência.
+    let coletor: ColetorDaGeracao | undefined
+    if (this.console !== undefined && request.console !== undefined) {
+      try {
+        coletor = this.console.abrir({
+          traceId: randomUUID(),
+          escopo: { userId: ctx.userId, workspace: ctx.workspace },
+          projectId: request.console.projectId,
+          ledgerEntryId: id,
+          etapa: request.console.etapa,
+          provider,
+          modelo: model
+        })
+      } catch (erro) {
+        log.ai.warn('Console da geração não pôde ser aberto', { correlationId: id, erro })
+      }
+    }
     // O timeout arma **antes** do primeiro chunk e desarma no fim. O que ele protege não é a
     // resposta longa (streaming é lento por natureza) e sim o stream pendurado, que sem isto
     // seguraria a chamada — e o evento de conclusão — para sempre.
     const relogio = setTimeout(() => controle.abort(), TIMEOUT_PADRAO_MS)
+
+    // O desfecho do console. Começa em `falhou` porque é o que um trace vale enquanto ninguém
+    // provou o contrário: uma geração que morre no meio é falha que o painel deve mostrar, e um
+    // padrão `concluido` afirmaria um fim que não houve.
+    let desfechoDoConsole: StatusDoTrace = 'falhou'
 
     try {
       for await (const chunk of adapter.generateStream({
@@ -341,13 +403,18 @@ export class AiCallService {
         maxTokens,
         ...(credencial === undefined ? {} : { apiKey: credencial.value }),
         timeoutMs: TIMEOUT_PADRAO_MS,
-        signal: controle.signal
+        signal: controle.signal,
+        ...(coletor === undefined
+          ? {}
+          : { onEvento: (evento) => coletor?.registrar(evento) })
       })) {
         if (chunk.tipo === 'texto') {
           latenciaPrimeiroChunkMs ??= Date.now() - inicio
           yield { tipo: 'chunk', id, texto: chunk.texto }
           continue
         }
+
+        desfechoDoConsole = 'concluido'
 
         // (4) Custo **real** pelo `usage` que o provider reportou — medição, não estimativa.
         yield this.finalizar(id, ctx, provider, model, {
@@ -395,6 +462,18 @@ export class AiCallService {
     } finally {
       clearTimeout(relogio)
       this.emVoo.delete(id)
+
+      // Fecha o console **sempre** — inclusive quando o consumidor abandona o `for await` no
+      // meio (o `finally` de um gerador roda no `.return()`), que é o caminho do cancelamento.
+      // O `flush` acontece dentro do `fechar`, então o trace termina com os eventos até ali
+      // (critério 8). Sem esta linha, toda geração cancelada deixaria um trace eternamente
+      // "em andamento", que a leitura degrada para `falhou` — verdadeiro, mas menos preciso do
+      // que o `cancelado` que o PI provocou.
+      try {
+        coletor?.fechar(controle.signal.aborted ? 'cancelado' : desfechoDoConsole)
+      } catch (erro) {
+        log.ai.warn('Console da geração não pôde ser fechado', { correlationId: id, erro })
+      }
     }
   }
 
