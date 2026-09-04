@@ -508,7 +508,8 @@ if (!app.requestSingleInstanceLock()) {
       userId: userIdAtual,
       // O modelo que a próxima geração usaria — a **mesma** fonte que a geração consulta, e é o
       // que faz o card e o selo nunca discordarem (SPEC-Fases-01, critério 4).
-      modeloAtivo: (workspace, provider) => routingRepo.modeloAtivo(userIdAtual(), workspace, provider)
+      modeloAtivo: (workspace, provider) =>
+        routingRepo.modeloAtivo(userIdAtual(), workspace, provider)
     })
 
     // O prompt e o brief refinado (SPEC-Jornada-02).

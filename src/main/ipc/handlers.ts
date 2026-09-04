@@ -1573,7 +1573,11 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 
   ipcMain.handle(
     IPC_CHANNELS.jornadaResumoDeVarios,
-    async (_event, projectIds: unknown, workspace: unknown): Promise<readonly ResumoDoProjeto[]> => {
+    async (
+      _event,
+      projectIds: unknown,
+      workspace: unknown
+    ): Promise<readonly ResumoDoProjeto[]> => {
       if (!isWorkspaceId(workspace) || !Array.isArray(projectIds)) return []
       const ids = projectIds.filter((id): id is string => typeof id === 'string')
       return deps.jornada.resumoDeVarios(ids, workspace, await deps.estadoDasRotas(workspace))
