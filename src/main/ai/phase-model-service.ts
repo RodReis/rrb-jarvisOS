@@ -95,7 +95,12 @@ export class PhaseModelService {
       return undefined
     }
 
-    const anterior = modeloDaFase(fase, rota, undefined, this.repo.find(scope.userId, scope.workspace))
+    const anterior = modeloDaFase(
+      fase,
+      rota,
+      undefined,
+      this.repo.find(scope.userId, scope.workspace)
+    )
 
     const politica = this.repo.save(
       scope.userId,

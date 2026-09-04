@@ -983,7 +983,15 @@ if (!app.requestSingleInstanceLock()) {
         const mvps = lerRoadmapDoModelo(texto)
         return mvps === undefined ? {} : { mvps }
       },
-      gerarSpec: async ({ projectId, workspace, rota, contextPackId, mvp, fatiaId, ...entrada }) => {
+      gerarSpec: async ({
+        projectId,
+        workspace,
+        rota,
+        contextPackId,
+        mvp,
+        fatiaId,
+        ...entrada
+      }) => {
         const fatia = [...mvp.fatias].sort((a, b) => a.numero - b.numero)[0]
         if (fatia === undefined) return {}
 

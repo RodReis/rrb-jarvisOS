@@ -132,10 +132,7 @@ export const POLITICA_DE_MODELO_PADRAO: Readonly<Record<Fase, ModeloPorRota>> = 
   }
 }
 
-export function politicaDeModeloPadrao(
-  userId: string,
-  workspace: WorkspaceId
-): PhaseModelPolicy {
+export function politicaDeModeloPadrao(userId: string, workspace: WorkspaceId): PhaseModelPolicy {
   return { user_id: userId, workspace_id: workspace, fases: POLITICA_DE_MODELO_PADRAO }
 }
 
@@ -208,7 +205,10 @@ export function modeloDaFase(
 
   const doWorkspace = politica.fases[fase]?.[rota]
 
-  if (doWorkspace !== undefined && modeloExisteNoCatalogo(doWorkspace.provider, doWorkspace.modelo)) {
+  if (
+    doWorkspace !== undefined &&
+    modeloExisteNoCatalogo(doWorkspace.provider, doWorkspace.modelo)
+  ) {
     return doWorkspace
   }
 

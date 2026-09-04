@@ -24,9 +24,7 @@ import {
 
 const USUARIO = 'user-teste'
 
-const politica = (
-  fases: Partial<PhaseModelPolicy['fases']> = {}
-): PhaseModelPolicy => ({
+const politica = (fases: Partial<PhaseModelPolicy['fases']> = {}): PhaseModelPolicy => ({
   ...politicaDeModeloPadrao(USUARIO, 'jarvis'),
   fases: { ...POLITICA_DE_MODELO_PADRAO, ...fases }
 })
@@ -87,9 +85,7 @@ describe('padrão de quem nunca editou', () => {
 
   it('a rota paga nunca devolve Fable, em nenhuma fase: ele não existe lá', () => {
     for (const fase of FASES) {
-      expect(modeloDaFase(fase, 'paga', undefined, politica()).modelo).not.toBe(
-        'claude-fable-5-1'
-      )
+      expect(modeloDaFase(fase, 'paga', undefined, politica()).modelo).not.toBe('claude-fable-5-1')
     }
   })
 
@@ -162,9 +158,7 @@ describe('linha velha no banco não derruba a geração', () => {
   it('override com modelo fora do catálogo cai no workspace, sem lançar', () => {
     const morto = override({ modelo: 'claude-fable-5-1', provider: 'anthropic' })
 
-    expect(modeloDaFase('construcao', 'assinatura', morto, politica()).modelo).toBe(
-      'claude-opus-5'
-    )
+    expect(modeloDaFase('construcao', 'assinatura', morto, politica()).modelo).toBe('claude-opus-5')
   })
 
   it('política com modelo fora do catálogo cai no padrão, sem lançar', () => {

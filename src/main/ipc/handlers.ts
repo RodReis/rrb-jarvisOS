@@ -42,7 +42,11 @@ import { isBudgetLimitsInput, type BudgetSnapshot } from '@shared/domain/budget'
 import { isProviderRoute, isTaskType } from '@shared/domain/routing'
 import type { PhaseModelService } from '../ai/phase-model-service'
 import type { PhaseModelPolicy, ProjectModelOverride } from '@shared/domain/modelo-da-fase'
-import { isModeloEscolhido, isProjectModelOverride, isRotaComModelo } from '@shared/domain/modelo-da-fase'
+import {
+  isModeloEscolhido,
+  isProjectModelOverride,
+  isRotaComModelo
+} from '@shared/domain/modelo-da-fase'
 import { isFase } from '@shared/domain/fase'
 import {
   isConnectorCredentialKey,
@@ -1055,13 +1059,10 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
    * que impede `{ anthropic, claude-fable-5-1 }`, que tem a forma certa e e exatamente o que a
    * decisao 4 do MVP-026 proibe.
    */
-  ipcMain.handle(
-    IPC_CHANNELS.phaseModelGet,
-    (_event, workspace: unknown): PhaseModelPolicy => {
-      const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
-      return deps.phaseModels.politica({ userId: deps.userId(), workspace: escopo })
-    }
-  )
+  ipcMain.handle(IPC_CHANNELS.phaseModelGet, (_event, workspace: unknown): PhaseModelPolicy => {
+    const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+    return deps.phaseModels.politica({ userId: deps.userId(), workspace: escopo })
+  })
 
   ipcMain.handle(
     IPC_CHANNELS.phaseModelSet,

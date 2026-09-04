@@ -525,9 +525,7 @@ export class JornadaService {
     projectId: string
   ): string | null {
     if (!rota || rota.decisao === 'bloqueado') return null
-    return (
-      this.modeloAtivo?.(workspaceId, PROVIDER_DA_ROTA[rota.decisao], fase, projectId) ?? null
-    )
+    return this.modeloAtivo?.(workspaceId, PROVIDER_DA_ROTA[rota.decisao], fase, projectId) ?? null
   }
 
   /** O bloqueio, quando existe. Sem bloqueio não há bloco: alerta permanente deixa de ser lido. */

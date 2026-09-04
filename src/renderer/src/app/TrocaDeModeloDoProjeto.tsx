@@ -169,8 +169,8 @@ export function TrocaDeModeloDoProjeto({
     >
       <div className="flex w-[18rem] flex-col gap-3">
         <p className="text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-suave)]">
-          O modelo da fase {ROTULO_DA_FASE[fase]} neste projeto. Sem escolha aqui, vale o padrão
-          do espaço.
+          O modelo da fase {ROTULO_DA_FASE[fase]} neste projeto. Sem escolha aqui, vale o padrão do
+          espaço.
         </p>
 
         {erro !== null && (

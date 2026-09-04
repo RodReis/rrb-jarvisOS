@@ -643,9 +643,7 @@ describe('ProjetosLocais', () => {
       // `data-jos-troca-modelo` e nao o rotulo: o gatilho do popover e o combo dentro dele
       // compartilham o nome da fase de proposito — um diz "trocar o modelo da fase X", o outro
       // rotula o campo que faz isso. O atributo distingue os dois sem afrouxar o teste.
-      await usuario.click(
-        document.querySelector('[data-jos-troca-modelo="p-1"]') as HTMLElement
-      )
+      await usuario.click(document.querySelector('[data-jos-troca-modelo="p-1"]') as HTMLElement)
       await usuario.click(await screen.findByRole('option', { name: /Sonnet 5/ }))
 
       await waitFor(() =>
@@ -672,9 +670,7 @@ describe('ProjetosLocais', () => {
       await usuario.click(
         await screen.findByRole('button', { name: /Trocar o modelo da fase Construção/i })
       )
-      await usuario.click(
-        document.querySelector('[data-jos-troca-modelo="p-1"]') as HTMLElement
-      )
+      await usuario.click(document.querySelector('[data-jos-troca-modelo="p-1"]') as HTMLElement)
       await usuario.click(await screen.findByRole('option', { name: /Sonnet 5/ }))
 
       // O que o card mostra e o que o **main** confirma: duas leituras, nao uma escrita local.
@@ -700,7 +696,9 @@ describe('ProjetosLocais', () => {
       await usuario.click(
         await screen.findByRole('button', { name: /Trocar o modelo da fase Construção/i })
       )
-      await usuario.click(await screen.findByRole('button', { name: /Voltar ao padrão do espaço/i }))
+      await usuario.click(
+        await screen.findByRole('button', { name: /Voltar ao padrão do espaço/i })
+      )
 
       await waitFor(() =>
         expect(clearPhaseModelOverride).toHaveBeenCalledWith(
