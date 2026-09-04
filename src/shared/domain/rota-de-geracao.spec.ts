@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from 'vitest'
 import type { EstadoDasRotas } from './rota-de-geracao'
-import { ACAO_DO_BLOQUEIO, escolherRota, podeGerar } from './rota-de-geracao'
+import { ACAO_DO_BLOQUEIO, PROVIDER_DA_ROTA, escolherRota, podeGerar } from './rota-de-geracao'
 
 function estado(over: Partial<EstadoDasRotas> = {}): EstadoDasRotas {
   return {
@@ -143,5 +143,16 @@ describe('a guarda como expressão única', () => {
         }
       }
     }
+  })
+})
+
+describe('provider concreto de cada rota', () => {
+  it('mapeia assinatura e paga para os providers do produto', () => {
+    expect(PROVIDER_DA_ROTA.assinatura).toBe('claude-code')
+    expect(PROVIDER_DA_ROTA.paga).toBe('anthropic')
+  })
+
+  it('não tem entrada para bloqueado: rota bloqueada não gera, logo não tem provider', () => {
+    expect(Object.keys(PROVIDER_DA_ROTA)).toEqual(['assinatura', 'paga'])
   })
 })

@@ -114,6 +114,9 @@ import type {
   ArquiteturaRegistrada
 } from '@shared/domain/arquitetura-gerada'
 import type { ResultadoDaRota } from '@shared/domain/rota-de-geracao'
+import type { ResumoDoProjeto } from '@shared/domain/fase'
+import type { EstadoDasRotas } from '@shared/domain/rota-de-geracao'
+import type { WorkspaceId } from '@shared/domain/entities'
 import type { EstadoDaJornada, TransicaoOutcome } from '@shared/domain/jornada'
 import type { AnexoService } from '../projects/anexo-service'
 import { isConnectorId } from '@shared/domain/connectors'
@@ -322,6 +325,14 @@ export interface IpcDependencies {
   readonly roadmap: RoadmapService
   readonly roadmapGerado: RoadmapGeradoService
   readonly jornada: JornadaService
+  /**
+   * O estado das rotas do ambiente, medido **uma vez** por leitura da lista.
+   *
+   * Async e fora do serviço porque medir a assinatura custa um `spawn` do CLI: doze projetos
+   * dariam doze processos para desenhar uma tela só. O estado é propriedade do ambiente, não do
+   * projeto, então uma medição serve todos os cards do lote.
+   */
+  readonly estadoDasRotas: (workspace: WorkspaceId) => Promise<EstadoDasRotas>
   readonly brief: BriefService
   readonly prd: PrdService
   readonly arquitetura: ArquiteturaService
@@ -1557,6 +1568,19 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       // ser comprometido.
       const ids = projectIds.filter((id): id is string => typeof id === 'string')
       return deps.jornada.estadoDeVarios(ids, workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.jornadaResumoDeVarios,
+    async (
+      _event,
+      projectIds: unknown,
+      workspace: unknown
+    ): Promise<readonly ResumoDoProjeto[]> => {
+      if (!isWorkspaceId(workspace) || !Array.isArray(projectIds)) return []
+      const ids = projectIds.filter((id): id is string => typeof id === 'string')
+      return deps.jornada.resumoDeVarios(ids, workspace, await deps.estadoDasRotas(workspace))
     }
   )
 

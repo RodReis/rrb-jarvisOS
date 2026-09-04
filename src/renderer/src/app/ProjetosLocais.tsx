@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { FolderPlus, FolderSearch, ShieldCheck, Wand2 } from 'lucide-react'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { Project, ProjectOutcome, ProjectReason } from '@shared/domain/projects'
-import type { EstadoDaJornada } from '@shared/domain/jornada'
+import type { ResumoDoProjeto } from '@shared/domain/fase'
+import { BloqueioDoCard, ResumoDoCard } from './ResumoDoCard'
 import { Button, EmptyState, Field, InlineAlert, Input, LoadingState } from '@design/ui'
 import { log } from '../lib/log'
 import { ProjetoAberto } from './ProjetoAberto'
@@ -91,7 +92,7 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
    * calculá-lo aqui exigiria o renderer conhecer os fatos que definem a etapa — que ele não tem
    * e não deve ter.
    */
-  const [jornadaPorProjeto, setJornadaPorProjeto] = useState<ReadonlyMap<string, EstadoDaJornada>>(
+  const [resumoPorProjeto, setResumoPorProjeto] = useState<ReadonlyMap<string, ResumoDoProjeto>>(
     new Map()
   )
 
@@ -149,18 +150,18 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
      */
     try {
       window.jarvis
-        .jornadaDeVarios(
+        .resumoDeVarios(
           projetos.map((p) => p.id),
           workspace
         )
-        .then((estados) => {
-          if (ativo) setJornadaPorProjeto(new Map(estados.map((e) => [e.projectId, e])))
+        .then((resumos) => {
+          if (ativo) setResumoPorProjeto(new Map(resumos.map((r) => [r.projectId, r])))
         })
         .catch((error: unknown) => {
-          if (ativo) log.ui.error('Falha ao carregar as jornadas dos projetos', { error })
+          if (ativo) log.ui.error('Falha ao carregar os resumos dos projetos', { error })
         })
     } catch (error: unknown) {
-      log.ui.error('Ponte sem o canal da jornada', { error })
+      log.ui.error('Ponte sem o canal do resumo', { error })
     }
 
     return () => {
@@ -437,6 +438,16 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
                       <span className="break-all font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-suave)]">
                         {projeto.diretorio}
                       </span>
+
+                      {/*
+                        Os quatro blocos ficam **abaixo do caminho e antes dos botões**: são o que
+                        o PI veio ler, e a coluna de ações continua alinhada entre os cards porque
+                        eles crescem para baixo, não para o lado. Escondidos durante a edição do
+                        nome — ali o card é formulário, e metadado disputaria com o campo.
+                      */}
+                      {!editando && !confirmando && (
+                        <ResumoDoCard resumo={resumoPorProjeto.get(projeto.id)} />
+                      )}
                     </div>
 
                     <div className="flex shrink-0 items-center gap-2">
@@ -521,7 +532,7 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
                                 aria-label={t('projetos.abrir', { nome: projeto.nome })}
                                 iconeInicial={<Wand2 aria-hidden="true" className="size-4" />}
                               >
-                                {jornadaPorProjeto.get(projeto.id)?.cta ??
+                                {resumoPorProjeto.get(projeto.id)?.cta ??
                                   t('projetos.abrir', { nome: projeto.nome })}
                               </Button>
                             </div>
@@ -559,6 +570,18 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
                         </Button>
                       </div>
                     </div>
+                  )}
+
+                  {/*
+                    O bloqueio ocupa a **largura do card**, e não a coluna dos metadados: ele é o
+                    aviso que decide se vale abrir o projeto, e a captura do gate visual o mostrou
+                    espremido em meia largura por herdar o `flex-1` da coluna do nome.
+
+                    Escondido durante edição e confirmação, como o resto dos metadados: ali o card
+                    é formulário, e um alerta competiria com a decisão em curso.
+                  */}
+                  {!editando && !confirmando && (
+                    <BloqueioDoCard resumo={resumoPorProjeto.get(projeto.id)} />
                   )}
                 </article>
               </li>

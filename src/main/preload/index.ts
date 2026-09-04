@@ -69,6 +69,7 @@ import type {
   RoadmapGeradoOutcome,
   RoadmapRegistrado
 } from '@shared/domain/roadmap-gerado'
+import type { ResumoDoProjeto } from '@shared/domain/fase'
 import type { EstadoDaJornada, TransicaoOutcome } from '@shared/domain/jornada'
 import type { BriefRegistrado, GeracaoOutcome, PromptDoProjeto } from '@shared/domain/brief'
 import type { PrdOutcome, PrdRegistrado } from '@shared/domain/prd'
@@ -402,6 +403,11 @@ const bridge: JarvisBridge = {
     workspace: WorkspaceId
   ): Promise<readonly EstadoDaJornada[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.jornadaEstadoDeVarios, projectIds, workspace),
+  resumoDeVarios: (
+    projectIds: readonly string[],
+    workspace: WorkspaceId
+  ): Promise<readonly ResumoDoProjeto[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.jornadaResumoDeVarios, projectIds, workspace),
   aplicarEventoDaJornada: (
     projectId: string,
     evento: string,

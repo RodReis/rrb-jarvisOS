@@ -71,6 +71,7 @@ import type { MergePolicyOutcome, PoliticaDeMerge, VistaDaFila } from '../domain
 import type { Roadmap } from '../domain/roadmap'
 import type { MvpGerado, RoadmapGeradoOutcome, RoadmapRegistrado } from '../domain/roadmap-gerado'
 import type { EstadoDaJornada, TransicaoOutcome } from '../domain/jornada'
+import type { ResumoDoProjeto } from '../domain/fase'
 import type { BriefRegistrado, GeracaoOutcome, PromptDoProjeto } from '../domain/brief'
 import type { PrdOutcome, PrdRegistrado } from '../domain/prd'
 import type { ArquiteturaGeradaOutcome, ArquiteturaRegistrada } from '../domain/arquitetura-gerada'
@@ -399,6 +400,14 @@ export const IPC_CHANNELS = {
    */
   jornadaEstado: 'jornada:estado',
   jornadaEstadoDeVarios: 'jornada:estado-de-varios',
+  /**
+   * O resumo do card de cada projeto (SPEC-Fases-01, critério 7).
+   *
+   * Canal próprio, e não um campo a mais em `jornada:estado-de-varios`, porque compõe fatos que
+   * aquele não toca: rota e modelo dependem dos adapters de provider. Quem só quer a etapa não
+   * deve pagar essa leitura.
+   */
+  jornadaResumoDeVarios: 'jornada:resumo-de-varios',
   jornadaEvento: 'jornada:evento',
   /**
    * O prompt e o brief refinado (SPEC-Jornada-02).
@@ -1030,6 +1039,17 @@ export interface JarvisBridge {
     projectIds: readonly string[],
     workspace: WorkspaceId
   ): Promise<readonly EstadoDaJornada[]>
+  /**
+   * O resumo de cada card da tela Projetos (SPEC-Fases-01, critério 7).
+   *
+   * Uma leitura por card, com os quatro blocos já compostos: fase e etapa, gates e data, rota e
+   * modelo, e o bloqueio quando existe. O renderer não recompõe fato nenhum — buscar cada peça
+   * no seu canal permitiria que a rota do card discordasse da rota do selo (critério 4).
+   */
+  resumoDeVarios(
+    projectIds: readonly string[],
+    workspace: WorkspaceId
+  ): Promise<readonly ResumoDoProjeto[]>
   /**
    * Aplica um evento nomeado à jornada — a **única** via de escrita (critério 1).
    *

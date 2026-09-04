@@ -222,6 +222,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'resolveFailure',
     'responderPerguntaDaSpec',
     'responderRefinamento',
+    'resumoDeVarios',
     'revisoesDoGate',
     'rotaDaGeracao',
     'runCommand',

@@ -21,6 +21,7 @@ import { join } from 'node:path'
 import type { Database as Db } from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Approval } from '@shared/domain/aprovacoes'
+import { faseDaEtapa } from '@shared/domain/fase'
 
 const logCat = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 vi.mock('../logging/logger', () => ({
@@ -391,5 +392,131 @@ describe('lista de projetos (critério 3)', () => {
 
     expect(estados).toHaveLength(1)
     expect(estados[0]?.cta).toBe('Escrever o prompt')
+  })
+})
+
+/**
+ * O resumo que o card da tela Projetos consome (SPEC-Fases-01, critérios 2 a 5 e 7).
+ *
+ * A garantia que só este nível alcança é a do **critério 7**: um card, uma leitura. O card
+ * mostra quatro fatos que nasceram em lugares diferentes (etapa, aprovações, rota, modelo), e a
+ * tentação natural é o renderer buscar cada um no seu canal. Isso daria quatro viagens por card
+ * e, pior, permitiria que dois deles discordassem — a rota do selo diferente da rota do card é
+ * exatamente o que o critério 4 proíbe. Aqui o main compõe uma vez e entrega pronto.
+ */
+describe('resumo do projeto para o card (SPEC-Fases-01)', () => {
+  const ROTAS_OK = {
+    assinaturaDisponivel: true,
+    assinaturaEsgotada: false,
+    rotaPagaConfigurada: false,
+    optInDeRotaPaga: false
+  } as const
+
+  const ROTAS_BLOQUEADAS = { ...ROTAS_OK, assinaturaDisponivel: false } as const
+
+  function servicoCom(
+    rotas: typeof ROTAS_OK | typeof ROTAS_BLOQUEADAS,
+    modelo = 'claude-sonnet-5'
+  ): InstanceType<typeof JornadaService> {
+    return new JornadaService({
+      repository: projects,
+      roadmap,
+      audit,
+      userId: () => USER,
+      estadoDasRotas: () => rotas,
+      modeloAtivo: () => modelo
+    })
+  }
+
+  it('dá fase e etapa coerentes com a etapa derivada (critério 2)', () => {
+    criarProjetoComSessao()
+    responderWizard()
+
+    const resumo = servicoCom(ROTAS_OK).resumoDoProjeto(PROJETO, WS)
+
+    expect(resumo?.etapa).toBe('brief-aceito')
+    expect(resumo?.fase).toBe('planejamento')
+    expect(resumo?.rotuloDaFase).toBe('Planejamento')
+    expect(resumo?.progresso).toEqual({ posicao: 3, total: 8 })
+  })
+
+  it('mantém fase e etapa de acordo conforme o projeto anda (critério 2)', () => {
+    // O teto observável da jornada hoje é `prd-aceito`: os aceites documentais não deixam
+    // evidência em `eventosObservados`, e `etapaDerivada` para no primeiro buraco. Este teste
+    // prova o acoplamento entre fase e etapa **derivada** dentro do que os fatos sustentam; a
+    // cobertura das três fases é do teste puro em `fase.spec.ts`, onde toda etapa é alcançável.
+    criarProjetoComSessao()
+    responderWizard()
+    db.prepare('UPDATE planning_session SET ultimo_marco = ? WHERE project_id = ?').run(
+      'prd-aprovado',
+      PROJETO
+    )
+
+    const resumo = servicoCom(ROTAS_OK).resumoDoProjeto(PROJETO, WS)
+
+    expect(resumo?.etapa).toBe('prd-aceito')
+    expect(resumo?.fase).toBe(faseDaEtapa(resumo!.etapa))
+    expect(resumo?.rotuloDaFase).toBe('Planejamento')
+    expect(resumo?.progresso).toEqual({ posicao: 5, total: 8 })
+  })
+
+  it('conta só os gates de aceite aprovados, e a data vem do último evento (critério 3)', () => {
+    criarProjetoComSessao()
+    responderWizard()
+    aprovar('PROJECT_PACKAGE')
+
+    const resumo = servicoCom(ROTAS_OK).resumoDoProjeto(PROJETO, WS)
+
+    expect(resumo?.gates).toEqual({ aceitos: 1, total: 5 })
+    expect(resumo?.dataDoUltimoEvento).toBeTruthy()
+  })
+
+  it('não conta gate nenhum em projeto sem aprovação (critério 3)', () => {
+    criarProjetoComSessao()
+
+    expect(servicoCom(ROTAS_OK).resumoDoProjeto(PROJETO, WS)?.gates).toEqual({
+      aceitos: 0,
+      total: 5
+    })
+  })
+
+  it('devolve a rota e o modelo do provider dela — a mesma fonte do selo (critério 4)', () => {
+    criarProjetoComSessao()
+
+    const resumo = servicoCom(ROTAS_OK, 'claude-opus-5').resumoDoProjeto(PROJETO, WS)
+
+    expect(resumo?.rota?.decisao).toBe('assinatura')
+    expect(resumo?.modelo).toBe('claude-opus-5')
+  })
+
+  it('mostra motivo e ação quando a rota bloqueia, e não anuncia modelo (critério 5)', () => {
+    criarProjetoComSessao()
+
+    const resumo = servicoCom(ROTAS_BLOQUEADAS).resumoDoProjeto(PROJETO, WS)
+
+    expect(resumo?.rota?.decisao).toBe('bloqueado')
+    expect(resumo?.bloqueio?.motivo).toBeTruthy()
+    expect(resumo?.bloqueio?.acao).toContain('Providers')
+    // Rota bloqueada não gera: anunciar o modelo descreveria uma chamada que não vai acontecer.
+    expect(resumo?.modelo).toBeNull()
+  })
+
+  it('não inventa bloqueio quando a rota resolve (critério 5)', () => {
+    criarProjetoComSessao()
+
+    expect(servicoCom(ROTAS_OK).resumoDoProjeto(PROJETO, WS)?.bloqueio).toBeNull()
+  })
+
+  it('resume vários projetos numa leitura só (critério 7)', () => {
+    criarProjetoComSessao()
+
+    const resumos = servicoCom(ROTAS_OK).resumoDeVarios([PROJETO, 'inexistente'], WS)
+
+    expect(resumos).toHaveLength(1)
+    expect(resumos[0].projectId).toBe(PROJETO)
+  })
+
+  it('projeto sem sessão não vira resumo em vez de estourar', () => {
+    expect(servicoCom(ROTAS_OK).resumoDoProjeto('nao-existe', WS)).toBeUndefined()
   })
 })

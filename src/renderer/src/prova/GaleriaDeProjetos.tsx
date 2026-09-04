@@ -2,8 +2,10 @@ import { ProvedorDeTema } from '@design/tokens/provider'
 import type { CorAcento } from '@design/tokens/acento'
 import type { ModoUi, Modulo } from '@design/tokens/semantic'
 import type { Project } from '@shared/domain/projects'
-import type { EstadoDaJornada } from '@shared/domain/jornada'
-import { montarTrilha } from '@shared/domain/jornada'
+import type { Etapa } from '@shared/domain/jornada'
+import { CTA_DA_ETAPA } from '@shared/domain/jornada'
+import type { ResumoDoProjeto } from '@shared/domain/fase'
+import { ROTULO_DA_FASE, faseDaEtapa, progressoNaFase } from '@shared/domain/fase'
 import { ProjetosLocais } from '../app/ProjetosLocais'
 
 /**
@@ -64,15 +66,31 @@ const PROJETOS: readonly Project[] = [
   })
 ]
 
-function jornada(projectId: string, etapa: Parameters<typeof montarTrilha>[0]): EstadoDaJornada {
-  const trilha = montarTrilha(etapa)
+/**
+ * O resumo de um card (SPEC-Fases-01). Os campos derivados saem das **funções do domínio**, e
+ * não de literais: uma galeria que inventasse a fase provaria a própria invenção, e o gate
+ * visual passaria com um card que o produto nunca desenha.
+ */
+function resumo(
+  projectId: string,
+  etapa: Etapa,
+  over: Partial<ResumoDoProjeto> = {}
+): ResumoDoProjeto {
+  const fase = faseDaEtapa(etapa)
+
   return {
     projectId,
     etapa,
-    cta: trilha.find((e) => e.posicao === 'atual')?.cta ?? 'Abrir',
-    trilha,
-    motivoDaRegressao: null,
-    recalculada: false
+    fase,
+    rotuloDaFase: ROTULO_DA_FASE[fase],
+    progresso: progressoNaFase(etapa),
+    cta: CTA_DA_ETAPA[etapa],
+    gates: { aceitos: 0, total: 5 },
+    dataDoUltimoEvento: '2026-09-04T10:00:00.000Z',
+    rota: { decisao: 'assinatura' },
+    modelo: 'claude-sonnet-5',
+    bloqueio: null,
+    ...over
   }
 }
 
@@ -85,10 +103,23 @@ function instalarPonte(cena: CenaDeProjetos): void {
     value: {
       listProjects: async (): Promise<readonly Project[]> =>
         cena === 'vazio' ? [] : [...PROJETOS],
-      jornadaDeVarios: async (): Promise<readonly EstadoDaJornada[]> => [
-        jornada('p-1', 'prompt'),
-        jornada('p-2', 'brief-aceito'),
-        jornada('p-3', 'construcao')
+      /*
+        Os três projetos ficam **um por fase** (SPEC-Fases-01, § Testes): é o que prova que o
+        bloco de fase acompanha a etapa, e não um rótulo fixo. O terceiro carrega o bloqueio,
+        porque a ausência dele nos outros dois é justamente o que o critério 5 exige ver.
+      */
+      resumoDeVarios: async (): Promise<readonly ResumoDoProjeto[]> => [
+        resumo('p-1', 'prd', { gates: { aceitos: 1, total: 5 } }),
+        resumo('p-2', 'mvp-aceito', { gates: { aceitos: 3, total: 5 } }),
+        resumo('p-3', 'construcao', {
+          gates: { aceitos: 5, total: 5 },
+          rota: { decisao: 'bloqueado', motivo: 'sem-rota-alguma' },
+          modelo: null,
+          bloqueio: {
+            motivo: 'sem-rota-alguma',
+            acao: 'Nenhuma rota de geração está configurada. Conecte a assinatura do Claude ou uma credencial de provider em Providers.'
+          }
+        })
       ],
       sendLog: (): void => {}
     },

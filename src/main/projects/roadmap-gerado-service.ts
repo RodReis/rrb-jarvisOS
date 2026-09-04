@@ -68,7 +68,7 @@ import {
 import { proximaFatia } from '@shared/domain/roadmap'
 import { slugificar } from '@shared/domain/projects'
 import type { EstadoDasRotas, ResultadoDaRota } from '@shared/domain/rota-de-geracao'
-import { escolherRota } from '@shared/domain/rota-de-geracao'
+import { PROVIDER_DA_ROTA, escolherRota } from '@shared/domain/rota-de-geracao'
 import { log } from '../logging/logger'
 import type { AuditRepository } from '../storage/audit-repository'
 import type { ProjectRepository } from './project-repository'
@@ -87,12 +87,6 @@ import type { EscopoDoRoadmap, RoadmapRepository } from './roadmap-repository'
  * seguidas não erra por acaso.
  */
 export const TENTATIVAS_DE_CORRECAO_DO_ROADMAP = 2
-
-/** A rota concreta de cada decisão. `claude-code` é a rota de assinatura do produto. */
-const PROVIDER_DA_ROTA: Readonly<Record<'assinatura' | 'paga', AiProvider>> = {
-  assinatura: 'claude-code',
-  paga: 'anthropic'
-}
 
 export interface RoadmapGeradoServiceDeps {
   readonly repository: RoadmapGeradoRepository

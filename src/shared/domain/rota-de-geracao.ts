@@ -16,6 +16,8 @@
  * `optInDeRotaPaga` não é um caminho que falha — é um caminho que não existe.
  */
 
+import type { AiProvider } from './ai'
+
 /** O que a geração vai fazer. Fechado: a tela e o serviço decidem a partir dele. */
 export const DECISOES_DE_ROTA = ['assinatura', 'paga', 'bloqueado'] as const
 
@@ -109,4 +111,21 @@ export function escolherRota(estado: EstadoDasRotas): ResultadoDaRota {
  */
 export function podeGerar(estado: EstadoDasRotas): boolean {
   return escolherRota(estado).decisao !== 'bloqueado'
+}
+
+/**
+ * O provider concreto de cada rota. `claude-code` é a rota de assinatura do produto.
+ *
+ * Mora aqui, junto de `DecisaoDeRota`, porque **rota e provider são o mesmo fato dito duas
+ * vezes**: quem decide a rota precisa do provider logo em seguida, e a tradução nasceu copiada
+ * em cada serviço de geração. Uma sexta cópia entraria com o card da SPEC-Fases-01, e aí o card
+ * poderia anunciar um provider diferente do que a geração usaria — exatamente o que o critério 4
+ * daquela spec proíbe ("rota e modelo do card são os mesmos que o selo mostra").
+ *
+ * Sem entrada para `bloqueado` de propósito: rota bloqueada não gera, então não tem provider. Um
+ * `Record<DecisaoDeRota, …>` obrigaria a inventar um valor para o caso em que nada acontece.
+ */
+export const PROVIDER_DA_ROTA: Readonly<Record<'assinatura' | 'paga', AiProvider>> = {
+  assinatura: 'claude-code',
+  paga: 'anthropic'
 }

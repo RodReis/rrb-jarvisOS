@@ -164,3 +164,96 @@ test('desregistrar tira da lista e preserva a pasta e o histórico no disco', as
   expect(existsSync(join(resultado.diretorio, 'README.md'))).toBe(true)
   expect(existsSync(join(resultado.diretorio, '.git'))).toBe(true)
 })
+
+/**
+ * O resumo do card contra o main real (SPEC-Fases-01, critérios 2 a 5 e 7).
+ *
+ * O que este teste prova e o de componente não consegue: **os quatro blocos vêm compostos do
+ * main, numa leitura só**. No teste de componente a ponte é dublada, e um dublê devolve o
+ * formato que se pedir a ele — ele diria que o card mostra fase e gates sem nunca provar que o
+ * main sabe derivá-los de um projeto de verdade, recém-criado, com a etapa que os fatos
+ * sustentam.
+ *
+ * A renderização tem suíte própria (`projetos.test.tsx`); aqui o alvo é o canal.
+ */
+test('o resumo do card vem composto do main, numa leitura por projeto', async () => {
+  const janela = await app.firstWindow()
+  await janela.waitForLoadState('domcontentloaded')
+
+  const resultado = await janela.evaluate(async () => {
+    const bridge = (
+      window as unknown as {
+        jarvis: {
+          getWorkspace: () => Promise<string>
+          addAllowedCommand: (b: string, w: string) => Promise<readonly string[]>
+          createProject: (n: string, w: string) => Promise<OutcomeDaPonte>
+          listProjects: (w: string) => Promise<readonly { id: string }[]>
+          resumoDeVarios: (
+            ids: readonly string[],
+            w: string
+          ) => Promise<
+            readonly {
+              projectId: string
+              etapa: string
+              fase: string
+              rotuloDaFase: string
+              progresso: { posicao: number; total: number }
+              cta: string
+              gates: { aceitos: number; total: number }
+              dataDoUltimoEvento: string | null
+              rota: { decisao: string } | null
+              modelo: string | null
+              bloqueio: { motivo: string; acao: string } | null
+            }[]
+          >
+        }
+      }
+    ).jarvis
+
+    const workspace = await bridge.getWorkspace()
+    await bridge.addAllowedCommand('git', workspace)
+    await bridge.createProject('Projeto Fases', workspace)
+
+    const projetos = await bridge.listProjects(workspace)
+    return {
+      resumos: await bridge.resumoDeVarios(
+        projetos.map((p) => p.id),
+        workspace
+      ),
+      quantidade: projetos.length
+    }
+  })
+
+  expect(resultado.quantidade).toBe(1)
+  expect(resultado.resumos).toHaveLength(1)
+
+  const resumo = resultado.resumos[0]
+
+  // Projeto recém-criado não tem fato nenhum, então abre na primeira etapa — e a fase que a
+  // acompanha é a primeira. É a migração do critério 6 da SPEC-Jornada-01 vista pelo card.
+  expect(resumo.etapa).toBe('prompt')
+  expect(resumo.fase).toBe('planejamento')
+  expect(resumo.rotuloDaFase).toBe('Planejamento')
+  expect(resumo.cta).toBe('Escrever o prompt')
+
+  // O progresso é da **fase**, não da trilha: oito etapas no Planejamento, e o projeto na
+  // primeira delas.
+  expect(resumo.progresso).toEqual({ posicao: 1, total: 8 })
+
+  // Nenhum gate aceito ainda, e o denominador é o contrato: cinco etapas de aceite.
+  expect(resumo.gates).toEqual({ aceitos: 0, total: 5 })
+
+  // A rota é decidida pelo main a partir dos providers reais da máquina. Qual delas sai depende
+  // do ambiente, então o que se afirma é o **acoplamento** entre rota e modelo: a rota que
+  // bloqueia não anuncia modelo e traz ação concreta; a que gera anuncia. Afirmar uma decisão
+  // fixa aqui testaria a máquina do CI, não o produto.
+  expect(resumo.rota).not.toBeNull()
+
+  if (resumo.rota?.decisao === 'bloqueado') {
+    expect(resumo.modelo).toBeNull()
+    expect(resumo.bloqueio?.acao).toBeTruthy()
+  } else {
+    expect(resumo.modelo).toBeTruthy()
+    expect(resumo.bloqueio).toBeNull()
+  }
+})

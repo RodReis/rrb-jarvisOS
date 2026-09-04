@@ -77,6 +77,15 @@ export const RECURSOS = {
       // Projetos locais (SPEC-Planejamento-01). Sem nenhum rótulo de Git: a tela não expõe
       // comando, e um texto de "inicializar repositório" anunciaria um controle que não existe.
       projetos: {
+        // O card completo (SPEC-Fases-01). `gates` e `progresso` são contagens, e o formato
+        // "n / total" cabe em mono sem virar frase — a linha do card é estreita.
+        faseEtapa: '{{fase}} · {{etapa}}',
+        progressoNaFase: '{{posicao}} / {{total}}',
+        gatesAceitos: 'Gates {{aceitos}} / {{total}}',
+        gatesRotulo: 'Gates aceitos',
+        ultimoEvento: 'Último evento em {{data}}',
+        semEvento: 'Sem movimento ainda',
+        bloqueioTitulo: 'Bloqueado',
         titulo: 'Projetos locais',
         descricao:
           'Crie ou importe um projeto. O Git local é inicializado automaticamente; nada é publicado.',
@@ -714,6 +723,13 @@ export const RECURSOS = {
         placeholder: 'Placeholder content — modules arrive in later slices.'
       },
       projetos: {
+        faseEtapa: '{{fase}} · {{etapa}}',
+        progressoNaFase: '{{posicao}} / {{total}}',
+        gatesAceitos: 'Gates {{aceitos}} / {{total}}',
+        gatesRotulo: 'Accepted gates',
+        ultimoEvento: 'Last event on {{data}}',
+        semEvento: 'No movement yet',
+        bloqueioTitulo: 'Blocked',
         titulo: 'Local projects',
         descricao:
           'Create or import a project. Local Git is initialized automatically; nothing is published.',
