@@ -155,6 +155,10 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'estadoDaJornada',
     'estadoDoRefinamento',
     'estadoDoSandbox',
+    // O console da geração (SPEC-Fases-03): dois canais de leitura da trilha gravada. Nenhum
+    // devolve segredo — o que atravessa é evento de geração, e o redator roda antes de gravar.
+    'generationEvents',
+    'generationHistory',
     'gerarArquiteturaPorIa',
     'gerarBrief',
     'gerarPacote',
@@ -207,6 +211,9 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'mvpsElegiveis',
     'onAiStreamEvent',
     'onAuthChanged',
+    // A assinatura ao vivo do console. Canal único; quem separa uma geração da seguinte é o
+    // painel, pelo `traceId` que viaja no payload.
+    'onGenerationEvent',
     'pendenciasDeLimpeza',
     'pickAllowedDirectory',
     'pickProjectDirectory',

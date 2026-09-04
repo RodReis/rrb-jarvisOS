@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ChevronRight } from 'lucide-react'
-import { cx, FOCO, LABEL_MONO, TRANSICAO } from './base'
+import { cx, FOCO, TRANSICAO } from './base'
 
 /**
  * Divulgação progressiva — um bloco que abre e fecha (PRD §11.4).
@@ -89,13 +89,15 @@ export function Disclosure({
       className="group/disclosure"
     >
       <summary
+        // `display: flex` no `<summary>` **é** o que remove o marcador do WebKit: o
+        // pseudo-elemento `::-webkit-details-marker` só é gerado enquanto o display for
+        // `list-item`. A variante `[&::-webkit-details-marker]:hidden` que estava aqui não
+        // gerava CSS nenhum (o gate visual mediu `display: flex` no pseudo-elemento, não
+        // `none`) — e era supérflua, porque o `flex` da própria linha já resolve. `list-none`
+        // fica para o Firefox, que usa `list-style-type`.
         className={cx(
           'flex cursor-pointer list-none items-center gap-2 rounded-[var(--jos-raio-controle)]',
           compacto ? 'py-1' : 'py-2',
-          // O triângulo nativo sai pelos dois caminhos: `list-style` cobre o Firefox e o
-          // pseudo-elemento do WebKit cobre Safari e Chrome. Só um dos dois deixaria o marcador
-          // aparecer em metade dos navegadores.
-          '[&::-webkit-details-marker]:hidden',
           FOCO,
           TRANSICAO
         )}
@@ -108,17 +110,34 @@ export function Disclosure({
             // A rotação usa `transform`, nunca propriedade de layout; a duração vem do token,
             // então `prefers-reduced-motion` a zera de uma vez (base.ts).
             'transition-transform duration-[var(--jos-duracao-rapida)]',
-            'group-open/disclosure:rotate-90'
+            // Classe condicional pelo estado que o componente **já tem em mão**, e não uma
+            // variante `group-open` nem um seletor arbitrário com `>`: nenhum dos dois gera
+            // CSS aqui, e o gate visual mediu `transform: none` nos dois estados — o chevron
+            // não girava, e nenhum teste de tela via, porque jsdom não computa estilo.
+            //
+            // É a mesma lição do mapa literal em `semantica.ts`: o Tailwind descobre classes
+            // varrendo o **texto** do código, então o que ele não consegue ler por extenso não
+            // chega ao CSS gerado. Classe escrita inteira sempre chega.
+            estaAberto && 'rotate-90'
           )}
         />
 
         <span
           className={cx(
             'min-w-0 flex-1 text-left',
-            compacto ? LABEL_MONO : 'text-sm',
+            // **Sem `LABEL_MONO`**, mesmo no compacto: ele carrega `uppercase`, que serve a
+            // rótulo de seção e destrói conteúdo — o gate visual pegou
+            // `SRC/MAIN/AI/CALL-PROVIDER.TS` no lugar do caminho, ilegível justamente onde a
+            // distinção entre `l`/`1` e `O`/`0` importa. Aqui o rótulo **é** conteúdo: o nome da
+            // ferramenta e o argumento que ela recebeu.
+            compacto
+              ? 'text-[length:var(--jos-texto-micro)]'
+              : 'text-[length:var(--jos-texto-corpo)]',
             // Peso e cor **junto** com o ângulo do chevron: três sinais para o mesmo estado.
-            'text-[var(--jos-cor-texto-suave)] group-open/disclosure:font-medium',
-            'group-open/disclosure:text-[var(--jos-cor-texto)]',
+            // Classe condicional pela mesma razão do chevron.
+            estaAberto
+              ? 'font-medium text-[var(--jos-cor-texto)]'
+              : 'text-[var(--jos-cor-texto-suave)]',
             TRANSICAO
           )}
         >

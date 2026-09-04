@@ -25,6 +25,7 @@ import type { RegraDeRetencao } from '../pipeline/retencao-service'
 import {
   EVENTOS_POR_LOTE,
   INTERVALO_DE_LOTE_MS,
+  eventoSeguro,
   type EscopoDaGeracao,
   type GenerationTraceRepository
 } from './generation-trace-repository'
@@ -133,10 +134,25 @@ class Coletor implements ColetorDaGeracao {
     // terminou.
     if (this.fechado) return
 
-    this.pendentes.push(evento)
+    /*
+     * **A redação acontece na entrada, e é isso que a torna uma garantia.**
+     *
+     * Ela morava só na gravação, e o E2E mediu a consequência: o mesmo `Bash` com um token na
+     * linha de comando ia redigido para o banco e **em claro para a tela**, porque `publicar`
+     * recebia o evento cru. O segredo atravessava o IPC e era exibido durante a geração ao vivo
+     * — a superfície que o PI está justamente olhando.
+     *
+     * O critério 3 fala em "argumento e resultado **persistidos**", então pela letra não era
+     * violação; pelo ADR-005 ("sem vazar segredo/PII") era. Redigir na entrada resolve os dois
+     * de uma vez e por construção: não existe caminho a partir daqui que veja o texto cru, então
+     * a próxima saída que alguém acrescentar nasce protegida sem precisar lembrar disso.
+     */
+    const seguro = eventoSeguro(evento)
+
+    this.pendentes.push(seguro)
 
     try {
-      this.publicar?.({ traceId: this.traceId, evento })
+      this.publicar?.({ traceId: this.traceId, evento: seguro })
     } catch (erro) {
       // A tela não pode derrubar a gravação, pelo mesmo motivo que a gravação não derruba a
       // geração: cada camada só quebra a si mesma.

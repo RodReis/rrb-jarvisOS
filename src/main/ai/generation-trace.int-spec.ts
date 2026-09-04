@@ -224,6 +224,38 @@ describe('redação antes do disco (critério 3)', () => {
     expect(JSON.stringify(cru)).not.toContain('ghp_TOKENQUEVAZOU0123456789012345678901')
   })
 
+  it('o segredo também não chega à TELA — a redação vale ao vivo', () => {
+    // O defeito que este teste trava: a redação morava só na gravação, então o mesmo `Bash` ia
+    // redigido para o banco e **em claro para o IPC**. O segredo era exibido durante a geração
+    // ao vivo — a superfície que o PI está justamente olhando. Achado pelo E2E.
+    const coletor = service.abrir(ABERTURA)
+    coletor.registrar({
+      tipo: 'ferramenta-inicio',
+      chamadaId: 'c1',
+      nome: 'Bash',
+      resumoDoArgumento: 'curl -H "Authorization: ghp_TOKENQUEVAZOU0123456789012345678901" /health'
+    })
+    coletor.fechar('concluido')
+
+    expect(JSON.stringify(publicados)).not.toContain('ghp_TOKENQUEVAZOU0123456789012345678901')
+    // E o resto do comando sobrevive: redigir a linha inteira cegaria a evidência.
+    expect(JSON.stringify(publicados)).toContain('curl')
+  })
+
+  it('o resultado com segredo também não chega à tela', () => {
+    const coletor = service.abrir(ABERTURA)
+    coletor.registrar({
+      tipo: 'ferramenta-fim',
+      chamadaId: 'c1',
+      status: 'ok',
+      resumoDoResultado: 'ANTHROPIC_API_KEY=sk-ant-api03-abcdefghijklmnopqrstuv',
+      tamanhoOriginal: 52
+    })
+    coletor.fechar('concluido')
+
+    expect(JSON.stringify(publicados)).not.toContain('sk-ant-api03-abcdefghijklmnopqrstuv')
+  })
+
   it('o texto do modelo não é redigido — ele é o documento', () => {
     // Redigir o `delta` mutilaria o produto. O que precisa de redação é o que veio de fora.
     const coletor = service.abrir(ABERTURA)

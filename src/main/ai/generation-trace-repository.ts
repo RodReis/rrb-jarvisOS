@@ -5,9 +5,13 @@
  *
  * 1. **Redigir antes de gravar.** O argumento e o resultado de uma ferramenta podem carregar
  *    segredo (um `Bash` com token na linha de comando é o caso concreto do MVP-009). O banco
- *    guarda para sempre; um segredo que entra aqui não sai mais. Por isso a redação acontece
- *    **neste ponto** e não no chamador: quem gravar trace de outra fatia herda a proteção sem
- *    saber que precisava dela — a mesma postura de `argsSeguros` no terminal do MVP-004.
+ *    guarda para sempre; um segredo que entra aqui não sai mais.
+ *
+ *    `eventoSeguro` roda aqui **e** na entrada do coletor (`generation-trace-service.ts`), e a
+ *    duplicação é deliberada: a do coletor é a garantia — protege o banco e a tela de uma vez,
+ *    porque nada a partir dali vê o texto cru; esta é a rede, para quem grave direto pelo
+ *    repositório sem passar pelo coletor. `redigirSegredos` é idempotente, então redigir duas
+ *    vezes não muda nada. É a mesma postura de `argsSeguros` no terminal do MVP-004.
  * 2. **Recusar trace órfão.** `ledgerEntryId` vazio não vira linha (critério 2). O banco não tem
  *    FK, então quem garante a ligação é este arquivo.
  *
@@ -69,7 +73,7 @@ interface EventoRow {
  * - `redigirSegredos` age sobre **formato**: `sk-…`, `ghp_…`, `AIza…`, bloco de chave privada,
  *   atribuição explícita de senha. É o que alcança o argumento do `Bash`.
  */
-function textoSeguro(texto: string): string {
+export function textoSeguro(texto: string): string {
   const redigido = redact(texto)
   return redigirSegredos(typeof redigido === 'string' ? redigido : String(redigido))
 }
@@ -82,7 +86,7 @@ function textoSeguro(texto: string): string {
  * O que precisa de redação é o que veio de **fora**: o comando que o modelo pediu e o que a
  * ferramenta respondeu.
  */
-function eventoSeguro(evento: GenerationEvent): GenerationEvent {
+export function eventoSeguro(evento: GenerationEvent): GenerationEvent {
   if (evento.tipo === 'ferramenta-inicio') {
     return { ...evento, resumoDoArgumento: textoSeguro(evento.resumoDoArgumento) }
   }

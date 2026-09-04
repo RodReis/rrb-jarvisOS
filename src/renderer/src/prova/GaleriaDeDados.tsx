@@ -10,6 +10,7 @@ import {
   Button,
   Card,
   Dialog,
+  Disclosure,
   Drawer,
   EmptyState,
   ErrorState,
@@ -183,6 +184,48 @@ function SecaoSuperficies(): React.JSX.Element {
             A política barrou a etapa de escrita.
           </p>
         </Panel>
+      </div>
+
+      {/* O `Disclosure` (SPEC-Fases-03) nos dois estados, lado a lado: fechado e aberto. Um
+          só não bastaria — o que a captura precisa mostrar é o **par**, porque o estado é
+          comunicado por três sinais redundantes (ângulo do chevron, peso e cor do rótulo), e
+          um deles quebrado só aparece na comparação. O aninhado à direita é a forma que o
+          console usa para o resultado da ferramenta. */}
+      <div className="grid grid-cols-2 gap-4">
+        <Disclosure rotulo="Console da geração" resumo={<Badge>3 ferramentas</Badge>}>
+          <p className="text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-secundario)]">
+            Conteúdo revelado.
+          </p>
+        </Disclosure>
+
+        <Disclosure
+          rotulo="Console da geração"
+          resumo={
+            <Badge tom="info" comPonto>
+              gerando
+            </Badge>
+          }
+          abertoPorPadrao
+        >
+          <Disclosure
+            compacto
+            rotulo={
+              <span className="flex min-w-0 items-baseline gap-2">
+                <span className="shrink-0 font-[family-name:var(--jos-fonte-mono)] text-[var(--jos-cor-texto)]">
+                  Read
+                </span>
+                <span className="truncate font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-suave)]">
+                  src/main/ai/call-provider.ts
+                </span>
+              </span>
+            }
+            resumo={<Badge tom="ok">ok</Badge>}
+          >
+            <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-[var(--jos-raio-controle)] border border-[rgba(var(--jos-borda-rgb),0.12)] p-2 font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-secundario)]">
+              export class AiCallService
+            </pre>
+          </Disclosure>
+        </Disclosure>
       </div>
 
       {/* Os cinco tons lado a lado: é a linha onde um tom que não sobrevive ao modo claro

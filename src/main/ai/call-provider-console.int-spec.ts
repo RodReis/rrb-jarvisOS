@@ -479,3 +479,66 @@ describe('ponta a ponta com o repositório real', () => {
     ])
   })
 })
+
+/**
+ * Critério 7 — adapters **sem** ferramentas, com lastro em produção.
+ *
+ * Os testes que carimbavam este critério chamavam `coletor.registrar(...)` à mão, então provavam
+ * que o coletor e a tela lidam com texto+uso — nunca que algum adapter os produz. E não produzia:
+ * `anthropic`, `gemini` e `ollama` não têm uma linha de `onEvento`, e uma geração por eles
+ * gravava trace **vazio**. O dublê complacente escondeu isso; o E2E o achou.
+ *
+ * `adapterFalso` aqui é o dublê certo justamente por **não** emitir evento nenhum: é exatamente o
+ * que os três adapters reais fazem.
+ */
+describe('adapter que não emite evento (critério 7)', () => {
+  it('o ponto único sintetiza texto e uso, em vez de gravar trace vazio', async () => {
+    const espiao = consoleFalso()
+
+    await coletar(
+      servico(adapterFalso(ROTEIRO_OK), espiao).call(PEDIDO_COM_CONSOLE, {
+        userId: USUARIO,
+        workspace: 'jarvis'
+      })
+    )
+
+    expect(espiao.eventos.map((e) => e.tipo)).toEqual(['texto', 'uso'])
+    expect(espiao.eventos[0]).toEqual({ tipo: 'texto', delta: 'Paris' })
+    expect(espiao.eventos[1]).toMatchObject({
+      tipo: 'uso',
+      tokensEntrada: USAGE.tokensEntrada,
+      tokensSaida: USAGE.tokensSaida
+    })
+  })
+
+  it('não duplica o texto quando o adapter já emitiu', async () => {
+    // Com o `claude-code`, o texto vem do parser como `GenerationEvent`. Sintetizá-lo de novo
+    // aqui repetiria cada parágrafo do documento no painel.
+    const espiao = consoleFalso()
+    const adapter = adapterEmissor([{ tipo: 'texto', delta: 'Paris' }])
+
+    await coletar(
+      servico(adapter, espiao).call(PEDIDO_COM_CONSOLE, { userId: USUARIO, workspace: 'jarvis' })
+    )
+
+    expect(espiao.eventos.filter((e) => e.tipo === 'texto')).toHaveLength(1)
+  })
+
+  it('grava um trace legível no banco, e não um vazio', async () => {
+    const repo = new GenerationTraceRepository(db)
+    const trace = new GenerationTraceService(repo)
+
+    await coletar(
+      servico(adapterFalso(ROTEIRO_OK), trace).call(PEDIDO_COM_CONSOLE, {
+        userId: USUARIO,
+        workspace: 'jarvis'
+      })
+    )
+
+    const escopo = { userId: USUARIO, workspace: 'jarvis' } as const
+    const [gravado] = trace.historico(escopo, 'p1', 'refinamento')
+
+    expect(gravado).toBeDefined()
+    expect(trace.eventos(escopo, gravado?.id ?? '').map((e) => e.tipo)).toEqual(['texto', 'uso'])
+  })
+})

@@ -88,11 +88,13 @@ describe('Disclosure', () => {
       </Disclosure>
     )
 
-    // O triângulo padrão não pertence a design system nenhum. `list-none` cobre o Firefox; o
-    // pseudo-elemento cobre WebKit e Chrome. Só um dos dois deixaria o marcador em metade dos
-    // navegadores.
+    // O triângulo padrão não pertence a design system nenhum. `list-none` cobre o Firefox; no
+    // Chromium quem o remove é o `flex` do próprio `<summary>` — o `::-webkit-details-marker`
+    // só é gerado enquanto o display for `list-item`. A variante
+    // `[&::-webkit-details-marker]:hidden` que estava aqui não gerava CSS nenhum, e o gate
+    // visual mediu o pseudo-elemento ainda presente.
     const resumo = screen.getByText('Console').closest('summary')
     expect(resumo?.className).toContain('list-none')
-    expect(resumo?.className).toContain('[&::-webkit-details-marker]:hidden')
+    expect(resumo?.className).toContain('flex')
   })
 })

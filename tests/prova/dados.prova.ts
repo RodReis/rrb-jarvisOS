@@ -451,3 +451,92 @@ test.describe('overlay em portal recebe os tokens do tema (FIX issue 107)', () =
     expect(painel).toBeGreaterThan(pagina)
   })
 })
+
+/**
+ * O `Disclosure` (SPEC-Fases-03), medido renderizado.
+ *
+ * O gate visual desta fatia achou o que 27 testes de tela não pegaram: o rótulo saía em
+ * MAIÚSCULAS, porque o modo compacto usava `LABEL_MONO` — que carrega `uppercase`. Num rótulo
+ * que é **conteúdo** (o caminho do arquivo que a ferramenta leu) isso destrói a legibilidade
+ * justamente onde a distinção entre `l`/`1` e `O`/`0` importa. jsdom não vê `text-transform`.
+ */
+test.describe('divulgação progressiva', () => {
+  test('o rótulo não é transformado em maiúsculas — ele é conteúdo, não label', async ({
+    page
+  }) => {
+    await abrir(page, 'modo=dark')
+
+    const transform = await page.evaluate(() => {
+      const grade = document.querySelector('[data-prova="superficies"] .grid-cols-2')
+      const rotulo = grade?.querySelector('details details summary span') as HTMLElement
+      return getComputedStyle(rotulo).textTransform
+    })
+
+    expect(transform).toBe('none')
+  })
+
+  test('o marcador nativo do navegador não aparece', async ({ page }) => {
+    await abrir(page, 'modo=dark')
+
+    // O triângulo padrão não pertence a design system nenhum. `list-style: none` cobre o
+    // Firefox; no Chromium quem o remove é o `display: flex` do próprio `<summary>` — o
+    // `::-webkit-details-marker` só existe enquanto o display for `list-item`.
+    //
+    // A medida é o **conteúdo** do pseudo-elemento e não o seu `display`: um marcador removido
+    // por não ser gerado reporta o display do elemento, não `none`, e afirmar `none` reprovaria
+    // a solução que funciona. O que importa é que nada seja desenhado antes do chevron.
+    const estilo = await page.evaluate(() => {
+      const resumo = document.querySelector(
+        '[data-prova="superficies"] .grid-cols-2 summary'
+      ) as HTMLElement
+      return {
+        listStyle: getComputedStyle(resumo).listStyleType,
+        display: getComputedStyle(resumo).display,
+        conteudo: getComputedStyle(resumo, '::-webkit-details-marker').content
+      }
+    })
+
+    expect(estilo.listStyle).toBe('none')
+    // `flex` (ou qualquer coisa que não seja `list-item`) é o que impede o marcador de nascer.
+    expect(estilo.display).not.toBe('list-item')
+    expect(estilo.conteudo === 'none' || estilo.conteudo === 'normal' || estilo.conteudo === '').toBe(true)
+  })
+
+  test('o chevron gira ao abrir — o estado tem sinal de forma, não só de cor', async ({ page }) => {
+    await abrir(page, 'modo=dark')
+
+    const grade = page.locator('[data-prova="superficies"] .grid-cols-2')
+    const chevron = grade.locator('summary svg').first()
+
+    // `rotate` e **não** `transform`: o Tailwind v4 emite a propriedade CSS `rotate` para
+    // `rotate-90`, e `transform` fica em `none` mesmo com a rotação aplicada. Medir `transform`
+    // reprovaria um componente que gira corretamente — foi o que a primeira versão deste teste
+    // fez, e a investigação custou uma hora antes de a medição errada aparecer.
+    const fechado = await chevron.evaluate((el) => getComputedStyle(el).rotate)
+    expect(fechado).toBe('none')
+
+    await grade.locator('summary').first().click()
+
+    // `toPass` e não uma leitura direta: `rotate` é animado por `transition-transform`, e ler
+    // no instante do clique pega o valor de partida. O teste espera o estado final, que é o que
+    // o usuário vê — sem `waitForTimeout` fixo, que seria mais lento e mais frágil.
+    await expect(async () => {
+      expect(await chevron.evaluate((el) => getComputedStyle(el).rotate)).toBe('90deg')
+    }).toPass({ timeout: 2_000 })
+  })
+
+  test('o rótulo aberto ganha contraste — o segundo sinal do mesmo estado', async ({ page }) => {
+    await abrir(page, 'modo=dark')
+
+    const grade = page.locator('[data-prova="superficies"] .grid-cols-2')
+    const rotulo = grade.locator('summary span').first()
+
+    const fechado = await rotulo.evaluate((el) => getComputedStyle(el).color)
+    await grade.locator('summary').first().click()
+
+    // Mesma razão do chevron: a cor entra por transição, e a leitura imediata pega a de partida.
+    await expect(async () => {
+      expect(await rotulo.evaluate((el) => getComputedStyle(el).color)).not.toBe(fechado)
+    }).toPass({ timeout: 2_000 })
+  })
+})

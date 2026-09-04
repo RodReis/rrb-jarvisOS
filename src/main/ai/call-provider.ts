@@ -395,6 +395,20 @@ export class AiCallService {
     // padrão `concluido` afirmaria um fim que não houve.
     let desfechoDoConsole: StatusDoTrace = 'falhou'
 
+    /*
+     * O adapter emitiu evento de console por conta própria? (critério 7.)
+     *
+     * Só o `ClaudeCodeAdapter` o faz — é o único que tem ferramentas a relatar. Os outros três
+     * (`anthropic`, `gemini`, `ollama`) devolvem texto e `usage` pelo `AdapterChunk` e mais nada,
+     * e sem esta síntese uma geração por eles gravaria um trace **vazio**: nem texto, nem uso.
+     *
+     * A spec pede o contrário — "adapters sem ferramentas produzem trace válido só com `texto` e
+     * `uso`" —, e o dado para isso já passa por aqui. Sintetizar no ponto único e não em cada
+     * adapter é o que impede a próxima rota de nascer sem console por esquecimento: quem não
+     * emitir nada continua sendo atendido.
+     */
+    let adapterEmitiu = false
+
     try {
       for await (const chunk of adapter.generateStream({
         model,
@@ -406,15 +420,34 @@ export class AiCallService {
         signal: controle.signal,
         ...(coletor === undefined
           ? {}
-          : { onEvento: (evento) => coletor?.registrar(evento) })
+          : {
+              onEvento: (evento) => {
+                adapterEmitiu = true
+                coletor?.registrar(evento)
+              }
+            })
       })) {
         if (chunk.tipo === 'texto') {
           latenciaPrimeiroChunkMs ??= Date.now() - inicio
+          // A síntese só entra quando o adapter não falou: com o `claude-code`, o texto já veio
+          // como `GenerationEvent` do parser, e repeti-lo aqui duplicaria cada parágrafo.
+          if (!adapterEmitiu) coletor?.registrar({ tipo: 'texto', delta: chunk.texto })
           yield { tipo: 'chunk', id, texto: chunk.texto }
           continue
         }
 
         desfechoDoConsole = 'concluido'
+
+        // O fechamento do console para quem não emite evento: tokens e duração, que é o que o
+        // painel mostra ao fim de qualquer geração (critério 7).
+        if (!adapterEmitiu) {
+          coletor?.registrar({
+            tipo: 'uso',
+            tokensEntrada: chunk.usage.tokensEntrada,
+            tokensSaida: chunk.usage.tokensSaida,
+            duracaoMs: Date.now() - inicio
+          })
+        }
 
         // (4) Custo **real** pelo `usage` que o provider reportou — medição, não estimativa.
         yield this.finalizar(id, ctx, provider, model, {
