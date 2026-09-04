@@ -237,19 +237,16 @@ const bridge: JarvisBridge = {
   /**
    * A assinatura do console da geração (SPEC-Fases-03 § Superfície).
    *
-   * **É aqui que "um canal por `traceId`" acontece**: o transporte é um canal só, e o filtro por
-   * geração mora nesta função. O painel assina o seu trace e recebe só o dele — mesma ergonomia
-   * de um canal dedicado, sem sair da união fechada de `IpcEventChannel` nem furar o teste de
-   * contrato que exige um handler por canal declarado.
+   * Entrega o payload inteiro, com o `traceId` dentro. Filtrar aqui por um `traceId` recebido
+   * como argumento seria a forma óbvia e **não serviria à geração ao vivo**: a jornada dispara a
+   * geração por `invoke`, que só resolve no fim, então no instante da assinatura o id ainda não
+   * existe do lado do renderer. Quem separa uma geração da seguinte é o painel, pelo `traceId`
+   * do primeiro evento que chega — o transporte continua sendo um canal só.
    */
-  onGenerationEvent: (
-    traceId: string,
-    listener: (evento: GenerationEvent) => void
-  ): (() => void) => {
-    const wrapped = (_event: unknown, payload: EventoDaGeracao): void => {
-      if (payload.traceId !== traceId) return
-      listener(payload.evento)
-    }
+  onGenerationEvent: (listener: (payload: EventoDaGeracao) => void): (() => void) => {
+    // Mesmo recorte do `onAiStreamEvent`: o `IpcRendererEvent` fica de fora porque carrega
+    // `sender`, um objeto do Electron que não pode vazar para o renderer.
+    const wrapped = (_event: unknown, payload: EventoDaGeracao): void => listener(payload)
 
     ipcRenderer.on(IPC_EVENT_CHANNELS.generationEvent, wrapped)
 

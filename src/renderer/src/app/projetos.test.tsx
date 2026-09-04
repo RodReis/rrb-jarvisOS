@@ -126,6 +126,12 @@ beforeEach(() => {
       estadoDaJornada,
       lerPromptDoProjeto,
       rotaDaGeracao,
+      // O console da geração (SPEC-Fases-03) mora dentro do projeto aberto. Sem estes três a
+      // tela nem monta — e o que esta suíte testa é a jornada, não o console, que tem suíte
+      // própria. Histórico vazio ⇒ o painel não renderiza e sai do caminho.
+      onGenerationEvent: () => () => {},
+      generationHistory: vi.fn().mockResolvedValue([]),
+      generationEvents: vi.fn().mockResolvedValue([]),
       // A ponte real sempre tem `sendLog`; aqui ele existe porque o caminho de falha **loga**,
       // e sem o método o próprio logger estouraria — mascarando a resiliência que se testa.
       sendLog: vi.fn()

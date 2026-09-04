@@ -7,6 +7,7 @@ import type { EstadoDaJornada } from '@shared/domain/jornada'
 import { Button, ErrorState, LoadingState } from '@design/ui'
 import { log } from '../lib/log'
 import { TrilhaDaJornada } from './TrilhaDaJornada'
+import { ConsoleDaGeracao } from './ConsoleDaGeracao'
 import { WizardDoProjeto } from './WizardDoProjeto'
 import { AnexosDeDesign } from './AnexosDeDesign'
 import { ArquiteturaDoProjeto } from './ArquiteturaDoProjeto'
@@ -173,6 +174,18 @@ export function ProjetoAberto({
               estado={estado}
               onRecarregar={() => void carregar()}
               onAbrirPerguntas={() => setRespondendo(true)}
+            />
+
+            {/*
+              O console da geração (SPEC-Fases-03), **abaixo do documento e dentro da etapa**.
+              Um ponto só, e não uma inserção em cada um dos sete painéis: o que ele mostra é a
+              geração da etapa corrente, que é justamente o que este contêiner delimita. Sete
+              cópias divergiriam na primeira correção feita só numa delas.
+            */}
+            <ConsoleDaGeracao
+              projectId={projeto.id}
+              workspace={workspace}
+              etapa={estado.etapa}
             />
           </div>
         </div>

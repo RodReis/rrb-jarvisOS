@@ -36,7 +36,7 @@ import type { BudgetLimitsInput, BudgetSnapshot } from '@shared/domain/budget'
 import type { ProviderRoute, ProviderStatus, RoutingPolicy } from '@shared/domain/routing'
 import type { Fase } from '@shared/domain/fase'
 import type { Etapa } from '@shared/domain/jornada'
-import type { GenerationEvent, GenerationTrace } from '@shared/domain/geracao'
+import type { EventoDaGeracao, GenerationEvent, GenerationTrace } from '@shared/domain/geracao'
 import type {
   PhaseModelPolicy,
   ProjectModelOverride,
@@ -818,12 +818,17 @@ export interface JarvisBridge {
   onAiStreamEvent(listener: (evento: AiStreamEvent) => void): () => void
 
   /**
-   * Assina o console de **uma** geração (SPEC-Fases-03 § Superfície).
+   * Assina o console da geração (SPEC-Fases-03 § Superfície).
    *
-   * O `traceId` é o filtro: o transporte é um canal só, e o preload entrega ao painel apenas os
-   * eventos da geração que ele assinou. Devolve a função que cancela a assinatura.
+   * O payload traz o `traceId`, e é ele que separa uma geração da seguinte. Passar um `traceId`
+   * como filtro no preload **não funcionaria para a geração ao vivo**: o renderer dispara a
+   * geração por `invoke`, que só resolve no fim, então no instante em que o painel precisa
+   * assinar o id ainda não existe do lado de cá. Quem descobre a geração corrente é o painel,
+   * pelo primeiro evento que chega.
+   *
+   * Devolve a função que cancela a assinatura.
    */
-  onGenerationEvent(traceId: string, listener: (evento: GenerationEvent) => void): () => void
+  onGenerationEvent(listener: (payload: EventoDaGeracao) => void): () => void
   /** As gerações anteriores de uma etapa, da mais recente para a mais antiga (critério 6). */
   generationHistory(
     projectId: string,

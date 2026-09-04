@@ -27,6 +27,7 @@ export { Alternador } from './Alternador'
 
 // Exibição de dados (PRD §11.4) — F03b
 export { Card, Panel, Badge, Tag, Separator } from './Superficies'
+export { Disclosure } from './Disclosure'
 export { Avatar } from './Avatar'
 export { Progress, Meter, Spinner, Skeleton } from './Indicadores'
 export {
