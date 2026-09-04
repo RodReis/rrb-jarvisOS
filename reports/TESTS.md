@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 1295 | 1295 | 0 | 74.5 | — | — |
-| — | — | — | Banco | 966 | 961 | 0 | 87.6 | — | — |
-| — | — | — | Tela | 489 | 488 | 0 | 73.5 | — | — |
+| — | — | — | Regras de Negócio | 1305 | 1305 | 0 | 74.5 | — | — |
+| — | — | — | Banco | 975 | 970 | 0 | 87.7 | — | — |
+| — | — | — | Tela | 505 | 504 | 0 | 74.0 | — | — |
 
 ## Histórico por entrega
 
@@ -244,3 +244,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-03 | #242 | spec-jornada-05-roadmap-mvp-spec-por-ia | Regras de Negócio | 1295 | 1295 | 0 | 74.5 | #249 | [#249](https://github.com/RodReis/rrb-jarvisOS/pull/249) |
 | 2026-09-03 | #242 | spec-jornada-05-roadmap-mvp-spec-por-ia | Banco | 966 | 961 | 0 | 87.6 | #249 | [#249](https://github.com/RodReis/rrb-jarvisOS/pull/249) |
 | 2026-09-03 | #242 | spec-jornada-05-roadmap-mvp-spec-por-ia | Tela | 489 | 488 | 0 | 73.5 | #249 | [#249](https://github.com/RodReis/rrb-jarvisOS/pull/249) |
+| 2026-09-04 | #251 | spec-fases-01-fase-e-card-do-projeto | Regras de Negócio | 1305 | 1305 | 0 | 74.5 | #258 | [#258](https://github.com/RodReis/rrb-jarvisOS/pull/258) |
+| 2026-09-04 | #251 | spec-fases-01-fase-e-card-do-projeto | Banco | 975 | 970 | 0 | 87.7 | #258 | [#258](https://github.com/RodReis/rrb-jarvisOS/pull/258) |
+| 2026-09-04 | #251 | spec-fases-01-fase-e-card-do-projeto | Tela | 505 | 504 | 0 | 74.0 | #258 | [#258](https://github.com/RodReis/rrb-jarvisOS/pull/258) |
