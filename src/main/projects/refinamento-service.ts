@@ -31,7 +31,7 @@ import type { GeracaoDePerguntasOutcome } from '@shared/domain/refinamento'
 import type { PerguntaGerada } from '@shared/domain/pergunta-gerada'
 import { separarPerguntasValidas } from '@shared/domain/pergunta-gerada'
 import type { EstadoDasRotas, ResultadoDaRota } from '@shared/domain/rota-de-geracao'
-import { escolherRota } from '@shared/domain/rota-de-geracao'
+import { PROVIDER_DA_ROTA, escolherRota } from '@shared/domain/rota-de-geracao'
 import type { Decision, EstadoDoWizard, Resposta, RespostaOutcome } from '@shared/domain/wizard'
 import {
   decidirPorMim,
@@ -44,12 +44,6 @@ import type { AuditRepository } from '../storage/audit-repository'
 import type { DecisionRepository } from './decision-repository'
 import type { PerguntaGeradaRepository } from './pergunta-gerada-repository'
 import type { ProjectRepository } from './project-repository'
-
-/** A rota concreta de cada decisão. Igual à do `BriefService` — é o mesmo produto. */
-const PROVIDER_DA_ROTA: Readonly<Record<'assinatura' | 'paga', AiProvider>> = {
-  assinatura: 'claude-code',
-  paga: 'anthropic'
-}
 
 export interface RefinamentoServiceDeps {
   readonly perguntas: PerguntaGeradaRepository

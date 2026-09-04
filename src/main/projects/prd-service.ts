@@ -58,7 +58,7 @@ import {
 } from '@shared/domain/prd'
 import type { FonteParaOModelo } from '@shared/domain/prd-schema'
 import type { EstadoDasRotas, ResultadoDaRota } from '@shared/domain/rota-de-geracao'
-import { escolherRota } from '@shared/domain/rota-de-geracao'
+import { PROVIDER_DA_ROTA, escolherRota } from '@shared/domain/rota-de-geracao'
 import type { ConnectorOutcome, ConnectorRequest } from '@shared/domain/connectors'
 import { CONNECTOR_CONTRACT_VERSION } from '@shared/domain/connectors'
 import type { TavilyExtractData, TavilySearchData } from '@shared/domain/tavily'
@@ -89,12 +89,6 @@ export const TENTATIVAS_DE_CORRECAO = 1
 
 /** Quantos caracteres do trecho extraído entram no pedido ao modelo. */
 const TAMANHO_DO_TRECHO = 400
-
-/** A rota concreta de cada decisão. `claude-code` é a rota de assinatura do produto. */
-const PROVIDER_DA_ROTA: Readonly<Record<'assinatura' | 'paga', AiProvider>> = {
-  assinatura: 'claude-code',
-  paga: 'anthropic'
-}
 
 /** O pedido de geração. `termo` vazio significa "gerar sem pesquisa" (critérios 3 e 4). */
 export interface PedidoDoPrd {

@@ -35,7 +35,7 @@ import type { PerguntaGerada } from '@shared/domain/pergunta-gerada'
 import { separarPerguntasValidas } from '@shared/domain/pergunta-gerada'
 import type { DecisaoDoRefinamento } from '@shared/domain/brief-schema'
 import type { EstadoDasRotas, ResultadoDaRota } from '@shared/domain/rota-de-geracao'
-import { escolherRota } from '@shared/domain/rota-de-geracao'
+import { PROVIDER_DA_ROTA, escolherRota } from '@shared/domain/rota-de-geracao'
 import { log } from '../logging/logger'
 import type { AuditRepository } from '../storage/audit-repository'
 import type { BriefRepository } from './brief-repository'
@@ -50,12 +50,6 @@ import type { BriefRepository } from './brief-repository'
  * É a mesma economia do MVP-009: até duas recuperações, depois `BLOCKED` explicável.
  */
 export const TENTATIVAS_DE_CORRECAO = 1
-
-/** A rota concreta de cada decisão. `claude-code` é a rota de assinatura do produto. */
-const PROVIDER_DA_ROTA: Readonly<Record<'assinatura' | 'paga', AiProvider>> = {
-  assinatura: 'claude-code',
-  paga: 'anthropic'
-}
 
 /** O que o modelo devolve. Estruturado, nunca prosa — é o que torna a origem verificável. */
 export interface SaidaDoModelo {

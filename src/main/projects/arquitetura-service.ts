@@ -67,7 +67,7 @@ import type { PrdRegistrado } from '@shared/domain/prd'
 import type { ValidacaoDoPrototipo } from '@shared/domain/validacao-de-prototipo'
 import { achadosQueImpedem } from '@shared/domain/validacao-de-prototipo'
 import type { EstadoDasRotas, ResultadoDaRota } from '@shared/domain/rota-de-geracao'
-import { escolherRota } from '@shared/domain/rota-de-geracao'
+import { PROVIDER_DA_ROTA, escolherRota } from '@shared/domain/rota-de-geracao'
 import { log } from '../logging/logger'
 import type { AuditRepository } from '../storage/audit-repository'
 import type { AnexoRepository } from './anexo-repository'
@@ -81,12 +81,6 @@ import type { ProjectService } from './project-service'
  * seguidas não erra por acaso — insistir não conserta, só gasta.
  */
 export const TENTATIVAS_DE_CORRECAO_DA_ARQUITETURA = 1
-
-/** A rota concreta de cada decisão. `claude-code` é a rota de assinatura do produto. */
-const PROVIDER_DA_ROTA: Readonly<Record<'assinatura' | 'paga', AiProvider>> = {
-  assinatura: 'claude-code',
-  paga: 'anthropic'
-}
 
 export interface ArquiteturaServiceDeps {
   readonly repository: ArquiteturaRepository
