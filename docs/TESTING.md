@@ -258,6 +258,29 @@ O último passo dele afirma um **limite conhecido** em vez de uma garantia: o eg
 restrito ([#222](https://github.com/RodReis/rrb-jarvisOS/issues/222)). Smoke que registra o que
 *ainda não* vale é mais honesto do que smoke que só mede o que já funciona.
 
+### 3.2.1 Smoke do console da geração (M26-F03)
+
+`scripts/smoke-console-geracao.mjs` chama o **Claude Code CLI real** com
+`--output-format stream-json --verbose` e passa a saída pelo parser que vai para produção.
+
+```bash
+TSX_TSCONFIG_PATH=tsconfig.node.json npx tsx scripts/smoke-console-geracao.mjs
+```
+
+O `TSX_TSCONFIG_PATH` é obrigatório: o parser importa `@shared/domain/geracao`, e o alias mora no
+`tsconfig.node.json` — o `tsconfig.json` da raiz só referencia os dois projetos.
+
+**Por que ele existe, com 29 testes verdes sobre o parser:** as fixtures são gravadas e o CLI é
+vivo. O dublê responde no formato que foi *anotado*; o CLI responde no formato que ele tem hoje,
+com a versão instalada e a telemetria que a Anthropic acrescentou desde a captura. O prompt força
+uma ferramenta de propósito — sem isso o smoke provaria só o caminho de texto, que os adapters
+antigos já faziam.
+
+Execução de 2026-09-04: `texto: 1 · ferramenta-inicio: 1 · ferramenta-fim: 1 · uso: 1`, com
+`Bash · grep -m1 '"name"' .../package.json → ok · 25 B` e `227690 tokens de entrada · 125 de
+saída · 5548 ms`. Os 227.690 são o achado: a aproximação por caracteres do adapter antigo daria
+~30, porque media o prompt e não o contexto que o CLI carrega.
+
 ## 4. O relatório: `reports/TESTS.md`
 
 **Local:** `reports/` na raiz — **diretório neutro**. Não vai em `docs/` (um arquivo reescrito a
