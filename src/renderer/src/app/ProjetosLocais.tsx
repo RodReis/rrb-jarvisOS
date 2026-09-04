@@ -96,6 +96,16 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
     new Map()
   )
 
+  /*
+   * Gatilho de recarga dos resumos (SPEC-Fases-02, criterio 3).
+   *
+   * Um contador e nao um `boolean`: trocar o modelo duas vezes seguidas precisa recarregar duas
+   * vezes, e um `boolean` alternado perderia a segunda quando a primeira ainda estivesse em voo.
+   * Recarregar do main, e nao aplicar localmente, e a mesma regra do resto da tela — o que o
+   * card mostra e o que o main confirma.
+   */
+  const [recargaDeResumos, setRecargaDeResumos] = useState(0)
+
   // Derivado no render, não em estado próprio: guardar o objeto do projeto duplicaria o que a
   // lista já tem, e um rename deixaria a tela aberta mostrando o nome antigo.
   const projetoAberto = projetos.find((p) => p.id === projetoAbertoId)
@@ -167,7 +177,7 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
     return () => {
       ativo = false
     }
-  }, [projetos, workspace])
+  }, [projetos, workspace, recargaDeResumos])
 
   async function recarregar(): Promise<void> {
     setProjetos(await window.jarvis.listProjects(workspace))
@@ -446,7 +456,11 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
                         nome — ali o card é formulário, e metadado disputaria com o campo.
                       */}
                       {!editando && !confirmando && (
-                        <ResumoDoCard resumo={resumoPorProjeto.get(projeto.id)} />
+                        <ResumoDoCard
+                          resumo={resumoPorProjeto.get(projeto.id)}
+                          workspace={workspace}
+                          aoTrocarModelo={() => setRecargaDeResumos((n) => n + 1)}
+                        />
                       )}
                     </div>
 

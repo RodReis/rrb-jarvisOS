@@ -46,6 +46,9 @@ const revisoesDoGate = vi.fn()
 // abaixo, não um acidente.
 const jornadaDeVarios = vi.fn()
 const resumoDeVarios = vi.fn()
+const getPhaseModelOverrides = vi.fn()
+const setPhaseModelOverride = vi.fn()
+const clearPhaseModelOverride = vi.fn()
 const estadoDaJornada = vi.fn()
 // A etapa `prompt` passou a montar `PromptDoProjeto` (M25-F02): abrir o projeto na primeira
 // etapa monta a tela do prompt, e sem estes dois o teste quebraria por falta de dublê, não pelo
@@ -88,6 +91,9 @@ beforeEach(() => {
   revisoesDoGate.mockReset().mockResolvedValue([])
   jornadaDeVarios.mockReset().mockResolvedValue([])
   resumoDeVarios.mockReset().mockResolvedValue([])
+  getPhaseModelOverrides.mockReset().mockResolvedValue([])
+  setPhaseModelOverride.mockReset().mockImplementation(async (o: unknown) => o)
+  clearPhaseModelOverride.mockReset().mockResolvedValue(true)
   estadoDaJornada.mockReset().mockResolvedValue(null)
   lerPromptDoProjeto.mockReset().mockResolvedValue(null)
   rotaDaGeracao.mockReset().mockResolvedValue({ decisao: 'assinatura' })
@@ -114,6 +120,9 @@ beforeEach(() => {
       revisoesDoGate,
       jornadaDeVarios,
       resumoDeVarios,
+      getPhaseModelOverrides,
+      setPhaseModelOverride,
+      clearPhaseModelOverride,
       estadoDaJornada,
       lerPromptDoProjeto,
       rotaDaGeracao,
@@ -600,6 +609,126 @@ describe('ProjetosLocais', () => {
       render(<ProjetosLocais workspace="jarvis" />)
 
       await screen.findByText(/claude-opus-5/)
+    })
+
+    /*
+     * A troca de modelo por projeto (SPEC-Fases-02, criterios 3 e 6).
+     *
+     * O que se prova aqui e que o **selo virou acao sem deixar de ser selo**: o id continua
+     * legivel (criterio 4 da F01, que casa o card com o ledger), e agora ele grava o override da
+     * fase atual. E que na rota bloqueada a acao nao existe — escolher modelo nao destrava rota.
+     */
+    it('o modelo do selo é o gatilho da troca, nomeando a fase (critério 3)', async () => {
+      listProjects.mockResolvedValue([projeto()])
+      resumoDeVarios.mockResolvedValue([resumo({ fase: 'construcao', modelo: 'claude-opus-5' })])
+
+      render(<ProjetosLocais workspace="jarvis" />)
+
+      const gatilho = await screen.findByRole('button', {
+        name: /Trocar o modelo da fase Construção deste projeto/i
+      })
+      expect(gatilho).toHaveTextContent('claude-opus-5')
+    })
+
+    it('trocar grava o override da fase atual, não das outras (critério 3)', async () => {
+      const usuario = userEvent.setup()
+      listProjects.mockResolvedValue([projeto()])
+      resumoDeVarios.mockResolvedValue([resumo({ fase: 'construcao', modelo: 'claude-opus-5' })])
+
+      render(<ProjetosLocais workspace="jarvis" />)
+
+      await usuario.click(
+        await screen.findByRole('button', { name: /Trocar o modelo da fase Construção/i })
+      )
+      // `data-jos-troca-modelo` e nao o rotulo: o gatilho do popover e o combo dentro dele
+      // compartilham o nome da fase de proposito — um diz "trocar o modelo da fase X", o outro
+      // rotula o campo que faz isso. O atributo distingue os dois sem afrouxar o teste.
+      await usuario.click(
+        document.querySelector('[data-jos-troca-modelo="p-1"]') as HTMLElement
+      )
+      await usuario.click(await screen.findByRole('option', { name: /Sonnet 5/ }))
+
+      await waitFor(() =>
+        expect(setPhaseModelOverride).toHaveBeenCalledWith(
+          {
+            project_id: 'p-1',
+            fase: 'construcao',
+            rota: 'assinatura',
+            provider: 'claude-code',
+            modelo: 'claude-sonnet-5'
+          },
+          'jarvis'
+        )
+      )
+    })
+
+    it('depois de trocar, recarrega o resumo em vez de aplicar localmente', async () => {
+      const usuario = userEvent.setup()
+      listProjects.mockResolvedValue([projeto()])
+      resumoDeVarios.mockResolvedValue([resumo({ fase: 'construcao', modelo: 'claude-opus-5' })])
+
+      render(<ProjetosLocais workspace="jarvis" />)
+
+      await usuario.click(
+        await screen.findByRole('button', { name: /Trocar o modelo da fase Construção/i })
+      )
+      await usuario.click(
+        document.querySelector('[data-jos-troca-modelo="p-1"]') as HTMLElement
+      )
+      await usuario.click(await screen.findByRole('option', { name: /Sonnet 5/ }))
+
+      // O que o card mostra e o que o **main** confirma: duas leituras, nao uma escrita local.
+      await waitFor(() => expect(resumoDeVarios).toHaveBeenCalledTimes(2))
+    })
+
+    it('"voltar ao padrão" só aparece quando há override a remover', async () => {
+      const usuario = userEvent.setup()
+      listProjects.mockResolvedValue([projeto()])
+      resumoDeVarios.mockResolvedValue([resumo({ fase: 'construcao', modelo: 'claude-opus-5' })])
+      getPhaseModelOverrides.mockResolvedValue([
+        {
+          project_id: 'p-1',
+          fase: 'construcao',
+          rota: 'assinatura',
+          provider: 'claude-code',
+          modelo: 'claude-opus-5'
+        }
+      ])
+
+      render(<ProjetosLocais workspace="jarvis" />)
+
+      await usuario.click(
+        await screen.findByRole('button', { name: /Trocar o modelo da fase Construção/i })
+      )
+      await usuario.click(await screen.findByRole('button', { name: /Voltar ao padrão do espaço/i }))
+
+      await waitFor(() =>
+        expect(clearPhaseModelOverride).toHaveBeenCalledWith(
+          'p-1',
+          'construcao',
+          'assinatura',
+          'jarvis'
+        )
+      )
+    })
+
+    it('rota bloqueada não oferece troca: escolher modelo não destrava rota (critério 6)', async () => {
+      listProjects.mockResolvedValue([projeto()])
+      resumoDeVarios.mockResolvedValue([
+        resumo({
+          rota: { decisao: 'bloqueado', motivo: 'sem-rota-alguma' },
+          modelo: null,
+          bloqueio: {
+            motivo: 'sem-rota-alguma',
+            acao: 'Conecte a assinatura do Claude em Providers.'
+          }
+        })
+      ])
+
+      render(<ProjetosLocais workspace="jarvis" />)
+
+      await screen.findByText(/Conecte a assinatura do Claude em Providers/)
+      expect(screen.queryByRole('button', { name: /Trocar o modelo da fase/i })).toBeNull()
     })
 
     it('mostra motivo e ação quando o projeto está bloqueado (critério 5)', async () => {
