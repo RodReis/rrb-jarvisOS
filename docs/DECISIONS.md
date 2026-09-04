@@ -152,3 +152,17 @@ O PI testou o fluxo entregue pelo MVP-008 e constatou que ele não corresponde a
 4. **Rota de assinatura (Claude MAX via Claude Code CLI) é a rota da geração do planejamento** — decisão 4 do MVP-008 levada à consequência: sem valor monetário no ledger, e rota paga nunca como fallback.
 5. **Fila:** MVP-025 entra logo após o MVP-009, antes do MVP-022 e do Command Center — altera a ordem registrada em 2026-08-30 para esses dois.
 6. O aceite do MVP-008 **não é reaberto**: suas fatias permanecem válidas como infraestrutura (Git local, `Decision`, anexos por ato, gates por hash). O que muda entra por fatias novas com SPEC própria, nunca por emenda a spec finalizada (regra consolidada em 2026-08-30).
+
+## Fases, modelo por fase e console da geração (PI, 2026-09-04)
+
+O PI usou o app com o MVP-025 aceito e apontou que o card não diz a fase, que o modelo não é escolhido por fase, que a IA gera sem mostrar texto nem ferramentas e que os marcos Git não são visíveis nem verificados antes da Construção. Verificado no código: a aba "Roteamento por tipo de tarefa" (SPEC-Providers-04) não é consumida pela jornada — a geração usa `escolherRota()` e o modelo ativo do provider. Nasce o MVP-026 (`docs/mvp/mvp-026-fases-modelos-e-console.md`). Decisões:
+
+1. **Fase é derivada da etapa** (Planejamento / Especificação / Construção); não é estado novo nem transição nova. A máquina da SPEC-Jornada-01 permanece.
+2. **Modelo por fase: default por workspace + override por projeto**, auditados. **Fable 5.1 (`claude-fable-5-1`) existe só na rota de assinatura (Claude Code CLI), nunca na API paga** — não entra no catálogo do provider `anthropic`.
+3. **Codex passa a ser provider do ponto único** (`AI_PROVIDERS`), pela assinatura do Codex, para Planejamento e Especificação (`gpt-5.6-sol`). A decisão 4 do MVP-025 (assinatura obrigatória, paga só por opt-in) vale para as duas assinaturas: **nenhuma cai na outra nem em API por conta própria**; o modo `api` do Codex fica atrás do mesmo opt-in por projeto. Reordena a fila: **M10-F02 sobe para antes da M26-F06**. Codex como executor da Construção continua sendo MVP-010 (F03/F04).
+4. **O modelo da fase Construção chega ao run do MVP-009** (`--model` no Claude Code do container, congelado por tentativa, no `ExecutionLedger`). Sem modelo por passo do run — Construção é o run inteiro.
+5. **Console da geração é evidência persistida**, ligada ao ledger: texto do modelo e ferramentas (nome + resumo do argumento + status; resultado truncado no persistido), painel retrátil na própria etapa. Não altera permissões de ferramenta (MVP-004).
+6. **Documentos versionados antes da Construção passam a ser verificados:** painel de marcos na tela do projeto e bloqueio determinístico no `SLICE_ENTRY` (marco sem commit, blob divergente da revisão aceita, worktree sujo), sem "aceitar mesmo assim". Git continua só pelo `GitRunner`.
+7. **Fila:** MVP-026 antes do MVP-022 e do Command Center — altera a ordem registrada em 2026-09-03 para esses dois.
+8. **SPEC-Providers-04 não é reaberta:** o editor por tipo de tarefa vira "Avançado" e continua sendo o roteamento de chamadas fora da jornada (MVP-007, 017, 021).
+9. O aceite do MVP-025 **não é reaberto**; o que muda entra por fatias novas com SPEC própria (regra de 2026-08-30).
