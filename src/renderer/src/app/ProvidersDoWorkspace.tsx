@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { WorkspaceId } from '@shared/domain/entities'
-import { AI_PROVIDERS, type AiProvider } from '@shared/domain/ai'
+import { AI_PROVIDERS, ROTULO_DO_PROVIDER, type AiProvider } from '@shared/domain/ai'
 import {
   ROTULO_DO_TASK_TYPE,
   TASK_TYPES,
@@ -10,6 +10,7 @@ import {
 } from '@shared/domain/routing'
 import { ArrowDown, ArrowUp, Plus } from 'lucide-react'
 import { Button, Checkbox, Field, IconButton, InlineAlert, Panel, Select, Tag } from '@design/ui'
+import { ModelosPorFase } from './ModelosPorFase'
 import { StatusOperacional, type EstadoOperacional } from '@design/patterns'
 import { log } from '../lib/log'
 
@@ -31,13 +32,6 @@ interface ProvidersProps {
 }
 
 /** Nome legível de cada provider — a tela não deriva texto de identificador. */
-const ROTULO_DO_PROVIDER: Readonly<Record<AiProvider, string>> = {
-  anthropic: 'Anthropic (Claude API)',
-  gemini: 'Google Gemini',
-  ollama: 'Ollama (local)',
-  'claude-code': 'Claude Code CLI'
-}
-
 /**
  * O estado operacional que o DS pinta a partir do healthcheck.
  *
@@ -355,7 +349,13 @@ export function ProvidersDoWorkspace({
           </InlineAlert>
         )}
 
-        <div className="flex flex-col gap-4">
+        {/*
+         * `aria-label` na lista de providers, e nao so uma classe: desde que a aba passou a ter
+         * duas superficies que mostram origem e custo (a lista e as combos por fase), "quantos
+         * providers sem custo existem" precisa de um escopo para nao virar "quantas Tags a aba
+         * inteira tem". O rotulo serve ao leitor de tela e ao teste pela mesma porta.
+         */}
+        <div role="group" aria-label="Providers deste espaço" className="flex flex-col gap-4">
           {status.map((s) => (
             <LinhaDeProvider
               key={s.provider}
@@ -366,23 +366,41 @@ export function ProvidersDoWorkspace({
           ))}
         </div>
 
-        <section className="flex flex-col gap-4">
-          <h3 className="text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto)]">
-            Roteamento por tipo de tarefa
-          </h3>
+        <ModelosPorFase workspace={workspace} />
 
-          {TASK_TYPES.map((taskType) => (
-            <EditorDeRota
-              key={taskType}
-              taskType={taskType}
-              preferencia={rotas.rotas[taskType].preferencia}
-              preferirLocal={rotas.rotas[taskType].preferirLocal}
-              aoMudar={(preferencia, preferirLocal) =>
-                void salvarRota(taskType, preferencia, preferirLocal)
-              }
-            />
-          ))}
-        </section>
+        {/*
+         * O roteamento por tipo de tarefa desce para "Avançado" e nasce recolhido
+         * (SPEC-Fases-02, criterio 7).
+         *
+         * Recolhido, e nao removido: MVP-007, 017 e 021 vao consumir o `ProviderRoute`, e apaga-lo
+         * agora desfaria a SPEC-Providers-04 sem decisao do PI. Recolhido **e** com a linha que
+         * diz que a jornada nao passa por aqui, porque duas listas de modelo na mesma aba, sem
+         * essa frase, fariam o PI editar a errada procurando a da geracao.
+         */}
+        <details className="flex flex-col gap-4 border-t border-[rgba(var(--jos-borda-rgb),0.16)] pt-5">
+          <summary className="cursor-pointer text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto)]">
+            Avançado · Roteamento por tipo de tarefa
+          </summary>
+
+          <p className="mt-2 text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-suave)]">
+            Estas rotas valem para chamadas fora da jornada do projeto. A geração de brief, PRD,
+            arquitetura, roadmap e SPEC usa o modelo da fase, escolhido acima.
+          </p>
+
+          <div className="mt-4 flex flex-col gap-4">
+            {TASK_TYPES.map((taskType) => (
+              <EditorDeRota
+                key={taskType}
+                taskType={taskType}
+                preferencia={rotas.rotas[taskType].preferencia}
+                preferirLocal={rotas.rotas[taskType].preferirLocal}
+                aoMudar={(preferencia, preferirLocal) =>
+                  void salvarRota(taskType, preferencia, preferirLocal)
+                }
+              />
+            ))}
+          </div>
+        </details>
       </div>
     </Panel>
   )

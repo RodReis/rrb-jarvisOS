@@ -170,6 +170,20 @@ export const ORIGEM_DO_PROVIDER: Readonly<Record<AiProvider, 'local' | 'cloud'>>
   'claude-code': 'local'
 }
 
+/**
+ * O rótulo pt-BR de cada provider, para as telas.
+ *
+ * Sobe para o domínio na SPEC-Fases-02 porque **duas telas passam a lê-lo**: a lista de
+ * providers e as combos de modelo por fase. Uma cópia local em cada uma divergiria na primeira
+ * renomeação, e as duas telas mostrariam nomes diferentes para o mesmo provider.
+ */
+export const ROTULO_DO_PROVIDER: Readonly<Record<AiProvider, string>> = {
+  anthropic: 'Anthropic (Claude API)',
+  gemini: 'Google Gemini',
+  ollama: 'Ollama (local)',
+  'claude-code': 'Claude Code CLI'
+}
+
 /** O modelo usado quando o chamador não escolhe. */
 export const MODELO_PADRAO: Readonly<Record<AiProvider, string>> = {
   anthropic: 'claude-opus-5',

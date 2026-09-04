@@ -459,7 +459,7 @@ describe('Settings (SPEC-05)', () => {
     // A régua completa (decisão do PI, 2026-08-30): escopo do usuário à esquerda, escopo do
     // espaço à direita.
     const abas = screen.getAllByRole('tab').map((tab) => tab.textContent)
-    expect(abas).toEqual(['Geral', 'Permissões', 'IA', 'Roteamento', 'Conectores'])
+    expect(abas).toEqual(['Geral', 'Permissões', 'IA', 'Modelos', 'Conectores'])
 
     // A aba padrão é Geral, e as seções das outras abas **não estão no DOM** — é o que
     // garante que as buscas de dados das seções escopadas só disparam quando a aba abre.
