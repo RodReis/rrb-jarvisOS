@@ -109,6 +109,8 @@ import { NATUREZAS, isGate } from '@shared/domain/aprovacoes'
 import type { PublicacaoService } from '../projects/publicacao-service'
 import type { MergePolicyService } from '../pipeline/merge-policy-service'
 import type { FilaService } from '../pipeline/fila-service'
+import type { VistaDeMarcos } from '@shared/domain/marcos'
+import type { MarcosService } from '../projects/marcos-service'
 import type { RoadmapService } from '../projects/roadmap-service'
 import type { RoadmapGeradoService } from '../projects/roadmap-gerado-service'
 import type { JornadaService } from '../projects/jornada-service'
@@ -335,6 +337,7 @@ export interface IpcDependencies {
   readonly anexos: AnexoService
   readonly roadmap: RoadmapService
   readonly roadmapGerado: RoadmapGeradoService
+  readonly marcos: MarcosService
   readonly jornada: JornadaService
   /**
    * O estado das rotas do ambiente, medido **uma vez** por leitura da lista.
@@ -2146,6 +2149,23 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
         return { reason: 'sem-revisoes', mensagem: 'Gate desconhecido.' }
       }
       return deps.roadmap.aprovar(projectId, gate, workspace)
+    }
+  )
+
+  // O painel de marcos (SPEC-Fases-04). Leitura pura: nenhuma escrita no Git sai daqui — o botão
+  // "Commitar marco" da tela usa `projectCompleteMilestone`, a retomada da M8-F01.
+  ipcMain.handle(
+    IPC_CHANNELS.marcosVista,
+    (_event, projectId: unknown, workspace: unknown): VistaDeMarcos => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
+        return {
+          disponivel: false,
+          linhas: [],
+          repositorio: { sujos: [], headInterrompido: false, head: '' },
+          mensagem: 'Projeto não encontrado.'
+        }
+      }
+      return deps.marcos.vista(projectId, workspace)
     }
   )
 

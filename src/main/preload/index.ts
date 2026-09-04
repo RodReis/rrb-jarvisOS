@@ -93,6 +93,7 @@ import type {
   MudancaDeArtefato,
   RevisaoAprovada
 } from '@shared/domain/aprovacoes'
+import type { VistaDeMarcos } from '@shared/domain/marcos'
 import type { CredentialKey, CredentialStatusView } from '@shared/domain/credentials'
 import type { BudgetLimitsInput, BudgetSnapshot } from '@shared/domain/budget'
 import type {
@@ -609,6 +610,9 @@ const bridge: JarvisBridge = {
     workspace: WorkspaceId
   ): Promise<readonly Gate[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.aprovacaoSimular, projectId, mudancas, workspace),
+  // Leitura do painel de marcos. Sem contraparte de escrita: commitar marco é `concluirMarco`.
+  marcosDoProjeto: (projectId: string, workspace: WorkspaceId): Promise<VistaDeMarcos> =>
+    ipcRenderer.invoke(IPC_CHANNELS.marcosVista, projectId, workspace),
 
   // Anexos de design e arquitetura (SPEC-Planejamento-05). Nenhum método recebe conteúdo de
   // arquivo: o renderer manda o *caminho* que o seletor nativo devolveu, e quem lê, copia e

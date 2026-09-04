@@ -51,6 +51,7 @@ import { MergePolicyRepository } from './pipeline/merge-policy-repository'
 import { MergePolicyService } from './pipeline/merge-policy-service'
 import { PipelineRepository } from './pipeline/pipeline-repository'
 import { ReconciliacaoService } from './pipeline/reconciliacao-service'
+import { MarcosService } from './projects/marcos-service'
 import { RoadmapService } from './projects/roadmap-service'
 import { RoadmapGeradoService } from './projects/roadmap-gerado-service'
 import { RoadmapGeradoRepository } from './projects/roadmap-gerado-repository'
@@ -512,6 +513,19 @@ if (!app.requestSingleInstanceLock()) {
      * — ele depende da projeção que este mesmo repositório grava —, e a leitura é só uma linha.
      */
     const roadmapGeradoRepository = new RoadmapGeradoRepository(storage.db)
+
+    // O painel de marcos e o gate da Construção (SPEC-Fases-04). Lê o mesmo `gitRunner` que
+    // commita os marcos: uma segunda instância não seria um segundo caminho de política — o
+    // `TerminalEngine` é o mesmo —, mas seria uma segunda resposta para "qual Git o app usa".
+    const marcos = new MarcosService({
+      git: gitRunner,
+      projects: projectRepository,
+      pacotes: pacoteRepository,
+      anexos,
+      audit: storage.audit,
+      userId: userIdAtual
+    })
+
     const roadmap = new RoadmapService({
       repository: roadmapRepository,
       projects: projectRepository,
@@ -520,7 +534,8 @@ if (!app.requestSingleInstanceLock()) {
       audit: storage.audit,
       userId: userIdAtual,
       identidade: () => auth?.usuarioAtual()?.id,
-      roadmapGerado: (projectId) => roadmapGeradoRepository.vigente(userIdAtual(), projectId)
+      roadmapGerado: (projectId) => roadmapGeradoRepository.vigente(userIdAtual(), projectId),
+      verificarMarcos: (projectId, workspaceId) => marcos.verificar(projectId, workspaceId)
     })
 
     // A jornada de planejamento (SPEC-Jornada-01).
@@ -1240,6 +1255,7 @@ if (!app.requestSingleInstanceLock()) {
       anexos,
       roadmap,
       roadmapGerado,
+      marcos,
       jornada,
       /*
        * O card não tem projeto único: o estado das rotas é do ambiente, e uma medição serve a

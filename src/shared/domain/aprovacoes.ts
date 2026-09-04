@@ -180,7 +180,16 @@ export const APROVACAO_REASONS = [
   /** O gate não tem o que aprovar: o pacote/MVP/fatia ainda não existe. */
   'sem-revisoes',
   /** O DAG tem ciclo ou dependência ausente — não há roadmap válido a aprovar (critério 1). */
-  'dag-invalido'
+  'dag-invalido',
+  /**
+   * Há documento aceito que não está versionado, ou o repositório não está limpo
+   * (SPEC-Fases-04, critério 4). Só o `SLICE_ENTRY` produz este desfecho: é o gate que abre a
+   * Construção, e a regra do PI é que ninguém entre nela com documentação fora do Git.
+   *
+   * **Não existe "aceitar mesmo assim".** Um parâmetro de bypass transformaria a regra em
+   * sugestão, e o remédio de cada item vem em `problemas` — o bloqueio é um passo, não um beco.
+   */
+  'marcos-pendentes'
 ] as const
 
 export type AprovacaoReason = (typeof APROVACAO_REASONS)[number]
@@ -190,8 +199,13 @@ export interface AprovacaoOutcome {
   readonly approval?: Approval
   /** Em `ja-aprovado`: a aprovação que já cobre estas revisões. */
   readonly vigente?: Approval
-  /** Em `dag-invalido`: os problemas encontrados, com os ids envolvidos. */
-  readonly problemas?: readonly { readonly mensagem: string }[]
+  /**
+   * Em `dag-invalido`: os problemas encontrados, com os ids envolvidos.
+   *
+   * Em `marcos-pendentes`: um item por pendência, e `acao` é o que fazer para destravar cada uma
+   * — obrigatório ali, ausente aqui, porque um DAG inválido não tem ação de uma linha.
+   */
+  readonly problemas?: readonly { readonly mensagem: string; readonly acao?: string }[]
   readonly mensagem: string
 }
 

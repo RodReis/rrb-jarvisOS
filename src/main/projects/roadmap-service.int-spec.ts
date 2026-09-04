@@ -21,6 +21,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Database as Db } from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ResultadoDaVerificacao } from '@shared/domain/marcos'
 import type { MvpGerado, RoadmapRegistrado, SpecGerada } from '@shared/domain/roadmap-gerado'
 
 const logCat = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
@@ -54,6 +55,7 @@ let arquiteturas: { documentos: { caminho: string; hash: string }[] }[]
 let identidadeAtual: string | undefined
 /** A revisão gerada que os gates do roadmap aprovam. */
 let gerado: RoadmapRegistrado | undefined
+let marcos: ResultadoDaVerificacao
 
 function mvp(over: Partial<MvpGerado> = {}): MvpGerado {
   return {
@@ -189,6 +191,9 @@ beforeEach(() => {
   arquiteturas = [{ documentos: [{ caminho: 'docs/ARCHITECTURE.md', hash: 'b'.repeat(64) }] }]
   identidadeAtual = 'pi@exemplo'
   gerado = revisao()
+  // Marcos em dia é o caso comum: os testes deste arquivo falam sobre os gates, e um repositório
+  // sujo por padrão faria todos eles falharem por um motivo que não é o que estão medindo.
+  marcos = { ok: true, head: 'abc1234', pendencias: [] }
 
   projects.save({
     id: PROJETO,
@@ -213,7 +218,8 @@ beforeEach(() => {
     audit,
     userId: () => USER,
     identidade: () => identidadeAtual,
-    roadmapGerado: () => gerado
+    roadmapGerado: () => gerado,
+    verificarMarcos: () => marcos
   })
 
   vi.clearAllMocks()
@@ -397,6 +403,78 @@ describe('aprovar — o aceite do PI', () => {
     gravarProjecao()
 
     expect(service.aprovar(PROJETO, 'SLICE_ENTRY', WS).reason).toBe('aprovado')
+  })
+
+  /**
+   * O gate da Construção (SPEC-Fases-04, critério 4).
+   *
+   * O que estes testes protegem não é a verificação em si — ela tem suíte própria, pura — e sim
+   * a **ligação**: que o `SLICE_ENTRY` a consulta, que a recusa não grava `Approval`, e que os
+   * outros dois gates não são afetados.
+   */
+  function specRespondida(): void {
+    gerado = revisao({
+      mvpEscolhido: 'mvp-1',
+      spec: spec({ perguntas: [{ ...spec().perguntas[0]!, resposta: 'a' }] })
+    })
+    gravarProjecao()
+  }
+
+  it('SLICE_ENTRY recusa com marcos-pendentes quando há documento fora do Git', () => {
+    specRespondida()
+    marcos = {
+      ok: false,
+      head: 'abc1234',
+      pendencias: [
+        {
+          caminho: 'docs/PRD.md',
+          estado: 'revisao-sem-commit',
+          mensagem: 'docs/PRD.md foi aceito mas não está commitado.',
+          acao: 'Commitar marco docs/PRD.md'
+        }
+      ]
+    }
+
+    const r = service.aprovar(PROJETO, 'SLICE_ENTRY', WS)
+
+    expect(r.reason).toBe('marcos-pendentes')
+    // A ação concreta atravessa: sem ela o bloqueio seria um beco, e a spec proíbe o "aceitar
+    // mesmo assim" justamente porque o caminho de saída é o remédio, não o bypass.
+    expect(r.problemas?.[0]?.acao).toBe('Commitar marco docs/PRD.md')
+  })
+
+  it('a recusa por marcos não grava aprovação — a verificação roda antes do Approval', () => {
+    specRespondida()
+    marcos = {
+      ok: false,
+      head: 'abc1234',
+      pendencias: [
+        {
+          caminho: 'README.md',
+          estado: 'arvore-suja',
+          mensagem: 'Há 1 arquivo(s) com alteração não commitada.',
+          acao: 'Descartar ou commitar alterações em README.md'
+        }
+      ]
+    }
+
+    service.aprovar(PROJETO, 'SLICE_ENTRY', WS)
+
+    expect(aprovacoesNoBanco()).toBe(0)
+  })
+
+  it('os outros gates não consultam marcos: PROJECT_PACKAGE aprova com o repositório sujo', () => {
+    marcos = {
+      ok: false,
+      head: 'abc1234',
+      pendencias: [
+        { caminho: 'x.md', estado: 'arvore-suja', mensagem: 'sujo', acao: 'commitar x.md' }
+      ]
+    }
+
+    // A regra do PI é sobre entrar na Construção. Estender o bloqueio aos gates anteriores
+    // travaria o planejamento inteiro por trabalho em andamento — que é o estado normal dele.
+    expect(service.aprovar(PROJETO, 'PROJECT_PACKAGE', WS).reason).toBe('aprovado')
   })
 
   /**

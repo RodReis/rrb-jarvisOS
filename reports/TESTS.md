@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 1369 | 1369 | 0 | 74.2 | — | — |
-| — | — | — | Banco | 1058 | 1053 | 0 | 87.8 | — | — |
-| — | — | — | Tela | 547 | 546 | 0 | 74.6 | — | — |
+| — | — | — | Regras de Negócio | 1387 | 1387 | 0 | 74.3 | — | — |
+| — | — | — | Banco | 1075 | 1070 | 0 | 87.8 | — | — |
+| — | — | — | Tela | 557 | 556 | 0 | 75.0 | — | — |
 
 ## Histórico por entrega
 
@@ -262,3 +262,9 @@ Append-only — linhas de entregas passadas são imutáveis.
 | — | #253 | spec-fases-03-console-da-geracao | Regras de Negócio | 1369 | 1369 | 0 | 74.2 | #263 | [#263](https://github.com/RodReis/rrb-jarvisOS/pull/263) |
 | — | #253 | spec-fases-03-console-da-geracao | Banco | 1058 | 1053 | 0 | 87.8 | #263 | [#263](https://github.com/RodReis/rrb-jarvisOS/pull/263) |
 | — | #253 | spec-fases-03-console-da-geracao | Tela | 547 | 546 | 0 | 74.6 | #263 | [#263](https://github.com/RodReis/rrb-jarvisOS/pull/263) |
+| 2026-09-04 | #254 | SPEC-Fases-04 | Regras de Negócio | 1387 | 1387 | 0 | 74.3 | #264 | [#264](https://github.com/RodReis/rrb-jarvisOS/pull/264) |
+| 2026-09-04 | #254 | SPEC-Fases-04 | Banco | 1074 | 1069 | 0 | 87.8 | #264 | [#264](https://github.com/RodReis/rrb-jarvisOS/pull/264) |
+| 2026-09-04 | #254 | SPEC-Fases-04 | Tela | 557 | 556 | 0 | 75.0 | #264 | [#264](https://github.com/RodReis/rrb-jarvisOS/pull/264) |
+| 2026-09-04 | #254 | SPEC-Fases-04 | Regras de Negócio | 1387 | 1387 | 0 | 74.3 | #264 | [#264](https://github.com/RodReis/rrb-jarvisOS/pull/264) |
+| 2026-09-04 | #254 | SPEC-Fases-04 | Banco | 1075 | 1070 | 0 | 87.8 | #264 | [#264](https://github.com/RodReis/rrb-jarvisOS/pull/264) |
+| 2026-09-04 | #254 | SPEC-Fases-04 | Tela | 557 | 556 | 0 | 75.0 | #264 | [#264](https://github.com/RodReis/rrb-jarvisOS/pull/264) |

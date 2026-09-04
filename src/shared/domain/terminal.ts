@@ -46,6 +46,23 @@ export interface CommandSubmission {
   readonly binary: string
   readonly args: readonly string[]
   readonly cwd: string
+  /**
+   * A saída deste comando é **conteúdo de arquivo do usuário**, não evidência de execução.
+   *
+   * Quando `true`, o `stdout` é substituído por um marcador no `CommandExecution` — que é o que
+   * a auditoria persiste, a evidência guarda e a tela mostra. O chamador ainda recebe a saída
+   * real, porque é para isso que ele rodou o comando.
+   *
+   * Existe por causa de `git show <sha>:<caminho>` (SPEC-Fases-04): é o primeiro comando desta
+   * base cujo **propósito** é despejar o conteúdo de um arquivo, e sem esta marca o texto
+   * inteiro de `PRD.md` iria para o `AuditEvent` — o `redact()` age sobre *nome de campo*, e um
+   * documento não tem campo a reconhecer. É o mesmo defeito que a M26-F03 corrigiu com
+   * `redigirSegredos`, aparecendo por outra porta.
+   *
+   * **Não é um jeito de escapar da auditoria:** binário, argumentos, cwd, exit code, duração e
+   * o par antes/depois continuam sendo gravados. O que sai é só o corpo do arquivo.
+   */
+  readonly saidaEhConteudo?: boolean
 }
 
 /**
