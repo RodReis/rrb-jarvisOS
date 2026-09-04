@@ -8,6 +8,7 @@ import { Button, ErrorState, LoadingState } from '@design/ui'
 import { log } from '../lib/log'
 import { TrilhaDaJornada } from './TrilhaDaJornada'
 import { ConsoleDaGeracao } from './ConsoleDaGeracao'
+import { MarcosDoProjeto } from './MarcosDoProjeto'
 import { WizardDoProjeto } from './WizardDoProjeto'
 import { AnexosDeDesign } from './AnexosDeDesign'
 import { ArquiteturaDoProjeto } from './ArquiteturaDoProjeto'
@@ -183,6 +184,13 @@ export function ProjetoAberto({
               cópias divergiriam na primeira correção feita só numa delas.
             */}
             <ConsoleDaGeracao projectId={projeto.id} workspace={workspace} etapa={estado.etapa} />
+
+            {/*
+              O painel de marcos (SPEC-Fases-04), no mesmo contêiner e pela mesma razão do
+              console: o que ele mostra é do **projeto**, não da etapa — e uma cópia em cada um
+              dos sete painéis divergiria na primeira correção feita só numa delas.
+            */}
+            <MarcosDoProjeto projectId={projeto.id} workspace={workspace} />
           </div>
         </div>
       )}

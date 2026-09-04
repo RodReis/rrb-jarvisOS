@@ -136,6 +136,7 @@ describe('ponte do preload', () => {
       'login',
       'logout',
       'logoutGithub',
+      'marcosDoProjeto',
       'minimizeToTray',
       'mvpsElegiveis',
       'onAiStreamEvent',

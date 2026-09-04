@@ -132,6 +132,13 @@ beforeEach(() => {
       onGenerationEvent: () => () => {},
       generationHistory: vi.fn().mockResolvedValue([]),
       generationEvents: vi.fn().mockResolvedValue([]),
+      // O painel de marcos (SPEC-Fases-04) mora no mesmo contêiner, pela mesma razão. Lista
+      // vazia ⇒ o painel não renderiza e sai do caminho desta suíte, que testa a jornada.
+      marcosDoProjeto: vi.fn().mockResolvedValue({
+        disponivel: true,
+        linhas: [],
+        repositorio: { sujos: [], headInterrompido: false, head: 'abc1234' }
+      }),
       // A ponte real sempre tem `sendLog`; aqui ele existe porque o caminho de falha **loga**,
       // e sem o método o próprio logger estouraria — mascarando a resiliência que se testa.
       sendLog: vi.fn()
