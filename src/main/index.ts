@@ -15,6 +15,8 @@ import { RoutingService, SondaDeAdapters } from './ai/routing-service'
 import { RoutingRepository } from './ai/routing-repository'
 import { PhaseModelRepository } from './ai/phase-model-repository'
 import { PhaseModelService } from './ai/phase-model-service'
+import { GenerationTraceService } from './ai/generation-trace-service'
+import { GenerationTraceRepository } from './ai/generation-trace-repository'
 import { QuotaRepository } from './ai/quota-repository'
 import { BudgetService } from './budget/budget-service'
 import { BudgetRepository } from './budget/budget-repository'
@@ -372,6 +374,19 @@ if (!app.requestSingleInstanceLock()) {
     // sem ele o gate de quota do `claude-code` fica sempre "desconhecido" em produção.
     const quota = new QuotaRepository(storage.db)
 
+    // O console da geração (SPEC-Fases-03). O `publicar` empurra cada evento para o renderer no
+    // canal único; quem filtra por `traceId` é o preload. `isDestroyed` pela mesma razão do
+    // `authChanged`: a corrida entre o fim da geração e o fechamento da janela é normal, e um
+    // `send` para uma janela morta lançaria dentro do coletor.
+    const generationTraces = new GenerationTraceService(
+      new GenerationTraceRepository(storage.db),
+      (evento) => {
+        if (janela !== undefined && !janela.isDestroyed()) {
+          janela.webContents.send(IPC_EVENT_CHANNELS.generationEvent, evento)
+        }
+      }
+    )
+
     const ai = new AiCallService(
       adapters,
       credentials,
@@ -380,7 +395,8 @@ if (!app.requestSingleInstanceLock()) {
       budget,
       routing,
       contexts,
-      quota
+      quota,
+      generationTraces
     )
 
     // Ponto único de conectores (SPEC-Conectores-01). **Runtime separado** do ponto único de
@@ -663,7 +679,8 @@ if (!app.requestSingleInstanceLock()) {
             ...(model === undefined ? {} : { model }),
             system: SISTEMA_DAS_PERGUNTAS,
             prompt: promptDasPerguntas(prompt, blocosEmAberto),
-            contextPackId
+            contextPackId,
+            console: { projectId, etapa: 'refinamento' }
           },
           { userId: userIdAtual(), workspace }
         )) {
@@ -738,7 +755,8 @@ if (!app.requestSingleInstanceLock()) {
             ...(model === undefined ? {} : { model }),
             system: SISTEMA_DO_BRIEF,
             prompt: promptDaGeracao(prompt, decisoes, correcao),
-            contextPackId
+            contextPackId,
+            console: { projectId, etapa: 'brief-aceito' }
           },
           { userId: userIdAtual(), workspace }
         )) {
@@ -807,7 +825,8 @@ if (!app.requestSingleInstanceLock()) {
               ...(model === undefined ? {} : { model }),
               system: SISTEMA_DO_TERMO,
               prompt: promptDoTermo(afirmacoesDoBrief),
-              contextPackId
+              contextPackId,
+              console: { projectId, etapa: 'prd' }
             },
             { userId: userIdAtual(), workspace }
           )
@@ -826,7 +845,8 @@ if (!app.requestSingleInstanceLock()) {
               ...(model === undefined ? {} : { model }),
               system: SISTEMA_DO_PRD,
               prompt: promptDoPrd(entrada),
-              contextPackId
+              contextPackId,
+              console: { projectId, etapa: 'prd' }
             },
             { userId: userIdAtual(), workspace }
           )
@@ -845,7 +865,8 @@ if (!app.requestSingleInstanceLock()) {
               ...(model === undefined ? {} : { model }),
               system: SISTEMA_DAS_CONTRADICOES,
               prompt: promptDasContradicoes(afirmacoes),
-              contextPackId
+              contextPackId,
+              console: { projectId, etapa: 'prd' }
             },
             { userId: userIdAtual(), workspace }
           )
@@ -905,7 +926,8 @@ if (!app.requestSingleInstanceLock()) {
               ...(model === undefined ? {} : { model }),
               system: SISTEMA_DA_ARQUITETURA,
               prompt: promptDaArquitetura(entrada),
-              contextPackId
+              contextPackId,
+              console: { projectId, etapa: 'arquitetura' }
             },
             { userId: userIdAtual(), workspace }
           )
@@ -973,7 +995,8 @@ if (!app.requestSingleInstanceLock()) {
               ...(model === undefined ? {} : { model }),
               system: SISTEMA_DO_ROADMAP,
               prompt: promptDoRoadmap(entrada),
-              contextPackId
+              contextPackId,
+              console: { projectId, etapa: 'roadmap' }
             },
             { userId: userIdAtual(), workspace }
           )
@@ -1010,7 +1033,8 @@ if (!app.requestSingleInstanceLock()) {
                 arquitetura: entrada.arquitetura,
                 ...(entrada.correcao === undefined ? {} : { correcao: entrada.correcao })
               }),
-              contextPackId
+              contextPackId,
+              console: { projectId, etapa: 'spec-aceita' }
             },
             { userId: userIdAtual(), workspace }
           )
@@ -1217,6 +1241,7 @@ if (!app.requestSingleInstanceLock()) {
       routing,
       routingRepo,
       phaseModels,
+      generationTraces,
       connectors,
       connectorCredits,
       githubAuth,

@@ -60,6 +60,18 @@ export type GenerationEvent =
     }
   | { readonly tipo: 'erro'; readonly mensagem: string }
 
+/**
+ * Um evento a caminho da tela: o evento e a geração a que ele pertence.
+ *
+ * O `traceId` viaja **no payload** e não no nome do canal porque o transporte é um canal único
+ * (`IPC_EVENT_CHANNELS.generationEvent`); quem filtra por geração é o preload. Mora aqui, e não
+ * no main, justamente porque atravessa a ponte — os dois lados precisam do mesmo tipo.
+ */
+export interface EventoDaGeracao {
+  readonly traceId: string
+  readonly evento: GenerationEvent
+}
+
 /** Como terminou a geração inteira. */
 export type StatusDoTrace = 'concluido' | 'falhou' | 'cancelado'
 

@@ -35,6 +35,8 @@ import type { ApprovalDecision, ApprovalRequest } from '../domain/execution'
 import type { BudgetLimitsInput, BudgetSnapshot } from '@shared/domain/budget'
 import type { ProviderRoute, ProviderStatus, RoutingPolicy } from '@shared/domain/routing'
 import type { Fase } from '@shared/domain/fase'
+import type { Etapa } from '@shared/domain/jornada'
+import type { GenerationEvent, GenerationTrace } from '@shared/domain/geracao'
 import type {
   PhaseModelPolicy,
   ProjectModelOverride,
@@ -242,6 +244,13 @@ export const IPC_CHANNELS = {
   phaseModelOverrides: 'phase-model:overrides',
   phaseModelSetOverride: 'phase-model:set-override',
   phaseModelClearOverride: 'phase-model:clear-override',
+  /**
+   * Console da geração (SPEC-Fases-03 § Superfície). **Só leitura**: o renderer lista as
+   * gerações de uma etapa e abre uma delas. Não há canal que escreva evento — quem grava é o
+   * ponto único, do lado do main, e um canal de escrita aqui deixaria a tela inventar trilha.
+   */
+  generationHistory: 'geracao:historico',
+  generationEvents: 'geracao:eventos',
   /**
    * Conectores externos (SPEC-Conectores-01, critérios 5 e 6). **Dois canais nomeados, e
    * nenhum genérico**: `connectors:capabilities` lista o que os adapters registrados declaram
@@ -575,7 +584,21 @@ export const IPC_EVENT_CHANNELS = {
    * enquanto chega. Um `invoke` que resolvesse com a resposta inteira entregaria o mesmo
    * conteúdo depois de o usuário ter esperado por ele em silêncio.
    */
-  aiStreamEvent: 'ai:stream-event'
+  aiStreamEvent: 'ai:stream-event',
+  /**
+   * Um evento do **console da geração** (SPEC-Fases-03 § Superfície).
+   *
+   * Canal único com `traceId` no payload, e não um canal por geração: `IpcEventChannel` é uma
+   * união fechada de literais, e um nome montado em runtime (`geracao:trace:<id>`) sairia do
+   * tipo e do teste de contrato que exige um handler por canal declarado. A "assinatura por
+   * `traceId`" que a spec pede é o `onGenerationEvent(traceId, …)` do preload, que filtra —
+   * mesmo padrão já provado pelo `aiStreamEvent`.
+   *
+   * Separado do `aiStreamEvent` porque o conteúdo é outro: lá vai o texto que vira o documento,
+   * aqui vão as ferramentas e o uso. Um canal só obrigaria cada consumidor a filtrar o que não
+   * lhe diz respeito.
+   */
+  generationEvent: 'geracao:evento'
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]
@@ -793,6 +816,22 @@ export interface JarvisBridge {
   cancelAi(id: string): Promise<void>
   /** Assina os eventos de stream. Devolve a função que cancela a assinatura. */
   onAiStreamEvent(listener: (evento: AiStreamEvent) => void): () => void
+
+  /**
+   * Assina o console de **uma** geração (SPEC-Fases-03 § Superfície).
+   *
+   * O `traceId` é o filtro: o transporte é um canal só, e o preload entrega ao painel apenas os
+   * eventos da geração que ele assinou. Devolve a função que cancela a assinatura.
+   */
+  onGenerationEvent(traceId: string, listener: (evento: GenerationEvent) => void): () => void
+  /** As gerações anteriores de uma etapa, da mais recente para a mais antiga (critério 6). */
+  generationHistory(
+    projectId: string,
+    etapa: Etapa,
+    workspace: WorkspaceId
+  ): Promise<readonly GenerationTrace[]>
+  /** Os eventos gravados de uma geração — o que reabre o painel a partir do histórico. */
+  generationEvents(traceId: string, workspace: WorkspaceId): Promise<readonly GenerationEvent[]>
 
   /**
    * Orçamento do escopo: limites e acumulado do dia e do mês (SPEC-Providers-03, critério 8).

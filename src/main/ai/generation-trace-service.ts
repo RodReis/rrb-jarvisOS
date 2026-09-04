@@ -16,7 +16,7 @@
  *   precisa do evento agora; o SQLite não precisa de um commit por delta de texto.
  */
 
-import type { GenerationEvent, StatusDoTrace } from '@shared/domain/geracao'
+import type { EventoDaGeracao, GenerationEvent, StatusDoTrace } from '@shared/domain/geracao'
 import { faseDaEtapa, type Fase } from '@shared/domain/fase'
 import type { Etapa } from '@shared/domain/jornada'
 import { log } from '../logging/logger'
@@ -26,12 +26,6 @@ import {
   type EscopoDaGeracao,
   type GenerationTraceRepository
 } from './generation-trace-repository'
-
-/** O que a tela recebe: o evento e a geração a que ele pertence. */
-export interface EventoDaGeracao {
-  readonly traceId: string
-  readonly evento: GenerationEvent
-}
 
 export interface AberturaDoTrace {
   readonly traceId: string

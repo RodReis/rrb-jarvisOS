@@ -48,6 +48,9 @@ import {
   isRotaComModelo
 } from '@shared/domain/modelo-da-fase'
 import { isFase } from '@shared/domain/fase'
+import { isEtapa } from '@shared/domain/jornada'
+import type { GenerationEvent, GenerationTrace } from '@shared/domain/geracao'
+import type { GenerationTraceService } from '../ai/generation-trace-service'
 import {
   isConnectorCredentialKey,
   isConnectorRequest,
@@ -371,6 +374,11 @@ export interface IpcDependencies {
   readonly routingRepo: RoutingRepository
   /** O modelo de cada fase (SPEC-Fases-02): política do workspace e overrides por projeto. */
   readonly phaseModels: PhaseModelService
+  /**
+   * A trilha das gerações (SPEC-Fases-03). O renderer só **lê** por aqui — quem grava é o ponto
+   * único, e não há canal que escreva evento.
+   */
+  readonly generationTraces: GenerationTraceService
   /** O ponto único de conectores (SPEC-Conectores-01). */
   readonly connectors: ConnectorService
   /** O ledger de créditos de conector (SPEC-Conectores-02). */
@@ -1134,6 +1142,33 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
         fase,
         rota
       )
+    }
+  )
+
+  // Console da geração (SPEC-Fases-03, critério 6). Dois canais de leitura: a lista das gerações
+  // de uma etapa e os eventos de uma delas. O escopo vem do main (`deps.userId()`), nunca do
+  // pedido — o renderer não escolhe de quem é a trilha que lê.
+  ipcMain.handle(
+    IPC_CHANNELS.generationHistory,
+    (_event, projectId: unknown, etapa: unknown, workspace: unknown): readonly GenerationTrace[] => {
+      if (typeof projectId !== 'string' || projectId.length === 0 || !isEtapa(etapa)) return []
+      const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+
+      return deps.generationTraces.historico(
+        { userId: deps.userId(), workspace: escopo },
+        projectId,
+        etapa
+      )
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.generationEvents,
+    (_event, traceId: unknown, workspace: unknown): readonly GenerationEvent[] => {
+      if (typeof traceId !== 'string' || traceId.length === 0) return []
+      const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+
+      return deps.generationTraces.eventos({ userId: deps.userId(), workspace: escopo }, traceId)
     }
   )
 

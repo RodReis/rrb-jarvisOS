@@ -35,6 +35,12 @@ import type { CommandExecution, CommandSubmission } from '@shared/domain/termina
 import type { AiCallHandle, AiProvider, AiRequest, AiStreamEvent } from '@shared/domain/ai'
 import type { ProviderRoute, ProviderStatus, RoutingPolicy } from '@shared/domain/routing'
 import type { Fase } from '@shared/domain/fase'
+import type { Etapa } from '@shared/domain/jornada'
+import type {
+  EventoDaGeracao,
+  GenerationEvent,
+  GenerationTrace
+} from '@shared/domain/geracao'
 import type {
   PhaseModelPolicy,
   ProjectModelOverride,
@@ -227,6 +233,41 @@ const bridge: JarvisBridge = {
 
     return () => ipcRenderer.removeListener(IPC_EVENT_CHANNELS.aiStreamEvent, wrapped)
   },
+
+  /**
+   * A assinatura do console da geração (SPEC-Fases-03 § Superfície).
+   *
+   * **É aqui que "um canal por `traceId`" acontece**: o transporte é um canal só, e o filtro por
+   * geração mora nesta função. O painel assina o seu trace e recebe só o dele — mesma ergonomia
+   * de um canal dedicado, sem sair da união fechada de `IpcEventChannel` nem furar o teste de
+   * contrato que exige um handler por canal declarado.
+   */
+  onGenerationEvent: (
+    traceId: string,
+    listener: (evento: GenerationEvent) => void
+  ): (() => void) => {
+    const wrapped = (_event: unknown, payload: EventoDaGeracao): void => {
+      if (payload.traceId !== traceId) return
+      listener(payload.evento)
+    }
+
+    ipcRenderer.on(IPC_EVENT_CHANNELS.generationEvent, wrapped)
+
+    return () => ipcRenderer.removeListener(IPC_EVENT_CHANNELS.generationEvent, wrapped)
+  },
+
+  generationHistory: (
+    projectId: string,
+    etapa: Etapa,
+    workspace: WorkspaceId
+  ): Promise<readonly GenerationTrace[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.generationHistory, projectId, etapa, workspace),
+
+  generationEvents: (
+    traceId: string,
+    workspace: WorkspaceId
+  ): Promise<readonly GenerationEvent[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.generationEvents, traceId, workspace),
 
   getBudget: (workspace: WorkspaceId): Promise<BudgetSnapshot> =>
     ipcRenderer.invoke(IPC_CHANNELS.budgetGet, workspace),
