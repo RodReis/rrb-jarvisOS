@@ -13,6 +13,8 @@ import { OllamaAdapter } from './ai/ollama-adapter'
 import { ClaudeCodeAdapter } from './ai/claude-code-adapter'
 import { RoutingService, SondaDeAdapters } from './ai/routing-service'
 import { RoutingRepository } from './ai/routing-repository'
+import { PhaseModelRepository } from './ai/phase-model-repository'
+import { PhaseModelService } from './ai/phase-model-service'
 import { QuotaRepository } from './ai/quota-repository'
 import { BudgetService } from './budget/budget-service'
 import { BudgetRepository } from './budget/budget-repository'
@@ -96,6 +98,9 @@ import {
   promptDoRoadmap
 } from '@shared/domain/roadmap-schema'
 import { ordemDaEtapa } from '@shared/domain/jornada'
+import type { Etapa } from '@shared/domain/jornada'
+import { faseDaEtapa } from '@shared/domain/fase'
+import type { RotaComModelo } from '@shared/domain/modelo-da-fase'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { AiProvider, AiStreamEvent } from '@shared/domain/ai'
 import type { EstadoDasRotas } from '@shared/domain/rota-de-geracao'
@@ -343,6 +348,12 @@ if (!app.requestSingleInstanceLock()) {
     // quando falta credencial — pingar a API para descobrir isso custaria uma requisição por
     // checagem e responderia a pergunta errada.
     const routingRepo = new RoutingRepository(storage.db)
+
+    // O modelo de cada fase (SPEC-Fases-02). Ao lado do roteamento porque responde a pergunta
+    // vizinha — aquele decide **quem** atende uma tarefa, este decide **com que modelo** a
+    // jornada gera cada fase —, e as duas politicas vivem no mesmo escopo.
+    const phaseModelRepo = new PhaseModelRepository(storage.db)
+    const phaseModels = new PhaseModelService(phaseModelRepo, storage.audit)
     const routing = new RoutingService(
       routingRepo,
       new SondaDeAdapters({
@@ -555,6 +566,46 @@ if (!app.requestSingleInstanceLock()) {
       }
     }
 
+    /*
+     * O modelo que atende esta geracao (SPEC-Fases-02, criterio 2).
+     *
+     * As closures de geracao recebem o **provider** ja decidido (`rota`), nao a decisao; e o
+     * `modeloDaFase` precisa da rota para saber qual dos dois combos ler — a rota de assinatura
+     * oferece Fable, a paga nao. A traducao de volta e um `Record`, e nao um `if`: acrescentar
+     * provider passa a ser acrescentar uma linha, e um `else` faria todo provider desconhecido
+     * cair na rota errada em silencio.
+     *
+     * Vive aqui, ao lado das sete closures que o consomem, pela mesma razao que
+     * `estadoDasRotasDoProjeto` vive: e composicao, nao regra — a regra e a funcao pura.
+     */
+    const ROTA_DO_PROVIDER: Readonly<Record<AiProvider, RotaComModelo | undefined>> = {
+      'claude-code': 'assinatura',
+      anthropic: 'paga',
+      gemini: undefined,
+      ollama: undefined
+    }
+
+    const modeloDaGeracao = (
+      etapa: Etapa,
+      provider: AiProvider,
+      projectId: string,
+      workspace: WorkspaceId
+    ): string | undefined => {
+      const rota = ROTA_DO_PROVIDER[provider]
+      // Provider que nao atende nenhuma das duas rotas da jornada nao tem modelo por fase a
+      // resolver: devolve `undefined` e o ponto unico cai no `MODELO_PADRAO`, como antes desta
+      // fatia. Inventar uma rota aqui faria a politica do PI valer para uma chamada que ele
+      // nunca configurou.
+      if (rota === undefined) return undefined
+
+      return phaseModels.resolver(
+        { userId: userIdAtual(), workspace },
+        faseDaEtapa(etapa),
+        rota,
+        projectId
+      ).modelo
+    }
+
     const montarContextoDoPrompt = (
       projectId: string,
       workspace: WorkspaceId,
@@ -589,12 +640,14 @@ if (!app.requestSingleInstanceLock()) {
       promptVigente: (projectId) => briefRepository.promptVigente(userIdAtual(), projectId)?.texto,
       estadoDasRotas: estadoDasRotasDoProjeto,
       montarContexto: montarContextoDoPrompt,
-      gerar: async ({ workspace, prompt, blocosEmAberto, rota, contextPackId }) => {
+      gerar: async ({ projectId, workspace, prompt, blocosEmAberto, rota, contextPackId }) => {
         let texto = ''
+        const model = modeloDaGeracao('refinamento', rota, projectId, workspace)
 
         for await (const evento of ai.call(
           {
             provider: rota,
+            ...(model === undefined ? {} : { model }),
             system: SISTEMA_DAS_PERGUNTAS,
             prompt: promptDasPerguntas(prompt, blocosEmAberto),
             contextPackId
@@ -662,12 +715,14 @@ if (!app.requestSingleInstanceLock()) {
        * bloqueio do critério 6 aplicado antes. Deixar o roteamento escolher de novo aqui
        * desfaria essa decisão — e poderia cair na rota paga que ninguém autorizou.
        */
-      gerar: async ({ workspace, prompt, rota, contextPackId, decisoes, correcao }) => {
+      gerar: async ({ projectId, workspace, prompt, rota, contextPackId, decisoes, correcao }) => {
         let texto = ''
+        const model = modeloDaGeracao('brief-aceito', rota, projectId, workspace)
 
         for await (const evento of ai.call(
           {
             provider: rota,
+            ...(model === undefined ? {} : { model }),
             system: SISTEMA_DO_BRIEF,
             prompt: promptDaGeracao(prompt, decisoes, correcao),
             contextPackId
@@ -730,11 +785,13 @@ if (!app.requestSingleInstanceLock()) {
        * mesma fronteira do `BriefService`, e `provider` é a rota **já decidida**: deixar o
        * roteamento escolher de novo aqui poderia cair na rota paga que ninguém autorizou.
        */
-      gerarTermo: async ({ workspace, rota, contextPackId, afirmacoesDoBrief }) => {
+      gerarTermo: async ({ projectId, workspace, rota, contextPackId, afirmacoesDoBrief }) => {
+        const model = modeloDaGeracao('prd', rota, projectId, workspace)
         const texto = await coletarTexto(
           ai.call(
             {
               provider: rota,
+              ...(model === undefined ? {} : { model }),
               system: SISTEMA_DO_TERMO,
               prompt: promptDoTermo(afirmacoesDoBrief),
               contextPackId
@@ -747,11 +804,13 @@ if (!app.requestSingleInstanceLock()) {
         const termo = lerTermoDoModelo(texto)
         return termo === undefined ? {} : { termo }
       },
-      gerarDocumentos: async ({ workspace, rota, contextPackId, ...entrada }) => {
+      gerarDocumentos: async ({ projectId, workspace, rota, contextPackId, ...entrada }) => {
+        const model = modeloDaGeracao('prd', rota, projectId, workspace)
         const texto = await coletarTexto(
           ai.call(
             {
               provider: rota,
+              ...(model === undefined ? {} : { model }),
               system: SISTEMA_DO_PRD,
               prompt: promptDoPrd(entrada),
               contextPackId
@@ -764,11 +823,13 @@ if (!app.requestSingleInstanceLock()) {
         const afirmacoes = lerDocumentosDoModelo(texto)
         return afirmacoes === undefined ? {} : { afirmacoes }
       },
-      detectarContradicoes: async ({ workspace, rota, contextPackId, afirmacoes }) => {
+      detectarContradicoes: async ({ projectId, workspace, rota, contextPackId, afirmacoes }) => {
+        const model = modeloDaGeracao('prd', rota, projectId, workspace)
         const texto = await coletarTexto(
           ai.call(
             {
               provider: rota,
+              ...(model === undefined ? {} : { model }),
               system: SISTEMA_DAS_CONTRADICOES,
               prompt: promptDasContradicoes(afirmacoes),
               contextPackId
@@ -822,11 +883,13 @@ if (!app.requestSingleInstanceLock()) {
        * `provider` é a rota **já decidida** — deixar o roteamento escolher de novo aqui poderia
        * cair na rota paga que ninguém autorizou.
        */
-      gerarDocumentos: async ({ workspace, rota, contextPackId, ...entrada }) => {
+      gerarDocumentos: async ({ projectId, workspace, rota, contextPackId, ...entrada }) => {
+        const model = modeloDaGeracao('arquitetura', rota, projectId, workspace)
         const texto = await coletarTexto(
           ai.call(
             {
               provider: rota,
+              ...(model === undefined ? {} : { model }),
               system: SISTEMA_DA_ARQUITETURA,
               prompt: promptDaArquitetura(entrada),
               contextPackId
@@ -888,11 +951,13 @@ if (!app.requestSingleInstanceLock()) {
        * `provider` é a rota **já decidida** — deixar o roteamento escolher de novo aqui poderia
        * cair na rota paga que ninguém autorizou.
        */
-      gerarMvps: async ({ workspace, rota, contextPackId, ...entrada }) => {
+      gerarMvps: async ({ projectId, workspace, rota, contextPackId, ...entrada }) => {
+        const model = modeloDaGeracao('roadmap', rota, projectId, workspace)
         const texto = await coletarTexto(
           ai.call(
             {
               provider: rota,
+              ...(model === undefined ? {} : { model }),
               system: SISTEMA_DO_ROADMAP,
               prompt: promptDoRoadmap(entrada),
               contextPackId
@@ -905,14 +970,16 @@ if (!app.requestSingleInstanceLock()) {
         const mvps = lerRoadmapDoModelo(texto)
         return mvps === undefined ? {} : { mvps }
       },
-      gerarSpec: async ({ workspace, rota, contextPackId, mvp, fatiaId, ...entrada }) => {
+      gerarSpec: async ({ projectId, workspace, rota, contextPackId, mvp, fatiaId, ...entrada }) => {
         const fatia = [...mvp.fatias].sort((a, b) => a.numero - b.numero)[0]
         if (fatia === undefined) return {}
 
+        const model = modeloDaGeracao('spec-aceita', rota, projectId, workspace)
         const texto = await coletarTexto(
           ai.call(
             {
               provider: rota,
+              ...(model === undefined ? {} : { model }),
               system: SISTEMA_DA_SPEC,
               prompt: promptDaSpec({
                 mvp,

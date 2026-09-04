@@ -420,7 +420,12 @@ export class AiCallService {
     if (request.provider !== undefined) {
       return {
         provider: request.provider,
-        modelo: MODELO_PADRAO[request.provider]
+        // `request.model` **e depois** o padrao: desde a SPEC-Fases-02 a jornada resolve o
+        // modelo da fase antes de chamar, e ignora-lo aqui faria o ponto unico descartar a
+        // escolha do PI em silencio — a geracao sairia por `MODELO_PADRAO` com o ledger
+        // registrando o mesmo, sem erro nenhum a investigar. O campo ja existia no `AiRequest`
+        // ("ausente = o modelo ativo do provider"); o que faltava era honra-lo.
+        modelo: request.model ?? MODELO_PADRAO[request.provider]
       }
     }
 
