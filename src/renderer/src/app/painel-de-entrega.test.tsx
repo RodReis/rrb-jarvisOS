@@ -72,7 +72,23 @@ describe('PainelDeEntrega', () => {
    * Na primeira leitura, sem expandir: quem escolheu o modelo por fase é o PI, e a pergunta
    * "qual rodou?" é sobre o resultado. Esconder atrás do expansor custaria um clique justamente
    * a quem fez a escolha.
+   *
+   * O id aparece na caixa em que foi escrito. O gate visual da M26-F03 achou o oposto disto —
+   * rótulo em MAIÚSCULAS onde o valor era conteúdo —, e o `Badge` do DS aplica `uppercase`, por
+   * isso o modelo não é um badge.
    */
+  it('mostra o modelo preservando a caixa do id, não em maiúsculas', () => {
+    render(
+      <PainelDeEntrega
+        ledger={ledger({ provider: 'claude-code', modelo: 'claude-opus-5' })}
+        pendencias={[]}
+      />
+    )
+
+    expect(screen.getByText('claude-opus-5')).toBeInTheDocument()
+    expect(screen.queryByText('CLAUDE-OPUS-5')).toBeNull()
+  })
+
   it('mostra o modelo que executou o run, sem precisar expandir', () => {
     render(
       <PainelDeEntrega
@@ -105,7 +121,11 @@ describe('PainelDeEntrega', () => {
    */
   it('não inventa um campo de modelo em run que não o registrou', () => {
     render(<PainelDeEntrega ledger={ledger()} pendencias={[]} />)
-    expect(screen.queryByText(/^Modelo$/i)).toBeNull()
+
+    // Nem o id, nem um "—" no lugar dele: ausência de registro não é ausência de modelo, e um
+    // travessão afirmaria a segunda coisa.
+    expect(screen.queryByText(/claude-/)).toBeNull()
+    expect(screen.queryByText('—')).toBeNull()
   })
 
   it('não oferece botão de commit, push, PR, merge ou aceite', () => {
