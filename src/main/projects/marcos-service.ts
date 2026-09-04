@@ -20,6 +20,7 @@
 
 import { createHash } from 'node:crypto'
 import type { WorkspaceId } from '@shared/domain/entities'
+import type { CommandExecution } from '@shared/domain/terminal'
 import type {
   EstadoDoRepositorio,
   FatoDoMarco,
@@ -58,10 +59,26 @@ export class MarcosService {
       return { disponivel: false, linhas: [], repositorio: VAZIO, mensagem: 'Projeto não encontrado.' }
     }
 
-    const cabeca = this.deps.git.run(['rev-parse', 'HEAD'], projeto.diretorio, workspaceId)
-    if (!cabeca.ok) {
-      // Sem `HEAD` não há o que comparar, e o motivo importa: Git ausente, fora da allowlist ou
-      // repositório sem commit nenhum têm remédios diferentes.
+    /*
+     * O `HEAD` — e o repositório **sem commit nenhum** não é falha.
+     *
+     * Um projeto recém-criado está exatamente nesse estado: `createProject` roda `git init`, e o
+     * primeiro commit só vem com o marco `estrutura-inicial`. O `rev-parse HEAD` ali falha com
+     * *"ambiguous argument 'HEAD'"*, e tratar isso como Git indisponível faria o painel acusar
+     * problema de ferramenta no caminho mais comum que existe — o projeto novo. Foi o E2E contra
+     * o app real que mostrou: com dublê, `HEAD` sempre respondia.
+     *
+     * A distinção que importa não é o código de saída, e sim **se o Git rodou**: `git rev-parse`
+     * num repositório sem commit executa e sai não-zero, enquanto Git ausente ou barrado pela
+     * allowlist não chega a executar. O `--verify -q` cala o ruído do primeiro caso.
+     */
+    const cabeca = this.deps.git.run(
+      ['rev-parse', '--verify', '-q', 'HEAD'],
+      projeto.diretorio,
+      workspaceId
+    )
+
+    if (!cabeca.ok && !executou(cabeca.execucao)) {
       return {
         disponivel: false,
         linhas: [],
@@ -249,3 +266,19 @@ export class MarcosService {
 }
 
 const VAZIO: EstadoDoRepositorio = { sujos: [], headInterrompido: false, head: '' }
+
+/**
+ * O comando **rodou**, ainda que tenha saído não-zero?
+ *
+ * A pergunta separa "o Git respondeu que não há commit" de "o Git não está aqui" — dois desfechos
+ * que o `ok: false` do `GitOutcome` funde num só e que têm ações opostas: o primeiro não é
+ * problema nenhum (projeto novo), o segundo é `BLOCKED_EXTERNAL` com remédio.
+ *
+ * A distinção é o `exitCode`, e não o `reason`: o `TerminalEngine` classifica **toda** saída
+ * não-zero como `falha-na-execucao` (é a mesma etiqueta de um `npm test` que reprova), e só um
+ * processo que não chegou a rodar fica com `exitCode: null` — barrado pela allowlist, sem
+ * binário, ou morto por timeout.
+ */
+function executou(execucao: CommandExecution): boolean {
+  return execucao.exitCode !== null
+}

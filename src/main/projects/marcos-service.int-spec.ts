@@ -65,12 +65,28 @@ let repo: string
 let db: Db
 let audit: InstanceType<typeof AuditRepository>
 let service: InstanceType<typeof MarcosService>
+let projects: InstanceType<typeof ProjectRepository>
 /** Os documentos que o "PI aceitou", como os repositórios os devolveriam. */
 let documentos: { caminho: string; hash: string }[]
 
 /** O hash como a gravação o calcula: SHA-256 do texto, utf8 (`PacoteService`, `PrdService`). */
 function hashDaRevisao(conteudo: string): string {
   return createHash('sha256').update(conteudo, 'utf8').digest('hex')
+}
+
+/** Grava um projeto apontando para `diretorio`. Slug próprio: `save` é insert, não upsert. */
+function projetoNoDiretorio(diretorio: string, id = PROJETO, slug = 'projeto-alfa'): void {
+  projects.save({
+    id,
+    user_id: USER,
+    workspace_id: WS,
+    nome: slug,
+    slug,
+    diretorio,
+    origem: 'criado',
+    gitPreexistente: false,
+    created_at: new Date().toISOString()
+  })
 }
 
 /** Escreve, commita e devolve o hash do conteúdo escrito. */
@@ -108,18 +124,8 @@ beforeEach(() => {
     )
   )
 
-  const projects = new ProjectRepository(db)
-  projects.save({
-    id: PROJETO,
-    user_id: USER,
-    workspace_id: WS,
-    nome: 'Projeto Alfa',
-    slug: 'projeto-alfa',
-    diretorio: repo,
-    origem: 'criado',
-    gitPreexistente: false,
-    created_at: new Date().toISOString()
-  })
+  projects = new ProjectRepository(db)
+  projetoNoDiretorio(repo)
 
   documentos = []
   service = new MarcosService({
@@ -211,6 +217,24 @@ comGit('MarcosService — painel', () => {
     }
 
     expect(service.vista(PROJETO, WS).repositorio.headInterrompido).toBe(true)
+  })
+
+  it('trata repositório sem commit nenhum como estado normal, não como Git indisponível', () => {
+    // O estado de um projeto recém-criado: `git init` rodou, e o primeiro commit só vem com o
+    // marco `estrutura-inicial`. Achado pelo E2E contra o app real — com dublê, `HEAD` sempre
+    // respondia, e "Git indisponível" apareceria no caminho mais comum que existe.
+    // Dentro do `appDir`, como o repo principal: fora dele o cwd cairia na allowlist de
+    // diretórios e o teste passaria por outro motivo.
+    const vazio = join(appDir, 'projeto-vazio')
+    mkdirSync(vazio, { recursive: true })
+    execFileSync('git', ['init', '--initial-branch=main'], { cwd: vazio, stdio: 'ignore' })
+    projetoNoDiretorio(vazio, 'p-vazio', 'projeto-vazio')
+
+    const vista = service.vista('p-vazio', WS)
+
+    expect(vista.mensagem ?? '(sem mensagem)').toBe('(sem mensagem)')
+    expect(vista.disponivel).toBe(true)
+    expect(vista.repositorio.head).toBe('')
   })
 
   it('explica em vez de listar vazio quando o `git` não está permitido', () => {
