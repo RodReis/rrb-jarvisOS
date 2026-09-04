@@ -8,11 +8,13 @@
 
 import { describe, expect, it } from 'vitest'
 import {
+  MARCOS_DE_DECISAO,
   MARCOS_DOCUMENTAIS,
   MENSAGEM_DO_MARCO,
   TAMANHO_MAXIMO_DO_SLUG,
   isMarcoDocumental,
   isNomeDeProjetoValido,
+  registraDecisaoSemArquivo,
   slugificar
 } from './projects'
 
@@ -73,5 +75,35 @@ describe('marcos documentais', () => {
     expect(isMarcoDocumental('estrutura-inicial')).toBe(true)
     expect(isMarcoDocumental('marco-inventado')).toBe(false)
     expect(isMarcoDocumental(null)).toBe(false)
+  })
+})
+
+/**
+ * Os marcos de decisão (correção #259).
+ *
+ * O defeito que este teste fecha foi achado pelo E2E com Git real, e nenhum dos 38 testes de
+ * integração o pegou: o aceite do PRD logo depois do aceite do brief **não commitava**, porque
+ * nada mudou no disco entre os dois e `git commit` sem mudança falha. A jornada travava com uma
+ * falha de Git que não descrevia problema nenhum.
+ */
+describe('marcos de decisão (#259)', () => {
+  it('os dois aceites documentais registram decisão, não mudança de arquivo', () => {
+    expect(registraDecisaoSemArquivo('brief-aceito-pelo-pi')).toBe(true)
+    expect(registraDecisaoSemArquivo('prd-aceito-pelo-pi')).toBe(true)
+  })
+
+  it('os marcos que produzem documento continuam exigindo mudança', () => {
+    // Commit vazio aqui esconderia que a geração não produziu o documento que devia.
+    for (const marco of MARCOS_DOCUMENTAIS) {
+      if (marco === 'brief-aceito-pelo-pi' || marco === 'prd-aceito-pelo-pi') continue
+      expect(registraDecisaoSemArquivo(marco), `marco "${marco}"`).toBe(false)
+    }
+  })
+
+  it('todo marco de decisão é um marco documental conhecido', () => {
+    for (const marco of MARCOS_DE_DECISAO) {
+      expect(MARCOS_DOCUMENTAIS).toContain(marco)
+      expect(MENSAGEM_DO_MARCO[marco]).toBeTruthy()
+    }
   })
 })

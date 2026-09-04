@@ -12,8 +12,8 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 1305 | 1305 | 0 | 74.5 | — | — |
-| — | — | — | Banco | 975 | 970 | 0 | 87.7 | — | — |
+| — | — | — | Regras de Negócio | 1308 | 1308 | 0 | 74.5 | — | — |
+| — | — | — | Banco | 981 | 976 | 0 | 87.8 | — | — |
 | — | — | — | Tela | 506 | 505 | 0 | 74.0 | — | — |
 
 ## Histórico por entrega
@@ -250,3 +250,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-04 | #251 | spec-fases-01-fase-e-card-do-projeto | Regras de Negócio | 1305 | 1305 | 0 | 74.5 | #258 | [#258](https://github.com/RodReis/rrb-jarvisOS/pull/258) |
 | 2026-09-04 | #251 | spec-fases-01-fase-e-card-do-projeto | Banco | 975 | 970 | 0 | 87.7 | #258 | [#258](https://github.com/RodReis/rrb-jarvisOS/pull/258) |
 | 2026-09-04 | #251 | spec-fases-01-fase-e-card-do-projeto | Tela | 506 | 505 | 0 | 74.0 | #258 | [#258](https://github.com/RodReis/rrb-jarvisOS/pull/258) |
+| 2026-09-04 | #259 | spec-jornada-01-estado-e-jornada-unica | Regras de Negócio | 1308 | 1308 | 0 | 74.5 | — | — |
+| 2026-09-04 | #259 | spec-jornada-01-estado-e-jornada-unica | Banco | 981 | 976 | 0 | 87.8 | — | — |
+| 2026-09-04 | #259 | spec-jornada-01-estado-e-jornada-unica | Tela | 506 | 505 | 0 | 74.0 | — | — |

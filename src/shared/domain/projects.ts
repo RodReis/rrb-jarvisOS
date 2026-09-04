@@ -78,7 +78,13 @@ export const MARCOS_DOCUMENTAIS = [
   // ler (SPEC-Planejamento-02, critério 1: nenhuma chamada sem contexto montado).
   'prompt-registrado',
   'contexto-aprovado',
+  // SPEC-Jornada-01, critério 1 (correção #259): os aceites **documentais** do brief e do PRD
+  // precisam de evidência no Git, senão `etapaDerivada` não tem como vê-los — a coluna avançava
+  // e a leitura seguinte a desfazia, e nenhum projeto passava de `prd-aceito`. Os outros cinco
+  // eventos já tinham marco; estes dois eram os únicos sem.
+  'brief-aceito-pelo-pi',
   'prd-aprovado',
+  'prd-aceito-pelo-pi',
   'design-anexado',
   'arquitetura-aprovada',
   'roadmap-aprovado'
@@ -98,7 +104,9 @@ export const MENSAGEM_DO_MARCO: Readonly<Record<MarcoDocumental, string>> = {
   'estrutura-inicial': 'docs: estrutura documental inicial do projeto',
   'prompt-registrado': 'docs: prompt do projeto',
   'contexto-aprovado': 'docs: contexto e escopo aprovados',
+  'brief-aceito-pelo-pi': 'docs: brief aceito pelo PI',
   'prd-aprovado': 'docs: PRD aprovado',
+  'prd-aceito-pelo-pi': 'docs: PRD aceito pelo PI',
   'design-anexado': 'docs: anexos de design do PI',
   'arquitetura-aprovada': 'docs: arquitetura aprovada',
   'roadmap-aprovado': 'docs: roadmap e índice de fatias'
@@ -216,6 +224,26 @@ export function slugificar(nome: string): string {
 export function isNomeDeProjetoValido(nome: string): boolean {
   const slug = slugificar(nome)
   return slug.length > 0 && slug.length <= TAMANHO_MAXIMO_DO_SLUG
+}
+
+/**
+ * Os marcos que registram **decisão**, não mudança de arquivo (correção #259).
+ *
+ * O aceite do brief e o do PRD não alteram nada no disco: o documento já foi commitado quando
+ * foi gerado, e o que o aceite acrescenta é o fato de o PI ter concordado. Um `git commit` sem
+ * mudança falha, e sem esta distinção o segundo aceite seguido travaria a jornada com
+ * `marco-nao-commitado` — que o PI leria como problema de Git, e não é.
+ *
+ * Fechado a estes dois de propósito. Os outros cinco marcos commitam arquivos de verdade, e um
+ * commit vazio ali esconderia que a geração não produziu o documento que devia.
+ */
+export const MARCOS_DE_DECISAO: readonly MarcoDocumental[] = [
+  'brief-aceito-pelo-pi',
+  'prd-aceito-pelo-pi'
+]
+
+export function registraDecisaoSemArquivo(marco: MarcoDocumental): boolean {
+  return MARCOS_DE_DECISAO.includes(marco)
 }
 
 export function isMarcoDocumental(value: unknown): value is MarcoDocumental {
