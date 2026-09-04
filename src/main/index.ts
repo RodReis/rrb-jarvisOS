@@ -112,6 +112,7 @@ import { ConstrutorService } from './pipeline/construtor-service'
 import { EntregaService } from './pipeline/entrega-service'
 import { ExecutionLedgerRepository } from './pipeline/execution-ledger-repository'
 import { LimpezaService } from './pipeline/limpeza-service'
+import { RetencaoService } from './pipeline/retencao-service'
 import { ExecutorProxy } from './pipeline/executor-proxy'
 import { RulesetRepository } from './pipeline/ruleset-repository'
 import { PreflightService } from './pipeline/preflight-service'
@@ -1107,6 +1108,27 @@ if (!app.requestSingleInstanceLock()) {
     // ledger grava o desfecho, e a limpeza registra nele a pendência do que não pôde ser removido.
     const executionLedger = new ExecutionLedgerRepository(storage.db)
 
+    /*
+     * O coletor de retenção, **instanciado** (SPEC-Fases-03 § Persistência).
+     *
+     * Ele existia desde a M9-F06 e nunca fora construído em produção: era código testado que
+     * nada chamava. A regra dos traces da geração precisa de um lugar para viver, e criar um
+     * segundo coletor ao lado de um que já existe é o começo de dois lugares para agendar
+     * limpeza. Então esta fatia liga o que estava ali.
+     *
+     * **Limite conhecido:** a expiração de **anexos** continua sem rodar. Ela precisa do
+     * `caminhoDoAnexo`, e o layout do diretório de anexos nunca foi decidido — é escopo da
+     * M9-F06, não desta fatia. O `caminhoDoAnexo` abaixo devolve caminho vazio de propósito:
+     * `elegiveisParaExpirar` não encontra artefato algum enquanto nada os grava, então o laço
+     * não roda; inventar um layout aqui criaria a decisão de produto por omissão que a spec
+     * proíbe. Registrado no STATUS.md.
+     */
+    const retencao = new RetencaoService({
+      ledger: executionLedger,
+      caminhoDoAnexo: () => '',
+      regras: [generationTraces.regraDeRetencao()]
+    })
+
     // A entrega da fatia (SPEC-Entrega-05): construção, revisão, CI e squash merge no mesmo PR.
     //
     // O `ConstrutorService` ganha aqui o consumidor que a M9-F04 dizia faltar — era por não tê-lo
@@ -1255,6 +1277,25 @@ if (!app.requestSingleInstanceLock()) {
 
     janela = createMainWindow()
     createTray(janela)
+
+    /*
+     * A coleta roda **uma vez, na abertura** (SPEC-Fases-03 § Persistência).
+     *
+     * Na abertura e não num intervalo: o app é local e de sessão longa, e um timer periódico
+     * compactaria durante o uso — trabalho de disco competindo com a geração que o PI está
+     * olhando. O que a retenção precisa é rodar de tempos em tempos, e "toda vez que o app
+     * abre" é isso sem relógio nenhum a manter.
+     *
+     * Nunca derruba o boot: uma falha aqui é log, não tela de erro. Retenção que não rodou
+     * custa disco; boot que não completou custa o app.
+     */
+    try {
+      retencao.coletar(userIdAtual())
+    } catch (erro) {
+      log.sistema.warn('Coleta de retenção falhou na abertura', {
+        motivo: erro instanceof Error ? erro.message : 'desconhecido'
+      })
+    }
 
     // Restaura a sessão do cofre depois da janela existir: a transição é empurrada ao
     // renderer, e sem janela o `webContents.send` cairia no vazio.

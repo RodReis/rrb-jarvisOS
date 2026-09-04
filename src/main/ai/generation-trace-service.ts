@@ -19,7 +19,9 @@
 import type { EventoDaGeracao, GenerationEvent, StatusDoTrace } from '@shared/domain/geracao'
 import { faseDaEtapa, type Fase } from '@shared/domain/fase'
 import type { Etapa } from '@shared/domain/jornada'
+import { RETENCAO_DIAS } from '@shared/domain/retencao'
 import { log } from '../logging/logger'
+import type { RegraDeRetencao } from '../pipeline/retencao-service'
 import {
   EVENTOS_POR_LOTE,
   INTERVALO_DE_LOTE_MS,
@@ -88,6 +90,27 @@ export class GenerationTraceService {
   /** Os eventos de uma geração anterior — o que reabre o painel do histórico (critério 6). */
   eventos(escopo: EscopoDaGeracao, traceId: string): readonly GenerationEvent[] {
     return this.repo.eventos(escopo, traceId)
+  }
+
+  /**
+   * A regra de retenção desta fatia (SPEC-Fases-03 § Persistência).
+   *
+   * Compacta os traces com mais de `RETENCAO_DIAS`: os eventos saem, o `uso` e a contagem por
+   * ferramenta ficam. **O trace nunca é apagado** enquanto o projeto existir — ele é a prova de
+   * que o documento foi gerado, e é a ele que o ledger se liga.
+   *
+   * `RETENCAO_DIAS` vem do domínio da M9-F06 em vez de uma constante local: a janela é a mesma
+   * decisão de produto, e duas constantes divergiriam na primeira vez que alguém mudasse uma.
+   *
+   * Não filtra por usuário: a compactação é sobre **idade**, e um trace velho de outro usuário é
+   * igualmente velho. O `userId` entra na assinatura por causa do contrato da regra.
+   */
+  regraDeRetencao(): RegraDeRetencao {
+    return {
+      nome: 'traces-da-geracao',
+      aplicar: (_userId, agoraMs) =>
+        this.repo.compactar(new Date(agoraMs - RETENCAO_DIAS * 24 * 60 * 60 * 1000).toISOString())
+    }
   }
 }
 

@@ -23,10 +23,33 @@ import type { ArtefatoRetido } from '@shared/domain/retencao'
 import { log } from '../logging/logger'
 import type { ExecutionLedgerRepository } from './execution-ledger-repository'
 
+/**
+ * Uma regra de retenção — algo que sabe expirar **um** tipo de coisa.
+ *
+ * O ponto de extensão nasceu com o console da geração (SPEC-Fases-03), que precisa compactar
+ * traces antigos. Antes disto o coletor era monolítico e só conhecia anexos do ledger; a segunda
+ * regra teria virado um segundo coletor, e o dia em que alguém precisasse agendar a limpeza
+ * teria dois lugares para agendar.
+ *
+ * `aplicar` devolve **quantas coisas saíram** — o número que o log carrega. Nunca lança: uma
+ * regra que falha não pode impedir as outras de rodarem, pela mesma razão que um anexo travado
+ * pelo antivírus não impede os outros de expirarem.
+ */
+export interface RegraDeRetencao {
+  /** Como a regra aparece no log. */
+  readonly nome: string
+  aplicar(userId: string, agoraMs: number): number
+}
+
 export interface RetencaoDeps {
   readonly ledger: ExecutionLedgerRepository
   /** Onde mora o anexo daquele artefato. O layout é do main, não do coletor. */
   readonly caminhoDoAnexo: (item: ArtefatoRetido) => string
+  /**
+   * Regras além dos anexos. Vazio por padrão — o coletor continua fazendo o que sempre fez, e
+   * quem acrescenta uma regra a declara aqui em vez de editar o laço.
+   */
+  readonly regras?: readonly RegraDeRetencao[]
   readonly agora?: () => number
 }
 
@@ -37,9 +60,37 @@ export class RetencaoService {
     this.agora = deps.agora ?? ((): number => Date.now())
   }
 
-  /** Expira o que puder e devolve o que saiu. Síncrona: tudo aqui é disco e SQLite síncronos. */
+  /**
+   * Roda a coleta inteira: os anexos e cada regra registrada.
+   *
+   * Devolve os anexos que saíram — as demais regras reportam pelo log, porque o que elas
+   * removem não tem forma comum (um trace compactado não é um `ArtefatoRetido`, e forçá-lo a
+   * ser inventaria um tipo só para o valor de retorno caber).
+   */
   coletar(userId: string): readonly ArtefatoRetido[] {
     const agoraMs = this.agora()
+    const expirados = this.expirarAnexos(userId, agoraMs)
+
+    for (const regra of this.deps.regras ?? []) {
+      try {
+        const quantidade = regra.aplicar(userId, agoraMs)
+        if (quantidade > 0) {
+          log.sistema.info('Regra de retenção aplicada', { regra: regra.nome, quantidade })
+        }
+      } catch (erro) {
+        // Uma regra que falha não pode impedir as outras — mesma postura da remoção de anexo.
+        log.sistema.warn('Regra de retenção falhou', {
+          regra: regra.nome,
+          motivo: erro instanceof Error ? erro.message : 'desconhecido'
+        })
+      }
+    }
+
+    return expirados
+  }
+
+  /** Expira o que puder e devolve o que saiu. Síncrona: tudo aqui é disco e SQLite síncronos. */
+  private expirarAnexos(userId: string, agoraMs: number): readonly ArtefatoRetido[] {
     const elegiveis = elegiveisParaExpirar(this.deps.ledger.listarArtefatos(userId), agoraMs)
     if (elegiveis.length === 0) return []
 

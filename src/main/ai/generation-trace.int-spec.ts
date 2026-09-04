@@ -387,6 +387,36 @@ describe('compactação da retenção', () => {
     expect(repo.eventos(ESCOPO, 't1')).toHaveLength(1)
   })
 
+  it('a regra do trace roda pelo coletor, com a janela do domínio', async () => {
+    // Sem dublê de coletor: o `RetencaoService` real, com a regra registrada. É o que prova que
+    // as duas pontas casam — um dublê provaria só que o meu dublê casa consigo.
+    const { RetencaoService } = await import('../pipeline/retencao-service')
+
+    const velho = new GenerationTraceService(
+      repo,
+      undefined,
+      () => new Date(Date.now() - 60 * 24 * 60 * 60 * 1000)
+    )
+    const coletor = velho.abrir(ABERTURA)
+    coletor.registrar(texto('de dois meses atrás'))
+    coletor.registrar({ tipo: 'uso', tokensEntrada: 1, tokensSaida: 1, duracaoMs: 1 })
+    coletor.fechar('concluido')
+
+    // Um trace recente, que a mesma coleta não pode tocar.
+    const recente = service.abrir({ ...ABERTURA, traceId: 't2', ledgerEntryId: 'call-2' })
+    recente.registrar(texto('de agora'))
+    recente.fechar('concluido')
+
+    new RetencaoService({
+      ledger: { listarArtefatos: () => [] } as never,
+      caminhoDoAnexo: () => '',
+      regras: [service.regraDeRetencao()]
+    }).coletar(ESCOPO.userId)
+
+    expect(repo.eventos(ESCOPO, 't1').some((e) => e.tipo === 'texto')).toBe(false)
+    expect(repo.eventos(ESCOPO, 't2').some((e) => e.tipo === 'texto')).toBe(true)
+  })
+
   it('compactar duas vezes não conta o que já foi compactado', () => {
     const antigo = new GenerationTraceService(
       repo,
