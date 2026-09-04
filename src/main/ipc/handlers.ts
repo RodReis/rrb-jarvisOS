@@ -81,7 +81,12 @@ import type { AlvoDaPublicacao, PublicacaoOutcome } from '@shared/domain/publica
 import type { ExecutionLedger } from '@shared/domain/execution-ledger'
 import type { PendenciaDeLimpeza } from '@shared/domain/limpeza'
 import type { MergePolicyOutcome, PoliticaDeMerge, VistaDaFila } from '@shared/domain/pipeline'
-import type { Roadmap, RoadmapOutcome } from '@shared/domain/roadmap'
+import type { Roadmap } from '@shared/domain/roadmap'
+import type {
+  MvpGerado,
+  RoadmapGeradoOutcome,
+  RoadmapRegistrado
+} from '@shared/domain/roadmap-gerado'
 import type {
   Approval,
   AprovacaoOutcome,
@@ -94,6 +99,7 @@ import type { PublicacaoService } from '../projects/publicacao-service'
 import type { MergePolicyService } from '../pipeline/merge-policy-service'
 import type { FilaService } from '../pipeline/fila-service'
 import type { RoadmapService } from '../projects/roadmap-service'
+import type { RoadmapGeradoService } from '../projects/roadmap-gerado-service'
 import type { JornadaService } from '../projects/jornada-service'
 import type { BriefService } from '../projects/brief-service'
 import type { PrdService } from '../projects/prd-service'
@@ -314,6 +320,7 @@ export interface IpcDependencies {
   readonly pacotes: PacoteService
   readonly anexos: AnexoService
   readonly roadmap: RoadmapService
+  readonly roadmapGerado: RoadmapGeradoService
   readonly jornada: JornadaService
   readonly brief: BriefService
   readonly prd: PrdService
@@ -1446,22 +1453,82 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
   // Roadmap e gates (SPEC-Planejamento-06). O gate mora no serviço; o handler valida a forma na
   // fronteira e não decide nada — repetir a política aqui criaria uma segunda fonte.
   ipcMain.handle(
-    IPC_CHANNELS.roadmapGerar,
-    async (_event, projectId: unknown, workspace: unknown): Promise<RoadmapOutcome> => {
-      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
-        return { reason: 'projeto-inexistente', mensagem: 'Projeto não encontrado.' }
-      }
-      return await deps.roadmap.gerar(projectId, workspace)
-    }
-  )
-
-  ipcMain.handle(
     IPC_CHANNELS.roadmapCarregar,
     (_event, projectId: unknown, workspace: unknown): Roadmap => {
       if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
         return { mvps: [], slices: [] }
       }
       return deps.roadmap.carregar(projectId, workspace)
+    }
+  )
+
+  /**
+   * O roadmap gerado por IA (SPEC-Jornada-05). Quatro canais, como o contrato descreve: propor,
+   * ler, escolher o MVP e responder as perguntas da SPEC.
+   *
+   * A fronteira valida **forma**, não vocabulário: um id de MVP desconhecido atravessa e o
+   * serviço recusa com `mvp-inelegivel`. Barrar aqui duplicaria a lista de MVPs em dois lugares
+   * que divergiriam — a mesma decisão que a M25-F01 tomou com os eventos da jornada.
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.roadmapGerarPorIa,
+    async (_event, projectId: unknown, workspace: unknown): Promise<RoadmapGeradoOutcome> => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
+        return { resultado: 'projeto-inexistente', mensagem: 'Projeto não encontrado.' }
+      }
+      return await deps.roadmapGerado.gerar(projectId, workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.roadmapCarregarGerado,
+    (_event, projectId: unknown, workspace: unknown): RoadmapRegistrado | null => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return null
+      return deps.roadmapGerado.carregar(projectId) ?? null
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.roadmapElegiveis,
+    (_event, projectId: unknown, workspace: unknown): readonly MvpGerado[] => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return []
+      return deps.roadmapGerado.elegiveis(projectId)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.roadmapEscolherMvp,
+    async (
+      _event,
+      projectId: unknown,
+      mvpId: unknown,
+      workspace: unknown
+    ): Promise<RoadmapGeradoOutcome> => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string' || typeof mvpId !== 'string') {
+        return { resultado: 'projeto-inexistente', mensagem: 'Projeto não encontrado.' }
+      }
+      return await deps.roadmapGerado.escolherMvp(projectId, mvpId, workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.roadmapResponderPergunta,
+    (
+      _event,
+      projectId: unknown,
+      perguntaId: unknown,
+      resposta: unknown,
+      workspace: unknown
+    ): RoadmapGeradoOutcome => {
+      if (
+        !isWorkspaceId(workspace) ||
+        typeof projectId !== 'string' ||
+        typeof perguntaId !== 'string' ||
+        typeof resposta !== 'string'
+      ) {
+        return { resultado: 'projeto-inexistente', mensagem: 'Projeto não encontrado.' }
+      }
+      return deps.roadmapGerado.responderPergunta(projectId, perguntaId, resposta, workspace)
     }
   )
 

@@ -48,6 +48,8 @@ import { MergePolicyService } from './pipeline/merge-policy-service'
 import { PipelineRepository } from './pipeline/pipeline-repository'
 import { ReconciliacaoService } from './pipeline/reconciliacao-service'
 import { RoadmapService } from './projects/roadmap-service'
+import { RoadmapGeradoService } from './projects/roadmap-gerado-service'
+import { RoadmapGeradoRepository } from './projects/roadmap-gerado-repository'
 import { JornadaService } from './projects/jornada-service'
 import { BriefService } from './projects/brief-service'
 import { BriefRepository } from './projects/brief-repository'
@@ -85,6 +87,14 @@ import {
   promptDaArquitetura,
   promptDaCoerencia
 } from '@shared/domain/arquitetura-schema'
+import {
+  SISTEMA_DA_SPEC,
+  SISTEMA_DO_ROADMAP,
+  lerRoadmapDoModelo,
+  lerSpecDoModelo,
+  promptDaSpec,
+  promptDoRoadmap
+} from '@shared/domain/roadmap-schema'
 import { ordemDaEtapa } from '@shared/domain/jornada'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { AiProvider, AiStreamEvent } from '@shared/domain/ai'
@@ -467,16 +477,22 @@ if (!app.requestSingleInstanceLock()) {
     // sempre e faria toda aprovação passar como se houvesse alguém logado. A distinção é o
     // critério 4: a aprovação registra *quem* aceitou, e "o usuário local" não é ninguém.
     const roadmapRepository = new RoadmapRepository(storage.db)
+    /*
+     * O repositório da revisão gerada é criado aqui, antes do serviço que a produz, porque os
+     * **gates** precisam dela: `MVP_ENTRY` aprova o MVP escolhido e `SLICE_ENTRY` a SPEC com as
+     * respostas, e os dois moram no `RoadmapService`. Passar o serviço inteiro criaria um ciclo
+     * — ele depende da projeção que este mesmo repositório grava —, e a leitura é só uma linha.
+     */
+    const roadmapGeradoRepository = new RoadmapGeradoRepository(storage.db)
     const roadmap = new RoadmapService({
       repository: roadmapRepository,
       projects: projectRepository,
-      projectService: projects,
-      decisions: new DecisionRepository(storage.db),
       pacotes: pacoteRepository,
       anexos,
       audit: storage.audit,
       userId: userIdAtual,
-      identidade: () => auth?.usuarioAtual()?.id
+      identidade: () => auth?.usuarioAtual()?.id,
+      roadmapGerado: (projectId) => roadmapGeradoRepository.vigente(userIdAtual(), projectId)
     })
 
     // A jornada de planejamento (SPEC-Jornada-01).
@@ -825,6 +841,82 @@ if (!app.requestSingleInstanceLock()) {
       }
     })
 
+    /*
+     * O roadmap, os MVPs e a SPEC da primeira fatia por IA (SPEC-Jornada-05).
+     *
+     * Recebe o `roadmapRepository` — o mesmo do `RoadmapService` — porque a revisão é gravada nas
+     * **duas** estruturas: o conteúdo verificável com as origens em `project_roadmap`, e a
+     * projeção `mvp`/`slice` que o `STATUS.md` renderiza e o MVP-009 lê (critério 7). Gravar só
+     * na tabela nova quebraria o índice Fatia ↔ SPEC.
+     *
+     * A arquitetura entra como leitura porque a origem `arquitetura` referencia as afirmações
+     * dela: sem a lista de ids, todo MVP viraria `proposto` e a distinção que o critério 2
+     * protege sumiria.
+     */
+    const roadmapGerado = new RoadmapGeradoService({
+      repository: roadmapGeradoRepository,
+      projecao: roadmapRepository,
+      projects: projectRepository,
+      projectService: projects,
+      audit: storage.audit,
+      userId: userIdAtual,
+      prdVigente: (projectId) => prd.carregar(projectId),
+      pacoteEstruturalId: (projectId) =>
+        pacoteRepository.listarPacotes(userIdAtual(), projectId)[0]?.id,
+      arquiteturaVigente: (projectId) => arquitetura.carregar(projectId),
+      montarContexto: montarContextoDoPrompt,
+      estadoDasRotas: estadoDasRotasDoProjeto,
+      /*
+       * As duas chamadas passam pelo **ponto único** (`ai.call`), nunca pelo adapter direto, e
+       * `provider` é a rota **já decidida** — deixar o roteamento escolher de novo aqui poderia
+       * cair na rota paga que ninguém autorizou.
+       */
+      gerarMvps: async ({ workspace, rota, contextPackId, ...entrada }) => {
+        const texto = await coletarTexto(
+          ai.call(
+            {
+              provider: rota,
+              system: SISTEMA_DO_ROADMAP,
+              prompt: promptDoRoadmap(entrada),
+              contextPackId
+            },
+            { userId: userIdAtual(), workspace }
+          )
+        )
+
+        if (texto === undefined) return {}
+        const mvps = lerRoadmapDoModelo(texto)
+        return mvps === undefined ? {} : { mvps }
+      },
+      gerarSpec: async ({ workspace, rota, contextPackId, mvp, fatiaId, ...entrada }) => {
+        const fatia = [...mvp.fatias].sort((a, b) => a.numero - b.numero)[0]
+        if (fatia === undefined) return {}
+
+        const texto = await coletarTexto(
+          ai.call(
+            {
+              provider: rota,
+              system: SISTEMA_DA_SPEC,
+              prompt: promptDaSpec({
+                mvp,
+                fatia,
+                outrasFatias: mvp.fatias.filter((f) => f.id !== fatiaId).map((f) => f.titulo),
+                requisitos: entrada.requisitos,
+                arquitetura: entrada.arquitetura,
+                ...(entrada.correcao === undefined ? {} : { correcao: entrada.correcao })
+              }),
+              contextPackId
+            },
+            { userId: userIdAtual(), workspace }
+          )
+        )
+
+        if (texto === undefined) return {}
+        const spec = lerSpecDoModelo(texto, fatiaId)
+        return spec === undefined ? {} : { spec }
+      }
+    })
+
     // Publicação no GitHub (SPEC-Entrega-01). Recebe o `ConnectorService`, **não** o
     // `GithubAdapter`: o gate de créditos, a policy e a auditoria vivem dentro do `call()`, e um
     // adapter injetado aqui seria o segundo caminho sem gate — o mesmo erro que o `GitRunner`
@@ -996,6 +1088,7 @@ if (!app.requestSingleInstanceLock()) {
       pacotes,
       anexos,
       roadmap,
+      roadmapGerado,
       jornada,
       brief,
       prd,

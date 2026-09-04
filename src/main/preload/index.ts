@@ -63,7 +63,12 @@ import type { PacoteEstrutural, PacoteOutcome } from '@shared/domain/pacote-estr
 import type { Anexo, AnexoOutcome, TipoDeAnexo } from '@shared/domain/anexos-de-design'
 import type { ValidacaoDoPrototipo } from '@shared/domain/validacao-de-prototipo'
 import type { PacoteArquitetura } from '@shared/domain/arquitetura'
-import type { Roadmap, RoadmapOutcome } from '@shared/domain/roadmap'
+import type { Roadmap } from '@shared/domain/roadmap'
+import type {
+  MvpGerado,
+  RoadmapGeradoOutcome,
+  RoadmapRegistrado
+} from '@shared/domain/roadmap-gerado'
 import type { EstadoDaJornada, TransicaoOutcome } from '@shared/domain/jornada'
 import type { BriefRegistrado, GeracaoOutcome, PromptDoProjeto } from '@shared/domain/brief'
 import type { PrdOutcome, PrdRegistrado } from '@shared/domain/prd'
@@ -355,10 +360,39 @@ const bridge: JarvisBridge = {
   // distintos, e a separação é a fatia: gerar propõe, aprovar aceita. **A identidade não
   // atravessa a ponte** — ela vem da sessão no main, porque um parâmetro deixaria o renderer
   // declarar quem aprovou.
-  gerarRoadmap: (projectId: string, workspace: WorkspaceId): Promise<RoadmapOutcome> =>
-    ipcRenderer.invoke(IPC_CHANNELS.roadmapGerar, projectId, workspace),
   carregarRoadmap: (projectId: string, workspace: WorkspaceId): Promise<Roadmap> =>
     ipcRenderer.invoke(IPC_CHANNELS.roadmapCarregar, projectId, workspace),
+  // O roadmap gerado por IA (SPEC-Jornada-05). Propor, ler, escolher o MVP e responder as
+  // perguntas da SPEC são atos distintos, e a ponte os mantém distintos: um método só faria a
+  // geração escolher o que ela mesma propôs.
+  gerarRoadmapPorIa: (projectId: string, workspace: WorkspaceId): Promise<RoadmapGeradoOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.roadmapGerarPorIa, projectId, workspace),
+  carregarRoadmapGerado: (
+    projectId: string,
+    workspace: WorkspaceId
+  ): Promise<RoadmapRegistrado | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.roadmapCarregarGerado, projectId, workspace),
+  mvpsElegiveis: (projectId: string, workspace: WorkspaceId): Promise<readonly MvpGerado[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.roadmapElegiveis, projectId, workspace),
+  escolherMvpDoRoadmap: (
+    projectId: string,
+    mvpId: string,
+    workspace: WorkspaceId
+  ): Promise<RoadmapGeradoOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.roadmapEscolherMvp, projectId, mvpId, workspace),
+  responderPerguntaDaSpec: (
+    projectId: string,
+    perguntaId: string,
+    resposta: string,
+    workspace: WorkspaceId
+  ): Promise<RoadmapGeradoOutcome> =>
+    ipcRenderer.invoke(
+      IPC_CHANNELS.roadmapResponderPergunta,
+      projectId,
+      perguntaId,
+      resposta,
+      workspace
+    ),
   // A jornada: duas leituras e uma escrita. Nenhuma recebe etapa — só evento nomeado, porque
   // onde o projeto está é conclusão do main a partir dos fatos, não afirmação do renderer.
   estadoDaJornada: (projectId: string, workspace: WorkspaceId): Promise<EstadoDaJornada | null> =>

@@ -1,105 +1,79 @@
 /**
- * O roadmap e os gates de aprovação (SPEC-Planejamento-06).
+ * Os gates de aprovação do roadmap (SPEC-Planejamento-06, § gates; SPEC-Jornada-05).
  *
- * Duas operações, e a fronteira entre elas é a fatia inteira:
+ * Este serviço registra o aceite: `MVP_ENTRY` e `SLICE_ENTRY` — com o conjunto exato de revisões
+ * e a identidade do PI.
  *
- *   1. **`gerar`** — compõe o roadmap das decisões e das jornadas, valida o DAG, escreve
- *      `STATUS.md`, `STATUS-ARQUIVO.md` e a SPEC da próxima fatia, e commita `roadmap-aprovado`.
- *      Gerar **não aprova nada**.
- *   2. **`aprovar`** — registra o gate com o conjunto exato de revisões e a identidade do PI.
+ * **A composição saiu daqui** (decisão do PI de 2026-09-03, mesma da F04 com a arquitetura). Até
+ * a M8-F06 este serviço também *montava* o roadmap das decisões do wizard e das jornadas
+ * prototipadas; agora quem o propõe é o `RoadmapGeradoService`, com origem por MVP e validação da
+ * saída. Dois caminhos para o mesmo `STATUS.md` produziriam dois roadmaps com garantias
+ * diferentes, e só um deles passa pelo validador de origem.
  *
- * **A separação é o critério 3 e o critério 7 ao mesmo tempo.** Se gerar promovesse o MVP para a
- * fila, a geração estaria aprovando o que ela mesma propôs; se aprovar aceitasse um autor
- * qualquer, a delegação aprovaria gate. Os dois erros têm a mesma forma — quem propõe decidindo
- * que a proposta vale —, e a fronteira entre os métodos é o que os impede.
+ * **Propor e aprovar continuam separados, e é o critério 3 e o critério 7 ao mesmo tempo.** A
+ * geração propõe; o aceite é daqui. Se gerar promovesse o MVP para a fila, a geração estaria
+ * aprovando o que ela mesma propôs; se aprovar aceitasse um autor qualquer, a delegação aprovaria
+ * gate. Os dois erros têm a mesma forma — quem propõe decidindo que a proposta vale.
  *
  * **Sem sessão autenticada não há aprovação** (decisão cravada da spec). O gate falha fechado,
  * com `sem-identidade`, nunca "aprova como anônimo": uma aprovação sem identidade não responde
  * a pergunta que o critério 4 faz — *quem* aceitou.
- *
- * **Nenhuma chamada de IA nesta fatia.** O roadmap é composto (`roadmap-compositor.ts`), como o
- * pacote da M8-F04 e a arquitetura da M8-F05.
  */
 
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdirSync, writeFileSync } from 'node:fs'
-import { dirname, join, relative, resolve } from 'node:path'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { Approval, AprovacaoOutcome, Gate, RevisaoAprovada } from '@shared/domain/aprovacoes'
 import { aprovacaoVigente, gatesInvalidados } from '@shared/domain/aprovacoes'
 import type { MudancaDeArtefato } from '@shared/domain/aprovacoes'
-import type { Roadmap, RoadmapOutcome, Slice } from '@shared/domain/roadmap'
-import { ordemDeExecucao, proximaFatia, validarDag } from '@shared/domain/roadmap'
-import {
-  ARQUIVO_DO_ARQUIVO_HISTORICO,
-  ARQUIVO_DO_STATUS,
-  comporRoadmap,
-  renderizarArquivoHistorico,
-  renderizarSpec,
-  renderizarStatus
-} from '@shared/domain/roadmap-compositor'
-import { jornadasCobertas } from '@shared/domain/validacao-de-prototipo'
-import type { Pergunta } from '@shared/domain/wizard'
-import { decisoesVigentes } from '@shared/domain/wizard'
-import { CATALOGO_DO_CONTEXTO } from '@shared/domain/wizard-catalogo'
+import type { Roadmap } from '@shared/domain/roadmap'
+import type { RoadmapRegistrado } from '@shared/domain/roadmap-gerado'
+import { specPodeSerAceita } from '@shared/domain/roadmap-gerado'
 import { log } from '../logging/logger'
 import type { AuditRepository } from '../storage/audit-repository'
 import type { AnexoService } from './anexo-service'
-import type { DecisionRepository } from './decision-repository'
 import type { PacoteRepository } from './pacote-repository'
 import type { ProjectRepository } from './project-repository'
-import type { ProjectService } from './project-service'
 import type { EscopoDoRoadmap, RoadmapRepository } from './roadmap-repository'
 
 interface RoadmapDeps {
   readonly repository: RoadmapRepository
   readonly projects: ProjectRepository
-  readonly projectService: ProjectService
-  readonly decisions: DecisionRepository
   readonly pacotes: PacoteRepository
   readonly anexos: AnexoService
   readonly audit: AuditRepository
   readonly userId: () => string
   /** A identidade do PI: o usuário autenticado. `undefined` ⇒ sem sessão ⇒ sem aprovação. */
   readonly identidade: () => string | undefined
-  readonly catalogo?: readonly Pergunta[]
   /**
-   * Como o roadmap é composto. Injetável **só** para o teste, e por um motivo concreto: o
-   * compositor de produção só produz `[]` ou `['mvp-fundacao']` como dependência, então nunca
-   * gera ciclo — e a guarda do critério 1 ficaria sem como ser exercitada.
+   * A revisão gerada do roadmap — o que os gates `MVP_ENTRY` e `SLICE_ENTRY` aprovam
+   * (SPEC-Jornada-05).
    *
-   * A guarda **não** é código morto: ela protege contra o compositor mudar (uma estratégia nova
-   * de roadmap pode gerar dependências cruzadas) e contra um roadmap vindo do banco com linhas
-   * corrompidas. O que falta é só o caminho para provocá-la em teste — e essa costura é ele.
+   * Injetada, e não lida do repositório aqui, porque quem sabe qual revisão vale é o
+   * `RoadmapGeradoService`: duplicar essa leitura criaria uma segunda resposta para a mesma
+   * pergunta, e o gate poderia aprovar uma revisão diferente da que a tela mostrou.
    */
-  readonly compor?: typeof comporRoadmap
+  readonly roadmapGerado: (projectId: string) => RoadmapRegistrado | undefined
 }
 
 export class RoadmapService {
   private readonly repository: RoadmapRepository
   private readonly projects: ProjectRepository
-  private readonly projectService: ProjectService
-  private readonly decisions: DecisionRepository
   private readonly pacotes: PacoteRepository
   private readonly anexos: AnexoService
   private readonly audit: AuditRepository
   private readonly userId: () => string
   private readonly identidade: () => string | undefined
-  private readonly catalogo: readonly Pergunta[]
-  private readonly compor: typeof comporRoadmap
+  private readonly roadmapGerado: (projectId: string) => RoadmapRegistrado | undefined
 
   constructor(deps: RoadmapDeps) {
     this.repository = deps.repository
     this.projects = deps.projects
-    this.projectService = deps.projectService
-    this.decisions = deps.decisions
     this.pacotes = deps.pacotes
     this.anexos = deps.anexos
     this.audit = deps.audit
     this.userId = deps.userId
     this.identidade = deps.identidade
-    this.catalogo = deps.catalogo ?? CATALOGO_DO_CONTEXTO
-    this.compor = deps.compor ?? comporRoadmap
+    this.roadmapGerado = deps.roadmapGerado
   }
 
   /** O roadmap gravado do projeto. */
@@ -110,100 +84,6 @@ export class RoadmapService {
   /** As aprovações registradas, da mais recente à mais antiga. */
   aprovacoes(projectId: string, workspaceId: WorkspaceId): readonly Approval[] {
     return this.repository.listarAprovacoes(this.escopo(projectId, workspaceId))
-  }
-
-  /**
-   * Gera o roadmap: compõe, valida o DAG, escreve e commita.
-   *
-   * A ordem das recusas é a garantia:
-   *   1. **Projeto existe?** A checagem que não escreve vem primeiro.
-   *   2. **Há base para compor?** Sem decisão de escopo ou sem jornada, recusa — assumir uma
-   *      estratégia seria escolher pelo PI, e inventar jornada seria prometer o que ninguém
-   *      desenhou.
-   *   3. **O DAG é válido?** Ciclo ou dependência ausente ⇒ recusa **antes de escrever**
-   *      (critério 1). Descobrir depois seria descobrir tarde.
-   *   4. **Escreve, persiste e commita `roadmap-aprovado`.**
-   *
-   * **A geração não promove nem aprova nada.** Os MVPs nascem `proposto` (critério 3) e a SPEC
-   * nasce `rascunho`.
-   */
-  async gerar(projectId: string, workspaceId: WorkspaceId): Promise<RoadmapOutcome> {
-    const userId = this.userId()
-    const projeto = this.projects.findById(userId, projectId)
-    if (projeto === undefined) {
-      return { reason: 'projeto-inexistente', mensagem: 'Projeto não encontrado.' }
-    }
-
-    const decisoes = decisoesVigentes(this.decisions.listar(userId, projectId))
-    // As jornadas vêm da validação dos protótipos (M8-F05): é o mesmo conjunto que a arquitetura
-    // usou, e não uma segunda leitura que poderia divergir dela.
-    const jornadas = jornadasCobertas(await this.anexos.validar(projectId))
-
-    const roadmap = this.compor(this.catalogo, decisoes, jornadas)
-    if (roadmap.mvps.length === 0) {
-      return {
-        reason: 'sem-base',
-        mensagem:
-          decisoes.escopo === undefined
-            ? 'Responda a pergunta de escopo no planejamento: ela decide a forma do roadmap.'
-            : 'Nenhuma jornada prototipada. Anexe protótipos antes de gerar o roadmap.'
-      }
-    }
-
-    const problemas = validarDag(roadmap.mvps)
-    if (problemas.length > 0) {
-      this.audit.append({
-        user_id: userId,
-        workspace_id: workspaceId,
-        type: 'roadmap',
-        payload: { projectId, fase: 'dag-invalido', problemas: problemas.length }
-      })
-      return {
-        reason: 'dag-invalido',
-        problemas: problemas.map((p) => ({ mensagem: p.mensagem })),
-        mensagem: 'O roadmap composto tem dependências inválidas.'
-      }
-    }
-
-    const escopo = this.escopo(projectId, workspaceId)
-    const salvo = this.repository.salvarRoadmap(escopo, roadmap)
-    const proxima = proximaFatia(salvo)
-
-    const escrita = this.escrever(projeto.diretorio, projeto.nome, salvo, proxima)
-    if (!escrita.ok) {
-      return { reason: 'falha-de-escrita', mensagem: escrita.mensagem }
-    }
-
-    // A fatia detalhada é marcada **depois** da escrita: marcar antes deixaria uma fatia
-    // "detalhada" cuja spec não existe no disco, se a escrita falhasse.
-    if (proxima !== undefined) this.repository.marcarDetalhada(escopo, proxima.id)
-
-    this.audit.append({
-      user_id: userId,
-      workspace_id: workspaceId,
-      type: 'roadmap',
-      payload: {
-        projectId,
-        fase: 'gerado',
-        mvps: salvo.mvps.length,
-        slices: salvo.slices.length,
-        proxima: proxima?.specSlug ?? null
-      }
-    })
-
-    const marco = this.projectService.concluirMarco(projectId, 'roadmap-aprovado', workspaceId)
-
-    log.agent.info('Roadmap gerado', { projectId, mvps: salvo.mvps.length })
-
-    return {
-      reason: 'gerado',
-      roadmap: this.repository.carregar(escopo),
-      ...(proxima !== undefined ? { proxima } : {}),
-      mensagem:
-        marco?.commitado === true
-          ? 'Roadmap gerado e commitado.'
-          : 'Roadmap gerado. O commit do marco falhou e pode ser retomado.'
-    }
   }
 
   /**
@@ -235,21 +115,65 @@ export class RoadmapService {
       ]
     }
 
-    const roadmap = this.repository.carregar(escopo)
+    // Os dois gates do roadmap aprovam a **revisão gerada** (SPEC-Jornada-05), não a projeção:
+    // é ali que moram as origens por MVP e as respostas das perguntas abertas, que é o que o PI
+    // lê antes de aceitar. A projeção é o índice; a revisão é o conteúdo.
+    const gerado = this.roadmapGerado(projectId)
+    if (gerado === undefined) return []
 
     if (gate === 'MVP_ENTRY') {
-      // O hash de um MVP é do seu conteúdo composto — título, tese e dependências. Mudar a tese
-      // é mudar o que foi aprovado; reordenar o array não é.
-      return roadmap.mvps.map((m) => ({
-        artefato: m.id,
-        hash: hashDoTexto(`${m.titulo}|${m.tese}|${[...m.dependeDe].sort().join(',')}`)
-      }))
+      // Só o MVP **escolhido** entra: o gate aprova a entrada de um MVP na fila, e listar os
+      // outros faria o aceite carregar hashes de propostas que ninguém escolheu — mudar uma
+      // delas invalidaria um gate que não falava sobre ela.
+      const escolhido = gerado.mvps.find((m) => m.id === gerado.mvpEscolhido)
+      if (escolhido === undefined) return []
+
+      // O hash é do conteúdo do MVP — título, tese, resultado, dependências e o checklist de
+      // fatias. Mudar a tese ou tirar uma fatia é mudar o que foi aprovado; reordenar o array
+      // não é, e por isso as dependências entram ordenadas.
+      return [
+        {
+          artefato: escolhido.id,
+          hash: hashDoTexto(
+            [
+              escolhido.titulo,
+              escolhido.tese,
+              escolhido.resultado,
+              [...escolhido.dependeDe].sort().join(','),
+              escolhido.fatias.map((f) => f.titulo).join(',')
+            ].join('|')
+          )
+        }
+      ]
     }
 
-    // SLICE_ENTRY: só a fatia detalhada tem SPEC a aprovar.
-    return roadmap.slices
-      .filter((s) => s.detalhada)
-      .map((s) => ({ artefato: s.specSlug, hash: hashDoTexto(`${s.titulo}|${s.specSlug}`) }))
+    // SLICE_ENTRY: a SPEC gerada, **com as respostas**.
+    //
+    // Enquanto houver pergunta aberta o gate não tem objeto: a lista vazia faz `aprovar` recusar
+    // com `sem-revisoes`, que é o critério 4 — *"aceite recusado enquanto houver pergunta sem
+    // resposta"*. E as respostas entram no hash porque responder **é** mudança da SPEC: um hash
+    // cego a elas aprovaria um documento diferente do que o PI leu.
+    const spec = gerado.spec
+    if (spec === undefined || !specPodeSerAceita(spec)) return []
+
+    const fatia = this.repository.carregar(escopo).slices.find((s) => s.id === spec.fatiaId)
+
+    return [
+      {
+        artefato: fatia?.specSlug ?? spec.fatiaId,
+        hash: hashDoTexto(
+          JSON.stringify({
+            titulo: spec.titulo,
+            objetivo: spec.objetivo,
+            fluxo: spec.fluxo,
+            regras: spec.regras,
+            criterios: spec.criteriosDeAceite,
+            testes: spec.testes,
+            respostas: spec.perguntas.map((pergunta) => `${pergunta.id}=${pergunta.resposta ?? ''}`)
+          })
+        )
+      }
+    ]
   }
 
   /**
@@ -317,14 +241,15 @@ export class RoadmapService {
       payload: { projectId, gate, revisoes: revisoes.length, identidade, fase: 'aprovado' }
     })
 
-    // `MVP_ENTRY` é o que promove: é aqui, e só aqui, que um MVP sai de `proposto` (critério 3).
+    // `MVP_ENTRY` promove **o MVP que o PI escolheu**, e não o primeiro da ordem topológica
+    // (pergunta 1 da SPEC-Jornada-05, resolvida pelo PI em 2026-09-03). O automático da M8-F06
+    // existia porque aquela spec não definia quem escolhia; agora define, e escolher pelo PI
+    // seria decidir por ele justo no gate que existe para ele decidir.
     if (gate === 'MVP_ENTRY') {
-      const roadmap = this.repository.carregar(escopo)
-      const ordem = ordemDeExecucao(roadmap.mvps) ?? []
-      const primeiro = ordem
-        .map((id) => roadmap.mvps.find((m) => m.id === id))
-        .find((m) => m?.estado === 'proposto')
-      if (primeiro !== undefined) this.repository.promover(escopo, primeiro.id)
+      const escolhido = this.roadmapGerado(projectId)?.mvpEscolhido
+      if (escolhido !== null && escolhido !== undefined) {
+        this.repository.promover(escopo, escolhido)
+      }
     }
 
     log.agent.info('Gate aprovado', { projectId, gate })
@@ -349,58 +274,6 @@ export class RoadmapService {
 
   private escopo(projectId: string, workspaceId: WorkspaceId): EscopoDoRoadmap {
     return { userId: this.userId(), workspaceId, projectId }
-  }
-
-  /** Escreve o STATUS, o histórico e a SPEC da próxima fatia. Caminhos constantes ou derivados. */
-  private escrever(
-    diretorio: string,
-    nomeDoProjeto: string,
-    roadmap: Roadmap,
-    proxima: Slice | undefined
-  ): { readonly ok: boolean; readonly mensagem: string } {
-    const raiz = resolve(diretorio)
-    const hoje = new Date().toISOString().slice(0, 10)
-
-    const arquivos: { caminho: string; conteudo: string }[] = [
-      {
-        caminho: ARQUIVO_DO_STATUS,
-        conteudo: renderizarStatus(nomeDoProjeto, roadmap, proxima, hoje)
-      },
-      {
-        caminho: ARQUIVO_DO_ARQUIVO_HISTORICO,
-        conteudo: renderizarArquivoHistorico(nomeDoProjeto, [], hoje)
-      }
-    ]
-
-    if (proxima !== undefined) {
-      arquivos.push({
-        caminho: proxima.specSlug,
-        conteudo: renderizarSpec(
-          proxima,
-          roadmap.mvps.find((m) => m.id === proxima.mvpId),
-          hoje
-        )
-      })
-    }
-
-    try {
-      for (const arquivo of arquivos) {
-        const alvo = resolve(join(raiz, arquivo.caminho))
-        // O `specSlug` é derivado de `slugificar`, que já remove separadores de caminho — mas a
-        // barreira permanece: derivado hoje não é constante para sempre.
-        if (relative(raiz, alvo).startsWith('..')) {
-          return { ok: false, mensagem: 'Caminho de documento fora do projeto.' }
-        }
-        mkdirSync(dirname(alvo), { recursive: true })
-        writeFileSync(alvo, arquivo.conteudo, 'utf8')
-      }
-      return { ok: true, mensagem: 'Documentos escritos.' }
-    } catch (causa) {
-      log.agent.error('Falha ao escrever o roadmap', {
-        stack: causa instanceof Error ? causa.stack : undefined
-      })
-      return { ok: false, mensagem: 'Não foi possível escrever os documentos no projeto.' }
-    }
   }
 }
 

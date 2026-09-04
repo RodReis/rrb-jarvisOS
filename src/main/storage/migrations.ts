@@ -1406,6 +1406,45 @@ const MIGRATIONS: readonly string[] = [
     created_at           TEXT NOT NULL
   );
   CREATE INDEX idx_project_architecture ON project_architecture(user_id, project_id, created_at);
+  `,
+
+  // 35 — O roadmap gerado por IA (SPEC-Jornada-05).
+  //
+  // Tabela nova ao lado de `mvp` e `slice`, e não uma coluna neles, porque elas guardam coisas
+  // diferentes: `mvp`/`slice` são a projeção que o `STATUS.md` e o MVP-009 leem, e esta guarda a
+  // **revisão verificável** — as origens por MVP e por fatia, a SPEC gerada com as perguntas
+  // abertas, e as duas revisões que a geração assumiu. Sem a tabela própria, a origem por item
+  // teria de caber numa coluna de `mvp`, e a revisão deixaria de ser uma unidade com hash.
+  //
+  // "mvp_escolhido" guarda o `MVP_ENTRY` (critério 3): é a escolha do PI entre os elegíveis, e é
+  // o que congela o MVP aceito na regeneração (critério 6). Nulo até ele escolher — a geração
+  // não escolhe nada.
+  //
+  // Append-only, a oitava vez com esta postura. Regenerar insere outra linha; o hash UNIQUE
+  // reconhece quando o conteúdo é o mesmo. As duas escritas posteriores (`mvp_escolhido` e
+  // `commit_hash`) não tocam conteúdo nem hash.
+  `
+  CREATE TABLE project_roadmap (
+    id                   TEXT PRIMARY KEY,
+    user_id              TEXT NOT NULL,
+    workspace_id         TEXT NOT NULL,
+    project_id           TEXT NOT NULL,
+    -- A revisao do PRD que este roadmap assume.
+    pacote_estrutural_id TEXT NOT NULL,
+    -- A revisao da arquitetura que este roadmap assume.
+    arquitetura_id       TEXT NOT NULL,
+    -- JSON dos MVPs, cada um com origem obrigatoria e o checklist de fatias.
+    mvps                 TEXT NOT NULL,
+    -- JSON da SPEC da primeira fatia do MVP escolhido; nulo antes do MVP_ENTRY.
+    spec                 TEXT,
+    -- O MVP que o PI escolheu no MVP_ENTRY; nulo enquanto ele nao escolheu.
+    mvp_escolhido        TEXT,
+    hash                 TEXT NOT NULL UNIQUE,
+    commit_hash          TEXT,
+    context_pack_id      TEXT,
+    created_at           TEXT NOT NULL
+  );
+  CREATE INDEX idx_project_roadmap ON project_roadmap(user_id, project_id, created_at);
   `
 ]
 
