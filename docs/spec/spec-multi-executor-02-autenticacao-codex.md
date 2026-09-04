@@ -2,8 +2,8 @@
 
 - MVP: `docs/mvp/mvp-010-multi-executor.md` (Fatia 02).
 - Issue: [#117](https://github.com/RodReis/rrb-jarvisOS/issues/117); épico [#115](https://github.com/RodReis/rrb-jarvisOS/issues/115).
-- Status: **aprovada-pi** (2026-08-29) — entra no backlog na ordem do MVP; implementação depende da fila.
-- Depende de: F01 aprovada e entregue.
+- Status: **aprovada-pi** (2026-08-29); **emendada pelo PI em 2026-09-04** (dependência e posição na fila — ver § Emenda).
+- Depende de: **M10-F01 apenas para o mount no container** (critério 2). A parte de host não depende da F01.
 
 ## Objetivo
 
@@ -50,6 +50,14 @@ Disponibilizar uma identidade Codex exclusiva da pipeline, autenticada pelo PI d
 - smoke real explícito, limitado e sem registrar o segredo;
 - evidência de crédito desabilitado e quota desconhecida.
 
+## Emenda do PI (2026-09-04)
+
+O MVP-026 (`docs/mvp/mvp-026-fases-modelos-e-console.md`) faz do Codex um provider do ponto único no **host** (M26-F06), e precisa desta fatia antes: `CODEX_HOME` dedicado, login/logout acionado pelo PI, health, modos `subscription_limited`/`subscription_credits`/`api` sem transição silenciosa, redaction. Nada disso depende do runtime de executores em container (M10-F01). Decisão do PI:
+
+1. A dependência da M10-F01 passa a valer **só para o mount no container** (critério 2). Os demais critérios (1, 3–6) são entregues sem a F01.
+2. Esta fatia **sobe na fila**: imediatamente antes da M26-F06, à frente das outras fatias do MVP-010. Quando o MVP-010 chegar, o critério 2 é fechado sobre o mesmo perfil — sem segundo dono do `CODEX_HOME`.
+3. A rota de assinatura do Codex obedece à mesma regra da assinatura do Claude (decisão 4 do MVP-025 e decisão 3 de 2026-09-04): nenhuma cai na outra nem em API por conta própria; `api` só com opt-in por projeto.
+
 ## Perguntas abertas ao PI
 
-Nenhuma. Revisão exata aprovada pelo PI em 2026-08-29.
+Nenhuma. Revisão exata aprovada pelo PI em 2026-08-29; emenda aprovada em 2026-09-04.
