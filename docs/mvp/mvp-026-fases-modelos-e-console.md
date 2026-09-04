@@ -1,7 +1,7 @@
 # MVP-026 — Fases, modelo por fase e console da geração
 
-- Status: **aprovado pelo PI (2026-09-04)** — cinco SPECs `aprovada-pi` na mesma data (F01–F05), com as perguntas abertas respondidas pelo PI antes da redação; **F06 em `rascunho-completo`** com uma pergunta aberta (dependência da M10-F02 sobre a M10-F01).
-- GitHub: épico [#250](https://github.com/RodReis/rrb-jarvisOS/issues/250); fatias [#251](https://github.com/RodReis/rrb-jarvisOS/issues/251) (`proplan:next`), [#252](https://github.com/RodReis/rrb-jarvisOS/issues/252), [#253](https://github.com/RodReis/rrb-jarvisOS/issues/253), [#254](https://github.com/RodReis/rrb-jarvisOS/issues/254), [#255](https://github.com/RodReis/rrb-jarvisOS/issues/255) em `proplan:backlog` e [#256](https://github.com/RodReis/rrb-jarvisOS/issues/256) em `proplan:planejado` (F06, rascunho-completo), assignee PI.
+- Status: **aprovado pelo PI (2026-09-04)** — seis SPECs `aprovada-pi` na mesma data; todas as perguntas abertas respondidas pelo PI (a última, da F06, com a emenda à SPEC-Multi-Executor-02).
+- GitHub: épico [#250](https://github.com/RodReis/rrb-jarvisOS/issues/250); fatias [#251](https://github.com/RodReis/rrb-jarvisOS/issues/251) (`proplan:next`), [#252](https://github.com/RodReis/rrb-jarvisOS/issues/252), [#253](https://github.com/RodReis/rrb-jarvisOS/issues/253), [#254](https://github.com/RodReis/rrb-jarvisOS/issues/254), [#255](https://github.com/RodReis/rrb-jarvisOS/issues/255) em `proplan:backlog`, [#256](https://github.com/RodReis/rrb-jarvisOS/issues/256) em `proplan:backlog`, assignee PI.
 - Depende de: MVP-025 (aceito em 2026-09-03), MVP-009 (finalizado), M5-F04 (multi-provider), M10-F02 (autenticação Codex — **puxada para a frente da fila** por este MVP; só a F06 depende dela).
 - Fila: **cabeça da fila, antes do MVP-022 (Shell) e do Command Center** — decisão do PI de 2026-09-04.
 - Corrige: a superfície do MVP-025. Não reabre o aceite do MVP-025 — a máquina de etapas, os gates e a geração com origem continuam válidos; o que muda é **como o PI vê o projeto** (fase, card, console) e **qual modelo gera em cada fase**.
@@ -75,6 +75,6 @@ Ordem de execução: F01 → F02 → F03 → F04 → F05 → **M10-F02** → F06
 ## Riscos registrados
 
 - **`--output-format stream-json` do Claude Code CLI e `codex exec --json` são contratos de terceiros.** O parser fica atrás de um `GenerationEvent` próprio; mudança de formato quebra o console, não a geração — o texto final continua vindo pelo caminho de hoje.
-- **Codex no ponto único depende da M10-F02**, cuja SPEC foi escrita pensando no executor de construção (container). A F06 reaproveita a identidade isolada (`CODEX_HOME` dedicado) para chamadas no host; se a M10-F02 precisar de emenda para isso, a emenda é registrada na F06, não assumida.
+- **Codex no ponto único depende da M10-F02**, cuja SPEC foi escrita pensando no executor de construção (container). **Emendada pelo PI em 2026-09-04:** a dependência da M10-F01 vale só para o mount no container; a parte de host entra antes da F06, e a M10-F02 sobe na fila.
 - **VRAM:** `qwen3:8b` (5,2 GB) na RTX 5060 de 8 GB convive mal com outros modelos locais carregados. Já registrado na SPEC-Voz-03; este MVP só o inclui no catálogo.
 - **SPEC-Multi-Executor-04 (M10-F04)** prevê "preferência ordenada de executor por projeto e tipo de tarefa" para a Construção. A F05 entrega o caso de um executor (Claude Code) com modelo por fase; a M10-F04 estende para escolher executor. Sem colisão: a F05 não decide executor.
