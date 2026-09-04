@@ -1445,6 +1445,52 @@ const MIGRATIONS: readonly string[] = [
     created_at           TEXT NOT NULL
   );
   CREATE INDEX idx_project_roadmap ON project_roadmap(user_id, project_id, created_at);
+  `,
+
+  // 36 - modelo por fase, no workspace e no projeto (SPEC-Fases-02).
+  //
+  // `phase_model_policy` guarda **uma linha por (fase, rota)**, e nao um JSON com as seis: e a
+  // mesma razao que fez `provider_route` ser uma linha por tipo de tarefa. A tela edita um combo
+  // de cada vez, e uma coluna JSON faria salvar o Planejamento reescrever o documento inteiro,
+  // perdendo a edicao concorrente da Construcao. A PK `(user_id, workspace_id, fase, rota)` e o
+  // que torna cada combo independente.
+  //
+  // **Rota na chave, e nao um par so por fase**: a rota de assinatura oferece
+  // `claude-fable-5-1`, que a rota paga nao tem (decisao 4 do MVP-026). Sob um par unico, a
+  // escolha da assinatura vazaria para a rota paga e so falharia em runtime, depois da chamada
+  // sair - exatamente o que o catalogo resolve estaticamente.
+  //
+  // `project_model_override` mora em tabela separada porque o escopo e outro: a politica e do
+  // **workspace** (`user_id` + `workspace_id`), o override e do **projeto**. Juntar faria a
+  // heranca virar coluna anulavel na mesma linha, e "sem override" (herda) deixaria de ser
+  // distinguivel de "override apagado". Ausencia de linha e o que significa herdar.
+  //
+  // Ausencia de linha nas duas e o **padrao valendo** (`POLITICA_DE_MODELO_PADRAO`), nao erro: o
+  // app gera desde o primeiro boot, sem semear linha por usuario.
+  `
+  CREATE TABLE phase_model_policy (
+    user_id      TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    fase         TEXT NOT NULL,
+    -- 'assinatura' | 'paga'. Rota bloqueada nao gera, entao nao tem modelo a escolher.
+    rota         TEXT NOT NULL,
+    provider     TEXT NOT NULL,
+    model        TEXT NOT NULL,
+    updated_at   TEXT NOT NULL,
+    PRIMARY KEY (user_id, workspace_id, fase, rota)
+  );
+
+  CREATE TABLE project_model_override (
+    user_id      TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    project_id   TEXT NOT NULL,
+    fase         TEXT NOT NULL,
+    rota         TEXT NOT NULL,
+    provider     TEXT NOT NULL,
+    model        TEXT NOT NULL,
+    updated_at   TEXT NOT NULL,
+    PRIMARY KEY (user_id, workspace_id, project_id, fase, rota)
+  );
   `
 ]
 
