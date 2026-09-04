@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Badge, Button, Disclosure, Spinner } from '@design/ui'
+import { Badge, Button, Disclosure, InlineAlert, Spinner } from '@design/ui'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { EstadoDoMarco, LinhaDeMarco, VistaDeMarcos } from '@shared/domain/marcos'
 import type { MarcoDocumental } from '@shared/domain/projects'
@@ -125,15 +125,11 @@ export function MarcosDoProjeto({
   if (!carregando && vista?.disponivel === true && vista.linhas.length === 0) return null
 
   const pendentes =
-    vista?.linhas.filter(
-      (l) => l.estado === 'revisao-sem-commit' || l.estado === 'blob-divergente'
-    ).length ?? 0
+    vista?.linhas.filter((l) => l.estado === 'revisao-sem-commit' || l.estado === 'blob-divergente')
+      .length ?? 0
 
   return (
-    <Disclosure
-      rotulo="Marcos"
-      resumo={<ResumoDosMarcos vista={vista} pendentes={pendentes} />}
-    >
+    <Disclosure rotulo="Marcos" resumo={<ResumoDosMarcos vista={vista} pendentes={pendentes} />}>
       <div className="flex flex-col gap-3">
         {carregando && vista === undefined ? (
           <div className="flex items-center gap-2 py-4 text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-suave)]">
@@ -141,14 +137,25 @@ export function MarcosDoProjeto({
             Lendo o repositório do projeto.
           </div>
         ) : vista?.disponivel === false ? (
-          // O motivo, e não uma lista vazia: lista vazia seria lida como "nenhum documento",
-          // que é o oposto do que aconteceu.
-          <p className="py-2 text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-warn-leitura)]">
+          /*
+            O motivo, e não uma lista vazia: lista vazia seria lida como "nenhum documento", que
+            é o oposto do que aconteceu.
+
+            `InlineAlert` e não um `<p>` colorido — foi o gate visual que mostrou a diferença: o
+            texto em `--jos-cor-warn-leitura` sobre a superfície do painel media **3,90:1** no
+            modo claro, abaixo da régua de 4.5:1 (PRD §14), justo na mensagem mais importante da
+            tela. O componente resolve fundo, borda, ícone e cor de texto como um par testado.
+          */
+          <InlineAlert tom="warn" titulo="Git indisponível">
             {vista.mensagem}
-          </p>
+          </InlineAlert>
         ) : (
           <>
-            <ul className="flex flex-col gap-1">
+            {/* O grid vive **na lista**, não em cada linha: um grid por `<li>` resolve as
+                colunas dentro daquela linha e nada entre linhas — foi assim que a captura pegou
+                quatro origens diferentes para a mesma coluna de hash. Aqui as trilhas são da
+                lista inteira, e cada linha as herda por `subgrid`. */}
+            <ul className="grid grid-cols-[1fr_7ch_5ch_auto_auto] gap-x-3">
               {(vista?.linhas ?? []).map((linha) => (
                 <LinhaDoMarco
                   key={linha.caminho}
@@ -208,20 +215,32 @@ function LinhaDoMarco({
   const temMarco = MARCO_DO_DOCUMENTO[linha.caminho] !== undefined
 
   return (
-    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-[rgba(var(--jos-borda-rgb),0.08)] py-2 last:border-b-0">
-      <span className="min-w-0 flex-1 truncate text-[length:var(--jos-texto-corpo)]">
+    /*
+      **`subgrid`, e não colunas próprias** — foi a captura do gate visual que mostrou por quê:
+      com `flex-1` no caminho, cada linha punha o hash onde sobrava espaço (x≈613 numa linha,
+      x≈358 na seguinte), e um grid *por linha* alinharia só dentro dela. A coluna do hash é
+      justamente a que o PI compara com o `git log`, e uma coluna que dança obriga a procurar o
+      dado em vez de varrer. Herdando as trilhas da lista, as cinco colunas são as mesmas em
+      todas as linhas.
+    */
+    <li className="col-span-full grid grid-cols-subgrid items-center gap-y-1 border-b border-[rgba(var(--jos-borda-rgb),0.08)] py-2 last:border-b-0">
+      <span
+        data-jos-marco-caminho
+        className="min-w-0 truncate text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto)]"
+      >
         {linha.caminho}
       </span>
 
-      {/* O hash curto em tabular: são sete dígitos hexadecimais que o PI compara com o `git log`,
-          e a largura variável faria a coluna dançar entre uma linha e a seguinte. */}
-      {linha.commit !== undefined && (
-        <code className="font-mono text-[length:var(--jos-texto-micro)] tabular-nums text-[var(--jos-cor-texto-suave)]">
-          {linha.commit.slice(0, 7)}
-        </code>
-      )}
+      {/* O hash curto em tabular: são sete dígitos hexadecimais que o PI compara com o `git log`.
+          O elemento é renderizado mesmo vazio para que a linha sem commit ocupe a coluna — sem
+          ele, as células seguintes deslizariam uma trilha à esquerda. */}
+      <code className="font-mono text-[length:var(--jos-texto-micro)] tabular-nums text-[var(--jos-cor-texto-suave)]">
+        {linha.commit?.slice(0, 7) ?? ''}
+      </code>
 
-      {linha.data !== undefined && (
+      {linha.data === undefined ? (
+        <span aria-hidden />
+      ) : (
         <time
           dateTime={linha.data}
           className="text-[length:var(--jos-texto-micro)] tabular-nums text-[var(--jos-cor-texto-suave)]"
@@ -232,7 +251,7 @@ function LinhaDoMarco({
 
       <Badge tom={TOM_DO_ESTADO[linha.estado]}>{ROTULO_DO_ESTADO[linha.estado]}</Badge>
 
-      {precisaCommit && temMarco && (
+      {precisaCommit && temMarco ? (
         <Button
           variante="secundaria"
           onClick={onCommitar}
@@ -241,12 +260,14 @@ function LinhaDoMarco({
         >
           Commitar marco
         </Button>
+      ) : (
+        <span aria-hidden />
       )}
 
       {/* A explicação em texto, e não num `title`: tooltip de mouse não existe para quem navega
           por teclado, e é justamente o estado pendente que precisa ser entendido. */}
       {precisaCommit && (
-        <p className="w-full text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-suave)]">
+        <p className="col-span-full text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-suave)]">
           {DESCRICAO_DO_ESTADO[linha.estado]}
         </p>
       )}
@@ -265,10 +286,12 @@ function EstadoDoRepositorio({
 
   return (
     <div className="flex flex-col gap-1 border-t border-[rgba(var(--jos-borda-rgb),0.10)] pt-3 text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-suave)]">
+      {/* `InlineAlert` pela mesma razão do aviso de Git: o texto solto em `warn-leitura` sobre
+          esta superfície não alcança 4.5:1 no modo claro. */}
       {headInterrompido && (
-        <p className="text-[var(--jos-cor-warn-leitura)]">
+        <InlineAlert tom="warn" titulo="Operação de Git em curso">
           Há um merge ou rebase interrompido. Conclua ou aborte a operação antes de aceitar a SPEC.
-        </p>
+        </InlineAlert>
       )}
 
       {/* Só os caminhos, nunca o conteúdo (critério 2): o painel fala sobre versionamento, e
@@ -280,9 +303,7 @@ function EstadoDoRepositorio({
       </p>
 
       <p>
-        {publicadoEm === undefined
-          ? 'Não publicado.'
-          : `Publicado em ${publicadoEm.slice(0, 7)}.`}
+        {publicadoEm === undefined ? 'Não publicado.' : `Publicado em ${publicadoEm.slice(0, 7)}.`}
       </p>
     </div>
   )

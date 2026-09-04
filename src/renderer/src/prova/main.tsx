@@ -13,6 +13,7 @@ import {
 import { GaleriaDeProjetos } from './GaleriaDeProjetos'
 import type { CenaDeProjetos } from './GaleriaDeProjetos'
 import { GaleriaDoBrief, type CenaDoBrief } from './GaleriaDoBrief'
+import { GaleriaDeMarcos, type CenaDeMarcos } from './GaleriaDeMarcos'
 import { initI18n } from '@renderer/i18n'
 import type { ModoUi, Modulo } from '@design/tokens/semantic'
 import type { CorAcento } from '@design/tokens/acento'
@@ -63,7 +64,9 @@ const CENAS_POR_GALERIA: Readonly<Record<string, readonly string[]>> = {
     'refinamento-rota-paga'
   ],
   // O índice de projetos: a lista com jornadas distintas e o primeiro uso.
-  projetos: ['lista', 'vazio']
+  projetos: ['lista', 'vazio'],
+  // O painel de marcos (M26-F04): em dia, bloqueando a Construção, e sem Git disponível.
+  marcos: ['em-dia', 'pendente', 'sem-git']
 }
 
 const cenaBruta = params.get('cena')
@@ -117,6 +120,14 @@ const GALERIAS = {
       modulo={modulo}
       acento={acento ?? undefined}
       cena={(cenaBruta ?? 'lista') as CenaDeProjetos}
+    />
+  ),
+  marcos: () => (
+    <GaleriaDeMarcos
+      modo={modo}
+      modulo={modulo}
+      acento={acento ?? undefined}
+      cena={(cenaBruta ?? 'pendente') as CenaDeMarcos}
     />
   ),
   planejamento: () => (

@@ -101,7 +101,6 @@ import type {
 import type {
   Approval,
   AprovacaoOutcome,
-
   Gate,
   MudancaDeArtefato,
   RevisaoAprovada

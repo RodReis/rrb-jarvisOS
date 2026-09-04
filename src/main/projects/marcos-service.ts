@@ -56,7 +56,12 @@ export class MarcosService {
   vista(projectId: string, workspaceId: WorkspaceId): VistaDeMarcos {
     const projeto = this.deps.projects.findById(this.deps.userId(), projectId)
     if (projeto === undefined) {
-      return { disponivel: false, linhas: [], repositorio: VAZIO, mensagem: 'Projeto não encontrado.' }
+      return {
+        disponivel: false,
+        linhas: [],
+        repositorio: VAZIO,
+        mensagem: 'Projeto não encontrado.'
+      }
     }
 
     /*

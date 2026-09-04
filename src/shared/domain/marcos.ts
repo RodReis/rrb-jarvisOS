@@ -92,7 +92,8 @@ export interface EstadoDoRepositorio {
  */
 export interface ItemPendente {
   readonly caminho: string
-  readonly estado: Exclude<EstadoDoMarco, 'sem-revisao' | 'commitado'> | 'arvore-suja' | 'head-interrompido'
+  readonly estado:
+    Exclude<EstadoDoMarco, 'sem-revisao' | 'commitado'> | 'arvore-suja' | 'head-interrompido'
   readonly mensagem: string
   /** O que fazer para destravar. Nunca vazio. */
   readonly acao: string
