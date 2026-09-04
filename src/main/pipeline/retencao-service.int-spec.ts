@@ -18,6 +18,7 @@ import type { ArtefatoRetido } from '@shared/domain/retencao'
 import { openDatabase } from '../storage/database'
 import { ExecutionLedgerRepository } from './execution-ledger-repository'
 import { RetencaoService } from './retencao-service'
+import type { RegraDeRetencao } from './retencao-service'
 
 const DIA_MS = 24 * 60 * 60 * 1000
 const USER = 'user-1'
@@ -177,5 +178,57 @@ describe('RetencaoService', () => {
 
     expect(servico(() => caminho).coletar('outro-usuario')).toEqual([])
     expect(existsSync(caminho)).toBe(true)
+  })
+})
+
+/**
+ * As regras registradas (SPEC-Fases-03 § Persistência).
+ *
+ * O ponto de extensão nasceu com o console da geração, e o que se prova aqui é que ele **não
+ * derruba a coleta**: uma regra que falha não pode impedir as outras, pela mesma razão que um
+ * anexo travado pelo antivírus não impede os outros de expirarem.
+ */
+describe('regras registradas', () => {
+  function comRegras(regras: readonly RegraDeRetencao[]): RetencaoService {
+    return new RetencaoService({
+      ledger,
+      caminhoDoAnexo: () => join(dir, 'nada.txt'),
+      regras,
+      agora: () => AGORA
+    })
+  }
+
+  it('aplica cada regra registrada, com o instante da coleta', () => {
+    const vistos: number[] = []
+
+    comRegras([
+      { nome: 'uma', aplicar: (_u, agoraMs) => (vistos.push(agoraMs), 3) },
+      { nome: 'outra', aplicar: (_u, agoraMs) => (vistos.push(agoraMs), 0) }
+    ]).coletar(USER)
+
+    expect(vistos).toEqual([AGORA, AGORA])
+  })
+
+  it('regra que lança não impede as seguintes', () => {
+    const seguinte = vi.fn().mockReturnValue(1)
+
+    comRegras([
+      {
+        nome: 'quebrada',
+        aplicar: () => {
+          throw new Error('banco travado')
+        }
+      },
+      { nome: 'seguinte', aplicar: seguinte }
+    ]).coletar(USER)
+
+    expect(seguinte).toHaveBeenCalled()
+  })
+
+  it('sem regras, o coletor faz o que sempre fez', () => {
+    const caminho = anexo('velho-sem-regra.txt')
+    registrar({ id: 'art-8', criadoEm: new Date(AGORA - 31 * DIA_MS).toISOString() })
+
+    expect(servico(() => caminho).coletar(USER)).toHaveLength(1)
   })
 })

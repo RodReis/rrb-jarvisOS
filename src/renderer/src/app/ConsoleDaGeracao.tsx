@@ -1,0 +1,488 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Badge, Disclosure, Field, Select, Spinner } from '@design/ui'
+import { redigirTexto } from '@design/patterns'
+import type { GenerationEvent, GenerationTrace } from '@shared/domain/geracao'
+import type { Etapa } from '@shared/domain/jornada'
+import type { WorkspaceId } from '@shared/domain/entities'
+
+/**
+ * O console da geração (SPEC-Fases-03 § Superfície).
+ *
+ * Mostra, **enquanto a IA gera**, o texto que ela produz e as ferramentas que usa — e reabre a
+ * mesma vista para qualquer geração anterior da etapa.
+ *
+ * ## Por que vive aqui e não no DS
+ *
+ * Ele conhece domínio: `GenerationEvent`, `Etapa`, o IPC. A regra do DS é dura nisso — componente
+ * da camada `ui` recebe dado por props e não conhece infraestrutura. O que **é** genérico saiu
+ * daqui e virou primitivo: o `Disclosure`.
+ *
+ * ## O painel abre sozinho, e depois obedece
+ *
+ * O critério 6 pede que ele abra quando a geração começa. Fazer isso a cada render o tornaria
+ * impossível de fechar durante uma geração longa — a abertura automática dispara **na transição**
+ * para "gerando", uma vez, e daí em diante quem manda é o PI (a posição escolhida vale pela
+ * sessão).
+ */
+
+/** Quantos eventos o painel mantém em memória durante uma geração. */
+const TETO_DE_EVENTOS = 500
+
+interface ConsoleDaGeracaoProps {
+  readonly projectId: string
+  readonly workspace: WorkspaceId
+  readonly etapa: Etapa
+}
+
+export function ConsoleDaGeracao({
+  projectId,
+  workspace,
+  etapa
+}: ConsoleDaGeracaoProps): React.JSX.Element | null {
+  const [aberto, setAberto] = useState(false)
+  const [eventos, setEventos] = useState<readonly GenerationEvent[]>([])
+  const [historico, setHistorico] = useState<readonly GenerationTrace[]>([])
+  const [traceEscolhido, setTraceEscolhido] = useState<string | undefined>(undefined)
+  const [carregando, setCarregando] = useState(false)
+  const [traceAoVivo, setTraceAoVivo] = useState<string | undefined>(undefined)
+
+  /**
+   * A geração corrente é descoberta **pelos próprios eventos**, e não informada pelo pai.
+   *
+   * A alternativa seria propagar um `gerando` desde cada um dos sete painéis de etapa — que
+   * saberiam dizer "estou ocupado", mas nunca o `traceId`: a geração vai por `invoke`, que só
+   * resolve no fim, então do lado do renderer o id não existe enquanto ela corre. Sete props
+   * novas para entregar metade do dado.
+   *
+   * Descobrir pelo evento entrega o dado inteiro e é mais honesto: o console mostra que há
+   * geração porque **chegou evento dela**, não porque alguém disse que ia gerar.
+   */
+  const traceCorrente = useRef<string | undefined>(undefined)
+
+  useEffect(() => {
+    return window.jarvis.onGenerationEvent(({ traceId, evento }) => {
+      // Geração nova: o painel abre sozinho (critério 6) e a trilha anterior sai da tela. O
+      // `ref` e não o estado porque a decisão é **por evento** — ler o estado aqui daria o
+      // valor do render em que o listener foi criado, e todo evento pareceria de geração nova.
+      const eNova = traceCorrente.current !== traceId
+      traceCorrente.current = traceId
+
+      if (eNova) {
+        setTraceAoVivo(traceId)
+        setTraceEscolhido(undefined)
+        setAberto(true)
+        setEventos([evento])
+        return
+      }
+
+      setEventos((atuais) =>
+        // O teto protege uma geração longa de encher a memória do renderer. O que sai é o
+        // começo, não o fim: ao vivo interessa o que acontece agora, e a trilha completa fica
+        // no banco para o histórico reabrir.
+        atuais.length >= TETO_DE_EVENTOS
+          ? [...atuais.slice(atuais.length - TETO_DE_EVENTOS + 1), evento]
+          : [...atuais, evento]
+      )
+    })
+  }, [])
+
+  const gerando = traceAoVivo !== undefined && traceEscolhido === undefined
+
+  /**
+   * O histórico da etapa. Recarrega quando o projeto/etapa muda e quando uma geração nova
+   * aparece — a que acabou de correr passa a ser a primeira da lista.
+   *
+   * `cancelado` porque a resposta pode chegar depois de o PI ter trocado de etapa: sem ele, o
+   * histórico da etapa anterior sobrescreveria o da atual, e a lista mostraria gerações que não
+   * pertencem à tela.
+   */
+  useEffect(() => {
+    let cancelado = false
+
+    void window.jarvis.generationHistory(projectId, etapa, workspace).then((lista) => {
+      if (!cancelado) setHistorico(lista)
+    })
+
+    return () => {
+      cancelado = true
+    }
+  }, [projectId, etapa, workspace, traceAoVivo])
+
+  /**
+   * Abrir uma geração do histórico: os eventos vêm do banco, não da assinatura.
+   *
+   * Handler e não `useEffect`: escolher no seletor é uma **ação do usuário**, e buscar num
+   * efeito disparado pela mudança de estado é o `setState` em cascata que o lint recusa — com
+   * razão, porque a busca aconteceria também quando o componente remonta pelo mesmo valor.
+   */
+  const abrirDoHistorico = useCallback(
+    (traceId: string | undefined): void => {
+      setTraceEscolhido(traceId)
+
+      if (traceId === undefined) {
+        // Voltou para a geração atual: a trilha ao vivo continua chegando pela assinatura.
+        setEventos([])
+        return
+      }
+
+      setCarregando(true)
+      void window.jarvis
+        .generationEvents(traceId, workspace)
+        .then(setEventos)
+        .finally(() => setCarregando(false))
+    },
+    [workspace]
+  )
+
+  // Nada a mostrar e nada acontecendo: o painel não existe. Um bloco vazio "Console da geração"
+  // numa etapa nunca gerada é ruído — a etapa que ainda não gerou não tem trilha nenhuma.
+  if (!gerando && historico.length === 0) return null
+
+  return (
+    <Disclosure
+      aberto={aberto}
+      onAbertoChange={setAberto}
+      rotulo="Console da geração"
+      resumo={<ResumoDoCabecalho gerando={gerando} eventos={eventos} />}
+    >
+      <div className="flex flex-col gap-3">
+        {historico.length > 0 && (
+          <SeletorDeGeracao
+            historico={historico}
+            valor={traceEscolhido}
+            gerando={gerando}
+            onEscolher={abrirDoHistorico}
+          />
+        )}
+
+        {carregando ? (
+          <div className="flex items-center gap-2 py-4 text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-suave)]">
+            <Spinner rotulo="Carregando a trilha" tamanho="pequeno" />
+            Carregando a trilha desta geração.
+          </div>
+        ) : (
+          <TrilhaDaGeracao eventos={eventos} gerando={gerando} />
+        )}
+      </div>
+    </Disclosure>
+  )
+}
+
+function ResumoDoCabecalho({
+  gerando,
+  eventos
+}: {
+  readonly gerando: boolean
+  readonly eventos: readonly GenerationEvent[]
+}): React.JSX.Element {
+  const ferramentas = eventos.filter((e) => e.tipo === 'ferramenta-inicio').length
+
+  return (
+    <span className="flex items-center gap-2">
+      {ferramentas > 0 && (
+        <Badge>
+          {ferramentas} {ferramentas === 1 ? 'ferramenta' : 'ferramentas'}
+        </Badge>
+      )}
+      {gerando && (
+        <Badge tom="info" comPonto>
+          gerando
+        </Badge>
+      )}
+    </span>
+  )
+}
+
+function SeletorDeGeracao({
+  historico,
+  valor,
+  gerando,
+  onEscolher
+}: {
+  readonly historico: readonly GenerationTrace[]
+  readonly valor: string | undefined
+  readonly gerando: boolean
+  readonly onEscolher: (traceId: string | undefined) => void
+}): React.JSX.Element {
+  const opcoes = useMemo(
+    () => [
+      ...(gerando ? [{ valor: '', rotulo: 'Geração atual' }] : []),
+      ...historico.map((trace) => ({
+        valor: trace.id,
+        rotulo: `${dataCurta(trace.iniciadoEm)} · ${trace.modelo} · ${ROTULO_DO_STATUS[trace.status]}`
+      }))
+    ],
+    [historico, gerando]
+  )
+
+  return (
+    <Field rotulo="Geração">
+      {(atributos) => (
+        <Select
+          {...atributos}
+          opcoes={opcoes}
+          valor={valor ?? ''}
+          onMudar={(escolhido) => onEscolher(escolhido === '' ? undefined : escolhido)}
+        />
+      )}
+    </Field>
+  )
+}
+
+const ROTULO_DO_STATUS: Readonly<Record<GenerationTrace['status'], string>> = {
+  concluido: 'concluída',
+  falhou: 'falhou',
+  cancelado: 'cancelada'
+}
+
+function dataCurta(iso: string): string {
+  const data = new Date(iso)
+  return Number.isNaN(data.getTime())
+    ? iso
+    : data.toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+}
+
+/**
+ * A trilha: o texto do modelo em fluxo, as ferramentas como linhas, o uso no fim.
+ *
+ * O texto dos `delta` é **concatenado** num bloco só, e não uma linha por evento: o modelo emite
+ * pedaços arbitrários (às vezes uma palavra, às vezes meia frase), e renderizá-los separados
+ * quebraria o parágrafo em confete. A ordem entre texto e ferramenta é preservada — é o critério
+ * 1 —, então blocos de texto consecutivos se juntam, e uma ferramenta no meio abre bloco novo.
+ */
+function TrilhaDaGeracao({
+  eventos,
+  gerando
+}: {
+  readonly eventos: readonly GenerationEvent[]
+  readonly gerando: boolean
+}): React.JSX.Element {
+  const fim = useRef<HTMLDivElement>(null)
+  const blocos = useMemo(() => agruparEmBlocos(eventos), [eventos])
+
+  // Rola para o fim enquanto gera. `block: 'nearest'` para não arrastar a página inteira quando
+  // o painel está fora da vista — o console não pode sequestrar o scroll de quem lê o documento.
+  useEffect(() => {
+    if (gerando) fim.current?.scrollIntoView({ block: 'nearest' })
+  }, [blocos, gerando])
+
+  if (blocos.length === 0) {
+    return (
+      <p className="py-3 text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-suave)]">
+        {gerando
+          ? 'A geração começou. O texto e as ferramentas aparecem aqui conforme chegam.'
+          : 'Esta geração não deixou registro de texto nem de ferramentas.'}
+      </p>
+    )
+  }
+
+  return (
+    <div
+      // `tabIndex` para que quem navega por teclado consiga rolar a região — mesma escolha do
+      // `LogViewer`, e o motivo do `aria-label`: sem ele o leitor anuncia a região sem dizer de quê.
+      tabIndex={0}
+      aria-label="Trilha da geração"
+      aria-live={gerando ? 'polite' : 'off'}
+      className="max-h-80 overflow-auto rounded-[var(--jos-raio-card)] border border-[rgba(var(--jos-borda-rgb),0.12)] bg-[var(--jos-cor-superficie-elevada)] p-3"
+    >
+      <div className="flex flex-col gap-2">
+        {blocos.map((bloco, indice) =>
+          bloco.tipo === 'texto' ? (
+            <p
+              key={`texto-${indice}`}
+              className="whitespace-pre-wrap text-[length:var(--jos-texto-micro)] leading-relaxed text-[var(--jos-cor-texto-secundario)]"
+            >
+              {/*
+               * Segunda camada de redação, como no `LogViewer`: a primeira é o main, que impede
+               * o segredo de chegar ao banco. O texto do modelo não passa pelo redator do main
+               * (ele é o documento), então é aqui que um token citado na resposta é coberto.
+               */}
+              {redigirTexto(bloco.texto)}
+            </p>
+          ) : bloco.tipo === 'ferramenta' ? (
+            <LinhaDeFerramenta key={`ferramenta-${bloco.chamadaId}-${indice}`} bloco={bloco} />
+          ) : bloco.tipo === 'uso' ? (
+            <LinhaDeUso key={`uso-${indice}`} bloco={bloco} />
+          ) : (
+            <p
+              key={`erro-${indice}`}
+              className="text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-warn-leitura)]"
+            >
+              {bloco.mensagem}
+            </p>
+          )
+        )}
+      </div>
+      <div ref={fim} />
+    </div>
+  )
+}
+
+function LinhaDeFerramenta({ bloco }: { readonly bloco: BlocoDeFerramenta }): React.JSX.Element {
+  const status = bloco.status
+  const rotulo = (
+    <span className="flex min-w-0 items-baseline gap-2">
+      <span className="shrink-0 font-[family-name:var(--jos-fonte-mono)] text-[var(--jos-cor-texto)]">
+        {bloco.nome}
+      </span>
+      <span className="truncate font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-suave)]">
+        {bloco.resumoDoArgumento}
+      </span>
+    </span>
+  )
+
+  const selo =
+    status === undefined ? (
+      <Spinner rotulo={`${bloco.nome} em execução`} tamanho="pequeno" />
+    ) : (
+      <Badge tom={status === 'ok' ? 'ok' : 'err'}>{status === 'ok' ? 'ok' : 'erro'}</Badge>
+    )
+
+  // Sem resultado ainda (a ferramenta está rodando) não há o que colapsar: a linha é só a linha.
+  if (bloco.resumoDoResultado === undefined) {
+    return (
+      <div className="flex items-center gap-2 py-1 text-sm">
+        {rotulo}
+        <span className="ml-auto shrink-0">{selo}</span>
+      </div>
+    )
+  }
+
+  return (
+    <Disclosure compacto rotulo={rotulo} resumo={selo}>
+      <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-[var(--jos-raio-controle)] border border-[rgba(var(--jos-borda-rgb),0.12)] p-2 font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-secundario)]">
+        {bloco.resumoDoResultado === '' ? '(sem saída)' : bloco.resumoDoResultado}
+      </pre>
+      {bloco.tamanhoOriginal !== undefined &&
+        bloco.tamanhoOriginal > bloco.resumoDoResultado.length && (
+          <p className="pt-1 text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-suave)]">
+            Resumo de {formatarBytes(bloco.tamanhoOriginal)}. O resultado completo não é guardado.
+          </p>
+        )}
+    </Disclosure>
+  )
+}
+
+function LinhaDeUso({ bloco }: { readonly bloco: BlocoDeUso }): React.JSX.Element {
+  return (
+    <p className="flex flex-wrap gap-x-4 gap-y-1 border-t border-[rgba(var(--jos-borda-rgb),0.12)] pt-2 font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-suave)]">
+      <span>{bloco.tokensEntrada.toLocaleString('pt-BR')} tokens de entrada</span>
+      <span>{bloco.tokensSaida.toLocaleString('pt-BR')} de saída</span>
+      {bloco.duracaoMs > 0 && <span>{(bloco.duracaoMs / 1000).toFixed(1)}s</span>}
+    </p>
+  )
+}
+
+function formatarBytes(bytes: number): string {
+  return bytes < 1024
+    ? `${bytes} B`
+    : bytes < 1024 * 1024
+      ? `${(bytes / 1024).toFixed(1)} kB`
+      : `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+interface BlocoDeTexto {
+  readonly tipo: 'texto'
+  readonly texto: string
+}
+
+interface BlocoDeFerramenta {
+  readonly tipo: 'ferramenta'
+  readonly chamadaId: string
+  readonly nome: string
+  readonly resumoDoArgumento: string
+  readonly status?: 'ok' | 'erro'
+  readonly resumoDoResultado?: string
+  readonly tamanhoOriginal?: number
+}
+
+interface BlocoDeUso {
+  readonly tipo: 'uso'
+  readonly tokensEntrada: number
+  readonly tokensSaida: number
+  readonly duracaoMs: number
+}
+
+interface BlocoDeErro {
+  readonly tipo: 'erro'
+  readonly mensagem: string
+}
+
+type Bloco = BlocoDeTexto | BlocoDeFerramenta | BlocoDeUso | BlocoDeErro
+
+/**
+ * Agrupa os eventos no que a tela mostra, **preservando a ordem** (critério 1).
+ *
+ * Duas junções acontecem aqui, e as duas são sobre o mesmo princípio — a tela mostra o que
+ * aconteceu, não o formato em que chegou:
+ *
+ * - `texto` consecutivo vira um parágrafo. O modelo emite pedaços arbitrários; um `<p>` por
+ *   evento quebraria a frase em confete.
+ * - `ferramenta-fim` **completa** a linha que o `ferramenta-inicio` abriu, casada pelo
+ *   `chamadaId`. Duas linhas por ferramenta seriam dois itens para um acontecimento só.
+ *
+ * O `fim` sem `inicio` correspondente é ignorado: só acontece quando o teto de eventos cortou o
+ * começo da trilha, e uma linha órfã "terminou algo" não informa nada.
+ */
+export function agruparEmBlocos(eventos: readonly GenerationEvent[]): readonly Bloco[] {
+  const blocos: Bloco[] = []
+  const porChamada = new Map<string, number>()
+
+  for (const evento of eventos) {
+    if (evento.tipo === 'texto') {
+      const ultimo = blocos.at(-1)
+      if (ultimo?.tipo === 'texto') {
+        blocos[blocos.length - 1] = { tipo: 'texto', texto: ultimo.texto + evento.delta }
+      } else {
+        blocos.push({ tipo: 'texto', texto: evento.delta })
+      }
+      continue
+    }
+
+    if (evento.tipo === 'ferramenta-inicio') {
+      porChamada.set(evento.chamadaId, blocos.length)
+      blocos.push({
+        tipo: 'ferramenta',
+        chamadaId: evento.chamadaId,
+        nome: evento.nome,
+        resumoDoArgumento: evento.resumoDoArgumento
+      })
+      continue
+    }
+
+    if (evento.tipo === 'ferramenta-fim') {
+      const indice = porChamada.get(evento.chamadaId)
+      if (indice === undefined) continue
+
+      const aberto = blocos[indice]
+      if (aberto?.tipo !== 'ferramenta') continue
+
+      blocos[indice] = {
+        ...aberto,
+        status: evento.status === 'ok' ? 'ok' : 'erro',
+        resumoDoResultado: evento.resumoDoResultado,
+        tamanhoOriginal: evento.tamanhoOriginal
+      }
+      continue
+    }
+
+    if (evento.tipo === 'uso') {
+      blocos.push({
+        tipo: 'uso',
+        tokensEntrada: evento.tokensEntrada,
+        tokensSaida: evento.tokensSaida,
+        duracaoMs: evento.duracaoMs
+      })
+      continue
+    }
+
+    blocos.push({ tipo: 'erro', mensagem: evento.mensagem })
+  }
+
+  return blocos
+}

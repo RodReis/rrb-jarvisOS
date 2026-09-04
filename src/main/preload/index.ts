@@ -35,6 +35,8 @@ import type { CommandExecution, CommandSubmission } from '@shared/domain/termina
 import type { AiCallHandle, AiProvider, AiRequest, AiStreamEvent } from '@shared/domain/ai'
 import type { ProviderRoute, ProviderStatus, RoutingPolicy } from '@shared/domain/routing'
 import type { Fase } from '@shared/domain/fase'
+import type { Etapa } from '@shared/domain/jornada'
+import type { EventoDaGeracao, GenerationEvent, GenerationTrace } from '@shared/domain/geracao'
 import type {
   PhaseModelPolicy,
   ProjectModelOverride,
@@ -227,6 +229,38 @@ const bridge: JarvisBridge = {
 
     return () => ipcRenderer.removeListener(IPC_EVENT_CHANNELS.aiStreamEvent, wrapped)
   },
+
+  /**
+   * A assinatura do console da geração (SPEC-Fases-03 § Superfície).
+   *
+   * Entrega o payload inteiro, com o `traceId` dentro. Filtrar aqui por um `traceId` recebido
+   * como argumento seria a forma óbvia e **não serviria à geração ao vivo**: a jornada dispara a
+   * geração por `invoke`, que só resolve no fim, então no instante da assinatura o id ainda não
+   * existe do lado do renderer. Quem separa uma geração da seguinte é o painel, pelo `traceId`
+   * do primeiro evento que chega — o transporte continua sendo um canal só.
+   */
+  onGenerationEvent: (listener: (payload: EventoDaGeracao) => void): (() => void) => {
+    // Mesmo recorte do `onAiStreamEvent`: o `IpcRendererEvent` fica de fora porque carrega
+    // `sender`, um objeto do Electron que não pode vazar para o renderer.
+    const wrapped = (_event: unknown, payload: EventoDaGeracao): void => listener(payload)
+
+    ipcRenderer.on(IPC_EVENT_CHANNELS.generationEvent, wrapped)
+
+    return () => ipcRenderer.removeListener(IPC_EVENT_CHANNELS.generationEvent, wrapped)
+  },
+
+  generationHistory: (
+    projectId: string,
+    etapa: Etapa,
+    workspace: WorkspaceId
+  ): Promise<readonly GenerationTrace[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.generationHistory, projectId, etapa, workspace),
+
+  generationEvents: (
+    traceId: string,
+    workspace: WorkspaceId
+  ): Promise<readonly GenerationEvent[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.generationEvents, traceId, workspace),
 
   getBudget: (workspace: WorkspaceId): Promise<BudgetSnapshot> =>
     ipcRenderer.invoke(IPC_CHANNELS.budgetGet, workspace),

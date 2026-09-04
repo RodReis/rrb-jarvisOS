@@ -1491,6 +1491,65 @@ const MIGRATIONS: readonly string[] = [
     updated_at   TEXT NOT NULL,
     PRIMARY KEY (user_id, workspace_id, project_id, fase, rota)
   );
+  `,
+
+  // 37 - o console da geracao: a trilha de como cada documento nasceu (SPEC-Fases-03).
+  //
+  // Duas tabelas porque as cardinalidades sao outras: um trace por chamada do ponto unico, e
+  // dezenas a milhares de eventos dentro dele. Guardar os eventos como JSON numa coluna do trace
+  // obrigaria a reescrever o documento inteiro a cada lote durante o stream - o oposto do que a
+  // escrita em lote existe para evitar.
+  //
+  // **`ledger_entry_id` e NOT NULL** (criterio 2). E o `call_id` do ponto unico - o mesmo
+  // identificador que ja correlaciona `cost_event`, auditoria e log (decisao do PI, 2026-09-04).
+  // Anulavel, a coluna permitiria o trace orfao que a spec proibe: uma segunda contabilidade de
+  // uso, paralela ao ledger e divergindo dele em silencio. Nao ha FK declarada (o banco quase nao
+  // as usa) - quem garante a ligacao e o servico, e o teste que recusa trace sem ela.
+  //
+  // **`etapa` e `fase` moram aqui e nao em `cost_event`**: o ponto unico nao sabe em que etapa da
+  // jornada esta - quem sabe e o call site (`src/main/index.ts`). Duplicar a coluna no ledger
+  // faria o gasto e a trilha discordarem no dia em que so um dos dois fosse preenchido.
+  //
+  // `seq` ordena os eventos dentro do trace: a ordem em que o CLI os emitiu e o que o criterio 1
+  // exige mostrar, e `created_at` nao serve - a escrita em lote grava varios eventos no mesmo
+  // milissegundo, e o `rowid` seria ordem de insercao, nao ordem do stream.
+  //
+  // `payload` e JSON do resto do `GenerationEvent`, sem os campos que ja sao coluna. Coluna por
+  // campo seria uma tabela larga e esparsa: `delta` so existe em `texto`, `chamada_id` so nas
+  // ferramentas, `tokens_*` so no `uso`. A uniao e discriminada no dominio; aqui ela e uma
+  // coluna de tipo mais um documento.
+  `
+  CREATE TABLE generation_trace (
+    id              TEXT PRIMARY KEY,
+    user_id         TEXT NOT NULL,
+    workspace_id    TEXT NOT NULL,
+    project_id      TEXT NOT NULL,
+    -- O call_id do ponto unico. Trace sem ledger nao existe (criterio 2).
+    ledger_entry_id TEXT NOT NULL,
+    etapa           TEXT NOT NULL,
+    fase            TEXT NOT NULL,
+    provider        TEXT NOT NULL,
+    model           TEXT NOT NULL,
+    iniciado_em     TEXT NOT NULL,
+    -- Nulo enquanto a geracao corre. Preenchido no fechamento, com o status.
+    terminado_em    TEXT,
+    -- 'concluido' | 'falhou' | 'cancelado'.
+    status          TEXT NOT NULL
+  );
+
+  -- O historico da etapa: as geracoes de um projeto, da mais recente para a mais antiga.
+  CREATE INDEX idx_generation_trace_etapa
+    ON generation_trace(user_id, project_id, etapa, iniciado_em DESC);
+
+  CREATE TABLE generation_trace_event (
+    trace_id   TEXT NOT NULL,
+    -- A ordem em que o CLI emitiu. Parte da PK: dois eventos no mesmo trace nunca compartilham.
+    seq        INTEGER NOT NULL,
+    -- 'texto' | 'ferramenta-inicio' | 'ferramenta-fim' | 'uso' | 'erro'.
+    tipo       TEXT NOT NULL,
+    payload    TEXT NOT NULL,
+    PRIMARY KEY (trace_id, seq)
+  );
   `
 ]
 

@@ -15,6 +15,7 @@
 import type { WorkspaceId } from './entities'
 import type { CredentialKey } from './credentials'
 import type { TaskType } from './routing'
+import type { Etapa } from './jornada'
 
 /**
  * Os providers que o app conhece — **dado, não lógica**, como `CREDENTIAL_KEYS`.
@@ -270,6 +271,22 @@ export interface AiRequest {
    */
   readonly runId?: string
   readonly tentativa?: number
+  /**
+   * A etapa e o projeto que esta geração serve — o que faz dela uma **geração da jornada**, e
+   * não uma chamada solta (SPEC-Fases-03).
+   *
+   * Presente, o ponto único abre um `GenerationTrace` e o painel da etapa acompanha ao vivo;
+   * ausente, nada de console — é o caso do painel de teste do Settings e dos usos internos, que
+   * não pertencem a etapa nenhuma.
+   *
+   * Vem do **chamador** porque só ele sabe em que ponto da jornada está: o `AiCallService`
+   * conhece provider, modelo e custo, nunca a etapa. Derivá-la aqui exigiria o ponto único
+   * conhecer a jornada, e a próxima fatia que acrescentasse uma etapa teria de vir editá-lo.
+   */
+  readonly console?: {
+    readonly projectId: string
+    readonly etapa: Etapa
+  }
   /**
    * `true` só para o painel de diagnóstico do Settings — a chamada que testa se o provider
    * responde, sem gerar nada para um projeto.

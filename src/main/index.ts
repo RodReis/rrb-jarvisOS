@@ -15,6 +15,8 @@ import { RoutingService, SondaDeAdapters } from './ai/routing-service'
 import { RoutingRepository } from './ai/routing-repository'
 import { PhaseModelRepository } from './ai/phase-model-repository'
 import { PhaseModelService } from './ai/phase-model-service'
+import { GenerationTraceService } from './ai/generation-trace-service'
+import { GenerationTraceRepository } from './ai/generation-trace-repository'
 import { QuotaRepository } from './ai/quota-repository'
 import { BudgetService } from './budget/budget-service'
 import { BudgetRepository } from './budget/budget-repository'
@@ -110,6 +112,7 @@ import { ConstrutorService } from './pipeline/construtor-service'
 import { EntregaService } from './pipeline/entrega-service'
 import { ExecutionLedgerRepository } from './pipeline/execution-ledger-repository'
 import { LimpezaService } from './pipeline/limpeza-service'
+import { RetencaoService } from './pipeline/retencao-service'
 import { ExecutorProxy } from './pipeline/executor-proxy'
 import { RulesetRepository } from './pipeline/ruleset-repository'
 import { PreflightService } from './pipeline/preflight-service'
@@ -372,6 +375,19 @@ if (!app.requestSingleInstanceLock()) {
     // sem ele o gate de quota do `claude-code` fica sempre "desconhecido" em produção.
     const quota = new QuotaRepository(storage.db)
 
+    // O console da geração (SPEC-Fases-03). O `publicar` empurra cada evento para o renderer no
+    // canal único; quem filtra por `traceId` é o preload. `isDestroyed` pela mesma razão do
+    // `authChanged`: a corrida entre o fim da geração e o fechamento da janela é normal, e um
+    // `send` para uma janela morta lançaria dentro do coletor.
+    const generationTraces = new GenerationTraceService(
+      new GenerationTraceRepository(storage.db),
+      (evento) => {
+        if (janela !== undefined && !janela.isDestroyed()) {
+          janela.webContents.send(IPC_EVENT_CHANNELS.generationEvent, evento)
+        }
+      }
+    )
+
     const ai = new AiCallService(
       adapters,
       credentials,
@@ -380,7 +396,8 @@ if (!app.requestSingleInstanceLock()) {
       budget,
       routing,
       contexts,
-      quota
+      quota,
+      generationTraces
     )
 
     // Ponto único de conectores (SPEC-Conectores-01). **Runtime separado** do ponto único de
@@ -663,7 +680,8 @@ if (!app.requestSingleInstanceLock()) {
             ...(model === undefined ? {} : { model }),
             system: SISTEMA_DAS_PERGUNTAS,
             prompt: promptDasPerguntas(prompt, blocosEmAberto),
-            contextPackId
+            contextPackId,
+            console: { projectId, etapa: 'refinamento' }
           },
           { userId: userIdAtual(), workspace }
         )) {
@@ -738,7 +756,8 @@ if (!app.requestSingleInstanceLock()) {
             ...(model === undefined ? {} : { model }),
             system: SISTEMA_DO_BRIEF,
             prompt: promptDaGeracao(prompt, decisoes, correcao),
-            contextPackId
+            contextPackId,
+            console: { projectId, etapa: 'brief-aceito' }
           },
           { userId: userIdAtual(), workspace }
         )) {
@@ -807,7 +826,8 @@ if (!app.requestSingleInstanceLock()) {
               ...(model === undefined ? {} : { model }),
               system: SISTEMA_DO_TERMO,
               prompt: promptDoTermo(afirmacoesDoBrief),
-              contextPackId
+              contextPackId,
+              console: { projectId, etapa: 'prd' }
             },
             { userId: userIdAtual(), workspace }
           )
@@ -826,7 +846,8 @@ if (!app.requestSingleInstanceLock()) {
               ...(model === undefined ? {} : { model }),
               system: SISTEMA_DO_PRD,
               prompt: promptDoPrd(entrada),
-              contextPackId
+              contextPackId,
+              console: { projectId, etapa: 'prd' }
             },
             { userId: userIdAtual(), workspace }
           )
@@ -845,7 +866,8 @@ if (!app.requestSingleInstanceLock()) {
               ...(model === undefined ? {} : { model }),
               system: SISTEMA_DAS_CONTRADICOES,
               prompt: promptDasContradicoes(afirmacoes),
-              contextPackId
+              contextPackId,
+              console: { projectId, etapa: 'prd' }
             },
             { userId: userIdAtual(), workspace }
           )
@@ -905,7 +927,8 @@ if (!app.requestSingleInstanceLock()) {
               ...(model === undefined ? {} : { model }),
               system: SISTEMA_DA_ARQUITETURA,
               prompt: promptDaArquitetura(entrada),
-              contextPackId
+              contextPackId,
+              console: { projectId, etapa: 'arquitetura' }
             },
             { userId: userIdAtual(), workspace }
           )
@@ -973,7 +996,8 @@ if (!app.requestSingleInstanceLock()) {
               ...(model === undefined ? {} : { model }),
               system: SISTEMA_DO_ROADMAP,
               prompt: promptDoRoadmap(entrada),
-              contextPackId
+              contextPackId,
+              console: { projectId, etapa: 'roadmap' }
             },
             { userId: userIdAtual(), workspace }
           )
@@ -1010,7 +1034,8 @@ if (!app.requestSingleInstanceLock()) {
                 arquitetura: entrada.arquitetura,
                 ...(entrada.correcao === undefined ? {} : { correcao: entrada.correcao })
               }),
-              contextPackId
+              contextPackId,
+              console: { projectId, etapa: 'spec-aceita' }
             },
             { userId: userIdAtual(), workspace }
           )
@@ -1082,6 +1107,27 @@ if (!app.requestSingleInstanceLock()) {
     // A prova e a limpeza de cada run (SPEC-Entrega-06). O mesmo repositório serve aos dois: o
     // ledger grava o desfecho, e a limpeza registra nele a pendência do que não pôde ser removido.
     const executionLedger = new ExecutionLedgerRepository(storage.db)
+
+    /*
+     * O coletor de retenção, **instanciado** (SPEC-Fases-03 § Persistência).
+     *
+     * Ele existia desde a M9-F06 e nunca fora construído em produção: era código testado que
+     * nada chamava. A regra dos traces da geração precisa de um lugar para viver, e criar um
+     * segundo coletor ao lado de um que já existe é o começo de dois lugares para agendar
+     * limpeza. Então esta fatia liga o que estava ali.
+     *
+     * **Limite conhecido:** a expiração de **anexos** continua sem rodar. Ela precisa do
+     * `caminhoDoAnexo`, e o layout do diretório de anexos nunca foi decidido — é escopo da
+     * M9-F06, não desta fatia. O `caminhoDoAnexo` abaixo devolve caminho vazio de propósito:
+     * `elegiveisParaExpirar` não encontra artefato algum enquanto nada os grava, então o laço
+     * não roda; inventar um layout aqui criaria a decisão de produto por omissão que a spec
+     * proíbe. Registrado no STATUS.md.
+     */
+    const retencao = new RetencaoService({
+      ledger: executionLedger,
+      caminhoDoAnexo: () => '',
+      regras: [generationTraces.regraDeRetencao()]
+    })
 
     // A entrega da fatia (SPEC-Entrega-05): construção, revisão, CI e squash merge no mesmo PR.
     //
@@ -1217,6 +1263,7 @@ if (!app.requestSingleInstanceLock()) {
       routing,
       routingRepo,
       phaseModels,
+      generationTraces,
       connectors,
       connectorCredits,
       githubAuth,
@@ -1230,6 +1277,25 @@ if (!app.requestSingleInstanceLock()) {
 
     janela = createMainWindow()
     createTray(janela)
+
+    /*
+     * A coleta roda **uma vez, na abertura** (SPEC-Fases-03 § Persistência).
+     *
+     * Na abertura e não num intervalo: o app é local e de sessão longa, e um timer periódico
+     * compactaria durante o uso — trabalho de disco competindo com a geração que o PI está
+     * olhando. O que a retenção precisa é rodar de tempos em tempos, e "toda vez que o app
+     * abre" é isso sem relógio nenhum a manter.
+     *
+     * Nunca derruba o boot: uma falha aqui é log, não tela de erro. Retenção que não rodou
+     * custa disco; boot que não completou custa o app.
+     */
+    try {
+      retencao.coletar(userIdAtual())
+    } catch (erro) {
+      log.sistema.warn('Coleta de retenção falhou na abertura', {
+        motivo: erro instanceof Error ? erro.message : 'desconhecido'
+      })
+    }
 
     // Restaura a sessão do cofre depois da janela existir: a transição é empurrada ao
     // renderer, e sem janela o `webContents.send` cairia no vazio.
