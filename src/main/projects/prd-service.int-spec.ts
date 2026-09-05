@@ -621,9 +621,7 @@ describe('progresso da geração (SPEC-Jornada-03 § Geração)', () => {
 
     expect(r.resultado).toBe('gerado')
 
-    const pesquisa = etapasAnunciadas.find(
-      (e) => e.etapa === 'pesquisa' && e.estado !== 'iniciada'
-    )
+    const pesquisa = etapasAnunciadas.find((e) => e.etapa === 'pesquisa' && e.estado !== 'iniciada')
     expect(pesquisa?.estado).toBe('concluida')
     expect(pesquisa?.resumo).toContain('lacuna')
   })
@@ -648,9 +646,9 @@ describe('progresso da geração (SPEC-Jornada-03 § Geração)', () => {
     const r = await service.gerar({ projectId: PROJETO, termo: 'x' }, WS)
 
     expect(r.resultado).toBe('saida-invalida')
-    expect(
-      etapasAnunciadas.some((e) => e.etapa === 'contradicoes' && e.estado === 'falhou')
-    ).toBe(true)
+    expect(etapasAnunciadas.some((e) => e.etapa === 'contradicoes' && e.estado === 'falhou')).toBe(
+      true
+    )
     expect(concluidas()).not.toContain('gravacao')
   })
 

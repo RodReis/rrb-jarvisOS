@@ -110,9 +110,7 @@ export type EstadoDaEtapa = 'iniciada' | 'concluida' | 'falhou'
  * não há como saber quanto dela já passou, e inventar meio passo faria a barra andar por
  * suposição em vez de por fato.
  */
-export function progressoDaGeracao(
-  etapas: ReadonlyMap<EtapaDaGeracao, EstadoDaEtapa>
-): number {
+export function progressoDaGeracao(etapas: ReadonlyMap<EtapaDaGeracao, EstadoDaEtapa>): number {
   let concluidas = 0
   for (const etapa of ETAPAS_DA_GERACAO) {
     if (etapas.get(etapa) === 'concluida') concluidas += 1
