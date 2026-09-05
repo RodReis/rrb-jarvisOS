@@ -58,7 +58,7 @@ import {
 } from '@shared/domain/prd'
 import type { FonteParaOModelo } from '@shared/domain/prd-schema'
 import type { EstadoDasRotas, ResultadoDaRota } from '@shared/domain/rota-de-geracao'
-import { PROVIDER_DA_ROTA, escolherRota } from '@shared/domain/rota-de-geracao'
+import { PROVIDER_DA_ROTA, escolherRota, providerDaRota } from '@shared/domain/rota-de-geracao'
 import type { ConnectorOutcome, ConnectorRequest } from '@shared/domain/connectors'
 import { CONNECTOR_CONTRACT_VERSION } from '@shared/domain/connectors'
 import type { TavilyExtractData, TavilySearchData } from '@shared/domain/tavily'
@@ -238,7 +238,7 @@ export class PrdService {
     const rota = escolherRota(await this.deps.estadoDasRotas(projectId, workspaceId))
     if (rota.decisao === 'bloqueado') return undefined
 
-    const provider = PROVIDER_DA_ROTA[rota.decisao]
+    const provider = providerDaRota(rota) ?? PROVIDER_DA_ROTA[rota.decisao]
     const contextPackId = this.deps.montarContexto(projectId, workspaceId, provider)
     if (contextPackId === undefined) return undefined
 
@@ -307,7 +307,7 @@ export class PrdService {
       }
     }
 
-    const provider = PROVIDER_DA_ROTA[rota.decisao]
+    const provider = providerDaRota(rota) ?? PROVIDER_DA_ROTA[rota.decisao]
 
     const contextPackId = this.deps.montarContexto(pedido.projectId, workspaceId, provider)
     if (contextPackId === undefined) {

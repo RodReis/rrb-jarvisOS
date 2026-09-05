@@ -140,7 +140,13 @@ function servico(
   )
 
   return new AiCallService(
-    { anthropic: adapter, gemini: adapter, ollama: adapter, 'claude-code': adapter },
+    {
+      anthropic: adapter,
+      gemini: adapter,
+      ollama: adapter,
+      'claude-code': adapter,
+      codex: adapter
+    },
     credentials,
     new PolicyService(audit, () => USUARIO),
     audit,

@@ -55,9 +55,39 @@ describe('catálogo (critério 1)', () => {
     )
   })
 
-  it('nenhum id do Codex entra nesta fatia: sem provider, seria opção que nunca casa', () => {
-    const todos = Object.values(TABELA_DE_PRECO).flatMap((m) => Object.keys(m))
-    expect(todos.filter((id) => id.startsWith('gpt-'))).toEqual([])
+  /**
+   * Os ids do Codex existem **só** sob `codex` (SPEC-Fases-06 § Dentro).
+   *
+   * Este teste dizia "nenhum id do Codex entra nesta fatia" enquanto o provider não existia — era
+   * o limite da M26-F02, e ele cumpriu o papel: falhou quando a M26-F06 acrescentou o `codex`, em
+   * vez de deixar a mudança passar despercebida.
+   *
+   * A garantia que sobrevive é a mesma de Fable em `anthropic`: um id no provider errado não é
+   * recusado em runtime, ele **não existe como opção** — e é o que faz `modelosDisponiveis` nunca
+   * oferecer o que a rota não atende.
+   */
+  it('os ids do Codex existem só sob o provider codex', () => {
+    for (const [provider, modelos] of Object.entries(TABELA_DE_PRECO)) {
+      const doCodex = Object.keys(modelos).filter((id) => id.startsWith('gpt-'))
+      if (provider === 'codex') {
+        expect(doCodex).toEqual(expect.arrayContaining(['gpt-5.6-sol', 'gpt-5.5', 'gpt-5.4']))
+      } else {
+        expect(doCodex).toEqual([])
+      }
+    }
+  })
+
+  /**
+   * O modo `api` do Codex **não tem preço cadastrado**, e isso é deliberado.
+   *
+   * A spec é literal: *"preço a cadastrar na habilitação, não inventado aqui"*. Um número chutado
+   * alimentaria o gate de orçamento, que barra ou libera chamada paga com base nele — e o erro
+   * apareceria como uma conta errada, não como uma falha visível.
+   */
+  it('o catálogo do Codex traz só a assinatura, a preço zero', () => {
+    for (const preco of Object.values(TABELA_DE_PRECO.codex)) {
+      expect(preco).toEqual({ entrada: 0, saida: 0 })
+    }
   })
 
   it('o rótulo do combo cai no próprio id quando o produto não nomeia o modelo', () => {

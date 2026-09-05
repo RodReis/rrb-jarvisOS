@@ -18,6 +18,20 @@
 
 import type { AiProvider } from './ai'
 
+/**
+ * A assinatura que cada provider representa, ou `undefined` quando ele não é rota de assinatura.
+ *
+ * Existe para o boot responder *"a assinatura **desta** fase está no ar?"* sem espalhar a
+ * pergunta: o modelo da fase dá o provider, e este mapa diz se ele é assinatura e qual. Um `if`
+ * por provider no boot faria o próximo provider de assinatura nascer com a checagem esquecida.
+ */
+export const PROVIDER_DE_ASSINATURA: readonly AiProvider[] = ['claude-code', 'codex']
+
+/** `true` quando o provider atende pela assinatura do PI, não por credencial paga. */
+export function ehAssinatura(provider: AiProvider): boolean {
+  return PROVIDER_DE_ASSINATURA.includes(provider)
+}
+
 /** O que a geração vai fazer. Fechado: a tela e o serviço decidem a partir dele. */
 export const DECISOES_DE_ROTA = ['assinatura', 'paga', 'bloqueado'] as const
 
@@ -33,7 +47,13 @@ export const MOTIVOS_DE_BLOQUEIO = [
 export type MotivoDeBloqueio = (typeof MOTIVOS_DE_BLOQUEIO)[number]
 
 export interface EstadoDasRotas {
-  /** A rota de assinatura está configurada e utilizável agora. */
+  /**
+   * A rota de assinatura está configurada e utilizável agora.
+   *
+   * **Qual** assinatura é decidido por quem monta este estado, e não aqui: desde a SPEC-Fases-06
+   * existem duas (Claude Code e Codex), e o modelo da fase é que diz qual atende esta geração.
+   * A função continua pura e com a mesma forma — ver `assinaturaDoProvider`.
+   */
   readonly assinaturaDisponivel: boolean
   /** A quota da assinatura acabou (SPEC-Entrega-04, critério 12). */
   readonly assinaturaEsgotada: boolean
@@ -46,6 +66,17 @@ export interface EstadoDasRotas {
    * mesma granularidade do orçamento por workspace, um nível abaixo.
    */
   readonly optInDeRotaPaga: boolean
+  /**
+   * **Qual** assinatura esta geração precisa (SPEC-Fases-06 § Dentro).
+   *
+   * Existe para a mensagem de bloqueio nomear o fornecedor certo: mandar conectar o Claude quando
+   * a fase escolheu Sol seria uma ação que não destrava nada. Não muda a **decisão** — a regra é
+   * a mesma para as duas assinaturas —, só o texto que o PI lê.
+   *
+   * Opcional para não quebrar quem monta o estado sem saber a fase (o painel do Settings, que
+   * pergunta pelo ambiente e não por um projeto); ausente, a mensagem fica genérica.
+   */
+  readonly assinaturaDe?: AiProvider
 }
 
 export interface ResultadoDaRota {
@@ -53,6 +84,15 @@ export interface ResultadoDaRota {
   readonly motivo?: MotivoDeBloqueio
   /** O que o PI faz para destravar. Presente sempre que a decisão é `bloqueado`. */
   readonly acao?: string
+  /**
+   * O provider que atende esta rota (SPEC-Fases-06). Ausente em `bloqueado` — rota bloqueada não
+   * gera, então não tem provider.
+   *
+   * Vem no resultado, e não de um mapa consultado depois, porque **rota e provider deixaram de
+   * ser o mesmo fato**: `assinatura` pode ser Claude Code ou Codex, e só quem montou o estado
+   * sabe qual. Ler `PROVIDER_DA_ROTA['assinatura']` a esta altura devolveria sempre o Claude.
+   */
+  readonly provider?: AiProvider
 }
 
 /**
@@ -71,6 +111,39 @@ export const ACAO_DO_BLOQUEIO: Readonly<Record<MotivoDeBloqueio, string>> = {
 }
 
 /**
+ * Como o PI conecta **cada** assinatura (SPEC-Fases-06 § Dentro).
+ *
+ * A ação genérica manda conectar o Claude, e isso era verdade quando havia uma assinatura só.
+ * Com duas, mandar conectar o Claude quando a fase escolheu Sol é uma ação que **não destrava
+ * nada** — e um bloqueio com ação errada é pior que um bloqueio sem ação, porque manda o PI
+ * fazer trabalho inútil.
+ *
+ * Dado e não `if`: acrescentar uma terceira assinatura passa a ser acrescentar uma linha.
+ */
+const COMO_CONECTAR: Partial<Record<AiProvider, string>> = {
+  'claude-code': 'Conecte a assinatura do Claude (Claude Code CLI) em Providers',
+  codex: 'Conecte a assinatura do Codex em Providers'
+}
+
+/**
+ * A ação do bloqueio, nomeando o fornecedor quando ele é conhecido.
+ *
+ * **Não muda a decisão** — a regra de bloqueio é a mesma para as duas assinaturas, e é justamente
+ * isso que impede uma de cair na outra. O que muda é o texto: "conecte o Codex" quando foi Sol
+ * que faltou, "troque o modelo da fase" como alternativa que não gasta.
+ */
+export function acaoDoBloqueio(motivo: MotivoDeBloqueio, assinaturaDe?: AiProvider): string {
+  const conectar = assinaturaDe === undefined ? undefined : COMO_CONECTAR[assinaturaDe]
+  if (conectar === undefined) return ACAO_DO_BLOQUEIO[motivo]
+
+  if (motivo === 'assinatura-esgotada-sem-opt-in') {
+    return `A quota da assinatura acabou. Aguarde a renovação, troque o modelo da fase, ou habilite a rota paga para este projeto.`
+  }
+
+  return `${conectar}, troque o modelo da fase, ou habilite a rota paga para este projeto.`
+}
+
+/**
  * Escolhe a rota — ou bloqueia.
  *
  * **A assinatura vem primeiro sempre**, e não só quando é mais barata: a rota paga é exceção
@@ -85,13 +158,21 @@ export function escolherRota(estado: EstadoDasRotas): ResultadoDaRota {
   const assinaturaUtilizavel = estado.assinaturaDisponivel && !estado.assinaturaEsgotada
 
   if (assinaturaUtilizavel) {
-    return { decisao: 'assinatura' }
+    // **A assinatura que o estado declarou**, não `PROVIDER_DA_ROTA.assinatura`: desde a
+    // SPEC-Fases-06 há duas, e quem sabe qual atende esta fase é quem montou o estado a partir do
+    // modelo escolhido. Cravar o Claude aqui faria a geração por Sol sair pelo fornecedor errado.
+    return { decisao: 'assinatura', provider: estado.assinaturaDe ?? PROVIDER_DA_ROTA.assinatura }
   }
 
   // A partir daqui a assinatura não serve. A rota paga só entra com autorização explícita —
   // ter credencial configurada não é autorização.
+  //
+  // **Isto não é fallback entre assinaturas.** A paga é outra moeda, autorizada por opt-in; o que
+  // a decisão 4 do MVP-025 proíbe, e a SPEC-Fases-06 estende às duas assinaturas, é uma
+  // assinatura cair na outra — e não há caminho aqui que faça isso, porque o estado carrega uma
+  // assinatura só.
   if (estado.optInDeRotaPaga && estado.rotaPagaConfigurada) {
-    return { decisao: 'paga' }
+    return { decisao: 'paga', provider: PROVIDER_DA_ROTA.paga }
   }
 
   const motivo: MotivoDeBloqueio = !estado.assinaturaDisponivel
@@ -100,7 +181,7 @@ export function escolherRota(estado: EstadoDasRotas): ResultadoDaRota {
       : 'sem-rota-alguma'
     : 'assinatura-esgotada-sem-opt-in'
 
-  return { decisao: 'bloqueado', motivo, acao: ACAO_DO_BLOQUEIO[motivo] }
+  return { decisao: 'bloqueado', motivo, acao: acaoDoBloqueio(motivo, estado.assinaturaDe) }
 }
 
 /**
@@ -128,4 +209,19 @@ export function podeGerar(estado: EstadoDasRotas): boolean {
 export const PROVIDER_DA_ROTA: Readonly<Record<'assinatura' | 'paga', AiProvider>> = {
   assinatura: 'claude-code',
   paga: 'anthropic'
+}
+
+/**
+ * O provider que **esta** decisão de rota usa (SPEC-Fases-06 § Dentro).
+ *
+ * Existe porque `PROVIDER_DA_ROTA` crava `assinatura → 'claude-code'`, o que era verdade com uma
+ * assinatura só. Com duas, o PI escolheria Sol no combo da fase e **a chamada sairia pelo
+ * Claude** — sem erro nenhum aparecer, e com o ledger registrando o provider errado.
+ *
+ * Lê o `provider` que `escolherRota` já resolveu; o fallback cobre um `ResultadoDaRota` montado à
+ * mão (dublê de teste), onde a ausência do campo não deve virar exceção.
+ */
+export function providerDaRota(rota: ResultadoDaRota): AiProvider | undefined {
+  if (rota.decisao === 'bloqueado') return undefined
+  return rota.provider ?? PROVIDER_DA_ROTA[rota.decisao]
 }

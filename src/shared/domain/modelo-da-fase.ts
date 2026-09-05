@@ -174,6 +174,66 @@ export function modelosDoCatalogo(provider: AiProvider): readonly string[] {
 }
 
 /**
+ * Uma opção de modelo no combo da fase, com o motivo quando ela não atende (SPEC-Fases-06,
+ * critério 7).
+ */
+export interface OpcaoDeModelo {
+  readonly provider: AiProvider
+  readonly modelo: string
+  /** Presente quando a opção aparece **desabilitada**; ausente quando ela pode ser escolhida. */
+  readonly indisponivel?: string
+}
+
+/**
+ * Os providers que atendem cada rota — **plural desde a SPEC-Fases-06**.
+ *
+ * A rota de assinatura passou a ter dois (Claude Code e Codex), e é por isso que o combo da fase
+ * não pode mais derivar um provider único da rota. Dado e não `if`: a terceira assinatura entra
+ * como uma linha.
+ */
+export const PROVIDERS_DA_ROTA: Readonly<Record<RotaComModelo, readonly AiProvider[]>> = {
+  assinatura: ['claude-code', 'codex'],
+  paga: ['anthropic']
+}
+
+/**
+ * As opções que o combo de uma fase oferece, com o que estiver indisponível **listado e
+ * desabilitado** (SPEC-Fases-06, critério 7).
+ *
+ * **Listar e desabilitar, em vez de omitir**, é a decisão da spec: o Codex ainda não executa a
+ * Construção (isso é M10-F03/F04), e um combo que simplesmente escondesse `gpt-5.5` ali deixaria
+ * o PI sem saber que a opção existe e por que não pode usá-la. Omitir é silêncio; desabilitar com
+ * motivo é resposta.
+ *
+ * O inverso também seria pior: **listar e atender** faria a Construção sair por um executor que
+ * não existe — fallback que não funciona, exatamente o que a spec chama de errado.
+ */
+export function opcoesDeModelo(fase: Fase, rota: RotaComModelo): readonly OpcaoDeModelo[] {
+  return PROVIDERS_DA_ROTA[rota].flatMap((provider) =>
+    modelosDoCatalogo(provider).map((modelo) => {
+      const motivo = motivoDeIndisponibilidade(fase, provider)
+      return motivo === undefined
+        ? { provider, modelo }
+        : { provider, modelo, indisponivel: motivo }
+    })
+  )
+}
+
+/**
+ * Por que um provider não atende uma fase, ou `undefined` quando atende.
+ *
+ * Hoje há um caso só: o Codex na Construção, que espera o executor em container da M10-F03/F04.
+ * Função e não mapa porque a resposta depende do par — e um `Record<Fase, Record<Provider, …>>`
+ * teria dez entradas `undefined` para descrever uma exceção.
+ */
+export function motivoDeIndisponibilidade(fase: Fase, provider: AiProvider): string | undefined {
+  if (provider === 'codex' && fase === 'construcao') {
+    return 'O Codex ainda não executa a Construção. Disponível quando o executor em container chegar (MVP-010).'
+  }
+  return undefined
+}
+
+/**
  * **A função da fatia**: qual modelo atende esta fase, nesta rota.
  *
  * Pura e sem banco de propósito — a herança (projeto vence workspace, ausência herda) é a regra
