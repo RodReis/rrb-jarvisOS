@@ -982,7 +982,7 @@ if (!app.requestSingleInstanceLock()) {
               provider: rota,
               ...(model === undefined ? {} : { model }),
               system: SISTEMA_DO_PRD,
-            jsonSchema: SCHEMA_DAS_AFIRMACOES,
+              jsonSchema: SCHEMA_DAS_AFIRMACOES,
               prompt: promptDoPrd(entrada),
               contextPackId,
               console: { projectId, etapa: 'prd' }
@@ -1003,7 +1003,7 @@ if (!app.requestSingleInstanceLock()) {
               provider: rota,
               ...(model === undefined ? {} : { model }),
               system: SISTEMA_DAS_CONTRADICOES,
-            jsonSchema: SCHEMA_DAS_CONTRADICOES,
+              jsonSchema: SCHEMA_DAS_CONTRADICOES,
               prompt: promptDasContradicoes(afirmacoes),
               contextPackId,
               console: { projectId, etapa: 'prd' }
@@ -1066,7 +1066,7 @@ if (!app.requestSingleInstanceLock()) {
               provider: rota,
               ...(model === undefined ? {} : { model }),
               system: SISTEMA_DA_ARQUITETURA,
-            jsonSchema: SCHEMA_DAS_AFIRMACOES,
+              jsonSchema: SCHEMA_DAS_AFIRMACOES,
               prompt: promptDaArquitetura(entrada),
               contextPackId,
               console: { projectId, etapa: 'arquitetura' }
@@ -1085,7 +1085,7 @@ if (!app.requestSingleInstanceLock()) {
             {
               provider: rota,
               system: SISTEMA_DA_COERENCIA,
-            jsonSchema: SCHEMA_DOS_AJUSTES,
+              jsonSchema: SCHEMA_DOS_AJUSTES,
               prompt: promptDaCoerencia({ requisitos, jornadas }),
               contextPackId
             },
@@ -1138,7 +1138,7 @@ if (!app.requestSingleInstanceLock()) {
               provider: rota,
               ...(model === undefined ? {} : { model }),
               system: SISTEMA_DO_ROADMAP,
-            jsonSchema: SCHEMA_DO_ROADMAP,
+              jsonSchema: SCHEMA_DO_ROADMAP,
               prompt: promptDoRoadmap(entrada),
               contextPackId,
               console: { projectId, etapa: 'roadmap' }
@@ -1170,7 +1170,7 @@ if (!app.requestSingleInstanceLock()) {
               provider: rota,
               ...(model === undefined ? {} : { model }),
               system: SISTEMA_DA_SPEC,
-            jsonSchema: SCHEMA_DA_SPEC,
+              jsonSchema: SCHEMA_DA_SPEC,
               prompt: promptDaSpec({
                 mvp,
                 fatia,

@@ -22,6 +22,7 @@ import { CodexAdapter, entradaDoCodex } from './codex-adapter'
 import { novoEstadoDoParser, parsearLinha } from './stream-json-parser'
 import { runsDeTeste } from './cwd-neutro.test-helper'
 import { LIMITE_RESUMO_BYTES, type GenerationEvent } from '@shared/domain/geracao'
+import { SCHEMA_DAS_PERGUNTAS } from '@shared/domain/json-schema-da-saida'
 import type { AdapterRequest } from './adapter'
 
 /** Um pedido mínimo. Cada teste sobrescreve só o que lhe interessa. */
@@ -77,7 +78,10 @@ describe('#271 — o contrato da etapa chega ao CLI', () => {
 describe('#272 — o que o CLI injeta não vira documento', () => {
   /** Uma mensagem `user` com bloco `text`: é assim que o corpo de uma skill chega. */
   const linhaDeUser = (texto: string): string =>
-    JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: texto }] } })
+    JSON.stringify({
+      type: 'user',
+      message: { role: 'user', content: [{ type: 'text', text: texto }] }
+    })
 
   const linhaDeAssistant = (texto: string): string =>
     JSON.stringify({
@@ -88,7 +92,10 @@ describe('#272 — o que o CLI injeta não vira documento', () => {
   const linhaDeToolUse = (id: string): string =>
     JSON.stringify({
       type: 'assistant',
-      message: { role: 'assistant', content: [{ type: 'tool_use', id, name: 'Skill', input: { skill: 'claude-api' } }] }
+      message: {
+        role: 'assistant',
+        content: [{ type: 'tool_use', id, name: 'Skill', input: { skill: 'claude-api' } }]
+      }
     })
 
   it('texto de `assistant` continua virando `texto`', () => {
@@ -259,14 +266,15 @@ describe('emenda E1 — o cwd é neutro e some no fim (critério 1)', () => {
     // remoção reprovaria por artefato do teste, não por defeito do código.
     const relato = join(mkdtempSync(`${tmpdir()}/jarvis-relato-`), 'relato.json')
 
-    const adapter = new ClaudeCodeAdapter(
-      runs.abrir,
-      ((_b: string, _a: readonly string[], opcoes: object) =>
-        spawn(process.execPath, ['-e', scriptQueRelata(relato)], opcoes)) as typeof spawn
-    )
+    const adapter = new ClaudeCodeAdapter(runs.abrir, ((
+      _b: string,
+      _a: readonly string[],
+      opcoes: object
+    ) => spawn(process.execPath, ['-e', scriptQueRelata(relato)], opcoes)) as typeof spawn)
 
-    for await (const _ of adapter.generateStream(pedido({ fase: 'planejamento' }))) {
-      // O consumo é o que faz o stream rodar até o fim; o que importa é o relato e a remoção.
+    // O consumo é o que faz o stream rodar até o fim; o que se afirma é o relato e a remoção.
+    for await (const chunk of adapter.generateStream(pedido({ fase: 'planejamento' }))) {
+      expect(chunk.tipo).toBeDefined()
     }
 
     const visto = JSON.parse(readFileSync(relato, 'utf8')) as { cwd: string; itens: string[] }
@@ -281,16 +289,18 @@ describe('emenda E1 — o cwd é neutro e some no fim (critério 1)', () => {
 
   it('o diretório some também quando o processo é morto no meio', async () => {
     const runs = runsDeTeste()
-    const adapter = new ClaudeCodeAdapter(
-      runs.abrir,
-      ((_b: string, _a: readonly string[], opcoes: object) =>
-        // Um processo que nunca termina sozinho: só o `SIGKILL` do timeout o encerra.
-        spawn(process.execPath, ['-e', 'setInterval(()=>{},1000)'], opcoes)) as typeof spawn
-    )
+    const adapter = new ClaudeCodeAdapter(runs.abrir, ((
+      _b: string,
+      _a: readonly string[],
+      opcoes: object
+    ) =>
+      // Um processo que nunca termina sozinho: só o `SIGKILL` do timeout o encerra.
+      spawn(process.execPath, ['-e', 'setInterval(()=>{},1000)'], opcoes)) as typeof spawn)
 
     await expect(async () => {
-      for await (const _ of adapter.generateStream(pedido({ timeoutMs: 200 }))) {
-        // Sem saída: o processo é morto antes de escrever qualquer coisa.
+      // Sem saída: o processo é morto pelo timeout antes de escrever qualquer coisa.
+      for await (const chunk of adapter.generateStream(pedido({ timeoutMs: 200 }))) {
+        expect(chunk).toBeUndefined()
       }
     }).rejects.toThrow()
 
@@ -326,8 +336,9 @@ describe('emenda E1 — flag recusada é falha declarada (critério 6)', () => {
     )
 
     await expect(async () => {
-      for await (const _ of adapter.generateStream(pedido({ fase: 'planejamento' }))) {
-        // Nada a consumir: o processo falha antes de emitir.
+      // Nada a consumir: o processo falha antes de emitir.
+      for await (const chunk of adapter.generateStream(pedido({ fase: 'planejamento' }))) {
+        expect(chunk).toBeUndefined()
       }
     }).rejects.toThrow(/--json-schema/)
   })
@@ -393,15 +404,16 @@ describe('emenda E1 — ferramenta em fase sem ferramentas (critério 3)', () =>
     eventos: GenerationEvent[]
   }> {
     const eventos: GenerationEvent[] = []
-    const adapter = new ClaudeCodeAdapter(
-      runsDeTeste().abrir,
-      ((_b: string, _a: readonly string[], opcoes: object) =>
-        spawn(
-          process.execPath,
-          ['-e', scriptQueEmite(TEXTO_ANTES, CHAMADA, TEXTO_DEPOIS)],
-          opcoes
-        )) as typeof spawn
-    )
+    const adapter = new ClaudeCodeAdapter(runsDeTeste().abrir, ((
+      _b: string,
+      _a: readonly string[],
+      opcoes: object
+    ) =>
+      spawn(
+        process.execPath,
+        ['-e', scriptQueEmite(TEXTO_ANTES, CHAMADA, TEXTO_DEPOIS)],
+        opcoes
+      )) as typeof spawn)
 
     let texto = ''
     for await (const chunk of adapter.generateStream(
@@ -438,5 +450,81 @@ describe('emenda E1 — ferramenta em fase sem ferramentas (critério 3)', () =>
 
     expect(texto).toContain('DEPOIS')
     expect(eventos.some((e) => e.tipo === 'erro')).toBe(false)
+  })
+})
+
+describe('saída estruturada — `--json-schema` devolve o documento por ferramenta', () => {
+  /**
+   * O que o CLI 2.1.258 faz de verdade com `--json-schema`, medido no smoke de 2026-09-05.
+   *
+   * Ele **não** pede JSON em texto: injeta a ferramenta `StructuredOutput` e o modelo responde
+   * chamando-a, com o documento inteiro no `input`. Nenhum bloco `text` aparece na geração — daí
+   * este bloco de testes, que fixa a descoberta antes que ela se perca.
+   */
+  const linhaDaSaida = (documento: object): string =>
+    JSON.stringify({
+      type: 'assistant',
+      message: {
+        role: 'assistant',
+        content: [{ type: 'tool_use', id: 'toolu_1', name: 'StructuredOutput', input: documento }]
+      }
+    })
+
+  const linhaDoAceite = JSON.stringify({
+    type: 'user',
+    message: {
+      role: 'user',
+      content: [
+        {
+          type: 'tool_result',
+          tool_use_id: 'toolu_1',
+          content: 'Structured output provided successfully'
+        }
+      ]
+    }
+  })
+
+  it('a saída estruturada vira documento, não chamada de ferramenta', () => {
+    const eventos = parsearLinha(linhaDaSaida({ perguntas: [{ bloco: 'problema' }] }))
+
+    // Como `ferramenta-inicio`, o documento nasceria vazio — e o critério 3 mataria a geração,
+    // porque uma ferramenta teria sido usada numa fase que não tem ferramentas.
+    expect(eventos).toEqual([{ tipo: 'texto', delta: '{"perguntas":[{"bloco":"problema"}]}' }])
+  })
+
+  it('o aceite do protocolo não vai ao console', () => {
+    // "Structured output provided successfully" é confirmação de protocolo, não resultado. Uma
+    // linha dessas por geração encheria o painel do PI com o que não lhe diz nada.
+    const estado = novoEstadoDoParser()
+    parsearLinha(linhaDaSaida({ perguntas: [] }), estado)
+
+    expect(parsearLinha(linhaDoAceite, estado)).toEqual([])
+  })
+
+  it('uma ferramenta de verdade continua sendo ferramenta', () => {
+    // A exceção é **só** a `StructuredOutput`. `Bash` numa fase de documento continua sendo o
+    // desvio que o critério 3 corta.
+    const eventos = parsearLinha(
+      JSON.stringify({
+        type: 'assistant',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'tool_use', id: 'call-1', name: 'Bash', input: { command: 'ls' } }]
+        }
+      })
+    )
+
+    expect(eventos[0]).toMatchObject({ tipo: 'ferramenta-inicio', nome: 'Bash' })
+  })
+
+  it('`--tools ""` e `--json-schema` convivem: a lista fica só com a saída estruturada', () => {
+    // Medido no CLI 2.1.258: o `system/init` reporta `"tools":["StructuredOutput"]`. Não há
+    // colisão entre as duas flags, e é por isso que a tabela da emenda pede as duas.
+    const args = new ClaudeCodeAdapter(runsDeTeste().abrir).argsDaGeracao(
+      pedido({ system: 'S', fase: 'planejamento', jsonSchema: SCHEMA_DAS_PERGUNTAS })
+    )
+
+    expect(args[args.indexOf('--tools') + 1]).toBe('')
+    expect(args[args.indexOf('--json-schema') + 1]).toBe(SCHEMA_DAS_PERGUNTAS)
   })
 })

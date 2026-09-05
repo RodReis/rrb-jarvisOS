@@ -108,7 +108,19 @@ function inteiro(valor: unknown): number {
 export interface EstadoDoParser {
   /** O `id` do último `tool_use` que ainda não recebeu `tool_result`. */
   chamadaPendente?: string
+  /** O `id` da chamada de `StructuredOutput`, cujo aceite não vai ao console. */
+  saidaEstruturada?: string
 }
+
+/**
+ * O nome da ferramenta que o CLI injeta quando recebe `--json-schema`.
+ *
+ * Não é uma ferramenta de agente: é o canal pelo qual a saída estruturada volta. Confirmado no
+ * `system/init` do CLI 2.1.258, que com `--tools "" --json-schema <s>` reporta
+ * `"tools":["StructuredOutput"]` — a lista fica com esta e mais nada, que é exatamente o
+ * isolamento que a emenda E1 quer.
+ */
+const NOME_DA_SAIDA_ESTRUTURADA = 'StructuredOutput'
 
 /** Um estado novo, para uma geração nova. */
 export function novoEstadoDoParser(): EstadoDoParser {
@@ -204,6 +216,19 @@ function eventosDoBloco(
     const nome = typeof bloco.name === 'string' ? bloco.name : 'desconhecida'
     if (chamadaId === '') return []
 
+    // A saída estruturada **é** o documento, não uma ferramenta que o modelo resolveu chamar.
+    //
+    // Com `--json-schema`, o CLI não pede JSON em texto: ele injeta a ferramenta
+    // `StructuredOutput` e o modelo responde chamando-a, com o documento inteiro no `input`.
+    // Nenhum bloco `text` aparece na geração. Tratá-la como as outras faria o documento nascer
+    // vazio — e, pior, dispararia o corte do critério 3, que mata a geração quando uma
+    // ferramenta é usada numa fase que não tem ferramentas.
+    if (nome === NOME_DA_SAIDA_ESTRUTURADA) {
+      estado.saidaEstruturada = chamadaId
+      const documento = JSON.stringify(bloco.input)
+      return documento === undefined ? [] : [{ tipo: 'texto', delta: documento }]
+    }
+
     // Guardada para o texto que o CLI injetar em seguida sem dizer de qual chamada veio.
     estado.chamadaPendente = chamadaId
 
@@ -220,6 +245,14 @@ function eventosDoBloco(
   if (bloco.type === 'tool_result') {
     const chamadaId = typeof bloco.tool_use_id === 'string' ? bloco.tool_use_id : ''
     if (chamadaId === '') return []
+
+    // O aceite da saída estruturada ("Structured output provided successfully") é confirmação de
+    // protocolo, não resultado de ferramenta. Mostrá-lo no console encheria o painel de uma
+    // linha por geração que não diz nada ao PI.
+    if (estado.saidaEstruturada === chamadaId) {
+      estado.saidaEstruturada = undefined
+      return []
+    }
 
     if (estado.chamadaPendente === chamadaId) estado.chamadaPendente = undefined
 
