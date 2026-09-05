@@ -23,6 +23,7 @@
  */
 
 import { _electron as electron, expect, test, type ElectronApplication } from '@playwright/test'
+import { execFileSync } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import electronPath from 'electron'
@@ -32,7 +33,7 @@ let userData: string
 
 interface OutcomeDaPonte {
   readonly reason: string
-  readonly project?: { readonly id: string }
+  readonly project?: { readonly id: string; readonly diretorio: string }
 }
 
 interface EstadoDaPonte {
@@ -68,14 +69,16 @@ test.afterEach(async () => {
 test('salvar o prompt commita o marco e leva a jornada ao refinamento', async () => {
   const janela = await app.firstWindow()
 
-  const medido = await janela.evaluate(async () => {
+  // Etapa 1: criar o projeto e ler a etapa inicial. Separada da etapa 2 porque entre as duas
+  // é preciso configurar a identidade de Git **no diretório que o app acabou de criar**, e
+  // isso acontece no processo de teste, não dentro da janela.
+  const criado = await janela.evaluate(async () => {
     const bridge = (
       window as unknown as {
         jarvis: {
           getWorkspace: () => Promise<string>
           addAllowedCommand: (b: string, w: string) => Promise<readonly string[]>
           createProject: (n: string, w: string) => Promise<OutcomeDaPonte>
-          salvarPromptDoProjeto: (p: string, t: string, w: string) => Promise<unknown>
           estadoDaJornada: (p: string, w: string) => Promise<EstadoDaPonte | null>
         }
       }
@@ -85,29 +88,56 @@ test('salvar o prompt commita o marco e leva a jornada ao refinamento', async ()
     // Sem `git` na allowlist o marco não commita — a allowlist nasce vazia no app real.
     await bridge.addAllowedCommand('git', workspace)
 
-    const criado = await bridge.createProject('Projeto Jornada', workspace)
-    const projectId = criado.project?.id ?? ''
+    const projeto = await bridge.createProject('Projeto Jornada', workspace)
+    const projectId = projeto.project?.id ?? ''
 
     // O piso: projeto recém-criado está em `prompt`. Sem esta leitura, a asserção final não
     // provaria que foi **salvar** que moveu a jornada.
     const antes = await bridge.estadoDaJornada(projectId, workspace)
 
-    await bridge.salvarPromptDoProjeto(
+    return {
       projectId,
-      '# Prompt\n\nUm painel que mostra a IA trabalhando enquanto ela trabalha.\n',
-      workspace
-    )
-
-    const depois = await bridge.estadoDaJornada(projectId, workspace)
-
-    return { antes: antes?.etapa, depois: depois?.etapa, cta: depois?.cta }
+      workspace,
+      diretorio: projeto.project?.diretorio ?? '',
+      antes: antes?.etapa
+    }
   })
 
-  expect(medido.antes).toBe('prompt')
+  // Identidade de Git local ao repositório: o runner de CI pode não ter uma global, e o commit
+  // do marco falharia por motivo alheio ao que se testa (lição do E2E da M8-F04). Sem isto o
+  // teste passa na máquina de dev e reprova só no CI, com `commitado: false` — que parece
+  // defeito do código sob teste e não é.
+  execFileSync('git', ['config', 'user.email', 'teste@jarvis'], { cwd: criado.diretorio })
+  execFileSync('git', ['config', 'user.name', 'Teste'], { cwd: criado.diretorio })
+
+  // Etapa 2: salvar o prompt, que commita o `PROMPT.md` e é o que deve mover a jornada.
+  const depois = await janela.evaluate(
+    async ({ projectId, workspace }: { projectId: string; workspace: string }) => {
+      const bridge = (
+        window as unknown as {
+          jarvis: {
+            salvarPromptDoProjeto: (p: string, t: string, w: string) => Promise<unknown>
+            estadoDaJornada: (p: string, w: string) => Promise<EstadoDaPonte | null>
+          }
+        }
+      ).jarvis
+
+      await bridge.salvarPromptDoProjeto(
+        projectId,
+        '# Prompt\n\nUm painel que mostra a IA trabalhando enquanto ela trabalha.\n',
+        workspace
+      )
+
+      return await bridge.estadoDaJornada(projectId, workspace)
+    },
+    { projectId: criado.projectId, workspace: criado.workspace }
+  )
+
+  expect(criado.antes).toBe('prompt')
   // A prova do defeito: antes da #281 isto continuava `prompt`, e o PI ficava sem saída.
-  expect(medido.depois).toBe('refinamento')
+  expect(depois?.etapa).toBe('refinamento')
   // A trilha oferece a ação da etapa nova — etapa sem CTA seria avanço que o PI não vê.
-  expect(medido.cta).toBeTruthy()
+  expect(depois?.cta).toBeTruthy()
 })
 
 test('sem prompt salvo a jornada não sai do lugar', async () => {

@@ -17,7 +17,7 @@ import { expect, test } from '@playwright/test'
 
 const ROTA = (query: string): string => `/?galeria=brief&${query}`
 
-const CENAS = ['prompt-vazio', 'prompt-bloqueado', 'brief-propostos', 'brief-travado'] as const
+const CENAS = ['prompt-vazio', 'refinamento-bloqueado', 'brief-propostos', 'brief-travado'] as const
 const MODOS = ['dark', 'light'] as const
 
 /** Luminância relativa WCAG a partir de `rgb(r, g, b)`. */
@@ -58,19 +58,27 @@ test.describe('captura para o gate visual', () => {
   }
 })
 
+/**
+ * O critério 6 vive no **refinamento** desde a #281.
+ *
+ * A geração do brief migrou da tela do prompt para o fim do refinamento, e o bloqueio migrou
+ * com ela: salvar o prompt não chama o modelo, então bloquear aquela tela anunciaria um custo
+ * que ali não existe. O que a prova mede é o mesmo — o bloqueio antes do clique, com a ação
+ * junto —, na tela onde a chamada de fato acontece.
+ */
 test.describe('critério 6 — o bloqueio aparece antes do clique', () => {
   for (const modo of MODOS) {
     test(`o aviso traz a ação concreta (${modo})`, async ({ page }) => {
-      await abrir(page, 'prompt-bloqueado', modo)
+      await abrir(page, 'refinamento-bloqueado', modo)
 
       // Bloqueio sem saída é beco: o PI precisa saber o que fazer, não só que não deu.
       await expect(page.getByText(/Conecte a assinatura do Claude/)).toBeVisible()
     })
 
     test(`o botão de gerar está desabilitado (${modo})`, async ({ page }) => {
-      await abrir(page, 'prompt-bloqueado', modo)
+      await abrir(page, 'refinamento-bloqueado', modo)
 
-      await expect(page.getByRole('button', { name: /Gerar o brief/ })).toBeDisabled()
+      await expect(page.getByRole('button', { name: /Gerar as perguntas/ })).toBeDisabled()
     })
   }
 })
@@ -222,7 +230,7 @@ test.describe('a rota é dita antes do clique', () => {
   })
 
   test('bloqueada, nenhum selo anuncia rota — o botão não gera', async ({ page }) => {
-    await abrir(page, 'prompt-bloqueado', 'dark')
+    await abrir(page, 'refinamento-bloqueado', 'dark')
 
     // Anunciar por onde a geração sairia descreveria algo que não vai acontecer.
     await expect(page.locator('[data-jos-rota]')).toHaveCount(0)
