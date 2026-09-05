@@ -183,6 +183,19 @@ export class ClaudeCodeAdapter implements AiAdapter {
       }
 
       const run = this.abrirCwd()
+      /**
+       * A limpeza pendurada na **resposta**, não no `close`.
+       *
+       * Este healthcheck roda em laço na tela de providers, e o caso mais comum dele é o binário
+       * não instalado — que chega por `error` e pode nunca emitir `close`. Remover só no `close`
+       * deixaria um diretório por sondagem acumulando no `userData` de quem não tem o CLI, que é
+       * justamente quem mais sonda.
+       */
+      const responderELimpar = (valor: boolean): void => {
+        if (respondido) return
+        run.remover()
+        responder(valor)
+      }
 
       try {
         const processo = this.spawnImpl(BINARIO, ['--version'], {
@@ -194,20 +207,16 @@ export class ClaudeCodeAdapter implements AiAdapter {
 
         // `error` cobre o caso mais comum — binário não instalado (ENOENT). Sem este ramo, a
         // promessa nunca resolveria e a tela de providers ficaria carregando para sempre.
-        processo.on('error', () => responder(false))
-        processo.on('close', (codigo) => responder(codigo === 0))
+        processo.on('error', () => responderELimpar(false))
+        processo.on('close', (codigo) => responderELimpar(codigo === 0))
 
         const relogio = setTimeout(() => {
           processo.kill('SIGKILL')
-          responder(false)
+          responderELimpar(false)
         }, 3_000)
-        processo.on('close', () => {
-          clearTimeout(relogio)
-          run.remover()
-        })
+        processo.on('close', () => clearTimeout(relogio))
       } catch {
-        run.remover()
-        responder(false)
+        responderELimpar(false)
       }
     })
   }

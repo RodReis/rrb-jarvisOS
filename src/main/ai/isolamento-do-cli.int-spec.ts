@@ -528,3 +528,113 @@ describe('saída estruturada — `--json-schema` devolve o documento por ferrame
     expect(args[args.indexOf('--json-schema') + 1]).toBe(SCHEMA_DAS_PERGUNTAS)
   })
 })
+
+describe('o healthcheck não deixa diretório para trás', () => {
+  /**
+   * O `disponivel()` roda **em laço** na tela de providers, e o caso mais comum dele é o binário
+   * não instalado — que chega por `error` e pode nunca emitir `close`. Limpar só no `close`
+   * acumularia um diretório por sondagem no `userData` de quem não tem o CLI: justamente quem
+   * mais sonda, porque a tela fica perguntando se ele já apareceu.
+   */
+  it('o binário ausente não acumula diretório', async () => {
+    const runs = runsDeTeste()
+    const adapter = new ClaudeCodeAdapter(runs.abrir, ((
+      _b: string,
+      _a: readonly string[],
+      opcoes: object
+    ) => spawn('binario-que-nao-existe-em-lugar-nenhum', [], opcoes)) as typeof spawn)
+
+    expect(await adapter.disponivel()).toBe(false)
+    expect(await adapter.disponivel()).toBe(false)
+
+    expect(runs.caminhos).toHaveLength(2)
+    expect(runs.caminhos.filter((caminho) => existsSync(caminho))).toEqual([])
+  })
+
+  it('o binário presente também limpa', async () => {
+    const runs = runsDeTeste()
+    const adapter = new ClaudeCodeAdapter(runs.abrir, ((
+      _b: string,
+      _a: readonly string[],
+      opcoes: object
+    ) => spawn(process.execPath, ['-e', 'process.exit(0)'], opcoes)) as typeof spawn)
+
+    expect(await adapter.disponivel()).toBe(true)
+    expect(runs.caminhos.filter((caminho) => existsSync(caminho))).toEqual([])
+  })
+
+  it('o Codex segue a mesma regra', async () => {
+    const runs = runsDeTeste()
+    const adapter = new CodexAdapter(runs.abrir, () => 'C:/perfil', ((
+      _b: string,
+      _a: readonly string[],
+      opcoes: object
+    ) => spawn('binario-que-nao-existe-em-lugar-nenhum', [], opcoes)) as typeof spawn)
+
+    expect(await adapter.disponivel()).toBe(false)
+    expect(runs.caminhos.filter((caminho) => existsSync(caminho))).toEqual([])
+  })
+})
+
+describe('critério 3 — o corte deixa passar o que já estava no buffer', () => {
+  /**
+   * O dublê despeja tudo de uma vez, e é assim que o CLI real se comporta numa geração curta: o
+   * `SIGKILL` chega **depois** de o buffer já ter sido lido. O laço termina de processar as linhas
+   * que já estão em mãos, então o `tool_result` da ferramenta cortada ainda vira `ferramenta-fim`
+   * no console.
+   *
+   * Isso é correto e importa: o PI precisa ver **o que** a ferramenta devolveu para entender por
+   * que a geração parou. O que o corte impede é o **texto posterior** virar documento.
+   */
+  it('o resultado da ferramenta cortada ainda chega ao console', async () => {
+    const linhas = [
+      JSON.stringify({
+        type: 'assistant',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'tool_use', id: 'call-1', name: 'Bash', input: { command: 'ls' } }]
+        }
+      }),
+      JSON.stringify({
+        type: 'user',
+        message: {
+          role: 'user',
+          content: [{ type: 'tool_result', tool_use_id: 'call-1', content: 'saída da ferramenta' }]
+        }
+      }),
+      JSON.stringify({
+        type: 'assistant',
+        message: { role: 'assistant', content: [{ type: 'text', text: 'DEPOIS' }] }
+      })
+    ]
+
+    const eventos: GenerationEvent[] = []
+    const adapter = new ClaudeCodeAdapter(runsDeTeste().abrir, ((
+      _b: string,
+      _a: readonly string[],
+      opcoes: object
+    ) =>
+      spawn(
+        process.execPath,
+        [
+          '-e',
+          `process.stdin.on("data",()=>{});` +
+            linhas.map((l) => `process.stdout.write(${JSON.stringify(l + '\n')});`).join('') +
+            `process.exit(0)`
+        ],
+        opcoes
+      )) as typeof spawn)
+
+    let texto = ''
+    for await (const chunk of adapter.generateStream(
+      pedido({ fase: 'planejamento', onEvento: (e) => eventos.push(e) })
+    )) {
+      if (chunk.tipo === 'texto') texto += chunk.texto
+    }
+
+    const tipos = eventos.map((e) => e.tipo)
+    expect(tipos.slice(0, 3)).toEqual(['ferramenta-inicio', 'erro', 'ferramenta-fim'])
+    expect(eventos[2]).toMatchObject({ resumoDoResultado: 'saída da ferramenta' })
+    expect(texto).not.toContain('DEPOIS')
+  })
+})

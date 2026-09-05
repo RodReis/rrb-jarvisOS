@@ -136,6 +136,18 @@ export class CodexAdapter implements AiAdapter {
       }
 
       const run = this.abrirCwd()
+      /**
+       * A limpeza pendurada na **resposta**, não no `close` — mesma razão do `ClaudeCodeAdapter`.
+       *
+       * O healthcheck roda em laço na tela, e o caso do binário ausente chega por `error` sem
+       * necessariamente emitir `close`. Limpar só no `close` acumularia um diretório por
+       * sondagem no `userData` de quem não tem o CLI instalado.
+       */
+      const responderELimpar = (valor: boolean): void => {
+        if (respondido) return
+        run.remover()
+        responder(valor)
+      }
 
       try {
         const invocacao = resolverInvocacao(BINARIO_CODEX, ['--version'], this.resolverScript)
@@ -146,20 +158,16 @@ export class CodexAdapter implements AiAdapter {
           windowsHide: true
         })
 
-        processo.on('error', () => responder(false))
-        processo.on('close', (codigo) => responder(codigo === 0))
+        processo.on('error', () => responderELimpar(false))
+        processo.on('close', (codigo) => responderELimpar(codigo === 0))
 
         const relogio = setTimeout(() => {
           processo.kill('SIGKILL')
-          responder(false)
+          responderELimpar(false)
         }, 5_000)
-        processo.on('close', () => {
-          clearTimeout(relogio)
-          run.remover()
-        })
+        processo.on('close', () => clearTimeout(relogio))
       } catch {
-        run.remover()
-        responder(false)
+        responderELimpar(false)
       }
     })
   }
