@@ -43,7 +43,7 @@ import type { EstadoDasRotas, ResultadoDaRota } from '@shared/domain/rota-de-ger
 import { PROVIDER_DA_ROTA, escolherRota, providerDaRota } from '@shared/domain/rota-de-geracao'
 import type { AiProvider } from '@shared/domain/ai'
 import { ETAPAS_DE_ACEITE } from '@shared/domain/jornada'
-import type { MarcoDocumental } from '@shared/domain/projects'
+import { MARCOS_DOCUMENTAIS, type MarcoDocumental } from '@shared/domain/projects'
 import { log } from '../logging/logger'
 import type { AuditRepository } from '../storage/audit-repository'
 import type { ProjectRepository } from './project-repository'
@@ -57,6 +57,12 @@ import type { RoadmapRepository } from './roadmap-repository'
  * correspondente (o prompt, o refinamento) vêm das respostas do wizard, não daqui.
  */
 const EVENTO_DO_MARCO: Readonly<Partial<Record<MarcoDocumental, EventoDeJornada>>> = {
+  // O prompt do PI virou revisão no Git (#281). A spec é literal: "salvar o prompt cria a
+  // revisão `PROMPT.md`... **e avança para `refinamento`**". Antes desta entrada o único
+  // sustento de `prompt-salvo` eram as respostas do wizard do MVP-008 — que o fluxo novo não
+  // grava —, então um projeto que escrevia o prompt, commitava e gerava o brief ficava em
+  // `prompt` para sempre, sem botão que o tirasse dali.
+  'prompt-registrado': 'prompt-salvo',
   'contexto-aprovado': 'brief-aceito',
   // Os dois aceites documentais (correção #259). A ordem do objeto é a ordem da jornada, porque
   // `eventosObservados` percorre estas entradas até o último marco do projeto — uma entrada fora
@@ -104,6 +110,22 @@ export interface JornadaDeps {
     workspaceId: WorkspaceId
   ) => EstadoDasRotas | undefined
   /**
+   * O projeto já tem brief gerado? É o que comprova o **fim do refinamento** (#281).
+   *
+   * Decisão do PI (2026-09-05): a geração do brief é o ato que fecha o refinamento, e não um
+   * botão "concluir" com marco próprio. O brief só existe depois de o modelo ler o prompt e as
+   * decisões, então gerá-lo é a evidência de que o refinamento chegou ao fim — e a alternativa
+   * acrescentaria um marco ao vocabulário para registrar o que o brief já registra.
+   *
+   * Um **predicado**, não o brief inteiro: a jornada não lê afirmação nem pendência, só precisa
+   * saber se existe. Devolver o documento aqui daria à jornada acesso a um conteúdo que ela não
+   * tem por que conhecer.
+   *
+   * Opcional pela mesma razão dos outros: os call sites que só leem a etapa não devem montar o
+   * repositório de briefs para isso.
+   */
+  readonly temBrief?: (projectId: string) => boolean
+  /**
    * O modelo que a próxima geração usaria — **a mesma fonte que a geração consulta**
    * (SPEC-Fases-01, critério 4).
    *
@@ -139,6 +161,7 @@ export class JornadaService {
   private readonly audit: AuditRepository
   private readonly userId: () => string
   private readonly estadoDasRotas?: JornadaDeps['estadoDasRotas']
+  private readonly temBrief?: JornadaDeps['temBrief']
   private readonly modeloAtivo?: JornadaDeps['modeloAtivo']
   private readonly concluirMarco?: JornadaDeps['concluirMarco']
 
@@ -148,6 +171,7 @@ export class JornadaService {
     this.audit = deps.audit
     this.userId = deps.userId
     this.estadoDasRotas = deps.estadoDasRotas
+    this.temBrief = deps.temBrief
     this.modeloAtivo = deps.modeloAtivo
     this.concluirMarco = deps.concluirMarco
   }
@@ -164,20 +188,43 @@ export class JornadaService {
     const sessao = this.repository.findSession(userId, projectId)
     const eventos: EventoDeJornada[] = []
 
-    // O prompt e o refinamento vivem nas respostas do wizard, não em marco: são estado de
-    // trabalho, e o MVP-008 deliberadamente não os commita.
+    // O fluxo antigo (MVP-008): as respostas do wizard sustentam os dois primeiros eventos.
+    // Estado de trabalho, que aquele MVP deliberadamente não commita — daí não haver marco.
     if (sessao && Object.keys(sessao.respostas).length > 0) {
       eventos.push('prompt-salvo', 'refinamento-respondido')
     }
 
-    // Marco commitado é evidência no Git. `ultimoMarco` guarda só o último, mas os marcos são
-    // ordenados e a cadeia de `etapaDerivada` para no primeiro buraco de qualquer forma — o
-    // último marco implica os anteriores porque não há como commitar fora de ordem.
-    if (sessao?.ultimoMarco) {
-      const ateAqui = Object.entries(EVENTO_DO_MARCO)
-      for (const [marco, evento] of ateAqui) {
-        eventos.push(evento)
-        if (marco === sessao.ultimoMarco) break
+    /*
+     * O fluxo novo (M25-F02): o brief gerado é o que fecha o refinamento (#281).
+     *
+     * `prompt-salvo` não entra aqui — ele vem do marco `prompt-registrado` logo abaixo, que é
+     * evidência no Git. O brief não tem marco próprio (só o **aceite** dele tem, e aceitar é
+     * ato do PI), então a evidência é a linha em `project_brief`.
+     *
+     * Sem isto, um projeto do fluxo novo não tinha como sair de `refinamento`: gerar o brief
+     * era o único ato disponível na etapa e ele não movia nada.
+     */
+    if (this.temBrief?.(projectId) === true) {
+      eventos.push('refinamento-respondido')
+    }
+
+    /*
+     * Marco commitado é evidência no Git. `ultimoMarco` guarda só o último, mas os marcos são
+     * ordenados e o último implica os anteriores — não há como commitar fora de ordem.
+     *
+     * A parada é pela **ordem dos marcos**, não pela ordem deste mapa. Percorrer as entradas de
+     * `EVENTO_DO_MARCO` e parar no `ultimoMarco` fazia um marco ausente do mapa
+     * (`estrutura-inicial`, o primeiro de todos) nunca casar com o `break` — e o laço então
+     * empurrava a cadeia **inteira**, do brief ao roadmap, para um projeto recém-criado. Só não
+     * virava jornada adiantada porque `etapaDerivada` para no primeiro buraco e os outros
+     * eventos não tinham como se encadear; era um acidente feliz, não uma garantia.
+     */
+    const ultimo = sessao?.ultimoMarco
+    if (ultimo) {
+      const ateOndeChegou = MARCOS_DOCUMENTAIS.indexOf(ultimo)
+      for (const marco of MARCOS_DOCUMENTAIS.slice(0, ateOndeChegou + 1)) {
+        const evento = EVENTO_DO_MARCO[marco]
+        if (evento) eventos.push(evento)
       }
     }
 

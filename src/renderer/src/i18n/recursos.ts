@@ -144,18 +144,21 @@ export const RECURSOS = {
         exemploBPorque: 'quem usa e para quê',
         placeholder: 'Ex.: um app que organiza minhas leituras e me lembra do que parei no meio…',
         carregando: 'Carregando o prompt…',
-        gerar: 'Gerar o brief',
-        // O rótulo da espera: uma geração longa com o rótulo parado parece uma tela travada.
-        gerando: 'Gerando o brief…',
+        // Salvar não gera nada (#281): o prompt vira revisão no Git e a jornada vai para o
+        // refinamento, que é onde o modelo entra. O rótulo diz o destino, não o mecanismo —
+        // "Salvar" sozinho não conta ao PI que a tela muda depois do clique.
+        salvar: 'Salvar e ir ao refinamento',
+        salvando: 'Salvando…',
         escrevaAlgo: 'Escreva o prompt para continuar.',
-        semRota: 'A geração está indisponível',
-        naoGerou: 'O brief não foi gerado',
+        // O prompt vazio já desabilita o botão; esta é a segunda barreira, a do main.
+        vazioRecusa: 'O prompt está vazio. Escreva o que você quer construir.',
+        naoGerou: 'O prompt não foi salvo',
         // Título alternativo para quando o modelo respondeu em prosa: ali não houve defeito —
         // ele leu o pedido e levantou um ponto. Chamar isso de "não foi gerado" descreve a
         // consequência e esconde a causa, que é o que o PI precisa ler.
         modeloRespondeu: 'O modelo levantou um ponto antes de gerar',
         detalheTecnico: 'O que o validador recusou',
-        falha: 'Não foi possível gerar o brief. Tente de novo.'
+        falha: 'Não foi possível salvar o prompt. Tente de novo.'
       },
       brief: {
         titulo: 'Brief do projeto',
@@ -332,6 +335,10 @@ export const RECURSOS = {
         descricao: 'A IA pergunta o que o prompt de {{nome}} não respondeu. Uma decisão por vez.',
         carregando: 'Carregando o refinamento…',
         gerar: 'Gerar as perguntas',
+        // O brief fecha o refinamento (#281). O rótulo nomeia o documento, não o ato: é o que o
+        // PI vai ler na etapa seguinte, e "Concluir" não diria o que ele ganha.
+        gerarBrief: 'Gerar o brief',
+        briefFalhou: 'Não foi possível gerar o brief. Tente de novo.',
         gerarMais: 'Procurar o que ainda falta',
         responder: 'Responder a próxima',
         // O número diz ao PI se ele começa agora ou depois. Um botão sem essa conta pediria
@@ -781,14 +788,14 @@ export const RECURSOS = {
         exemploBPorque: 'who uses it and what for',
         placeholder: 'e.g. an app that organizes my reading and reminds me what I left halfway…',
         carregando: 'Loading the prompt…',
-        gerar: 'Generate the brief',
-        gerando: 'Generating the brief…',
+        salvar: 'Save and go to refinement',
+        salvando: 'Saving…',
         escrevaAlgo: 'Write the prompt to continue.',
-        semRota: 'Generation is unavailable',
-        naoGerou: 'The brief was not generated',
+        vazioRecusa: 'The prompt is empty. Write what you want to build.',
+        naoGerou: 'The prompt was not saved',
         modeloRespondeu: 'The model raised a point before generating',
         detalheTecnico: 'What the validator refused',
-        falha: 'Could not generate the brief. Try again.'
+        falha: 'Could not save the prompt. Try again.'
       },
       brief: {
         titulo: 'Project brief',
@@ -957,6 +964,8 @@ export const RECURSOS = {
         descricao: 'The AI asks what the prompt for {{nome}} left out. One decision at a time.',
         carregando: 'Loading refinement…',
         gerar: 'Generate the questions',
+        gerarBrief: 'Generate the brief',
+        briefFalhou: 'Could not generate the brief. Try again.',
         gerarMais: 'Look for what is still missing',
         responder: 'Answer the next one',
         restantes: '{{count}} decisions pending.',

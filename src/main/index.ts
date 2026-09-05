@@ -635,7 +635,15 @@ if (!app.requestSingleInstanceLock()) {
        * etapa adiante de uma evidência que não existe.
        */
       concluirMarco: (projectId, marco, workspace) =>
-        projects.concluirMarco(projectId, marco, workspace)?.commitado ?? false
+        projects.concluirMarco(projectId, marco, workspace)?.commitado ?? false,
+      /*
+       * O brief gerado fecha o refinamento (#281, decisão do PI de 2026-09-05).
+       *
+       * Lazy de propósito: o `briefRepository` nasce depois deste serviço, e antecipá-lo só
+       * para esta linha reordenaria o wiring inteiro. A closure é resolvida na primeira
+       * leitura da jornada, muito depois de os dois existirem.
+       */
+      temBrief: (projectId) => briefRepository.briefVigente(userIdAtual(), projectId) !== undefined
     })
 
     // O prompt e o brief refinado (SPEC-Jornada-02).
@@ -885,7 +893,16 @@ if (!app.requestSingleInstanceLock()) {
             jsonSchema: SCHEMA_DO_BRIEF,
             prompt: promptDaGeracao(prompt, decisoes, correcao),
             contextPackId,
-            console: { projectId, etapa: 'brief-aceito' }
+            /*
+             * A etapa **onde a geração acontece**, não a que ela desbloqueia (#281).
+             *
+             * O console do `ProjetoAberto` filtra pela etapa da tela corrente. Com o brief
+             * nascendo no fim do refinamento, registrar `brief-aceito` aqui esconderia do PI o
+             * console da própria geração que ele acabou de disparar — ele só apareceria depois
+             * de a jornada avançar, quando já não há o que acompanhar. As duas etapas são da
+             * fase `planejamento`, então o isolamento do CLI não muda.
+             */
+            console: { projectId, etapa: 'refinamento' }
           },
           { userId: userIdAtual(), workspace }
         )) {
