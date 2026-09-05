@@ -288,7 +288,12 @@ export class EntregaService {
       ...(resultado?.mergeSha === undefined ? {} : { mergeSha: resultado.mergeSha }),
       checks: resultado?.checks ?? [],
       artefatos: [],
-      encerradoEm: new Date(this.agora()).toISOString()
+      encerradoEm: new Date(this.agora()).toISOString(),
+      // O par congelado pelo preflight, não uma nova resolução (SPEC-Fases-05, critério 5).
+      // Resolver de novo aqui leria a política **no fim** do run, e um `de`/`para` editado no
+      // meio faria o ledger nomear um modelo que não executou nada.
+      provider: pedido.sandbox.modeloDaConstrucao.provider,
+      modelo: pedido.sandbox.modeloDaConstrucao.modelo
     }
 
     if (!ledgerCompleto(ledger)) {

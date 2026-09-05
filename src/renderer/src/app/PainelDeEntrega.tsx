@@ -170,9 +170,35 @@ export function PainelDeEntrega({ ledger, pendencias }: PainelDeEntregaProps): R
     <Panel titulo="Resultado da entrega" tom={desfecho.tom}>
       <div className="flex flex-col gap-5">
         <div className="flex flex-col gap-2">
-          <Badge tom={desfecho.tom} comPonto>
-            {desfecho.rotulo}
-          </Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge tom={desfecho.tom} comPonto>
+              {desfecho.rotulo}
+            </Badge>
+            {/*
+             * O modelo que executou (SPEC-Fases-05, critério 5), **ao lado do desfecho e não na
+             * grade de medidas**.
+             *
+             * Duas razões para sair da grade. Ela é `sm:grid-cols-4`, e um quinto item cairia
+             * sozinho numa segunda linha com três lacunas ao lado — órfão nos dois breakpoints. E
+             * o modelo não é da mesma natureza dos outros quatro: custo, duração, tentativas e
+             * tokens são medidas numéricas (`tabular-nums`); o modelo é uma identidade textual e
+             * longa (`claude-fable-5-1`), que sob aquela tipografia leria como número.
+             *
+             * **Texto, e não `Badge`**, por duas razões que já custaram defeito nesta base. O
+             * `Badge` aplica `uppercase`, e aqui o valor é **conteúdo**, não rótulo — foi o achado
+             * do gate visual na M26-F03. E todo tom do `Badge` é semântico (`ok/info/warn/err`):
+             * pintar o modelo com um deles faria a cor do sistema descrever uma identidade, contra
+             * o princípio 5 do PRD.
+             *
+             * Ausente em run gravado antes desta fatia: some em vez de mostrar vazio, porque um
+             * "—" afirmaria que não houve modelo, e o fato é que não foi registrado.
+             */}
+            {ledger.modelo !== undefined && (
+              <span className="font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-secundario)]">
+                {ledger.modelo}
+              </span>
+            )}
+          </div>
           <p className="max-w-[68ch] text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto-secundario)]">
             {desfecho.decisao}
           </p>
@@ -232,6 +258,14 @@ export function PainelDeEntrega({ ledger, pendencias }: PainelDeEntregaProps): R
               )}
               {ledger.mergeSha !== undefined && (
                 <LinhaTecnica rotulo="Merge confirmado" valor={ledger.mergeSha} />
+              )}
+              {/*
+               * O provider fica aqui, e o modelo na grade acima: quem lê o painel reconhece o
+               * modelo (foi ele que escolheu); o provider é a rota que o atendeu — rastro, como
+               * head e merge.
+               */}
+              {ledger.provider !== undefined && (
+                <LinhaTecnica rotulo="Provider" valor={ledger.provider} />
               )}
               <LinhaTecnica rotulo="Encerrado em" valor={ledger.encerradoEm} />
             </dl>

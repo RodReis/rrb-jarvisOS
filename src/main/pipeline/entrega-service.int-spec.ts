@@ -235,7 +235,8 @@ function sandboxDe(): SandboxPreparado {
     branch: 'feat/fatia',
     worktreeNoHost: worktree,
     pathsPermitidos: { paths: ['src'], origem: 'spec', justificativa: 'SPEC' },
-    proxyUrl: 'http://172.20.0.2:8080'
+    proxyUrl: 'http://172.20.0.2:8080',
+    modeloDaConstrucao: { provider: 'claude-code', modelo: 'claude-opus-5' }
   }
 }
 

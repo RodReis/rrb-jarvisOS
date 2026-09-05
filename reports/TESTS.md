@@ -13,8 +13,8 @@ Totais da última execução (regenerado, não acumulado):
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
 | — | — | — | Regras de Negócio | 1387 | 1387 | 0 | 74.3 | — | — |
-| — | — | — | Banco | 1075 | 1070 | 0 | 87.8 | — | — |
-| — | — | — | Tela | 557 | 556 | 0 | 75.0 | — | — |
+| — | — | — | Banco | 1085 | 1080 | 0 | 87.8 | — | — |
+| — | — | — | Tela | 561 | 560 | 0 | 75.0 | — | — |
 
 ## Histórico por entrega
 
@@ -268,3 +268,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-04 | #254 | SPEC-Fases-04 | Regras de Negócio | 1387 | 1387 | 0 | 74.3 | #264 | [#264](https://github.com/RodReis/rrb-jarvisOS/pull/264) |
 | 2026-09-04 | #254 | SPEC-Fases-04 | Banco | 1075 | 1070 | 0 | 87.8 | #264 | [#264](https://github.com/RodReis/rrb-jarvisOS/pull/264) |
 | 2026-09-04 | #254 | SPEC-Fases-04 | Tela | 557 | 556 | 0 | 75.0 | #264 | [#264](https://github.com/RodReis/rrb-jarvisOS/pull/264) |
+| 2026-09-04 | #255 | spec-fases-05-modelo-da-fase-no-run | Regras de Negócio | 1387 | 1387 | 0 | 74.3 | #265 | [#265](https://github.com/RodReis/rrb-jarvisOS/pull/265) |
+| 2026-09-04 | #255 | spec-fases-05-modelo-da-fase-no-run | Banco | 1085 | 1080 | 0 | 87.8 | #265 | [#265](https://github.com/RodReis/rrb-jarvisOS/pull/265) |
+| 2026-09-04 | #255 | spec-fases-05-modelo-da-fase-no-run | Tela | 561 | 560 | 0 | 75.0 | #265 | [#265](https://github.com/RodReis/rrb-jarvisOS/pull/265) |

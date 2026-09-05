@@ -19,6 +19,7 @@
 
 import { randomUUID } from 'node:crypto'
 import type { Database } from 'better-sqlite3'
+import type { AiProvider } from '@shared/domain/ai'
 import type {
   ArtefatoReferenciado,
   CheckDoLedger,
@@ -46,6 +47,8 @@ interface LedgerRow {
   readonly checks: string
   readonly artefatos: string
   readonly encerrado_em: string
+  readonly provider: string | null
+  readonly modelo: string | null
 }
 
 interface ArtefatoRow {
@@ -81,8 +84,9 @@ export class ExecutionLedgerRepository {
       .prepare(
         `INSERT INTO execution_ledger
            (id, user_id, project_id, run_id, estado_final, duracao_ms, tentativas, tokens,
-            creditos, custo_usd, eventos, head_sha, merge_sha, checks, artefatos, encerrado_em)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+            creditos, custo_usd, eventos, head_sha, merge_sha, checks, artefatos, encerrado_em,
+            provider, modelo)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
       )
       .run(
         randomUUID(),
@@ -100,7 +104,9 @@ export class ExecutionLedgerRepository {
         ledger.mergeSha ?? null,
         JSON.stringify(ledger.checks),
         JSON.stringify(ledger.artefatos),
-        ledger.encerradoEm
+        ledger.encerradoEm,
+        ledger.provider ?? null,
+        ledger.modelo ?? null
       )
 
     log.db.info('Ledger do run registrado', {
@@ -131,7 +137,9 @@ export class ExecutionLedgerRepository {
       ...(row.merge_sha === null ? {} : { mergeSha: row.merge_sha }),
       checks: JSON.parse(row.checks) as readonly CheckDoLedger[],
       artefatos: JSON.parse(row.artefatos) as readonly ArtefatoReferenciado[],
-      encerradoEm: row.encerrado_em
+      encerradoEm: row.encerrado_em,
+      ...(row.provider === null ? {} : { provider: row.provider as AiProvider }),
+      ...(row.modelo === null ? {} : { modelo: row.modelo })
     }
   }
 

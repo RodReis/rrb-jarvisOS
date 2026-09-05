@@ -90,6 +90,35 @@ describe('ExecutionLedgerRepository', () => {
     expect(() => repo.registrar(ledger({ custoUsd: 99 }))).toThrow()
   })
 
+  /**
+   * SPEC-Fases-05, critério 5: provider e modelo sobrevivem à ida e volta ao banco.
+   *
+   * O teste acima (`grava e lê o ledger inteiro`) já compara o objeto todo, mas o `ledger()` da
+   * fixture não traz o par — sem este caso, colunas ausentes no INSERT passariam despercebidas.
+   */
+  it('grava e lê o provider e o modelo que executaram o run', () => {
+    repo.registrar(ledger({ provider: 'claude-code', modelo: 'claude-opus-5' }))
+
+    const lido = repo.buscar(USER, RUN)
+    expect(lido?.provider).toBe('claude-code')
+    expect(lido?.modelo).toBe('claude-opus-5')
+  })
+
+  /**
+   * Run gravado antes desta fatia lê de volta **sem** o par, e não com string vazia.
+   *
+   * É o que sustenta as colunas anuláveis da migração 38: ausência aqui significa "run anterior
+   * ao modelo por fase", um fato histórico — e `''` faria o painel exibir um campo vazio como se
+   * fosse um modelo sem nome.
+   */
+  it('preserva a ausência do par em run gravado antes do modelo por fase', () => {
+    repo.registrar(ledger({ provider: undefined, modelo: undefined }))
+
+    const lido = repo.buscar(USER, RUN)
+    expect(lido?.provider).toBeUndefined()
+    expect(lido?.modelo).toBeUndefined()
+  })
+
   it('preserva a ausência de merge SHA em AWAITING_MERGE', () => {
     const esperando = ledger({ estadoFinal: 'AWAITING_MERGE', mergeSha: undefined })
     repo.registrar(esperando)

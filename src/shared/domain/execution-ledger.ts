@@ -17,6 +17,7 @@
  * **O que este arquivo não faz:** não lê banco, não calcula hash, não decide quando encerrar.
  */
 
+import type { AiProvider } from './ai'
 import type { EstadoDoRun } from './pipeline'
 
 /**
@@ -64,6 +65,15 @@ export interface ExecutionLedger {
   readonly checks: readonly CheckDoLedger[]
   readonly artefatos: readonly ArtefatoReferenciado[]
   readonly encerradoEm: string
+  /**
+   * O par que executou este run (SPEC-Fases-05, critério 5).
+   *
+   * Um por run, e não por tentativa: o preflight congela o par antes de o container subir, e as
+   * três tentativas correm sob ele. Opcional porque runs gravados antes desta fatia não o têm —
+   * ausência aqui é "run anterior ao modelo por fase", não "não se sabe qual foi".
+   */
+  readonly provider?: AiProvider
+  readonly modelo?: string
 }
 
 /** O que a tela mostra de relance. O ledger inteiro fica atrás de um expansor. */
@@ -73,6 +83,9 @@ export interface ResumoDoLedger {
   readonly custoUsd: number
   readonly tentativas: number
   readonly artefatos: readonly ArtefatoReferenciado[]
+  /** Quem executou. O painel os mostra ao lado do custo (SPEC-Fases-05, critério 5). */
+  readonly provider?: AiProvider
+  readonly modelo?: string
 }
 
 /**
@@ -106,6 +119,11 @@ export function resumoDoLedger(ledger: ExecutionLedger): ResumoDoLedger {
     duracaoMs: ledger.duracaoMs,
     custoUsd: ledger.custoUsd,
     tentativas: ledger.tentativas,
-    artefatos: ledger.artefatos
+    artefatos: ledger.artefatos,
+    // Espalhados condicionalmente, como `headSha`/`mergeSha` fazem em `buscar`: um `provider:
+    // undefined` explícito no objeto é indistinguível da chave ausente para o consumidor, mas
+    // difere na serialização e nas asserções de igualdade estrutural dos testes.
+    ...(ledger.provider === undefined ? {} : { provider: ledger.provider }),
+    ...(ledger.modelo === undefined ? {} : { modelo: ledger.modelo })
   }
 }

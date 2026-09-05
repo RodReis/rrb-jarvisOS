@@ -17,7 +17,8 @@ const sandbox: SandboxPreparado = {
   branch: 'feat/run-1',
   worktreeNoHost: '/host/worktree',
   pathsPermitidos: { paths: ['src'], origem: 'spec', justificativa: 'SPEC-Entrega-04 §Entrada' },
-  proxyUrl: 'http://172.20.0.2:8080'
+  proxyUrl: 'http://172.20.0.2:8080',
+  modeloDaConstrucao: { provider: 'claude-code', modelo: 'claude-opus-5' }
 }
 
 function dockerDuble(
@@ -173,7 +174,10 @@ describe('ConstrutorService — recuperação corrigível', () => {
     let chamadasDeValidacao = 0
     const docker = dockerDuble((comando) => {
       if (comando[0] === 'claude') {
-        promptsDoClaude.push(comando[2] ?? '')
+        // O prompt é o argumento **depois de `--print`**, e não uma posição fixa: a SPEC-Fases-05
+        // inseriu `--model <id>` antes dele, e um índice cravado leria o id do modelo como se
+        // fosse o prompt.
+        promptsDoClaude.push(comando[comando.indexOf('--print') + 1] ?? '')
         return { ok: true, stdout: '', stderr: '', exitCode: 0, timeoutExcedido: false }
       }
       if (comando[0] === 'git' && comando.includes('status')) {
@@ -366,6 +370,102 @@ describe('ConstrutorService — comando do executor é sempre dentro do containe
 
     expect(chamadas.length).toBeGreaterThan(0)
     expect(chamadas[0]?.[0]).toBe('claude')
+  })
+})
+
+describe('ConstrutorService — modelo da fase Construção no run (SPEC-Fases-05)', () => {
+  /**
+   * Critério 1: o executor é chamado com `--model` igual ao modelo da fase Construção.
+   *
+   * Args capturados, e não o retorno: o que a spec pede é que o **argumento** chegue ao CLI. Uma
+   * asserção sobre o resultado passaria com o `--model` ausente, porque o dublê responde `ok` de
+   * qualquer jeito — e o run cairia silenciosamente no default do CLI, que é exatamente o estado
+   * anterior a esta fatia.
+   */
+  it('chama o claude com --model igual ao modelo congelado no sandbox', async () => {
+    const chamadas: string[][] = []
+    const docker = {
+      exec: vi.fn((_container: string, comando: readonly string[]) => {
+        chamadas.push([...comando])
+        return { ok: true, stdout: 'ok', stderr: '', exitCode: 0, timeoutExcedido: false }
+      }),
+      matarProcesso: vi.fn()
+    } as unknown as DockerRunner
+    const service = new ConstrutorService(
+      docker,
+      repoDuble(),
+      auditDuble(),
+      () => 'u1',
+      () => 'ws1' as never
+    )
+
+    await service.construir({
+      runId: 'run-1',
+      sandbox: {
+        ...sandbox,
+        modeloDaConstrucao: { provider: 'claude-code', modelo: 'claude-fable-5-1' }
+      },
+      promptInicial: 'x',
+      comandosDeValidacao
+    })
+
+    const doClaude = chamadas.find((c) => c[0] === 'claude')
+    expect(doClaude).toBeDefined()
+    // O par `--model <id>`, e não só a presença do id em algum lugar da linha: um id solto seria
+    // interpretado pelo CLI como parte do prompt.
+    const posicao = doClaude?.indexOf('--model') ?? -1
+    expect(posicao).toBeGreaterThanOrEqual(0)
+    expect(doClaude?.[posicao + 1]).toBe('claude-fable-5-1')
+  })
+
+  /**
+   * Critério 3, do lado do run: **a segunda tentativa usa o mesmo modelo da primeira.**
+   *
+   * O congelamento é do preflight, mas quem poderia desfazê-lo é este serviço, resolvendo de novo
+   * a cada volta do laço. Este teste força uma recuperação (validação falha na 1ª, passa na 2ª) e
+   * compara os dois `--model`. Sem ele, uma futura resolução por tentativa passaria despercebida.
+   */
+  it('mantém o mesmo modelo entre a tentativa que falhou e a recuperação', async () => {
+    const modelosUsados: string[] = []
+    let jaFalhou = false
+    const docker = {
+      exec: vi.fn((_container: string, comando: readonly string[]) => {
+        if (comando[0] === 'claude') {
+          const i = comando.indexOf('--model')
+          modelosUsados.push(comando[i + 1] ?? '')
+          return { ok: true, stdout: 'ok', stderr: '', exitCode: 0, timeoutExcedido: false }
+        }
+        if (comando[0] === 'git') {
+          return { ok: true, stdout: '', stderr: '', exitCode: 0, timeoutExcedido: false }
+        }
+        // O `npm run test` da primeira tentativa reprova; da segunda em diante, passa.
+        if (!jaFalhou && comando.includes('test')) {
+          jaFalhou = true
+          return {
+            ok: false,
+            stdout: '',
+            stderr: 'teste reprovou',
+            exitCode: 1,
+            timeoutExcedido: false
+          }
+        }
+        return { ok: true, stdout: 'ok', stderr: '', exitCode: 0, timeoutExcedido: false }
+      }),
+      matarProcesso: vi.fn()
+    } as unknown as DockerRunner
+    const service = new ConstrutorService(
+      docker,
+      repoDuble(),
+      auditDuble(),
+      () => 'u1',
+      () => 'ws1' as never
+    )
+
+    await service.construir({ runId: 'run-1', sandbox, promptInicial: 'x', comandosDeValidacao })
+
+    expect(modelosUsados.length).toBeGreaterThan(1)
+    expect(new Set(modelosUsados).size).toBe(1)
+    expect(modelosUsados[0]).toBe('claude-opus-5')
   })
 })
 
