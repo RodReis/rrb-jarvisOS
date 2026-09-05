@@ -41,12 +41,15 @@ import type { ProviderStatus, RoutingPolicy } from '@shared/domain/routing'
 import { isBudgetLimitsInput, type BudgetSnapshot } from '@shared/domain/budget'
 import { isProviderRoute, isTaskType } from '@shared/domain/routing'
 import type { PhaseModelService } from '../ai/phase-model-service'
+import type { CodexProfileService } from '../ai/codex-profile-service'
 import type { PhaseModelPolicy, ProjectModelOverride } from '@shared/domain/modelo-da-fase'
 import {
   isModeloEscolhido,
   isProjectModelOverride,
   isRotaComModelo
 } from '@shared/domain/modelo-da-fase'
+import type { CodexBillingMode, CodexProfileState } from '@shared/domain/codex-profile'
+import { isCodexBillingMode } from '@shared/domain/codex-profile'
 import { isFase } from '@shared/domain/fase'
 import { isEtapa } from '@shared/domain/jornada'
 import type { GenerationEvent, GenerationTrace } from '@shared/domain/geracao'
@@ -377,6 +380,8 @@ export interface IpcDependencies {
   readonly routingRepo: RoutingRepository
   /** O modelo de cada fase (SPEC-Fases-02): política do workspace e overrides por projeto. */
   readonly phaseModels: PhaseModelService
+  /** O perfil isolado do Codex (SPEC-Multi-Executor-02): saúde, login e modo de cobrança. */
+  readonly codex: CodexProfileService
   /**
    * A trilha das gerações (SPEC-Fases-03). O renderer só **lê** por aqui — quem grava é o ponto
    * único, e não há canal que escreva evento.
@@ -1021,6 +1026,39 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     async (_event, workspace: unknown): Promise<readonly ProviderStatus[]> => {
       const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
       return await deps.routing.status({ userId: deps.userId(), workspace: escopo })
+    }
+  )
+
+  /*
+   * O perfil isolado do Codex (SPEC-Multi-Executor-02).
+   *
+   * **Nenhum destes handlers aceita segredo**, e não por validação: não há parâmetro onde ele
+   * caiba. O login dispara `codex login --device-auth` e devolve a instrução que o PI segue no
+   * navegador; a credencial nasce dentro do `CODEX_HOME` e este processo nunca a vê (critério 1).
+   */
+  ipcMain.handle(IPC_CHANNELS.codexEstado, async (): Promise<CodexProfileState> => {
+    return await deps.codex.estado()
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.codexLogin,
+    async (): Promise<{ readonly ok: boolean; readonly instrucao: string }> => {
+      return await deps.codex.iniciarLogin()
+    }
+  )
+
+  ipcMain.handle(IPC_CHANNELS.codexLogout, async (): Promise<boolean> => {
+    return await deps.codex.logout()
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.codexSetModo,
+    (_event, modo: unknown, habilitado: unknown): CodexBillingMode | undefined => {
+      // Guard de fronteira, como `isModeloEscolhido` na M26-F02: modo inválido é recusado aqui,
+      // antes de o serviço decidir qualquer coisa. E `habilitado` só é verdadeiro quando **é**
+      // `true` — um valor truthy qualquer vindo do renderer não pode virar autorização de gasto.
+      if (!isCodexBillingMode(modo)) return undefined
+      return deps.codex.aplicarModo(modo, habilitado === true)
     }
   )
 

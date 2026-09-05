@@ -19,6 +19,7 @@ import type { PendenciaDeLimpeza } from '@shared/domain/limpeza'
 import type { MergePolicyOutcome, PoliticaDeMerge, VistaDaFila } from '@shared/domain/pipeline'
 import type { ContextPack, ContextPackOutcome, FalhaRegistrada } from '@shared/domain/context-pack'
 import type { CapacidadeResolvida } from '@shared/domain/skills'
+import type { CodexBillingMode, CodexProfileState } from '@shared/domain/codex-profile'
 import type { AuthSnapshot } from '@shared/contracts/auth'
 import type { LogInput } from '@shared/contracts/logging'
 import type { PolicyContext, PolicyDecision } from '@shared/policies'
@@ -270,6 +271,18 @@ const bridge: JarvisBridge = {
 
   getProviderStatus: (workspace: WorkspaceId): Promise<readonly ProviderStatus[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.providerStatus, workspace),
+
+  // O perfil do Codex (SPEC-Multi-Executor-02). Nenhum destes canais transporta segredo — ver a
+  // nota em `IPC_CHANNELS`.
+  estadoDoCodex: (): Promise<CodexProfileState> => ipcRenderer.invoke(IPC_CHANNELS.codexEstado),
+  entrarNoCodex: (): Promise<{ readonly ok: boolean; readonly instrucao: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.codexLogin),
+  sairDoCodex: (): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.codexLogout),
+  setModoDoCodex: (
+    modo: CodexBillingMode,
+    habilitado: boolean
+  ): Promise<CodexBillingMode | undefined> =>
+    ipcRenderer.invoke(IPC_CHANNELS.codexSetModo, modo, habilitado),
   getProviderModels: (provider: AiProvider): Promise<readonly string[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.providerModels, provider),
   setProviderModel: (

@@ -11,6 +11,7 @@ import {
 import { ArrowDown, ArrowUp, Plus } from 'lucide-react'
 import { Button, Checkbox, Field, IconButton, InlineAlert, Panel, Select, Tag } from '@design/ui'
 import { ModelosPorFase } from './ModelosPorFase'
+import { PerfilDoCodexDoWorkspace } from './PerfilDoCodex'
 import { StatusOperacional, type EstadoOperacional } from '@design/patterns'
 import { log } from '../lib/log'
 
@@ -367,6 +368,13 @@ export function ProvidersDoWorkspace({
         </div>
 
         <ModelosPorFase workspace={workspace} />
+
+        {/*
+         * O perfil isolado do Codex (SPEC-Multi-Executor-02) fica aqui, junto dos providers: é
+         * uma identidade de execução, como a assinatura do Claude — e é nesta tela que o PI
+         * responde "com que conta a pipeline vai rodar?".
+         */}
+        <PerfilDoCodexDoWorkspace />
 
         {/*
          * O roteamento por tipo de tarefa desce para "Avançado" e nasce recolhido

@@ -25,6 +25,10 @@ const setProviderModel = vi.fn()
 const getRouting = vi.fn()
 const setRoute = vi.fn()
 const getPhaseModels = vi.fn()
+const estadoDoCodex = vi.fn()
+const entrarNoCodex = vi.fn()
+const sairDoCodex = vi.fn()
+const setModoDoCodex = vi.fn()
 const setPhaseModel = vi.fn()
 const sendLog = vi.fn()
 
@@ -65,6 +69,11 @@ beforeEach(() => {
   getRouting.mockResolvedValue(ROTAS_PADRAO)
   setRoute.mockResolvedValue(ROTAS_PADRAO)
   getPhaseModels.mockResolvedValue(POLITICA_PADRAO)
+  estadoDoCodex.mockResolvedValue({
+    saude: 'auth_required',
+    codexHome: 'C:/userData/codex-pipeline',
+    modo: 'subscription_limited'
+  })
   setPhaseModel.mockResolvedValue(POLITICA_PADRAO)
   setProviderModel.mockResolvedValue(true)
   getProviderModels.mockImplementation(async (p: AiProvider) =>
@@ -80,6 +89,12 @@ beforeEach(() => {
       setRoute,
       getPhaseModels,
       setPhaseModel,
+      // O perfil do Codex (SPEC-Multi-Executor-02) é montado dentro desta tela e consulta o
+      // estado ao montar. Sem o dublê, o `.then` do contêiner estoura em toda asserção daqui.
+      estadoDoCodex,
+      entrarNoCodex,
+      sairDoCodex,
+      setModoDoCodex,
       sendLog
     },
     configurable: true,
