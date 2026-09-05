@@ -16,8 +16,8 @@ import { _electron as electron, expect, test, type ElectronApplication } from '@
 /**
  * Multi-provider e roteamento no **app real** (SPEC-Providers-04, critérios 1, 3, 4, 6 e 8).
  *
- * O que este arquivo prova e nenhuma outra camada prova: que os quatro adapters estão
- * **montados** no ponto único, que o roteamento decide de verdade e que o fallback acontece
+ * O que este arquivo prova e nenhuma outra camada prova: que **todos** os adapters do catálogo
+ * estão montados no ponto único, que o roteamento decide de verdade e que o fallback acontece
  * com o healthcheck real — a sonda aqui é a do boot, não uma dublada.
  *
  * O cenário é o do desenvolvedor comum: **sem credencial de nuvem e sem Ollama rodando**. Com
@@ -83,7 +83,7 @@ test('a ponte expõe os canais de provider e roteamento, e nenhum que decida', a
   expect(metodos.filter((m) => /reveal|secret|getCredential/i.test(m))).toEqual([])
 })
 
-test('o status cobre os quatro providers, com origem e custo corretos', async () => {
+test('o status cobre todos os providers do catálogo, com origem e custo corretos', async () => {
   const janela = await app.firstWindow()
   await janela.waitForLoadState('domcontentloaded')
 
@@ -111,20 +111,46 @@ test('o status cobre os quatro providers, com origem e custo corretos', async ()
     modelo: string
   }>
 
-  expect(status).toHaveLength(4)
-
+  /*
+   * Os providers **por nome**, e não por contagem.
+   *
+   * Era `toHaveLength(4)`, e o 4 virou 5 na SPEC-Fases-06 (entrada do `codex`) — este teste
+   * reprovou no CI depois de a suíte comum passar, porque o número cravado aqui é invisível para
+   * quem corrige o do outro arquivo. Afirmar os nomes é mais forte e não envelhece a cada
+   * provider novo: o que importa é que **cada** um chegue pela ponte com origem e custo corretos.
+   */
   const porNome = Object.fromEntries(status.map((s) => [s.provider, s]))
+
+  expect(Object.keys(porNome).sort()).toEqual(
+    ['anthropic', 'claude-code', 'codex', 'gemini', 'ollama'].sort()
+  )
 
   // Sem credencial, os de nuvem estão indisponíveis **para este usuário** — que é a pergunta
   // certa, e não "o serviço está no ar".
   expect(porNome.anthropic).toMatchObject({ estado: 'offline', origem: 'cloud', unmetered: false })
   expect(porNome.gemini).toMatchObject({ estado: 'offline', origem: 'cloud', unmetered: false })
 
-  // Sem servidor Ollama rodando no CI.
-  expect(porNome.ollama).toMatchObject({ estado: 'offline', origem: 'local', unmetered: true })
+  /*
+   * O Ollama: origem e custo são fato do catálogo; o **estado** depende de haver servidor local.
+   *
+   * `estado` sai da asserção porque ele varia com a máquina — o CI não tem Ollama rodando, uma
+   * estação de desenvolvimento costuma ter. Cravar `offline` aqui faz o teste reprovar em toda
+   * máquina que o tenha instalado, e o sinal vira ruído em vez de defeito.
+   */
+  expect(porNome.ollama).toMatchObject({ origem: 'local', unmetered: true })
 
   // O `claude-code` é local e sem custo por chamada — a rota de assinatura.
   expect(porNome['claude-code']).toMatchObject({ origem: 'local', unmetered: true })
+
+  /*
+   * O `codex` é a **segunda** rota de assinatura (SPEC-Fases-06): sem custo por chamada, como o
+   * Claude Code, e `cloud` — diferente dele, porque o CLI do Codex orquestra a sessão em nuvem.
+   *
+   * `estado` fica de fora da asserção de propósito: ele depende de o binário estar instalado no
+   * runner **e** de o perfil ter login, e nenhum dos dois é verdade no CI. O que este teste mede
+   * é que o provider **chega pela ponte** com origem e custo corretos.
+   */
+  expect(porNome.codex).toMatchObject({ origem: 'cloud', unmetered: true })
 
   // Todo provider tem um modelo ativo, mesmo sem troca: o padrão vale desde o primeiro boot.
   for (const s of status) expect(s.modelo).toBeTruthy()
