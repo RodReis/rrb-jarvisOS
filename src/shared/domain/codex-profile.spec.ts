@@ -171,9 +171,7 @@ describe('gate de execução (critério 5)', () => {
   })
 
   it('gasto acima do teto bloqueia', () => {
-    expect(
-      execucaoPermitida({ modo: 'api', tetoUsd: 10, gastoUsd: 10.01 }).permitida
-    ).toBe(false)
+    expect(execucaoPermitida({ modo: 'api', tetoUsd: 10, gastoUsd: 10.01 }).permitida).toBe(false)
   })
 
   /**

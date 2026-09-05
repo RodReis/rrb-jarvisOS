@@ -388,8 +388,10 @@ export class CodexProfileService {
   private scriptDoCodex(): string | undefined {
     if (this.scriptResolvido === undefined) {
       this.scriptResolvido =
-        localizarScriptDoCodex(this.deps.execSyncImpl ?? execSync, this.deps.existeImpl ?? existsSync) ??
-        null
+        localizarScriptDoCodex(
+          this.deps.execSyncImpl ?? execSync,
+          this.deps.existeImpl ?? existsSync
+        ) ?? null
     }
     return this.scriptResolvido ?? undefined
   }

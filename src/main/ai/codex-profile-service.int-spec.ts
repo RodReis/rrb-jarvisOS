@@ -147,8 +147,9 @@ const DOCTOR_SADIO = JSON.stringify({
 
 function eventosDeAuditoria(): readonly { type: string; payload: Record<string, unknown> }[] {
   return (
-    db.prepare('SELECT type, payload FROM audit_event WHERE user_id = ? ORDER BY seq').all(USER) as
-      readonly { type: string; payload: string }[]
+    db
+      .prepare('SELECT type, payload FROM audit_event WHERE user_id = ? ORDER BY seq')
+      .all(USER) as readonly { type: string; payload: string }[]
   ).map((r) => ({ type: r.type, payload: JSON.parse(r.payload) as Record<string, unknown> }))
 }
 
