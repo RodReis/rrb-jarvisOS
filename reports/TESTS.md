@@ -12,8 +12,8 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 1444 | 1444 | 0 | 74.6 | — | — |
-| — | — | — | Banco | 1130 | 1118 | 0 | 87.6 | — | — |
+| — | — | — | Regras de Negócio | 1455 | 1455 | 0 | 74.5 | — | — |
+| — | — | — | Banco | 1169 | 1155 | 0 | 87.4 | — | — |
 | — | — | — | Tela | 581 | 580 | 0 | 75.0 | — | — |
 
 ## Histórico por entrega
@@ -283,3 +283,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | — | #275 | — | Regras de Negócio | 1444 | 1444 | 0 | 74.6 | #276 | [#276](https://github.com/RodReis/rrb-jarvisOS/pull/276) |
 | — | #275 | — | Banco | 1130 | 1118 | 0 | 87.6 | #276 | [#276](https://github.com/RodReis/rrb-jarvisOS/pull/276) |
 | — | #275 | — | Tela | 581 | 580 | 0 | 75.0 | #276 | [#276](https://github.com/RodReis/rrb-jarvisOS/pull/276) |
+| 2026-09-05 | #271 | — | Regras de Negócio | 1455 | 1455 | 0 | 74.5 | #278 | [#278](https://github.com/RodReis/rrb-jarvisOS/pull/278) |
+| 2026-09-05 | #271 | — | Banco | 1169 | 1155 | 0 | 87.4 | #278 | [#278](https://github.com/RodReis/rrb-jarvisOS/pull/278) |
+| 2026-09-05 | #271 | — | Tela | 581 | 580 | 0 | 75.0 | #278 | [#278](https://github.com/RodReis/rrb-jarvisOS/pull/278) |

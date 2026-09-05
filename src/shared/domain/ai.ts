@@ -277,6 +277,19 @@ export interface AiRequest {
   readonly prompt: string
   /** Instrução de sistema, opcional. */
   readonly system?: string
+  /**
+   * O JSON Schema que o provider deve impor à saída, já serializado (emenda E1 à SPEC-Fases-03).
+   *
+   * Acompanha o `system` porque é o **par system+prompt** que decide o formato, e não a etapa: a
+   * etapa `prd` chama o modelo três vezes com contratos diferentes — termo de pesquisa (texto
+   * puro), documentos (`afirmacoes`) e contradições. Um schema derivado da etapa aplicaria
+   * `afirmacoes` ao termo e quebraria a pesquisa de mercado.
+   *
+   * Hoje só o `claude-code` o consome (é o único CLI com flag equivalente). Os demais o ignoram
+   * — e isso é correto, não uma lacuna: o `lerSaidaDoModelo` de cada domínio continua sendo a
+   * barreira que vale para **todas** as rotas.
+   */
+  readonly jsonSchema?: string
   readonly maxTokens?: number
   /**
    * O `ContextPack` que autoriza esta geração — **obrigatório** (SPEC-Planejamento-02,

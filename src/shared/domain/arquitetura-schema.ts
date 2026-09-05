@@ -21,6 +21,7 @@
  *    completasse uma âncora ausente inventaria a procedência que o critério 2 exige.
  */
 
+import { IDIOMA_DA_SAIDA } from './idioma-da-geracao'
 import type { DocumentoDaArquitetura } from './arquitetura'
 import { SECOES_DA_ARQUITETURA } from './arquitetura'
 import type { AfirmacaoDaArquitetura, AjusteProposto } from './arquitetura-gerada'
@@ -55,6 +56,7 @@ export interface RequisitoParaOModelo {
  */
 export const SISTEMA_DA_ARQUITETURA = [
   'Você recebe o PRD aceito de um projeto e os protótipos que o dono desenhou, e produz quatro',
+  IDIOMA_DA_SAIDA,
   'documentos estruturados: ARCHITECTURE, DECISIONS, TESTING e REVIEW.',
   '',
   'Responda **somente** com JSON válido, sem cercas de código e sem texto antes ou depois.',
@@ -204,6 +206,7 @@ export function promptDaArquitetura(entrada: {
  */
 export const SISTEMA_DA_COERENCIA = [
   'Você recebe os requisitos de um PRD aceito e as telas dos protótipos desenhados, e procura',
+  IDIOMA_DA_SAIDA,
   'onde os dois não se encontram.',
   '',
   'Responda **somente** com JSON válido, sem cercas de código e sem texto antes ou depois.',

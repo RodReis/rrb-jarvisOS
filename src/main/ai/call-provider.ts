@@ -52,6 +52,7 @@ import type { RoutingService } from './routing-service'
 import { AdapterError } from './anthropic-adapter'
 import type { AiAdapter } from './adapter'
 import type { Etapa } from '@shared/domain/jornada'
+import { faseDaEtapa } from '@shared/domain/fase'
 import type { StatusDoTrace } from '@shared/domain/geracao'
 import type { ColetorDaGeracao } from './generation-trace-service'
 
@@ -414,6 +415,16 @@ export class AiCallService {
         model,
         prompt: request.prompt,
         ...(request.system === undefined ? {} : { system: request.system }),
+        // A **fase**, derivada da etapa (emenda E1 à SPEC-Fases-03). Derivar aqui e não no call
+        // site é o que impede a nona geração de nascer sem isolamento por esquecimento: quem
+        // declara a etapa ganha a fase de graça, e `faseDaEtapa` é `Record` completo — uma etapa
+        // nova quebra o `tsc` lá, no lugar onde a decisão pertence.
+        //
+        // Ausente sem `console`: é a chamada que não pertence a etapa nenhuma (o painel de teste
+        // do Settings), e impor a ela a política de uma geração de documento restringiria um
+        // diagnóstico que não gera documento.
+        ...(request.console === undefined ? {} : { fase: faseDaEtapa(request.console.etapa) }),
+        ...(request.jsonSchema === undefined ? {} : { jsonSchema: request.jsonSchema }),
         maxTokens,
         ...(credencial === undefined ? {} : { apiKey: credencial.value }),
         timeoutMs: TIMEOUT_PADRAO_MS,
