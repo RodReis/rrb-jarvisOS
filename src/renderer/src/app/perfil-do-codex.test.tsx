@@ -102,6 +102,21 @@ describe('PerfilDoCodex — saúde e ação (critério 6)', () => {
     montar()
     expect(screen.getByText(/codex-pipeline/)).toBeInTheDocument()
   })
+
+  /**
+   * **O que o gate visual achou:** o caminho é uma palavra só, longa, e `flex-wrap` quebra entre
+   * itens — nunca dentro de um token sem espaços.
+   *
+   * Sem `break-all`, um `C:\Users\...\AppData\Roaming\jarvisOS\codex-pipeline` empurra o painel
+   * para fora da largura em tela estreita. Nenhum teste de papel ou de texto pega isso: a árvore
+   * fica idêntica, só o layout quebra. É a mesma correção do SHA de 40 caracteres na M26-F04.
+   */
+  it('quebra o caminho longo do perfil em vez de transbordar o painel', () => {
+    montar({ codexHome: 'C:/Users/rodrigo/AppData/Roaming/jarvisOS/perfis/codex-pipeline' })
+
+    const caminho = screen.getByText(/codex-pipeline/)
+    expect(caminho.className).toContain('break-all')
+  })
 })
 
 describe('PerfilDoCodex — modo de cobrança (critério 4, regra 4)', () => {

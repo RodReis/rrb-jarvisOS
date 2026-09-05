@@ -165,7 +165,14 @@ export function PerfilDoCodex({
           <Badge tom={TOM_DA_SAUDE[estado.saude]} comPonto>
             {ROTULO_DA_SAUDE[estado.saude]}
           </Badge>
-          <span className="font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-secundario)]">
+          {/*
+           * `break-all` porque o caminho é **uma palavra só, longa**: `flex-wrap` quebra entre
+           * itens, nunca dentro de um token sem espaços, então um
+           * `C:\Users\...\AppData\Roaming\jarvisOS\codex-pipeline` empurraria o painel para fora
+           * da largura em tela estreita. É a mesma correção que o `LinhaTecnica` da M26-F04 já
+           * carrega para o SHA de 40 caracteres, e pela mesma razão.
+           */}
+          <span className="break-all font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-secundario)]">
             {estado.codexHome}
           </span>
         </div>
