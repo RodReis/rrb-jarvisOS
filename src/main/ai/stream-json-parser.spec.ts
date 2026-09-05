@@ -6,8 +6,13 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { extrairLinhas, novoEstadoDoParser, parsearLinha } from './stream-json-parser'
-import { LIMITE_RESUMO_BYTES } from '@shared/domain/geracao'
+import {
+  documentoRetido,
+  extrairLinhas,
+  novoEstadoDoParser,
+  parsearLinha
+} from './stream-json-parser'
+import { LIMITE_RESUMO_BYTES, type GenerationEvent } from '@shared/domain/geracao'
 
 const LINHA_INIT =
   '{"type":"system","subtype":"init","cwd":"C:\\\\Desenv","session_id":"3c0bef5b","tools":["Task","Bash","Read"]}'
@@ -268,7 +273,8 @@ describe('parsearLinha — saída estruturada chamada mais de uma vez', () => {
 
     const eventos = [
       ...parsearLinha(chamada('toolu_vazia', {}), estado),
-      ...parsearLinha(chamada('toolu_cheia', documento), estado)
+      ...parsearLinha(chamada('toolu_cheia', documento), estado),
+      ...documentoRetido(estado)
     ]
 
     const texto = eventos
@@ -278,5 +284,78 @@ describe('parsearLinha — saída estruturada chamada mais de uma vez', () => {
 
     expect(() => JSON.parse(texto)).not.toThrow()
     expect(JSON.parse(texto)).toEqual(documento)
+  })
+})
+
+/**
+ * Fixture **real** da geração de 2026-09-05T21:32:39.604Z, lida do `generation_trace_event`: o
+ * CLI não reconheceu a primeira chamada, injetou `[structured-output-enforce] You MUST call the
+ * StructuredOutput tool` e o modelo repetiu o **mesmo** documento. Os dois deltas de 3641 bytes
+ * colavam e quebravam o JSON na posição 3641 — o caso que o conserto anterior deixou declarado
+ * como limite, e que o CLI **provoca** por desenho.
+ */
+describe('parsearLinha — saída estruturada repetida pelo enforce do CLI', () => {
+  const chamada = (id: string, input: unknown): string =>
+    JSON.stringify({
+      type: 'assistant',
+      message: {
+        role: 'assistant',
+        content: [{ type: 'tool_use', id, name: 'StructuredOutput', input }]
+      }
+    })
+
+  const textoDe = (eventos: readonly GenerationEvent[]): string =>
+    eventos
+      .filter((e) => e.tipo === 'texto')
+      .map((e) => (e.tipo === 'texto' ? e.delta : ''))
+      .join('')
+
+  it('não emite o documento na hora — ele fica retido até o fim da geração', () => {
+    const estado = novoEstadoDoParser()
+
+    const naHora = parsearLinha(chamada('toolu_1', { contradicoes: [] }), estado)
+
+    expect(textoDe(naHora)).toBe('')
+    expect(textoDe(documentoRetido(estado))).toBe('{"contradicoes":[]}')
+  })
+
+  it('vale a última chamada quando o CLI força a repetição', () => {
+    const estado = novoEstadoDoParser()
+    const documento = { contradicoes: [{ id: 'c-1', pergunta: 'a mesma dos dois deltas' }] }
+
+    parsearLinha(chamada('toolu_1', documento), estado)
+    parsearLinha(chamada('toolu_2', documento), estado)
+
+    const texto = textoDe(documentoRetido(estado))
+
+    expect(() => JSON.parse(texto)).not.toThrow()
+    expect(JSON.parse(texto)).toEqual(documento)
+  })
+
+  it('vale a última também quando as duas chamadas divergem', () => {
+    const estado = novoEstadoDoParser()
+
+    parsearLinha(chamada('toolu_1', { contradicoes: [{ id: 'rascunho' }] }), estado)
+    parsearLinha(chamada('toolu_2', { contradicoes: [{ id: 'final' }] }), estado)
+
+    expect(JSON.parse(textoDe(documentoRetido(estado)))).toEqual({
+      contradicoes: [{ id: 'final' }]
+    })
+  })
+
+  it('não inventa documento quando a geração não teve saída estruturada', () => {
+    const estado = novoEstadoDoParser()
+
+    parsearLinha(LINHA_TEXTO, estado)
+
+    expect(documentoRetido(estado)).toEqual([])
+  })
+
+  it('entrega o retido uma vez só — chamar de novo não duplica', () => {
+    const estado = novoEstadoDoParser()
+    parsearLinha(chamada('toolu_1', { contradicoes: [] }), estado)
+
+    expect(documentoRetido(estado)).toHaveLength(1)
+    expect(documentoRetido(estado)).toEqual([])
   })
 })
