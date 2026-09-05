@@ -19,7 +19,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { ClaudeCodeAdapter, flagRecusada, VERSAO_MINIMA_DO_CLI } from './claude-code-adapter'
 import { CodexAdapter, entradaDoCodex } from './codex-adapter'
-import { novoEstadoDoParser, parsearLinha } from './stream-json-parser'
+import { documentoRetido, novoEstadoDoParser, parsearLinha } from './stream-json-parser'
 import { runsDeTeste } from './cwd-neutro.test-helper'
 import { LIMITE_RESUMO_BYTES, type GenerationEvent } from '@shared/domain/geracao'
 import { SCHEMA_DAS_PERGUNTAS } from '@shared/domain/json-schema-da-saida'
@@ -485,11 +485,17 @@ describe('saída estruturada — `--json-schema` devolve o documento por ferrame
   })
 
   it('a saída estruturada vira documento, não chamada de ferramenta', () => {
-    const eventos = parsearLinha(linhaDaSaida({ perguntas: [{ bloco: 'problema' }] }))
+    const estado = novoEstadoDoParser()
+    const eventos = parsearLinha(linhaDaSaida({ perguntas: [{ bloco: 'problema' }] }), estado)
 
     // Como `ferramenta-inicio`, o documento nasceria vazio — e o critério 3 mataria a geração,
-    // porque uma ferramenta teria sido usada numa fase que não tem ferramentas.
-    expect(eventos).toEqual([{ tipo: 'texto', delta: '{"perguntas":[{"bloco":"problema"}]}' }])
+    // porque uma ferramenta teria sido usada numa fase que não tem ferramentas. **Nenhum**
+    // evento sai na hora: desde o #284 o documento fica retido até o fim da geração, porque o
+    // CLI repete a chamada e dois deltas emitidos se concatenariam num JSON quebrado.
+    expect(eventos).toEqual([])
+    expect(documentoRetido(estado)).toEqual([
+      { tipo: 'texto', delta: '{"perguntas":[{"bloco":"problema"}]}' }
+    ])
   })
 
   it('o aceite do protocolo não vai ao console', () => {
@@ -645,5 +651,90 @@ describe('critério 3 — o corte deixa passar o que já estava no buffer', () =
     expect(tipos.slice(0, 3)).toEqual(['ferramenta-inicio', 'erro', 'ferramenta-fim'])
     expect(eventos[2]).toMatchObject({ resumoDoResultado: 'saída da ferramenta' })
     expect(texto).not.toContain('DEPOIS')
+  })
+})
+
+/**
+ * A saída estruturada repetida, atravessando o adapter inteiro (#284, segundo caso).
+ *
+ * A sequência abaixo é a da geração real de 2026-09-05T21:32:39.604Z, lida do
+ * `generation_trace_event`: o modelo chamou `StructuredOutput` com o documento, o CLI **não
+ * reconheceu** a chamada e injetou `[structured-output-enforce] You MUST call the StructuredOutput
+ * tool`, e o modelo repetiu o **mesmo** documento. Os dois deltas de 3641 bytes se concatenavam e
+ * o `JSON.parse` quebrava na posição 3641.
+ *
+ * O teste vive no int-spec e não no spec do parser porque o defeito só aparece **montado**: o
+ * parser pode reter corretamente e o documento nunca sair se o adapter não o entregar no
+ * fechamento. É a lição do E2E que roda contra o bundle — a peça certa sozinha não prova a
+ * entrega.
+ */
+describe('#284 — o CLI repete a saída estruturada e o documento sai uma vez só', () => {
+  const linha = (payload: unknown): string => JSON.stringify(payload)
+
+  const DOCUMENTO = { contradicoes: [{ id: 'c-1', pergunta: 'a mesma dos dois deltas' }] }
+
+  const chamadaEstruturada = (id: string): string =>
+    linha({
+      type: 'assistant',
+      message: {
+        role: 'assistant',
+        content: [{ type: 'tool_use', id, name: 'StructuredOutput', input: DOCUMENTO }]
+      }
+    })
+
+  /** O lembrete que o CLI injeta como mensagem `user` quando não reconhece a chamada. */
+  const ENFORCE = linha({
+    type: 'user',
+    message: {
+      role: 'user',
+      content: [
+        {
+          type: 'text',
+          text: '[structured-output-enforce] You MUST call the StructuredOutput tool to complete this request. Call this tool now.'
+        }
+      ]
+    }
+  })
+
+  const scriptQueEmite = (...linhas: readonly string[]): string =>
+    `process.stdin.on("data",()=>{});` +
+    linhas.map((l) => `process.stdout.write(${JSON.stringify(l + '\n')});`).join('') +
+    `process.exit(0)`
+
+  async function gerar(): Promise<string> {
+    const adapter = new ClaudeCodeAdapter(runsDeTeste().abrir, ((
+      _b: string,
+      _a: readonly string[],
+      opcoes: object
+    ) =>
+      spawn(
+        process.execPath,
+        [
+          '-e',
+          scriptQueEmite(chamadaEstruturada('toolu_1'), ENFORCE, chamadaEstruturada('toolu_2'))
+        ],
+        opcoes
+      )) as typeof spawn)
+
+    let texto = ''
+    for await (const chunk of adapter.generateStream(
+      pedido({ fase: 'planejamento', timeoutMs: 3_000, jsonSchema: '{"type":"object"}' })
+    )) {
+      if (chunk.tipo === 'texto') texto += chunk.texto
+    }
+
+    return texto
+  }
+
+  it('o documento que chega ao leitor é um JSON só, e é o da última chamada', async () => {
+    const texto = await gerar()
+
+    // A asserção que falha com o defeito: `{…}{…}` quebra aqui, na posição do fim do primeiro.
+    expect(() => JSON.parse(texto)).not.toThrow()
+    expect(JSON.parse(texto)).toEqual(DOCUMENTO)
+  })
+
+  it('o lembrete do CLI não entra no documento — é mensagem `user`', async () => {
+    expect(await gerar()).not.toContain('structured-output-enforce')
   })
 })
