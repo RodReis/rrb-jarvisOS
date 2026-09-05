@@ -80,7 +80,16 @@ function LinhaDaAfirmacao({
           para a borda oposta, o botão ficava a meia tela do que ele corta, e o olho tinha de
           percorrer o vazio para ligar um ao outro. */}
       <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
-        <p className="min-w-0 max-w-[58ch] flex-1 text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto)]">
+        {/*
+          Sem teto próprio de medida: quem limita agora é a **coluna**.
+
+          O `max-w-[58ch]` fazia sentido quando o documento ocupava a tela inteira. Dentro da
+          coluna esquerda ele passou a sufocar duas vezes — a captura mediu 366px de texto numa
+          coluna de 536px, com 170px vazios do lado direito *dentro* da própria coluna, além do
+          vazio da página. Duas medidas empilhadas cortam pelo menor, e o menor aqui era o teto
+          que a coluna já garante.
+        */}
+        <p className="min-w-0 flex-1 text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto)]">
           {afirmacao.texto}
         </p>
 
@@ -215,7 +224,13 @@ export function BriefDoProjeto({
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    /*
+     *  porque o que decide o layout é o espaço que **este** componente recebe, não a
+     * largura da janela. Na tela do projeto a trilha ocupa 19rem fixos à esquerda, então uma
+     * media query de janela erraria por essa diferença: a 768px de janela o brief tem ~27rem, e
+     * uma coluna dupla ali espremeria as duas metades.
+     */
+    <div className="@container flex flex-col gap-5">
       <div className="flex flex-col gap-1">
         <h3 className="text-[length:var(--jos-texto-realce)] font-[var(--jos-peso-semi)] text-[var(--jos-cor-texto)]">
           {t('brief.titulo')}
@@ -255,7 +270,7 @@ export function BriefDoProjeto({
         não espremer os rótulos, e o documento de ~40rem para manter a medida. Abaixo disso as
         duas empilham, e o painel volta a ser o rodapé que era.
       */}
-      <div className="grid grid-cols-1 items-start gap-6 min-[72rem]:grid-cols-[minmax(0,1fr)_minmax(15rem,17rem)]">
+      <div className="grid grid-cols-1 items-start gap-6 @[52rem]:grid-cols-[minmax(0,1fr)_minmax(15rem,18rem)]">
         <div className="flex min-w-0 flex-col gap-5">
           {/*
         O que a IA inferiu, como conjunto (critério 4). Fica **acima** do brief porque é o que o
@@ -329,7 +344,7 @@ export function BriefDoProjeto({
         <aside
           data-jos-aceite="brief"
           aria-labelledby="brief-aceite"
-          className="flex flex-col overflow-hidden rounded-[var(--jos-raio-card)] border border-[rgba(var(--jos-borda-rgb),0.16)] bg-[linear-gradient(180deg,rgba(255,255,255,0.025),transparent_40%),var(--jos-cor-superficie-elevada)] min-[72rem]:sticky min-[72rem]:top-4"
+          className="flex flex-col overflow-hidden rounded-[var(--jos-raio-card)] border border-[rgba(var(--jos-borda-rgb),0.16)] bg-[linear-gradient(180deg,rgba(255,255,255,0.025),transparent_40%),var(--jos-cor-superficie-elevada)] @[52rem]:sticky @[52rem]:top-4"
         >
           <div className="flex flex-col gap-2 border-b border-[rgba(var(--jos-borda-rgb),0.10)] p-4">
             <h4 className="font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] uppercase tracking-[2px] text-[var(--jos-cor-texto-suave)]">

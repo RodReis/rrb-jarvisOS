@@ -236,3 +236,55 @@ test.describe('a rota é dita antes do clique', () => {
     await expect(page.locator('[data-jos-rota]')).toHaveCount(0)
   })
 })
+
+/**
+ * A coluna de julgamento (SPEC-Jornada-02, § Superfície).
+ *
+ * Estes testes existem porque os 24 de tela passaram verdes sobre o defeito: papel ARIA não mede
+ * largura, e a captura mostrou o documento usando 366px de uma coluna de 536px — duas medidas
+ * empilhadas cortando pelo menor.
+ */
+test.describe('a coluna de julgamento', () => {
+  test('o documento usa a largura da coluna, sem teto próprio herdado', async ({ page }) => {
+    await abrir(page, 'brief-propostos', 'dark')
+
+    const medida = await page.evaluate(() => {
+      // Uma afirmação **sem botão**: com o "Cortar" ao lado, o texto divide a linha por desenho,
+      // e medir essa cortaria pelo motivo errado.
+      const semBotao = [...document.querySelectorAll('[data-jos-afirmacao]')].find(
+        (li) => li.querySelector('button') === null
+      )
+      const p = semBotao?.querySelector('p')
+      const coluna = document.querySelector('[data-jos-aceite="brief"]')?.previousElementSibling
+
+      return {
+        texto: p?.getBoundingClientRect().width ?? 0,
+        coluna: coluna?.getBoundingClientRect().width ?? 0
+      }
+    })
+
+    expect(medida.coluna).toBeGreaterThan(0)
+    // Sem folga: o parágrafo ocupa a coluna. Antes eram 366 de 536.
+    expect(medida.texto).toBeCloseTo(medida.coluna, 0)
+  })
+
+  test('o painel acompanha a rolagem quando há espaço para duas colunas', async ({ page }) => {
+    await abrir(page, 'brief-travado', 'dark')
+
+    const posicao = await page.evaluate(() => {
+      const painel = document.querySelector('[data-jos-aceite="brief"]')
+      return painel === null ? null : getComputedStyle(painel).position
+    })
+
+    // Com o aceite no rodapé, a razão do bloqueio ficava a uma tela de distância do botão.
+    expect(posicao).toBe('sticky')
+  })
+
+  test('o botão de aceite e a pendência que o trava ficam no mesmo painel', async ({ page }) => {
+    await abrir(page, 'brief-travado', 'dark')
+
+    const painel = page.locator('[data-jos-aceite="brief"]')
+    await expect(painel.getByRole('button', { name: /Aceitar o brief/ })).toBeDisabled()
+    await expect(painel.getByText(/Onde os dados de leitura/)).toBeVisible()
+  })
+})
