@@ -27,6 +27,7 @@ import type { Database as Db } from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AfirmacaoDoPrd, ContradicaoDoPrd } from '@shared/domain/prd'
 import type { BriefRegistrado } from '@shared/domain/brief'
+import type { EstadoDaEtapa, EtapaDaGeracao } from '@shared/domain/geracao'
 import type { EstadoDasRotas } from '@shared/domain/rota-de-geracao'
 import type { ConnectorOutcome } from '@shared/domain/connectors'
 import { TAVILY_OPERATIONS } from '@shared/domain/tavily'
@@ -66,6 +67,13 @@ let respostas: (readonly AfirmacaoDoPrd[] | undefined)[]
 let correcoesRecebidas: (readonly string[] | undefined)[]
 /** As contradições que a detecção devolve. `undefined` simula falha da chamada. */
 let contradicoes: readonly ContradicaoDoPrd[] | undefined
+/** O que o serviço anunciou de progresso, na ordem. */
+let etapasAnunciadas: {
+  projectId: string
+  etapa: EtapaDaGeracao
+  estado: EstadoDaEtapa
+  resumo?: string
+}[] = []
 /** O brief aceito. `undefined` simula "o gate do brief ainda não passou". */
 let briefAceito: BriefRegistrado | undefined
 /** Se o commit do marco funciona — o critério 8 se prova no caso falso. */
@@ -219,8 +227,13 @@ beforeEach(() => {
       const saida = respostas.shift()
       return saida === undefined ? {} : { afirmacoes: saida }
     },
-    detectarContradicoes: async () => (contradicoes === undefined ? {} : { contradicoes })
+    detectarContradicoes: async () => (contradicoes === undefined ? {} : { contradicoes }),
+    anunciarEtapa: (projectId, etapa, estado, resumo) => {
+      etapasAnunciadas.push({ projectId, etapa, estado, resumo })
+    }
   })
+
+  etapasAnunciadas = []
 
   logCat.info.mockClear()
   logCat.warn.mockClear()
@@ -566,5 +579,94 @@ describe('contexto e projeto', () => {
 
     expect(r.resultado).toBe('sem-contexto')
     expect(chamadasDeGeracao).toBe(0)
+  })
+})
+
+describe('progresso da geração (SPEC-Jornada-03 § Geração)', () => {
+  /** As etapas concluídas, na ordem em que o serviço as anunciou. */
+  const concluidas = (): readonly EtapaDaGeracao[] =>
+    etapasAnunciadas.filter((e) => e.estado === 'concluida').map((e) => e.etapa)
+
+  it('anuncia as cinco etapas, na ordem do fluxo', async () => {
+    const r = await service.gerar({ projectId: PROJETO, termo: 'ferramentas' }, WS)
+
+    expect(r.resultado).toBe('gerado')
+    expect(concluidas()).toEqual([
+      'pesquisa',
+      'documentos',
+      'validacao',
+      'contradicoes',
+      'gravacao'
+    ])
+  })
+
+  it('cada etapa é anunciada antes de acontecer, não só depois', async () => {
+    await service.gerar({ projectId: PROJETO, termo: 'ferramentas' }, WS)
+
+    // Sem o `iniciada`, a tela não teria o que mostrar como "acontecendo agora" — ela saltaria
+    // de uma etapa concluída para a próxima concluída, e o PI olharia para uma barra parada.
+    for (const etapa of ['pesquisa', 'documentos', 'validacao', 'contradicoes', 'gravacao']) {
+      const inicio = etapasAnunciadas.findIndex((e) => e.etapa === etapa && e.estado === 'iniciada')
+      const fim = etapasAnunciadas.findIndex((e) => e.etapa === etapa && e.estado === 'concluida')
+
+      expect(inicio, `${etapa} não anunciou o início`).toBeGreaterThanOrEqual(0)
+      expect(fim, `${etapa} não anunciou o fim`).toBeGreaterThan(inicio)
+    }
+  })
+
+  it('sem termo, a pesquisa conclui declarando a lacuna — não falha', async () => {
+    // Não pesquisar é decisão do PI, não defeito. Uma etapa vermelha aqui anunciaria um erro
+    // onde houve uma escolha.
+    const r = await service.gerar({ projectId: PROJETO, termo: '' }, WS)
+
+    expect(r.resultado).toBe('gerado')
+
+    const pesquisa = etapasAnunciadas.find(
+      (e) => e.etapa === 'pesquisa' && e.estado !== 'iniciada'
+    )
+    expect(pesquisa?.estado).toBe('concluida')
+    expect(pesquisa?.resumo).toContain('lacuna')
+  })
+
+  it('saída recusada pelo validador anuncia falha, e a barra não chega ao fim', async () => {
+    // Duas saídas ancoradas num id que o brief não tem: o validador recusa as duas, e a
+    // tentativa de correção se esgota.
+    respostas = [[afirmacao({ referencia: 'b-99' })], [afirmacao({ referencia: 'b-98' })]]
+
+    const r = await service.gerar({ projectId: PROJETO, termo: 'x' }, WS)
+
+    expect(r.resultado).toBe('saida-invalida')
+    expect(etapasAnunciadas.some((e) => e.estado === 'falhou')).toBe(true)
+    // A gravação nunca aconteceu, então ela não pode ter sido anunciada como concluída: uma
+    // barra em 100% sobre um pacote não gravado é o fechamento frágil que isto evita.
+    expect(concluidas()).not.toContain('gravacao')
+  })
+
+  it('detecção de contradições que não sai anuncia falha, e nada é gravado', async () => {
+    contradicoes = undefined
+
+    const r = await service.gerar({ projectId: PROJETO, termo: 'x' }, WS)
+
+    expect(r.resultado).toBe('saida-invalida')
+    expect(
+      etapasAnunciadas.some((e) => e.etapa === 'contradicoes' && e.estado === 'falhou')
+    ).toBe(true)
+    expect(concluidas()).not.toContain('gravacao')
+  })
+
+  it('um anúncio que estoura não derruba a geração', async () => {
+    // A janela pode ser fechada no meio da geração, e o `send` do Electron lança. Perder o
+    // pacote pago por causa da barra de progresso dele seria o pior desfecho possível.
+    const deps = (service as unknown as { deps: Record<string, unknown> }).deps
+    service = new PrdService({
+      ...deps,
+      anunciarEtapa: () => {
+        throw new Error('janela destruída')
+      }
+    } as never)
+
+    const r = await service.gerar({ projectId: PROJETO, termo: 'x' }, WS)
+
+    expect(r.resultado).toBe('gerado')
   })
 })

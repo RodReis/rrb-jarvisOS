@@ -966,6 +966,29 @@ if (!app.requestSingleInstanceLock()) {
         return brief.carregar(projectId)
       },
       decisoesDoRefinamento: (projectId) => refinamento.decisoesParaOBrief(projectId),
+      /*
+       * O progresso da geração do pacote (SPEC-Jornada-03 § Geração).
+       *
+       * Vai pelo **mesmo canal** dos eventos do console, e não por um canal novo: o transporte
+       * já existe, o preload já o entrega e o painel já filtra por `traceId`. Um segundo canal
+       * para a mesma tela seria uma segunda coisa a manter, autorizar e testar.
+       *
+       * O `traceId` é derivado do projeto (`etapas:<projectId>`) em vez de sorteado: as etapas
+       * atravessam várias chamadas ao modelo, e um id novo a cada anúncio faria a tela tratar
+       * cada etapa como uma geração diferente. Derivado, ele é o mesmo do começo ao fim — e não
+       * colide com os traces do console, que são UUID.
+       *
+       * `isDestroyed` pela mesma razão do console: a corrida entre a geração e o fechamento da
+       * janela é normal, e um `send` para janela morta lança de dentro do Electron.
+       */
+      anunciarEtapa: (projectId, etapa, estado, resumo) => {
+        if (janela === undefined || janela.isDestroyed()) return
+
+        janela.webContents.send(IPC_EVENT_CHANNELS.generationEvent, {
+          traceId: `etapas:${projectId}`,
+          evento: { tipo: 'etapa', etapa, estado, ...(resumo === undefined ? {} : { resumo }) }
+        })
+      },
       montarContexto: montarContextoDoPrompt,
       estadoDasRotas: (projectId, workspace) =>
         estadoDasRotasDoProjeto(projectId, workspace, 'planejamento'),

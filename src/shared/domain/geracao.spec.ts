@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ETAPAS_DA_GERACAO,
   LIMITE_ARGUMENTO_DESCONHECIDO,
   LIMITE_RESUMO_BYTES,
+  progressoDaGeracao,
   resumoDoArgumento,
   truncarBytes
 } from './geracao'
+import type { EstadoDaEtapa, EtapaDaGeracao } from './geracao'
 
 describe('truncarBytes', () => {
   it('devolve o texto inteiro quando cabe no limite', () => {
@@ -72,5 +75,49 @@ describe('resumoDoArgumento', () => {
     expect(resumoDoArgumento('Read', undefined)).toBe('')
     expect(resumoDoArgumento('Read', null)).toBe('null')
     expect(resumoDoArgumento('Bash', 'texto solto')).toBe('"texto solto"')
+  })
+})
+
+describe('progressoDaGeracao', () => {
+  it('é zero quando nada terminou', () => {
+    expect(progressoDaGeracao(new Map())).toBe(0)
+  })
+
+  it('conta só as etapas concluídas — a que está em curso não vale meio passo', () => {
+    const etapas = new Map<EtapaDaGeracao, EstadoDaEtapa>([
+      ['pesquisa', 'concluida'],
+      ['documentos', 'iniciada']
+    ])
+
+    // 1 de 5, não 1,5 de 5: quanto da etapa em curso já passou é desconhecido, e supor
+    // metade faria a barra andar por chute.
+    expect(progressoDaGeracao(etapas)).toBe(20)
+  })
+
+  it('não conta a etapa que falhou como progresso', () => {
+    const etapas = new Map<EtapaDaGeracao, EstadoDaEtapa>([
+      ['pesquisa', 'concluida'],
+      ['documentos', 'falhou']
+    ])
+
+    expect(progressoDaGeracao(etapas)).toBe(20)
+  })
+
+  it('chega a 100 só com todas as etapas concluídas', () => {
+    const etapas = new Map<EtapaDaGeracao, EstadoDaEtapa>(
+      ETAPAS_DA_GERACAO.map((e) => [e, 'concluida'])
+    )
+
+    expect(progressoDaGeracao(etapas)).toBe(100)
+  })
+
+  it('ignora chave que não é etapa conhecida', () => {
+    // Um evento de versão futura não pode inflar a barra além do que o app sabe medir.
+    const etapas = new Map([
+      ['pesquisa', 'concluida'],
+      ['inventada', 'concluida']
+    ] as readonly (readonly [EtapaDaGeracao, EstadoDaEtapa])[])
+
+    expect(progressoDaGeracao(etapas)).toBe(20)
   })
 })

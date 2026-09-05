@@ -56,6 +56,7 @@ import {
   renderizarDocumentoDoPrd,
   validarPrd
 } from '@shared/domain/prd'
+import type { EstadoDaEtapa, EtapaDaGeracao } from '@shared/domain/geracao'
 import type { FonteParaOModelo } from '@shared/domain/prd-schema'
 import type { EstadoDasRotas, ResultadoDaRota } from '@shared/domain/rota-de-geracao'
 import { PROVIDER_DA_ROTA, escolherRota, providerDaRota } from '@shared/domain/rota-de-geracao'
@@ -162,6 +163,23 @@ export interface PrdServiceDeps {
     readonly contextPackId: string
     readonly afirmacoes: readonly { readonly id: string; readonly texto: string }[]
   }) => Promise<{ readonly contradicoes?: readonly ContradicaoDoPrd[] }>
+  /**
+   * Anuncia o andamento da geração (SPEC-Jornada-03 § Geração).
+   *
+   * **Opcional, e falhar aqui não interrompe nada** — mesma ordem de prioridade do console: o
+   * pacote é o produto, o progresso é evidência. Uma tela fechada, um canal caído ou um erro no
+   * publish não podem custar a geração que o PI já pagou.
+   *
+   * Fica fora do `ColetorDaGeracao` porque as etapas daqui **atravessam várias chamadas** ao
+   * modelo, e o coletor vive dentro de uma. Um trace por etapa diria quanto durou cada chamada;
+   * o que a barra precisa saber é em que ponto do pacote o serviço está.
+   */
+  readonly anunciarEtapa?: (
+    projectId: string,
+    etapa: EtapaDaGeracao,
+    estado: EstadoDaEtapa,
+    resumo?: string
+  ) => void
 }
 
 /**
@@ -267,6 +285,27 @@ export class PrdService {
    * assimetria da decisão do PI de 2026-09-03: **falha de pesquisa não bloqueia a geração**. Só
    * o Landscape fica pendente, e o bloqueio viaja junto da revisão até o gate.
    */
+  /**
+   * Anuncia uma etapa, e **nunca deixa isso derrubar a geração**.
+   *
+   * O `try` não é zelo defensivo genérico: `anunciarEtapa` termina num `webContents.send`, e uma
+   * janela destruída entre o início da geração e este ponto lança de dentro do Electron. Sem o
+   * bloqueio, fechar a janela durante a geração mataria o pacote que estava quase pronto — e o
+   * PI perderia a chamada que já pagou por causa da barra de progresso dela.
+   */
+  private anunciar(
+    projectId: string,
+    etapa: EtapaDaGeracao,
+    estado: EstadoDaEtapa,
+    resumo?: string
+  ): void {
+    try {
+      this.deps.anunciarEtapa?.(projectId, etapa, estado, resumo)
+    } catch (erro) {
+      log.agent.warn('Falha ao anunciar a etapa da geração', { projectId, etapa, estado, erro })
+    }
+  }
+
   async gerar(pedido: PedidoDoPrd, workspaceId: WorkspaceId): Promise<PrdOutcome> {
     const userId = this.userId()
 
@@ -326,6 +365,8 @@ export class PrdService {
 
     // (3) A pesquisa. Termo vazio é decisão do PI, não falha: nenhuma chamada acontece, e o
     // Landscape declara a lacuna (critérios 3 e 4).
+    this.anunciar(pedido.projectId, 'pesquisa', 'iniciada')
+
     const pesquisa =
       pedido.termo.trim() === ''
         ? {
@@ -334,6 +375,23 @@ export class PrdService {
             bloqueio: bloqueioSemTermo()
           }
         : await this.pesquisar(pedido.termo, pedido.projectId, workspaceId, userId)
+
+    /*
+     * A pesquisa **conclui mesmo bloqueada**, e o resumo diz por quê.
+     *
+     * Marcar `falhou` aqui seria mentir sobre o que aconteceu: sem termo, o PI escolheu não
+     * pesquisar, e essa escolha é um desfecho normal — o Landscape declara a lacuna e o resto
+     * do pacote segue (decisão do PI, 2026-09-03). Uma etapa vermelha faria a tela anunciar um
+     * defeito onde houve uma decisão.
+     */
+    this.anunciar(
+      pedido.projectId,
+      'pesquisa',
+      'concluida',
+      pesquisa.bloqueio === undefined
+        ? `${pesquisa.fontes.length} ${pesquisa.fontes.length === 1 ? 'fonte extraída' : 'fontes extraídas'}.`
+        : 'Sem fontes: o Landscape vai declarar a lacuna.'
+    )
 
     this.audit.append({
       user_id: userId,
@@ -355,6 +413,8 @@ export class PrdService {
 
     // (4) Uma tentativa de correção, não um laço: ver `TENTATIVAS_DE_CORRECAO`.
     for (let tentativa = 0; tentativa <= TENTATIVAS_DE_CORRECAO; tentativa += 1) {
+      this.anunciar(pedido.projectId, 'documentos', 'iniciada')
+
       const resposta = await this.deps.gerarDocumentos({
         projectId: pedido.projectId,
         workspace: workspaceId,
@@ -369,8 +429,17 @@ export class PrdService {
 
       if (resposta.afirmacoes === undefined) {
         problemas = ['A chamada ao modelo não devolveu saída.']
+        this.anunciar(pedido.projectId, 'documentos', 'falhou', problemas[0])
         continue
       }
+
+      this.anunciar(
+        pedido.projectId,
+        'documentos',
+        'concluida',
+        `${resposta.afirmacoes.length} ${resposta.afirmacoes.length === 1 ? 'afirmação escrita' : 'afirmações escritas'} nos três documentos.`
+      )
+      this.anunciar(pedido.projectId, 'validacao', 'iniciada')
 
       const candidato: ConteudoDoPrd = {
         projectId: pedido.projectId,
@@ -386,6 +455,13 @@ export class PrdService {
 
       if (!validacao.valido) {
         problemas = validacao.problemas.map((p) => p.mensagem)
+
+        this.anunciar(
+          pedido.projectId,
+          'validacao',
+          'falhou',
+          `${problemas.length} ${problemas.length === 1 ? 'problema encontrado' : 'problemas encontrados'} na saída do modelo.`
+        )
 
         this.audit.append({
           user_id: userId,
@@ -404,6 +480,9 @@ export class PrdService {
 
       // (5) As contradições. Falha na detecção **não** vira "nenhuma contradição": ficaria
       // liberando o aceite por uma falha de infraestrutura, que é o oposto do critério 6.
+      this.anunciar(pedido.projectId, 'validacao', 'concluida', 'A saída passou no validador.')
+      this.anunciar(pedido.projectId, 'contradicoes', 'iniciada')
+
       const deteccao = await this.deps.detectarContradicoes({
         projectId: pedido.projectId,
         workspace: workspaceId,
@@ -414,12 +493,25 @@ export class PrdService {
 
       if (deteccao.contradicoes === undefined) {
         problemas = ['A detecção de contradições não devolveu saída.']
+        this.anunciar(pedido.projectId, 'contradicoes', 'falhou', problemas[0])
         continue
       }
 
+      const achadas = deteccao.contradicoes.length
+      this.anunciar(
+        pedido.projectId,
+        'contradicoes',
+        'concluida',
+        achadas === 0
+          ? 'Nenhuma contradição entre as afirmações.'
+          : `${achadas} ${achadas === 1 ? 'contradição encontrada' : 'contradições encontradas'} — o aceite fica travado até você decidir.`
+      )
+
       const conteudo: ConteudoDoPrd = { ...candidato, contradicoes: deteccao.contradicoes }
 
-      return this.persistir(conteudo, {
+      this.anunciar(pedido.projectId, 'gravacao', 'iniciada')
+
+      const gravado = this.persistir(conteudo, {
         projeto,
         brief,
         workspaceId,
@@ -428,6 +520,21 @@ export class PrdService {
         rota: rota.decisao,
         commitarMarco: true
       })
+
+      /*
+       * O anúncio segue o desfecho **real** da gravação, não o fato de ela ter sido tentada.
+       * `persistir` devolve `falha-de-escrita` sem lançar, e anunciar `concluida` aqui deixaria
+       * a barra em 100% sobre um pacote que não foi para o disco — exatamente o fechamento
+       * frágil que a barra existe para não produzir.
+       */
+      this.anunciar(
+        pedido.projectId,
+        'gravacao',
+        gravado.resultado === 'gerado' ? 'concluida' : 'falhou',
+        gravado.resultado === 'gerado' ? 'Os três documentos foram gravados.' : gravado.mensagem
+      )
+
+      return gravado
     }
 
     // Esgotou a tentativa de correção. Bloqueia com o problema nomeado, em vez de gravar o que
