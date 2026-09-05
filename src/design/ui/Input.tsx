@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useLayoutEffect, useRef } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import type { AtributosDoControle } from './Field'
 import { ALTURA_CONTROLE, BORDA, cx, DESABILITADO, FOCO, SUPERFICIE, TRANSICAO } from './base'
@@ -155,7 +155,16 @@ interface TextareaProps extends Partial<AtributosDoControle> {
   readonly onMudar: (valor: string) => void
   readonly placeholder?: string
   readonly desabilitado?: boolean
+  /** Altura mínima, em linhas. O campo cresce a partir daqui conforme o texto. */
   readonly linhas?: number
+  /**
+   * Teto do crescimento automático, em linhas. Acima dele o campo rola.
+   *
+   * Existe porque crescimento sem teto empurra a ação para fora da tela: num prompt longo, o
+   * botão de gerar acabaria abaixo da dobra e o PI teria de rolar para achar o que ele acabou
+   * de decidir fazer.
+   */
+  readonly linhasMaximas?: number
 }
 
 export function Textarea({
@@ -164,18 +173,67 @@ export function Textarea({
   placeholder,
   desabilitado = false,
   linhas = 4,
+  linhasMaximas = 18,
   ...campo
 }: TextareaProps): React.JSX.Element {
+  const referencia = useRef<HTMLTextAreaElement>(null)
+
+  /*
+   * O campo cresce com o texto.
+   *
+   * Um `rows` fixo erra dos dois lados: com 4 linhas, o prompt longo vira uma janelinha rolante
+   * onde o PI não enxerga o que escreveu; com 12, o campo vazio abre meio metro de vazio sob uma
+   * frase — que foi o que a captura da tela de prompt mostrou. A altura certa é a do conteúdo,
+   * entre um piso e um teto.
+   *
+   * `height = 'auto'` antes de medir é obrigatório: `scrollHeight` de um elemento com altura
+   * fixa devolve a altura fixa, então sem zerar primeiro o campo cresce e nunca mais encolhe ao
+   * apagar texto.
+   *
+   * No efeito e não no `onChange` porque o valor é controlado: texto que chega por prop (um
+   * rascunho carregado do banco, ao reabrir o projeto) também precisa dimensionar o campo, e um
+   * handler de digitação nunca veria essa mudança.
+   */
+  useLayoutEffect(() => {
+    // `area`, e não `campo`: o rest de props já se chama `campo` no escopo de fora, e sombrear
+    // o nome faria a próxima leitura hesitar sobre qual dos dois está em jogo.
+    const area = referencia.current
+    if (area === null) return
+
+    const estilo = window.getComputedStyle(area)
+    const alturaDaLinha = Number.parseFloat(estilo.lineHeight)
+    // Sem `line-height` numérico resolvido (jsdom devolve "normal") não há como calcular o teto:
+    // deixa o campo no tamanho natural em vez de aplicar uma altura inventada.
+    if (!Number.isFinite(alturaDaLinha)) return
+
+    const molduras =
+      Number.parseFloat(estilo.paddingTop) +
+      Number.parseFloat(estilo.paddingBottom) +
+      Number.parseFloat(estilo.borderTopWidth) +
+      Number.parseFloat(estilo.borderBottomWidth)
+
+    area.style.height = 'auto'
+
+    const teto = alturaDaLinha * linhasMaximas + molduras
+    const desejada = area.scrollHeight
+
+    area.style.height = `${Math.min(desejada, teto)}px`
+    area.style.overflowY = desejada > teto ? 'auto' : 'hidden'
+  }, [valor, linhasMaximas])
+
   return (
     <textarea
       {...campo}
+      ref={referencia}
       value={valor}
       onChange={(e) => onMudar(e.target.value)}
       placeholder={placeholder}
       disabled={desabilitado}
       rows={linhas}
       // `resize-y` e não `resize`: redimensionar na horizontal quebra o layout do formulário,
-      // e a medida de leitura é decisão do design, não do arrasto.
+      // e a medida de leitura é decisão do design, não do arrasto. Continua permitido na
+      // vertical — o crescimento automático é o padrão, não uma camisa de força, e o arrasto
+      // do usuário vence até a próxima tecla.
       className={cx(CLASSES_CAMPO, 'resize-y py-3 leading-relaxed')}
     />
   )

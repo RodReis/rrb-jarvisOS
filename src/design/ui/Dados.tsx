@@ -2,6 +2,7 @@ import { useState } from 'react'
 import * as RadixTooltip from '@radix-ui/react-tooltip'
 import { ChevronRight } from 'lucide-react'
 import { cx } from './base'
+import { useContainerDeOverlay } from '../tokens/provider'
 
 /**
  * Estrutura de dados (SPEC-DesignSystem-03b, PRD §11.4).
@@ -217,21 +218,33 @@ interface TooltipProps {
  * usa toque não tem hover, e conteúdo crítico escondido atrás de um tooltip é conteúdo perdido.
  */
 export function Tooltip({ children, texto }: TooltipProps): React.JSX.Element {
+  /*
+   * O mesmo `container` do FIX #107 — o Tooltip também tinha ficado para trás.
+   *
+   * Sem ele o portal monta no `<body>`, fora do nó que carrega os tokens `--jos-*`, e o balão
+   * sai transparente e sem `z-index`: texto solto sobre a página, atropelado por qualquer
+   * elemento posicionado. Menos visível que o defeito do `Select` porque o tooltip é pequeno e
+   * passageiro — e por isso mesmo ninguém tinha reparado.
+   */
+  const container = useContainerDeOverlay()
+
   return (
     <RadixTooltip.Root>
       <RadixTooltip.Trigger asChild>{children}</RadixTooltip.Trigger>
-      <RadixTooltip.Portal>
+      <RadixTooltip.Portal container={container}>
         <RadixTooltip.Content
           sideOffset={6}
           className={cx(
             'z-[var(--jos-camada-overlay)] max-w-56 rounded-[var(--jos-raio-chip)] px-2.5 py-1.5',
-            'border border-[rgba(var(--jos-borda-rgb),0.24)] bg-[var(--jos-cor-superficie-elevada)]',
+            // Superfície **opaca**: o balão flutua sobre conteúdo, e o vidro de card deixaria o
+            // texto de trás atravessar as duas linhas do tooltip.
+            'border border-[rgba(var(--jos-borda-rgb),0.24)] bg-[var(--jos-cor-superficie-overlay)]',
             'text-[length:var(--jos-texto-mini)] text-[var(--jos-cor-texto)]',
             'shadow-[var(--jos-sombra-card)]'
           )}
         >
           {texto}
-          <RadixTooltip.Arrow className="fill-[var(--jos-cor-superficie-elevada)]" />
+          <RadixTooltip.Arrow className="fill-[var(--jos-cor-superficie-overlay)]" />
         </RadixTooltip.Content>
       </RadixTooltip.Portal>
     </RadixTooltip.Root>

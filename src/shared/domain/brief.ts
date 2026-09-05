@@ -181,6 +181,16 @@ export interface GeracaoOutcome {
   readonly acao?: string
   /** Os problemas do validador, quando a saída foi recusada. */
   readonly problemas?: readonly string[]
+  /**
+   * O que o modelo escreveu, quando ele respondeu em prosa em vez do brief.
+   *
+   * Existe porque essa recusa **não é** um defeito técnico: o modelo entendeu o pedido e
+   * respondeu com uma observação — um impedimento encontrado, uma confirmação pedida. Escondê-la
+   * atrás de "a saída não passou no validador" transformava a resposta mais útil da falha na
+   * menos visível dela. Vazio nas outras recusas: JSON quebrado é lixo de máquina, e despejá-lo
+   * numa tela seria o stack trace cru que o produto proíbe.
+   */
+  readonly textoDoModelo?: string
 }
 
 /**

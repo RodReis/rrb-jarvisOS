@@ -129,6 +129,10 @@ export function variaveisDoTema({
     // Papéis de superfície/texto/borda — variam com módulo e modo.
     '--jos-cor-superficie': p.surface,
     '--jos-cor-superficie-elevada': p.surfaceRaised,
+    // Superfície de overlay — **opaca**, ver `surfaceOverlay` em `semantic.ts`. Combo aberto,
+    // popover, menu, modal e gaveta leem esta, nunca a elevada: eles flutuam sobre conteúdo, e
+    // o vidro de card deixaria o texto de trás vazar por baixo das opções.
+    '--jos-cor-superficie-overlay': p.surfaceOverlay,
     '--jos-cor-texto': p.textPrimary,
     '--jos-cor-texto-secundario': p.textSecondary,
     '--jos-cor-texto-suave': p.textMuted,
@@ -235,6 +239,9 @@ export function variaveisDoTema({
     '--jos-tamanho-marcador': TAMANHO.marcador,
     '--jos-tamanho-icone': TAMANHO.icone,
     '--jos-tamanho-icone-mini': TAMANHO.iconeMini,
+    '--jos-tamanho-painel-minimo': TAMANHO.painelMinimo,
+    '--jos-tamanho-painel-maximo': TAMANHO.painelMaximo,
+    '--jos-tamanho-lista-maxima': TAMANHO.listaMaxima,
     '--jos-tracking-label': ESPACAMENTO_LETRA.label,
     '--jos-tracking-acao': ESPACAMENTO_LETRA.titulo,
     // O peso participa da hierarquia de ação (F03a): primária e perigo são mais pesadas que

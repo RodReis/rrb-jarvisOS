@@ -70,7 +70,7 @@ import {
   SISTEMA_DAS_PERGUNTAS,
   SISTEMA_DO_BRIEF,
   lerPerguntasDoModelo,
-  lerSaidaDoModelo,
+  lerSaidaDoModeloDetalhada,
   promptDaGeracao,
   promptDasPerguntas
 } from '@shared/domain/brief-schema'
@@ -877,8 +877,19 @@ if (!app.requestSingleInstanceLock()) {
           if (evento.estado !== 'concluido') return {}
         }
 
-        const saida = lerSaidaDoModelo(texto)
-        return saida === undefined ? {} : { saida }
+        // A leitura **detalhada**: o motivo da recusa vem junto, e é ele que separa "o modelo
+        // respondeu em português explicando um impedimento" de "o JSON veio quebrado". Sem essa
+        // distinção os dois chegavam à tela do PI como a mesma frase de erro.
+        const leitura = lerSaidaDoModeloDetalhada(texto)
+
+        return leitura.saida === undefined
+          ? {
+              ...(leitura.recusa === undefined ? {} : { recusa: leitura.recusa }),
+              ...(leitura.textoDoModelo === undefined
+                ? {}
+                : { textoDoModelo: leitura.textoDoModelo })
+            }
+          : { saida: leitura.saida }
       }
     })
 
