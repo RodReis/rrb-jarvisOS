@@ -25,7 +25,7 @@ import type { Etapa } from './jornada'
  * coincidência onde existe: o provider é quem consome a credencial daquele nome — e `ollama` e
  * `claude-code` **não têm** credencial, o que o `CREDENCIAL_DO_PROVIDER` registra explicitamente.
  */
-export const AI_PROVIDERS = ['anthropic', 'gemini', 'ollama', 'claude-code'] as const
+export const AI_PROVIDERS = ['anthropic', 'gemini', 'ollama', 'claude-code', 'codex'] as const
 
 export type AiProvider = (typeof AI_PROVIDERS)[number]
 
@@ -88,6 +88,21 @@ export const TABELA_DE_PRECO: Readonly<
     // apareceria depois da chamada sair. Ausencia no catalogo faz `modelosDisponiveis('anthropic')`
     // nunca listar Fable, e o guard de fronteira recusar antes de qualquer chamada.
     'claude-fable-5-1': { entrada: 0, saida: 0 }
+  },
+  /*
+   * Rota de **assinatura do Codex** (SPEC-Fases-06 § Dentro), `unmetered` pela mesma razão do
+   * `claude-code`: o plano é pago por mês, não por chamada, então zero aqui não é "de graça" — é
+   * "não se converte em USD".
+   *
+   * **Só os três modelos da assinatura.** O modo `api` do Codex (M10-F02) é rota paga e **não
+   * tem entrada aqui**: a spec é literal — *"preço a cadastrar na habilitação, não inventado
+   * aqui"* —, e um preço chutado alimentaria o gate de orçamento, que barra ou libera chamada
+   * paga com base nele. Ausência é o estado correto até o PI cadastrar os valores reais.
+   */
+  codex: {
+    'gpt-5.6-sol': { entrada: 0, saida: 0 },
+    'gpt-5.5': { entrada: 0, saida: 0 },
+    'gpt-5.4': { entrada: 0, saida: 0 }
   }
 }
 
@@ -103,7 +118,7 @@ export const TABELA_DE_PRECO: Readonly<
  * Dado e não `if`: o gate pergunta "esta rota é medida?" em vez de listar providers, e
  * acrescentar um provider grátis passa a ser acrescentar uma linha aqui.
  */
-export const ROTAS_UNMETERED: readonly AiProvider[] = ['ollama', 'claude-code']
+export const ROTAS_UNMETERED: readonly AiProvider[] = ['ollama', 'claude-code', 'codex']
 
 /** `true` quando a rota registra uso sem valor monetário — a `BudgetPolicy` não a barra. */
 export function isRotaUnmetered(provider: AiProvider): boolean {
@@ -120,7 +135,7 @@ export function isRotaUnmetered(provider: AiProvider): boolean {
  * é o mesmo que quota infinita — a distinção que este critério existe para não deixar a rota
  * MAX se comportar como "sempre disponível" quando na verdade pode estar rate-limited.
  */
-export const ROTAS_SUBSCRIPTION_LIMITED: readonly AiProvider[] = ['claude-code']
+export const ROTAS_SUBSCRIPTION_LIMITED: readonly AiProvider[] = ['claude-code', 'codex']
 
 /** `true` quando a rota tem teto de uso por assinatura, não por dólar (critério 12). */
 export function isRotaSubscriptionLimited(provider: AiProvider): boolean {
@@ -168,7 +183,12 @@ export const ORIGEM_DO_PROVIDER: Readonly<Record<AiProvider, 'local' | 'cloud'>>
   // `local` no sentido que importa aqui: o processo roda nesta máquina. O CLI fala com a
   // Anthropic por dentro, mas quem o app executa é um binário local — e é isso que a tela
   // precisa dizer para o usuário entender o que está acontecendo no computador dele.
-  'claude-code': 'local'
+  'claude-code': 'local',
+  // **`cloud`, e não `local` como o `claude-code`** — é a spec quem crava (SPEC-Fases-06 §
+  // Dentro), e a diferença não é descuido: o Codex CLI orquestra a sessão em nuvem (medido: ele
+  // abre WebSocket para `api.openai.com/v1/responses`), enquanto o Claude Code roda o modelo
+  // pela sessão local do binário. O rótulo existe para o usuário saber o que sai da máquina.
+  codex: 'cloud'
 }
 
 /**
@@ -182,7 +202,8 @@ export const ROTULO_DO_PROVIDER: Readonly<Record<AiProvider, string>> = {
   anthropic: 'Anthropic (Claude API)',
   gemini: 'Google Gemini',
   ollama: 'Ollama (local)',
-  'claude-code': 'Claude Code CLI'
+  'claude-code': 'Claude Code CLI',
+  codex: 'Codex CLI'
 }
 
 /** O modelo usado quando o chamador não escolhe. */
@@ -190,7 +211,9 @@ export const MODELO_PADRAO: Readonly<Record<AiProvider, string>> = {
   anthropic: 'claude-opus-5',
   gemini: 'gemini-2.5-pro',
   ollama: 'llama3.1',
-  'claude-code': 'claude-opus-5'
+  'claude-code': 'claude-opus-5',
+  // Sol é o modelo que a spec põe no Planejamento e na Especificação (SPEC-Fases-06 § Objetivo).
+  codex: 'gpt-5.6-sol'
 }
 
 /**
@@ -204,7 +227,11 @@ export const CREDENCIAL_DO_PROVIDER: Readonly<Record<AiProvider, CredentialKey |
   anthropic: 'anthropic',
   gemini: 'gemini',
   ollama: undefined,
-  'claude-code': undefined
+  'claude-code': undefined,
+  // Sem credencial no Vault, como o `claude-code`: quem autentica é o PI, direto no CLI, e a
+  // sessão vive no `CODEX_HOME` da M10-F02 — o app nunca vê o segredo (SPEC-Multi-Executor-02,
+  // critério 1).
+  codex: undefined
 }
 
 /**

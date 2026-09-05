@@ -16,6 +16,7 @@ import { RoutingRepository } from './ai/routing-repository'
 import { PhaseModelRepository } from './ai/phase-model-repository'
 import { PhaseModelService } from './ai/phase-model-service'
 import { CodexProfileService } from './ai/codex-profile-service'
+import { CodexAdapter } from './ai/codex-adapter'
 import { GenerationTraceService } from './ai/generation-trace-service'
 import { GenerationTraceRepository } from './ai/generation-trace-repository'
 import { QuotaRepository } from './ai/quota-repository'
@@ -338,13 +339,35 @@ if (!app.requestSingleInstanceLock()) {
     // e o ponto de chamada não mudou por causa disso, que é o critério 1 da F02 valendo na
     // prática. `ollama` e `claude-code` não recebem credencial: o primeiro fala com o
     // `localhost`, o segundo usa a sessão do próprio CLI.
+    /*
+     * O perfil isolado do Codex (SPEC-Multi-Executor-02).
+     *
+     * O `CODEX_HOME` nasce sob `userData` — fora do perfil pessoal do PI e fora do repositório,
+     * como a spec pede. Um terceiro requisito só apareceu medindo: o Codex **recusa** criar seus
+     * binários auxiliares sob diretório temporário, então `TEMP` degradaria em silêncio.
+     *
+     * Nasce **antes** dos adapters porque o `CodexAdapter` depende dele: é o `CODEX_HOME` que faz
+     * o CLI abrir a sessão da pipeline em vez do `~/.codex` pessoal do PI.
+     */
+    const codexProfile = new CodexProfileService({
+      userDataDir: app.getPath('userData'),
+      audit: storage.audit,
+      userId: userIdAtual,
+      workspaceId: () => workspaces.atual()
+    })
+
     const ollamaAdapter = new OllamaAdapter()
     const claudeCodeAdapter = new ClaudeCodeAdapter()
+    // O quinto adapter (SPEC-Fases-06): a assinatura do Codex pelo mesmo ponto único. O perfil
+    // entra por função e não por valor — quem o resolve é o `CodexProfileService`, e capturá-lo
+    // aqui congelaria um caminho que pode mudar.
+    const codexAdapter = new CodexAdapter(process.cwd(), () => codexProfile.codexHome)
     const adapters = {
       anthropic: new AnthropicAdapter(),
       gemini: new GeminiAdapter(),
       ollama: ollamaAdapter,
-      'claude-code': claudeCodeAdapter
+      'claude-code': claudeCodeAdapter,
+      codex: codexAdapter
     }
 
     // Roteamento e healthcheck (SPEC-Providers-04). A sonda é montada aqui porque **cada
@@ -360,19 +383,6 @@ if (!app.requestSingleInstanceLock()) {
     const phaseModelRepo = new PhaseModelRepository(storage.db)
     const phaseModels = new PhaseModelService(phaseModelRepo, storage.audit)
 
-    /*
-     * O perfil isolado do Codex (SPEC-Multi-Executor-02).
-     *
-     * O `CODEX_HOME` nasce sob `userData` — fora do perfil pessoal do PI e fora do repositório,
-     * como a spec pede. Um terceiro requisito só apareceu medindo: o Codex **recusa** criar seus
-     * binários auxiliares sob diretório temporário, então `TEMP` degradaria em silêncio.
-     */
-    const codexProfile = new CodexProfileService({
-      userDataDir: app.getPath('userData'),
-      audit: storage.audit,
-      userId: userIdAtual,
-      workspaceId: () => workspaces.atual()
-    })
     const routing = new RoutingService(
       routingRepo,
       new SondaDeAdapters({
@@ -381,7 +391,11 @@ if (!app.requestSingleInstanceLock()) {
         gemini: async () =>
           credentials.resolve(userIdAtual(), workspaces.atual(), 'gemini') !== undefined,
         ollama: () => ollamaAdapter.disponivel(),
-        'claude-code': () => claudeCodeAdapter.disponivel()
+        'claude-code': () => claudeCodeAdapter.disponivel(),
+        // O binário responde? É a mesma pergunta do `claude-code`, e **não** a saúde do perfil:
+        // a tela distingue "CLI ausente" de "perfil sem login", e o segundo é o `PerfilDoCodex`
+        // da M10-F02 que responde.
+        codex: () => codexAdapter.disponivel()
       }),
       storage.audit
     )
@@ -642,7 +656,12 @@ if (!app.requestSingleInstanceLock()) {
       'claude-code': 'assinatura',
       anthropic: 'paga',
       gemini: undefined,
-      ollama: undefined
+      ollama: undefined,
+      // **`assinatura`, e não uma terceira rota** (SPEC-Fases-06 § Dentro): o Codex atende pela
+      // assinatura do PI, e o modo `api` dele é rota paga governada pelo mesmo opt-in por
+      // projeto. As duas assinaturas dividem a mesma coluna do catálogo por fase, e nenhuma cai
+      // na outra — quem garante isso é `escolherRota`.
+      codex: 'assinatura'
     }
 
     const modeloDaGeracao = (

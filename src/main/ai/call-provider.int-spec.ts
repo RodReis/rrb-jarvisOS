@@ -140,7 +140,13 @@ function servico(
     // Os quatro do contrato. Os três da F04 recebem o mesmo dublê: esta suíte é sobre o
     // **ponto único**, e o que ela precisa é que todo provider passe por ele — não que cada
     // adapter fale seu protocolo, o que tem suíte própria.
-    { anthropic: adapter, gemini: adapter, ollama: adapter, 'claude-code': adapter },
+    {
+      anthropic: adapter,
+      gemini: adapter,
+      ollama: adapter,
+      'claude-code': adapter,
+      codex: adapter
+    },
     credentials,
     new PolicyService(audit, () => USUARIO),
     audit,

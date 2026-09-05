@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { Database as Db } from 'better-sqlite3'
-import { MODELO_PADRAO, type AiProvider } from '@shared/domain/ai'
+import { AI_PROVIDERS, MODELO_PADRAO, type AiProvider } from '@shared/domain/ai'
 import { ROTEAMENTO_PADRAO, TASK_TYPES } from '@shared/domain/routing'
 import { openDatabase } from '../storage/database'
 import { AuditRepository } from '../storage/audit-repository'
@@ -46,7 +46,8 @@ function sondaCom(disponiveis: readonly AiProvider[]): {
       anthropic: checar('anthropic'),
       gemini: checar('gemini'),
       ollama: checar('ollama'),
-      'claude-code': checar('claude-code')
+      'claude-code': checar('claude-code'),
+      codex: checar('codex')
     }),
     chamadas: () => chamadas
   }
@@ -265,9 +266,19 @@ describe('healthcheck e status (critérios 5 e 6)', () => {
     expect(anthropic).toMatchObject({ estado: 'offline', origem: 'cloud', unmetered: false })
   })
 
-  it('cobre os quatro providers', async () => {
+  /**
+   * Cobre **todos** os providers do catálogo, e o número vem de `AI_PROVIDERS`.
+   *
+   * Era `toHaveLength(4)` cravado, e o 4 virou 5 na SPEC-Fases-06 (entrada do `codex`). Derivar
+   * da lista é mais forte que corrigir o número: o teste passa a acusar qualquer provider que
+   * alguém acrescente ao catálogo sem ligar à sonda — que é justamente o defeito silencioso, um
+   * provider que a tela nunca mostra como online.
+   */
+  it('cobre todos os providers do catálogo', async () => {
     const status = await servico([]).status(ESCOPO)
-    expect(status).toHaveLength(4)
+
+    expect(status).toHaveLength(AI_PROVIDERS.length)
+    expect(status.map((s) => s.provider).sort()).toEqual([...AI_PROVIDERS].sort())
   })
 
   it('o cache evita sondar de novo dentro da validade', async () => {
@@ -314,7 +325,8 @@ describe('healthcheck e status (critérios 5 e 6)', () => {
       },
       gemini: async () => false,
       ollama: async () => false,
-      'claude-code': async () => false
+      'claude-code': async () => false,
+      codex: async () => false
     })
     const gate = new RoutingService(repo, sonda, audit, () => relogio)
 
