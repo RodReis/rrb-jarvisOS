@@ -19,11 +19,12 @@
  * falha antes de medir e o smoke reporta isso em vez de fingir um número.
  */
 
-import { execFileSync } from 'node:child_process'
+import { execFileSync, execSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { BINARIO, ClaudeCodeAdapter } from './claude-code-adapter'
 import { runsDeTeste } from './cwd-neutro.test-helper'
+import { BINARIO_CODEX, localizarScriptDoCodex, resolverInvocacao } from './codex-profile-service'
 import { SISTEMA_DAS_PERGUNTAS, promptDasPerguntas } from '@shared/domain/brief-schema'
 import { SCHEMA_DAS_PERGUNTAS } from '@shared/domain/json-schema-da-saida'
 import { IDIOMA_DA_SAIDA } from '@shared/domain/idioma-da-geracao'
@@ -101,4 +102,56 @@ describe.skipIf(!cliInstalado)('isolamento do CLI — smoke real (critério 4)',
     // O diretório do run sumiu — critério 1, agora contra o CLI de verdade.
     expect(runs.caminhos.filter((caminho) => existsSync(caminho))).toEqual([])
   }, 200_000)
+})
+
+/**
+ * O Codex tem **duas** fontes de contexto, e só uma é o cwd.
+ *
+ * Medido em 2026-09-05 com o `codex-cli` 0.149.0: rodando no cwd neutro mas com o `CODEX_HOME`
+ * pessoal do PI, a sessão ainda carregou plugins e hooks de `~/.codex/plugins/` — o mesmo tipo de
+ * contexto do ambiente que a emenda E1 corta no Claude Code pelo cwd. O `--sandbox read-only` não
+ * os desliga: ele restringe o que as ferramentas alcançam, não o que a sessão carrega.
+ *
+ * O que fecha essa segunda porta é o `CODEX_HOME` da pipeline, que a M10-F02 já entrega e o boot
+ * já passa ao adapter. Com um `CODEX_HOME` isolado, plugins e hooks somem da sessão.
+ *
+ * Este bloco existe para que a descoberta não se perca: quem mexer no `CODEX_HOME` amanhã
+ * precisa saber que ele é metade do isolamento do Codex, não só a escolha de perfil.
+ */
+/**
+ * A invocação real do Codex, pela **mesma** resolução que o adapter usa.
+ *
+ * `execFileSync('codex')` direto responderia "não instalado" no Windows, onde o binário do npm é
+ * um `.cmd` que o Node recusa com `shell: false` — o defeito que o smoke da M10-F02 achou.
+ * Repetir o caminho ingênuo aqui faria este bloco virar `skipped` sem ninguém notar.
+ */
+const invocacaoDoCodex = resolverInvocacao(BINARIO_CODEX, [], () =>
+  localizarScriptDoCodex(execSync, existsSync)
+)
+
+const codexInstalado = ((): boolean => {
+  if (!habilitado) return false
+  try {
+    execFileSync(invocacaoDoCodex.comando, [...invocacaoDoCodex.args, '--version'], {
+      stdio: 'ignore'
+    })
+    return true
+  } catch {
+    return false
+  }
+})()
+
+describe.skipIf(!codexInstalado)('Codex — o cwd neutro é metade do isolamento', () => {
+  it('as flags da emenda são aceitas pela versão instalada', () => {
+    // O que este teste prova é que `codex exec` conhece as duas flags: uma versão que não as
+    // conhecesse falharia aqui, e não numa geração do PI.
+    const ajuda = execFileSync(
+      invocacaoDoCodex.comando,
+      [...invocacaoDoCodex.args, 'exec', '--help'],
+      { encoding: 'utf8' }
+    )
+
+    expect(ajuda).toContain('--skip-git-repo-check')
+    expect(ajuda).toContain('--sandbox')
+  })
 })
