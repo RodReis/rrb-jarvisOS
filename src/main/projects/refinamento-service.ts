@@ -31,7 +31,7 @@ import type { GeracaoDePerguntasOutcome } from '@shared/domain/refinamento'
 import type { PerguntaGerada } from '@shared/domain/pergunta-gerada'
 import { separarPerguntasValidas } from '@shared/domain/pergunta-gerada'
 import type { EstadoDasRotas, ResultadoDaRota } from '@shared/domain/rota-de-geracao'
-import { PROVIDER_DA_ROTA, escolherRota } from '@shared/domain/rota-de-geracao'
+import { PROVIDER_DA_ROTA, escolherRota, providerDaRota } from '@shared/domain/rota-de-geracao'
 import type { Decision, EstadoDoWizard, Resposta, RespostaOutcome } from '@shared/domain/wizard'
 import {
   decidirPorMim,
@@ -205,7 +205,7 @@ export class RefinamentoService {
       }
     }
 
-    const provider = PROVIDER_DA_ROTA[rota.decisao]
+    const provider = providerDaRota(rota) ?? PROVIDER_DA_ROTA[rota.decisao]
     const contextPackId = this.montarContexto(projectId, workspaceId, provider)
     if (contextPackId === undefined) {
       return {

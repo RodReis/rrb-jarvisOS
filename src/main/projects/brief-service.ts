@@ -35,7 +35,7 @@ import type { PerguntaGerada } from '@shared/domain/pergunta-gerada'
 import { separarPerguntasValidas } from '@shared/domain/pergunta-gerada'
 import type { DecisaoDoRefinamento } from '@shared/domain/brief-schema'
 import type { EstadoDasRotas, ResultadoDaRota } from '@shared/domain/rota-de-geracao'
-import { PROVIDER_DA_ROTA, escolherRota } from '@shared/domain/rota-de-geracao'
+import { PROVIDER_DA_ROTA, escolherRota, providerDaRota } from '@shared/domain/rota-de-geracao'
 import { log } from '../logging/logger'
 import type { AuditRepository } from '../storage/audit-repository'
 import type { BriefRepository } from './brief-repository'
@@ -276,7 +276,7 @@ export class BriefService {
       }
     }
 
-    const provider = PROVIDER_DA_ROTA[rota.decisao]
+    const provider = providerDaRota(rota) ?? PROVIDER_DA_ROTA[rota.decisao]
 
     // O pacote de contexto (SPEC-Planejamento-02, critério 1) — montado **depois** de saber a
     // rota, porque é ela que decide se o orçamento é em USD ou em uso, e **antes** de gerar,

@@ -64,9 +64,7 @@ function linhaDeUso(entrada: number, saida: number): string {
 }
 
 function scriptQueEmite(...linhas: readonly string[]): string {
-  const escritas = linhas
-    .map((l) => `process.stdout.write(${JSON.stringify(l + '\n')});`)
-    .join('')
+  const escritas = linhas.map((l) => `process.stdout.write(${JSON.stringify(l + '\n')});`).join('')
   return `process.stdin.on("data",()=>{});${escritas}process.exit(0)`
 }
 

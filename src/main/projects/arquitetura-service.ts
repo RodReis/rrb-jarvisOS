@@ -67,7 +67,7 @@ import type { PrdRegistrado } from '@shared/domain/prd'
 import type { ValidacaoDoPrototipo } from '@shared/domain/validacao-de-prototipo'
 import { achadosQueImpedem } from '@shared/domain/validacao-de-prototipo'
 import type { EstadoDasRotas, ResultadoDaRota } from '@shared/domain/rota-de-geracao'
-import { PROVIDER_DA_ROTA, escolherRota } from '@shared/domain/rota-de-geracao'
+import { PROVIDER_DA_ROTA, escolherRota, providerDaRota } from '@shared/domain/rota-de-geracao'
 import { log } from '../logging/logger'
 import type { AuditRepository } from '../storage/audit-repository'
 import type { AnexoRepository } from './anexo-repository'
@@ -282,7 +282,7 @@ export class ArquiteturaService {
       }
     }
 
-    const provider = PROVIDER_DA_ROTA[rota.decisao]
+    const provider = providerDaRota(rota) ?? PROVIDER_DA_ROTA[rota.decisao]
 
     const contextPackId = this.deps.montarContexto(projectId, workspaceId, provider)
     if (contextPackId === undefined) {

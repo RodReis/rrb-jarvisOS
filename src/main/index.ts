@@ -104,7 +104,7 @@ import {
 } from '@shared/domain/roadmap-schema'
 import { ordemDaEtapa } from '@shared/domain/jornada'
 import type { Etapa } from '@shared/domain/jornada'
-import { faseDaEtapa } from '@shared/domain/fase'
+import { faseDaEtapa, type Fase } from '@shared/domain/fase'
 import type { RotaComModelo } from '@shared/domain/modelo-da-fase'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { AiProvider, AiStreamEvent } from '@shared/domain/ai'
@@ -626,17 +626,59 @@ if (!app.requestSingleInstanceLock()) {
     /** O card da lista pergunta pelo ambiente, não por um projeto. */
     const SEM_PROJETO = ''
 
+    /*
+     * A disponibilidade de **cada** assinatura (SPEC-Fases-06 § Dentro).
+     *
+     * `Record` e não `if`: com duas assinaturas, um `if (provider === 'codex')` faria a terceira
+     * nascer com a checagem esquecida — e o modo de falha seria o pior possível, uma assinatura
+     * que o app dá como indisponível sem nunca ter perguntado.
+     */
+    const ASSINATURA_NO_AR: Readonly<Partial<Record<AiProvider, () => Promise<boolean>>>> = {
+      'claude-code': () => claudeCodeAdapter.disponivel(),
+      codex: () => codexAdapter.disponivel()
+    }
+
+    /**
+     * O estado das rotas **para a fase que vai gerar**.
+     *
+     * A `fase` entra na assinatura (decisão do PI, 2026-09-05) porque desde a SPEC-Fases-06 há
+     * duas assinaturas, e **qual** delas precisa estar no ar depende do modelo que o PI escolheu
+     * para aquela fase. Sem esse parâmetro, o app perguntaria sempre pelo Claude Code e
+     * bloquearia uma geração por Sol com base na assinatura errada — ou, pior, a liberaria.
+     *
+     * **Nenhuma assinatura cai na outra**: a função devolve a disponibilidade *daquela* que a
+     * fase escolheu, e `escolherRota` bloqueia se ela faltar. Um `||` entre as duas aqui seria
+     * exatamente o fallback que a decisão 4 do MVP-025 proíbe, com o agravante de trocar de
+     * fornecedor sem o PI decidir.
+     */
     const estadoDasRotasDoProjeto = async (
-      _projectId: string,
-      workspace: WorkspaceId
+      projectId: string,
+      workspace: WorkspaceId,
+      // **Obrigatória, sem default** — a razão que a M26-F04 cravou em `verificarMarcos` e a
+      // M26-F05 em `modeloDaConstrucao`: um default de `'planejamento'` faria o RoadmapGerado
+      // (que é `especificacao`) consultar a assinatura da fase errada, e o compilador não teria
+      // como apontar. Sendo obrigatória, cada ponto de injeção declara a sua.
+      fase: Fase
     ): Promise<EstadoDasRotas> => {
-      const quotaDaAssinatura = quota.ler(userIdAtual(), workspace, 'claude-code')
+      const daFase = phaseModels.resolver(
+        { userId: userIdAtual(), workspace },
+        fase,
+        'assinatura',
+        projectId === '' ? undefined : projectId
+      )
+      const sonda = ASSINATURA_NO_AR[daFase.provider]
+      const quotaDaAssinatura = quota.ler(userIdAtual(), workspace, daFase.provider)
+
       return {
-        assinaturaDisponivel: await claudeCodeAdapter.disponivel(),
+        // Provider que não é rota de assinatura (a política guardada pode apontar um) responde
+        // `false`: é fail-closed, e o bloqueio diz o que fazer. Inventar `true` liberaria uma
+        // chamada por uma rota que não existe.
+        assinaturaDisponivel: sonda === undefined ? false : await sonda(),
         assinaturaEsgotada: quotaDaAssinatura?.restante === 0,
         rotaPagaConfigurada:
           credentials.resolve(userIdAtual(), workspace, 'anthropic') !== undefined,
-        optInDeRotaPaga: false
+        optInDeRotaPaga: false,
+        assinaturaDe: daFase.provider
       }
     }
 
@@ -717,7 +759,8 @@ if (!app.requestSingleInstanceLock()) {
       audit: storage.audit,
       userId: userIdAtual,
       promptVigente: (projectId) => briefRepository.promptVigente(userIdAtual(), projectId)?.texto,
-      estadoDasRotas: estadoDasRotasDoProjeto,
+      estadoDasRotas: (projectId, workspace) =>
+        estadoDasRotasDoProjeto(projectId, workspace, 'planejamento'),
       montarContexto: montarContextoDoPrompt,
       gerar: async ({ projectId, workspace, prompt, blocosEmAberto, rota, contextPackId }) => {
         let texto = ''
@@ -783,7 +826,8 @@ if (!app.requestSingleInstanceLock()) {
        * pediu para ler, não algo que uma busca estrutural encontrou.
        */
       montarContexto: montarContextoDoPrompt,
-      estadoDasRotas: estadoDasRotasDoProjeto,
+      estadoDasRotas: (projectId, workspace) =>
+        estadoDasRotasDoProjeto(projectId, workspace, 'planejamento'),
       /*
        * A geração, pelo **ponto único** — nunca chamando o adapter direto.
        *
@@ -860,7 +904,8 @@ if (!app.requestSingleInstanceLock()) {
       },
       decisoesDoRefinamento: (projectId) => refinamento.decisoesParaOBrief(projectId),
       montarContexto: montarContextoDoPrompt,
-      estadoDasRotas: estadoDasRotasDoProjeto,
+      estadoDasRotas: (projectId, workspace) =>
+        estadoDasRotasDoProjeto(projectId, workspace, 'planejamento'),
       /*
        * As três chamadas passam pelo **ponto único** (`ai.call`), nunca pelo adapter direto — a
        * mesma fronteira do `BriefService`, e `provider` é a rota **já decidida**: deixar o
@@ -961,7 +1006,8 @@ if (!app.requestSingleInstanceLock()) {
       validarPrototipos: (projectId) => anexos.validar(projectId),
       decisoesDoRefinamento: (projectId) => refinamento.decisoesParaOBrief(projectId),
       montarContexto: montarContextoDoPrompt,
-      estadoDasRotas: estadoDasRotasDoProjeto,
+      estadoDasRotas: (projectId, workspace) =>
+        estadoDasRotasDoProjeto(projectId, workspace, 'planejamento'),
       /*
        * As duas chamadas passam pelo **ponto único** (`ai.call`), nunca pelo adapter direto, e
        * `provider` é a rota **já decidida** — deixar o roteamento escolher de novo aqui poderia
@@ -1030,7 +1076,8 @@ if (!app.requestSingleInstanceLock()) {
         pacoteRepository.listarPacotes(userIdAtual(), projectId)[0]?.id,
       arquiteturaVigente: (projectId) => arquitetura.carregar(projectId),
       montarContexto: montarContextoDoPrompt,
-      estadoDasRotas: estadoDasRotasDoProjeto,
+      estadoDasRotas: (projectId, workspace) =>
+        estadoDasRotasDoProjeto(projectId, workspace, 'especificacao'),
       /*
        * As duas chamadas passam pelo **ponto único** (`ai.call`), nunca pelo adapter direto, e
        * `provider` é a rota **já decidida** — deixar o roteamento escolher de novo aqui poderia
@@ -1313,11 +1360,15 @@ if (!app.requestSingleInstanceLock()) {
       jornada,
       /*
        * O card não tem projeto único: o estado das rotas é do ambiente, e uma medição serve a
-       * lista inteira. O `projectId` da assinatura é ignorado pela função (o opt-in de rota paga
-       * ainda não é por projeto), então qualquer valor serviria — `SEM_PROJETO` diz isso em vez
-       * de esconder um `''` no meio da chamada.
+       * lista inteira. `SEM_PROJETO` diz isso em vez de esconder um `''` no meio da chamada — e
+       * a função o trata como "sem override", caindo na política do workspace.
+       *
+       * **`planejamento`** é a fase certa aqui: o card responde *"dá para começar?"*, e começar é
+       * o Planejamento. Uma lista que perguntasse pela Construção mostraria bloqueio para
+       * projetos que ainda nem chegaram lá (SPEC-Fases-06 § Dentro).
        */
-      estadoDasRotas: (workspace) => estadoDasRotasDoProjeto(SEM_PROJETO, workspace),
+      estadoDasRotas: (workspace) =>
+        estadoDasRotasDoProjeto(SEM_PROJETO, workspace, 'planejamento'),
       brief,
       prd,
       arquitetura,

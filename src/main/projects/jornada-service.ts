@@ -40,7 +40,7 @@ import {
 import type { Fase, ResumoDoProjeto } from '@shared/domain/fase'
 import { ROTULO_DA_FASE, faseDaEtapa, progressoNaFase } from '@shared/domain/fase'
 import type { EstadoDasRotas, ResultadoDaRota } from '@shared/domain/rota-de-geracao'
-import { PROVIDER_DA_ROTA, escolherRota } from '@shared/domain/rota-de-geracao'
+import { PROVIDER_DA_ROTA, escolherRota, providerDaRota } from '@shared/domain/rota-de-geracao'
 import type { AiProvider } from '@shared/domain/ai'
 import { ETAPAS_DE_ACEITE } from '@shared/domain/jornada'
 import type { MarcoDocumental } from '@shared/domain/projects'
@@ -525,7 +525,11 @@ export class JornadaService {
     projectId: string
   ): string | null {
     if (!rota || rota.decisao === 'bloqueado') return null
-    return this.modeloAtivo?.(workspaceId, PROVIDER_DA_ROTA[rota.decisao], fase, projectId) ?? null
+    // `providerDaRota` e não `PROVIDER_DA_ROTA[...]`: aquele mapa crava o Claude na assinatura, e
+    // com duas assinaturas (SPEC-Fases-06) o selo do card anunciaria um provider diferente do que
+    // a geração usaria — o mesmo defeito que a M26-F02 corrigiu no `modeloAtivo`, por outra porta.
+    const provider = providerDaRota(rota) ?? PROVIDER_DA_ROTA[rota.decisao]
+    return this.modeloAtivo?.(workspaceId, provider, fase, projectId) ?? null
   }
 
   /** O bloqueio, quando existe. Sem bloqueio não há bloco: alerta permanente deixa de ser lido. */

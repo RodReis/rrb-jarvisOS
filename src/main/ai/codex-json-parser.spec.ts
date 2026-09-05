@@ -153,9 +153,7 @@ describe('uso medido', () => {
       '{"type":"turn.completed","usage":{"input_tokens":1200,"output_tokens":340}}'
     )
 
-    expect(eventos).toEqual([
-      { tipo: 'uso', tokensEntrada: 1200, tokensSaida: 340, duracaoMs: 0 }
-    ])
+    expect(eventos).toEqual([{ tipo: 'uso', tokensEntrada: 1200, tokensSaida: 340, duracaoMs: 0 }])
   })
 
   /** Campo ausente vira 0, nunca `NaN` — um `NaN` no ledger contaminaria a soma inteira. */
