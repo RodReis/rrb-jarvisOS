@@ -20,6 +20,7 @@ import { CodexAdapter } from './ai/codex-adapter'
 import { abrirRunNeutro, type RunNeutro } from './ai/cwd-neutro'
 import {
   SCHEMA_DAS_AFIRMACOES,
+  SCHEMA_DO_BRIEF,
   SCHEMA_DAS_CONTRADICOES,
   SCHEMA_DAS_PERGUNTAS,
   SCHEMA_DA_SPEC,
@@ -879,7 +880,9 @@ if (!app.requestSingleInstanceLock()) {
             provider: rota,
             ...(model === undefined ? {} : { model }),
             system: SISTEMA_DO_BRIEF,
-            jsonSchema: SCHEMA_DAS_AFIRMACOES,
+            // O brief é o único contrato da jornada com duas chaves de topo (#280): as
+            // pendências vivem ao lado das afirmações, e o schema de uma chave só as proibia.
+            jsonSchema: SCHEMA_DO_BRIEF,
             prompt: promptDaGeracao(prompt, decisoes, correcao),
             contextPackId,
             console: { projectId, etapa: 'brief-aceito' }
