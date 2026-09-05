@@ -2,7 +2,7 @@
 
 - MVP/Fatia: MVP-026 · M26-F03.
 - Issue: [#253](https://github.com/RodReis/rrb-jarvisOS/issues/253); épico [#250](https://github.com/RodReis/rrb-jarvisOS/issues/250).
-- Status: **aprovada-pi** (2026-09-04) — perguntas respondidas pelo PI nesta data, antes da redação. **Entregue** (PR #263). **Emenda E1** abaixo: `proposta-cowork` (2026-09-05), aguarda `aprovada-pi`.
+- Status: **aprovada-pi** (2026-09-04) — perguntas respondidas pelo PI nesta data, antes da redação. **Entregue** (PR #263). **Emenda E1** abaixo: **aprovada-pi** (2026-09-05) → fatia M26-F07, issue [#274](https://github.com/RodReis/rrb-jarvisOS/issues/274).
 - Depende de: M26-F02 (modelo por fase); M8-F02 (ponto único, `ContextPack`, ledger); M5-F04 (adapter Claude Code CLI, `generateStream`).
 
 ## Objetivo
@@ -76,14 +76,18 @@ Unitários do parser (fixtures reais de `stream-json`, inclusive linha corrompid
 
 ## Emenda E1 — Isolamento do CLI por fase (2026-09-05)
 
-- Status: **proposta-cowork**, aguarda `aprovada-pi`. Vira **fatia nova** (sub-issue do #250, título `[MVP26][SPEC-Fases-03][F07] Isolamento do CLI por fase`) quando aprovada — não reabre a #253.
+- Status: **aprovada-pi** (2026-09-05). Fatia **M26-F07**, issue [#274](https://github.com/RodReis/rrb-jarvisOS/issues/274) (sub-issue do #250). Não reabre a #253.
 - Motivação: teste do PI em 2026-09-05 (refinamento, prompt pequeno) — muito código, muito lixo, nada sobre o prompt. Três causas no código; duas são bugs documentados e já têm card ([#271](https://github.com/RodReis/rrb-jarvisOS/issues/271) `request.system` descartado pelo adapter; [#272](https://github.com/RodReis/rrb-jarvisOS/issues/272) texto de mensagens `user` entrando no documento). A terceira é **decisão de produto**, e é esta emenda.
 - Evidência: o smoke da M26-F03 mediu **230.444 tokens de entrada** numa geração de refinamento. O `cwd` do CLI é `process.cwd()` — em dev, o repositório do próprio app: `CLAUDE.md` (184 linhas), `.claude/CLAUDE.md` (378), `rules/`, `hooks/`, `settings.json`, skills e MCPs do ambiente do PI entram no contexto de uma geração sobre **outro** projeto. Sem restrição de ferramentas, o modelo invocou a skill `claude-api` e rodou `Bash` fora do app.
 
-### Decisões do PI já tomadas (2026-09-05)
+### Decisões do PI (2026-09-05)
 
 1. **cwd neutro** para o subprocess, nos dois adapters (`ClaudeCodeAdapter` **e** `CodexAdapter`). Nunca `process.cwd()`.
 2. Isolamento por fase: nas fases **Planejamento** e **Especificação** o CLI é um gerador de documento, sem persona de agente e sem ferramentas; na **Construção** o agente é legítimo.
+3. `--json-schema` **entra nesta fatia** — é a barreira que sobra quando o modelo desobedece o prompt.
+4. `cli-runs` em **`app.getPath('userData')`**, não dentro do workspace do JarvisOS (evita herdar `.claude/`/`CLAUDE.md` de diretório acima).
+5. Versão mínima dos CLIs = **a instalada no PC do PI em 2026-09-05**; o Code confirma cada flag em `claude --help` / `codex exec --help` e registra a versão em `ARCHITECTURE.md` § Providers.
+6. **Saída sempre em pt-BR**: o system de todas as etapas declara o idioma explicitamente (complemento em #271).
 
 ### Regras
 
@@ -115,8 +119,6 @@ Unitários do parser (fixtures reais de `stream-json`, inclusive linha corrompid
 5. Codex: args contêm `--sandbox read-only` e `--skip-git-repo-check`; o stdin começa por `request.system` quando definido.
 6. Flag rejeitada pelo CLI → `AdapterError` nomeando a flag; teste com `spawnImpl` que devolve o erro do CLI.
 
-### Perguntas abertas ao PI
+### Depende de
 
-1. `--json-schema` já nesta fatia, ou fatia própria depois dos FIXes? (Recomendação: nesta — é a barreira que sobra quando o modelo desobedece o prompt.)
-2. Diretório dos `cli-runs`: `userData` (por usuário do SO) serve, ou quer dentro do diretório do workspace do JarvisOS?
-3. Versão mínima do Claude Code a exigir: a instalada no PI hoje (`claude --version`) ou a primeira que tem `--json-schema`?
+#271 e #272 (correções que esta fatia pressupõe). Ordem sugerida ao Code: #271 → #272 → M26-F07. `proplan:next` é decisão do PI no STATUS.md, não desta emenda.
