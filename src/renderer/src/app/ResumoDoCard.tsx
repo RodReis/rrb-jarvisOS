@@ -38,6 +38,53 @@ function nomeDaEtapa(etapa: Etapa, t: (chave: string) => string): string {
   return t(`jornada.etapas.${etapa}`)
 }
 
+/**
+ * O progresso da fase como marcas, uma por etapa.
+ *
+ * ## Por que forma e não a cor do acento
+ *
+ * O acento é escolhido pelo usuário entre oito cores, e três delas destruiriam o sinal: com
+ * `#FF2C2C` um projeto saudável ficaria vermelho como um erro, com `#2CFF05` uma etapa pendente
+ * pareceria concluída, e `#2323FF` tem 2,58:1 sobre o carbono — invisível. Pintar **estado** com
+ * a cor da preferência quebra o princípio 5 do produto: preferência visual não altera
+ * significado semântico.
+ *
+ * Então o que distingue vencido de pendente é **preenchimento**, não matiz — e isso continua
+ * legível nas oito cores, no daltonismo e em escala de cinza (princípio 2).
+ *
+ * ## Por que `aria-hidden`
+ *
+ * A régua é a **mesma** informação que o texto ao lado já diz ("3 / 8 no Planejamento"). Expô-la
+ * à árvore de acessibilidade faria o leitor de tela anunciar o progresso duas vezes, uma delas
+ * como uma fileira de elementos sem nome. Redundância visual ajuda; redundância falada atrapalha.
+ */
+function ReguaDaFase({
+  posicao,
+  total
+}: {
+  readonly posicao: number
+  readonly total: number
+}): React.JSX.Element | null {
+  // Fase de uma etapa só não tem progresso a desenhar: uma marca sozinha não compara com nada, e
+  // a linha já diz o nome da fase. É o caso da Construção.
+  if (total <= 1) return null
+
+  return (
+    <span aria-hidden="true" className="flex items-center gap-[3px]">
+      {Array.from({ length: total }, (_, i) => (
+        <span
+          key={i}
+          className={
+            i < posicao
+              ? 'h-[3px] w-3.5 rounded-[var(--jos-raio-pill)] bg-[var(--jos-cor-texto-secundario)]'
+              : 'h-[3px] w-3.5 rounded-[var(--jos-raio-pill)] bg-[rgba(var(--jos-borda-rgb),0.18)]'
+          }
+        />
+      ))}
+    </span>
+  )
+}
+
 interface ResumoDoCardProps {
   readonly resumo: ResumoDoProjeto | undefined
   /**
@@ -87,7 +134,14 @@ export function ResumoDoCard({
           O progresso é da **fase**, não da trilha inteira: "5 / 8 no Planejamento" responde
           quanto falta para virar de fase, que é a pergunta do índice. "5 / 12" responderia a
           pergunta da trilha, que a tela do projeto aberto já responde melhor.
+
+          A régua desenha o mesmo número que o texto ao lado diz. Ela existe porque a pilha de
+          cards é varrida, não lida: "3 / 8" e "6 / 8" só se distinguem lendo os dígitos, e o
+          olho que percorre oito projetos não lê — ele compara. O texto continua ali para quem
+          usa leitor de tela e para quem quer o número exato.
         */}
+        <ReguaDaFase posicao={resumo.progresso.posicao} total={resumo.progresso.total} />
+
         <span className={`${mono} text-[var(--jos-cor-texto-suave)]`}>
           {t('projetos.progressoNaFase', {
             posicao: resumo.progresso.posicao,

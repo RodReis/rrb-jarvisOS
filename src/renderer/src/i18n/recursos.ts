@@ -170,13 +170,30 @@ export const RECURSOS = {
         cortar: 'Cortar',
         cortarEsta: 'Cortar a afirmação: {{texto}}',
         pendenciaMaterial: 'Falta decidir antes de aceitar',
+        // Diz onde a lista está, em vez de repeti-la: ela vive ao lado do botão que ela trava.
+        pendenciaOndeVer_one: '{{count}} pendência, listada no aceite ao lado.',
+        pendenciaOndeVer_other: '{{count}} pendências, listadas no aceite ao lado.',
         // O aceite do brief (SPEC-Jornada-02, critério 5). O rótulo diz o que o clique
         // faz — congela o documento e libera a próxima etapa —, não um "OK" genérico.
         aceitar: 'Aceitar o brief',
         aceiteTitulo: 'Aceite do brief',
         aceiteDescricao:
           'Aceitar congela este brief como base do PRD. Corte o que não serve antes: depois do aceite, mudar exige refazer a etapa.',
-        aceiteBloqueado: 'Resolva as pendências acima para aceitar.',
+        aceiteBloqueado: 'Resolva as pendências para aceitar.',
+        // Nomeia o que a coluna resume: de onde veio cada afirmação do brief.
+        origensTitulo: 'Origem das {{total}} afirmações',
+        /*
+         * Rótulos da contagem, distintos dos que cada linha usa.
+         *
+         * A linha diz "do seu prompt" porque ela fala de uma afirmação; a legenda conta um
+         * conjunto, e repetir a mesma frase faria a tela ter dois textos idênticos com papéis
+         * diferentes — ambíguo para quem lê e para quem navega por leitor de tela.
+         */
+        contagem: {
+          prompt: 'Do prompt',
+          decisao: 'De decisão sua',
+          proposto: 'Propostas pela IA'
+        },
         aceiteFalhou: 'Não foi possível registrar o aceite. Tente de novo.',
         propostosTitulo: '{{count}} afirmações propostas pela IA',
         // Diz o que distingue estas das outras: ninguém as disse, foram inferidas.
@@ -807,11 +824,19 @@ export const RECURSOS = {
         cortar: 'Cut',
         cortarEsta: 'Cut the statement: {{texto}}',
         pendenciaMaterial: 'Decide this before accepting',
+        pendenciaOndeVer_one: '{{count}} pending item, listed in the acceptance panel.',
+        pendenciaOndeVer_other: '{{count}} pending items, listed in the acceptance panel.',
         aceitar: 'Accept the brief',
         aceiteTitulo: 'Brief acceptance',
         aceiteDescricao:
           'Accepting freezes this brief as the basis for the PRD. Cut what does not belong first: after acceptance, changing it means redoing the stage.',
-        aceiteBloqueado: 'Resolve the pending items above to accept.',
+        aceiteBloqueado: 'Resolve the pending items to accept.',
+        origensTitulo: 'Origin of the {{total}} statements',
+        contagem: {
+          prompt: 'From the prompt',
+          decisao: 'From your decision',
+          proposto: 'Proposed by the AI'
+        },
         aceiteFalhou: 'Could not record the acceptance. Try again.',
         propostosTitulo: '{{count}} statements proposed by the AI',
         propostosDescricao:
