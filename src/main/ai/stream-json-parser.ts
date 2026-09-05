@@ -110,6 +110,19 @@ export interface EstadoDoParser {
   chamadaPendente?: string
   /** O `id` da chamada de `StructuredOutput`, cujo aceite não vai ao console. */
   saidaEstruturada?: string
+  /**
+   * O documento da **última** chamada de `StructuredOutput`, retido até o fim da geração.
+   *
+   * Retido, e não emitido na hora, porque o CLI chama a ferramenta mais de uma vez: quando ele
+   * não reconhece a primeira chamada, injeta `[structured-output-enforce] You MUST call the
+   * StructuredOutput tool` e o modelo repete o documento. Emitindo na hora, os dois deltas se
+   * concatenavam em `{…}{…}` e nenhum `JSON.parse` aceitava o resultado.
+   *
+   * Não custa streaming: com `--json-schema` o documento chega **inteiro** no `input`, e o
+   * `ARCHITECTURE.md` § Providers registra que nenhum bloco `text` aparece nessas gerações — não
+   * há texto pingando que este atraso pudesse segurar.
+   */
+  documento?: string
 }
 
 /**
@@ -196,6 +209,23 @@ export function parsearLinha(
   return []
 }
 
+/**
+ * O documento da saída estruturada, entregue **uma vez** no fim da geração.
+ *
+ * O adapter a chama ao fechar o stdout, depois da última linha. Devolve lista — e não string —
+ * para o chamador tratá-la como qualquer outro lote de eventos, sem um caminho especial só para
+ * este caso. Lista vazia quando a geração não teve saída estruturada (a maioria: só as etapas
+ * com `jsonSchema` a usam) ou quando o documento já foi entregue: chamar duas vezes não duplica,
+ * porque o adapter tem mais de um caminho de fechamento e o documento não pode sair por dois.
+ */
+export function documentoRetido(estado: EstadoDoParser): readonly GenerationEvent[] {
+  const documento = estado.documento
+  if (documento === undefined) return []
+
+  estado.documento = undefined
+  return [{ tipo: 'texto', delta: documento }]
+}
+
 /** Se o `input` da saída estruturada carrega documento. Objeto sem chaves não carrega. */
 function temConteudo(input: unknown): boolean {
   if (typeof input !== 'object' || input === null) return false
@@ -232,22 +262,24 @@ function eventosDoBloco(
     if (nome === NOME_DA_SAIDA_ESTRUTURADA) {
       estado.saidaEstruturada = chamadaId
 
-      // Chamada **sem conteúdo** não é documento, e emiti-la corrompe o que vier depois.
-      //
-      // O CLI chama `StructuredOutput` mais de uma vez na mesma geração, e a primeira pode vir
-      // com `input` vazio. Como cada chamada virava um delta, os dois se concatenavam em
-      // `{}{"contradicoes":[…]}` — dois JSON colados, que nenhum `JSON.parse` aceita. O
-      // documento chegava íntegro no segundo delta e ainda assim era recusado: na detecção de
-      // contradições do PRD, cinco contradições prontas apareceram no console e a tela disse
-      // que a detecção "não devolveu saída".
-      //
-      // Descartar aqui e não no leitor de cada etapa: são sete chamadas com `jsonSchema`, e o
-      // `ARCHITECTURE.md` (§ Providers) já define que o documento é o `input` — um `input` sem
-      // chaves não é documento nenhum.
+      // Chamada **sem conteúdo** não é documento: o CLI abre a saída estruturada com um
+      // `input` vazio antes de preenchê-la, e tratá-lo como documento gravaria `{}` por cima
+      // do que viesse depois.
       if (!temConteudo(bloco.input)) return []
 
+      // **Vale a última chamada** (decisão do PI, 2026-09-05). Retém em vez de emitir: o CLI
+      // repete a chamada quando não reconhece a primeira — injetando
+      // `[structured-output-enforce] You MUST call the StructuredOutput tool` —, e o modelo
+      // responde com o documento de novo. Emitindo na hora, os dois deltas se concatenavam
+      // (`{…}{…}`) e o JSON quebrava exatamente no fim do primeiro.
+      //
+      // Substituir o retido cobre os dois casos vistos e o que ainda não foi: chamadas
+      // idênticas, chamadas divergentes, e a vazia seguida do documento. O que sai é sempre um
+      // JSON só — o último, que é o que o CLI aceitou.
       const documento = JSON.stringify(bloco.input)
-      return documento === undefined ? [] : [{ tipo: 'texto', delta: documento }]
+      if (documento !== undefined) estado.documento = documento
+
+      return []
     }
 
     // Guardada para o texto que o CLI injetar em seguida sem dizer de qual chamada veio.

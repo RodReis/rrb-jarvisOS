@@ -30,7 +30,12 @@ import { spawn } from 'node:child_process'
 import type { AdapterChunk, AdapterRequest, AiAdapter } from './adapter'
 import { AdapterError } from './anthropic-adapter'
 import { ambienteControlado } from '../execution/terminal-engine'
-import { extrairLinhas, novoEstadoDoParser, parsearLinha } from './stream-json-parser'
+import {
+  documentoRetido,
+  extrairLinhas,
+  novoEstadoDoParser,
+  parsearLinha
+} from './stream-json-parser'
 import type { GenerationEvent } from '@shared/domain/geracao'
 import type { Fase } from '@shared/domain/fase'
 import type { RunNeutro } from './cwd-neutro'
@@ -388,6 +393,24 @@ export class ClaudeCodeAdapter implements AiAdapter {
           }
         }
         resto = ''
+      }
+
+      /*
+       * O documento da saída estruturada sai **aqui**, depois da última linha.
+       *
+       * Ele fica retido no parser durante a geração porque o CLI chama `StructuredOutput` mais
+       * de uma vez — repetindo o documento quando não reconhece a primeira chamada —, e emitir
+       * cada uma na hora concatenava dois JSON num texto que nenhum leitor aceita. Vale a
+       * última chamada (decisão do PI, 2026-09-05).
+       *
+       * Não custa streaming: nas gerações com `--json-schema` o documento chega inteiro numa
+       * tacada, e o `ARCHITECTURE.md` § Providers registra que nenhum bloco `text` aparece
+       * nelas. A guarda do critério 3 vale igual: documento retido de uma geração que saiu do
+       * contrato não entra.
+       */
+      for (const evento of documentoRetido(estadoDoParser)) {
+        publicar(evento)
+        if (evento.tipo === 'texto' && !ferramentaProibida) empurrar(evento.delta)
       }
 
       if (sinal === 'SIGKILL' && ferramentaProibida) {
