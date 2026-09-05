@@ -585,6 +585,13 @@ describe('critério 3 — o corte deixa passar o que já estava no buffer', () =
    *
    * Isso é correto e importa: o PI precisa ver **o que** a ferramenta devolveu para entender por
    * que a geração parou. O que o corte impede é o **texto posterior** virar documento.
+   *
+   * **Uma escrita só, e não uma por linha.** A versão anterior fazia um `write` por linha e
+   * passava em máquina de dev, onde as três saem no mesmo `data`; no runner do CI, mais lento,
+   * o `SIGKILL` do corte chegava entre o primeiro `write` e o segundo, e o `tool_result` nunca
+   * era escrito — o teste reprovava com dois eventos em vez de três, intermitentemente. A
+   * intenção sempre foi "o buffer já tinha tudo", e agora o dublê a cumpre por construção em vez
+   * de por sorte de escalonamento.
    */
   it('o resultado da ferramenta cortada ainda chega ao console', async () => {
     const linhas = [
@@ -619,7 +626,9 @@ describe('critério 3 — o corte deixa passar o que já estava no buffer', () =
         [
           '-e',
           `process.stdin.on("data",()=>{});` +
-            linhas.map((l) => `process.stdout.write(${JSON.stringify(l + '\n')});`).join('') +
+            // Uma escrita só: as três linhas chegam no mesmo evento `data`, então o corte não
+            // tem como acontecer no meio delas. Ver o comentário do `describe`.
+            `process.stdout.write(${JSON.stringify(linhas.join('\n') + '\n')});` +
             `process.exit(0)`
         ],
         opcoes
