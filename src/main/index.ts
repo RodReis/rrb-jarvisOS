@@ -392,10 +392,22 @@ if (!app.requestSingleInstanceLock()) {
           credentials.resolve(userIdAtual(), workspaces.atual(), 'gemini') !== undefined,
         ollama: () => ollamaAdapter.disponivel(),
         'claude-code': () => claudeCodeAdapter.disponivel(),
-        // O binário responde? É a mesma pergunta do `claude-code`, e **não** a saúde do perfil:
-        // a tela distingue "CLI ausente" de "perfil sem login", e o segundo é o `PerfilDoCodex`
-        // da M10-F02 que responde.
-        codex: () => codexAdapter.disponivel()
+        /*
+         * O Codex está **pronto para gerar**? — binário no ar **e** perfil autenticado.
+         *
+         * Perguntar só pelo binário (como o `claude-code` faz) seria incoerente aqui, e de um
+         * jeito que confunde: um Codex instalado e sem login apareceria **online** na tela de
+         * providers enquanto toda geração por Sol bloqueia. O critério 6 da SPEC-Fases-06 pede
+         * justamente que o health apareça — e um "online" que não gera é pior que um "offline".
+         *
+         * A diferença em relação ao Claude Code não é inconsistência: lá a sessão vive no perfil
+         * pessoal do CLI e o app não a inspeciona; aqui o perfil é **da pipeline** (M10-F02) e o
+         * `CodexProfileService` responde por ele. O detalhe de *por que* está fora (login,
+         * quota, ferramenta) fica no painel do perfil, que tem os cinco estados.
+         */
+        codex: async () =>
+          (await codexAdapter.disponivel()) &&
+          (await codexProfile.estado()).saude !== 'auth_required'
       }),
       storage.audit
     )
