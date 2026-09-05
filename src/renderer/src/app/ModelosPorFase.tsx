@@ -8,7 +8,7 @@ import { ORIGEM_DO_PROVIDER, ROTULO_DO_PROVIDER, isRotaUnmetered } from '@shared
 import {
   ROTAS_COM_MODELO,
   ROTULO_DA_ROTA,
-  modelosDoCatalogo,
+  opcoesDeModelo,
   politicaDeModeloPadrao,
   rotuloDoModelo
 } from '@shared/domain/modelo-da-fase'
@@ -38,7 +38,13 @@ import { Field, InlineAlert, Select, Tag } from '@design/ui'
  * linhas com o editor de rotas por tarefa, e as duas superfícies respondem perguntas diferentes.
  */
 
-/** O provider que atende cada rota. Espelha `PROVIDER_DA_ROTA` do main, sem importar do main. */
+/**
+ * O provider **exibido** no rótulo da combo.
+ *
+ * Desde a SPEC-Fases-06 a rota de assinatura tem dois providers, e as opções vêm de
+ * `opcoesDeModelo`. Este mapa sobrevive só para nomear a rota no rótulo — na assinatura, o nome
+ * do provider sai do rótulo, porque ele agora varia por opção.
+ */
 const PROVIDER_DA_ROTA: Readonly<Record<RotaComModelo, AiProvider>> = {
   assinatura: 'claude-code',
   paga: 'anthropic'
@@ -53,11 +59,16 @@ interface ComboDeModeloProps {
 
 /** Uma combo: os modelos que o provider daquela rota oferece, com rótulo e id juntos. */
 function ComboDeModelo({ fase, rota, valor, aoMudar }: ComboDeModeloProps): React.JSX.Element {
-  const provider = PROVIDER_DA_ROTA[rota]
+  const opcoes = opcoesDeModelo(fase, rota)
+  // O provider **do modelo escolhido**, não o da rota: com duas assinaturas, as tags de origem e
+  // custo precisam descrever o que o PI selecionou. Cai no da rota enquanto o valor não casa com
+  // nenhuma opção (política guardada com id morto), para a tela não ficar sem tag nenhuma.
+  const escolhida = opcoes.find((o) => o.modelo === valor)
+  const provider = escolhida?.provider ?? PROVIDER_DA_ROTA[rota]
 
   return (
     <div className="flex flex-col gap-2">
-      <Field rotulo={`${ROTULO_DA_ROTA[rota]} · ${ROTULO_DO_PROVIDER[provider]}`}>
+      <Field rotulo={ROTULO_DA_ROTA[rota]}>
         {(atributos) => (
           <Select
             {...atributos}
@@ -65,15 +76,44 @@ function ComboDeModelo({ fase, rota, valor, aoMudar }: ComboDeModeloProps): Reac
             data-jos-rota={rota}
             valor={valor}
             onMudar={aoMudar}
-            opcoes={modelosDoCatalogo(provider).map((m) => ({
-              valor: m,
-              // Rótulo **e** id: o rótulo é o que o PI reconhece, o id é o que aparece no ledger
-              // e no card. Só o rótulo faria a evidência não casar com a escolha.
-              rotulo: `${rotuloDoModelo(m)} · ${m}`
+            opcoes={opcoes.map((o) => ({
+              valor: o.modelo,
+              /*
+               * Provider, rótulo **e** id. O provider entrou na SPEC-Fases-06: com Claude e Codex
+               * na mesma combo, "Opus 5" e "Sol" lado a lado sem o fornecedor faria o PI escolher
+               * às cegas de quem é cada modelo.
+               *
+               * O id continua porque é o que aparece no ledger e no card — só o rótulo faria a
+               * evidência não casar com a escolha.
+               */
+              rotulo: `${ROTULO_DO_PROVIDER[o.provider]} · ${rotuloDoModelo(o.modelo)} · ${o.modelo}`,
+              ...(o.indisponivel === undefined ? {} : { desabilitada: true })
             }))}
           />
         )}
       </Field>
+
+      {/*
+       * O motivo das opções desabilitadas, **visível e uma vez só** (critério 7).
+       *
+       * Uma opção cinza sem explicação é pior que a ausência dela: o PI vê que existe e não
+       * descobre por que não pode usá-la. Como `title` também não serviria — tooltip de mouse não
+       * existe para quem navega por teclado.
+       *
+       * **Agrupado por motivo**, e não uma linha por modelo: os três modelos do Codex compartilham
+       * a mesma razão na Construção, e repetir a frase três vezes transformaria a explicação em
+       * ruído — o PI leria a primeira e ignoraria o painel.
+       */}
+      {[...new Set(opcoes.map((o) => o.indisponivel).filter((m) => m !== undefined))].map(
+        (motivo) => (
+          <p
+            key={motivo}
+            className="max-w-[68ch] text-[length:var(--jos-texto-mini)] text-[var(--jos-cor-texto-secundario)]"
+          >
+            {motivo}
+          </p>
+        )
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         {/*

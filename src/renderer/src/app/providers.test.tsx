@@ -443,7 +443,12 @@ describe('modelos por fase (SPEC-Fases-02)', () => {
   it('Fable aparece na rota de assinatura (critério 1)', async () => {
     await montar()
 
-    expect(await opcoesDe('planejamento', 'assinatura')).toContain('Fable 5.1 · claude-fable-5-1')
+    // O rótulo ganhou o **provider** na SPEC-Fases-06: com Claude e Codex na mesma combo, o nome
+    // do modelo sozinho não diz de quem ele é. A garantia que importa (rótulo + id juntos, para
+    // casar com o ledger) segue afirmada.
+    expect(await opcoesDe('planejamento', 'assinatura')).toContain(
+      'Claude Code CLI · Fable 5.1 · claude-fable-5-1'
+    )
   })
 
   it('Fable NÃO aparece na rota paga: o catálogo resolve, não o runtime (critério 1)', async () => {
@@ -453,13 +458,15 @@ describe('modelos por fase (SPEC-Fases-02)', () => {
 
     expect(opcoes.some((o) => o.includes('claude-fable-5-1'))).toBe(false)
     // A combo não fica vazia por causa da ausência: a rota paga tem catálogo próprio.
-    expect(opcoes).toContain('Opus 5 · claude-opus-5')
+    expect(opcoes).toContain('Anthropic (Claude API) · Opus 5 · claude-opus-5')
   })
 
   it('a combo mostra rótulo e id juntos, para casar com o ledger', async () => {
     await montar()
 
-    expect(await opcoesDe('construcao', 'assinatura')).toContain('Opus 5 · claude-opus-5')
+    expect(await opcoesDe('construcao', 'assinatura')).toContain(
+      'Claude Code CLI · Opus 5 · claude-opus-5'
+    )
   })
 
   it('o padrão do PI aparece: Fable no Planejamento, Opus na Construção', async () => {
