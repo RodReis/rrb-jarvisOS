@@ -14,6 +14,7 @@ import {
   SISTEMA_DO_BRIEF,
   lerPerguntasDoModelo,
   lerSaidaDoModelo,
+  lerSaidaDoModeloDetalhada,
   promptDaGeracao,
   promptDasPerguntas
 } from './brief-schema'
@@ -261,5 +262,55 @@ describe('leitura das perguntas — o parser não conserta', () => {
 
   it('recusa quando perguntas não é lista', () => {
     expect(lerPerguntasDoModelo('{"perguntas":"nenhuma"}')).toBeUndefined()
+  })
+})
+
+/**
+ * A leitura com o motivo nomeado — e por que `prosa` é um caso à parte.
+ *
+ * O defeito que originou isto: o PI pediu um brief, o modelo respondeu em português que o
+ * diretório já continha outro produto e que não ia sobrescrever, e a tela mostrou "a saída do
+ * modelo não passou no validador, nem depois da correção". A frase era verdadeira e escondia a
+ * única informação útil da falha — uma pergunta do modelo esperando resposta.
+ *
+ * A causa era a leitura devolver `undefined` para tudo: prosa e JSON quebrado chegavam ao
+ * serviço como o mesmo nada. Nomear a recusa é o que permite à tela mostrar o texto quando ele
+ * existe, sem abrir a mão de "o parser não conserta" — nada aqui recupera saída inválida.
+ */
+describe('leitura detalhada: a recusa tem nome', () => {
+  it('separa prosa de JSON quebrado — e devolve o que o modelo escreveu', () => {
+    const observacao =
+      'O diretório `rrb-insights` já contém outro produto. Não vou sobrescrever: crio ao lado.'
+
+    const leitura = lerSaidaDoModeloDetalhada(observacao)
+
+    expect(leitura.saida).toBeUndefined()
+    expect(leitura.recusa).toBe('prosa')
+    expect(leitura.textoDoModelo).toBe(observacao)
+  })
+
+  it('JSON truncado é `json-malformado`, e não carrega texto', () => {
+    // A distinção é pelo primeiro caractere: o que começa em `{` ou `[` é estrutura que o modelo
+    // tentou escrever. Despejar esse lixo numa tela seria o stack trace cru que o produto proíbe.
+    const leitura = lerSaidaDoModeloDetalhada('{"afirmacoes": [')
+
+    expect(leitura.recusa).toBe('json-malformado')
+    expect(leitura.textoDoModelo).toBeUndefined()
+  })
+
+  it('nomeia a afirmação malformada em vez de descartá-la em silêncio', () => {
+    const semOrigem = JSON.stringify({
+      afirmacoes: [{ id: 'a-1', bloco: 'jornadas', texto: 'x' }],
+      pendencias: []
+    })
+
+    expect(lerSaidaDoModeloDetalhada(semOrigem).recusa).toBe('afirmacao-malformada')
+  })
+
+  it('a saída boa passa sem recusa — nomear o erro não afrouxa o contrato', () => {
+    const leitura = lerSaidaDoModeloDetalhada(VALIDO)
+
+    expect(leitura.recusa).toBeUndefined()
+    expect(leitura.saida?.afirmacoes).toHaveLength(1)
   })
 })

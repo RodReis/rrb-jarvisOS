@@ -288,14 +288,40 @@ function TrilhaDaGeracao({
       tabIndex={0}
       aria-label="Trilha da geração"
       aria-live={gerando ? 'polite' : 'off'}
-      className="max-h-80 overflow-auto rounded-[var(--jos-raio-card)] border border-[rgba(var(--jos-borda-rgb),0.12)] bg-[var(--jos-cor-superficie-elevada)] p-3"
+      /*
+       * `max-h-96` e não `80`: a captura mostrou a trilha cortada no meio de um comando, com a
+       * rolagem escondendo justamente a linha em que a geração parou. Duas linhas a mais de
+       * altura custam nada e mostram a chamada inteira na maioria dos casos.
+       *
+       * `overscroll-contain` para a rolagem no fim da trilha não continuar na página: rolar
+       * dentro de um painel e ver o documento inteiro andar é o defeito clássico de log embutido.
+       *
+       * `scroll-py` mantém a última linha longe da borda quando o `scrollIntoView` do modo ao
+       * vivo pousa nela.
+       */
+      className="max-h-96 overflow-auto overscroll-contain scroll-py-3 rounded-[var(--jos-raio-card)] border border-[rgba(var(--jos-borda-rgb),0.12)] bg-[var(--jos-cor-superficie-elevada)] p-3"
     >
-      <div className="flex flex-col gap-2">
+      {/*
+        `gap-3`: com `gap-2` a prosa e as linhas de ferramenta encostavam, e o que era narrativa
+        com anotações virava uma pilha uniforme. O espaço é o que separa os dois registros.
+      */}
+      <div className="flex flex-col gap-3">
         {blocos.map((bloco, indice) =>
           bloco.tipo === 'texto' ? (
             <p
               key={`texto-${indice}`}
-              className="whitespace-pre-wrap text-[length:var(--jos-texto-micro)] leading-relaxed text-[var(--jos-cor-texto-secundario)]"
+              /*
+               * O texto do modelo lê em **corpo**, não em micro cinza.
+               *
+               * Era o inverso: a prosa — o que o PI vem ler — vinha no menor tamanho e no tom
+               * mais fraco, enquanto as linhas de ferramenta, que são registro de máquina,
+               * vinham em `text-sm`. A captura mostrou o efeito: o console parecia um log com um
+               * parágrafo perdido no meio, e a frase que explicava a recusa da geração era a
+               * menos visível da tela.
+               *
+               * `max-w` porque o painel é largo e prosa sem medida cansa o retorno de linha.
+               */
+              className="max-w-[68ch] whitespace-pre-wrap text-[length:var(--jos-texto-corpo)] leading-relaxed text-[var(--jos-cor-texto)]"
             >
               {/*
                * Segunda camada de redação, como no `LogViewer`: a primeira é o main, que impede
@@ -325,9 +351,17 @@ function TrilhaDaGeracao({
 
 function LinhaDeFerramenta({ bloco }: { readonly bloco: BlocoDeFerramenta }): React.JSX.Element {
   const status = bloco.status
+  /*
+   * A ferramenta é **registro**, e agora se lê como tal: um degrau abaixo da prosa do modelo,
+   * não acima dela. O nome fica em `mini` com o texto secundário; o argumento, em micro suave.
+   *
+   * Antes o bloco inteiro vinha em `text-sm` — maior que a prosa —, e a trilha parecia uma lista
+   * de comandos com um parágrafo enfiado no meio, em vez de uma narrativa com as ferramentas
+   * anotadas ao lado.
+   */
   const rotulo = (
     <span className="flex min-w-0 items-baseline gap-2">
-      <span className="shrink-0 font-[family-name:var(--jos-fonte-mono)] text-[var(--jos-cor-texto)]">
+      <span className="shrink-0 font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-mini)] text-[var(--jos-cor-texto-secundario)]">
         {bloco.nome}
       </span>
       <span className="truncate font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-suave)]">
@@ -346,7 +380,7 @@ function LinhaDeFerramenta({ bloco }: { readonly bloco: BlocoDeFerramenta }): Re
   // Sem resultado ainda (a ferramenta está rodando) não há o que colapsar: a linha é só a linha.
   if (bloco.resumoDoResultado === undefined) {
     return (
-      <div className="flex items-center gap-2 py-1 text-sm">
+      <div className="flex items-center gap-2 py-1">
         {rotulo}
         <span className="ml-auto shrink-0">{selo}</span>
       </div>

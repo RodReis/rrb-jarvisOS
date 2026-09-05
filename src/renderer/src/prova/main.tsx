@@ -57,6 +57,7 @@ const CENAS_POR_GALERIA: Readonly<Record<string, readonly string[]>> = {
   brief: [
     'prompt-vazio',
     'prompt-bloqueado',
+    'prompt-recusado',
     'brief-propostos',
     'brief-travado',
     'refinamento-vazio',

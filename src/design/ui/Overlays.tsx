@@ -36,7 +36,7 @@ const BACKDROP = cx(
 const PAINEL_MODAL = cx(
   'fixed left-1/2 top-1/2 z-[var(--jos-camada-modal)] w-[min(92vw,32rem)] -translate-x-1/2 -translate-y-1/2',
   'flex flex-col gap-4 rounded-[var(--jos-raio-modal)] p-5',
-  'border border-[rgba(var(--jos-borda-rgb),0.16)] bg-[var(--jos-cor-superficie-elevada)]',
+  'border border-[rgba(var(--jos-borda-rgb),0.16)] bg-[var(--jos-cor-superficie-overlay)]',
   // Cor de texto **declarada**, não herdada. O painel vive num portal: a herança que o resto do
   // app recebe do `FundoDaIdentidade` não chega até aqui, e sem isto o título cai no preto padrão
   // do navegador — ilegível sobre a superfície escura. O mesmo defeito de fundo que o `container`
@@ -243,8 +243,14 @@ export function Popover({ gatilho, children }: PopoverProps): React.JSX.Element 
         <RadixPopover.Content
           sideOffset={6}
           className={cx(
-            'z-[var(--jos-camada-overlay)] w-64 rounded-[var(--jos-raio-card)] p-3',
-            'border border-[rgba(var(--jos-borda-rgb),0.16)] bg-[var(--jos-cor-superficie-elevada)]',
+            // Largura pelo **conteúdo**, com piso e teto — não um `w-64` fixo. O fixo era um
+            // defeito real: o painel de troca de modelo declara `w-[18rem]` e vazava 2rem para
+            // fora da caixa de 16rem, com a borda cortando o campo pelo meio. Teto na largura
+            // disponível para o popover nunca sair da janela.
+            'z-[var(--jos-camada-overlay)] w-max min-w-[var(--jos-tamanho-painel-minimo)]',
+            'max-w-[min(var(--jos-tamanho-painel-maximo),var(--radix-popover-content-available-width))]',
+            'rounded-[var(--jos-raio-card)] p-3',
+            'border border-[rgba(var(--jos-borda-rgb),0.16)] bg-[var(--jos-cor-superficie-overlay)]',
             'text-[var(--jos-cor-texto)]',
             'shadow-[var(--jos-sombra-card)]',
             'data-[state=open]:animate-[surgir_var(--jos-duracao-rapida)_ease-out]'
@@ -289,7 +295,7 @@ export function DropdownMenu({ gatilho, itens }: DropdownMenuProps): React.JSX.E
           align="end"
           className={cx(
             'z-[var(--jos-camada-overlay)] min-w-44 rounded-[var(--jos-raio-card)] p-1',
-            'border border-[rgba(var(--jos-borda-rgb),0.16)] bg-[var(--jos-cor-superficie-elevada)]',
+            'border border-[rgba(var(--jos-borda-rgb),0.16)] bg-[var(--jos-cor-superficie-overlay)]',
             'text-[var(--jos-cor-texto)]',
             'shadow-[var(--jos-sombra-card)]'
           )}
@@ -353,7 +359,7 @@ export function Drawer({
         <RadixDialog.Content
           className={cx(
             'fixed top-0 z-[var(--jos-camada-modal)] flex h-full w-[min(90vw,26rem)] flex-col gap-4 p-5',
-            'border-[rgba(var(--jos-borda-rgb),0.16)] bg-[var(--jos-cor-superficie-elevada)]',
+            'border-[rgba(var(--jos-borda-rgb),0.16)] bg-[var(--jos-cor-superficie-overlay)]',
             'text-[var(--jos-cor-texto)]',
             'shadow-[var(--jos-sombra-card)]',
             lado === 'direita'

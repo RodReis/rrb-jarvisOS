@@ -14,6 +14,7 @@ export { type TomSemantico } from './semantica'
 // Ações (PRD §11.1)
 export { Button } from './Button'
 export { IconButton } from './IconButton'
+export { ChipButton } from './ChipButton'
 export { ButtonGroup } from './ButtonGroup'
 export { Link } from './Link'
 

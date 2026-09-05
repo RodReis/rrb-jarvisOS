@@ -105,6 +105,49 @@ const CARD_POR_MODULO: Readonly<Record<Modulo, string>> = {
   noa: 'nt2'
 }
 
+/**
+ * Achata uma cor translúcida sobre um fundo, devolvendo o opaco equivalente.
+ *
+ * O protótipo especifica as superfícies em `rgba(...,.7)` — vidro sobre a atmosfera do app. Onde
+ * a camada **flutua sobre conteúdo** isso deixa de funcionar, e a saída não é escolher outro hex
+ * a olho: é compor o vidro com o fundo que ele teria e congelar o resultado. A cor continua
+ * derivada do tema, e um card que mude leva o overlay junto.
+ *
+ * Aceita `rgba()`/`rgb()` e hex. Uma cor já opaca volta como está — não há o que achatar.
+ */
+export function opacaSobre(cor: string, fundo: string): string {
+  const frente = paraRgba(cor)
+  if (frente === undefined || frente.a >= 1) return cor
+
+  const atras = paraRgba(fundo)
+  if (atras === undefined) return cor
+
+  const misturar = (f: number, b: number): number => Math.round(f * frente.a + b * (1 - frente.a))
+
+  return `rgb(${misturar(frente.r, atras.r)},${misturar(frente.g, atras.g)},${misturar(frente.b, atras.b)})`
+}
+
+/** `rgba()`, `rgb()` ou hex em canais numéricos. `undefined` quando a forma não é reconhecida. */
+function paraRgba(cor: string): { r: number; g: number; b: number; a: number } | undefined {
+  const funcional =
+    /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+)\s*)?\)$/i.exec(cor.trim())
+
+  if (funcional !== null) {
+    return {
+      r: Number(funcional[1]),
+      g: Number(funcional[2]),
+      b: Number(funcional[3]),
+      a: funcional[4] === undefined ? 1 : Number(funcional[4])
+    }
+  }
+
+  const hex = /^#([0-9a-f]{6})$/i.exec(cor.trim())
+  if (hex === null) return undefined
+
+  const n = Number.parseInt(hex[1], 16)
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255, a: 1 }
+}
+
 export function papeis(modulo: Modulo, modo: ModoUi) {
   const t = TEMA[modo]
 
@@ -120,6 +163,25 @@ export function papeis(modulo: Modulo, modo: ModoUi) {
           : '#f2f4f2',
     /** Card — o token de cada módulo, do mapa explícito acima. */
     surfaceRaised: t[CARD_POR_MODULO[modulo]],
+    /**
+     * Superfície de overlay flutuante — combo aberto, popover, menu, modal, gaveta.
+     *
+     * **Opaca, e é essa a diferença.** O card do protótipo é vidro (`rgba(...,.7)`): ele
+     * repousa sobre o fundo do app, e deixar a atmosfera atravessar é o efeito. Um overlay
+     * flutua sobre **conteúdo** — texto, campos, outro overlay — e a mesma transparência
+     * deixa o que está atrás vazar por baixo das opções. Foi o que a captura do combo de
+     * modelo mostrou: as três opções do Select legíveis por cima da prosa do Popover, e a
+     * prosa legível por cima delas.
+     *
+     * Não é escolha estética, é legibilidade: sobrepor dois textos remove o contraste que a
+     * régua de 4.5:1 mede sobre um fundo — e nenhuma medição de token pega isso, porque cada
+     * camada isolada passa. O princípio 1 do PRODUCT.md decide: clareza antes de efeito.
+     *
+     * Composta a partir do próprio card, e não um hex novo: o overlay é o mesmo material do
+     * card com o vidro fechado, então ele acompanha o tema em vez de virar uma segunda paleta
+     * que divergiria no dia em que o card mudasse.
+     */
+    surfaceOverlay: opacaSobre(t[CARD_POR_MODULO[modulo]], modo === 'dark' ? '#0a0b0e' : '#ffffff'),
     textPrimary: modo === 'dark' ? '#eef1f5' : '#111316',
     textSecondary: modo === 'dark' ? '#9aa3b2' : '#27292d',
     /**

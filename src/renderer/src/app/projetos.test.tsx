@@ -637,8 +637,14 @@ describe('ProjetosLocais', () => {
 
       render(<ProjetosLocais workspace="jarvis" />)
 
+      /*
+       * O nome acessivel diz **qual modelo** e **de onde ele vem** antes de nomear a acao. O
+       * rotulo antigo ("Trocar o modelo da fase X deste projeto") descrevia so a acao: quem
+       * navega por teclado ouvia a mesma frase em doze cards e nao sabia o que ia trocar nem se
+       * aquele projeto ja divergia do espaco. O id visivel continua sendo o do ledger.
+       */
       const gatilho = await screen.findByRole('button', {
-        name: /Trocar o modelo da fase Construção deste projeto/i
+        name: /claude-opus-5.*padrão do espaço.*Trocar o modelo da fase Construção/i
       })
       expect(gatilho).toHaveTextContent('claude-opus-5')
     })

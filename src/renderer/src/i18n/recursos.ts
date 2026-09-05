@@ -145,9 +145,16 @@ export const RECURSOS = {
         placeholder: 'Ex.: um app que organiza minhas leituras e me lembra do que parei no meio…',
         carregando: 'Carregando o prompt…',
         gerar: 'Gerar o brief',
+        // O rótulo da espera: uma geração longa com o rótulo parado parece uma tela travada.
+        gerando: 'Gerando o brief…',
         escrevaAlgo: 'Escreva o prompt para continuar.',
         semRota: 'A geração está indisponível',
         naoGerou: 'O brief não foi gerado',
+        // Título alternativo para quando o modelo respondeu em prosa: ali não houve defeito —
+        // ele leu o pedido e levantou um ponto. Chamar isso de "não foi gerado" descreve a
+        // consequência e esconde a causa, que é o que o PI precisa ler.
+        modeloRespondeu: 'O modelo levantou um ponto antes de gerar',
+        detalheTecnico: 'O que o validador recusou',
         falha: 'Não foi possível gerar o brief. Tente de novo.'
       },
       brief: {
@@ -775,9 +782,12 @@ export const RECURSOS = {
         placeholder: 'e.g. an app that organizes my reading and reminds me what I left halfway…',
         carregando: 'Loading the prompt…',
         gerar: 'Generate the brief',
+        gerando: 'Generating the brief…',
         escrevaAlgo: 'Write the prompt to continue.',
         semRota: 'Generation is unavailable',
         naoGerou: 'The brief was not generated',
+        modeloRespondeu: 'The model raised a point before generating',
+        detalheTecnico: 'What the validator refused',
         falha: 'Could not generate the brief. Try again.'
       },
       brief: {

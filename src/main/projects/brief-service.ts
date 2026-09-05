@@ -33,7 +33,7 @@ import type {
 import { cortarProposto, validarBrief } from '@shared/domain/brief'
 import type { PerguntaGerada } from '@shared/domain/pergunta-gerada'
 import { separarPerguntasValidas } from '@shared/domain/pergunta-gerada'
-import type { DecisaoDoRefinamento } from '@shared/domain/brief-schema'
+import type { DecisaoDoRefinamento, RecusaDaLeitura } from '@shared/domain/brief-schema'
 import type { EstadoDasRotas, ResultadoDaRota } from '@shared/domain/rota-de-geracao'
 import { PROVIDER_DA_ROTA, escolherRota, providerDaRota } from '@shared/domain/rota-de-geracao'
 import { log } from '../logging/logger'
@@ -126,7 +126,20 @@ export interface BriefServiceDeps {
      */
     readonly decisoes: readonly DecisaoDoRefinamento[]
     readonly correcao?: readonly string[]
-  }) => Promise<{ readonly saida?: SaidaDoModelo }>
+  }) => Promise<{
+    readonly saida?: SaidaDoModelo
+    /**
+     * Por que não veio saída utilizável. Presente só quando `saida` está ausente.
+     *
+     * Sem isto, "a chamada falhou" e "o modelo respondeu em português explicando um
+     * impedimento" chegavam aqui como o mesmo `undefined` — e a tela do PI dizia "a saída não
+     * passou no validador" nos dois casos, escondendo justamente a resposta que ele precisava
+     * ler. A distinção que o comentário do adapter já prometia agora existe no tipo.
+     */
+    readonly recusa?: RecusaDaLeitura
+    /** O texto do modelo, quando ele respondeu em prosa. Vazio nos demais casos. */
+    readonly textoDoModelo?: string
+  }>
 }
 
 /** Hash canônico do conteúdo. É por ele que o brief é citado e que a reaprovação compara. */
@@ -143,6 +156,24 @@ function hashDoBrief(afirmacoes: readonly Afirmacao[], pendencias: readonly Pend
 
 export function hashDoPrompt(texto: string): string {
   return createHash('sha256').update(texto, 'utf8').digest('hex')
+}
+
+/**
+ * O que cada recusa de leitura significa em português, para o registro de correção e a tela.
+ *
+ * Mapa fechado: uma recusa nova no schema quebra a compilação aqui, em vez de cair num texto
+ * genérico que descreveria o problema errado. `chamada-sem-saida` é o caso que não vem do
+ * parser — o stream fechou sem concluir, e aí não houve texto nenhum para julgar.
+ */
+const MOTIVO_DA_RECUSA: Readonly<Record<RecusaDaLeitura | 'chamada-sem-saida', string>> = {
+  'chamada-sem-saida': 'A chamada ao modelo não devolveu saída.',
+  prosa: 'O modelo respondeu em texto corrido, e o brief exige saída estruturada.',
+  'json-malformado': 'A resposta do modelo não é JSON válido.',
+  'sem-afirmacoes': 'A resposta não traz a lista de afirmações que o brief exige.',
+  'afirmacao-malformada':
+    'Uma das afirmações não tem os campos obrigatórios (id, bloco, texto e origem).',
+  'pendencia-malformada':
+    'Uma das pendências não tem os campos obrigatórios (bloco, pergunta e material).'
 }
 
 export class BriefService {
@@ -296,9 +327,17 @@ export class BriefService {
         projectId
       })
 
+      /*
+       * Este caso não é falha do modelo — nenhuma chamada aconteceu. A mensagem e a ação são
+       * separadas porque a tela as trata como papéis diferentes: a primeira diz o que houve, a
+       * segunda diz o que fazer. Antes as duas vinham grudadas numa frase só, e o PI lia um
+       * diagnóstico de Git com a mesma cara de "a IA falhou".
+       */
       return {
         resultado: 'saida-invalida',
-        mensagem: 'O prompt ainda não virou revisão no Git; salve o prompt de novo antes de gerar.'
+        mensagem:
+          'O prompt ainda não virou revisão no Git, e a geração precisa dela para citar o texto.',
+        acao: 'Clique em gerar de novo: o prompt é salvo e commitado no caminho, e a geração segue.'
       }
     }
 
@@ -310,6 +349,16 @@ export class BriefService {
     })
 
     let problemas: readonly string[] = []
+    /*
+     * O que o modelo escreveu quando respondeu em prosa, e o motivo da última recusa.
+     *
+     * Sobrevivem ao laço porque é no fim dele que a tela é servida: a última tentativa é a que
+     * o PI vê explicada. Guardar só o `problemas` perdia justamente o caso em que o modelo
+     * tinha algo a dizer — "o diretório já contém outro produto, não vou sobrescrever" virava
+     * "a saída não passou no validador".
+     */
+    let recusaDaLeitura: RecusaDaLeitura | undefined
+    let textoDoModelo: string | undefined
 
     // Uma tentativa de correção, não um laço: ver `TENTATIVAS_DE_CORRECAO`.
     for (let tentativa = 0; tentativa <= TENTATIVAS_DE_CORRECAO; tentativa += 1) {
@@ -326,9 +375,19 @@ export class BriefService {
       })
 
       if (resposta.saida === undefined) {
-        problemas = ['A chamada ao modelo não devolveu saída.']
+        recusaDaLeitura = resposta.recusa
+        textoDoModelo = resposta.textoDoModelo
+        // Substitui, não acumula: a correção repete a mesma recusa quando o modelo erra do
+        // mesmo jeito duas vezes, e listar a frase idêntica duas vezes na tela não informa que
+        // houve duas tentativas — informa que a lista foi montada sem cuidado.
+        problemas = [MOTIVO_DA_RECUSA[resposta.recusa ?? 'chamada-sem-saida']]
         continue
       }
+
+      // Uma volta que produziu saída limpa o que a anterior deixou: o desfecho descreve a última
+      // tentativa, e carregar a prosa de uma tentativa anterior descreveria o passado.
+      recusaDaLeitura = undefined
+      textoDoModelo = undefined
 
       const candidato: Brief = {
         projectId,
@@ -407,15 +466,46 @@ export class BriefService {
       user_id: userId,
       workspace_id: workspaceId,
       type: 'brief-generation',
-      payload: { projectId, fase: 'desistiu', problemas: problemas.length }
+      payload: {
+        projectId,
+        fase: 'desistiu',
+        problemas: problemas.length,
+        ...(recusaDaLeitura === undefined ? {} : { recusa: recusaDaLeitura })
+      }
     })
 
-    log.agent.error('Saída do modelo recusada depois da correção', { projectId, problemas })
+    log.agent.error('Saída do modelo recusada depois da correção', {
+      projectId,
+      problemas,
+      recusa: recusaDaLeitura
+    })
+
+    /*
+     * A prosa do modelo **é** o desfecho quando ele respondeu em português.
+     *
+     * O PI viu "a saída do modelo não passou no validador" enquanto o modelo tinha dito, no
+     * console, que o diretório já continha outro produto e que não ia sobrescrever. A frase de
+     * erro descrevia um defeito técnico; o que havia era o modelo pedindo uma decisão. Nomear o
+     * caso aqui é o que permite à tela mostrar o que ele disse — e o PRODUCT.md é explícito:
+     * mensagem de erro diz o que houve e qual o próximo passo.
+     */
+    if (recusaDaLeitura === 'prosa' && textoDoModelo !== undefined) {
+      return {
+        resultado: 'saida-invalida',
+        mensagem: 'Nada foi gravado — nenhum brief, nenhuma alteração no projeto.',
+        // Sem "abaixo"/"acima": a posição do texto na tela é decisão de layout, e uma cópia que
+        // aponta direção mente na primeira vez que o layout muda. Diz o que fazer, e o PI
+        // encontra a observação porque ela é o elemento mais visível do alerta.
+        acao: 'Responda ao ponto no campo do prompt e gere de novo.',
+        textoDoModelo,
+        problemas
+      }
+    }
 
     return {
       resultado: 'saida-invalida',
-      mensagem:
-        'A saída do modelo não passou no validador, nem depois da correção. Nada foi gravado.',
+      mensagem: 'A resposta do modelo não teve a forma que o brief exige. Nada foi gravado.',
+      acao: 'Gere de novo. Se repetir, descreva o projeto em menos pontos e tente outra vez.',
       problemas
     }
   }

@@ -215,6 +215,84 @@ describe('PromptDoProjeto', () => {
 
     expect(await screen.findByText(/Habilite a rota paga/)).toBeInTheDocument()
   })
+
+  /**
+   * O defeito real que o PI encontrou, travado como teste.
+   *
+   * Ele pediu o brief; o modelo respondeu em português que o diretório já continha outro produto
+   * e que não ia sobrescrever; a tela mostrou *"A saída do modelo não passou no validador, nem
+   * depois da correção. Nada foi gravado."* — verdadeira, e escondendo a única coisa útil da
+   * falha. O texto do modelo estava no console, colapsado abaixo da dobra.
+   *
+   * O que se prova aqui: a observação chega à tela **como conteúdo**, não como anexo. Um teste
+   * sobre a mensagem genérica passaria com o defeito presente, então ele afirma sobre o texto do
+   * modelo — que é o que faltava ao PI.
+   */
+  it('quando o modelo responde em prosa, o PI lê o que ele disse (não só "não foi gerado")', async () => {
+    const usuario = userEvent.setup()
+    const observacao =
+      'O diretório `rrb-insights` já contém outro produto (AgroInsights). Não vou sobrescrever.'
+
+    gerarBrief.mockResolvedValue({
+      resultado: 'saida-invalida',
+      mensagem: 'Nada foi gravado — nenhum brief, nenhuma alteração no projeto.',
+      acao: 'Responda ao ponto no campo do prompt e gere de novo.',
+      textoDoModelo: observacao,
+      problemas: ['O modelo respondeu em texto corrido, e o brief exige saída estruturada.']
+    })
+
+    render(
+      <PromptDoProjeto
+        workspace="jarvis"
+        projectId="p-1"
+        nomeDoProjeto="Leituras"
+        onAvancar={vi.fn()}
+      />
+    )
+
+    await usuario.type(await screen.findByRole('textbox'), 'Um app.')
+    await usuario.click(screen.getByRole('button', { name: /Gerar o brief/ }))
+
+    // O que o modelo disse, na tela.
+    expect(await screen.findByText(new RegExp('já contém outro produto'))).toBeInTheDocument()
+    // E o próximo passo junto: erro sem recuperação é beco (PRD §14).
+    expect(screen.getByText(/Responda ao ponto no campo do prompt/)).toBeInTheDocument()
+  })
+
+  /**
+   * O tom, que decide como o PI lê a tela antes de ler as palavras.
+   *
+   * Prosa do modelo é ponderação — nada quebrou, nada se perdeu. Pintá-la de erro ensina a ler
+   * estado normal como falha, e aí o vermelho para de significar algo quando algo de fato
+   * quebrar. É a mesma régua que o índice de projetos aplica à colisão de nome.
+   */
+  it('a observação do modelo é aviso, não erro — o alerta não é vermelho', async () => {
+    const usuario = userEvent.setup()
+
+    gerarBrief.mockResolvedValue({
+      resultado: 'saida-invalida',
+      mensagem: 'Nada foi gravado.',
+      textoDoModelo: 'Confirmo a forma exata antes de gerar.'
+    })
+
+    render(
+      <PromptDoProjeto
+        workspace="jarvis"
+        projectId="p-1"
+        nomeDoProjeto="Leituras"
+        onAvancar={vi.fn()}
+      />
+    )
+
+    await usuario.type(await screen.findByRole('textbox'), 'Um app.')
+    await usuario.click(screen.getByRole('button', { name: /Gerar o brief/ }))
+
+    // O `InlineAlert` prefixa o tom no nome acessível (`NOME_DO_TOM`) — é assim que quem usa
+    // leitor de tela recebe a severidade, e é o que se afirma aqui em vez de uma classe CSS.
+    const alerta = await screen.findByRole('alert')
+    expect(alerta).toHaveTextContent(/atenção/i)
+    expect(alerta).not.toHaveTextContent(/^erro/i)
+  })
 })
 
 describe('BriefDoProjeto', () => {

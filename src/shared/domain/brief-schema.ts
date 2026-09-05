@@ -193,6 +193,51 @@ function pendenciaValida(v: unknown): v is Pendencia {
  * rodada de correção com um problema que não é de conteúdo.
  */
 export function lerSaidaDoModelo(bruto: string): SaidaBruta | undefined {
+  return lerSaidaDoModeloDetalhada(bruto).saida
+}
+
+/**
+ * Por que a leitura recusou. O primeiro caso é o que a captura do PI mostrou.
+ *
+ * `prosa` existe porque ele **não é** um erro de forma como os outros: o modelo entendeu o
+ * pedido, tinha algo a dizer, e disse em português — "o diretório já contém outro produto, não
+ * vou sobrescrever" — em vez do JSON. Tratado como `json-malformado`, isso chegava à tela como
+ * "a saída não passou no validador", que descreve um defeito técnico onde havia uma **pergunta
+ * do modelo esperando resposta**. Nomear o caso é o que permite à tela mostrar o que ele disse
+ * em vez de escondê-lo atrás de uma frase de erro.
+ */
+export const RECUSAS_DA_LEITURA = [
+  'prosa',
+  'json-malformado',
+  'sem-afirmacoes',
+  'afirmacao-malformada',
+  'pendencia-malformada'
+] as const
+
+export type RecusaDaLeitura = (typeof RECUSAS_DA_LEITURA)[number]
+
+export interface LeituraDaSaida {
+  readonly saida?: SaidaBruta
+  readonly recusa?: RecusaDaLeitura
+  /**
+   * O que o modelo escreveu, quando escreveu prosa.
+   *
+   * **Vazio nos outros casos**, de propósito: JSON malformado é lixo de máquina, e despejá-lo
+   * numa tela seria o stack trace cru que o PRODUCT.md proíbe. Prosa é diferente — foi escrita
+   * para ser lida, e é a única coisa na falha que ajuda o PI a decidir o que fazer.
+   */
+  readonly textoDoModelo?: string
+}
+
+/**
+ * A leitura com o motivo da recusa (SPEC-Jornada-02, critério 3).
+ *
+ * Mesma postura de `lerSaidaDoModelo` — **não conserta nada**. O que muda é só que a recusa
+ * passa a ter nome: sem isso, "veio prosa explicando um impedimento" e "veio uma chave com o
+ * tipo errado" chegavam ao serviço como o mesmo `undefined`, e a tela não tinha como distinguir
+ * um do outro para o PI.
+ */
+export function lerSaidaDoModeloDetalhada(bruto: string): LeituraDaSaida {
   const semCerca = bruto
     .trim()
     .replace(/^```(?:json)?\s*/i, '')
@@ -203,23 +248,30 @@ export function lerSaidaDoModelo(bruto: string): SaidaBruta | undefined {
   try {
     json = JSON.parse(semCerca)
   } catch {
-    return undefined
+    // Prosa e JSON quebrado se separam pelo primeiro caractere: JSON que o modelo tentou
+    // escrever começa em `{` ou `[`. Texto que começa com palavra é resposta em português, não
+    // uma estrutura truncada — e a diferença decide qual mensagem o PI lê.
+    return semCerca.length > 0 && !/^[{[]/.test(semCerca)
+      ? { recusa: 'prosa', textoDoModelo: semCerca }
+      : { recusa: 'json-malformado' }
   }
 
-  if (typeof json !== 'object' || json === null) return undefined
+  if (typeof json !== 'object' || json === null) return { recusa: 'json-malformado' }
 
   const raiz = json as Record<string, unknown>
   const afirmacoes = raiz['afirmacoes']
   const pendencias = raiz['pendencias'] ?? []
 
-  if (!Array.isArray(afirmacoes) || !Array.isArray(pendencias)) return undefined
+  if (!Array.isArray(afirmacoes) || !Array.isArray(pendencias)) {
+    return { recusa: 'sem-afirmacoes' }
+  }
 
   // Uma entrada malformada invalida a saída inteira, em vez de ser descartada em silêncio: o
   // brief precisa ser o que o modelo produziu, não o que sobrou dele depois de um filtro.
-  if (!afirmacoes.every(afirmacaoValida)) return undefined
-  if (!pendencias.every(pendenciaValida)) return undefined
+  if (!afirmacoes.every(afirmacaoValida)) return { recusa: 'afirmacao-malformada' }
+  if (!pendencias.every(pendenciaValida)) return { recusa: 'pendencia-malformada' }
 
-  return { afirmacoes, pendencias }
+  return { saida: { afirmacoes, pendencias } }
 }
 
 /**
