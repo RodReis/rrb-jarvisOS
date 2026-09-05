@@ -354,7 +354,7 @@ describe('BriefDoProjeto', () => {
 
     // Alvo morto sem explicação faria o PI procurar o defeito no próprio brief.
     expect(await screen.findByRole('button', { name: /Aceitar o brief/ })).toBeDisabled()
-    expect(screen.getByText(/Resolva as pendências acima/)).toBeInTheDocument()
+    expect(screen.getByText(/Resolva as pendências para aceitar/)).toBeInTheDocument()
   })
 
   it('bloqueado, o aceite não move a jornada', async () => {
@@ -411,5 +411,69 @@ describe('BriefDoProjeto', () => {
 
     // Sem isto o PI clica, nada acontece, e ele não sabe se aceitou.
     expect(await screen.findByText(/Não foi possível registrar o aceite/)).toBeInTheDocument()
+  })
+})
+
+describe('o painel de julgamento do brief', () => {
+  it('conta as afirmações por origem', async () => {
+    carregarBrief.mockResolvedValue(
+      brief({
+        afirmacoes: [
+          afirmacao({ id: 'a-1', origem: 'prompt' }),
+          afirmacao({ id: 'a-2', origem: 'prompt' }),
+          afirmacao({ id: 'a-3', origem: 'decisao' }),
+          afirmacao({ id: 'a-4', origem: 'proposto' })
+        ]
+      })
+    )
+
+    render(<BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" />)
+
+    // O PI vê quantas a IA inventou sem varrer os dez blocos.
+    const painel = await screen.findByLabelText('Aceite do brief')
+    const doPrompt = within(painel).getByText('Do prompt').closest('div')
+    expect(within(doPrompt as HTMLElement).getByText('2')).toBeInTheDocument()
+
+    const propostas = within(painel).getByText('Propostas pela IA').closest('div')
+    expect(within(propostas as HTMLElement).getByText('1')).toBeInTheDocument()
+  })
+
+  it('lista as pendências ao lado do botão que elas travam', async () => {
+    carregarBrief.mockResolvedValue(
+      brief({
+        pendencias: [{ bloco: 'dominio-e-dados', pergunta: 'Qual base de dados?', material: true }]
+      })
+    )
+
+    render(<BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" />)
+
+    // Com o aceite no rodapé, a razão do bloqueio ficava a uma tela de distância do botão.
+    const painel = await screen.findByLabelText('Aceite do brief')
+    expect(within(painel).getByText('Qual base de dados?')).toBeInTheDocument()
+    expect(within(painel).getByRole('button', { name: /Aceitar o brief/ })).toBeDisabled()
+  })
+
+  it('a pergunta da pendência aparece uma vez só na tela', async () => {
+    // O alerta do topo diz que há bloqueio; a lista vive no painel. Repetir o texto nos dois
+    // faria o leitor de tela anunciar a mesma pergunta em duplicata.
+    carregarBrief.mockResolvedValue(
+      brief({
+        pendencias: [{ bloco: 'dominio-e-dados', pergunta: 'Qual base de dados?', material: true }]
+      })
+    )
+
+    render(<BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" />)
+
+    expect(await screen.findAllByText('Qual base de dados?')).toHaveLength(1)
+  })
+
+  it('sem pendência, o painel não mostra bloco de bloqueio', async () => {
+    carregarBrief.mockResolvedValue(brief())
+
+    render(<BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" />)
+
+    const painel = await screen.findByLabelText('Aceite do brief')
+    expect(within(painel).queryByText(/Falta decidir/)).not.toBeInTheDocument()
+    expect(within(painel).getByRole('button', { name: /Aceitar o brief/ })).toBeEnabled()
   })
 })

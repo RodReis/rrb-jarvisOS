@@ -429,7 +429,24 @@ export function ProjetosLocais({ workspace }: ProjetosLocaisProps): React.JSX.El
                   O hover acende a **borda inteira**, não uma faixa lateral: faixa colorida à
                   esquerda é decoração que finge ser semântica, e aqui o item todo é a superfície.
                 */}
-                <article className="flex flex-col gap-3 rounded-[var(--jos-raio-card)] border border-[rgba(var(--jos-borda-rgb),0.12)] bg-[var(--jos-cor-superficie-elevada)] p-4 transition-colors duration-[var(--jos-duracao-rapida)] hover:border-[rgba(var(--jos-borda-rgb),0.24)]">
+                {/*
+                  A superfície ganha **aresta e profundidade**, não uma cor de fundo nova.
+
+                  O gradiente de topo é o que separa uma placa de um retângulo chapado: uma
+                  lâmina de branco a 2,5% pega a luz na borda superior e some antes da metade,
+                  que é como uma superfície física se comporta. Custa um `linear-gradient` e não
+                  toca em nenhum token.
+
+                  A lâmina de acento (`::before`, via `jos-brilho-acento`) acende **só no hover**
+                  — o acento é identidade, e identidade constante em oito cards vira ruído. No
+                  hover ele diz "este é o card sob o cursor", que é papel de marca, não de
+                  estado: nenhum dado do projeto depende de vê-la, então as três cores fracas da
+                  paleta não escondem informação nenhuma.
+
+                  `translate-y` de 1px com a sombra: o card sobe um fio, o suficiente para o olho
+                  registrar a resposta sem que a pilha inteira pareça se mexer.
+                */}
+                <article className="group relative flex flex-col gap-3 overflow-hidden rounded-[var(--jos-raio-card)] border border-[rgba(var(--jos-borda-rgb),0.12)] bg-[linear-gradient(180deg,rgba(255,255,255,0.025),transparent_42%),var(--jos-cor-superficie-elevada)] p-4 transition-[border-color,transform,box-shadow] duration-[var(--jos-duracao-media)] ease-[var(--jos-curva-padrao)] before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-[linear-gradient(90deg,transparent,var(--jos-cor-acento)_22%,var(--jos-cor-acento)_78%,transparent)] before:opacity-0 before:transition-opacity before:duration-[var(--jos-duracao-media)] hover:-translate-y-px hover:border-[rgba(var(--jos-borda-rgb),0.24)] hover:shadow-[0_18px_40px_-26px_rgba(0,0,0,0.95)] hover:before:opacity-100 motion-reduce:transition-none motion-reduce:hover:translate-y-0">
                   <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
                     <div className="flex min-w-0 flex-1 flex-col gap-1">
                       {editando ? (

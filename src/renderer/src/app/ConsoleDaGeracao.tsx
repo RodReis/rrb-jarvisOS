@@ -2,6 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Badge, Disclosure, Field, Select, Spinner } from '@design/ui'
 import { redigirTexto } from '@design/patterns'
 import type { GenerationEvent, GenerationTrace } from '@shared/domain/geracao'
+import type { EstadoDaEtapa, EtapaDaGeracao } from '@shared/domain/geracao'
+import { ETAPAS_DA_GERACAO, progressoDaGeracao } from '@shared/domain/geracao'
+import { lerSaidaComoDocumento } from '@shared/domain/saida-em-documento'
 import type { Etapa } from '@shared/domain/jornada'
 import type { WorkspaceId } from '@shared/domain/entities'
 
@@ -161,7 +164,14 @@ export function ConsoleDaGeracao({
             Carregando a trilha desta geração.
           </div>
         ) : (
-          <TrilhaDaGeracao eventos={eventos} gerando={gerando} />
+          <>
+            {/*
+              O andamento fica **acima** da trilha: é o resumo, e a trilha é o detalhe. Quem abre
+              o painel durante uma geração longa quer primeiro saber em que ponto ela está.
+            */}
+            <ProgressoDaGeracao eventos={eventos} gerando={gerando} />
+            <TrilhaDaGeracao eventos={eventos} gerando={gerando} />
+          </>
         )}
       </div>
     </Disclosure>
@@ -247,6 +257,229 @@ function dataCurta(iso: string): string {
       })
 }
 
+/** O nome de cada etapa na tela. Dado, não lógica — e em pt-BR, como toda a interface. */
+const NOME_DA_ETAPA: Readonly<Record<EtapaDaGeracao, string>> = {
+  pesquisa: 'Pesquisa de mercado',
+  documentos: 'PRD, Landscape e Convention',
+  validacao: 'Validação da saída',
+  contradicoes: 'Busca de contradições',
+  gravacao: 'Gravação dos documentos'
+}
+
+/**
+ * O andamento da geração: quanto já terminou, o que acontece agora, o que cada etapa produziu.
+ *
+ * ## Por que o acento não aparece aqui
+ *
+ * O acento é escolhido pelo usuário entre oito cores, e três delas colidem com significado que o
+ * sistema reserva: com `#FF2C2C` uma geração saudável ficaria idêntica a erro, com `#2CFF05` uma
+ * etapa pendente pareceria concluída, e `#2323FF` tem 2,58:1 sobre o carbono. Pintar **estado**
+ * com a cor da preferência quebra o princípio 5 do produto — preferência visual não altera
+ * significado semântico.
+ *
+ * Então quem distingue as etapas é **forma**: preenchido contra vazado, ícone de concluído
+ * contra pendente, peso do texto. Isso funciona nas oito cores, no daltonismo e em escala de
+ * cinza, que é o princípio 2. As semânticas (`ok` e `err`) entram só onde há de fato estado de
+ * sistema — e essas o usuário não retematiza.
+ */
+function ProgressoDaGeracao({
+  eventos,
+  gerando
+}: {
+  readonly eventos: readonly GenerationEvent[]
+  readonly gerando: boolean
+}): React.JSX.Element | null {
+  // Varre os eventos uma vez por lista nova, e não a cada render: durante uma geração longa a
+  // trilha passa de centenas de eventos, e recontá-la a cada frame de digitação é trabalho puro.
+  const etapas = useMemo(() => estadoDasEtapas(eventos), [eventos])
+
+  const progresso = useMemo(
+    () => progressoDaGeracao(new Map([...etapas].map(([etapa, v]) => [etapa, v.estado]))),
+    [etapas]
+  )
+
+  // Sem nenhum anúncio não há progresso a mostrar. Uma barra em 0% durante uma geração que não
+  // reporta etapas afirmaria que nada aconteceu, o que é diferente de "não se sabe".
+  if (etapas.size === 0) return null
+
+  const emCurso = ETAPAS_DA_GERACAO.find((e) => etapas.get(e)?.estado === 'iniciada')
+  const atual = emCurso ?? [...ETAPAS_DA_GERACAO].reverse().find((e) => etapas.has(e))
+  const resumoAtual = atual === undefined ? undefined : etapas.get(atual)?.resumo
+
+  return (
+    <section
+      data-jos-progresso
+      aria-label="Andamento da geração"
+      className="flex flex-col gap-3 rounded-[var(--jos-raio-card)] border border-[rgba(var(--jos-borda-rgb),0.14)] bg-[var(--jos-cor-superficie-elevada)] p-4"
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <span className="text-[length:var(--jos-texto-corpo)] font-[var(--jos-peso-semi)] text-[var(--jos-cor-texto)]">
+          {atual === undefined ? 'Geração' : NOME_DA_ETAPA[atual]}
+        </span>
+        {/* `tabular-nums` para o número não dançar de largura entre 8% e 100%. */}
+        <span className="font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-realce)] tabular-nums text-[var(--jos-cor-texto)]">
+          {progresso}%
+        </span>
+      </div>
+
+      {/*
+        A barra carrega o mesmo número que o texto ao lado, e o `role` diz isso ao leitor de tela
+        — sem ele, a barra é uma div decorativa e quem não vê fica sem o progresso.
+      */}
+      <div
+        role="progressbar"
+        aria-valuenow={progresso}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label="Progresso da geração"
+        className="h-1 w-full overflow-hidden rounded-[var(--jos-raio-pill)] bg-[rgba(var(--jos-borda-rgb),0.14)]"
+      >
+        <div
+          className="h-full rounded-[var(--jos-raio-pill)] bg-[var(--jos-cor-texto)] transition-[width] duration-[var(--jos-duracao-media)] ease-[var(--jos-curva-padrao)]"
+          style={{ width: `${progresso}%` }}
+        />
+      </div>
+
+      <ul className="flex flex-col gap-1.5">
+        {ETAPAS_DA_GERACAO.map((etapa) => {
+          const registro = etapas.get(etapa)
+          const estado = registro?.estado
+
+          return (
+            <li
+              key={etapa}
+              data-jos-etapa={etapa}
+              data-jos-estado={estado ?? 'pendente'}
+              className="flex items-baseline gap-2.5"
+            >
+              {/*
+                O marcador é **forma antes de cor**: cheio para concluída, anel para a que está
+                acontecendo, vazado para o que não começou. Lido em cinza, ele continua dizendo
+                as três coisas.
+              */}
+              <span
+                aria-hidden="true"
+                className={
+                  estado === 'concluida'
+                    ? 'mt-[0.35rem] size-2 shrink-0 rounded-full bg-[var(--jos-cor-ok-leitura)]'
+                    : estado === 'falhou'
+                      ? 'mt-[0.35rem] size-2 shrink-0 rounded-full bg-[var(--jos-cor-err-leitura)]'
+                      : estado === 'iniciada'
+                        ? 'mt-[0.35rem] size-2 shrink-0 rounded-full border-2 border-[var(--jos-cor-texto)]'
+                        : 'mt-[0.35rem] size-2 shrink-0 rounded-full border border-[rgba(var(--jos-borda-rgb),0.35)]'
+                }
+              />
+
+              <span
+                className={
+                  estado === 'iniciada'
+                    ? 'text-[length:var(--jos-texto-mini)] font-[var(--jos-peso-semi)] text-[var(--jos-cor-texto)]'
+                    : estado === undefined
+                      ? 'text-[length:var(--jos-texto-mini)] text-[var(--jos-cor-texto-suave)]'
+                      : 'text-[length:var(--jos-texto-mini)] text-[var(--jos-cor-texto-secundario)]'
+                }
+              >
+                {NOME_DA_ETAPA[etapa]}
+              </span>
+
+              {/* O estado também em texto, para quem não distingue as formas nem as cores. */}
+              {estado === 'falhou' && (
+                <span className="font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] uppercase tracking-[2px] text-[var(--jos-cor-err-leitura)]">
+                  falhou
+                </span>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+
+      {/*
+        O que a etapa em curso produziu. `aria-live` porque ele muda sozinho durante a geração, e
+        `polite` para não interromper quem está lendo outra parte da tela.
+      */}
+      {resumoAtual !== undefined && (
+        <p
+          aria-live={gerando ? 'polite' : 'off'}
+          className="max-w-[62ch] border-t border-[rgba(var(--jos-borda-rgb),0.10)] pt-3 text-[length:var(--jos-texto-mini)] text-[var(--jos-cor-texto-secundario)]"
+        >
+          {resumoAtual}
+        </p>
+      )}
+    </section>
+  )
+}
+
+/**
+ * O texto do modelo, lido como documento quando ele **é** um documento.
+ *
+ * A saída da geração do pacote é JSON, e mostrá-la crua transformava o painel numa parede de
+ * chaves e aspas — o PI precisava decodificar o transporte para ler o conteúdo. Aqui a mesma
+ * saída aparece com a forma que ela terá depois de aceita: seção como título, afirmação como
+ * parágrafo, origem em mono.
+ *
+ * **Nada é escondido.** O que a leitura não reconhece como afirmação vem como texto normal, e
+ * isso não é caso de borda: quando o modelo recusa ou erra o schema, a explicação vive
+ * justamente nessa sobra. Um painel que mostrasse só o que entendeu deixaria o PI sem a frase
+ * que diz por que a geração falhou.
+ */
+function TextoDoModelo({ texto }: { readonly texto: string }): React.JSX.Element {
+  const { topicos, restante } = useMemo(() => lerSaidaComoDocumento(texto), [texto])
+
+  // Nada reconhecido: é prosa, e prosa se lê como prosa.
+  if (topicos.length === 0) {
+    return (
+      <p className="max-w-[68ch] whitespace-pre-wrap text-[length:var(--jos-texto-corpo)] leading-relaxed text-[var(--jos-cor-texto)]">
+        {/*
+         * Segunda camada de redação, como no `LogViewer`: a primeira é o main, que impede o
+         * segredo de chegar ao banco. O texto do modelo não passa pelo redator do main (ele é o
+         * documento), então é aqui que um token citado na resposta é coberto.
+         */}
+        {redigirTexto(restante)}
+      </p>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      {topicos.map((topico) => (
+        <section key={`${topico.documento}-${topico.secao}`} className="flex flex-col gap-2">
+          {/*
+            O cabeçalho do tópico em mono maiúsculo com o acento de leitura: mesma convenção que
+            o brief e o PRD já usam para nomear bloco e seção. Repetir a forma é o que faz o
+            console parecer o documento nascendo, e não outra tela.
+
+            A régua que sai do título ocupa a largura restante — separa os tópicos com o material
+            mais barato que existe, sem acrescentar mais uma caixa ao que já é uma pilha.
+          */}
+          <h4 className="flex items-center gap-3 font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] uppercase tracking-[2px] text-[var(--jos-cor-acento-leitura)]">
+            <span className="shrink-0">
+              {topico.documento === '' ? topico.secao : `${topico.documento} · ${topico.secao}`}
+            </span>
+            <span aria-hidden="true" className="h-px flex-1 bg-[rgba(var(--jos-borda-rgb),0.12)]" />
+          </h4>
+
+          <div className="flex flex-col gap-3">
+            {topico.afirmacoes.map((a, indice) => (
+              <div key={a.id === '' ? `sem-id-${indice}` : a.id} className="flex flex-col gap-0.5">
+                <p className="max-w-[68ch] text-[length:var(--jos-texto-corpo)] leading-relaxed text-[var(--jos-cor-texto)]">
+                  {redigirTexto(a.texto)}
+                </p>
+                {/* A origem é dita em texto, nunca por cor: mesma regra do brief, e o princípio
+                    2 do produto vale igual aqui. Origem ausente não vira linha vazia. */}
+                {a.origem !== '' && (
+                  <span className="font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] uppercase tracking-[2px] text-[var(--jos-cor-texto-suave)]">
+                    {a.origem}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  )
+}
+
 /**
  * A trilha: o texto do modelo em fluxo, as ferramentas como linhas, o uso no fim.
  *
@@ -308,28 +541,15 @@ function TrilhaDaGeracao({
       <div className="flex flex-col gap-3">
         {blocos.map((bloco, indice) =>
           bloco.tipo === 'texto' ? (
-            <p
-              key={`texto-${indice}`}
-              /*
-               * O texto do modelo lê em **corpo**, não em micro cinza.
-               *
-               * Era o inverso: a prosa — o que o PI vem ler — vinha no menor tamanho e no tom
-               * mais fraco, enquanto as linhas de ferramenta, que são registro de máquina,
-               * vinham em `text-sm`. A captura mostrou o efeito: o console parecia um log com um
-               * parágrafo perdido no meio, e a frase que explicava a recusa da geração era a
-               * menos visível da tela.
-               *
-               * `max-w` porque o painel é largo e prosa sem medida cansa o retorno de linha.
-               */
-              className="max-w-[68ch] whitespace-pre-wrap text-[length:var(--jos-texto-corpo)] leading-relaxed text-[var(--jos-cor-texto)]"
-            >
-              {/*
-               * Segunda camada de redação, como no `LogViewer`: a primeira é o main, que impede
-               * o segredo de chegar ao banco. O texto do modelo não passa pelo redator do main
-               * (ele é o documento), então é aqui que um token citado na resposta é coberto.
-               */}
-              {redigirTexto(bloco.texto)}
-            </p>
+            /*
+             * O texto do modelo lê em **corpo**, não em micro cinza — e, quando é a saída
+             * estruturada da geração, lê como documento em vez de JSON cru.
+             *
+             * Era o inverso nos dois eixos: a prosa que o PI vem ler vinha no menor tamanho e no
+             * tom mais fraco, enquanto as linhas de ferramenta (registro de máquina) vinham
+             * maiores; e a saída da geração aparecia como uma parede de chaves.
+             */
+            <TextoDoModelo key={`texto-${indice}`} texto={bloco.texto} />
           ) : bloco.tipo === 'ferramenta' ? (
             <LinhaDeFerramenta key={`ferramenta-${bloco.chamadaId}-${indice}`} bloco={bloco} />
           ) : bloco.tipo === 'uso' ? (
@@ -515,8 +735,39 @@ export function agruparEmBlocos(eventos: readonly GenerationEvent[]): readonly B
       continue
     }
 
+    /*
+     * `etapa` não vira bloco da trilha: ele alimenta a **barra de progresso**, que é outra
+     * superfície. Empilhá-lo aqui produziria dez linhas de "iniciou/terminou" no meio do texto
+     * do modelo — ruído entre exatamente o que o painel existe para deixar legível.
+     */
+    if (evento.tipo === 'etapa') continue
+
     blocos.push({ tipo: 'erro', mensagem: evento.mensagem })
   }
 
   return blocos
+}
+
+/**
+ * O andamento das etapas, na ordem do contrato.
+ *
+ * Reduz os eventos ao **último estado** de cada etapa: uma etapa que iniciou, falhou e foi
+ * retentada aparece pelo que ela é agora, não pela soma do que já foi. É a mesma leitura que a
+ * barra faz, e tê-la aqui é o que impede a tela de recontar o histórico a cada render.
+ */
+export function estadoDasEtapas(
+  eventos: readonly GenerationEvent[]
+): ReadonlyMap<EtapaDaGeracao, { readonly estado: EstadoDaEtapa; readonly resumo?: string }> {
+  const mapa = new Map<EtapaDaGeracao, { estado: EstadoDaEtapa; resumo?: string }>()
+
+  for (const evento of eventos) {
+    if (evento.tipo !== 'etapa') continue
+
+    mapa.set(evento.etapa, {
+      estado: evento.estado,
+      ...(evento.resumo === undefined ? {} : { resumo: evento.resumo })
+    })
+  }
+
+  return mapa
 }
