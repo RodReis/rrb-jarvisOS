@@ -1871,10 +1871,164 @@ Pedido do PI em 2026-09-03, depois da M25-F02: *"melhorar o layout, UX e UI — 
 
 **Limite:** os anexos continuam na etapa `design`, depois do PRD. Oferecê-los na etapa do prompt seria escopo novo, sem spec — o que a tela do prompt ganhou foi o exemplo legível, não um controle de anexo.
 
+
+## `[FIX]` A jornada não saía do prompt, e o schema do brief proibia as pendências (#281, #280)
+
+O PI testou a jornada depois das correções #271/#272/#274 e escreveu: *"habilitou os botões:
+Gerar Brief, e agora não sei o que fazer?"*. A geração estava **certa** — 2.460 tokens de
+entrada contra 230.444 antes, sem ferramenta, uma resposta só no contrato. O que estava errado
+era tudo em volta dela.
+
+**Por que os dois defeitos só apareceram agora.** Nenhum é novo: o do schema nasceu na M26-F07
+(ontem), o da jornada na M25-F02 (dois dias antes). Eles precisavam de uma geração que
+**chegasse ao fim** para se manifestar, e até as três correções de ontem nenhuma chegava — o CLI
+ou estourava o timeout de 120s ou invocava ferramenta e era cortado. Consertar o caminho expôs o
+destino.
+
+### O schema mais estreito que o contrato (#280)
+
+`SCHEMA_DAS_AFIRMACOES` declara `additionalProperties: false` e uma chave só. O `SISTEMA_DO_BRIEF`
+pede duas — `afirmacoes` e `pendencias`. O CLI valida a saída contra o schema, então a segunda
+chave era recusada **antes de o documento existir**.
+
+O modo de falha é o que torna isto grave: o modelo não erra ruidosamente, ele **cumpre a
+restrição**. Nas duas gerações reais do PI, `pendencias: []` no banco, e o que deveria ser
+pendência material apareceu como afirmação `proposto` no bloco de riscos — *"nenhuma fonte de
+dados de cotações foi indicada"*, *"nenhuma fonte de notícias foi indicada"*. São exatamente as
+lacunas que a spec manda **bloquear o aceite** (§ Brief: *"pendência material bloqueia o
+aceite"*), e chegaram como texto informativo que não bloqueia nada. Um documento que parece
+completo e perdeu o freio.
+
+`SCHEMA_DO_BRIEF` é um envelope de duas listas, ambas `required`: lista vazia é resposta legítima
+("nada ficou em aberto"), chave ausente não é — e é a chave que o schema cobra. Os outros call
+sites seguem com o envelope de uma chave, porque o PRD e a arquitetura de fato só devolvem
+afirmações; alargar aquele por simetria faria o CLI aceitar chave que nenhum leitor consome.
+
+**O teste confronta cada schema com o system correspondente**, e não com uma lista de chaves
+escrita à mão: a lista à mão seria uma **terceira** cópia do contrato, divergindo das outras duas
+na primeira vez que alguém mexesse só numa. Tem sanidade própria — se a leitura do system quebrar,
+ela falha alto em vez de comparar contra lista vazia.
+
+### A jornada sem evidência do fluxo novo (#281)
+
+`eventosObservados` sustentava `prompt-salvo` e `refinamento-respondido` a partir de **uma fonte
+só**: as respostas do wizard do MVP-008. O fluxo da M25-F02 não grava `respostas` — ele grava
+`project_prompt`, o marco `prompt-registrado` e `project_brief`. Nenhum dos três estava ligado à
+jornada, então `etapaDerivada` não via evidência nenhuma e parava em `prompt`.
+
+Medido no banco do PI: `etapa_da_jornada = 'prompt'`, `ultimo_marco = 'prompt-registrado'`,
+`respostas = {}`, **dois briefs gravados**. A trilha mostrava "Prompt inicial" e todas as outras
+etapas diziam *Conclua "Escrever o prompt" para chegar aqui*. Não havia botão que tirasse o
+projeto dali.
+
+A lacuna estava **registrada** neste documento pela M25-F01: *"Contar só um prompt explícito é a
+M25-F02, que o cria"*. A M25-F02 criou o prompt explícito, criou o marco, e não ligou o marco à
+jornada. O aviso ficou no doc e o código seguiu sem ele.
+
+**A decisão do PI (2026-09-05): o brief nasce no fim do refinamento.** Duas opções foram levadas
+a ele — (a) o brief como evidência do refinamento concluído, (b) um botão "Concluir o refinamento"
+com marco próprio. Ele escolheu (a), que é o desenho que o próprio código já descrevia: o
+comentário do wiring em `index.ts` diz *"o refinamento vem **antes** do brief porque o brief cita
+as decisões dele: sem as respostas do PI no pedido, toda afirmação vinda de uma escolha viraria
+`proposto`"* — enquanto a tela gerava o brief no prompt, antes de qualquer pergunta. O predicado
+`temBrief` fecha a jornada e a mudança de tela corrige a origem das afirmações, de uma vez. A
+opção (b) acrescentaria um marco ao vocabulário para registrar o que o brief já registra.
+
+### O defeito latente que o conserto encontrou
+
+O laço que traduz marco → evento percorria as entradas de `EVENTO_DO_MARCO` e parava quando a
+chave batia com o `ultimoMarco`. **`estrutura-inicial` não está nesse mapa** — e é o primeiro
+marco de todo projeto —, então o `break` nunca disparava e o laço empurrava a cadeia **inteira**,
+do brief ao roadmap, para um projeto recém-criado.
+
+Nunca virou jornada adiantada porque `etapaDerivada` para no primeiro buraco e os eventos não
+tinham como se encadear. Era **acidente feliz, não garantia**: bastaria alguém acrescentar o
+evento que faltava para um projeto vazio saltar etapas. A parada agora é pela ordem dos marcos, e
+um teste trava o caso.
+
+### Três consequências na tela, e uma no console
+
+- **Salvar o prompt não chama mais o modelo.** Com isso saem daquela tela o aviso de rota e o
+  selo de custo: eles descreviam um custo que ali não existe. E a falta de rota deixou de
+  desabilitar o botão — barrar o **salvamento** por uma credencial ausente perderia o texto do PI
+  por um motivo sem relação com guardá-lo.
+- **O console da geração passa a registrar `refinamento`**, a etapa onde ela de fato acontece. O
+  `ProjetoAberto` filtra o console pela etapa da tela corrente; manter `brief-aceito` esconderia
+  do PI o console da própria geração que ele acabou de disparar — ele só apareceria depois de a
+  jornada avançar, quando já não há o que acompanhar. As duas etapas são da fase `planejamento`,
+  então o isolamento do CLI da M26-F07 não muda.
+- **`RecusaDaGeracao` virou módulo próprio**, porque agora duas telas o usam. Ele carrega o
+  conserto da #275 (a observação do modelo como conteúdo, não anexo), e duplicá-lo criaria duas
+  cópias que divergiriam na primeira correção feita só numa.
+
+### O que o E2E provou e o que ele não prova
+
+O int-spec da jornada escreve `ultimo_marco` direto no banco — é o que o torna rápido e também o
+que o impede de provar que o marco **nasce de um commit**. O E2E novo faz o `PROMPT.md` virar
+revisão pelo `GitRunner` sobre o `TerminalEngine`, no repositório que o app criou, com o
+`temBrief` do `index.ts` em vez do injetado.
+
+**Limite declarado:** a metade `brief → brief-aceito` não entra nele. Gerar o brief exige chamada
+real ao modelo (dezenas de segundos, custo, e a rota da assinatura pode não estar no ar no
+runner), e o dublê que a substituísse provaria o dublê. Essa metade é medida no int-spec, com
+`temBrief` injetado, e no teste de tela do refinamento.
+
+**Uma armadilha do harness, registrada porque me enganou:** o Playwright lança o app por
+`out/main/index.js` — o **bundle**, não o fonte —, e nenhum script encadeia build e E2E. O
+primeiro contrafactual que rodei "passou" com o defeito de volta, o que sugeria um teste inútil;
+era o bundle antigo, gerado minutos antes com o conserto dentro. Depois do `electron-vite build`,
+o mesmo contrafactual reprovou como devia. Um `npm run dev` em watch mantém o bundle fresco
+enquanto roda e congela quando é encerrado, o que torna o engano mais fácil.
+
+### Três coisas que só o CI mostrou
+
+**A identidade de Git, pela segunda vez.** O E2E novo commita, e o runner não tem `user.name`
+global — o marco falhava com `reason: falha-na-execucao`, e a jornada não avançava. A lição está
+registrada no repo desde a M8-F04, custou um ciclo na #259, e custou outro aqui. O conserto é
+duas linhas de `git config` locais ao diretório do projeto, depois de criá-lo.
+
+Mais útil que o conserto é **como reproduzir o runner no Windows**, porque a primeira tentativa
+mentiu: `GIT_CONFIG_GLOBAL=/dev/null` falha por dois motivos independentes e silenciosos — o Git
+Bash traduz `/dev/null` para `nul` ao repassar a processo Windows, e o `ambienteControlado()` do
+`TerminalEngine` só deixa passar uma **lista de permissão** de variáveis, na qual `GIT_CONFIG_*`
+não está. O teste passava e parecia provar que o conserto era desnecessário. O que funciona é
+apontar `USERPROFILE` e `HOME` — que **estão** na lista — para um diretório sem `.gitconfig`:
+
+```
+mkdir /tmp/homevazio && HV=$(cygpath -w /tmp/homevazio)
+USERPROFILE="$HV" HOME="$HV" npx playwright test tests/e2e/<arquivo>.e2e.ts
+```
+
+Sem a identidade isso reproduz o CI exatamente; com ela, passa.
+
+**A prova visual não roda no `npm test`.** A suíte `test:prova` é separada, e eu não a tinha
+rodado: ela media o critério 6 na tela do prompt, de onde o bloqueio saiu junto com a geração. A
+cena `prompt-bloqueado` virou `refinamento-bloqueado` e as três asserções migraram com ela — o
+que se mede é o mesmo, na tela onde a chamada de fato acontece.
+
+**Um teste com corrida, que a lentidão do runner expôs.** O dublê de
+`isolamento-do-cli.int-spec.ts` fazia um `write` por linha; no CI o `SIGKILL` do corte chegava
+entre o primeiro e o segundo, e o `tool_result` nunca era escrito. O comentário do teste já
+declarava a intenção — *"o buffer já tinha tudo"* —, mas o dublê a cumpria por sorte de
+escalonamento. Agora escreve as três linhas numa vez só, por construção.
+
+Ao medir o contrafactual desse conserto, achei um **buraco de cobertura anterior**: trocando
+`processo.kill('SIGKILL')` por um no-op, os 37 testes do arquivo continuam verdes. A flag
+`ferramentaProibida` sozinha sustenta todas as asserções — ela protege o **documento**, e o kill
+protege o **custo e o tempo**, que é outra coisa. Sem ele, uma sessão fora do contrato roda até o
+timeout de 120s consumindo a assinatura, com toda a saída descartada. Registrado em
+[#283](https://github.com/RodReis/rrb-jarvisOS/issues/283) em vez de alargar este PR.
+
+**Limite desta entrega:** o refinamento ainda termina em "Procurar o que ainda falta" quando não
+há pergunta pendente, e o PI decide quando parar de procurar. Um critério automático de "todos os
+blocos cobertos" é escopo novo — a spec fala em *"todos os blocos têm resposta ou pendência
+declarada"*, mas não define o fato que o comprova, e defini-lo é decisão de produto.
+
 ## Registro de entregas
 
 | Data | Fatia | PR | Observação |
 |---|---|---|---|
+| 2026-09-05 | `[FIX]` A jornada não saía do prompt, e o schema do brief proibia as pendências ([#281](https://github.com/RodReis/rrb-jarvisOS/issues/281), [#280](https://github.com/RodReis/rrb-jarvisOS/issues/280)) | [#282](https://github.com/RodReis/rrb-jarvisOS/pull/282) | **3229 testes verdes** (Regras 1467, Banco 1176, Tela 586), +24 sobre a `main`. Dois defeitos que o **teste do PI achou na primeira geração que chegou ao fim** — antes das correções #271/#272/#274 nenhuma chegava, e por isso nenhum dos dois aparecia. **#280:** o `--json-schema` do brief usava `SCHEMA_DAS_AFIRMACOES`, de **uma chave** e `additionalProperties: false`; o system pede **duas**. O CLI recusava `pendencias` antes de o documento existir e o modelo cumpria a restrição escrevendo o que sobrou onde coubesse: as duas gerações reais do PI gravaram `pendencias: []`, e o que deveria **bloquear o aceite** virou afirmação `proposto` no bloco de riscos. Documento aparentemente completo, freio inexistente. **#281:** `eventosObservados` sustentava `prompt-salvo` e `refinamento-respondido` a partir de **uma fonte só** — as respostas do wizard do MVP-008, que o fluxo novo não grava. Um projeto que escrevia o prompt, commitava o `PROMPT.md` e gerava o brief ficava em `prompt` **para sempre**, sem botão que o tirasse dali. A M25-F01 registrou a lacuna sabendo dela (*"contar só um prompt explícito é a M25-F02, que o cria"*); a M25-F02 criou o prompt explícito e não ligou o marco à jornada. **Decisão do PI (2026-09-05):** o brief passa a nascer no **fim do refinamento**, e é ele que fecha a etapa — o que corrige um segundo defeito de graça: gerando na tela do prompt, antes de qualquer pergunta, `decisoesDoRefinamento` chegava sempre vazio e **nenhuma afirmação podia ter origem `decisao`**. O comentário do wiring já dizia o certo enquanto a tela fazia o contrário. Contrafactuais medidos: 2 testes sem o schema, 4 sem a entrada do marco, 1 sem a leitura do brief, e o E2E novo reprova sem o conserto |
 | 2026-09-05 | M26-F07 Isolamento do CLI por fase ([#274](https://github.com/RodReis/rrb-jarvisOS/issues/274)), com as correções [#271](https://github.com/RodReis/rrb-jarvisOS/issues/271) e [#272](https://github.com/RodReis/rrb-jarvisOS/issues/272) | [#278](https://github.com/RodReis/rrb-jarvisOS/pull/278) | **3205 testes verdes** (Regras 1455, Banco 1169, Tela 581) — **+39**. Um defeito visto de três ângulos: uma geração de documento que se comportava como sessão de agente. O PI testou o refinamento com prompt pequeno e recebeu "vou montar o projeto e entregar o código", 30 KB de corpo de skill despejados na saída, e 230.444 tokens de entrada. **(1) #271 — o contrato nunca chegava ao modelo.** `generateStream` escrevia só `request.prompt` no stdin e ignorava `request.system`: `SISTEMA_DAS_PERGUNTAS` — blocos válidos, proibição de inventar requisito legal — nunca era entregue, e o CLI respondia dentro da persona padrão de agente de código. Os outros três adapters já o passavam; só este não. Agora vai por `--system-prompt`, em **qualquer** fase (entregar o contrato não tem relação com ferramentas). O Codex não tem flag equivalente — confirmado em `codex exec --help` —, então o system entra antes do prompt no stdin com cabeçalhos `INSTRUÇÕES:`/`PEDIDO:`; sem eles as duas partes viram um texto só e o modelo trata a instrução como conteúdo a descrever. Os nove systems da jornada passam a declarar o idioma (`IDIOMA_DA_SAIDA`): a saída em português era **imitação do prompt**, não contrato, e o dia em que um prompt viesse em inglês mudaria a língua do documento sem nada no código mudar. **(2) #272 — texto de mensagem `user` virava documento.** O parser tratava `user` igual a `assistant`, e o CLI usa `user` para injetar o que ninguém digitou: corpo de skill, `system-reminder`, resultado de ferramenta. O `truncarBytes` de 2 KB não alcançava esse caminho — só cobria `tool_result` —, então a skill `claude-api` inteira entrou no documento. Agora `texto` só nasce de `assistant`; o injetado vira `ferramenta-fim` truncado com `tamanhoOriginal`, pendurado no `tool_use` pendente quando há um. **Não** vira `erro`: conteúdo injetado é rotina do CLI, e um painel cheio de "erro" faria o PI ignorar os erros de verdade. O estado do parser é **por geração** e não de módulo — duas gerações simultâneas compartilhariam a global e uma penduraria na outra o resultado da sua ferramenta. **(3) F07 — o CLI rodava em `process.cwd()`.** O comentário que defendia isso ("o diretório do app, nunca o do usuário") estava errado nas duas metades: em dev o diretório do app **é** o repositório do JarvisOS, com `CLAUDE.md`, `.claude/`, regras, hooks, skills e MCPs entrando no contexto de uma geração sobre **outro** projeto; no app empacotado é o que o atalho do Windows decidir. Agora cada geração roda num diretório vazio sob o `userData`, removido em **todos** os desfechos (o teste do timeout prova o caso do `SIGKILL`). **O smoke real achou o que o dublê escondia.** O dublê aceita qualquer flag por construção; o `claude` 2.1.258 revelou que `--json-schema` **não** faz o modelo escrever JSON em texto: ele injeta a ferramenta `StructuredOutput` e o modelo responde chamando-a, com o documento no `input` e **nenhum** bloco `text`. Sem tratar isso o documento nasceria vazio — e o corte do critério 3 mataria a geração, porque uma ferramenta teria sido usada numa fase sem ferramentas. `--tools ""` e `--json-schema` **convivem**: o `system/init` reporta `"tools":["StructuredOutput"]`, `"mcp_servers":[]`, `"plugins":[]`. O smoke também mostrou que o **Codex tem duas fontes de contexto**: no cwd neutro mas com `CODEX_HOME` pessoal, a sessão ainda carregava plugins e hooks de `~/.codex/` — o `--sandbox read-only` restringe o que as ferramentas alcançam, não o que a sessão carrega; quem fecha essa porta é o `CODEX_HOME` da pipeline (M10-F02), e o isolamento do Codex é a soma dos dois. **Critério 4 medido: 1.634 tokens de entrada** com prompt de 145 caracteres, contra 230.444 — **99,3% abaixo**, e bem dentro do teto de 10.000. Flag que a versão instalada não reconheça vira `AdapterError` que a **nomeia** (lido do stderr por regex, só o nome da flag: o stderr pode carregar caminho de sessão), nunca fallback silencioso. Versões mínimas registradas no `ARCHITECTURE.md` § Providers: `claude` 2.1.258, `codex` 0.149.0, cada flag conferida em `--help`. **Um quarto defeito, achado relendo o próprio diff:** o `disponivel()` abria o diretório do run e o removia só no `close` — mas o caso mais comum dele é o binário **não instalado**, que chega por `error` e pode nunca emitir `close`. Como a tela de providers sonda em laço, cada sondagem deixaria um diretório no `userData` de quem não tem o CLI: justamente quem mais sonda, porque a tela fica perguntando se ele já apareceu. A limpeza passa a pendurar na **resposta**, não no `close`. O teste reprova com o código anterior e passa com o novo — verificado revertendo o conserto, não por leitura. **E o CI achou o quinto:** os dois testes do console no E2E terminavam em `saida-invalida`. O dublê do `claude` emitia `Read` e `Bash` numa geração de **Refinamento** — fase de Planejamento —, e o critério 3 passou a cortar exatamente isso; o texto das perguntas vem **depois** das ferramentas no roteiro, então nunca chegava ao documento. O app estava certo e o dublê é que ficou desatualizado: ele imitava um CLI que ignora `--tools ""`. Agora o dublê **olha os args**, como o CLI real — com `--tools` presente emite o roteiro sem ferramentas; sem ela, o roteiro com —, e nasce um segundo teste que mede o corte no app montado. O segredo mudou de ferramenta no roteiro: o corte mata na **primeira**, e um segredo pendurado na segunda poderia nunca atravessar a ponte, fazendo a asserção de redação passar por ausência. **O sexto foi a guarda anti-drift:** esqueci de regenerar `reports/TESTS.md`, e os números commitados eram os de antes desta fatia. |
 | 2026-09-05 | `[FIX]` Combo fora do tema, chip do modelo quebrado e recusa sem o que o modelo disse ([#275](https://github.com/RodReis/rrb-jarvisOS/issues/275)) | [#276](https://github.com/RodReis/rrb-jarvisOS/pull/276) | **3150 testes verdes** (Regras 1439, Banco 1130, Tela 581). Três defeitos achados por **captura do PI**, nenhum deles alcançável por teste de papel — os três passam por `getByRole` com a tela errada. **(1) O overlay montava fora do tema, e é uma regressão do FIX #107 por recorte.** `Select` e `Tooltip` chamavam `Portal` **sem `container`**: o conserto original foi feito arquivo a arquivo em `Overlays.tsx`, com o teste morando em `overlays.test.tsx`, e ninguém varreu os outros `Portal` do DS — os dois que ficaram de fora moram em arquivos diferentes, então nem o teste nem a revisão os alcançavam. O efeito é total, não estético: os tokens `--jos-*` vivem como `style` inline no `div` do provider, e um portal no `<body>` cai fora dessa subárvore, onde **toda** variável resolve vazio. Medido no navegador antes (`provedorContemPortal: false`, `varNoInner: ""`, fundo `rgba(0,0,0,0)`) e depois (`true`, `rgb(20,22,27)`) — a lista abria sem fundo, sem raio, sem sombra e **sem `z-index`**, então o texto de trás atravessava as opções e qualquer elemento posicionado da página passava por cima delas. É o mesmo modo de falha da M26-F06 (`toHaveLength(4)` com um irmão no E2E): o primeiro erro **é** corrigido, a sensação é de problema resolvido, e o segundo arquivo nunca entra no campo de visão. Somado a isso, a superfície de overlay herdava o card do protótipo (`rgba(...,.7)`) — que é vidro **por desenho**, correto sobre o fundo do app e errado sobre conteúdo: sobrepor dois textos remove o contraste que a régua de 4.5:1 mede sobre um fundo, e nenhuma medição de token pega isso porque cada camada isolada passa. Nasce `surfaceOverlay`, **composta a partir do card** (`opacaSobre`) em vez de um hex novo, para acompanhar o tema em vez de virar uma segunda paleta que divergiria. O `w-64` fixo do `Popover` também sai: era medida sem papel — cabia no filtro de duas linhas e cortava o painel de troca de modelo, que declara `17rem` e vazava 2rem para fora da caixa com a borda cruzando o campo pelo meio. **(2) O chip do modelo quebrava em duas linhas.** O gatilho da troca usava `IconButton`, que fixa `width` **e** `height` em 44px por desenho — é alvo quadrado para um glifo, e `claude-opus-5` quebrava em "CLAUDE-"/"OPUS-5" dentro de uma caixa que não cresce, vazando a borda. Nasce `ChipButton`: largura pelo conteúdo, altura da linha de metadados (44px ali empurraria a linha e roubaria a hierarquia do CTA do card). O nome acessível passa a dizer **qual modelo e se ele diverge do espaço**, em vez de repetir "Trocar o modelo da fase X" idêntico em doze cards. **(3) A recusa da geração escondia a única informação útil da falha.** O modelo respondeu **em português** que o diretório já continha outro produto e que não ia sobrescrever, pedindo confirmação; a tela mostrou *"A saída do modelo não passou no validador, nem depois da correção."* — verdadeira, e descrevendo um defeito técnico onde havia uma **pergunta esperando resposta**. Duas causas somadas: `lerSaidaDoModelo` devolvia `undefined` para toda recusa, então "veio prosa" e "o JSON quebrou" chegavam ao serviço como o mesmo nada; e a tela fazia `[mensagem, acao].join(' ')`, descartando `problemas`, que a ponte **já entregava**. `lerSaidaDoModeloDetalhada` nomeia a recusa — `prosa` separada por ser o caso que **não é** defeito técnico — e o desfecho carrega `textoDoModelo`. O parser continua **sem consertar nada**: o que muda é só que a recusa passa a ter nome, e o texto só viaja quando é prosa (JSON quebrado é lixo de máquina, e despejá-lo na tela seria o stack trace cru que o `PRODUCT.md` proíbe). A tela mostra a observação **como conteúdo** — primeiro o que o modelo disse, depois a ação, e só então "nada foi gravado", que é garantia e não notícia —, em tom de **atenção**: nada quebrou, e pintar ponderação de vermelho gasta o vermelho para quando algo quebrar de fato, que é a régua que o índice de projetos já aplica à colisão de nome. **A captura também expôs o que nenhum critério nomeava:** a tela do prompt tinha sete irmãos com `gap` uniforme e nenhum agrupamento (vira três grupos com ritmo); o campo herdava a largura do painel sem medida de leitura e abria ~500px de vazio sob uma frase (o `Textarea` do DS passa a crescer com o texto entre piso e teto, o que serve todo campo longo do app); e no console a prosa do modelo lia em **micro cinza** enquanto as linhas de ferramenta liam em `text-sm` — o registro de máquina acima do que o PI vem ler. **Contrafactual verificado** no teste do portal: removido o `container`, ele falha; restaurado, passa. Os testes da recusa afirmam sobre **o texto do modelo**, não sobre a mensagem — um teste sobre a frase genérica passaria com o defeito presente, que é exatamente como ele sobreviveu até aqui. **E o CI achou o quarto:** a guarda anti-drift barrou o job `test` com **zero falhas** nas três categorias — o PR altera arquivo de teste, e a prova 3 (`--require-entry`) exige carimbo em `reports/TESTS.md` com a issue do `refs #N`. Reincidência da lição da M26-F04. **Limite declarado:** o `ModelosPorFase` e o `PerfilDoCodex` continuam sem cena na suíte de prova visual — a combo foi inspecionada numa página descartável, não numa cena versionada. |
 | 2026-09-05 | M26-F06 Codex como provider do ponto único ([#256](https://github.com/RodReis/rrb-jarvisOS/issues/256)) — **fecha o MVP-026** | [#269](https://github.com/RodReis/rrb-jarvisOS/pull/269) | **3129 testes verdes** em 171 arquivos. Os oito critérios da SPEC-Fases-06. **O defeito que a fatia teve de corrigir na raiz, e que nenhum critério nomeia:** `PROVIDER_DA_ROTA` cravava `assinatura → 'claude-code'` — verdade enquanto havia uma assinatura só. Com duas, o PI escolheria Sol no combo da fase e **a chamada sairia pelo Claude**: sem erro nenhum, com o ledger registrando o provider errado, e com o selo do card anunciando um fornecedor diferente do que gerou. **Sete serviços** liam aquele mapa. A correção move o fato para onde ele nasce: `escolherRota` devolve o `provider` que resolveu, e `providerDaRota` o lê — rota e provider deixaram de ser o mesmo fato dito duas vezes. **Três decisões do PI antes de qualquer linha.** (1) **A função do boot recebe a fase**, e **sem default**: quatro dos cinco serviços de geração são `planejamento` e o roadmap é `especificacao`, então um `fase = 'planejamento'` faria o roadmap consultar a assinatura errada — e o compilador não teria como apontar, que é a razão pela qual a M26-F04 tornou `verificarMarcos` obrigatória e a M26-F05 fez o mesmo com `modeloDaConstrucao`. Sendo obrigatória, o compilador listou os seis pontos de injeção. (2) **Parser próprio para o Codex**, e não ramos no do Claude Code: os formatos não têm um campo em comum (`item.completed` com `item.type` versus `message.content[].type`), unificá-los seria um `if (provider)` dentro de uma função só — exatamente o que o Done 1 do MVP-010 proíbe (*"sem compartilhar parser"*) —, e um bug no ramo comum atingiria os dois providers de uma vez. (3) **Catálogo só com a assinatura.** O PI havia escolhido cadastrar preço de API já; levantei a ressalva antes de escrever, porque a spec é literal (*"preço a cadastrar na habilitação, não inventado aqui"*) e eu não tinha os preços reais — qualquer número seria chute, e ele alimenta o gate de orçamento que barra ou libera chamada paga. O PI reconsiderou e confirmou seguir a spec. **Medição, não suposição — o CLI 0.149.0 está instalado nesta máquina.** O stdout do `codex exec --json` é **JSONL puro**: zero linhas não-JSON, com todos os logs no stderr, o que o contrato do próprio CLI declara (*"in --json mode, stdout must be valid JSONL… any other output must be written to stderr"*). Os nomes dos tipos vêm da fonte oficial (`codex-rs/exec/src/exec_events.rs` — `ThreadEvent` e `ThreadItemDetails`), não de adivinhação. O `usage` medido chega no `turn.completed` (`TurnCompletedEvent = { type, usage }` no SDK), então o ledger não depende da divisão por caracteres. E **`item.updated` não perde texto**, o que foi verificado *antes* de decidir ignorá-lo: o streaming token a token é `item/agentMessage/delta`, um evento do **app-server** — protocolo diferente que esta fatia não usa —, e a documentação trata `item/completed` como *"the authoritative execution/result state"*. **Dois defeitos que a implementação achou.** O **health mediria a coisa errada**: a sonda perguntava só se o binário responde, então um Codex instalado e sem login apareceria **online** na tela de providers enquanto toda geração por Sol bloqueava — um "online" que não gera é pior que um "offline", e o critério 6 pede justamente a coerência. Passa a exigir binário **e** perfil autenticado; a diferença em relação ao `claude-code` não é inconsistência, porque lá a sessão vive no perfil pessoal e o app não a inspeciona, enquanto aqui o perfil é o da pipeline (M10-F02). E o **motivo da opção desabilitada aparecia três vezes** — um por modelo do Codex na Construção —, o que transformaria a explicação em ruído; foi o teste de tela que mostrou, e virou agrupamento por motivo. Um teste da M26-F02 dizia *"nenhum id do Codex entra nesta fatia: sem provider, seria opção que nunca casa"* e **falhou ao ganhar o provider**: cumpriu exatamente o papel de marcar um limite temporário, em vez de deixar a mudança passar despercebida — passou a afirmar o que vale agora (ids do Codex só sob `codex`, e o modo `api` sem preço). **O relatório precisou ser regerado:** a primeira execução gravou Banco em 1074/1130 e a execução limpa dá 1118/1130, estável em duas rodadas — era o worker morto do pool ([#232](https://github.com/RodReis/rrb-jarvisOS/issues/232)), e a memória do projeto registra que execução com ele não serve para carimbar. Descartado com `git checkout` e regerado uma vez só, para não duplicar o histórico. **Smoke real com o CLI de verdade** (3 provas, `JARVIS_SMOKE_CODEX=1`): o parser traduz a saída real **sem nenhum erro de formato**, o CLI aceita os argumentos que o adapter monta, e os tipos de evento que o parser reconhece existem. **E o CI achou o terceiro, num modo que vale nomear:** um `toHaveLength(4)` no **E2E** do multi-provider. O mesmo número existia no `routing-repository.int-spec.ts`, a suíte comum o acusou, eu o corrigi — e **não procurei os irmãos**. `src/` e `tests/` são duas árvores, e `npm run test` não roda Playwright, então o do E2E só reprova depois do push, com todo o resto verde. A armadilha é que o primeiro erro **é** corrigido: a sensação é de problema resolvido, e o segundo arquivo nunca entra no campo de visão. Passa a afirmar os **nomes** dos cinco providers — mais forte que a contagem e não envelhece a cada provider novo; no E2E a lista literal é a saída certa, porque ele testa pela ponte e não importa do domínio de propósito. Rodando local, o teste falhou **adiante**, no Ollama: a asserção cravava `estado: 'offline'` porque o CI não o roda, mas a estação de desenvolvimento roda — e ali o teste reprovava por estar certo. `estado` sai da asserção dele e da do `codex`; origem e custo são fato do catálogo e valem sempre. Corrigido, rodei a **suíte E2E inteira** (58 passaram, 2 pulados) em vez de só o arquivo que falhou — o recorte estreito é o mesmo erro de método que custou o ciclo anterior. **Limites declarados:** o caminho feliz do smoke (geração completa) depende de sessão autenticada do PI — formato, argumentos e tradução são provados sem ela; e o Codex como **executor** da Construção continua sendo M10-F03/F04, com `gpt-5.5` listado e desabilitado até lá. |

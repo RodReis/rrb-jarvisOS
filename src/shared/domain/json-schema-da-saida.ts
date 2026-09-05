@@ -38,6 +38,27 @@ function envelopeDeObjeto(chave: string): string {
   return envelope(chave, { type: 'object' })
 }
 
+/**
+ * Um envelope de **duas** listas — o brief, que devolve afirmações e pendências juntas.
+ *
+ * Existe porque `additionalProperties: false` é literal: um envelope de uma chave só não
+ * "tolera" a segunda, ele a **proíbe**. O CLI recusa a chave ausente do schema antes de o
+ * documento existir, e o modelo cumpre a restrição escrevendo o que sobrou onde couber — no
+ * caso medido, as pendências viraram afirmações `proposto` no bloco de riscos.
+ *
+ * As duas são `required` porque o system pede as duas. Uma lista vazia é resposta legítima
+ * ("nada ficou em aberto"); a **chave** ausente não é, e é a chave que o schema cobra.
+ */
+function envelopeDeDuasListas(primeira: string, segunda: string): string {
+  const lista = { type: 'array', items: { type: 'object' } }
+  return JSON.stringify({
+    type: 'object',
+    properties: { [primeira]: lista, [segunda]: lista },
+    required: [primeira, segunda],
+    additionalProperties: false
+  })
+}
+
 function envelope(chave: string, conteudo: object): string {
   return JSON.stringify({
     type: 'object',
@@ -56,8 +77,19 @@ function envelope(chave: string, conteudo: object): string {
  */
 export const SCHEMA_DAS_PERGUNTAS = envelopeDeLista('perguntas')
 
-/** O brief e os documentos do pacote: uma lista de afirmações com origem. */
+/** Os documentos do pacote (PRD, arquitetura): uma lista de afirmações com origem. */
 export const SCHEMA_DAS_AFIRMACOES = envelopeDeLista('afirmacoes')
+
+/**
+ * O brief: afirmações **e** pendências (SPEC-Jornada-02 § Brief).
+ *
+ * Separado do `SCHEMA_DAS_AFIRMACOES` porque o contrato é outro, e o do brief é o único da
+ * jornada com duas chaves de topo. Reusar aquele aqui foi o defeito da #280: a pendência
+ * material é o que **bloqueia o aceite** do brief, e proibi-la no schema não a fazia sumir —
+ * fazia o modelo reescrevê-la como afirmação `proposto`, que não bloqueia coisa nenhuma. Um
+ * documento aparentemente completo, sem o freio que a spec exige.
+ */
+export const SCHEMA_DO_BRIEF = envelopeDeDuasListas('afirmacoes', 'pendencias')
 
 /** As contradições entre documentos do pacote. */
 export const SCHEMA_DAS_CONTRADICOES = envelopeDeLista('contradicoes')

@@ -25,7 +25,6 @@ import { RefinamentoDoProjeto } from '../app/RefinamentoDoProjeto'
 
 export type CenaDoBrief =
   | 'prompt-vazio'
-  | 'prompt-bloqueado'
   /**
    * A recusa que o PI encontrou: o modelo respondeu em português explicando um impedimento em
    * vez de devolver o brief. A cena existe porque a tela antiga mostrava "a saída não passou no
@@ -38,6 +37,12 @@ export type CenaDoBrief =
   // O refinamento: sem perguntas (o convite a gerar) e com pergunta na fila (o próximo passo
   // é respondê-la, não gerar mais).
   | 'refinamento-vazio'
+  /**
+   * O critério 6 no lugar onde ele passou a viver (#281): a geração migrou da tela do prompt
+   * para o fim do refinamento, e o bloqueio de rota migrou com ela. Salvar o prompt não chama
+   * o modelo, então bloquear aquela tela descreveria um custo que ali não existe.
+   */
+  | 'refinamento-bloqueado'
   | 'refinamento-pendente'
   // A rota paga: o clique passa a custar dinheiro, e a tela precisa dizer isso antes.
   | 'refinamento-rota-paga'
@@ -121,7 +126,7 @@ const ROTA_BLOQUEADA: ResultadoDaRota = {
  * galeria, e a captura pegaria o estado de carregamento em vez da tela.
  */
 function instalarPonte(cena: CenaDoBrief): void {
-  const bloqueado = cena === 'prompt-bloqueado'
+  const bloqueado = cena === 'refinamento-bloqueado'
   const travado = cena === 'brief-travado'
 
   Object.defineProperty(window, 'jarvis', {
@@ -200,12 +205,12 @@ export function GaleriaDoBrief({
 }: GaleriaProps): React.JSX.Element {
   instalarPonte(cena)
 
-  const ehPrompt =
-    cena === 'prompt-vazio' || cena === 'prompt-bloqueado' || cena === 'prompt-recusado'
+  const ehPrompt = cena === 'prompt-vazio' || cena === 'prompt-recusado'
   const ehRefinamento =
     cena === 'refinamento-vazio' ||
     cena === 'refinamento-pendente' ||
-    cena === 'refinamento-rota-paga'
+    cena === 'refinamento-rota-paga' ||
+    cena === 'refinamento-bloqueado'
 
   return (
     <ProvedorDeTema

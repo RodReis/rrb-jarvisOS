@@ -108,7 +108,7 @@ describe('PromptDoProjeto', () => {
     expect(await screen.findByRole('textbox')).toHaveValue('Um app de leituras.')
   })
 
-  it('não gera com o campo vazio, e diz por quê', async () => {
+  it('não salva com o campo vazio, e diz por quê', async () => {
     render(
       <PromptDoProjeto
         workspace="jarvis"
@@ -118,14 +118,14 @@ describe('PromptDoProjeto', () => {
       />
     )
 
-    const botao = await screen.findByRole('button', { name: /Gerar o brief/ })
+    const botao = await screen.findByRole('button', { name: /Salvar e ir ao refinamento/ })
 
     // Alvo desabilitado sem explicação faz o PI procurar o defeito na própria escrita.
     expect(botao).toBeDisabled()
     expect(screen.getByText('Escreva o prompt para continuar.')).toBeInTheDocument()
   })
 
-  it('salva e gera num ato só', async () => {
+  it('salva o prompt e avança para o refinamento', async () => {
     const usuario = userEvent.setup()
     const onAvancar = vi.fn()
 
@@ -139,14 +139,52 @@ describe('PromptDoProjeto', () => {
     )
 
     await usuario.type(await screen.findByRole('textbox'), 'Um app de leituras.')
-    await usuario.click(screen.getByRole('button', { name: /Gerar o brief/ }))
+    await usuario.click(screen.getByRole('button', { name: /Salvar e ir ao refinamento/ }))
 
     await waitFor(() => expect(onAvancar).toHaveBeenCalled())
     expect(salvarPromptDoProjeto).toHaveBeenCalledWith('p-1', 'Um app de leituras.', 'jarvis')
-    expect(gerarBrief).toHaveBeenCalledWith('p-1', 'jarvis')
   })
 
-  it('mostra o bloqueio de rota **antes** do clique, com a ação (critério 6)', async () => {
+  /**
+   * O defeito da #281, travado como teste.
+   *
+   * Salvar o prompt disparava a geração do brief no mesmo clique — e como isso acontecia
+   * **antes de qualquer pergunta**, o brief nascia sem nenhuma decisão do refinamento para
+   * citar: toda afirmação vinda de uma escolha do PI virava `proposto`. O brief agora nasce no
+   * fim do refinamento, e esta tela só guarda o texto.
+   *
+   * A asserção é sobre a **ausência da chamada**, e não sobre o rótulo do botão: um teste que
+   * olhasse só o texto passaria de novo no dia em que alguém religasse a geração aqui.
+   */
+  it('salvar não chama a geração do brief (#281)', async () => {
+    const usuario = userEvent.setup()
+
+    render(
+      <PromptDoProjeto
+        workspace="jarvis"
+        projectId="p-1"
+        nomeDoProjeto="Leituras"
+        onAvancar={vi.fn()}
+      />
+    )
+
+    await usuario.type(await screen.findByRole('textbox'), 'Um app de leituras.')
+    await usuario.click(screen.getByRole('button', { name: /Salvar e ir ao refinamento/ }))
+
+    await waitFor(() => expect(salvarPromptDoProjeto).toHaveBeenCalled())
+    expect(gerarBrief).not.toHaveBeenCalled()
+  })
+
+  /**
+   * Sem rota, escrever ainda vale — e o botão continua vivo.
+   *
+   * Antes da #281 a falta de rota desabilitava este botão, porque o clique gerava o brief.
+   * Agora ele só salva: barrar o salvamento por causa de uma credencial ausente perderia o
+   * texto do PI por um motivo que não tem relação com guardá-lo. O aviso de rota migrou para o
+   * refinamento, que é onde a chamada de fato acontece.
+   */
+  it('sem rota autorizada, o prompt ainda pode ser salvo (#281)', async () => {
+    const usuario = userEvent.setup()
     rotaDaGeracao.mockResolvedValue({
       decisao: 'bloqueado',
       motivo: 'sem-rota-alguma',
@@ -162,21 +200,21 @@ describe('PromptDoProjeto', () => {
       />
     )
 
-    // Descobrir que não há rota só ao tentar gerar seria a mesma fricção que o critério evita
-    // no custo, repetida na atenção.
-    expect(
-      await screen.findByText('Conecte a assinatura do Claude em Providers.')
-    ).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Gerar o brief/ })).toBeDisabled()
+    await usuario.type(await screen.findByRole('textbox'), 'Um app.')
+
+    const botao = screen.getByRole('button', { name: /Salvar e ir ao refinamento/ })
+    expect(botao).toBeEnabled()
+
+    await usuario.click(botao)
+    await waitFor(() => expect(salvarPromptDoProjeto).toHaveBeenCalled())
   })
 
-  it('bloqueado, o botão não chama a geração nem com texto escrito', async () => {
+  it('prompt recusado pelo main vira mensagem, não erro cru', async () => {
     const usuario = userEvent.setup()
-    rotaDaGeracao.mockResolvedValue({
-      decisao: 'bloqueado',
-      motivo: 'sem-rota-alguma',
-      acao: 'Conecte a assinatura.'
-    })
+    // O main devolve `null` para prompt vazio — aqui, um texto só de espaços passa pelo
+    // `trim` da tela? Não: o botão estaria desabilitado. Este teste cobre a segunda barreira,
+    // a do main, que é a que vale se a primeira mudar.
+    salvarPromptDoProjeto.mockResolvedValue(null)
 
     render(
       <PromptDoProjeto
@@ -188,110 +226,9 @@ describe('PromptDoProjeto', () => {
     )
 
     await usuario.type(await screen.findByRole('textbox'), 'Um app.')
+    await usuario.click(screen.getByRole('button', { name: /Salvar e ir ao refinamento/ }))
 
-    expect(screen.getByRole('button', { name: /Gerar o brief/ })).toBeDisabled()
-    expect(gerarBrief).not.toHaveBeenCalled()
-  })
-
-  it('recusa da geração vira mensagem com a ação, não erro cru', async () => {
-    const usuario = userEvent.setup()
-    gerarBrief.mockResolvedValue({
-      resultado: 'bloqueado-sem-rota',
-      mensagem: 'A geração não aconteceu.',
-      acao: 'Habilite a rota paga.'
-    })
-
-    render(
-      <PromptDoProjeto
-        workspace="jarvis"
-        projectId="p-1"
-        nomeDoProjeto="Leituras"
-        onAvancar={vi.fn()}
-      />
-    )
-
-    await usuario.type(await screen.findByRole('textbox'), 'Um app.')
-    await usuario.click(screen.getByRole('button', { name: /Gerar o brief/ }))
-
-    expect(await screen.findByText(/Habilite a rota paga/)).toBeInTheDocument()
-  })
-
-  /**
-   * O defeito real que o PI encontrou, travado como teste.
-   *
-   * Ele pediu o brief; o modelo respondeu em português que o diretório já continha outro produto
-   * e que não ia sobrescrever; a tela mostrou *"A saída do modelo não passou no validador, nem
-   * depois da correção. Nada foi gravado."* — verdadeira, e escondendo a única coisa útil da
-   * falha. O texto do modelo estava no console, colapsado abaixo da dobra.
-   *
-   * O que se prova aqui: a observação chega à tela **como conteúdo**, não como anexo. Um teste
-   * sobre a mensagem genérica passaria com o defeito presente, então ele afirma sobre o texto do
-   * modelo — que é o que faltava ao PI.
-   */
-  it('quando o modelo responde em prosa, o PI lê o que ele disse (não só "não foi gerado")', async () => {
-    const usuario = userEvent.setup()
-    const observacao =
-      'O diretório `rrb-insights` já contém outro produto (AgroInsights). Não vou sobrescrever.'
-
-    gerarBrief.mockResolvedValue({
-      resultado: 'saida-invalida',
-      mensagem: 'Nada foi gravado — nenhum brief, nenhuma alteração no projeto.',
-      acao: 'Responda ao ponto no campo do prompt e gere de novo.',
-      textoDoModelo: observacao,
-      problemas: ['O modelo respondeu em texto corrido, e o brief exige saída estruturada.']
-    })
-
-    render(
-      <PromptDoProjeto
-        workspace="jarvis"
-        projectId="p-1"
-        nomeDoProjeto="Leituras"
-        onAvancar={vi.fn()}
-      />
-    )
-
-    await usuario.type(await screen.findByRole('textbox'), 'Um app.')
-    await usuario.click(screen.getByRole('button', { name: /Gerar o brief/ }))
-
-    // O que o modelo disse, na tela.
-    expect(await screen.findByText(new RegExp('já contém outro produto'))).toBeInTheDocument()
-    // E o próximo passo junto: erro sem recuperação é beco (PRD §14).
-    expect(screen.getByText(/Responda ao ponto no campo do prompt/)).toBeInTheDocument()
-  })
-
-  /**
-   * O tom, que decide como o PI lê a tela antes de ler as palavras.
-   *
-   * Prosa do modelo é ponderação — nada quebrou, nada se perdeu. Pintá-la de erro ensina a ler
-   * estado normal como falha, e aí o vermelho para de significar algo quando algo de fato
-   * quebrar. É a mesma régua que o índice de projetos aplica à colisão de nome.
-   */
-  it('a observação do modelo é aviso, não erro — o alerta não é vermelho', async () => {
-    const usuario = userEvent.setup()
-
-    gerarBrief.mockResolvedValue({
-      resultado: 'saida-invalida',
-      mensagem: 'Nada foi gravado.',
-      textoDoModelo: 'Confirmo a forma exata antes de gerar.'
-    })
-
-    render(
-      <PromptDoProjeto
-        workspace="jarvis"
-        projectId="p-1"
-        nomeDoProjeto="Leituras"
-        onAvancar={vi.fn()}
-      />
-    )
-
-    await usuario.type(await screen.findByRole('textbox'), 'Um app.')
-    await usuario.click(screen.getByRole('button', { name: /Gerar o brief/ }))
-
-    // O `InlineAlert` prefixa o tom no nome acessível (`NOME_DO_TOM`) — é assim que quem usa
-    // leitor de tela recebe a severidade, e é o que se afirma aqui em vez de uma classe CSS.
-    const alerta = await screen.findByRole('alert')
-    expect(alerta).toHaveTextContent(/atenção/i)
-    expect(alerta).not.toHaveTextContent(/^erro/i)
+    expect(await screen.findByText(/O prompt está vazio/)).toBeInTheDocument()
   })
 })
 

@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { MessagesSquare, Sparkles } from 'lucide-react'
+import { FileText, MessagesSquare, Sparkles } from 'lucide-react'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { EstadoDoWizard } from '@shared/domain/wizard'
+import type { GeracaoOutcome } from '@shared/domain/brief'
 import type { ResultadoDaRota } from '@shared/domain/rota-de-geracao'
 import { Button, InlineAlert, LoadingState } from '@design/ui'
 import { log } from '../lib/log'
 import { AvisoDaRotaPaga, SeloDaRota } from './RotaDaGeracao'
+import { RecusaDaGeracao } from './RecusaDaGeracao'
 
 /**
  * A etapa do refinamento (SPEC-Jornada-02, § Refinamento).
@@ -23,6 +25,11 @@ import { AvisoDaRotaPaga, SeloDaRota } from './RotaDaGeracao'
  *  - **O bloqueio de rota aparece antes do clique**, como na etapa do prompt. Descobrir que não
  *    há rota autorizada depois de pedir a geração é a mesma fricção que o critério 6 evita no
  *    custo, repetida na atenção.
+ *  - **O brief nasce aqui, no fim do refinamento** (#281, decisão do PI de 2026-09-05). Antes
+ *    ele era gerado na tela do prompt, **antes de qualquer pergunta** — então `decisoesDoRefinamento`
+ *    chegava sempre vazio e nenhuma afirmação podia ter origem `decisao`, só `prompt` ou
+ *    `proposto`. A spec pede o contrário: o brief cita as decisões do refinamento. Gerar aqui
+ *    corrige a origem e dá à jornada a evidência de que o refinamento terminou.
  */
 
 interface RefinamentoDoProjetoProps {
@@ -48,6 +55,16 @@ export function RefinamentoDoProjeto({
   const [carregando, setCarregando] = useState(true)
   const [ocupado, setOcupado] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
+  const [gerandoBrief, setGerandoBrief] = useState(false)
+  /*
+   * O desfecho **inteiro** da geração do brief, não uma string concatenada.
+   *
+   * Mesma postura da tela do prompt, de onde esta geração veio: o main devolve mensagem, ação,
+   * problemas e — quando o modelo respondeu em prosa — o que ele escreveu. Guardar só a
+   * mensagem faria o PI ler "a saída não passou no validador" enquanto o console, logo abaixo,
+   * mostra o modelo explicando o que houve.
+   */
+  const [recusaDoBrief, setRecusaDoBrief] = useState<GeracaoOutcome | null>(null)
 
   const carregar = useCallback(async (): Promise<void> => {
     try {
@@ -111,6 +128,34 @@ export function RefinamentoDoProjeto({
     }
   }
 
+  /**
+   * Gera o brief a partir do prompt e das decisões (#281).
+   *
+   * Diferente de `gerar`: aquele produz perguntas e mantém o PI nesta etapa; este produz o
+   * documento e **move a jornada**. Por isso só o sucesso chama `onRecarregar` — uma recusa
+   * deixaria a trilha piscando para uma etapa que não avançou.
+   */
+  async function gerarBrief(): Promise<void> {
+    setGerandoBrief(true)
+    setRecusaDoBrief(null)
+
+    try {
+      const desfecho = await window.jarvis.gerarBrief(projectId, workspace)
+
+      if (desfecho.resultado === 'gerado') {
+        onRecarregar()
+        return
+      }
+
+      setRecusaDoBrief(desfecho)
+    } catch (error: unknown) {
+      log.ui.error('Falha ao gerar o brief', { error })
+      setRecusaDoBrief({ resultado: 'saida-invalida', mensagem: t('refinamento.briefFalhou') })
+    } finally {
+      setGerandoBrief(false)
+    }
+  }
+
   if (carregando) return <LoadingState rotulo={t('refinamento.carregando')} />
 
   const bloqueado = rota?.decisao === 'bloqueado'
@@ -141,6 +186,10 @@ export function RefinamentoDoProjeto({
           {erro}
         </InlineAlert>
       )}
+
+      {/* A recusa do brief tem bloco próprio: o modelo pode ter respondido em prosa, e o que ele
+          disse é o conteúdo do erro, não um anexo dele. Mesmo componente da tela do prompt. */}
+      {recusaDoBrief !== null && <RecusaDaGeracao desfecho={recusaDoBrief} />}
 
       {/*
         O estado em texto, antes do botão: quantas decisões faltam é o que o PI precisa saber
@@ -190,10 +239,28 @@ export function RefinamentoDoProjeto({
              respondê-la, e oferecer "gerar mais" convidaria a acumular perguntas sem responder
              nenhuma. */
           <>
+            {/*
+              Com o refinamento concluído, o **acento vai para o brief** — ele é o que avança a
+              jornada, e "procurar o que ainda falta" passa a ser a ação de manutenção. Manter
+              os dois primários faria a tela oferecer duas saídas com o mesmo peso, e a que
+              termina a etapa é uma só.
+            */}
+            {concluido && (
+              <Button
+                variante="primaria"
+                onClick={() => void gerarBrief()}
+                desabilitado={ocupado || gerandoBrief || bloqueado}
+                carregando={gerandoBrief}
+                iconeInicial={<FileText aria-hidden="true" className="size-4" />}
+              >
+                {t('refinamento.gerarBrief')}
+              </Button>
+            )}
+
             <Button
-              variante="primaria"
+              variante={concluido ? 'secundaria' : 'primaria'}
               onClick={() => void gerar()}
-              desabilitado={ocupado || bloqueado}
+              desabilitado={ocupado || gerandoBrief || bloqueado}
               carregando={ocupado}
               iconeInicial={<Sparkles aria-hidden="true" className="size-4" />}
             >
