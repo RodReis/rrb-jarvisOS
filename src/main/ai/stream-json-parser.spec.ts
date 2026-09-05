@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { extrairLinhas, parsearLinha } from './stream-json-parser'
+import { extrairLinhas, novoEstadoDoParser, parsearLinha } from './stream-json-parser'
 import { LIMITE_RESUMO_BYTES } from '@shared/domain/geracao'
 
 const LINHA_INIT =
@@ -237,5 +237,46 @@ describe('parsearLinha — falha aberta (critério 5)', () => {
     expect(parsearLinha('{"type":"result","subtype":"success"}')).toEqual([
       { tipo: 'uso', tokensEntrada: 0, tokensSaida: 0, duracaoMs: 0 }
     ])
+  })
+})
+
+/**
+ * Fixture **real** da geração de contradições de 2026-09-05T19:56:08.700Z, lida do
+ * `generation_trace_event`: o CLI chamou `StructuredOutput` **duas vezes**, a primeira com
+ * `input` vazio. Os dois deltas concatenados viraram `{}{"contradicoes":[…]}`, que nenhum
+ * `JSON.parse` aceita — o PRD foi recusado com as cinco contradições prontas na tela.
+ */
+describe('parsearLinha — saída estruturada chamada mais de uma vez', () => {
+  const chamada = (id: string, input: unknown): string =>
+    JSON.stringify({
+      type: 'assistant',
+      message: {
+        role: 'assistant',
+        content: [{ type: 'tool_use', id, name: 'StructuredOutput', input }]
+      }
+    })
+
+  it('ignora a chamada de input vazio, que não é documento', () => {
+    const estado = novoEstadoDoParser()
+
+    expect(parsearLinha(chamada('toolu_vazia', {}), estado)).toEqual([])
+  })
+
+  it('entrega só o documento quando o CLI chama duas vezes', () => {
+    const estado = novoEstadoDoParser()
+    const documento = { contradicoes: [{ id: 'c-1' }] }
+
+    const eventos = [
+      ...parsearLinha(chamada('toolu_vazia', {}), estado),
+      ...parsearLinha(chamada('toolu_cheia', documento), estado)
+    ]
+
+    const texto = eventos
+      .filter((e) => e.tipo === 'texto')
+      .map((e) => (e.tipo === 'texto' ? e.delta : ''))
+      .join('')
+
+    expect(() => JSON.parse(texto)).not.toThrow()
+    expect(JSON.parse(texto)).toEqual(documento)
   })
 })

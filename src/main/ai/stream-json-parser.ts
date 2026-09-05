@@ -196,6 +196,12 @@ export function parsearLinha(
   return []
 }
 
+/** Se o `input` da saída estruturada carrega documento. Objeto sem chaves não carrega. */
+function temConteudo(input: unknown): boolean {
+  if (typeof input !== 'object' || input === null) return false
+  return Object.keys(input as Record<string, unknown>).length > 0
+}
+
 function eventosDoBloco(
   bloco: BlocoDeConteudo,
   doModelo: boolean,
@@ -225,6 +231,21 @@ function eventosDoBloco(
     // ferramenta é usada numa fase que não tem ferramentas.
     if (nome === NOME_DA_SAIDA_ESTRUTURADA) {
       estado.saidaEstruturada = chamadaId
+
+      // Chamada **sem conteúdo** não é documento, e emiti-la corrompe o que vier depois.
+      //
+      // O CLI chama `StructuredOutput` mais de uma vez na mesma geração, e a primeira pode vir
+      // com `input` vazio. Como cada chamada virava um delta, os dois se concatenavam em
+      // `{}{"contradicoes":[…]}` — dois JSON colados, que nenhum `JSON.parse` aceita. O
+      // documento chegava íntegro no segundo delta e ainda assim era recusado: na detecção de
+      // contradições do PRD, cinco contradições prontas apareceram no console e a tela disse
+      // que a detecção "não devolveu saída".
+      //
+      // Descartar aqui e não no leitor de cada etapa: são sete chamadas com `jsonSchema`, e o
+      // `ARCHITECTURE.md` (§ Providers) já define que o documento é o `input` — um `input` sem
+      // chaves não é documento nenhum.
+      if (!temConteudo(bloco.input)) return []
+
       const documento = JSON.stringify(bloco.input)
       return documento === undefined ? [] : [{ tipo: 'texto', delta: documento }]
     }
