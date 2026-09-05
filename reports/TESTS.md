@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 1387 | 1387 | 0 | 74.3 | — | — |
-| — | — | — | Banco | 1085 | 1080 | 0 | 87.8 | — | — |
-| — | — | — | Tela | 561 | 560 | 0 | 75.0 | — | — |
+| — | — | — | Regras de Negócio | 1404 | 1404 | 0 | 74.3 | — | — |
+| — | — | — | Banco | 1116 | 1107 | 0 | 88.0 | — | — |
+| — | — | — | Tela | 572 | 571 | 0 | 74.8 | — | — |
 
 ## Histórico por entrega
 
@@ -271,3 +271,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-04 | #255 | spec-fases-05-modelo-da-fase-no-run | Regras de Negócio | 1387 | 1387 | 0 | 74.3 | #265 | [#265](https://github.com/RodReis/rrb-jarvisOS/pull/265) |
 | 2026-09-04 | #255 | spec-fases-05-modelo-da-fase-no-run | Banco | 1085 | 1080 | 0 | 87.8 | #265 | [#265](https://github.com/RodReis/rrb-jarvisOS/pull/265) |
 | 2026-09-04 | #255 | spec-fases-05-modelo-da-fase-no-run | Tela | 561 | 560 | 0 | 75.0 | #265 | [#265](https://github.com/RodReis/rrb-jarvisOS/pull/265) |
+| 2026-09-05 | #117 | spec-multi-executor-02-autenticacao-codex | Regras de Negócio | 1404 | 1404 | 0 | 74.3 | #267 | [#267](https://github.com/RodReis/rrb-jarvisOS/pull/267) |
+| 2026-09-05 | #117 | spec-multi-executor-02-autenticacao-codex | Banco | 1116 | 1107 | 0 | 88.0 | #267 | [#267](https://github.com/RodReis/rrb-jarvisOS/pull/267) |
+| 2026-09-05 | #117 | spec-multi-executor-02-autenticacao-codex | Tela | 572 | 571 | 0 | 74.8 | #267 | [#267](https://github.com/RodReis/rrb-jarvisOS/pull/267) |
