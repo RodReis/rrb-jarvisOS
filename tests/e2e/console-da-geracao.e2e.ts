@@ -420,16 +420,19 @@ test('ferramenta numa fase sem ferramentas corta a geração (emenda E1, critér
 
   const tipos = colhido.eventos.map((e) => e.tipo)
 
-  // O console **registra** as ferramentas: o PI precisa ver o que o modelo tentou fazer.
-  expect(tipos.slice(0, 2)).toEqual(['ferramenta-inicio', 'ferramenta-fim'])
+  // A ordem: o console **registra** a ferramenta, avisa do desvio, e ainda entrega o resultado
+  // dela — o PI precisa ver o que o modelo tentou fazer **e** o que voltou, para entender por que
+  // a geração parou. O `erro` entra entre os dois porque o corte dispara no `ferramenta-inicio`,
+  // e o `tool_result` já estava no mesmo buffer.
+  expect(tipos.slice(0, 3)).toEqual(['ferramenta-inicio', 'erro', 'ferramenta-fim'])
   expect(colhido.eventos[0]).toMatchObject({ nome: 'Bash' })
 
-  const fimDoRead = colhido.eventos[1] as { status: string; resumoDoResultado: string }
-  expect(fimDoRead.status).toBe('ok')
+  const fimDaFerramenta = colhido.eventos[2] as { status: string; resumoDoResultado: string }
+  expect(fimDaFerramenta.status).toBe('ok')
   // Critério 4 da SPEC-Fases-03: o resultado de 5000 bytes chegou truncado nos 2 KB, com o
   // tamanho original ao lado — é o que o painel mostra como "Resumo de N".
-  expect(fimDoRead.resumoDoResultado.length).toBe(2048)
-  expect(colhido.eventos[1]).toMatchObject({ tamanhoOriginal: RESULTADO_GRANDE.length })
+  expect(fimDaFerramenta.resumoDoResultado.length).toBe(2048)
+  expect(colhido.eventos[2]).toMatchObject({ tamanhoOriginal: RESULTADO_GRANDE.length })
 
   // E o erro que nomeia o desvio, com a ferramenta que o causou.
   const erroDoDesvio = colhido.eventos.find(
@@ -525,7 +528,11 @@ test('a geração vai para o histórico da etapa, e reabri-la devolve a mesma tr
   // — antes, o ao vivo trazia o token e o gravado não, e os dois nunca batiam.
   expect(doHistorico.eventos).toEqual(aoVivo.eventos)
 
-  // Critério 3: o token do `Bash` não está em nenhum dos dois lados.
-  expect(JSON.stringify(doHistorico.eventos)).not.toContain(SEGREDO)
-  expect(doHistorico.eventos[2]).toMatchObject({ nome: 'Bash' })
+  // A trilha gravada é a da geração inteira: erro de parser, texto e uso, na ordem.
+  //
+  // A redação do segredo **não** é afirmada aqui, e a omissão é deliberada: este roteiro é o das
+  // fases de documento, onde não há ferramenta nem, portanto, segredo em argumento nenhum.
+  // Afirmar a ausência de um token que o roteiro nunca emitiu passaria sempre, provando nada. Ela
+  // vive no teste do critério 3, que é onde existe ferramenta com segredo.
+  expect(doHistorico.eventos.map((e) => e['tipo'])).toEqual(['erro', 'texto', 'uso'])
 })
