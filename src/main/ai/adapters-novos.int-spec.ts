@@ -20,6 +20,7 @@ import { AdapterError } from './anthropic-adapter'
 import { GeminiAdapter, extrairEventos } from './gemini-adapter'
 import { OllamaAdapter, extrairLinhas } from './ollama-adapter'
 import { ClaudeCodeAdapter } from './claude-code-adapter'
+import { runsDeTeste } from './cwd-neutro.test-helper'
 
 let servidor: Server | undefined
 
@@ -318,7 +319,7 @@ describe('Claude Code CLI — subprocess app-managed (critério 2)', () => {
     const spawnDuble = ((_binario: string, _args: readonly string[], opcoes: object) =>
       spawn(process.execPath, ['-e', script], opcoes)) as typeof spawn
 
-    return new ClaudeCodeAdapter(process.cwd(), spawnDuble)
+    return new ClaudeCodeAdapter(runsDeTeste().abrir, spawnDuble)
   }
 
   /** Uma linha de `assistant` com texto, no formato que o CLI emite em `stream-json`. */
@@ -528,7 +529,7 @@ describe('Claude Code CLI — subprocess app-managed (critério 2)', () => {
   it('pede stream-json e verbose ao CLI', async () => {
     // `--verbose` não é enfeite: sem ele o CLI recusa `stream-json` junto com `--print`.
     let argsRecebidos: readonly string[] = []
-    const adapter = new ClaudeCodeAdapter(process.cwd(), ((
+    const adapter = new ClaudeCodeAdapter(runsDeTeste().abrir, ((
       _binario: string,
       args: readonly string[],
       opcoes: object
@@ -606,7 +607,7 @@ describe('Claude Code CLI — subprocess app-managed (critério 2)', () => {
   })
 
   it('binário ausente vira mensagem que diz o que fazer', async () => {
-    const adapter = new ClaudeCodeAdapter(process.cwd(), ((
+    const adapter = new ClaudeCodeAdapter(runsDeTeste().abrir, ((
       _bin: string,
       _args: readonly string[],
       o: object
@@ -625,7 +626,7 @@ describe('Claude Code CLI — subprocess app-managed (critério 2)', () => {
   })
 
   it('healthcheck responde false quando o binário não existe, sem lançar', async () => {
-    const adapter = new ClaudeCodeAdapter(process.cwd(), ((
+    const adapter = new ClaudeCodeAdapter(runsDeTeste().abrir, ((
       _b: string,
       _a: readonly string[],
       o: object
@@ -635,7 +636,7 @@ describe('Claude Code CLI — subprocess app-managed (critério 2)', () => {
   })
 
   it('healthcheck responde true quando o processo sai com código 0', async () => {
-    const adapter = new ClaudeCodeAdapter(process.cwd(), ((
+    const adapter = new ClaudeCodeAdapter(runsDeTeste().abrir, ((
       _b: string,
       _a: readonly string[],
       o: object

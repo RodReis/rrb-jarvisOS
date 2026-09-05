@@ -19,6 +19,7 @@
  *    o serviço paga.
  */
 
+import { IDIOMA_DA_SAIDA } from './idioma-da-geracao'
 import type { Afirmacao, BlocoDoBrief, Pendencia } from './brief'
 import { BLOCOS_DO_BRIEF, isBlocoDoBrief, isOrigemDaAfirmacao } from './brief'
 
@@ -35,6 +36,7 @@ import { BLOCOS_DO_BRIEF, isBlocoDoBrief, isOrigemDaAfirmacao } from './brief'
  */
 export const SISTEMA_DO_BRIEF = [
   'Você recebe o prompt de um projeto escrito pelo dono dele e produz um brief estruturado.',
+  IDIOMA_DA_SAIDA,
   '',
   'Responda **somente** com JSON válido, sem cercas de código e sem texto antes ou depois.',
   '',
@@ -113,6 +115,7 @@ export function promptDaGeracao(
  */
 export const SISTEMA_DAS_PERGUNTAS = [
   'Você recebe o prompt de um projeto e gera as perguntas que faltam para entendê-lo.',
+  IDIOMA_DA_SAIDA,
   '',
   'Responda **somente** com JSON válido, sem cercas de código e sem texto antes ou depois.',
   '',

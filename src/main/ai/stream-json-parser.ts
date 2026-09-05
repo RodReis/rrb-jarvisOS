@@ -11,6 +11,17 @@
  * mudança de formato do CLI parar a jornada inteira. Por isso nenhuma função aqui lança: entrada
  * inesperada devolve `erro` ou `undefined`, nunca exceção.
  *
+ * ## Texto de `assistant` é documento; texto de `user`, não
+ *
+ * O CLI usa mensagens `user` para injetar coisas que ninguém digitou: o corpo de uma skill que o
+ * modelo invocou, um `system-reminder`, o resultado de uma ferramenta. Tratá-las como
+ * `assistant` — o que este parser fazia — despejava esse conteúdo no documento: numa geração de
+ * refinamento, os ~30 KB da skill `claude-api` saíram como se fossem a resposta do modelo (#272).
+ *
+ * A spec é literal: `texto` é "texto do modelo, em pedaços", e conteúdo de mensagem `user` não é
+ * texto do modelo. Ele vira evidência no console — truncado pela mesma régua de 2 KB do
+ * `tool_result` — e **nunca** documento.
+ *
  * ## O que é ignorado, e por quê
  *
  * O CLI emite muito mais do que interessa: `system/init` (com a lista inteira de ferramentas
@@ -82,13 +93,42 @@ function inteiro(valor: unknown): number {
 }
 
 /**
+ * O que o parser precisa lembrar entre linhas: a última chamada de ferramenta sem resultado.
+ *
+ * Existe por causa do #272. O conteúdo que o CLI injeta numa mensagem `user` — o corpo de uma
+ * skill, um `system-reminder` — chega **sem** `tool_use_id`, então não há como atribuí-lo a uma
+ * chamada olhando só para a linha. A `GenerationEvent` é união fechada pela spec e não ganha
+ * tipo novo sem passar pelo PI; o que a spec autoriza é reusar `ferramenta-fim` com o
+ * `chamadaId` do `tool_use` pendente, e é isso que este estado guarda.
+ *
+ * Objeto passado pelo chamador, e não variável de módulo: duas gerações simultâneas
+ * compartilhariam a global, e uma atribuiria à outra o resultado da sua ferramenta. O adapter
+ * cria um por `generateStream`, que é exatamente o escopo de uma geração.
+ */
+export interface EstadoDoParser {
+  /** O `id` do último `tool_use` que ainda não recebeu `tool_result`. */
+  chamadaPendente?: string
+}
+
+/** Um estado novo, para uma geração nova. */
+export function novoEstadoDoParser(): EstadoDoParser {
+  return {}
+}
+
+/**
  * Traduz uma linha do `stream-json` nos eventos que ela contém.
  *
  * Devolve **lista** porque uma linha de `assistant` pode carregar vários blocos — texto e duas
  * chamadas de ferramenta na mesma mensagem é comum. Lista vazia significa "linha irrelevante"
  * (telemetria, init, hooks), que é diferente de erro.
+ *
+ * O `estado` tem padrão para os testes que olham uma linha só; em produção o adapter passa
+ * sempre o mesmo, porque é ele que liga o texto injetado à ferramenta que o trouxe.
  */
-export function parsearLinha(linha: string): readonly GenerationEvent[] {
+export function parsearLinha(
+  linha: string,
+  estado: EstadoDoParser = novoEstadoDoParser()
+): readonly GenerationEvent[] {
   let payload: unknown
   try {
     payload = JSON.parse(linha)
@@ -110,9 +150,14 @@ export function parsearLinha(linha: string): readonly GenerationEvent[] {
     const blocos = (mensagem as Record<string, unknown>).content
     if (!Array.isArray(blocos)) return []
 
+    // **Quem falou** decide o que o bloco `text` vira. A correção do #272 vive aqui e não no
+    // adapter de propósito: o adapter empurra todo `texto` para o documento, então filtrar lá
+    // seria ensinar a ele o formato do CLI que este arquivo existe para esconder.
+    const doModelo = tipo === 'assistant'
+
     return blocos.flatMap((bloco: unknown): readonly GenerationEvent[] => {
       if (typeof bloco !== 'object' || bloco === null) return []
-      return eventosDoBloco(bloco as BlocoDeConteudo)
+      return eventosDoBloco(bloco as BlocoDeConteudo, doModelo, estado)
     })
   }
 
@@ -139,17 +184,28 @@ export function parsearLinha(linha: string): readonly GenerationEvent[] {
   return []
 }
 
-function eventosDoBloco(bloco: BlocoDeConteudo): readonly GenerationEvent[] {
+function eventosDoBloco(
+  bloco: BlocoDeConteudo,
+  doModelo: boolean,
+  estado: EstadoDoParser
+): readonly GenerationEvent[] {
   if (bloco.type === 'text') {
     const texto = bloco.text
     if (typeof texto !== 'string' || texto === '') return []
-    return [{ tipo: 'texto', delta: texto }]
+
+    // Texto do modelo: documento, inteiro e sem truncar. É o produto.
+    if (doModelo) return [{ tipo: 'texto', delta: texto }]
+
+    return [textoInjetado(texto, estado)]
   }
 
   if (bloco.type === 'tool_use') {
     const chamadaId = typeof bloco.id === 'string' ? bloco.id : ''
     const nome = typeof bloco.name === 'string' ? bloco.name : 'desconhecida'
     if (chamadaId === '') return []
+
+    // Guardada para o texto que o CLI injetar em seguida sem dizer de qual chamada veio.
+    estado.chamadaPendente = chamadaId
 
     return [
       {
@@ -165,6 +221,8 @@ function eventosDoBloco(bloco: BlocoDeConteudo): readonly GenerationEvent[] {
     const chamadaId = typeof bloco.tool_use_id === 'string' ? bloco.tool_use_id : ''
     if (chamadaId === '') return []
 
+    if (estado.chamadaPendente === chamadaId) estado.chamadaPendente = undefined
+
     const { resumo, tamanhoOriginal } = truncarBytes(textoDoResultado(bloco.content))
     const status: StatusDaFerramenta = bloco.is_error === true ? 'erro' : 'ok'
 
@@ -174,4 +232,29 @@ function eventosDoBloco(bloco: BlocoDeConteudo): readonly GenerationEvent[] {
   }
 
   return []
+}
+
+/**
+ * O texto que o CLI **injetou** numa mensagem `user`: corpo de skill, `system-reminder`, aviso.
+ *
+ * Vira `ferramenta-fim` truncado, e não `texto` — que é o defeito do #272 — nem `erro`, que
+ * mentiria: conteúdo injetado é rotina do CLI, não falha. Com `tool_use` pendente, o resumo
+ * aparece embaixo da chamada que o trouxe, que é onde o PI o procura; sem ele — um
+ * `system-reminder` fora de qualquer ferramenta —, `chamadaId` fica vazio e a tela o mostra como
+ * bloco solto. `status` é `ok` porque nada falhou.
+ *
+ * A régua de 2 KB é a mesma do `tool_result` (SPEC-Fases-03 § Eventos), e é a que o código de
+ * antes não alcançava: `truncarBytes` só cobria `tool_result`, então a skill de 30 KB passava
+ * inteira e ia parar no documento.
+ */
+function textoInjetado(texto: string, estado: EstadoDoParser): GenerationEvent {
+  const { resumo, tamanhoOriginal } = truncarBytes(texto)
+
+  return {
+    tipo: 'ferramenta-fim',
+    chamadaId: estado.chamadaPendente ?? '',
+    status: 'ok',
+    resumoDoResultado: resumo,
+    tamanhoOriginal
+  }
 }

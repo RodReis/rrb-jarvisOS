@@ -17,6 +17,15 @@ import { PhaseModelRepository } from './ai/phase-model-repository'
 import { PhaseModelService } from './ai/phase-model-service'
 import { CodexProfileService } from './ai/codex-profile-service'
 import { CodexAdapter } from './ai/codex-adapter'
+import { abrirRunNeutro, type RunNeutro } from './ai/cwd-neutro'
+import {
+  SCHEMA_DAS_AFIRMACOES,
+  SCHEMA_DAS_CONTRADICOES,
+  SCHEMA_DAS_PERGUNTAS,
+  SCHEMA_DA_SPEC,
+  SCHEMA_DOS_AJUSTES,
+  SCHEMA_DO_ROADMAP
+} from '@shared/domain/json-schema-da-saida'
 import { GenerationTraceService } from './ai/generation-trace-service'
 import { GenerationTraceRepository } from './ai/generation-trace-repository'
 import { QuotaRepository } from './ai/quota-repository'
@@ -357,11 +366,20 @@ if (!app.requestSingleInstanceLock()) {
     })
 
     const ollamaAdapter = new OllamaAdapter()
-    const claudeCodeAdapter = new ClaudeCodeAdapter()
+    /**
+     * O cwd neutro dos dois CLIs (emenda E1 à SPEC-Fases-03).
+     *
+     * Um diretório vazio por geração sob o `userData`, e **não** `process.cwd()`: em dev o
+     * diretório do processo é o repositório do próprio JarvisOS, e o CLI carregava `CLAUDE.md`,
+     * `.claude/`, regras, hooks e MCPs deste projeto para gerar o documento de outro — 230.444
+     * tokens de entrada num refinamento de prompt pequeno.
+     */
+    const abrirRunDoCli = (): RunNeutro => abrirRunNeutro(app.getPath('userData'))
+    const claudeCodeAdapter = new ClaudeCodeAdapter(abrirRunDoCli)
     // O quinto adapter (SPEC-Fases-06): a assinatura do Codex pelo mesmo ponto único. O perfil
     // entra por função e não por valor — quem o resolve é o `CodexProfileService`, e capturá-lo
     // aqui congelaria um caminho que pode mudar.
-    const codexAdapter = new CodexAdapter(process.cwd(), () => codexProfile.codexHome)
+    const codexAdapter = new CodexAdapter(abrirRunDoCli, () => codexProfile.codexHome)
     const adapters = {
       anthropic: new AnthropicAdapter(),
       gemini: new GeminiAdapter(),
@@ -783,6 +801,7 @@ if (!app.requestSingleInstanceLock()) {
             provider: rota,
             ...(model === undefined ? {} : { model }),
             system: SISTEMA_DAS_PERGUNTAS,
+            jsonSchema: SCHEMA_DAS_PERGUNTAS,
             prompt: promptDasPerguntas(prompt, blocosEmAberto),
             contextPackId,
             console: { projectId, etapa: 'refinamento' }
@@ -860,6 +879,7 @@ if (!app.requestSingleInstanceLock()) {
             provider: rota,
             ...(model === undefined ? {} : { model }),
             system: SISTEMA_DO_BRIEF,
+            jsonSchema: SCHEMA_DAS_AFIRMACOES,
             prompt: promptDaGeracao(prompt, decisoes, correcao),
             contextPackId,
             console: { projectId, etapa: 'brief-aceito' }
@@ -962,6 +982,7 @@ if (!app.requestSingleInstanceLock()) {
               provider: rota,
               ...(model === undefined ? {} : { model }),
               system: SISTEMA_DO_PRD,
+            jsonSchema: SCHEMA_DAS_AFIRMACOES,
               prompt: promptDoPrd(entrada),
               contextPackId,
               console: { projectId, etapa: 'prd' }
@@ -982,6 +1003,7 @@ if (!app.requestSingleInstanceLock()) {
               provider: rota,
               ...(model === undefined ? {} : { model }),
               system: SISTEMA_DAS_CONTRADICOES,
+            jsonSchema: SCHEMA_DAS_CONTRADICOES,
               prompt: promptDasContradicoes(afirmacoes),
               contextPackId,
               console: { projectId, etapa: 'prd' }
@@ -1044,6 +1066,7 @@ if (!app.requestSingleInstanceLock()) {
               provider: rota,
               ...(model === undefined ? {} : { model }),
               system: SISTEMA_DA_ARQUITETURA,
+            jsonSchema: SCHEMA_DAS_AFIRMACOES,
               prompt: promptDaArquitetura(entrada),
               contextPackId,
               console: { projectId, etapa: 'arquitetura' }
@@ -1062,6 +1085,7 @@ if (!app.requestSingleInstanceLock()) {
             {
               provider: rota,
               system: SISTEMA_DA_COERENCIA,
+            jsonSchema: SCHEMA_DOS_AJUSTES,
               prompt: promptDaCoerencia({ requisitos, jornadas }),
               contextPackId
             },
@@ -1114,6 +1138,7 @@ if (!app.requestSingleInstanceLock()) {
               provider: rota,
               ...(model === undefined ? {} : { model }),
               system: SISTEMA_DO_ROADMAP,
+            jsonSchema: SCHEMA_DO_ROADMAP,
               prompt: promptDoRoadmap(entrada),
               contextPackId,
               console: { projectId, etapa: 'roadmap' }
@@ -1145,6 +1170,7 @@ if (!app.requestSingleInstanceLock()) {
               provider: rota,
               ...(model === undefined ? {} : { model }),
               system: SISTEMA_DA_SPEC,
+            jsonSchema: SCHEMA_DA_SPEC,
               prompt: promptDaSpec({
                 mvp,
                 fatia,

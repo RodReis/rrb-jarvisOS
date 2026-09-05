@@ -13,6 +13,7 @@
 
 import type { AiUsage } from '@shared/domain/ai'
 import type { GenerationEvent } from '@shared/domain/geracao'
+import type { Fase } from '@shared/domain/fase'
 
 /** O que o adapter recebe. Já resolvido: modelo escolhido, teto definido, credencial em mãos. */
 export interface AdapterRequest {
@@ -50,6 +51,32 @@ export interface AdapterRequest {
    * porque uma exceção do consumidor derrubaria a geração que ele apenas observa.
    */
   readonly onEvento?: (evento: GenerationEvent) => void
+  /**
+   * A fase da jornada a que esta chamada pertence (emenda E1 à SPEC-Fases-03).
+   *
+   * Existe porque o isolamento do CLI **depende da fase**: no Planejamento e na Especificação o
+   * CLI é um gerador de documento — sem persona de agente, sem ferramentas, sem settings do
+   * ambiente —, enquanto na Construção o agente é legítimo e essas mesmas restrições o
+   * quebrariam. Sem este campo o adapter teria de adivinhar, e adivinharia igual nos dois casos.
+   *
+   * Opcional, e ausente significa **sem isolamento por fase**: é o caso das chamadas que não
+   * pertencem a etapa nenhuma (o painel de teste do Settings), onde impor `--tools ""` seria
+   * restringir uma chamada que não é geração de documento. Quem tem fase é quem passa `console`,
+   * e é o ponto único que a deriva da etapa — nunca o call site, que erraria em uma das nove.
+   */
+  readonly fase?: Fase
+  /**
+   * O JSON Schema que o CLI deve impor à saída, já serializado (emenda E1 § Decisão 3).
+   *
+   * Vem do call site junto do `system` porque é o **par system+prompt** que decide o formato:
+   * a etapa `prd` gera termo de pesquisa (texto puro), documentos e contradições, com três
+   * contratos diferentes. Ausente = a etapa não produz JSON, e impor schema ali quebraria a
+   * saída em vez de protegê-la.
+   *
+   * String e não objeto: é o que a flag recebe, e desserializar aqui só para reserializar no
+   * adapter seria trabalho para chegar ao mesmo lugar.
+   */
+  readonly jsonSchema?: string
 }
 
 /**

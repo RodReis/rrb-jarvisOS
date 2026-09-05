@@ -19,6 +19,7 @@ import type { AdapterChunk } from './adapter'
 import type { GenerationEvent } from '@shared/domain/geracao'
 import { AdapterError } from './anthropic-adapter'
 import { CodexAdapter } from './codex-adapter'
+import { runsDeTeste } from './cwd-neutro.test-helper'
 
 const CODEX_HOME_DA_PIPELINE = '/userData/codex-pipeline'
 
@@ -44,7 +45,7 @@ function comBinarioDuble(script: string, capturadas?: ChamadaDoCodex[]): CodexAd
     return spawn(process.execPath, ['-e', script], opcoes)
   }) as typeof spawn
 
-  return new CodexAdapter(process.cwd(), () => CODEX_HOME_DA_PIPELINE, spawnDuble)
+  return new CodexAdapter(runsDeTeste().abrir, () => CODEX_HOME_DA_PIPELINE, spawnDuble)
 }
 
 /** O texto do documento vem em `agent_message`, dentro de um `item.completed`. */

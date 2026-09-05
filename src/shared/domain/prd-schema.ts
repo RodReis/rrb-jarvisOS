@@ -19,6 +19,7 @@
  *    completasse origem ausente inventaria a procedência que o critério 1 exige.
  */
 
+import { IDIOMA_DA_SAIDA } from './idioma-da-geracao'
 import type { DocumentoDoPacote } from './pacote-estrutural'
 import type { AfirmacaoDoPrd, ContradicaoDoPrd } from './prd'
 import { ORIGENS_POR_DOCUMENTO, SECOES_DO_PRD, isDocumentoDoPrd, isOrigemDoPrd } from './prd'
@@ -35,6 +36,7 @@ import { ORIGENS_POR_DOCUMENTO, SECOES_DO_PRD, isDocumentoDoPrd, isOrigemDoPrd }
  */
 export const SISTEMA_DO_TERMO = [
   'Você recebe o brief de um projeto e propõe UM termo de busca de mercado.',
+  IDIOMA_DA_SAIDA,
   '',
   'Responda com o termo e nada mais: sem aspas, sem explicação, sem pontuação final.',
   '',
@@ -69,6 +71,7 @@ export function promptDoTermo(afirmacoesDoBrief: readonly string[]): string {
  */
 export const SISTEMA_DO_PRD = [
   'Você recebe o brief aceito de um projeto e produz três documentos estruturados: PRD,',
+  IDIOMA_DA_SAIDA,
   'LANDSCAPE e CONVENTION.',
   '',
   'Responda **somente** com JSON válido, sem cercas de código e sem texto antes ou depois.',
@@ -192,6 +195,7 @@ export function promptDoPrd(entrada: {
  */
 export const SISTEMA_DAS_CONTRADICOES = [
   'Você recebe as afirmações de três documentos e do brief que os originou, e procura',
+  IDIOMA_DA_SAIDA,
   'contradições: pares de afirmações que não podem ser verdadeiras ao mesmo tempo.',
   '',
   'Responda **somente** com JSON válido, sem cercas de código e sem texto antes ou depois.',
