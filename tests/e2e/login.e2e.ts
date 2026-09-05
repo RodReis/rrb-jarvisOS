@@ -150,9 +150,14 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'createWorkflow',
     'definirPoliticaDeMerge',
     'descartarAjusteDaArquitetura',
+    // O perfil isolado do Codex (SPEC-Multi-Executor-02): quatro canais, **nenhum** com segredo.
+    // Quem autentica é o PI, direto no CLI, e o que passa aqui é estado, gatilho e decisão de
+    // cobrança — não há parâmetro onde token, chave ou senha caibam (critério 1).
+    'entrarNoCodex',
     'escolherAnexo',
     'escolherMvpDoRoadmap',
     'estadoDaJornada',
+    'estadoDoCodex',
     'estadoDoRefinamento',
     'estadoDoSandbox',
     // O console da geração (SPEC-Fases-03): dois canais de leitura da trilha gravada. Nenhum
@@ -239,6 +244,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'runCommand',
     'runWorkflowReal',
     'runWorkflowSimulated',
+    'sairDoCodex',
     'salvarPromptDoProjeto',
     'savePlanningAnswers',
     'savePreferences',
@@ -249,6 +255,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'setConnectorCreditLimits',
     'setCredential',
     'setGithubClientId',
+    'setModoDoCodex',
     'setPhaseModel',
     'setPhaseModelOverride',
     'setProviderModel',

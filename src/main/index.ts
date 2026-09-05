@@ -15,6 +15,7 @@ import { RoutingService, SondaDeAdapters } from './ai/routing-service'
 import { RoutingRepository } from './ai/routing-repository'
 import { PhaseModelRepository } from './ai/phase-model-repository'
 import { PhaseModelService } from './ai/phase-model-service'
+import { CodexProfileService } from './ai/codex-profile-service'
 import { GenerationTraceService } from './ai/generation-trace-service'
 import { GenerationTraceRepository } from './ai/generation-trace-repository'
 import { QuotaRepository } from './ai/quota-repository'
@@ -358,6 +359,20 @@ if (!app.requestSingleInstanceLock()) {
     // jornada gera cada fase —, e as duas politicas vivem no mesmo escopo.
     const phaseModelRepo = new PhaseModelRepository(storage.db)
     const phaseModels = new PhaseModelService(phaseModelRepo, storage.audit)
+
+    /*
+     * O perfil isolado do Codex (SPEC-Multi-Executor-02).
+     *
+     * O `CODEX_HOME` nasce sob `userData` — fora do perfil pessoal do PI e fora do repositório,
+     * como a spec pede. Um terceiro requisito só apareceu medindo: o Codex **recusa** criar seus
+     * binários auxiliares sob diretório temporário, então `TEMP` degradaria em silêncio.
+     */
+    const codexProfile = new CodexProfileService({
+      userDataDir: app.getPath('userData'),
+      audit: storage.audit,
+      userId: userIdAtual,
+      workspaceId: () => workspaces.atual()
+    })
     const routing = new RoutingService(
       routingRepo,
       new SondaDeAdapters({
@@ -1299,6 +1314,7 @@ if (!app.requestSingleInstanceLock()) {
       routing,
       routingRepo,
       phaseModels,
+      codex: codexProfile,
       generationTraces,
       connectors,
       connectorCredits,

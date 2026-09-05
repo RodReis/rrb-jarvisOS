@@ -382,7 +382,15 @@ export const AUDIT_EVENT_TYPES = [
   // registrando o que o `RoadmapService` faz com os gates. A pergunta que este responde é a da
   // geração — *quantas vezes o modelo foi recusado pelo validador de DAG antes de acertar?* —,
   // e sob o tipo antigo ela exigiria filtrar por um campo de payload.
-  'roadmap-generation'
+  'roadmap-generation',
+  // SPEC-Multi-Executor-02: o perfil isolado do Codex — login, logout e **troca de modo de
+  // cobrança**, que a regra 4 exige que seja "nova decisão auditada antes do próximo run".
+  //
+  // Tipo próprio, e não `credential-change`: aquele registra segredo entrando ou saindo do
+  // Vault, e aqui **não há segredo no app** — quem autentica é o PI, direto no CLI (critério 1).
+  // O que se audita é a decisão (qual modo passou a valer, autorizada por quem), não a posse de
+  // uma credencial que este lado nunca tem.
+  'codex-profile'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]

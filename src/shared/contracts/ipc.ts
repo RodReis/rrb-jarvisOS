@@ -42,6 +42,7 @@ import type {
   ProjectModelOverride,
   RotaComModelo
 } from '@shared/domain/modelo-da-fase'
+import type { CodexBillingMode, CodexProfileState } from '@shared/domain/codex-profile'
 import type {
   ConnectorCapability,
   ConnectorCredentialKey,
@@ -233,6 +234,19 @@ export const IPC_CHANNELS = {
   providerStatus: 'provider:status',
   providerModels: 'provider:models',
   providerSetModel: 'provider:set-model',
+  /*
+   * O perfil isolado do Codex (SPEC-Multi-Executor-02).
+   *
+   * **Quatro canais, e nenhum deles transporta segredo** — não por disciplina, por construção:
+   * quem autentica é o PI, direto no CLI, e o que atravessa aqui é estado (`codex:estado`), um
+   * gatilho sem payload (`codex:login`, `codex:logout`) e uma decisão de cobrança
+   * (`codex:set-modo`). Não existe canal que aceite token, chave ou senha, porque não existe
+   * momento em que o app os tenha (critério 1).
+   */
+  codexEstado: 'codex:estado',
+  codexLogin: 'codex:login',
+  codexLogout: 'codex:logout',
+  codexSetModo: 'codex:set-modo',
   routingGet: 'routing:get',
   routingSetRoute: 'routing:set-route',
   /**
@@ -878,6 +892,25 @@ export interface JarvisBridge {
   getRouting(workspace: WorkspaceId): Promise<RoutingPolicy>
   /** Edita a rota de um tipo de tarefa e devolve o conjunto resultante. */
   setRoute(rota: ProviderRoute, workspace: WorkspaceId): Promise<RoutingPolicy>
+
+  /**
+   * O perfil isolado do Codex (SPEC-Multi-Executor-02, critérios 1, 4, 5 e 6).
+   *
+   * `estadoDoCodex` devolve saúde, referência opaca ao perfil e modo vigente — nunca conteúdo do
+   * perfil. `entrarNoCodex` dispara o login por dispositivo e devolve a **instrução** que o PI
+   * segue no navegador (o código e a URL, já redigidos), não uma credencial.
+   */
+  estadoDoCodex(): Promise<CodexProfileState>
+  entrarNoCodex(): Promise<{ readonly ok: boolean; readonly instrucao: string }>
+  sairDoCodex(): Promise<boolean>
+  /**
+   * Troca o modo de cobrança — **decisão do PI, auditada** (regra 4).
+   *
+   * `habilitado` é parâmetro explícito e não estado guardado: subir para um modo que gasta
+   * dinheiro exige que o chamador declare a autorização na própria chamada. `undefined` de volta
+   * é a recusa (regra 3: rate limit de assinatura não autoriza créditos nem API).
+   */
+  setModoDoCodex(modo: CodexBillingMode, habilitado: boolean): Promise<CodexBillingMode | undefined>
 
   /**
    * O modelo de cada fase no workspace, com o padrao preenchendo o que nunca foi editado
