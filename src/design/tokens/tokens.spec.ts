@@ -16,6 +16,7 @@ import {
   contraste,
   CONTRASTE_MINIMO,
   hexA,
+  opacaSobre,
   PALETA_ACENTO,
   contrasteSobre,
   papeis,
@@ -309,5 +310,57 @@ describe('primitivos de base', () => {
     const sombra = sombraComGlow('#C4C4C4')
     expect(sombra).toContain('0 20px 46px -18px rgba(0,0,0,.9)')
     expect(sombra).toContain('#C4C4C4')
+  })
+})
+
+/**
+ * `opacaSobre` — o achatamento que torna o overlay legível (FIX da #275).
+ *
+ * O protótipo especifica as superfícies em `rgba(...,.7)`: vidro sobre a atmosfera do app.
+ * Onde a camada **flutua sobre conteúdo** isso deixa de funcionar — dois textos sobrepostos
+ * removem o contraste que a régua de 4.5:1 mede sobre um fundo, e nenhuma medição de token
+ * pega, porque cada camada isolada passa.
+ *
+ * A alternativa seria escolher um hex novo a olho; achatar o vidro sobre o fundo que ele teria
+ * mantém o overlay derivado do card, então um card que mude leva o overlay junto.
+ */
+describe('opacaSobre: vidro achatado sobre o fundo', () => {
+  it('achata a translucidez contra o fundo, canal a canal', () => {
+    // 50% de branco sobre preto é cinza médio: 0*0.5 + 255*0.5 = 127,5 → 128.
+    expect(opacaSobre('rgba(255,255,255,.5)', '#000000')).toBe('rgb(128,128,128)')
+  })
+
+  it('devolve a cor intacta quando ela já é opaca — não há o que achatar', () => {
+    expect(opacaSobre('#123456', '#000000')).toBe('#123456')
+    expect(opacaSobre('rgb(1,2,3)', '#ffffff')).toBe('rgb(1,2,3)')
+  })
+
+  it('o resultado é sempre opaco — é a razão de a função existir', () => {
+    // A garantia que o overlay depende: seja qual for o alfa de entrada, o que sai não deixa
+    // nada atravessar. Um `rgba` na saída reabriria o defeito em silêncio.
+    for (const modulo of ['jarvis', 'noa'] as const) {
+      for (const modo of ['dark', 'light'] as const) {
+        const overlay = papeis(modulo, modo).surfaceOverlay
+        expect(overlay).toMatch(/^rgb\(\d+,\d+,\d+\)$/)
+      }
+    }
+  })
+
+  it('a superfície de overlay é mais opaca que o card, nos dois módulos e modos', () => {
+    // O card continua sendo vidro: o overlay não o substitui, ele é o mesmo material fechado.
+    for (const modulo of ['jarvis', 'noa'] as const) {
+      for (const modo of ['dark', 'light'] as const) {
+        const { surfaceRaised, surfaceOverlay } = papeis(modulo, modo)
+        expect(surfaceRaised).toMatch(/rgba\(/)
+        expect(surfaceOverlay).not.toMatch(/rgba\(/)
+      }
+    }
+  })
+
+  it('forma não reconhecida volta intacta em vez de virar cor inventada', () => {
+    // Fail safe pelo lado visível: uma cor que o parser não entende continua sendo a que o tema
+    // declarou. Devolver preto ou transparente esconderia o defeito atrás de uma tela plausível.
+    expect(opacaSobre('var(--alguma-coisa)', '#000000')).toBe('var(--alguma-coisa)')
+    expect(opacaSobre('rgba(1,2,3,.5)', 'não-é-cor')).toBe('rgba(1,2,3,.5)')
   })
 })

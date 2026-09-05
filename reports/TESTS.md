@@ -12,7 +12,7 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 1439 | 1439 | 0 | 74.6 | — | — |
+| — | — | — | Regras de Negócio | 1444 | 1444 | 0 | 74.6 | — | — |
 | — | — | — | Banco | 1130 | 1118 | 0 | 87.6 | — | — |
 | — | — | — | Tela | 581 | 580 | 0 | 75.0 | — | — |
 
@@ -278,5 +278,8 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-05 | #256 | spec-fases-06-codex-no-ponto-unico | Banco | 1130 | 1118 | 0 | 87.6 | #269 | [#269](https://github.com/RodReis/rrb-jarvisOS/pull/269) |
 | 2026-09-05 | #256 | spec-fases-06-codex-no-ponto-unico | Tela | 577 | 576 | 0 | 74.9 | #269 | [#269](https://github.com/RodReis/rrb-jarvisOS/pull/269) |
 | — | #275 | — | Regras de Negócio | 1439 | 1439 | 0 | 74.6 | #276 | [#276](https://github.com/RodReis/rrb-jarvisOS/pull/276) |
+| — | #275 | — | Banco | 1130 | 1118 | 0 | 87.6 | #276 | [#276](https://github.com/RodReis/rrb-jarvisOS/pull/276) |
+| — | #275 | — | Tela | 581 | 580 | 0 | 75.0 | #276 | [#276](https://github.com/RodReis/rrb-jarvisOS/pull/276) |
+| — | #275 | — | Regras de Negócio | 1444 | 1444 | 0 | 74.6 | #276 | [#276](https://github.com/RodReis/rrb-jarvisOS/pull/276) |
 | — | #275 | — | Banco | 1130 | 1118 | 0 | 87.6 | #276 | [#276](https://github.com/RodReis/rrb-jarvisOS/pull/276) |
 | — | #275 | — | Tela | 581 | 580 | 0 | 75.0 | #276 | [#276](https://github.com/RodReis/rrb-jarvisOS/pull/276) |
