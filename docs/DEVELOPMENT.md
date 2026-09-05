@@ -1980,6 +1980,45 @@ era o bundle antigo, gerado minutos antes com o conserto dentro. Depois do `elec
 o mesmo contrafactual reprovou como devia. Um `npm run dev` em watch mantém o bundle fresco
 enquanto roda e congela quando é encerrado, o que torna o engano mais fácil.
 
+### Três coisas que só o CI mostrou
+
+**A identidade de Git, pela segunda vez.** O E2E novo commita, e o runner não tem `user.name`
+global — o marco falhava com `reason: falha-na-execucao`, e a jornada não avançava. A lição está
+registrada no repo desde a M8-F04, custou um ciclo na #259, e custou outro aqui. O conserto é
+duas linhas de `git config` locais ao diretório do projeto, depois de criá-lo.
+
+Mais útil que o conserto é **como reproduzir o runner no Windows**, porque a primeira tentativa
+mentiu: `GIT_CONFIG_GLOBAL=/dev/null` falha por dois motivos independentes e silenciosos — o Git
+Bash traduz `/dev/null` para `nul` ao repassar a processo Windows, e o `ambienteControlado()` do
+`TerminalEngine` só deixa passar uma **lista de permissão** de variáveis, na qual `GIT_CONFIG_*`
+não está. O teste passava e parecia provar que o conserto era desnecessário. O que funciona é
+apontar `USERPROFILE` e `HOME` — que **estão** na lista — para um diretório sem `.gitconfig`:
+
+```
+mkdir /tmp/homevazio && HV=$(cygpath -w /tmp/homevazio)
+USERPROFILE="$HV" HOME="$HV" npx playwright test tests/e2e/<arquivo>.e2e.ts
+```
+
+Sem a identidade isso reproduz o CI exatamente; com ela, passa.
+
+**A prova visual não roda no `npm test`.** A suíte `test:prova` é separada, e eu não a tinha
+rodado: ela media o critério 6 na tela do prompt, de onde o bloqueio saiu junto com a geração. A
+cena `prompt-bloqueado` virou `refinamento-bloqueado` e as três asserções migraram com ela — o
+que se mede é o mesmo, na tela onde a chamada de fato acontece.
+
+**Um teste com corrida, que a lentidão do runner expôs.** O dublê de
+`isolamento-do-cli.int-spec.ts` fazia um `write` por linha; no CI o `SIGKILL` do corte chegava
+entre o primeiro e o segundo, e o `tool_result` nunca era escrito. O comentário do teste já
+declarava a intenção — *"o buffer já tinha tudo"* —, mas o dublê a cumpria por sorte de
+escalonamento. Agora escreve as três linhas numa vez só, por construção.
+
+Ao medir o contrafactual desse conserto, achei um **buraco de cobertura anterior**: trocando
+`processo.kill('SIGKILL')` por um no-op, os 37 testes do arquivo continuam verdes. A flag
+`ferramentaProibida` sozinha sustenta todas as asserções — ela protege o **documento**, e o kill
+protege o **custo e o tempo**, que é outra coisa. Sem ele, uma sessão fora do contrato roda até o
+timeout de 120s consumindo a assinatura, com toda a saída descartada. Registrado em
+[#283](https://github.com/RodReis/rrb-jarvisOS/issues/283) em vez de alargar este PR.
+
 **Limite desta entrega:** o refinamento ainda termina em "Procurar o que ainda falta" quando não
 há pergunta pendente, e o PI decide quando parar de procurar. Um critério automático de "todos os
 blocos cobertos" é escopo novo — a spec fala em *"todos os blocos têm resposta ou pendência
