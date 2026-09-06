@@ -370,66 +370,7 @@ describe('agruparEmBlocos', () => {
   })
 })
 
-describe('andamento da geração (SPEC-Jornada-03 § Geração)', () => {
-  it('não mostra a barra enquanto nenhuma etapa foi anunciada', async () => {
-    // Barra em 0% numa geração que não reporta etapas afirmaria que nada aconteceu — que é
-    // diferente de "não se sabe".
-    renderizar()
-    await chega({ tipo: 'texto', delta: 'gerando' })
-
-    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
-  })
-
-  it('a barra conta as etapas concluídas', async () => {
-    renderizar()
-    await chega({ tipo: 'etapa', etapa: 'pesquisa', estado: 'iniciada' })
-    await chega({ tipo: 'etapa', etapa: 'pesquisa', estado: 'concluida', resumo: '3 fontes.' })
-    await chega({ tipo: 'etapa', etapa: 'documentos', estado: 'iniciada' })
-
-    const barra = await screen.findByRole('progressbar')
-    // 1 de 5 concluída: a que está em curso não vale meio passo.
-    expect(barra).toHaveAttribute('aria-valuenow', '20')
-  })
-
-  it('mostra a etapa em curso e o que a anterior produziu', async () => {
-    renderizar()
-    await chega({ tipo: 'etapa', etapa: 'pesquisa', estado: 'concluida' })
-    await chega({
-      tipo: 'etapa',
-      etapa: 'documentos',
-      estado: 'iniciada',
-      resumo: '18 afirmações escritas.'
-    })
-
-    expect(await screen.findByText('PRD, Landscape e Convention')).toBeInTheDocument()
-    expect(screen.getByText('18 afirmações escritas.')).toBeInTheDocument()
-  })
-
-  it('a falha de uma etapa é dita em texto, não só por cor', async () => {
-    // Princípio 2 do produto: estado nunca é comunicado só por cor.
-    renderizar()
-    await chega({ tipo: 'etapa', etapa: 'documentos', estado: 'falhou', resumo: 'Sem saída.' })
-
-    expect(await screen.findByText('falhou')).toBeInTheDocument()
-  })
-
-  it('a etapa que falhou não conta como progresso', async () => {
-    renderizar()
-    await chega({ tipo: 'etapa', etapa: 'pesquisa', estado: 'concluida' })
-    await chega({ tipo: 'etapa', etapa: 'documentos', estado: 'falhou' })
-
-    expect(await screen.findByRole('progressbar')).toHaveAttribute('aria-valuenow', '20')
-  })
-
-  it('a etapa retentada aparece pelo estado atual, não pelo anterior', async () => {
-    renderizar()
-    await chega({ tipo: 'etapa', etapa: 'documentos', estado: 'falhou' })
-    await chega({ tipo: 'etapa', etapa: 'documentos', estado: 'concluida' })
-
-    expect(await screen.findByRole('progressbar')).toHaveAttribute('aria-valuenow', '20')
-    expect(screen.queryByText('falhou')).not.toBeInTheDocument()
-  })
-
+describe('etapas e a trilha (#318)', () => {
   it('a etapa não vira linha na trilha do texto', async () => {
     // Dez linhas de "iniciou/terminou" no meio da prosa seriam ruído entre exatamente o que o
     // painel existe para deixar legível.
@@ -439,6 +380,28 @@ describe('andamento da geração (SPEC-Jornada-03 § Geração)', () => {
 
     const trilha = await screen.findByLabelText('Trilha da geração')
     expect(within(trilha).queryByText(/Pesquisa de mercado/)).not.toBeInTheDocument()
+  })
+
+  it('o evento de etapa não zera a trilha, mesmo vindo com trace próprio (#318)', async () => {
+    // O anunciador de etapas usa um trace derivado do projeto (`etapas:<id>`), diferente do
+    // trace da chamada ao modelo. Tratá-lo como geração nova apagava o texto que já tinha
+    // chegado — e, na rodada seguinte, o trace repetido fazia o oposto: nada era apagado.
+    renderizar()
+    await chega({ tipo: 'texto', delta: 'O PRD começa assim.' })
+    await chega({ tipo: 'etapa', etapa: 'pesquisa', estado: 'concluida' }, 'etapas:p1')
+
+    expect(await screen.findByText('O PRD começa assim.')).toBeInTheDocument()
+  })
+
+  it('a barra não vive mais aqui: o andamento é da tela da etapa (#318)', async () => {
+    // Ela subiu para junto do botão que dispara a geração; deixar uma cópia aqui daria duas
+    // respostas para "em que ponto está", e elas divergiriam na primeira correção.
+    renderizar()
+    await chega({ tipo: 'texto', delta: 'gerando' })
+    await chega({ tipo: 'etapa', etapa: 'pesquisa', estado: 'concluida' }, 'etapas:p1')
+
+    expect(await screen.findByText('Console da geração')).toBeInTheDocument()
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
   })
 })
 

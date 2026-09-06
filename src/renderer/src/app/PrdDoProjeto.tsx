@@ -20,7 +20,10 @@ import {
 } from '@shared/domain/prd'
 import { Button, EmptyState, Field, InlineAlert, Input, LoadingState } from '@design/ui'
 import type { Resposta, RespostaOutcome, VistaDoWizard } from '@shared/domain/wizard'
+import type { AndamentoDaEtapa, EtapaDaGeracao } from '@shared/domain/geracao'
+import { aplicarEtapa } from '@shared/domain/geracao'
 import { log } from '../lib/log'
+import { AndamentoDaGeracao } from './AndamentoDaGeracao'
 import { WizardDoProjeto } from './WizardDoProjeto'
 
 /**
@@ -53,6 +56,14 @@ interface PrdDoProjetoProps {
   readonly nomeDoProjeto: string
   /** Relê a jornada depois do aceite — sem isto a trilha ficaria pedindo "Aceitar o PRD". */
   readonly onAceito?: () => void
+  /**
+   * Por que o aceite está travado, ou `undefined` quando está livre (#318).
+   *
+   * Quem sabe do gate é esta tela; quem também oferece o aceite é a trilha, que não tem como
+   * saber. Sem este aviso o botão da trilha saía primário com "Aceitar o PRD" enquanto o botão
+   * daqui recusava o mesmo aceite — e o PI via primeiro o que estava errado.
+   */
+  readonly onBloqueioDoAceite?: (motivo: string | undefined) => void
 }
 
 /** O rótulo de cada origem. **Dado, não lógica** — e o texto é o sinal, não a cor. */
@@ -265,7 +276,8 @@ export function PrdDoProjeto({
   workspace,
   projectId,
   nomeDoProjeto,
-  onAceito
+  onAceito,
+  onBloqueioDoAceite
 }: PrdDoProjetoProps): React.JSX.Element {
   const { t } = useTranslation()
   const [prd, setPrd] = useState<PrdRegistrado | null>(null)
@@ -290,6 +302,14 @@ export function PrdDoProjeto({
    * a pesquisa rodar sem confirmação (critério 3).
    */
   const [termoConfirmado, setTermoConfirmado] = useState(false)
+  /**
+   * O andamento das etapas **desta rodada** (#318).
+   *
+   * Mora aqui, e não no console: o console zera a trilha a cada `traceId` novo, e o anúncio de
+   * etapa viaja com um trace derivado do projeto — fixo entre rodadas. Lá, a barra somava duas
+   * gerações; aqui, quem decide onde uma rodada começa é `aplicarEtapa`, no domínio.
+   */
+  const [etapas, setEtapas] = useState<ReadonlyMap<EtapaDaGeracao, AndamentoDaEtapa>>(new Map())
 
   const carregar = useCallback(async (): Promise<void> => {
     try {
@@ -331,6 +351,35 @@ export function PrdDoProjeto({
       ativo = false
     }
   }, [projectId, workspace])
+
+  /**
+   * As etapas da geração, pelo canal de eventos (#318).
+   *
+   * A geração corre no **main** e não depende desta tela — fechar a janela não pode custar a
+   * chamada que o PI já pagou. A consequência é o inverso: é a tela que precisa acompanhar a
+   * geração, inclusive uma que começou antes de ela montar. Trocar de menu e voltar deixava o PI
+   * olhando a revisão velha, com o botão "Gerar" habilitado sobre uma geração em curso.
+   *
+   * Quando a gravação conclui, relê revisão e contradições: é o único ponto em que a revisão nova
+   * existe no banco.
+   */
+  useEffect(() => {
+    return window.jarvis.onGenerationEvent(({ evento }) => {
+      if (evento.tipo !== 'etapa') return
+
+      setEtapas((atuais) => aplicarEtapa(atuais, evento))
+      if (evento.etapa === 'gravacao' && evento.estado === 'concluida') void carregar()
+    })
+  }, [carregar])
+
+  /*
+   * O aviso ao pai sobre o gate (#318). Efeito, e não chamada dentro do `carregar`: o bloqueio é
+   * derivado da revisão, e derivar num lugar e avisar noutro faria os dois divergirem.
+   */
+  useEffect(() => {
+    if (carregando) return
+    onBloqueioDoAceite?.(prd !== null && podeAceitarPrd(prd) ? undefined : t('prd.aceiteBloqueado'))
+  }, [prd, carregando, onBloqueioDoAceite, t])
 
   /*
    * O termo proposto pela IA (critério 3), buscado uma vez ao abrir.
@@ -427,6 +476,13 @@ export function PrdDoProjeto({
   if (carregando) return <LoadingState rotulo={t('prd.carregando')} />
 
   const liberado = prd !== null && podeAceitarPrd(prd)
+  /*
+   * Uma geração está correndo? A resposta é a **etapa**, não o `ocupado` local: `ocupado` só
+   * conhece a geração que esta tela disparou, e a que veio de antes de ela montar (o PI trocou
+   * de menu e voltou) deixaria o botão habilitado sobre uma chamada em curso.
+   */
+  const gerando = [...etapas.values()].some((e) => e.estado === 'iniciada')
+  const trabalhando = ocupado || gerando
 
   return (
     <div className="flex flex-col gap-5" aria-labelledby={`prd-${projectId}`}>
@@ -463,8 +519,8 @@ export function PrdDoProjeto({
         <Button
           variante="primaria"
           onClick={() => void gerar()}
-          desabilitado={ocupado}
-          carregando={ocupado}
+          desabilitado={trabalhando}
+          carregando={trabalhando}
           iconeInicial={<Sparkles aria-hidden="true" className="size-4" />}
         >
           {prd === null ? t('prd.gerar') : t('prd.regerar')}
@@ -476,6 +532,13 @@ export function PrdDoProjeto({
           </span>
         )}
       </div>
+
+      {/*
+        O andamento fica **aqui**, logo abaixo do botão que o dispara (#318): é onde o PI está
+        quando aperta "Gerar", e é a primeira pergunta que ele faz depois. No console, no fim de
+        uma página de três documentos, a resposta exigia rolar a tela inteira.
+      */}
+      <AndamentoDaGeracao etapas={etapas} gerando={gerando} />
 
       {desfecho !== null && desfecho.resultado !== 'gerado' && (
         <InlineAlert

@@ -1,6 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { EventoDaGeracao, GenerationEvent } from '@shared/domain/geracao'
 import { PrdDoProjeto } from './PrdDoProjeto'
 
 /**
@@ -25,6 +26,15 @@ const cortarPropostoDoPrd = vi.fn()
 const aplicarEventoDaJornada = vi.fn()
 const contradicoesDoPrd = vi.fn()
 const responderContradicaoDoPrd = vi.fn()
+const cancelarAssinatura = vi.fn()
+/** O ouvinte que a tela registra no canal de eventos da geração (#318). */
+let emitir: ((payload: EventoDaGeracao) => void) | undefined
+
+/** Emite um evento de etapa como o main o entregaria, e espera o React reagir. */
+async function chega(evento: GenerationEvent): Promise<void> {
+  await waitFor(() => expect(emitir).toBeDefined())
+  emitir?.({ traceId: 'etapas:p-1', evento })
+}
 
 function afirmacao(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -62,6 +72,8 @@ function montar(): void {
 }
 
 beforeEach(() => {
+  emitir = undefined
+  cancelarAssinatura.mockClear()
   proporTermoDePesquisa.mockReset().mockResolvedValue('ferramentas de leitura')
   gerarPrd.mockReset().mockResolvedValue({ resultado: 'gerado', mensagem: 'ok' })
   carregarPrd.mockReset().mockResolvedValue(null)
@@ -79,6 +91,10 @@ beforeEach(() => {
       aplicarEventoDaJornada,
       contradicoesDoPrd,
       responderContradicaoDoPrd,
+      onGenerationEvent: (ouvinte: (payload: EventoDaGeracao) => void) => {
+        emitir = ouvinte
+        return cancelarAssinatura
+      },
       sendLog: vi.fn()
     },
     configurable: true,
@@ -305,6 +321,44 @@ describe('contradições — pergunta no pop-up da M8-F03 (critério 6, emenda E
     ).toBeInTheDocument()
   })
 
+  it('avisa o pai que o aceite está travado, para a trilha não oferecê-lo (#318)', async () => {
+    carregarPrd.mockResolvedValue(COM_CONTRADICAO)
+    contradicoesDoPrd.mockResolvedValue(VISTA_PENDENTE)
+    const onBloqueio = vi.fn()
+
+    render(
+      <PrdDoProjeto
+        workspace="jarvis"
+        projectId="p-1"
+        nomeDoProjeto="Leituras"
+        onAceito={vi.fn()}
+        onBloqueioDoAceite={onBloqueio}
+      />
+    )
+
+    // A razão é a mesma frase que o botão de baixo mostra: uma fonte, dois lugares.
+    await waitFor(() =>
+      expect(onBloqueio).toHaveBeenLastCalledWith('Resolva as contradições acima para aceitar.')
+    )
+  })
+
+  it('sem contradição, o pai é avisado de que o aceite está livre', async () => {
+    carregarPrd.mockResolvedValue(prd())
+    const onBloqueio = vi.fn()
+
+    render(
+      <PrdDoProjeto
+        workspace="jarvis"
+        projectId="p-1"
+        nomeDoProjeto="Leituras"
+        onAceito={vi.fn()}
+        onBloqueioDoAceite={onBloqueio}
+      />
+    )
+
+    await waitFor(() => expect(onBloqueio).toHaveBeenLastCalledWith(undefined))
+  })
+
   it('trava o aceite, com a razão ao lado do botão', async () => {
     carregarPrd.mockResolvedValue(COM_CONTRADICAO)
     contradicoesDoPrd.mockResolvedValue(VISTA_PENDENTE)
@@ -451,5 +505,130 @@ describe('aceite e desfechos', () => {
     montar()
 
     expect(await screen.findByText(/Nenhum documento ainda/i)).toBeInTheDocument()
+  })
+})
+
+/**
+ * O andamento da geração, na tela da etapa (#318).
+ *
+ * A barra vivia dentro do console, no fim da página, e contava as etapas de duas rodadas
+ * somadas — o PI via uma rodada nova abrir em 60% com "Gravação" concluída da anterior. Aqui ela
+ * fica junto do botão que dispara a geração, e o que ela conta é **uma** rodada.
+ */
+describe('andamento da geração (#318)', () => {
+  it('a barra fica junto do botão de gerar, não no fim da página', async () => {
+    montar()
+    await chega({ tipo: 'etapa', etapa: 'pesquisa', estado: 'iniciada' })
+
+    const andamento = await screen.findByRole('progressbar')
+    const botao = screen.getByRole('button', { name: /Gerar/i })
+
+    // `compareDocumentPosition`: o andamento vem **depois** do botão na ordem do documento, e
+    // antes de tudo o mais — é isso que o PI vê sem rolar.
+    expect(botao.compareDocumentPosition(andamento) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    )
+  })
+
+  it('sem etapa anunciada não há barra: 0% afirmaria que nada aconteceu', async () => {
+    montar()
+
+    expect(await screen.findByRole('button', { name: /Gerar/i })).toBeInTheDocument()
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+  })
+
+  it('conta só as etapas concluídas desta rodada', async () => {
+    montar()
+    await chega({ tipo: 'etapa', etapa: 'pesquisa', estado: 'iniciada' })
+    await chega({ tipo: 'etapa', etapa: 'pesquisa', estado: 'concluida', resumo: '3 fontes.' })
+    await chega({ tipo: 'etapa', etapa: 'documentos', estado: 'iniciada' })
+
+    // 1 de 5: a que está em curso não vale meio passo.
+    expect(await screen.findByRole('progressbar')).toHaveAttribute('aria-valuenow', '20')
+
+    // A lista diz o estado de cada etapa: uma concluída, a seguinte em curso, o resto pendente.
+    const andamento = screen.getByLabelText('Andamento da geração')
+    expect(andamento.querySelector('[data-jos-etapa="documentos"]')).toHaveAttribute(
+      'data-jos-estado',
+      'iniciada'
+    )
+    expect(andamento.querySelector('[data-jos-etapa="pesquisa"]')).toHaveAttribute(
+      'data-jos-estado',
+      'concluida'
+    )
+  })
+
+  it('o resumo mostrado é o da etapa em curso, não o da anterior', async () => {
+    montar()
+    await chega({ tipo: 'etapa', etapa: 'pesquisa', estado: 'concluida', resumo: '3 fontes.' })
+    expect(await screen.findByText('3 fontes.')).toBeInTheDocument()
+
+    await chega({ tipo: 'etapa', etapa: 'documentos', estado: 'iniciada' })
+
+    // "3 fontes." pendurado sob "PRD, Landscape e Convention" descreveria a etapa errada.
+    await waitFor(() => expect(screen.queryByText('3 fontes.')).not.toBeInTheDocument())
+  })
+
+  it('a rodada nova não herda as etapas da anterior', async () => {
+    // O defeito exato que o PI viu: rodada nova abrindo em 60%, com "Gravação dos documentos —
+    // os três documentos foram gravados" sobre uma rodada que ainda estava gerando.
+    montar()
+    await chega({ tipo: 'etapa', etapa: 'pesquisa', estado: 'concluida' })
+    await chega({ tipo: 'etapa', etapa: 'contradicoes', estado: 'concluida' })
+    await chega({ tipo: 'etapa', etapa: 'gravacao', estado: 'concluida', resumo: 'gravados.' })
+    expect(await screen.findByRole('progressbar')).toHaveAttribute('aria-valuenow', '60')
+
+    await chega({ tipo: 'etapa', etapa: 'pesquisa', estado: 'iniciada' })
+
+    await waitFor(() =>
+      expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0')
+    )
+    expect(screen.queryByText('gravados.')).not.toBeInTheDocument()
+  })
+
+  it('a falha da etapa é dita em texto, não só por cor', async () => {
+    montar()
+    await chega({ tipo: 'etapa', etapa: 'documentos', estado: 'falhou', resumo: 'Sem saída.' })
+
+    expect(await screen.findByText('falhou')).toBeInTheDocument()
+    expect(screen.getByText('Sem saída.')).toBeInTheDocument()
+  })
+
+  it('a gravação concluída recarrega a revisão — mesmo sem ter sido esta tela a gerar', async () => {
+    // Trocar de menu e voltar não pode deixar o PI olhando a revisão velha: a geração corre no
+    // main, e a tela lia o banco só ao montar.
+    carregarPrd.mockResolvedValue(null)
+    montar()
+    await waitFor(() => expect(carregarPrd).toHaveBeenCalledTimes(1))
+
+    carregarPrd.mockResolvedValue(prd())
+    await chega({ tipo: 'etapa', etapa: 'gravacao', estado: 'concluida', resumo: 'gravados.' })
+
+    expect(await screen.findByText(/O produto organiza leituras por projeto/i)).toBeInTheDocument()
+  })
+
+  it('geração em curso desabilita o botão de gerar, mesmo vinda de outra tela', async () => {
+    montar()
+    await waitFor(() => expect(screen.getByRole('button', { name: /Gerar/i })).toBeEnabled())
+
+    await chega({ tipo: 'etapa', etapa: 'documentos', estado: 'iniciada' })
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /Gerar/i })).toBeDisabled())
+  })
+
+  it('cancela a assinatura ao desmontar — ouvinte vivo sobre tela morta vaza', async () => {
+    const { unmount } = render(
+      <PrdDoProjeto
+        workspace="jarvis"
+        projectId="p-1"
+        nomeDoProjeto="Leituras"
+        onAceito={vi.fn()}
+      />
+    )
+    await waitFor(() => expect(emitir).toBeDefined())
+
+    unmount()
+
+    expect(cancelarAssinatura).toHaveBeenCalled()
   })
 })

@@ -83,6 +83,28 @@ describe('TrilhaDaJornada agrupada por fase (critério 6)', () => {
     expect(botoes[0]).toHaveTextContent(CTA_DA_ETAPA.prd)
   })
 
+  it('o CTA travado fica desabilitado com a razão ao lado, não oferecendo um aceite que não vai (#318)', () => {
+    // O botão da trilha levava o rótulo "Aceitar o PRD" e saía primário enquanto o gate estava
+    // travado por contradição — prometendo um aceite que o painel de baixo recusava.
+    render(
+      <TrilhaDaJornada
+        estado={estado('prd-aceito')}
+        onAgir={vi.fn()}
+        bloqueio="Resolva as contradições acima para aceitar."
+      />
+    )
+
+    const botao = screen.getByRole('button', { name: CTA_DA_ETAPA['prd-aceito'] })
+    expect(botao).toBeDisabled()
+    expect(screen.getByText('Resolva as contradições acima para aceitar.')).toBeInTheDocument()
+  })
+
+  it('sem bloqueio, o CTA continua acionável', () => {
+    render(<TrilhaDaJornada estado={estado('prd-aceito')} onAgir={vi.fn()} />)
+
+    expect(screen.getByRole('button', { name: CTA_DA_ETAPA['prd-aceito'] })).toBeEnabled()
+  })
+
   it('mantém a etapa atual anunciada para quem ouve a interface', () => {
     render(<TrilhaDaJornada estado={estado('roadmap')} onAgir={vi.fn()} />)
 
