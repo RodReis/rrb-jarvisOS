@@ -16,6 +16,7 @@ import type { PerguntaGerada } from './pergunta-gerada'
 import {
   MAXIMO_DE_OPCOES,
   MINIMO_DE_OPCOES,
+  validarContratoDaPergunta,
   separarPerguntasValidas,
   validarPerguntaGerada
 } from './pergunta-gerada'
@@ -179,5 +180,40 @@ describe('separação em lote', () => {
 
     expect(recusadas).toHaveLength(1)
     expect(recusadas[0]?.problemas[0]?.mensagem).toContain('fantasma')
+  })
+})
+
+describe('validarContratoDaPergunta — o contrato sem o bloco do brief', () => {
+  const base = {
+    id: 'c-1',
+    etapa: 'prd',
+    titulo: 'Local ou nuvem',
+    enunciado: 'O produto é local ou na nuvem?',
+    opcoes: [
+      { id: 'a', rotulo: 'Local', impacto: 'Sem sync.' },
+      { id: 'b', rotulo: 'Nuvem', impacto: 'Exige rede.' }
+    ],
+    recomendada: 'a',
+    justificativa: 'O brief diz local.',
+    aceitaTextoLivre: true,
+    delegavel: true
+  }
+
+  it('aceita a pergunta que cumpre o contrato', () => {
+    expect(validarContratoDaPergunta(base).valida).toBe(true)
+  })
+
+  it('recusa uma opção só e recomendada inexistente', () => {
+    const r = validarContratoDaPergunta({ ...base, opcoes: [base.opcoes[0]!], recomendada: 'z' })
+
+    expect(r.problemas.map((p) => p.recusa)).toEqual(
+      expect.arrayContaining(['opcoes-fora-do-contrato', 'recomendada-inexistente'])
+    )
+  })
+
+  it('a invariante 9 vale também aqui', () => {
+    const r = validarContratoDaPergunta({ ...base, enunciado: 'Precisa de consentimento LGPD?' })
+
+    expect(r.problemas.map((p) => p.recusa)).toContain('requisito-inventado')
   })
 })

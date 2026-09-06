@@ -87,7 +87,23 @@ describe('lerDocumentosDoModelo', () => {
   })
 })
 
-describe('lerContradicoesDoModelo', () => {
+describe('lerContradicoesDoModelo — a contradição é uma pergunta da M8-F03 (emenda E1)', () => {
+  const contradicao = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
+    id: 'c-1',
+    afirmacoes: ['a-1', 'a-2'],
+    titulo: 'Local ou nuvem',
+    enunciado: 'O produto é local ou na nuvem?',
+    opcoes: [
+      { id: 'a', rotulo: 'Local', impacto: 'Sem sync entre máquinas.' },
+      { id: 'b', rotulo: 'Nuvem', impacto: 'Exige conta e rede.' }
+    ],
+    recomendada: 'a',
+    justificativa: 'O brief diz local.',
+    aceitaTextoLivre: true,
+    delegavel: true,
+    ...over
+  })
+
   it('lista vazia é resultado legítimo, não ausência de saída', () => {
     expect(lerContradicoesDoModelo('{"contradicoes":[]}')).toEqual([])
   })
@@ -96,12 +112,30 @@ describe('lerContradicoesDoModelo', () => {
     expect(lerContradicoesDoModelo('{"contradicoes":"nenhuma"}')).toBeUndefined()
   })
 
-  it('exige pergunta e recomendação — o par é o contrato do critério 6', () => {
-    const semRecomendacao = JSON.stringify({
-      contradicoes: [{ id: 'c-1', afirmacoes: ['a-1', 'a-2'], pergunta: 'Qual vale?' }]
+  it('lê a pergunta inteira e carimba a etapa', () => {
+    const lidas = lerContradicoesDoModelo(JSON.stringify({ contradicoes: [contradicao()] }))
+
+    expect(lidas).toHaveLength(1)
+    expect(lidas?.[0]).toMatchObject({ id: 'c-1', etapa: 'prd', recomendada: 'a' })
+    expect(lidas?.[0]?.opcoes).toHaveLength(2)
+  })
+
+  it('a forma antiga (pergunta + recomendação, sem opções) não passa mais', () => {
+    const antiga = JSON.stringify({
+      contradicoes: [
+        { id: 'c-1', afirmacoes: ['a-1', 'a-2'], pergunta: 'Qual vale?', recomendacao: 'A.' }
+      ]
     })
 
-    expect(lerContradicoesDoModelo(semRecomendacao)).toBeUndefined()
+    expect(lerContradicoesDoModelo(antiga)).toBeUndefined()
+  })
+
+  it('opção sem impacto ou sem rótulo derruba a leitura', () => {
+    const semImpacto = JSON.stringify({
+      contradicoes: [contradicao({ opcoes: [{ id: 'a', rotulo: 'Local' }] })]
+    })
+
+    expect(lerContradicoesDoModelo(semImpacto)).toBeUndefined()
   })
 })
 

@@ -12,6 +12,7 @@ import {
   cortarPropostoDoPrd,
   landscapePendente,
   podeAceitarPrd,
+  contradicaoGravada,
   propostosDoDocumento,
   renderizarDocumentoDoPrd,
   validarPrd
@@ -208,7 +209,12 @@ describe('gate do aceite (critérios 4, 6 e 7)', () => {
     const com = {
       ...conteudo([DO_BRIEF]),
       contradicoes: [
-        { id: 'c-1', afirmacoes: ['a-1', 'b-2'], pergunta: 'Qual vale?', recomendacao: 'A de b-2.' }
+        contradicaoGravada({
+          id: 'c-1',
+          afirmacoes: ['a-1', 'b-2'],
+          pergunta: 'Qual vale?',
+          recomendacao: 'A de b-2.'
+        })
       ]
     }
 
@@ -297,5 +303,42 @@ describe('renderizarDocumentoDoPrd', () => {
 
     expect(texto).toContain('## Entidades')
     expect(texto).toContain('_Sem conteúdo registrado nesta revisão._')
+  })
+})
+
+describe('contradicaoGravada — revisões anteriores à emenda E1 continuam respondíveis', () => {
+  it('a forma nova passa intacta', () => {
+    const nova = {
+      id: 'c-1',
+      etapa: 'prd',
+      afirmacoes: ['a-1'],
+      titulo: 'T',
+      enunciado: 'E?',
+      opcoes: [{ id: 'a', rotulo: 'A', impacto: 'i' }],
+      recomendada: 'a',
+      justificativa: 'j',
+      aceitaTextoLivre: false,
+      delegavel: true
+    }
+
+    expect(contradicaoGravada(nova)).toEqual(nova)
+  })
+
+  it('a forma antiga vira pergunta de texto livre, sem opções e sem delegação', () => {
+    const antiga = {
+      id: 'c-1',
+      afirmacoes: ['a-1', 'b-1'],
+      pergunta: 'O produto é local ou na nuvem?',
+      recomendacao: 'Local, como o brief diz.'
+    }
+
+    const lida = contradicaoGravada(antiga)
+
+    expect(lida.enunciado).toBe('O produto é local ou na nuvem?')
+    expect(lida.justificativa).toBe('Local, como o brief diz.')
+    expect(lida.opcoes).toEqual([])
+    expect(lida.aceitaTextoLivre).toBe(true)
+    expect(lida.delegavel).toBe(false)
+    expect(lida.etapa).toBe('prd')
   })
 })

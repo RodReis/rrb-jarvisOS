@@ -73,26 +73,31 @@ export interface PerguntaGerada extends Pergunta {
  * Todo texto que o PI **lê** numa pergunta. É a superfície onde um requisito inventado
  * apareceria — e por isso a varredura cobre a pergunta inteira, não só o enunciado.
  *
- * `porQue` entra: ele é mostrado ao PI como justificativa do que está sendo perguntado, e um
- * requisito inventado escondido ali chegaria à tela igual.
+ * `extras` é o que cada origem acrescenta: o refinamento mostra `porQue` como justificativa do
+ * que está sendo perguntado, e um requisito inventado escondido ali chegaria à tela igual.
  */
-function textoVisivel(p: PerguntaGerada): string {
+function textoVisivel(p: Pergunta, extras: readonly string[]): string {
   return [
     p.titulo,
     p.enunciado,
     p.justificativa,
-    p.porQue,
+    ...extras,
     ...p.opcoes.flatMap((o) => [o.rotulo, o.impacto])
   ].join(' | ')
 }
 
 /**
- * Valida uma pergunta gerada contra o contrato (critério 3).
+ * O contrato da M8-F03 sobre **qualquer** pergunta gerada — do refinamento ou uma contradição
+ * do PRD (emenda E1 da SPEC-Jornada-03). O que é próprio do refinamento (o bloco do brief) fica
+ * em `validarPerguntaGerada`.
  *
  * Devolve todos os problemas, não o primeiro: quem gerou corrige a pergunta inteira numa
  * rodada, em vez de uma chamada de modelo por defeito.
  */
-export function validarPerguntaGerada(p: PerguntaGerada): ValidacaoDaPergunta {
+export function validarContratoDaPergunta(
+  p: Pergunta,
+  textoExtra: readonly string[] = []
+): ValidacaoDaPergunta {
   const problemas: ProblemaNaPergunta[] = []
 
   if (p.titulo.trim().length === 0) {
@@ -107,13 +112,6 @@ export function validarPerguntaGerada(p: PerguntaGerada): ValidacaoDaPergunta {
     problemas.push({
       recusa: 'justificativa-vazia',
       mensagem: 'A recomendação não vem justificada, e sem justificativa ela é só um default.'
-    })
-  }
-
-  if (!isBlocoDoBrief(p.bloco)) {
-    problemas.push({
-      recusa: 'bloco-desconhecido',
-      mensagem: `A pergunta declara preencher o bloco "${p.bloco}", que não existe no schema.`
     })
   }
 
@@ -167,13 +165,30 @@ export function validarPerguntaGerada(p: PerguntaGerada): ValidacaoDaPergunta {
 
   // A invariante 9 em runtime — a razão de este arquivo existir. Na M8-F03 esta varredura era
   // teste sobre catálogo revisado; aqui roda sobre texto que ninguém leu.
-  const texto = normalizar(textoVisivel(p))
+  const texto = normalizar(textoVisivel(p, textoExtra))
   const termo = TERMOS_QUE_EXIGEM_ORIGEM_HUMANA.find((t) => texto.includes(t))
 
   if (termo !== undefined) {
     problemas.push({
       recusa: 'requisito-inventado',
       mensagem: `A pergunta menciona "${termo}". A pipeline não inventa requisito legal, regulatório, de consentimento, aceite duplo ou classificação por domínio (invariante 9 do CONVENTION §4).`
+    })
+  }
+
+  return { valida: problemas.length === 0, problemas }
+}
+
+/**
+ * Valida uma pergunta gerada do refinamento (critério 3): o contrato inteiro, mais o bloco do
+ * brief que ela declara preencher e o `porQue` que o PI lê como justificativa.
+ */
+export function validarPerguntaGerada(p: PerguntaGerada): ValidacaoDaPergunta {
+  const problemas: ProblemaNaPergunta[] = [...validarContratoDaPergunta(p, [p.porQue]).problemas]
+
+  if (!isBlocoDoBrief(p.bloco)) {
+    problemas.push({
+      recusa: 'bloco-desconhecido',
+      mensagem: `A pergunta declara preencher o bloco "${p.bloco}", que não existe no schema.`
     })
   }
 
