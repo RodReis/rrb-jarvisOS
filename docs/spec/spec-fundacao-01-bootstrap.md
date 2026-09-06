@@ -51,3 +51,6 @@ Fixar a base técnica: app Electron + React + TypeScript + Vite que abre uma jan
 
 1. Scaffold: **`electron-vite`** (template integrado, menos config manual). — aprovado.
 2. Versão mínima no `engines`: **Node 22 LTS + Electron estável mais recente**. — aprovado.
+   **Superado em 2026-09-06:** o PI passou o projeto para **Node 24 LTS** (mínimo `>=24.15.0` no
+   `engines`, CI na linha major 24) — ver `DECISIONS.md` § Política de PR/CI multiplataforma e
+   Node 24 LTS. O resto da decisão segue valendo; o Electron mantém runtime próprio.

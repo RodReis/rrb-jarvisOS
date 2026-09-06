@@ -31,7 +31,9 @@ com `--check`. Lint e prova visual atrasavam a subida do banco sem depender dela
   consulta releases no GitHub e pode falhar por rate limit antes de qualquer teste rodar.
 - Template de PR com problema, rastreabilidade, evidência e limites.
 
-Estimativa baseada nesta execução: caminho crítico próximo de 8 minutos, contra 16min33s.
+Estimativa feita na #311, baseada nesta execução: caminho crítico próximo de 8 minutos, contra
+16min33s. **Superada pela medição da #312**, registrada logo abaixo — fica como registro do que
+se projetou, não como número vigente.
 É uma projeção, não um benchmark: fila, downloads, runner e crescimento da suíte variam.
 A paralelização adiciona duas instalações npm curtas; a remoção da segunda suíte elimina
 cerca de cinco minutos de runner observados. Não se usa cache de resultados de teste.
