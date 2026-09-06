@@ -4,7 +4,7 @@
 - Origem: pedido do PI para separar orientação do Claude Code no jarvisOS de funcionalidade genérica da pipeline.
 - MVP/Fatia: MVP-027 · M27-F01.
 - Enquadramento: extensão transversal da entrega autônoma. Não reabre o MVP-009 finalizado nem inventa M9-F07.
-- Issue: não criada; publicação de rascunho não coloca nova fatia no Backlog.
+- Issue: #314; épico MVP #313.
 - Dependências: SPEC-Entrega-05 (M9-F05), SPEC-Entrega-06 (M9-F06), adapter GitHub M6-F04, pacote aprovado do projeto e contratos de execução vigentes.
 - Consumidores futuros: MVP-015 Observabilidade e MVP-023 Blueprints. Não são dependências obrigatórias para a primeira entrega desta SPEC.
 
@@ -171,7 +171,7 @@ A implementação futura pode ser dividida em entregas verticais: perfil/compati
 3. Apenas `success` satisfaz check obrigatório. `neutral` e `skipped` não comprovam uma validação exigida.
 4. O legado do jarvisOS passa para Node 24 LTS, compatível com o Node 24.15.0 do host. Electron mantém runtime embutido próprio e módulos nativos recompilados para seu ABI.
 
-Não há pergunta estrutural aberta nesta revisão. A issue da fatia deve ser criada pelo fluxo de planejamento e entrar em Backlog; a aprovação não altera `proplan:next` nem inicia a implementação completa do perfil genérico.
+Não há pergunta estrutural aberta nesta revisão. A issue da fatia foi criada pelo fluxo de planejamento e entrou em Backlog; a aprovação não altera `proplan:next` nem inicia a implementação completa do perfil genérico.
 
 ## Referências
 

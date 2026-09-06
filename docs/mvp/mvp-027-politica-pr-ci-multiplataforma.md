@@ -1,12 +1,12 @@
 # MVP-027 — Política de PR e CI multiplataforma
 
-- Status: definido pelo PI em 2026-09-06.
+- Status: definido pelo PI em 2026-09-06; GitHub #313.
 - Objetivo: fazer a pipeline gerar, preservar e validar CI segundo o perfil aprovado de cada projeto, com Windows como ambiente primário comprovado e sem falso verde.
 - Dependência: MVP-009 Entrega Autônoma concluído.
 
 ## Fatias
 
-- [ ] M27-F01 — Política de PR e CI por projeto — [SPEC aprovada](../spec/spec-pipeline-01-politica-pr-ci.md). Issue pendente de criação pelo fluxo de planejamento; aprovação não altera a cabeça da fila.
+- [ ] M27-F01 — Política de PR e CI por projeto — [SPEC aprovada](../spec/spec-pipeline-01-politica-pr-ci.md), GitHub #314. A aprovação não altera a cabeça da fila.
 
 ## Done do MVP
 
