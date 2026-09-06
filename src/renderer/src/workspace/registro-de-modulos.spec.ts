@@ -117,3 +117,53 @@ describe('rotas derivadas do registro', () => {
     expect(rotasDoSubModulo(registro, 'command')[0]).toBe('neg')
   })
 })
+
+/**
+ * O grupo HARNESSES é dinâmico (SPEC-Shell-01, critério 4 e regra 3).
+ *
+ * Um item por executor registrado, e **só** quando existe a página que ele abre. O teste usa o
+ * registro genérico de propósito: se o grupo dependesse de tabela fixa na UI, ele não teria como
+ * refletir um executor novo — e é essa a diferença que o contrafactual da spec mede.
+ */
+describe('HARNESSES vem do registro de executores (critério 4)', () => {
+  /** Como uma fatia futura registraria os executores que têm página. */
+  function harnessesDe(executores: readonly string[]): readonly ModuloRegistrado[] {
+    return executores.map((nome, i) => ({
+      id: `h_${nome}`,
+      subModulo: 'agents' as const,
+      grupo: 'HARNESSES' as const,
+      ordem: i + 1,
+      rota: `h_${nome}`,
+      disponivel: () => true
+    }))
+  }
+
+  it('sem executor com página, o grupo inteiro fica oculto', () => {
+    expect(gruposVisiveis(harnessesDe([]), 'agents')).toEqual([])
+  })
+
+  it('com dois executores, nascem dois itens — nem mais, nem menos', () => {
+    const grupos = gruposVisiveis(harnessesDe(['claude-code', 'codex']), 'agents')
+
+    expect(grupos).toHaveLength(1)
+    expect(grupos[0]?.itens.map((i) => i.rota)).toEqual(['h_claude-code', 'h_codex'])
+  })
+
+  it('um executor a mais vira um item a mais, sem tocar na tela', () => {
+    // O contrafactual que a spec pede: uma tabela fixa de seis harnesses devolveria seis aqui,
+    // e continuaria devolvendo seis com um executor a mais. O número acompanha o registro.
+    const antes = gruposVisiveis(harnessesDe(['claude-code']), 'agents')[0]?.itens ?? []
+    const depois = gruposVisiveis(harnessesDe(['claude-code', 'codex']), 'agents')[0]?.itens ?? []
+
+    expect(antes).toHaveLength(1)
+    expect(depois).toHaveLength(2)
+  })
+
+  it('executor sem página não vira item', () => {
+    // Regra 3: o item só existe quando existe a página que ele abre. `disponivel` é o que a
+    // fatia do executor usa para dizer isso.
+    const semPagina = harnessesDe(['claude-code']).map((m) => ({ ...m, disponivel: () => false }))
+
+    expect(gruposVisiveis(semPagina, 'agents')).toEqual([])
+  })
+})
