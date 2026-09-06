@@ -14,7 +14,7 @@ Totais da última execução (regenerado, não acumulado):
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
 | — | — | — | Regras de Negócio | 1544 | 1544 | 0 | 75.8 | — | — |
 | — | — | — | Banco | 1186 | 1172 | 0 | 87.4 | — | — |
-| — | — | — | Tela | 620 | 619 | 0 | 75.3 | — | — |
+| — | — | — | Tela | 622 | 621 | 0 | 75.3 | — | — |
 
 ## Histórico por entrega
 
@@ -313,3 +313,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-06 | #200 | SPEC-Voz-01 | Regras de Negócio | 1544 | 1544 | 0 | 75.8 | #299 | [#299](https://github.com/RodReis/rrb-jarvisOS/pull/299) |
 | 2026-09-06 | #200 | SPEC-Voz-01 | Banco | 1186 | 1172 | 0 | 87.4 | #299 | [#299](https://github.com/RodReis/rrb-jarvisOS/pull/299) |
 | 2026-09-06 | #200 | SPEC-Voz-01 | Tela | 620 | 619 | 0 | 75.3 | #299 | [#299](https://github.com/RodReis/rrb-jarvisOS/pull/299) |
+| 2026-09-06 | #200 | SPEC-Voz-01 | Regras de Negócio | 1544 | 1544 | 0 | 75.8 | #299 | [#299](https://github.com/RodReis/rrb-jarvisOS/pull/299) |
+| 2026-09-06 | #200 | SPEC-Voz-01 | Banco | 1186 | 1172 | 0 | 87.4 | #299 | [#299](https://github.com/RodReis/rrb-jarvisOS/pull/299) |
+| 2026-09-06 | #200 | SPEC-Voz-01 | Tela | 622 | 621 | 0 | 75.3 | #299 | [#299](https://github.com/RodReis/rrb-jarvisOS/pull/299) |
