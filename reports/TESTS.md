@@ -307,3 +307,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-05 | #206 | SPEC-Shell-01 | Regras de Negócio | 1513 | 1513 | 0 | 75.4 | #296 | [#296](https://github.com/RodReis/rrb-jarvisOS/pull/296) |
 | 2026-09-05 | #206 | SPEC-Shell-01 | Banco | 1186 | 1172 | 0 | 87.4 | #296 | [#296](https://github.com/RodReis/rrb-jarvisOS/pull/296) |
 | 2026-09-05 | #206 | SPEC-Shell-01 | Tela | 609 | 608 | 0 | 75.5 | #296 | [#296](https://github.com/RodReis/rrb-jarvisOS/pull/296) |
+| 2026-09-06 | #232 | — | Regras de Negócio | 1513 | 1513 | 0 | 75.4 | #297 | [#297](https://github.com/RodReis/rrb-jarvisOS/pull/297) |
+| 2026-09-06 | #232 | — | Banco | 1186 | 1172 | 0 | 87.4 | #297 | [#297](https://github.com/RodReis/rrb-jarvisOS/pull/297) |
+| 2026-09-06 | #232 | — | Tela | 609 | 608 | 0 | 75.5 | #297 | [#297](https://github.com/RodReis/rrb-jarvisOS/pull/297) |
