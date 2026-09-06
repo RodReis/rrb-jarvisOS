@@ -249,8 +249,15 @@ export const MAX_TOKENS_PADRAO = 4096
  * Generoso porque streaming de resposta longa é lento por natureza — o que o timeout protege
  * não é a lentidão, é o pendurado: um stream que parou de emitir e nunca fecha seguraria o
  * `AuditEvent` de conclusão para sempre.
+ *
+ * **Cinco minutos, não dois** (#316): a geração dos três documentos do PRD levava 111–120 s com
+ * 60 afirmações, e com o teto em 120 s a primeira tentativa morria por sorte — a repetição
+ * salvava a rodada ou não. Um teto na borda da duração normal não protege do pendurado; ele
+ * transforma a geração saudável em loteria. Global e não por chamada (decisão do PI,
+ * 2026-09-06): contradições, arquitetura e roadmap crescem com o mesmo projeto, e um teto por
+ * chamada deixaria os irmãos batendo na mesma parede um a um.
  */
-export const TIMEOUT_PADRAO_MS = 120_000
+export const TIMEOUT_PADRAO_MS = 300_000
 
 /** O que o chamador pede. Stateless nesta fatia: o contexto é o que vem aqui (spec § Fora). */
 export interface AiRequest {

@@ -12,6 +12,7 @@ import {
   lerContradicoesDoModelo,
   lerDocumentosDoModelo,
   lerTermoDoModelo,
+  promptDasContradicoes,
   promptDoPrd,
   SISTEMA_DO_PRD
 } from './prd-schema'
@@ -177,6 +178,24 @@ describe('promptDoPrd', () => {
     const p = promptDoPrd({ afirmacoesDoBrief: [], correcao: ['A afirmação a-1 não tem origem.'] })
 
     expect(p).toContain('A afirmação a-1 não tem origem.')
+  })
+})
+
+describe('promptDasContradicoes', () => {
+  it('leva as decisões já tomadas — conflito que uma delas resolve não volta como pergunta (E1)', () => {
+    const p = promptDasContradicoes(
+      [{ id: 'b-1', texto: 'Login pelo Google.' }],
+      [{ id: 'd-1', pergunta: 'Google ou e-mail e senha?', resposta: 'E-mail e senha' }]
+    )
+
+    expect(p).toContain('DECISÕES JÁ TOMADAS')
+    expect(p).toContain('[d-1] Google ou e-mail e senha? → E-mail e senha')
+  })
+
+  it('sem decisão, não promete uma lista vazia', () => {
+    const p = promptDasContradicoes([{ id: 'b-1', texto: 'Organiza tarefas.' }], [])
+
+    expect(p).not.toContain('DECISÕES')
   })
 })
 
