@@ -18,7 +18,6 @@ import { log } from '../lib/log'
 import { usePreferences } from '../preferences/usePreferences'
 import {
   NAVEGACAO_INICIAL,
-  ROTAS_POR_SUB_MODULO,
   ROTAS_POR_WORKSPACE,
   navegar,
   rotaDoWorkspace,
@@ -27,6 +26,8 @@ import {
   type RotasPorWorkspace,
   type SubModuloJarvis
 } from '../workspace/navegacao'
+import { MODULOS_DO_APP } from '../workspace/modulos'
+import { gruposVisiveis } from '../workspace/registro-de-modulos'
 import { Settings } from './Settings'
 import { AprovacoesPendentes } from './AprovacoesPendentes'
 import { TerminalControlado } from './TerminalControlado'
@@ -62,6 +63,13 @@ export function AppShell({ perfil, onSair }: AppShellProps = {}): React.JSX.Elem
 
   // Espaço ativo mora no main (ele audita a troca); o renderer espelha.
   const [workspace, setWorkspace] = useState<WorkspaceId | null>(null)
+  /*
+   * A navegação vive na sessão: hoje **não** há rota persistida em disco (nem `usePreferences`
+   * nem o main guardam rota), então não existe estado antigo a migrar aqui. `migrarNavegacao`
+   * existe e é testada em `navegacao.spec.ts` — ela é o contrato do critério 6 e o ponto de
+   * ligação do dia em que a rota for persistida; chamá-la sobre `NAVEGACAO_INICIAL` seria
+   * teatro, porque o valor inicial já nasce das rotas de agora.
+   */
   const [navegacao, setNavegacao] = useState<RotasPorWorkspace>(NAVEGACAO_INICIAL)
   const [erro, setErro] = useState<string | null>(null)
 
@@ -116,6 +124,8 @@ export function AppShell({ perfil, onSair }: AppShellProps = {}): React.JSX.Elem
   const nomeEspaco = t(`espaco.${workspace}`)
   const rotaAtiva = rotaDoWorkspace(navegacao, workspace)
 
+  const uiTheme = preferencias.resolvedTheme === 'claro' ? 'light' : 'dark'
+
   /**
    * O módulo real desta rota, ou `null` quando ainda não existe um.
    *
@@ -125,12 +135,29 @@ export function AppShell({ perfil, onSair }: AppShellProps = {}): React.JSX.Elem
    * uma resposta só, e o cabeçalho de placeholder passa a depender dela.
    */
   const MODULOS: Readonly<Record<string, React.JSX.Element>> = {
-    operacoes: <AprovacoesPendentes workspace={workspace} />,
-    projetos: <ProjetosLocais workspace={workspace} />,
-    terminal: <TerminalControlado workspace={workspace} />
+    operator: <AprovacoesPendentes workspace={workspace} />,
+    projects: <ProjetosLocais workspace={workspace} />,
+    terminal: <TerminalControlado workspace={workspace} />,
+    /*
+     * O Settings entra no mapa como qualquer módulo (decisão do PI, 2026-09-05).
+     *
+     * Era um ramo `if` antes do mapa, e a exceção obrigaria o teste do critério 2 — "nenhuma
+     * rota visível cai no placeholder" — a abrir uma brecha justamente para ele. Exceção no
+     * teste que guarda a garantia da fatia enfraquece a garantia; a própria `navegacao.ts` já
+     * avisa que "caso especial é onde vazamento se esconde".
+     */
+    settings: (
+      <Settings
+        preferencias={preferencias}
+        erro={erroPreferencias}
+        onSalvar={(mudanca) => void salvar(mudanca)}
+        uiTheme={uiTheme}
+        workspace={workspace}
+        nomeDoEspaco={nomeEspaco}
+      />
+    )
   }
   const moduloDaRota = MODULOS[rotaAtiva] ?? null
-  const uiTheme = preferencias.resolvedTheme === 'claro' ? 'light' : 'dark'
   const outroEspaco: WorkspaceId = workspace === 'jarvis' ? 'noa' : 'jarvis'
 
   // Sub-módulo ativo do JARVIS: derivado da rota, não guardado em estado próprio. Duas fontes
@@ -187,10 +214,27 @@ export function AppShell({ perfil, onSair }: AppShellProps = {}): React.JSX.Elem
     irPara(rotaInicialDoSubModulo(id as SubModuloJarvis))
   }
 
-  // Rotas visíveis na sidebar: no JARVIS, só as do sub-módulo ativo (protótipo JARVISOS §2);
-  // no NOA, todas as do espaço.
-  const rotasVisiveis =
-    workspace === 'jarvis' ? ROTAS_POR_SUB_MODULO[subModulo] : ROTAS_POR_WORKSPACE[workspace]
+  /**
+   * Os grupos da sidebar — **projeção do registro** (SPEC-Shell-01, regra 1).
+   *
+   * No JARVIS vêm do sub-módulo ativo (protótipo JARVISOS §2). O NOA não tem sub-módulo — o rail
+   * dele é atalho de view (NOA §2) —, então continua com um grupo só, o do espaço.
+   *
+   * Não existe lista de itens escrita aqui: é isso que faz a fatia que entrega uma tela acender
+   * o item dela sem editar este arquivo.
+   */
+  const gruposDaSidebar =
+    workspace === 'jarvis'
+      ? gruposVisiveis(MODULOS_DO_APP, subModulo).map((g) => ({
+          titulo: t(`grupoDoMenu.${g.grupo}`),
+          rotas: g.itens.map((i) => i.rota)
+        }))
+      : [
+          {
+            titulo: t('navegacao.de', { espaco: nomeEspaco }),
+            rotas: ROTAS_POR_WORKSPACE[workspace]
+          }
+        ]
 
   const subtituloDaSidebar =
     workspace === 'jarvis'
@@ -221,17 +265,20 @@ export function AppShell({ perfil, onSair }: AppShellProps = {}): React.JSX.Elem
             onTrocar={(id) => void trocarWorkspace(id as WorkspaceId)}
             rotulo={t('espaco.seletor')}
           />
-          <NavigationGroup
-            grupo={{
-              titulo: t('navegacao.de', { espaco: nomeEspaco }),
-              itens: rotasVisiveis.map((rota) => ({
-                id: rota,
-                rotulo: t(`navegacao.${rota}`),
-                ativo: rota === rotaAtiva
-              }))
-            }}
-            onNavegar={irPara}
-          />
+          {gruposDaSidebar.map((grupo) => (
+            <NavigationGroup
+              key={grupo.titulo}
+              grupo={{
+                titulo: grupo.titulo,
+                itens: grupo.rotas.map((rota) => ({
+                  id: rota,
+                  rotulo: t(`navegacao.${rota}`),
+                  ativo: rota === rotaAtiva
+                }))
+              }}
+              onNavegar={irPara}
+            />
+          ))}
         </Sidebar>
       }
       topbar={
@@ -281,14 +328,7 @@ export function AppShell({ perfil, onSair }: AppShellProps = {}): React.JSX.Elem
       )}
 
       {rotaAtiva === 'settings' ? (
-        <Settings
-          preferencias={preferencias}
-          erro={erroPreferencias}
-          onSalvar={(mudanca) => void salvar(mudanca)}
-          uiTheme={uiTheme}
-          workspace={workspace}
-          nomeDoEspaco={nomeEspaco}
-        />
+        MODULOS[rotaAtiva]
       ) : (
         <section
           aria-label={t('conteudo.de', { rota: t(`navegacao.${rotaAtiva}`) })}

@@ -46,6 +46,15 @@ function mockarPonte(): void {
       getAuth,
       login,
       logout,
+      /*
+       * A rota inicial do JARVIS passou a ser `projects` (SPEC-Shell-01, regra 6): a `inicio`
+       * saiu, e o primeiro item visível é o Projects Hub. Entrar no shell monta a lista de
+       * projetos, então o dublê precisa dela — sem isto o efeito estoura antes de o teste
+       * chegar ao que mede, num arquivo que não é sobre projetos.
+       */
+      listProjects: vi.fn(async () => []),
+      createProject: vi.fn(),
+      openProject: vi.fn(),
       onAuthChanged
     },
     configurable: true,

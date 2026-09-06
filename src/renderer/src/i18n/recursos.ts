@@ -45,14 +45,54 @@ export const RECURSOS = {
       navegacao: {
         principal: 'Navegação principal',
         de: 'Navegação de {{espaco}}',
-        inicio: 'Início',
         notas: 'Notas',
         agenda: 'Agenda',
-        operacoes: 'Operações',
-        projetos: 'Projetos',
+        /*
+         * Rótulos dos itens do menu (SPEC-Shell-01, regra 10). O protótipo usa **nomes próprios
+         * em inglês** para as telas, de propósito — `Projects Hub`, `Operator Central` —, e é o
+         * protótipo que vence na forma do menu.
+         *
+         * Estão aqui **todos** os itens do mapa da spec, inclusive os ocultos (critério 8): a
+         * fatia que entregar a tela só precisa registrar o módulo, sem voltar ao i18n. Chave sem
+         * módulo não vira item — quem decide isso é o registro, não esta tabela.
+         */
+        command: 'Command Center',
+        hud: 'HUD',
+        mission: 'Mission Control',
+        specialties: 'Specialties',
+        skills: 'Skills Catalog',
+        kanban: 'Kanban',
+        workflows: 'Workflows',
+        automations: 'Automations',
+        osdesktop: 'OS Desktop',
+        analytics: 'Analytics',
+        insights: 'Insights',
+        projects: 'Projects Hub',
+        goals: 'Metas',
+        studio: 'Studio',
+        seo: 'SEO Content',
+        video: 'Video Director',
+        services: 'Services',
         terminal: 'Terminal',
-        agentes: 'Agentes',
-        settings: 'Configurações'
+        settings: 'Settings',
+        operator: 'Operator Central',
+        teams: 'Specialist Teams',
+        memory: 'Agent Memory',
+        notebook: 'Notebook'
+      },
+      /** Cabeçalhos de grupo da sidebar — mono uppercase no protótipo. */
+      grupoDoMenu: {
+        COMANDO: 'Comando',
+        AGENTS_OS: 'Agents OS',
+        OPERACOES: 'Operações',
+        INTEL: 'Intel',
+        NEGOCIOS: 'Negócios',
+        SISTEMA: 'Sistema',
+        CORE: 'Core',
+        HARNESSES: 'Harnesses',
+        TEAMS: 'Teams',
+        GOVERNANCE: 'Governance',
+        KNOWLEDGE: 'Knowledge'
       },
       janela: {
         minimizar: 'Minimizar para a bandeja'
@@ -727,14 +767,45 @@ export const RECURSOS = {
       navegacao: {
         principal: 'Main navigation',
         de: '{{espaco}} navigation',
-        inicio: 'Home',
         notas: 'Notes',
         agenda: 'Calendar',
-        operacoes: 'Operations',
-        projetos: 'Projects',
+        // Nomes próprios do protótipo: os mesmos nos dois idiomas, de propósito.
+        command: 'Command Center',
+        hud: 'HUD',
+        mission: 'Mission Control',
+        specialties: 'Specialties',
+        skills: 'Skills Catalog',
+        kanban: 'Kanban',
+        workflows: 'Workflows',
+        automations: 'Automations',
+        osdesktop: 'OS Desktop',
+        analytics: 'Analytics',
+        insights: 'Insights',
+        projects: 'Projects Hub',
+        goals: 'Goals',
+        studio: 'Studio',
+        seo: 'SEO Content',
+        video: 'Video Director',
+        services: 'Services',
         terminal: 'Terminal',
-        agentes: 'Agents',
-        settings: 'Settings'
+        settings: 'Settings',
+        operator: 'Operator Central',
+        teams: 'Specialist Teams',
+        memory: 'Agent Memory',
+        notebook: 'Notebook'
+      },
+      grupoDoMenu: {
+        COMANDO: 'Command',
+        AGENTS_OS: 'Agents OS',
+        OPERACOES: 'Operations',
+        INTEL: 'Intel',
+        NEGOCIOS: 'Business',
+        SISTEMA: 'System',
+        CORE: 'Core',
+        HARNESSES: 'Harnesses',
+        TEAMS: 'Teams',
+        GOVERNANCE: 'Governance',
+        KNOWLEDGE: 'Knowledge'
       },
       janela: {
         minimizar: 'Minimize to tray'

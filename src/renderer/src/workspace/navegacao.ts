@@ -10,9 +10,34 @@
  */
 
 import type { WorkspaceId } from '@shared/domain/entities'
+import { MODULOS_DO_APP } from './modulos'
+import { rotasDoSubModulo } from './registro-de-modulos'
 
 /**
- * Itens de navegação por espaço. Placeholders — os módulos reais vêm em fatias futuras.
+ * Sub-módulos do JARVIS — o **rail dual** do protótipo (JARVISOS §2, critério 3 da SPEC-04a).
+ *
+ * `command` é o Professional Ops; `agents` é o Agents OS. Não são workspaces: o CLAUDE.md é
+ * explícito em que `Agentic OS` é **área interna** do JARVIS OS, nunca um quarto espaço. Por
+ * isso vivem aqui como dimensão da navegação do JARVIS, e não em `WorkspaceId` — pôr `agents`
+ * ao lado de `noa`/`jarvis` seria criar por acidente o espaço que a arquitetura proíbe.
+ *
+ * O NOA não tem sub-módulo. O rail dele é atalho de view (NOA §2), e é por isso que
+ * `subModuloDoWorkspace` devolve `null` — ausência declarada, não valor default que a UI
+ * precisaria adivinhar se é real.
+ */
+export const SUB_MODULOS_JARVIS = ['command', 'agents'] as const
+
+export type SubModuloJarvis = (typeof SUB_MODULOS_JARVIS)[number]
+
+export const SUB_MODULO_INICIAL: SubModuloJarvis = 'command'
+
+/**
+ * Itens de navegação por espaço.
+ *
+ * As rotas do JARVIS **derivam do registro de módulos** (SPEC-Shell-01, regra 1): não existe
+ * lista literal, e por isso uma fatia que entrega tela não precisa editar este arquivo. O NOA
+ * mantém a lista própria — o rail dele é atalho de view, não sub-módulo (NOA §2), e ele não
+ * entra no escopo desta fatia.
  *
  * `settings` aparece nos **dois** espaços de propósito (SPEC-05): é capacidade
  * compartilhada, e a preferência é do usuário, não do espaço. Ainda assim ela é uma rota
@@ -20,19 +45,64 @@ import type { WorkspaceId } from '@shared/domain/entities'
  * teria um caso especial, e caso especial é onde vazamento se esconde.
  */
 export const ROTAS_POR_WORKSPACE: Readonly<Record<WorkspaceId, readonly string[]>> = {
-  noa: ['inicio', 'notas', 'agenda', 'settings'],
-  jarvis: ['inicio', 'operacoes', 'projetos', 'terminal', 'agentes', 'settings']
+  noa: ['notas', 'agenda', 'settings'],
+  jarvis: SUB_MODULOS_JARVIS.flatMap((sub) => rotasDoSubModulo(MODULOS_DO_APP, sub))
 }
 
-/** Rota inicial de cada espaço, usada na primeira visita. */
-export const ROTA_INICIAL = 'inicio'
+/**
+ * Rota inicial de cada espaço.
+ *
+ * Não é mais uma constante `'inicio'`: a rota `inicio` **saiu** (regra 6), e a inicial passou a
+ * ser o primeiro item visível. Uma constante fixa apontaria para tela que pode não existir, que
+ * é exatamente o problema que esta fatia resolve.
+ */
+export function rotaInicialDoWorkspace(workspace: WorkspaceId): string {
+  const primeira = ROTAS_POR_WORKSPACE[workspace][0]
+  if (primeira === undefined) throw new Error(`Espaço sem rotas: ${workspace}`)
+  return primeira
+}
 
 /** Onde o usuário está em cada espaço. */
 export type RotasPorWorkspace = Readonly<Record<WorkspaceId, string>>
 
 export const NAVEGACAO_INICIAL: RotasPorWorkspace = {
-  noa: ROTA_INICIAL,
-  jarvis: ROTA_INICIAL
+  noa: rotaInicialDoWorkspace('noa'),
+  jarvis: rotaInicialDoWorkspace('jarvis')
+}
+
+/**
+ * Traduz uma rota gravada antes desta fatia (SPEC-Shell-01, critério 6).
+ *
+ * `operacoes` → `operator` (a fila de aprovação é governança, não "Operações") e `projetos` →
+ * `projects` (identificador em inglês, regra 10). Devolve `undefined` para rota que **sumiu** —
+ * `inicio` e `agentes` — em vez de um substituto plausível: quem chama decide, e um palpite aqui
+ * mandaria a pessoa para uma tela que ela não escolheu, escondendo o desaparecimento.
+ */
+export function migrarRota(rota: string): string | undefined {
+  const RENOMEADAS: Readonly<Record<string, string>> = {
+    operacoes: 'operator',
+    projetos: 'projects'
+  }
+
+  const nova = RENOMEADAS[rota] ?? rota
+  return ROTAS_POR_WORKSPACE.noa.includes(nova) || ROTAS_POR_WORKSPACE.jarvis.includes(nova)
+    ? nova
+    : undefined
+}
+
+/**
+ * Migra o estado de navegação inteiro, lido do disco.
+ *
+ * Rota que sumiu cai na inicial **do espaço**, nunca em placeholder (regra 7).
+ */
+export function migrarNavegacao(atual: RotasPorWorkspace): RotasPorWorkspace {
+  const migrado = { ...atual }
+
+  for (const workspace of Object.keys(atual) as WorkspaceId[]) {
+    migrado[workspace] = migrarRota(atual[workspace]) ?? rotaInicialDoWorkspace(workspace)
+  }
+
+  return migrado
 }
 
 /** Verifica se a rota pertence ao espaço — evita restaurar uma rota que vazou. */
@@ -60,31 +130,18 @@ export function navegar(
 /** A rota a exibir ao entrar num espaço: a última dele, nunca a de outro. */
 export function rotaDoWorkspace(atual: RotasPorWorkspace, workspace: WorkspaceId): string {
   const rota = atual[workspace]
-  return rotaPertenceAoWorkspace(workspace, rota) ? rota : ROTA_INICIAL
+  return rotaPertenceAoWorkspace(workspace, rota) ? rota : rotaInicialDoWorkspace(workspace)
 }
 
 /**
- * Sub-módulos do JARVIS — o **rail dual** do protótipo (JARVISOS §2, critério 3 da SPEC-04a).
+ * Rotas por sub-módulo do JARVIS — **derivadas do registro**, não escritas aqui.
  *
- * `command` é o Professional Ops; `agents` é o Agents OS. Não são workspaces: o CLAUDE.md é
- * explícito em que `Agentic OS` é **área interna** do JARVIS OS, nunca um quarto espaço. Por
- * isso vivem aqui como dimensão da navegação do JARVIS, e não em `WorkspaceId` — pôr `agents`
- * ao lado de `noa`/`jarvis` seria criar por acidente o espaço que a arquitetura proíbe.
- *
- * O NOA não tem sub-módulo. O rail dele é atalho de view (NOA §2), e é por isso que
- * `subModuloDoWorkspace` devolve `null` — ausência declarada, não valor default que a UI
- * precisaria adivinhar se é real.
+ * Era uma lista literal; virar projeção é o ponto da SPEC-Shell-01. Rota de módulo oculto não
+ * entra, então nenhuma rota navegável cai no cabeçalho de placeholder (critério 2).
  */
-export const SUB_MODULOS_JARVIS = ['command', 'agents'] as const
-
-export type SubModuloJarvis = (typeof SUB_MODULOS_JARVIS)[number]
-
-export const SUB_MODULO_INICIAL: SubModuloJarvis = 'command'
-
-/** Rotas por sub-módulo do JARVIS — protótipo JARVISOS §2 (`navJDef` / `navADef`). */
 export const ROTAS_POR_SUB_MODULO: Readonly<Record<SubModuloJarvis, readonly string[]>> = {
-  command: ['inicio', 'operacoes', 'projetos', 'terminal', 'settings'],
-  agents: ['agentes']
+  command: rotasDoSubModulo(MODULOS_DO_APP, 'command'),
+  agents: rotasDoSubModulo(MODULOS_DO_APP, 'agents')
 }
 
 /**
