@@ -53,6 +53,31 @@ test.describe('critério 1 — o grid do protótipo tem as medidas certas', () =
     expect(rodape?.height).toBe(34)
   })
 
+  test('o shell preenche a janela — o rodapé encosta no fim', async ({ page }) => {
+    await abrir(page, 'modo=dark&modulo=jarvis')
+
+    /*
+     * O defeito que isto pega (achado por captura do PI em 2026-09-06): o rodapé parava no meio
+     * da tela, com uma faixa vazia até o fim da janela.
+     *
+     * A causa era uma **quebra na cadeia de altura**: `html`, `body` e `#root` declaram 100%, e
+     * o shell pede `h-full` — mas o `div` do `ProvedorDeTema`, entre os dois, não tinha altura
+     * nenhuma. `h-full` resolve contra o pai, e um pai de altura automática o zera.
+     *
+     * Nenhum teste de papel pega isto: os elementos estão todos lá, com os papéis e a ordem
+     * certos. Só medida em navegador vê que o layout não chegou ao fim.
+     */
+    const viewport = page.viewportSize()
+    const rodape = await page.locator('[data-jos-rodape]').boundingBox()
+
+    expect(viewport).not.toBeNull()
+    expect(rodape).not.toBeNull()
+    // Tolerância de 1px para arredondamento de layout; a faixa vazia do defeito tinha ~280px.
+    expect(
+      Math.abs((rodape?.y ?? 0) + (rodape?.height ?? 0) - (viewport?.height ?? 0))
+    ).toBeLessThanOrEqual(1)
+  })
+
   test('as quatro regiões não se sobrepõem e o conteúdo fica à direita da sidebar', async ({
     page
   }) => {

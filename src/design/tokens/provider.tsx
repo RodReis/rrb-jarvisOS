@@ -309,7 +309,20 @@ export function ProvedorDeTema({
           data-modo={modo}
           data-modulo={modulo}
           data-superficie={superficie}
-          style={variaveis as React.CSSProperties}
+          /*
+           * `height: 100%` **não** é decoração: este `div` fica entre o `#root` (que declara
+           * 100% no global.css) e o shell, que pede `h-full`. Sem altura aqui, a cadeia quebra —
+           * `h-full` resolve contra um pai de altura automática e vira o tamanho do conteúdo.
+           *
+           * O sintoma era o rodapé parando no meio da tela, com uma faixa vazia até o fim da
+           * janela. Nenhum teste de papel o pega: os elementos estão todos lá, na ordem certa.
+           * Achado por captura do PI em 2026-09-06 e travado por prova visual, que mede layout.
+           *
+           * Fica no `style` junto das variáveis, e não numa classe: o provider é usado também
+           * dentro de card e modal, onde ele **deve** ocupar o pai — que é exatamente o que
+           * `height: 100%` faz nos dois casos, sem o componente precisar saber onde está.
+           */
+          style={{ height: '100%', ...(variaveis as React.CSSProperties) }}
         >
           {children}
         </div>
