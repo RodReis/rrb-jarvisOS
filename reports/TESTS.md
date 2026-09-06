@@ -13,7 +13,7 @@ Totais da última execução (regenerado, não acumulado):
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
 | — | — | — | Regras de Negócio | 1544 | 1544 | 0 | 75.8 | — | — |
-| — | — | — | Banco | 1186 | 1172 | 0 | 87.4 | — | — |
+| — | — | — | Banco | 1191 | 1177 | 0 | 87.4 | — | — |
 | — | — | — | Tela | 622 | 621 | 0 | 75.3 | — | — |
 
 ## Histórico por entrega
@@ -319,3 +319,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-06 | #301 | SPEC-DesignSystem-04a | Regras de Negócio | 1544 | 1544 | 0 | 75.8 | #302 | [#302](https://github.com/RodReis/rrb-jarvisOS/pull/302) |
 | 2026-09-06 | #301 | SPEC-DesignSystem-04a | Banco | 1186 | 1172 | 0 | 87.4 | #302 | [#302](https://github.com/RodReis/rrb-jarvisOS/pull/302) |
 | 2026-09-06 | #301 | SPEC-DesignSystem-04a | Tela | 622 | 621 | 0 | 75.3 | #302 | [#302](https://github.com/RodReis/rrb-jarvisOS/pull/302) |
+| 2026-09-06 | #304 | spec-fases-03-console-da-geracao | Regras de Negócio | 1544 | 1544 | 0 | 75.8 | #305 | [#305](https://github.com/RodReis/rrb-jarvisOS/pull/305) |
+| 2026-09-06 | #304 | spec-fases-03-console-da-geracao | Banco | 1191 | 1177 | 0 | 87.4 | #305 | [#305](https://github.com/RodReis/rrb-jarvisOS/pull/305) |
+| 2026-09-06 | #304 | spec-fases-03-console-da-geracao | Tela | 622 | 621 | 0 | 75.3 | #305 | [#305](https://github.com/RodReis/rrb-jarvisOS/pull/305) |

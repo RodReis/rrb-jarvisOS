@@ -101,6 +101,16 @@ export function flagRecusada(stderr: string): string | undefined {
   return achado?.[1]
 }
 
+/**
+ * O que o system ganha quando a geração tem schema (#304).
+ *
+ * Medido com o CLI real em 2026-09-06: sem a linha, o modelo escreveu o JSON em texto, levou
+ * `[structured-output-enforce]` e gerou o documento de novo pela ferramenta (2955 tokens de
+ * entrada, 955 de saída); com ela, chamou a ferramenta direto (1261 / 676).
+ */
+export const DICA_DA_SAIDA_ESTRUTURADA =
+  'Entregue o JSON chamando a ferramenta StructuredOutput, não como texto.'
+
 export class ClaudeCodeAdapter implements AiAdapter {
   readonly nome = 'claude-code'
 
@@ -139,8 +149,21 @@ export class ClaudeCodeAdapter implements AiAdapter {
     // `--system-prompt` vale em **qualquer** fase: entregar o contrato da etapa ao modelo é o
     // defeito da #271, e ele não tem nada a ver com ferramentas. Só a ausência de `system` tira
     // a flag — passar string vazia substituiria o prompt padrão por nada.
+    //
+    // Com `jsonSchema`, o system ganha a dica de entregar pela ferramenta (#304). Os systems do
+    // domínio pedem "responda somente com JSON" porque os outros providers só têm o texto; aqui
+    // isso faz o modelo escrever o JSON em texto, levar o `enforce` do CLI e gerar o documento
+    // **duas vezes** — foi o que estourou o timeout dos documentos do PRD. A dica mora no adapter
+    // porque a `StructuredOutput` é detalhe deste CLI, não do contrato da etapa.
     if (request.system !== undefined && request.system !== '') {
-      base.push('--system-prompt', request.system)
+      base.push(
+        '--system-prompt',
+        request.jsonSchema === undefined
+          ? request.system
+          : `${request.system}
+
+${DICA_DA_SAIDA_ESTRUTURADA}`
+      )
     }
 
     // O resto do isolamento é **por fase**. Sem fase declarada não há isolamento: é a chamada
@@ -299,6 +322,25 @@ export class ClaudeCodeAdapter implements AiAdapter {
     }
 
     /**
+     * Com `--json-schema`, o documento vem pela ferramenta `StructuredOutput`, e o texto do modelo
+     * **não é documento** (#304).
+     *
+     * O modelo às vezes escreve o JSON em texto antes — o system pede "responda somente com JSON"
+     * e ele obedece —, o CLI não reconhece texto como saída estruturada, injeta o
+     * `structured-output-enforce` e o modelo repete o documento pela ferramenta. Empurrar o texto
+     * na hora e o documento retido no `close` colava os dois (`{…}{…}`), e nenhum leitor aceita
+     * isso. O texto fica guardado: só vira documento se **nenhuma** chamada chegar, para o caminho
+     * de um CLI que não injete a ferramenta não regredir. Sem schema, nada muda — o texto sai na
+     * hora, como sempre.
+     */
+    const documentoVemPorFerramenta = request.jsonSchema !== undefined
+    let textoSolto = ''
+    const entregar = (delta: string): void => {
+      if (documentoVemPorFerramenta) textoSolto += delta
+      else empurrar(delta)
+    }
+
+    /**
      * Entrega o evento ao console **sem deixar o console derrubar a geração**.
      *
      * O `try/catch` não é paranoia: quem passa `onEvento` é o ponto único, que dele escreve no
@@ -352,7 +394,7 @@ export class ClaudeCodeAdapter implements AiAdapter {
           // com `stream-json` faria o documento nascer como um despejo de NDJSON.
           //
           // `ferramentaProibida` corta o texto **posterior** ao desvio (critério 3).
-          if (evento.tipo === 'texto' && !ferramentaProibida) empurrar(evento.delta)
+          if (evento.tipo === 'texto' && !ferramentaProibida) entregar(evento.delta)
 
           // O CLI **reporta** `usage` no `result`. Preferir o número medido à aproximação é o
           // ganho de graça desta fatia: `CARACTERES_POR_TOKEN` deixa de ser o que vai ao ledger
@@ -387,7 +429,7 @@ export class ClaudeCodeAdapter implements AiAdapter {
         for (const evento of parsearLinha(resto, estadoDoParser)) {
           publicar(evento)
           // Mesma guarda do laço do stdout: a última linha não escapa do critério 3.
-          if (evento.tipo === 'texto' && !ferramentaProibida) fila.push(evento.delta)
+          if (evento.tipo === 'texto' && !ferramentaProibida) entregar(evento.delta)
           if (evento.tipo === 'uso') {
             usoMedido = { tokensEntrada: evento.tokensEntrada, tokensSaida: evento.tokensSaida }
           }
@@ -404,14 +446,18 @@ export class ClaudeCodeAdapter implements AiAdapter {
        * última chamada (decisão do PI, 2026-09-05).
        *
        * Não custa streaming: nas gerações com `--json-schema` o documento chega inteiro numa
-       * tacada, e o `ARCHITECTURE.md` § Providers registra que nenhum bloco `text` aparece
-       * nelas. A guarda do critério 3 vale igual: documento retido de uma geração que saiu do
+       * tacada. A guarda do critério 3 vale igual: documento retido de uma geração que saiu do
        * contrato não entra.
+       *
+       * Sem documento retido, o texto guardado é a saída (#304): é o caso do CLI que não injetou
+       * a ferramenta, e descartá-lo devolveria "não devolveu saída" sobre um documento que veio.
        */
-      for (const evento of documentoRetido(estadoDoParser)) {
+      const retido = documentoRetido(estadoDoParser)
+      for (const evento of retido) {
         publicar(evento)
         if (evento.tipo === 'texto' && !ferramentaProibida) empurrar(evento.delta)
       }
+      if (retido.length === 0 && textoSolto !== '') empurrar(textoSolto)
 
       if (sinal === 'SIGKILL' && ferramentaProibida) {
         // O `SIGKILL` **fomos nós** (critério 3), e não o timeout: a geração **termina**, não
