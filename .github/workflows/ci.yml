@@ -169,7 +169,7 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: v2.116.0
 
       - name: Subir o Supabase local (RLS do int-spec)
         run: supabase start

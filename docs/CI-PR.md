@@ -27,6 +27,8 @@ com `--check`. Lint e prova visual atrasavam a subida do banco sem depender dela
   agregação posterior dos JSONs e coberturas do ADR-003.
 - Falha no filtro bloqueia o gate; alteração no workflow também exercita o E2E.
 - Limites de tempo explícitos por job, cache npm e cancelamento de pushes antigos preservados.
+- Supabase CLI fixado em `v2.116.0`; não usar `version: latest`, porque a resolução dinâmica
+  consulta releases no GitHub e pode falhar por rate limit antes de qualquer teste rodar.
 - Template de PR com problema, rastreabilidade, evidência e limites.
 
 Estimativa baseada nesta execução: caminho crítico próximo de 8 minutos, contra 16min33s.

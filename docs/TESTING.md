@@ -453,8 +453,10 @@ Os jobs de teste em detalhe:
 - **Services:** **nenhum** no sentido do `services:` do Actions. A maior parte do "Banco" testa o
   storage local (SQLite em arquivo temp), que não é serviço. Desde a **M2-F01** (entregue em
   2026-07-22) há uma exceção: o int-spec de RLS exige o **Supabase local**, que sobe pela CLI
-  (`supabase/setup-cli` + `supabase start`) e não por `services:` — não é um container só, e sim a
-  stack que a CLI orquestra (Postgres + PostgREST + Auth), com migrations e seed aplicados no start.
+  (`supabase/setup-cli` fixado em `v2.116.0` + `supabase start`) e não por `services:` — não é um
+  container só, e sim a stack que a CLI orquestra (Postgres + PostgREST + Auth), com migrations e
+  seed aplicados no start. **Não usar `version: latest` no CI:** a resolução dinâmica consulta as
+  releases do GitHub e pode falhar por rate limit antes de qualquer teste rodar.
   - **Pular, no CI, é falha.** Esses testes se pulam quando a stack não responde, para não punir
     quem clona o repo sem Docker. No CI a stack sobe de propósito, então o `beforeAll` **lança**
     quando `process.env.CI` está setado. Sem isso, uma stack que não subisse deixaria o CI verde
