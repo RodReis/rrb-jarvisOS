@@ -34,10 +34,10 @@ import type { EstadoDasRotas, ResultadoDaRota } from '@shared/domain/rota-de-ger
 import { PROVIDER_DA_ROTA, escolherRota, providerDaRota } from '@shared/domain/rota-de-geracao'
 import type { Decision, EstadoDoWizard, Resposta, RespostaOutcome } from '@shared/domain/wizard'
 import {
-  decidirPorMim,
   decisoesVigentes,
   detectarContradicoes,
-  estadoDoWizard
+  estadoDoWizard,
+  montarDecisao
 } from '@shared/domain/wizard'
 import { log } from '../logging/logger'
 import type { AuditRepository } from '../storage/audit-repository'
@@ -321,22 +321,6 @@ export class RefinamentoService {
       }
     }
 
-    const delegada = resposta.autor === 'agente'
-    // A regra de delegabilidade vem do domínio, não do fato de a tela ter mostrado o botão.
-    const decidida = delegada ? decidirPorMim(pergunta) : null
-    if (delegada && decidida === null) {
-      return {
-        reason: 'nao-delegavel',
-        mensagem: 'Esta decisão precisa do PI e não pode ser delegada.'
-      }
-    }
-
-    const escolha = decidida?.escolha ?? resposta.escolha
-    const texto = decidida ? null : resposta.texto
-    if (!this.escolhaValida(pergunta, escolha, texto)) {
-      return { reason: 'escolha-invalida', mensagem: 'Escolha inválida para esta pergunta.' }
-    }
-
     const historico = this.decisions.listar(userId, projectId)
     const vigentes = decisoesVigentes(historico)
     const contradicoes = detectarContradicoes(catalogo, vigentes, pergunta.id)
@@ -349,30 +333,23 @@ export class RefinamentoService {
       }
     }
 
-    const anterior = vigentes[pergunta.id]
-    const decisao: Decision = {
-      id: randomUUID(),
-      user_id: userId,
-      workspace_id: workspaceId,
-      projectId,
-      perguntaId: pergunta.id,
-      etapa: pergunta.etapa,
-      escolha,
-      texto,
-      recomendacao: pergunta.recomendada,
-      justificativa: decidida?.justificativa ?? pergunta.justificativa,
-      autor: decidida?.autor ?? 'pi',
-      motivo: decidida
-        ? 'delegada'
-        : anterior !== undefined
-          ? 'substituida'
-          : texto !== null
-            ? 'texto-livre'
-            : 'escolhida',
-      substituiu: anterior?.id ?? null,
-      created_at: new Date().toISOString()
-    }
+    // A regra de delegabilidade e a validade da escolha vêm do domínio, não do fato de a tela
+    // ter mostrado o botão — mesma mecânica das contradições do PRD.
+    const montada = montarDecisao({
+      pergunta,
+      resposta,
+      anterior: vigentes[pergunta.id],
+      escopo: {
+        id: randomUUID(),
+        user_id: userId,
+        workspace_id: workspaceId,
+        projectId,
+        created_at: new Date().toISOString()
+      }
+    })
+    if ('recusa' in montada) return { reason: montada.recusa, mensagem: montada.mensagem }
 
+    const decisao = montada.decisao
     this.decisions.registrar(decisao)
     this.perguntas.marcarRespondida(userId, pergunta.id)
 
@@ -409,21 +386,5 @@ export class RefinamentoService {
   /** A rota que seria usada agora — sem gerar nada. */
   async rotaAtual(projectId: string, workspaceId: WorkspaceId): Promise<ResultadoDaRota> {
     return escolherRota(await this.estadoDasRotas(projectId, workspaceId))
-  }
-
-  /**
-   * A escolha precisa ser uma opção real, ou texto livre numa pergunta que o aceita.
-   *
-   * Validar aqui, e não só na tela, é o que impede o IPC de gravar decisão impossível: o
-   * renderer é fronteira não confiável.
-   */
-  private escolhaValida(
-    pergunta: PerguntaGerada,
-    escolha: string | null,
-    texto: string | null
-  ): boolean {
-    if (escolha !== null) return pergunta.opcoes.some((o) => o.id === escolha)
-    if (texto !== null) return pergunta.aceitaTextoLivre && texto.trim().length > 0
-    return false
   }
 }

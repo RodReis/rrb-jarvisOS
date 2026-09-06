@@ -16,6 +16,7 @@ import {
   estadoDoWizard,
   isAutorDaDecisao,
   isDecisionReason,
+  montarDecisao,
   opcoesOrdenadas,
   perguntasRelevantes,
   podeAprovarGate,
@@ -319,5 +320,104 @@ describe('type guards de fronteira', () => {
   it('reconhece e recusa motivos', () => {
     expect(isDecisionReason('delegada')).toBe(true)
     expect(isDecisionReason('inventada')).toBe(false)
+  })
+})
+
+describe('montarDecisao — a mecânica de responder, uma vez só', () => {
+  const escopo = {
+    id: 'd-novo',
+    user_id: 'u-1',
+    workspace_id: 'jarvis' as const,
+    projectId: 'p-1',
+    created_at: '2026-09-06T12:00:00.000Z'
+  }
+  const p = pergunta({
+    id: 'q-1',
+    opcoes: [
+      { id: 'a', rotulo: 'A', impacto: 'ia' },
+      { id: 'b', rotulo: 'B', impacto: 'ib' }
+    ],
+    recomendada: 'a',
+    justificativa: 'porque a',
+    aceitaTextoLivre: true,
+    delegavel: true
+  })
+
+  it('escolha real vira decisão do PI com motivo escolhida', () => {
+    const r = montarDecisao({
+      pergunta: p,
+      resposta: { perguntaId: 'q-1', escolha: 'b', texto: null, autor: 'pi' },
+      anterior: undefined,
+      escopo
+    })
+
+    expect(r).toMatchObject({
+      decisao: { escolha: 'b', autor: 'pi', motivo: 'escolhida', substituiu: null, id: 'd-novo' }
+    })
+  })
+
+  it('texto livre grava o texto e o motivo texto-livre', () => {
+    const r = montarDecisao({
+      pergunta: p,
+      resposta: { perguntaId: 'q-1', escolha: null, texto: 'Outra.', autor: 'pi' },
+      anterior: undefined,
+      escopo
+    })
+
+    expect(r).toMatchObject({ decisao: { escolha: null, texto: 'Outra.', motivo: 'texto-livre' } })
+  })
+
+  it('delegação grava a recomendada com o agente como autor', () => {
+    const r = montarDecisao({
+      pergunta: p,
+      resposta: { perguntaId: 'q-1', escolha: null, texto: null, autor: 'agente' },
+      anterior: undefined,
+      escopo
+    })
+
+    expect(r).toMatchObject({ decisao: { escolha: 'a', autor: 'agente', motivo: 'delegada' } })
+  })
+
+  it('recusa delegar o que não é delegável — a regra é do domínio, não do botão', () => {
+    const r = montarDecisao({
+      pergunta: pergunta({ ...p, delegavel: false }),
+      resposta: { perguntaId: 'q-1', escolha: null, texto: null, autor: 'agente' },
+      anterior: undefined,
+      escopo
+    })
+
+    expect(r).toMatchObject({ recusa: 'nao-delegavel' })
+  })
+
+  it('recusa escolha que não é opção, e texto livre onde não cabe', () => {
+    expect(
+      montarDecisao({
+        pergunta: p,
+        resposta: { perguntaId: 'q-1', escolha: 'z', texto: null, autor: 'pi' },
+        anterior: undefined,
+        escopo
+      })
+    ).toMatchObject({ recusa: 'escolha-invalida' })
+
+    expect(
+      montarDecisao({
+        pergunta: pergunta({ ...p, aceitaTextoLivre: false }),
+        resposta: { perguntaId: 'q-1', escolha: null, texto: 'x', autor: 'pi' },
+        anterior: undefined,
+        escopo
+      })
+    ).toMatchObject({ recusa: 'escolha-invalida' })
+  })
+
+  it('com decisão anterior, a nova a substitui e aponta para ela', () => {
+    const anterior = decisao({ id: 'd-velha', perguntaId: 'q-1' })
+    const r = montarDecisao({
+      pergunta: p,
+      resposta: { perguntaId: 'q-1', escolha: 'b', texto: null, autor: 'pi' },
+      anterior,
+      escopo
+    })
+
+    expect(r).toMatchObject({ decisao: { motivo: 'substituida', substituiu: 'd-velha' } })
   })
 })

@@ -29,6 +29,7 @@
  */
 
 import type { WorkspaceId } from './entities'
+import type { Pergunta } from './wizard'
 import type { BloqueioExterno, DocumentoDoPacote } from './pacote-estrutural'
 import { DOCUMENTOS_DO_PACOTE } from './pacote-estrutural'
 import { TERMOS_QUE_EXIGEM_ORIGEM_HUMANA, normalizar } from './brief'
@@ -78,16 +79,42 @@ export interface AfirmacaoDoPrd {
 /**
  * Uma contradição detectada entre documentos ou contra o brief (critério 6).
  *
- * Carrega a **recomendação** junto, e não só o conflito: a M8-F03 estabeleceu que o app propõe
- * e o PI decide — mostrar duas frases incompatíveis sem dizer qual parece certa devolveria ao
- * PI o trabalho de reler tudo que a máquina acabou de ler.
+ * **É uma pergunta do contrato da M8-F03** (emenda E1): opções excludentes com impacto,
+ * recomendada primeiro com justificativa, texto livre e delegação declarados pelo modelo. Assim
+ * a máquina do `wizard.ts` e o pop-up do refinamento a conduzem sem uma segunda superfície —
+ * mostrar duas frases incompatíveis com uma recomendação em prosa devolvia ao PI o trabalho de
+ * decidir sem opção acionável, que é exatamente o que o contrato existe para evitar.
  */
-export interface ContradicaoDoPrd {
-  readonly id: string
+export interface ContradicaoDoPrd extends Pergunta {
   /** As afirmações em conflito. Duas ou mais ids de `AfirmacaoDoPrd` ou do brief. */
   readonly afirmacoes: readonly string[]
-  readonly pergunta: string
-  readonly recomendacao: string
+}
+
+/** A `etapa` que a pergunta e a decisão sobre uma contradição carregam. */
+export const ETAPA_DA_CONTRADICAO = 'prd'
+
+/**
+ * Lê uma contradição como foi gravada.
+ *
+ * Revisões anteriores à emenda E1 guardavam só `pergunta` e `recomendacao`. Elas viram pergunta
+ * de **texto livre**, sem opções e sem delegação: continuam respondíveis pelo mesmo pop-up e
+ * nunca quebram a tela — `opcoesOrdenadas` sobre `opcoes` ausente derrubaria o componente.
+ */
+export function contradicaoGravada(bruta: Record<string, unknown>): ContradicaoDoPrd {
+  if (Array.isArray(bruta['opcoes'])) return bruta as unknown as ContradicaoDoPrd
+
+  return {
+    id: typeof bruta['id'] === 'string' ? bruta['id'] : '',
+    etapa: ETAPA_DA_CONTRADICAO,
+    afirmacoes: Array.isArray(bruta['afirmacoes']) ? (bruta['afirmacoes'] as string[]) : [],
+    titulo: 'Contradição',
+    enunciado: typeof bruta['pergunta'] === 'string' ? bruta['pergunta'] : '',
+    opcoes: [],
+    recomendada: '',
+    justificativa: typeof bruta['recomendacao'] === 'string' ? bruta['recomendacao'] : '',
+    aceitaTextoLivre: true,
+    delegavel: false
+  }
 }
 
 /**

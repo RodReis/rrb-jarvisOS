@@ -309,7 +309,13 @@ export const RECURSOS = {
           'Ninguém disse isto — a IA inferiu. Corte o que não faz sentido antes de aceitar.',
         contradicoesTitulo: '{{count}} contradições a resolver',
         contradicoesDescricao:
-          'Duas afirmações não podem valer ao mesmo tempo. Decida e gere de novo; nada foi corrigido sozinho.',
+          'Duas afirmações não podem valer ao mesmo tempo. Responda uma por vez; quando a última for respondida, os três documentos são gerados de novo com as suas decisões. Nada é corrigido sozinho.',
+        contradicoesRespondidas:
+          'Todas respondidas. Se a geração automática não saiu, gere de novo para aplicar as decisões.',
+        responderContradicoes: 'Responder às contradições',
+        contradicoesPopupTitulo: 'Contradições de {{nome}}',
+        contradicoesPopupDescricao:
+          'Uma decisão por vez. A recomendação vem primeiro, mas a escolha é sua — e ao responder a última, os documentos são gerados de novo.',
         recomendacao: 'Recomendação: {{texto}}',
         aceitar: 'Aceitar o PRD',
         aceiteTitulo: 'Aceite do PRD',

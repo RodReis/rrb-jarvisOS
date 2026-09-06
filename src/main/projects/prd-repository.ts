@@ -18,7 +18,8 @@
 import type { Database } from 'better-sqlite3'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { BloqueioExterno } from '@shared/domain/pacote-estrutural'
-import type { AfirmacaoDoPrd, ContradicaoDoPrd, PrdRegistrado } from '@shared/domain/prd'
+import type { AfirmacaoDoPrd, PrdRegistrado } from '@shared/domain/prd'
+import { contradicaoGravada } from '@shared/domain/prd'
 import { log } from '../logging/logger'
 
 interface PrdRow {
@@ -91,7 +92,9 @@ function toPrd(row: PrdRow): PrdRegistrado {
     projectId: row.project_id,
     briefHash: row.brief_hash,
     afirmacoes: parseLista<AfirmacaoDoPrd>(row.afirmacoes, 'afirmacoes'),
-    contradicoes: parseLista<ContradicaoDoPrd>(row.contradicoes, 'contradicoes'),
+    contradicoes: parseLista<Record<string, unknown>>(row.contradicoes, 'contradicoes').map(
+      contradicaoGravada
+    ),
     ...(bloqueio === undefined ? {} : { bloqueioDoLandscape: bloqueio }),
     hash: row.hash,
     commitHash: row.commit_hash,

@@ -42,6 +42,7 @@ const { openDatabase } = await import('../storage/database')
 const { AuditRepository } = await import('../storage/audit-repository')
 const { PrdRepository } = await import('./prd-repository')
 const { PacoteRepository } = await import('./pacote-repository')
+const { DecisionRepository } = await import('./decision-repository')
 const { PrdService, TENTATIVAS_DE_CORRECAO } = await import('./prd-service')
 const { ProjectRepository } = await import('./project-repository')
 
@@ -54,6 +55,7 @@ let projetoDir: string
 let db: Db
 let repo: InstanceType<typeof PrdRepository>
 let pacotes: InstanceType<typeof PacoteRepository>
+let decisions: InstanceType<typeof DecisionRepository>
 let service: InstanceType<typeof PrdService>
 
 let rotas: EstadoDasRotas
@@ -117,6 +119,25 @@ function afirmacao(over: Partial<AfirmacaoDoPrd> = {}): AfirmacaoDoPrd {
     texto: 'O produto organiza leituras por projeto.',
     origem: 'brief',
     referencia: 'b-1',
+    ...over
+  }
+}
+
+function contradicao(over: Partial<ContradicaoDoPrd> = {}): ContradicaoDoPrd {
+  return {
+    id: 'c-1',
+    etapa: 'prd',
+    afirmacoes: ['a-1', 'b-1'],
+    titulo: 'Local ou nuvem',
+    enunciado: 'O produto é local ou na nuvem?',
+    opcoes: [
+      { id: 'a', rotulo: 'Local', impacto: 'Sem sync entre máquinas.' },
+      { id: 'b', rotulo: 'Nuvem', impacto: 'Exige conta e rede.' }
+    ],
+    recomendada: 'a',
+    justificativa: 'Local, como o brief diz.',
+    aceitaTextoLivre: true,
+    delegavel: true,
     ...over
   }
 }
@@ -198,9 +219,11 @@ beforeEach(() => {
     creditos: 1
   } as unknown as ConnectorOutcome
 
+  decisions = new DecisionRepository(db)
   service = new PrdService({
     repository: repo,
     pacotes,
+    decisions,
     projects: projetos,
     projectService: {
       concluirMarco: () => {
@@ -437,20 +460,41 @@ describe('validação da saída (critérios 1, 2 e 5)', () => {
 })
 
 describe('contradições viram perguntas (critério 6)', () => {
-  it('a contradição detectada é gravada com a pergunta e a recomendação', async () => {
-    contradicoes = [
-      {
-        id: 'c-1',
-        afirmacoes: ['a-1', 'b-1'],
-        pergunta: 'O produto é local ou na nuvem?',
-        recomendacao: 'Local, como o brief diz.'
-      }
-    ]
+  it('a contradição é gravada como pergunta, com id próprio e etapa prd', async () => {
+    contradicoes = [contradicao()]
 
     const r = await service.gerar({ projectId: PROJETO, termo: '' }, WS)
 
     expect(r.prd?.contradicoes).toHaveLength(1)
-    expect(r.prd?.contradicoes[0]?.recomendacao).toBe('Local, como o brief diz.')
+    const gravada = r.prd?.contradicoes[0]
+    // O id vem do serviço, não do modelo: "c-1" colidiria entre revisões, e a decisão do PI
+    // passaria a apontar para a contradição errada.
+    expect(gravada?.id).not.toBe('c-1')
+    expect(gravada).toMatchObject({ etapa: 'prd', justificativa: 'Local, como o brief diz.' })
+  })
+
+  it('contradição fora do contrato não chega ao PI — a etapa falha, como a detecção que não saiu', async () => {
+    contradicoes = [contradicao({ opcoes: [{ id: 'a', rotulo: 'Só uma', impacto: 'x' }] })]
+    respostas = [[afirmacao()], [afirmacao()]]
+
+    const r = await service.gerar({ projectId: PROJETO, termo: '' }, WS)
+
+    expect(r.resultado).toBe('saida-invalida')
+    expect(r.problemas?.join(' ')).toContain('opções')
+    expect(repo.vigente(USER, PROJETO)).toBeUndefined()
+  })
+
+  it('a mesma contradição com outro id do modelo não muda a revisão', async () => {
+    contradicoes = [contradicao({ id: 'c-1' })]
+    const primeira = await service.gerar({ projectId: PROJETO, termo: '' }, WS)
+
+    respostas = [[afirmacao()]]
+    contradicoes = [contradicao({ id: 'c-9' })]
+    const segunda = await service.gerar({ projectId: PROJETO, termo: '' }, WS)
+
+    // O hash ignora o id da contradição: ele é sorteado por revisão, e entrar no hash faria
+    // "mesmo conteúdo é a mesma revisão" (invariante 2 da CONVENTION §4) deixar de valer.
+    expect(segunda.prd?.hash).toBe(primeira.prd?.hash)
   })
 
   it('falha na detecção NÃO vira "nenhuma contradição"', async () => {
@@ -666,5 +710,116 @@ describe('progresso da geração (SPEC-Jornada-03 § Geração)', () => {
     const r = await service.gerar({ projectId: PROJETO, termo: 'x' }, WS)
 
     expect(r.resultado).toBe('gerado')
+  })
+})
+
+describe('responder às contradições (emenda E1)', () => {
+  async function gerarComContradicao(): Promise<string> {
+    contradicoes = [contradicao()]
+    const r = await service.gerar({ projectId: PROJETO, termo: '' }, WS)
+    return r.prd?.contradicoes[0]?.id ?? ''
+  }
+
+  it('a vista traz a contradição como a próxima pergunta, e nenhuma decisão ainda', async () => {
+    await gerarComContradicao()
+
+    const vista = service.contradicoes(PROJETO)
+
+    expect(vista?.estado.tipo).toBe('pergunta')
+    expect(vista?.estado.tipo === 'pergunta' && vista.estado.pergunta.enunciado).toBe(
+      'O produto é local ou na nuvem?'
+    )
+    expect(vista?.historico).toEqual([])
+  })
+
+  it('sem revisão, a vista é undefined — não há o que responder', () => {
+    expect(service.contradicoes(PROJETO)).toBeUndefined()
+  })
+
+  it('a resposta do PI vira decisão gravada com etapa prd, e a vista conclui', async () => {
+    const id = await gerarComContradicao()
+
+    const r = service.responderContradicao(
+      PROJETO,
+      { perguntaId: id, escolha: 'b', texto: null, autor: 'pi' },
+      WS
+    )
+
+    expect(r.reason).toBe('registrada')
+    expect(r.estado?.tipo).toBe('concluido')
+    expect(decisions.listar(USER, PROJETO)).toHaveLength(1)
+    expect(decisions.listar(USER, PROJETO)[0]).toMatchObject({
+      perguntaId: id,
+      etapa: 'prd',
+      escolha: 'b',
+      autor: 'pi'
+    })
+  })
+
+  it('"Decide por mim" grava a recomendada com o agente como autor', async () => {
+    const id = await gerarComContradicao()
+
+    const r = service.responderContradicao(
+      PROJETO,
+      { perguntaId: id, escolha: null, texto: null, autor: 'agente' },
+      WS
+    )
+
+    expect(r.decisao).toMatchObject({ escolha: 'a', autor: 'agente', motivo: 'delegada' })
+  })
+
+  it('recusa pergunta que não é da revisão vigente', async () => {
+    await gerarComContradicao()
+
+    const r = service.responderContradicao(
+      PROJETO,
+      { perguntaId: 'fantasma', escolha: 'a', texto: null, autor: 'pi' },
+      WS
+    )
+
+    expect(r.reason).toBe('pergunta-desconhecida')
+    expect(decisions.listar(USER, PROJETO)).toHaveLength(0)
+  })
+
+  it('a decisão sobre a contradição entra no pedido da geração seguinte, com o rótulo', async () => {
+    const id = await gerarComContradicao()
+    service.responderContradicao(
+      PROJETO,
+      { perguntaId: id, escolha: 'b', texto: null, autor: 'pi' },
+      WS
+    )
+
+    // Remonta o serviço com as mesmas deps do `beforeEach`, trocando só `gerarDocumentos` para
+    // capturar o pedido: o que se prova é o conteúdo de `decisoes`, não a montagem.
+    const pedidos: { decisoes: readonly { pergunta: string; resposta: string }[] }[] = []
+    service = new PrdService({
+      repository: repo,
+      pacotes,
+      decisions,
+      projects: new ProjectRepository(db),
+      projectService: {
+        concluirMarco: () => ({ commitado: true, commitHash: 'abc1234' })
+      } as never,
+      connectors: { call: async () => respostaDaBusca } as never,
+      audit: new AuditRepository(db, 'chave-de-teste'),
+      userId: () => USER,
+      briefAceito: () => briefAceito,
+      decisoesDoRefinamento: () => [],
+      montarContexto: () => 'pack-1',
+      estadoDasRotas: () => rotas,
+      gerarTermo: async () => ({ termo: 'x' }),
+      gerarDocumentos: async (entrada) => {
+        pedidos.push({ decisoes: entrada.decisoes })
+        return { afirmacoes: [afirmacao()] }
+      },
+      detectarContradicoes: async () => ({ contradicoes: [] })
+    })
+
+    await service.gerar({ projectId: PROJETO, termo: '' }, WS)
+
+    // O modelo precisa do conteúdo, não do id da opção — mesma regra de `decisoesParaOBrief`.
+    expect(pedidos[0]?.decisoes).toEqual([
+      expect.objectContaining({ pergunta: 'O produto é local ou na nuvem?', resposta: 'Nuvem' })
+    ])
   })
 })

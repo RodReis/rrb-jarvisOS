@@ -32,6 +32,7 @@ const listFailures = vi.fn()
 // abrir. Sem os dois métodos aqui a tela estoura no efeito, e a falha aparece longe da causa.
 const carregarPrd = vi.fn()
 const proporTermoDePesquisa = vi.fn()
+const contradicoesDoPrd = vi.fn()
 // Mesma razão, um nível abaixo: o painel de anexos (M8-F05) também é filho do de contexto, e
 // monta junto. Sem os dois métodos, o teste do contexto quebraria por falta de mock.
 const listarAnexos = vi.fn()
@@ -84,6 +85,7 @@ beforeEach(() => {
   listFailures.mockReset().mockResolvedValue([])
   carregarPrd.mockReset().mockResolvedValue(null)
   proporTermoDePesquisa.mockReset().mockResolvedValue(null)
+  contradicoesDoPrd.mockReset().mockResolvedValue(null)
   listarAnexos.mockReset().mockResolvedValue([])
   listarArquiteturas.mockReset().mockResolvedValue([])
   carregarRoadmap.mockReset().mockResolvedValue({ mvps: [], slices: [] })
@@ -113,6 +115,7 @@ beforeEach(() => {
       listFailures,
       carregarPrd,
       proporTermoDePesquisa,
+      contradicoesDoPrd,
       listarAnexos,
       listarArquiteturas,
       carregarRoadmap,

@@ -951,6 +951,7 @@ if (!app.requestSingleInstanceLock()) {
     const prd = new PrdService({
       repository: new PrdRepository(storage.db),
       pacotes: pacoteRepository,
+      decisions: new DecisionRepository(storage.db),
       projects: projectRepository,
       projectService: projects,
       connectors,

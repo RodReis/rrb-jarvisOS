@@ -66,6 +66,13 @@ interface WizardDoProjetoProps {
     readonly ler: () => Promise<VistaDoWizard | null>
     readonly responder: (resposta: Resposta) => Promise<RespostaOutcome>
   }
+  /**
+   * Título e descrição do pop-up. Ausentes, os do planejamento (`wizard.*`). As contradições do
+   * PRD (emenda E1) conduzem a mesma decisão, mas o PI precisa ler **por que** está sendo
+   * perguntado — e "Planejamento de X" diria que ele voltou ao refinamento.
+   */
+  readonly titulo?: string
+  readonly descricao?: string
 }
 
 /**
@@ -90,7 +97,9 @@ export function WizardDoProjeto({
   nomeDoProjeto,
   aberto,
   onFechar,
-  fonte
+  fonte,
+  titulo,
+  descricao
 }: WizardDoProjetoProps): React.JSX.Element {
   const { t } = useTranslation()
   /**
@@ -175,8 +184,8 @@ export function WizardDoProjeto({
     <Dialog
       aberto={aberto}
       onFechar={onFechar}
-      titulo={t('wizard.titulo', { nome: nomeDoProjeto })}
-      descricao={t('wizard.descricao')}
+      titulo={titulo ?? t('wizard.titulo', { nome: nomeDoProjeto })}
+      descricao={descricao ?? t('wizard.descricao')}
       rodape={
         <Button variante="secundaria" onClick={onFechar}>
           {t('wizard.fechar')}

@@ -210,9 +210,19 @@ const refinamento = {
   historico: vi.fn(() => [])
 }
 
+/**
+ * Dublê do PRD (SPEC-Jornada-03, emenda E1). Só a fronteira das contradições é exercitada aqui;
+ * a geração, a vista e a resposta têm suíte própria em `prd-service.int-spec.ts`.
+ */
+const prd = {
+  contradicoes: vi.fn(() => undefined),
+  responderContradicao: vi.fn(() => ({ reason: 'registrada', mensagem: 'ok' }))
+}
+
 const deps = {
   audit,
   refinamento,
+  prd,
   ai,
   jornada,
   brief,
@@ -919,5 +929,49 @@ describe('refinamento', () => {
     // A ponte serializa: `undefined` atravessaria como ausência de valor, e a tela não
     // distinguiria "sem histórico" de "o canal não respondeu".
     expect(invocar(IPC_CHANNELS.refinamentoHistorico, 42, 'jarvis')).toEqual([])
+  })
+})
+
+describe('contradições do PRD (emenda E1) — a fronteira valida forma, o serviço decide', () => {
+  it('a vista inválida devolve null, nunca undefined', () => {
+    expect(invocar(IPC_CHANNELS.prdContradicoes, 42, 'jarvis')).toBeNull()
+    expect(invocar(IPC_CHANNELS.prdContradicoes, 'p-1', 'jarvis')).toBeNull()
+    expect(prd.contradicoes).toHaveBeenCalledWith('p-1')
+  })
+
+  it('responder exige a forma da resposta — sem ela, nada chega ao serviço', () => {
+    const r = invocar(IPC_CHANNELS.prdResponderContradicao, 'p-1', { escolha: 'a' }, 'jarvis') as {
+      reason: string
+    }
+
+    expect(r.reason).toBe('escolha-invalida')
+    expect(prd.responderContradicao).not.toHaveBeenCalled()
+  })
+
+  it('responder recusa autor fora do enum', () => {
+    const r = invocar(
+      IPC_CHANNELS.prdResponderContradicao,
+      'p-1',
+      { perguntaId: 'c-1', escolha: 'a', texto: null, autor: 'terceiro' },
+      'jarvis'
+    ) as { reason: string }
+
+    expect(r.reason).toBe('escolha-invalida')
+    expect(prd.responderContradicao).not.toHaveBeenCalled()
+  })
+
+  it('responder repassa a resposta bem formada', () => {
+    invocar(
+      IPC_CHANNELS.prdResponderContradicao,
+      'p-1',
+      { perguntaId: 'c-1', escolha: null, texto: null, autor: 'agente' },
+      'jarvis'
+    )
+
+    expect(prd.responderContradicao).toHaveBeenCalledWith(
+      'p-1',
+      { perguntaId: 'c-1', escolha: null, texto: null, autor: 'agente' },
+      'jarvis'
+    )
   })
 })
