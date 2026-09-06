@@ -24,6 +24,9 @@
     "test:prova": "playwright test --config playwright.prova.config.ts",
     "test:report": "node scripts/test-report.mjs",
     "test:report:check": "node scripts/test-report.mjs --check",
+    "test:report:regras": "node scripts/test-report.mjs --project regras",
+    "test:report:banco": "node scripts/test-report.mjs --project banco",
+    "test:report:tela": "node scripts/test-report.mjs --project tela",
     "test:report:selfcheck": "node scripts/test-report.mjs --selfcheck"
   },
   "devDependencies": {

@@ -39,6 +39,10 @@ const check = process.argv.includes('--check')
 const selfcheck = process.argv.includes('--selfcheck')
 const noRun = process.argv.includes('--no-run') || selfcheck
 const isWin = process.platform === 'win32'
+const projectArgIndex = process.argv.indexOf('--project')
+const onlyProject =
+  process.argv.find((arg) => arg.startsWith('--project='))?.slice('--project='.length) ||
+  (projectArgIndex >= 0 ? process.argv[projectArgIndex + 1] : undefined)
 
 function run(cmd, args, cwd = ROOT) {
   console.log(`\n$ ${cmd} ${args.join(' ')}  (${cwd})`)
@@ -59,7 +63,7 @@ function run(cmd, args, cwd = ROOT) {
 
 /** Uma execução Vitest por categoria — JSON e cobertura em caminhos próprios. */
 function runVitestProject(project, rawName, coverageDir) {
-  run('npx', [
+  return run('npx', [
     'vitest',
     'run',
     '--project',
@@ -85,9 +89,23 @@ if (!noRun) {
   // vitest-componente (jsdom) — o E2E Playwright-Electron saiu daqui no card #34
   // (ver o cabeçalho deste arquivo). Sem `npm run build` nem `playwright test`: o
   // relatório não depende mais do app empacotado, e a geração local ficou rápida.
-  runVitestProject('regras', 'regras.json', 'regras')
-  runVitestProject('banco', 'banco.json', 'banco')
-  runVitestProject('tela', 'tela-vitest.json', 'tela')
+  const projects = [
+    ['regras', 'regras.json', 'regras'],
+    ['banco', 'banco.json', 'banco'],
+    ['tela', 'tela-vitest.json', 'tela']
+  ]
+  if (onlyProject) {
+    const project = projects.find(([name]) => name === onlyProject)
+    if (!project) {
+      console.error(`[test-report] projeto Vitest desconhecido: ${onlyProject}`)
+      process.exit(1)
+    }
+    process.exit(runVitestProject(...project))
+  }
+
+  for (const project of projects) {
+    runVitestProject(...project)
+  }
 }
 
 const entry = selfcheck ? 'scripts/gen-test-report.selfcheck.mjs' : 'scripts/gen-test-report.mjs'

@@ -23,6 +23,8 @@ com `--check`. Lint e prova visual atrasavam a subida do banco sem depender dela
 
 - Uma execução da suíte, preservando cobertura, anti-drift, append-only e carimbo condicional.
 - Jobs independentes de qualidade e prova visual, agregados pelo mesmo `gate` obrigatório.
+- Categorias do relatório (`regras`, `banco`, `tela`) preparadas para rodar em paralelo, com
+  agregação posterior dos JSONs e coberturas do ADR-003.
 - Falha no filtro bloqueia o gate; alteração no workflow também exercita o E2E.
 - Limites de tempo explícitos por job, cache npm e cancelamento de pushes antigos preservados.
 - Template de PR com problema, rastreabilidade, evidência e limites.
@@ -31,6 +33,12 @@ Estimativa baseada nesta execução: caminho crítico próximo de 8 minutos, con
 É uma projeção, não um benchmark: fila, downloads, runner e crescimento da suíte variam.
 A paralelização adiciona duas instalações npm curtas; a remoção da segunda suíte elimina
 cerca de cinco minutos de runner observados. Não se usa cache de resultados de teste.
+
+Nova medição da #312, após rebase sobre a #311: `quality` 1min20s, `visual` 2min49s,
+`e2e` 2min53s e `test` 8min06s antes de falhar por carimbo de issue incorreto. O
+gargalo restante é a soma interna das três categorias Vitest dentro de `test`; por isso
+a próxima otimização divide `regras`, `banco` e `tela` em jobs paralelos e mantém um
+job `test` agregado para preservar o check obrigatório.
 
 ## Rotina de PR
 
@@ -44,8 +52,9 @@ cerca de cinco minutos de runner observados. Não se usa cache de resultados de 
    conjunto de execuções; uma única amostra não comprova estabilidade nem escalabilidade.
 
 Não reduzir cobertura, desabilitar RLS ou pular toda a suíte em PR documental para atingir
-uma meta de tempo. Sharding e separação adicional das categorias só se justificam por nova
-medição e preservação da agregação de evidências do ADR-003.
+uma meta de tempo. Separação das categorias só vale com nova medição e preservação da
+agregação de evidências do ADR-003: os números continuam vindo dos JSONs dos runners, não
+de texto digitado no workflow.
 
 ## Referências oficiais consultadas
 
