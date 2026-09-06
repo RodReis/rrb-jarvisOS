@@ -738,3 +738,84 @@ describe('#284 — o CLI repete a saída estruturada e o documento sai uma vez s
     expect(await gerar()).not.toContain('structured-output-enforce')
   })
 })
+
+/**
+ * O `SIGKILL` do corte por ferramenta (#283) — a **segunda** defesa do critério 3.
+ *
+ * O critério pede duas coisas: *"evento `erro` no console e **a geração termina**; o documento não
+ * recebe o texto posterior"*. A flag `ferramentaProibida` cobre a segunda metade e já é medida; o
+ * `processo.kill('SIGKILL')` cobre a primeira e **não era medido por nada** — em 2026-09-05,
+ * trocá-lo por um no-op deixava os 39 testes deste arquivo verdes.
+ *
+ * As duas defesas protegem coisas diferentes. A flag protege o **documento**; o kill protege
+ * **custo e tempo**: sem ele a sessão que saiu do contrato segue rodando, consumindo a assinatura
+ * e segurando a geração até o timeout, com toda a saída sendo descartada no fim.
+ *
+ * O dublê daqui **não** termina sozinho — o de cima termina, e é por isso que ele não enxerga o
+ * kill. Sem alguém que fique vivo depois do desvio, não há encerramento a observar.
+ */
+describe('#283 — o corte por ferramenta encerra a sessão, não só o documento', () => {
+  const linha = (payload: object): string => JSON.stringify(payload)
+
+  const CHAMADA = linha({
+    type: 'assistant',
+    message: {
+      role: 'assistant',
+      content: [{ type: 'tool_use', id: 'call-1', name: 'Bash', input: { command: 'ls' } }]
+    }
+  })
+
+  /**
+   * Quanto o dublê fica vivo se ninguém o matar.
+   *
+   * Folgado o bastante para separar "morto pelo corte" de "terminou sozinho" numa máquina
+   * carregada, e curto o bastante para o caso da Construção — onde ninguém o mata — esperar essa
+   * vida inteira sem estourar o tempo do teste.
+   */
+  const VIDA_DO_DUBLE_MS = 4_000
+
+  /**
+   * Um dublê que emite a chamada proibida e **continua vivo**, como o CLI real continuaria.
+   *
+   * O `setTimeout` segura o event loop: sem `SIGKILL` o processo só termina quando ele vence, e a
+   * asserção de duração separa "foi morto" de "terminou sozinho" sem espiar o sinal.
+   */
+  const scriptQueFicaVivo = (): string =>
+    `process.stdin.on("data",()=>{});` +
+    `process.stdout.write(${JSON.stringify(CHAMADA + '\n')});` +
+    `setTimeout(()=>process.exit(0),${VIDA_DO_DUBLE_MS})`
+
+  async function gerar(fase: 'planejamento' | 'construcao'): Promise<number> {
+    const adapter = new ClaudeCodeAdapter(runsDeTeste().abrir, ((
+      _b: string,
+      _a: readonly string[],
+      opcoes: object
+    ) => spawn(process.execPath, ['-e', scriptQueFicaVivo()], opcoes)) as typeof spawn)
+
+    const comecou = Date.now()
+
+    // O timeout é maior que a vida do dublê: assim, uma geração que termina cedo só pode ter
+    // sido **morta pelo corte** — se fosse o relógio do adapter, ela duraria mais, não menos.
+    // O documento não interessa aqui — o que se mede é o encerramento —, mas o stream precisa
+    // ser drenado até o fim: é o `for await` que espera o processo morrer.
+    for await (const chunk of adapter.generateStream(
+      pedido({ fase, timeoutMs: VIDA_DO_DUBLE_MS * 2 })
+    )) {
+      void chunk
+    }
+
+    return Date.now() - comecou
+  }
+
+  it('a geração termina antes do fim natural do roteiro', async () => {
+    // Com o kill, encerra assim que a chamada proibida chega. Sem ele, esperaria os 30s do dublê.
+    expect(await gerar('planejamento')).toBeLessThan(VIDA_DO_DUBLE_MS / 2)
+  }, 20_000)
+
+  it('na Construção a ferramenta é legítima e a sessão não é morta', async () => {
+    // O contrapeso do teste acima, e a razão de ele não poder ser "mata sempre": um adapter que
+    // matasse **toda** geração com ferramenta passaria no primeiro e quebraria a Construção, onde
+    // o agente é legítimo. Aqui a geração dura a vida inteira do dublê, porque ninguém a corta.
+    expect(await gerar('construcao')).toBeGreaterThanOrEqual(VIDA_DO_DUBLE_MS * 0.8)
+  }, 20_000)
+})
