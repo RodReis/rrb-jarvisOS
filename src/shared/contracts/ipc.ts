@@ -103,6 +103,8 @@ import type {
 import type { CapacidadeResolvida } from '../domain/skills'
 
 /** Canais de request/response (renderer → main → renderer). */
+import type { DesfechoDaTranscricao, DesfechoDoDownload, ProntidaoDaVoz } from '@shared/domain/voz'
+
 export const IPC_CHANNELS = {
   /** Metadados do app (nome, versão, ambiente). Sem segredo, sem caminho de disco. */
   appInfo: 'app:info',
@@ -181,6 +183,16 @@ export const IPC_CHANNELS = {
   executionRun: 'execution:run',
   executionRunReal: 'execution:run-real',
   executionList: 'execution:list',
+  /*
+   * Voz (SPEC-Voz-01). Três canais e nada mais: transcrever um enunciado, perguntar se o
+   * runtime está pronto, e mandar baixar o que falta.
+   *
+   * Nenhum deles carrega processo, caminho de modelo ou comando (critério 3) — com isso na
+   * mão, a tela deixaria de falar com uma capacidade e passaria a falar com uma implementação.
+   */
+  vozTranscrever: 'voz:transcrever',
+  vozProntidao: 'voz:prontidao',
+  vozBaixarArtefato: 'voz:baixar-artefato',
   approvalList: 'approval:list',
   approvalResolve: 'approval:resolve',
   /**
@@ -773,6 +785,14 @@ export interface JarvisBridge {
   runWorkflowReal(workflowId: string, workspace: WorkspaceId): Promise<ExecutionRun>
   listExecutionRuns(workspace: WorkspaceId): Promise<readonly ExecutionRun[]>
   listPendingApprovals(workspace: WorkspaceId): Promise<readonly ApprovalRequest[]>
+
+  /*
+   * Voz (SPEC-Voz-01, critério 3). O renderer captura com `getUserMedia` — Web API — e manda o
+   * PCM; o que volta é texto ou desfecho nomeado, nunca caminho de modelo nem comando.
+   */
+  transcreverAudio(pcm: Int16Array, workspace: WorkspaceId): Promise<DesfechoDaTranscricao>
+  prontidaoDaVoz(): Promise<ProntidaoDaVoz>
+  baixarArtefatoDeVoz(id: string): Promise<DesfechoDoDownload>
   /**
    * Resolve uma aprovação pendente. O retorno varia com o que estava pausado: uma etapa de
    * filesystem devolve o `ExecutionRun` retomado (F01); um comando devolve o

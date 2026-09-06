@@ -1,4 +1,8 @@
 import { dirname, join, resolve } from 'node:path'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
+import { VozService } from './voz/voz-service'
+import { ARTEFATOS_DA_VOZ } from './voz/artefatos'
+import { baixarArtefato } from './voz/download-de-artefato'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { app, BrowserWindow, nativeTheme, shell } from 'electron'
 import { IPC_EVENT_CHANNELS } from '@shared/contracts/ipc'
@@ -1430,7 +1434,53 @@ if (!app.requestSingleInstanceLock()) {
     // pé — e o WIP=1 valeria para os runs que ele conhece, não para a máquina.
     await reconciliacao.reconcileAll()
 
+    /*
+     * A voz (SPEC-Voz-01), primeira entrega.
+     *
+     * O engine concreto — faster-whisper no sidecar Python — é a **segunda** entrega desta
+     * fatia. Aqui ele é o engine ausente: `disponivel()` responde `false`, então a tela mostra
+     * "runtime não instalado" com a ação de baixar, que é literalmente o estado da máquina de
+     * quem abre o app hoje. Não é dublê de teste disfarçado de produção: é o comportamento
+     * honesto enquanto o runtime não existe, e é o caminho do critério 4.
+     */
+    const voz = new VozService({
+      engine: {
+        transcribe: () => Promise.reject(new Error('O runtime de voz ainda não foi instalado.')),
+        disponivel: async () => false,
+        encerrar: async () => undefined
+      },
+      artefatosFaltando: () => ARTEFATOS_DA_VOZ.map((a) => a.id),
+      computeAtual: () => 'cpu-int8'
+    })
+
     registerIpcHandlers({
+      voz,
+      baixarArtefatoDeVoz: async (id) => {
+        const artefato = ARTEFATOS_DA_VOZ.find((a) => a.id === id)
+        if (artefato === undefined) {
+          return { estado: 'falhou', motivo: 'Artefato desconhecido.' }
+        }
+
+        return baixarArtefato(artefato, {
+          buscar: async (url) => Buffer.from(await (await fetch(url)).arrayBuffer()),
+          gravar: async (destino, dados) => {
+            const alvo = join(app.getPath('userData'), destino)
+            await mkdir(dirname(alvo), { recursive: true })
+            await writeFile(alvo, dados)
+          },
+          apagar: async (destino) => {
+            await rm(join(app.getPath('userData'), destino), { force: true })
+          },
+          auditar: (evento) =>
+            storage.audit.append({
+              user_id: userIdAtual(),
+              type: evento.type,
+              payload: evento.payload
+            }),
+          // Fail closed: só as URLs pinadas no catálogo passam.
+          permitido: (url) => ARTEFATOS_DA_VOZ.some((a) => a.url === url)
+        })
+      },
       audit: storage.audit,
       workspaces,
       preferences,

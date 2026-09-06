@@ -74,8 +74,7 @@ describe('SttEngine — o contrato (critério 1)', () => {
   it('engine indisponível é desfecho próprio, não falha', async () => {
     // "Runtime ausente" pede **baixar**; "transcrição falhou" pede **tentar de novo**. Fundir
     // os dois daria à UI uma próxima ação errada na primeira execução do app.
-    const engine = engineFalso()
-    engine.disponivel = vi.fn(async () => false)
+    const engine: SttEngine = { ...engineFalso(), disponivel: async () => false }
 
     const r = await transcrever(engine, pcm())
 
