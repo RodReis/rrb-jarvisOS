@@ -13,6 +13,7 @@ Desktop app **local-first** (Electron + React + TypeScript) com dois espaços de
 | `docs/STATUS.md` | Kanban/roadmap deste projeto (mantenha atualizado ao concluir fatias) |
 | `docs/LANDSCAPE.md` | Mapa do território: domínios, módulos e onde cada documento mora |
 | `docs/TESTING.md` | processo de test, QA, relatório |
+| `docs/GUIA-PRS-CLAUDE-CODE.md` | rotina de autoria, revisão, CI e evidência das PRs deste repositório; distingue orientação operacional de evolução da pipeline |
 | `docs/spec/` | Specs por fatia — só implemente fatia com spec `aprovada-pi` |
 | `docs/mvp/` | MVPs (épicos) com checklist das fatias previstas |
 
