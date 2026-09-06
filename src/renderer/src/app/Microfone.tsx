@@ -157,7 +157,7 @@ export function Microfone({
             onPointerDown={() => void comecar()}
             onPointerUp={() => void terminar()}
             onPointerLeave={() => void terminar()}
-            disabled={estado === 'transcrevendo'}
+            desabilitado={estado === 'transcrevendo'}
           >
             {rotuloDoBotao}
           </Button>
@@ -166,7 +166,7 @@ export function Microfone({
             <p className="text-[length:var(--jos-texto-mini)] text-[var(--jos-cor-texto-suave)]">
               {t('voz.runtimeAusente')}
             </p>
-            <Button onClick={() => void baixar()} disabled={baixando}>
+            <Button onClick={() => void baixar()} desabilitado={baixando}>
               {baixando ? t('voz.baixando') : t('voz.baixar')}
             </Button>
           </div>

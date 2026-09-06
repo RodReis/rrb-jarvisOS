@@ -24,6 +24,19 @@ interface ButtonProps extends PropsDeComposicao {
   readonly children: React.ReactNode
   readonly variante?: VarianteBotao
   readonly onClick?: React.MouseEventHandler<HTMLButtonElement>
+  /**
+   * Gesto de **segurar** (SPEC-Voz-01, critério 5): pressionar age, soltar age de novo.
+   *
+   * Existe porque há ação cujo contrato é a duração, não o toque — o push-to-talk do microfone
+   * é a primeira. `onClick` não a expressa: ele dispara uma vez, no fim, e um botão de falar
+   * que só reage ao clique gravaria sempre zero segundo.
+   *
+   * `onPointerLeave` e não só `onPointerUp` porque soltar o botão **fora** dele é comum, e sem
+   * o par a ação ficaria aberta — no microfone, gravando até o timeout duro.
+   */
+  readonly onPointerDown?: React.PointerEventHandler<HTMLButtonElement>
+  readonly onPointerUp?: React.PointerEventHandler<HTMLButtonElement>
+  readonly onPointerLeave?: React.PointerEventHandler<HTMLButtonElement>
   readonly desabilitado?: boolean
   /**
    * Estado de carregamento.
@@ -112,6 +125,9 @@ export function Button({
   children,
   variante = 'secundaria',
   onClick,
+  onPointerDown,
+  onPointerUp,
+  onPointerLeave,
   desabilitado = false,
   carregando = false,
   tipo = 'button',
@@ -127,6 +143,9 @@ export function Button({
       {...composicao}
       type={tipo}
       onClick={onClick}
+      onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
+      onPointerLeave={onPointerLeave}
       disabled={desabilitado || carregando}
       aria-busy={carregando || undefined}
       style={{ height: ALTURA_CONTROLE }}

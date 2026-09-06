@@ -115,6 +115,40 @@ describe('IconButton', () => {
   })
 })
 
+describe('Button — gesto de segurar (SPEC-Voz-01)', () => {
+  it('dispara ao pressionar e ao soltar, não só no clique', async () => {
+    const pressionou = vi.fn()
+    const soltou = vi.fn()
+    render(
+      <Button onPointerDown={pressionou} onPointerUp={soltou}>
+        Segure para falar
+      </Button>
+    )
+
+    const botao = screen.getByRole('button', { name: 'Segure para falar' })
+    await userEvent.pointer([{ keys: '[MouseLeft>]', target: botao }, { keys: '[/MouseLeft]' }])
+
+    // Um botão de falar que só reagisse ao clique gravaria sempre zero segundo: `onClick`
+    // dispara uma vez, no fim, e o contrato aqui é a **duração**.
+    expect(pressionou).toHaveBeenCalled()
+    expect(soltou).toHaveBeenCalled()
+  })
+
+  it('sair com o ponteiro também encerra o gesto', async () => {
+    const saiu = vi.fn()
+    render(<Button onPointerLeave={saiu}>Segure</Button>)
+
+    // Soltar **fora** do botão é comum; sem este par a ação ficaria aberta — no microfone,
+    // gravando até o timeout duro.
+    await userEvent.pointer([
+      { target: screen.getByRole('button', { name: 'Segure' }) },
+      { target: document.body }
+    ])
+
+    expect(saiu).toHaveBeenCalled()
+  })
+})
+
 describe('ButtonGroup', () => {
   it('agrupa ações independentes como group', () => {
     render(
