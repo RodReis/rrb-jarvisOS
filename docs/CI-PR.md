@@ -34,11 +34,10 @@ Estimativa baseada nesta execução: caminho crítico próximo de 8 minutos, con
 A paralelização adiciona duas instalações npm curtas; a remoção da segunda suíte elimina
 cerca de cinco minutos de runner observados. Não se usa cache de resultados de teste.
 
-Nova medição da #312, após rebase sobre a #311: `quality` 1min20s, `visual` 2min49s,
-`e2e` 2min53s e `test` 8min06s antes de falhar por carimbo de issue incorreto. O
-gargalo restante é a soma interna das três categorias Vitest dentro de `test`; por isso
-a próxima otimização divide `regras`, `banco` e `tela` em jobs paralelos e mantém um
-job `test` agregado para preservar o check obrigatório.
+Nova medição da #312, após rebase sobre a #311 e paralelização das categorias: workflow
+completo em 4min56s. `test-regras` passou em 54s, `test-tela` em 3min22s,
+`test-banco` em 4min34s, `test` agregado em 11s e `gate` em 3s. O caminho crítico
+restante é o banco/Supabase, não mais a soma das três categorias Vitest.
 
 ## Rotina de PR
 
