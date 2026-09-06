@@ -12,7 +12,8 @@ Desktop app **local-first** (Electron + React + TypeScript) com dois espaços de
 | `docs/CONVENTION.md` | Contrato do processo (labels `proplan:*`) e contrato de dados das entidades |
 | `docs/STATUS.md` | Kanban/roadmap deste projeto (mantenha atualizado ao concluir fatias) |
 | `docs/LANDSCAPE.md` | Mapa do território: domínios, módulos e onde cada documento mora |
-| `docs/TESTING.md` | processo de test, QA, relatório |
+| `docs/TESTING.md` | processo obrigatório de testes, QA, relatório e evidência por SPEC/issue |
+| `docs/CI-PR.md` | política de PR rápida: jobs paralelos, gate único, medição de duração e limites |
 | `docs/GUIA-PRS-CLAUDE-CODE.md` | rotina de autoria, revisão, CI e evidência das PRs deste repositório; distingue orientação operacional de evolução da pipeline |
 | `docs/spec/` | Specs por fatia — só implemente fatia com spec `aprovada-pi` |
 | `docs/mvp/` | MVPs (épicos) com checklist das fatias previstas |
@@ -158,6 +159,56 @@ Priorizam cautela sobre velocidade; em tarefa trivial, bom senso.
 - **Simplicidade primeiro.** Código mínimo que resolve. Sem abstração de uso único, sem flexibilidade não pedida, sem tratar cenário impossível.
 - **Alterações cirúrgicas.** Cada linha alterada rastreável ao pedido. Não refatore o que não quebrou; mantenha o estilo existente; código morto não relacionado se aponta, não se apaga. **Exceção:** atualizar `docs/` é escopo obrigatório da entrega, não "melhoria adjacente".
 - **Execução verificável.** Traduza tarefa em critério checável ("adicionar validação" → "teste para entrada inválida passa"). `dev`, `test`, `lint` verdes é o piso.
+
+## Processo de PR, CI e Testing/QA
+
+O processo vigente está em `docs/CI-PR.md`, `docs/TESTING.md` e `docs/GUIA-PRS-CLAUDE-CODE.md`.
+Ao preparar, revisar ou integrar PR neste repositório, trate estes documentos como contrato
+operacional. Não use memória de conversa para substituir regra versionada.
+
+### PRs
+
+- Uma PR deve ter **uma finalidade principal**. Código, testes e documentação entram juntos quando
+  são necessários para provar a entrega; escopo oportunista fica fora.
+- A descrição da PR deve trazer problema, comportamento antes/depois, `refs #N`, evidência executada
+  e limites conhecidos. **Nunca use `closes #N`**.
+- Antes do push final, conferir o diff e executar as verificações pertinentes localmente. Não declarar
+  “pronto”, “verde” ou “mergeável” sem evidência do SHA atual.
+- Para CI remoto, usar `gh pr checks <n>` ou `gh pr checks <n> --watch`. Não confiar em silêncio de
+  watcher, print antigo, aba aberta ou status lembrado.
+- Depois do gate verde, a integração segue o contrato Git do projeto: PR para `main`, sem commit
+  direto na `main`; merge integra código, mas aceite da issue continua sendo ato do PI.
+
+### CI rápido de PR
+
+- A pipeline de PR deve manter o caminho crítico curto. Jobs independentes rodam em paralelo:
+  `quality`, `visual`, `test-regras`, `test-banco`, `test-tela` e `e2e` quando aplicável.
+- O job agregado `test` não reexecuta a suíte: ele baixa os artefatos das categorias, valida
+  anti-drift/append-only e publica a evidência. O `gate` depende dos jobs obrigatórios.
+- Se uma mudança aumentar a duração da PR, medir e registrar a causa em `docs/CI-PR.md`. O alvo
+  operacional é evitar voltar ao padrão de PR acima de 15 minutos sem justificativa técnica.
+- Não economize removendo prova. A otimização válida é paralelizar, condicionar jobs por mudança,
+  eliminar repetição e reaproveitar artefatos rastreáveis.
+
+### Testing/QA
+
+- `docs/TESTING.md` governa as categorias obrigatórias: regras, banco, tela e E2E. A ausência de
+  credencial, serviço externo ou ambiente real deve ser registrada como `not_run`, nunca como `pass`.
+- Testes devem produzir evidência rastreável por SPEC/issue: arquivos brutos em `reports/.raw`,
+  cobertura por categoria e relatório agregado conforme ADR-003.
+- Mudança em teste, workflow ou gerador de relatório exige self-check e verificação do relatório.
+  Se tocar UI, IPC, janela, preload ou fluxo crítico, incluir prova visual/E2E pertinente.
+- Correção de bug precisa de teste de regressão quando houver comportamento verificável. Se não houver
+  teste viável, registrar o motivo e a prova alternativa na PR.
+
+### Runtime local e CI
+
+- O projeto usa **Node 24** no desenvolvimento local e no GitHub Actions. No Windows, valide com
+  `node -v`; a versão esperada é Node 24.x.
+- Ao escrever scripts portáveis, considerar Windows primeiro: resolver `.cmd` quando necessário,
+  evitar suposições Linux-only e não depender de shell específico para lógica essencial.
+- Se uma dependência ainda não suportar Node 24, trate como bloqueio explícito: documente o erro,
+  ajuste a matriz apenas com justificativa e não esconda quebra degradando silenciosamente para Node 22.
 
 ## Grafo de conhecimento (graphify)
 
