@@ -225,6 +225,8 @@ export const SISTEMA_DAS_CONTRADICOES = [
   '',
   'Diferença de ênfase, de detalhe ou de vocabulário não é contradição. Só reporte quando',
   'aceitar as duas afirmações tornaria o projeto impossível de construir de um jeito só.',
+  'Conflito que uma decisão já tomada pelo dono do projeto resolve também não é contradição:',
+  'a afirmação de origem "decisao" prevalece sobre a que ela substitui.',
   '',
   'Nunca invente requisito legal, regulatório, de consentimento, aceite duplo, termos de uso,',
   'política de privacidade, dados pessoais ou sensíveis, compliance ou classificação jurídica.',
@@ -232,17 +234,37 @@ export const SISTEMA_DAS_CONTRADICOES = [
   'Se não houver contradição, devolva {"contradicoes":[]}.'
 ].join('\n')
 
-/** O pedido de detecção: todas as afirmações com os ids, para o modelo poder citá-las. */
+/**
+ * O pedido de detecção: todas as afirmações com os ids, para o modelo poder citá-las — e as
+ * decisões já tomadas, para ele não perguntar de novo o que o dono do projeto já respondeu.
+ *
+ * As decisões entram aqui pelo mesmo motivo que entram em `promptDoPrd` (#316): o brief aceito
+ * segue afirmando um lado, o PRD novo afirma o outro por decisão, e um detector que só visse as
+ * afirmações acharia o mesmo par a cada rodada. A lista vazia não vira seção: prometer "decisões"
+ * sem nenhuma faria o modelo procurar o que não existe.
+ */
 export function promptDasContradicoes(
-  afirmacoes: readonly { readonly id: string; readonly texto: string }[]
+  afirmacoes: readonly { readonly id: string; readonly texto: string }[],
+  decisoes: readonly {
+    readonly id: string
+    readonly pergunta: string
+    readonly resposta: string
+  }[] = []
 ): string {
-  return [
-    'AFIRMAÇÕES:',
-    '',
-    ...afirmacoes.map((a) => `- [${a.id}] ${a.texto}`),
-    '',
-    'Liste as contradições, ou devolva a lista vazia.'
-  ].join('\n')
+  const partes: string[] = ['AFIRMAÇÕES:', '', ...afirmacoes.map((a) => `- [${a.id}] ${a.texto}`)]
+
+  if (decisoes.length > 0) {
+    partes.push(
+      '',
+      'DECISÕES JÁ TOMADAS PELO DONO DO PROJETO (um conflito que uma delas resolve NÃO é',
+      'contradição — não pergunte de novo):',
+      ...decisoes.map((d) => `- [${d.id}] ${d.pergunta} → ${d.resposta}`)
+    )
+  }
+
+  partes.push('', 'Liste as contradições, ou devolva a lista vazia.')
+
+  return partes.join('\n')
 }
 
 /** Remove a cerca de código que modelos produzem por hábito. Ver `lerSaidaDoModelo`. */

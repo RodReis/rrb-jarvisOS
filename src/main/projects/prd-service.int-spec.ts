@@ -822,4 +822,46 @@ describe('responder às contradições (emenda E1)', () => {
       expect.objectContaining({ pergunta: 'O produto é local ou na nuvem?', resposta: 'Nuvem' })
     ])
   })
+
+  it('a decisão chega também à detecção — o que o PI decidiu não volta como pergunta', async () => {
+    const id = await gerarComContradicao()
+    service.responderContradicao(
+      PROJETO,
+      { perguntaId: id, escolha: 'b', texto: null, autor: 'pi' },
+      WS
+    )
+
+    // O defeito que este teste fecha: as decisões iam à geração e **não** à detecção. O brief
+    // segue afirmando um lado; o PRD novo afirma o outro por decisão; e o detector, sem saber
+    // da decisão, achava o mesmo par de novo — o laço da E1 não convergia.
+    const pedidos: { decisoes: readonly { pergunta: string; resposta: string }[] }[] = []
+    service = new PrdService({
+      repository: repo,
+      pacotes,
+      decisions,
+      projects: new ProjectRepository(db),
+      projectService: {
+        concluirMarco: () => ({ commitado: true, commitHash: 'abc1234' })
+      } as never,
+      connectors: { call: async () => respostaDaBusca } as never,
+      audit: new AuditRepository(db, 'chave-de-teste'),
+      userId: () => USER,
+      briefAceito: () => briefAceito,
+      decisoesDoRefinamento: () => [],
+      montarContexto: () => 'pack-1',
+      estadoDasRotas: () => rotas,
+      gerarTermo: async () => ({ termo: 'x' }),
+      gerarDocumentos: async () => ({ afirmacoes: [afirmacao()] }),
+      detectarContradicoes: async (entrada) => {
+        pedidos.push({ decisoes: entrada.decisoes })
+        return { contradicoes: [] }
+      }
+    })
+
+    await service.gerar({ projectId: PROJETO, termo: '' }, WS)
+
+    expect(pedidos[0]?.decisoes).toEqual([
+      expect.objectContaining({ pergunta: 'O produto é local ou na nuvem?', resposta: 'Nuvem' })
+    ])
+  })
 })

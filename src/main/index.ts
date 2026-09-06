@@ -1043,7 +1043,14 @@ if (!app.requestSingleInstanceLock()) {
         const afirmacoes = lerDocumentosDoModelo(texto)
         return afirmacoes === undefined ? {} : { afirmacoes }
       },
-      detectarContradicoes: async ({ projectId, workspace, rota, contextPackId, afirmacoes }) => {
+      detectarContradicoes: async ({
+        projectId,
+        workspace,
+        rota,
+        contextPackId,
+        afirmacoes,
+        decisoes
+      }) => {
         const model = modeloDaGeracao('prd', rota, projectId, workspace)
         const texto = await coletarTexto(
           ai.call(
@@ -1052,7 +1059,7 @@ if (!app.requestSingleInstanceLock()) {
               ...(model === undefined ? {} : { model }),
               system: SISTEMA_DAS_CONTRADICOES,
               jsonSchema: SCHEMA_DAS_CONTRADICOES,
-              prompt: promptDasContradicoes(afirmacoes),
+              prompt: promptDasContradicoes(afirmacoes, decisoes),
               contextPackId,
               console: { projectId, etapa: 'prd' }
             },

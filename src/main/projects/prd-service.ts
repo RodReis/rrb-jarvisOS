@@ -167,6 +167,10 @@ export interface PrdServiceDeps {
    * Devolve lista vazia quando não há, e `undefined` quando a chamada falhou. A distinção
    * importa: sem ela, uma detecção que não saiu pareceria "nenhuma contradição", e o gate
    * liberaria o aceite por uma falha de infraestrutura.
+   *
+   * Recebe as **mesmas decisões** da geração (#316): o brief aceito segue afirmando um lado, o
+   * PRD novo afirma o outro por decisão do PI, e um detector que não soubesse da decisão acharia
+   * o mesmo par a cada rodada — o laço da emenda E1 nunca convergiria.
    */
   readonly detectarContradicoes: (entrada: {
     readonly projectId: string
@@ -174,6 +178,7 @@ export interface PrdServiceDeps {
     readonly rota: AiProvider
     readonly contextPackId: string
     readonly afirmacoes: readonly { readonly id: string; readonly texto: string }[]
+    readonly decisoes: readonly DecisaoDoRefinamento[]
   }) => Promise<{ readonly contradicoes?: readonly ContradicaoDoPrd[] }>
   /**
    * Anuncia o andamento da geração (SPEC-Jornada-03 § Geração).
@@ -427,6 +432,14 @@ export class PrdService {
     })
 
     const ancoras = brief.afirmacoes.map((a) => ({ id: a.id, texto: a.texto }))
+    // As decisões do refinamento **e** as respostas às contradições (emenda E1), pelo mesmo
+    // campo: para o modelo as duas são "o dono do projeto decidiu", citáveis como `decisao`.
+    // Uma lista só para a geração **e** para a detecção (#316): as duas precisam ver as mesmas,
+    // senão o detector pergunta de novo o que a geração acabou de honrar.
+    const decisoes = [
+      ...this.deps.decisoesDoRefinamento(pedido.projectId),
+      ...this.decisoesDasContradicoes(pedido.projectId, userId)
+    ]
     let problemas: readonly string[] = []
 
     // (4) Uma tentativa de correção, não um laço: ver `TENTATIVAS_DE_CORRECAO`.
@@ -439,12 +452,7 @@ export class PrdService {
         rota: provider,
         contextPackId,
         afirmacoesDoBrief: ancoras,
-        // As decisões do refinamento **e** as respostas às contradições (emenda E1), pelo mesmo
-        // campo: para o modelo as duas são "o dono do projeto decidiu", citáveis como `decisao`.
-        decisoes: [
-          ...this.deps.decisoesDoRefinamento(pedido.projectId),
-          ...this.decisoesDasContradicoes(pedido.projectId, userId)
-        ],
+        decisoes,
         fontes: pesquisa.fontes,
         landscapeBloqueado: pesquisa.bloqueio !== undefined,
         ...(problemas.length > 0 ? { correcao: problemas } : {})
@@ -511,7 +519,11 @@ export class PrdService {
         workspace: workspaceId,
         rota: provider,
         contextPackId,
-        afirmacoes: [...ancoras, ...candidato.afirmacoes.map((a) => ({ id: a.id, texto: a.texto }))]
+        afirmacoes: [
+          ...ancoras,
+          ...candidato.afirmacoes.map((a) => ({ id: a.id, texto: a.texto }))
+        ],
+        decisoes
       })
 
       if (deteccao.contradicoes === undefined) {
