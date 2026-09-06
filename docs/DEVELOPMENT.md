@@ -2152,7 +2152,7 @@ Status: **primeira de duas entregas na `main`** — spec `aprovada-pi` (2026-08-
 
 ### Fatia 01 — Perfil de CI por projeto (`docs/spec/spec-pipeline-01-politica-pr-ci.md`)
 
-Status: **primeira de três entregas verticais** — SPEC-Pipeline-01 R2 + Emenda E1 `aprovada-pi` (2026-09-06); issue [#314](https://github.com/RodReis/rrb-jarvisOS/issues/314).
+Status: **primeira de três entregas verticais, na `main`** — SPEC-Pipeline-01 R2 + Emenda E1 `aprovada-pi` (2026-09-06); issue [#314](https://github.com/RodReis/rrb-jarvisOS/issues/314), PR [#323](https://github.com/RodReis/rrb-jarvisOS/pull/323) (`7e56459`).
 
 **Recortada em três por decisão do PI (2026-09-06).** A M27-F01 tem 26 critérios, e a §11 da própria spec sugere a divisão: perfil/compatibilidade/gerador; integração e preservação de workflow; evidência/retomada e smoke. Entregar as 26 numa PR só produziria um diff que ninguém revisa.
 
