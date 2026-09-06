@@ -299,7 +299,10 @@ describe('contradições — pergunta no pop-up da M8-F03 (critério 6, emenda E
 
     const lista = await screen.findByTestId('prd-contradicoes')
     expect(within(lista).getByText(/O produto é local ou na nuvem/i)).toBeInTheDocument()
-    expect(within(lista).getByText(/Local, como o brief diz/i)).toBeInTheDocument()
+    // A recomendada aparece pelo rótulo, com a justificativa ao lado — não só o porquê.
+    expect(
+      within(lista).getByText(/Recomendação: Local — Local, como o brief diz/i)
+    ).toBeInTheDocument()
   })
 
   it('trava o aceite, com a razão ao lado do botão', async () => {
@@ -317,6 +320,33 @@ describe('contradições — pergunta no pop-up da M8-F03 (critério 6, emenda E
   })
 
   it('responder a última contradição gera os documentos de novo, sozinho, com o termo confirmado', async () => {
+    // O termo só conta como confirmado quando o PI gerou com ele nesta sessão: a revisão com
+    // contradição chega depois desse clique, e a última resposta regera com o mesmo termo.
+    contradicoesDoPrd.mockResolvedValue(VISTA_PENDENTE)
+    responderContradicaoDoPrd.mockResolvedValue({
+      reason: 'registrada',
+      mensagem: 'ok',
+      estado: { tipo: 'concluido', decisoes: [] }
+    })
+    montar()
+    await screen.findByRole('textbox')
+    carregarPrd.mockResolvedValue(COM_CONTRADICAO)
+    await userEvent.click(screen.getByRole('button', { name: /Gerar os documentos/i }))
+
+    const dialogo = await screen.findByRole('dialog')
+    await userEvent.click(await within(dialogo).findByRole('radio', { name: /Nuvem/ }))
+    await userEvent.click(within(dialogo).getByRole('button', { name: /Confirmar/i }))
+
+    await waitFor(() => expect(gerarPrd).toHaveBeenCalledTimes(2))
+    expect(gerarPrd).toHaveBeenLastCalledWith('p-1', 'ferramentas de leitura', 'jarvis')
+    expect(responderContradicaoDoPrd).toHaveBeenCalledWith(
+      'p-1',
+      expect.objectContaining({ perguntaId: 'c-1', escolha: 'b', autor: 'pi' }),
+      'jarvis'
+    )
+  })
+
+  it('tela reaberta: responder a última não regera com termo que ninguém confirmou (critério 3)', async () => {
     carregarPrd.mockResolvedValue(COM_CONTRADICAO)
     contradicoesDoPrd.mockResolvedValue(VISTA_PENDENTE)
     responderContradicaoDoPrd.mockResolvedValue({
@@ -330,14 +360,14 @@ describe('contradições — pergunta no pop-up da M8-F03 (critério 6, emenda E
     await userEvent.click(await within(dialogo).findByRole('radio', { name: /Nuvem/ }))
     await userEvent.click(within(dialogo).getByRole('button', { name: /Confirmar/i }))
 
-    await waitFor(() =>
-      expect(gerarPrd).toHaveBeenCalledWith('p-1', 'ferramentas de leitura', 'jarvis')
-    )
-    expect(responderContradicaoDoPrd).toHaveBeenCalledWith(
-      'p-1',
-      expect.objectContaining({ perguntaId: 'c-1', escolha: 'b', autor: 'pi' }),
-      'jarvis'
-    )
+    // O pop-up fecha e a lista diz que falta gerar; a pesquisa não roda sem confirmação.
+    contradicoesDoPrd.mockResolvedValue({
+      estado: { tipo: 'concluido', decisoes: [] },
+      historico: []
+    })
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(gerarPrd).not.toHaveBeenCalled()
+    expect(await screen.findByText(/Todas respondidas/i)).toBeInTheDocument()
   })
 
   it('com contradição que sobra, responder não regera — só avança para a próxima', async () => {

@@ -6,6 +6,7 @@ import type { DocumentoDoPacote } from '@shared/domain/pacote-estrutural'
 import { DOCUMENTOS_DO_PACOTE } from '@shared/domain/pacote-estrutural'
 import type {
   AfirmacaoDoPrd,
+  ContradicaoDoPrd,
   OrigemDoPrd,
   PrdOutcome,
   PrdRegistrado,
@@ -77,6 +78,15 @@ const TOM_POR_RESULTADO: Readonly<Record<ResultadoDoPrd, 'ok' | 'err' | 'warn'>>
   'brief-nao-aceito': 'warn',
   'sem-contexto': 'warn',
   'falha-de-escrita': 'err'
+}
+
+/**
+ * O que a lista inline diz da recomendação: **qual** opção, e por quê. Revisão anterior à emenda
+ * E1 não tem opções — mostra só a justificativa, que era tudo o que ela guardava.
+ */
+function recomendacaoDaContradicao(c: ContradicaoDoPrd): string {
+  const rotulo = c.opcoes.find((o) => o.id === c.recomendada)?.rotulo
+  return rotulo === undefined ? c.justificativa : `${rotulo} — ${c.justificativa}`
 }
 
 function LinhaDaAfirmacao({
@@ -274,6 +284,12 @@ export function PrdDoProjeto({
    */
   const [vista, setVista] = useState<VistaDoWizard | null>(null)
   const [respondendo, setRespondendo] = useState(false)
+  /**
+   * Se o termo no campo foi **confirmado** pelo PI nesta sessão — isto é, se ele gerou com ele.
+   * Reaberta a tela, o campo traz o termo re-proposto pela IA, e regerar sozinho com ele faria
+   * a pesquisa rodar sem confirmação (critério 3).
+   */
+  const [termoConfirmado, setTermoConfirmado] = useState(false)
 
   const carregar = useCallback(async (): Promise<void> => {
     try {
@@ -342,6 +358,7 @@ export function PrdDoProjeto({
 
   async function gerar(): Promise<void> {
     setOcupado(true)
+    setTermoConfirmado(true)
     try {
       const resultado = await window.jarvis.gerarPrd(projectId, termo, workspace)
       setDesfecho(resultado)
@@ -400,7 +417,9 @@ export function PrdDoProjeto({
     const desfecho = await window.jarvis.responderContradicaoDoPrd(projectId, resposta, workspace)
     if (desfecho.reason === 'registrada' && desfecho.estado?.tipo === 'concluido') {
       setRespondendo(false)
-      void gerar()
+      // Só com o termo confirmado nesta sessão; senão a lista diz que falta gerar de novo.
+      if (termoConfirmado) void gerar()
+      else await carregar()
     }
     return desfecho
   }
@@ -514,7 +533,7 @@ export function PrdDoProjeto({
                       {c.enunciado}
                     </p>
                     <p className="max-w-[58ch] text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-secundario)]">
-                      {t('prd.recomendacao', { texto: c.justificativa })}
+                      {t('prd.recomendacao', { texto: recomendacaoDaContradicao(c) })}
                     </p>
                   </li>
                 ))}
