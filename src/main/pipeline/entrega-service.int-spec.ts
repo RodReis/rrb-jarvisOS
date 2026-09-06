@@ -33,6 +33,8 @@ vi.mock('../logging/logger', () => ({
 
 const { CAMINHO_DO_WORKFLOW, NOME_DO_JOB_DE_CI } = await import('@shared/domain/ci-workflow')
 const { GITHUB_OPERATIONS } = await import('@shared/domain/github-automation')
+const { perfilNodeEmWindows, perfilPythonEmWindows } =
+  await import('@shared/domain/ci-profile-perfis')
 const { EntregaService } = await import('./entrega-service')
 const { RulesetRepository } = await import('./ruleset-repository')
 const { ExecutionLedgerRepository } = await import('./execution-ledger-repository')
@@ -850,5 +852,88 @@ describe('encerramento do run (SPEC-Entrega-06)', () => {
       .prepare('SELECT COUNT(*) AS total FROM execution_ledger WHERE run_id = ?')
       .get('run-1') as { total: number }
     expect(linhas.total).toBe(1)
+  })
+})
+
+describe('EntregaService — workflow a partir do perfil (SPEC-Pipeline-01, critérios 1, 3 e 6)', () => {
+  it('gera o workflow do perfil, e não o legado, quando o pacote declara um', async () => {
+    const caminho = join(worktree, CAMINHO_DO_WORKFLOW)
+
+    await montar().entregar({ ...pedido(), perfilDeCi: perfilNodeEmWindows('alvo') })
+
+    const yml = readFileSync(caminho, 'utf8')
+    expect(yml).toContain('runs-on: windows-latest')
+    expect(yml).toContain('  qualidade:')
+    // O legado punha os quatro passos num job só e disparava em `push`.
+    expect(yml).not.toMatch(/^\s*push:/m)
+  })
+
+  it('perfil Python não recebe npm ci: a stack vem do pacote, não de adivinhação', async () => {
+    const caminho = join(worktree, CAMINHO_DO_WORKFLOW)
+
+    await montar().entregar({ ...pedido(), perfilDeCi: perfilPythonEmWindows('alvo-py') })
+
+    const yml = readFileSync(caminho, 'utf8')
+    expect(yml).toContain('pip install -r requirements.txt')
+    expect(yml).not.toContain('npm ci')
+  })
+
+  it('perfil inválido bloqueia antes de escrever o workflow ou tocar a origem', async () => {
+    const caminho = join(worktree, CAMINHO_DO_WORKFLOW)
+    const base = perfilNodeEmWindows('alvo')
+    const invalido = {
+      ...base,
+      validacoes: base.validacoes.map((v) =>
+        v.id === 'test' ? { ...v, dependeDe: ['nao-existe'] } : v
+      )
+    }
+
+    const r = await montar().entregar({ ...pedido(), perfilDeCi: invalido })
+
+    expect(r.estadoFinal).toBe('BLOCKED')
+    expect(r.bloqueio?.causa).toBe('perfil-de-ci-invalido')
+    expect(r.bloqueio?.mensagem).toContain('dependencia-ausente')
+    // O ponto do critério 3: nada foi escrito, e a origem não recebeu chamada nenhuma.
+    expect(existsSync(caminho)).toBe(false)
+    expect(chamadas).toHaveLength(0)
+    expect(pushes).toHaveLength(0)
+  })
+
+  it('não reescreve o arquivo que ele mesmo gerou com o mesmo perfil', async () => {
+    const caminho = join(worktree, CAMINHO_DO_WORKFLOW)
+    const perfil = perfilNodeEmWindows('alvo')
+
+    await montar().entregar({ ...pedido(), perfilDeCi: perfil })
+    const primeiro = readFileSync(caminho, 'utf8')
+
+    await montar().entregar({ ...pedido(), perfilDeCi: perfil })
+    expect(readFileSync(caminho, 'utf8')).toBe(primeiro)
+  })
+
+  it('preserva os bytes de workflow escrito à mão, sem tentar provar equivalência', async () => {
+    const caminho = join(worktree, CAMINHO_DO_WORKFLOW)
+    mkdirSync(join(worktree, '.github', 'workflows'), { recursive: true })
+    const aMao = [
+      'name: ci-do-time',
+      'jobs:',
+      '  validacao:',
+      '    steps:',
+      '      - run: make ci'
+    ].join('\n')
+    writeFileSync(caminho, aMao, 'utf8')
+
+    await montar().entregar({ ...pedido(), perfilDeCi: perfilNodeEmWindows('alvo') })
+
+    expect(readFileSync(caminho, 'utf8')).toBe(aMao)
+  })
+
+  it('sem perfil, o gerador legado continua intacto — nenhuma migração tácita', async () => {
+    const caminho = join(worktree, CAMINHO_DO_WORKFLOW)
+
+    await montar().entregar(pedido())
+
+    const yml = readFileSync(caminho, 'utf8')
+    expect(yml).toContain('runs-on: ubuntu-latest')
+    expect(yml).not.toContain('windows-latest')
   })
 })
