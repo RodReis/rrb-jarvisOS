@@ -51,11 +51,15 @@ import type {
   PrdRegistrado
 } from '@shared/domain/prd'
 import {
+  ETAPA_DA_CONTRADICAO,
   afirmacoesDoDocumento,
   cortarPropostoDoPrd,
   renderizarDocumentoDoPrd,
   validarPrd
 } from '@shared/domain/prd'
+import { validarContratoDaPergunta } from '@shared/domain/pergunta-gerada'
+import type { Decision, Resposta, RespostaOutcome, VistaDoWizard } from '@shared/domain/wizard'
+import { decisoesVigentes, estadoDoWizard, montarDecisao } from '@shared/domain/wizard'
 import type { EstadoDaEtapa, EtapaDaGeracao } from '@shared/domain/geracao'
 import type { FonteParaOModelo } from '@shared/domain/prd-schema'
 import type { EstadoDasRotas, ResultadoDaRota } from '@shared/domain/rota-de-geracao'
@@ -67,6 +71,7 @@ import { MAX_URLS_EXTRACT, TAVILY_OPERATIONS } from '@shared/domain/tavily'
 import { log } from '../logging/logger'
 import type { AuditRepository } from '../storage/audit-repository'
 import type { ConnectorService } from '../connectors/connector-service'
+import type { DecisionRepository } from './decision-repository'
 import type { PrdRepository } from './prd-repository'
 import type { PacoteRepository } from './pacote-repository'
 import type { ProjectRepository } from './project-repository'
@@ -105,6 +110,13 @@ export interface PedidoDoPrd {
 export interface PrdServiceDeps {
   readonly repository: PrdRepository
   readonly pacotes: PacoteRepository
+  /**
+   * Onde a resposta a uma contradição é gravada (emenda E1). O **mesmo** repositório das
+   * decisões do refinamento e do wizard: a resposta é uma `Decision` como qualquer outra, com
+   * `etapa: 'prd'`, e uma tabela própria faria a trilha do projeto ter dois lugares para
+   * "quem decidiu o quê".
+   */
+  readonly decisions: DecisionRepository
   readonly projects: ProjectRepository
   readonly projectService: ProjectService
   readonly connectors: ConnectorService
@@ -196,7 +208,11 @@ export function hashDoPrd(
 ): string {
   const canonico = JSON.stringify({
     afirmacoes: [...afirmacoes].sort((a, b) => a.id.localeCompare(b.id)),
-    contradicoes: [...contradicoes].sort((a, b) => a.id.localeCompare(b.id)),
+    // Sem o id: ele é sorteado a cada geração (emenda E1), e entrar no hash faria duas gerações
+    // idênticas virarem duas revisões — o oposto da invariante 2 da CONVENTION §4.
+    contradicoes: contradicoes
+      .map(({ id: _id, ...resto }) => resto)
+      .sort((a, b) => a.enunciado.localeCompare(b.enunciado)),
     bloqueio: bloqueio ?? null
   })
 
@@ -206,6 +222,7 @@ export function hashDoPrd(
 export class PrdService {
   private readonly repository: PrdRepository
   private readonly pacotes: PacoteRepository
+  private readonly decisions: DecisionRepository
   private readonly projects: ProjectRepository
   private readonly projectService: ProjectService
   private readonly connectors: ConnectorService
@@ -216,6 +233,7 @@ export class PrdService {
   constructor(deps: PrdServiceDeps) {
     this.repository = deps.repository
     this.pacotes = deps.pacotes
+    this.decisions = deps.decisions
     this.projects = deps.projects
     this.projectService = deps.projectService
     this.connectors = deps.connectors
@@ -421,7 +439,12 @@ export class PrdService {
         rota: provider,
         contextPackId,
         afirmacoesDoBrief: ancoras,
-        decisoes: this.deps.decisoesDoRefinamento(pedido.projectId),
+        // As decisões do refinamento **e** as respostas às contradições (emenda E1), pelo mesmo
+        // campo: para o modelo as duas são "o dono do projeto decidiu", citáveis como `decisao`.
+        decisoes: [
+          ...this.deps.decisoesDoRefinamento(pedido.projectId),
+          ...this.decisoesDasContradicoes(pedido.projectId, userId)
+        ],
         fontes: pesquisa.fontes,
         landscapeBloqueado: pesquisa.bloqueio !== undefined,
         ...(problemas.length > 0 ? { correcao: problemas } : {})
@@ -497,7 +520,31 @@ export class PrdService {
         continue
       }
 
-      const achadas = deteccao.contradicoes.length
+      // O id é do serviço, não do modelo (emenda E1): "c-1" colidiria entre revisões, e a
+      // decisão do PI passaria a apontar para a contradição errada. O contrato da M8-F03 vale
+      // sobre a pergunta inteira, e pergunta que o fere **não chega ao PI**: a etapa falha, pelo
+      // mesmo caminho da detecção que não saiu — fail closed, nunca "nenhuma contradição".
+      const contradicoesDaRevisao = deteccao.contradicoes.map((c) => ({
+        ...c,
+        id: randomUUID(),
+        etapa: ETAPA_DA_CONTRADICAO
+      }))
+      const recusadas = contradicoesDaRevisao.flatMap((c) =>
+        validarContratoDaPergunta(c).problemas.map((p) => p.mensagem)
+      )
+
+      if (recusadas.length > 0) {
+        problemas = recusadas
+        this.anunciar(
+          pedido.projectId,
+          'contradicoes',
+          'falhou',
+          `${recusadas.length} ${recusadas.length === 1 ? 'problema' : 'problemas'} no contrato das perguntas.`
+        )
+        continue
+      }
+
+      const achadas = contradicoesDaRevisao.length
       this.anunciar(
         pedido.projectId,
         'contradicoes',
@@ -507,7 +554,7 @@ export class PrdService {
           : `${achadas} ${achadas === 1 ? 'contradição encontrada' : 'contradições encontradas'} — o aceite fica travado até você decidir.`
       )
 
-      const conteudo: ConteudoDoPrd = { ...candidato, contradicoes: deteccao.contradicoes }
+      const conteudo: ConteudoDoPrd = { ...candidato, contradicoes: contradicoesDaRevisao }
 
       this.anunciar(pedido.projectId, 'gravacao', 'iniciada')
 
@@ -602,6 +649,139 @@ export class PrdService {
     })
 
     return desfecho.prd
+  }
+
+  /**
+   * A vista do pop-up das contradições (emenda E1): a próxima pergunta ou a conclusão, mais o
+   * histórico **desta revisão**.
+   *
+   * Calculada do banco a cada chamada, como o refinamento: fechar o pop-up no meio e reabrir
+   * volta à contradição pendente porque a resposta vem das decisões gravadas.
+   */
+  contradicoes(projectId: string): VistaDoWizard | undefined {
+    const userId = this.userId()
+    const vigente = this.repository.vigente(userId, projectId)
+    if (vigente === undefined) return undefined
+
+    const historico = this.historicoDasContradicoes(vigente.contradicoes, userId, projectId)
+    return { estado: estadoDoWizard(vigente.contradicoes, historico), historico }
+  }
+
+  /**
+   * Registra a resposta do PI (ou a delegação) a uma contradição da revisão vigente.
+   *
+   * A pergunta tem de ser da revisão **vigente**: responder a uma contradição de revisão antiga
+   * gravaria decisão sobre um conflito que já não existe no que o PI está lendo.
+   */
+  responderContradicao(
+    projectId: string,
+    resposta: Resposta,
+    workspaceId: WorkspaceId
+  ): RespostaOutcome {
+    const userId = this.userId()
+    if (this.projects.findById(userId, projectId) === undefined) {
+      return { reason: 'projeto-inexistente', mensagem: 'Projeto não encontrado.' }
+    }
+
+    const vigente = this.repository.vigente(userId, projectId)
+    const pergunta = vigente?.contradicoes.find((c) => c.id === resposta.perguntaId)
+    if (vigente === undefined || pergunta === undefined) {
+      return {
+        reason: 'pergunta-desconhecida',
+        mensagem: 'Esta contradição não é da revisão vigente; nada foi gravado.'
+      }
+    }
+
+    const historico = this.historicoDasContradicoes(vigente.contradicoes, userId, projectId)
+    const montada = montarDecisao({
+      pergunta,
+      resposta,
+      anterior: decisoesVigentes(historico)[pergunta.id],
+      escopo: {
+        id: randomUUID(),
+        user_id: userId,
+        workspace_id: workspaceId,
+        projectId,
+        created_at: new Date().toISOString()
+      }
+    })
+    if ('recusa' in montada) return { reason: montada.recusa, mensagem: montada.mensagem }
+
+    const decisao = montada.decisao
+    this.decisions.registrar(decisao)
+
+    this.audit.append({
+      user_id: userId,
+      workspace_id: workspaceId,
+      type: 'planning-decision',
+      payload: {
+        projectId,
+        perguntaId: pergunta.id,
+        etapa: decisao.etapa,
+        autor: decisao.autor,
+        motivo: decisao.motivo,
+        escolha: decisao.escolha,
+        recomendacao: decisao.recomendacao,
+        substituiu: decisao.substituiu
+      }
+    })
+
+    log.agent.info('Decisão sobre contradição do PRD registrada', {
+      projectId,
+      perguntaId: pergunta.id,
+      autor: decisao.autor
+    })
+
+    const atualizado = this.historicoDasContradicoes(vigente.contradicoes, userId, projectId)
+    return {
+      reason: 'registrada',
+      decisao,
+      estado: estadoDoWizard(vigente.contradicoes, atualizado),
+      mensagem: 'Decisão registrada.'
+    }
+  }
+
+  /** As decisões que pertencem a estas contradições — e só elas. */
+  private historicoDasContradicoes(
+    contradicoes: readonly ContradicaoDoPrd[],
+    userId: string,
+    projectId: string
+  ): readonly Decision[] {
+    const ids = new Set(contradicoes.map((c) => c.id))
+    return this.decisions
+      .listar(userId, projectId)
+      .filter((d) => d.etapa === ETAPA_DA_CONTRADICAO && ids.has(d.perguntaId))
+  }
+
+  /**
+   * As respostas às contradições no formato que o pedido de geração cita (emenda E1).
+   *
+   * Varre **todas** as revisões, e não só a vigente: a decisão foi tomada sobre a contradição de
+   * uma revisão, e a geração seguinte — que é quem precisa dela — cria outra. O rótulo, não o
+   * id da opção: o modelo precisa do conteúdo (mesma regra de `decisoesParaOBrief`).
+   */
+  private decisoesDasContradicoes(
+    projectId: string,
+    userId: string
+  ): readonly DecisaoDoRefinamento[] {
+    const catalogo = this.repository.listar(userId, projectId).flatMap((r) => r.contradicoes)
+    const vigentes = decisoesVigentes(
+      this.decisions.listar(userId, projectId).filter((d) => d.etapa === ETAPA_DA_CONTRADICAO)
+    )
+
+    return Object.values(vigentes).flatMap((decisao) => {
+      const pergunta = catalogo.find((c) => c.id === decisao.perguntaId)
+      if (pergunta === undefined) return []
+
+      const rotulo =
+        decisao.escolha === null
+          ? decisao.texto
+          : (pergunta.opcoes.find((o) => o.id === decisao.escolha)?.rotulo ?? decisao.escolha)
+
+      return rotulo === null
+        ? []
+        : [{ id: decisao.id, pergunta: pergunta.enunciado, resposta: rotulo }]
+    })
   }
 
   /**
