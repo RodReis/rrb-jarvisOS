@@ -78,6 +78,27 @@ test.describe('critério 1 — o grid do protótipo tem as medidas certas', () =
     ).toBeLessThanOrEqual(1)
   })
 
+  test('o provider não vira caixa — ele não pode deslocar o que envolve', async ({ page }) => {
+    await abrir(page, 'modo=dark&modulo=jarvis')
+
+    /*
+     * A regressão que isto trava (2026-09-06): a primeira tentativa de consertar a altura deu
+     * `height: 100%` ao `div` do `ProvedorDeTema`. Resolveu o shell **e quebrou a CHOICE** —
+     * cada card reabre o provider, e ali o `div` esticou para a altura da tela, empurrando os
+     * cards para o topo de um contêiner que pedia `items-center`.
+     *
+     * Consertar um lugar e quebrar outro é o sinal de que a caixa não devia existir:
+     * `display: contents` tira o `div` da formatação, e os filhos passam a ser filhos diretos
+     * do pai real. As variáveis continuam herdando, porque herança não depende de caixa.
+     */
+    const display = await page
+      .locator('[data-jos-tema]')
+      .first()
+      .evaluate((el) => getComputedStyle(el).display)
+
+    expect(display).toBe('contents')
+  })
+
   test('as quatro regiões não se sobrepõem e o conteúdo fica à direita da sidebar', async ({
     page
   }) => {

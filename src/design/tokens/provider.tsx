@@ -310,19 +310,24 @@ export function ProvedorDeTema({
           data-modulo={modulo}
           data-superficie={superficie}
           /*
-           * `height: 100%` **não** é decoração: este `div` fica entre o `#root` (que declara
-           * 100% no global.css) e o shell, que pede `h-full`. Sem altura aqui, a cadeia quebra —
-           * `h-full` resolve contra um pai de altura automática e vira o tamanho do conteúdo.
+           * `display: contents` resolve a cadeia de altura **sem** o provider virar uma caixa.
            *
-           * O sintoma era o rodapé parando no meio da tela, com uma faixa vazia até o fim da
-           * janela. Nenhum teste de papel o pega: os elementos estão todos lá, na ordem certa.
-           * Achado por captura do PI em 2026-09-06 e travado por prova visual, que mede layout.
+           * O problema: este `div` fica entre o `#root` (100% no global.css) e o shell, que pede
+           * `h-full`. Como caixa de bloco sem altura, ele quebrava a cadeia — `h-full` resolvia
+           * contra um pai de altura automática e virava o tamanho do conteúdo, deixando o rodapé
+           * no meio da tela.
            *
-           * Fica no `style` junto das variáveis, e não numa classe: o provider é usado também
-           * dentro de card e modal, onde ele **deve** ocupar o pai — que é exatamente o que
-           * `height: 100%` faz nos dois casos, sem o componente precisar saber onde está.
+           * A primeira tentativa foi `height: 100%`, e ela **regrediu a CHOICE**: cada card
+           * reabre o provider, e ali o `div` esticou para a altura da tela, empurrando os cards
+           * para o topo de um contêiner que pedia `items-center`. Consertar um lugar e quebrar
+           * outro é o sinal de que a caixa não devia existir.
+           *
+           * `display: contents` remove o `div` da formatação: os filhos passam a ser filhos
+           * diretos do pai real — o `#root` no shell, o flex na CHOICE —, e as variáveis de tema
+           * continuam herdando normalmente, porque herança não depende de caixa. Nenhum dos dois
+           * lugares precisa saber que o provider está no meio, que era o ponto o tempo todo.
            */
-          style={{ height: '100%', ...(variaveis as React.CSSProperties) }}
+          style={{ display: 'contents', ...(variaveis as React.CSSProperties) }}
         >
           {children}
         </div>
