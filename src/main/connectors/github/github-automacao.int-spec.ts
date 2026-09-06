@@ -16,7 +16,7 @@ import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const logCat = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+const logCat = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 vi.mock('../../logging/logger', () => ({
   log: new Proxy({}, { get: () => logCat }),
   setCurrentWorkspace: vi.fn(),

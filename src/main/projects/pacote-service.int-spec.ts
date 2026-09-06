@@ -22,7 +22,7 @@ import type { Pergunta } from '@shared/domain/wizard'
 import type { ConnectorOutcome } from '@shared/domain/connectors'
 import { TAVILY_OPERATIONS } from '@shared/domain/tavily'
 
-const logCat = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+const logCat = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 vi.mock('../logging/logger', () => ({
   log: new Proxy({}, { get: () => logCat }),
   setCurrentWorkspace: vi.fn()

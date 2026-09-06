@@ -24,7 +24,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ResultadoDaVerificacao } from '@shared/domain/marcos'
 import type { MvpGerado, RoadmapRegistrado, SpecGerada } from '@shared/domain/roadmap-gerado'
 
-const logCat = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+const logCat = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 vi.mock('../logging/logger', () => ({
   log: new Proxy({}, { get: () => logCat }),
   setCurrentWorkspace: vi.fn()

@@ -19,7 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ConnectorOutcome, ConnectorRequest } from '@shared/domain/connectors'
 import type { WorkspaceId } from '@shared/domain/entities'
 
-const logCat = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+const logCat = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 vi.mock('../logging/logger', () => ({
   log: new Proxy({}, { get: () => logCat }),
   setCurrentWorkspace: vi.fn()

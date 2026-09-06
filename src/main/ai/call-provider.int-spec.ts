@@ -24,7 +24,7 @@ import type { BudgetLimitsInput } from '@shared/domain/budget'
 import { RoutingService } from '../ai/routing-service'
 import { RoutingRepository } from '../ai/routing-repository'
 
-const logCat = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+const logCat = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 vi.mock('../logging/logger', () => ({
   log: new Proxy({}, { get: () => logCat }),
   setCurrentWorkspace: vi.fn(),

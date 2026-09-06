@@ -30,7 +30,7 @@ import type { BloqueioExterno } from '@shared/domain/pacote-estrutural'
 import type { Mvp, Slice } from '@shared/domain/roadmap'
 import { RECURSO_WIP_GLOBAL, VALIDADE_DO_LEASE_MS } from '@shared/domain/lease'
 
-const logCat = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+const logCat = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 vi.mock('../logging/logger', () => ({
   log: new Proxy({}, { get: () => logCat }),
   setCurrentWorkspace: vi.fn()

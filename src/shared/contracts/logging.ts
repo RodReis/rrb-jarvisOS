@@ -11,10 +11,25 @@
  * substitui o outro, e os stores são separados.
  */
 
-/** Níveis gravados em arquivo. `debug` existe só em dev (console), fora da produção. */
+/** Níveis gravados em arquivo — cada um com a sua retenção. */
 export const LOG_LEVELS = ['error', 'warn', 'info'] as const
 
-export type LogLevel = (typeof LOG_LEVELS)[number]
+/**
+ * Todos os níveis que a API oferece: os de arquivo mais o `debug` (#319).
+ *
+ * `debug` fica **fora** de `LOG_LEVELS` de propósito: ele não vai a arquivo, então não tem
+ * retenção a decidir nem transporte a criar. Ele existe para o que é registro de máquina —
+ * cada evento de auditoria gravado, cada decisão de política, cada comando do terminal —, que
+ * numa geração de PRD tomava 197 de 420 linhas do console e enterrava o que o PI lê. Nada some:
+ * o registro durável desses fatos é a tabela `audit_event` (ADR-004), e o console de
+ * desenvolvimento continua mostrando o nível quando se quer olhar.
+ */
+export const NIVEIS_DO_LOG = ['error', 'warn', 'info', 'debug'] as const
+
+export type LogLevel = (typeof NIVEIS_DO_LOG)[number]
+
+/** Nível que vai a arquivo. Subconjunto de `LogLevel` — o que tem retenção própria. */
+export type NivelEmArquivo = (typeof LOG_LEVELS)[number]
 
 /**
  * Categorias do contrato. As três primeiras ainda não têm fluxo na fundação (`ai`, `agent`
@@ -91,6 +106,11 @@ export interface CategoryLogger {
   error(msg: string, ctx?: LogContext): void
   warn(msg: string, ctx?: LogContext): void
   info(msg: string, ctx?: LogContext): void
+  /**
+   * Registro de máquina: acontece por linha gravada, e não conta a história da sessão (#319).
+   * Não vai a arquivo — só ao console de desenvolvimento. Ver `NIVEIS_DO_LOG`.
+   */
+  debug(msg: string, ctx?: LogContext): void
 }
 
 /**
@@ -125,8 +145,12 @@ export const REDACTED_SENSITIVITIES = [
 /** Marcador que substitui o valor removido — deixa visível *que* houve redaction. */
 export const REDACTED_PLACEHOLDER = '[redigido]'
 
-/** Retenção em dias, por nível (SPEC-Fundacao-06; decisão do PI em 2026-07-21). */
-export const LOG_RETENTION_DAYS: Readonly<Record<LogLevel, number>> = {
+/**
+ * Retenção em dias, por nível **de arquivo** (SPEC-Fundacao-06; decisão do PI em 2026-07-21).
+ *
+ * `debug` não entra: ele não é gravado, e uma entrada aqui prometeria um arquivo que não existe.
+ */
+export const LOG_RETENTION_DAYS: Readonly<Record<NivelEmArquivo, number>> = {
   info: 3,
   warn: 7,
   error: 10
