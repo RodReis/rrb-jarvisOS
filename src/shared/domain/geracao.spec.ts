@@ -3,6 +3,7 @@ import {
   ETAPAS_DA_GERACAO,
   LIMITE_ARGUMENTO_DESCONHECIDO,
   LIMITE_RESUMO_BYTES,
+  aplicarEtapa,
   progressoDaGeracao,
   resumoDoArgumento,
   truncarBytes
@@ -119,5 +120,63 @@ describe('progressoDaGeracao', () => {
     ] as readonly (readonly [EtapaDaGeracao, EstadoDaEtapa])[])
 
     expect(progressoDaGeracao(etapas)).toBe(20)
+  })
+})
+
+/**
+ * O andamento de **uma** rodada (#318).
+ *
+ * O defeito que estes testes fecham: o estado das etapas sobrevivia entre gerações, e a barra
+ * abria a rodada nova em 60% com etapas concluídas da anterior. Uma rodada começa quando a
+ * primeira etapa do contrato inicia — é o único marco que o serviço já emite.
+ */
+describe('aplicarEtapa', () => {
+  const PRIMEIRA = ETAPAS_DA_GERACAO[0]
+
+  it('a primeira etapa iniciando abre rodada nova e descarta a anterior', () => {
+    const anterior = new Map<EtapaDaGeracao, { estado: EstadoDaEtapa }>([
+      ['contradicoes', { estado: 'concluida' }],
+      ['gravacao', { estado: 'concluida' }]
+    ])
+
+    const depois = aplicarEtapa(anterior, { etapa: PRIMEIRA, estado: 'iniciada' })
+
+    expect([...depois.keys()]).toEqual([PRIMEIRA])
+    expect(progressoDaGeracao(new Map([...depois].map(([e, v]) => [e, v.estado])))).toBe(0)
+  })
+
+  it('as etapas seguintes acumulam dentro da mesma rodada', () => {
+    let mapa = aplicarEtapa(new Map(), { etapa: PRIMEIRA, estado: 'iniciada' })
+    mapa = aplicarEtapa(mapa, { etapa: PRIMEIRA, estado: 'concluida', resumo: '3 fontes.' })
+    mapa = aplicarEtapa(mapa, { etapa: 'documentos', estado: 'iniciada' })
+
+    expect(mapa.get(PRIMEIRA)).toEqual({ estado: 'concluida', resumo: '3 fontes.' })
+    expect(mapa.get('documentos')?.estado).toBe('iniciada')
+  })
+
+  it('a primeira etapa concluindo não abre rodada — só o início marca a fronteira', () => {
+    // Sem isto, `pesquisa` sem termo (que inicia e conclui em sequência) zeraria a si mesma.
+    const mapa = aplicarEtapa(aplicarEtapa(new Map(), { etapa: PRIMEIRA, estado: 'iniciada' }), {
+      etapa: PRIMEIRA,
+      estado: 'concluida'
+    })
+
+    expect(mapa.get(PRIMEIRA)?.estado).toBe('concluida')
+  })
+
+  it('a etapa retentada troca o estado, não acrescenta linha', () => {
+    let mapa = aplicarEtapa(new Map(), { etapa: 'documentos', estado: 'falhou' })
+    mapa = aplicarEtapa(mapa, { etapa: 'documentos', estado: 'concluida' })
+
+    expect(mapa.size).toBe(1)
+    expect(mapa.get('documentos')?.estado).toBe('concluida')
+  })
+
+  it('o resumo antigo não sobrevive a um estado sem resumo', () => {
+    // "os três documentos foram gravados" pendurado numa rodada que falhou foi o que o PI viu.
+    let mapa = aplicarEtapa(new Map(), { etapa: 'gravacao', estado: 'concluida', resumo: 'ok' })
+    mapa = aplicarEtapa(mapa, { etapa: 'gravacao', estado: 'falhou' })
+
+    expect(mapa.get('gravacao')).toEqual({ estado: 'falhou' })
   })
 })

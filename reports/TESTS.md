@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 1564 | 1564 | 0 | 76.1 | — | — |
-| — | — | — | Banco | 1200 | 1186 | 0 | 87.5 | — | — |
-| — | — | — | Tela | 627 | 626 | 0 | 75.1 | — | — |
+| — | — | — | Regras de Negócio | 1569 | 1569 | 0 | 76.1 | — | — |
+| — | — | — | Banco | 1200 | 1186 | 0 | 87.4 | — | — |
+| — | — | — | Tela | 636 | 635 | 0 | 75.2 | — | — |
 
 ## Histórico por entrega
 
@@ -331,3 +331,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-06 | #316 | spec-jornada-03-prd-landscape-convention-por-ia | Regras de Negócio | 1564 | 1564 | 0 | 76.1 | #317 | [#317](https://github.com/RodReis/rrb-jarvisOS/pull/317) |
 | 2026-09-06 | #316 | spec-jornada-03-prd-landscape-convention-por-ia | Banco | 1200 | 1186 | 0 | 87.5 | #317 | [#317](https://github.com/RodReis/rrb-jarvisOS/pull/317) |
 | 2026-09-06 | #316 | spec-jornada-03-prd-landscape-convention-por-ia | Tela | 627 | 626 | 0 | 75.1 | #317 | [#317](https://github.com/RodReis/rrb-jarvisOS/pull/317) |
+| 2026-09-06 | #318 | spec-jornada-03-prd-landscape-convention-por-ia | Regras de Negócio | 1569 | 1569 | 0 | 76.1 | #320 | [#320](https://github.com/RodReis/rrb-jarvisOS/pull/320) |
+| 2026-09-06 | #318 | spec-jornada-03-prd-landscape-convention-por-ia | Banco | 1200 | 1186 | 0 | 87.4 | #320 | [#320](https://github.com/RodReis/rrb-jarvisOS/pull/320) |
+| 2026-09-06 | #318 | spec-jornada-03-prd-landscape-convention-por-ia | Tela | 636 | 635 | 0 | 75.2 | #320 | [#320](https://github.com/RodReis/rrb-jarvisOS/pull/320) |

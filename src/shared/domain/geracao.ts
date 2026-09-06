@@ -118,6 +118,48 @@ export function progressoDaGeracao(etapas: ReadonlyMap<EtapaDaGeracao, EstadoDaE
   return Math.round((concluidas / ETAPAS_DA_GERACAO.length) * 100)
 }
 
+/** O andamento de uma etapa: em que ponto está e o que ela produziu quando terminou. */
+export interface AndamentoDaEtapa {
+  readonly estado: EstadoDaEtapa
+  readonly resumo?: string
+}
+
+/**
+ * Aplica um anúncio de etapa ao andamento **de uma rodada** (#318).
+ *
+ * A rodada é a unidade honesta: o PI viu uma geração nova abrir em 60%, com "Gravação — os três
+ * documentos foram gravados" pendurado de uma rodada anterior enquanto esta ainda gerava. Contar
+ * etapas de duas gerações somadas responde uma pergunta que ninguém fez.
+ *
+ * **A fronteira é a primeira etapa do contrato iniciando** — o único marco que o serviço já
+ * emite, sem inventar um evento de "rodada nova" que ninguém manda. Concluir a primeira **não**
+ * abre rodada: sem termo de pesquisa ela inicia e conclui em sequência, e zerar ali apagaria a
+ * si mesma.
+ *
+ * Devolve mapa novo, nunca muta o recebido: quem guarda o andamento é o estado do React, e mutar
+ * o mapa anterior deixaria a tela sem saber que algo mudou.
+ */
+export function aplicarEtapa(
+  anterior: ReadonlyMap<EtapaDaGeracao, AndamentoDaEtapa>,
+  evento: {
+    readonly etapa: EtapaDaGeracao
+    readonly estado: EstadoDaEtapa
+    readonly resumo?: string
+  }
+): ReadonlyMap<EtapaDaGeracao, AndamentoDaEtapa> {
+  const rodadaNova = evento.etapa === ETAPAS_DA_GERACAO[0] && evento.estado === 'iniciada'
+  const mapa = new Map(rodadaNova ? [] : anterior)
+
+  // O andamento é **substituído**, não mesclado: um estado sem resumo apaga o resumo anterior.
+  // Mesclar deixaria "os três documentos foram gravados" ao lado de `falhou`.
+  mapa.set(evento.etapa, {
+    estado: evento.estado,
+    ...(evento.resumo === undefined ? {} : { resumo: evento.resumo })
+  })
+
+  return mapa
+}
+
 /**
  * Um evento a caminho da tela: o evento e a geração a que ele pertence.
  *

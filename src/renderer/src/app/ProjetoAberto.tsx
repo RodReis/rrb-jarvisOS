@@ -56,6 +56,14 @@ export function ProjetoAberto({
    * inline mostraria a pergunta ao lado de tudo que compete por atenção.
    */
   const [respondendo, setRespondendo] = useState(false)
+  /**
+   * Por que o CTA da etapa atual não pode agir, quando não pode (#318).
+   *
+   * Quem sabe é o painel da etapa — o gate do PRD trava com contradição pendente. O pai é só o
+   * carteiro entre o painel e a trilha; ele não deriva nada, para não haver duas contas do mesmo
+   * gate divergindo.
+   */
+  const [bloqueioDoCta, setBloqueioDoCta] = useState<string | undefined>(undefined)
 
   const carregar = useCallback(async (): Promise<void> => {
     try {
@@ -162,7 +170,11 @@ export function ProjetoAberto({
           {/* A trilha não estica: ela é uma coluna de leitura, e alargá-la afastaria o marcador
               do rótulo até a linha deixar de se ler como uma unidade. */}
           <div className="lg:w-[19rem] lg:shrink-0">
-            <TrilhaDaJornada estado={estado} onAgir={agir} />
+            <TrilhaDaJornada
+              estado={estado}
+              onAgir={agir}
+              {...(bloqueioDoCta === undefined ? {} : { bloqueio: bloqueioDoCta })}
+            />
           </div>
 
           <div
@@ -175,6 +187,7 @@ export function ProjetoAberto({
               estado={estado}
               onRecarregar={() => void carregar()}
               onAbrirPerguntas={() => setRespondendo(true)}
+              onBloqueioDoCta={setBloqueioDoCta}
             />
 
             {/*
@@ -244,7 +257,8 @@ function ConteudoDaEtapa({
   projeto,
   estado,
   onRecarregar,
-  onAbrirPerguntas
+  onAbrirPerguntas,
+  onBloqueioDoCta
 }: {
   readonly workspace: WorkspaceId
   readonly projeto: Project
@@ -253,6 +267,8 @@ function ConteudoDaEtapa({
   readonly onRecarregar: () => void
   /** Abre o pop-up de perguntas. A tela de refinamento pede; quem monta o pop-up é o pai. */
   readonly onAbrirPerguntas: () => void
+  /** O painel diz por que o CTA da trilha não pode agir — ou `undefined` quando pode (#318). */
+  readonly onBloqueioDoCta: (motivo: string | undefined) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
 
@@ -303,6 +319,7 @@ function ConteudoDaEtapa({
           projectId={projeto.id}
           nomeDoProjeto={projeto.nome}
           onAceito={onRecarregar}
+          onBloqueioDoAceite={onBloqueioDoCta}
         />
       )
 
