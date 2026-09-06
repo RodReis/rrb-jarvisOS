@@ -12,11 +12,14 @@ import { SUB_MODULOS_JARVIS } from './navegacao'
  * atualização, em vez de a mudança passar despercebida.
  */
 describe('módulos do app — o menu de hoje (critério 3)', () => {
-  it('o Professional Ops mostra só NEGÓCIOS e SISTEMA', () => {
+  it('o Professional Ops mostra COMANDO, NEGÓCIOS e SISTEMA', () => {
     const grupos = gruposVisiveis(MODULOS_DO_APP, 'command')
 
-    expect(grupos.map((g) => g.grupo)).toEqual(['NEGOCIOS', 'SISTEMA'])
+    // COMANDO acendeu na SPEC-Voz-01, com o microfone. Este teste reprovou quando o módulo
+    // entrou, que é exatamente o papel dele: mudança no menu não passa despercebida.
+    expect(grupos.map((g) => g.grupo)).toEqual(['COMANDO', 'NEGOCIOS', 'SISTEMA'])
     expect(grupos.flatMap((g) => g.itens.map((i) => i.rota))).toEqual([
+      'voz',
       'projects',
       'terminal',
       'settings'
@@ -37,7 +40,10 @@ describe('módulos do app — o menu de hoje (critério 3)', () => {
   })
 
   it('as rotas iniciais são os primeiros itens visíveis (regra 6)', () => {
-    expect(rotasDoSubModulo(MODULOS_DO_APP, 'command')[0]).toBe('projects')
+    // A rota inicial mudou sozinha ao COMANDO acender: ele vem antes de NEGÓCIOS na ordem do
+    // protótipo, e a regra 6 diz "primeiro item do primeiro grupo visível". Nada foi editado
+    // para isso acontecer — é a projeção fazendo o trabalho.
+    expect(rotasDoSubModulo(MODULOS_DO_APP, 'command')[0]).toBe('voz')
     expect(rotasDoSubModulo(MODULOS_DO_APP, 'agents')[0]).toBe('operator')
   })
 
@@ -47,7 +53,7 @@ describe('módulos do app — o menu de hoje (critério 3)', () => {
     // seria lista literal disfarçada — e a chave i18n já guarda o lugar deles.
     for (const sub of SUB_MODULOS_JARVIS) {
       for (const item of rotasDoSubModulo(MODULOS_DO_APP, sub)) {
-        expect(['projects', 'terminal', 'settings', 'operator']).toContain(item)
+        expect(['voz', 'projects', 'terminal', 'settings', 'operator']).toContain(item)
       }
     }
   })

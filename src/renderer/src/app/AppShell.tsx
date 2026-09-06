@@ -28,6 +28,7 @@ import {
 } from '../workspace/navegacao'
 import { MODULOS_DO_APP } from '../workspace/modulos'
 import { gruposVisiveis } from '../workspace/registro-de-modulos'
+import { Microfone } from './Microfone'
 import { Settings } from './Settings'
 import { AprovacoesPendentes } from './AprovacoesPendentes'
 import { TerminalControlado } from './TerminalControlado'
@@ -136,6 +137,7 @@ export function AppShell({ perfil, onSair }: AppShellProps = {}): React.JSX.Elem
    */
   const MODULOS: Readonly<Record<string, React.JSX.Element>> = {
     operator: <AprovacoesPendentes workspace={workspace} />,
+    voz: <Microfone workspace={workspace} />,
     projects: <ProjetosLocais workspace={workspace} />,
     terminal: <TerminalControlado workspace={workspace} />,
     /*

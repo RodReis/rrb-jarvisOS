@@ -64,6 +64,22 @@ export const MODULOS_DO_APP: readonly ModuloRegistrado[] = [
   },
   {
     /*
+     * O microfone do Command Center (SPEC-Voz-01). É a **primeira** tela do MVP-017 a existir,
+     * e por isso acende o grupo COMANDO — que até aqui estava oculto por não ter item nenhum.
+     *
+     * `disponivel: () => true` porque a tela existe **sempre**: quando o runtime não está
+     * instalado, ela é justamente quem oferece baixá-lo (critério 4). Amarrá-la à prontidão
+     * esconderia o único caminho para instalar o que falta.
+     */
+    id: 'voz',
+    subModulo: 'command',
+    grupo: 'COMANDO',
+    ordem: 1,
+    rota: 'voz',
+    disponivel: () => true
+  },
+  {
+    /*
      * A fila de aprovação é **governança** (Operator Central do protótipo), não "Operações" —
      * que ali é Kanban/Workflows. Daí o `operacoes` → `operator` desta fatia.
      */
