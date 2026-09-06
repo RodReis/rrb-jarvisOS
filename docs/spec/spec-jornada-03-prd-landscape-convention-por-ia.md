@@ -53,3 +53,12 @@ Fixtures de brief completo/contraditório; evidência ausente/hostil (M8-F04); v
 
 - **Síntese sobre evidência é permitida; fonte fabricada não.** O limite da M8-F04 ("síntese seria conclusão sem evidência") é substituído por síntese **com** as evidências citadas por afirmação, verificáveis pelo verificador da M6-F06.
 - **Origem `brief` é âncora, não texto**: o PRD referencia o id da afirmação do brief, para que "todo requisito material possui origem" (critério 1 da SPEC-Planejamento-04) seja checável por máquina.
+
+## Emenda E1 — contradição vira pergunta respondível (decisões do PI, 2026-09-06)
+
+Achado pelo PI ao gerar o PRD em 2026-09-06 (issue [#307](https://github.com/RodReis/rrb-jarvisOS/issues/307)): as contradições apareciam como cartões só de leitura, sem lugar para responder. O item 5 de § Geração já manda que contradição *"vira pergunta ao PI com recomendação (M8-F03)"*; esta emenda fixa o que faltava decidir.
+
+1. **A contradição é uma pergunta no contrato da M8-F03**: título, enunciado, 2–3 opções excludentes com impacto, recomendada primeiro com justificativa, texto livre quando couber, "Decide por mim" quando delegável. Ela é respondida **no pop-up** do wizard — uma por vez —, nunca num formulário inline. O modelo gera a pergunta inteira; pergunta fora do contrato é recusada pelo validador e a etapa `contradicoes` falha (fail closed).
+2. **A resposta é uma `Decision` gravada** (`etapa: 'prd'`), pelo mesmo canal das decisões do refinamento, e entra no pedido de geração como decisão citável (origem `decisao`). "Decide por mim" grava com o agente como autor e **não aprova o gate**.
+3. **Ao responder a última contradição, os três documentos são gerados de novo, sozinhos**, com o termo de pesquisa confirmado — criando uma revisão nova candidata (critério 7 mantido: o aceite é por revisão exata). A regeração **parcial** (só as afirmações afetadas) fica para uma entrega posterior.
+4. **O aceite continua sendo o clique do PI**, com o gate travado enquanto a revisão vigente tiver contradição.
