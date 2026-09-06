@@ -48,7 +48,11 @@ function readRunnerJson(path) {
   return {
     total: j.numTotalTests ?? 0,
     passed: j.numPassedTests ?? 0,
-    failed: j.numFailedTests ?? 0
+    failed: j.numFailedTests ?? 0,
+    // Quantos arquivos o runner **relatou**. É o número que cai quando o pool perde um
+    // worker (#232) — e o único sinal disponível, porque o JSON não diz quantos arquivos ele
+    // pretendia rodar (ver `perdaDeArquivos`).
+    files: j.testResults?.length ?? 0
   }
 }
 
@@ -92,7 +96,8 @@ function buildRows(cfg) {
       tests: runner.total + pw.total,
       pass: runner.passed + pw.passed,
       fail: runner.failed + pw.failed,
-      coverage: readCoverage(cat.coverageSummary)
+      coverage: readCoverage(cat.coverageSummary),
+      files: runner.files
     }
   })
 }
@@ -308,6 +313,50 @@ function reportAtBase(cfg) {
  * este prova que a ENTREGA foi carimbada. Formas diferentes de mentir.
  */
 /**
+ * Quais categorias perderam arquivo desde a última execução íntegra (#232).
+ *
+ * ## O defeito
+ *
+ * O pool do Vitest às vezes perde um worker e a execução **termina verde**: `success: true`,
+ * zero falhas, e um arquivo inteiro fora da contagem. Nada fica vermelho; o total apenas cai. A
+ * guarda anti-drift então compara o relatório contra a mesma execução incompleta e concorda
+ * consigo mesma — o número falso entra no histórico append-only, onde é imutável.
+ *
+ * `docs/TESTING.md` §1: *"evidência de máquina, nunca narrada"*. Execução que perde uma parte em
+ * silêncio deixa de ser evidência e vira afirmação — o fechamento frágil que o mesmo parágrafo
+ * proíbe, produzido pela própria infra de teste.
+ *
+ * ## Por que um piso, e não o que a issue propunha
+ *
+ * A issue sugere comparar arquivos coletados contra executados. **Essa comparação não tem
+ * fonte:** a saída do runner diz quantos arquivos ele *relatou* (`testResults`), nunca quantos
+ * pretendia rodar. O campo que parece servir, `numTotalTestSuites`, conta blocos `describe` —
+ * 379 contra 67 arquivos no projeto `banco` —, e uma guarda sobre ele acusaria toda execução
+ * saudável.
+ *
+ * O piso é a única fonte confiável que existe: **quantos arquivos a última execução íntegra
+ * teve**. Cair abaixo dele é o sintoma exato do defeito, e não depende de descobrir por que o
+ * worker morreu — coisa que não reproduz sob demanda (o Vitest 4.1 reinicia o worker e se
+ * recupera na maioria das vezes, que é por que o defeito é raro).
+ *
+ * ## O que **não** é perda
+ *
+ * Subir é rotina: teste novo acrescenta arquivo. Categoria sem piso é a primeira execução dela,
+ * e acusar ali tornaria a guarda impossível de satisfazer — guarda impossível é guarda que
+ * alguém desliga (a mesma lição do `shouldRequireEntry`). E categoria que sumiu do config é
+ * decisão de quem o editou, não arquivo perdido.
+ *
+ * Devolve `null` quando está tudo certo, e a lista de perdas quando não — nunca lança.
+ */
+export function perdaDeArquivos(agora, piso) {
+  const perdas = Object.entries(agora)
+    .filter(([cat, n]) => typeof piso[cat] === 'number' && n < piso[cat])
+    .map(([categoria, n]) => ({ categoria, agora: n, piso: piso[categoria] }))
+
+  return perdas.length ? perdas : null
+}
+
+/**
  * A cobrança do carimbo se aplica a este PR?
  *
  * Duas condições. `--require-entry` já limita ao CI (rodando local não há `refs
@@ -334,6 +383,44 @@ export function hasHistoryEntry(docRaw, issue) {
   })
 }
 
+/**
+ * Onde mora o piso de arquivos por categoria (#232).
+ *
+ * Arquivo próprio, e **não** uma coluna na tabela: o histórico de `TESTS.md` é append-only e
+ * suas linhas são imutáveis (TESTING.md §4). Acrescentar coluna reescreveria todas as linhas
+ * passadas — exatamente o que o append-only proíbe.
+ *
+ * Fica ao lado do relatório, versionado: o piso precisa atravessar execuções e máquinas, e um
+ * piso que vive só na máquina de quem rodou não protegeria o CI.
+ */
+const PISO_PATH = 'reports/.arquivos-por-categoria.json'
+
+function lerPiso() {
+  const abs = resolve(ROOT, PISO_PATH)
+  if (!existsSync(abs)) return {}
+  try {
+    return JSON.parse(readFileSync(abs, 'utf-8'))
+  } catch {
+    // Piso ilegível não pode barrar a entrega: ele é defesa contra um defeito raro, e
+    // transformá-lo em bloqueio por JSON corrompido inverteria o custo. Sem piso, não acusa.
+    return {}
+  }
+}
+
+function gravarPiso(rows) {
+  const atual = lerPiso()
+  const proximo = { ...atual }
+  // O piso **sobe** com a execução íntegra e nunca desce sozinho: descer aqui apagaria a
+  // memória do número certo justamente quando ele é preciso.
+  for (const r of rows) proximo[r.category] = Math.max(atual[r.category] ?? 0, r.files)
+
+  writeFileSync(resolve(ROOT, PISO_PATH), JSON.stringify(proximo, null, 2) + NL, 'utf-8')
+}
+
+/** Quebra de linha das mensagens e do arquivo de piso. */
+const NL = `
+`
+
 function main() {
   const check = process.argv.includes('--check')
   const requireEntry = process.argv.includes('--require-entry')
@@ -342,6 +429,41 @@ function main() {
   const reportAbs = resolve(ROOT, cfg.reportPath)
   const existing = existsSync(reportAbs) ? readFileSync(reportAbs, 'utf-8') : ''
   const rows = buildRows(cfg)
+
+  /*
+   * Prova 0 — a execução chegou inteira? (#232)
+   *
+   * Vem **antes** das outras três e vale com e sem `--check`, porque elas auditam o *conteúdo*
+   * do relatório e esta audita a *evidência que o alimenta*. Sem ela, uma execução que perdeu
+   * arquivo grava um total menor que a verdade e as demais o abençoam: a guarda anti-drift
+   * compara o relatório contra a mesma execução incompleta e concorda consigo mesma.
+   *
+   * Sair com erro em vez de gravar é o ponto. Repetir a execução custa minutos; um número falso
+   * numa tabela append-only fica para sempre.
+   */
+  const perdas = perdaDeArquivos(
+    Object.fromEntries(rows.map((r) => [r.category, r.files])),
+    lerPiso()
+  )
+
+  if (perdas) {
+    console.error(
+      [
+        '[gen-test-report] EXECUCAO INCOMPLETA: o runner perdeu arquivo de teste (#232).',
+        ...perdas.map(
+          (p) =>
+            `  ${p.categoria}: ${p.agora} arquivos nesta execucao, contra ${p.piso} na ultima integra.`
+        ),
+        'A execucao terminou "verde" com arquivo inteiro fora da contagem: o numero esta baixo',
+        'e nada ficou vermelho. Isso e fechamento fragil produzido pela infra de teste',
+        '(TESTING.md §1: evidencia de maquina, nunca narrada).',
+        'Rode `npm run test:report` de novo. Se repetir, investigue o pool antes de carimbar;',
+        `se um teste foi removido de proposito, ajuste ${PISO_PATH} no mesmo commit.`
+      ].join(NL)
+    )
+    process.exit(1)
+  }
+
   const next = render(rows, existing, meta)
 
   if (check) {
@@ -411,10 +533,16 @@ function main() {
 
   mkdirSync(dirname(reportAbs), { recursive: true })
   writeFileSync(reportAbs, next, 'utf-8')
+
+  // Só aqui, e só depois de a Prova 0 ter passado: o piso é a memória da última execução
+  // **íntegra**, e gravá-lo antes da verificação o contaminaria com o número que ela recusou.
+  gravarPiso(rows)
+
   console.log(`[gen-test-report] escrito ${cfg.reportPath}:`)
   for (const r of rows) {
     console.log(
-      `  ${r.category}: ${r.tests} testes, ${r.pass} pass, ${r.fail} falha, cob ${r.coverage}%`
+      `  ${r.category}: ${r.tests} testes, ${r.pass} pass, ${r.fail} falha, ` +
+        `cob ${r.coverage}%, ${r.files} arquivos`
     )
   }
 }

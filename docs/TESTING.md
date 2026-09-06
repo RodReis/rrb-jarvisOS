@@ -343,9 +343,18 @@ conserto**, não precisa reviver o bug):
 > prova 3 abaixo.
 
 **Guarda anti-drift (o que torna o arquivo confiável):** no PR, o CI roda o gerador em
-**`--check`**, que faz **três provas independentes** — são três formas distintas de a evidência
-mentir:
+**`--check`**, que faz **quatro provas independentes** — são quatro formas distintas de a
+evidência mentir:
 
+0. **Execução completa** (desde 2026-09-06, issue #232) — prova que o runner **não perdeu
+   arquivo**. Vem antes das outras e vale também fora do `--check`, porque as três seguintes
+   auditam o *conteúdo* do relatório e esta audita a *evidência que o alimenta*: uma execução que
+   perdeu arquivo grava um total menor que a verdade, e a prova 1 então compara o relatório
+   contra a mesma execução incompleta e **concorda consigo mesma**. Compara a contagem de
+   arquivos de cada categoria com a da última execução íntegra, guardada em
+   `reports/.arquivos-por-categoria.json`; caiu → **falha e não grava**. Subir é rotina (teste
+   novo); categoria sem piso é a primeira execução dela. Se um teste foi removido de propósito,
+   o piso é ajustado no mesmo commit.
 1. **Números** — recomputa os totais numa execução limpa e compara com a seção `## Estado atual`
    commitada. Divergiu → **CI falha**. O número só "cola" se sobreviver a uma reexecução
    independente. Compara só os números, não os rótulos Data/Issue/PR (que variam por PR de
@@ -357,6 +366,21 @@ mentir:
    linha** no histórico. Só é exigida de PR que **altera arquivo de teste** (PR só de `docs/` não
    é barrado) e cobra pela issue do `refs #N`. Sem linha → **CI falha**, com o comando exato na
    mensagem.
+
+> **Por que a prova 0 é um piso, e não a comparação que parece óbvia.** O modo de falha é o pool
+> do Vitest perder um worker: a execução termina com `success: true`, **zero falhas**, e um
+> arquivo inteiro fora da contagem — nada fica vermelho, o total apenas cai. A defesa intuitiva
+> seria comparar "arquivos coletados" com "arquivos executados", mas **essa comparação não tem
+> fonte**: a saída do runner diz quantos arquivos ele *relatou* (`testResults`), nunca quantos
+> pretendia rodar, e o campo que parece servir (`numTotalTestSuites`) conta blocos `describe` —
+> 379 contra 67 arquivos no projeto `banco`. Uma guarda sobre ele acusaria toda execução
+> saudável. O piso é a única fonte confiável que existe.
+>
+> **Ele não depende de reproduzir o gatilho**, e isso é deliberado: por que o worker morre é
+> intermitente e não reproduz sob demanda (o Vitest 4.1 reinicia o worker e se recupera na
+> maioria das vezes, que é por que o defeito é raro). O que a guarda mede é o **efeito**, sempre
+> o mesmo. Verificado com a perda simulada num JSON real: 66 de 67 arquivos, zero falhas,
+> `success: true` — o gerador recusa gravar e sai com código 1.
 
 > **Por que a prova 3 existe — e por que ela já era necessária aqui.** As provas 1 e 2 cobrem
 > *número forjado* e *histórico apagado*; nenhuma cobre **histórico que nunca foi escrito**. No
