@@ -174,18 +174,6 @@ function parsePolicyContext(value: unknown): PolicyContext {
 }
 
 /**
- * Valida o pedido de contexto na fronteira (SPEC-Planejamento-02; CONVENTION §2).
- *
- * Devolve `undefined` quando o pedido não casa o contrato. O que se valida aqui é **forma**, e
- * só forma: se há projeto, tarefa, etapa e ao menos um candidato com caminho e origem
- * conhecidos. A política — segredo, teto, exceção — mora no serviço, e repeti-la aqui criaria
- * uma segunda fonte que divergiria da primeira no dia em que uma das duas mudasse.
- *
- * O candidato de origem desconhecida é **descartado**, não corrigido para um default: um item
- * cuja origem o app não reconhece entraria no manifesto declarando uma procedência inventada, e
- * a origem é justamente o que distingue "o usuário anexou" de "a busca encontrou".
- */
-/**
  * A **forma** de uma `Resposta` vinda do renderer. O vocabulário — a escolha ser opção real, a
  * delegação ser permitida — é do serviço; barrar aqui duplicaria a regra em dois lugares que
  * divergiriam. `undefined` é "forma inválida", e quem chama decide o outcome.
@@ -212,6 +200,18 @@ function lerResposta(resposta: unknown): Resposta | undefined {
   }
 }
 
+/**
+ * Valida o pedido de contexto na fronteira (SPEC-Planejamento-02; CONVENTION §2).
+ *
+ * Devolve `undefined` quando o pedido não casa o contrato. O que se valida aqui é **forma**, e
+ * só forma: se há projeto, tarefa, etapa e ao menos um candidato com caminho e origem
+ * conhecidos. A política — segredo, teto, exceção — mora no serviço, e repeti-la aqui criaria
+ * uma segunda fonte que divergiria da primeira no dia em que uma das duas mudasse.
+ *
+ * O candidato de origem desconhecida é **descartado**, não corrigido para um default: um item
+ * cuja origem o app não reconhece entraria no manifesto declarando uma procedência inventada, e
+ * a origem é justamente o que distingue "o usuário anexou" de "a busca encontrou".
+ */
 function parsePedidoDeContexto(value: unknown): PedidoDeContexto | undefined {
   if (typeof value !== 'object' || value === null) return undefined
   const source = value as Record<string, unknown>
