@@ -1,9 +1,9 @@
 # SPEC-Pipeline-01 — Política de PR e CI por projeto
 
-- Status: **rascunho para revisão do PI**, revisão R1 de 2026-09-06. Não autoriza implementação.
+- Status: **aprovada-pi**, revisão R2 de 2026-09-06. O PI aprovou: novo MVP/fatia transversal; Windows como ambiente primário; `success` obrigatório; atualização segura da linha Node 22 para Node 24 LTS.
 - Origem: pedido do PI para separar orientação do Claude Code no jarvisOS de funcionalidade genérica da pipeline.
-- Enquadramento proposto: extensão transversal da entrega autônoma. Não reabre o MVP-009 finalizado nem inventa M9-F07; vínculo a MVP/fatia será definido no aceite.
-- MVP pai: não atribuído nesta proposta; decisão aberta antes de cadastrar fatia.
+- MVP/Fatia: MVP-027 · M27-F01.
+- Enquadramento: extensão transversal da entrega autônoma. Não reabre o MVP-009 finalizado nem inventa M9-F07.
 - Issue: não criada; publicação de rascunho não coloca nova fatia no Backlog.
 - Dependências: SPEC-Entrega-05 (M9-F05), SPEC-Entrega-06 (M9-F06), adapter GitHub M6-F04, pacote aprovado do projeto e contratos de execução vigentes.
 - Consumidores futuros: MVP-015 Observabilidade e MVP-023 Blueprints. Não são dependências obrigatórias para a primeira entrega desta SPEC.
@@ -12,7 +12,7 @@
 
 Orientar o Claude Code a produzir PRs melhores não modifica a pipeline determinística. Ela precisa transformar o contrato do projeto-alvo em validações executáveis, preservar as provas e impedir que ganho de tempo seja obtido pulando trabalho necessário.
 
-Na fonte atual, `src/shared/domain/ci-workflow.ts` gera Node 22, `npm ci`, lint/typecheck/test/build sequenciais e eventos `push` e `pull_request` sem restrição. `EntregaService.garantirWorkflowDeCi` usa esse gerador. Isso limita a portabilidade e pode executar CI duplicado em pushes de branch com PR aberto. A otimização da #311 modifica o workflow do jarvisOS; não altera esse gerador.
+Na revisão anterior, `src/shared/domain/ci-workflow.ts` gerava Node 22, `npm ci`, lint/typecheck/test/build sequenciais e eventos `push` e `pull_request` sem restrição. `EntregaService.garantirWorkflowDeCi` usa esse gerador. Isso limita a portabilidade e pode executar CI duplicado em pushes de branch com PR aberto. A correção aprovada junto da R2 atualiza o legado para Node 24 LTS; o perfil genérico completo continua sendo o escopo desta fatia.
 
 Objetivo: entregar uma política versionada e um perfil de validação por projeto, consumidos pelo executor e pelo gerador de CI, com execução única por unidade de validação, paralelismo declarado e gate vinculado ao estado realmente validado.
 
@@ -27,7 +27,7 @@ Objetivo: entregar uma política versionada e um perfil de validação por proje
 5. Check obrigatório ausente, vazio, cancelado, expirado, inválido ou sem sucesso não aprova. Preservar a implementação vigente de `gate-de-merge.ts`, que exige `success` dos obrigatórios; não importar a interpretação permissiva de checks opcionais.
 6. Documentos do projeto-alvo entram no mesmo PR antes do merge. Evidência local usa o ledger existente; não criar outro banco operacional ou escrever na branch-base depois do merge.
 
-**Harmonização pendente no aceite:** o critério 11 da SPEC-Entrega-05 menciona aceitar `neutral/skipped` quando a origem os considerar satisfatórios; `gate-de-merge.ts` e a explicação da M9-F05 em `DEVELOPMENT.md` exigem `success` de obrigatórios. R1 propõe formalizar o comportamento mais estrito já implementado. A SPEC aprovada não é alterada por este rascunho; sua emenda deve acompanhar o aceite dessa decisão.
+**Harmonização aprovada:** o critério 11 da SPEC-Entrega-05 foi emendado na mesma decisão do PI. Checks obrigatórios só satisfazem o gate com `success`; `neutral` e `skipped` não comprovam a validação exigida. Isso formaliza o comportamento mais estrito já implementado por `gate-de-merge.ts` e documentado para a M9-F05 em `DEVELOPMENT.md`.
 
 ## 3. Dentro e fora
 
@@ -35,7 +35,7 @@ Objetivo: entregar uma política versionada e um perfil de validação por proje
 
 **Fora:** dashboard novo, alertas recorrentes, aprendizado automático, alteração automática do tamanho das fatias, criação de novos aprovadores, contratação de runners, instalação global de ferramentas, sharding interno de uma suíte, migração de stack, GitLab/Bitbucket e suporte operacional a merge queue.
 
-R1 deve provar dois perfis de stack distintos: Node/npm e Python/pip, ambos com runtime e versão declarados no pacote. Outras combinações respondem incompatibilidade antes de escrever workflow; não recebem fallback silencioso para Node. Não há promessa de acelerar todos os perfis.
+R2 deve provar dois perfis de stack distintos: Node/npm e Python/pip, ambos com runtime, versão, sistema e shell declarados no pacote. Windows é o ambiente primário e deve ser provado por integração local em Windows/PowerShell. O workflow remoto pode usar Windows ou Linux somente quando o perfil declarar essa escolha; nenhuma plataforma é inferida. Outras combinações respondem incompatibilidade antes de escrever workflow; não recebem fallback silencioso para Node. Não há promessa de acelerar todos os perfis.
 
 ## 4. Perfil de validação e política
 
@@ -44,7 +44,7 @@ O artefato estruturado proposto é `ci-profile.json` na raiz do pacote do projet
 | Campo lógico | Contrato obrigatório |
 |---|---|
 | Identidade | `schemaVersion`, `profileId`, revisão/hash e origem no pacote aprovado |
-| Ambiente | OS/runner compatível, runtime, versão e shell suportado; R1 Linux/Bash |
+| Ambiente | OS/runner compatível, runtime, versão e shell suportado; Windows/PowerShell é obrigatório na R2 |
 | Instalação | Comando em argv, diretório de trabalho dentro do checkout, lockfile e versões do ambiente |
 | Validações | IDs estáveis, argv, cwd, dependências por ID e grupo de execução |
 | Evidência | Saídas declaradas por validação, formato/adapter compatível e condição de completude |
@@ -60,7 +60,7 @@ Variáveis de ambiente são declaradas por nome e origem autorizada; valores sec
 
 ### Compatibilidade com projetos atuais
 
-- Pacote legado com `ComandosDeValidacao` recebe representação explícita do ambiente legado já usado: Node 22/npm, quatro comandos em sequência. Registrar `legacy`, não alegar descoberta automática da stack.
+- Pacote legado com `ComandosDeValidacao` recebe representação explícita do ambiente legado atualizado: Node 24 LTS/npm, quatro comandos em sequência. Registrar `legacy`, não alegar descoberta automática da stack.
 - O fallback legado não paraleliza, migra ou modifica proteções por iniciativa própria. Perfil incompatível não usa esse fallback.
 - Perfil novo ou revisão material passa pelos gates existentes de impacto/aprovação do pacote. Nenhum novo aceite é criado quando a revisão já está aprovada.
 - O perfil e os mesmos argumentos alimentam execução local e remota. Otimização de topologia não autoriza mudar o teste ou requisito verificado.
@@ -68,14 +68,14 @@ Variáveis de ambiente são declaradas por nome e origem autorizada; valores sec
 ## 5. Geração, paralelismo e deduplicação
 
 1. Geração é função determinística do perfil aprovado e da versão de geração adotada. Mesma entrada produz os mesmos bytes.
-2. R1 roda todas as validações declaradas em todo PR elegível, incluindo documental. Seleção automática por impacto não entra nesta revisão.
+2. R2 roda todas as validações declaradas em todo PR elegível, incluindo documental. Seleção automática por impacto não entra nesta revisão.
 3. Independência deve estar declarada. Sem prova explícita, comandos permanecem sequenciais. Se build inclui typecheck, o perfil pode representar essa dependência, mas o gerador não modifica scripts por heurística textual para deduplicá-los.
 4. Uma unidade de validação é executada uma vez por ambiente e tentativa de CI. Consumidores de relatório reutilizam evidência dessa execução; exigir carimbo não dispara novamente os runners. Reexecução local e remota continua legítima: são ambientes e finalidades diferentes.
 5. Cada job tem instalação compatível e serviços necessários. Serviços compartilhados, disco e singletons não são presumidos isolados; grupos incompatíveis ficam serializados. Banco do jarvisOS continua serial internamente.
 6. Para workflows novos gerados, validar branches de trabalho por `pull_request`. `push` fica restrito à branch-base quando o pacote exigir verificação pós-merge; sem CI duplicado de branch + PR. Um push na base tem finalidade própria e não é deduplicado como se fosse o PR.
 7. Concorrência agrupa por repositório/workflow e número do PR, cancelando apenas execução anterior do mesmo PR. Não cancelar outro PR, outra execução local da pipeline ou validação pós-merge da base.
 8. O job agregado mantém o nome/context estável `validacao`, usa dependências explícitas e executa mesmo após falha de dependentes. Exige sucesso de todas as validações obrigatórias; `skipped` inesperado ou resultado ausente falha.
-9. Workflow humano com jobs condicionais precisa de um gate agregado cuja decisão de skip seja verificável; R1 não gera automaticamente novos filtros. Falha na classificação nunca dispensa uma prova.
+9. Workflow humano com jobs condicionais precisa de um gate agregado cuja decisão de skip seja verificável; R2 não gera automaticamente novos filtros. Falha na classificação nunca dispensa uma prova.
 
 ## 6. Preservação de workflows existentes
 
@@ -129,7 +129,7 @@ Blueprints pode transportar o perfil como artefato versionado, mas não transpor
 
 ## 10. Critérios de aceite verificáveis
 
-1. Dois projetos-alvo, Node/npm e Python/pip, recebem CI a partir de seus perfis; Python não recebe `npm ci` nem Node por padrão.
+1. Dois projetos-alvo, Node/npm e Python/pip, recebem CI a partir de seus perfis; ambos são exercitados em Windows/PowerShell, e Python não recebe `npm ci` nem Node por padrão.
 2. Pacote legado mantém ambiente/comandos anteriores, sem migração tácita ou perda de validação.
 3. Perfil inválido/cíclico/incompatível falha antes de escrita, push ou alteração remota.
 4. Mesmo perfil/revisão produz bytes iguais; segundo run não reescreve por cosmética.
@@ -154,23 +154,24 @@ Testes unitários do perfil/gerador/gate; integração da orquestração com con
 
 Medir antes/depois em perfil equivalente: tempo decorrido, preparação, número de invocações e soma de minutos dos jobs. A prova de desempenho exige ausência de perda de testes e evidencia custo; não fixa a redução de 55% da #311 como requisito universal. Smoke não executado permanece `not_run`.
 
-A implementação futura pode ser dividida em entregas verticais: perfil/compatibilidade/gerador; integração e preservação de workflow; evidência/retomada e smoke. O PI define o vínculo no roadmap antes da criação das issues. Não iniciar implementação a partir deste rascunho.
+A implementação futura pode ser dividida em entregas verticais: perfil/compatibilidade/gerador; integração e preservação de workflow; evidência/retomada e smoke. O fluxo de planejamento cria a issue canônica da M27-F01 antes de iniciar a implementação completa desta SPEC.
 
-## 12. Decisões propostas para aceite da R1
+## 12. Decisões aprovadas na R2
 
 - Separar guia operacional local desta funcionalidade genérica; não duplicar SPEC-Entrega-05.
-- Adotar perfil estruturado aprovado e iniciar com Node/npm e Python/pip em Linux/Bash; outras stacks por evolução de capacidade.
+- Adotar perfil estruturado aprovado e iniciar com Node/npm e Python/pip em Windows/PowerShell; runners Linux permanecem possíveis quando declarados pelo perfil.
 - Preservar workflows humanos e tratar migração como mudança material; não espalhar otimização por todos os projetos automaticamente.
 - Preservar merge autônomo e kill-switch existentes; proteções adicionais do plano local não se tornam imposição universal.
 - Definir MVP/fatia responsável ao aprovar, sem reabrir MVP finalizado por conta própria.
 
-## 13. Perguntas abertas ao PI
+## 13. Decisões do PI na aprovação da R2
 
-1. **Enquadramento:** em qual MVP vigente deve entrar esta evolução? Recomendação: manter como proposta transversal ligada à entrega autônoma até definir o vínculo, sem reabrir automaticamente o MVP-009 nem renumerar o roadmap.
-2. **Primeiras stacks:** aprovar Node/npm e Python/pip em Linux/Bash como os dois perfis da R1? É o recorte proposto para provar a portabilidade, não uma restrição permanente da pipeline.
-3. **Harmonização:** formalizar `success` como única conclusão satisfatória de check obrigatório, emendando a redação antiga conforme o comportamento atual? Recomendação: sim; skips opcionais continuam sendo decididos pelo agregado, sem transformar um obrigatório não executado em PASS.
+1. A evolução entra no MVP-027, M27-F01, sem reabrir o MVP-009.
+2. Windows é o ambiente primário do PI e prova obrigatória. Linux não é default implícito; só entra quando declarado pelo perfil.
+3. Apenas `success` satisfaz check obrigatório. `neutral` e `skipped` não comprovam uma validação exigida.
+4. O legado do jarvisOS passa para Node 24 LTS, compatível com o Node 24.15.0 do host. Electron mantém runtime embutido próprio e módulos nativos recompilados para seu ABI.
 
-Após as respostas, registrar a revisão exata aprovada e ajustar as fontes afetadas na mesma entrega documental. Até lá, manter `rascunho`, sem issue de fatia e sem implementação.
+Não há pergunta estrutural aberta nesta revisão. A issue da fatia deve ser criada pelo fluxo de planejamento e entrar em Backlog; a aprovação não altera `proplan:next` nem inicia a implementação completa do perfil genérico.
 
 ## Referências
 

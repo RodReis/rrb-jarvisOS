@@ -45,6 +45,8 @@ Diagnóstico concreto da #308: o job test durou 16min33s e reexecutou a suíte p
 
 Consulta de 2026-09-06: #311 com seis checks verdes, head `b6e8729b7588f23c2e9bf74d8c3980364d933070`, mas resposta remota `state=OPEN`, `mergedAt=null`, `mergeCommit=null`. O PI a descreveu como finalizada; operacionalmente, diferenciar implementação validada de merge confirmado. Reconsultar a origem antes de agir; este registro não pretende congelar o estado futuro.
 
+O host Windows do PI usa Node 24.15.0. O contrato vigente passa a Node 24 LTS para desenvolvimento e CI. Isso não fixa o patch do Node embutido no Electron: o Electron carrega seu próprio runtime e `electron-rebuild` recompila `better-sqlite3` para o ABI correspondente.
+
 A recomendação de merge autônomo da pipeline não depende da opção de auto-merge nativo do GitHub. O serviço pode acompanhar e integrar pelo adapter, respeitando os gates e o kill-switch já aprovados na SPEC-Entrega-05.
 
 Referências: [práticas de autoria e autorrevisão do GitHub](https://docs.github.com/en/pull-requests/concepts/helping-others-review-your-changes), [checks obrigatórios](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks), [execução da #311](https://github.com/RodReis/rrb-jarvisOS/actions/runs/34046954735) e [issue #310](https://github.com/RodReis/rrb-jarvisOS/issues/310).

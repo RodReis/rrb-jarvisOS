@@ -153,6 +153,14 @@ O PI testou o fluxo entregue pelo MVP-008 e constatou que ele não corresponde a
 5. **Fila:** MVP-025 entra logo após o MVP-009, antes do MVP-022 e do Command Center — altera a ordem registrada em 2026-08-30 para esses dois.
 6. O aceite do MVP-008 **não é reaberto**: suas fatias permanecem válidas como infraestrutura (Git local, `Decision`, anexos por ato, gates por hash). O que muda entra por fatias novas com SPEC própria, nunca por emenda a spec finalizada (regra consolidada em 2026-08-30).
 
+## Política de PR/CI multiplataforma e Node 24 LTS (PI, 2026-09-06)
+
+1. Orientação de autoria/revisão do Claude Code pertence ao guia operacional do repositório; comportamento executável e reutilizável pertence à SPEC-Pipeline-01.
+2. A evolução nasce como MVP-027/M27-F01, sem reabrir o MVP-009. Merge autônomo e kill-switch da M9-F05 permanecem.
+3. Windows/PowerShell é ambiente primário e prova obrigatória. Linux só é usado quando o perfil do projeto o declara; não há plataforma implícita.
+4. Check obrigatório só satisfaz o gate com `success`; `neutral` e `skipped` não comprovam execução obrigatória. A redação conflitante da SPEC-Entrega-05 deve ser harmonizada com o comportamento já implementado.
+5. O jarvisOS passa de Node 22 para Node 24 LTS: mínimo de desenvolvimento 24.15.0 e CI na linha major 24. O Electron conserva o runtime Node embutido de sua versão; módulos nativos continuam recompilados contra o ABI do Electron.
+
 ## Fases, modelo por fase e console da geração (PI, 2026-09-04)
 
 O PI usou o app com o MVP-025 aceito e apontou que o card não diz a fase, que o modelo não é escolhido por fase, que a IA gera sem mostrar texto nem ferramentas e que os marcos Git não são visíveis nem verificados antes da Construção. Verificado no código: a aba "Roteamento por tipo de tarefa" (SPEC-Providers-04) não é consumida pela jornada — a geração usa `escolherRota()` e o modelo ativo do provider. Nasce o MVP-026 (`docs/mvp/mvp-026-fases-modelos-e-console.md`). Decisões:
