@@ -136,6 +136,8 @@ Além disso há a **prova visual**: Playwright num navegador de verdade, medindo
 | [`docs/STATUS.md`](docs/STATUS.md) | Kanban e roadmap, espelho das GitHub Issues |
 | [`docs/CONVENTION.md`](docs/CONVENTION.md) | Contrato do processo e das entidades |
 | [`docs/TESTING.md`](docs/TESTING.md) | Metodologia de teste e o relatório de evidência |
+| [`docs/CI-PR.md`](docs/CI-PR.md) | Política de PR rápida: jobs paralelos, gate único e medição de duração |
+| [`docs/GUIA-PRS-CLAUDE-CODE.md`](docs/GUIA-PRS-CLAUDE-CODE.md) | Rotina de autoria, revisão, CI e evidência das PRs |
 | [`docs/spec/`](docs/spec/) | Specs por fatia — só se implementa fatia com spec `aprovada-pi` |
 
 ---

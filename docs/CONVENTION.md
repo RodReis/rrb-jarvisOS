@@ -48,6 +48,19 @@ O board é uma **projeção** das GitHub Issues: `issue → coluna` por **label 
 
 - Local: `docs/mvp/mvp-<nnn>-<slug>.md`. Espelha a issue-épico: tese, checklist de fatias, fora de escopo, critérios de done.
 
+### PR, CI e evidência
+
+Este arquivo governa o **elo PR→issue** (`refs #N`, nunca `closes #N` — regras acima). O resto do contrato de entrega mora em documento próprio, e não se duplica aqui:
+
+| Documento | O que governa |
+|---|---|
+| `docs/GUIA-PRS-CLAUDE-CODE.md` | Rotina de autoria, autorrevisão, acompanhamento do CI e integração da PR |
+| `docs/CI-PR.md` | Política de PR rápida: jobs paralelos, gate único, medição de duração e o que não se otimiza |
+| `docs/TESTING.md` | Categorias obrigatórias, guardas do relatório e evidência por SPEC/issue (ADR-003) |
+| `docs/REVIEW.md` | Contrato dos revisores e severidade |
+
+O check obrigatório é o **`gate`** — um job isolado verde não substitui. Merge integra código; **aceite da issue continua sendo ato do PI**.
+
 ## 2. Contrato de dados das entidades
 
 Toda entidade persistida carrega os campos de escopo:

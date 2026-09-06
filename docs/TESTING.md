@@ -147,8 +147,9 @@ do CI (§6), que faz o `npm run build` antes do `playwright test`. Para rodar o 
 `npm run build && npx playwright test`.
 
 > **Onde vivem as armadilhas 4–6 (binário, setuid, keyring).** Elas são exigências do E2E, e só
-> dele — desde o card #34 os steps que as tratam moram no **job `e2e`** do `ci.yml`, não no job
-> do relatório. O job `test` (relatório) não sobe Electron, então não precisa de nenhuma delas.
+> dele — desde o card #34 os steps que as tratam moram no **job `e2e`** do `ci.yml`, não nos jobs
+> do relatório. Nenhum deles sobe Electron: os runners (`test-regras`, `test-banco`, `test-tela`)
+> rodam Vitest, e o `test` só agrega os artefatos — então nenhum precisa de qualquer uma delas.
 
 **Padrão das armadilhas:** nenhuma se apresenta como o que é. Falha de launch do
 Electron no CI quase sempre reporta timeout ou "browser has been closed" — mensagens que
@@ -509,19 +510,31 @@ Rodar a guarda local antes do push é o passo que fecha o ciclo: se ela passa aq
     faria as asserções passarem sem tocar em política nenhuma. A única exceção deliberada é o
     teste do trigger append-only, que **precisa** do owner justamente para provar a camada que
     protege contra quem escapa da RLS.
-- **Passos:**
-  1. `npm ci`.
-  2. **Domínio/main:** `vitest run` das categorias `regras` e `banco` com `--coverage --reporter=json`.
-  3. **Renderer (componente):** `vitest run` (jsdom) com `--coverage --reporter=json`.
+- **Passos.** Desde 2026-09-06 eles não são uma sequência num job só: cada categoria roda no
+  seu próprio job, em paralelo, e o `test` agrega. Todos começam por `npm ci` (com cache npm).
+  1. **`test-regras`** — `vitest run` da categoria `regras` com `--coverage --reporter=json`.
+  2. **`test-banco`** — sobe o Supabase local (CLI fixada, ver acima) e roda `banco` com
+     `--coverage --reporter=json`. É o caminho crítico do workflow.
+  3. **`test-tela`** — `vitest run` (jsdom) da categoria de componente, mesmo par de flags.
+     Cada um dos três publica, como artefato, os arquivos que `test-report.config.json` declara:
+     o JSON do runner e o `coverage-summary.json`. O upload usa **`include-hidden-files: true`**,
+     porque `reports/.raw` é diretório oculto — sem isso o job agregado baixaria a cobertura sem
+     os JSONs, e a evidência chegaria incompleta ao gerador.
   3b. **E2E:** ativo desde a **Fatia 03** (entregue em 2026-07-22); desde o **card #34** roda no
-     **job `e2e` à parte** (não neste job, e só quando o PR toca a fronteira — ver a abertura da
-     §6). Lá dentro: `npm run build` → `xvfb-run playwright test` (o Electron abre janela: no Linux
-     do CI precisa de display virtual). O reporter JSON e o caminho de saída vivem no
-     `playwright.config.ts`. Ver §3.1 para as armadilhas de ambiente antes de depurar falha de
+     **job `e2e` à parte** (não nos jobs do relatório, e só quando o PR toca a fronteira — ver a
+     abertura da §6). Lá dentro: `npm run build` → `xvfb-run playwright test` (o Electron abre
+     janela: no Linux do CI precisa de display virtual). O reporter JSON e o caminho de saída vivem
+     no `playwright.config.ts`. Ver §3.1 para as armadilhas de ambiente antes de depurar falha de
      launch no CI.
-  4. `npm run test:report` → escreve a tabela em **`$GITHUB_STEP_SUMMARY`** (aba do run) **e**
-     publica/atualiza um **comentário fixo no PR** (sticky comment).
-  5. `npm run test:report:check` → **falha se `reports/TESTS.md` divergir** de uma execução limpa.
+  4. **`test`** (depende dos três) — baixa os artefatos das categorias, confere que as três deram
+     `success` (categoria que não passou barra aqui, não no `gate`) e roda o self-check do gerador.
+  5. Ainda no `test`, a guarda: `npm run test:report:check -- --no-run [--require-entry]`.
+     O `--no-run` é o que torna o job agregador — os números vêm dos JSONs que os runners já
+     produziram, nunca de uma reexecução. Falha se `reports/TESTS.md` divergir da evidência, se o
+     histórico perder linha ou se a entrega que altera teste não tiver carimbo. **As guardas rodam
+     numa chamada só**: exigir o carimbo não custa mais uma execução da suíte — era essa a segunda
+     suíte, ~5 min de runner, que a otimização de 2026-09-06 eliminou. Depois a tabela vai para o
+     **`$GITHUB_STEP_SUMMARY`** e para o **comentário fixo no PR** (sticky comment).
 - **Metadados da entrega:** `REPORT_ISSUE` sai do `refs #N` do corpo do PR (o elo canônico
   PR→issue — `closes #N` é proibido, ver `CONVENTION.md`); `REPORT_SPEC` do link
   `docs/spec/spec-*.md`; `REPORT_PR`/`REPORT_PR_URL` do evento do PR; `REPORT_DATE` do
@@ -783,7 +796,3 @@ Provas mínimas: Graphify ausente/incompatível mantém busca básica; pergunta 
 - **Regressão/contrafactual:** candidato, estado desconhecido, cobertura stale, falha técnica, redelivery ou evidência retrospectiva nunca viram validação; remover filtros/atomicidade deve reprovar teste direcionado.
 
 Provas mínimas: todos os critérios obrigatórios sustentados produzem `validated`; insuficiência mantém `candidate`; contradição/perda de prova produz `needs_revalidation`; aceite do PI e merge não viram prova de impacto; reinício não zera tentativas; excesso pagina sem fingir completude; nenhuma chamada de modelo, Graphify ou serviço pago participa da avaliação. SPEC aprovada na revisão `4f47c12`; aprovação não é evidência de execução dos testes.
-- **Agregação:** `test-regras`, `test-banco` e `test-tela` publicam os arquivos declarados em
-  `test-report.config.json`. Como `reports/.raw` é diretório oculto, o upload usa
-  `include-hidden-files: true`; sem isso o job agregado baixaria cobertura sem os JSONs e a
-  evidência ficaria incompleta.
