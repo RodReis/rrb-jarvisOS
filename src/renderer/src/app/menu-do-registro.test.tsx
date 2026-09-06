@@ -54,6 +54,10 @@ beforeEach(() => {
     listPendingApprovals: vi.fn(async () => []),
     resolveApproval: vi.fn(),
     onAuthChanged: vi.fn(() => () => undefined),
+    // A rota inicial virou `voz` (SPEC-Voz-01): entrar no shell consulta a prontidão.
+    prontidaoDaVoz: vi.fn(async () => ({ pronta: false, faltando: [], compute: 'cpu-int8' })),
+    transcreverAudio: vi.fn(async () => ({ estado: 'sem-audio' })),
+    baixarArtefatoDeVoz: vi.fn(async () => ({ estado: 'ok' })),
     listProjects: vi.fn(async () => []),
     listPermittedDirectories: vi.fn(async () => []),
     // O Terminal é um dos itens visíveis, e o critério 2 abre **todos** eles: sem estes, o
@@ -105,10 +109,12 @@ describe('sidebar projetada do registro (critério 3)', () => {
     // O cabeçalho é estilizado em uppercase pelo CSS; o texto no DOM é o do i18n.
     await waitFor(() => expect(screen.getByText('Negócios')).toBeInTheDocument())
     expect(screen.getByText('Sistema')).toBeInTheDocument()
+    // COMANDO acendeu na SPEC-Voz-01: o microfone é o primeiro item que ele ganhou. É a
+    // projeção funcionando — a fatia registrou o módulo e o grupo apareceu sozinho.
+    expect(screen.getByText('Comando')).toBeInTheDocument()
     // Grupo sem item visível não é renderizado — um cabeçalho sozinho prometeria uma seção
     // que não leva a lugar nenhum.
     expect(screen.queryByText('Intel')).not.toBeInTheDocument()
-    expect(screen.queryByText('Comando')).not.toBeInTheDocument()
     expect(screen.queryByText('Operações')).not.toBeInTheDocument()
   })
 
@@ -156,7 +162,7 @@ describe('nenhuma rota visível cai no placeholder (critério 2)', () => {
     await entrarPelaChoice('jarvis')
     await waitFor(() => expect(itemDoMenu('Projects Hub')).toBeInTheDocument())
 
-    for (const item of ['Projects Hub', 'Terminal', 'Settings']) {
+    for (const item of ['Voz', 'Projects Hub', 'Terminal', 'Settings']) {
       await userEvent.click(itemDoMenu(item))
       // O texto do placeholder é o que a fatia promete nunca mais aparecer.
       expect(screen.queryByText(/conteúdo placeholder/i), `${item} caiu no placeholder`).toBeNull()

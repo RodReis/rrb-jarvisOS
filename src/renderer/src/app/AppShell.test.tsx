@@ -131,6 +131,15 @@ function mockarPonte(): void {
        * projetos, então o dublê precisa dela — sem isto o efeito estoura antes de o teste
        * chegar ao que mede, num arquivo que não é sobre projetos.
        */
+      /*
+       * A rota inicial do JARVIS virou `voz` (SPEC-Voz-01): COMANDO acendeu com o microfone e
+       * vem antes de NEGÓCIOS na ordem do protótipo. Entrar no shell consulta a prontidão da
+       * voz, então o dublê precisa dela — sem isto a tela nem monta, num arquivo que não é
+       * sobre voz.
+       */
+      prontidaoDaVoz: vi.fn(async () => ({ pronta: false, faltando: [], compute: 'cpu-int8' })),
+      transcreverAudio: vi.fn(async () => ({ estado: 'sem-audio' })),
+      baixarArtefatoDeVoz: vi.fn(async () => ({ estado: 'ok' })),
       listProjects: vi.fn(async () => []),
       createProject: vi.fn(),
       openProject: vi.fn(),

@@ -57,6 +57,7 @@ export const RECURSOS = {
          * módulo não vira item — quem decide isso é o registro, não esta tabela.
          */
         command: 'Command Center',
+        voz: 'Voz',
         hud: 'HUD',
         mission: 'Mission Control',
         specialties: 'Specialties',
@@ -93,6 +94,31 @@ export const RECURSOS = {
         TEAMS: 'Teams',
         GOVERNANCE: 'Governance',
         KNOWLEDGE: 'Knowledge'
+      },
+      voz: {
+        titulo: 'Voz',
+        verificando: 'Verificando o runtime de voz...',
+        problema: 'Problema na voz',
+        segureParaFalar: 'Segure para falar',
+        gravando: 'Ouvindo...',
+        transcrevendo: 'Transcrevendo...',
+        runtimeAusente:
+          'O runtime de transcricao ainda nao esta instalado nesta maquina. Ele roda local: nenhum audio sai daqui.',
+        baixar: 'Baixar o runtime de voz',
+        baixando: 'Baixando...',
+        falhou: 'Nao foi possivel transcrever. Tentar de novo.',
+        microfoneIndisponivel:
+          'O microfone nao esta disponivel. Verifique a permissao do sistema e o dispositivo padrao.',
+        compute: {
+          gpu: 'GPU (CUDA)',
+          cpu: 'CPU (int8)'
+        },
+        download: {
+          'hash-divergente':
+            'O arquivo baixado nao passou na verificacao de integridade e foi descartado. Tentar de novo.',
+          bloqueado: 'A origem do download nao esta na lista permitida.',
+          falhou: 'O download nao concluiu. Verifique a conexao e tente de novo.'
+        }
       },
       janela: {
         minimizar: 'Minimizar para a bandeja'
@@ -771,6 +797,7 @@ export const RECURSOS = {
         agenda: 'Calendar',
         // Nomes próprios do protótipo: os mesmos nos dois idiomas, de propósito.
         command: 'Command Center',
+        voz: 'Voice',
         hud: 'HUD',
         mission: 'Mission Control',
         specialties: 'Specialties',
@@ -806,6 +833,31 @@ export const RECURSOS = {
         TEAMS: 'Teams',
         GOVERNANCE: 'Governance',
         KNOWLEDGE: 'Knowledge'
+      },
+      voz: {
+        titulo: 'Voice',
+        verificando: 'Checking the voice runtime...',
+        problema: 'Voice problem',
+        segureParaFalar: 'Hold to talk',
+        gravando: 'Listening...',
+        transcrevendo: 'Transcribing...',
+        runtimeAusente:
+          'The transcription runtime is not installed on this machine yet. It runs locally: no audio leaves this device.',
+        baixar: 'Download the voice runtime',
+        baixando: 'Downloading...',
+        falhou: 'Could not transcribe. Try again.',
+        microfoneIndisponivel:
+          'The microphone is unavailable. Check system permission and the default device.',
+        compute: {
+          gpu: 'GPU (CUDA)',
+          cpu: 'CPU (int8)'
+        },
+        download: {
+          'hash-divergente':
+            'The downloaded file failed the integrity check and was discarded. Try again.',
+          bloqueado: 'The download origin is not on the allowed list.',
+          falhou: 'The download did not finish. Check your connection and try again.'
+        }
       },
       janela: {
         minimizar: 'Minimize to tray'

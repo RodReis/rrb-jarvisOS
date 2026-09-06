@@ -1,3 +1,5 @@
+import type { VozService } from '../voz/voz-service'
+import type { DesfechoDoDownload } from '@shared/domain/voz'
 import { app, dialog, ipcMain } from 'electron'
 import {
   IPC_CHANNELS,
@@ -368,6 +370,9 @@ export interface IpcDependencies {
   readonly runs: ExecutionRepository
   /** Fila de aprovações pendentes do usuário corrente. */
   readonly approvals: ApprovalRepository
+  /** O serviço de voz (SPEC-Voz-01). Injetado como todo o resto — o IPC não conhece o engine. */
+  readonly voz: VozService
+  readonly baixarArtefatoDeVoz: (id: string) => Promise<DesfechoDoDownload>
   /** Ausente quando as credenciais não estão configuradas — o app roda sem login. */
   readonly auth?: AuthService
   /** Ponto único de chamada de IA (SPEC-Providers-02): classifica, estima, audita, mede. */
@@ -736,6 +741,29 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       return deps.runs.list(deps.userId(), workspace)
     }
   )
+
+  /*
+   * Voz (SPEC-Voz-01, critério 3).
+   *
+   * Três canais, e o que eles **devolvem** é o ponto: texto ou desfecho nomeado. Nada de
+   * caminho de modelo, comando ou PID — com isso na mão, a tela deixaria de falar com uma
+   * capacidade e passaria a falar com uma implementação.
+   */
+  ipcMain.handle(IPC_CHANNELS.vozTranscrever, async (_event, pcm: unknown) => {
+    // O PCM atravessa a ponte como `Int16Array`; qualquer outra coisa é chamada malformada, e
+    // tratá-la como áudio vazio dá à tela o desfecho honesto em vez de uma exceção opaca.
+    if (!(pcm instanceof Int16Array)) return { estado: 'sem-audio' as const }
+    return deps.voz.transcrever(pcm)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.vozProntidao, async () => deps.voz.prontidao())
+
+  ipcMain.handle(IPC_CHANNELS.vozBaixarArtefato, async (_event, id: unknown) => {
+    if (typeof id !== 'string') {
+      return { estado: 'falhou' as const, motivo: 'Artefato não identificado.' }
+    }
+    return deps.baixarArtefatoDeVoz(id)
+  })
 
   ipcMain.handle(IPC_CHANNELS.approvalList, (_event, workspace: unknown) => {
     if (!isWorkspaceId(workspace)) return []

@@ -15,6 +15,7 @@ import {
 } from '@shared/contracts/ipc'
 import type { AlvoDaPublicacao, PublicacaoOutcome } from '@shared/domain/publicacao'
 import type { ExecutionLedger } from '@shared/domain/execution-ledger'
+import type { DesfechoDaTranscricao, DesfechoDoDownload, ProntidaoDaVoz } from '@shared/domain/voz'
 import type { PendenciaDeLimpeza } from '@shared/domain/limpeza'
 import type { MergePolicyOutcome, PoliticaDeMerge, VistaDaFila } from '@shared/domain/pipeline'
 import type { ContextPack, ContextPackOutcome, FalhaRegistrada } from '@shared/domain/context-pack'
@@ -190,6 +191,17 @@ const bridge: JarvisBridge = {
     ipcRenderer.invoke(IPC_CHANNELS.executionList, workspace),
   listPendingApprovals: (workspace: WorkspaceId): Promise<readonly ApprovalRequest[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.approvalList, workspace),
+
+  /*
+   * Voz (SPEC-Voz-01, critério 3). O renderer captura com `getUserMedia` — Web API, a fronteira
+   * renderer/Node não é tocada — e manda o PCM por aqui. O que volta é texto ou um desfecho
+   * nomeado; nunca o caminho do modelo nem o comando do sidecar.
+   */
+  transcreverAudio: (pcm: Int16Array, workspace: WorkspaceId): Promise<DesfechoDaTranscricao> =>
+    ipcRenderer.invoke(IPC_CHANNELS.vozTranscrever, pcm, workspace),
+  prontidaoDaVoz: (): Promise<ProntidaoDaVoz> => ipcRenderer.invoke(IPC_CHANNELS.vozProntidao),
+  baixarArtefatoDeVoz: (id: string): Promise<DesfechoDoDownload> =>
+    ipcRenderer.invoke(IPC_CHANNELS.vozBaixarArtefato, id),
   resolveApproval: (
     id: string,
     decision: ApprovalDecision
