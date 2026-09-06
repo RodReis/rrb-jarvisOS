@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ShieldCheck, Sparkles, X } from 'lucide-react'
+import { MessagesSquare, ShieldCheck, Sparkles, X } from 'lucide-react'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { DocumentoDoPacote } from '@shared/domain/pacote-estrutural'
 import { DOCUMENTOS_DO_PACOTE } from '@shared/domain/pacote-estrutural'
@@ -18,7 +18,9 @@ import {
   propostosDoDocumento
 } from '@shared/domain/prd'
 import { Button, EmptyState, Field, InlineAlert, Input, LoadingState } from '@design/ui'
+import type { Resposta, RespostaOutcome, VistaDoWizard } from '@shared/domain/wizard'
 import { log } from '../lib/log'
+import { WizardDoProjeto } from './WizardDoProjeto'
 
 /**
  * O PRD, o Landscape e a Convention, com o gate de aceite (SPEC-Jornada-03).
@@ -262,10 +264,26 @@ export function PrdDoProjeto({
   const [ocupado, setOcupado] = useState(false)
   const [desfecho, setDesfecho] = useState<PrdOutcome | null>(null)
   const [falhaNoAceite, setFalhaNoAceite] = useState(false)
+  /**
+   * A vista do pop-up das contradições (emenda E1) e se ele está aberto.
+   *
+   * A vista é lida do main **junto** da revisão: é ela que diz se ainda há pergunta ou se todas
+   * foram respondidas — a tela não conta decisões por conta própria. O pop-up abre sozinho
+   * quando a revisão que acabou de chegar tem pergunta pendente; fechar é permitido (o PI pode
+   * querer ler os documentos antes), e o botão da lista reabre onde parou.
+   */
+  const [vista, setVista] = useState<VistaDoWizard | null>(null)
+  const [respondendo, setRespondendo] = useState(false)
 
   const carregar = useCallback(async (): Promise<void> => {
     try {
-      setPrd(await window.jarvis.carregarPrd(projectId, workspace))
+      const [atual, contradicoes] = await Promise.all([
+        window.jarvis.carregarPrd(projectId, workspace),
+        window.jarvis.contradicoesDoPrd(projectId, workspace)
+      ])
+      setPrd(atual)
+      setVista(contradicoes)
+      setRespondendo(contradicoes?.estado.tipo === 'pergunta')
     } catch (error: unknown) {
       log.ui.error('Falha ao carregar o PRD', { error })
     } finally {
@@ -276,10 +294,15 @@ export function PrdDoProjeto({
   useEffect(() => {
     let ativo = true
 
-    window.jarvis
-      .carregarPrd(projectId, workspace)
-      .then((atual) => {
-        if (ativo) setPrd(atual)
+    Promise.all([
+      window.jarvis.carregarPrd(projectId, workspace),
+      window.jarvis.contradicoesDoPrd(projectId, workspace)
+    ])
+      .then(([atual, contradicoes]) => {
+        if (!ativo) return
+        setPrd(atual)
+        setVista(contradicoes)
+        setRespondendo(contradicoes?.estado.tipo === 'pergunta')
       })
       .catch((error: unknown) => {
         if (ativo) log.ui.error('Falha ao carregar o PRD', { error })
@@ -368,6 +391,20 @@ export function PrdDoProjeto({
     }
   }
 
+  /**
+   * Responde a uma contradição pelo pop-up e, **na última**, gera os documentos de novo
+   * (decisão do PI, 2026-09-06). O gatilho vive aqui, e não no main, porque é a tela que tem o
+   * termo de pesquisa confirmado — a geração é o mesmo ato do botão, com o mesmo termo.
+   */
+  async function responder(resposta: Resposta): Promise<RespostaOutcome> {
+    const desfecho = await window.jarvis.responderContradicaoDoPrd(projectId, resposta, workspace)
+    if (desfecho.reason === 'registrada' && desfecho.estado?.tipo === 'concluido') {
+      setRespondendo(false)
+      void gerar()
+    }
+    return desfecho
+  }
+
   if (carregando) return <LoadingState rotulo={t('prd.carregando')} />
 
   const liberado = prd !== null && podeAceitarPrd(prd)
@@ -452,12 +489,18 @@ export function PrdDoProjeto({
             contradizem. Cada uma traz a pergunta e a recomendação — nunca a correção aplicada.
           */}
           {prd.contradicoes.length > 0 && (
-            <section data-jos-contradicoes className="flex flex-col gap-2">
+            <section
+              data-jos-contradicoes
+              data-testid="prd-contradicoes"
+              className="flex flex-col gap-2"
+            >
               <InlineAlert
                 tom="warn"
                 titulo={t('prd.contradicoesTitulo', { count: prd.contradicoes.length })}
               >
-                {t('prd.contradicoesDescricao')}
+                {vista?.estado.tipo === 'concluido'
+                  ? t('prd.contradicoesRespondidas')
+                  : t('prd.contradicoesDescricao')}
               </InlineAlert>
 
               <ul className="flex flex-col gap-3">
@@ -468,14 +511,27 @@ export function PrdDoProjeto({
                     className="flex flex-col gap-1 rounded-[var(--jos-raio-card)] border border-[rgba(var(--jos-borda-rgb),0.16)] p-4"
                   >
                     <p className="max-w-[58ch] text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto)]">
-                      {c.pergunta}
+                      {c.enunciado}
                     </p>
                     <p className="max-w-[58ch] text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-secundario)]">
-                      {t('prd.recomendacao', { texto: c.recomendacao })}
+                      {t('prd.recomendacao', { texto: c.justificativa })}
                     </p>
                   </li>
                 ))}
               </ul>
+
+              {vista?.estado.tipo === 'pergunta' && (
+                <div>
+                  <Button
+                    variante="primaria"
+                    onClick={() => setRespondendo(true)}
+                    desabilitado={ocupado}
+                    iconeInicial={<MessagesSquare aria-hidden="true" className="size-4" />}
+                  >
+                    {t('prd.responderContradicoes')}
+                  </Button>
+                </div>
+              )}
             </section>
           )}
 
@@ -534,6 +590,26 @@ export function PrdDoProjeto({
             </div>
           </section>
         </>
+      )}
+
+      {respondendo && (
+        <WizardDoProjeto
+          workspace={workspace}
+          projectId={projectId}
+          nomeDoProjeto={nomeDoProjeto}
+          aberto
+          titulo={t('prd.contradicoesPopupTitulo', { nome: nomeDoProjeto })}
+          descricao={t('prd.contradicoesPopupDescricao')}
+          /*
+           * A contradição é a mesma decisão que o refinamento conduz (M8-F03), com outra origem:
+           * a pergunta vive na revisão do PRD, e a resposta vai ao mesmo repositório de decisões.
+           */
+          fonte={{
+            ler: () => window.jarvis.contradicoesDoPrd(projectId, workspace),
+            responder
+          }}
+          onFechar={() => setRespondendo(false)}
+        />
       )}
     </div>
   )

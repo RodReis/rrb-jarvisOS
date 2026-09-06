@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PrdDoProjeto } from './PrdDoProjeto'
@@ -23,6 +23,8 @@ const gerarPrd = vi.fn()
 const carregarPrd = vi.fn()
 const cortarPropostoDoPrd = vi.fn()
 const aplicarEventoDaJornada = vi.fn()
+const contradicoesDoPrd = vi.fn()
+const responderContradicaoDoPrd = vi.fn()
 
 function afirmacao(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -65,6 +67,8 @@ beforeEach(() => {
   carregarPrd.mockReset().mockResolvedValue(null)
   cortarPropostoDoPrd.mockReset().mockResolvedValue(null)
   aplicarEventoDaJornada.mockReset().mockResolvedValue({ resultado: 'avancou' })
+  contradicoesDoPrd.mockReset().mockResolvedValue(null)
+  responderContradicaoDoPrd.mockReset().mockResolvedValue({ reason: 'registrada', mensagem: 'ok' })
 
   Object.defineProperty(window, 'jarvis', {
     value: {
@@ -73,6 +77,8 @@ beforeEach(() => {
       carregarPrd,
       cortarPropostoDoPrd,
       aplicarEventoDaJornada,
+      contradicoesDoPrd,
+      responderContradicaoDoPrd,
       sendLog: vi.fn()
     },
     configurable: true,
@@ -251,32 +257,119 @@ describe('bloqueio do Landscape (critério 4)', () => {
   })
 })
 
-describe('contradições (critério 6)', () => {
-  const COM_CONTRADICAO = prd({
-    contradicoes: [
-      {
-        id: 'c-1',
-        afirmacoes: ['a-1', 'b-1'],
-        pergunta: 'O produto é local ou na nuvem?',
-        recomendacao: 'Local, como o brief diz.'
-      }
-    ]
-  })
+describe('contradições — pergunta no pop-up da M8-F03 (critério 6, emenda E1)', () => {
+  const CONTRADICAO = {
+    id: 'c-1',
+    etapa: 'prd',
+    afirmacoes: ['a-1', 'b-1'],
+    titulo: 'Local ou nuvem',
+    enunciado: 'O produto é local ou na nuvem?',
+    opcoes: [
+      { id: 'a', rotulo: 'Local', impacto: 'Sem sync entre máquinas.' },
+      { id: 'b', rotulo: 'Nuvem', impacto: 'Exige conta e rede.' }
+    ],
+    recomendada: 'a',
+    justificativa: 'Local, como o brief diz.',
+    aceitaTextoLivre: true,
+    delegavel: true
+  }
+  const COM_CONTRADICAO = prd({ contradicoes: [CONTRADICAO] })
+  const VISTA_PENDENTE = {
+    estado: { tipo: 'pergunta', pergunta: CONTRADICAO, restantes: 1 },
+    historico: []
+  }
 
-  it('mostra a pergunta e a recomendação, nunca uma correção já aplicada', async () => {
+  it('o pop-up abre sozinho com a pergunta e as opções, e a recomendada vem primeiro', async () => {
     carregarPrd.mockResolvedValue(COM_CONTRADICAO)
+    contradicoesDoPrd.mockResolvedValue(VISTA_PENDENTE)
     montar()
 
-    expect(await screen.findByText(/O produto é local ou na nuvem/i)).toBeInTheDocument()
-    expect(screen.getByText(/Local, como o brief diz/i)).toBeInTheDocument()
+    const dialogo = await screen.findByRole('dialog')
+    expect(await within(dialogo).findByText(/O produto é local ou na nuvem/i)).toBeInTheDocument()
+    const opcoes = within(dialogo).getAllByRole('radio')
+    expect(opcoes[0]).toHaveAccessibleName(/Local/)
+    expect(opcoes[0]).not.toBeChecked()
+    expect(within(dialogo).getByRole('button', { name: /Decide por mim/i })).toBeInTheDocument()
+  })
+
+  it('a lista inline mostra a pergunta e a justificativa, nunca uma correção aplicada', async () => {
+    carregarPrd.mockResolvedValue(COM_CONTRADICAO)
+    contradicoesDoPrd.mockResolvedValue(VISTA_PENDENTE)
+    montar()
+
+    const lista = await screen.findByTestId('prd-contradicoes')
+    expect(within(lista).getByText(/O produto é local ou na nuvem/i)).toBeInTheDocument()
+    expect(within(lista).getByText(/Local, como o brief diz/i)).toBeInTheDocument()
   })
 
   it('trava o aceite, com a razão ao lado do botão', async () => {
     carregarPrd.mockResolvedValue(COM_CONTRADICAO)
+    contradicoesDoPrd.mockResolvedValue(VISTA_PENDENTE)
     montar()
 
-    expect(await screen.findByRole('button', { name: /Aceitar o PRD/i })).toBeDisabled()
-    expect(screen.getByText(/Resolva as contradições acima/i)).toBeInTheDocument()
+    // O modal esconde o resto da página (aria-hidden); o aceite se confere com ele fechado.
+    const dialogo = await screen.findByRole('dialog')
+    await userEvent.click(within(dialogo).getAllByRole('button', { name: /Fechar/i })[0]!)
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+    expect(screen.getByRole('button', { name: /Aceitar o PRD/i })).toBeDisabled()
+    expect(screen.getByText(/Resolva as contradições/i)).toBeInTheDocument()
+  })
+
+  it('responder a última contradição gera os documentos de novo, sozinho, com o termo confirmado', async () => {
+    carregarPrd.mockResolvedValue(COM_CONTRADICAO)
+    contradicoesDoPrd.mockResolvedValue(VISTA_PENDENTE)
+    responderContradicaoDoPrd.mockResolvedValue({
+      reason: 'registrada',
+      mensagem: 'ok',
+      estado: { tipo: 'concluido', decisoes: [] }
+    })
+    montar()
+
+    const dialogo = await screen.findByRole('dialog')
+    await userEvent.click(await within(dialogo).findByRole('radio', { name: /Nuvem/ }))
+    await userEvent.click(within(dialogo).getByRole('button', { name: /Confirmar/i }))
+
+    await waitFor(() =>
+      expect(gerarPrd).toHaveBeenCalledWith('p-1', 'ferramentas de leitura', 'jarvis')
+    )
+    expect(responderContradicaoDoPrd).toHaveBeenCalledWith(
+      'p-1',
+      expect.objectContaining({ perguntaId: 'c-1', escolha: 'b', autor: 'pi' }),
+      'jarvis'
+    )
+  })
+
+  it('com contradição que sobra, responder não regera — só avança para a próxima', async () => {
+    carregarPrd.mockResolvedValue(COM_CONTRADICAO)
+    contradicoesDoPrd.mockResolvedValue(VISTA_PENDENTE)
+    responderContradicaoDoPrd.mockResolvedValue({
+      reason: 'registrada',
+      mensagem: 'ok',
+      estado: { tipo: 'pergunta', pergunta: { ...CONTRADICAO, id: 'c-2' }, restantes: 1 }
+    })
+    montar()
+
+    const dialogo = await screen.findByRole('dialog')
+    await userEvent.click(await within(dialogo).findByRole('radio', { name: /Nuvem/ }))
+    await userEvent.click(within(dialogo).getByRole('button', { name: /Confirmar/i }))
+
+    await waitFor(() => expect(responderContradicaoDoPrd).toHaveBeenCalled())
+    expect(gerarPrd).not.toHaveBeenCalled()
+  })
+
+  it('fechar o pop-up deixa o botão de reabrir na lista', async () => {
+    carregarPrd.mockResolvedValue(COM_CONTRADICAO)
+    contradicoesDoPrd.mockResolvedValue(VISTA_PENDENTE)
+    montar()
+
+    const dialogo = await screen.findByRole('dialog')
+    // Dois botões respondem por 'Fechar': o do rodapé e o 'X' do Radix. Qualquer um serve.
+    await userEvent.click(within(dialogo).getAllByRole('button', { name: /Fechar/i })[0]!)
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    await userEvent.click(screen.getByRole('button', { name: /Responder às contradições/i }))
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
   })
 })
 
