@@ -546,6 +546,14 @@ const bridge: JarvisBridge = {
     workspace: WorkspaceId
   ): Promise<PrdRegistrado | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.prdCortarProposto, projectId, afirmacaoId, workspace),
+  contradicoesDoPrd: (projectId: string, workspace: WorkspaceId): Promise<VistaDoWizard | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.prdContradicoes, projectId, workspace),
+  responderContradicaoDoPrd: (
+    projectId: string,
+    resposta: Resposta,
+    workspace: WorkspaceId
+  ): Promise<RespostaOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.prdResponderContradicao, projectId, resposta, workspace),
   // A arquitetura, as decisões, os testes e a revisão (SPEC-Jornada-04). Descartar um ajuste é
   // canal próprio, e não um "aplicar": nenhum destes escreve no anexo do PI (critério 4).
   gerarArquiteturaPorIa: (

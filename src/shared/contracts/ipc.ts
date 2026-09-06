@@ -507,6 +507,16 @@ export const IPC_CHANNELS = {
   prdGerar: 'prd:gerar',
   prdCarregar: 'prd:carregar',
   prdCortarProposto: 'prd:cortar-proposto',
+  /**
+   * As contradições do PRD como perguntas (emenda E1 da SPEC-Jornada-03).
+   *
+   * Mesma divisão do refinamento: `contradicoes` **lê** a vista do pop-up (pergunta pendente
+   * ou conclusão, mais o histórico) e `responder-contradicao` grava — e recebe só o id da
+   * pergunta, nunca o enunciado, porque a pergunta vive na revisão gravada e aceitar o texto
+   * de volta deixaria o renderer reescrever o que o PI leu.
+   */
+  prdContradicoes: 'prd:contradicoes',
+  prdResponderContradicao: 'prd:responder-contradicao',
   arquiteturaGerarPorIa: 'arquitetura:gerar-por-ia',
   arquiteturaCarregar: 'arquitetura:carregar',
   arquiteturaCortarProposto: 'arquitetura:cortar-proposto',
@@ -1278,6 +1288,14 @@ export interface JarvisBridge {
     afirmacaoId: string,
     workspace: WorkspaceId
   ): Promise<PrdRegistrado | null>
+  /** A vista do pop-up das contradições da revisão vigente; `null` sem revisão. */
+  contradicoesDoPrd(projectId: string, workspace: WorkspaceId): Promise<VistaDoWizard | null>
+  /** Registra a resposta a uma contradição (ou a delegação). Recusa volta como outcome. */
+  responderContradicaoDoPrd(
+    projectId: string,
+    resposta: Resposta,
+    workspace: WorkspaceId
+  ): Promise<RespostaOutcome>
   /**
    * Gera a arquitetura, as decisões, os testes e a revisão por IA (SPEC-Jornada-04).
    *

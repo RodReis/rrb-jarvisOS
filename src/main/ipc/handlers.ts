@@ -185,6 +185,33 @@ function parsePolicyContext(value: unknown): PolicyContext {
  * cuja origem o app não reconhece entraria no manifesto declarando uma procedência inventada, e
  * a origem é justamente o que distingue "o usuário anexou" de "a busca encontrou".
  */
+/**
+ * A **forma** de uma `Resposta` vinda do renderer. O vocabulário — a escolha ser opção real, a
+ * delegação ser permitida — é do serviço; barrar aqui duplicaria a regra em dois lugares que
+ * divergiriam. `undefined` é "forma inválida", e quem chama decide o outcome.
+ */
+function lerResposta(resposta: unknown): Resposta | undefined {
+  const r = resposta as Partial<Resposta> | null
+  if (
+    r === null ||
+    typeof r !== 'object' ||
+    typeof r.perguntaId !== 'string' ||
+    (r.escolha !== null && typeof r.escolha !== 'string') ||
+    (r.texto !== null && typeof r.texto !== 'string') ||
+    (r.autor !== 'pi' && r.autor !== 'agente')
+  ) {
+    return undefined
+  }
+
+  return {
+    perguntaId: r.perguntaId,
+    escolha: r.escolha ?? null,
+    texto: r.texto ?? null,
+    autor: r.autor,
+    ...(r.aceitarSubstituicao === true ? { aceitarSubstituicao: true } : {})
+  }
+}
+
 function parsePedidoDeContexto(value: unknown): PedidoDeContexto | undefined {
   if (typeof value !== 'object' || value === null) return undefined
   const source = value as Record<string, unknown>
@@ -1949,6 +1976,30 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     }
   )
 
+  ipcMain.handle(
+    IPC_CHANNELS.prdContradicoes,
+    (_event, projectId: unknown, workspace: unknown): VistaDoWizard | null => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return null
+      return deps.prd.contradicoes(projectId) ?? null
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.prdResponderContradicao,
+    (_event, projectId: unknown, resposta: unknown, workspace: unknown): RespostaOutcome => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
+        return { reason: 'projeto-inexistente', mensagem: 'Projeto não encontrado.' }
+      }
+
+      const lida = lerResposta(resposta)
+      if (lida === undefined) {
+        return { reason: 'escolha-invalida', mensagem: 'Resposta com forma inválida.' }
+      }
+
+      return deps.prd.responderContradicao(projectId, lida, workspace)
+    }
+  )
+
   /*
    * A arquitetura, as decisões, os testes e a revisão gerados por IA (SPEC-Jornada-04).
    *
@@ -2051,29 +2102,12 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       }
       if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return invalida
 
-      const r = resposta as Partial<Resposta> | null
-      if (
-        r === null ||
-        typeof r !== 'object' ||
-        typeof r.perguntaId !== 'string' ||
-        (r.escolha !== null && typeof r.escolha !== 'string') ||
-        (r.texto !== null && typeof r.texto !== 'string') ||
-        (r.autor !== 'pi' && r.autor !== 'agente')
-      ) {
+      const lida = lerResposta(resposta)
+      if (lida === undefined) {
         return { reason: 'escolha-invalida', mensagem: 'Resposta com forma inválida.' }
       }
 
-      return deps.refinamento.responder(
-        projectId,
-        {
-          perguntaId: r.perguntaId,
-          escolha: r.escolha ?? null,
-          texto: r.texto ?? null,
-          autor: r.autor,
-          ...(r.aceitarSubstituicao === true ? { aceitarSubstituicao: true } : {})
-        },
-        workspace
-      )
+      return deps.refinamento.responder(projectId, lida, workspace)
     }
   )
 
