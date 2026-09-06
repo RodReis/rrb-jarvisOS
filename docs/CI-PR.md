@@ -31,6 +31,12 @@ com `--check`. Lint e prova visual atrasavam a subida do banco sem depender dela
   consulta releases no GitHub e pode falhar por rate limit antes de qualquer teste rodar.
 - Template de PR com problema, rastreabilidade, evidência e limites.
 
+Baseline validada no Windows: Node host `24.15.0`, Electron `43.2.0` com Node embarcado
+`24.18.0` e módulos nativos recompilados para seu ABI. Os JSONs brutos da execução completa
+registram 3.373 testes aprovados, 14 `pending` (ignorados) e 1 `todo` (pendente), sem falhas; typecheck e build
+também passaram. Esses números descrevem essa revisão do jarvisOS e não viram requisito fixo para
+outros projetos ou execuções futuras.
+
 Estimativa feita na #311, baseada nesta execução: caminho crítico próximo de 8 minutos, contra
 16min33s. **Superada pela medição da #312**, registrada logo abaixo — fica como registro do que
 se projetou, não como número vigente.
@@ -38,9 +44,10 @@ se projetou, não como número vigente.
 A paralelização adiciona duas instalações npm curtas; a remoção da segunda suíte elimina
 cerca de cinco minutos de runner observados. Não se usa cache de resultados de teste.
 
-Nova medição da #312, após rebase sobre a #311 e paralelização das categorias: workflow
-completo em 4min56s. `test-regras` passou em 54s, `test-tela` em 3min22s,
-`test-banco` em 4min34s, `test` agregado em 11s e `gate` em 3s. O caminho crítico
+Medição final da #312, no run `34054899376` do head `b94a46d`, depois do rebase sobre a #311 e
+da paralelização das categorias: workflow completo em aproximadamente 6min16s.
+`test-regras` passou em 44s, `test-tela` em 3min09s, `test-banco` em 5min51s,
+`test` agregado em 11s e `gate` em 5s. O caminho crítico
 restante é o banco/Supabase, não mais a soma das três categorias Vitest.
 
 ## Rotina de PR
