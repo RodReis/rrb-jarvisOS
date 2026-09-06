@@ -7,7 +7,7 @@ const handle = vi.fn()
 const on = vi.fn()
 const writeLog = vi.fn()
 const showOpenDialog = vi.fn()
-const logIpc = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+const logIpc = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 
 vi.mock('electron', () => ({
   app: {

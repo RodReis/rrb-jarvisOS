@@ -14,7 +14,7 @@ import type { Database as Db } from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SCHEMA_VERSION } from './migrations'
 
-const logDb = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+const logDb = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 vi.mock('../logging/logger', () => ({ log: new Proxy({}, { get: () => logDb }) }))
 
 const { openDatabase } = await import('./database')
@@ -327,13 +327,17 @@ describe('perfil de usuário', () => {
 })
 
 describe('instrumentação do logger (critério de aceite 7)', () => {
-  it('emite info na categoria db ao gravar com sucesso', () => {
+  it('emite debug na categoria db ao gravar com sucesso (#319)', () => {
+    // `debug`, e não `info`: uma linha por evento de auditoria gravado enchia o terminal (197
+    // de 420 linhas numa geração de PRD). O registro durável é a tabela `audit_event`, e a
+    // linha de log só a duplicava — ela continua existindo, um nível abaixo.
     audit.append({ user_id: 'u-1', type: 'login' })
 
-    expect(logDb.info).toHaveBeenCalledWith(
+    expect(logDb.debug).toHaveBeenCalledWith(
       'Evento de auditoria registrado',
       expect.objectContaining({ op: 'insert', table: 'audit_event' })
     )
+    expect(logDb.info).not.toHaveBeenCalled()
   })
 
   it('emite error na categoria db quando a gravação falha', () => {

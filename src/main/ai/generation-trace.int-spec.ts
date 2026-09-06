@@ -13,7 +13,7 @@ import type { Database as Db } from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GenerationEvent } from '@shared/domain/geracao'
 
-const logDb = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+const logDb = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 vi.mock('../logging/logger', () => ({ log: new Proxy({}, { get: () => logDb }) }))
 
 const { openDatabase } = await import('../storage/database')

@@ -521,7 +521,9 @@ export class TerminalEngine {
      * persistida. Ver `CommandSubmission.saidaEhConteudo`.
      */
     this.auditar(semConteudo(execucao, ctx.submission), exitCode === 0 ? 'depois' : 'erro')
-    log.agent.info('Comando executado no terminal controlado', {
+    // `debug` (#319): um comando do marco documental são dois `AuditEvent` e esta linha; num
+    // commit de PRD isso enchia o console. A execução em si já está auditada logo acima.
+    log.agent.debug('Comando executado no terminal controlado', {
       executionId: execucao.id,
       exitCode,
       durationMs,

@@ -8,6 +8,14 @@ describe('parseLogInput', () => {
     expect(parseLogInput(valido)).toEqual(valido)
   })
 
+  it('aceita debug — o nível existe na API, ainda que não vá a arquivo (#319)', () => {
+    // Validar contra os níveis de arquivo faria o `log.ui.debug` do renderer sumir em silêncio
+    // na travessia da ponte: sem erro, sem registro.
+    const entrada = { ...valido, level: 'debug' }
+
+    expect(parseLogInput(entrada)).toEqual(entrada)
+  })
+
   it('aceita os campos opcionais do contrato', () => {
     const entrada = {
       ...valido,

@@ -19,6 +19,7 @@ Não há como monitorar em tempo real o que a aplicação faz — falhas de auth
    - A ponte roteia os registros do `electron-log` (renderer) para o `winston` (main). Um só dono do arquivo evita dois escritores concorrentes.
 2. **Registro estruturado (JSON)** com `ts`, `level`, `category`, `direction?`, `workspace`, `msg` (pt-BR), `ctx`, `correlationId`, `pid`, `source`. Categorias: `integracao`/`ai`/`agent`/`db`/`auth`/`ipc`/`ui`/`sistema`.
 3. **Retenção por nível, zipada, local:** `info` 3 dias, `warn` 7 dias, `error` 10 dias (`zippedArchive`, `maxFiles` em dias), em `userData/logs/`.
+   - *Correção [#319](https://github.com/RodReis/rrb-jarvisOS/issues/319) (2026-09-06): existe um quarto nível, **`debug`**, que **não é gravado** — logo, não tem retenção nem arquivo. Ele recebe o registro que acontece por linha gravada (cada `AuditEvent` persistido, cada decisão de política, cada comando do terminal), que tomava 197 de 420 linhas do console numa geração de PRD e enterrava o que se precisa ler. Nada some: o registro durável desses fatos é a própria tabela `audit_event` (item 6 e ADR-004), e o console de desenvolvimento continua mostrando o nível. Contrato em `NIVEIS_DO_LOG`; `LOG_LEVELS` segue sendo só o que vai a arquivo.*
 4. **Redaction obrigatória:** segredo/token e campos `credential|secret` nunca gravados; `personal|financial|health` mascarados (CONVENTION §2). Log é `sensitivity: internal` no mínimo.
 5. **Cobertura NOA + JARVIS** por campo `workspace` (stream único etiquetado), não por diretório separado — o monitor futuro filtra por campo.
 

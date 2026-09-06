@@ -56,7 +56,8 @@ export class PolicyService {
     })
 
     // Categoria `agent`: a decisão de política é do runtime agente, não da UI nem do storage.
-    log.agent.info('Decisão de política registrada', {
+    // `debug` (#319): uma decisão por comando avaliado, e o `AuditEvent` acima já é a evidência.
+    log.agent.debug('Decisão de política registrada', {
       action: decision.action,
       tier: decision.tier,
       outcome: decision.outcome,
