@@ -93,7 +93,13 @@ export default tseslint.config(
     // importado de qualquer forma: `src/design/` e `src/renderer/` já não alcançam node_modules
     // de provider pelas suas próprias fronteiras.
     files: ['src/main/**/*.ts'],
-    ignores: ['src/main/ai/anthropic-adapter.ts', 'src/main/ai/*.int-spec.ts'],
+    ignores: [
+      'src/main/ai/anthropic-adapter.ts',
+      'src/main/ai/*.int-spec.ts',
+      // A implementação do engine de STT é quem pode importar o runtime dele.
+      'src/main/voz/faster-whisper-engine.ts',
+      'src/main/voz/*.int-spec.ts'
+    ],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -103,6 +109,15 @@ export default tseslint.config(
               group: ['@anthropic-ai/*'],
               message:
                 'Critério 1 (SPEC-Providers-02): só o adapter do provider importa o SDK dele. O resto do app fala com a interface `AiAdapter` — é isso que torna trocar de provider uma questão de escrever outro adapter.'
+            },
+            {
+              // Mesmo desenho, mesma razão (SPEC-Voz-01, critério 1): o app fala com
+              // `SttEngine`, nunca com o runtime concreto. A `ignores` acima libera só a
+              // implementação — trocar de engine tem de ser escrever outra, não caçar imports
+              // espalhados pelo main.
+              group: ['faster-whisper*', 'whisper*', 'onnxruntime*'],
+              message:
+                'Critério 1 (SPEC-Voz-01): só a implementação do engine conhece o runtime de STT. O resto do app fala com a interface `SttEngine`.'
             }
           ]
         }
