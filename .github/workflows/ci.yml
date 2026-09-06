@@ -2,15 +2,16 @@ name: CI — testes + relatório de evidência
 
 # ADR-003: evidência de teste gerada por máquina e verificada, nunca narrada.
 #
-# Três jobs (card #34):
+# Jobs independentes; gate único obrigatório (cards #34 e #66):
+#   quality / visual — lint + typecheck e prova visual em paralelo ao relatório.
 #   test — roda em TODO PR: runners unitários/integração (regras/banco/tela-componente),
 #          gera reports/TESTS.md a partir do --json e barra o merge se o relatório
 #          commitado divergir de uma execução limpa (guarda anti-drift). NÃO roda E2E.
 #   e2e  — sobe o app Electron de verdade (build + xvfb + keyring + Playwright). Custa
-#          ~15 min e prova a fronteira preload/IPC/janela, que muda raramente. Só EXECUTA
+#          tempo variável e prova a fronteira preload/IPC/janela, que muda raramente. Só EXECUTA
 #          quando o PR toca essa fronteira (ver o job `changes`); nos demais é no-op verde.
-#   gate — required check único. Sempre roda; agrega `test` e `e2e`. Falha se `test` falhou
-#          ou se o `e2e` rodou e falhou; passa quando o E2E foi legitimamente pulado. É ele,
+#   gate — required check único. Exige changes, quality, visual e test com sucesso;
+#          E2E só pode ser pulado quando changes confirma frontier=false. É ele,
 #          não `e2e`, que a branch protection exige — assim o E2E condicional nunca fica
 #          "pending eterno" bloqueando o merge (a armadilha do required check pulado).
 #
@@ -43,6 +44,7 @@ jobs:
   # então o filtro vive aqui, num step, e vira output que o `e2e` consulta no seu `if:`.
   changes:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       frontier: ${{ steps.filter.outputs.frontier }}
     steps:
@@ -63,7 +65,8 @@ jobs:
             'src/main/index.ts' \
             'src/main/window.ts' \
             'tests/e2e/**' \
-            'playwright.config.ts' || true)
+            'playwright.config.ts' \
+            '.github/workflows/ci.yml')
           if [ -n "$changed" ]; then
             echo "frontier=true" >> "$GITHUB_OUTPUT"
             echo "PR toca a fronteira do E2E — o job e2e vai rodar:"
@@ -73,8 +76,52 @@ jobs:
             echo "PR não toca a fronteira do E2E — job e2e pulado (no-op verde no gate)."
           fi
 
+  # Verificações independentes: não atrasam a inicialização do banco e a suíte.
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Lint e typecheck
+        run: |
+          npm run lint
+          npm run typecheck
+
+  visual:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Instalar dependências
+        run: npm ci
+
+      # Prova visual dos controles (SPEC-DesignSystem-03a): sobe a galeria num Chromium de
+      # verdade e mede o que jsdom não mede — altura real dos controles, contraste computado,
+      # fontes carregadas, anel de foco pintado. Independente da suíte de relatório e pega classe de defeito que
+      # nenhum teste de papel pega. É Chromium headless, não o Electron: fica no job `visual`,
+      # não no `e2e` (que sobe o app empacotado). Ver docs/TESTING.md.
+      #
+      # `--with-deps chromium` e não o browser inteiro: só o Chromium é usado aqui.
+      - name: Instalar o Chromium do Playwright (galeria de prova)
+        run: npx playwright install --with-deps chromium
+
+      - name: Prova visual dos controles
+        run: npm run test:prova
+
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     # Sem `services:`: a maior parte da categoria "Banco" testa o storage local (SQLite em
     # arquivo temporário), que não é serviço (docs/TESTING.md §6). A exceção é o Supabase
     # local, que sobe abaixo pela CLI — `services:` não serviria, porque não é um container
@@ -120,24 +167,6 @@ jobs:
 
       - name: Instalar dependências
         run: npm ci
-
-      - name: Lint e typecheck
-        run: |
-          npm run lint
-          npm run typecheck
-
-      # Prova visual dos controles (SPEC-DesignSystem-03a): sobe a galeria num Chromium de
-      # verdade e mede o que jsdom não mede — altura real dos controles, contraste computado,
-      # fontes carregadas, anel de foco pintado. Barata (~5s) e pega classe de defeito que
-      # nenhum teste de papel pega. É Chromium headless, não o Electron: fica no job `test`,
-      # não no `e2e` (que sobe o app empacotado). Ver docs/TESTING.md.
-      #
-      # `--with-deps chromium` e não o browser inteiro: só o Chromium é usado aqui.
-      - name: Instalar o Chromium do Playwright (galeria de prova)
-        run: npx playwright install --with-deps chromium
-
-      - name: Prova visual dos controles
-        run: npm run test:prova
 
       # SPEC-Execucao-01, critério 6: o int-spec de RLS exercita a stack real, então o CI
       # a sobe. Sem este step o arquivo **passaria pulando** — os testes se pulam quando a
@@ -199,18 +228,15 @@ jobs:
       # A categoria "Tela" do relatório é só vitest-componente (jsdom) — o E2E saiu daqui
       # (card #34, vive no job `e2e`). O relatório não precisa mais de xvfb, keyring,
       # setuid nem do build do app: tudo isso migrou para o job `e2e`.
-      - name: Rodar testes + guarda anti-drift
+      - name: Rodar testes + guardas de relatório e histórico (execução única)
         env:
           REPORT_BASE_REF: origin/${{ github.base_ref }}
-        run: npm run test:report:check
-
-      # Terceira guarda: números certos + histórico íntegro ainda deixavam
-      # passar uma entrega SEM linha no histórico — no repo de origem duas
-      # entregas mergearam com a tabela sugerindo que não tiveram teste. Roda
-      # depois do --check para que a falha de números apareça antes.
-      - name: Guarda — a entrega está carimbada no histórico?
-        if: env.REQUIRE_ENTRY == '1'
-        run: npm run test:report:check -- --require-entry
+        run: |
+          if [ "${REQUIRE_ENTRY:-0}" = "1" ]; then
+            npm run test:report:check -- --require-entry
+          else
+            npm run test:report:check
+          fi
 
       - name: Publicar tabela no job summary
         if: always()
@@ -245,6 +271,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.frontier == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -350,13 +377,11 @@ jobs:
             exec xvfb-run --auto-servernum npx playwright test
           '
 
-  # Required check único (branch protection exige `gate`, não `e2e`). Sempre roda —
-  # `if: always()` — e agrega os resultados: falha se `test` falhou, ou se `e2e` RODOU e
-  # falhou. Passa quando `e2e` foi legitimamente pulado (`result == 'skipped'`), que é o
-  # que impede o E2E condicional de bloquear o merge em "pending eterno". Um E2E que falha
-  # de verdade tem `result == 'failure'` e derruba o gate — a garantia do card #34 fica de pé.
+  # Required check único: todas as provas obrigatórias e a decisão do filtro.
+  # always() garante que uma dependência com falha não dispense o gate.
   gate:
-    needs: [test, e2e]
+    needs: [changes, quality, visual, test, e2e]
+    timeout-minutes: 5
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -364,18 +389,29 @@ jobs:
         env:
           TEST_RESULT: ${{ needs.test.result }}
           E2E_RESULT: ${{ needs.e2e.result }}
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          FRONTIER: ${{ needs.changes.outputs.frontier }}
+          QUALITY_RESULT: ${{ needs.quality.result }}
+          VISUAL_RESULT: ${{ needs.visual.result }}
         run: |
           set -euo pipefail
           echo "test = $TEST_RESULT"
           echo "e2e  = $E2E_RESULT"
+          for result in "$CHANGES_RESULT" "$QUALITY_RESULT" "$VISUAL_RESULT"; do
+            if [ "$result" != "success" ]; then
+              echo "::error::Detecção, lint/typecheck ou prova visual não passou ($result)."
+              exit 1
+            fi
+          done
           if [ "$TEST_RESULT" != "success" ]; then
             echo "::error::O job test nao passou ($TEST_RESULT)."
             exit 1
           fi
           # `e2e` é aceitável em success (rodou e passou) ou skipped (PR não toca a fronteira).
           # Qualquer outra coisa — failure, cancelled — barra o merge.
-          if [ "$E2E_RESULT" != "success" ] && [ "$E2E_RESULT" != "skipped" ]; then
-            echo "::error::O job e2e rodou e nao passou ($E2E_RESULT)."
+          if ! { [ "$FRONTIER" = "true" ] && [ "$E2E_RESULT" = "success" ]; } &&
+             ! { [ "$FRONTIER" = "false" ] && [ "$E2E_RESULT" = "skipped" ]; }; then
+            echo "::error::E2E incompatível com a fronteira ($FRONTIER): $E2E_RESULT."
             exit 1
           fi
           echo "Gate verde: test OK; e2e $E2E_RESULT (aceitável)."

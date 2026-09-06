@@ -1,5 +1,7 @@
 # DEVELOPMENT.md — Ordem de execução e status
 
+> **Infra de CI (2026-09-06):** otimização autorizada pelo PI após a PR #308: suíte única com todas as guardas, lint/typecheck e prova visual paralelos, gate fechado em falhas. Diagnóstico e critérios em [CI-PR.md](CI-PR.md). Rastreabilidade e resultado remoto na issue [#310](https://github.com/RodReis/rrb-jarvisOS/issues/310) e na PR vinculada.
+
 **Dono: Claude Code.** Atualize este arquivo a cada entrega, junto com `STATUS.md`. Aqui vive o *"onde estou dentro da fatia"* (passos com checkmarks); o *"qual fatia está em qual coluna"* vive nas GitHub Issues / `STATUS.md`. Nenhum fato mora nos dois lugares.
 
 Regra de trabalho: **uma fatia por vez (WIP = 1)**. Só iniciar fatia com spec `aprovada-pi` e issue criada.

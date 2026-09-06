@@ -419,21 +419,25 @@ registradas no código de referência da §10):
 
 Dispara em **todo pull request** para `main`. Um bloco `concurrency` (card #66) cancela a execução
 anterior quando chega um push novo no mesmo PR — três pushes seguidos não deixam três suítes
-inteiras (~7 min cada) rodando em paralelo quando só a última importa. Desde o **card #34**
-(2026-07-24) são **três jobs**, não um:
+inteiras (~7 min cada) rodando em paralelo quando só a última importa. A otimização de 2026-09-06 mantém todas as provas e distribui o trabalho em **seis jobs**:
 
-- **`test`** — roda em todo PR. Runners unitários/integração + relatório + guarda anti-drift
-  (descrito nesta seção). **Não sobe Electron** e **não roda E2E**.
-- **`e2e`** — sobe o app Electron de verdade (build + xvfb + keyring + Playwright). Custa ~15 min
-  e prova a fronteira preload/IPC/janela, que muda raramente. **Só executa quando o PR toca essa
-  fronteira** — um job leve `changes` faz `git diff` contra a base e casa
+- **`changes`** — detecta a fronteira E2E; falha de Git bloqueia o gate.
+- **`quality`** — lint e typecheck em paralelo à suíte.
+- **`visual`** — Chromium e prova visual completa, também em paralelo.
+- **`test`** — Supabase real, self-check e runners unitários/integração com cobertura.
+  Executa a suíte **uma vez**; quando o PR altera testes, a mesma chamada recebe
+  `--require-entry` e verifica números, append-only e carimbo do histórico juntos.
+- **`e2e`** — app Electron real; executa quando a fronteira muda:
   `src/main/preload/**`, `src/main/index.ts`, `src/main/window.ts`, `tests/e2e/**`,
-  `playwright.config.ts`; nos demais PRs o `e2e` é pulado (no-op). Filtro por `paths:` no evento
-  não serve aqui — cancelaria o workflow inteiro, não um job.
-- **`gate`** — o **required check** (branch protection exige `gate`, não `e2e`). Sempre roda,
-  agrega `test` e `e2e`: falha se `test` falhou ou se o `e2e` **rodou e** falhou; passa quando o
-  `e2e` foi legitimamente pulado. É o que impede o E2E condicional de bloquear o merge em
-  "pending eterno" — a armadilha do required check pulado no GitHub.
+  `playwright.config.ts` e o próprio `.github/workflows/ci.yml`.
+- **`gate`** — continua sendo o único check obrigatório. Exige sucesso de `changes`,
+  `quality`, `visual` e `test`. Exige E2E verde com `frontier=true`, ou pulado com
+  `frontier=false`. Falha, cancelamento ou saída inválida nunca dispensam uma prova.
+
+O workflow continua rodando em todo PR, inclusive documental; não usamos filtro de paths no
+trigger, que deixaria checks obrigatórios pendentes. Cache npm e cancelamento por PR já
+existiam e foram preservados. Os limites de tempo por job interrompem execuções travadas;
+não fazem testes lentos passar.
 
 > **A garantia (card #34):** o E2E completo tem de rodar no caminho para a `main`. O filtro de
 > `paths` do job `changes` cobre toda a fronteira que o E2E prova; PR que a toca roda o E2E e é
