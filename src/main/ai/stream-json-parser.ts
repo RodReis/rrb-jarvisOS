@@ -118,9 +118,9 @@ export interface EstadoDoParser {
    * StructuredOutput tool` e o modelo repete o documento. Emitindo na hora, os dois deltas se
    * concatenavam em `{…}{…}` e nenhum `JSON.parse` aceitava o resultado.
    *
-   * Não custa streaming: com `--json-schema` o documento chega **inteiro** no `input`, e o
-   * `ARCHITECTURE.md` § Providers registra que nenhum bloco `text` aparece nessas gerações — não
-   * há texto pingando que este atraso pudesse segurar.
+   * Não custa streaming: com `--json-schema` o documento chega **inteiro** no `input`. O bloco
+   * `text` que o modelo às vezes escreve antes de chamar a ferramenta não é documento (#304) —
+   * quem o segura é o adapter, que sabe se a geração tem schema.
    */
   documento?: string
 }
@@ -256,7 +256,7 @@ function eventosDoBloco(
     //
     // Com `--json-schema`, o CLI não pede JSON em texto: ele injeta a ferramenta
     // `StructuredOutput` e o modelo responde chamando-a, com o documento inteiro no `input`.
-    // Nenhum bloco `text` aparece na geração. Tratá-la como as outras faria o documento nascer
+    // Tratá-la como as outras faria o documento nascer
     // vazio — e, pior, dispararia o corte do critério 3, que mata a geração quando uma
     // ferramenta é usada numa fase que não tem ferramentas.
     if (nome === NOME_DA_SAIDA_ESTRUTURADA) {

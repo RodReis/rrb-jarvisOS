@@ -87,7 +87,7 @@ Nas fases **Planejamento** e **Especificação** o CLI é um gerador de document
 
 Flag que a versão instalada não reconhece = `AdapterError` que a nomeia, nunca fallback silencioso para a invocação sem isolamento.
 
-**A saída estruturada vem por ferramenta, não por texto.** Com `--json-schema`, o `claude` não pede JSON em prosa: ele injeta a ferramenta `StructuredOutput` e o modelo responde chamando-a, com o documento no `input` — nenhum bloco `text` aparece. Por isso `--tools ""` e `--json-schema` **convivem**: o `system/init` reporta `"tools":["StructuredOutput"]`, e mais nada.
+**A saída estruturada vem por ferramenta, não por texto.** Com `--json-schema`, o `claude` não pede JSON em prosa: ele injeta a ferramenta `StructuredOutput` e o modelo responde chamando-a, com o documento no `input`. Por isso `--tools ""` e `--json-schema` **convivem**: o `system/init` reporta `"tools":["StructuredOutput"]`, e mais nada. **O modelo às vezes escreve o JSON em texto antes** (o system pede "responda somente com JSON", e ele obedece); o CLI não aceita texto como saída estruturada, injeta `[structured-output-enforce]` e o modelo repete o documento pela ferramenta. Numa geração com schema, **texto do modelo não é documento**: o documento é o `input` da **última** chamada de `StructuredOutput` (decisão do PI, 2026-09-05), retido no parser e entregue no `close`; o texto só vira documento se nenhuma chamada chegar (#304).
 
 **O Codex tem duas fontes de contexto.** O cwd é uma; a outra é o `CODEX_HOME`, que carrega plugins e hooks de `~/.codex/` independentemente do diretório. O `--sandbox read-only` não os desliga — quem fecha essa porta é o `CODEX_HOME` da pipeline (M10-F02). O isolamento do Codex é a soma dos dois.
 

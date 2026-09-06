@@ -819,3 +819,92 @@ describe('#283 — o corte por ferramenta encerra a sessão, não só o document
     expect(await gerar('construcao')).toBeGreaterThanOrEqual(VIDA_DO_DUBLE_MS * 0.8)
   }, 20_000)
 })
+
+/**
+ * O bloco `text` do modelo numa geração com schema (#304).
+ *
+ * A sequência é a da geração real de 2026-09-06T14:10:31.138Z, lida do `generation_trace_event`:
+ * o modelo escreveu o JSON **em texto** (o system pede "responda somente com JSON", e ele
+ * obedece), o CLI não reconheceu texto como saída estruturada e injetou o `enforce`, e o modelo
+ * repetiu o documento chamando `StructuredOutput`. O texto saiu na hora e o documento retido no
+ * `close`: 3735 + 3735 bytes, e o `JSON.parse` quebrava na posição 3735.
+ *
+ * A retenção do #289 só segura `tool_use`; a premissa de que "nenhum bloco `text` aparece" numa
+ * geração com schema era **falsa**. Com schema, o documento é o `input` da última chamada e texto
+ * do modelo não é documento — mas, sem nenhuma chamada, o texto continua sendo a saída, senão o
+ * caminho antigo regrediria.
+ */
+describe('#304 — com schema, o texto do modelo não cola no documento estruturado', () => {
+  const linha = (payload: unknown): string => JSON.stringify(payload)
+
+  const DOCUMENTO = { contradicoes: [{ id: 'c-1', pergunta: 'a mesma nos dois' }] }
+
+  const TEXTO_DO_MODELO = linha({
+    type: 'assistant',
+    message: { role: 'assistant', content: [{ type: 'text', text: JSON.stringify(DOCUMENTO) }] }
+  })
+
+  const ENFORCE = linha({
+    type: 'user',
+    message: {
+      role: 'user',
+      content: [
+        {
+          type: 'text',
+          text: '[structured-output-enforce] You MUST call the StructuredOutput tool to complete this request. Call this tool now.'
+        }
+      ]
+    }
+  })
+
+  const CHAMADA = linha({
+    type: 'assistant',
+    message: {
+      role: 'assistant',
+      content: [{ type: 'tool_use', id: 'toolu_1', name: 'StructuredOutput', input: DOCUMENTO }]
+    }
+  })
+
+  const scriptQueEmite = (linhas: readonly string[]): string =>
+    `process.stdin.on("data",()=>{});` +
+    linhas.map((l) => `process.stdout.write(${JSON.stringify(l + '\n')});`).join('') +
+    `process.exit(0)`
+
+  async function gerar(linhas: readonly string[], jsonSchema?: string): Promise<string> {
+    const adapter = new ClaudeCodeAdapter(runsDeTeste().abrir, ((
+      _b: string,
+      _a: readonly string[],
+      opcoes: object
+    ) => spawn(process.execPath, ['-e', scriptQueEmite(linhas)], opcoes)) as typeof spawn)
+
+    let texto = ''
+    for await (const chunk of adapter.generateStream(
+      pedido({
+        fase: 'planejamento',
+        timeoutMs: 3_000,
+        ...(jsonSchema === undefined ? {} : { jsonSchema })
+      })
+    )) {
+      if (chunk.tipo === 'texto') texto += chunk.texto
+    }
+
+    return texto
+  }
+
+  it('o documento é o da chamada de StructuredOutput, e o texto anterior não cola nele', async () => {
+    const texto = await gerar([TEXTO_DO_MODELO, ENFORCE, CHAMADA], '{"type":"object"}')
+
+    // A asserção que falha com o defeito: `{…}{…}` quebra aqui, no fim do primeiro.
+    expect(JSON.parse(texto)).toEqual(DOCUMENTO)
+  })
+
+  it('sem nenhuma chamada de StructuredOutput, o texto do modelo continua sendo o documento', async () => {
+    const texto = await gerar([TEXTO_DO_MODELO], '{"type":"object"}')
+
+    expect(JSON.parse(texto)).toEqual(DOCUMENTO)
+  })
+
+  it('sem schema, o texto do modelo sai como sempre', async () => {
+    expect(JSON.parse(await gerar([TEXTO_DO_MODELO]))).toEqual(DOCUMENTO)
+  })
+})
