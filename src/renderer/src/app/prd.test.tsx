@@ -322,7 +322,6 @@ describe('contradições — pergunta no pop-up da M8-F03 (critério 6, emenda E
   it('responder a última contradição gera os documentos de novo, sozinho, com o termo confirmado', async () => {
     // O termo só conta como confirmado quando o PI gerou com ele nesta sessão: a revisão com
     // contradição chega depois desse clique, e a última resposta regera com o mesmo termo.
-    contradicoesDoPrd.mockResolvedValue(VISTA_PENDENTE)
     responderContradicaoDoPrd.mockResolvedValue({
       reason: 'registrada',
       mensagem: 'ok',
@@ -331,6 +330,7 @@ describe('contradições — pergunta no pop-up da M8-F03 (critério 6, emenda E
     montar()
     await screen.findByRole('textbox')
     carregarPrd.mockResolvedValue(COM_CONTRADICAO)
+    contradicoesDoPrd.mockResolvedValue(VISTA_PENDENTE)
     await userEvent.click(screen.getByRole('button', { name: /Gerar os documentos/i }))
 
     const dialogo = await screen.findByRole('dialog')
@@ -358,13 +358,14 @@ describe('contradições — pergunta no pop-up da M8-F03 (critério 6, emenda E
 
     const dialogo = await screen.findByRole('dialog')
     await userEvent.click(await within(dialogo).findByRole('radio', { name: /Nuvem/ }))
-    await userEvent.click(within(dialogo).getByRole('button', { name: /Confirmar/i }))
-
-    // O pop-up fecha e a lista diz que falta gerar; a pesquisa não roda sem confirmação.
+    // Depois da resposta o main diz que concluiu; a tela relê a vista em vez de regerar.
     contradicoesDoPrd.mockResolvedValue({
       estado: { tipo: 'concluido', decisoes: [] },
       historico: []
     })
+    await userEvent.click(within(dialogo).getByRole('button', { name: /Confirmar/i }))
+
+    // O pop-up fecha e a lista diz que falta gerar; a pesquisa não roda sem confirmação.
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(gerarPrd).not.toHaveBeenCalled()
     expect(await screen.findByText(/Todas respondidas/i)).toBeInTheDocument()
