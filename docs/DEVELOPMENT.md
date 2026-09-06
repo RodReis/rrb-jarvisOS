@@ -2148,6 +2148,32 @@ Status: **primeira de duas entregas na `main`** — spec `aprovada-pi` (2026-08-
 
 **Limites declarados:** os hashes do catálogo estão vazios e falham fechado por construção; o engine composto é o **ausente** (a tela oferece baixar, que é o caminho do critério 4); o critério 8 está garantido por construção e testado nos três níveis, mas a varredura do `userData` fecha na segunda entrega, quando houver sessão de uso real.
 
+## MVP-027 — Política de PR e CI multiplataforma
+
+### Fatia 01 — Perfil de CI por projeto (`docs/spec/spec-pipeline-01-politica-pr-ci.md`)
+
+Status: **primeira de três entregas verticais** — SPEC-Pipeline-01 R2 + Emenda E1 `aprovada-pi` (2026-09-06); issue [#314](https://github.com/RodReis/rrb-jarvisOS/issues/314).
+
+**Recortada em três por decisão do PI (2026-09-06).** A M27-F01 tem 26 critérios, e a §11 da própria spec sugere a divisão: perfil/compatibilidade/gerador; integração e preservação de workflow; evidência/retomada e smoke. Entregar as 26 numa PR só produziria um diff que ninguém revisa.
+
+Esta entrega cobre os critérios **1, 2, 3, 4, 6, 7, 8 e 18**.
+
+- [x] **`src/shared/domain/ci-profile.ts`** — o contrato do `ci-profile.json` e o validador. Devolve **todos** os problemas, não o primeiro, pelo mesmo motivo de `validarDag`. Ciclo por DFS tri-estado, que distingue "já visitei" de "está no caminho atual" e por isso não acusa losango
+- [x] **`src/shared/domain/ci-profile-workflow.ts`** — o gerador. Separado do legado de propósito: fundi-los faria um `if` na entrada decidindo qual contrato está lendo, e a §4 manda o fallback legado não paralelizar nem migrar sozinho
+- [x] **`src/shared/domain/ci-profile-perfis.ts`** — os dois perfis que a R2 exige (Node/npm e Python/pip em Windows/PowerShell) e a representação `legacy`
+- [x] **`EntregaService`** — resolve o perfil antes de escrever, e **bloqueia** quando ele é inválido
+- [ ] **Vertical 2:** preservação de workflow com detecção de edição concorrente, adoção/migração, integração com gate e ledger
+- [ ] **Vertical 3:** evidência por execução com manifesto e hash, retomada após crash, métricas e smoke real
+
+**Um defeito que o gerador legado tem e este não repete.** O docblock de `ci-workflow.ts` afirma que "quebra de linha entra escapada pelo mesmo mecanismo" das aspas simples. **Não entra.** Gerando o arquivo com um argv contendo `
+`, o YAML sai partido: `run: echo 'linha1` numa linha e `linha2'` solta na seguinte — arquivo que não faz parse. Aspas simples protegem contra o *shell*, e a ameaça aqui é do *formato*. O gerador novo serializa como string JSON quando há caractere de controle. Medido com contrafactual: removida a proteção, o teste reprova; recolocada, passa.
+
+**A terceira ameaça do critério 18, que o escape POSIX não alcança.** `${{ secrets.X }}` é expandido pelo **GitHub**, antes de existir shell: aspas simples são texto para o expansor. A sequência `${{` é quebrada no arquivo gerado, sem mudar os bytes que o shell lê.
+
+**Duas decisões de desenho que a spec obrigou.** (1) O `needs` do agregado inclui **todo** grupo, mas a condição de sucesso só exige os obrigatórios — assim ele espera o job opcional terminar antes de decidir, em vez de ignorá-lo. (2) `if: always()` no agregado: sem isso, um job vermelho deixaria o context `validacao` **ausente**, e ausência não é falha para a proteção da branch — o gate ficaria esperando um check que nunca chega, que é a "ausência que termina verde" do critério 16.
+
+**Limites declarados:** (1) o **smoke real** contra dois repositórios GitHub de teste, que a §11 pede, ficou `not_run` — não há credencial nem orçamento de Actions autorizados; a prova aqui é de regra e integração local. (2) A preservação de workflow distingue gerado de humano pela **marca do cabeçalho**, o que é mais fraco que o diff de adoção da §6, escopo da vertical 2. (3) O perfil ainda não é lido de `ci-profile.json` no disco nem entra no pacote aprovado: chega pelo `PedidoDeEntrega`, e o ponto de montagem é da vertical 2. (4) A E1 (critérios 19 a 26, preflight do `SLICE_ENTRY`) não entra aqui — depende do perfil existir, que é justamente esta vertical.
+
 ## Registro de entregas
 
 | Data | Fatia | PR | Observação |

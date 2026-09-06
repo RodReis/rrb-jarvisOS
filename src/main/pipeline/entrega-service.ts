@@ -37,6 +37,8 @@ import {
   precisaReescreverWorkflow,
   type ComandosDeValidacao
 } from '@shared/domain/ci-workflow'
+import { validarPerfilDeCi, type PerfilDeCi } from '@shared/domain/ci-profile'
+import { MARCA_DO_WORKFLOW_GERADO, gerarWorkflowDoPerfil } from '@shared/domain/ci-profile-workflow'
 import {
   avaliarGateDeMerge,
   type SeveridadeDeAchado,
@@ -100,6 +102,14 @@ export interface PedidoDeEntrega {
    */
   readonly contextPackId?: string
   readonly comandosDeValidacao: ComandosDeValidacao
+  /**
+   * O perfil de CI do pacote aprovado (SPEC-Pipeline-01 §4).
+   *
+   * Opcional porque projeto legado não tem perfil, e a spec (§4) proíbe migrá-lo por iniciativa
+   * própria: sem este campo, o gerador legado segue intacto. Presente, ele decide runtime,
+   * sistema, shell e paralelismo — e um perfil inválido bloqueia a entrega antes da escrita.
+   */
+  readonly perfilDeCi?: PerfilDeCi
   /** Documentos do projeto-alvo que entram no mesmo PR, antes do merge (critério 13). */
   readonly docsDoProjeto?: readonly string[]
   readonly signal?: AbortSignal
@@ -309,7 +319,16 @@ export class EntregaService {
   private async executar(pedido: PedidoDeEntrega): Promise<ResultadoDaEntrega> {
     // (1) O workflow de CI do projeto-alvo, antes de construir: ele entra no mesmo PR e é o que
     // dá à origem um check para exigir (critério 9).
-    this.garantirWorkflowDeCi(pedido)
+    // Perfil inválido barra **aqui**, antes de construir, escrever workflow, empurrar branch ou
+    // tocar a origem. É a letra do critério 3: falhar antes de qualquer efeito externo.
+    const problemaNoPerfil = this.garantirWorkflowDeCi(pedido)
+    if (problemaNoPerfil !== undefined) {
+      return this.bloqueado(
+        'perfil-de-ci-invalido',
+        'Corrigir o perfil de CI no pacote aprovado e reenviar a fatia.',
+        problemaNoPerfil
+      )
+    }
 
     // (2) Construção e validação no container. `BLOCKED` termina aqui, com a causa do construtor.
     const construcao = await this.deps.construtor.construir({
@@ -352,14 +371,53 @@ export class EntregaService {
   /**
    * Escreve `.github/workflows/ci.yml` no worktree quando ele falta ou não declara os comandos.
    *
+   * **Dois caminhos, e a escolha é do pacote.** Com `perfilDeCi` declarado, o workflow sai do
+   * perfil (SPEC-Pipeline-01 §5): runtime, sistema, shell e paralelismo vêm do projeto-alvo. Sem
+   * perfil, segue o gerador legado — que a spec (§4) manda não paralelizar nem migrar por
+   * iniciativa própria, e por isso continua exatamente como estava.
+   *
    * Não reescreve por cosmética: `precisaReescreverWorkflow` compara os comandos, não o texto, e
    * um arquivo editado à mão que ainda roda os mesmos comandos fica como está.
+   *
+   * Devolve o problema quando o perfil é inválido. **Recusar aqui é o ponto**: o critério 3 exige
+   * falhar antes de escrita, push ou alteração remota, e este é o último lugar antes da escrita.
    */
-  private garantirWorkflowDeCi(pedido: PedidoDeEntrega): void {
+  private garantirWorkflowDeCi(pedido: PedidoDeEntrega): string | undefined {
     const caminho = join(pedido.sandbox.worktreeNoHost, CAMINHO_DO_WORKFLOW)
     const atual = existsSync(caminho) ? readFileSync(caminho, 'utf8') : undefined
 
-    if (!precisaReescreverWorkflow(atual, pedido.comandosDeValidacao)) return
+    if (pedido.perfilDeCi !== undefined) {
+      const problemas = validarPerfilDeCi(pedido.perfilDeCi)
+      if (problemas.length > 0) {
+        return problemas.map((p) => `${p.problema}: ${p.mensagem}`).join(' ')
+      }
+
+      const desejado = gerarWorkflowDoPerfil(pedido.perfilDeCi)
+      // Bytes iguais: nada a fazer. Diferente e **gerado por nós** (o cabeçalho o diz): atualiza.
+      // Diferente e sem o cabeçalho: é edição humana, e a spec (§6) manda preservar os bytes.
+      if (atual === desejado) return undefined
+      if (atual !== undefined && !atual.startsWith(MARCA_DO_WORKFLOW_GERADO)) {
+        log.agent.warn(
+          'Workflow existente não foi gerado pela pipeline; preservado sem alteração',
+          {
+            runId: pedido.runId,
+            caminho: CAMINHO_DO_WORKFLOW
+          }
+        )
+        return undefined
+      }
+
+      mkdirSync(dirname(caminho), { recursive: true })
+      writeFileSync(caminho, desejado, 'utf8')
+      log.agent.info('Workflow de CI gerado a partir do perfil', {
+        runId: pedido.runId,
+        caminho: CAMINHO_DO_WORKFLOW,
+        profileId: pedido.perfilDeCi.profileId
+      })
+      return undefined
+    }
+
+    if (!precisaReescreverWorkflow(atual, pedido.comandosDeValidacao)) return undefined
 
     mkdirSync(dirname(caminho), { recursive: true })
     writeFileSync(caminho, gerarWorkflowDeCi(pedido.comandosDeValidacao), 'utf8')
@@ -367,6 +425,7 @@ export class EntregaService {
       runId: pedido.runId,
       caminho: CAMINHO_DO_WORKFLOW
     })
+    return undefined
   }
 
   /**
