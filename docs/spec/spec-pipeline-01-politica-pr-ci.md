@@ -1,6 +1,6 @@
 # SPEC-Pipeline-01 — Política de PR e CI por projeto
 
-- Status: **aprovada-pi**, revisão R2 de 2026-09-06. O PI aprovou: novo MVP/fatia transversal; Windows como ambiente primário; `success` obrigatório; atualização segura da linha Node 22 para Node 24 LTS.
+- Status: **R2 aprovada-pi** em 2026-09-06; **Emenda E1 aprovada-pi** em 2026-09-06. R2 aprovou: novo MVP/fatia transversal; Windows como ambiente primário; `success` obrigatório; atualização segura da linha Node 22 para Node 24 LTS. E1 torna a prontidão de PR/Testing/QA/Banco condição anterior à issue de Construção.
 - Origem: pedido do PI para separar orientação do Claude Code no jarvisOS de funcionalidade genérica da pipeline.
 - MVP/Fatia: MVP-027 · M27-F01.
 - Enquadramento: extensão transversal da entrega autônoma. Não reabre o MVP-009 finalizado nem inventa M9-F07.
@@ -172,6 +172,61 @@ A implementação futura pode ser dividida em entregas verticais: perfil/compati
 4. O legado do jarvisOS passa para Node 24 LTS, compatível com o Node 24.15.0 do host. Electron mantém runtime embutido próprio e módulos nativos recompilados para seu ABI.
 
 Não há pergunta estrutural aberta nesta revisão. A issue da fatia foi criada pelo fluxo de planejamento e entrou em Backlog; a aprovação não altera `proplan:next` nem inicia a implementação completa do perfil genérico.
+
+## 14. Emenda E1 aprovada — prontidão antes da Construção
+
+### 14.1 Lacuna que a R2 ainda deixa
+
+A R2 define o perfil aprovado e o CI que será usado durante a entrega, mas não fixa em qual ponto da jornada o perfil nasce nem impede explicitamente a criação da issue de Construção quando PR, testes, QA ou banco continuam sem contrato executável. Gerar o workflow apenas no primeiro run é tarde demais para esse requisito: a issue já existe e a fase Construção já começou.
+
+E1 fecha essa lacuna sem criar segundo aceite. O `SLICE_ENTRY` continua sendo o único aceite que abre a Construção; ele passa a validar também a prontidão da entrega. A aprovação da SPEC e do plano de provas continua sendo uma decisão única sobre a mesma revisão.
+
+### 14.2 Artefatos e momento de geração
+
+1. O planejamento gera `ci-profile.json` depois de arquitetura, `TESTING.md` e `REVIEW.md` existirem, antes do `SLICE_ENTRY`. O perfil é artefato versionado do pacote e seu hash entra no conjunto de revisões apresentado ao PI.
+2. A SPEC da fatia contém uma matriz de prova que liga cada critério de aceite a pelo menos uma validação estável do perfil. Regra, banco, tela e E2E são categorias semânticas; stack e ferramenta são escolhidas pelo perfil, não inferidas do jarvisOS.
+3. Categoria não aplicável exige justificativa estruturada. Ausência silenciosa não equivale a `not_applicable`; indisponibilidade de credencial ou serviço continua sendo `not_run`, nunca PASS.
+4. Projeto com persistência declara validação de schema/migration, isolamento/autorização e receita de serviço/prontidão compatível com sua tecnologia. A E1 não impõe Supabase, RLS ou Docker a projeto que não os use.
+5. Projeto com UI, IPC, janela ou fluxo crítico declara prova de tela e a condição do E2E. Um filtro por paths faz parte do contrato e deve falhar fechado quando não conseguir classificar a mudança.
+
+### 14.3 Preflight do `SLICE_ENTRY`
+
+Antes de registrar o `Approval`, o gate executa validação determinística e sem efeito remoto:
+
+1. valida schema, versão, runtime, OS/shell, argv, cwd, dependências, grupos, serviços, timeouts, cache, evidências e context obrigatório;
+2. prova cobertura bidirecional entre critérios da SPEC e validações — critério sem prova e validação obrigatória sem consumidor bloqueiam;
+3. gera o workflow em memória e verifica determinismo, parse do YAML, grafo acíclico, nomes/contextos estáveis e ausência de duplicação `push` de branch + `pull_request`;
+4. confirma que workflow manual/edição externa tem modo de adoção explícito e não será sobrescrito;
+5. executa as verificações de marcos Git da SPEC-Fases-04 sobre o perfil, a SPEC e os demais documentos aceitos.
+
+Falha retorna itens acionáveis e não grava `Approval`, não avança a etapa para `spec-aceita`, não publica repositório e não cria issue. O preflight não roda GitHub Actions nem testes da aplicação durante o planejamento; ele prova que o contrato é completo e gerável. A execução real continua na entrega e precisa produzir evidência do SHA corrente.
+
+### 14.4 Criação e mudança posterior
+
+- A M9-F01 só cria a issue de Construção depois de observar `SLICE_ENTRY` vigente e o resultado positivo do preflight para a mesma revisão/hash.
+- Mudança material no perfil, na matriz, na SPEC, em `TESTING.md` ou no workflow adotado invalida o preflight e o aceite correspondente. A nova revisão volta ao mesmo `SLICE_ENTRY`; não cria aceite adicional.
+- Se a issue já existir quando uma mudança posterior invalidar a revisão, a pipeline preserva issue, branch e PR, mas bloqueia iniciar/retomar execução até reconciliar. Nunca apaga estado remoto para fingir que a Construção não começou.
+- Projetos legados sem perfil não recebem fallback silencioso ao abrir nova fatia: a pipeline produz a representação `legacy` explícita e exige sua inclusão na revisão. Runs já em andamento não são cancelados retroativamente por esta emenda.
+- A própria #314 é a exceção de bootstrap: foi criada sob a governança anterior para implementar o novo gate. A regra passa a valer para issues de Construção criadas depois da integração desta fatia.
+
+### 14.5 Critérios adicionais de aceite da E1
+
+19. `SLICE_ENTRY` sem `ci-profile.json`, com perfil inválido ou hash diferente da revisão apresentada é recusado antes do `Approval` e antes de qualquer efeito GitHub.
+20. Todo critério da SPEC tem validação correspondente; critério órfão, validação obrigatória órfã ou categoria omitida sem justificativa estruturada bloqueia.
+21. Projeto com banco prova migration/schema, isolamento/autorização e prontidão do serviço conforme seu perfil; projeto sem banco não recebe Supabase/RLS por inferência.
+22. Projeto com fronteira visual declara prova de tela/E2E e filtro fail-closed; projeto sem essa fronteira registra a não aplicabilidade.
+23. O dry-run gera YAML válido e determinístico, sem CI duplicado de branch com PR, sem executar Actions ou testes reais no planejamento.
+24. O fluxo não cria issue, branch ou PR quando o preflight falha; com perfil e matriz válidos, cria uma única issue depois do mesmo `SLICE_ENTRY`.
+25. Mudança material posterior invalida a revisão e bloqueia execução sem apagar issue/branch/PR já existentes; nova aprovação substitui a anterior por revisão, sem segundo gate.
+26. Projeto legado recebe perfil `legacy` explícito antes da próxima issue de Construção; run anterior em andamento é preservado.
+
+### 14.6 Pontos de integração adicionais
+
+`RoadmapGeradoService` passa a gerar/persistir o perfil e a matriz; `RoadmapService` compõe o preflight com `verificarMarcos` antes do `Approval`; `PublicacaoService` exige a referência positiva e vigente antes de criar a issue; pacote/manifesto/hash incluem os novos artefatos. A implementação deve manter dependências obrigatórias nos tipos para que um ponto de montagem não possa omitir o gate silenciosamente.
+
+### 14.7 Estado da decisão
+
+Esta emenda foi aprovada pelo PI em 2026-09-06 na mesma revisão documental que registrou a lacuna e os critérios 19-26. O aceite torna E1 parte da SPEC-Pipeline-01/M27-F01 e da issue #314, sem mover #314 para `proplan:next` e sem autorizar implementação fora da fila.
 
 ## Referências
 

@@ -160,6 +160,7 @@ O PI testou o fluxo entregue pelo MVP-008 e constatou que ele não corresponde a
 3. Windows/PowerShell é ambiente primário e prova obrigatória. Linux só é usado quando o perfil do projeto o declara; não há plataforma implícita.
 4. Check obrigatório só satisfaz o gate com `success`; `neutral` e `skipped` não comprovam execução obrigatória. A redação conflitante da SPEC-Entrega-05 deve ser harmonizada com o comportamento já implementado.
 5. O jarvisOS passa de Node 22 para Node 24 LTS: mínimo de desenvolvimento 24.15.0 e CI na linha major 24. O Electron conserva o runtime Node embutido de sua versão; módulos nativos continuam recompilados contra o ABI do Electron.
+6. Emenda E1 da SPEC-Pipeline-01 aprovada: a prontidão de PR/Testing/QA/Banco passa a ser pré-condição do `SLICE_ENTRY`, antes da criação da issue de Construção. O pacote aceito deve incluir perfil de CI, matriz critério-prova e preflight determinístico sem efeito remoto. Falha não grava aceite nem cria issue/branch/PR; mudança material posterior invalida a revisão e bloqueia execução até reconciliação, preservando estado já existente. A própria #314 é exceção de bootstrap; a regra vale para issues de Construção criadas depois da integração da fatia. A decisão não move #314 para `proplan:next` nem inicia implementação.
 
 ## Fases, modelo por fase e console da geração (PI, 2026-09-04)
 

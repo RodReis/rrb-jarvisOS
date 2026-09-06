@@ -6,7 +6,7 @@
 
 ## Fatias
 
-- [ ] M27-F01 — Política de PR e CI por projeto — [SPEC aprovada](../spec/spec-pipeline-01-politica-pr-ci.md), GitHub #314. A aprovação não altera a cabeça da fila.
+- [ ] M27-F01 — Política de PR e CI por projeto — [SPEC R2+E1 aprovada](../spec/spec-pipeline-01-politica-pr-ci.md), GitHub #314. A emenda torna o perfil e a matriz de prova pré-condições do `SLICE_ENTRY`, antes da issue de Construção; não altera a cabeça da fila.
 
 ## Done do MVP
 
