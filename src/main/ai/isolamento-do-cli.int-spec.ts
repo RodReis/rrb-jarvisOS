@@ -17,7 +17,12 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { ClaudeCodeAdapter, flagRecusada, VERSAO_MINIMA_DO_CLI } from './claude-code-adapter'
+import {
+  ClaudeCodeAdapter,
+  DICA_DA_SAIDA_ESTRUTURADA,
+  flagRecusada,
+  VERSAO_MINIMA_DO_CLI
+} from './claude-code-adapter'
 import { CodexAdapter, entradaDoCodex } from './codex-adapter'
 import { documentoRetido, novoEstadoDoParser, parsearLinha } from './stream-json-parser'
 import { runsDeTeste } from './cwd-neutro.test-helper'
@@ -906,5 +911,31 @@ describe('#304 — com schema, o texto do modelo não cola no documento estrutur
 
   it('sem schema, o texto do modelo sai como sempre', async () => {
     expect(JSON.parse(await gerar([TEXTO_DO_MODELO]))).toEqual(DOCUMENTO)
+  })
+
+  /**
+   * A segunda peça: **não provocar** o texto. Medido com o CLI real em 2026-09-06: sem a dica, o
+   * modelo escreveu o JSON em texto, levou o `enforce` e gerou o documento **duas vezes** (2955
+   * tokens de entrada, 955 de saída); com a dica, chamou a ferramenta direto (1261 / 676). Nos
+   * documentos do PRD, 17 KB gerados duas vezes foi o que estourou o timeout de 120 s.
+   */
+  it('com schema, o system leva a dica de entregar pela ferramenta', () => {
+    const adapter = new ClaudeCodeAdapter(runsDeTeste().abrir)
+    const args = adapter.argsDaGeracao(
+      pedido({ system: 'CONTRATO DA ETAPA', jsonSchema: '{"type":"object"}' })
+    )
+
+    expect(args[args.indexOf('--system-prompt') + 1]).toBe(
+      `CONTRATO DA ETAPA
+
+${DICA_DA_SAIDA_ESTRUTURADA}`
+    )
+  })
+
+  it('sem schema, o system chega intacto — a dica falaria de uma ferramenta que não existe', () => {
+    const adapter = new ClaudeCodeAdapter(runsDeTeste().abrir)
+    const args = adapter.argsDaGeracao(pedido({ system: 'CONTRATO DA ETAPA' }))
+
+    expect(args[args.indexOf('--system-prompt') + 1]).toBe('CONTRATO DA ETAPA')
   })
 })

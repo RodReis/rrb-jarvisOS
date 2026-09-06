@@ -101,6 +101,16 @@ export function flagRecusada(stderr: string): string | undefined {
   return achado?.[1]
 }
 
+/**
+ * O que o system ganha quando a geração tem schema (#304).
+ *
+ * Medido com o CLI real em 2026-09-06: sem a linha, o modelo escreveu o JSON em texto, levou
+ * `[structured-output-enforce]` e gerou o documento de novo pela ferramenta (2955 tokens de
+ * entrada, 955 de saída); com ela, chamou a ferramenta direto (1261 / 676).
+ */
+export const DICA_DA_SAIDA_ESTRUTURADA =
+  'Entregue o JSON chamando a ferramenta StructuredOutput, não como texto.'
+
 export class ClaudeCodeAdapter implements AiAdapter {
   readonly nome = 'claude-code'
 
@@ -139,8 +149,21 @@ export class ClaudeCodeAdapter implements AiAdapter {
     // `--system-prompt` vale em **qualquer** fase: entregar o contrato da etapa ao modelo é o
     // defeito da #271, e ele não tem nada a ver com ferramentas. Só a ausência de `system` tira
     // a flag — passar string vazia substituiria o prompt padrão por nada.
+    //
+    // Com `jsonSchema`, o system ganha a dica de entregar pela ferramenta (#304). Os systems do
+    // domínio pedem "responda somente com JSON" porque os outros providers só têm o texto; aqui
+    // isso faz o modelo escrever o JSON em texto, levar o `enforce` do CLI e gerar o documento
+    // **duas vezes** — foi o que estourou o timeout dos documentos do PRD. A dica mora no adapter
+    // porque a `StructuredOutput` é detalhe deste CLI, não do contrato da etapa.
     if (request.system !== undefined && request.system !== '') {
-      base.push('--system-prompt', request.system)
+      base.push(
+        '--system-prompt',
+        request.jsonSchema === undefined
+          ? request.system
+          : `${request.system}
+
+${DICA_DA_SAIDA_ESTRUTURADA}`
+      )
     }
 
     // O resto do isolamento é **por fase**. Sem fase declarada não há isolamento: é a chamada
