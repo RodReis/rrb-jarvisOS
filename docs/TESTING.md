@@ -419,14 +419,17 @@ registradas no código de referência da §10):
 
 Dispara em **todo pull request** para `main`. Um bloco `concurrency` (card #66) cancela a execução
 anterior quando chega um push novo no mesmo PR — três pushes seguidos não deixam três suítes
-inteiras (~7 min cada) rodando em paralelo quando só a última importa. A otimização de 2026-09-06 mantém todas as provas e distribui o trabalho em **seis jobs**:
+inteiras (~7 min cada) rodando em paralelo quando só a última importa. A otimização de 2026-09-06 mantém todas as provas e distribui o trabalho em jobs paralelos:
 
 - **`changes`** — detecta a fronteira E2E; falha de Git bloqueia o gate.
 - **`quality`** — lint e typecheck em paralelo à suíte.
 - **`visual`** — Chromium e prova visual completa, também em paralelo.
-- **`test`** — Supabase real, self-check e runners unitários/integração com cobertura.
-  Executa a suíte **uma vez**; quando o PR altera testes, a mesma chamada recebe
-  `--require-entry` e verifica números, append-only e carimbo do histórico juntos.
+- **`test-regras`**, **`test-banco`** e **`test-tela`** — runners unitários/integração
+  com cobertura, em paralelo. Cada job publica o JSON do runner e o `coverage-summary.json`
+  correspondente; o job de banco sobe o Supabase real antes dos int-specs de RLS.
+- **`test`** — agrega os artefatos das três categorias e executa self-check, anti-drift,
+  append-only e carimbo. Não reexecuta a suíte; os números continuam vindo dos JSONs dos
+  runners, conforme o ADR-003.
 - **`e2e`** — app Electron real; executa quando a fronteira muda:
   `src/main/preload/**`, `src/main/index.ts`, `src/main/window.ts`, `tests/e2e/**`,
   `playwright.config.ts` e o próprio `.github/workflows/ci.yml`.
@@ -445,13 +448,15 @@ não fazem testes lentos passar.
 > em sincronia com o que o E2E realmente exercita é parte do contrato. Falso verde é pior que
 > teste ausente.
 
-O job `test` em detalhe:
+Os jobs de teste em detalhe:
 
 - **Services:** **nenhum** no sentido do `services:` do Actions. A maior parte do "Banco" testa o
   storage local (SQLite em arquivo temp), que não é serviço. Desde a **M2-F01** (entregue em
   2026-07-22) há uma exceção: o int-spec de RLS exige o **Supabase local**, que sobe pela CLI
-  (`supabase/setup-cli` + `supabase start`) e não por `services:` — não é um container só, e sim a
-  stack que a CLI orquestra (Postgres + PostgREST + Auth), com migrations e seed aplicados no start.
+  (`supabase/setup-cli` fixado em `v2.116.0` + `supabase start`) e não por `services:` — não é um
+  container só, e sim a stack que a CLI orquestra (Postgres + PostgREST + Auth), com migrations e
+  seed aplicados no start. **Não usar `version: latest` no CI:** a resolução dinâmica consulta as
+  releases do GitHub e pode falhar por rate limit antes de qualquer teste rodar.
   - **Pular, no CI, é falha.** Esses testes se pulam quando a stack não responde, para não punir
     quem clona o repo sem Docker. No CI a stack sobe de propósito, então o `beforeAll` **lança**
     quando `process.env.CI` está setado. Sem isso, uma stack que não subisse deixaria o CI verde
@@ -778,3 +783,7 @@ Provas mínimas: Graphify ausente/incompatível mantém busca básica; pergunta 
 - **Regressão/contrafactual:** candidato, estado desconhecido, cobertura stale, falha técnica, redelivery ou evidência retrospectiva nunca viram validação; remover filtros/atomicidade deve reprovar teste direcionado.
 
 Provas mínimas: todos os critérios obrigatórios sustentados produzem `validated`; insuficiência mantém `candidate`; contradição/perda de prova produz `needs_revalidation`; aceite do PI e merge não viram prova de impacto; reinício não zera tentativas; excesso pagina sem fingir completude; nenhuma chamada de modelo, Graphify ou serviço pago participa da avaliação. SPEC aprovada na revisão `4f47c12`; aprovação não é evidência de execução dos testes.
+- **Agregação:** `test-regras`, `test-banco` e `test-tela` publicam os arquivos declarados em
+  `test-report.config.json`. Como `reports/.raw` é diretório oculto, o upload usa
+  `include-hidden-files: true`; sem isso o job agregado baixaria cobertura sem os JSONs e a
+  evidência ficaria incompleta.

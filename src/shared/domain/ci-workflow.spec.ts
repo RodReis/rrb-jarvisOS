@@ -40,6 +40,11 @@ describe('gerarWorkflowDeCi — critério 9', () => {
     expect(gerarWorkflowDeCi(COMANDOS)).toContain('pull_request:')
   })
 
+  it('usa a linha Node 24 LTS adotada pelo projeto-alvo legado', () => {
+    expect(gerarWorkflowDeCi(COMANDOS)).toContain("node-version: '24'")
+    expect(gerarWorkflowDeCi(COMANDOS)).not.toContain("node-version: '22'")
+  })
+
   it('é determinístico: mesmos comandos, mesmo arquivo', () => {
     // Sem isto, cada run reescreveria o arquivo e o critério 9 ("o run seguinte não o reescreve")
     // dependeria de sorte na serialização.

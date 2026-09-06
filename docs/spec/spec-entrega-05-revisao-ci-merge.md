@@ -47,7 +47,7 @@ Escopo → testes/lint/type/build → code/architecture review → design review
 8. **Kill-switch respeitado:** com merge autônomo desligado, o run para em `AWAITING_MERGE` (M9-F02) sem mergear e sem marcar falha; com ligado, mergeia e confirma na origem. Teste dos dois caminhos.
 9. **Projeto sem CI recebe o workflow gerado no primeiro PR**, e o run seguinte o encontra e não o reescreve. Teste.
 10. **Sem check configurado não há merge:** lista vazia de checks termina em bloqueio explicável, nunca em `MERGED`. Teste.
-11. **Ruleset em movimento:** mudança de ruleset/check obrigatório durante o run força novo snapshot e reconciliação; check `neutral`/`skipped` só passa quando a própria regra da origem o considerar satisfatório. Teste.
+11. **Ruleset em movimento:** mudança de ruleset/check obrigatório durante o run força novo snapshot e reconciliação. **Emenda aprovada pelo PI em 2026-09-06:** check obrigatório só satisfaz o gate com `success`; `neutral`/`skipped` não comprovam a validação exigida. Teste.
 12. **Merge queue:** repositório que a exige termina com PR verde em `AWAITING_MERGE` e bloqueio externo explicável; a pipeline **não** tenta contorná-la. Teste.
 13. **`STATUS.md`, `STATUS-ARQUIVO.md` e o relatório de testes do projeto-alvo entram no mesmo PR, antes do merge** — nunca em commit direto na branch-base depois dele (invariante 10 da CONVENTION §4; Convention do próprio projeto-alvo). A M9-F06 só grava o `ExecutionLedger` local.
 

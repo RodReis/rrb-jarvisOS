@@ -82,7 +82,7 @@ export function gerarWorkflowDeCi(comandos: ComandosDeValidacao): string {
     '    steps:\n' +
     '      - uses: actions/checkout@v4\n' +
     '      - uses: actions/setup-node@v4\n' +
-    "        with:\n          node-version: '22'\n" +
+    "        with:\n          node-version: '24'\n" +
     '      - name: install\n        run: npm ci\n' +
     passo('lint', comandos.lint) +
     passo('typecheck', comandos.typecheck) +

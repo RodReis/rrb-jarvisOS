@@ -23,14 +23,23 @@ com `--check`. Lint e prova visual atrasavam a subida do banco sem depender dela
 
 - Uma execução da suíte, preservando cobertura, anti-drift, append-only e carimbo condicional.
 - Jobs independentes de qualidade e prova visual, agregados pelo mesmo `gate` obrigatório.
+- Categorias do relatório (`regras`, `banco`, `tela`) preparadas para rodar em paralelo, com
+  agregação posterior dos JSONs e coberturas do ADR-003.
 - Falha no filtro bloqueia o gate; alteração no workflow também exercita o E2E.
 - Limites de tempo explícitos por job, cache npm e cancelamento de pushes antigos preservados.
+- Supabase CLI fixado em `v2.116.0`; não usar `version: latest`, porque a resolução dinâmica
+  consulta releases no GitHub e pode falhar por rate limit antes de qualquer teste rodar.
 - Template de PR com problema, rastreabilidade, evidência e limites.
 
 Estimativa baseada nesta execução: caminho crítico próximo de 8 minutos, contra 16min33s.
 É uma projeção, não um benchmark: fila, downloads, runner e crescimento da suíte variam.
 A paralelização adiciona duas instalações npm curtas; a remoção da segunda suíte elimina
 cerca de cinco minutos de runner observados. Não se usa cache de resultados de teste.
+
+Nova medição da #312, após rebase sobre a #311 e paralelização das categorias: workflow
+completo em 4min56s. `test-regras` passou em 54s, `test-tela` em 3min22s,
+`test-banco` em 4min34s, `test` agregado em 11s e `gate` em 3s. O caminho crítico
+restante é o banco/Supabase, não mais a soma das três categorias Vitest.
 
 ## Rotina de PR
 
@@ -44,8 +53,9 @@ cerca de cinco minutos de runner observados. Não se usa cache de resultados de 
    conjunto de execuções; uma única amostra não comprova estabilidade nem escalabilidade.
 
 Não reduzir cobertura, desabilitar RLS ou pular toda a suíte em PR documental para atingir
-uma meta de tempo. Sharding e separação adicional das categorias só se justificam por nova
-medição e preservação da agregação de evidências do ADR-003.
+uma meta de tempo. Separação das categorias só vale com nova medição e preservação da
+agregação de evidências do ADR-003: os números continuam vindo dos JSONs dos runners, não
+de texto digitado no workflow.
 
 ## Referências oficiais consultadas
 

@@ -15,7 +15,7 @@
 3. **Commite cedo e faça push** do branch a cada passo relevante — inclui os docs de `docs/`. Nunca deixe entrega só no disco local.
 
 ## 3. O que entregar (da spec — escopo fechado)
-- Scaffold **`electron-vite`** (Electron + React + TypeScript + Vite). `engines`: **Node 22 LTS + Electron estável mais recente**.
+- Scaffold histórico com **`electron-vite`** (Electron + React + TypeScript + Vite). O mínimo original era Node 22 LTS; o contrato vigente passou a **Node 24 LTS** por decisão do PI em 2026-09-06. O Electron mantém runtime próprio.
 - Estrutura: `src/main/` (electron, ipc, runtime), `src/renderer/` (app, components, modules, styles), `src/shared/` (domain, contracts, policies) + README curto por diretório de topo de `src/`.
 - **IPC seguro:** `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`; ponte via **preload tipada** com contratos em `src/shared/contracts/`. Sem canal IPC genérico (`invoke` arbitrário).
 - Tela inicial placeholder (sem backend real).

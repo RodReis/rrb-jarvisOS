@@ -2,11 +2,12 @@ name: CI — testes + relatório de evidência
 
 # ADR-003: evidência de teste gerada por máquina e verificada, nunca narrada.
 #
-# Jobs independentes; gate único obrigatório (cards #34 e #66):
+# Jobs independentes; gate único obrigatório (cards #34, #66 e #310):
 #   quality / visual — lint + typecheck e prova visual em paralelo ao relatório.
-#   test — roda em TODO PR: runners unitários/integração (regras/banco/tela-componente),
-#          gera reports/TESTS.md a partir do --json e barra o merge se o relatório
-#          commitado divergir de uma execução limpa (guarda anti-drift). NÃO roda E2E.
+#   test-regras / test-banco / test-tela — rodam em paralelo e publicam os JSONs/coberturas
+#          que alimentam o relatório. NÃO rodam E2E.
+#   test — agrega a evidência das categorias, gera reports/TESTS.md a partir do --json e
+#          barra o merge se o relatório commitado divergir de uma execução limpa.
 #   e2e  — sobe o app Electron de verdade (build + xvfb + keyring + Playwright). Custa
 #          tempo variável e prova a fronteira preload/IPC/janela, que muda raramente. Só EXECUTA
 #          quando o PR toca essa fronteira (ver o job `changes`); nos demais é no-op verde.
@@ -84,7 +85,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
       - name: Instalar dependências
         run: npm ci
@@ -101,7 +102,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
       - name: Instalar dependências
         run: npm ci
@@ -119,17 +120,111 @@ jobs:
       - name: Prova visual dos controles
         run: npm run test:prova
 
-  test:
+  test-regras:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Rodar regras
+        run: npm run test:report:regras
+
+      - name: Publicar evidência de regras
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-regras
+          path: |
+            reports/.raw/regras.json
+            coverage/regras/coverage-summary.json
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 7
+
+  test-banco:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     # Sem `services:`: a maior parte da categoria "Banco" testa o storage local (SQLite em
     # arquivo temporário), que não é serviço (docs/TESTING.md §6). A exceção é o Supabase
     # local, que sobe abaixo pela CLI — `services:` não serviria, porque não é um container
     # só, e sim a stack inteira que a CLI orquestra.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: v2.116.0
+
+      - name: Subir o Supabase local (RLS do int-spec)
+        run: supabase start
+
+      - name: Rodar banco
+        run: npm run test:report:banco
+
+      - name: Publicar evidência de banco
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-banco
+          path: |
+            reports/.raw/banco.json
+            coverage/banco/coverage-summary.json
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 7
+
+  test-tela:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Rodar tela
+        run: npm run test:report:tela
+
+      - name: Publicar evidência de tela
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-tela
+          path: |
+            reports/.raw/tela-vitest.json
+            coverage/tela/coverage-summary.json
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 7
+
+  test:
+    needs: [test-regras, test-banco, test-tela]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     env:
       REPORT_PR: '#${{ github.event.pull_request.number }}'
-      # O GitHub já tem a URL pronta — o gerador não precisa saber montar link
-      # de GitHub (segue repo-agnóstico, docs/TESTING.md §7).
       REPORT_PR_URL: ${{ github.event.pull_request.html_url }}
     steps:
       - uses: actions/checkout@v4
@@ -162,25 +257,13 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-          cache: npm
+          node-version: 24
 
-      - name: Instalar dependências
-        run: npm ci
-
-      # SPEC-Execucao-01, critério 6: o int-spec de RLS exercita a stack real, então o CI
-      # a sobe. Sem este step o arquivo **passaria pulando** — os testes se pulam quando a
-      # stack não responde (para não punir quem clona sem Docker), e o CI ficaria verde
-      # exatamente onde deveria provar o isolamento. Falso verde é pior que teste ausente:
-      # o relatório contaria RLS como coberta.
-      #
-      # `supabase start` já aplica migrations e seed do diretório versionado.
-      - uses: supabase/setup-cli@v1
+      - name: Baixar evidência dos testes
+        uses: actions/download-artifact@v4
         with:
-          version: latest
-
-      - name: Subir o Supabase local (RLS do int-spec)
-        run: supabase start
+          pattern: test-report-*
+          merge-multiple: true
 
       # O append-only é verificado contra a BASE do PR, não contra HEAD: aqui
       # HEAD é o merge commit, cujo TESTS.md é a versão do próprio PR — a guarda
@@ -194,6 +277,23 @@ jobs:
       # sob CI verde.
       - name: Self-check do gerador de relatório
         run: npm run test:report:selfcheck
+
+      - name: Verificar jobs de teste
+        env:
+          REGRAS_RESULT: ${{ needs.test-regras.result }}
+          BANCO_RESULT: ${{ needs.test-banco.result }}
+          TELA_RESULT: ${{ needs.test-tela.result }}
+        run: |
+          set -euo pipefail
+          echo "regras = $REGRAS_RESULT"
+          echo "banco  = $BANCO_RESULT"
+          echo "tela   = $TELA_RESULT"
+          for result in "$REGRAS_RESULT" "$BANCO_RESULT" "$TELA_RESULT"; do
+            if [ "$result" != "success" ]; then
+              echo "::error::Uma categoria de teste nao passou ($result)."
+              exit 1
+            fi
+          done
 
       # Guarda anti-drift: roda os runners e compara os números frescos com o
       # reports/TESTS.md COMMITADO no PR. Se alguém editou um número à mão (ou
@@ -227,15 +327,17 @@ jobs:
 
       # A categoria "Tela" do relatório é só vitest-componente (jsdom) — o E2E saiu daqui
       # (card #34, vive no job `e2e`). O relatório não precisa mais de xvfb, keyring,
-      # setuid nem do build do app: tudo isso migrou para o job `e2e`.
-      - name: Rodar testes + guardas de relatório e histórico (execução única)
+      # setuid nem do build do app: tudo isso migrou para o job `e2e`. Aqui o job
+      # agregado não reexecuta a suíte: usa os JSONs e coberturas publicados pelas
+      # categorias paralelas acima.
+      - name: Guardas de relatório e histórico
         env:
           REPORT_BASE_REF: origin/${{ github.base_ref }}
         run: |
           if [ "${REQUIRE_ENTRY:-0}" = "1" ]; then
-            npm run test:report:check -- --require-entry
+            npm run test:report:check -- --no-run --require-entry
           else
-            npm run test:report:check
+            npm run test:report:check -- --no-run
           fi
 
       - name: Publicar tabela no job summary
@@ -277,7 +379,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
 
       - name: Instalar dependências

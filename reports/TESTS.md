@@ -12,7 +12,7 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 1561 | 1561 | 0 | 76.0 | — | — |
+| — | — | — | Regras de Negócio | 1562 | 1562 | 0 | 76.0 | — | — |
 | — | — | — | Banco | 1199 | 1185 | 0 | 87.5 | — | — |
 | — | — | — | Tela | 627 | 626 | 0 | 75.1 | — | — |
 
@@ -325,3 +325,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-06 | #307 | spec-jornada-03-prd-landscape-convention-por-ia | Regras de Negócio | 1561 | 1561 | 0 | 76.0 | #308 | [#308](https://github.com/RodReis/rrb-jarvisOS/pull/308) |
 | 2026-09-06 | #307 | spec-jornada-03-prd-landscape-convention-por-ia | Banco | 1199 | 1185 | 0 | 87.5 | #308 | [#308](https://github.com/RodReis/rrb-jarvisOS/pull/308) |
 | 2026-09-06 | #307 | spec-jornada-03-prd-landscape-convention-por-ia | Tela | 627 | 626 | 0 | 75.1 | #308 | [#308](https://github.com/RodReis/rrb-jarvisOS/pull/308) |
+| 2026-09-06 | #310 | spec-pipeline-01-politica-pr-ci | Regras de Negócio | 1562 | 1562 | 0 | 76.0 | #312 | [#312](https://github.com/RodReis/rrb-jarvisOS/pull/312) |
+| 2026-09-06 | #310 | spec-pipeline-01-politica-pr-ci | Banco | 1199 | 1185 | 0 | 87.5 | #312 | [#312](https://github.com/RodReis/rrb-jarvisOS/pull/312) |
+| 2026-09-06 | #310 | spec-pipeline-01-politica-pr-ci | Tela | 627 | 626 | 0 | 75.1 | #312 | [#312](https://github.com/RodReis/rrb-jarvisOS/pull/312) |
