@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 1544 | 1544 | 0 | 75.8 | — | — |
-| — | — | — | Banco | 1191 | 1177 | 0 | 87.4 | — | — |
-| — | — | — | Tela | 622 | 621 | 0 | 75.3 | — | — |
+| — | — | — | Regras de Negócio | 1561 | 1561 | 0 | 76.0 | — | — |
+| — | — | — | Banco | 1199 | 1185 | 0 | 87.5 | — | — |
+| — | — | — | Tela | 627 | 626 | 0 | 75.1 | — | — |
 
 ## Histórico por entrega
 
@@ -322,3 +322,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-06 | #304 | spec-fases-03-console-da-geracao | Regras de Negócio | 1544 | 1544 | 0 | 75.8 | #305 | [#305](https://github.com/RodReis/rrb-jarvisOS/pull/305) |
 | 2026-09-06 | #304 | spec-fases-03-console-da-geracao | Banco | 1191 | 1177 | 0 | 87.4 | #305 | [#305](https://github.com/RodReis/rrb-jarvisOS/pull/305) |
 | 2026-09-06 | #304 | spec-fases-03-console-da-geracao | Tela | 622 | 621 | 0 | 75.3 | #305 | [#305](https://github.com/RodReis/rrb-jarvisOS/pull/305) |
+| 2026-09-06 | #307 | spec-jornada-03-prd-landscape-convention-por-ia | Regras de Negócio | 1561 | 1561 | 0 | 76.0 | #308 | [#308](https://github.com/RodReis/rrb-jarvisOS/pull/308) |
+| 2026-09-06 | #307 | spec-jornada-03-prd-landscape-convention-por-ia | Banco | 1199 | 1185 | 0 | 87.5 | #308 | [#308](https://github.com/RodReis/rrb-jarvisOS/pull/308) |
+| 2026-09-06 | #307 | spec-jornada-03-prd-landscape-convention-por-ia | Tela | 627 | 626 | 0 | 75.1 | #308 | [#308](https://github.com/RodReis/rrb-jarvisOS/pull/308) |
