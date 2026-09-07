@@ -80,10 +80,14 @@ interface EstadoDaOrigem {
     headSha: string
     status: 'queued' | 'in_progress' | 'completed'
     conclusao?: string
+    /** A tentativa que o adapter passou a normalizar com o critério 11 da SPEC-Pipeline-01. */
+    tentativa?: number
   }[]
   headSha: string
   /** O commit da branch-base. Avançá-lo entre a avaliação e o merge é o cenário do critério 12. */
   baseSha: string
+  /** Um PR por branch head, como a origem faz. É o que torna a idempotência observável. */
+  prsPorHead: Map<string, number>
   merged: boolean
   /** O merge respondeu 200 mas a origem não confirma? É o cenário do critério 7. */
   mergeSemConfirmacao: boolean
@@ -143,8 +147,19 @@ function connectorFalso(): { call: (r: ConnectorRequest) => Promise<ConnectorOut
         }) as unknown as ConnectorOutcome
 
       switch (request.operation) {
-        case GITHUB_OPERATIONS.ensurePullRequest:
-          return ok({ numero: PR, id: 100, titulo: String(input.title), criado: false })
+        case GITHUB_OPERATIONS.ensurePullRequest: {
+          // Idempotência **de verdade**: um PR por branch head. Antes o dublê devolvia sempre o
+          // mesmo número com `criado: false`, e por isso não distinguia "reusou" de "criou" — o
+          // teste de retomada passaria mesmo se o serviço abrisse um PR novo a cada run.
+          const head = String(input.head)
+          const existente = origem.prsPorHead.get(head)
+          if (existente !== undefined) {
+            return ok({ numero: existente, id: 100, titulo: String(input.title), criado: false })
+          }
+          const numero = PR + origem.prsPorHead.size
+          origem.prsPorHead.set(head, numero)
+          return ok({ numero, id: 100, titulo: String(input.title), criado: true })
+        }
 
         case GITHUB_OPERATIONS.getRequiredChecks:
           return ok({
@@ -308,6 +323,7 @@ beforeEach(() => {
     ],
     headSha: SHA_HEAD,
     baseSha: SHA_BASE,
+    prsPorHead: new Map<string, number>(),
     merged: false,
     mergeSemConfirmacao: false
   }
@@ -1073,5 +1089,109 @@ describe('EntregaService — adoção por manifesto, não por cabeçalho (crité
 
     expect(r.estadoFinal).toBe('MERGED')
     expect(readFileSync(caminho, 'utf8')).toContain('# alterado')
+  })
+})
+
+describe('EntregaService — correlação com a execução de CI (SPEC-Pipeline-01 §8)', () => {
+  it('grava PR, base, perfil e instantes observados no ledger', async () => {
+    await montar().entregar({ ...pedido(), perfilDeCi: perfilNodeEmWindows('alvo') })
+
+    const ledger = ledgerRepo.buscar(USER, 'run-1')
+    expect(ledger?.correlacaoDeCi).toBeDefined()
+    expect(ledger?.correlacaoDeCi?.pullRequest).toBe(PR)
+    expect(ledger?.correlacaoDeCi?.baseSha).toBe(SHA_BASE)
+    expect(ledger?.correlacaoDeCi?.revisaoDoPerfil).toBe('alvo')
+    expect(ledger?.correlacaoDeCi?.iniciadoEm).toBeDefined()
+    expect(ledger?.correlacaoDeCi?.observadoEm).toBeDefined()
+  })
+
+  it('base ilegível fica AUSENTE na correlação, nunca string vazia', async () => {
+    // O critério 17 em ação: "não sei" não pode virar um valor que parece dado.
+    chamadaExtra = (operation, input) => {
+      if (operation === GITHUB_OPERATIONS.getCommitSha && input.ref === 'main') {
+        throw new Error('sem permissão')
+      }
+    }
+
+    await montar().entregar(pedido())
+
+    const correlacao = ledgerRepo.buscar(USER, 'run-1')?.correlacaoDeCi
+    expect(correlacao).toBeDefined()
+    expect('baseSha' in (correlacao ?? {})).toBe(false)
+  })
+
+  it('sem perfil declarado, a revisão do perfil fica ausente', async () => {
+    await montar().entregar(pedido())
+
+    const correlacao = ledgerRepo.buscar(USER, 'run-1')?.correlacaoDeCi
+    expect('revisaoDoPerfil' in (correlacao ?? {})).toBe(false)
+  })
+
+  it('a tentativa do CI vem do check, não é inventada', async () => {
+    origem.checks = [
+      {
+        nome: NOME_DO_JOB_DE_CI,
+        headSha: SHA_HEAD,
+        status: 'completed',
+        conclusao: 'success',
+        tentativa: 3
+      }
+    ]
+
+    await montar().entregar(pedido())
+
+    expect(ledgerRepo.buscar(USER, 'run-1')?.correlacaoDeCi?.tentativaDoCi).toBe(3)
+  })
+
+  it('origem que não informa tentativa deixa o campo ausente', async () => {
+    await montar().entregar(pedido())
+
+    const correlacao = ledgerRepo.buscar(USER, 'run-1')?.correlacaoDeCi
+    expect('tentativaDoCi' in (correlacao ?? {})).toBe(false)
+  })
+})
+
+describe('EntregaService — retomada não duplica (critério 14)', () => {
+  it('segundo run sobre o mesmo branch reusa o PR em vez de abrir outro', async () => {
+    // O `ensurePullRequest` é idempotente por construção, mas nada media isso. Sem esta prova,
+    // trocá-lo por um `create` cru passaria com a suíte inteira verde — e a segunda execução
+    // depois de um crash abriria um PR novo para a mesma fatia.
+    const primeiro = await montar().entregar(pedido())
+    expect(primeiro.pullRequest).toBe(PR)
+
+    chamadas = []
+    const segundo = await montar().entregar({ ...pedido(), runId: 'run-2' })
+
+    // O ponto, agora observável: **o mesmo número de PR**. O dublê atribui um número novo a cada
+    // head inédito, então um serviço que abrisse outro PR devolveria PR+1 aqui.
+    expect(segundo.pullRequest).toBe(PR)
+    expect(origem.prsPorHead.size).toBe(1)
+
+    // E o dublê não é complacente: um head **diferente** recebe um PR diferente. Sem isto, a
+    // asserção acima passaria mesmo com um dublê que devolve sempre o mesmo número.
+    chamadas = []
+    const outroBranch = await montar().entregar({
+      ...pedido(),
+      runId: 'run-2b',
+      alvo: { ...pedido().alvo, branchDaFatia: 'feat/outra' }
+    })
+    expect(outroBranch.pullRequest).not.toBe(PR)
+  })
+
+  it('retomada não mergeia de novo o que já foi mergeado', async () => {
+    await montar().entregar(pedido())
+    expect(chamadasDe(GITHUB_OPERATIONS.squashMerge)).toHaveLength(1)
+
+    // Segundo run com a origem já refletindo o merge anterior.
+    chamadas = []
+    origem.headSha = SHA_MERGE
+    origem.checks = [
+      { nome: NOME_DO_JOB_DE_CI, headSha: SHA_MERGE, status: 'completed', conclusao: 'success' }
+    ]
+    const r = await montar().entregar({ ...pedido(), runId: 'run-3' })
+
+    // Ou mergeia o estado novo, ou para; o que não pode é o run terminar sem desfecho explicável.
+    expect(['MERGED', 'AWAITING_MERGE', 'BLOCKED']).toContain(r.estadoFinal)
+    expect(ledgerRepo.buscar(USER, 'run-3')).toBeDefined()
   })
 })

@@ -1567,6 +1567,20 @@ const MIGRATIONS: readonly string[] = [
   `
   ALTER TABLE execution_ledger ADD COLUMN provider TEXT;
   ALTER TABLE execution_ledger ADD COLUMN modelo TEXT;
+  `,
+
+  // 39 - correlacao com a execucao de CI no ledger (SPEC-Pipeline-01, secao 8).
+  //
+  // Uma coluna JSON e nao dez colunas: os campos sao **um bloco opcional inteiro** - ou a
+  // execucao de CI foi observada, ou nao foi. Dez colunas anulaveis permitiriam estados que nao
+  // existem (tested SHA sem run id), e a primeira leitura teria de explicar quais combinacoes
+  // sao possiveis. Mesma razao de `checks` e `artefatos` ja serem JSON aqui.
+  //
+  // Anulavel, como provider/modelo na 38 e pela mesma razao: ha runs gravados antes desta fatia,
+  // e `NOT NULL` sem default os tornaria ilegiveis. Nulo significa "run anterior a esta fatia" -
+  // e, dentro do bloco, campo ausente significa **nao observado**, nunca zero (criterio 17).
+  `
+  ALTER TABLE execution_ledger ADD COLUMN correlacao_ci TEXT;
   `
 ]
 

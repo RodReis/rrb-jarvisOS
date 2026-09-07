@@ -74,6 +74,47 @@ export interface ExecutionLedger {
    */
   readonly provider?: AiProvider
   readonly modelo?: string
+  /**
+   * A correlação com a execução do CI (SPEC-Pipeline-01 §8).
+   *
+   * Opcional porque runs gravados antes desta fatia não a têm, e porque nem toda origem informa
+   * tudo. Ausência aqui é "não observado", nunca zero — a mesma disciplina de `provider`/`modelo`.
+   */
+  readonly correlacaoDeCi?: CorrelacaoDeCi
+}
+
+/**
+ * O que liga o ledger à execução de CI que produziu a evidência (SPEC-Pipeline-01 §8).
+ *
+ * A §8 enumera: *"PR, head/base/tested SHA, CI run ID/attempt, perfil, resultados,
+ * started/completed/observed timestamps"*. `headSha` e `mergeSha` já moram no ledger desde a
+ * M9-F06; o que falta é o resto — e o que ele resolve é a pergunta *"esta prova descreve qual
+ * execução, exatamente?"*.
+ *
+ * **`testedSha` é distinto de `headSha` de propósito.** O provedor pode testar um merge commit
+ * sintético, que não é o head do PR; a §7 diz que a origem deve comprovar a relação entre eles,
+ * *"não exigir igualdade de SHAs que representam objetos diferentes"*. Um campo só apagaria essa
+ * distinção justamente onde ela importa.
+ *
+ * Todo campo é opcional e **ausência é ausência**: o critério 17 proíbe que dado indisponível
+ * apareça como zero.
+ */
+export interface CorrelacaoDeCi {
+  readonly pullRequest?: number
+  /** A base contra a qual o trabalho foi validado. */
+  readonly baseSha?: string
+  /** O commit efetivamente testado, quando difere do head do PR. */
+  readonly testedSha?: string
+  /** O identificador da execução na origem. */
+  readonly ciRunId?: string
+  /** A tentativa daquela execução. Artefato da tentativa 1 não prova a tentativa 2. */
+  readonly tentativaDoCi?: number
+  /** A revisão do perfil de CI vigente quando a evidência foi produzida. */
+  readonly revisaoDoPerfil?: string
+  /** Instantes **observados**, nunca derivados. */
+  readonly iniciadoEm?: string
+  readonly concluidoEm?: string
+  readonly observadoEm?: string
 }
 
 /** O que a tela mostra de relance. O ledger inteiro fica atrás de um expansor. */

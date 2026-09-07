@@ -23,6 +23,7 @@ import type { AiProvider } from '@shared/domain/ai'
 import type {
   ArtefatoReferenciado,
   CheckDoLedger,
+  CorrelacaoDeCi,
   EventoDoLedger,
   ExecutionLedger
 } from '@shared/domain/execution-ledger'
@@ -49,6 +50,8 @@ interface LedgerRow {
   readonly encerrado_em: string
   readonly provider: string | null
   readonly modelo: string | null
+  /** JSON do bloco `CorrelacaoDeCi`, ou `null` quando a execução de CI não foi observada. */
+  readonly correlacao_ci: string | null
 }
 
 interface ArtefatoRow {
@@ -85,8 +88,8 @@ export class ExecutionLedgerRepository {
         `INSERT INTO execution_ledger
            (id, user_id, project_id, run_id, estado_final, duracao_ms, tentativas, tokens,
             creditos, custo_usd, eventos, head_sha, merge_sha, checks, artefatos, encerrado_em,
-            provider, modelo)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+            provider, modelo, correlacao_ci)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
       )
       .run(
         randomUUID(),
@@ -106,7 +109,10 @@ export class ExecutionLedgerRepository {
         JSON.stringify(ledger.artefatos),
         ledger.encerradoEm,
         ledger.provider ?? null,
-        ledger.modelo ?? null
+        ledger.modelo ?? null,
+        // O bloco inteiro ou nada: `null` diz "execução de CI não observada". Gravar `'{}'` no
+        // lugar afirmaria que ela foi observada e veio vazia, que é outra coisa.
+        ledger.correlacaoDeCi === undefined ? null : JSON.stringify(ledger.correlacaoDeCi)
       )
 
     log.db.info('Ledger do run registrado', {
@@ -139,7 +145,10 @@ export class ExecutionLedgerRepository {
       artefatos: JSON.parse(row.artefatos) as readonly ArtefatoReferenciado[],
       encerradoEm: row.encerrado_em,
       ...(row.provider === null ? {} : { provider: row.provider as AiProvider }),
-      ...(row.modelo === null ? {} : { modelo: row.modelo })
+      ...(row.modelo === null ? {} : { modelo: row.modelo }),
+      ...(row.correlacao_ci === null || row.correlacao_ci === undefined
+        ? {}
+        : { correlacaoDeCi: JSON.parse(row.correlacao_ci) as CorrelacaoDeCi })
     }
   }
 

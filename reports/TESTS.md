@@ -12,8 +12,8 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 1630 | 1630 | 0 | 77.0 | — | — |
-| — | — | — | Banco | 1215 | 1201 | 0 | 87.0 | — | — |
+| — | — | — | Regras de Negócio | 1658 | 1658 | 0 | 77.2 | — | — |
+| — | — | — | Banco | 1222 | 1208 | 0 | 87.1 | — | — |
 | — | — | — | Tela | 636 | 635 | 0 | 75.2 | — | — |
 
 ## Histórico por entrega
@@ -346,3 +346,9 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-06 | #327 | — | Regras de Negócio | 1630 | 1630 | 0 | 77.0 | #328 | [#328](https://github.com/RodReis/rrb-jarvisOS/pull/328) |
 | 2026-09-06 | #327 | — | Banco | 1215 | 1201 | 0 | 87.0 | #328 | [#328](https://github.com/RodReis/rrb-jarvisOS/pull/328) |
 | 2026-09-06 | #327 | — | Tela | 636 | 635 | 0 | 75.2 | #328 | [#328](https://github.com/RodReis/rrb-jarvisOS/pull/328) |
+| — | #314 | spec-pipeline-01-politica-pr-ci | Regras de Negócio | 1658 | 1658 | 0 | 77.2 | — | — |
+| — | #314 | spec-pipeline-01-politica-pr-ci | Banco | 1222 | 1176 | 0 | 86.5 | — | — |
+| — | #314 | spec-pipeline-01-politica-pr-ci | Tela | 636 | 635 | 0 | 75.2 | — | — |
+| — | #314 | spec-pipeline-01-politica-pr-ci | Regras de Negócio | 1658 | 1658 | 0 | 77.2 | — | — |
+| — | #314 | spec-pipeline-01-politica-pr-ci | Banco | 1222 | 1208 | 0 | 87.1 | — | — |
+| — | #314 | spec-pipeline-01-politica-pr-ci | Tela | 636 | 635 | 0 | 75.2 | — | — |
