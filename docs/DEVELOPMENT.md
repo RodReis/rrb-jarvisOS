@@ -2177,7 +2177,7 @@ Esta entrega cobre os critérios **1, 2, 3, 4, 6, 7, 8 e 18**.
 
 #### Vertical 2 — Integração e preservação (critérios 5, 9, 10, 11 e 12)
 
-Segunda das três entregas verticais, continuando a mesma fatia.
+Segunda das três entregas verticais, continuando a mesma fatia. Na `main` pelo PR [#325](https://github.com/RodReis/rrb-jarvisOS/pull/325) (`266af2b`).
 
 **A heurística do cabeçalho, que a vertical 1 declarou como limite, era mesmo furada — nos dois sentidos.** Ela decidia "posso reescrever" por uma substring: arquivo que começa com a nossa marca é nosso. Isso *perde edição humana* feita num arquivo que a pipeline gerou (o cabeçalho continua lá) e *sobrescreve arquivo alheio* que tenha aquela linha no topo. `ci-workflow-adocao.ts` troca a opinião sobre o conteúdo por um fato sobre o histórico: um manifesto guarda o hash do que escrevemos, e o disco é comparado contra ele. "É igual ao que eu faria" deixa de ser confundido com "fui eu que fiz". Medido por contrafactual: com a heurística antiga de volta, dois testes de integração reprovam.
 
