@@ -1,5 +1,5 @@
 import type { VozService } from '../voz/voz-service'
-import type { DesfechoDoDownload } from '@shared/domain/voz'
+import type { ConfiguracaoDaVoz, DesfechoDoDownload } from '@shared/domain/voz'
 import { app, dialog, ipcMain } from 'electron'
 import {
   IPC_CHANNELS,
@@ -790,6 +790,17 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       return { estado: 'falhou' as const, motivo: 'Artefato não identificado.' }
     }
     return deps.baixarArtefatoDeVoz(id)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.vozConfiguracao, async () => deps.voz.configuracao())
+
+  ipcMain.handle(IPC_CHANNELS.vozConfigurar, async (_event, pedida: unknown) => {
+    // Objeto qualquer vira pedido vazio, e o serviço normaliza para o default. Recusar aqui
+    // exigiria um desfecho de erro que a tela teria de desenhar, para um caso que só acontece
+    // com chamada malformada — e o default é a resposta certa nos dois.
+    const bruto = typeof pedida === 'object' && pedida !== null ? pedida : {}
+
+    return deps.voz.configurar(bruto as Partial<ConfiguracaoDaVoz>)
   })
 
   ipcMain.handle(IPC_CHANNELS.approvalList, (_event, workspace: unknown) => {

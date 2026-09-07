@@ -103,7 +103,12 @@ import type {
 import type { CapacidadeResolvida } from '../domain/skills'
 
 /** Canais de request/response (renderer → main → renderer). */
-import type { DesfechoDaTranscricao, DesfechoDoDownload, ProntidaoDaVoz } from '@shared/domain/voz'
+import type {
+  ConfiguracaoDaVoz,
+  DesfechoDaTranscricao,
+  DesfechoDoDownload,
+  ProntidaoDaVoz
+} from '@shared/domain/voz'
 
 export const IPC_CHANNELS = {
   /** Metadados do app (nome, versão, ambiente). Sem segredo, sem caminho de disco. */
@@ -193,6 +198,8 @@ export const IPC_CHANNELS = {
   vozTranscrever: 'voz:transcrever',
   vozProntidao: 'voz:prontidao',
   vozBaixarArtefato: 'voz:baixar-artefato',
+  vozConfiguracao: 'voz:configuracao',
+  vozConfigurar: 'voz:configurar',
   approvalList: 'approval:list',
   approvalResolve: 'approval:resolve',
   /**
@@ -644,7 +651,15 @@ export const IPC_EVENT_CHANNELS = {
    * aqui vão as ferramentas e o uso. Um canal só obrigaria cada consumidor a filtrar o que não
    * lhe diz respeito.
    */
-  generationEvent: 'geracao:evento'
+  generationEvent: 'geracao:evento',
+  /**
+   * Um toque na hotkey global da voz (SPEC-Voz-01, critério 5).
+   *
+   * Canal de **evento** porque quem inicia é o sistema operacional, não a tela: o atalho
+   * funciona com a janela minimizada, e nesse momento não há `invoke` do renderer para
+   * responder. O main avisa; a tela abre ou fecha a captura.
+   */
+  vozHotkey: 'voz:hotkey'
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]
@@ -803,6 +818,17 @@ export interface JarvisBridge {
   transcreverAudio(pcm: Int16Array, workspace: WorkspaceId): Promise<DesfechoDaTranscricao>
   prontidaoDaVoz(): Promise<ProntidaoDaVoz>
   baixarArtefatoDeVoz(id: string): Promise<DesfechoDoDownload>
+  /** O modelo e o idioma em vigor, para Settings desenhar o estado atual (critério 6). */
+  configuracaoDaVoz(): Promise<ConfiguracaoDaVoz>
+  /**
+   * Troca modelo ou idioma, e devolve o que **de fato** ficou valendo.
+   *
+   * O retorno é a configuração inteira e não `void` porque o pedido é normalizado ao gravar: a
+   * tela precisa saber o que valeu, em vez de repetir a normalização do seu lado para adivinhar.
+   */
+  configurarVoz(pedida: Partial<ConfiguracaoDaVoz>): Promise<ConfiguracaoDaVoz>
+  /** Assina o toque da hotkey global. Devolve a função que cancela a assinatura. */
+  onHotkeyDaVoz(ouvinte: () => void): () => void
   /**
    * Resolve uma aprovação pendente. O retorno varia com o que estava pausado: uma etapa de
    * filesystem devolve o `ExecutionRun` retomado (F01); um comando devolve o

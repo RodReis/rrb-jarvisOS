@@ -15,7 +15,12 @@ import {
 } from '@shared/contracts/ipc'
 import type { AlvoDaPublicacao, PublicacaoOutcome } from '@shared/domain/publicacao'
 import type { ExecutionLedger } from '@shared/domain/execution-ledger'
-import type { DesfechoDaTranscricao, DesfechoDoDownload, ProntidaoDaVoz } from '@shared/domain/voz'
+import type {
+  ConfiguracaoDaVoz,
+  DesfechoDaTranscricao,
+  DesfechoDoDownload,
+  ProntidaoDaVoz
+} from '@shared/domain/voz'
 import type { PendenciaDeLimpeza } from '@shared/domain/limpeza'
 import type { MergePolicyOutcome, PoliticaDeMerge, VistaDaFila } from '@shared/domain/pipeline'
 import type { ContextPack, ContextPackOutcome, FalhaRegistrada } from '@shared/domain/context-pack'
@@ -202,6 +207,19 @@ const bridge: JarvisBridge = {
   prontidaoDaVoz: (): Promise<ProntidaoDaVoz> => ipcRenderer.invoke(IPC_CHANNELS.vozProntidao),
   baixarArtefatoDeVoz: (id: string): Promise<DesfechoDoDownload> =>
     ipcRenderer.invoke(IPC_CHANNELS.vozBaixarArtefato, id),
+  configuracaoDaVoz: (): Promise<ConfiguracaoDaVoz> =>
+    ipcRenderer.invoke(IPC_CHANNELS.vozConfiguracao),
+  configurarVoz: (pedida: Partial<ConfiguracaoDaVoz>): Promise<ConfiguracaoDaVoz> =>
+    ipcRenderer.invoke(IPC_CHANNELS.vozConfigurar, pedida),
+  onHotkeyDaVoz: (ouvinte: () => void): (() => void) => {
+    // Mesmo recorte do `onGenerationEvent`: o `IpcRendererEvent` fica de fora porque carrega
+    // `sender`, um objeto do Electron que não pode vazar para o renderer.
+    const embrulhado = (): void => ouvinte()
+
+    ipcRenderer.on(IPC_EVENT_CHANNELS.vozHotkey, embrulhado)
+
+    return () => ipcRenderer.removeListener(IPC_EVENT_CHANNELS.vozHotkey, embrulhado)
+  },
   resolveApproval: (
     id: string,
     decision: ApprovalDecision

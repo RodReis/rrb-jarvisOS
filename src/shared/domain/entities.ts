@@ -397,7 +397,14 @@ export const AUDIT_EVENT_TYPES = [
   // (esperado, obtido) do hash, que depois de um artefato adulterado ser apagado é a única
   // testemunha que sobra.
   'voz.download.inicio',
-  'voz.download.fim'
+  'voz.download.fim',
+  // Registrar hotkey global também é sensível, por outra razão: o atalho intercepta a tecla no
+  // **sistema inteiro**, por cima de qualquer outro aplicativo. A cadeia é o que permite dizer
+  // depois quando o app passou a escutar qual combinação — e a recusa entra junto, porque um
+  // atalho que o sistema negou deixa o app sem hotkey, e isso é estado, não não-evento.
+  'voz.hotkey.registrada',
+  'voz.hotkey.recusada',
+  'voz.hotkey.liberada'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]

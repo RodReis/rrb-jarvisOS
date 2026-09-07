@@ -17,7 +17,7 @@ import { caminhoDoPythonDaVoz, extrairTarGz, rodarPythonDaVoz } from './voz/runt
 import { createWriteStream, mkdirSync, writeFileSync } from 'node:fs'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
-import { app, BrowserWindow, nativeTheme, shell } from 'electron'
+import { app, BrowserWindow, globalShortcut, nativeTheme, shell } from 'electron'
 import { IPC_EVENT_CHANNELS } from '@shared/contracts/ipc'
 import { AuthService } from './auth/auth-service'
 import { createSupabaseClient, readSupabaseConfig } from './auth/supabase-client'
@@ -133,7 +133,7 @@ import { ordemDaEtapa } from '@shared/domain/jornada'
 import type { Etapa } from '@shared/domain/jornada'
 import { faseDaEtapa, type Fase } from '@shared/domain/fase'
 import type { RotaComModelo } from '@shared/domain/modelo-da-fase'
-import type { WorkspaceId } from '@shared/domain/entities'
+import type { AuditEventType, WorkspaceId } from '@shared/domain/entities'
 import type { AiProvider, AiStreamEvent } from '@shared/domain/ai'
 import type { EstadoDasRotas } from '@shared/domain/rota-de-geracao'
 import { GitRunner } from './projects/git-runner'
@@ -165,6 +165,7 @@ import { initRendererLogBridge } from './logging/renderer-bridge'
 import { LOCAL_USER_ID, LOCAL_USER_PROFILE } from './storage/local-user'
 import { closeStorage, initStorage } from './storage'
 import { createTray, destroyTray, revelarJanela } from './tray'
+import { HotkeyDaVoz } from './voz/hotkey-global'
 import { WorkspaceService } from './workspace/workspace-service'
 import { createMainWindow } from './window'
 
@@ -177,6 +178,7 @@ if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
   let janela: BrowserWindow | undefined
+  let hotkeyDaVoz: HotkeyDaVoz | undefined
 
   // Alguém tentou abrir o app de novo: em vez de uma segunda janela, foca a existente.
   app.on('second-instance', () => {
@@ -1506,7 +1508,12 @@ if (!app.requestSingleInstanceLock()) {
 
     // Encerrar o sidecar com o app é o critério 2: processo filho que sobrevive ao pai fica
     // segurando o modelo na memória sem ninguém para falar com ele.
-    app.on('before-quit', () => void engineDaVoz.encerrar())
+    app.on('before-quit', () => {
+      void engineDaVoz.encerrar()
+      // Um atalho global que sobrevive ao app fica interceptando a tecla para um processo que
+      // já não existe.
+      hotkeyDaVoz?.liberar()
+    })
 
     const voz = new VozService({
       engine: engineDaVoz,
@@ -1642,6 +1649,41 @@ if (!app.requestSingleInstanceLock()) {
 
     janela = createMainWindow()
     createTray(janela)
+
+    /*
+     * A hotkey global da voz (SPEC-Voz-01, critério 5).
+     *
+     * Registrada **depois** da janela porque o toque precisa de alguém para avisar: sem
+     * `janela`, o atalho funcionaria e o evento cairia no vazio.
+     *
+     * O que ela faz é só emitir o evento. A máquina de estados da gravação (`SessaoDeGravacao`)
+     * vive no renderer, junto do microfone que ele captura — pôr o estado aqui obrigaria a
+     * tela a perguntar ao main se está gravando, e as duas versões divergiriam no primeiro
+     * erro de rede interna.
+     */
+    hotkeyDaVoz = new HotkeyDaVoz({
+      registrador: {
+        registrar: (atalho, acao) => globalShortcut.register(atalho, acao),
+        liberar: (atalho) => globalShortcut.unregister(atalho)
+      },
+      aoAcionar: () => janela?.webContents.send(IPC_EVENT_CHANNELS.vozHotkey),
+      auditar: (evento) =>
+        storage.audit.append({
+          user_id: userIdAtual(),
+          type: evento.type as AuditEventType,
+          payload: evento.payload
+        })
+    })
+
+    const desfechoDaHotkey = hotkeyDaVoz.registrar()
+    if (desfechoDaHotkey.estado === 'ja-em-uso') {
+      // Não bloqueia o boot: o app funciona sem hotkey, e o botão da tela continua valendo.
+      // Derrubar a inicialização por um atalho que outro programa tomou seria punir o usuário
+      // por software de terceiros.
+      log.sistema.warn('Voz: a hotkey global já está em uso por outro programa.', {
+        atalho: desfechoDaHotkey.atalho
+      })
+    }
 
     /*
      * A coleta roda **uma vez, na abertura** (SPEC-Fases-03 § Persistência).
