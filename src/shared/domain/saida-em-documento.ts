@@ -95,6 +95,95 @@ function comoAfirmacao(valor: unknown): AfirmacaoLegivel | undefined {
 }
 
 /**
+ * O MVP do roadmap, lido como afirmações (issue #337).
+ *
+ * O leitor reconhecia **uma** forma, a das afirmações do PRD e da arquitetura, e as outras
+ * etapas caíam inteiras no `restante` — o PI viu a parede de `{"mvps":[{"id":"mvp-1"...` que o
+ * console existe para não mostrar. Um MVP não tem `texto`: tem `tese` e `resultado`, que são
+ * coisas diferentes e as duas precisam ser lidas.
+ *
+ * O par documento/seção vira o agrupamento que a tela já sabe desenhar: o MVP é a seção, e cada
+ * campo dele uma linha. Nenhum componente novo — a forma legível é a mesma.
+ */
+function comoMvp(valor: unknown): readonly AfirmacaoLegivel[] {
+  if (typeof valor !== 'object' || valor === null) return []
+
+  const bruto = valor as Record<string, unknown>
+  const titulo = bruto.titulo
+  const tese = bruto.tese
+
+  // `tese` é o que distingue um MVP de qualquer outro objeto com título — uma fatia, por
+  // exemplo, que é lida junto pela varredura e não deve virar seção própria.
+  if (typeof titulo !== 'string' || typeof tese !== 'string') return []
+
+  const id = typeof bruto.id === 'string' ? bruto.id : titulo
+  const linha = (campo: string, texto: unknown): AfirmacaoLegivel | undefined =>
+    typeof texto === 'string' && texto.trim() !== ''
+      ? { id: `${id}:${campo}`, documento: 'Roadmap', secao: titulo, texto, origem: campo }
+      : undefined
+
+  const fatias = Array.isArray(bruto.fatias) ? bruto.fatias : []
+  const titulosDasFatias = fatias
+    .map((f) => (typeof f === 'object' && f !== null ? (f as Record<string, unknown>).titulo : ''))
+    .filter((t): t is string => typeof t === 'string' && t.trim() !== '')
+
+  return [
+    linha('entrega', tese),
+    linha('resultado', bruto.resultado),
+    // As fatias como uma linha só: são o checklist do MVP, e uma seção por fatia faria a tela
+    // rolar o que o PI está lendo de relance.
+    titulosDasFatias.length === 0 ? undefined : linha('fatias', titulosDasFatias.join(' · '))
+  ].filter((l): l is AfirmacaoLegivel => l !== undefined)
+}
+
+/**
+ * A SPEC da fatia, lida como afirmações (issue #337).
+ *
+ * Mesma razão do MVP, forma diferente: a SPEC tem listas (`fluxo`, `regras`,
+ * `criteriosDeAceite`, `testes`) e é o documento que o PI lê antes de aprovar o `SLICE_ENTRY`.
+ * As perguntas abertas ficam de fora: elas têm tela própria, com as opções e o impacto de cada
+ * uma, e repeti-las aqui sem as opções mostraria a decisão sem o que ela decide.
+ */
+function comoSpec(valor: unknown): readonly AfirmacaoLegivel[] {
+  if (typeof valor !== 'object' || valor === null) return []
+
+  const bruto = valor as Record<string, unknown>
+  const titulo = bruto.titulo
+  const objetivo = bruto.objetivo
+
+  if (typeof titulo !== 'string' || typeof objetivo !== 'string') return []
+
+  const lidas: AfirmacaoLegivel[] = [
+    { id: 'spec:objetivo', documento: 'SPEC', secao: titulo, texto: objetivo, origem: 'objetivo' }
+  ]
+
+  const listas: readonly (readonly [string, string])[] = [
+    ['fluxo', 'passo'],
+    ['regras', 'regra'],
+    ['criteriosDeAceite', 'critério de aceite'],
+    ['testes', 'teste']
+  ]
+
+  for (const [campo, rotulo] of listas) {
+    const lista = bruto[campo]
+    if (!Array.isArray(lista)) continue
+
+    lista.forEach((item, i) => {
+      if (typeof item !== 'string' || item.trim() === '') return
+      lidas.push({
+        id: `spec:${campo}:${i}`,
+        documento: 'SPEC',
+        secao: titulo,
+        texto: item,
+        origem: rotulo
+      })
+    })
+  }
+
+  return lidas
+}
+
+/**
  * Extrai **todo** objeto JSON completo de um texto, em qualquer nível de aninhamento.
  *
  * Varredura por profundidade de chaves, e não regex: uma chave dentro de string (`"a}b"`) ou uma
@@ -170,6 +259,23 @@ export function lerSaidaComoDocumento(texto: string): SaidaLida {
     const direta = comoAfirmacao(objeto)
     if (direta !== undefined) {
       afirmacoes.push(direta)
+      continue
+    }
+
+    /*
+     * As outras formas da jornada (#337). A ordem importa só por economia: um objeto é MVP ou
+     * SPEC, nunca os dois — `tese` e `objetivo` não coexistem —, e cada leitor devolve lista
+     * vazia para o que não é seu.
+     */
+    const mvp = comoMvp(objeto)
+    if (mvp.length > 0) {
+      afirmacoes.push(...mvp)
+      continue
+    }
+
+    const spec = comoSpec(objeto)
+    if (spec.length > 0) {
+      afirmacoes.push(...spec)
       continue
     }
 

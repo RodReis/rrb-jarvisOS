@@ -101,3 +101,84 @@ describe('lerSaidaComoDocumento', () => {
     expect(lerSaidaComoDocumento('').topicos).toHaveLength(0)
   })
 })
+
+describe('as outras saídas da jornada (issue #337)', () => {
+  const MVP = {
+    id: 'mvp-1',
+    numero: 1,
+    titulo: 'Cadastro e autenticação',
+    tese: 'Entrega o fluxo de criação de conta do investidor.',
+    resultado: 'Um investidor cria a conta e entra sozinho.',
+    dependeDe: [],
+    fatias: [{ id: 'f-1', numero: 1, titulo: 'Formulário de cadastro' }]
+  }
+
+  it('o roadmap vira documento, não a parede de JSON que o PI viu', () => {
+    /*
+     * O defeito medido: o leitor reconhecia só a forma das afirmações do PRD, e o roadmap caía
+     * inteiro no `restante`. Um MVP não tem `texto` — tem `tese` e `resultado`, que dizem coisas
+     * diferentes: o que ele entrega e como se sabe que fechou.
+     */
+    const { topicos, restante } = lerSaidaComoDocumento(JSON.stringify({ mvps: [MVP] }))
+
+    expect(topicos[0]?.secao).toBe('Cadastro e autenticação')
+    expect(topicos[0]?.afirmacoes.map((a) => a.texto)).toEqual([
+      'Entrega o fluxo de criação de conta do investidor.',
+      'Um investidor cria a conta e entra sozinho.',
+      'Formulário de cadastro'
+    ])
+    expect(restante).toBe('')
+  })
+
+  it('a fatia sozinha não vira seção: ela é o checklist do MVP', () => {
+    // A varredura lê a fatia como objeto completo antes do MVP fechar. Sem `tese`, ela não é
+    // MVP — e uma seção por fatia faria a tela rolar o que o PI lê de relance.
+    const { topicos } = lerSaidaComoDocumento(
+      JSON.stringify({ id: 'f-1', numero: 1, titulo: 'Formulário de cadastro' })
+    )
+
+    expect(topicos).toHaveLength(0)
+  })
+
+  it('a SPEC vira documento, com o rótulo de cada lista', () => {
+    const spec = {
+      titulo: 'Formulário de cadastro',
+      objetivo: 'Capturar os dados do investidor antes de criar a conta.',
+      fluxo: ['Visitante acessa a tela'],
+      regras: ['CPF é validado'],
+      criteriosDeAceite: ['Salvar sem nome mostra erro'],
+      testes: ['Unitário da validação'],
+      perguntas: [{ id: 'p-1', enunciado: 'Qual gateway?' }]
+    }
+
+    const { topicos } = lerSaidaComoDocumento(JSON.stringify({ spec }))
+
+    const lidas = topicos[0]?.afirmacoes ?? []
+    expect(topicos[0]?.secao).toBe('Formulário de cadastro')
+    expect(lidas.map((a) => a.origem)).toEqual([
+      'objetivo',
+      'passo',
+      'regra',
+      'critério de aceite',
+      'teste'
+    ])
+
+    /*
+     * As perguntas abertas ficam de fora de propósito: elas têm tela própria, com as opções e o
+     * impacto de cada uma. Mostrá-las aqui sem as opções seria exibir a decisão sem o que ela
+     * decide.
+     */
+    expect(lidas.map((a) => a.texto)).not.toContain('Qual gateway?')
+  })
+
+  it('o PRD continua lido pela forma dele: as outras não sequestram a afirmação', () => {
+    const saida = JSON.stringify({
+      afirmacoes: [{ id: 'a-1', documento: 'PRD', secao: 'Problema', texto: 'Uma frase.' }]
+    })
+
+    const { topicos } = lerSaidaComoDocumento(saida)
+
+    expect(topicos[0]?.documento).toBe('PRD')
+    expect(topicos[0]?.afirmacoes).toHaveLength(1)
+  })
+})
