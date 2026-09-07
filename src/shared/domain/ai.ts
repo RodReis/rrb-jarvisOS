@@ -249,8 +249,15 @@ export const MAX_TOKENS_PADRAO = 4096
  * Generoso porque streaming de resposta longa é lento por natureza — o que o timeout protege
  * não é a lentidão, é o pendurado: um stream que parou de emitir e nunca fecha seguraria o
  * `AuditEvent` de conclusão para sempre.
+ *
+ * **Cinco minutos, não dois** (#316): a geração dos três documentos do PRD levava 111–120 s com
+ * 60 afirmações, e com o teto em 120 s a primeira tentativa morria por sorte — a repetição
+ * salvava a rodada ou não. Um teto na borda da duração normal não protege do pendurado; ele
+ * transforma a geração saudável em loteria. Global e não por chamada (decisão do PI,
+ * 2026-09-06): contradições, arquitetura e roadmap crescem com o mesmo projeto, e um teto por
+ * chamada deixaria os irmãos batendo na mesma parede um a um.
  */
-export const TIMEOUT_PADRAO_MS = 120_000
+export const TIMEOUT_PADRAO_MS = 300_000
 
 /** O que o chamador pede. Stateless nesta fatia: o contexto é o que vem aqui (spec § Fora). */
 export interface AiRequest {
@@ -277,6 +284,19 @@ export interface AiRequest {
   readonly prompt: string
   /** Instrução de sistema, opcional. */
   readonly system?: string
+  /**
+   * O JSON Schema que o provider deve impor à saída, já serializado (emenda E1 à SPEC-Fases-03).
+   *
+   * Acompanha o `system` porque é o **par system+prompt** que decide o formato, e não a etapa: a
+   * etapa `prd` chama o modelo três vezes com contratos diferentes — termo de pesquisa (texto
+   * puro), documentos (`afirmacoes`) e contradições. Um schema derivado da etapa aplicaria
+   * `afirmacoes` ao termo e quebraria a pesquisa de mercado.
+   *
+   * Hoje só o `claude-code` o consome (é o único CLI com flag equivalente). Os demais o ignoram
+   * — e isso é correto, não uma lacuna: o `lerSaidaDoModelo` de cada domínio continua sendo a
+   * barreira que vale para **todas** as rotas.
+   */
+  readonly jsonSchema?: string
   readonly maxTokens?: number
   /**
    * O `ContextPack` que autoriza esta geração — **obrigatório** (SPEC-Planejamento-02,

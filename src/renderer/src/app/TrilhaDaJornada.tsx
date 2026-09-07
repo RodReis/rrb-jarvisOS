@@ -41,6 +41,16 @@ interface TrilhaDaJornadaProps {
   /** Dispara o CTA da etapa atual. */
   readonly onAgir: () => void
   readonly ocupado?: boolean
+  /**
+   * Por que o CTA da etapa atual não pode agir agora, ou `undefined` quando pode (#318).
+   *
+   * Quem sabe é o painel da etapa — o gate do PRD trava com contradição pendente, e a trilha não
+   * tem como saber disso. Sem esta prop o botão saía primário com o rótulo "Aceitar o PRD"
+   * enquanto o painel de baixo recusava o mesmo aceite: duas respostas para a mesma pergunta, e
+   * a que o PI vê primeiro era a errada. A razão vem junto porque botão desabilitado sem motivo
+   * é pior que botão nenhum.
+   */
+  readonly bloqueio?: string
 }
 
 /**
@@ -84,7 +94,8 @@ function Marcador({ posicao }: { readonly posicao: EtapaNaTrilha['posicao'] }): 
 export function TrilhaDaJornada({
   estado,
   onAgir,
-  ocupado = false
+  ocupado = false,
+  bloqueio
 }: TrilhaDaJornadaProps): React.JSX.Element {
   const { t } = useTranslation()
 
@@ -250,7 +261,7 @@ export function TrilhaDaJornada({
                         própria. Quem posiciona é o layout, não o controle.
                       */}
                       {atual && (
-                        <div className="mt-1 flex">
+                        <div className="mt-1 flex flex-col gap-1.5">
                           {/* `primaria`: é o próximo passo da jornada, o único botão da coluna e a
                               razão de a trilha existir. No default `secundaria` ele saía contornado
                               e leve — o mesmo peso do "Voltar" — e o acento do usuário, que já pinta
@@ -258,11 +269,19 @@ export function TrilhaDaJornada({
                           <Button
                             variante="primaria"
                             onClick={onAgir}
-                            desabilitado={ocupado}
+                            desabilitado={ocupado || bloqueio !== undefined}
                             carregando={ocupado}
                           >
                             {etapa.cta}
                           </Button>
+
+                          {/* Botão desabilitado **sempre com a razão ao lado** — a mesma frase que
+                              o painel da etapa mostra, para não haver duas explicações. */}
+                          {bloqueio !== undefined && (
+                            <span className="text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-suave)]">
+                              {bloqueio}
+                            </span>
+                          )}
                         </div>
                       )}
 

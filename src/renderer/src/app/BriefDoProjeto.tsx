@@ -80,7 +80,16 @@ function LinhaDaAfirmacao({
           para a borda oposta, o botão ficava a meia tela do que ele corta, e o olho tinha de
           percorrer o vazio para ligar um ao outro. */}
       <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
-        <p className="min-w-0 max-w-[58ch] flex-1 text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto)]">
+        {/*
+          Sem teto próprio de medida: quem limita agora é a **coluna**.
+
+          O `max-w-[58ch]` fazia sentido quando o documento ocupava a tela inteira. Dentro da
+          coluna esquerda ele passou a sufocar duas vezes — a captura mediu 366px de texto numa
+          coluna de 536px, com 170px vazios do lado direito *dentro* da própria coluna, além do
+          vazio da página. Duas medidas empilhadas cortam pelo menor, e o menor aqui era o teto
+          que a coluna já garante.
+        */}
+        <p className="min-w-0 flex-1 text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto)]">
           {afirmacao.texto}
         </p>
 
@@ -201,8 +210,27 @@ export function BriefDoProjeto({
   const liberado = podeAceitar(brief)
   const materiais = brief.pendencias.filter((p) => p.material)
 
+  /*
+   * A contagem por origem — o que a coluna da direita resume.
+   *
+   * Contada aqui e não no main porque é aritmética sobre o que a tela já tem: pedir ao main um
+   * número derivado das mesmas afirmações que ele acabou de mandar seria uma segunda resposta
+   * para a mesma pergunta, que divergiria no dia em que uma das duas mudasse.
+   */
+  const porOrigem = {
+    prompt: brief.afirmacoes.filter((a) => a.origem === 'prompt').length,
+    decisao: brief.afirmacoes.filter((a) => a.origem === 'decisao').length,
+    proposto: inferidos.length
+  }
+
   return (
-    <div className="flex flex-col gap-5">
+    /*
+     *  porque o que decide o layout é o espaço que **este** componente recebe, não a
+     * largura da janela. Na tela do projeto a trilha ocupa 19rem fixos à esquerda, então uma
+     * media query de janela erraria por essa diferença: a 768px de janela o brief tem ~27rem, e
+     * uma coluna dupla ali espremeria as duas metades.
+     */
+    <div className="@container flex flex-col gap-5">
       <div className="flex flex-col gap-1">
         <h3 className="text-[length:var(--jos-texto-realce)] font-[var(--jos-peso-semi)] text-[var(--jos-cor-texto)]">
           {t('brief.titulo')}
@@ -213,12 +241,14 @@ export function BriefDoProjeto({
       </div>
 
       {/*
-        Pendência material bloqueia o aceite, e o aviso diz **quais** — listar o número sem os
-        itens obrigaria o PI a caçar os buracos pelos dez blocos.
+        Pendência material bloqueia o aceite. **Quais** são elas agora vive no painel lateral, ao
+        lado do botão que elas travam — repetir a lista aqui poria o mesmo texto duas vezes na
+        mesma tela, e o leitor de tela anunciaria as perguntas em duplicata. O alerta mantém o
+        papel que só ele tem: dizer, no topo, que existe bloqueio antes de o PI começar a ler.
       */}
       {!liberado && (
         <InlineAlert tom="warn" titulo={t('brief.pendenciaMaterial')}>
-          {materiais.map((p) => p.pergunta).join(' · ')}
+          {t('brief.pendenciaOndeVer', { count: materiais.length })}
         </InlineAlert>
       )}
 
@@ -229,108 +259,197 @@ export function BriefDoProjeto({
       )}
 
       {/*
+        Documento à esquerda, julgamento à direita.
+
+        A faixa vazia da captura não era espaço sobrando: era o resumo faltando. As afirmações
+        têm medida de leitura (58ch) e não crescem para ocupar a tela — alargá-las cansaria o
+        retorno de linha —, então a largura restante fica com o que o PI precisa para decidir:
+        quantas afirmações vieram de onde, o que trava o aceite, e o botão.
+
+        Uma coluna só abaixo de 72rem: a régua vem de a coluna auxiliar precisar de ~15rem para
+        não espremer os rótulos, e o documento de ~40rem para manter a medida. Abaixo disso as
+        duas empilham, e o painel volta a ser o rodapé que era.
+      */}
+      <div className="grid grid-cols-1 items-start gap-6 @[52rem]:grid-cols-[minmax(0,1fr)_minmax(15rem,18rem)]">
+        <div className="flex min-w-0 flex-col gap-5">
+          {/*
         O que a IA inferiu, como conjunto (critério 4). Fica **acima** do brief porque é o que o
         PI precisa julgar antes de aceitar — descobrir os propostos lendo dez blocos seria pedir
         que ele fizesse a varredura que esta lista faz por ele.
       */}
-      {inferidos.length > 0 && (
-        <section
-          data-jos-propostos
-          aria-labelledby="brief-propostos"
-          className="flex flex-col gap-1 rounded-[var(--jos-raio-card)] border border-[rgba(var(--jos-borda-rgb),0.16)] bg-[var(--jos-cor-superficie-elevada)] p-4"
+          {inferidos.length > 0 && (
+            <section
+              data-jos-propostos
+              aria-labelledby="brief-propostos"
+              className="flex flex-col gap-1 rounded-[var(--jos-raio-card)] border border-[rgba(var(--jos-borda-rgb),0.16)] bg-[var(--jos-cor-superficie-elevada)] p-4"
+            >
+              <h4
+                id="brief-propostos"
+                className="text-[length:var(--jos-texto-corpo)] font-[var(--jos-peso-semi)] text-[var(--jos-cor-texto)]"
+              >
+                {t('brief.propostosTitulo', { count: inferidos.length })}
+              </h4>
+              <p className="max-w-[62ch] text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-secundario)]">
+                {t('brief.propostosDescricao')}
+              </p>
+
+              <ul className="mt-1 divide-y divide-[rgba(var(--jos-borda-rgb),0.10)]">
+                {inferidos.map((a) => (
+                  <LinhaDaAfirmacao
+                    key={a.id}
+                    afirmacao={a}
+                    onCortar={() => void cortar(a.id)}
+                    ocupado={ocupado}
+                  />
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {/* O brief por bloco. Bloco sem afirmação não vira seção: o documento mostra o que tem. */}
+          {BLOCOS_DO_BRIEF.map((bloco) => {
+            const doBloco = brief.afirmacoes.filter((a) => a.bloco === bloco)
+            if (doBloco.length === 0) return null
+
+            return (
+              <section key={bloco} data-jos-bloco={bloco} className="flex flex-col gap-1">
+                <h4 className="font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] uppercase tracking-[2px] text-[var(--jos-cor-acento-leitura)]">
+                  {t(`brief.blocos.${bloco}` as `brief.blocos.${BlocoDoBrief}`)}
+                </h4>
+
+                <ul className="divide-y divide-[rgba(var(--jos-borda-rgb),0.10)]">
+                  {doBloco.map((a) => (
+                    <LinhaDaAfirmacao
+                      key={a.id}
+                      afirmacao={a}
+                      {...(a.origem === 'proposto' ? { onCortar: () => void cortar(a.id) } : {})}
+                      ocupado={ocupado}
+                    />
+                  ))}
+                </ul>
+              </section>
+            )
+          })}
+        </div>
+
+        {/*
+          O painel de julgamento (critérios 4 e 5).
+
+          `sticky` porque o brief é longo e a decisão precisa acompanhar a leitura: com o aceite
+          no rodapé, o PI que terminava de ler o quinto bloco tinha de rolar até o fim para agir,
+          e a razão do bloqueio ficava a uma tela de distância da pendência que a causou. Acima de
+          72rem ele acompanha; empilhado, volta a ser o rodapé que era — e aí `sticky` não faz
+          nada, que é o comportamento certo numa coluna estreita.
+        */}
+        <aside
+          data-jos-aceite="brief"
+          aria-labelledby="brief-aceite"
+          className="flex flex-col overflow-hidden rounded-[var(--jos-raio-card)] border border-[rgba(var(--jos-borda-rgb),0.16)] bg-[linear-gradient(180deg,rgba(255,255,255,0.025),transparent_40%),var(--jos-cor-superficie-elevada)] @[52rem]:sticky @[52rem]:top-4"
         >
-          <h4
-            id="brief-propostos"
-            className="text-[length:var(--jos-texto-corpo)] font-[var(--jos-peso-semi)] text-[var(--jos-cor-texto)]"
-          >
-            {t('brief.propostosTitulo', { count: inferidos.length })}
-          </h4>
-          <p className="max-w-[62ch] text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-secundario)]">
-            {t('brief.propostosDescricao')}
-          </p>
-
-          <ul className="mt-1 divide-y divide-[rgba(var(--jos-borda-rgb),0.10)]">
-            {inferidos.map((a) => (
-              <LinhaDaAfirmacao
-                key={a.id}
-                afirmacao={a}
-                onCortar={() => void cortar(a.id)}
-                ocupado={ocupado}
-              />
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {/* O brief por bloco. Bloco sem afirmação não vira seção: o documento mostra o que tem. */}
-      {BLOCOS_DO_BRIEF.map((bloco) => {
-        const doBloco = brief.afirmacoes.filter((a) => a.bloco === bloco)
-        if (doBloco.length === 0) return null
-
-        return (
-          <section key={bloco} data-jos-bloco={bloco} className="flex flex-col gap-1">
-            <h4 className="font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] uppercase tracking-[2px] text-[var(--jos-cor-acento-leitura)]">
-              {t(`brief.blocos.${bloco}` as `brief.blocos.${BlocoDoBrief}`)}
+          <div className="flex flex-col gap-2 border-b border-[rgba(var(--jos-borda-rgb),0.10)] p-4">
+            <h4 className="font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] uppercase tracking-[2px] text-[var(--jos-cor-texto-suave)]">
+              {t('brief.origensTitulo', { total: brief.afirmacoes.length })}
             </h4>
 
-            <ul className="divide-y divide-[rgba(var(--jos-borda-rgb),0.10)]">
-              {doBloco.map((a) => (
-                <LinhaDaAfirmacao
-                  key={a.id}
-                  afirmacao={a}
-                  {...(a.origem === 'proposto' ? { onCortar: () => void cortar(a.id) } : {})}
-                  ocupado={ocupado}
-                />
+            {/*
+              A contagem por origem, como lista de pares.
+
+              **Sem barra empilhada colorida**: as três origens não são estados de severidade, e
+              pintar cada uma de uma cor obrigaria a inventar três matizes que não significam
+              nada — ou a usar as semânticas, que significam outra coisa. O que o PI compara aqui
+              são três números, e três números se comparam lendo.
+            */}
+            <dl className="flex flex-col gap-1.5">
+              {(
+                [
+                  ['prompt', porOrigem.prompt],
+                  ['decisao', porOrigem.decisao],
+                  ['proposto', porOrigem.proposto]
+                ] as const
+              ).map(([origem, quantas]) => (
+                <div key={origem} className="flex items-baseline justify-between gap-3">
+                  {/*
+                    Rótulo próprio, e não o mesmo da linha: a linha fala de **uma** afirmação
+                    ("do seu prompt"), a legenda conta um **conjunto**. Reusar a frase deixaria
+                    o mesmo texto na tela com dois papéis, o que é ambíguo de ler e pior ainda
+                    de navegar por leitor de tela.
+                  */}
+                  <dt className="text-[length:var(--jos-texto-mini)] text-[var(--jos-cor-texto-secundario)]">
+                    {t(`brief.contagem.${origem}`)}
+                  </dt>
+                  {/* `tabular-nums` para os três números alinharem na coluna da direita. */}
+                  <dd className="font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-mini)] tabular-nums text-[var(--jos-cor-texto)]">
+                    {quantas}
+                  </dd>
+                </div>
               ))}
-            </ul>
-          </section>
-        )
-      })}
+            </dl>
+          </div>
 
-      {/*
-        O aceite (critério 5) — a soleira do documento, e por isso ele fica **no fim**: aceitar
-        é o que se faz depois de ler, e um botão no topo convidaria a aceitar sem descer.
-
-        Marcado por uma régua e um bloco recuado, não por um cartão: o brief inteiro já é uma
-        pilha de seções, e mais uma caixa faria o aceite competir com os blocos em vez de
-        encerrá-los. A régua diz "o documento acabou aqui" com o material mais barato que existe.
-
-        O botão desabilitado vem **com a razão ao lado**, nunca sozinho: um alvo morto sem
-        explicação faz o PI procurar o defeito no próprio brief.
-      */}
-      <section
-        data-jos-aceite="brief"
-        aria-labelledby="brief-aceite"
-        className="mt-1 flex flex-col gap-2 border-t border-[rgba(var(--jos-borda-rgb),0.16)] pt-5"
-      >
-        <h4
-          id="brief-aceite"
-          className="text-[length:var(--jos-texto-corpo)] font-[var(--jos-peso-semi)] text-[var(--jos-cor-texto)]"
-        >
-          {t('brief.aceiteTitulo')}
-        </h4>
-        <p className="max-w-[62ch] text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-secundario)]">
-          {t('brief.aceiteDescricao')}
-        </p>
-
-        <div className="mt-1 flex flex-wrap items-center gap-3">
-          <Button
-            variante="primaria"
-            onClick={() => void aceitar()}
-            desabilitado={ocupado || !liberado}
-            carregando={ocupado}
-            iconeInicial={<ShieldCheck aria-hidden="true" className="size-4" />}
-          >
-            {t('brief.aceitar')}
-          </Button>
-
-          {!liberado && (
-            <span className="text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-secundario)]">
-              {t('brief.aceiteBloqueado')}
-            </span>
+          {/*
+            O que trava o aceite, item a item — e não só o total. O alerta no topo já diz que há
+            pendência; aqui a lista fica ao lado do botão que ela bloqueia, que é onde o PI está
+            olhando quando pergunta "por que não posso aceitar?".
+          */}
+          {materiais.length > 0 && (
+            <div className="flex flex-col gap-2 border-b border-[rgba(var(--jos-borda-rgb),0.10)] p-4">
+              <h4 className="font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] uppercase tracking-[2px] text-[var(--jos-cor-texto-suave)]">
+                {t('brief.pendenciaMaterial')}
+              </h4>
+              <ul className="flex flex-col gap-2">
+                {materiais.map((p) => (
+                  <li
+                    key={p.pergunta}
+                    className="flex items-baseline gap-2 text-[length:var(--jos-texto-mini)] text-[var(--jos-cor-texto-secundario)]"
+                  >
+                    {/* Marcador em `warn`: é estado do sistema, não preferência — e essas cores
+                        o usuário não retematiza. O texto ao lado carrega o mesmo sinal. */}
+                    <span
+                      aria-hidden="true"
+                      className="mt-[0.4rem] size-1.5 shrink-0 rounded-full bg-[var(--jos-cor-warn-leitura)]"
+                    />
+                    {p.pergunta}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
-        </div>
-      </section>
+
+          {/*
+            O aceite (critério 5). O botão desabilitado vem **com a razão junto**, nunca sozinho:
+            um alvo morto sem explicação faz o PI procurar o defeito no próprio brief.
+          */}
+          <div className="flex flex-col gap-2 p-4">
+            <h4
+              id="brief-aceite"
+              className="text-[length:var(--jos-texto-corpo)] font-[var(--jos-peso-semi)] text-[var(--jos-cor-texto)]"
+            >
+              {t('brief.aceiteTitulo')}
+            </h4>
+            <p className="text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-secundario)]">
+              {t('brief.aceiteDescricao')}
+            </p>
+
+            <div className="mt-1 flex flex-col gap-2">
+              <Button
+                variante="primaria"
+                onClick={() => void aceitar()}
+                desabilitado={ocupado || !liberado}
+                carregando={ocupado}
+                iconeInicial={<ShieldCheck aria-hidden="true" className="size-4" />}
+              >
+                {t('brief.aceitar')}
+              </Button>
+
+              {!liberado && (
+                <span className="text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-secundario)]">
+                  {t('brief.aceiteBloqueado')}
+                </span>
+              )}
+            </div>
+          </div>
+        </aside>
+      </div>
     </div>
   )
 }

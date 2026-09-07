@@ -129,20 +129,21 @@ const linhaDeResult = JSON.stringify({
 })
 
 /**
- * O conjunto completo que o dublê emite, **nesta ordem** — é a ordem que o critério 1 exige que
- * sobreviva até a ponte.
+ * O roteiro **das fases de documento**, onde o CLI roda com `--tools ""` (emenda E1).
+ *
+ * Sem `tool_use`, porque nenhuma ferramenta existe ali: o único bloco de ferramenta que o CLI
+ * real emite nessas fases é o `StructuredOutput` do `--json-schema`, e ele não é ferramenta de
+ * agente — é o canal da saída estruturada. O dublê emite o texto direto, que é o caminho do CLI
+ * sem schema.
  *
  * Uma linha corrompida no meio (critério 5): ela vira `erro` de parser e a geração continua, com
  * o texto do documento intacto. Um dublê que só emitisse linhas boas nunca provaria isso.
  */
-const LINHAS: readonly string[] = [
+const LINHAS_SEM_FERRAMENTAS: readonly string[] = [
   // Ruído de sessão que o parser ignora por omissão. Está aqui porque o CLI real o emite, e um
-  // dublê limpo demais esconderia um parser que virasse `erro` diante dele.
-  JSON.stringify({ type: 'system', subtype: 'init', tools: ['Read', 'Bash'] }),
-  linhaDeFerramenta('call-1', 'Read', { file_path: ARQUIVO_LIDO }),
-  linhaDeResultado('call-1', RESULTADO_GRANDE),
-  linhaDeFerramenta('call-2', 'Bash', { command: `curl -H "Authorization: ${SEGREDO}" /health` }),
-  linhaDeResultado('call-2', 'exit 1', true),
+  // dublê limpo demais esconderia um parser que virasse `erro` diante dele. `tools: []` é o que o
+  // `system/init` reporta de verdade com `--tools ""`, medido no CLI 2.1.258.
+  JSON.stringify({ type: 'system', subtype: 'init', tools: [] }),
   '{ isto nao e json',
   // **O único `texto` do roteiro, e ele é o documento inteiro.**
   //
@@ -157,16 +158,48 @@ const LINHAS: readonly string[] = [
 ]
 
 /**
+ * O roteiro **com ferramentas**, que o dublê emite quando o adapter **não** passa `--tools ""`.
+ *
+ * Ele imita um CLI que ignora a flag — o cenário que o critério 3 da emenda E1 existe para
+ * fechar. Numa fase de documento, a primeira ferramenta corta a geração; o texto que vem depois
+ * dela não entra no documento. É isso que o segundo teste mede.
+ *
+ * O truncamento de 2 KB e a redação do segredo continuam sendo provados aqui: eles são do
+ * console (M26-F03) e valem para qualquer fase que tenha ferramentas.
+ */
+const LINHAS_COM_FERRAMENTAS: readonly string[] = [
+  JSON.stringify({ type: 'system', subtype: 'init', tools: ['Read', 'Bash'] }),
+  // O `Bash` vem **primeiro** e carrega o segredo: o corte do critério 3 mata o processo na
+  // primeira ferramenta, e um segredo pendurado na segunda poderia nunca atravessar a ponte —
+  // a asserção de redação passaria por ausência, provando nada.
+  linhaDeFerramenta('call-1', 'Bash', { command: `curl -H "Authorization: ${SEGREDO}" /health` }),
+  linhaDeResultado('call-1', RESULTADO_GRANDE),
+  linhaDeFerramenta('call-2', 'Read', { file_path: ARQUIVO_LIDO }),
+  linhaDeResultado('call-2', 'exit 1', true),
+  '{ isto nao e json',
+  linhaDeTexto(JSON.stringify(PERGUNTAS)),
+  linhaDeResult
+]
+
+/**
  * Escreve o `claude` dublado e devolve o diretório onde ele mora.
  *
  * Script POSIX com shebang, e não `.cmd`: é o que `spawn` com `shell: false` encontra. `--version`
  * responde e sai 0 (o healthcheck do `RoutingService`); qualquer outra invocação despeja o NDJSON.
  * O stdin é drenado porque o adapter escreve o prompt lá e fecha — não ler deixaria o `write` do
  * lado do app com EPIPE.
+ *
+ * ## O dublê olha os args, como o CLI real
+ *
+ * `obedece` decide qual roteiro sai: com `--tools` presente (a fase é de documento), o roteiro
+ * **sem** ferramentas; sem ela, o roteiro com. Um dublê de roteiro fixo mentiria numa das duas
+ * direções — emitindo `Bash` numa fase que o proíbe, ou nunca exercitando o corte que o critério
+ * 3 da emenda E1 pede.
  */
-function escreverDubleDoCli(): string {
+function escreverDubleDoCli(obedece: boolean): string {
   const dir = mkdtempSync(join(tmpdir(), 'jarvis-e2e-claude-bin-'))
   const alvo = join(dir, 'claude')
+  const linhas = obedece ? LINHAS_SEM_FERRAMENTAS : LINHAS_COM_FERRAMENTAS
 
   // Só builtins: `read` drena o stdin e `printf` emite, sem depender de `cat` estar no PATH que o
   // `ambienteControlado()` monta. O `printf '%s\n'` preserva cada linha inteira — inclusive a
@@ -179,7 +212,7 @@ function escreverDubleDoCli(): string {
     // O adapter escreve o prompt no stdin e fecha; não drenar deixaria o `write` do lado do app
     // com EPIPE. `|| true` porque `read` sai diferente de zero no EOF, e `sh -e` não é garantido.
     'while read -r _linha; do :; done || true',
-    ...LINHAS.map((linha) => `printf '%s\\n' ${aspasDeShell(linha)}`),
+    ...linhas.map((linha) => `printf '%s\\n' ${aspasDeShell(linha)}`),
     'exit 0',
     ''
   ].join('\n')
@@ -201,9 +234,16 @@ test.skip(
   'o dublê do `claude` é um script POSIX; `spawn` com `shell: false` não o resolve no Windows'
 )
 
-test.beforeEach(async () => {
+/**
+ * Sobe o app com o dublê escolhido.
+ *
+ * Explícita, e não `beforeEach`: qual roteiro o dublê emite depende de **qual teste** vai rodar,
+ * e o hook sobe antes de saber disso. O `afterEach` continua sendo hook, porque desmontar é igual
+ * nos dois casos.
+ */
+async function subirApp(obedece: boolean): Promise<void> {
   userData = mkdtempSync(join(tmpdir(), 'jarvis-e2e-console-'))
-  binarios = escreverDubleDoCli()
+  binarios = escreverDubleDoCli(obedece)
 
   // `ELECTRON_RUN_AS_NODE` herdado sobe o Electron como Node puro (ver `login.e2e.ts`).
   const ambiente = { ...process.env }
@@ -227,7 +267,7 @@ test.beforeEach(async () => {
 
   app.process().stderr?.on('data', (c: Buffer) => console.error(`[electron stderr] ${c}`))
   app.process().stdout?.on('data', (c: Buffer) => console.error(`[electron stdout] ${c}`))
-})
+}
 
 test.afterEach(async () => {
   // `app.exit()` e não `close()`/`quit()`: os dois travam pelo tray e pelos timers do
@@ -328,7 +368,8 @@ async function gerarColhendoEventos(
   }, projectId)
 }
 
-test('a geração do Refinamento empurra o conjunto completo de eventos, na ordem do CLI', async () => {
+test('a geração do Refinamento empurra os eventos na ordem do CLI', async () => {
+  await subirApp(true)
   const janela = await app.firstWindow()
   await janela.waitForLoadState('domcontentloaded')
 
@@ -344,43 +385,65 @@ test('a geração do Refinamento empurra o conjunto completo de eventos, na orde
   // Uma geração, um trace (critério 6: é ele que o painel usa para separar uma da seguinte).
   expect(colhido.traceIds).toHaveLength(1)
 
-  // **A ordem** (critério 1): ferramenta, resultado, ferramenta, resultado, erro de parser,
-  // texto, uso. A linha `system/init` não aparece — é ruído de sessão, não a geração.
-  expect(colhido.eventos.map((e) => e.tipo)).toEqual([
-    'ferramenta-inicio',
-    'ferramenta-fim',
-    'ferramenta-inicio',
-    'ferramenta-fim',
-    'erro',
-    'texto',
-    'uso'
-  ])
-
-  // A linha de ferramenta que o painel desenha: `nome · resumo · status`.
-  expect(colhido.eventos[0]).toMatchObject({ nome: 'Read', resumoDoArgumento: ARQUIVO_LIDO })
-
-  const fimDoRead = colhido.eventos[1] as { status: string; resumoDoResultado: string }
-  expect(fimDoRead.status).toBe('ok')
-  // Critério 4: o resultado de 5000 bytes chegou truncado nos 2 KB, com o tamanho original ao
-  // lado — é o que o painel mostra como "Resumo de N".
-  expect(fimDoRead.resumoDoResultado.length).toBe(2048)
-  expect(colhido.eventos[1]).toMatchObject({ tamanhoOriginal: RESULTADO_GRANDE.length })
-
-  // A ferramenta que falhou é `erro`, não silêncio.
-  expect(colhido.eventos[3]).toMatchObject({ status: 'erro', resumoDoResultado: 'exit 1' })
+  // **A ordem** (critério 1): erro de parser, texto, uso. A linha `system/init` não aparece — é
+  // ruído de sessão, não a geração.
+  //
+  // Sem ferramentas, e isto é a emenda E1 valendo no app real: o Refinamento é fase de
+  // Planejamento, o adapter passa `--tools ""`, e um `tool_use` aqui seria o CLI desobedecendo —
+  // o que o teste seguinte mede.
+  expect(colhido.eventos.map((e) => e.tipo)).toEqual(['erro', 'texto', 'uso'])
 
   // Critério 5: a linha corrompida virou `erro` de parser **e a geração continuou** — o texto
-  // seguinte (o JSON das perguntas) chegou depois dela, e o `resultado` acima é `gerado`.
-  expect(colhido.eventos[4]).toMatchObject({ tipo: 'erro' })
+  // seguinte (o JSON das perguntas) chegou depois dela, e o `resultado` acima é `geradas`.
+  expect(colhido.eventos[0]).toMatchObject({ tipo: 'erro' })
 
   // Tokens e duração ao fim. `1200 + 300` de cache: o parser soma o cache na entrada, e o painel
   // mostra o número somado.
-  expect(colhido.eventos[6]).toEqual({
+  expect(colhido.eventos[2]).toEqual({
     tipo: 'uso',
     tokensEntrada: 1500,
     tokensSaida: 340,
     duracaoMs: 2600
   })
+})
+
+test('ferramenta numa fase sem ferramentas corta a geração (emenda E1, critério 3)', async () => {
+  // O dublê aqui **ignora** `--tools ""` — é o CLI desobedecendo, que é exatamente o cenário que
+  // o critério 3 existe para fechar. A flag é promessa de terceiro: se uma versão futura passar a
+  // ignorá-la, o defeito volta em silêncio e o documento nasce de novo com lixo dentro.
+  await subirApp(false)
+  const janela = await app.firstWindow()
+  await janela.waitForLoadState('domcontentloaded')
+
+  const { projectId } = await projetoComPrompt(janela)
+  const colhido = await gerarColhendoEventos(janela, projectId)
+
+  const tipos = colhido.eventos.map((e) => e.tipo)
+
+  // A ordem: o console **registra** a ferramenta, avisa do desvio, e ainda entrega o resultado
+  // dela — o PI precisa ver o que o modelo tentou fazer **e** o que voltou, para entender por que
+  // a geração parou. O `erro` entra entre os dois porque o corte dispara no `ferramenta-inicio`,
+  // e o `tool_result` já estava no mesmo buffer.
+  expect(tipos.slice(0, 3)).toEqual(['ferramenta-inicio', 'erro', 'ferramenta-fim'])
+  expect(colhido.eventos[0]).toMatchObject({ nome: 'Bash' })
+
+  const fimDaFerramenta = colhido.eventos[2] as { status: string; resumoDoResultado: string }
+  expect(fimDaFerramenta.status).toBe('ok')
+  // Critério 4 da SPEC-Fases-03: o resultado de 5000 bytes chegou truncado nos 2 KB, com o
+  // tamanho original ao lado — é o que o painel mostra como "Resumo de N".
+  expect(fimDaFerramenta.resumoDoResultado.length).toBe(2048)
+  expect(colhido.eventos[2]).toMatchObject({ tamanhoOriginal: RESULTADO_GRANDE.length })
+
+  // E o erro que nomeia o desvio, com a ferramenta que o causou.
+  const erroDoDesvio = colhido.eventos.find(
+    (e) => e.tipo === 'erro' && String(e.mensagem).includes('sem ferramentas')
+  )
+  expect(erroDoDesvio).toBeDefined()
+  expect(String(erroDoDesvio?.mensagem)).toContain('Bash')
+
+  // **O documento não recebeu o texto posterior**: sem as perguntas, o refinamento não gera. É a
+  // segunda metade do critério 3, e é o que impede o lixo de virar produto.
+  expect(colhido.resultado).not.toBe('geradas')
 
   // O comando do `Bash` chegou ao renderer **sem o token**.
   //
@@ -391,13 +454,13 @@ test('a geração do Refinamento empurra o conjunto completo de eventos, na orde
   // segredo/PII") era, e a superfície afetada era justamente a que o PI olha durante a geração.
   //
   // A correção moveu `eventoSeguro` para a **entrada** do coletor, o que protege o banco e a tela
-  // de uma vez e por construção. O comando sobrevive redigido — cegar a linha inteira esconderia
-  // a ferramenta em vez de esconder o segredo dela.
+  // de uma vez e por construção. Ela continua provada aqui porque é aqui que há ferramenta com
+  // segredo no argumento.
   expect(JSON.stringify(colhido.eventos)).not.toContain(SEGREDO)
-  expect(JSON.stringify(colhido.eventos)).toContain('curl')
 })
 
 test('a geração vai para o histórico da etapa, e reabri-la devolve a mesma trilha (critério 6)', async () => {
+  await subirApp(true)
   const janela = await app.firstWindow()
   await janela.waitForLoadState('domcontentloaded')
 
@@ -465,7 +528,11 @@ test('a geração vai para o histórico da etapa, e reabri-la devolve a mesma tr
   // — antes, o ao vivo trazia o token e o gravado não, e os dois nunca batiam.
   expect(doHistorico.eventos).toEqual(aoVivo.eventos)
 
-  // Critério 3: o token do `Bash` não está em nenhum dos dois lados.
-  expect(JSON.stringify(doHistorico.eventos)).not.toContain(SEGREDO)
-  expect(doHistorico.eventos[2]).toMatchObject({ nome: 'Bash' })
+  // A trilha gravada é a da geração inteira: erro de parser, texto e uso, na ordem.
+  //
+  // A redação do segredo **não** é afirmada aqui, e a omissão é deliberada: este roteiro é o das
+  // fases de documento, onde não há ferramenta nem, portanto, segredo em argumento nenhum.
+  // Afirmar a ausência de um token que o roteiro nunca emitiu passaria sempre, provando nada. Ela
+  // vive no teste do critério 3, que é onde existe ferramenta com segredo.
+  expect(doHistorico.eventos.map((e) => e['tipo'])).toEqual(['erro', 'texto', 'uso'])
 })

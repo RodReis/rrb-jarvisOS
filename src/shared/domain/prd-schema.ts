@@ -19,9 +19,16 @@
  *    completasse origem ausente inventaria a procedência que o critério 1 exige.
  */
 
+import { IDIOMA_DA_SAIDA } from './idioma-da-geracao'
 import type { DocumentoDoPacote } from './pacote-estrutural'
 import type { AfirmacaoDoPrd, ContradicaoDoPrd } from './prd'
-import { ORIGENS_POR_DOCUMENTO, SECOES_DO_PRD, isDocumentoDoPrd, isOrigemDoPrd } from './prd'
+import {
+  ETAPA_DA_CONTRADICAO,
+  ORIGENS_POR_DOCUMENTO,
+  SECOES_DO_PRD,
+  isDocumentoDoPrd,
+  isOrigemDoPrd
+} from './prd'
 
 /**
  * A instrução de sistema do **termo de pesquisa** (critério 3, decisão 2 do PI).
@@ -35,6 +42,7 @@ import { ORIGENS_POR_DOCUMENTO, SECOES_DO_PRD, isDocumentoDoPrd, isOrigemDoPrd }
  */
 export const SISTEMA_DO_TERMO = [
   'Você recebe o brief de um projeto e propõe UM termo de busca de mercado.',
+  IDIOMA_DA_SAIDA,
   '',
   'Responda com o termo e nada mais: sem aspas, sem explicação, sem pontuação final.',
   '',
@@ -69,6 +77,7 @@ export function promptDoTermo(afirmacoesDoBrief: readonly string[]): string {
  */
 export const SISTEMA_DO_PRD = [
   'Você recebe o brief aceito de um projeto e produz três documentos estruturados: PRD,',
+  IDIOMA_DA_SAIDA,
   'LANDSCAPE e CONVENTION.',
   '',
   'Responda **somente** com JSON válido, sem cercas de código e sem texto antes ou depois.',
@@ -192,35 +201,70 @@ export function promptDoPrd(entrada: {
  */
 export const SISTEMA_DAS_CONTRADICOES = [
   'Você recebe as afirmações de três documentos e do brief que os originou, e procura',
+  IDIOMA_DA_SAIDA,
   'contradições: pares de afirmações que não podem ser verdadeiras ao mesmo tempo.',
   '',
   'Responda **somente** com JSON válido, sem cercas de código e sem texto antes ou depois.',
   '',
-  'Formato:',
+  'Cada contradição é uma **pergunta** para o dono do projeto decidir. Formato:',
   '{"contradicoes":[{"id":"c-1","afirmacoes":["<id>","<id>"],',
-  '  "pergunta":"<a pergunta que o dono do projeto precisa responder>",',
-  '  "recomendacao":"<qual das duas parece correta, e por quê>"}]}',
+  '  "titulo":"<curto>","enunciado":"<a pergunta que o dono do projeto precisa responder>",',
+  '  "opcoes":[{"id":"a","rotulo":"<opção>","impacto":"<o trade-off desta opção>"}],',
+  '  "recomendada":"<id de uma das opções>","justificativa":"<por que esta é a recomendada>",',
+  '  "aceitaTextoLivre":true|false,"delegavel":true|false}]}',
+  '',
+  'Regras da pergunta, e elas não são estilo — são contrato:',
+  '- Entre 2 e 3 opções, mutuamente excludentes. Cada opção é um dos lados da contradição, ou',
+  '  uma terceira saída concreta. Uma opção não é escolha; quatro viram formulário.',
+  '- Toda opção declara "impacto": o trade-off dela. Sem isso o dono do projeto escolhe no escuro.',
+  '- "recomendada" tem de ser o id de uma das opções que você ofereceu.',
+  '- "delegavel": false quando a decisão for cara de reverter. Só delegue o que é seguro delegar.',
   '',
   'Não corrija nada. Não escolha por conta própria. Sua saída é a pergunta e a recomendação;',
   'quem decide é o dono do projeto.',
   '',
   'Diferença de ênfase, de detalhe ou de vocabulário não é contradição. Só reporte quando',
   'aceitar as duas afirmações tornaria o projeto impossível de construir de um jeito só.',
+  'Conflito que uma decisão já tomada pelo dono do projeto resolve também não é contradição:',
+  'a afirmação de origem "decisao" prevalece sobre a que ela substitui.',
+  '',
+  'Nunca invente requisito legal, regulatório, de consentimento, aceite duplo, termos de uso,',
+  'política de privacidade, dados pessoais ou sensíveis, compliance ou classificação jurídica.',
   '',
   'Se não houver contradição, devolva {"contradicoes":[]}.'
 ].join('\n')
 
-/** O pedido de detecção: todas as afirmações com os ids, para o modelo poder citá-las. */
+/**
+ * O pedido de detecção: todas as afirmações com os ids, para o modelo poder citá-las — e as
+ * decisões já tomadas, para ele não perguntar de novo o que o dono do projeto já respondeu.
+ *
+ * As decisões entram aqui pelo mesmo motivo que entram em `promptDoPrd` (#316): o brief aceito
+ * segue afirmando um lado, o PRD novo afirma o outro por decisão, e um detector que só visse as
+ * afirmações acharia o mesmo par a cada rodada. A lista vazia não vira seção: prometer "decisões"
+ * sem nenhuma faria o modelo procurar o que não existe.
+ */
 export function promptDasContradicoes(
-  afirmacoes: readonly { readonly id: string; readonly texto: string }[]
+  afirmacoes: readonly { readonly id: string; readonly texto: string }[],
+  decisoes: readonly {
+    readonly id: string
+    readonly pergunta: string
+    readonly resposta: string
+  }[] = []
 ): string {
-  return [
-    'AFIRMAÇÕES:',
-    '',
-    ...afirmacoes.map((a) => `- [${a.id}] ${a.texto}`),
-    '',
-    'Liste as contradições, ou devolva a lista vazia.'
-  ].join('\n')
+  const partes: string[] = ['AFIRMAÇÕES:', '', ...afirmacoes.map((a) => `- [${a.id}] ${a.texto}`)]
+
+  if (decisoes.length > 0) {
+    partes.push(
+      '',
+      'DECISÕES JÁ TOMADAS PELO DONO DO PROJETO (um conflito que uma delas resolve NÃO é',
+      'contradição — não pergunte de novo):',
+      ...decisoes.map((d) => `- [${d.id}] ${d.pergunta} → ${d.resposta}`)
+    )
+  }
+
+  partes.push('', 'Liste as contradições, ou devolva a lista vazia.')
+
+  return partes.join('\n')
 }
 
 /** Remove a cerca de código que modelos produzem por hábito. Ver `lerSaidaDoModelo`. */
@@ -260,20 +304,6 @@ function afirmacaoValida(v: unknown): v is AfirmacaoDoPrd {
   )
 }
 
-function contradicaoValida(v: unknown): v is ContradicaoDoPrd {
-  if (typeof v !== 'object' || v === null) return false
-  const c = v as Record<string, unknown>
-  const afirmacoes = c['afirmacoes']
-
-  return (
-    typeof c['id'] === 'string' &&
-    typeof c['pergunta'] === 'string' &&
-    typeof c['recomendacao'] === 'string' &&
-    Array.isArray(afirmacoes) &&
-    afirmacoes.every((a) => typeof a === 'string')
-  )
-}
-
 /**
  * Lê a saída dos documentos. **Não conserta nada** — devolve `undefined` quando a forma não
  * confere, e o serviço decide o que fazer com isso.
@@ -292,12 +322,41 @@ export function lerDocumentosDoModelo(bruto: string): readonly AfirmacaoDoPrd[] 
   return afirmacoes
 }
 
+function opcaoValida(v: unknown): boolean {
+  if (typeof v !== 'object' || v === null) return false
+  const o = v as Record<string, unknown>
+  return (
+    typeof o['id'] === 'string' &&
+    typeof o['rotulo'] === 'string' &&
+    typeof o['impacto'] === 'string'
+  )
+}
+
+/** A forma que o modelo devolve: a pergunta da M8-F03 mais as afirmações — sem `etapa`. */
+function contradicaoValida(v: unknown): v is Omit<ContradicaoDoPrd, 'etapa'> {
+  if (typeof v !== 'object' || v === null) return false
+  const c = v as Record<string, unknown>
+  const afirmacoes = c['afirmacoes']
+
+  return (
+    typeof c['id'] === 'string' &&
+    Array.isArray(afirmacoes) &&
+    afirmacoes.every((a) => typeof a === 'string') &&
+    typeof c['titulo'] === 'string' &&
+    typeof c['enunciado'] === 'string' &&
+    Array.isArray(c['opcoes']) &&
+    c['opcoes'].every(opcaoValida) &&
+    typeof c['recomendada'] === 'string' &&
+    typeof c['justificativa'] === 'string' &&
+    typeof c['aceitaTextoLivre'] === 'boolean' &&
+    typeof c['delegavel'] === 'boolean'
+  )
+}
+
 /**
- * Lê a saída de contradições.
- *
- * Lista vazia é resultado legítimo — "não achei contradição" —, e por isso ela **não** é
- * confundida com `undefined`: aquele é "a saída não tem forma", e o serviço trata os dois de
- * modo diferente.
+ * Lê as contradições como perguntas (emenda E1). **Forma, não contrato**: o número de opções, a
+ * recomendada existir e a invariante 9 são do validador (`validarContratoDaPergunta`), que o
+ * serviço roda antes de gravar — mesma divisão do refinamento.
  */
 export function lerContradicoesDoModelo(bruto: string): readonly ContradicaoDoPrd[] | undefined {
   const raiz = parseObjeto(bruto)
@@ -307,7 +366,7 @@ export function lerContradicoesDoModelo(bruto: string): readonly ContradicaoDoPr
   if (!Array.isArray(contradicoes)) return undefined
   if (!contradicoes.every(contradicaoValida)) return undefined
 
-  return contradicoes
+  return contradicoes.map((c) => ({ ...c, etapa: ETAPA_DA_CONTRADICAO }))
 }
 
 /**

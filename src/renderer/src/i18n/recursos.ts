@@ -45,14 +45,80 @@ export const RECURSOS = {
       navegacao: {
         principal: 'Navegação principal',
         de: 'Navegação de {{espaco}}',
-        inicio: 'Início',
         notas: 'Notas',
         agenda: 'Agenda',
-        operacoes: 'Operações',
-        projetos: 'Projetos',
+        /*
+         * Rótulos dos itens do menu (SPEC-Shell-01, regra 10). O protótipo usa **nomes próprios
+         * em inglês** para as telas, de propósito — `Projects Hub`, `Operator Central` —, e é o
+         * protótipo que vence na forma do menu.
+         *
+         * Estão aqui **todos** os itens do mapa da spec, inclusive os ocultos (critério 8): a
+         * fatia que entregar a tela só precisa registrar o módulo, sem voltar ao i18n. Chave sem
+         * módulo não vira item — quem decide isso é o registro, não esta tabela.
+         */
+        command: 'Command Center',
+        voz: 'Voz',
+        hud: 'HUD',
+        mission: 'Mission Control',
+        specialties: 'Specialties',
+        skills: 'Skills Catalog',
+        kanban: 'Kanban',
+        workflows: 'Workflows',
+        automations: 'Automations',
+        osdesktop: 'OS Desktop',
+        analytics: 'Analytics',
+        insights: 'Insights',
+        projects: 'Projects Hub',
+        goals: 'Metas',
+        studio: 'Studio',
+        seo: 'SEO Content',
+        video: 'Video Director',
+        services: 'Services',
         terminal: 'Terminal',
-        agentes: 'Agentes',
-        settings: 'Configurações'
+        settings: 'Settings',
+        operator: 'Operator Central',
+        teams: 'Specialist Teams',
+        memory: 'Agent Memory',
+        notebook: 'Notebook'
+      },
+      /** Cabeçalhos de grupo da sidebar — mono uppercase no protótipo. */
+      grupoDoMenu: {
+        COMANDO: 'Comando',
+        AGENTS_OS: 'Agents OS',
+        OPERACOES: 'Operações',
+        INTEL: 'Intel',
+        NEGOCIOS: 'Negócios',
+        SISTEMA: 'Sistema',
+        CORE: 'Core',
+        HARNESSES: 'Harnesses',
+        TEAMS: 'Teams',
+        GOVERNANCE: 'Governance',
+        KNOWLEDGE: 'Knowledge'
+      },
+      voz: {
+        titulo: 'Voz',
+        verificando: 'Verificando o runtime de voz...',
+        problema: 'Problema na voz',
+        segureParaFalar: 'Segure para falar',
+        gravando: 'Ouvindo...',
+        transcrevendo: 'Transcrevendo...',
+        runtimeAusente:
+          'O runtime de transcricao ainda nao esta instalado nesta maquina. Ele roda local: nenhum audio sai daqui.',
+        baixar: 'Baixar o runtime de voz',
+        baixando: 'Baixando...',
+        falhou: 'Nao foi possivel transcrever. Tentar de novo.',
+        microfoneIndisponivel:
+          'O microfone nao esta disponivel. Verifique a permissao do sistema e o dispositivo padrao.',
+        compute: {
+          gpu: 'GPU (CUDA)',
+          cpu: 'CPU (int8)'
+        },
+        download: {
+          'hash-divergente':
+            'O arquivo baixado nao passou na verificacao de integridade e foi descartado. Tentar de novo.',
+          bloqueado: 'A origem do download nao esta na lista permitida.',
+          falhou: 'O download nao concluiu. Verifique a conexao e tente de novo.'
+        }
       },
       janela: {
         minimizar: 'Minimizar para a bandeja'
@@ -144,11 +210,21 @@ export const RECURSOS = {
         exemploBPorque: 'quem usa e para quê',
         placeholder: 'Ex.: um app que organiza minhas leituras e me lembra do que parei no meio…',
         carregando: 'Carregando o prompt…',
-        gerar: 'Gerar o brief',
+        // Salvar não gera nada (#281): o prompt vira revisão no Git e a jornada vai para o
+        // refinamento, que é onde o modelo entra. O rótulo diz o destino, não o mecanismo —
+        // "Salvar" sozinho não conta ao PI que a tela muda depois do clique.
+        salvar: 'Salvar e ir ao refinamento',
+        salvando: 'Salvando…',
         escrevaAlgo: 'Escreva o prompt para continuar.',
-        semRota: 'A geração está indisponível',
-        naoGerou: 'O brief não foi gerado',
-        falha: 'Não foi possível gerar o brief. Tente de novo.'
+        // O prompt vazio já desabilita o botão; esta é a segunda barreira, a do main.
+        vazioRecusa: 'O prompt está vazio. Escreva o que você quer construir.',
+        naoGerou: 'O prompt não foi salvo',
+        // Título alternativo para quando o modelo respondeu em prosa: ali não houve defeito —
+        // ele leu o pedido e levantou um ponto. Chamar isso de "não foi gerado" descreve a
+        // consequência e esconde a causa, que é o que o PI precisa ler.
+        modeloRespondeu: 'O modelo levantou um ponto antes de gerar',
+        detalheTecnico: 'O que o validador recusou',
+        falha: 'Não foi possível salvar o prompt. Tente de novo.'
       },
       brief: {
         titulo: 'Brief do projeto',
@@ -160,13 +236,30 @@ export const RECURSOS = {
         cortar: 'Cortar',
         cortarEsta: 'Cortar a afirmação: {{texto}}',
         pendenciaMaterial: 'Falta decidir antes de aceitar',
+        // Diz onde a lista está, em vez de repeti-la: ela vive ao lado do botão que ela trava.
+        pendenciaOndeVer_one: '{{count}} pendência, listada no aceite ao lado.',
+        pendenciaOndeVer_other: '{{count}} pendências, listadas no aceite ao lado.',
         // O aceite do brief (SPEC-Jornada-02, critério 5). O rótulo diz o que o clique
         // faz — congela o documento e libera a próxima etapa —, não um "OK" genérico.
         aceitar: 'Aceitar o brief',
         aceiteTitulo: 'Aceite do brief',
         aceiteDescricao:
           'Aceitar congela este brief como base do PRD. Corte o que não serve antes: depois do aceite, mudar exige refazer a etapa.',
-        aceiteBloqueado: 'Resolva as pendências acima para aceitar.',
+        aceiteBloqueado: 'Resolva as pendências para aceitar.',
+        // Nomeia o que a coluna resume: de onde veio cada afirmação do brief.
+        origensTitulo: 'Origem das {{total}} afirmações',
+        /*
+         * Rótulos da contagem, distintos dos que cada linha usa.
+         *
+         * A linha diz "do seu prompt" porque ela fala de uma afirmação; a legenda conta um
+         * conjunto, e repetir a mesma frase faria a tela ter dois textos idênticos com papéis
+         * diferentes — ambíguo para quem lê e para quem navega por leitor de tela.
+         */
+        contagem: {
+          prompt: 'Do prompt',
+          decisao: 'De decisão sua',
+          proposto: 'Propostas pela IA'
+        },
         aceiteFalhou: 'Não foi possível registrar o aceite. Tente de novo.',
         propostosTitulo: '{{count}} afirmações propostas pela IA',
         // Diz o que distingue estas das outras: ninguém as disse, foram inferidas.
@@ -216,7 +309,13 @@ export const RECURSOS = {
           'Ninguém disse isto — a IA inferiu. Corte o que não faz sentido antes de aceitar.',
         contradicoesTitulo: '{{count}} contradições a resolver',
         contradicoesDescricao:
-          'Duas afirmações não podem valer ao mesmo tempo. Decida e gere de novo; nada foi corrigido sozinho.',
+          'Duas afirmações não podem valer ao mesmo tempo. Responda uma por vez; quando a última for respondida, os três documentos são gerados de novo com as suas decisões. Nada é corrigido sozinho.',
+        contradicoesRespondidas:
+          'Todas respondidas. Se a geração automática não saiu, gere de novo para aplicar as decisões.',
+        responderContradicoes: 'Responder às contradições',
+        contradicoesPopupTitulo: 'Contradições de {{nome}}',
+        contradicoesPopupDescricao:
+          'Uma decisão por vez. A recomendação vem primeiro, mas a escolha é sua — e ao responder a última, os documentos são gerados de novo.',
         recomendacao: 'Recomendação: {{texto}}',
         aceitar: 'Aceitar o PRD',
         aceiteTitulo: 'Aceite do PRD',
@@ -325,6 +424,10 @@ export const RECURSOS = {
         descricao: 'A IA pergunta o que o prompt de {{nome}} não respondeu. Uma decisão por vez.',
         carregando: 'Carregando o refinamento…',
         gerar: 'Gerar as perguntas',
+        // O brief fecha o refinamento (#281). O rótulo nomeia o documento, não o ato: é o que o
+        // PI vai ler na etapa seguinte, e "Concluir" não diria o que ele ganha.
+        gerarBrief: 'Gerar o brief',
+        briefFalhou: 'Não foi possível gerar o brief. Tente de novo.',
         gerarMais: 'Procurar o que ainda falta',
         responder: 'Responder a próxima',
         // O número diz ao PI se ele começa agora ou depois. Um botão sem essa conta pediria
@@ -696,14 +799,71 @@ export const RECURSOS = {
       navegacao: {
         principal: 'Main navigation',
         de: '{{espaco}} navigation',
-        inicio: 'Home',
         notas: 'Notes',
         agenda: 'Calendar',
-        operacoes: 'Operations',
-        projetos: 'Projects',
+        // Nomes próprios do protótipo: os mesmos nos dois idiomas, de propósito.
+        command: 'Command Center',
+        voz: 'Voice',
+        hud: 'HUD',
+        mission: 'Mission Control',
+        specialties: 'Specialties',
+        skills: 'Skills Catalog',
+        kanban: 'Kanban',
+        workflows: 'Workflows',
+        automations: 'Automations',
+        osdesktop: 'OS Desktop',
+        analytics: 'Analytics',
+        insights: 'Insights',
+        projects: 'Projects Hub',
+        goals: 'Goals',
+        studio: 'Studio',
+        seo: 'SEO Content',
+        video: 'Video Director',
+        services: 'Services',
         terminal: 'Terminal',
-        agentes: 'Agents',
-        settings: 'Settings'
+        settings: 'Settings',
+        operator: 'Operator Central',
+        teams: 'Specialist Teams',
+        memory: 'Agent Memory',
+        notebook: 'Notebook'
+      },
+      grupoDoMenu: {
+        COMANDO: 'Command',
+        AGENTS_OS: 'Agents OS',
+        OPERACOES: 'Operations',
+        INTEL: 'Intel',
+        NEGOCIOS: 'Business',
+        SISTEMA: 'System',
+        CORE: 'Core',
+        HARNESSES: 'Harnesses',
+        TEAMS: 'Teams',
+        GOVERNANCE: 'Governance',
+        KNOWLEDGE: 'Knowledge'
+      },
+      voz: {
+        titulo: 'Voice',
+        verificando: 'Checking the voice runtime...',
+        problema: 'Voice problem',
+        segureParaFalar: 'Hold to talk',
+        gravando: 'Listening...',
+        transcrevendo: 'Transcribing...',
+        runtimeAusente:
+          'The transcription runtime is not installed on this machine yet. It runs locally: no audio leaves this device.',
+        baixar: 'Download the voice runtime',
+        baixando: 'Downloading...',
+        falhou: 'Could not transcribe. Try again.',
+        microfoneIndisponivel:
+          'The microphone is unavailable. Check system permission and the default device.',
+        compute: {
+          gpu: 'GPU (CUDA)',
+          cpu: 'CPU (int8)'
+        },
+        download: {
+          'hash-divergente':
+            'The downloaded file failed the integrity check and was discarded. Try again.',
+          bloqueado: 'The download origin is not on the allowed list.',
+          falhou: 'The download did not finish. Check your connection and try again.'
+        }
       },
       janela: {
         minimizar: 'Minimize to tray'
@@ -774,11 +934,14 @@ export const RECURSOS = {
         exemploBPorque: 'who uses it and what for',
         placeholder: 'e.g. an app that organizes my reading and reminds me what I left halfway…',
         carregando: 'Loading the prompt…',
-        gerar: 'Generate the brief',
+        salvar: 'Save and go to refinement',
+        salvando: 'Saving…',
         escrevaAlgo: 'Write the prompt to continue.',
-        semRota: 'Generation is unavailable',
-        naoGerou: 'The brief was not generated',
-        falha: 'Could not generate the brief. Try again.'
+        vazioRecusa: 'The prompt is empty. Write what you want to build.',
+        naoGerou: 'The prompt was not saved',
+        modeloRespondeu: 'The model raised a point before generating',
+        detalheTecnico: 'What the validator refused',
+        falha: 'Could not save the prompt. Try again.'
       },
       brief: {
         titulo: 'Project brief',
@@ -790,11 +953,19 @@ export const RECURSOS = {
         cortar: 'Cut',
         cortarEsta: 'Cut the statement: {{texto}}',
         pendenciaMaterial: 'Decide this before accepting',
+        pendenciaOndeVer_one: '{{count}} pending item, listed in the acceptance panel.',
+        pendenciaOndeVer_other: '{{count}} pending items, listed in the acceptance panel.',
         aceitar: 'Accept the brief',
         aceiteTitulo: 'Brief acceptance',
         aceiteDescricao:
           'Accepting freezes this brief as the basis for the PRD. Cut what does not belong first: after acceptance, changing it means redoing the stage.',
-        aceiteBloqueado: 'Resolve the pending items above to accept.',
+        aceiteBloqueado: 'Resolve the pending items to accept.',
+        origensTitulo: 'Origin of the {{total}} statements',
+        contagem: {
+          prompt: 'From the prompt',
+          decisao: 'From your decision',
+          proposto: 'Proposed by the AI'
+        },
         aceiteFalhou: 'Could not record the acceptance. Try again.',
         propostosTitulo: '{{count}} statements proposed by the AI',
         propostosDescricao:
@@ -947,6 +1118,8 @@ export const RECURSOS = {
         descricao: 'The AI asks what the prompt for {{nome}} left out. One decision at a time.',
         carregando: 'Loading refinement…',
         gerar: 'Generate the questions',
+        gerarBrief: 'Generate the brief',
+        briefFalhou: 'Could not generate the brief. Try again.',
         gerarMais: 'Look for what is still missing',
         responder: 'Answer the next one',
         restantes: '{{count}} decisions pending.',

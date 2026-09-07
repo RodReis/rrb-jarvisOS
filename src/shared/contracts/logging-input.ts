@@ -9,13 +9,20 @@
 
 import {
   LOG_CATEGORIES,
-  LOG_LEVELS,
+  NIVEIS_DO_LOG,
   type LogCategory,
   type LogInput,
   type LogLevel
 } from './logging'
 
-const levels = new Set<string>(LOG_LEVELS)
+/**
+ * Os níveis que a ponte aceita são os da **API** (`NIVEIS_DO_LOG`), não os de arquivo (#319).
+ *
+ * Validar contra `LOG_LEVELS` faria o `log.ui.debug` do renderer ser descartado em silêncio —
+ * a ponte devolveria `undefined` e o registro sumiria sem erro, que é o pior desfecho possível
+ * para uma guarda.
+ */
+const levels = new Set<string>(NIVEIS_DO_LOG)
 const categories = new Set<string>(LOG_CATEGORIES)
 const workspaces = new Set(['noa', 'jarvis', 'sistema'])
 const directions = new Set(['in', 'out'])

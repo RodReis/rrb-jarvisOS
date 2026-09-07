@@ -108,7 +108,7 @@ describe('PromptDoProjeto', () => {
     expect(await screen.findByRole('textbox')).toHaveValue('Um app de leituras.')
   })
 
-  it('não gera com o campo vazio, e diz por quê', async () => {
+  it('não salva com o campo vazio, e diz por quê', async () => {
     render(
       <PromptDoProjeto
         workspace="jarvis"
@@ -118,14 +118,14 @@ describe('PromptDoProjeto', () => {
       />
     )
 
-    const botao = await screen.findByRole('button', { name: /Gerar o brief/ })
+    const botao = await screen.findByRole('button', { name: /Salvar e ir ao refinamento/ })
 
     // Alvo desabilitado sem explicação faz o PI procurar o defeito na própria escrita.
     expect(botao).toBeDisabled()
     expect(screen.getByText('Escreva o prompt para continuar.')).toBeInTheDocument()
   })
 
-  it('salva e gera num ato só', async () => {
+  it('salva o prompt e avança para o refinamento', async () => {
     const usuario = userEvent.setup()
     const onAvancar = vi.fn()
 
@@ -139,14 +139,52 @@ describe('PromptDoProjeto', () => {
     )
 
     await usuario.type(await screen.findByRole('textbox'), 'Um app de leituras.')
-    await usuario.click(screen.getByRole('button', { name: /Gerar o brief/ }))
+    await usuario.click(screen.getByRole('button', { name: /Salvar e ir ao refinamento/ }))
 
     await waitFor(() => expect(onAvancar).toHaveBeenCalled())
     expect(salvarPromptDoProjeto).toHaveBeenCalledWith('p-1', 'Um app de leituras.', 'jarvis')
-    expect(gerarBrief).toHaveBeenCalledWith('p-1', 'jarvis')
   })
 
-  it('mostra o bloqueio de rota **antes** do clique, com a ação (critério 6)', async () => {
+  /**
+   * O defeito da #281, travado como teste.
+   *
+   * Salvar o prompt disparava a geração do brief no mesmo clique — e como isso acontecia
+   * **antes de qualquer pergunta**, o brief nascia sem nenhuma decisão do refinamento para
+   * citar: toda afirmação vinda de uma escolha do PI virava `proposto`. O brief agora nasce no
+   * fim do refinamento, e esta tela só guarda o texto.
+   *
+   * A asserção é sobre a **ausência da chamada**, e não sobre o rótulo do botão: um teste que
+   * olhasse só o texto passaria de novo no dia em que alguém religasse a geração aqui.
+   */
+  it('salvar não chama a geração do brief (#281)', async () => {
+    const usuario = userEvent.setup()
+
+    render(
+      <PromptDoProjeto
+        workspace="jarvis"
+        projectId="p-1"
+        nomeDoProjeto="Leituras"
+        onAvancar={vi.fn()}
+      />
+    )
+
+    await usuario.type(await screen.findByRole('textbox'), 'Um app de leituras.')
+    await usuario.click(screen.getByRole('button', { name: /Salvar e ir ao refinamento/ }))
+
+    await waitFor(() => expect(salvarPromptDoProjeto).toHaveBeenCalled())
+    expect(gerarBrief).not.toHaveBeenCalled()
+  })
+
+  /**
+   * Sem rota, escrever ainda vale — e o botão continua vivo.
+   *
+   * Antes da #281 a falta de rota desabilitava este botão, porque o clique gerava o brief.
+   * Agora ele só salva: barrar o salvamento por causa de uma credencial ausente perderia o
+   * texto do PI por um motivo que não tem relação com guardá-lo. O aviso de rota migrou para o
+   * refinamento, que é onde a chamada de fato acontece.
+   */
+  it('sem rota autorizada, o prompt ainda pode ser salvo (#281)', async () => {
+    const usuario = userEvent.setup()
     rotaDaGeracao.mockResolvedValue({
       decisao: 'bloqueado',
       motivo: 'sem-rota-alguma',
@@ -162,21 +200,21 @@ describe('PromptDoProjeto', () => {
       />
     )
 
-    // Descobrir que não há rota só ao tentar gerar seria a mesma fricção que o critério evita
-    // no custo, repetida na atenção.
-    expect(
-      await screen.findByText('Conecte a assinatura do Claude em Providers.')
-    ).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Gerar o brief/ })).toBeDisabled()
+    await usuario.type(await screen.findByRole('textbox'), 'Um app.')
+
+    const botao = screen.getByRole('button', { name: /Salvar e ir ao refinamento/ })
+    expect(botao).toBeEnabled()
+
+    await usuario.click(botao)
+    await waitFor(() => expect(salvarPromptDoProjeto).toHaveBeenCalled())
   })
 
-  it('bloqueado, o botão não chama a geração nem com texto escrito', async () => {
+  it('prompt recusado pelo main vira mensagem, não erro cru', async () => {
     const usuario = userEvent.setup()
-    rotaDaGeracao.mockResolvedValue({
-      decisao: 'bloqueado',
-      motivo: 'sem-rota-alguma',
-      acao: 'Conecte a assinatura.'
-    })
+    // O main devolve `null` para prompt vazio — aqui, um texto só de espaços passa pelo
+    // `trim` da tela? Não: o botão estaria desabilitado. Este teste cobre a segunda barreira,
+    // a do main, que é a que vale se a primeira mudar.
+    salvarPromptDoProjeto.mockResolvedValue(null)
 
     render(
       <PromptDoProjeto
@@ -188,32 +226,9 @@ describe('PromptDoProjeto', () => {
     )
 
     await usuario.type(await screen.findByRole('textbox'), 'Um app.')
+    await usuario.click(screen.getByRole('button', { name: /Salvar e ir ao refinamento/ }))
 
-    expect(screen.getByRole('button', { name: /Gerar o brief/ })).toBeDisabled()
-    expect(gerarBrief).not.toHaveBeenCalled()
-  })
-
-  it('recusa da geração vira mensagem com a ação, não erro cru', async () => {
-    const usuario = userEvent.setup()
-    gerarBrief.mockResolvedValue({
-      resultado: 'bloqueado-sem-rota',
-      mensagem: 'A geração não aconteceu.',
-      acao: 'Habilite a rota paga.'
-    })
-
-    render(
-      <PromptDoProjeto
-        workspace="jarvis"
-        projectId="p-1"
-        nomeDoProjeto="Leituras"
-        onAvancar={vi.fn()}
-      />
-    )
-
-    await usuario.type(await screen.findByRole('textbox'), 'Um app.')
-    await usuario.click(screen.getByRole('button', { name: /Gerar o brief/ }))
-
-    expect(await screen.findByText(/Habilite a rota paga/)).toBeInTheDocument()
+    expect(await screen.findByText(/O prompt está vazio/)).toBeInTheDocument()
   })
 })
 
@@ -339,7 +354,7 @@ describe('BriefDoProjeto', () => {
 
     // Alvo morto sem explicação faria o PI procurar o defeito no próprio brief.
     expect(await screen.findByRole('button', { name: /Aceitar o brief/ })).toBeDisabled()
-    expect(screen.getByText(/Resolva as pendências acima/)).toBeInTheDocument()
+    expect(screen.getByText(/Resolva as pendências para aceitar/)).toBeInTheDocument()
   })
 
   it('bloqueado, o aceite não move a jornada', async () => {
@@ -396,5 +411,69 @@ describe('BriefDoProjeto', () => {
 
     // Sem isto o PI clica, nada acontece, e ele não sabe se aceitou.
     expect(await screen.findByText(/Não foi possível registrar o aceite/)).toBeInTheDocument()
+  })
+})
+
+describe('o painel de julgamento do brief', () => {
+  it('conta as afirmações por origem', async () => {
+    carregarBrief.mockResolvedValue(
+      brief({
+        afirmacoes: [
+          afirmacao({ id: 'a-1', origem: 'prompt' }),
+          afirmacao({ id: 'a-2', origem: 'prompt' }),
+          afirmacao({ id: 'a-3', origem: 'decisao' }),
+          afirmacao({ id: 'a-4', origem: 'proposto' })
+        ]
+      })
+    )
+
+    render(<BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" />)
+
+    // O PI vê quantas a IA inventou sem varrer os dez blocos.
+    const painel = await screen.findByLabelText('Aceite do brief')
+    const doPrompt = within(painel).getByText('Do prompt').closest('div')
+    expect(within(doPrompt as HTMLElement).getByText('2')).toBeInTheDocument()
+
+    const propostas = within(painel).getByText('Propostas pela IA').closest('div')
+    expect(within(propostas as HTMLElement).getByText('1')).toBeInTheDocument()
+  })
+
+  it('lista as pendências ao lado do botão que elas travam', async () => {
+    carregarBrief.mockResolvedValue(
+      brief({
+        pendencias: [{ bloco: 'dominio-e-dados', pergunta: 'Qual base de dados?', material: true }]
+      })
+    )
+
+    render(<BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" />)
+
+    // Com o aceite no rodapé, a razão do bloqueio ficava a uma tela de distância do botão.
+    const painel = await screen.findByLabelText('Aceite do brief')
+    expect(within(painel).getByText('Qual base de dados?')).toBeInTheDocument()
+    expect(within(painel).getByRole('button', { name: /Aceitar o brief/ })).toBeDisabled()
+  })
+
+  it('a pergunta da pendência aparece uma vez só na tela', async () => {
+    // O alerta do topo diz que há bloqueio; a lista vive no painel. Repetir o texto nos dois
+    // faria o leitor de tela anunciar a mesma pergunta em duplicata.
+    carregarBrief.mockResolvedValue(
+      brief({
+        pendencias: [{ bloco: 'dominio-e-dados', pergunta: 'Qual base de dados?', material: true }]
+      })
+    )
+
+    render(<BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" />)
+
+    expect(await screen.findAllByText('Qual base de dados?')).toHaveLength(1)
+  })
+
+  it('sem pendência, o painel não mostra bloco de bloqueio', async () => {
+    carregarBrief.mockResolvedValue(brief())
+
+    render(<BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" />)
+
+    const painel = await screen.findByLabelText('Aceite do brief')
+    expect(within(painel).queryByText(/Falta decidir/)).not.toBeInTheDocument()
+    expect(within(painel).getByRole('button', { name: /Aceitar o brief/ })).toBeEnabled()
   })
 })

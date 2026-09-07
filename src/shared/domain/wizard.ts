@@ -256,6 +256,79 @@ export function decidirPorMim(
   }
 }
 
+/** O que o serviço acrescenta à decisão: identidade, escopo e instante. */
+export interface EscopoDaDecisao {
+  readonly id: string
+  readonly user_id: string
+  readonly workspace_id: WorkspaceId
+  readonly projectId: string
+  readonly created_at: string
+}
+
+export type DecisaoMontada =
+  | { readonly decisao: Decision }
+  | { readonly recusa: 'nao-delegavel' | 'escolha-invalida'; readonly mensagem: string }
+
+/**
+ * Monta a `Decision` de uma resposta — ou recusa, pelo vocabulário da pergunta.
+ *
+ * É a mecânica que o refinamento (M25-F02) e as contradições do PRD (emenda E1 da
+ * SPEC-Jornada-03) compartilham: a delegação tem de ser permitida pelo domínio, a escolha tem
+ * de ser opção real (ou texto livre onde cabe), e responder de novo **substitui** a anterior em
+ * vez de editá-la. Pura de propósito: quem chama decide onde gravar e o que auditar.
+ *
+ * Validar a escolha aqui, e não só na tela, é o que impede o IPC de gravar decisão impossível:
+ * o renderer é fronteira não confiável.
+ */
+export function montarDecisao(entrada: {
+  readonly pergunta: Pergunta
+  readonly resposta: Resposta
+  readonly anterior: Decision | undefined
+  readonly escopo: EscopoDaDecisao
+}): DecisaoMontada {
+  const { pergunta, resposta, anterior, escopo } = entrada
+
+  const delegada = resposta.autor === 'agente'
+  const decidida = delegada ? decidirPorMim(pergunta) : null
+  if (delegada && decidida === null) {
+    return {
+      recusa: 'nao-delegavel',
+      mensagem: 'Esta decisão precisa do PI e não pode ser delegada.'
+    }
+  }
+
+  const escolha = decidida?.escolha ?? resposta.escolha
+  const texto = decidida ? null : resposta.texto
+  const valida =
+    escolha !== null
+      ? pergunta.opcoes.some((o) => o.id === escolha)
+      : texto !== null && pergunta.aceitaTextoLivre && texto.trim().length > 0
+  if (!valida) {
+    return { recusa: 'escolha-invalida', mensagem: 'Escolha inválida para esta pergunta.' }
+  }
+
+  return {
+    decisao: {
+      ...escopo,
+      perguntaId: pergunta.id,
+      etapa: pergunta.etapa,
+      escolha,
+      texto,
+      recomendacao: pergunta.recomendada,
+      justificativa: decidida?.justificativa ?? pergunta.justificativa,
+      autor: decidida?.autor ?? 'pi',
+      motivo: decidida
+        ? 'delegada'
+        : anterior !== undefined
+          ? 'substituida'
+          : texto !== null
+            ? 'texto-livre'
+            : 'escolhida',
+      substituiu: anterior?.id ?? null
+    }
+  }
+}
+
 /**
  * Se esta decisão pode aprovar um gate. **Decisão de agente nunca aprova** — invariante 3 do
  * `CONVENTION.md` §4, aqui como função para que o gate pergunte ao domínio em vez de cada

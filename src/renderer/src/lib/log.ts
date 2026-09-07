@@ -29,7 +29,12 @@ function categoryLogger(category: LogCategory): CategoryLogger {
       window.jarvis.sendLog({ level, category, msg, ...(ctx ? { ctx: redactContext(ctx) } : {}) })
     }
 
-  return { error: emit('error'), warn: emit('warn'), info: emit('info') }
+  return {
+    error: emit('error'),
+    warn: emit('warn'),
+    info: emit('info'),
+    debug: emit('debug')
+  }
 }
 
 export const log = Object.fromEntries(

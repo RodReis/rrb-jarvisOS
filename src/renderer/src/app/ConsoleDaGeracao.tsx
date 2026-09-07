@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Badge, Disclosure, Field, Select, Spinner } from '@design/ui'
 import { redigirTexto } from '@design/patterns'
 import type { GenerationEvent, GenerationTrace } from '@shared/domain/geracao'
+import { lerSaidaComoDocumento } from '@shared/domain/saida-em-documento'
 import type { Etapa } from '@shared/domain/jornada'
 import type { WorkspaceId } from '@shared/domain/entities'
 
@@ -61,6 +62,18 @@ export function ConsoleDaGeracao({
 
   useEffect(() => {
     return window.jarvis.onGenerationEvent(({ traceId, evento }) => {
+      /*
+       * O anúncio de etapa **não é uma geração** (#318).
+       *
+       * Ele viaja pelo mesmo canal, mas com um trace derivado do projeto (`etapas:<id>`), fixo
+       * do começo ao fim do pacote — enquanto cada chamada ao modelo tem o seu, sorteado. Tratá-lo
+       * como trace comum fazia as duas coisas erradas ao mesmo tempo: no meio da rodada ele
+       * parecia geração nova e apagava o texto que já tinha chegado; na rodada seguinte, por ser
+       * o mesmo id, não apagava nada — e a trilha da rodada anterior sobrevivia. Quem consome
+       * etapa é a tela da fatia, que as guarda por rodada.
+       */
+      if (evento.tipo === 'etapa') return
+
       // Geração nova: o painel abre sozinho (critério 6) e a trilha anterior sai da tela. O
       // `ref` e não o estado porque a decisão é **por evento** — ler o estado aqui daria o
       // valor do render em que o listener foi criado, e todo evento pareceria de geração nova.
@@ -161,6 +174,12 @@ export function ConsoleDaGeracao({
             Carregando a trilha desta geração.
           </div>
         ) : (
+          /*
+            O andamento **não** vive mais aqui (#318): ele subiu para junto do botão que dispara a
+            geração, na tela da etapa, porque é lá que o PI está quando quer saber em que ponto a
+            rodada está — e o console fica no fim de uma página longa. Uma cópia aqui daria duas
+            respostas para a mesma pergunta, e elas divergiriam na primeira correção.
+          */
           <TrilhaDaGeracao eventos={eventos} gerando={gerando} />
         )}
       </div>
@@ -248,6 +267,77 @@ function dataCurta(iso: string): string {
 }
 
 /**
+ * O texto do modelo, lido como documento quando ele **é** um documento.
+ *
+ * A saída da geração do pacote é JSON, e mostrá-la crua transformava o painel numa parede de
+ * chaves e aspas — o PI precisava decodificar o transporte para ler o conteúdo. Aqui a mesma
+ * saída aparece com a forma que ela terá depois de aceita: seção como título, afirmação como
+ * parágrafo, origem em mono.
+ *
+ * **Nada é escondido.** O que a leitura não reconhece como afirmação vem como texto normal, e
+ * isso não é caso de borda: quando o modelo recusa ou erra o schema, a explicação vive
+ * justamente nessa sobra. Um painel que mostrasse só o que entendeu deixaria o PI sem a frase
+ * que diz por que a geração falhou.
+ */
+function TextoDoModelo({ texto }: { readonly texto: string }): React.JSX.Element {
+  const { topicos, restante } = useMemo(() => lerSaidaComoDocumento(texto), [texto])
+
+  // Nada reconhecido: é prosa, e prosa se lê como prosa.
+  if (topicos.length === 0) {
+    return (
+      <p className="max-w-[68ch] whitespace-pre-wrap text-[length:var(--jos-texto-corpo)] leading-relaxed text-[var(--jos-cor-texto)]">
+        {/*
+         * Segunda camada de redação, como no `LogViewer`: a primeira é o main, que impede o
+         * segredo de chegar ao banco. O texto do modelo não passa pelo redator do main (ele é o
+         * documento), então é aqui que um token citado na resposta é coberto.
+         */}
+        {redigirTexto(restante)}
+      </p>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      {topicos.map((topico) => (
+        <section key={`${topico.documento}-${topico.secao}`} className="flex flex-col gap-2">
+          {/*
+            O cabeçalho do tópico em mono maiúsculo com o acento de leitura: mesma convenção que
+            o brief e o PRD já usam para nomear bloco e seção. Repetir a forma é o que faz o
+            console parecer o documento nascendo, e não outra tela.
+
+            A régua que sai do título ocupa a largura restante — separa os tópicos com o material
+            mais barato que existe, sem acrescentar mais uma caixa ao que já é uma pilha.
+          */}
+          <h4 className="flex items-center gap-3 font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] uppercase tracking-[2px] text-[var(--jos-cor-acento-leitura)]">
+            <span className="shrink-0">
+              {topico.documento === '' ? topico.secao : `${topico.documento} · ${topico.secao}`}
+            </span>
+            <span aria-hidden="true" className="h-px flex-1 bg-[rgba(var(--jos-borda-rgb),0.12)]" />
+          </h4>
+
+          <div className="flex flex-col gap-3">
+            {topico.afirmacoes.map((a, indice) => (
+              <div key={a.id === '' ? `sem-id-${indice}` : a.id} className="flex flex-col gap-0.5">
+                <p className="max-w-[68ch] text-[length:var(--jos-texto-corpo)] leading-relaxed text-[var(--jos-cor-texto)]">
+                  {redigirTexto(a.texto)}
+                </p>
+                {/* A origem é dita em texto, nunca por cor: mesma regra do brief, e o princípio
+                    2 do produto vale igual aqui. Origem ausente não vira linha vazia. */}
+                {a.origem !== '' && (
+                  <span className="font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] uppercase tracking-[2px] text-[var(--jos-cor-texto-suave)]">
+                    {a.origem}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  )
+}
+
+/**
  * A trilha: o texto do modelo em fluxo, as ferramentas como linhas, o uso no fim.
  *
  * O texto dos `delta` é **concatenado** num bloco só, e não uma linha por evento: o modelo emite
@@ -288,22 +378,35 @@ function TrilhaDaGeracao({
       tabIndex={0}
       aria-label="Trilha da geração"
       aria-live={gerando ? 'polite' : 'off'}
-      className="max-h-80 overflow-auto rounded-[var(--jos-raio-card)] border border-[rgba(var(--jos-borda-rgb),0.12)] bg-[var(--jos-cor-superficie-elevada)] p-3"
+      /*
+       * `max-h-96` e não `80`: a captura mostrou a trilha cortada no meio de um comando, com a
+       * rolagem escondendo justamente a linha em que a geração parou. Duas linhas a mais de
+       * altura custam nada e mostram a chamada inteira na maioria dos casos.
+       *
+       * `overscroll-contain` para a rolagem no fim da trilha não continuar na página: rolar
+       * dentro de um painel e ver o documento inteiro andar é o defeito clássico de log embutido.
+       *
+       * `scroll-py` mantém a última linha longe da borda quando o `scrollIntoView` do modo ao
+       * vivo pousa nela.
+       */
+      className="max-h-96 overflow-auto overscroll-contain scroll-py-3 rounded-[var(--jos-raio-card)] border border-[rgba(var(--jos-borda-rgb),0.12)] bg-[var(--jos-cor-superficie-elevada)] p-3"
     >
-      <div className="flex flex-col gap-2">
+      {/*
+        `gap-3`: com `gap-2` a prosa e as linhas de ferramenta encostavam, e o que era narrativa
+        com anotações virava uma pilha uniforme. O espaço é o que separa os dois registros.
+      */}
+      <div className="flex flex-col gap-3">
         {blocos.map((bloco, indice) =>
           bloco.tipo === 'texto' ? (
-            <p
-              key={`texto-${indice}`}
-              className="whitespace-pre-wrap text-[length:var(--jos-texto-micro)] leading-relaxed text-[var(--jos-cor-texto-secundario)]"
-            >
-              {/*
-               * Segunda camada de redação, como no `LogViewer`: a primeira é o main, que impede
-               * o segredo de chegar ao banco. O texto do modelo não passa pelo redator do main
-               * (ele é o documento), então é aqui que um token citado na resposta é coberto.
-               */}
-              {redigirTexto(bloco.texto)}
-            </p>
+            /*
+             * O texto do modelo lê em **corpo**, não em micro cinza — e, quando é a saída
+             * estruturada da geração, lê como documento em vez de JSON cru.
+             *
+             * Era o inverso nos dois eixos: a prosa que o PI vem ler vinha no menor tamanho e no
+             * tom mais fraco, enquanto as linhas de ferramenta (registro de máquina) vinham
+             * maiores; e a saída da geração aparecia como uma parede de chaves.
+             */
+            <TextoDoModelo key={`texto-${indice}`} texto={bloco.texto} />
           ) : bloco.tipo === 'ferramenta' ? (
             <LinhaDeFerramenta key={`ferramenta-${bloco.chamadaId}-${indice}`} bloco={bloco} />
           ) : bloco.tipo === 'uso' ? (
@@ -325,9 +428,17 @@ function TrilhaDaGeracao({
 
 function LinhaDeFerramenta({ bloco }: { readonly bloco: BlocoDeFerramenta }): React.JSX.Element {
   const status = bloco.status
+  /*
+   * A ferramenta é **registro**, e agora se lê como tal: um degrau abaixo da prosa do modelo,
+   * não acima dela. O nome fica em `mini` com o texto secundário; o argumento, em micro suave.
+   *
+   * Antes o bloco inteiro vinha em `text-sm` — maior que a prosa —, e a trilha parecia uma lista
+   * de comandos com um parágrafo enfiado no meio, em vez de uma narrativa com as ferramentas
+   * anotadas ao lado.
+   */
   const rotulo = (
     <span className="flex min-w-0 items-baseline gap-2">
-      <span className="shrink-0 font-[family-name:var(--jos-fonte-mono)] text-[var(--jos-cor-texto)]">
+      <span className="shrink-0 font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-mini)] text-[var(--jos-cor-texto-secundario)]">
         {bloco.nome}
       </span>
       <span className="truncate font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-suave)]">
@@ -346,7 +457,7 @@ function LinhaDeFerramenta({ bloco }: { readonly bloco: BlocoDeFerramenta }): Re
   // Sem resultado ainda (a ferramenta está rodando) não há o que colapsar: a linha é só a linha.
   if (bloco.resumoDoResultado === undefined) {
     return (
-      <div className="flex items-center gap-2 py-1 text-sm">
+      <div className="flex items-center gap-2 py-1">
         {rotulo}
         <span className="ml-auto shrink-0">{selo}</span>
       </div>
@@ -480,6 +591,13 @@ export function agruparEmBlocos(eventos: readonly GenerationEvent[]): readonly B
       })
       continue
     }
+
+    /*
+     * `etapa` não vira bloco da trilha: ele alimenta a **barra de progresso**, que é outra
+     * superfície. Empilhá-lo aqui produziria dez linhas de "iniciou/terminou" no meio do texto
+     * do modelo — ruído entre exatamente o que o painel existe para deixar legível.
+     */
+    if (evento.tipo === 'etapa') continue
 
     blocos.push({ tipo: 'erro', mensagem: evento.mensagem })
   }

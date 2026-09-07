@@ -48,6 +48,19 @@ O board é uma **projeção** das GitHub Issues: `issue → coluna` por **label 
 
 - Local: `docs/mvp/mvp-<nnn>-<slug>.md`. Espelha a issue-épico: tese, checklist de fatias, fora de escopo, critérios de done.
 
+### PR, CI e evidência
+
+Este arquivo governa o **elo PR→issue** (`refs #N`, nunca `closes #N` — regras acima). O resto do contrato de entrega mora em documento próprio, e não se duplica aqui:
+
+| Documento | O que governa |
+|---|---|
+| `docs/GUIA-PRS-CLAUDE-CODE.md` | Rotina de autoria, autorrevisão, acompanhamento do CI e integração da PR |
+| `docs/CI-PR.md` | Política de PR rápida: jobs paralelos, gate único, medição de duração e o que não se otimiza |
+| `docs/TESTING.md` | Categorias obrigatórias, guardas do relatório e evidência por SPEC/issue (ADR-003) |
+| `docs/REVIEW.md` | Contrato dos revisores e severidade |
+
+O check obrigatório é o **`gate`** — um job isolado verde não substitui. Merge integra código; **aceite da issue continua sendo ato do PI**.
+
 ## 2. Contrato de dados das entidades
 
 Toda entidade persistida carrega os campos de escopo:
@@ -74,11 +87,12 @@ Regras:
 Governado pelo **ADR-005** e detalhado na `SPEC-Fundacao-06`. Vale para NOA e JARVIS OS.
 
 - **Todo método relevante loga.** Fluxo normal → `info`; degradação recuperável → `warn`; falha → `error`. Silêncio não é opção em caminho de auth, storage, IPC, integração, AI ou agente.
+- **`debug` é para registro de máquina** (correção [#319](https://github.com/RodReis/rrb-jarvisOS/issues/319), 2026-09-06): o que acontece **por linha gravada** e não conta a história da sessão — cada `AuditEvent` persistido, cada decisão de política, cada comando do terminal. Numa geração de PRD isso eram 197 de 420 linhas, e o que o PI precisa ler ficava enterrado. Ele **não vai a arquivo** (logo, não tem retenção) e aparece só no console de desenvolvimento; o registro durável desses fatos já é a tabela `audit_event`. Critério: se a linha se repete por item processado, é `debug`; se descreve o que o sistema decidiu ou entregou, é `info`.
 - **Mensagem (`msg`) em pt-BR**, curta e descritiva, **sem stack trace e sem segredo**. O detalhe técnico vai em `ctx` (stack em `ctx.stack`).
 - **Registro estruturado (JSON)** com no mínimo: `ts`, `level`, `category`, `direction?` (`in`|`out`), `workspace` (`noa`|`jarvis`|`sistema`), `msg`, `ctx`, `correlationId`, `pid`, `source` (`main`|`renderer`).
 - **Categorias:** `integracao`, `ai`, `agent`, `db`, `auth`, `ipc`, `ui`, `sistema`. Fluxos externos e de AI/agente logam **entrada e saída** (`direction`), casados por `correlationId`.
 - **Redaction é obrigatória.** `token`/`password`/`secret`/`authorization`/`accessToken`/`refreshToken`/`apiKey` e campos `sensitivity: credential|secret` **nunca** são gravados; `personal|financial|health` mascarados (JARVIS não loga esses sem aprovação — §2). Todo log é `sensitivity: internal` no mínimo.
-- **Escritor único:** o renderer captura via `electron-log` e encaminha por IPC; o **main** grava via `winston` (nunca o renderer em disco). Retenção por nível (info 3d/warn 7d/error 10d), zipada, em `userData/logs/`.
+- **Escritor único:** o renderer captura via `electron-log` e encaminha por IPC; o **main** grava via `winston` (nunca o renderer em disco). Retenção por nível (info 3d/warn 7d/error 10d), zipada, em `userData/logs/` — `debug` não é gravado, então não entra na retenção.
 - **Log ≠ AuditEvent.** Log é observabilidade efêmera (rotaciona/apaga); `AuditEvent` é evidência permanente e à prova de adulteração (§2, ADR-004). Um evento pode gerar os dois; um nunca substitui o outro. Auditoria não vai para arquivo de log; log não vai para o SQLite de auditoria.
 
 ## 4. Contrato de domínio da pipeline de desenvolvimento

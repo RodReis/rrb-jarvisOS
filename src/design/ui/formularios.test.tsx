@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
+import { ProvedorDeTema } from '../tokens/provider'
 import {
   Alternador,
   Checkbox,
@@ -12,7 +13,9 @@ import {
   RadioGroup,
   Select,
   Slider,
-  Textarea
+  Textarea,
+  Tooltip,
+  TooltipProvider
 } from './index'
 
 /**
@@ -336,5 +339,64 @@ describe('estado desabilitado em toda a família', () => {
     render(<Checkbox rotulo="Trava" marcado={false} onMudar={onMudar} desabilitado />)
     await userEvent.click(screen.getByRole('checkbox', { name: 'Trava' }))
     expect(onMudar).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * Onde o portal do Select monta (FIX #107, estendido).
+ *
+ * O `Select` ficou **fora** do conserto original: ele mora neste arquivo, o teste do FIX vivia
+ * em `overlays.test.tsx`, e a correção foi feita componente a componente sem varrer os outros
+ * `Portal` do DS. O efeito, encontrado na captura de navegador do PI: a lista de modelos abria
+ * no `<body>`, fora do nó que carrega os tokens `--jos-*`, e renderizava **sem fundo e sem
+ * `z-index`** — as opções ficavam legíveis por cima do texto atrás e qualquer elemento
+ * posicionado da página passava por cima delas.
+ *
+ * jsdom não resolve `var()`, então a cor não é mensurável aqui — a topologia é. Esta é a mesma
+ * condição necessária que `overlays.test.tsx` afirma para os outros cinco, agora para os dois
+ * que faltavam.
+ */
+describe('portal dentro do tema: Select e Tooltip (FIX issue 107)', () => {
+  function raizDoTema(): HTMLElement {
+    const no = document.querySelector('[data-jos-tema]')
+    if (no === null) throw new Error('Provider de tema não encontrado.')
+    return no as HTMLElement
+  }
+
+  it('a lista do Select monta dentro da subárvore do provider, não no body', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <ProvedorDeTema>
+        <Select valor="a" onMudar={vi.fn()} opcoes={OPCOES} />
+      </ProvedorDeTema>
+    )
+
+    await user.click(screen.getByRole('combobox'))
+
+    const lista = await screen.findByRole('listbox')
+    expect(raizDoTema().contains(lista)).toBe(true)
+  })
+
+  it('o balão do Tooltip monta dentro da subárvore do provider, não no body', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <ProvedorDeTema>
+        <TooltipProvider>
+          <Tooltip texto="Roda na sua máquina">
+            <button type="button">Origem</button>
+          </Tooltip>
+        </TooltipProvider>
+      </ProvedorDeTema>
+    )
+
+    await user.hover(screen.getByRole('button', { name: 'Origem' }))
+
+    // `findAllByRole`: o Radix renderiza o balão visível **e** uma cópia acessível para leitor
+    // de tela. Afirmar sobre o primeiro bastaria, mas exigir que os dois estejam sob o tema é o
+    // que impede meia correção.
+    const baloes = await screen.findAllByRole('tooltip')
+    for (const balao of baloes) expect(raizDoTema().contains(balao)).toBe(true)
   })
 })

@@ -17,6 +17,7 @@ import { RefinamentoDoProjeto } from './RefinamentoDoProjeto'
 const estadoDoRefinamento = vi.fn()
 const rotaDaGeracao = vi.fn()
 const gerarPerguntasDeRefinamento = vi.fn()
+const gerarBrief = vi.fn()
 
 function pergunta(restantes = 3): Record<string, unknown> {
   return {
@@ -45,12 +46,14 @@ beforeEach(() => {
   gerarPerguntasDeRefinamento
     .mockReset()
     .mockResolvedValue({ resultado: 'geradas', mensagem: 'ok' })
+  gerarBrief.mockReset().mockResolvedValue({ resultado: 'gerado', mensagem: 'ok' })
 
   Object.defineProperty(window, 'jarvis', {
     value: {
       estadoDoRefinamento,
       rotaDaGeracao,
       gerarPerguntasDeRefinamento,
+      gerarBrief,
       sendLog: vi.fn()
     },
     configurable: true,
@@ -248,5 +251,185 @@ describe('RefinamentoDoProjeto', () => {
 
     expect(await screen.findByText('Todas as perguntas foram respondidas.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Procurar o que ainda falta/ })).toBeInTheDocument()
+  })
+})
+
+/**
+ * A geração do brief, que a #281 trouxe da tela do prompt para cá.
+ *
+ * Antes ela acontecia ao salvar o prompt — **antes de qualquer pergunta** —, então
+ * `decisoesDoRefinamento` chegava sempre vazio e nenhuma afirmação do brief podia ter origem
+ * `decisao`. Aqui as decisões já existem, e gerar o brief é também o que dá à jornada a
+ * evidência de que o refinamento terminou.
+ */
+describe('RefinamentoDoProjeto — a geração do brief (#281)', () => {
+  it('com perguntas pendentes, não oferece gerar o brief', async () => {
+    estadoDoRefinamento.mockResolvedValue(pergunta())
+
+    render(
+      <RefinamentoDoProjeto
+        workspace="jarvis"
+        projectId="p-1"
+        nomeDoProjeto="Leituras"
+        onResponder={vi.fn()}
+        onRecarregar={vi.fn()}
+      />
+    )
+
+    // O brief só nasce do refinamento **terminado**: gerá-lo com decisão pendente produziria
+    // um documento que ignora a resposta que o PI ainda vai dar.
+    await screen.findByRole('button', { name: /Responder a próxima/ })
+    expect(screen.queryByRole('button', { name: /Gerar o brief/ })).not.toBeInTheDocument()
+  })
+
+  it('concluído, oferece gerar o brief', async () => {
+    estadoDoRefinamento.mockResolvedValue({ tipo: 'concluido', decisoes: [] })
+
+    render(
+      <RefinamentoDoProjeto
+        workspace="jarvis"
+        projectId="p-1"
+        nomeDoProjeto="Leituras"
+        onResponder={vi.fn()}
+        onRecarregar={vi.fn()}
+      />
+    )
+
+    expect(await screen.findByRole('button', { name: /Gerar o brief/ })).toBeInTheDocument()
+  })
+
+  it('gerar o brief recarrega a jornada — a etapa muda', async () => {
+    const usuario = userEvent.setup()
+    const onRecarregar = vi.fn()
+    estadoDoRefinamento.mockResolvedValue({ tipo: 'concluido', decisoes: [] })
+
+    render(
+      <RefinamentoDoProjeto
+        workspace="jarvis"
+        projectId="p-1"
+        nomeDoProjeto="Leituras"
+        onResponder={vi.fn()}
+        onRecarregar={onRecarregar}
+      />
+    )
+
+    await usuario.click(await screen.findByRole('button', { name: /Gerar o brief/ }))
+
+    expect(gerarBrief).toHaveBeenCalledWith('p-1', 'jarvis')
+    await waitFor(() => expect(onRecarregar).toHaveBeenCalled())
+  })
+
+  it('a recusa não move a jornada', async () => {
+    const usuario = userEvent.setup()
+    const onRecarregar = vi.fn()
+    estadoDoRefinamento.mockResolvedValue({ tipo: 'concluido', decisoes: [] })
+    gerarBrief.mockResolvedValue({
+      resultado: 'bloqueado-sem-rota',
+      mensagem: 'A geração não aconteceu.',
+      acao: 'Habilite a rota paga.'
+    })
+
+    render(
+      <RefinamentoDoProjeto
+        workspace="jarvis"
+        projectId="p-1"
+        nomeDoProjeto="Leituras"
+        onResponder={vi.fn()}
+        onRecarregar={onRecarregar}
+      />
+    )
+
+    await usuario.click(await screen.findByRole('button', { name: /Gerar o brief/ }))
+
+    // A trilha piscaria para uma etapa que não avançou se `onRecarregar` fosse chamado aqui.
+    expect(await screen.findByText(/Habilite a rota paga/)).toBeInTheDocument()
+    expect(onRecarregar).not.toHaveBeenCalled()
+  })
+
+  /**
+   * O defeito que o PI encontrou na tela do prompt, agora travado onde a geração vive.
+   *
+   * Ele pediu o brief; o modelo respondeu em português que o diretório já continha outro
+   * produto e que não ia sobrescrever; a tela mostrou *"a saída não passou no validador"* —
+   * verdadeira, e escondendo a única coisa útil da falha.
+   */
+  it('quando o modelo responde em prosa, o PI lê o que ele disse', async () => {
+    const usuario = userEvent.setup()
+    estadoDoRefinamento.mockResolvedValue({ tipo: 'concluido', decisoes: [] })
+    gerarBrief.mockResolvedValue({
+      resultado: 'saida-invalida',
+      mensagem: 'Nada foi gravado — nenhum brief, nenhuma alteração no projeto.',
+      acao: 'Responda ao ponto no campo do prompt e gere de novo.',
+      textoDoModelo:
+        'O diretório `rrb-insights` já contém outro produto (AgroInsights). Não vou sobrescrever.',
+      problemas: ['O modelo respondeu em texto corrido, e o brief exige saída estruturada.']
+    })
+
+    render(
+      <RefinamentoDoProjeto
+        workspace="jarvis"
+        projectId="p-1"
+        nomeDoProjeto="Leituras"
+        onResponder={vi.fn()}
+        onRecarregar={vi.fn()}
+      />
+    )
+
+    await usuario.click(await screen.findByRole('button', { name: /Gerar o brief/ }))
+
+    expect(await screen.findByText(new RegExp('já contém outro produto'))).toBeInTheDocument()
+    // E o próximo passo junto: erro sem recuperação é beco (PRD §14).
+    expect(screen.getByText(/Responda ao ponto no campo do prompt/)).toBeInTheDocument()
+  })
+
+  it('a observação do modelo é aviso, não erro — o alerta não é vermelho', async () => {
+    const usuario = userEvent.setup()
+    estadoDoRefinamento.mockResolvedValue({ tipo: 'concluido', decisoes: [] })
+    gerarBrief.mockResolvedValue({
+      resultado: 'saida-invalida',
+      mensagem: 'Nada foi gravado.',
+      textoDoModelo: 'Confirmo a forma exata antes de gerar.'
+    })
+
+    render(
+      <RefinamentoDoProjeto
+        workspace="jarvis"
+        projectId="p-1"
+        nomeDoProjeto="Leituras"
+        onResponder={vi.fn()}
+        onRecarregar={vi.fn()}
+      />
+    )
+
+    await usuario.click(await screen.findByRole('button', { name: /Gerar o brief/ }))
+
+    // O `InlineAlert` prefixa o tom no nome acessível — é assim que quem usa leitor de tela
+    // recebe a severidade, e é o que se afirma aqui em vez de uma classe CSS.
+    const alerta = await screen.findByRole('alert')
+    expect(alerta).toHaveTextContent(/atenção/i)
+    expect(alerta).not.toHaveTextContent(/^erro/i)
+  })
+
+  it('sem rota autorizada, o brief não é gerado', async () => {
+    estadoDoRefinamento.mockResolvedValue({ tipo: 'concluido', decisoes: [] })
+    rotaDaGeracao.mockResolvedValue({
+      decisao: 'bloqueado',
+      motivo: 'sem-rota-alguma',
+      acao: 'Conecte a assinatura do Claude em Providers.'
+    })
+
+    render(
+      <RefinamentoDoProjeto
+        workspace="jarvis"
+        projectId="p-1"
+        nomeDoProjeto="Leituras"
+        onResponder={vi.fn()}
+        onRecarregar={vi.fn()}
+      />
+    )
+
+    // Critério 6 na tela: o bloqueio aparece antes do clique, e o botão não gera.
+    expect(await screen.findByRole('button', { name: /Gerar o brief/ })).toBeDisabled()
+    expect(gerarBrief).not.toHaveBeenCalled()
   })
 })

@@ -153,7 +153,27 @@ export const TAMANHO = {
   /** Ícone dentro de controle. */
   icone: '16px',
   /** Ícone pequeno (mensagem de campo, indicador). */
-  iconeMini: '14px'
+  iconeMini: '14px',
+  /**
+   * Piso e teto do painel flutuante (Popover).
+   *
+   * Substituem a largura fixa que o `Popover` tinha: um `w-64` cravado é uma medida sem papel —
+   * ela cabe no filtro de duas linhas e corta o painel de troca de modelo, que declara a própria
+   * largura e vazava 2rem para fora da caixa, com a borda cruzando o campo pelo meio.
+   *
+   * Dois valores porque o painel cresce com o conteúdo: o piso impede um popover de uma palavra
+   * virar um selo, o teto impede um de texto longo virar uma coluna de leitura ruim.
+   */
+  painelMinimo: '16rem',
+  painelMaximo: '24rem',
+  /**
+   * Teto da lista suspensa do `Select`.
+   *
+   * Mais largo que o painel do popover porque o conteúdo é diferente: uma opção de modelo tem
+   * três segmentos ("Claude Code CLI · Opus 5 · claude-opus-5") e precisa caber numa linha —
+   * herdar a largura do campo truncava cada opção e o usuário escolhia entre reticências.
+   */
+  listaMaxima: '32rem'
 } as const
 
 /**

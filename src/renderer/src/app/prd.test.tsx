@@ -1,6 +1,7 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { EventoDaGeracao, GenerationEvent } from '@shared/domain/geracao'
 import { PrdDoProjeto } from './PrdDoProjeto'
 
 /**
@@ -23,6 +24,17 @@ const gerarPrd = vi.fn()
 const carregarPrd = vi.fn()
 const cortarPropostoDoPrd = vi.fn()
 const aplicarEventoDaJornada = vi.fn()
+const contradicoesDoPrd = vi.fn()
+const responderContradicaoDoPrd = vi.fn()
+const cancelarAssinatura = vi.fn()
+/** O ouvinte que a tela registra no canal de eventos da geração (#318). */
+let emitir: ((payload: EventoDaGeracao) => void) | undefined
+
+/** Emite um evento de etapa como o main o entregaria, e espera o React reagir. */
+async function chega(evento: GenerationEvent): Promise<void> {
+  await waitFor(() => expect(emitir).toBeDefined())
+  emitir?.({ traceId: 'etapas:p-1', evento })
+}
 
 function afirmacao(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -60,11 +72,15 @@ function montar(): void {
 }
 
 beforeEach(() => {
+  emitir = undefined
+  cancelarAssinatura.mockClear()
   proporTermoDePesquisa.mockReset().mockResolvedValue('ferramentas de leitura')
   gerarPrd.mockReset().mockResolvedValue({ resultado: 'gerado', mensagem: 'ok' })
   carregarPrd.mockReset().mockResolvedValue(null)
   cortarPropostoDoPrd.mockReset().mockResolvedValue(null)
   aplicarEventoDaJornada.mockReset().mockResolvedValue({ resultado: 'avancou' })
+  contradicoesDoPrd.mockReset().mockResolvedValue(null)
+  responderContradicaoDoPrd.mockReset().mockResolvedValue({ reason: 'registrada', mensagem: 'ok' })
 
   Object.defineProperty(window, 'jarvis', {
     value: {
@@ -73,6 +89,12 @@ beforeEach(() => {
       carregarPrd,
       cortarPropostoDoPrd,
       aplicarEventoDaJornada,
+      contradicoesDoPrd,
+      responderContradicaoDoPrd,
+      onGenerationEvent: (ouvinte: (payload: EventoDaGeracao) => void) => {
+        emitir = ouvinte
+        return cancelarAssinatura
+      },
       sendLog: vi.fn()
     },
     configurable: true,
@@ -251,32 +273,188 @@ describe('bloqueio do Landscape (critério 4)', () => {
   })
 })
 
-describe('contradições (critério 6)', () => {
-  const COM_CONTRADICAO = prd({
-    contradicoes: [
-      {
-        id: 'c-1',
-        afirmacoes: ['a-1', 'b-1'],
-        pergunta: 'O produto é local ou na nuvem?',
-        recomendacao: 'Local, como o brief diz.'
-      }
-    ]
-  })
+describe('contradições — pergunta no pop-up da M8-F03 (critério 6, emenda E1)', () => {
+  const CONTRADICAO = {
+    id: 'c-1',
+    etapa: 'prd',
+    afirmacoes: ['a-1', 'b-1'],
+    titulo: 'Local ou nuvem',
+    enunciado: 'O produto é local ou na nuvem?',
+    opcoes: [
+      { id: 'a', rotulo: 'Local', impacto: 'Sem sync entre máquinas.' },
+      { id: 'b', rotulo: 'Nuvem', impacto: 'Exige conta e rede.' }
+    ],
+    recomendada: 'a',
+    justificativa: 'Local, como o brief diz.',
+    aceitaTextoLivre: true,
+    delegavel: true
+  }
+  const COM_CONTRADICAO = prd({ contradicoes: [CONTRADICAO] })
+  const VISTA_PENDENTE = {
+    estado: { tipo: 'pergunta', pergunta: CONTRADICAO, restantes: 1 },
+    historico: []
+  }
 
-  it('mostra a pergunta e a recomendação, nunca uma correção já aplicada', async () => {
+  it('o pop-up abre sozinho com a pergunta e as opções, e a recomendada vem primeiro', async () => {
     carregarPrd.mockResolvedValue(COM_CONTRADICAO)
+    contradicoesDoPrd.mockResolvedValue(VISTA_PENDENTE)
     montar()
 
-    expect(await screen.findByText(/O produto é local ou na nuvem/i)).toBeInTheDocument()
-    expect(screen.getByText(/Local, como o brief diz/i)).toBeInTheDocument()
+    const dialogo = await screen.findByRole('dialog')
+    expect(await within(dialogo).findByText(/O produto é local ou na nuvem/i)).toBeInTheDocument()
+    const opcoes = within(dialogo).getAllByRole('radio')
+    expect(opcoes[0]).toHaveAccessibleName(/Local/)
+    expect(opcoes[0]).not.toBeChecked()
+    expect(within(dialogo).getByRole('button', { name: /Decide por mim/i })).toBeInTheDocument()
+  })
+
+  it('a lista inline mostra a pergunta e a justificativa, nunca uma correção aplicada', async () => {
+    carregarPrd.mockResolvedValue(COM_CONTRADICAO)
+    contradicoesDoPrd.mockResolvedValue(VISTA_PENDENTE)
+    montar()
+
+    const lista = await screen.findByTestId('prd-contradicoes')
+    expect(within(lista).getByText(/O produto é local ou na nuvem/i)).toBeInTheDocument()
+    // A recomendada aparece pelo rótulo, com a justificativa ao lado — não só o porquê.
+    expect(
+      within(lista).getByText(/Recomendação: Local — Local, como o brief diz/i)
+    ).toBeInTheDocument()
+  })
+
+  it('avisa o pai que o aceite está travado, para a trilha não oferecê-lo (#318)', async () => {
+    carregarPrd.mockResolvedValue(COM_CONTRADICAO)
+    contradicoesDoPrd.mockResolvedValue(VISTA_PENDENTE)
+    const onBloqueio = vi.fn()
+
+    render(
+      <PrdDoProjeto
+        workspace="jarvis"
+        projectId="p-1"
+        nomeDoProjeto="Leituras"
+        onAceito={vi.fn()}
+        onBloqueioDoAceite={onBloqueio}
+      />
+    )
+
+    // A razão é a mesma frase que o botão de baixo mostra: uma fonte, dois lugares.
+    await waitFor(() =>
+      expect(onBloqueio).toHaveBeenLastCalledWith('Resolva as contradições acima para aceitar.')
+    )
+  })
+
+  it('sem contradição, o pai é avisado de que o aceite está livre', async () => {
+    carregarPrd.mockResolvedValue(prd())
+    const onBloqueio = vi.fn()
+
+    render(
+      <PrdDoProjeto
+        workspace="jarvis"
+        projectId="p-1"
+        nomeDoProjeto="Leituras"
+        onAceito={vi.fn()}
+        onBloqueioDoAceite={onBloqueio}
+      />
+    )
+
+    await waitFor(() => expect(onBloqueio).toHaveBeenLastCalledWith(undefined))
   })
 
   it('trava o aceite, com a razão ao lado do botão', async () => {
     carregarPrd.mockResolvedValue(COM_CONTRADICAO)
+    contradicoesDoPrd.mockResolvedValue(VISTA_PENDENTE)
     montar()
 
-    expect(await screen.findByRole('button', { name: /Aceitar o PRD/i })).toBeDisabled()
-    expect(screen.getByText(/Resolva as contradições acima/i)).toBeInTheDocument()
+    // O modal esconde o resto da página (aria-hidden); o aceite se confere com ele fechado.
+    const dialogo = await screen.findByRole('dialog')
+    await userEvent.click(within(dialogo).getAllByRole('button', { name: /Fechar/i })[0]!)
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+    expect(screen.getByRole('button', { name: /Aceitar o PRD/i })).toBeDisabled()
+    expect(screen.getByText(/Resolva as contradições/i)).toBeInTheDocument()
+  })
+
+  it('responder a última contradição gera os documentos de novo, sozinho, com o termo confirmado', async () => {
+    // O termo só conta como confirmado quando o PI gerou com ele nesta sessão: a revisão com
+    // contradição chega depois desse clique, e a última resposta regera com o mesmo termo.
+    responderContradicaoDoPrd.mockResolvedValue({
+      reason: 'registrada',
+      mensagem: 'ok',
+      estado: { tipo: 'concluido', decisoes: [] }
+    })
+    montar()
+    await screen.findByRole('textbox')
+    carregarPrd.mockResolvedValue(COM_CONTRADICAO)
+    contradicoesDoPrd.mockResolvedValue(VISTA_PENDENTE)
+    await userEvent.click(screen.getByRole('button', { name: /Gerar os documentos/i }))
+
+    const dialogo = await screen.findByRole('dialog')
+    await userEvent.click(await within(dialogo).findByRole('radio', { name: /Nuvem/ }))
+    await userEvent.click(within(dialogo).getByRole('button', { name: /Confirmar/i }))
+
+    await waitFor(() => expect(gerarPrd).toHaveBeenCalledTimes(2))
+    expect(gerarPrd).toHaveBeenLastCalledWith('p-1', 'ferramentas de leitura', 'jarvis')
+    expect(responderContradicaoDoPrd).toHaveBeenCalledWith(
+      'p-1',
+      expect.objectContaining({ perguntaId: 'c-1', escolha: 'b', autor: 'pi' }),
+      'jarvis'
+    )
+  })
+
+  it('tela reaberta: responder a última não regera com termo que ninguém confirmou (critério 3)', async () => {
+    carregarPrd.mockResolvedValue(COM_CONTRADICAO)
+    contradicoesDoPrd.mockResolvedValue(VISTA_PENDENTE)
+    responderContradicaoDoPrd.mockResolvedValue({
+      reason: 'registrada',
+      mensagem: 'ok',
+      estado: { tipo: 'concluido', decisoes: [] }
+    })
+    montar()
+
+    const dialogo = await screen.findByRole('dialog')
+    await userEvent.click(await within(dialogo).findByRole('radio', { name: /Nuvem/ }))
+    // Depois da resposta o main diz que concluiu; a tela relê a vista em vez de regerar.
+    contradicoesDoPrd.mockResolvedValue({
+      estado: { tipo: 'concluido', decisoes: [] },
+      historico: []
+    })
+    await userEvent.click(within(dialogo).getByRole('button', { name: /Confirmar/i }))
+
+    // O pop-up fecha e a lista diz que falta gerar; a pesquisa não roda sem confirmação.
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(gerarPrd).not.toHaveBeenCalled()
+    expect(await screen.findByText(/Todas respondidas/i)).toBeInTheDocument()
+  })
+
+  it('com contradição que sobra, responder não regera — só avança para a próxima', async () => {
+    carregarPrd.mockResolvedValue(COM_CONTRADICAO)
+    contradicoesDoPrd.mockResolvedValue(VISTA_PENDENTE)
+    responderContradicaoDoPrd.mockResolvedValue({
+      reason: 'registrada',
+      mensagem: 'ok',
+      estado: { tipo: 'pergunta', pergunta: { ...CONTRADICAO, id: 'c-2' }, restantes: 1 }
+    })
+    montar()
+
+    const dialogo = await screen.findByRole('dialog')
+    await userEvent.click(await within(dialogo).findByRole('radio', { name: /Nuvem/ }))
+    await userEvent.click(within(dialogo).getByRole('button', { name: /Confirmar/i }))
+
+    await waitFor(() => expect(responderContradicaoDoPrd).toHaveBeenCalled())
+    expect(gerarPrd).not.toHaveBeenCalled()
+  })
+
+  it('fechar o pop-up deixa o botão de reabrir na lista', async () => {
+    carregarPrd.mockResolvedValue(COM_CONTRADICAO)
+    contradicoesDoPrd.mockResolvedValue(VISTA_PENDENTE)
+    montar()
+
+    const dialogo = await screen.findByRole('dialog')
+    // Dois botões respondem por 'Fechar': o do rodapé e o 'X' do Radix. Qualquer um serve.
+    await userEvent.click(within(dialogo).getAllByRole('button', { name: /Fechar/i })[0]!)
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    await userEvent.click(screen.getByRole('button', { name: /Responder às contradições/i }))
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
   })
 })
 
@@ -327,5 +505,130 @@ describe('aceite e desfechos', () => {
     montar()
 
     expect(await screen.findByText(/Nenhum documento ainda/i)).toBeInTheDocument()
+  })
+})
+
+/**
+ * O andamento da geração, na tela da etapa (#318).
+ *
+ * A barra vivia dentro do console, no fim da página, e contava as etapas de duas rodadas
+ * somadas — o PI via uma rodada nova abrir em 60% com "Gravação" concluída da anterior. Aqui ela
+ * fica junto do botão que dispara a geração, e o que ela conta é **uma** rodada.
+ */
+describe('andamento da geração (#318)', () => {
+  it('a barra fica junto do botão de gerar, não no fim da página', async () => {
+    montar()
+    await chega({ tipo: 'etapa', etapa: 'pesquisa', estado: 'iniciada' })
+
+    const andamento = await screen.findByRole('progressbar')
+    const botao = screen.getByRole('button', { name: /Gerar/i })
+
+    // `compareDocumentPosition`: o andamento vem **depois** do botão na ordem do documento, e
+    // antes de tudo o mais — é isso que o PI vê sem rolar.
+    expect(botao.compareDocumentPosition(andamento) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    )
+  })
+
+  it('sem etapa anunciada não há barra: 0% afirmaria que nada aconteceu', async () => {
+    montar()
+
+    expect(await screen.findByRole('button', { name: /Gerar/i })).toBeInTheDocument()
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+  })
+
+  it('conta só as etapas concluídas desta rodada', async () => {
+    montar()
+    await chega({ tipo: 'etapa', etapa: 'pesquisa', estado: 'iniciada' })
+    await chega({ tipo: 'etapa', etapa: 'pesquisa', estado: 'concluida', resumo: '3 fontes.' })
+    await chega({ tipo: 'etapa', etapa: 'documentos', estado: 'iniciada' })
+
+    // 1 de 5: a que está em curso não vale meio passo.
+    expect(await screen.findByRole('progressbar')).toHaveAttribute('aria-valuenow', '20')
+
+    // A lista diz o estado de cada etapa: uma concluída, a seguinte em curso, o resto pendente.
+    const andamento = screen.getByLabelText('Andamento da geração')
+    expect(andamento.querySelector('[data-jos-etapa="documentos"]')).toHaveAttribute(
+      'data-jos-estado',
+      'iniciada'
+    )
+    expect(andamento.querySelector('[data-jos-etapa="pesquisa"]')).toHaveAttribute(
+      'data-jos-estado',
+      'concluida'
+    )
+  })
+
+  it('o resumo mostrado é o da etapa em curso, não o da anterior', async () => {
+    montar()
+    await chega({ tipo: 'etapa', etapa: 'pesquisa', estado: 'concluida', resumo: '3 fontes.' })
+    expect(await screen.findByText('3 fontes.')).toBeInTheDocument()
+
+    await chega({ tipo: 'etapa', etapa: 'documentos', estado: 'iniciada' })
+
+    // "3 fontes." pendurado sob "PRD, Landscape e Convention" descreveria a etapa errada.
+    await waitFor(() => expect(screen.queryByText('3 fontes.')).not.toBeInTheDocument())
+  })
+
+  it('a rodada nova não herda as etapas da anterior', async () => {
+    // O defeito exato que o PI viu: rodada nova abrindo em 60%, com "Gravação dos documentos —
+    // os três documentos foram gravados" sobre uma rodada que ainda estava gerando.
+    montar()
+    await chega({ tipo: 'etapa', etapa: 'pesquisa', estado: 'concluida' })
+    await chega({ tipo: 'etapa', etapa: 'contradicoes', estado: 'concluida' })
+    await chega({ tipo: 'etapa', etapa: 'gravacao', estado: 'concluida', resumo: 'gravados.' })
+    expect(await screen.findByRole('progressbar')).toHaveAttribute('aria-valuenow', '60')
+
+    await chega({ tipo: 'etapa', etapa: 'pesquisa', estado: 'iniciada' })
+
+    await waitFor(() =>
+      expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0')
+    )
+    expect(screen.queryByText('gravados.')).not.toBeInTheDocument()
+  })
+
+  it('a falha da etapa é dita em texto, não só por cor', async () => {
+    montar()
+    await chega({ tipo: 'etapa', etapa: 'documentos', estado: 'falhou', resumo: 'Sem saída.' })
+
+    expect(await screen.findByText('falhou')).toBeInTheDocument()
+    expect(screen.getByText('Sem saída.')).toBeInTheDocument()
+  })
+
+  it('a gravação concluída recarrega a revisão — mesmo sem ter sido esta tela a gerar', async () => {
+    // Trocar de menu e voltar não pode deixar o PI olhando a revisão velha: a geração corre no
+    // main, e a tela lia o banco só ao montar.
+    carregarPrd.mockResolvedValue(null)
+    montar()
+    await waitFor(() => expect(carregarPrd).toHaveBeenCalledTimes(1))
+
+    carregarPrd.mockResolvedValue(prd())
+    await chega({ tipo: 'etapa', etapa: 'gravacao', estado: 'concluida', resumo: 'gravados.' })
+
+    expect(await screen.findByText(/O produto organiza leituras por projeto/i)).toBeInTheDocument()
+  })
+
+  it('geração em curso desabilita o botão de gerar, mesmo vinda de outra tela', async () => {
+    montar()
+    await waitFor(() => expect(screen.getByRole('button', { name: /Gerar/i })).toBeEnabled())
+
+    await chega({ tipo: 'etapa', etapa: 'documentos', estado: 'iniciada' })
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /Gerar/i })).toBeDisabled())
+  })
+
+  it('cancela a assinatura ao desmontar — ouvinte vivo sobre tela morta vaza', async () => {
+    const { unmount } = render(
+      <PrdDoProjeto
+        workspace="jarvis"
+        projectId="p-1"
+        nomeDoProjeto="Leituras"
+        onAceito={vi.fn()}
+      />
+    )
+    await waitFor(() => expect(emitir).toBeDefined())
+
+    unmount()
+
+    expect(cancelarAssinatura).toHaveBeenCalled()
   })
 })

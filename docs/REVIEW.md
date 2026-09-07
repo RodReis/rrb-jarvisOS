@@ -60,3 +60,9 @@ Cada item informa: severidade, título, evidência, impacto, arquivo/região, ce
 ## Resultado
 
 O relatório termina com: blockers P0/P1, itens P2/P3, testes executados, riscos residuais, conclusão `PASS`, `FIX_REQUIRED` ou `BLOCKED`, e evidências. `PASS` só é válido para o `head SHA` revisado.
+
+## Evidência de CI
+
+O check obrigatório é o **`gate`**, nunca um job isolado: ele exige `success` de `changes`, `quality`, `visual` e `test`, e E2E coerente com a fronteira (verde quando o PR a toca, pulado quando não). `neutral` e `skipped` não comprovam execução obrigatória. Ler estado pelo `gh pr checks <n>` no `head SHA` revisado — print antigo, aba aberta ou silêncio de watcher não são evidência.
+
+A estrutura dos jobs e o que cada um prova estão em `TESTING.md` §6; a política de duração e os limites, em `CI-PR.md`; a rotina de autoria e evidência da PR, em `GUIA-PRS-CLAUDE-CODE.md`. Ausência de credencial ou serviço externo é `not_run`, nunca `pass`.

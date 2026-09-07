@@ -17,7 +17,7 @@ import { expect, test } from '@playwright/test'
 
 const ROTA = (query: string): string => `/?galeria=brief&${query}`
 
-const CENAS = ['prompt-vazio', 'prompt-bloqueado', 'brief-propostos', 'brief-travado'] as const
+const CENAS = ['prompt-vazio', 'refinamento-bloqueado', 'brief-propostos', 'brief-travado'] as const
 const MODOS = ['dark', 'light'] as const
 
 /** Luminância relativa WCAG a partir de `rgb(r, g, b)`. */
@@ -58,19 +58,27 @@ test.describe('captura para o gate visual', () => {
   }
 })
 
+/**
+ * O critério 6 vive no **refinamento** desde a #281.
+ *
+ * A geração do brief migrou da tela do prompt para o fim do refinamento, e o bloqueio migrou
+ * com ela: salvar o prompt não chama o modelo, então bloquear aquela tela anunciaria um custo
+ * que ali não existe. O que a prova mede é o mesmo — o bloqueio antes do clique, com a ação
+ * junto —, na tela onde a chamada de fato acontece.
+ */
 test.describe('critério 6 — o bloqueio aparece antes do clique', () => {
   for (const modo of MODOS) {
     test(`o aviso traz a ação concreta (${modo})`, async ({ page }) => {
-      await abrir(page, 'prompt-bloqueado', modo)
+      await abrir(page, 'refinamento-bloqueado', modo)
 
       // Bloqueio sem saída é beco: o PI precisa saber o que fazer, não só que não deu.
       await expect(page.getByText(/Conecte a assinatura do Claude/)).toBeVisible()
     })
 
     test(`o botão de gerar está desabilitado (${modo})`, async ({ page }) => {
-      await abrir(page, 'prompt-bloqueado', modo)
+      await abrir(page, 'refinamento-bloqueado', modo)
 
-      await expect(page.getByRole('button', { name: /Gerar o brief/ })).toBeDisabled()
+      await expect(page.getByRole('button', { name: /Gerar as perguntas/ })).toBeDisabled()
     })
   }
 })
@@ -222,9 +230,61 @@ test.describe('a rota é dita antes do clique', () => {
   })
 
   test('bloqueada, nenhum selo anuncia rota — o botão não gera', async ({ page }) => {
-    await abrir(page, 'prompt-bloqueado', 'dark')
+    await abrir(page, 'refinamento-bloqueado', 'dark')
 
     // Anunciar por onde a geração sairia descreveria algo que não vai acontecer.
     await expect(page.locator('[data-jos-rota]')).toHaveCount(0)
+  })
+})
+
+/**
+ * A coluna de julgamento (SPEC-Jornada-02, § Superfície).
+ *
+ * Estes testes existem porque os 24 de tela passaram verdes sobre o defeito: papel ARIA não mede
+ * largura, e a captura mostrou o documento usando 366px de uma coluna de 536px — duas medidas
+ * empilhadas cortando pelo menor.
+ */
+test.describe('a coluna de julgamento', () => {
+  test('o documento usa a largura da coluna, sem teto próprio herdado', async ({ page }) => {
+    await abrir(page, 'brief-propostos', 'dark')
+
+    const medida = await page.evaluate(() => {
+      // Uma afirmação **sem botão**: com o "Cortar" ao lado, o texto divide a linha por desenho,
+      // e medir essa cortaria pelo motivo errado.
+      const semBotao = [...document.querySelectorAll('[data-jos-afirmacao]')].find(
+        (li) => li.querySelector('button') === null
+      )
+      const p = semBotao?.querySelector('p')
+      const coluna = document.querySelector('[data-jos-aceite="brief"]')?.previousElementSibling
+
+      return {
+        texto: p?.getBoundingClientRect().width ?? 0,
+        coluna: coluna?.getBoundingClientRect().width ?? 0
+      }
+    })
+
+    expect(medida.coluna).toBeGreaterThan(0)
+    // Sem folga: o parágrafo ocupa a coluna. Antes eram 366 de 536.
+    expect(medida.texto).toBeCloseTo(medida.coluna, 0)
+  })
+
+  test('o painel acompanha a rolagem quando há espaço para duas colunas', async ({ page }) => {
+    await abrir(page, 'brief-travado', 'dark')
+
+    const posicao = await page.evaluate(() => {
+      const painel = document.querySelector('[data-jos-aceite="brief"]')
+      return painel === null ? null : getComputedStyle(painel).position
+    })
+
+    // Com o aceite no rodapé, a razão do bloqueio ficava a uma tela de distância do botão.
+    expect(posicao).toBe('sticky')
+  })
+
+  test('o botão de aceite e a pendência que o trava ficam no mesmo painel', async ({ page }) => {
+    await abrir(page, 'brief-travado', 'dark')
+
+    const painel = page.locator('[data-jos-aceite="brief"]')
+    await expect(painel.getByRole('button', { name: /Aceitar o brief/ })).toBeDisabled()
+    await expect(painel.getByText(/Onde os dados de leitura/)).toBeVisible()
   })
 })

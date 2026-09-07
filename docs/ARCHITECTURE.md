@@ -68,6 +68,33 @@ flowchart LR
 - **Execução**: timeout obrigatório, kill process, retry state em falha de workflow.
 - **Sync**: estratégia de conflito multi-dispositivo ainda aberta (ADR-001, questão 3) — não implementar sync bidirecional antes de decidir.
 
+## Providers
+
+Todo provider entra por adapter isolado, atrás do ponto único de chamada (`AiCallService`). Os dois de assinatura são **subprocessos app-managed**: binário pinado, `shell: false`, args montados pelo app, prompt por stdin, `env` em lista de permissão, timeout com `SIGKILL`.
+
+### Isolamento do CLI por fase (emenda E1 da SPEC-Fases-03, 2026-09-05)
+
+Nas fases **Planejamento** e **Especificação** o CLI é um gerador de documento: sem persona de agente, sem ferramentas, sem settings do ambiente. Na **Construção** o agente é legítimo e essas restrições não se aplicam — aplicá-las ali quebraria o run.
+
+**cwd neutro, nos dois adapters.** Um diretório vazio por geração sob `app.getPath('userData')/cli-runs/<uuid>`, removido em todos os desfechos (conclusão, falha, cancelamento, timeout). Nunca `process.cwd()`: em desenvolvimento esse diretório é o repositório do próprio app, e o CLI carregava `CLAUDE.md`, `.claude/`, regras, hooks, skills e MCPs deste projeto para gerar o documento de outro.
+
+**Versões mínimas suportadas** — as instaladas no PC do PI em 2026-09-05, com cada flag confirmada em `--help`:
+
+| CLI | versão mínima | flags de isolamento |
+|---|---|---|
+| `claude` | **2.1.258** | `--system-prompt`, `--tools ""`, `--setting-sources ""`, `--strict-mcp-config`, `--no-session-persistence`, `--json-schema` |
+| `codex` | **0.149.0** | `--sandbox read-only`, `--skip-git-repo-check` |
+
+Flag que a versão instalada não reconhece = `AdapterError` que a nomeia, nunca fallback silencioso para a invocação sem isolamento.
+
+**A saída estruturada vem por ferramenta, não por texto.** Com `--json-schema`, o `claude` não pede JSON em prosa: ele injeta a ferramenta `StructuredOutput` e o modelo responde chamando-a, com o documento no `input`. Por isso `--tools ""` e `--json-schema` **convivem**: o `system/init` reporta `"tools":["StructuredOutput"]`, e mais nada. **O modelo às vezes escreve o JSON em texto antes** (o system pede "responda somente com JSON", e ele obedece); o CLI não aceita texto como saída estruturada, injeta `[structured-output-enforce]` e o modelo repete o documento pela ferramenta. Numa geração com schema, **texto do modelo não é documento**: o documento é o `input` da **última** chamada de `StructuredOutput` (decisão do PI, 2026-09-05), retido no parser e entregue no `close`; o texto só vira documento se nenhuma chamada chegar (#304).
+
+**O Codex tem duas fontes de contexto.** O cwd é uma; a outra é o `CODEX_HOME`, que carrega plugins e hooks de `~/.codex/` independentemente do diretório. O `--sandbox read-only` não os desliga — quem fecha essa porta é o `CODEX_HOME` da pipeline (M10-F02). O isolamento do Codex é a soma dos dois.
+
+**Texto de mensagem `user` nunca é documento.** O CLI usa mensagens `user` para injetar o corpo de uma skill, um `system-reminder` ou o resultado de uma ferramenta. Isso é evidência de console, truncada em 2 KB, e não conteúdo gerado.
+
+**Idioma declarado.** Todo system de geração carrega `IDIOMA_DA_SAIDA`: pt-BR para o conteúdo, inglês para identificadores de código. Sem a linha, a saída em português era imitação do prompt, não contrato.
+
 ## Dependências críticas (ordem que não pode inverter)
 
 1. Policy Engine antes de terminal real.

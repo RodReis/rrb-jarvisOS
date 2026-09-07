@@ -60,6 +60,7 @@ describe('ponte do preload', () => {
       'aplicarEventoDaJornada',
       'aprovarGate',
       'awaitGithubAuth',
+      'baixarArtefatoDeVoz',
       'buildContextPack',
       'callAi',
       'callConnector',
@@ -73,6 +74,7 @@ describe('ponte do preload', () => {
       'classifyAction',
       'clearPhaseModelOverride',
       'completeMilestone',
+      'contradicoesDoPrd',
       'cortarPropostoDaArquitetura',
       'cortarPropostoDoBrief',
       'cortarPropostoDoPrd',
@@ -147,6 +149,7 @@ describe('ponte do preload', () => {
       'pendenciasDeLimpeza',
       'pickAllowedDirectory',
       'pickProjectDirectory',
+      'prontidaoDaVoz',
       'proporTermoDePesquisa',
       'publicarNoGitHub',
       'removeAllowedCommand',
@@ -160,6 +163,7 @@ describe('ponte do preload', () => {
       'renameProject',
       'resolveApproval',
       'resolveFailure',
+      'responderContradicaoDoPrd',
       'responderPerguntaDaSpec',
       'responderRefinamento',
       'resumoDeVarios',
@@ -188,6 +192,7 @@ describe('ponte do preload', () => {
       'simularMudanca',
       'startGithubAuth',
       'switchWorkspace',
+      'transcreverAudio',
       'updateWorkflow',
       'validarPrototipos',
       'verifyAuditChain',
@@ -389,6 +394,39 @@ describe('ponte do preload', () => {
     const pedido = { connector: 'github', operation: 'issues.create' }
     await (bridge.callConnector as (r: unknown, w: string) => Promise<unknown>)(pedido, 'jarvis')
     expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.connectorsInvoke, pedido, 'jarvis')
+  })
+
+  /**
+   * A voz não abre porta nova na fronteira (SPEC-Voz-01, critério 3).
+   *
+   * O renderer captura o áudio com `getUserMedia` — Web API, não Node — e manda PCM pela ponte.
+   * O que ele **não** pode receber de volta é qualquer coisa que descreva o processo: caminho do
+   * modelo, comando do sidecar, PID. Com isso na mão, a tela deixaria de falar com uma
+   * capacidade e passaria a falar com uma implementação.
+   */
+  it('os canais de voz não expõem processo, caminho de modelo nem comando', async () => {
+    const bridge = await carregarPonte()
+
+    // A guarda mira os canais **de voz**: `runCommand` e os da allowlist expõem comando de
+    // propósito desde o MVP-004 — é o terminal controlado, e ali isso é o produto, não
+    // vazamento. Uma varredura cega sobre a ponte inteira reprovaria por um acerto.
+    const deVoz = Object.keys(bridge).filter((k) => /voz|audio|áudio|transcre/i.test(k))
+    expect(deVoz.length).toBeGreaterThan(0)
+
+    const suspeitos = deVoz.filter((k) =>
+      /spawn|pid|processo|process|comando|command|caminho|path|python|whisper|sidecar/i.test(k)
+    )
+
+    expect(suspeitos).toEqual([])
+  })
+
+  it('transcrever leva o PCM pelo canal nomeado, e nada mais', async () => {
+    const bridge = await carregarPonte()
+    const pcm = new Int16Array([1, 2, 3])
+
+    await (bridge.transcreverAudio as (p: Int16Array, w: string) => Promise<unknown>)(pcm, 'jarvis')
+
+    expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.vozTranscrever, pcm, 'jarvis')
   })
 
   it('recusa expor a ponte quando contextIsolation está desligado', async () => {

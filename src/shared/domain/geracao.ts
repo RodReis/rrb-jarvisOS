@@ -59,6 +59,106 @@ export type GenerationEvent =
       readonly duracaoMs: number
     }
   | { readonly tipo: 'erro'; readonly mensagem: string }
+  | {
+      readonly tipo: 'etapa'
+      readonly etapa: EtapaDaGeracao
+      readonly estado: EstadoDaEtapa
+      /**
+       * O que a etapa produziu, em uma frase. Presente só quando ela **termina** — antes disso
+       * não há saída a resumir, e prometer uma frase que ainda não existe faria a tela reservar
+       * espaço para um vazio.
+       */
+      readonly resumo?: string
+    }
+
+/**
+ * As etapas de uma geração de pacote, **na ordem em que acontecem** (SPEC-Jornada-03 § Geração).
+ *
+ * A lista é o que dá porcentagem honesta: o progresso é *quantas destas terminaram*, não um
+ * cronômetro estimando o que falta. Cronômetro mentiria — a duração de uma chamada ao modelo
+ * não é conhecida antes dela terminar, e uma barra que anda sozinha promete um fim que ninguém
+ * pode prometer.
+ *
+ * `pesquisa` entra na lista mesmo quando o PI não confirmou termo: ela acontece de qualquer
+ * forma, só que terminando imediatamente com a lacuna declarada. Tirá-la da lista nesse caso
+ * faria a mesma geração ter denominadores diferentes, e a porcentagem saltaria sem que nada
+ * tivesse mudado.
+ */
+export const ETAPAS_DA_GERACAO = [
+  'pesquisa',
+  'documentos',
+  'validacao',
+  'contradicoes',
+  'gravacao'
+] as const
+
+export type EtapaDaGeracao = (typeof ETAPAS_DA_GERACAO)[number]
+
+/**
+ * Em que ponto uma etapa está.
+ *
+ * `falhou` é estado próprio e não ausência de `concluida`: uma etapa que falhou e uma que ainda
+ * não começou parecem idênticas quando o único sinal é "não concluiu" — e são coisas opostas
+ * para quem está olhando a tela decidindo se espera ou intervém.
+ */
+export type EstadoDaEtapa = 'iniciada' | 'concluida' | 'falhou'
+
+/**
+ * Quanto da geração já terminou, de 0 a 100.
+ *
+ * Conta **etapas concluídas** sobre o total conhecido. Uma etapa em curso não conta como meia:
+ * não há como saber quanto dela já passou, e inventar meio passo faria a barra andar por
+ * suposição em vez de por fato.
+ */
+export function progressoDaGeracao(etapas: ReadonlyMap<EtapaDaGeracao, EstadoDaEtapa>): number {
+  let concluidas = 0
+  for (const etapa of ETAPAS_DA_GERACAO) {
+    if (etapas.get(etapa) === 'concluida') concluidas += 1
+  }
+  return Math.round((concluidas / ETAPAS_DA_GERACAO.length) * 100)
+}
+
+/** O andamento de uma etapa: em que ponto está e o que ela produziu quando terminou. */
+export interface AndamentoDaEtapa {
+  readonly estado: EstadoDaEtapa
+  readonly resumo?: string
+}
+
+/**
+ * Aplica um anúncio de etapa ao andamento **de uma rodada** (#318).
+ *
+ * A rodada é a unidade honesta: o PI viu uma geração nova abrir em 60%, com "Gravação — os três
+ * documentos foram gravados" pendurado de uma rodada anterior enquanto esta ainda gerava. Contar
+ * etapas de duas gerações somadas responde uma pergunta que ninguém fez.
+ *
+ * **A fronteira é a primeira etapa do contrato iniciando** — o único marco que o serviço já
+ * emite, sem inventar um evento de "rodada nova" que ninguém manda. Concluir a primeira **não**
+ * abre rodada: sem termo de pesquisa ela inicia e conclui em sequência, e zerar ali apagaria a
+ * si mesma.
+ *
+ * Devolve mapa novo, nunca muta o recebido: quem guarda o andamento é o estado do React, e mutar
+ * o mapa anterior deixaria a tela sem saber que algo mudou.
+ */
+export function aplicarEtapa(
+  anterior: ReadonlyMap<EtapaDaGeracao, AndamentoDaEtapa>,
+  evento: {
+    readonly etapa: EtapaDaGeracao
+    readonly estado: EstadoDaEtapa
+    readonly resumo?: string
+  }
+): ReadonlyMap<EtapaDaGeracao, AndamentoDaEtapa> {
+  const rodadaNova = evento.etapa === ETAPAS_DA_GERACAO[0] && evento.estado === 'iniciada'
+  const mapa = new Map(rodadaNova ? [] : anterior)
+
+  // O andamento é **substituído**, não mesclado: um estado sem resumo apaga o resumo anterior.
+  // Mesclar deixaria "os três documentos foram gravados" ao lado de `falhou`.
+  mapa.set(evento.etapa, {
+    estado: evento.estado,
+    ...(evento.resumo === undefined ? {} : { resumo: evento.resumo })
+  })
+
+  return mapa
+}
 
 /**
  * Um evento a caminho da tela: o evento e a geração a que ele pertence.

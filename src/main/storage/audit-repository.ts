@@ -99,7 +99,10 @@ export class AuditRepository {
 
     try {
       const evento = inserir(input)
-      log.db.info('Evento de auditoria registrado', {
+      // `debug` e não `info` (#319): isto acontece **por linha gravada** — 197 de 420 linhas do
+      // console numa geração de PRD —, e o registro durável do fato é a própria tabela
+      // `audit_event` (ADR-004). A linha existe para depurar, não para narrar a sessão.
+      log.db.debug('Evento de auditoria registrado', {
         op: 'insert',
         table: 'audit_event',
         tipo: evento.type,

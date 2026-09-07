@@ -168,7 +168,7 @@ export function Combobox({
             'max-h-56 overflow-auto rounded-[var(--jos-raio-card)] p-1',
             'shadow-[var(--jos-sombra-card)]',
             BORDA,
-            'bg-[var(--jos-cor-superficie-elevada)]'
+            'bg-[var(--jos-cor-superficie-overlay)]'
           )}
         >
           {filtradas.length === 0 ? (

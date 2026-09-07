@@ -32,6 +32,7 @@ const listFailures = vi.fn()
 // abrir. Sem os dois métodos aqui a tela estoura no efeito, e a falha aparece longe da causa.
 const carregarPrd = vi.fn()
 const proporTermoDePesquisa = vi.fn()
+const contradicoesDoPrd = vi.fn()
 // Mesma razão, um nível abaixo: o painel de anexos (M8-F05) também é filho do de contexto, e
 // monta junto. Sem os dois métodos, o teste do contexto quebraria por falta de mock.
 const listarAnexos = vi.fn()
@@ -84,6 +85,7 @@ beforeEach(() => {
   listFailures.mockReset().mockResolvedValue([])
   carregarPrd.mockReset().mockResolvedValue(null)
   proporTermoDePesquisa.mockReset().mockResolvedValue(null)
+  contradicoesDoPrd.mockReset().mockResolvedValue(null)
   listarAnexos.mockReset().mockResolvedValue([])
   listarArquiteturas.mockReset().mockResolvedValue([])
   carregarRoadmap.mockReset().mockResolvedValue({ mvps: [], slices: [] })
@@ -113,6 +115,7 @@ beforeEach(() => {
       listFailures,
       carregarPrd,
       proporTermoDePesquisa,
+      contradicoesDoPrd,
       listarAnexos,
       listarArquiteturas,
       carregarRoadmap,
@@ -637,8 +640,14 @@ describe('ProjetosLocais', () => {
 
       render(<ProjetosLocais workspace="jarvis" />)
 
+      /*
+       * O nome acessivel diz **qual modelo** e **de onde ele vem** antes de nomear a acao. O
+       * rotulo antigo ("Trocar o modelo da fase X deste projeto") descrevia so a acao: quem
+       * navega por teclado ouvia a mesma frase em doze cards e nao sabia o que ia trocar nem se
+       * aquele projeto ja divergia do espaco. O id visivel continua sendo o do ledger.
+       */
       const gatilho = await screen.findByRole('button', {
-        name: /Trocar o modelo da fase Construção deste projeto/i
+        name: /claude-opus-5.*padrão do espaço.*Trocar o modelo da fase Construção/i
       })
       expect(gatilho).toHaveTextContent('claude-opus-5')
     })

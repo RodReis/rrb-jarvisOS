@@ -40,6 +40,7 @@ Mostrar ao PI, **enquanto a IA gera**, o texto que ela produz e as ferramentas q
 ## Superfície
 
 - **Painel retrátil na própria etapa**, abaixo/ao lado do documento em geração: fechado por padrão, **abre sozinho quando a geração começa**, e mantém a posição escolhida pelo PI na sessão.
+- *Correção [#318](https://github.com/RodReis/rrb-jarvisOS/issues/318) (2026-09-06): a **barra de andamento das etapas não vive neste painel** — ela fica junto do botão que dispara a geração, na tela da etapa (SPEC-Jornada-03 § Emenda E2). O console mostra o texto do modelo e as ferramentas. O anúncio de etapa chega pelo mesmo canal, com trace derivado do projeto, e o console **o ignora**: tratá-lo como geração apagava a trilha no meio da rodada e, por ser o mesmo id entre rodadas, deixava a anterior sobreviver.*
 - Ao vivo: texto do modelo em fluxo; cada ferramenta vira uma linha `nome · resumo · status`, com o resultado resumido colapsável. Tokens e duração ao fechar.
 - Histórico: a etapa lista as gerações anteriores (data, modelo, status); abrir uma renderiza o trace gravado no mesmo painel. Regeneração não apaga a anterior.
 - IPC: um canal de assinatura por `traceId` (push do main para o renderer, tipado); o renderer nunca lê o processo.

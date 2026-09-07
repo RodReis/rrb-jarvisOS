@@ -25,12 +25,24 @@ import { RefinamentoDoProjeto } from '../app/RefinamentoDoProjeto'
 
 export type CenaDoBrief =
   | 'prompt-vazio'
-  | 'prompt-bloqueado'
+  /**
+   * A recusa que o PI encontrou: o modelo respondeu em português explicando um impedimento em
+   * vez de devolver o brief. A cena existe porque a tela antiga mostrava "a saída não passou no
+   * validador" enquanto o console, abaixo, trazia a observação inteira — e nenhum teste de papel
+   * acusa uma mensagem verdadeira que esconde a informação útil.
+   */
+  | 'prompt-recusado'
   | 'brief-propostos'
   | 'brief-travado'
   // O refinamento: sem perguntas (o convite a gerar) e com pergunta na fila (o próximo passo
   // é respondê-la, não gerar mais).
   | 'refinamento-vazio'
+  /**
+   * O critério 6 no lugar onde ele passou a viver (#281): a geração migrou da tela do prompt
+   * para o fim do refinamento, e o bloqueio de rota migrou com ela. Salvar o prompt não chama
+   * o modelo, então bloquear aquela tela descreveria um custo que ali não existe.
+   */
+  | 'refinamento-bloqueado'
   | 'refinamento-pendente'
   // A rota paga: o clique passa a custar dinheiro, e a tela precisa dizer isso antes.
   | 'refinamento-rota-paga'
@@ -114,7 +126,7 @@ const ROTA_BLOQUEADA: ResultadoDaRota = {
  * galeria, e a captura pegaria o estado de carregamento em vez da tela.
  */
 function instalarPonte(cena: CenaDoBrief): void {
-  const bloqueado = cena === 'prompt-bloqueado'
+  const bloqueado = cena === 'refinamento-bloqueado'
   const travado = cena === 'brief-travado'
 
   Object.defineProperty(window, 'jarvis', {
@@ -124,7 +136,19 @@ function instalarPonte(cena: CenaDoBrief): void {
       rotaDaGeracao: async (): Promise<ResultadoDaRota> =>
         bloqueado ? ROTA_BLOQUEADA : cena === 'refinamento-rota-paga' ? ROTA_PAGA : ROTA_OK,
       salvarPromptDoProjeto: async (): Promise<PromptDoProjeto> => PROMPT,
-      gerarBrief: async () => ({ resultado: 'gerado' as const, mensagem: 'ok' }),
+      gerarBrief: async () =>
+        cena === 'prompt-recusado'
+          ? {
+              resultado: 'saida-invalida' as const,
+              // Idêntico ao que `BriefService` produz: uma cena que inventa a própria cópia
+              // prova a galeria, não o produto.
+              mensagem: 'Nada foi gravado — nenhum brief, nenhuma alteração no projeto.',
+              acao: 'Responda ao ponto no campo do prompt e gere de novo.',
+              textoDoModelo:
+                'O diretório `rrb-insights` já contém outro produto (AgroInsights, para produtores rurais). Não vou sobrescrever: crio o projeto de construção ao lado. Antes, confirmo a forma exata de structured outputs e do SQLite embutido.',
+              problemas: ['O modelo respondeu em texto corrido, e o brief exige saída estruturada.']
+            }
+          : { resultado: 'gerado' as const, mensagem: 'ok' },
       carregarBrief: async (): Promise<BriefRegistrado> =>
         travado
           ? {
@@ -181,11 +205,12 @@ export function GaleriaDoBrief({
 }: GaleriaProps): React.JSX.Element {
   instalarPonte(cena)
 
-  const ehPrompt = cena === 'prompt-vazio' || cena === 'prompt-bloqueado'
+  const ehPrompt = cena === 'prompt-vazio' || cena === 'prompt-recusado'
   const ehRefinamento =
     cena === 'refinamento-vazio' ||
     cena === 'refinamento-pendente' ||
-    cena === 'refinamento-rota-paga'
+    cena === 'refinamento-rota-paga' ||
+    cena === 'refinamento-bloqueado'
 
   return (
     <ProvedorDeTema

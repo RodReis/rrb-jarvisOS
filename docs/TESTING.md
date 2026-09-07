@@ -147,8 +147,9 @@ do CI (§6), que faz o `npm run build` antes do `playwright test`. Para rodar o 
 `npm run build && npx playwright test`.
 
 > **Onde vivem as armadilhas 4–6 (binário, setuid, keyring).** Elas são exigências do E2E, e só
-> dele — desde o card #34 os steps que as tratam moram no **job `e2e`** do `ci.yml`, não no job
-> do relatório. O job `test` (relatório) não sobe Electron, então não precisa de nenhuma delas.
+> dele — desde o card #34 os steps que as tratam moram no **job `e2e`** do `ci.yml`, não nos jobs
+> do relatório. Nenhum deles sobe Electron: os runners (`test-regras`, `test-banco`, `test-tela`)
+> rodam Vitest, e o `test` só agrega os artefatos — então nenhum precisa de qualquer uma delas.
 
 **Padrão das armadilhas:** nenhuma se apresenta como o que é. Falha de launch do
 Electron no CI quase sempre reporta timeout ou "browser has been closed" — mensagens que
@@ -343,13 +344,28 @@ conserto**, não precisa reviver o bug):
 > prova 3 abaixo.
 
 **Guarda anti-drift (o que torna o arquivo confiável):** no PR, o CI roda o gerador em
-**`--check`**, que faz **três provas independentes** — são três formas distintas de a evidência
-mentir:
+**`--check`**, que faz **quatro provas independentes** — são quatro formas distintas de a
+evidência mentir:
 
+0. **Execução completa** (desde 2026-09-06, issue #232) — prova que o runner **não perdeu
+   arquivo**. Vem antes das outras e vale também fora do `--check`, porque as três seguintes
+   auditam o *conteúdo* do relatório e esta audita a *evidência que o alimenta*: uma execução que
+   perdeu arquivo grava um total menor que a verdade, e a prova 1 então compara o relatório
+   contra a mesma execução incompleta e **concorda consigo mesma**. Compara a contagem de
+   arquivos de cada categoria com a da última execução íntegra, guardada em
+   `reports/.arquivos-por-categoria.json`; caiu → **falha e não grava**. Subir é rotina (teste
+   novo); categoria sem piso é a primeira execução dela. Se um teste foi removido de propósito,
+   o piso é ajustado no mesmo commit.
 1. **Números** — recomputa os totais numa execução limpa e compara com a seção `## Estado atual`
    commitada. Divergiu → **CI falha**. O número só "cola" se sobreviver a uma reexecução
    independente. Compara só os números, não os rótulos Data/Issue/PR (que variam por PR de
-   propósito).
+   propósito) — **nem a cobertura** (desde 2026-09-06, issue #327). O ADR-003, ponto 5, decide
+   que a cobertura é *"report-only — publicada, não barra merge"*, e compará-la fazia exatamente
+   o contrário. O gatilho foi a PR #326, que altera **dois arquivos de documentação** e reprovou
+   por uma décima: a cobertura do Banco está em 87.05 (5798 de 6660 linhas), sobre a fronteira de
+   arredondamento, e **uma única linha coberta a mais** alterna o dígito entre execuções. A
+   cobertura continua vindo do `--json` do runner e é publicada com o valor real; ela só não
+   decide o merge. Testes, aprovados, falhas e categoria seguem comparados.
 2. **Histórico (append-only)** — prova que **toda linha da baseline continua no arquivo**.
    Append-only é verificável por **continência de conjunto**, não por igualdade: o histórico novo
    pode ter linhas a mais (a entrega atual), nunca a menos.
@@ -357,6 +373,21 @@ mentir:
    linha** no histórico. Só é exigida de PR que **altera arquivo de teste** (PR só de `docs/` não
    é barrado) e cobra pela issue do `refs #N`. Sem linha → **CI falha**, com o comando exato na
    mensagem.
+
+> **Por que a prova 0 é um piso, e não a comparação que parece óbvia.** O modo de falha é o pool
+> do Vitest perder um worker: a execução termina com `success: true`, **zero falhas**, e um
+> arquivo inteiro fora da contagem — nada fica vermelho, o total apenas cai. A defesa intuitiva
+> seria comparar "arquivos coletados" com "arquivos executados", mas **essa comparação não tem
+> fonte**: a saída do runner diz quantos arquivos ele *relatou* (`testResults`), nunca quantos
+> pretendia rodar, e o campo que parece servir (`numTotalTestSuites`) conta blocos `describe` —
+> 379 contra 67 arquivos no projeto `banco`. Uma guarda sobre ele acusaria toda execução
+> saudável. O piso é a única fonte confiável que existe.
+>
+> **Ele não depende de reproduzir o gatilho**, e isso é deliberado: por que o worker morre é
+> intermitente e não reproduz sob demanda (o Vitest 4.1 reinicia o worker e se recupera na
+> maioria das vezes, que é por que o defeito é raro). O que a guarda mede é o **efeito**, sempre
+> o mesmo. Verificado com a perda simulada num JSON real: 66 de 67 arquivos, zero falhas,
+> `success: true` — o gerador recusa gravar e sai com código 1.
 
 > **Por que a prova 3 existe — e por que ela já era necessária aqui.** As provas 1 e 2 cobrem
 > *número forjado* e *histórico apagado*; nenhuma cobre **histórico que nunca foi escrito**. No
@@ -395,21 +426,28 @@ registradas no código de referência da §10):
 
 Dispara em **todo pull request** para `main`. Um bloco `concurrency` (card #66) cancela a execução
 anterior quando chega um push novo no mesmo PR — três pushes seguidos não deixam três suítes
-inteiras (~7 min cada) rodando em paralelo quando só a última importa. Desde o **card #34**
-(2026-07-24) são **três jobs**, não um:
+inteiras (~7 min cada) rodando em paralelo quando só a última importa. A otimização de 2026-09-06 mantém todas as provas e distribui o trabalho em jobs paralelos:
 
-- **`test`** — roda em todo PR. Runners unitários/integração + relatório + guarda anti-drift
-  (descrito nesta seção). **Não sobe Electron** e **não roda E2E**.
-- **`e2e`** — sobe o app Electron de verdade (build + xvfb + keyring + Playwright). Custa ~15 min
-  e prova a fronteira preload/IPC/janela, que muda raramente. **Só executa quando o PR toca essa
-  fronteira** — um job leve `changes` faz `git diff` contra a base e casa
+- **`changes`** — detecta a fronteira E2E; falha de Git bloqueia o gate.
+- **`quality`** — lint e typecheck em paralelo à suíte.
+- **`visual`** — Chromium e prova visual completa, também em paralelo.
+- **`test-regras`**, **`test-banco`** e **`test-tela`** — runners unitários/integração
+  com cobertura, em paralelo. Cada job publica o JSON do runner e o `coverage-summary.json`
+  correspondente; o job de banco sobe o Supabase real antes dos int-specs de RLS.
+- **`test`** — agrega os artefatos das três categorias e executa self-check, anti-drift,
+  append-only e carimbo. Não reexecuta a suíte; os números continuam vindo dos JSONs dos
+  runners, conforme o ADR-003.
+- **`e2e`** — app Electron real; executa quando a fronteira muda:
   `src/main/preload/**`, `src/main/index.ts`, `src/main/window.ts`, `tests/e2e/**`,
-  `playwright.config.ts`; nos demais PRs o `e2e` é pulado (no-op). Filtro por `paths:` no evento
-  não serve aqui — cancelaria o workflow inteiro, não um job.
-- **`gate`** — o **required check** (branch protection exige `gate`, não `e2e`). Sempre roda,
-  agrega `test` e `e2e`: falha se `test` falhou ou se o `e2e` **rodou e** falhou; passa quando o
-  `e2e` foi legitimamente pulado. É o que impede o E2E condicional de bloquear o merge em
-  "pending eterno" — a armadilha do required check pulado no GitHub.
+  `playwright.config.ts` e o próprio `.github/workflows/ci.yml`.
+- **`gate`** — continua sendo o único check obrigatório. Exige sucesso de `changes`,
+  `quality`, `visual` e `test`. Exige E2E verde com `frontier=true`, ou pulado com
+  `frontier=false`. Falha, cancelamento ou saída inválida nunca dispensam uma prova.
+
+O workflow continua rodando em todo PR, inclusive documental; não usamos filtro de paths no
+trigger, que deixaria checks obrigatórios pendentes. Cache npm e cancelamento por PR já
+existiam e foram preservados. Os limites de tempo por job interrompem execuções travadas;
+não fazem testes lentos passar.
 
 > **A garantia (card #34):** o E2E completo tem de rodar no caminho para a `main`. O filtro de
 > `paths` do job `changes` cobre toda a fronteira que o E2E prova; PR que a toca roda o E2E e é
@@ -417,13 +455,15 @@ inteiras (~7 min cada) rodando em paralelo quando só a última importa. Desde o
 > em sincronia com o que o E2E realmente exercita é parte do contrato. Falso verde é pior que
 > teste ausente.
 
-O job `test` em detalhe:
+Os jobs de teste em detalhe:
 
 - **Services:** **nenhum** no sentido do `services:` do Actions. A maior parte do "Banco" testa o
   storage local (SQLite em arquivo temp), que não é serviço. Desde a **M2-F01** (entregue em
   2026-07-22) há uma exceção: o int-spec de RLS exige o **Supabase local**, que sobe pela CLI
-  (`supabase/setup-cli` + `supabase start`) e não por `services:` — não é um container só, e sim a
-  stack que a CLI orquestra (Postgres + PostgREST + Auth), com migrations e seed aplicados no start.
+  (`supabase/setup-cli` fixado em `v2.116.0` + `supabase start`) e não por `services:` — não é um
+  container só, e sim a stack que a CLI orquestra (Postgres + PostgREST + Auth), com migrations e
+  seed aplicados no start. **Não usar `version: latest` no CI:** a resolução dinâmica consulta as
+  releases do GitHub e pode falhar por rate limit antes de qualquer teste rodar.
   - **Pular, no CI, é falha.** Esses testes se pulam quando a stack não responde, para não punir
     quem clona o repo sem Docker. No CI a stack sobe de propósito, então o `beforeAll` **lança**
     quando `process.env.CI` está setado. Sem isso, uma stack que não subisse deixaria o CI verde
@@ -476,19 +516,31 @@ Rodar a guarda local antes do push é o passo que fecha o ciclo: se ela passa aq
     faria as asserções passarem sem tocar em política nenhuma. A única exceção deliberada é o
     teste do trigger append-only, que **precisa** do owner justamente para provar a camada que
     protege contra quem escapa da RLS.
-- **Passos:**
-  1. `npm ci`.
-  2. **Domínio/main:** `vitest run` das categorias `regras` e `banco` com `--coverage --reporter=json`.
-  3. **Renderer (componente):** `vitest run` (jsdom) com `--coverage --reporter=json`.
+- **Passos.** Desde 2026-09-06 eles não são uma sequência num job só: cada categoria roda no
+  seu próprio job, em paralelo, e o `test` agrega. Todos começam por `npm ci` (com cache npm).
+  1. **`test-regras`** — `vitest run` da categoria `regras` com `--coverage --reporter=json`.
+  2. **`test-banco`** — sobe o Supabase local (CLI fixada, ver acima) e roda `banco` com
+     `--coverage --reporter=json`. É o caminho crítico do workflow.
+  3. **`test-tela`** — `vitest run` (jsdom) da categoria de componente, mesmo par de flags.
+     Cada um dos três publica, como artefato, os arquivos que `test-report.config.json` declara:
+     o JSON do runner e o `coverage-summary.json`. O upload usa **`include-hidden-files: true`**,
+     porque `reports/.raw` é diretório oculto — sem isso o job agregado baixaria a cobertura sem
+     os JSONs, e a evidência chegaria incompleta ao gerador.
   3b. **E2E:** ativo desde a **Fatia 03** (entregue em 2026-07-22); desde o **card #34** roda no
-     **job `e2e` à parte** (não neste job, e só quando o PR toca a fronteira — ver a abertura da
-     §6). Lá dentro: `npm run build` → `xvfb-run playwright test` (o Electron abre janela: no Linux
-     do CI precisa de display virtual). O reporter JSON e o caminho de saída vivem no
-     `playwright.config.ts`. Ver §3.1 para as armadilhas de ambiente antes de depurar falha de
+     **job `e2e` à parte** (não nos jobs do relatório, e só quando o PR toca a fronteira — ver a
+     abertura da §6). Lá dentro: `npm run build` → `xvfb-run playwright test` (o Electron abre
+     janela: no Linux do CI precisa de display virtual). O reporter JSON e o caminho de saída vivem
+     no `playwright.config.ts`. Ver §3.1 para as armadilhas de ambiente antes de depurar falha de
      launch no CI.
-  4. `npm run test:report` → escreve a tabela em **`$GITHUB_STEP_SUMMARY`** (aba do run) **e**
-     publica/atualiza um **comentário fixo no PR** (sticky comment).
-  5. `npm run test:report:check` → **falha se `reports/TESTS.md` divergir** de uma execução limpa.
+  4. **`test`** (depende dos três) — baixa os artefatos das categorias, confere que as três deram
+     `success` (categoria que não passou barra aqui, não no `gate`) e roda o self-check do gerador.
+  5. Ainda no `test`, a guarda: `npm run test:report:check -- --no-run [--require-entry]`.
+     O `--no-run` é o que torna o job agregador — os números vêm dos JSONs que os runners já
+     produziram, nunca de uma reexecução. Falha se `reports/TESTS.md` divergir da evidência, se o
+     histórico perder linha ou se a entrega que altera teste não tiver carimbo. **As guardas rodam
+     numa chamada só**: exigir o carimbo não custa mais uma execução da suíte — era essa a segunda
+     suíte, ~5 min de runner, que a otimização de 2026-09-06 eliminou. Depois a tabela vai para o
+     **`$GITHUB_STEP_SUMMARY`** e para o **comentário fixo no PR** (sticky comment).
 - **Metadados da entrega:** `REPORT_ISSUE` sai do `refs #N` do corpo do PR (o elo canônico
   PR→issue — `closes #N` é proibido, ver `CONVENTION.md`); `REPORT_SPEC` do link
   `docs/spec/spec-*.md`; `REPORT_PR`/`REPORT_PR_URL` do evento do PR; `REPORT_DATE` do

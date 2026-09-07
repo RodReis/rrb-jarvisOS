@@ -25,6 +25,7 @@
  *    completasse uma referência ausente inventaria a procedência que o critério 2 exige.
  */
 
+import { IDIOMA_DA_SAIDA } from './idioma-da-geracao'
 import type {
   FatiaGerada,
   MvpGerado,
@@ -55,6 +56,7 @@ export interface AfirmacaoParaOModelo {
  */
 export const SISTEMA_DO_ROADMAP = [
   'Você recebe o PRD aceito de um projeto e a arquitetura aprovada dele, e propõe o roadmap:',
+  IDIOMA_DA_SAIDA,
   'os MVPs, o que cada um entrega, de quais outros ele depende e quais fatias ele prevê.',
   '',
   'Responda **somente** com JSON válido, sem cercas de código e sem texto antes ou depois.',
@@ -151,6 +153,7 @@ export function promptDoRoadmap(entrada: {
  */
 export const SISTEMA_DA_SPEC = [
   'Você recebe o MVP que o dono do projeto escolheu para entrar na fila e a primeira fatia',
+  IDIOMA_DA_SAIDA,
   'prevista dele, e escreve a especificação executável dessa fatia.',
   '',
   'Responda **somente** com JSON válido, sem cercas de código e sem texto antes ou depois.',

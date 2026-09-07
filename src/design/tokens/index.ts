@@ -44,6 +44,9 @@ export {
   borda,
   bordaRgb,
   modoEfetivo,
+  // Exportada porque o overlay opaco é derivado dela e o teste precisa medir o achatamento —
+  // uma função de cor que só o próprio arquivo enxerga não tem como ser provada.
+  opacaSobre,
   papeis,
   RISCO,
   STATUS,

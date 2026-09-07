@@ -266,3 +266,74 @@ describe('avaliarGateDeMerge — espera não é bloqueio', () => {
     expect(v).toMatchObject({ pendentes: 1 })
   })
 })
+
+describe('avaliarGateDeMerge — identidade da evidência (SPEC-Pipeline-01, critério 11)', () => {
+  it('sem exigência declarada, decide como sempre decidiu', () => {
+    // A §2 proíbe endurecer proteção por iniciativa própria: projeto que nunca declarou emissor
+    // não passa a ser bloqueado por isso.
+    const r = avaliarGateDeMerge(entrada({ checks: [check({ emissor: 'qualquer-um' })] }))
+    expect(r.reason).toBe('pode-mergear')
+  })
+
+  it('check verde de emissor diferente do exigido não satisfaz o gate', () => {
+    const r = avaliarGateDeMerge(
+      entrada({
+        checks: [check({ emissor: 'app-de-terceiro' })],
+        exigenciaDeIdentidade: { emissorEsperado: 'github-actions' }
+      })
+    )
+    expect(r.reason).toBe('bloqueado-externo')
+  })
+
+  it('check verde de tentativa antiga não satisfaz o gate', () => {
+    const r = avaliarGateDeMerge(
+      entrada({
+        checks: [check({ tentativa: 1 })],
+        exigenciaDeIdentidade: { tentativaCorrente: 2 }
+      })
+    )
+    expect(r.reason).toBe('bloqueado-externo')
+  })
+
+  it('emissor e tentativa corretos continuam aprovando', () => {
+    const r = avaliarGateDeMerge(
+      entrada({
+        checks: [check({ emissor: 'github-actions', tentativa: 2 })],
+        exigenciaDeIdentidade: { emissorEsperado: 'github-actions', tentativaCorrente: 2 }
+      })
+    )
+    expect(r.reason).toBe('pode-mergear')
+  })
+
+  it('origem que não informa emissor não vira bloqueio por ausência de dado', () => {
+    // "A API não me contou" não pode virar bloqueio (§2), mas também não vira aprovação: as
+    // três checagens de sempre continuam valendo, e um check vermelho segue reprovando.
+    const r = avaliarGateDeMerge(
+      entrada({ exigenciaDeIdentidade: { emissorEsperado: 'github-actions' } })
+    )
+    expect(r.reason).toBe('pode-mergear')
+
+    const vermelho = avaliarGateDeMerge(
+      entrada({
+        checks: [check({ conclusao: 'failure' })],
+        exigenciaDeIdentidade: { emissorEsperado: 'github-actions' }
+      })
+    )
+    expect(vermelho.reason).toBe('bloqueado-externo')
+  })
+
+  it('a causa nomeia a identidade, não "não concluiu com sucesso"', () => {
+    // Um check verde recusado por emissor, reportado como "sem sucesso", mandaria o leitor
+    // investigar o log de um job que passou — o erro verdadeiro que esconde a causa.
+    const r = avaliarGateDeMerge(
+      entrada({
+        checks: [check({ emissor: 'app-de-terceiro' })],
+        exigenciaDeIdentidade: { emissorEsperado: 'github-actions' }
+      })
+    )
+    if (r.reason !== 'bloqueado-externo') throw new Error('esperava bloqueado-externo')
+    expect(r.mensagem).toContain('emissor-nao-confiavel')
+    expect(r.mensagem).not.toContain('sem sucesso')
+    expect(r.acao).toContain('emissor')
+  })
+})

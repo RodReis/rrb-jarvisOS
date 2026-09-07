@@ -53,3 +53,21 @@ Fixtures de brief completo/contraditório; evidência ausente/hostil (M8-F04); v
 
 - **Síntese sobre evidência é permitida; fonte fabricada não.** O limite da M8-F04 ("síntese seria conclusão sem evidência") é substituído por síntese **com** as evidências citadas por afirmação, verificáveis pelo verificador da M6-F06.
 - **Origem `brief` é âncora, não texto**: o PRD referencia o id da afirmação do brief, para que "todo requisito material possui origem" (critério 1 da SPEC-Planejamento-04) seja checável por máquina.
+
+## Emenda E1 — contradição vira pergunta respondível (decisões do PI, 2026-09-06)
+
+Achado pelo PI ao gerar o PRD em 2026-09-06 (issue [#307](https://github.com/RodReis/rrb-jarvisOS/issues/307)): as contradições apareciam como cartões só de leitura, sem lugar para responder. O item 5 de § Geração já manda que contradição *"vira pergunta ao PI com recomendação (M8-F03)"*; esta emenda fixa o que faltava decidir.
+
+1. **A contradição é uma pergunta no contrato da M8-F03**: título, enunciado, 2–3 opções excludentes com impacto, recomendada primeiro com justificativa, texto livre quando couber, "Decide por mim" quando delegável. Ela é respondida **no pop-up** do wizard — uma por vez —, nunca num formulário inline. O modelo gera a pergunta inteira; pergunta fora do contrato é recusada pelo validador e a etapa `contradicoes` falha (fail closed).
+2. **A resposta é uma `Decision` gravada** (`etapa: 'prd'`), pelo mesmo canal das decisões do refinamento, e entra no pedido de geração como decisão citável (origem `decisao`). "Decide por mim" grava com o agente como autor e **não aprova o gate**. *Correção [#316](https://github.com/RodReis/rrb-jarvisOS/issues/316) (2026-09-06): a mesma lista de decisões entra também na **detecção** de contradições — conflito que uma decisão já tomada resolve não é contradição e não volta como pergunta. Sem isso o brief aceito seguia afirmando um lado, o PRD novo o outro, e o laço deste item nunca convergia.*
+3. **Ao responder a última contradição, os três documentos são gerados de novo, sozinhos**, com o termo de pesquisa confirmado — criando uma revisão nova candidata (critério 7 mantido: o aceite é por revisão exata). A regeração **parcial** (só as afirmações afetadas) fica para uma entrega posterior.
+4. **O aceite continua sendo o clique do PI**, com o gate travado enquanto a revisão vigente tiver contradição.
+
+## Emenda E2 — o andamento da geração na tela da etapa (decisões do PI, 2026-09-06)
+
+Achado pelo PI ao gerar o PRD em 2026-09-06 (issue [#318](https://github.com/RodReis/rrb-jarvisOS/issues/318)): a barra de andamento vivia no console, no fim da página, e somava **duas rodadas** — uma geração nova abria em 60% com "Gravação — os três documentos foram gravados" de uma rodada anterior. O botão "Aceitar o PRD" da trilha lateral aparecia habilitado enquanto o do fim da página estava travado por contradição.
+
+1. **O andamento (etapas + percentual) fica logo abaixo do botão que dispara a geração**, na tela da etapa; o console da geração segue embaixo com o texto do modelo e as ferramentas. Uma superfície responde "em que ponto está", a outra "o que a IA escreveu".
+2. **O andamento é de uma rodada.** A fronteira é a primeira etapa do contrato **iniciando**; ao começar uma rodada nova, o andamento da anterior é descartado. O anúncio de etapa deixa de ser tratado como geração pelo console — ele viaja com trace derivado do projeto, fixo entre rodadas.
+3. **O CTA da trilha desabilita com a razão** quando o painel da etapa diz que o gate está travado — a mesma frase que o botão do painel mostra, nunca duas explicações.
+4. **A tela acompanha a geração que corre no main**, inclusive a que começou antes de ela montar: ao concluir a gravação, relê a revisão e as contradições; enquanto uma etapa está em curso, o botão de gerar fica ocupado. A regeração automática após a última resposta continua exigindo termo confirmado na sessão (item 3 da E1).

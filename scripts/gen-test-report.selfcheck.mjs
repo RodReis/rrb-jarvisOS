@@ -14,8 +14,10 @@ import { strict as assert } from 'node:assert'
 
 import {
   droppedHistory,
+  estadoAtualComparavel,
   hasHistoryEntry,
   keepHistory,
+  perdaDeArquivos,
   shouldRequireEntry
 } from './gen-test-report.mjs'
 
@@ -172,4 +174,89 @@ run('não cobra PR de infra, sem `refs #N` (o furo do #26)', () => {
   assert.equal(shouldRequireEntry(true, undefined), false)
 })
 
-console.log('[selfcheck] OK — 20 checks')
+// --- execução incompleta do runner (#232) ----------------------------------
+// O pool do Vitest às vezes perde um worker e a execução **termina verde**: zero
+// falhas, `success: true`, e um arquivo inteiro fora da contagem. O total apenas
+// cai. A guarda anti-drift então compara o relatório contra a mesma execução
+// incompleta e concorda consigo mesma — o número falso entra no histórico
+// append-only, onde fica para sempre.
+//
+// `docs/TESTING.md` §1: *"evidência de máquina, nunca narrada"*. Execução que
+// perde arquivo em silêncio deixa de ser evidência e vira afirmação.
+//
+// **Por que um piso, e não a comparação que a issue propunha.** A saída do
+// runner diz quantos arquivos ele *relatou*, nunca quantos pretendia rodar —
+// `numTotalTestSuites` conta blocos `describe` (379 contra 67 arquivos no banco),
+// e compará-lo com `testResults` acusaria toda execução saudável. O piso é a
+// única fonte confiável: quantos arquivos a última execução íntegra teve.
+
+run('primeira execução da categoria não acusa — não há piso ainda', () => {
+  assert.equal(perdaDeArquivos({ Banco: 67 }, {}), null)
+})
+
+run('mesma contagem passa', () => {
+  assert.equal(perdaDeArquivos({ Banco: 67 }, { Banco: 67 }), null)
+})
+
+run('arquivo a mais passa — teste novo é rotina', () => {
+  assert.equal(perdaDeArquivos({ Banco: 68 }, { Banco: 67 }), null)
+})
+
+run('arquivo a menos é acusado, com a categoria e os dois números', () => {
+  const perda = perdaDeArquivos({ Banco: 66 }, { Banco: 67 })
+
+  assert.equal(perda?.length, 1)
+  assert.equal(perda[0].categoria, 'Banco')
+  assert.equal(perda[0].agora, 66)
+  assert.equal(perda[0].piso, 67)
+})
+
+run('acusa todas as categorias que perderam, não só a primeira', () => {
+  const perda = perdaDeArquivos({ Banco: 66, Tela: 40 }, { Banco: 67, Tela: 41 })
+
+  assert.equal(perda?.length, 2)
+})
+
+run('categoria que sumiu do config não é acusada', () => {
+  // Remover uma categoria é decisão de quem edita o config, não perda de arquivo.
+  assert.equal(perdaDeArquivos({ Banco: 67 }, { Banco: 67, Antiga: 10 }), null)
+})
+
+// --- Cobertura report-only (ADR-003 ponto 5, issue #327) ---------------------
+
+run('cobertura diferente NÃO é divergência: o ADR-003 a declara report-only', () => {
+  // O caso real da PR #326: dois arquivos de documentação, contagens idênticas,
+  // e o gate reprovando por uma décima. A cobertura do Banco está em 87.05, e
+  // uma única linha coberta a mais alterna o dígito entre execuções.
+  const a = doc([], ['| — | — | — | Banco | 1215 | 1201 | 0 | 87.0 | — | — |'])
+  const b = doc([], ['| — | — | — | Banco | 1215 | 1201 | 0 | 87.1 | — | — |'])
+  assert.equal(estadoAtualComparavel(a), estadoAtualComparavel(b))
+})
+
+run('número de testes diferente CONTINUA sendo divergência', () => {
+  const a = doc([], ['| — | — | — | Banco | 1215 | 1201 | 0 | 87.0 | — | — |'])
+  const b = doc([], ['| — | — | — | Banco | 1200 | 1201 | 0 | 87.0 | — | — |'])
+  assert.notEqual(estadoAtualComparavel(a), estadoAtualComparavel(b))
+})
+
+run('número de FALHAS diferente continua sendo divergência', () => {
+  // O contrapeso que guarda contra o erro de índice: neutralizar a célula errada
+  // apagaria justamente a coluna que a guarda existe para proteger.
+  const a = doc([], ['| — | — | — | Banco | 1215 | 1201 | 0 | 87.0 | — | — |'])
+  const b = doc([], ['| — | — | — | Banco | 1215 | 1201 | 9 | 87.0 | — | — |'])
+  assert.notEqual(estadoAtualComparavel(a), estadoAtualComparavel(b))
+})
+
+run('número de aprovados diferente continua sendo divergência', () => {
+  const a = doc([], ['| — | — | — | Banco | 1215 | 1201 | 0 | 87.0 | — | — |'])
+  const b = doc([], ['| — | — | — | Banco | 1215 | 1100 | 0 | 87.0 | — | — |'])
+  assert.notEqual(estadoAtualComparavel(a), estadoAtualComparavel(b))
+})
+
+run('a categoria continua sendo comparada', () => {
+  const a = doc([], ['| — | — | — | Banco | 1215 | 1201 | 0 | 87.0 | — | — |'])
+  const b = doc([], ['| — | — | — | Tela | 1215 | 1201 | 0 | 87.0 | — | — |'])
+  assert.notEqual(estadoAtualComparavel(a), estadoAtualComparavel(b))
+})
+
+console.log('[selfcheck] OK — 31 checks')

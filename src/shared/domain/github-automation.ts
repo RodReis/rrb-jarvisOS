@@ -316,6 +316,26 @@ export interface CheckNormalizado {
     | 'skipped'
     | 'stale'
   readonly url?: string
+  /**
+   * Quem emitiu o check (o `slug` do app no GitHub), quando a origem informa.
+   *
+   * O critério 11 da SPEC-Pipeline-01 exige validar o emissor quando a regra da origem o
+   * especifica: **nome de check não é identidade**. Qualquer app com permissão de escrita pode
+   * publicar um check chamado `validacao` e verde, e o gate que só olha o nome aceitaria a
+   * afirmação de um terceiro como se fosse do CI do repositório.
+   *
+   * Opcional porque nem toda origem informa, e ausência não pode virar bloqueio de projeto que
+   * nunca declarou emissor esperado — ver `checkTemEmissorEsperado`.
+   */
+  readonly emissor?: string
+  /**
+   * A tentativa da execução que produziu este check, quando a origem informa.
+   *
+   * Também do critério 11: uma tentativa **antiga** do mesmo workflow, no mesmo head, tem o mesmo
+   * nome e pode estar verde enquanto a corrente falhou. Sem este campo, "o check verde existe" e
+   * "o CI aprovou agora" são indistinguíveis.
+   */
+  readonly tentativa?: number
 }
 
 /** Uma execução de workflow normalizada. */
@@ -405,6 +425,72 @@ export function corpoTemChaveExterna(body: string | undefined, externalKey: stri
  */
 export function checkSatisfazGate(check: CheckNormalizado, headSha: string): boolean {
   return check.headSha === headSha && check.status === 'completed' && check.conclusao === 'success'
+}
+
+/**
+ * A exigência de identidade que a origem declara para um check obrigatório.
+ *
+ * Opcional por projeto: a §6 da SPEC-Pipeline-01 proíbe *"mudança de nome do check obrigatório"* e
+ * a §2 proíbe endurecer proteção por iniciativa própria. Exigir emissor em projeto que nunca o
+ * declarou seria endurecer, e o resultado seria bloquear entrega por uma regra que ninguém pediu.
+ */
+export interface ExigenciaDeIdentidade {
+  /** O emissor esperado (o `slug` do app). Quando ausente, o emissor não é verificado. */
+  readonly emissorEsperado?: string
+  /** A tentativa corrente do CI. Quando presente, check de tentativa anterior não satisfaz. */
+  readonly tentativaCorrente?: number
+}
+
+/** Por que um check não serve como evidência (critério 11). */
+export type RecusaDeEvidencia =
+  'head-diferente' | 'nao-concluido' | 'sem-sucesso' | 'emissor-nao-confiavel' | 'tentativa-antiga'
+
+/**
+ * O check serve como evidência do gate — e por que não, quando não serve (critério 11).
+ *
+ * `checkSatisfazGate` responde "está verde neste SHA?". Esta função responde a pergunta que a
+ * SPEC-Pipeline-01 acrescenta: **"e é de quem eu espero, da execução que está correndo?"**
+ *
+ * As duas checagens novas fecham buracos que o nome do check não cobre:
+ *
+ *  - *Emissor.* Qualquer app com permissão de escrita publica um check chamado `validacao` e
+ *    verde. Sem verificar quem o emitiu, a pipeline aceita a afirmação de um terceiro como se
+ *    fosse do CI do repositório.
+ *  - *Tentativa.* Uma tentativa antiga do mesmo workflow, no mesmo head, tem o mesmo nome e pode
+ *    estar verde enquanto a corrente falhou. "Existe check verde" e "o CI aprovou agora" só são a
+ *    mesma coisa quando a tentativa bate.
+ *
+ * **Ausência de dado não bloqueia.** Quando a origem não informa emissor ou tentativa, ou quando o
+ * projeto não declara exigência, essas duas checagens não se aplicam — a §2 proíbe endurecer a
+ * proteção por conta própria, e transformar "a API não me contou" em bloqueio seria isso. O que a
+ * ausência **não** faz é virar aprovação: as três checagens de sempre continuam valendo.
+ */
+export function recusaDaEvidencia(
+  check: CheckNormalizado,
+  headSha: string,
+  exigencia: ExigenciaDeIdentidade = {}
+): RecusaDeEvidencia | undefined {
+  if (check.headSha !== headSha) return 'head-diferente'
+  if (check.status !== 'completed') return 'nao-concluido'
+  if (check.conclusao !== 'success') return 'sem-sucesso'
+
+  if (
+    exigencia.emissorEsperado !== undefined &&
+    check.emissor !== undefined &&
+    check.emissor !== exigencia.emissorEsperado
+  ) {
+    return 'emissor-nao-confiavel'
+  }
+
+  if (
+    exigencia.tentativaCorrente !== undefined &&
+    check.tentativa !== undefined &&
+    check.tentativa !== exigencia.tentativaCorrente
+  ) {
+    return 'tentativa-antiga'
+  }
+
+  return undefined
 }
 
 /**

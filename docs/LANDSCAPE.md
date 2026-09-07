@@ -26,6 +26,9 @@ Orientação rápida: o que existe, onde vive, e quem manda em quê. Detalhe té
 | `docs/DECISIONS.md` | Índice de ADRs | Cowork |
 | `docs/CONVENTION.md` | Contrato de processo, domínio e dados | Cowork |
 | `docs/REVIEW.md` | Contrato exclusivo dos revisores | Cowork |
+| `docs/TESTING.md` | Metodologia de teste, categorias obrigatórias e relatório de evidência (ADR-003) | Cowork |
+| `docs/CI-PR.md` | Política de PR rápida: jobs paralelos, gate único, medição de duração e limites | Cowork |
+| `docs/GUIA-PRS-CLAUDE-CODE.md` | Rotina de autoria, revisão, CI e evidência das PRs deste repositório | Cowork |
 | `docs/adr/` | ADRs individuais | Cowork |
 | `docs/mvp/` | Épicos com checklist de fatias | Cowork |
 | `docs/spec/` | Uma spec por fatia | Cowork (aprova: PI) |

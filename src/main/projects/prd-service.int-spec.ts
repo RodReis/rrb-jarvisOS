@@ -27,11 +27,12 @@ import type { Database as Db } from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AfirmacaoDoPrd, ContradicaoDoPrd } from '@shared/domain/prd'
 import type { BriefRegistrado } from '@shared/domain/brief'
+import type { EstadoDaEtapa, EtapaDaGeracao } from '@shared/domain/geracao'
 import type { EstadoDasRotas } from '@shared/domain/rota-de-geracao'
 import type { ConnectorOutcome } from '@shared/domain/connectors'
 import { TAVILY_OPERATIONS } from '@shared/domain/tavily'
 
-const logCat = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+const logCat = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 vi.mock('../logging/logger', () => ({
   log: new Proxy({}, { get: () => logCat }),
   setCurrentWorkspace: vi.fn()
@@ -41,6 +42,7 @@ const { openDatabase } = await import('../storage/database')
 const { AuditRepository } = await import('../storage/audit-repository')
 const { PrdRepository } = await import('./prd-repository')
 const { PacoteRepository } = await import('./pacote-repository')
+const { DecisionRepository } = await import('./decision-repository')
 const { PrdService, TENTATIVAS_DE_CORRECAO } = await import('./prd-service')
 const { ProjectRepository } = await import('./project-repository')
 
@@ -53,6 +55,7 @@ let projetoDir: string
 let db: Db
 let repo: InstanceType<typeof PrdRepository>
 let pacotes: InstanceType<typeof PacoteRepository>
+let decisions: InstanceType<typeof DecisionRepository>
 let service: InstanceType<typeof PrdService>
 
 let rotas: EstadoDasRotas
@@ -66,6 +69,13 @@ let respostas: (readonly AfirmacaoDoPrd[] | undefined)[]
 let correcoesRecebidas: (readonly string[] | undefined)[]
 /** As contradições que a detecção devolve. `undefined` simula falha da chamada. */
 let contradicoes: readonly ContradicaoDoPrd[] | undefined
+/** O que o serviço anunciou de progresso, na ordem. */
+let etapasAnunciadas: {
+  projectId: string
+  etapa: EtapaDaGeracao
+  estado: EstadoDaEtapa
+  resumo?: string
+}[] = []
 /** O brief aceito. `undefined` simula "o gate do brief ainda não passou". */
 let briefAceito: BriefRegistrado | undefined
 /** Se o commit do marco funciona — o critério 8 se prova no caso falso. */
@@ -109,6 +119,25 @@ function afirmacao(over: Partial<AfirmacaoDoPrd> = {}): AfirmacaoDoPrd {
     texto: 'O produto organiza leituras por projeto.',
     origem: 'brief',
     referencia: 'b-1',
+    ...over
+  }
+}
+
+function contradicao(over: Partial<ContradicaoDoPrd> = {}): ContradicaoDoPrd {
+  return {
+    id: 'c-1',
+    etapa: 'prd',
+    afirmacoes: ['a-1', 'b-1'],
+    titulo: 'Local ou nuvem',
+    enunciado: 'O produto é local ou na nuvem?',
+    opcoes: [
+      { id: 'a', rotulo: 'Local', impacto: 'Sem sync entre máquinas.' },
+      { id: 'b', rotulo: 'Nuvem', impacto: 'Exige conta e rede.' }
+    ],
+    recomendada: 'a',
+    justificativa: 'Local, como o brief diz.',
+    aceitaTextoLivre: true,
+    delegavel: true,
     ...over
   }
 }
@@ -190,9 +219,11 @@ beforeEach(() => {
     creditos: 1
   } as unknown as ConnectorOutcome
 
+  decisions = new DecisionRepository(db)
   service = new PrdService({
     repository: repo,
     pacotes,
+    decisions,
     projects: projetos,
     projectService: {
       concluirMarco: () => {
@@ -219,8 +250,13 @@ beforeEach(() => {
       const saida = respostas.shift()
       return saida === undefined ? {} : { afirmacoes: saida }
     },
-    detectarContradicoes: async () => (contradicoes === undefined ? {} : { contradicoes })
+    detectarContradicoes: async () => (contradicoes === undefined ? {} : { contradicoes }),
+    anunciarEtapa: (projectId, etapa, estado, resumo) => {
+      etapasAnunciadas.push({ projectId, etapa, estado, resumo })
+    }
   })
+
+  etapasAnunciadas = []
 
   logCat.info.mockClear()
   logCat.warn.mockClear()
@@ -424,20 +460,41 @@ describe('validação da saída (critérios 1, 2 e 5)', () => {
 })
 
 describe('contradições viram perguntas (critério 6)', () => {
-  it('a contradição detectada é gravada com a pergunta e a recomendação', async () => {
-    contradicoes = [
-      {
-        id: 'c-1',
-        afirmacoes: ['a-1', 'b-1'],
-        pergunta: 'O produto é local ou na nuvem?',
-        recomendacao: 'Local, como o brief diz.'
-      }
-    ]
+  it('a contradição é gravada como pergunta, com id próprio e etapa prd', async () => {
+    contradicoes = [contradicao()]
 
     const r = await service.gerar({ projectId: PROJETO, termo: '' }, WS)
 
     expect(r.prd?.contradicoes).toHaveLength(1)
-    expect(r.prd?.contradicoes[0]?.recomendacao).toBe('Local, como o brief diz.')
+    const gravada = r.prd?.contradicoes[0]
+    // O id vem do serviço, não do modelo: "c-1" colidiria entre revisões, e a decisão do PI
+    // passaria a apontar para a contradição errada.
+    expect(gravada?.id).not.toBe('c-1')
+    expect(gravada).toMatchObject({ etapa: 'prd', justificativa: 'Local, como o brief diz.' })
+  })
+
+  it('contradição fora do contrato não chega ao PI — a etapa falha, como a detecção que não saiu', async () => {
+    contradicoes = [contradicao({ opcoes: [{ id: 'a', rotulo: 'Só uma', impacto: 'x' }] })]
+    respostas = [[afirmacao()], [afirmacao()]]
+
+    const r = await service.gerar({ projectId: PROJETO, termo: '' }, WS)
+
+    expect(r.resultado).toBe('saida-invalida')
+    expect(r.problemas?.join(' ')).toContain('opções')
+    expect(repo.vigente(USER, PROJETO)).toBeUndefined()
+  })
+
+  it('a mesma contradição com outro id do modelo não muda a revisão', async () => {
+    contradicoes = [contradicao({ id: 'c-1' })]
+    const primeira = await service.gerar({ projectId: PROJETO, termo: '' }, WS)
+
+    respostas = [[afirmacao()]]
+    contradicoes = [contradicao({ id: 'c-9' })]
+    const segunda = await service.gerar({ projectId: PROJETO, termo: '' }, WS)
+
+    // O hash ignora o id da contradição: ele é sorteado por revisão, e entrar no hash faria
+    // "mesmo conteúdo é a mesma revisão" (invariante 2 da CONVENTION §4) deixar de valer.
+    expect(segunda.prd?.hash).toBe(primeira.prd?.hash)
   })
 
   it('falha na detecção NÃO vira "nenhuma contradição"', async () => {
@@ -566,5 +623,245 @@ describe('contexto e projeto', () => {
 
     expect(r.resultado).toBe('sem-contexto')
     expect(chamadasDeGeracao).toBe(0)
+  })
+})
+
+describe('progresso da geração (SPEC-Jornada-03 § Geração)', () => {
+  /** As etapas concluídas, na ordem em que o serviço as anunciou. */
+  const concluidas = (): readonly EtapaDaGeracao[] =>
+    etapasAnunciadas.filter((e) => e.estado === 'concluida').map((e) => e.etapa)
+
+  it('anuncia as cinco etapas, na ordem do fluxo', async () => {
+    const r = await service.gerar({ projectId: PROJETO, termo: 'ferramentas' }, WS)
+
+    expect(r.resultado).toBe('gerado')
+    expect(concluidas()).toEqual([
+      'pesquisa',
+      'documentos',
+      'validacao',
+      'contradicoes',
+      'gravacao'
+    ])
+  })
+
+  it('cada etapa é anunciada antes de acontecer, não só depois', async () => {
+    await service.gerar({ projectId: PROJETO, termo: 'ferramentas' }, WS)
+
+    // Sem o `iniciada`, a tela não teria o que mostrar como "acontecendo agora" — ela saltaria
+    // de uma etapa concluída para a próxima concluída, e o PI olharia para uma barra parada.
+    for (const etapa of ['pesquisa', 'documentos', 'validacao', 'contradicoes', 'gravacao']) {
+      const inicio = etapasAnunciadas.findIndex((e) => e.etapa === etapa && e.estado === 'iniciada')
+      const fim = etapasAnunciadas.findIndex((e) => e.etapa === etapa && e.estado === 'concluida')
+
+      expect(inicio, `${etapa} não anunciou o início`).toBeGreaterThanOrEqual(0)
+      expect(fim, `${etapa} não anunciou o fim`).toBeGreaterThan(inicio)
+    }
+  })
+
+  it('sem termo, a pesquisa conclui declarando a lacuna — não falha', async () => {
+    // Não pesquisar é decisão do PI, não defeito. Uma etapa vermelha aqui anunciaria um erro
+    // onde houve uma escolha.
+    const r = await service.gerar({ projectId: PROJETO, termo: '' }, WS)
+
+    expect(r.resultado).toBe('gerado')
+
+    const pesquisa = etapasAnunciadas.find((e) => e.etapa === 'pesquisa' && e.estado !== 'iniciada')
+    expect(pesquisa?.estado).toBe('concluida')
+    expect(pesquisa?.resumo).toContain('lacuna')
+  })
+
+  it('saída recusada pelo validador anuncia falha, e a barra não chega ao fim', async () => {
+    // Duas saídas ancoradas num id que o brief não tem: o validador recusa as duas, e a
+    // tentativa de correção se esgota.
+    respostas = [[afirmacao({ referencia: 'b-99' })], [afirmacao({ referencia: 'b-98' })]]
+
+    const r = await service.gerar({ projectId: PROJETO, termo: 'x' }, WS)
+
+    expect(r.resultado).toBe('saida-invalida')
+    expect(etapasAnunciadas.some((e) => e.estado === 'falhou')).toBe(true)
+    // A gravação nunca aconteceu, então ela não pode ter sido anunciada como concluída: uma
+    // barra em 100% sobre um pacote não gravado é o fechamento frágil que isto evita.
+    expect(concluidas()).not.toContain('gravacao')
+  })
+
+  it('detecção de contradições que não sai anuncia falha, e nada é gravado', async () => {
+    contradicoes = undefined
+
+    const r = await service.gerar({ projectId: PROJETO, termo: 'x' }, WS)
+
+    expect(r.resultado).toBe('saida-invalida')
+    expect(etapasAnunciadas.some((e) => e.etapa === 'contradicoes' && e.estado === 'falhou')).toBe(
+      true
+    )
+    expect(concluidas()).not.toContain('gravacao')
+  })
+
+  it('um anúncio que estoura não derruba a geração', async () => {
+    // A janela pode ser fechada no meio da geração, e o `send` do Electron lança. Perder o
+    // pacote pago por causa da barra de progresso dele seria o pior desfecho possível.
+    const deps = (service as unknown as { deps: Record<string, unknown> }).deps
+    service = new PrdService({
+      ...deps,
+      anunciarEtapa: () => {
+        throw new Error('janela destruída')
+      }
+    } as never)
+
+    const r = await service.gerar({ projectId: PROJETO, termo: 'x' }, WS)
+
+    expect(r.resultado).toBe('gerado')
+  })
+})
+
+describe('responder às contradições (emenda E1)', () => {
+  async function gerarComContradicao(): Promise<string> {
+    contradicoes = [contradicao()]
+    const r = await service.gerar({ projectId: PROJETO, termo: '' }, WS)
+    return r.prd?.contradicoes[0]?.id ?? ''
+  }
+
+  it('a vista traz a contradição como a próxima pergunta, e nenhuma decisão ainda', async () => {
+    await gerarComContradicao()
+
+    const vista = service.contradicoes(PROJETO)
+
+    expect(vista?.estado.tipo).toBe('pergunta')
+    expect(vista?.estado.tipo === 'pergunta' && vista.estado.pergunta.enunciado).toBe(
+      'O produto é local ou na nuvem?'
+    )
+    expect(vista?.historico).toEqual([])
+  })
+
+  it('sem revisão, a vista é undefined — não há o que responder', () => {
+    expect(service.contradicoes(PROJETO)).toBeUndefined()
+  })
+
+  it('a resposta do PI vira decisão gravada com etapa prd, e a vista conclui', async () => {
+    const id = await gerarComContradicao()
+
+    const r = service.responderContradicao(
+      PROJETO,
+      { perguntaId: id, escolha: 'b', texto: null, autor: 'pi' },
+      WS
+    )
+
+    expect(r.reason).toBe('registrada')
+    expect(r.estado?.tipo).toBe('concluido')
+    expect(decisions.listar(USER, PROJETO)).toHaveLength(1)
+    expect(decisions.listar(USER, PROJETO)[0]).toMatchObject({
+      perguntaId: id,
+      etapa: 'prd',
+      escolha: 'b',
+      autor: 'pi'
+    })
+  })
+
+  it('"Decide por mim" grava a recomendada com o agente como autor', async () => {
+    const id = await gerarComContradicao()
+
+    const r = service.responderContradicao(
+      PROJETO,
+      { perguntaId: id, escolha: null, texto: null, autor: 'agente' },
+      WS
+    )
+
+    expect(r.decisao).toMatchObject({ escolha: 'a', autor: 'agente', motivo: 'delegada' })
+  })
+
+  it('recusa pergunta que não é da revisão vigente', async () => {
+    await gerarComContradicao()
+
+    const r = service.responderContradicao(
+      PROJETO,
+      { perguntaId: 'fantasma', escolha: 'a', texto: null, autor: 'pi' },
+      WS
+    )
+
+    expect(r.reason).toBe('pergunta-desconhecida')
+    expect(decisions.listar(USER, PROJETO)).toHaveLength(0)
+  })
+
+  it('a decisão sobre a contradição entra no pedido da geração seguinte, com o rótulo', async () => {
+    const id = await gerarComContradicao()
+    service.responderContradicao(
+      PROJETO,
+      { perguntaId: id, escolha: 'b', texto: null, autor: 'pi' },
+      WS
+    )
+
+    // Remonta o serviço com as mesmas deps do `beforeEach`, trocando só `gerarDocumentos` para
+    // capturar o pedido: o que se prova é o conteúdo de `decisoes`, não a montagem.
+    const pedidos: { decisoes: readonly { pergunta: string; resposta: string }[] }[] = []
+    service = new PrdService({
+      repository: repo,
+      pacotes,
+      decisions,
+      projects: new ProjectRepository(db),
+      projectService: {
+        concluirMarco: () => ({ commitado: true, commitHash: 'abc1234' })
+      } as never,
+      connectors: { call: async () => respostaDaBusca } as never,
+      audit: new AuditRepository(db, 'chave-de-teste'),
+      userId: () => USER,
+      briefAceito: () => briefAceito,
+      decisoesDoRefinamento: () => [],
+      montarContexto: () => 'pack-1',
+      estadoDasRotas: () => rotas,
+      gerarTermo: async () => ({ termo: 'x' }),
+      gerarDocumentos: async (entrada) => {
+        pedidos.push({ decisoes: entrada.decisoes })
+        return { afirmacoes: [afirmacao()] }
+      },
+      detectarContradicoes: async () => ({ contradicoes: [] })
+    })
+
+    await service.gerar({ projectId: PROJETO, termo: '' }, WS)
+
+    // O modelo precisa do conteúdo, não do id da opção — mesma regra de `decisoesParaOBrief`.
+    expect(pedidos[0]?.decisoes).toEqual([
+      expect.objectContaining({ pergunta: 'O produto é local ou na nuvem?', resposta: 'Nuvem' })
+    ])
+  })
+
+  it('a decisão chega também à detecção — o que o PI decidiu não volta como pergunta', async () => {
+    const id = await gerarComContradicao()
+    service.responderContradicao(
+      PROJETO,
+      { perguntaId: id, escolha: 'b', texto: null, autor: 'pi' },
+      WS
+    )
+
+    // O defeito que este teste fecha: as decisões iam à geração e **não** à detecção. O brief
+    // segue afirmando um lado; o PRD novo afirma o outro por decisão; e o detector, sem saber
+    // da decisão, achava o mesmo par de novo — o laço da E1 não convergia.
+    const pedidos: { decisoes: readonly { pergunta: string; resposta: string }[] }[] = []
+    service = new PrdService({
+      repository: repo,
+      pacotes,
+      decisions,
+      projects: new ProjectRepository(db),
+      projectService: {
+        concluirMarco: () => ({ commitado: true, commitHash: 'abc1234' })
+      } as never,
+      connectors: { call: async () => respostaDaBusca } as never,
+      audit: new AuditRepository(db, 'chave-de-teste'),
+      userId: () => USER,
+      briefAceito: () => briefAceito,
+      decisoesDoRefinamento: () => [],
+      montarContexto: () => 'pack-1',
+      estadoDasRotas: () => rotas,
+      gerarTermo: async () => ({ termo: 'x' }),
+      gerarDocumentos: async () => ({ afirmacoes: [afirmacao()] }),
+      detectarContradicoes: async (entrada) => {
+        pedidos.push({ decisoes: entrada.decisoes })
+        return { contradicoes: [] }
+      }
+    })
+
+    await service.gerar({ projectId: PROJETO, termo: '' }, WS)
+
+    expect(pedidos[0]?.decisoes).toEqual([
+      expect.objectContaining({ pergunta: 'O produto é local ou na nuvem?', resposta: 'Nuvem' })
+    ])
   })
 })

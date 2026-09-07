@@ -23,7 +23,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Approval } from '@shared/domain/aprovacoes'
 import { faseDaEtapa } from '@shared/domain/fase'
 
-const logCat = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+const logCat = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 vi.mock('../logging/logger', () => ({
   log: new Proxy({}, { get: () => logCat }),
   setCurrentWorkspace: vi.fn()
@@ -652,5 +652,108 @@ describe('aceite documental deixa marco (#259)', () => {
 
     expect(outcome?.resultado).toBe('marco-nao-commitado')
     expect(etapaNoBanco()).toBe('brief-aceito')
+  })
+})
+
+/**
+ * O fluxo novo move a jornada (#281).
+ *
+ * O defeito: `eventosObservados` sustentava `prompt-salvo` e `refinamento-respondido` a partir
+ * de **uma única fonte** — as respostas do wizard do MVP-008. O fluxo da M25-F02 não grava
+ * `respostas`: ele grava `project_prompt`, o marco `prompt-registrado` e `project_brief`. Um
+ * projeto que escrevia o prompt, commitava e gerava o brief ficava em `prompt` para sempre, sem
+ * botão que o tirasse dali.
+ *
+ * Estes testes usam as **duas evidências do fluxo novo**, sem tocar em `respostas`: é isso que
+ * os faz reprovar se alguém remover a entrada do marco ou a leitura do brief.
+ */
+describe('a jornada do fluxo novo, sem respostas do wizard (#281)', () => {
+  /** Marca o marco documental, como `ProjectService.concluirMarco` faria depois do commit. */
+  function marcar(marco: string): void {
+    db.prepare('UPDATE planning_session SET ultimo_marco = ? WHERE project_id = ?').run(
+      marco,
+      PROJETO
+    )
+  }
+
+  function servicoCom(temBrief: boolean): InstanceType<typeof JornadaService> {
+    return new JornadaService({
+      repository: projects,
+      roadmap,
+      audit,
+      userId: () => USER,
+      temBrief: () => temBrief
+    })
+  }
+
+  it('sem prompt commitado, a jornada fica no prompt', () => {
+    criarProjetoComSessao()
+
+    // O piso: sem evidência nenhuma, a etapa é a primeira. Sem esta asserção os testes abaixo
+    // não provariam que foi o marco que moveu a jornada.
+    expect(servicoCom(false).estado(PROJETO, WS)?.etapa).toBe('prompt')
+  })
+
+  it('o marco do prompt leva ao refinamento', () => {
+    criarProjetoComSessao()
+    marcar('prompt-registrado')
+
+    // A prova do defeito: antes da correção isto devolvia `prompt`, porque `prompt-registrado`
+    // não estava em `EVENTO_DO_MARCO` e `respostas` estava vazio.
+    expect(servicoCom(false).estado(PROJETO, WS)?.etapa).toBe('refinamento')
+  })
+
+  it('o brief gerado fecha o refinamento e leva ao aceite', () => {
+    criarProjetoComSessao()
+    marcar('prompt-registrado')
+
+    // A jornada para em `brief-aceito` porque aceitar é ato do PI — gerar o brief não o aceita.
+    expect(servicoCom(true).estado(PROJETO, WS)?.etapa).toBe('brief-aceito')
+  })
+
+  it('o brief sozinho não pula o prompt', () => {
+    criarProjetoComSessao()
+
+    // Sem o marco do prompt não há `prompt-salvo`, e `etapaDerivada` para no primeiro buraco:
+    // um brief não pode fazer a jornada saltar a etapa que não aconteceu.
+    expect(servicoCom(true).estado(PROJETO, WS)?.etapa).toBe('prompt')
+  })
+
+  /**
+   * O defeito latente que a correção do laço fechou.
+   *
+   * A versão anterior percorria as entradas de `EVENTO_DO_MARCO` e parava quando a chave batia
+   * com o `ultimoMarco`. `estrutura-inicial` — o **primeiro** marco de todo projeto — não está
+   * nesse mapa, então o `break` nunca disparava e o laço empurrava a cadeia inteira, do brief ao
+   * roadmap. Só não virava jornada adiantada porque `etapaDerivada` para no primeiro buraco.
+   */
+  it('marco fora do mapa não empurra a cadeia inteira de eventos', () => {
+    criarProjetoComSessao()
+    marcar('estrutura-inicial')
+
+    const estado = servicoCom(false).estado(PROJETO, WS)
+
+    // `estrutura-inicial` não comprova evento nenhum da jornada: a etapa continua no começo.
+    expect(estado?.etapa).toBe('prompt')
+  })
+
+  it('a etapa derivada é persistida, e a leitura seguinte não a recalcula', () => {
+    criarProjetoComSessao()
+    marcar('prompt-registrado')
+
+    const servico = servicoCom(false)
+    expect(servico.estado(PROJETO, WS)?.recalculada).toBe(true)
+    expect(etapaNoBanco()).toBe('refinamento')
+    // O desvio é corrigido uma vez, não a cada abertura da tela.
+    expect(servico.estado(PROJETO, WS)?.recalculada).toBe(false)
+  })
+
+  it('sem a dep de brief, a jornada não passa do refinamento', () => {
+    criarProjetoComSessao()
+    marcar('prompt-registrado')
+
+    // O caso de um call site que só lê a etapa e não monta o repositório de briefs: ele vê a
+    // jornada até onde os fatos que **ele** conhece sustentam, e nunca uma etapa inventada.
+    expect(service.estado(PROJETO, WS)?.etapa).toBe('refinamento')
   })
 })

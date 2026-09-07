@@ -47,10 +47,33 @@ function mockarPonte(): void {
       login: vi.fn(),
       logout: vi.fn(),
       runWorkflowReal: vi.fn(),
-      // A rota Operações monta as aprovações pendentes (SPEC-ExecucaoReal-01); sem o stub
+      // A rota Operator Central monta as aprovações pendentes (SPEC-ExecucaoReal-01); sem o stub
       // o efeito da lista estoura antes de o teste chegar ao que ele mede.
       listPendingApprovals: vi.fn(async () => []),
       resolveApproval: vi.fn(),
+      /*
+       * A rota inicial do JARVIS passou a ser `projects` (SPEC-Shell-01, regra 6): a `inicio`
+       * saiu, e o primeiro item visível é o Projects Hub. Entrar no shell monta a lista de
+       * projetos, então o dublê precisa dela — sem isto o efeito estoura antes de o teste
+       * chegar ao que mede, num arquivo que não é sobre projetos.
+       */
+      /*
+       * A rota inicial do JARVIS virou `voz` (SPEC-Voz-01): COMANDO acendeu com o microfone e
+       * vem antes de NEGÓCIOS na ordem do protótipo. Entrar no shell consulta a prontidão da
+       * voz, então o dublê precisa dela — sem isto a tela nem monta, num arquivo que não é
+       * sobre voz.
+       */
+      prontidaoDaVoz: vi.fn(async () => ({ pronta: false, faltando: [], compute: 'cpu-int8' })),
+      transcreverAudio: vi.fn(async () => ({ estado: 'sem-audio' })),
+      baixarArtefatoDeVoz: vi.fn(async () => ({ estado: 'ok' })),
+      listProjects: vi.fn(async () => []),
+      createProject: vi.fn(),
+      openProject: vi.fn(),
+      // O Terminal é item de SISTEMA desde a SPEC-Shell-01 (regra 5) e este teste navega até ele.
+      listAllowedCommands: vi.fn(async () => []),
+      runCommand: vi.fn(),
+      listCommandHistory: vi.fn(async () => []),
+      listPermittedDirectories: vi.fn(async () => []),
       onAuthChanged: vi.fn(() => () => undefined)
     },
     configurable: true,
@@ -138,16 +161,20 @@ describe('critério 3 — rail dual do JARVIS', () => {
   it('alternar o rail troca a navegação da sidebar — as duas não discordam', async () => {
     await esperarShell()
 
-    // No Command Center, "Operações" está na sidebar e "Agentes" não.
-    expect(screen.getByRole('button', { name: 'Operações' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Agentes' })).not.toBeInTheDocument()
+    // No Command Center, "Projects Hub" está na sidebar e "Operator Central" não. Os rótulos
+    // mudaram na SPEC-Shell-01 (o menu virou projeção do registro), mas o que este teste mede
+    // é o mesmo: cada rail mostra a navegação **dele**.
+    expect(screen.getByRole('button', { name: 'Projects Hub' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Operator Central' })).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: /agents os/i }))
 
     // Depois da troca, inverte-se — e o rail acompanha. Um estado de sub-módulo separado da
     // rota deixaria o rail aceso num lado e a sidebar no outro.
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Agentes' })).toBeInTheDocument())
-    expect(screen.queryByRole('button', { name: 'Operações' })).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Operator Central' })).toBeInTheDocument()
+    )
+    expect(screen.queryByRole('button', { name: 'Projects Hub' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /agents os/i })).toHaveAttribute(
       'aria-current',
       'page'
@@ -181,9 +208,9 @@ describe('critério 4 — o shell sobrevive à falha do runtime', () => {
     expect(document.querySelector('[data-jos-sidebar]')).toBeInTheDocument()
     expect(document.querySelector('[data-jos-topbar]')).toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Operações' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Terminal' }))
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Operações' })).toHaveAttribute(
+      expect(screen.getByRole('button', { name: 'Terminal' })).toHaveAttribute(
         'aria-current',
         'page'
       )

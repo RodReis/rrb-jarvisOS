@@ -390,7 +390,14 @@ export const AUDIT_EVENT_TYPES = [
   // Vault, e aqui **não há segredo no app** — quem autentica é o PI, direto no CLI (critério 1).
   // O que se audita é a decisão (qual modo passou a valer, autorizada por quem), não a posse de
   // uma credencial que este lado nunca tem.
-  'codex-profile'
+  'codex-profile',
+  // Voz (SPEC-Voz-01, critério 4): baixar runtime, wheel ou modelo é ação sensível — rede mais
+  // escrita em disco —, e por isso audita **antes e depois**. Tipos próprios, e não
+  // `policy-decision`: aquele registra o veredito da política, e o que interessa aqui é o par
+  // (esperado, obtido) do hash, que depois de um artefato adulterado ser apagado é a única
+  // testemunha que sobra.
+  'voz.download.inicio',
+  'voz.download.fim'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]

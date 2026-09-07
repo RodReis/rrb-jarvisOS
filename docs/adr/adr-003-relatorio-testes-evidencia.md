@@ -32,3 +32,11 @@ Adotar a rotina de **relatório de evidência de testes** descrita em `docs/TEST
 - Playwright-Electron no CI Linux exige `xvfb-run` (o app abre janela) — relevante a partir da Fatia 03.
 - `reports/TESTS.md` fica **fora de `docs/`**, para não mascarar o sinal de documentação humana defasada nem poluir o histórico de `docs/`.
 - Reutilização: em projetos futuros, copia-se o gerador + self-check (imutáveis), reescreve-se o orquestrador para a stack e ajusta-se o config.
+
+## Evolução posterior (a decisão continua valendo; o mecanismo cresceu)
+
+O registro acima é de 21/07/2026 e não se reescreve. O que a implementação acrescentou desde então, sem contrariar nenhum dos cinco pontos da decisão:
+
+- **A guarda tem quatro provas, não duas.** À dupla original (números contra execução limpa; append-only por continência) juntaram-se o **carimbo da entrega** (`--require-entry`, 2026-07-22 — prova que a entrega deixou linha, exigido só de PR que altera teste) e a **prova 0, de execução completa** (2026-09-06, issue #232 — piso de arquivos por categoria em `reports/.arquivos-por-categoria.json`, porque execução que perde worker grava total menor sem nada ficar vermelho, e a prova 1 então concorda consigo mesma). Detalhe em `TESTING.md` §5.
+- **O CI sobe Postgres, por exceção nomeada.** A consequência "não sobe Postgres por padrão" previa o caso: desde a M2-F01 o int-spec de RLS exige o **Supabase local**, que sobe pela CLI (fixada em `v2.116.0`) no job `test-banco` — não por `services:`, e só nessa categoria. "Banco" continua sendo storage local no resto.
+- **A evidência é produzida em jobs paralelos e agregada.** Desde 2026-09-06 cada categoria roda no seu job e publica JSON + cobertura como artefato; o job `test` agrega com `--no-run` e aplica as guardas sem reexecutar a suíte. O ponto 1 da decisão fica intacto — os números seguem vindo do `--json` do runner, agora lidos do artefato em vez da execução local ao job. Ver `TESTING.md` §6 e `CI-PR.md`.

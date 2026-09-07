@@ -56,12 +56,13 @@ const CENAS_POR_GALERIA: Readonly<Record<string, readonly string[]>> = {
   // O prompt e o gate do brief (M25-F02): as cenas são os estados que mudam a decisão do PI.
   brief: [
     'prompt-vazio',
-    'prompt-bloqueado',
+    'prompt-recusado',
     'brief-propostos',
     'brief-travado',
     'refinamento-vazio',
     'refinamento-pendente',
-    'refinamento-rota-paga'
+    'refinamento-rota-paga',
+    'refinamento-bloqueado'
   ],
   // O índice de projetos: a lista com jornadas distintas e o primeiro uso.
   projetos: ['lista', 'vazio'],

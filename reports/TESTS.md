@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 1435 | 1435 | 0 | 74.5 | — | — |
-| — | — | — | Banco | 1130 | 1118 | 0 | 87.6 | — | — |
-| — | — | — | Tela | 577 | 576 | 0 | 74.9 | — | — |
+| — | — | — | Regras de Negócio | 1658 | 1658 | 0 | 77.2 | — | — |
+| — | — | — | Banco | 1222 | 1208 | 0 | 87.1 | — | — |
+| — | — | — | Tela | 636 | 635 | 0 | 75.2 | — | — |
 
 ## Histórico por entrega
 
@@ -277,3 +277,78 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-05 | #256 | spec-fases-06-codex-no-ponto-unico | Regras de Negócio | 1435 | 1435 | 0 | 74.5 | #269 | [#269](https://github.com/RodReis/rrb-jarvisOS/pull/269) |
 | 2026-09-05 | #256 | spec-fases-06-codex-no-ponto-unico | Banco | 1130 | 1118 | 0 | 87.6 | #269 | [#269](https://github.com/RodReis/rrb-jarvisOS/pull/269) |
 | 2026-09-05 | #256 | spec-fases-06-codex-no-ponto-unico | Tela | 577 | 576 | 0 | 74.9 | #269 | [#269](https://github.com/RodReis/rrb-jarvisOS/pull/269) |
+| — | #275 | — | Regras de Negócio | 1439 | 1439 | 0 | 74.6 | #276 | [#276](https://github.com/RodReis/rrb-jarvisOS/pull/276) |
+| — | #275 | — | Banco | 1130 | 1118 | 0 | 87.6 | #276 | [#276](https://github.com/RodReis/rrb-jarvisOS/pull/276) |
+| — | #275 | — | Tela | 581 | 580 | 0 | 75.0 | #276 | [#276](https://github.com/RodReis/rrb-jarvisOS/pull/276) |
+| — | #275 | — | Regras de Negócio | 1444 | 1444 | 0 | 74.6 | #276 | [#276](https://github.com/RodReis/rrb-jarvisOS/pull/276) |
+| — | #275 | — | Banco | 1130 | 1118 | 0 | 87.6 | #276 | [#276](https://github.com/RodReis/rrb-jarvisOS/pull/276) |
+| — | #275 | — | Tela | 581 | 580 | 0 | 75.0 | #276 | [#276](https://github.com/RodReis/rrb-jarvisOS/pull/276) |
+| 2026-09-05 | #271 | — | Regras de Negócio | 1455 | 1455 | 0 | 74.5 | #278 | [#278](https://github.com/RodReis/rrb-jarvisOS/pull/278) |
+| 2026-09-05 | #271 | — | Banco | 1169 | 1155 | 0 | 87.4 | #278 | [#278](https://github.com/RodReis/rrb-jarvisOS/pull/278) |
+| 2026-09-05 | #271 | — | Tela | 581 | 580 | 0 | 75.0 | #278 | [#278](https://github.com/RodReis/rrb-jarvisOS/pull/278) |
+| 2026-09-05 | #281 | — | Regras de Negócio | 1467 | 1467 | 0 | 74.6 | #282 | [#282](https://github.com/RodReis/rrb-jarvisOS/pull/282) |
+| 2026-09-05 | #281 | — | Banco | 1176 | 1162 | 0 | 87.4 | #282 | [#282](https://github.com/RodReis/rrb-jarvisOS/pull/282) |
+| 2026-09-05 | #281 | — | Tela | 586 | 585 | 0 | 75.1 | #282 | [#282](https://github.com/RodReis/rrb-jarvisOS/pull/282) |
+| 2026-09-05 | #284 | — | Regras de Negócio | 1469 | 1469 | 0 | 74.7 | #285 | [#285](https://github.com/RodReis/rrb-jarvisOS/pull/285) |
+| 2026-09-05 | #284 | — | Banco | 1176 | 1162 | 0 | 87.4 | #285 | [#285](https://github.com/RodReis/rrb-jarvisOS/pull/285) |
+| 2026-09-05 | #284 | — | Tela | 586 | 585 | 0 | 75.1 | #285 | [#285](https://github.com/RodReis/rrb-jarvisOS/pull/285) |
+| 2026-09-05 | #287 | SPEC-Jornada-03 | Regras de Negócio | 1483 | 1483 | 0 | 75.2 | #288 | [#288](https://github.com/RodReis/rrb-jarvisOS/pull/288) |
+| 2026-09-05 | #287 | SPEC-Jornada-03 | Banco | 1182 | 1165 | 0 | 86.5 | #288 | [#288](https://github.com/RodReis/rrb-jarvisOS/pull/288) |
+| 2026-09-05 | #287 | SPEC-Jornada-03 | Tela | 601 | 599 | 1 | — | #288 | [#288](https://github.com/RodReis/rrb-jarvisOS/pull/288) |
+| 2026-09-05 | #287 | SPEC-Jornada-03 | Regras de Negócio | 1483 | 1483 | 0 | 75.2 | #288 | [#288](https://github.com/RodReis/rrb-jarvisOS/pull/288) |
+| 2026-09-05 | #287 | SPEC-Jornada-03 | Banco | 1182 | 1168 | 0 | 87.4 | #288 | [#288](https://github.com/RodReis/rrb-jarvisOS/pull/288) |
+| 2026-09-05 | #287 | SPEC-Jornada-03 | Tela | 601 | 600 | 0 | 75.5 | #288 | [#288](https://github.com/RodReis/rrb-jarvisOS/pull/288) |
+| 2026-09-05 | #289 | — | Regras de Negócio | 1488 | 1488 | 0 | 75.3 | #290 | [#290](https://github.com/RodReis/rrb-jarvisOS/pull/290) |
+| 2026-09-05 | #289 | — | Banco | 1184 | 1170 | 0 | 87.4 | #290 | [#290](https://github.com/RodReis/rrb-jarvisOS/pull/290) |
+| 2026-09-05 | #289 | — | Tela | 601 | 600 | 0 | 75.5 | #290 | [#290](https://github.com/RodReis/rrb-jarvisOS/pull/290) |
+| 2026-09-05 | #283 | SPEC-Fases-03 | Regras de Negócio | 1488 | 1488 | 0 | 75.3 | #294 | [#294](https://github.com/RodReis/rrb-jarvisOS/pull/294) |
+| 2026-09-05 | #283 | SPEC-Fases-03 | Banco | 1186 | 1172 | 0 | 87.4 | #294 | [#294](https://github.com/RodReis/rrb-jarvisOS/pull/294) |
+| 2026-09-05 | #283 | SPEC-Fases-03 | Tela | 601 | 600 | 0 | 75.5 | #294 | [#294](https://github.com/RodReis/rrb-jarvisOS/pull/294) |
+| 2026-09-05 | #206 | SPEC-Shell-01 | Regras de Negócio | 1513 | 1513 | 0 | 75.4 | #296 | [#296](https://github.com/RodReis/rrb-jarvisOS/pull/296) |
+| 2026-09-05 | #206 | SPEC-Shell-01 | Banco | 1186 | 1172 | 0 | 87.4 | #296 | [#296](https://github.com/RodReis/rrb-jarvisOS/pull/296) |
+| 2026-09-05 | #206 | SPEC-Shell-01 | Tela | 609 | 608 | 0 | 75.5 | #296 | [#296](https://github.com/RodReis/rrb-jarvisOS/pull/296) |
+| 2026-09-06 | #232 | — | Regras de Negócio | 1513 | 1513 | 0 | 75.4 | #297 | [#297](https://github.com/RodReis/rrb-jarvisOS/pull/297) |
+| 2026-09-06 | #232 | — | Banco | 1186 | 1172 | 0 | 87.4 | #297 | [#297](https://github.com/RodReis/rrb-jarvisOS/pull/297) |
+| 2026-09-06 | #232 | — | Tela | 609 | 608 | 0 | 75.5 | #297 | [#297](https://github.com/RodReis/rrb-jarvisOS/pull/297) |
+| 2026-09-06 | #200 | SPEC-Voz-01 | Regras de Negócio | 1544 | 1544 | 0 | 75.8 | #299 | [#299](https://github.com/RodReis/rrb-jarvisOS/pull/299) |
+| 2026-09-06 | #200 | SPEC-Voz-01 | Banco | 1186 | 1172 | 0 | 87.4 | #299 | [#299](https://github.com/RodReis/rrb-jarvisOS/pull/299) |
+| 2026-09-06 | #200 | SPEC-Voz-01 | Tela | 620 | 619 | 0 | 75.3 | #299 | [#299](https://github.com/RodReis/rrb-jarvisOS/pull/299) |
+| 2026-09-06 | #200 | SPEC-Voz-01 | Regras de Negócio | 1544 | 1544 | 0 | 75.8 | #299 | [#299](https://github.com/RodReis/rrb-jarvisOS/pull/299) |
+| 2026-09-06 | #200 | SPEC-Voz-01 | Banco | 1186 | 1172 | 0 | 87.4 | #299 | [#299](https://github.com/RodReis/rrb-jarvisOS/pull/299) |
+| 2026-09-06 | #200 | SPEC-Voz-01 | Tela | 622 | 621 | 0 | 75.3 | #299 | [#299](https://github.com/RodReis/rrb-jarvisOS/pull/299) |
+| 2026-09-06 | #301 | SPEC-DesignSystem-04a | Regras de Negócio | 1544 | 1544 | 0 | 75.8 | #302 | [#302](https://github.com/RodReis/rrb-jarvisOS/pull/302) |
+| 2026-09-06 | #301 | SPEC-DesignSystem-04a | Banco | 1186 | 1172 | 0 | 87.4 | #302 | [#302](https://github.com/RodReis/rrb-jarvisOS/pull/302) |
+| 2026-09-06 | #301 | SPEC-DesignSystem-04a | Tela | 622 | 621 | 0 | 75.3 | #302 | [#302](https://github.com/RodReis/rrb-jarvisOS/pull/302) |
+| 2026-09-06 | #304 | spec-fases-03-console-da-geracao | Regras de Negócio | 1544 | 1544 | 0 | 75.8 | #305 | [#305](https://github.com/RodReis/rrb-jarvisOS/pull/305) |
+| 2026-09-06 | #304 | spec-fases-03-console-da-geracao | Banco | 1191 | 1177 | 0 | 87.4 | #305 | [#305](https://github.com/RodReis/rrb-jarvisOS/pull/305) |
+| 2026-09-06 | #304 | spec-fases-03-console-da-geracao | Tela | 622 | 621 | 0 | 75.3 | #305 | [#305](https://github.com/RodReis/rrb-jarvisOS/pull/305) |
+| 2026-09-06 | #307 | spec-jornada-03-prd-landscape-convention-por-ia | Regras de Negócio | 1561 | 1561 | 0 | 76.0 | #308 | [#308](https://github.com/RodReis/rrb-jarvisOS/pull/308) |
+| 2026-09-06 | #307 | spec-jornada-03-prd-landscape-convention-por-ia | Banco | 1199 | 1185 | 0 | 87.5 | #308 | [#308](https://github.com/RodReis/rrb-jarvisOS/pull/308) |
+| 2026-09-06 | #307 | spec-jornada-03-prd-landscape-convention-por-ia | Tela | 627 | 626 | 0 | 75.1 | #308 | [#308](https://github.com/RodReis/rrb-jarvisOS/pull/308) |
+| 2026-09-06 | #310 | spec-pipeline-01-politica-pr-ci | Regras de Negócio | 1562 | 1562 | 0 | 76.0 | #312 | [#312](https://github.com/RodReis/rrb-jarvisOS/pull/312) |
+| 2026-09-06 | #310 | spec-pipeline-01-politica-pr-ci | Banco | 1199 | 1185 | 0 | 87.5 | #312 | [#312](https://github.com/RodReis/rrb-jarvisOS/pull/312) |
+| 2026-09-06 | #310 | spec-pipeline-01-politica-pr-ci | Tela | 627 | 626 | 0 | 75.1 | #312 | [#312](https://github.com/RodReis/rrb-jarvisOS/pull/312) |
+| 2026-09-06 | #316 | spec-jornada-03-prd-landscape-convention-por-ia | Regras de Negócio | 1564 | 1564 | 0 | 76.1 | #317 | [#317](https://github.com/RodReis/rrb-jarvisOS/pull/317) |
+| 2026-09-06 | #316 | spec-jornada-03-prd-landscape-convention-por-ia | Banco | 1200 | 1186 | 0 | 87.5 | #317 | [#317](https://github.com/RodReis/rrb-jarvisOS/pull/317) |
+| 2026-09-06 | #316 | spec-jornada-03-prd-landscape-convention-por-ia | Tela | 627 | 626 | 0 | 75.1 | #317 | [#317](https://github.com/RodReis/rrb-jarvisOS/pull/317) |
+| 2026-09-06 | #318 | spec-jornada-03-prd-landscape-convention-por-ia | Regras de Negócio | 1569 | 1569 | 0 | 76.1 | #320 | [#320](https://github.com/RodReis/rrb-jarvisOS/pull/320) |
+| 2026-09-06 | #318 | spec-jornada-03-prd-landscape-convention-por-ia | Banco | 1200 | 1186 | 0 | 87.4 | #320 | [#320](https://github.com/RodReis/rrb-jarvisOS/pull/320) |
+| 2026-09-06 | #318 | spec-jornada-03-prd-landscape-convention-por-ia | Tela | 636 | 635 | 0 | 75.2 | #320 | [#320](https://github.com/RodReis/rrb-jarvisOS/pull/320) |
+| 2026-09-06 | #319 | — | Regras de Negócio | 1570 | 1570 | 0 | 76.1 | #321 | [#321](https://github.com/RodReis/rrb-jarvisOS/pull/321) |
+| 2026-09-06 | #319 | — | Banco | 1201 | 1187 | 0 | 87.4 | #321 | [#321](https://github.com/RodReis/rrb-jarvisOS/pull/321) |
+| 2026-09-06 | #319 | — | Tela | 636 | 635 | 0 | 75.2 | #321 | [#321](https://github.com/RodReis/rrb-jarvisOS/pull/321) |
+| — | #314 | spec-pipeline-01-politica-pr-ci | Regras de Negócio | 1607 | 1607 | 0 | 76.8 | — | — |
+| — | #314 | spec-pipeline-01-politica-pr-ci | Banco | 1207 | 1193 | 0 | 87.0 | — | — |
+| — | #314 | spec-pipeline-01-politica-pr-ci | Tela | 636 | 635 | 0 | 75.2 | — | — |
+| — | #314 | spec-pipeline-01-politica-pr-ci | Regras de Negócio | 1630 | 1630 | 0 | 77.0 | — | — |
+| — | #314 | spec-pipeline-01-politica-pr-ci | Banco | 1215 | 1201 | 0 | 87.0 | — | — |
+| — | #314 | spec-pipeline-01-politica-pr-ci | Tela | 636 | 635 | 0 | 75.2 | — | — |
+| 2026-09-06 | #327 | — | Regras de Negócio | 1630 | 1630 | 0 | 77.0 | #328 | [#328](https://github.com/RodReis/rrb-jarvisOS/pull/328) |
+| 2026-09-06 | #327 | — | Banco | 1215 | 1201 | 0 | 87.0 | #328 | [#328](https://github.com/RodReis/rrb-jarvisOS/pull/328) |
+| 2026-09-06 | #327 | — | Tela | 636 | 635 | 0 | 75.2 | #328 | [#328](https://github.com/RodReis/rrb-jarvisOS/pull/328) |
+| — | #314 | spec-pipeline-01-politica-pr-ci | Regras de Negócio | 1658 | 1658 | 0 | 77.2 | — | — |
+| — | #314 | spec-pipeline-01-politica-pr-ci | Banco | 1222 | 1176 | 0 | 86.5 | — | — |
+| — | #314 | spec-pipeline-01-politica-pr-ci | Tela | 636 | 635 | 0 | 75.2 | — | — |
+| — | #314 | spec-pipeline-01-politica-pr-ci | Regras de Negócio | 1658 | 1658 | 0 | 77.2 | — | — |
+| — | #314 | spec-pipeline-01-politica-pr-ci | Banco | 1222 | 1208 | 0 | 87.1 | — | — |
+| — | #314 | spec-pipeline-01-politica-pr-ci | Tela | 636 | 635 | 0 | 75.2 | — | — |

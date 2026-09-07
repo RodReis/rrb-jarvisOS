@@ -369,3 +369,82 @@ describe('agruparEmBlocos', () => {
     expect(blocos[1]).toMatchObject({ nome: 'Grep', status: 'erro' })
   })
 })
+
+describe('etapas e a trilha (#318)', () => {
+  it('a etapa não vira linha na trilha do texto', async () => {
+    // Dez linhas de "iniciou/terminou" no meio da prosa seriam ruído entre exatamente o que o
+    // painel existe para deixar legível.
+    renderizar()
+    await chega({ tipo: 'texto', delta: 'O PRD começa assim.' })
+    await chega({ tipo: 'etapa', etapa: 'pesquisa', estado: 'concluida' })
+
+    const trilha = await screen.findByLabelText('Trilha da geração')
+    expect(within(trilha).queryByText(/Pesquisa de mercado/)).not.toBeInTheDocument()
+  })
+
+  it('o evento de etapa não zera a trilha, mesmo vindo com trace próprio (#318)', async () => {
+    // O anunciador de etapas usa um trace derivado do projeto (`etapas:<id>`), diferente do
+    // trace da chamada ao modelo. Tratá-lo como geração nova apagava o texto que já tinha
+    // chegado — e, na rodada seguinte, o trace repetido fazia o oposto: nada era apagado.
+    renderizar()
+    await chega({ tipo: 'texto', delta: 'O PRD começa assim.' })
+    await chega({ tipo: 'etapa', etapa: 'pesquisa', estado: 'concluida' }, 'etapas:p1')
+
+    expect(await screen.findByText('O PRD começa assim.')).toBeInTheDocument()
+  })
+
+  it('a barra não vive mais aqui: o andamento é da tela da etapa (#318)', async () => {
+    // Ela subiu para junto do botão que dispara a geração; deixar uma cópia aqui daria duas
+    // respostas para "em que ponto está", e elas divergiriam na primeira correção.
+    renderizar()
+    await chega({ tipo: 'texto', delta: 'gerando' })
+    await chega({ tipo: 'etapa', etapa: 'pesquisa', estado: 'concluida' }, 'etapas:p1')
+
+    expect(await screen.findByText('Console da geração')).toBeInTheDocument()
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+  })
+})
+
+describe('a saída do modelo lida como documento', () => {
+  const afirmacao = (id: string, secao: string, texto: string): string =>
+    JSON.stringify({ id, documento: 'PRD', secao, texto, origem: 'brief' })
+
+  it('mostra seção como título e afirmação como parágrafo, não JSON cru', async () => {
+    renderizar()
+    await chega({
+      tipo: 'texto',
+      delta: `{"afirmacoes":[${afirmacao('a-1', 'Problema', 'O usuário busca preço ativamente.')}]}`
+    })
+
+    expect(await screen.findByText('PRD · Problema')).toBeInTheDocument()
+    expect(screen.getByText('O usuário busca preço ativamente.')).toBeInTheDocument()
+    // O que o PI não pode mais ver: a chave de abertura do transporte.
+    expect(screen.queryByText(/"afirmacoes"/)).not.toBeInTheDocument()
+  })
+
+  it('já mostra o que chegou enquanto o JSON não fechou', async () => {
+    renderizar()
+    await chega({
+      tipo: 'texto',
+      delta: `{"afirmacoes":[${afirmacao('a-1', 'Problema', 'Primeira afirmação.')},{"id":"a-2","sec`
+    })
+
+    expect(await screen.findByText('Primeira afirmação.')).toBeInTheDocument()
+  })
+
+  it('mostra a origem em texto, junto de cada afirmação', async () => {
+    renderizar()
+    await chega({ tipo: 'texto', delta: afirmacao('a-1', 'Problema', 'Uma afirmação.') })
+
+    expect(await screen.findByText('brief')).toBeInTheDocument()
+  })
+
+  it('texto que não é a saída estruturada continua sendo mostrado', async () => {
+    // Quando o modelo recusa, a explicação vive justamente nessa sobra. Um painel que mostrasse
+    // só o que entendeu deixaria o PI sem a frase que diz por que a geração falhou.
+    renderizar()
+    await chega({ tipo: 'texto', delta: 'Não posso gerar sem o brief aceito.' })
+
+    expect(await screen.findByText('Não posso gerar sem o brief aceito.')).toBeInTheDocument()
+  })
+})

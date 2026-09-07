@@ -11,6 +11,17 @@
  * mudança de formato do CLI parar a jornada inteira. Por isso nenhuma função aqui lança: entrada
  * inesperada devolve `erro` ou `undefined`, nunca exceção.
  *
+ * ## Texto de `assistant` é documento; texto de `user`, não
+ *
+ * O CLI usa mensagens `user` para injetar coisas que ninguém digitou: o corpo de uma skill que o
+ * modelo invocou, um `system-reminder`, o resultado de uma ferramenta. Tratá-las como
+ * `assistant` — o que este parser fazia — despejava esse conteúdo no documento: numa geração de
+ * refinamento, os ~30 KB da skill `claude-api` saíram como se fossem a resposta do modelo (#272).
+ *
+ * A spec é literal: `texto` é "texto do modelo, em pedaços", e conteúdo de mensagem `user` não é
+ * texto do modelo. Ele vira evidência no console — truncado pela mesma régua de 2 KB do
+ * `tool_result` — e **nunca** documento.
+ *
  * ## O que é ignorado, e por quê
  *
  * O CLI emite muito mais do que interessa: `system/init` (com a lista inteira de ferramentas
@@ -82,13 +93,67 @@ function inteiro(valor: unknown): number {
 }
 
 /**
+ * O que o parser precisa lembrar entre linhas: a última chamada de ferramenta sem resultado.
+ *
+ * Existe por causa do #272. O conteúdo que o CLI injeta numa mensagem `user` — o corpo de uma
+ * skill, um `system-reminder` — chega **sem** `tool_use_id`, então não há como atribuí-lo a uma
+ * chamada olhando só para a linha. A `GenerationEvent` é união fechada pela spec e não ganha
+ * tipo novo sem passar pelo PI; o que a spec autoriza é reusar `ferramenta-fim` com o
+ * `chamadaId` do `tool_use` pendente, e é isso que este estado guarda.
+ *
+ * Objeto passado pelo chamador, e não variável de módulo: duas gerações simultâneas
+ * compartilhariam a global, e uma atribuiria à outra o resultado da sua ferramenta. O adapter
+ * cria um por `generateStream`, que é exatamente o escopo de uma geração.
+ */
+export interface EstadoDoParser {
+  /** O `id` do último `tool_use` que ainda não recebeu `tool_result`. */
+  chamadaPendente?: string
+  /** O `id` da chamada de `StructuredOutput`, cujo aceite não vai ao console. */
+  saidaEstruturada?: string
+  /**
+   * O documento da **última** chamada de `StructuredOutput`, retido até o fim da geração.
+   *
+   * Retido, e não emitido na hora, porque o CLI chama a ferramenta mais de uma vez: quando ele
+   * não reconhece a primeira chamada, injeta `[structured-output-enforce] You MUST call the
+   * StructuredOutput tool` e o modelo repete o documento. Emitindo na hora, os dois deltas se
+   * concatenavam em `{…}{…}` e nenhum `JSON.parse` aceitava o resultado.
+   *
+   * Não custa streaming: com `--json-schema` o documento chega **inteiro** no `input`. O bloco
+   * `text` que o modelo às vezes escreve antes de chamar a ferramenta não é documento (#304) —
+   * quem o segura é o adapter, que sabe se a geração tem schema.
+   */
+  documento?: string
+}
+
+/**
+ * O nome da ferramenta que o CLI injeta quando recebe `--json-schema`.
+ *
+ * Não é uma ferramenta de agente: é o canal pelo qual a saída estruturada volta. Confirmado no
+ * `system/init` do CLI 2.1.258, que com `--tools "" --json-schema <s>` reporta
+ * `"tools":["StructuredOutput"]` — a lista fica com esta e mais nada, que é exatamente o
+ * isolamento que a emenda E1 quer.
+ */
+const NOME_DA_SAIDA_ESTRUTURADA = 'StructuredOutput'
+
+/** Um estado novo, para uma geração nova. */
+export function novoEstadoDoParser(): EstadoDoParser {
+  return {}
+}
+
+/**
  * Traduz uma linha do `stream-json` nos eventos que ela contém.
  *
  * Devolve **lista** porque uma linha de `assistant` pode carregar vários blocos — texto e duas
  * chamadas de ferramenta na mesma mensagem é comum. Lista vazia significa "linha irrelevante"
  * (telemetria, init, hooks), que é diferente de erro.
+ *
+ * O `estado` tem padrão para os testes que olham uma linha só; em produção o adapter passa
+ * sempre o mesmo, porque é ele que liga o texto injetado à ferramenta que o trouxe.
  */
-export function parsearLinha(linha: string): readonly GenerationEvent[] {
+export function parsearLinha(
+  linha: string,
+  estado: EstadoDoParser = novoEstadoDoParser()
+): readonly GenerationEvent[] {
   let payload: unknown
   try {
     payload = JSON.parse(linha)
@@ -110,9 +175,14 @@ export function parsearLinha(linha: string): readonly GenerationEvent[] {
     const blocos = (mensagem as Record<string, unknown>).content
     if (!Array.isArray(blocos)) return []
 
+    // **Quem falou** decide o que o bloco `text` vira. A correção do #272 vive aqui e não no
+    // adapter de propósito: o adapter empurra todo `texto` para o documento, então filtrar lá
+    // seria ensinar a ele o formato do CLI que este arquivo existe para esconder.
+    const doModelo = tipo === 'assistant'
+
     return blocos.flatMap((bloco: unknown): readonly GenerationEvent[] => {
       if (typeof bloco !== 'object' || bloco === null) return []
-      return eventosDoBloco(bloco as BlocoDeConteudo)
+      return eventosDoBloco(bloco as BlocoDeConteudo, doModelo, estado)
     })
   }
 
@@ -139,17 +209,81 @@ export function parsearLinha(linha: string): readonly GenerationEvent[] {
   return []
 }
 
-function eventosDoBloco(bloco: BlocoDeConteudo): readonly GenerationEvent[] {
+/**
+ * O documento da saída estruturada, entregue **uma vez** no fim da geração.
+ *
+ * O adapter a chama ao fechar o stdout, depois da última linha. Devolve lista — e não string —
+ * para o chamador tratá-la como qualquer outro lote de eventos, sem um caminho especial só para
+ * este caso. Lista vazia quando a geração não teve saída estruturada (a maioria: só as etapas
+ * com `jsonSchema` a usam) ou quando o documento já foi entregue: chamar duas vezes não duplica,
+ * porque o adapter tem mais de um caminho de fechamento e o documento não pode sair por dois.
+ */
+export function documentoRetido(estado: EstadoDoParser): readonly GenerationEvent[] {
+  const documento = estado.documento
+  if (documento === undefined) return []
+
+  estado.documento = undefined
+  return [{ tipo: 'texto', delta: documento }]
+}
+
+/** Se o `input` da saída estruturada carrega documento. Objeto sem chaves não carrega. */
+function temConteudo(input: unknown): boolean {
+  if (typeof input !== 'object' || input === null) return false
+  return Object.keys(input as Record<string, unknown>).length > 0
+}
+
+function eventosDoBloco(
+  bloco: BlocoDeConteudo,
+  doModelo: boolean,
+  estado: EstadoDoParser
+): readonly GenerationEvent[] {
   if (bloco.type === 'text') {
     const texto = bloco.text
     if (typeof texto !== 'string' || texto === '') return []
-    return [{ tipo: 'texto', delta: texto }]
+
+    // Texto do modelo: documento, inteiro e sem truncar. É o produto.
+    if (doModelo) return [{ tipo: 'texto', delta: texto }]
+
+    return [textoInjetado(texto, estado)]
   }
 
   if (bloco.type === 'tool_use') {
     const chamadaId = typeof bloco.id === 'string' ? bloco.id : ''
     const nome = typeof bloco.name === 'string' ? bloco.name : 'desconhecida'
     if (chamadaId === '') return []
+
+    // A saída estruturada **é** o documento, não uma ferramenta que o modelo resolveu chamar.
+    //
+    // Com `--json-schema`, o CLI não pede JSON em texto: ele injeta a ferramenta
+    // `StructuredOutput` e o modelo responde chamando-a, com o documento inteiro no `input`.
+    // Tratá-la como as outras faria o documento nascer
+    // vazio — e, pior, dispararia o corte do critério 3, que mata a geração quando uma
+    // ferramenta é usada numa fase que não tem ferramentas.
+    if (nome === NOME_DA_SAIDA_ESTRUTURADA) {
+      estado.saidaEstruturada = chamadaId
+
+      // Chamada **sem conteúdo** não é documento: o CLI abre a saída estruturada com um
+      // `input` vazio antes de preenchê-la, e tratá-lo como documento gravaria `{}` por cima
+      // do que viesse depois.
+      if (!temConteudo(bloco.input)) return []
+
+      // **Vale a última chamada** (decisão do PI, 2026-09-05). Retém em vez de emitir: o CLI
+      // repete a chamada quando não reconhece a primeira — injetando
+      // `[structured-output-enforce] You MUST call the StructuredOutput tool` —, e o modelo
+      // responde com o documento de novo. Emitindo na hora, os dois deltas se concatenavam
+      // (`{…}{…}`) e o JSON quebrava exatamente no fim do primeiro.
+      //
+      // Substituir o retido cobre os dois casos vistos e o que ainda não foi: chamadas
+      // idênticas, chamadas divergentes, e a vazia seguida do documento. O que sai é sempre um
+      // JSON só — o último, que é o que o CLI aceitou.
+      const documento = JSON.stringify(bloco.input)
+      if (documento !== undefined) estado.documento = documento
+
+      return []
+    }
+
+    // Guardada para o texto que o CLI injetar em seguida sem dizer de qual chamada veio.
+    estado.chamadaPendente = chamadaId
 
     return [
       {
@@ -165,6 +299,16 @@ function eventosDoBloco(bloco: BlocoDeConteudo): readonly GenerationEvent[] {
     const chamadaId = typeof bloco.tool_use_id === 'string' ? bloco.tool_use_id : ''
     if (chamadaId === '') return []
 
+    // O aceite da saída estruturada ("Structured output provided successfully") é confirmação de
+    // protocolo, não resultado de ferramenta. Mostrá-lo no console encheria o painel de uma
+    // linha por geração que não diz nada ao PI.
+    if (estado.saidaEstruturada === chamadaId) {
+      estado.saidaEstruturada = undefined
+      return []
+    }
+
+    if (estado.chamadaPendente === chamadaId) estado.chamadaPendente = undefined
+
     const { resumo, tamanhoOriginal } = truncarBytes(textoDoResultado(bloco.content))
     const status: StatusDaFerramenta = bloco.is_error === true ? 'erro' : 'ok'
 
@@ -174,4 +318,29 @@ function eventosDoBloco(bloco: BlocoDeConteudo): readonly GenerationEvent[] {
   }
 
   return []
+}
+
+/**
+ * O texto que o CLI **injetou** numa mensagem `user`: corpo de skill, `system-reminder`, aviso.
+ *
+ * Vira `ferramenta-fim` truncado, e não `texto` — que é o defeito do #272 — nem `erro`, que
+ * mentiria: conteúdo injetado é rotina do CLI, não falha. Com `tool_use` pendente, o resumo
+ * aparece embaixo da chamada que o trouxe, que é onde o PI o procura; sem ele — um
+ * `system-reminder` fora de qualquer ferramenta —, `chamadaId` fica vazio e a tela o mostra como
+ * bloco solto. `status` é `ok` porque nada falhou.
+ *
+ * A régua de 2 KB é a mesma do `tool_result` (SPEC-Fases-03 § Eventos), e é a que o código de
+ * antes não alcançava: `truncarBytes` só cobria `tool_result`, então a skill de 30 KB passava
+ * inteira e ia parar no documento.
+ */
+function textoInjetado(texto: string, estado: EstadoDoParser): GenerationEvent {
+  const { resumo, tamanhoOriginal } = truncarBytes(texto)
+
+  return {
+    tipo: 'ferramenta-fim',
+    chamadaId: estado.chamadaPendente ?? '',
+    status: 'ok',
+    resumoDoResultado: resumo,
+    tamanhoOriginal
+  }
 }

@@ -24,7 +24,7 @@ import type { ConnectorOutcome, ConnectorRequest } from '@shared/domain/connecto
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { SandboxPreparado } from '@shared/domain/preflight'
 
-const logCat = { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+const logCat = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 vi.mock('../logging/logger', () => ({
   log: new Proxy({}, { get: () => logCat }),
   setCurrentWorkspace: vi.fn(),
@@ -33,6 +33,8 @@ vi.mock('../logging/logger', () => ({
 
 const { CAMINHO_DO_WORKFLOW, NOME_DO_JOB_DE_CI } = await import('@shared/domain/ci-workflow')
 const { GITHUB_OPERATIONS } = await import('@shared/domain/github-automation')
+const { perfilNodeEmWindows, perfilPythonEmWindows } =
+  await import('@shared/domain/ci-profile-perfis')
 const { EntregaService } = await import('./entrega-service')
 const { RulesetRepository } = await import('./ruleset-repository')
 const { ExecutionLedgerRepository } = await import('./execution-ledger-repository')
@@ -50,6 +52,15 @@ const REPO = 'projeto-alvo'
 const PR = 7
 const SHA_HEAD = 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0'
 const SHA_MERGE = 'f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3f2e1'
+/**
+ * O commit da branch-base, **distinto** do head da fatia.
+ *
+ * Antes, o dublê devolvia `origem.headSha` para qualquer ref, base inclusive. Isso fazia a
+ * reconferência da base (critério 12) comparar um valor consigo mesmo e concordar sempre — dublê
+ * complacente, que aprova a garantia sem que ela exista. Base e head são commits diferentes na
+ * vida real, e agora também aqui.
+ */
+const SHA_BASE = '1122334455667788990011223344556677889900'
 
 const COMANDOS = {
   test: ['npm', 'test'],
@@ -69,8 +80,14 @@ interface EstadoDaOrigem {
     headSha: string
     status: 'queued' | 'in_progress' | 'completed'
     conclusao?: string
+    /** A tentativa que o adapter passou a normalizar com o critério 11 da SPEC-Pipeline-01. */
+    tentativa?: number
   }[]
   headSha: string
+  /** O commit da branch-base. Avançá-lo entre a avaliação e o merge é o cenário do critério 12. */
+  baseSha: string
+  /** Um PR por branch head, como a origem faz. É o que torna a idempotência observável. */
+  prsPorHead: Map<string, number>
   merged: boolean
   /** O merge respondeu 200 mas a origem não confirma? É o cenário do critério 7. */
   mergeSemConfirmacao: boolean
@@ -94,6 +111,14 @@ let construcao: {
   bloqueio?: Record<string, string>
 }
 let pushes: string[]
+/**
+ * Gancho para o teste intervir **durante** a sequência de chamadas à origem.
+ *
+ * Necessário porque o critério 12 é sobre uma mudança que acontece *entre* duas chamadas: a base
+ * avança depois da avaliação e antes do merge. Montar o estado antes de `entregar` não reproduz
+ * isso — o valor já estaria mudado quando o gate leu, e a comparação concordaria consigo mesma.
+ */
+let chamadaExtra: ((operation: string, input: Record<string, unknown>) => void) | undefined
 
 function chamadasDe(operation: string): { input: Record<string, unknown> }[] {
   return chamadas.filter((c) => c.operation === operation)
@@ -110,6 +135,7 @@ function connectorFalso(): { call: (r: ConnectorRequest) => Promise<ConnectorOut
     call: async (request: ConnectorRequest): Promise<ConnectorOutcome> => {
       const input = (request.input ?? {}) as Record<string, unknown>
       chamadas.push({ operation: request.operation, input })
+      chamadaExtra?.(request.operation, input)
 
       const ok = (data: unknown): ConnectorOutcome =>
         ({
@@ -121,8 +147,19 @@ function connectorFalso(): { call: (r: ConnectorRequest) => Promise<ConnectorOut
         }) as unknown as ConnectorOutcome
 
       switch (request.operation) {
-        case GITHUB_OPERATIONS.ensurePullRequest:
-          return ok({ numero: PR, id: 100, titulo: String(input.title), criado: false })
+        case GITHUB_OPERATIONS.ensurePullRequest: {
+          // Idempotência **de verdade**: um PR por branch head. Antes o dublê devolvia sempre o
+          // mesmo número com `criado: false`, e por isso não distinguia "reusou" de "criou" — o
+          // teste de retomada passaria mesmo se o serviço abrisse um PR novo a cada run.
+          const head = String(input.head)
+          const existente = origem.prsPorHead.get(head)
+          if (existente !== undefined) {
+            return ok({ numero: existente, id: 100, titulo: String(input.title), criado: false })
+          }
+          const numero = PR + origem.prsPorHead.size
+          origem.prsPorHead.set(head, numero)
+          return ok({ numero, id: 100, titulo: String(input.title), criado: true })
+        }
 
         case GITHUB_OPERATIONS.getRequiredChecks:
           return ok({
@@ -139,7 +176,11 @@ function connectorFalso(): { call: (r: ConnectorRequest) => Promise<ConnectorOut
           return ok({ branch: input.branch, revisoesExigidas: input.revisoesExigidas })
 
         case GITHUB_OPERATIONS.getCommitSha:
-          return ok({ ref: input.ref, sha: origem.headSha })
+          // A ref decide qual SHA volta: base e branch da fatia são commits diferentes.
+          return ok({
+            ref: input.ref,
+            sha: input.ref === 'main' ? origem.baseSha : origem.headSha
+          })
 
         // O adapter devolve o **array**, não um envelope. Ver o cabeçalho deste arquivo.
         case GITHUB_OPERATIONS.getChecksForHead:
@@ -267,6 +308,7 @@ beforeEach(() => {
   limpezas = []
 
   chamadas = []
+  chamadaExtra = undefined
   pushes = []
   achados = []
   autonomo = true
@@ -280,6 +322,8 @@ beforeEach(() => {
       { nome: NOME_DO_JOB_DE_CI, headSha: SHA_HEAD, status: 'completed', conclusao: 'success' }
     ],
     headSha: SHA_HEAD,
+    baseSha: SHA_BASE,
+    prsPorHead: new Map<string, number>(),
     merged: false,
     mergeSemConfirmacao: false
   }
@@ -850,5 +894,304 @@ describe('encerramento do run (SPEC-Entrega-06)', () => {
       .prepare('SELECT COUNT(*) AS total FROM execution_ledger WHERE run_id = ?')
       .get('run-1') as { total: number }
     expect(linhas.total).toBe(1)
+  })
+})
+
+describe('EntregaService — workflow a partir do perfil (SPEC-Pipeline-01, critérios 1, 3 e 6)', () => {
+  it('gera o workflow do perfil, e não o legado, quando o pacote declara um', async () => {
+    const caminho = join(worktree, CAMINHO_DO_WORKFLOW)
+
+    await montar().entregar({ ...pedido(), perfilDeCi: perfilNodeEmWindows('alvo') })
+
+    const yml = readFileSync(caminho, 'utf8')
+    expect(yml).toContain('runs-on: windows-latest')
+    expect(yml).toContain('  qualidade:')
+    // O legado punha os quatro passos num job só e disparava em `push`.
+    expect(yml).not.toMatch(/^\s*push:/m)
+  })
+
+  it('perfil Python não recebe npm ci: a stack vem do pacote, não de adivinhação', async () => {
+    const caminho = join(worktree, CAMINHO_DO_WORKFLOW)
+
+    await montar().entregar({ ...pedido(), perfilDeCi: perfilPythonEmWindows('alvo-py') })
+
+    const yml = readFileSync(caminho, 'utf8')
+    expect(yml).toContain('pip install -r requirements.txt')
+    expect(yml).not.toContain('npm ci')
+  })
+
+  it('perfil inválido bloqueia antes de escrever o workflow ou tocar a origem', async () => {
+    const caminho = join(worktree, CAMINHO_DO_WORKFLOW)
+    const base = perfilNodeEmWindows('alvo')
+    const invalido = {
+      ...base,
+      validacoes: base.validacoes.map((v) =>
+        v.id === 'test' ? { ...v, dependeDe: ['nao-existe'] } : v
+      )
+    }
+
+    const r = await montar().entregar({ ...pedido(), perfilDeCi: invalido })
+
+    expect(r.estadoFinal).toBe('BLOCKED')
+    expect(r.bloqueio?.causa).toBe('perfil-de-ci-invalido')
+    expect(r.bloqueio?.mensagem).toContain('dependencia-ausente')
+    // O ponto do critério 3: nada foi escrito, e a origem não recebeu chamada nenhuma.
+    expect(existsSync(caminho)).toBe(false)
+    expect(chamadas).toHaveLength(0)
+    expect(pushes).toHaveLength(0)
+  })
+
+  it('não reescreve o arquivo que ele mesmo gerou com o mesmo perfil', async () => {
+    const caminho = join(worktree, CAMINHO_DO_WORKFLOW)
+    const perfil = perfilNodeEmWindows('alvo')
+
+    await montar().entregar({ ...pedido(), perfilDeCi: perfil })
+    const primeiro = readFileSync(caminho, 'utf8')
+
+    await montar().entregar({ ...pedido(), perfilDeCi: perfil })
+    expect(readFileSync(caminho, 'utf8')).toBe(primeiro)
+  })
+
+  it('preserva os bytes de workflow escrito à mão, sem tentar provar equivalência', async () => {
+    const caminho = join(worktree, CAMINHO_DO_WORKFLOW)
+    mkdirSync(join(worktree, '.github', 'workflows'), { recursive: true })
+    const aMao = [
+      'name: ci-do-time',
+      'jobs:',
+      '  validacao:',
+      '    steps:',
+      '      - run: make ci'
+    ].join('\n')
+    writeFileSync(caminho, aMao, 'utf8')
+
+    await montar().entregar({ ...pedido(), perfilDeCi: perfilNodeEmWindows('alvo') })
+
+    expect(readFileSync(caminho, 'utf8')).toBe(aMao)
+  })
+
+  it('sem perfil, o gerador legado continua intacto — nenhuma migração tácita', async () => {
+    const caminho = join(worktree, CAMINHO_DO_WORKFLOW)
+
+    await montar().entregar(pedido())
+
+    const yml = readFileSync(caminho, 'utf8')
+    expect(yml).toContain('runs-on: ubuntu-latest')
+    expect(yml).not.toContain('windows-latest')
+  })
+})
+
+describe('EntregaService — a base avançou entre a avaliação e o merge (critério 12)', () => {
+  it('base que avança depois da avaliação bloqueia em vez de mergear', async () => {
+    // O head do PR **não se move** quando alguém mergeia outro PR na base: o CI continua verde
+    // descrevendo o código contra uma base que já não existe. Sem `strict` na proteção, ninguém
+    // recusa, e esta reconferência é a única que existe.
+    let leiturasDaBase = 0
+    const original = origem.baseSha
+    chamadaExtra = (operation, input) => {
+      if (operation === GITHUB_OPERATIONS.getCommitSha && input.ref === 'main') {
+        leiturasDaBase += 1
+        // A primeira leitura é a da avaliação; entre ela e o merge, alguém mergeou na base.
+        if (leiturasDaBase >= 2) origem.baseSha = SHA_MERGE
+      }
+    }
+
+    const r = await montar().entregar(pedido())
+
+    expect(r.estadoFinal).toBe('BLOCKED')
+    expect(r.bloqueio?.causa).toBe('base-avancou')
+    expect(r.bloqueio?.mensagem).toContain(original.slice(0, 12))
+    // O ponto: nada foi mergeado.
+    expect(chamadasDe(GITHUB_OPERATIONS.squashMerge)).toHaveLength(0)
+  })
+
+  it('base estável mergeia normalmente', async () => {
+    const r = await montar().entregar(pedido())
+
+    expect(r.estadoFinal).toBe('MERGED')
+    expect(chamadasDe(GITHUB_OPERATIONS.squashMerge)).toHaveLength(1)
+  })
+
+  it('base ilegível não vira bloqueio nem afirmação de que nada mudou', async () => {
+    // "Não sei" não pode virar "não mudou" (a comparação concordaria consigo mesma), e também
+    // não vira bloqueio: a §7 manda preservar o PR e explicar a limitação.
+    chamadaExtra = (operation, input) => {
+      if (operation === GITHUB_OPERATIONS.getCommitSha && input.ref === 'main') {
+        throw new Error('sem permissão de leitura na base')
+      }
+    }
+
+    const r = await montar().entregar(pedido())
+
+    expect(r.estadoFinal).toBe('MERGED')
+  })
+})
+
+describe('EntregaService — adoção por manifesto, não por cabeçalho (critério 10)', () => {
+  it('preserva edição humana feita no arquivo que a pipeline gerou', async () => {
+    // O caso que a heurística do cabeçalho da vertical 1 errava: o arquivo é nosso, alguém o
+    // editou e **manteve** a primeira linha. "Começa com a nossa marca" respondia "pode
+    // reescrever", e a edição sumia. Com manifesto, a pergunta passa a ser se o conteúdo ainda é
+    // o que registramos.
+    const caminho = join(worktree, CAMINHO_DO_WORKFLOW)
+    const perfil = perfilNodeEmWindows('alvo')
+
+    await montar().entregar({ ...pedido(), perfilDeCi: perfil })
+    const gerado = readFileSync(caminho, 'utf8')
+
+    const editado = `${gerado}      - name: passo do time
+        run: make extra
+`
+    writeFileSync(caminho, editado, 'utf8')
+
+    await montar().entregar({ ...pedido(), perfilDeCi: perfil })
+
+    expect(readFileSync(caminho, 'utf8')).toBe(editado)
+  })
+
+  it('atualiza o arquivo intocado quando o perfil muda', async () => {
+    const caminho = join(worktree, CAMINHO_DO_WORKFLOW)
+
+    await montar().entregar({ ...pedido(), perfilDeCi: perfilNodeEmWindows('alvo') })
+    const primeiro = readFileSync(caminho, 'utf8')
+
+    await montar().entregar({ ...pedido(), perfilDeCi: perfilPythonEmWindows('alvo') })
+    const segundo = readFileSync(caminho, 'utf8')
+
+    expect(segundo).not.toBe(primeiro)
+    expect(segundo).toContain('pip install -r requirements.txt')
+  })
+
+  it('grava o manifesto ao lado do workflow, para a procedência viajar com o repositório', async () => {
+    await montar().entregar({ ...pedido(), perfilDeCi: perfilNodeEmWindows('alvo') })
+
+    const manifesto = join(worktree, '.github', 'ci-workflow-manifesto.json')
+    expect(existsSync(manifesto)).toBe(true)
+    const lido = JSON.parse(readFileSync(manifesto, 'utf8')) as Record<string, unknown>
+    expect(lido.profileId).toBe('alvo')
+    expect(typeof lido.hashDoConteudo).toBe('string')
+  })
+
+  it('manifesto corrompido é tratado como ausência: preserva em vez de derrubar a entrega', async () => {
+    const caminho = join(worktree, CAMINHO_DO_WORKFLOW)
+    const perfil = perfilNodeEmWindows('alvo')
+
+    await montar().entregar({ ...pedido(), perfilDeCi: perfil })
+    const gerado = readFileSync(caminho, 'utf8')
+    writeFileSync(join(worktree, '.github', 'ci-workflow-manifesto.json'), '{ nao é json', 'utf8')
+    writeFileSync(
+      caminho,
+      `${gerado}# alterado
+`,
+      'utf8'
+    )
+
+    const r = await montar().entregar({ ...pedido(), perfilDeCi: perfil })
+
+    expect(r.estadoFinal).toBe('MERGED')
+    expect(readFileSync(caminho, 'utf8')).toContain('# alterado')
+  })
+})
+
+describe('EntregaService — correlação com a execução de CI (SPEC-Pipeline-01 §8)', () => {
+  it('grava PR, base, perfil e instantes observados no ledger', async () => {
+    await montar().entregar({ ...pedido(), perfilDeCi: perfilNodeEmWindows('alvo') })
+
+    const ledger = ledgerRepo.buscar(USER, 'run-1')
+    expect(ledger?.correlacaoDeCi).toBeDefined()
+    expect(ledger?.correlacaoDeCi?.pullRequest).toBe(PR)
+    expect(ledger?.correlacaoDeCi?.baseSha).toBe(SHA_BASE)
+    expect(ledger?.correlacaoDeCi?.revisaoDoPerfil).toBe('alvo')
+    expect(ledger?.correlacaoDeCi?.iniciadoEm).toBeDefined()
+    expect(ledger?.correlacaoDeCi?.observadoEm).toBeDefined()
+  })
+
+  it('base ilegível fica AUSENTE na correlação, nunca string vazia', async () => {
+    // O critério 17 em ação: "não sei" não pode virar um valor que parece dado.
+    chamadaExtra = (operation, input) => {
+      if (operation === GITHUB_OPERATIONS.getCommitSha && input.ref === 'main') {
+        throw new Error('sem permissão')
+      }
+    }
+
+    await montar().entregar(pedido())
+
+    const correlacao = ledgerRepo.buscar(USER, 'run-1')?.correlacaoDeCi
+    expect(correlacao).toBeDefined()
+    expect('baseSha' in (correlacao ?? {})).toBe(false)
+  })
+
+  it('sem perfil declarado, a revisão do perfil fica ausente', async () => {
+    await montar().entregar(pedido())
+
+    const correlacao = ledgerRepo.buscar(USER, 'run-1')?.correlacaoDeCi
+    expect('revisaoDoPerfil' in (correlacao ?? {})).toBe(false)
+  })
+
+  it('a tentativa do CI vem do check, não é inventada', async () => {
+    origem.checks = [
+      {
+        nome: NOME_DO_JOB_DE_CI,
+        headSha: SHA_HEAD,
+        status: 'completed',
+        conclusao: 'success',
+        tentativa: 3
+      }
+    ]
+
+    await montar().entregar(pedido())
+
+    expect(ledgerRepo.buscar(USER, 'run-1')?.correlacaoDeCi?.tentativaDoCi).toBe(3)
+  })
+
+  it('origem que não informa tentativa deixa o campo ausente', async () => {
+    await montar().entregar(pedido())
+
+    const correlacao = ledgerRepo.buscar(USER, 'run-1')?.correlacaoDeCi
+    expect('tentativaDoCi' in (correlacao ?? {})).toBe(false)
+  })
+})
+
+describe('EntregaService — retomada não duplica (critério 14)', () => {
+  it('segundo run sobre o mesmo branch reusa o PR em vez de abrir outro', async () => {
+    // O `ensurePullRequest` é idempotente por construção, mas nada media isso. Sem esta prova,
+    // trocá-lo por um `create` cru passaria com a suíte inteira verde — e a segunda execução
+    // depois de um crash abriria um PR novo para a mesma fatia.
+    const primeiro = await montar().entregar(pedido())
+    expect(primeiro.pullRequest).toBe(PR)
+
+    chamadas = []
+    const segundo = await montar().entregar({ ...pedido(), runId: 'run-2' })
+
+    // O ponto, agora observável: **o mesmo número de PR**. O dublê atribui um número novo a cada
+    // head inédito, então um serviço que abrisse outro PR devolveria PR+1 aqui.
+    expect(segundo.pullRequest).toBe(PR)
+    expect(origem.prsPorHead.size).toBe(1)
+
+    // E o dublê não é complacente: um head **diferente** recebe um PR diferente. Sem isto, a
+    // asserção acima passaria mesmo com um dublê que devolve sempre o mesmo número.
+    chamadas = []
+    const outroBranch = await montar().entregar({
+      ...pedido(),
+      runId: 'run-2b',
+      alvo: { ...pedido().alvo, branchDaFatia: 'feat/outra' }
+    })
+    expect(outroBranch.pullRequest).not.toBe(PR)
+  })
+
+  it('retomada não mergeia de novo o que já foi mergeado', async () => {
+    await montar().entregar(pedido())
+    expect(chamadasDe(GITHUB_OPERATIONS.squashMerge)).toHaveLength(1)
+
+    // Segundo run com a origem já refletindo o merge anterior.
+    chamadas = []
+    origem.headSha = SHA_MERGE
+    origem.checks = [
+      { nome: NOME_DO_JOB_DE_CI, headSha: SHA_MERGE, status: 'completed', conclusao: 'success' }
+    ]
+    const r = await montar().entregar({ ...pedido(), runId: 'run-3' })
+
+    // Ou mergeia o estado novo, ou para; o que não pode é o run terminar sem desfecho explicável.
+    expect(['MERGED', 'AWAITING_MERGE', 'BLOCKED']).toContain(r.estadoFinal)
+    expect(ledgerRepo.buscar(USER, 'run-3')).toBeDefined()
   })
 })

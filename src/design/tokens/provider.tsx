@@ -129,6 +129,10 @@ export function variaveisDoTema({
     // Papéis de superfície/texto/borda — variam com módulo e modo.
     '--jos-cor-superficie': p.surface,
     '--jos-cor-superficie-elevada': p.surfaceRaised,
+    // Superfície de overlay — **opaca**, ver `surfaceOverlay` em `semantic.ts`. Combo aberto,
+    // popover, menu, modal e gaveta leem esta, nunca a elevada: eles flutuam sobre conteúdo, e
+    // o vidro de card deixaria o texto de trás vazar por baixo das opções.
+    '--jos-cor-superficie-overlay': p.surfaceOverlay,
     '--jos-cor-texto': p.textPrimary,
     '--jos-cor-texto-secundario': p.textSecondary,
     '--jos-cor-texto-suave': p.textMuted,
@@ -235,6 +239,9 @@ export function variaveisDoTema({
     '--jos-tamanho-marcador': TAMANHO.marcador,
     '--jos-tamanho-icone': TAMANHO.icone,
     '--jos-tamanho-icone-mini': TAMANHO.iconeMini,
+    '--jos-tamanho-painel-minimo': TAMANHO.painelMinimo,
+    '--jos-tamanho-painel-maximo': TAMANHO.painelMaximo,
+    '--jos-tamanho-lista-maxima': TAMANHO.listaMaxima,
     '--jos-tracking-label': ESPACAMENTO_LETRA.label,
     '--jos-tracking-acao': ESPACAMENTO_LETRA.titulo,
     // O peso participa da hierarquia de ação (F03a): primária e perigo são mais pesadas que
@@ -302,7 +309,25 @@ export function ProvedorDeTema({
           data-modo={modo}
           data-modulo={modulo}
           data-superficie={superficie}
-          style={variaveis as React.CSSProperties}
+          /*
+           * `display: contents` resolve a cadeia de altura **sem** o provider virar uma caixa.
+           *
+           * O problema: este `div` fica entre o `#root` (100% no global.css) e o shell, que pede
+           * `h-full`. Como caixa de bloco sem altura, ele quebrava a cadeia — `h-full` resolvia
+           * contra um pai de altura automática e virava o tamanho do conteúdo, deixando o rodapé
+           * no meio da tela.
+           *
+           * A primeira tentativa foi `height: 100%`, e ela **regrediu a CHOICE**: cada card
+           * reabre o provider, e ali o `div` esticou para a altura da tela, empurrando os cards
+           * para o topo de um contêiner que pedia `items-center`. Consertar um lugar e quebrar
+           * outro é o sinal de que a caixa não devia existir.
+           *
+           * `display: contents` remove o `div` da formatação: os filhos passam a ser filhos
+           * diretos do pai real — o `#root` no shell, o flex na CHOICE —, e as variáveis de tema
+           * continuam herdando normalmente, porque herança não depende de caixa. Nenhum dos dois
+           * lugares precisa saber que o provider está no meio, que era o ponto o tempo todo.
+           */
+          style={{ display: 'contents', ...(variaveis as React.CSSProperties) }}
         >
           {children}
         </div>

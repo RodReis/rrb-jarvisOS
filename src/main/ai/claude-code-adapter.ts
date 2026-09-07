@@ -18,7 +18,9 @@
  *   ser rejeitado por lista. É a garantia mais importante do arquivo;
  * - **Args controlados**: o prompt vai por **stdin**, não como argumento, para não depender de
  *   escape em nenhuma camada;
- * - **cwd controlado** — o diretório do app, não o do usuário;
+ * - **cwd neutro** — um diretório vazio por geração, sob o `userData` do Electron, removido no
+ *   fim (emenda E1). Não é mais "o diretório do app": em dev esse diretório **é** o repositório
+ *   do JarvisOS, e o CLI carregava a governança deste projeto para gerar o documento de outro;
  * - **`env` em lista de permissão**, reusando `ambienteControlado()` do terminal do MVP-004: a
  *   lição de que `process.env` do main não pode alcançar o filho vale igual aqui;
  * - **Timeout + kill** pelo SO (`SIGKILL`), não uma promessa nossa de parar de escutar.
@@ -28,8 +30,15 @@ import { spawn } from 'node:child_process'
 import type { AdapterChunk, AdapterRequest, AiAdapter } from './adapter'
 import { AdapterError } from './anthropic-adapter'
 import { ambienteControlado } from '../execution/terminal-engine'
-import { extrairLinhas, parsearLinha } from './stream-json-parser'
+import {
+  documentoRetido,
+  extrairLinhas,
+  novoEstadoDoParser,
+  parsearLinha
+} from './stream-json-parser'
 import type { GenerationEvent } from '@shared/domain/geracao'
+import type { Fase } from '@shared/domain/fase'
+import type { RunNeutro } from './cwd-neutro'
 
 /**
  * O binário, **pinado**. Constante e não configuração: o dia em que este nome vier de fora é o
@@ -48,15 +57,142 @@ export const BINARIO = 'claude'
  */
 const CARACTERES_POR_TOKEN = 4
 
+/**
+ * A versão mínima do CLI que aceita todas as flags de isolamento (emenda E1 § Decisão 5).
+ *
+ * É a instalada no PC do PI em 2026-09-05, confirmada flag a flag em `claude --help`. Serve à
+ * mensagem de erro: quando uma flag é recusada, o usuário precisa saber contra o quê comparar.
+ */
+export const VERSAO_MINIMA_DO_CLI = '2.1.258'
+
+/**
+ * As fases em que o CLI é um **gerador de documento**, não um agente (emenda E1 § Decisão 2).
+ *
+ * Na Construção o agente é legítimo: ele lê arquivos, roda comandos e escreve código, e as
+ * restrições abaixo o quebrariam. Por isso a lista é positiva — nomeia onde restringir — em vez
+ * de excluir `construcao`: uma fase nova nasceria sem isolamento por omissão, e a omissão é
+ * justamente o defeito que esta emenda corrige.
+ */
+const FASES_SEM_FERRAMENTAS: readonly Fase[] = ['planejamento', 'especificacao']
+
+/**
+ * O trecho do stderr que denuncia uma flag que a versão instalada não conhece.
+ *
+ * O CLI recusa opção desconhecida pelo parser de linha de comando, que escreve
+ * `error: unknown option '--x'` e sai com código 1. Sem reconhecer esse caso, a mensagem ao
+ * usuário seria "o CLI terminou com código 1" — que descreve o sintoma e esconde a causa, e a
+ * causa aqui tem conserto: atualizar o binário.
+ */
+const MARCA_DE_FLAG_DESCONHECIDA = 'unknown option'
+
+/**
+ * O nome da flag que o CLI recusou, lido do stderr — ou `undefined` se a falha foi outra.
+ *
+ * Devolve **só o nome da flag**, e não o stderr: o texto do CLI pode carregar caminho de
+ * sessão, e a mensagem de erro é caminho clássico de vazamento. O nome da flag é dado nosso —
+ * nós é que a passamos —, então repeti-lo não revela nada que o app já não soubesse.
+ */
+export function flagRecusada(stderr: string): string | undefined {
+  if (!stderr.includes(MARCA_DE_FLAG_DESCONHECIDA)) return undefined
+
+  // O formato do parser de linha de comando é `unknown option '--x'`. Sem a captura, a
+  // alternativa seria devolver o stderr inteiro — que é exatamente o que não pode sair daqui.
+  const achado = /unknown option '?(--[\w-]+)'?/.exec(stderr)
+  return achado?.[1]
+}
+
+/**
+ * O que o system ganha quando a geração tem schema (#304).
+ *
+ * Medido com o CLI real em 2026-09-06: sem a linha, o modelo escreveu o JSON em texto, levou
+ * `[structured-output-enforce]` e gerou o documento de novo pela ferramenta (2955 tokens de
+ * entrada, 955 de saída); com ela, chamou a ferramenta direto (1261 / 676).
+ */
+export const DICA_DA_SAIDA_ESTRUTURADA =
+  'Entregue o JSON chamando a ferramenta StructuredOutput, não como texto.'
+
 export class ClaudeCodeAdapter implements AiAdapter {
   readonly nome = 'claude-code'
 
   constructor(
-    /** O cwd do subprocess. O diretório do app, nunca o do usuário. */
-    private readonly cwd: string = process.cwd(),
+    /**
+     * O diretório **neutro** do subprocess, resolvido por geração (emenda E1 § Regras).
+     *
+     * Função e não string: o cwd é um diretório novo e vazio a cada chamada, e capturá-lo por
+     * valor no boot faria todas as gerações compartilharem o mesmo — que é o oposto do
+     * isolamento. Devolve o caminho e a função que o remove; o `finally` a chama.
+     *
+     * O padrão existe só para o teste: em produção quem o passa é o boot, que conhece o
+     * `userData` do Electron.
+     */
+    private readonly abrirCwd: () => RunNeutro,
     /** Injetável só para o teste não depender do binário estar instalado. */
     private readonly spawnImpl: typeof spawn = spawn
   ) {}
+
+  /**
+   * Os args do `generateStream`, montados a partir da fase.
+   *
+   * Método separado, e é o que o critério 2 da emenda inspeciona: a lista de flags é a decisão
+   * desta fatia, e tê-la como expressão nomeada permite prová-la sem rodar um subprocess.
+   */
+  argsDaGeracao(request: AdapterRequest): readonly string[] {
+    const base = [
+      '--print',
+      '--model',
+      request.model,
+      '--output-format',
+      'stream-json',
+      '--verbose'
+    ]
+
+    // `--system-prompt` vale em **qualquer** fase: entregar o contrato da etapa ao modelo é o
+    // defeito da #271, e ele não tem nada a ver com ferramentas. Só a ausência de `system` tira
+    // a flag — passar string vazia substituiria o prompt padrão por nada.
+    //
+    // Com `jsonSchema`, o system ganha a dica de entregar pela ferramenta (#304). Os systems do
+    // domínio pedem "responda somente com JSON" porque os outros providers só têm o texto; aqui
+    // isso faz o modelo escrever o JSON em texto, levar o `enforce` do CLI e gerar o documento
+    // **duas vezes** — foi o que estourou o timeout dos documentos do PRD. A dica mora no adapter
+    // porque a `StructuredOutput` é detalhe deste CLI, não do contrato da etapa.
+    if (request.system !== undefined && request.system !== '') {
+      base.push(
+        '--system-prompt',
+        request.jsonSchema === undefined
+          ? request.system
+          : `${request.system}
+
+${DICA_DA_SAIDA_ESTRUTURADA}`
+      )
+    }
+
+    // O resto do isolamento é **por fase**. Sem fase declarada não há isolamento: é a chamada
+    // que não pertence a etapa nenhuma (o painel de teste do Settings), e restringi-la seria
+    // impor a uma chamada avulsa a política de uma geração de documento.
+    if (request.fase === undefined || !FASES_SEM_FERRAMENTAS.includes(request.fase)) return base
+
+    base.push(
+      // Nenhuma ferramenta: sem `Bash`, sem `Read`, sem `Skill`. Gerar documento não precisa de
+      // ferramenta, e foi a `Skill` que despejou 30 KB de corpo de skill na saída (#272).
+      '--tools',
+      '',
+      // Sem settings do ambiente: hooks, permissões e plugins do PC do PI não entram numa
+      // geração sobre outro projeto.
+      '--setting-sources',
+      '',
+      // Sem `--mcp-config`, esta flag zera os servidores MCP em vez de herdar os do ambiente.
+      '--strict-mcp-config',
+      // A geração não deixa transcript fora do trace: o registro dela é o console, não um
+      // arquivo de sessão no disco do CLI.
+      '--no-session-persistence'
+    )
+
+    // O schema é a barreira que sobra quando o modelo desobedece o prompt. Ausente quando a
+    // etapa não produz JSON — o termo de pesquisa pede texto puro, e impor schema o quebraria.
+    if (request.jsonSchema !== undefined) base.push('--json-schema', request.jsonSchema)
+
+    return base
+  }
 
   /**
    * O binário existe e responde? (critério 6)
@@ -74,9 +210,24 @@ export class ClaudeCodeAdapter implements AiAdapter {
         resolve(valor)
       }
 
+      const run = this.abrirCwd()
+      /**
+       * A limpeza pendurada na **resposta**, não no `close`.
+       *
+       * Este healthcheck roda em laço na tela de providers, e o caso mais comum dele é o binário
+       * não instalado — que chega por `error` e pode nunca emitir `close`. Remover só no `close`
+       * deixaria um diretório por sondagem acumulando no `userData` de quem não tem o CLI, que é
+       * justamente quem mais sonda.
+       */
+      const responderELimpar = (valor: boolean): void => {
+        if (respondido) return
+        run.remover()
+        responder(valor)
+      }
+
       try {
         const processo = this.spawnImpl(BINARIO, ['--version'], {
-          cwd: this.cwd,
+          cwd: run.caminho,
           env: ambienteControlado(),
           shell: false,
           windowsHide: true
@@ -84,32 +235,37 @@ export class ClaudeCodeAdapter implements AiAdapter {
 
         // `error` cobre o caso mais comum — binário não instalado (ENOENT). Sem este ramo, a
         // promessa nunca resolveria e a tela de providers ficaria carregando para sempre.
-        processo.on('error', () => responder(false))
-        processo.on('close', (codigo) => responder(codigo === 0))
+        processo.on('error', () => responderELimpar(false))
+        processo.on('close', (codigo) => responderELimpar(codigo === 0))
 
         const relogio = setTimeout(() => {
           processo.kill('SIGKILL')
-          responder(false)
+          responderELimpar(false)
         }, 3_000)
         processo.on('close', () => clearTimeout(relogio))
       } catch {
-        responder(false)
+        responderELimpar(false)
       }
     })
   }
 
   async *generateStream(request: AdapterRequest): AsyncIterable<AdapterChunk> {
+    // O diretório neutro desta geração. Aberto antes do spawn e removido no `finally` — também
+    // em cancelamento e timeout, que passam pelo mesmo caminho (emenda E1, critério 1).
+    const run = this.abrirCwd()
+
     const processo = this.spawnImpl(
       BINARIO,
-      // Args fixos e montados aqui — nada vem de entrada do usuário além do **modelo**, que é
-      // validado contra a tabela de preço antes de chegar ao adapter. O prompt vai por stdin.
+      // Args montados por `argsDaGeracao` — nada vem de entrada do usuário além do **modelo**,
+      // validado contra a tabela de preço antes de chegar ao adapter, e do `system`/`jsonSchema`,
+      // que são constantes do domínio. O prompt vai por stdin.
       //
       // `stream-json` + `verbose` (SPEC-Fases-03 § Adapter): é o formato que traz as ferramentas
       // e o `usage` medido. `--verbose` não é opcional — sem ele o CLI recusa `stream-json` com
       // `--print`. O texto continua saindo igual; o que muda é que agora ele vem etiquetado.
-      ['--print', '--model', request.model, '--output-format', 'stream-json', '--verbose'],
+      [...this.argsDaGeracao(request)],
       {
-        cwd: this.cwd,
+        cwd: run.caminho,
         env: ambienteControlado(),
         // A garantia central: sem shell, não há interpolação, então não há o que escapar.
         shell: false,
@@ -151,11 +307,37 @@ export class ClaudeCodeAdapter implements AiAdapter {
     let usoMedido: { tokensEntrada: number; tokensSaida: number } | undefined
     /** O pedaço de linha que ainda não fechou entre dois `data` do stdout. */
     let resto = ''
+    /**
+     * O estado do parser desta geração (#272).
+     *
+     * Um por `generateStream` e não um do módulo: duas gerações simultâneas compartilhariam a
+     * global, e o texto injetado numa apareceria pendurado na ferramenta da outra.
+     */
+    const estadoDoParser = novoEstadoDoParser()
 
     const empurrar = (texto: string): void => {
       fila.push(texto)
       acordar?.()
       acordar = undefined
+    }
+
+    /**
+     * Com `--json-schema`, o documento vem pela ferramenta `StructuredOutput`, e o texto do modelo
+     * **não é documento** (#304).
+     *
+     * O modelo às vezes escreve o JSON em texto antes — o system pede "responda somente com JSON"
+     * e ele obedece —, o CLI não reconhece texto como saída estruturada, injeta o
+     * `structured-output-enforce` e o modelo repete o documento pela ferramenta. Empurrar o texto
+     * na hora e o documento retido no `close` colava os dois (`{…}{…}`), e nenhum leitor aceita
+     * isso. O texto fica guardado: só vira documento se **nenhuma** chamada chegar, para o caminho
+     * de um CLI que não injete a ferramenta não regredir. Sem schema, nada muda — o texto sai na
+     * hora, como sempre.
+     */
+    const documentoVemPorFerramenta = request.jsonSchema !== undefined
+    let textoSolto = ''
+    const entregar = (delta: string): void => {
+      if (documentoVemPorFerramenta) textoSolto += delta
+      else empurrar(delta)
     }
 
     /**
@@ -174,18 +356,45 @@ export class ClaudeCodeAdapter implements AiAdapter {
       }
     }
 
+    /**
+     * Uma ferramenta foi chamada numa fase que não tem ferramentas? (emenda E1, critério 3)
+     *
+     * Com `--tools ""` isto não deveria acontecer — e é justamente por isso que existe. A flag é
+     * promessa de terceiro: se uma versão do CLI a ignorar, ou se a lista de fases divergir do
+     * que o adapter monta, o defeito voltaria em silêncio e o documento nasceria de novo com o
+     * corpo de uma skill dentro. Aqui ele para de ser silencioso: o console recebe o erro e o
+     * texto que vier depois não entra no documento.
+     */
+    let ferramentaProibida = false
+    const semFerramentas =
+      request.fase !== undefined && FASES_SEM_FERRAMENTAS.includes(request.fase)
+
     processo.stdout?.on('data', (pedaco: Buffer) => {
       const extracao = extrairLinhas(resto + pedaco.toString('utf8'))
       resto = extracao.resto
 
       for (const linha of extracao.linhas) {
-        for (const evento of parsearLinha(linha)) {
+        for (const evento of parsearLinha(linha, estadoDoParser)) {
           publicar(evento)
+
+          if (semFerramentas && evento.tipo === 'ferramenta-inicio' && !ferramentaProibida) {
+            ferramentaProibida = true
+            publicar({
+              tipo: 'erro',
+              mensagem: `O modelo chamou a ferramenta ${evento.nome} numa fase sem ferramentas. O documento foi interrompido.`
+            })
+            // Encerra a geração pelo mesmo caminho do timeout: o que veio antes do desvio já
+            // está no documento e é honesto; o que vier depois nasceu de uma sessão que saiu do
+            // contrato, e deixá-lo entrar seria repetir o defeito com um aviso ao lado.
+            processo.kill('SIGKILL')
+          }
 
           // O texto do documento sai **daqui**, dos eventos de texto — é o mesmo conteúdo de
           // antes, agora desembrulhado do JSON em vez de repassado cru. Sem isto, o `--print`
           // com `stream-json` faria o documento nascer como um despejo de NDJSON.
-          if (evento.tipo === 'texto') empurrar(evento.delta)
+          //
+          // `ferramentaProibida` corta o texto **posterior** ao desvio (critério 3).
+          if (evento.tipo === 'texto' && !ferramentaProibida) entregar(evento.delta)
 
           // O CLI **reporta** `usage` no `result`. Preferir o número medido à aproximação é o
           // ganho de graça desta fatia: `CARACTERES_POR_TOKEN` deixa de ser o que vai ao ledger
@@ -217,9 +426,10 @@ export class ClaudeCodeAdapter implements AiAdapter {
       // A última linha pode não ter terminado em '\n'. Descartá-la perderia justamente o
       // `result` — a linha que carrega o `usage` medido, que o CLI emite por último.
       if (resto.trim() !== '') {
-        for (const evento of parsearLinha(resto)) {
+        for (const evento of parsearLinha(resto, estadoDoParser)) {
           publicar(evento)
-          if (evento.tipo === 'texto') fila.push(evento.delta)
+          // Mesma guarda do laço do stdout: a última linha não escapa do critério 3.
+          if (evento.tipo === 'texto' && !ferramentaProibida) entregar(evento.delta)
           if (evento.tipo === 'uso') {
             usoMedido = { tokensEntrada: evento.tokensEntrada, tokensSaida: evento.tokensSaida }
           }
@@ -227,13 +437,48 @@ export class ClaudeCodeAdapter implements AiAdapter {
         resto = ''
       }
 
-      if (sinal === 'SIGKILL' && falha === undefined) {
+      /*
+       * O documento da saída estruturada sai **aqui**, depois da última linha.
+       *
+       * Ele fica retido no parser durante a geração porque o CLI chama `StructuredOutput` mais
+       * de uma vez — repetindo o documento quando não reconhece a primeira chamada —, e emitir
+       * cada uma na hora concatenava dois JSON num texto que nenhum leitor aceita. Vale a
+       * última chamada (decisão do PI, 2026-09-05).
+       *
+       * Não custa streaming: nas gerações com `--json-schema` o documento chega inteiro numa
+       * tacada. A guarda do critério 3 vale igual: documento retido de uma geração que saiu do
+       * contrato não entra.
+       *
+       * Sem documento retido, o texto guardado é a saída (#304): é o caso do CLI que não injetou
+       * a ferramenta, e descartá-lo devolveria "não devolveu saída" sobre um documento que veio.
+       */
+      const retido = documentoRetido(estadoDoParser)
+      for (const evento of retido) {
+        publicar(evento)
+        if (evento.tipo === 'texto' && !ferramentaProibida) empurrar(evento.delta)
+      }
+      if (retido.length === 0 && textoSolto !== '') empurrar(textoSolto)
+
+      if (sinal === 'SIGKILL' && ferramentaProibida) {
+        // O `SIGKILL` **fomos nós** (critério 3), e não o timeout: a geração **termina**, não
+        // falha. O texto anterior ao desvio já está no documento e é honesto; o erro que explica
+        // o corte já foi ao console. Reportar falha aqui descartaria conteúdo válido e diria ao
+        // PI que o CLI travou, quando o que houve foi o modelo sair do contrato.
+      } else if (sinal === 'SIGKILL' && falha === undefined) {
         falha = 'A chamada ao Claude Code CLI excedeu o tempo limite ou foi interrompida.'
       } else if (codigo !== 0 && falha === undefined) {
-        // O stderr **não** entra na mensagem: pode carregar caminho, token de sessão ou
-        // qualquer coisa que o CLI resolva imprimir, e a mensagem de erro é caminho clássico
-        // de vazamento. O código de saída é seguro; o texto, não.
-        falha = `O Claude Code CLI terminou com código ${codigo ?? 'desconhecido'}.`
+        // Flag recusada é o **único** caso em que o stderr vira mensagem, e mesmo assim só o
+        // nome da flag: sem isto a falha chegaria como "terminou com código 1", que esconde a
+        // causa justamente onde ela tem conserto. Nunca cair para a invocação sem isolamento —
+        // rodar sem `--tools ""` é o defeito que esta emenda existe para fechar (critério 6).
+        const flag = flagRecusada(saidaDeErro)
+        falha =
+          flag === undefined
+            ? // O stderr **não** entra na mensagem: pode carregar caminho, token de sessão ou
+              // qualquer coisa que o CLI resolva imprimir, e mensagem de erro é caminho clássico
+              // de vazamento. O código de saída é seguro; o texto, não.
+              `O Claude Code CLI terminou com código ${codigo ?? 'desconhecido'}.`
+            : `O Claude Code CLI não reconhece a opção ${flag}. Atualize o binário \`claude\` para a versão ${VERSAO_MINIMA_DO_CLI} ou mais recente.`
       }
       terminou = true
       acordar?.()
@@ -275,6 +520,10 @@ export class ClaudeCodeAdapter implements AiAdapter {
       // Mata o processo se o consumidor abandonou o iterador no meio (um `break` no
       // `for await`). Sem isto, o filho seguiria rodando e consumindo a assinatura.
       if (!terminou) processo.kill('SIGKILL')
+      // O diretório do run sai por aqui **em todos os desfechos** — conclusão, falha,
+      // cancelamento e timeout —, que é o que o critério 1 da emenda pede. Nunca lança: ver
+      // `abrirRunNeutro`.
+      run.remover()
     }
   }
 }

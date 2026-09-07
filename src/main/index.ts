@@ -1,4 +1,8 @@
 import { dirname, join, resolve } from 'node:path'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
+import { VozService } from './voz/voz-service'
+import { ARTEFATOS_DA_VOZ } from './voz/artefatos'
+import { baixarArtefato } from './voz/download-de-artefato'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { app, BrowserWindow, nativeTheme, shell } from 'electron'
 import { IPC_EVENT_CHANNELS } from '@shared/contracts/ipc'
@@ -17,6 +21,16 @@ import { PhaseModelRepository } from './ai/phase-model-repository'
 import { PhaseModelService } from './ai/phase-model-service'
 import { CodexProfileService } from './ai/codex-profile-service'
 import { CodexAdapter } from './ai/codex-adapter'
+import { abrirRunNeutro, type RunNeutro } from './ai/cwd-neutro'
+import {
+  SCHEMA_DAS_AFIRMACOES,
+  SCHEMA_DO_BRIEF,
+  SCHEMA_DAS_CONTRADICOES,
+  SCHEMA_DAS_PERGUNTAS,
+  SCHEMA_DA_SPEC,
+  SCHEMA_DOS_AJUSTES,
+  SCHEMA_DO_ROADMAP
+} from '@shared/domain/json-schema-da-saida'
 import { GenerationTraceService } from './ai/generation-trace-service'
 import { GenerationTraceRepository } from './ai/generation-trace-repository'
 import { QuotaRepository } from './ai/quota-repository'
@@ -70,7 +84,7 @@ import {
   SISTEMA_DAS_PERGUNTAS,
   SISTEMA_DO_BRIEF,
   lerPerguntasDoModelo,
-  lerSaidaDoModelo,
+  lerSaidaDoModeloDetalhada,
   promptDaGeracao,
   promptDasPerguntas
 } from '@shared/domain/brief-schema'
@@ -357,11 +371,20 @@ if (!app.requestSingleInstanceLock()) {
     })
 
     const ollamaAdapter = new OllamaAdapter()
-    const claudeCodeAdapter = new ClaudeCodeAdapter()
+    /**
+     * O cwd neutro dos dois CLIs (emenda E1 à SPEC-Fases-03).
+     *
+     * Um diretório vazio por geração sob o `userData`, e **não** `process.cwd()`: em dev o
+     * diretório do processo é o repositório do próprio JarvisOS, e o CLI carregava `CLAUDE.md`,
+     * `.claude/`, regras, hooks e MCPs deste projeto para gerar o documento de outro — 230.444
+     * tokens de entrada num refinamento de prompt pequeno.
+     */
+    const abrirRunDoCli = (): RunNeutro => abrirRunNeutro(app.getPath('userData'))
+    const claudeCodeAdapter = new ClaudeCodeAdapter(abrirRunDoCli)
     // O quinto adapter (SPEC-Fases-06): a assinatura do Codex pelo mesmo ponto único. O perfil
     // entra por função e não por valor — quem o resolve é o `CodexProfileService`, e capturá-lo
     // aqui congelaria um caminho que pode mudar.
-    const codexAdapter = new CodexAdapter(process.cwd(), () => codexProfile.codexHome)
+    const codexAdapter = new CodexAdapter(abrirRunDoCli, () => codexProfile.codexHome)
     const adapters = {
       anthropic: new AnthropicAdapter(),
       gemini: new GeminiAdapter(),
@@ -616,7 +639,15 @@ if (!app.requestSingleInstanceLock()) {
        * etapa adiante de uma evidência que não existe.
        */
       concluirMarco: (projectId, marco, workspace) =>
-        projects.concluirMarco(projectId, marco, workspace)?.commitado ?? false
+        projects.concluirMarco(projectId, marco, workspace)?.commitado ?? false,
+      /*
+       * O brief gerado fecha o refinamento (#281, decisão do PI de 2026-09-05).
+       *
+       * Lazy de propósito: o `briefRepository` nasce depois deste serviço, e antecipá-lo só
+       * para esta linha reordenaria o wiring inteiro. A closure é resolvida na primeira
+       * leitura da jornada, muito depois de os dois existirem.
+       */
+      temBrief: (projectId) => briefRepository.briefVigente(userIdAtual(), projectId) !== undefined
     })
 
     // O prompt e o brief refinado (SPEC-Jornada-02).
@@ -783,6 +814,7 @@ if (!app.requestSingleInstanceLock()) {
             provider: rota,
             ...(model === undefined ? {} : { model }),
             system: SISTEMA_DAS_PERGUNTAS,
+            jsonSchema: SCHEMA_DAS_PERGUNTAS,
             prompt: promptDasPerguntas(prompt, blocosEmAberto),
             contextPackId,
             console: { projectId, etapa: 'refinamento' }
@@ -860,9 +892,21 @@ if (!app.requestSingleInstanceLock()) {
             provider: rota,
             ...(model === undefined ? {} : { model }),
             system: SISTEMA_DO_BRIEF,
+            // O brief é o único contrato da jornada com duas chaves de topo (#280): as
+            // pendências vivem ao lado das afirmações, e o schema de uma chave só as proibia.
+            jsonSchema: SCHEMA_DO_BRIEF,
             prompt: promptDaGeracao(prompt, decisoes, correcao),
             contextPackId,
-            console: { projectId, etapa: 'brief-aceito' }
+            /*
+             * A etapa **onde a geração acontece**, não a que ela desbloqueia (#281).
+             *
+             * O console do `ProjetoAberto` filtra pela etapa da tela corrente. Com o brief
+             * nascendo no fim do refinamento, registrar `brief-aceito` aqui esconderia do PI o
+             * console da própria geração que ele acabou de disparar — ele só apareceria depois
+             * de a jornada avançar, quando já não há o que acompanhar. As duas etapas são da
+             * fase `planejamento`, então o isolamento do CLI não muda.
+             */
+            console: { projectId, etapa: 'refinamento' }
           },
           { userId: userIdAtual(), workspace }
         )) {
@@ -877,8 +921,19 @@ if (!app.requestSingleInstanceLock()) {
           if (evento.estado !== 'concluido') return {}
         }
 
-        const saida = lerSaidaDoModelo(texto)
-        return saida === undefined ? {} : { saida }
+        // A leitura **detalhada**: o motivo da recusa vem junto, e é ele que separa "o modelo
+        // respondeu em português explicando um impedimento" de "o JSON veio quebrado". Sem essa
+        // distinção os dois chegavam à tela do PI como a mesma frase de erro.
+        const leitura = lerSaidaDoModeloDetalhada(texto)
+
+        return leitura.saida === undefined
+          ? {
+              ...(leitura.recusa === undefined ? {} : { recusa: leitura.recusa }),
+              ...(leitura.textoDoModelo === undefined
+                ? {}
+                : { textoDoModelo: leitura.textoDoModelo })
+            }
+          : { saida: leitura.saida }
       }
     })
 
@@ -896,6 +951,7 @@ if (!app.requestSingleInstanceLock()) {
     const prd = new PrdService({
       repository: new PrdRepository(storage.db),
       pacotes: pacoteRepository,
+      decisions: new DecisionRepository(storage.db),
       projects: projectRepository,
       projectService: projects,
       connectors,
@@ -915,6 +971,29 @@ if (!app.requestSingleInstanceLock()) {
         return brief.carregar(projectId)
       },
       decisoesDoRefinamento: (projectId) => refinamento.decisoesParaOBrief(projectId),
+      /*
+       * O progresso da geração do pacote (SPEC-Jornada-03 § Geração).
+       *
+       * Vai pelo **mesmo canal** dos eventos do console, e não por um canal novo: o transporte
+       * já existe, o preload já o entrega e o painel já filtra por `traceId`. Um segundo canal
+       * para a mesma tela seria uma segunda coisa a manter, autorizar e testar.
+       *
+       * O `traceId` é derivado do projeto (`etapas:<projectId>`) em vez de sorteado: as etapas
+       * atravessam várias chamadas ao modelo, e um id novo a cada anúncio faria a tela tratar
+       * cada etapa como uma geração diferente. Derivado, ele é o mesmo do começo ao fim — e não
+       * colide com os traces do console, que são UUID.
+       *
+       * `isDestroyed` pela mesma razão do console: a corrida entre a geração e o fechamento da
+       * janela é normal, e um `send` para janela morta lança de dentro do Electron.
+       */
+      anunciarEtapa: (projectId, etapa, estado, resumo) => {
+        if (janela === undefined || janela.isDestroyed()) return
+
+        janela.webContents.send(IPC_EVENT_CHANNELS.generationEvent, {
+          traceId: `etapas:${projectId}`,
+          evento: { tipo: 'etapa', etapa, estado, ...(resumo === undefined ? {} : { resumo }) }
+        })
+      },
       montarContexto: montarContextoDoPrompt,
       estadoDasRotas: (projectId, workspace) =>
         estadoDasRotasDoProjeto(projectId, workspace, 'planejamento'),
@@ -951,6 +1030,7 @@ if (!app.requestSingleInstanceLock()) {
               provider: rota,
               ...(model === undefined ? {} : { model }),
               system: SISTEMA_DO_PRD,
+              jsonSchema: SCHEMA_DAS_AFIRMACOES,
               prompt: promptDoPrd(entrada),
               contextPackId,
               console: { projectId, etapa: 'prd' }
@@ -963,7 +1043,14 @@ if (!app.requestSingleInstanceLock()) {
         const afirmacoes = lerDocumentosDoModelo(texto)
         return afirmacoes === undefined ? {} : { afirmacoes }
       },
-      detectarContradicoes: async ({ projectId, workspace, rota, contextPackId, afirmacoes }) => {
+      detectarContradicoes: async ({
+        projectId,
+        workspace,
+        rota,
+        contextPackId,
+        afirmacoes,
+        decisoes
+      }) => {
         const model = modeloDaGeracao('prd', rota, projectId, workspace)
         const texto = await coletarTexto(
           ai.call(
@@ -971,7 +1058,8 @@ if (!app.requestSingleInstanceLock()) {
               provider: rota,
               ...(model === undefined ? {} : { model }),
               system: SISTEMA_DAS_CONTRADICOES,
-              prompt: promptDasContradicoes(afirmacoes),
+              jsonSchema: SCHEMA_DAS_CONTRADICOES,
+              prompt: promptDasContradicoes(afirmacoes, decisoes),
               contextPackId,
               console: { projectId, etapa: 'prd' }
             },
@@ -1033,6 +1121,7 @@ if (!app.requestSingleInstanceLock()) {
               provider: rota,
               ...(model === undefined ? {} : { model }),
               system: SISTEMA_DA_ARQUITETURA,
+              jsonSchema: SCHEMA_DAS_AFIRMACOES,
               prompt: promptDaArquitetura(entrada),
               contextPackId,
               console: { projectId, etapa: 'arquitetura' }
@@ -1051,6 +1140,7 @@ if (!app.requestSingleInstanceLock()) {
             {
               provider: rota,
               system: SISTEMA_DA_COERENCIA,
+              jsonSchema: SCHEMA_DOS_AJUSTES,
               prompt: promptDaCoerencia({ requisitos, jornadas }),
               contextPackId
             },
@@ -1103,6 +1193,7 @@ if (!app.requestSingleInstanceLock()) {
               provider: rota,
               ...(model === undefined ? {} : { model }),
               system: SISTEMA_DO_ROADMAP,
+              jsonSchema: SCHEMA_DO_ROADMAP,
               prompt: promptDoRoadmap(entrada),
               contextPackId,
               console: { projectId, etapa: 'roadmap' }
@@ -1134,6 +1225,7 @@ if (!app.requestSingleInstanceLock()) {
               provider: rota,
               ...(model === undefined ? {} : { model }),
               system: SISTEMA_DA_SPEC,
+              jsonSchema: SCHEMA_DA_SPEC,
               prompt: promptDaSpec({
                 mvp,
                 fatia,
@@ -1350,7 +1442,53 @@ if (!app.requestSingleInstanceLock()) {
     // pé — e o WIP=1 valeria para os runs que ele conhece, não para a máquina.
     await reconciliacao.reconcileAll()
 
+    /*
+     * A voz (SPEC-Voz-01), primeira entrega.
+     *
+     * O engine concreto — faster-whisper no sidecar Python — é a **segunda** entrega desta
+     * fatia. Aqui ele é o engine ausente: `disponivel()` responde `false`, então a tela mostra
+     * "runtime não instalado" com a ação de baixar, que é literalmente o estado da máquina de
+     * quem abre o app hoje. Não é dublê de teste disfarçado de produção: é o comportamento
+     * honesto enquanto o runtime não existe, e é o caminho do critério 4.
+     */
+    const voz = new VozService({
+      engine: {
+        transcribe: () => Promise.reject(new Error('O runtime de voz ainda não foi instalado.')),
+        disponivel: async () => false,
+        encerrar: async () => undefined
+      },
+      artefatosFaltando: () => ARTEFATOS_DA_VOZ.map((a) => a.id),
+      computeAtual: () => 'cpu-int8'
+    })
+
     registerIpcHandlers({
+      voz,
+      baixarArtefatoDeVoz: async (id) => {
+        const artefato = ARTEFATOS_DA_VOZ.find((a) => a.id === id)
+        if (artefato === undefined) {
+          return { estado: 'falhou', motivo: 'Artefato desconhecido.' }
+        }
+
+        return baixarArtefato(artefato, {
+          buscar: async (url) => Buffer.from(await (await fetch(url)).arrayBuffer()),
+          gravar: async (destino, dados) => {
+            const alvo = join(app.getPath('userData'), destino)
+            await mkdir(dirname(alvo), { recursive: true })
+            await writeFile(alvo, dados)
+          },
+          apagar: async (destino) => {
+            await rm(join(app.getPath('userData'), destino), { force: true })
+          },
+          auditar: (evento) =>
+            storage.audit.append({
+              user_id: userIdAtual(),
+              type: evento.type,
+              payload: evento.payload
+            }),
+          // Fail closed: só as URLs pinadas no catálogo passam.
+          permitido: (url) => ARTEFATOS_DA_VOZ.some((a) => a.url === url)
+        })
+      },
       audit: storage.audit,
       workspaces,
       preferences,

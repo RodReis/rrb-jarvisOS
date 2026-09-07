@@ -125,6 +125,29 @@ function mockarPonte(): void {
       setGithubClientId,
       // Devolve a função de cancelamento, como a ponte real: sem isso o `useEffect`
       // tentaria chamar `undefined` na desmontagem e o cleanup estouraria.
+      /*
+       * A rota inicial do JARVIS passou a ser `projects` (SPEC-Shell-01, regra 6): a `inicio`
+       * saiu, e o primeiro item visível é o Projects Hub. Entrar no shell monta a lista de
+       * projetos, então o dublê precisa dela — sem isto o efeito estoura antes de o teste
+       * chegar ao que mede, num arquivo que não é sobre projetos.
+       */
+      /*
+       * A rota inicial do JARVIS virou `voz` (SPEC-Voz-01): COMANDO acendeu com o microfone e
+       * vem antes de NEGÓCIOS na ordem do protótipo. Entrar no shell consulta a prontidão da
+       * voz, então o dublê precisa dela — sem isto a tela nem monta, num arquivo que não é
+       * sobre voz.
+       */
+      prontidaoDaVoz: vi.fn(async () => ({ pronta: false, faltando: [], compute: 'cpu-int8' })),
+      transcreverAudio: vi.fn(async () => ({ estado: 'sem-audio' })),
+      baixarArtefatoDeVoz: vi.fn(async () => ({ estado: 'ok' })),
+      listProjects: vi.fn(async () => []),
+      createProject: vi.fn(),
+      openProject: vi.fn(),
+      // O Terminal é item de SISTEMA desde a SPEC-Shell-01 (regra 5).
+      listAllowedCommands: vi.fn(async () => []),
+      runCommand: vi.fn(),
+      listCommandHistory: vi.fn(async () => []),
+      listPermittedDirectories: vi.fn(async () => []),
       onAuthChanged: vi.fn(() => () => undefined)
     },
     configurable: true,
@@ -223,24 +246,20 @@ describe('AppShell', () => {
     // O cenário exato do critério de aceite, agora pela UI real.
     await entrarPelaChoice()
 
-    // Navega no JARVIS até "Operações".
-    await userEvent.click(screen.getByRole('button', { name: 'Operações' }))
-    expect(screen.getByRole('button', { name: 'Operações' })).toHaveAttribute(
-      'aria-current',
-      'page'
-    )
+    // Navega no JARVIS até "Terminal". Era "Operações" antes da SPEC-Shell-01 — que a moveu
+    // para o Agents OS como "Operator Central" —, e o Terminal ocupa o mesmo papel aqui: uma
+    // rota do Professional Ops diferente da inicial. O que se mede continua sendo o isolamento.
+    await userEvent.click(screen.getByRole('button', { name: 'Terminal' }))
+    expect(screen.getByRole('button', { name: 'Terminal' })).toHaveAttribute('aria-current', 'page')
 
     // Vai para o NOA: a rota do JARVIS não pode aparecer aqui.
     await trocarPara('NOA')
-    expect(screen.queryByRole('button', { name: 'Operações' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Terminal' })).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Agenda' }))
 
     // Volta ao JARVIS: a rota dele foi preservada.
     await trocarPara('JARVIS OS')
-    expect(screen.getByRole('button', { name: 'Operações' })).toHaveAttribute(
-      'aria-current',
-      'page'
-    )
+    expect(screen.getByRole('button', { name: 'Terminal' })).toHaveAttribute('aria-current', 'page')
     expect(screen.queryByRole('button', { name: 'Agenda' })).not.toBeInTheDocument()
   })
 
@@ -277,7 +296,7 @@ describe('AppShell', () => {
     expect(minimizeToTray).toHaveBeenCalled()
   })
 
-  it('mostra aprovações pendentes em Operações e resolve pela ponte', async () => {
+  it('mostra aprovações pendentes em Operator Central e resolve pela ponte', async () => {
     listPendingApprovals.mockResolvedValueOnce([
       {
         id: 'apr-1',
@@ -295,7 +314,11 @@ describe('AppShell', () => {
     ])
 
     await entrarPelaChoice()
-    await userEvent.click(screen.getByRole('button', { name: 'Operações' }))
+    // A fila de aprovação virou "Operator Central", no **Agents OS** (SPEC-Shell-01): é
+    // governança, não "Operações" — que no protótipo é Kanban/Workflows. Chegar nela agora
+    // passa pelo rail, e é isso que o clique a mais representa.
+    await userEvent.click(screen.getByRole('button', { name: /agents os/i }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Operator Central' }))
 
     expect(await screen.findByText('Etapa s-read')).toBeInTheDocument()
     expect(
@@ -333,7 +356,11 @@ describe('AppShell', () => {
     ])
 
     await entrarPelaChoice()
-    await userEvent.click(screen.getByRole('button', { name: 'Operações' }))
+    // A fila de aprovação virou "Operator Central", no **Agents OS** (SPEC-Shell-01): é
+    // governança, não "Operações" — que no protótipo é Kanban/Workflows. Chegar nela agora
+    // passa pelo rail, e é isso que o clique a mais representa.
+    await userEvent.click(screen.getByRole('button', { name: /agents os/i }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Operator Central' }))
     await screen.findByText('Etapa s-delete')
 
     // O risco alto se lê como texto, não só pelo tom: quem não distingue cor continua sabendo.
@@ -382,7 +409,7 @@ describe('Settings (SPEC-05)', () => {
   /** Entra pela CHOICE e abre a tela de Settings do espaço ativo. */
   async function abrirSettings(): Promise<void> {
     await entrarPelaChoice()
-    await userEvent.click(screen.getByRole('button', { name: 'Configurações' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
   }
 
   it('é acessível nos dois workspaces', async () => {
@@ -391,7 +418,7 @@ describe('Settings (SPEC-05)', () => {
 
     // Troca de espaço e confirma que a tela continua alcançável.
     await trocarPara('NOA')
-    await userEvent.click(screen.getByRole('button', { name: 'Configurações' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
     expect(screen.getByRole('combobox', { name: 'Idioma' })).toBeInTheDocument()
   })
 

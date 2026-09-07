@@ -2,6 +2,7 @@ import * as RadixSelect from '@radix-ui/react-select'
 import { Check, ChevronDown } from 'lucide-react'
 import type { AtributosDoControle } from './Field'
 import { ALTURA_CONTROLE, BORDA, cx, DESABILITADO, FOCO, SUPERFICIE, TRANSICAO } from './base'
+import { useContainerDeOverlay } from '../tokens/provider'
 
 /**
  * Seleção de uma opção (SPEC-DesignSystem-03a, PRD §11.2; critério 3).
@@ -38,6 +39,22 @@ export function Select({
   desabilitado = false,
   ...campo
 }: SelectProps): React.JSX.Element {
+  /*
+   * O nó do `ProvedorDeTema` — o mesmo conserto que o FIX #107 aplicou aos `Overlays`, e que
+   * **nunca chegou aqui**.
+   *
+   * Os tokens `--jos-*` são `style` inline no `div` do provider, não em `:root`. Sem `container`,
+   * o Radix monta o portal no `<body>`, fora dessa subárvore, e lá **toda** variável resolve para
+   * vazio: a lista sai sem fundo (transparente sobre o conteúdo), sem raio, sem sombra e sem
+   * `z-index` — então qualquer elemento posicionado da página passa por cima dela.
+   *
+   * Foi exatamente o que a captura do PI mostrou nas duas telas de escolha de modelo: as opções
+   * legíveis por cima da prosa atrás delas, e o botão da página cruzando o dropdown. O `Dialog` e
+   * o `Popover` já estavam corrigidos; o `Select` e o `Combobox` ficaram para trás porque a
+   * correção foi feita arquivo a arquivo, e ninguém varreu os outros `Portal` do DS.
+   */
+  const container = useContainerDeOverlay()
+
   return (
     <RadixSelect.Root value={valor} onValueChange={onMudar} disabled={desabilitado}>
       <RadixSelect.Trigger
@@ -61,18 +78,32 @@ export function Select({
         </RadixSelect.Icon>
       </RadixSelect.Trigger>
 
-      <RadixSelect.Portal>
+      <RadixSelect.Portal container={container}>
         <RadixSelect.Content
           position="popper"
           sideOffset={6}
           className={cx(
-            'z-[var(--jos-camada-overlay)] min-w-[var(--radix-select-trigger-width)] overflow-hidden',
+            /*
+             * Largura pelo **conteúdo**, com o gatilho como piso — não `w-[trigger-width]`.
+             *
+             * O rótulo de modelo tem três segmentos ("Claude Code CLI · Opus 5 ·
+             * claude-opus-5"), e numa coluna estreita a lista herdava a largura do campo e
+             * truncava cada opção. O PI escolhia entre reticências. O teto na largura
+             * disponível impede que a lista saia da janela ao crescer.
+             */
+            'z-[var(--jos-camada-overlay)] w-max overflow-hidden',
+            'min-w-[var(--radix-select-trigger-width)]',
+            'max-w-[min(var(--jos-tamanho-lista-maxima),var(--radix-select-content-available-width))]',
+            // Teto de altura na altura disponível, e rolagem no viewport interno: um catálogo
+            // de modelos que cresça acima da janela empurraria as últimas opções para fora da
+            // tela — sem barra, sem sinal de que existem, e sem alcance por mouse.
+            'max-h-[var(--radix-select-content-available-height)]',
             'rounded-[var(--jos-raio-card)] shadow-[var(--jos-sombra-card)]',
             BORDA,
-            'bg-[var(--jos-cor-superficie-elevada)]'
+            'bg-[var(--jos-cor-superficie-overlay)]'
           )}
         >
-          <RadixSelect.Viewport className="p-1">
+          <RadixSelect.Viewport className="max-h-[inherit] overflow-y-auto p-1">
             {opcoes.map((o) => (
               <RadixSelect.Item
                 key={o.valor}
@@ -81,6 +112,9 @@ export function Select({
                 className={cx(
                   'relative flex cursor-default select-none items-center gap-2 rounded-[var(--jos-raio-chip)]',
                   'py-2 pl-8 pr-3 text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto)] outline-none',
+                  // Uma opção por linha: com o rótulo quebrando, o check da esquerda descolava
+                  // da segunda linha e a lista deixava de se ler como uma coluna de escolhas.
+                  'whitespace-nowrap',
                   'data-[highlighted]:bg-[color-mix(in_srgb,var(--jos-cor-acento)_14%,transparent)]',
                   'data-[disabled]:opacity-45'
                 )}

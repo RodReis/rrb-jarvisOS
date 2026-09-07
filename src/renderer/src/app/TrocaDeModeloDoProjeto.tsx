@@ -6,7 +6,7 @@ import type { RotaComModelo } from '@shared/domain/modelo-da-fase'
 import type { DecisaoDeRota } from '@shared/domain/rota-de-geracao'
 import { ROTULO_DA_FASE } from '@shared/domain/fase'
 import { modelosDoCatalogo, rotuloDoModelo } from '@shared/domain/modelo-da-fase'
-import { Button, Field, IconButton, Popover, Select } from '@design/ui'
+import { Button, ChipButton, Field, Popover, Select } from '@design/ui'
 import { log } from '../lib/log'
 
 /**
@@ -140,34 +140,36 @@ export function TrocaDeModeloDoProjeto({
   return (
     <Popover
       gatilho={
-        <IconButton
+        /*
+         * O **id** do modelo e o gatilho, nao o rotulo curto: o selo ja dizia `ROTA · modelo`
+         * com o id, e e o id que aparece no ledger (SPEC-Fases-01, criterio 4 — "rota e modelo
+         * do card sao os mesmos que a geracao usa"). Trocar por "Opus 5" aqui faria o card e a
+         * evidencia deixarem de casar. O rotulo curto vive no combo, onde ha espaco para os dois.
+         *
+         * `ChipButton`, e nao `IconButton`: o segundo fixa 44x44px por desenho — e a captura
+         * mostrou `claude-opus-5` quebrando em "CLAUDE-" / "OPUS-5" dentro de uma caixa que nao
+         * cresce, com o texto vazando por fora da borda. O chip cresce com o conteudo e mantem a
+         * altura da linha de metadados, que e onde ele vive.
+         *
+         * O ponto de divergencia continua sendo **forma**, nao so cor: o criterio do DS e que
+         * estado nunca viva so na cor, e o rotulo acessivel diz por extenso o que o ponto marca.
+         */
+        <ChipButton
           desabilitado={bloqueada}
+          divergente={temOverride}
           rotulo={
             bloqueada
               ? 'Trocar o modelo não está disponível: nenhuma rota autorizada para este projeto'
-              : `Trocar o modelo da fase ${ROTULO_DA_FASE[fase]} deste projeto`
+              : temOverride
+                ? `Modelo ${modelo}, escolhido só para este projeto. Trocar o modelo da fase ${ROTULO_DA_FASE[fase]}`
+                : `Modelo ${modelo}, o padrão do espaço. Trocar o modelo da fase ${ROTULO_DA_FASE[fase]}`
           }
         >
-          {/*
-           * O **id** do modelo e o gatilho, nao o rotulo curto: o selo ja dizia `ROTA · modelo`
-           * com o id, e e o id que aparece no ledger (SPEC-Fases-01, criterio 4 — "rota e modelo
-           * do card sao os mesmos que a geracao usa"). Trocar por "Opus 5" aqui faria o card e a
-           * evidencia deixarem de casar. O rotulo curto vive no combo, onde ha espaco para os
-           * dois.
-           *
-           * Transformar o modelo em botao mantem a leitura e ganha a acao, sem um icone a mais
-           * competindo pela atencao numa linha que o PI varre em doze cards. O ponto depois do id
-           * marca "este projeto diverge do espaco" — forma, e nao so cor, porque o criterio do DS
-           * e que estado nunca viva so na cor.
-           */}
-          <span className="font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] uppercase tracking-[2px]">
-            {modelo}
-            {temOverride ? ' ·' : ''}
-          </span>
-        </IconButton>
+          {modelo}
+        </ChipButton>
       }
     >
-      <div className="flex w-[18rem] flex-col gap-3">
+      <div className="flex w-[17rem] max-w-full flex-col gap-3">
         <p className="text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-suave)]">
           O modelo da fase {ROTULO_DA_FASE[fase]} neste projeto. Sem escolha aqui, vale o padrão do
           espaço.

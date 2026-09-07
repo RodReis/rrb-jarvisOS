@@ -8,7 +8,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=24.15.0"
   },
   "scripts": {
     "dev": "electron-vite dev",
@@ -24,6 +24,9 @@
     "test:prova": "playwright test --config playwright.prova.config.ts",
     "test:report": "node scripts/test-report.mjs",
     "test:report:check": "node scripts/test-report.mjs --check",
+    "test:report:regras": "node scripts/test-report.mjs --project regras",
+    "test:report:banco": "node scripts/test-report.mjs --project banco",
+    "test:report:tela": "node scripts/test-report.mjs --project tela",
     "test:report:selfcheck": "node scripts/test-report.mjs --selfcheck"
   },
   "devDependencies": {
@@ -37,7 +40,7 @@
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
     "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^22.19.0",
+    "@types/node": "^24.13.3",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "@vitejs/plugin-react": "^5.1.0",

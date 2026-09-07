@@ -100,6 +100,19 @@ describe('logger do main', () => {
     expect(error.map((r) => r.level)).toEqual(['error'])
   })
 
+  it('debug não vai para arquivo nenhum — ele existe só no console de dev (#319)', async () => {
+    // O nível nasceu para tirar do `info` o que é registro de máquina (auditoria, política,
+    // comando), sem apagá-lo. Gravá-lo em arquivo criaria um quarto arquivo com retenção que
+    // ninguém decidiu, e o volume que motivou a mudança voltaria pelo disco.
+    log.db.debug('Evento de auditoria registrado', { op: 'insert' })
+    log.sistema.info('Aplicação iniciada')
+
+    // O `info` é a âncora: ele aparece, o `debug` do mesmo instante não.
+    const info = await lerRegistros('info-')
+    expect(info.map((r) => r.msg)).toEqual(['Aplicação iniciada'])
+    expect(readdirSync(logsDir).some((nome) => nome.startsWith('debug-'))).toBe(false)
+  })
+
   it('etiqueta o registro com o workspace ativo', async () => {
     setCurrentWorkspace('noa')
     log.ui.info('Tela aberta')

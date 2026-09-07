@@ -53,6 +53,52 @@ test.describe('critério 1 — o grid do protótipo tem as medidas certas', () =
     expect(rodape?.height).toBe(34)
   })
 
+  test('o shell preenche a janela — o rodapé encosta no fim', async ({ page }) => {
+    await abrir(page, 'modo=dark&modulo=jarvis')
+
+    /*
+     * O defeito que isto pega (achado por captura do PI em 2026-09-06): o rodapé parava no meio
+     * da tela, com uma faixa vazia até o fim da janela.
+     *
+     * A causa era uma **quebra na cadeia de altura**: `html`, `body` e `#root` declaram 100%, e
+     * o shell pede `h-full` — mas o `div` do `ProvedorDeTema`, entre os dois, não tinha altura
+     * nenhuma. `h-full` resolve contra o pai, e um pai de altura automática o zera.
+     *
+     * Nenhum teste de papel pega isto: os elementos estão todos lá, com os papéis e a ordem
+     * certos. Só medida em navegador vê que o layout não chegou ao fim.
+     */
+    const viewport = page.viewportSize()
+    const rodape = await page.locator('[data-jos-rodape]').boundingBox()
+
+    expect(viewport).not.toBeNull()
+    expect(rodape).not.toBeNull()
+    // Tolerância de 1px para arredondamento de layout; a faixa vazia do defeito tinha ~280px.
+    expect(
+      Math.abs((rodape?.y ?? 0) + (rodape?.height ?? 0) - (viewport?.height ?? 0))
+    ).toBeLessThanOrEqual(1)
+  })
+
+  test('o provider não vira caixa — ele não pode deslocar o que envolve', async ({ page }) => {
+    await abrir(page, 'modo=dark&modulo=jarvis')
+
+    /*
+     * A regressão que isto trava (2026-09-06): a primeira tentativa de consertar a altura deu
+     * `height: 100%` ao `div` do `ProvedorDeTema`. Resolveu o shell **e quebrou a CHOICE** —
+     * cada card reabre o provider, e ali o `div` esticou para a altura da tela, empurrando os
+     * cards para o topo de um contêiner que pedia `items-center`.
+     *
+     * Consertar um lugar e quebrar outro é o sinal de que a caixa não devia existir:
+     * `display: contents` tira o `div` da formatação, e os filhos passam a ser filhos diretos
+     * do pai real. As variáveis continuam herdando, porque herança não depende de caixa.
+     */
+    const display = await page
+      .locator('[data-jos-tema]')
+      .first()
+      .evaluate((el) => getComputedStyle(el).display)
+
+    expect(display).toBe('contents')
+  })
+
   test('as quatro regiões não se sobrepõem e o conteúdo fica à direita da sidebar', async ({
     page
   }) => {

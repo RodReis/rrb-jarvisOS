@@ -1,3 +1,5 @@
+import type { VozService } from '../voz/voz-service'
+import type { DesfechoDoDownload } from '@shared/domain/voz'
 import { app, dialog, ipcMain } from 'electron'
 import {
   IPC_CHANNELS,
@@ -168,6 +170,33 @@ function parsePolicyContext(value: unknown): PolicyContext {
     workspace,
     ...(sensitivity ? { sensitivity } : {}),
     ...(detail ? { detail } : {})
+  }
+}
+
+/**
+ * A **forma** de uma `Resposta` vinda do renderer. O vocabulário — a escolha ser opção real, a
+ * delegação ser permitida — é do serviço; barrar aqui duplicaria a regra em dois lugares que
+ * divergiriam. `undefined` é "forma inválida", e quem chama decide o outcome.
+ */
+function lerResposta(resposta: unknown): Resposta | undefined {
+  const r = resposta as Partial<Resposta> | null
+  if (
+    r === null ||
+    typeof r !== 'object' ||
+    typeof r.perguntaId !== 'string' ||
+    (r.escolha !== null && typeof r.escolha !== 'string') ||
+    (r.texto !== null && typeof r.texto !== 'string') ||
+    (r.autor !== 'pi' && r.autor !== 'agente')
+  ) {
+    return undefined
+  }
+
+  return {
+    perguntaId: r.perguntaId,
+    escolha: r.escolha ?? null,
+    texto: r.texto ?? null,
+    autor: r.autor,
+    ...(r.aceitarSubstituicao === true ? { aceitarSubstituicao: true } : {})
   }
 }
 
@@ -368,6 +397,9 @@ export interface IpcDependencies {
   readonly runs: ExecutionRepository
   /** Fila de aprovações pendentes do usuário corrente. */
   readonly approvals: ApprovalRepository
+  /** O serviço de voz (SPEC-Voz-01). Injetado como todo o resto — o IPC não conhece o engine. */
+  readonly voz: VozService
+  readonly baixarArtefatoDeVoz: (id: string) => Promise<DesfechoDoDownload>
   /** Ausente quando as credenciais não estão configuradas — o app roda sem login. */
   readonly auth?: AuthService
   /** Ponto único de chamada de IA (SPEC-Providers-02): classifica, estima, audita, mede. */
@@ -736,6 +768,29 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       return deps.runs.list(deps.userId(), workspace)
     }
   )
+
+  /*
+   * Voz (SPEC-Voz-01, critério 3).
+   *
+   * Três canais, e o que eles **devolvem** é o ponto: texto ou desfecho nomeado. Nada de
+   * caminho de modelo, comando ou PID — com isso na mão, a tela deixaria de falar com uma
+   * capacidade e passaria a falar com uma implementação.
+   */
+  ipcMain.handle(IPC_CHANNELS.vozTranscrever, async (_event, pcm: unknown) => {
+    // O PCM atravessa a ponte como `Int16Array`; qualquer outra coisa é chamada malformada, e
+    // tratá-la como áudio vazio dá à tela o desfecho honesto em vez de uma exceção opaca.
+    if (!(pcm instanceof Int16Array)) return { estado: 'sem-audio' as const }
+    return deps.voz.transcrever(pcm)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.vozProntidao, async () => deps.voz.prontidao())
+
+  ipcMain.handle(IPC_CHANNELS.vozBaixarArtefato, async (_event, id: unknown) => {
+    if (typeof id !== 'string') {
+      return { estado: 'falhou' as const, motivo: 'Artefato não identificado.' }
+    }
+    return deps.baixarArtefatoDeVoz(id)
+  })
 
   ipcMain.handle(IPC_CHANNELS.approvalList, (_event, workspace: unknown) => {
     if (!isWorkspaceId(workspace)) return []
@@ -1921,6 +1976,30 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     }
   )
 
+  ipcMain.handle(
+    IPC_CHANNELS.prdContradicoes,
+    (_event, projectId: unknown, workspace: unknown): VistaDoWizard | null => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return null
+      return deps.prd.contradicoes(projectId) ?? null
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.prdResponderContradicao,
+    (_event, projectId: unknown, resposta: unknown, workspace: unknown): RespostaOutcome => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
+        return { reason: 'projeto-inexistente', mensagem: 'Projeto não encontrado.' }
+      }
+
+      const lida = lerResposta(resposta)
+      if (lida === undefined) {
+        return { reason: 'escolha-invalida', mensagem: 'Resposta com forma inválida.' }
+      }
+
+      return deps.prd.responderContradicao(projectId, lida, workspace)
+    }
+  )
+
   /*
    * A arquitetura, as decisões, os testes e a revisão gerados por IA (SPEC-Jornada-04).
    *
@@ -2023,29 +2102,12 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       }
       if (!isWorkspaceId(workspace) || typeof projectId !== 'string') return invalida
 
-      const r = resposta as Partial<Resposta> | null
-      if (
-        r === null ||
-        typeof r !== 'object' ||
-        typeof r.perguntaId !== 'string' ||
-        (r.escolha !== null && typeof r.escolha !== 'string') ||
-        (r.texto !== null && typeof r.texto !== 'string') ||
-        (r.autor !== 'pi' && r.autor !== 'agente')
-      ) {
+      const lida = lerResposta(resposta)
+      if (lida === undefined) {
         return { reason: 'escolha-invalida', mensagem: 'Resposta com forma inválida.' }
       }
 
-      return deps.refinamento.responder(
-        projectId,
-        {
-          perguntaId: r.perguntaId,
-          escolha: r.escolha ?? null,
-          texto: r.texto ?? null,
-          autor: r.autor,
-          ...(r.aceitarSubstituicao === true ? { aceitarSubstituicao: true } : {})
-        },
-        workspace
-      )
+      return deps.refinamento.responder(projectId, lida, workspace)
     }
   )
 

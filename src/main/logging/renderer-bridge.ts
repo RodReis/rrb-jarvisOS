@@ -15,13 +15,18 @@ import electronLog from 'electron-log/main'
 import type { LogCategory, LogLevel } from '@shared/contracts/logging'
 import { writeLog } from './logger'
 
-/** `electron-log` tem níveis que o contrato não grava; mapeiam para o mais próximo. */
+/**
+ * `electron-log` tem níveis que o contrato não tem; mapeiam para o mais próximo.
+ *
+ * `debug` e os abaixo dele deixam de virar `info` (#319): promover ruído a narrativa é
+ * exatamente o que o nível novo existe para desfazer. `verbose` e `silly` acompanham — são mais
+ * baixos que `debug`, e o contrato não tem onde colocá-los separadamente.
+ */
 function toContractLevel(level: string): LogLevel | undefined {
   if (level === 'error') return 'error'
   if (level === 'warn') return 'warn'
-  if (level === 'info' || level === 'verbose' || level === 'debug' || level === 'silly') {
-    return 'info'
-  }
+  if (level === 'info') return 'info'
+  if (level === 'verbose' || level === 'debug' || level === 'silly') return 'debug'
   return undefined
 }
 

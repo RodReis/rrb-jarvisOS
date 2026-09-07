@@ -17,6 +17,7 @@ import {
   type LogCategory,
   type LogInput,
   type LogLevel,
+  type NivelEmArquivo,
   type LogRecord
 } from '@shared/contracts/logging'
 import { redactContext } from '@shared/contracts/logging-redaction'
@@ -39,7 +40,7 @@ export function getCurrentWorkspace(): LogRecord['workspace'] {
  * único transport por nível colocaria os `error` também no arquivo de info — e eles seriam
  * podados em 3 dias em vez de 10. O filtro abaixo restringe cada transport ao seu nível exato.
  */
-function exactLevel(level: LogLevel): winston.Logform.Format {
+function exactLevel(level: NivelEmArquivo): winston.Logform.Format {
   return winston.format((info) => (info.level === level ? info : false))()
 }
 
@@ -55,7 +56,7 @@ const fileFormat = winston.format.combine(
   winston.format.json()
 )
 
-function buildTransport(level: LogLevel, dirname: string): DailyRotateFile {
+function buildTransport(level: NivelEmArquivo, dirname: string): DailyRotateFile {
   return new DailyRotateFile({
     dirname,
     filename: `${level}-%DATE%.log`,
@@ -84,8 +85,17 @@ export function initLogger(logsDir: string, { console = false } = {}): winston.L
 
   mkdirSync(logsDir, { recursive: true })
 
+  /*
+   * A raiz aceita `debug`; os **transportes de arquivo** continuam sendo só os de `LOG_LEVELS`,
+   * cada um filtrado ao seu nível exato (#319).
+   *
+   * Sem subir a raiz, o `debug` morreria antes de qualquer transporte — inclusive o console de
+   * desenvolvimento, que já pedia `debug` e nunca recebia. Subir a raiz **sem** manter os
+   * transportes restritos faria o oposto: um arquivo `debug-*.log` com retenção que ninguém
+   * decidiu, engolindo o volume que a mudança existe para tirar da frente.
+   */
   logger = winston.createLogger({
-    level: 'info',
+    level: 'debug',
     transports: LOG_LEVELS.map((level) => buildTransport(level, logsDir))
   })
 
@@ -141,7 +151,12 @@ function categoryLogger(category: LogCategory): CategoryLogger {
     (msg: string, ctx?: LogRecord['ctx']): void =>
       writeLog({ level, category, msg, ...(ctx ? { ctx } : {}), source: 'main' })
 
-  return { error: emit('error'), warn: emit('warn'), info: emit('info') }
+  return {
+    error: emit('error'),
+    warn: emit('warn'),
+    info: emit('info'),
+    debug: emit('debug')
+  }
 }
 
 /**
