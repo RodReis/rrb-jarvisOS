@@ -19,7 +19,7 @@ import {
   ajustesDoTipo,
   propostosDoDocumentoDaArquitetura
 } from '@shared/domain/arquitetura-gerada'
-import { Button, EmptyState, InlineAlert, LoadingState } from '@design/ui'
+import { Button, Dialog, EmptyState, InlineAlert, LoadingState } from '@design/ui'
 import { log } from '../lib/log'
 
 /**
@@ -327,12 +327,27 @@ export function ArquiteturaDoProjeto({
   const [ocupado, setOcupado] = useState(false)
   const [desfecho, setDesfecho] = useState<ArquiteturaGeradaOutcome | null>(null)
   const [falhaNoAceite, setFalhaNoAceite] = useState(false)
+  /**
+   * O aviso de que a IA propôs ajustes, aberto **na chegada** deles (#332, defeito 5).
+   *
+   * A geração termina, o PI continua olhando o topo da tela, e a lista dos ajustes fica abaixo da
+   * dobra. Ele descobriu os oito rolando a página por conta própria — o que só aconteceu porque
+   * ele estava procurando. O aviso é o que transforma "estava lá" em "eu soube".
+   *
+   * **Só abre quando a geração acabou de trazê-los.** Uma revisão já lida que volta à tela (o PI
+   * trocou de menu e voltou) não abre nada: um pop-up a cada montagem viraria ruído, e ruído se
+   * fecha sem ler.
+   */
+  const [ajustesChegaram, setAjustesChegaram] = useState<number | null>(null)
 
-  const carregar = useCallback(async (): Promise<void> => {
+  const carregar = useCallback(async (): Promise<ArquiteturaRegistrada | null> => {
     try {
-      setArquitetura(await window.jarvis.carregarArquitetura(projectId, workspace))
+      const atual = await window.jarvis.carregarArquitetura(projectId, workspace)
+      setArquitetura(atual)
+      return atual
     } catch (error: unknown) {
       log.ui.error('Falha ao carregar a arquitetura', { error })
+      return null
     } finally {
       setCarregando(false)
     }
@@ -363,7 +378,11 @@ export function ArquiteturaDoProjeto({
     try {
       const resultado = await window.jarvis.gerarArquiteturaPorIa(projectId, workspace)
       setDesfecho(resultado)
-      if (resultado.resultado === 'gerada') await carregar()
+      if (resultado.resultado === 'gerada') {
+        const nova = await carregar()
+        // O aviso só nasce aqui, do resultado da geração que **este** clique disparou.
+        if (nova !== null && nova.ajustes.length > 0) setAjustesChegaram(nova.ajustes.length)
+      }
     } catch (error: unknown) {
       log.ui.error('Falha ao gerar a arquitetura', { error })
     } finally {
@@ -533,7 +552,7 @@ export function ArquiteturaDoProjeto({
             ele desenhou.
           */}
           {arquitetura.ajustes.length > 0 && (
-            <section data-jos-ajustes className="flex flex-col gap-2">
+            <section data-jos-ajustes id="arquitetura-ajustes" className="flex flex-col gap-2">
               <InlineAlert
                 tom="warn"
                 titulo={t('arquitetura.ajustesTitulo', { count: arquitetura.ajustes.length })}
@@ -606,6 +625,47 @@ export function ArquiteturaDoProjeto({
           </section>
         </>
       )}
+
+      {/*
+        O aviso de chegada dos ajustes (#332, defeito 5).
+        
+        **Pop-up por decisão do PI.** A ressalva técnica está registrada na issue: os ajustes se
+        julgam com o documento ao lado, um a um, e um modal que os listasse tiraria justamente
+        esse contexto. Então este pop-up **não decide nada** — ele anuncia, responde a pergunta
+        que o PI fez ("ajuste é DISCARTE?") e leva até a lista, onde cada item vive com o
+        documento que o originou.
+
+        `Depois` fecha sem levar: o aviso é uma notícia, não um bloqueio. O que ele não pode é
+        deixar o PI descobrir oito ajustes rolando a página por conta própria.
+      */}
+      <Dialog
+        aberto={ajustesChegaram !== null}
+        onFechar={() => setAjustesChegaram(null)}
+        titulo={t('arquitetura.chegadaTitulo', { count: ajustesChegaram ?? 0 })}
+        descricao={t('arquitetura.chegadaDescricao')}
+        rodape={
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              variante="primaria"
+              onClick={() => {
+                setAjustesChegaram(null)
+                document
+                  .getElementById('arquitetura-ajustes')
+                  ?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+              }}
+            >
+              {t('arquitetura.chegadaVer')}
+            </Button>
+            <Button variante="secundaria" onClick={() => setAjustesChegaram(null)}>
+              {t('arquitetura.chegadaDepois')}
+            </Button>
+          </div>
+        }
+      >
+        <p className="max-w-[58ch] text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto-secundario)]">
+          {t('arquitetura.chegadaOQueE')}
+        </p>
+      </Dialog>
     </div>
   )
 }
