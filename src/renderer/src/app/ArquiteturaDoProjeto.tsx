@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ShieldCheck, Sparkles, X } from 'lucide-react'
+import { Sparkles, X } from 'lucide-react'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { DocumentoDaArquitetura } from '@shared/domain/arquitetura'
 import { DOCUMENTOS_DA_ARQUITETURA, SECOES_DA_ARQUITETURA } from '@shared/domain/arquitetura'
@@ -19,7 +19,7 @@ import {
   ajustesDoTipo,
   propostosDoDocumentoDaArquitetura
 } from '@shared/domain/arquitetura-gerada'
-import { Button, EmptyState, InlineAlert, LoadingState } from '@design/ui'
+import { Button, Dialog, EmptyState, InlineAlert, LoadingState } from '@design/ui'
 import { log } from '../lib/log'
 
 /**
@@ -52,6 +52,22 @@ interface ArquiteturaDoProjetoProps {
   readonly nomeDoProjeto: string
   /** Relê a jornada depois do aceite — sem isto a trilha ficaria pedindo "Aceitar o pacote". */
   readonly onAceito?: () => void
+  /**
+   * A etapa atual da jornada. Este painel serve duas — `arquitetura` (gerar) e `pacote-aceito`
+   * (aceitar) — e o botão da trilha promete uma coisa diferente em cada uma. Sem saber onde a
+   * jornada está, o painel não teria como publicar a ação certa.
+   */
+  readonly etapa?: 'arquitetura' | 'pacote-aceito'
+  /**
+   * Publica no pai a ação que o botão da trilha dispara (#332, defeito 4).
+   *
+   * A regra do PI: **avanço e aceite ficam na trilha**; o painel guarda só `Gerar de novo`. Por
+   * isso o botão primário de gerar sai daqui quando a etapa é `arquitetura`, e o de aceitar sai
+   * quando é `pacote-aceito` — dois botões com o mesmo nome, um do lado do outro, não dá.
+   */
+  readonly onAcaoDaEtapa?: (acao: (() => void) | null) => void
+  /** Avisa o pai enquanto gera ou aceita: é o botão da trilha que mostra o carregando agora. */
+  readonly onOcupado?: (ocupado: boolean) => void
 }
 
 /** O rótulo de cada origem. **Dado, não lógica** — e o texto é o sinal, não a cor. */
@@ -300,7 +316,10 @@ export function ArquiteturaDoProjeto({
   workspace,
   projectId,
   nomeDoProjeto,
-  onAceito
+  onAceito,
+  etapa = 'arquitetura',
+  onAcaoDaEtapa,
+  onOcupado
 }: ArquiteturaDoProjetoProps): React.JSX.Element {
   const { t } = useTranslation()
   const [arquitetura, setArquitetura] = useState<ArquiteturaRegistrada | null>(null)
@@ -308,12 +327,27 @@ export function ArquiteturaDoProjeto({
   const [ocupado, setOcupado] = useState(false)
   const [desfecho, setDesfecho] = useState<ArquiteturaGeradaOutcome | null>(null)
   const [falhaNoAceite, setFalhaNoAceite] = useState(false)
+  /**
+   * O aviso de que a IA propôs ajustes, aberto **na chegada** deles (#332, defeito 5).
+   *
+   * A geração termina, o PI continua olhando o topo da tela, e a lista dos ajustes fica abaixo da
+   * dobra. Ele descobriu os oito rolando a página por conta própria — o que só aconteceu porque
+   * ele estava procurando. O aviso é o que transforma "estava lá" em "eu soube".
+   *
+   * **Só abre quando a geração acabou de trazê-los.** Uma revisão já lida que volta à tela (o PI
+   * trocou de menu e voltou) não abre nada: um pop-up a cada montagem viraria ruído, e ruído se
+   * fecha sem ler.
+   */
+  const [ajustesChegaram, setAjustesChegaram] = useState<number | null>(null)
 
-  const carregar = useCallback(async (): Promise<void> => {
+  const carregar = useCallback(async (): Promise<ArquiteturaRegistrada | null> => {
     try {
-      setArquitetura(await window.jarvis.carregarArquitetura(projectId, workspace))
+      const atual = await window.jarvis.carregarArquitetura(projectId, workspace)
+      setArquitetura(atual)
+      return atual
     } catch (error: unknown) {
       log.ui.error('Falha ao carregar a arquitetura', { error })
+      return null
     } finally {
       setCarregando(false)
     }
@@ -339,18 +373,22 @@ export function ArquiteturaDoProjeto({
     }
   }, [projectId, workspace])
 
-  async function gerar(): Promise<void> {
+  const gerar = useCallback(async (): Promise<void> => {
     setOcupado(true)
     try {
       const resultado = await window.jarvis.gerarArquiteturaPorIa(projectId, workspace)
       setDesfecho(resultado)
-      if (resultado.resultado === 'gerada') await carregar()
+      if (resultado.resultado === 'gerada') {
+        const nova = await carregar()
+        // O aviso só nasce aqui, do resultado da geração que **este** clique disparou.
+        if (nova !== null && nova.ajustes.length > 0) setAjustesChegaram(nova.ajustes.length)
+      }
     } catch (error: unknown) {
       log.ui.error('Falha ao gerar a arquitetura', { error })
     } finally {
       setOcupado(false)
     }
-  }
+  }, [projectId, workspace, carregar])
 
   /**
    * O aceite do pacote (gate `PROJECT_PACKAGE`).
@@ -359,7 +397,7 @@ export function ArquiteturaDoProjeto({
    * `aplicarEventoDaJornada` é a única via de escrita da etapa, e uma segunda entrada só para a
    * arquitetura criaria um caminho que escapa da checagem de ordem que ela faz.
    */
-  async function aceitar(): Promise<void> {
+  const aceitar = useCallback(async (): Promise<void> => {
     setOcupado(true)
     setFalhaNoAceite(false)
 
@@ -373,7 +411,26 @@ export function ArquiteturaDoProjeto({
     } finally {
       setOcupado(false)
     }
-  }
+  }, [projectId, workspace, carregar, onAceito])
+
+  /*
+   * A ação da etapa vai para a trilha (#332, defeito 4).
+   *
+   * Na etapa `arquitetura` o botão da trilha diz "Gerar a arquitetura" e agora **gera**; na
+   * `pacote-aceito` ele diz "Aceitar o pacote" e aceita. Antes ele só rolava a página até um
+   * segundo botão de mesmo nome — e quem clicava no primeiro não via nada acontecer.
+   *
+   * A limpeza no retorno é o que impede a ação desta etapa de sobreviver à troca de painel.
+   */
+  useEffect(() => {
+    const acao = etapa === 'pacote-aceito' ? aceitar : gerar
+    onAcaoDaEtapa?.(() => void acao())
+    return () => onAcaoDaEtapa?.(null)
+  }, [etapa, gerar, aceitar, onAcaoDaEtapa])
+
+  useEffect(() => {
+    onOcupado?.(ocupado)
+  }, [ocupado, onOcupado])
 
   async function cortar(afirmacaoId: string): Promise<void> {
     setOcupado(true)
@@ -423,17 +480,27 @@ export function ArquiteturaDoProjeto({
         </p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <Button
-          variante="primaria"
-          onClick={() => void gerar()}
-          desabilitado={ocupado}
-          carregando={ocupado}
-          iconeInicial={<Sparkles aria-hidden="true" className="size-4" />}
-        >
-          {arquitetura === null ? t('arquitetura.gerar') : t('arquitetura.regerar')}
-        </Button>
-      </div>
+      {/*
+        **Só o "gerar de novo" fica aqui** (regra do PI, #332).
+
+        A primeira geração é o avanço da jornada e mora na trilha: dois botões com o mesmo nome,
+        um do lado do outro, é o defeito que esta correção fecha. Refazer é outra coisa — não
+        avança nada, desfaz um resultado que o PI leu e não gostou, e por isso pertence ao lado
+        do documento, em `secundaria`.
+      */}
+      {arquitetura !== null && (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            variante="secundaria"
+            onClick={() => void gerar()}
+            desabilitado={ocupado}
+            carregando={ocupado}
+            iconeInicial={<Sparkles aria-hidden="true" className="size-4" />}
+          >
+            {t('arquitetura.regerar')}
+          </Button>
+        </div>
+      )}
 
       {desfecho !== null && desfecho.resultado !== 'gerada' && (
         <InlineAlert
@@ -485,7 +552,7 @@ export function ArquiteturaDoProjeto({
             ele desenhou.
           */}
           {arquitetura.ajustes.length > 0 && (
-            <section data-jos-ajustes className="flex flex-col gap-2">
+            <section data-jos-ajustes id="arquitetura-ajustes" className="flex flex-col gap-2">
               <InlineAlert
                 tom="warn"
                 titulo={t('arquitetura.ajustesTitulo', { count: arquitetura.ajustes.length })}
@@ -550,20 +617,55 @@ export function ArquiteturaDoProjeto({
               {t('arquitetura.aceiteDescricao')}
             </p>
 
-            <div className="mt-1 flex flex-wrap items-center gap-3">
-              <Button
-                variante="primaria"
-                onClick={() => void aceitar()}
-                desabilitado={ocupado}
-                carregando={ocupado}
-                iconeInicial={<ShieldCheck aria-hidden="true" className="size-4" />}
-              >
-                {t('arquitetura.aceitar')}
-              </Button>
-            </div>
+            {/*
+              O botão de aceitar saiu daqui e foi para a trilha (regra do PI, #332): aceite é
+              avanço da jornada. O texto acima continua sendo o que o PI precisa ler **antes** de
+              apertar — a soleira permanece, só a maçaneta mudou de lugar.
+            */}
           </section>
         </>
       )}
+
+      {/*
+        O aviso de chegada dos ajustes (#332, defeito 5).
+        
+        **Pop-up por decisão do PI.** A ressalva técnica está registrada na issue: os ajustes se
+        julgam com o documento ao lado, um a um, e um modal que os listasse tiraria justamente
+        esse contexto. Então este pop-up **não decide nada** — ele anuncia, responde a pergunta
+        que o PI fez ("ajuste é DISCARTE?") e leva até a lista, onde cada item vive com o
+        documento que o originou.
+
+        `Depois` fecha sem levar: o aviso é uma notícia, não um bloqueio. O que ele não pode é
+        deixar o PI descobrir oito ajustes rolando a página por conta própria.
+      */}
+      <Dialog
+        aberto={ajustesChegaram !== null}
+        onFechar={() => setAjustesChegaram(null)}
+        titulo={t('arquitetura.chegadaTitulo', { count: ajustesChegaram ?? 0 })}
+        descricao={t('arquitetura.chegadaDescricao')}
+        rodape={
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              variante="primaria"
+              onClick={() => {
+                setAjustesChegaram(null)
+                document
+                  .getElementById('arquitetura-ajustes')
+                  ?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+              }}
+            >
+              {t('arquitetura.chegadaVer')}
+            </Button>
+            <Button variante="secundaria" onClick={() => setAjustesChegaram(null)}>
+              {t('arquitetura.chegadaDepois')}
+            </Button>
+          </div>
+        }
+      >
+        <p className="max-w-[58ch] text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto-secundario)]">
+          {t('arquitetura.chegadaOQueE')}
+        </p>
+      </Dialog>
     </div>
   )
 }

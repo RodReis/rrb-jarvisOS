@@ -1,6 +1,7 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ComTrilha } from './trilha-de-teste'
 import { ArquiteturaDoProjeto } from './ArquiteturaDoProjeto'
 
 /**
@@ -58,13 +59,27 @@ function arquitetura(over: Record<string, unknown> = {}): Record<string, unknown
   }
 }
 
-function montar(): void {
+/**
+ * Monta o painel **junto do botão que a trilha desenha** (#332, defeito 4).
+ *
+ * O gerar e o aceitar saíram do painel por decisão do PI, e é a trilha que os oferece agora. A
+ * etapa escolhe qual dos dois: `arquitetura` gera, `pacote-aceito` aceita.
+ */
+function montar(etapa: 'arquitetura' | 'pacote-aceito' = 'arquitetura'): void {
   render(
-    <ArquiteturaDoProjeto
-      workspace="jarvis"
-      projectId="p-1"
-      nomeDoProjeto="Leituras"
-      onAceito={vi.fn()}
+    <ComTrilha
+      etapa={etapa}
+      painel={({ onAcaoDaEtapa, onOcupado }) => (
+        <ArquiteturaDoProjeto
+          workspace="jarvis"
+          projectId="p-1"
+          nomeDoProjeto="Leituras"
+          onAceito={vi.fn()}
+          etapa={etapa}
+          onAcaoDaEtapa={onAcaoDaEtapa}
+          onOcupado={onOcupado}
+        />
+      )}
     />
   )
 }
@@ -245,9 +260,75 @@ describe('os ajustes da análise de coerência (critério 4)', () => {
 
   it('ajuste pendente NÃO trava o aceite: é proposta sobre o desenho, não conflito interno', async () => {
     carregarArquitetura.mockResolvedValue(arquitetura({ ajustes: [AJUSTE] }))
-    montar()
+    montar('pacote-aceito')
 
     expect(await screen.findByRole('button', { name: /aceitar o pacote/i })).toBeEnabled()
+  })
+})
+
+/**
+ * O aviso de chegada dos ajustes (#332, defeito 5).
+ *
+ * O PI gerou a arquitetura, a tela mostrou "8 ajustes propostos", e ele só descobriu isso
+ * rolando a página por conta própria. A lista fica abaixo da dobra, e quem acabou de clicar em
+ * gerar está olhando o topo.
+ */
+describe('a chegada dos ajustes', () => {
+  const AJUSTE_NOVO = {
+    id: 'j-9',
+    tipo: 'estado-ausente',
+    jornada: 'Painel',
+    observacao: 'A tela não mostra o estado de carregando.',
+    recomendacao: 'Desenhar o estado no protótipo.'
+  }
+
+  it('avisa em pop-up quando a geração traz ajustes', async () => {
+    const user = userEvent.setup()
+    // Sem revisão antes de gerar; a geração traz a revisão com o ajuste.
+    carregarArquitetura.mockResolvedValueOnce(null)
+    montar()
+
+    carregarArquitetura.mockResolvedValue(arquitetura({ ajustes: [AJUSTE_NOVO] }))
+    await user.click(await screen.findByRole('button', { name: 'Gerar a arquitetura' }))
+
+    const dialogo = await screen.findByRole('dialog')
+    expect(within(dialogo).getByText(/A IA propôs 1 ajuste/)).toBeInTheDocument()
+  })
+
+  it('o aviso responde "ajuste é DISCARTE?" — a pergunta que o PI fez', async () => {
+    const user = userEvent.setup()
+    carregarArquitetura.mockResolvedValueOnce(null)
+    montar()
+
+    carregarArquitetura.mockResolvedValue(arquitetura({ ajustes: [AJUSTE_NOVO] }))
+    await user.click(await screen.findByRole('button', { name: 'Gerar a arquitetura' }))
+
+    const dialogo = await screen.findByRole('dialog')
+    expect(
+      within(dialogo).getByText(/única ação sobre um ajuste é descartá-lo/)
+    ).toBeInTheDocument()
+  })
+
+  it('geração sem ajustes não abre pop-up — aviso à toa vira ruído', async () => {
+    const user = userEvent.setup()
+    carregarArquitetura.mockResolvedValueOnce(null)
+    montar()
+
+    carregarArquitetura.mockResolvedValue(arquitetura({ ajustes: [] }))
+    await user.click(await screen.findByRole('button', { name: 'Gerar a arquitetura' }))
+
+    await waitFor(() => expect(carregarArquitetura).toHaveBeenCalledTimes(2))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('revisão já lida que volta à tela não reabre o aviso', async () => {
+    // O PI trocou de menu e voltou. Um pop-up a cada montagem viraria ruído, e ruído se fecha
+    // sem ler — que é exatamente o defeito que este aviso existe para não repetir.
+    carregarArquitetura.mockResolvedValue(arquitetura({ ajustes: [AJUSTE_NOVO] }))
+    montar()
+
+    await screen.findByText('A tela não mostra o estado de carregando.')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })
 
@@ -255,7 +336,7 @@ describe('o aceite do pacote', () => {
   it('vai pelo canal de evento da jornada, com o evento pacote-aceito', async () => {
     const user = userEvent.setup()
     carregarArquitetura.mockResolvedValue(arquitetura())
-    montar()
+    montar('pacote-aceito')
 
     await user.click(await screen.findByRole('button', { name: /aceitar o pacote/i }))
 
@@ -269,5 +350,16 @@ describe('o aceite do pacote', () => {
 
     expect(await screen.findByText(/nenhum documento ainda/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /aceitar o pacote/i })).not.toBeInTheDocument()
+  })
+
+  it('o aceite não aparece duplicado dentro do painel — ele mora na trilha', async () => {
+    // A regra do PI (#332): avanço e aceite ficam na trilha; dois botões com o mesmo nome, um
+    // do lado do outro, não dá. Este teste reprova se o botão do painel voltar.
+    carregarArquitetura.mockResolvedValue(arquitetura())
+    montar('pacote-aceito')
+
+    const painel = await screen.findByLabelText('Aceite do pacote')
+    expect(within(painel).queryByRole('button')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /aceitar o pacote/i })).toBeInTheDocument()
   })
 })

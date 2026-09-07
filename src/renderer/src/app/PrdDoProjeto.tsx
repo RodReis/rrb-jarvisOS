@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { MessagesSquare, ShieldCheck, Sparkles, X } from 'lucide-react'
+import { MessagesSquare, Sparkles, X } from 'lucide-react'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { DocumentoDoPacote } from '@shared/domain/pacote-estrutural'
 import { DOCUMENTOS_DO_PACOTE } from '@shared/domain/pacote-estrutural'
@@ -64,6 +64,19 @@ interface PrdDoProjetoProps {
    * daqui recusava o mesmo aceite — e o PI via primeiro o que estava errado.
    */
   readonly onBloqueioDoAceite?: (motivo: string | undefined) => void
+  /**
+   * A etapa atual. Este painel serve duas — `prd` (gerar) e `prd-aceito` (aceitar) — e o botão
+   * da trilha promete coisas diferentes em cada uma.
+   */
+  readonly etapa?: 'prd' | 'prd-aceito'
+  /**
+   * Publica no pai a ação que o botão da trilha dispara (#332, defeito 4).
+   *
+   * A regra do PI: **avanço e aceite ficam na trilha**; o painel guarda só `Gerar de novo`.
+   */
+  readonly onAcaoDaEtapa?: (acao: (() => void) | null) => void
+  /** Avisa o pai enquanto gera ou aceita: o carregando agora é do botão da trilha. */
+  readonly onOcupado?: (ocupado: boolean) => void
 }
 
 /** O rótulo de cada origem. **Dado, não lógica** — e o texto é o sinal, não a cor. */
@@ -277,7 +290,10 @@ export function PrdDoProjeto({
   projectId,
   nomeDoProjeto,
   onAceito,
-  onBloqueioDoAceite
+  onBloqueioDoAceite,
+  etapa = 'prd',
+  onAcaoDaEtapa,
+  onOcupado
 }: PrdDoProjetoProps): React.JSX.Element {
   const { t } = useTranslation()
   const [prd, setPrd] = useState<PrdRegistrado | null>(null)
@@ -378,8 +394,19 @@ export function PrdDoProjeto({
    */
   useEffect(() => {
     if (carregando) return
+
+    /*
+     * Na etapa da geração **não há bloqueio**. Termo vazio não trava nada: o painel avisa que
+     * sem ele o Landscape sai pendente e o PRD segue mesmo assim — desabilitar o botão da trilha
+     * aqui inventaria um gate que o produto não tem.
+     */
+    if (etapa === 'prd') {
+      onBloqueioDoAceite?.(undefined)
+      return
+    }
+
     onBloqueioDoAceite?.(prd !== null && podeAceitarPrd(prd) ? undefined : t('prd.aceiteBloqueado'))
-  }, [prd, carregando, onBloqueioDoAceite, t])
+  }, [prd, etapa, carregando, onBloqueioDoAceite, t])
 
   /*
    * O termo proposto pela IA (critério 3), buscado uma vez ao abrir.
@@ -405,7 +432,7 @@ export function PrdDoProjeto({
     }
   }, [projectId, workspace])
 
-  async function gerar(): Promise<void> {
+  const gerar = useCallback(async (): Promise<void> => {
     setOcupado(true)
     setTermoConfirmado(true)
     try {
@@ -417,7 +444,7 @@ export function PrdDoProjeto({
     } finally {
       setOcupado(false)
     }
-  }
+  }, [projectId, termo, workspace, carregar])
 
   /**
    * O aceite (critério 7).
@@ -426,7 +453,7 @@ export function PrdDoProjeto({
    * `aplicarEventoDaJornada` é a única via de escrita da etapa, e uma segunda entrada só para o
    * PRD criaria um caminho que escapa da checagem de ordem que ela faz.
    */
-  async function aceitar(): Promise<void> {
+  const aceitar = useCallback(async (): Promise<void> => {
     setOcupado(true)
     setFalhaNoAceite(false)
 
@@ -440,7 +467,31 @@ export function PrdDoProjeto({
     } finally {
       setOcupado(false)
     }
-  }
+  }, [projectId, workspace, carregar, onAceito])
+
+  /*
+   * Uma geração está correndo? A resposta é a **etapa**, não o `ocupado` local: `ocupado` só
+   * conhece a geração que esta tela disparou, e a que veio de antes de ela montar (o PI trocou
+   * de menu e voltou) deixaria o botão habilitado sobre uma chamada em curso.
+   *
+   * Calculado **antes** dos early returns porque agora também alimenta o botão da trilha.
+   */
+  const gerando = [...etapas.values()].some((e) => e.estado === 'iniciada')
+  const trabalhando = ocupado || gerando
+
+  /*
+   * A ação da etapa vai para a trilha (#332, defeito 4): gerar na etapa `prd`, aceitar na
+   * `prd-aceito`. A limpeza no retorno impede que a ação sobreviva à troca de painel.
+   */
+  useEffect(() => {
+    const acao = etapa === 'prd-aceito' ? aceitar : gerar
+    onAcaoDaEtapa?.(() => void acao())
+    return () => onAcaoDaEtapa?.(null)
+  }, [etapa, gerar, aceitar, onAcaoDaEtapa])
+
+  useEffect(() => {
+    onOcupado?.(trabalhando)
+  }, [trabalhando, onOcupado])
 
   async function cortar(afirmacaoId: string): Promise<void> {
     setOcupado(true)
@@ -475,15 +526,6 @@ export function PrdDoProjeto({
 
   if (carregando) return <LoadingState rotulo={t('prd.carregando')} />
 
-  const liberado = prd !== null && podeAceitarPrd(prd)
-  /*
-   * Uma geração está correndo? A resposta é a **etapa**, não o `ocupado` local: `ocupado` só
-   * conhece a geração que esta tela disparou, e a que veio de antes de ela montar (o PI trocou
-   * de menu e voltou) deixaria o botão habilitado sobre uma chamada em curso.
-   */
-  const gerando = [...etapas.values()].some((e) => e.estado === 'iniciada')
-  const trabalhando = ocupado || gerando
-
   return (
     <div className="flex flex-col gap-5" aria-labelledby={`prd-${projectId}`}>
       <div className="flex flex-col gap-1">
@@ -515,16 +557,24 @@ export function PrdDoProjeto({
         )}
       </Field>
 
+      {/*
+        **Só o "gerar de novo" fica aqui** (regra do PI, #332). A primeira geração é o avanço da
+        jornada e mora na trilha — dois botões com o mesmo nome, um do lado do outro, é o defeito
+        que esta correção fecha. Refazer não avança nada: desfaz um resultado que o PI leu e não
+        aprovou, e por isso pertence ao lado do campo, em `secundaria`.
+      */}
       <div className="flex flex-wrap items-center gap-3">
-        <Button
-          variante="primaria"
-          onClick={() => void gerar()}
-          desabilitado={trabalhando}
-          carregando={trabalhando}
-          iconeInicial={<Sparkles aria-hidden="true" className="size-4" />}
-        >
-          {prd === null ? t('prd.gerar') : t('prd.regerar')}
-        </Button>
+        {prd !== null && (
+          <Button
+            variante="secundaria"
+            onClick={() => void gerar()}
+            desabilitado={trabalhando}
+            carregando={trabalhando}
+            iconeInicial={<Sparkles aria-hidden="true" className="size-4" />}
+          >
+            {t('prd.regerar')}
+          </Button>
+        )}
 
         {termo.trim() === '' && (
           <span className="text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-secundario)]">
@@ -653,23 +703,11 @@ export function PrdDoProjeto({
               {t('prd.aceiteDescricao')}
             </p>
 
-            <div className="mt-1 flex flex-wrap items-center gap-3">
-              <Button
-                variante="primaria"
-                onClick={() => void aceitar()}
-                desabilitado={ocupado || !liberado}
-                carregando={ocupado}
-                iconeInicial={<ShieldCheck aria-hidden="true" className="size-4" />}
-              >
-                {t('prd.aceitar')}
-              </Button>
-
-              {!liberado && (
-                <span className="text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-secundario)]">
-                  {t('prd.aceiteBloqueado')}
-                </span>
-              )}
-            </div>
+            {/*
+              O botão de aceitar saiu daqui e foi para a trilha (regra do PI, #332): aceite é
+              avanço da jornada. A razão do bloqueio viaja com ele e aparece sob o botão da
+              trilha, para não haver duas explicações do mesmo gate.
+            */}
           </section>
         </>
       )}

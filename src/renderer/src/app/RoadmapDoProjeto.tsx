@@ -47,6 +47,24 @@ interface RoadmapDoProjetoProps {
   readonly nomeDoProjeto: string
   /** Relê a jornada depois do aceite — sem isto a trilha ficaria pedindo "Aceitar o MVP". */
   readonly onAceito?: () => void
+  /**
+   * A etapa atual. Este painel serve quatro, e só a primeira tem uma ação única para a trilha.
+   */
+  readonly etapa?: 'roadmap' | 'mvp-aceito' | 'spec-aceita' | 'construcao'
+  /**
+   * Publica no pai a ação que o botão da trilha dispara (#332, defeito 4), ou `null` quando
+   * esta etapa não tem uma.
+   *
+   * **Aqui a regra do PI se aplica em parte, e o desvio é deliberado.** Na etapa `roadmap` a
+   * geração sobe: era o botão duplicado com a trilha. Nas etapas de aceite (`mvp-aceito`,
+   * `spec-aceita`) ela publica `null` — os aceites são gates numa **lista**, cada linha com o
+   * próprio estado de pendente ou aprovado, e um botão fora dela não diria qual gate está sendo
+   * aprovado. Puxar o primeiro gate pendente para a trilha esconderia essa escolha. Registrado
+   * na issue para o PI decidir. Em `construcao` não há ato nenhum: acompanhar é ler.
+   */
+  readonly onAcaoDaEtapa?: (acao: (() => void) | null) => void
+  /** Avisa o pai enquanto trabalha: o carregando da geração agora é do botão da trilha. */
+  readonly onOcupado?: (ocupado: boolean) => void
 }
 
 /** O rótulo de cada origem. **Dado, não lógica** — e o texto é o sinal, não a cor. */
@@ -97,7 +115,10 @@ export function RoadmapDoProjeto({
   workspace,
   projectId,
   nomeDoProjeto,
-  onAceito
+  onAceito,
+  etapa = 'roadmap',
+  onAcaoDaEtapa,
+  onOcupado
 }: RoadmapDoProjetoProps): React.JSX.Element {
   const { t } = useTranslation()
   const [roadmap, setRoadmap] = useState<RoadmapRegistrado | null>(null)
@@ -158,7 +179,7 @@ export function RoadmapDoProjeto({
     }
   }, [projectId, buscar, aplicar])
 
-  async function gerar(): Promise<void> {
+  const gerar = useCallback(async (): Promise<void> => {
     setOcupado('gerando')
     try {
       const resultado = await window.jarvis.gerarRoadmapPorIa(projectId, workspace)
@@ -174,7 +195,21 @@ export function RoadmapDoProjeto({
     } finally {
       setOcupado('nao')
     }
-  }
+  }, [projectId, workspace, recarregar])
+
+  /* A geração vai para a trilha (#332, defeito 4). Só ela — ver a nota em `onAcaoDaEtapa`. */
+  useEffect(() => {
+    if (etapa !== 'roadmap') {
+      onAcaoDaEtapa?.(null)
+      return
+    }
+    onAcaoDaEtapa?.(() => void gerar())
+    return () => onAcaoDaEtapa?.(null)
+  }, [etapa, gerar, onAcaoDaEtapa])
+
+  useEffect(() => {
+    onOcupado?.(ocupado !== 'nao')
+  }, [ocupado, onOcupado])
 
   /**
    * A escolha do MVP que entra na fila (critério 3).
@@ -271,17 +306,23 @@ export function RoadmapDoProjeto({
         </p>
       </header>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <Button
-          variante="primaria"
-          onClick={() => void gerar()}
-          carregando={ocupado === 'gerando'}
-          desabilitado={trabalhando}
-          iconeInicial={<Sparkles aria-hidden="true" className="size-4" />}
-        >
-          {roadmap === null ? t('roadmap.gerar') : t('roadmap.regerar')}
-        </Button>
-      </div>
+      {/*
+        **Só o "gerar de novo" fica aqui** (regra do PI, #332). A primeira geração é o avanço da
+        jornada e mora na trilha; refazer não avança nada e pertence ao lado do documento.
+      */}
+      {roadmap !== null && (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            variante="secundaria"
+            onClick={() => void gerar()}
+            carregando={ocupado === 'gerando'}
+            desabilitado={trabalhando}
+            iconeInicial={<Sparkles aria-hidden="true" className="size-4" />}
+          >
+            {t('roadmap.regerar')}
+          </Button>
+        </div>
+      )}
 
       {desfecho !== null && desfecho.resultado !== 'gerado' && (
         <InlineAlert

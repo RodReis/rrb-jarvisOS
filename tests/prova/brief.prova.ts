@@ -280,11 +280,20 @@ test.describe('a coluna de julgamento', () => {
     expect(posicao).toBe('sticky')
   })
 
-  test('o botão de aceite e a pendência que o trava ficam no mesmo painel', async ({ page }) => {
+  test('a pendência que trava o aceite fica no painel do aceite', async ({ page }) => {
     await abrir(page, 'brief-travado', 'dark')
 
+    /*
+     * **O botão saiu deste painel e foi para a trilha** (regra do PI, #332): dois botões com o
+     * mesmo nome, um do lado do outro, não dá. Antes esta prova media os dois juntos.
+     *
+     * A garantia que ela protegia não sumiu, mudou de lugar: a razão do bloqueio viaja **com** a
+     * ação, e a trilha a desenha sob o próprio botão — é `planejamento.prova.ts` que mede aquele
+     * lado. Aqui resta o que continua sendo verdade deste painel: a pendência é legível ao lado
+     * do texto do aceite, e nenhum botão duplicado voltou.
+     */
     const painel = page.locator('[data-jos-aceite="brief"]')
-    await expect(painel.getByRole('button', { name: /Aceitar o brief/ })).toBeDisabled()
     await expect(painel.getByText(/Onde os dados de leitura/)).toBeVisible()
+    await expect(painel.getByRole('button')).toHaveCount(0)
   })
 })

@@ -375,6 +375,17 @@ export const RECURSOS = {
         ajustesDescricao:
           'A IA leu seus protótipos contra o PRD. Nada foi alterado nos anexos: mudar o desenho é ato seu, e descartar só tira o ajuste desta revisão.',
         recomendacao: 'Recomendação: {{texto}}',
+        // O aviso de chegada (#332, defeito 5). A geração termina e o PI continua olhando o topo
+        // da tela; a lista dos ajustes fica abaixo da dobra, e ele só descobre rolando.
+        chegadaTitulo_one: 'A IA propôs 1 ajuste',
+        chegadaTitulo_other: 'A IA propôs {{count}} ajustes',
+        chegadaDescricao:
+          'A arquitetura foi gerada. A IA comparou seus protótipos com o PRD e anotou o que não fecha.',
+        // Responde a pergunta do PI: "ajuste é DISCARTE?". É: descartar é a única ação daqui.
+        chegadaOQueE:
+          'Nada foi alterado nos seus anexos. A única ação sobre um ajuste é descartá-lo desta revisão — mudar o desenho é ato seu, fora do app.',
+        chegadaVer: 'Ver os ajustes',
+        chegadaDepois: 'Depois',
         aceitar: 'Aceitar o pacote',
         aceiteTitulo: 'Aceite do pacote',
         aceiteDescricao:
@@ -470,7 +481,7 @@ export const RECURSOS = {
           'Os MVPs de {{nome}}, propostos a partir do PRD aceito e da arquitetura aprovada. Gerar propõe; escolher e aprovar são seus.',
         carregando: 'Carregando o roadmap…',
         gerar: 'Gerar roadmap',
-        regerar: 'Regerar roadmap',
+        regerar: 'Gerar de novo',
         vazio: 'Nenhum roadmap gerado ainda',
         vazioDescricao:
           'Os MVPs nascem do PRD aceito e da arquitetura aprovada. Gerar propõe o mapa; qual MVP entra na fila é sua escolha.',
@@ -1014,6 +1025,14 @@ export const RECURSOS = {
         contradicoesDescricao:
           'Two statements cannot hold at once. Decide and generate again; nothing was fixed on its own.',
         recomendacao: 'Recommendation: {{texto}}',
+        chegadaTitulo_one: 'The AI proposed 1 adjustment',
+        chegadaTitulo_other: 'The AI proposed {{count}} adjustments',
+        chegadaDescricao:
+          'The architecture was generated. The AI compared your prototypes with the PRD and noted what does not add up.',
+        chegadaOQueE:
+          'Nothing was changed in your attachments. The only action on an adjustment is discarding it from this revision — changing the design is your act, outside the app.',
+        chegadaVer: 'See the adjustments',
+        chegadaDepois: 'Later',
         aceitar: 'Accept the PRD',
         aceiteTitulo: 'PRD acceptance',
         aceiteDescricao:
@@ -1156,7 +1175,7 @@ export const RECURSOS = {
           'The MVPs for {{nome}}, proposed from the accepted PRD and the approved architecture. Generating proposes; choosing and approving are yours.',
         carregando: 'Loading the roadmap…',
         gerar: 'Generate roadmap',
-        regerar: 'Regenerate roadmap',
+        regerar: 'Generate again',
         vazio: 'No roadmap generated yet',
         vazioDescricao:
           'MVPs come from the accepted PRD and the approved architecture. Generating proposes the map; which MVP is queued is your call.',

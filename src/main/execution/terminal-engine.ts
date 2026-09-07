@@ -72,6 +72,22 @@ export const TIMEOUT_PADRAO_MS = 30_000
 export const LIMITE_SAIDA_BYTES = 64 * 1024
 
 /**
+ * Teto para o comando cuja saída **é o arquivo do usuário** (`saidaEhConteudo`).
+ *
+ * O teto de 64 KB existe por dois motivos, e nenhum dos dois vale aqui: a saída não vira linha de
+ * auditoria (`semConteudo` a substitui por `SAIDA_OMITIDA` antes de gravar) e não vira texto de
+ * tela (quem a pede consome os bytes e descarta). Aplicá-la mesmo assim produziu o defeito da
+ * issue #332: `git show` de um documento de 255 KB **abortava** com `ENOBUFS`, e o hash
+ * recalculado sobre o pedaço que sobrou marcava como `blob-divergente` um arquivo idêntico ao
+ * commit. Todo documento acima do teto ficaria assim para sempre.
+ *
+ * O limite continua existindo, e é o do processo: sem teto nenhum, um arquivo maior que a memória
+ * disponível derrubaria o main. 64 MB cobre documento e protótipo com folga de ordem de grandeza,
+ * e ainda recusa o caso patológico.
+ */
+export const LIMITE_CONTEUDO_BYTES = 64 * 1024 * 1024
+
+/**
  * Ambiente entregue ao processo filho — **lista de permissão, não o `process.env` inteiro**.
  *
  * O env do main carrega o que o app precisa para funcionar, e parte disso é segredo (chaves
@@ -161,13 +177,25 @@ function semConteudo(execucao: CommandExecution, submission: CommandSubmission):
  * ao meio e deixar o pedaço passar pela redação, que casa padrões inteiros — o segredo
  * vazaria justamente por ter sido cortado.
  */
-function saidaSegura(raw: string): string {
+function saidaSegura(raw: string, limite: number = LIMITE_SAIDA_BYTES): string {
   const redigido = redact(raw)
   const texto = typeof redigido === 'string' ? redigido : String(redigido)
 
-  if (Buffer.byteLength(texto, 'utf8') <= LIMITE_SAIDA_BYTES) return texto
+  if (Buffer.byteLength(texto, 'utf8') <= limite) return texto
 
-  return `${texto.slice(0, LIMITE_SAIDA_BYTES)}\n[saída truncada em ${LIMITE_SAIDA_BYTES} bytes]`
+  return `${texto.slice(0, limite)}\n[saída truncada em ${limite} bytes]`
+}
+
+/**
+ * O teto que vale para esta submissão.
+ *
+ * Só o `stdout` de um comando `saidaEhConteudo` recebe o teto largo; o `stderr` continua com o de
+ * evidência em todos os casos, porque é evidência em todos os casos — inclusive no comando que
+ * despeja arquivo, onde a mensagem de erro do Git é exatamente o que precisa caber na linha de
+ * auditoria.
+ */
+function limiteDaSaida(submission: CommandSubmission): number {
+  return submission.saidaEhConteudo === true ? LIMITE_CONTEUDO_BYTES : LIMITE_SAIDA_BYTES
 }
 
 /** O payload da operação guardado na `ApprovalRequest`, para retomar depois da decisão. */
@@ -441,13 +469,16 @@ export class TerminalEngine {
       shell: false,
       timeout: this.timeoutMs,
       killSignal: 'SIGKILL',
-      maxBuffer: LIMITE_SAIDA_BYTES,
+      // O `maxBuffer` não trunca: ele **aborta** a execução com `ENOBUFS` e devolve o pedaço que
+      // coube. Para o comando que despeja o arquivo do usuário isso transformava um documento
+      // grande em saída cortada no meio — a raiz do defeito da issue #332.
+      maxBuffer: limiteDaSaida(ctx.submission),
       encoding: 'utf8',
       windowsHide: true
     })
 
     const durationMs = Date.now() - ctx.started
-    const stdout = saidaSegura(resultado.stdout ?? '')
+    const stdout = saidaSegura(resultado.stdout ?? '', limiteDaSaida(ctx.submission))
     const stderrBruto = resultado.stderr ?? ''
 
     // Estourou o timeout: o Node marca `error.code === 'ETIMEDOUT'` (ou devolve o sinal com

@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EventoDaGeracao, GenerationEvent } from '@shared/domain/geracao'
+import { ComTrilha } from './trilha-de-teste'
 import { PrdDoProjeto } from './PrdDoProjeto'
 
 /**
@@ -65,9 +66,29 @@ function prd(over: Record<string, unknown> = {}): Record<string, unknown> {
   }
 }
 
-function montar(): void {
+/**
+ * Monta o painel **junto do botão que a trilha desenha** (#332, defeito 4).
+ *
+ * O gerar e o aceitar saíram do painel por decisão do PI. A etapa escolhe qual dos dois o botão
+ * da trilha oferece: `prd` gera, `prd-aceito` aceita.
+ */
+function montar(etapa: 'prd' | 'prd-aceito' = 'prd'): void {
   render(
-    <PrdDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" onAceito={vi.fn()} />
+    <ComTrilha
+      etapa={etapa}
+      painel={({ onAcaoDaEtapa, onOcupado, onBloqueioDoAceite }) => (
+        <PrdDoProjeto
+          workspace="jarvis"
+          projectId="p-1"
+          nomeDoProjeto="Leituras"
+          onAceito={vi.fn()}
+          etapa={etapa}
+          onAcaoDaEtapa={onAcaoDaEtapa}
+          onOcupado={onOcupado}
+          onBloqueioDoAceite={onBloqueioDoAceite}
+        />
+      )}
+    />
   )
 }
 
@@ -267,9 +288,11 @@ describe('bloqueio do Landscape (critério 4)', () => {
 
   it('NÃO trava o aceite — o PRD depende do brief, não do mercado', async () => {
     carregarPrd.mockResolvedValue(COM_BLOQUEIO)
-    montar()
+    montar('prd-aceito')
 
-    expect(await screen.findByRole('button', { name: /Aceitar o PRD/i })).toBeEnabled()
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Aceitar o PRD/i })).toBeEnabled()
+    )
   })
 })
 
@@ -332,6 +355,7 @@ describe('contradições — pergunta no pop-up da M8-F03 (critério 6, emenda E
         projectId="p-1"
         nomeDoProjeto="Leituras"
         onAceito={vi.fn()}
+        etapa="prd-aceito"
         onBloqueioDoAceite={onBloqueio}
       />
     )
@@ -352,6 +376,7 @@ describe('contradições — pergunta no pop-up da M8-F03 (critério 6, emenda E
         projectId="p-1"
         nomeDoProjeto="Leituras"
         onAceito={vi.fn()}
+        etapa="prd-aceito"
         onBloqueioDoAceite={onBloqueio}
       />
     )
@@ -362,7 +387,7 @@ describe('contradições — pergunta no pop-up da M8-F03 (critério 6, emenda E
   it('trava o aceite, com a razão ao lado do botão', async () => {
     carregarPrd.mockResolvedValue(COM_CONTRADICAO)
     contradicoesDoPrd.mockResolvedValue(VISTA_PENDENTE)
-    montar()
+    montar('prd-aceito')
 
     // O modal esconde o resto da página (aria-hidden); o aceite se confere com ele fechado.
     const dialogo = await screen.findByRole('dialog')
@@ -385,7 +410,7 @@ describe('contradições — pergunta no pop-up da M8-F03 (critério 6, emenda E
     await screen.findByRole('textbox')
     carregarPrd.mockResolvedValue(COM_CONTRADICAO)
     contradicoesDoPrd.mockResolvedValue(VISTA_PENDENTE)
-    await userEvent.click(screen.getByRole('button', { name: /Gerar os documentos/i }))
+    await userEvent.click(screen.getByRole('button', { name: /Gerar o PRD/i }))
 
     const dialogo = await screen.findByRole('dialog')
     await userEvent.click(await within(dialogo).findByRole('radio', { name: /Nuvem/ }))
@@ -462,13 +487,24 @@ describe('aceite e desfechos', () => {
   it('o aceite vai pelo canal de evento da jornada, não por um canal próprio', async () => {
     const user = userEvent.setup()
     carregarPrd.mockResolvedValue(prd())
-    montar()
+    montar('prd-aceito')
 
     await user.click(await screen.findByRole('button', { name: /Aceitar o PRD/i }))
 
     await waitFor(() => {
       expect(aplicarEventoDaJornada).toHaveBeenCalledWith('p-1', 'prd-aceito', 'jarvis')
     })
+  })
+
+  it('o aceite não aparece duplicado dentro do painel — ele mora na trilha', async () => {
+    // A regra do PI (#332): avanço e aceite ficam na trilha; dois botões com o mesmo nome, um do
+    // lado do outro, não dá. Este teste reprova se o botão do painel voltar.
+    carregarPrd.mockResolvedValue(prd())
+    montar('prd-aceito')
+
+    const painel = await screen.findByLabelText('Aceite do PRD')
+    expect(within(painel).queryByRole('button')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Aceitar o PRD/i })).toBeInTheDocument()
   })
 
   it('bloqueio de rota vira aviso com a ação, não erro genérico', async () => {

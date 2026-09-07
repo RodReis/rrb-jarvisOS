@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft } from 'lucide-react'
 import type { WorkspaceId } from '@shared/domain/entities'
@@ -64,6 +64,25 @@ export function ProjetoAberto({
    * gate divergindo.
    */
   const [bloqueioDoCta, setBloqueioDoCta] = useState<string | undefined>(undefined)
+  /**
+   * A ação da etapa atual, publicada pelo painel que sabe executá-la (#332, defeito 4).
+   *
+   * O botão da trilha prometia "Gerar a arquitetura" e só rolava a página até um segundo botão
+   * com o mesmo nome — dois alvos para o mesmo ato, e o primeiro não fazia nada. A regra do PI é
+   * uma só: **avanço e aceite ficam na trilha**; `Gerar de novo` e `Verificar de novo` ficam no
+   * painel. Para isso a trilha precisa da própria ação, e quem a tem é o painel.
+   *
+   * Em `ref` e não em `state`: publicar a ação não muda nada na tela, e guardá-la em estado
+   * re-renderizaria a árvore inteira a cada render do painel — que republica a cada uma.
+   */
+  const acaoDaEtapa = useRef<(() => void) | null>(null)
+  /**
+   * O painel está ocupado executando a própria ação.
+   *
+   * Este **é** estado: enquanto o painel gera, o botão da trilha tem de aparecer carregando e
+   * recusar o segundo clique. É o mesmo `ocupado` que o painel já usava no botão que saiu.
+   */
+  const [ocupadoNaEtapa, setOcupadoNaEtapa] = useState(false)
 
   const carregar = useCallback(async (): Promise<void> => {
     try {
@@ -119,9 +138,15 @@ export function ProjetoAberto({
       return
     }
 
-    // Nas demais etapas o conteúdo já está na tela, e o CTA rola até ele em vez de abrir outra
-    // superfície: mandar o PI para um pop-up sobre um painel que ele já está vendo seria uma
-    // porta a mais para o mesmo lugar — o erro que esta fatia corrige.
+    // O botão da trilha **executa**. Antes ele rolava a tela até um segundo botão com o mesmo
+    // rótulo, e quem clicava no primeiro não via nada acontecer (#332, defeito 4).
+    const acao = acaoDaEtapa.current
+    if (acao !== null) {
+      acao()
+      return
+    }
+
+    // Etapa cujo painel não publica ação — o conteúdo já está na tela e o CTA leva até ele.
     document.querySelector('[data-jos-conteudo-da-etapa]')?.scrollIntoView({ block: 'nearest' })
   }
 
@@ -173,6 +198,7 @@ export function ProjetoAberto({
             <TrilhaDaJornada
               estado={estado}
               onAgir={agir}
+              ocupado={ocupadoNaEtapa}
               {...(bloqueioDoCta === undefined ? {} : { bloqueio: bloqueioDoCta })}
             />
           </div>
@@ -188,6 +214,10 @@ export function ProjetoAberto({
               onRecarregar={() => void carregar()}
               onAbrirPerguntas={() => setRespondendo(true)}
               onBloqueioDoCta={setBloqueioDoCta}
+              onAcaoDaEtapa={(acao) => {
+                acaoDaEtapa.current = acao
+              }}
+              onOcupadoNaEtapa={setOcupadoNaEtapa}
             />
 
             {/*
@@ -258,7 +288,9 @@ function ConteudoDaEtapa({
   estado,
   onRecarregar,
   onAbrirPerguntas,
-  onBloqueioDoCta
+  onBloqueioDoCta,
+  onAcaoDaEtapa,
+  onOcupadoNaEtapa
 }: {
   readonly workspace: WorkspaceId
   readonly projeto: Project
@@ -269,6 +301,13 @@ function ConteudoDaEtapa({
   readonly onAbrirPerguntas: () => void
   /** O painel diz por que o CTA da trilha não pode agir — ou `undefined` quando pode (#318). */
   readonly onBloqueioDoCta: (motivo: string | undefined) => void
+  /**
+   * O painel entrega ao pai a ação que o botão da trilha dispara (#332, defeito 4), ou `null`
+   * quando esta etapa não tem uma — aí o CTA volta a apenas levar o PI até o conteúdo.
+   */
+  readonly onAcaoDaEtapa: (acao: (() => void) | null) => void
+  /** O painel está executando a própria ação: a trilha mostra carregando e recusa o clique. */
+  readonly onOcupadoNaEtapa: (ocupado: boolean) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
 
@@ -305,6 +344,9 @@ function ConteudoDaEtapa({
           projectId={projeto.id}
           nomeDoProjeto={projeto.nome}
           onAceito={onRecarregar}
+          onAcaoDaEtapa={onAcaoDaEtapa}
+          onOcupado={onOcupadoNaEtapa}
+          onBloqueioDoAceite={onBloqueioDoCta}
         />
       )
 
@@ -320,6 +362,9 @@ function ConteudoDaEtapa({
           nomeDoProjeto={projeto.nome}
           onAceito={onRecarregar}
           onBloqueioDoAceite={onBloqueioDoCta}
+          etapa={estado.etapa}
+          onAcaoDaEtapa={onAcaoDaEtapa}
+          onOcupado={onOcupadoNaEtapa}
         />
       )
 
@@ -327,7 +372,12 @@ function ConteudoDaEtapa({
     // o botão de gerar — a geração migrou para a etapa seguinte, que tem tela própria.
     case 'design':
       return (
-        <AnexosDeDesign workspace={workspace} projectId={projeto.id} nomeDoProjeto={projeto.nome} />
+        <AnexosDeDesign
+          workspace={workspace}
+          projectId={projeto.id}
+          nomeDoProjeto={projeto.nome}
+          onEtapaMudou={onRecarregar}
+        />
       )
 
     // A arquitetura, as decisões, os testes e a revisão gerados por IA, com o gate do pacote
@@ -341,6 +391,9 @@ function ConteudoDaEtapa({
           projectId={projeto.id}
           nomeDoProjeto={projeto.nome}
           onAceito={onRecarregar}
+          etapa={estado.etapa}
+          onAcaoDaEtapa={onAcaoDaEtapa}
+          onOcupado={onOcupadoNaEtapa}
         />
       )
 
@@ -353,6 +406,9 @@ function ConteudoDaEtapa({
           workspace={workspace}
           projectId={projeto.id}
           nomeDoProjeto={projeto.nome}
+          etapa={estado.etapa}
+          onAcaoDaEtapa={onAcaoDaEtapa}
+          onOcupado={onOcupadoNaEtapa}
         />
       )
 
