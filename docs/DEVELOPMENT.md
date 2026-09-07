@@ -2162,8 +2162,8 @@ Esta entrega cobre os critérios **1, 2, 3, 4, 6, 7, 8 e 18**.
 - [x] **`src/shared/domain/ci-profile-workflow.ts`** — o gerador. Separado do legado de propósito: fundi-los faria um `if` na entrada decidindo qual contrato está lendo, e a §4 manda o fallback legado não paralelizar nem migrar sozinho
 - [x] **`src/shared/domain/ci-profile-perfis.ts`** — os dois perfis que a R2 exige (Node/npm e Python/pip em Windows/PowerShell) e a representação `legacy`
 - [x] **`EntregaService`** — resolve o perfil antes de escrever, e **bloqueia** quando ele é inválido
-- [ ] **Vertical 2:** preservação de workflow com detecção de edição concorrente, adoção/migração, integração com gate e ledger
-- [ ] **Vertical 3:** evidência por execução com manifesto e hash, retomada após crash, métricas e smoke real
+- [x] **Vertical 2 (critérios 5, 9, 10, 11 e 12):** adoção por manifesto, identidade da evidência e reconferência da base — ver abaixo
+- [ ] **Vertical 3:** evidência por execução com manifesto de artefatos e hash, retomada após crash, métricas e smoke real
 
 **Um defeito que o gerador legado tem e este não repete.** O docblock de `ci-workflow.ts` afirma que "quebra de linha entra escapada pelo mesmo mecanismo" das aspas simples. **Não entra.** Gerando o arquivo com um argv contendo `
 `, o YAML sai partido: `run: echo 'linha1` numa linha e `linha2'` solta na seguinte — arquivo que não faz parse. Aspas simples protegem contra o *shell*, e a ameaça aqui é do *formato*. O gerador novo serializa como string JSON quando há caractere de controle. Medido com contrafactual: removida a proteção, o teste reprova; recolocada, passa.
@@ -2173,6 +2173,29 @@ Esta entrega cobre os critérios **1, 2, 3, 4, 6, 7, 8 e 18**.
 **Duas decisões de desenho que a spec obrigou.** (1) O `needs` do agregado inclui **todo** grupo, mas a condição de sucesso só exige os obrigatórios — assim ele espera o job opcional terminar antes de decidir, em vez de ignorá-lo. (2) `if: always()` no agregado: sem isso, um job vermelho deixaria o context `validacao` **ausente**, e ausência não é falha para a proteção da branch — o gate ficaria esperando um check que nunca chega, que é a "ausência que termina verde" do critério 16.
 
 **Limites declarados:** (1) o **smoke real** contra dois repositórios GitHub de teste, que a §11 pede, ficou `not_run` — não há credencial nem orçamento de Actions autorizados; a prova aqui é de regra e integração local. (2) A preservação de workflow distingue gerado de humano pela **marca do cabeçalho**, o que é mais fraco que o diff de adoção da §6, escopo da vertical 2. (3) O perfil ainda não é lido de `ci-profile.json` no disco nem entra no pacote aprovado: chega pelo `PedidoDeEntrega`, e o ponto de montagem é da vertical 2. (4) A E1 (critérios 19 a 26, preflight do `SLICE_ENTRY`) não entra aqui — depende do perfil existir, que é justamente esta vertical.
+
+
+#### Vertical 2 — Integração e preservação (critérios 5, 9, 10, 11 e 12)
+
+Segunda das três entregas verticais, continuando a mesma fatia.
+
+**A heurística do cabeçalho, que a vertical 1 declarou como limite, era mesmo furada — nos dois sentidos.** Ela decidia "posso reescrever" por uma substring: arquivo que começa com a nossa marca é nosso. Isso *perde edição humana* feita num arquivo que a pipeline gerou (o cabeçalho continua lá) e *sobrescreve arquivo alheio* que tenha aquela linha no topo. `ci-workflow-adocao.ts` troca a opinião sobre o conteúdo por um fato sobre o histórico: um manifesto guarda o hash do que escrevemos, e o disco é comparado contra ele. "É igual ao que eu faria" deixa de ser confundido com "fui eu que fiz". Medido por contrafactual: com a heurística antiga de volta, dois testes de integração reprovam.
+
+O manifesto mora em `.github/ci-workflow-manifesto.json`, **versionado junto do workflow** — a procedência precisa viajar com o repositório, senão um clone novo perderia o registro e todo arquivo viraria "origem desconhecida". Manifesto corrompido é tratado como ausência, não como erro: sem procedência confiável a decisão certa já é preservar, e derrubar a entrega por um JSON quebrado seria pior que o problema.
+
+O diff da proposta de adoção usa subsequência comum mais longa, não comparação posicional. Com esta, inserir uma linha no topo reportaria o arquivo inteiro como alterado, e quem precisa decidir a adoção receberia ruído em vez de informação.
+
+**Nome de check não é identidade (critério 11).** `CheckNormalizado` ganha `emissor` e `tentativa`, e `recusaDaEvidencia` acrescenta as duas checagens às três de sempre. Sem elas, qualquer app com permissão de escrita publica um check chamado `validacao` e verde, e a pipeline aceita a afirmação de um terceiro como se fosse do CI; e uma tentativa antiga do mesmo workflow, no mesmo head, tem o mesmo nome e pode estar verde enquanto a corrente falhou. **Ausência de dado não bloqueia** — a §2 proíbe endurecer proteção por iniciativa própria —, mas também não vira aprovação.
+
+**A causa nomeia o que de fato recusou.** Um check verde recusado por emissor, reportado como "não concluiu com sucesso", mandaria o leitor investigar o log de um job que passou. O gate distingue os dois casos.
+
+**A base avançou, e ninguém olhava (critério 12).** O gate já recusava head do PR divergente, mas o head do PR **não se move** quando alguém mergeia outro PR na base: o CI continua verde descrevendo o código contra uma base que já não existe — dois PRs que passam sozinhos e quebram juntos. Sem `strict` na proteção, a origem não recusa, e esta reconferência imediatamente antes da mutação é a única que existe. `shaDaBase` devolve `undefined` (e não string vazia como `headNaOrigem`) quando a leitura falha: vazio casaria com vazio numa segunda leitura também falha, e a comparação afirmaria "a base não mudou" a partir de duas ignorâncias.
+
+**O dublê aprovava a garantia sem que ela existisse.** Ele devolvia `origem.headSha` para qualquer ref, base inclusive, então a reconferência comparava um valor consigo mesmo e concordava sempre. Base e head são commits diferentes na vida real, e agora também no teste.
+
+**Dois defeitos que os testes acharam.** Uma exceção na leitura da base derrubava a entrega inteira, num ponto em que a §7 manda preservar o PR e explicar a limitação — o `try` ficou só nessa consulta, cujo contrato inclui não saber; nas vizinhas a exceção deve subir. E o teste do adapter da M6-F04 afirmava o objeto normalizado inteiro e reprovou com os campos novos: a spec daquela fatia pede "SHA e conclusão normalizados" e não proíbe campos adicionais, então o teste passou a afirmar os dois escalares extraídos e a continuar provando que o objeto do GitHub fica fora.
+
+**Limites declarados:** (1) o teste do critério 5 prova a **política** de reúso sobre um modelo com contador de invocações, como a spec pede, mas não sobre o `test-report.mjs` real — o `--no-run` do CI já implementa o reúso, e amarrar o teste ao script é escopo da vertical 3. (2) `baseAvancou` é uma comparação de igualdade: o que a carrega é o ponto de chamada, não a função. (3) A leitura do perfil a partir de `ci-profile.json` no disco continua pendente; o perfil ainda chega pelo pedido. (4) A Emenda E1 (critérios 19 a 26) segue fora.
 
 ## Registro de entregas
 

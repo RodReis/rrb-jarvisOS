@@ -17,7 +17,12 @@
  *    satisfazer, e a causa do bloqueio é outra: configurar, não investigar.
  */
 
-import { checksAprovam, type CheckNormalizado } from './github-automation'
+import {
+  checksAprovam,
+  recusaDaEvidencia,
+  type CheckNormalizado,
+  type ExigenciaDeIdentidade
+} from './github-automation'
 import type { SnapshotDeRuleset } from './ruleset'
 
 /** A severidade de um achado de revisão, na baseline do `REVIEW.md`. */
@@ -33,6 +38,14 @@ export interface EntradaDoGate {
   readonly snapshot: SnapshotDeRuleset
   /** Os achados de revisão ainda abertos. P0/P1 bloqueiam; P2/P3 registram. */
   readonly achadosAbertos: readonly { readonly severidade: SeveridadeDeAchado }[]
+  /**
+   * A identidade que a origem exige dos checks obrigatórios (SPEC-Pipeline-01, critério 11).
+   *
+   * Opcional: projeto que não declara emissor nem tentativa continua avaliado exatamente como
+   * antes. A §2 proíbe endurecer proteção por iniciativa própria, e exigir identidade de quem
+   * nunca a pediu seria endurecer.
+   */
+  readonly exigenciaDeIdentidade?: ExigenciaDeIdentidade
 }
 
 export type VeredictoDoGate =
@@ -86,8 +99,16 @@ export function avaliarGateDeMerge(entrada: EntradaDoGate): VeredictoDoGate {
   // o que continua certo para check opcional — mas um obrigatório que decidiu não rodar (`skipped`)
   // ou que terminou sem veredito (`neutral`) não verificou nada, e a regra da origem exige que ele
   // conclua com sucesso (critério 11).
+  // `recusaDaEvidencia` acrescenta às três checagens de sempre (head, concluído, sucesso) as duas
+  // do critério 11 da SPEC-Pipeline-01: emissor e tentativa. Sem exigência declarada ela decide
+  // igual ao que decidia antes — o nome do check nunca foi identidade, e agora isso é verificável.
   const satisfeitos = new Set(
-    doHead.filter((c) => c.status === 'completed' && c.conclusao === 'success').map((c) => c.nome)
+    doHead
+      .filter(
+        (c) =>
+          recusaDaEvidencia(c, entrada.headShaEsperado, entrada.exigenciaDeIdentidade) === undefined
+      )
+      .map((c) => c.nome)
   )
   const faltando = entrada.snapshot.contexts.filter((nome) => !satisfeitos.has(nome))
 
@@ -103,6 +124,31 @@ export function avaliarGateDeMerge(entrada: EntradaDoGate): VeredictoDoGate {
         reason: 'aguardando',
         pendentes: emAndamento.length,
         mensagem: `${emAndamento.length} check(s) obrigatório(s) ainda correndo no head verificado.`
+      }
+    }
+
+    // A causa precisa nomear o que **de fato** recusou cada check. Um check verde recusado por
+    // emissor não confiável ou por tentativa antiga sob a mensagem "não concluiu com sucesso"
+    // manda o leitor investigar o log de um job que passou — o erro verdadeiro que esconde a
+    // causa. Aqui a recusa é reportada com o nome dela.
+    const porCausa = naoResolvidos.map((c) => ({
+      nome: c.nome,
+      recusa: recusaDaEvidencia(c, entrada.headShaEsperado, entrada.exigenciaDeIdentidade)
+    }))
+    const identidade = porCausa.filter(
+      (p) => p.recusa === 'emissor-nao-confiavel' || p.recusa === 'tentativa-antiga'
+    )
+
+    if (identidade.length > 0) {
+      return {
+        reason: 'bloqueado-externo',
+        acao:
+          'Conferir o emissor e a tentativa dos checks obrigatórios: eles existem e estão ' +
+          'verdes, mas não são a evidência que a origem exige.',
+        mensagem:
+          'Checks obrigatórios recusados por identidade no head verificado: ' +
+          identidade.map((p) => `${p.nome} (${p.recusa})`).join(', ') +
+          '.'
       }
     }
 

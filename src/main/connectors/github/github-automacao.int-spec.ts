@@ -668,8 +668,9 @@ describe('checks.for-head — critério 4', () => {
         status: 'completed',
         conclusion: 'success',
         html_url: 'https://github.com/x',
-        // Campos que o GitHub manda e que não devem atravessar o IPC.
+        // O GitHub manda muito mais do que isto. O normalizado leva só o que alguma regra usa.
         app: { id: 1, slug: 'github-actions' },
+        check_suite: { id: 9, run_attempt: 2 },
         output: { summary: 'tudo certo' }
       }
     ]
@@ -680,16 +681,40 @@ describe('checks.for-head — critério 4', () => {
       sha: SHA
     })) as ConnectorResult
 
+    // `emissor` e `tentativa` entraram com a SPEC-Pipeline-01 (critério 11): nome de check não é
+    // identidade, e um check verde de outro app ou de uma tentativa antiga não pode satisfazer o
+    // gate. São **dois escalares extraídos** de `app.slug` e `check_suite.run_attempt`, não o
+    // objeto do GitHub — que continua fora, como este teste segue provando com `output`.
     expect(r.data).toEqual([
       {
         nome: 'test',
         headSha: SHA,
         status: 'completed',
         conclusao: 'success',
-        url: 'https://github.com/x'
+        url: 'https://github.com/x',
+        emissor: 'github-actions',
+        tentativa: 2
       }
     ])
-    expect(JSON.stringify(r.data)).not.toContain('github-actions')
+    expect(JSON.stringify(r.data)).not.toContain('tudo certo')
+    expect(JSON.stringify(r.data)).not.toContain('"id"')
+  })
+
+  it('origem sem app nem check_suite não vira campo inventado', async () => {
+    // Ausência de dado é ausência: `recusaDaEvidencia` não bloqueia por falta de emissor ou
+    // tentativa, mas também não pode receber um valor forjado para preencher o buraco.
+    estado.checkRuns = [{ name: 'test', head_sha: SHA, status: 'completed', conclusion: 'success' }]
+
+    const r = (await executar(GITHUB_OPERATIONS.getChecksForHead, {
+      owner: OWNER,
+      repo: REPO,
+      sha: SHA
+    })) as ConnectorResult
+
+    const check = (r.data as readonly Record<string, unknown>[])[0]
+    expect(check).toBeDefined()
+    expect('emissor' in check!).toBe(false)
+    expect('tentativa' in check!).toBe(false)
   })
 
   it('check sem conclusão fica sem o campo — ausência é "ainda não se sabe"', async () => {

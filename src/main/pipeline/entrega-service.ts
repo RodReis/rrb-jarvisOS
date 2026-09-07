@@ -21,7 +21,7 @@
  *   gate de créditos, a policy `api.external-call` e a auditoria do par antes/depois.
  */
 
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import {
@@ -37,8 +37,9 @@ import {
   precisaReescreverWorkflow,
   type ComandosDeValidacao
 } from '@shared/domain/ci-workflow'
-import { validarPerfilDeCi, type PerfilDeCi } from '@shared/domain/ci-profile'
-import { MARCA_DO_WORKFLOW_GERADO, gerarWorkflowDoPerfil } from '@shared/domain/ci-profile-workflow'
+import { VERSAO_DO_GERADOR, validarPerfilDeCi, type PerfilDeCi } from '@shared/domain/ci-profile'
+import { gerarWorkflowDoPerfil } from '@shared/domain/ci-profile-workflow'
+import { decidirSobreWorkflow, type ManifestoDoWorkflow } from '@shared/domain/ci-workflow-adocao'
 import {
   avaliarGateDeMerge,
   type SeveridadeDeAchado,
@@ -52,7 +53,7 @@ import {
 import { GITHUB_OPERATIONS, type CheckNormalizado } from '@shared/domain/github-automation'
 import type { EstadoDoRun } from '@shared/domain/pipeline'
 import type { SandboxPreparado } from '@shared/domain/preflight'
-import { rulesetMudou, type SnapshotDeRuleset } from '@shared/domain/ruleset'
+import { baseAvancou, rulesetMudou, type SnapshotDeRuleset } from '@shared/domain/ruleset'
 import type { ConnectorService } from '../connectors/connector-service'
 import { log } from '../logging/logger'
 import type { AuditRepository } from '../storage/audit-repository'
@@ -64,6 +65,11 @@ import type { BudgetRepository } from '../budget/budget-repository'
 import type { ExecutionLedgerRepository } from './execution-ledger-repository'
 import type { LimpezaService } from './limpeza-service'
 import type { RulesetRepository } from './ruleset-repository'
+
+/** O hash de um conteúdo. `src/shared` não pode calcular: `node:crypto` não existe no renderer. */
+function sha256(conteudo: string): string {
+  return createHash('sha256').update(conteudo, 'utf8').digest('hex')
+}
 
 /** O teto padrão de espera por checks pendentes (decisão do PI, 2026-09-02). */
 export const TETO_DE_ESPERA_PADRAO_MS = 30 * 60 * 1000
@@ -393,26 +399,47 @@ export class EntregaService {
       }
 
       const desejado = gerarWorkflowDoPerfil(pedido.perfilDeCi)
-      // Bytes iguais: nada a fazer. Diferente e **gerado por nós** (o cabeçalho o diz): atualiza.
-      // Diferente e sem o cabeçalho: é edição humana, e a spec (§6) manda preservar os bytes.
-      if (atual === desejado) return undefined
-      if (atual !== undefined && !atual.startsWith(MARCA_DO_WORKFLOW_GERADO)) {
-        log.agent.warn(
-          'Workflow existente não foi gerado pela pipeline; preservado sem alteração',
-          {
-            runId: pedido.runId,
-            caminho: CAMINHO_DO_WORKFLOW
-          }
-        )
+      const hashDoPerfil = sha256(JSON.stringify(pedido.perfilDeCi))
+      const manifesto = this.manifestoDoWorkflow(pedido)
+      const decisao = decidirSobreWorkflow({
+        ...(atual === undefined ? {} : { conteudoAtual: atual, hashAtual: sha256(atual) }),
+        conteudoDesejado: desejado,
+        hashDesejado: sha256(desejado),
+        hashDoPerfil,
+        profileId: pedido.perfilDeCi.profileId,
+        versaoDoGerador: VERSAO_DO_GERADOR,
+        ...(manifesto === undefined ? {} : { manifesto })
+      })
+
+      if (decisao.acao === 'manter') return undefined
+
+      if (decisao.acao === 'propor-adocao') {
+        // Não é falha: é a pipeline dizendo que **não consegue comprovar equivalência** (§6). Os
+        // bytes ficam, e o diff vai para o log para a decisão humana. Substituir o arquivo aqui
+        // apagaria trabalho de outra pessoa sobre uma suposição.
+        log.agent.warn('Workflow preservado; adoção precisa de decisão humana', {
+          runId: pedido.runId,
+          caminho: CAMINHO_DO_WORKFLOW,
+          causa: decisao.causa,
+          mensagem: decisao.mensagem,
+          linhasNoDiff: decisao.diff.filter((l) => l.tipo !== 'igual').length
+        })
         return undefined
       }
 
       mkdirSync(dirname(caminho), { recursive: true })
       writeFileSync(caminho, desejado, 'utf8')
+      this.registrarManifesto(pedido, {
+        profileId: pedido.perfilDeCi.profileId,
+        hashDoPerfil,
+        hashDoConteudo: sha256(desejado),
+        versaoDoGerador: VERSAO_DO_GERADOR
+      })
       log.agent.info('Workflow de CI gerado a partir do perfil', {
         runId: pedido.runId,
         caminho: CAMINHO_DO_WORKFLOW,
-        profileId: pedido.perfilDeCi.profileId
+        profileId: pedido.perfilDeCi.profileId,
+        acao: decisao.acao
       })
       return undefined
     }
@@ -573,6 +600,10 @@ export class EntregaService {
       const snapshot = await this.snapshotDoRuleset(pedido)
       const headShaNaOrigem = await this.headNaOrigem(pedido)
       const checks = await this.checksDoHead(pedido, headShaEsperado)
+      // A base **na avaliação**: é contra este valor que a reconferência antes do merge compara.
+      // Lida na mesma volta em que o gate decide, senão comparar-se-ia com um instante diferente
+      // daquele em que a decisão foi tomada.
+      const baseNaAvaliacao = await this.shaDaBase(pedido)
 
       const veredicto = avaliarGateDeMerge({
         headShaEsperado,
@@ -587,7 +618,8 @@ export class EntregaService {
         pullRequest,
         veredicto,
         headShaEsperado,
-        checks.map((check) => ({ nome: check.nome, conclusao: check.conclusao ?? 'pendente' }))
+        checks.map((check) => ({ nome: check.nome, conclusao: check.conclusao ?? 'pendente' })),
+        baseNaAvaliacao
       )
       if (desfecho !== undefined) return desfecho
 
@@ -614,7 +646,8 @@ export class EntregaService {
     pullRequest: number,
     veredicto: VeredictoDoGate,
     headSha: string,
-    checks: readonly CheckDoLedger[]
+    checks: readonly CheckDoLedger[],
+    baseNaAvaliacao: string | undefined
   ): Promise<ResultadoDaEntrega | undefined> {
     if (veredicto.reason === 'aguardando') return undefined
 
@@ -641,7 +674,7 @@ export class EntregaService {
       }
     }
 
-    return await this.mergear(pedido, pullRequest, headSha, checks)
+    return await this.mergear(pedido, pullRequest, headSha, checks, baseNaAvaliacao)
   }
 
   /**
@@ -654,7 +687,8 @@ export class EntregaService {
     pedido: PedidoDeEntrega,
     pullRequest: number,
     headSha: string,
-    checks: readonly CheckDoLedger[]
+    checks: readonly CheckDoLedger[],
+    baseNaAvaliacao: string | undefined
   ): Promise<ResultadoDaEntrega> {
     if (!this.deps.mergePolicy.autonomoLigado(pedido.projectId)) {
       this.deps.fila.concluir(pedido.projectId, pedido.workspaceId, pedido.runId)
@@ -663,6 +697,39 @@ export class EntregaService {
         pullRequest
       })
       return { estadoFinal: 'AWAITING_MERGE', pullRequest, headSha, checks }
+    }
+
+    // **A base é reconferida imediatamente antes da mutação** (SPEC-Pipeline-01 §7 e critério 12).
+    // O gate já recusa head do PR divergente, mas o head do PR **não se move** quando alguém
+    // mergeia outro PR na base: o CI continua verde descrevendo o código contra uma base que já
+    // não existe. É o caso de dois PRs que passam sozinhos e quebram juntos. Sem `strict` na
+    // proteção, a origem não recusa por conta própria, e esta é a única verificação que existe.
+    // Não saber o SHA da base (leitura falhou, permissão ausente) **não** vira bloqueio: a §7
+    // manda preservar o PR e explicar a limitação, e as outras garantias seguem valendo. O que
+    // não pode é o desconhecido virar afirmação de que a base não mudou.
+    const baseAgora = await this.shaDaBase(pedido)
+    if (
+      baseNaAvaliacao !== undefined &&
+      baseAgora !== undefined &&
+      baseAvancou(baseNaAvaliacao, baseAgora)
+    ) {
+      this.deps.fila.concluir(pedido.projectId, pedido.workspaceId, pedido.runId)
+      log.agent.warn('A base avançou entre a avaliação e o merge; reconciliar antes de integrar', {
+        runId: pedido.runId,
+        pullRequest
+      })
+      return {
+        ...this.bloqueado(
+          'base-avancou',
+          'Atualizar o branch da fatia sobre a base nova e revalidar no mesmo pull request.',
+          `A branch ${pedido.alvo.branchBase} avançou de ${baseNaAvaliacao.slice(0, 12)} para ` +
+            `${baseAgora.slice(0, 12)} depois da avaliação. Os checks verdes descrevem o código ` +
+            'contra a base anterior, e uma leitura prévia não basta para afirmar integração segura.'
+        ),
+        pullRequest,
+        headSha,
+        checks
+      }
     }
 
     await this.chamar(GITHUB_OPERATIONS.squashMerge, pedido.workspaceId, {
@@ -787,6 +854,86 @@ export class EntregaService {
     })
 
     return r.ok ? ((r.data as { readonly sha?: string } | undefined)?.sha ?? '') : ''
+  }
+
+  /**
+   * O commit que a branch-base tem na origem agora (critério 12).
+   *
+   * Devolve `undefined` — e não string vazia como `headNaOrigem` — quando a leitura falha. A
+   * diferença é deliberada: ali, vazio nunca casa com o head esperado e o desfecho seguro é
+   * "stale". Aqui, vazio casaria com vazio numa segunda leitura também falha, e a comparação
+   * afirmaria "a base não mudou" a partir de duas ignorâncias. `undefined` diz o que é: não sei.
+   */
+  /**
+   * Onde o manifesto da última escrita mora.
+   *
+   * Dentro de `.github/`, junto do arquivo que ele descreve, e **versionado com ele**: o registro
+   * precisa viajar com o repositório, senão um clone novo perderia a procedência e todo workflow
+   * viraria "origem desconhecida". Não vai para o ledger local porque o fato é do projeto-alvo,
+   * não do run.
+   */
+  private caminhoDoManifesto(pedido: PedidoDeEntrega): string {
+    return join(pedido.sandbox.worktreeNoHost, '.github', 'ci-workflow-manifesto.json')
+  }
+
+  /** O manifesto registrado, ou `undefined` quando não há — ou está ilegível. */
+  private manifestoDoWorkflow(pedido: PedidoDeEntrega): ManifestoDoWorkflow | undefined {
+    const caminho = this.caminhoDoManifesto(pedido)
+    if (!existsSync(caminho)) return undefined
+
+    try {
+      const lido = JSON.parse(readFileSync(caminho, 'utf8')) as Partial<ManifestoDoWorkflow>
+      // Manifesto corrompido ou de outra forma é **ausência**, não erro: sem procedência
+      // confiável a decisão certa já é preservar o arquivo, e derrubar a entrega por causa de um
+      // JSON quebrado seria pior que o problema.
+      if (
+        typeof lido.profileId !== 'string' ||
+        typeof lido.hashDoPerfil !== 'string' ||
+        typeof lido.hashDoConteudo !== 'string' ||
+        typeof lido.versaoDoGerador !== 'number'
+      ) {
+        return undefined
+      }
+      return lido as ManifestoDoWorkflow
+    } catch {
+      return undefined
+    }
+  }
+
+  private registrarManifesto(pedido: PedidoDeEntrega, manifesto: ManifestoDoWorkflow): void {
+    const caminho = this.caminhoDoManifesto(pedido)
+    mkdirSync(dirname(caminho), { recursive: true })
+    writeFileSync(
+      caminho,
+      `${JSON.stringify(manifesto, null, 2)}
+`,
+      'utf8'
+    )
+  }
+
+  private async shaDaBase(pedido: PedidoDeEntrega): Promise<string | undefined> {
+    // `try` aqui, e não nos vizinhos, porque esta é a **única** consulta cujo contrato inclui não
+    // saber: `undefined` é uma resposta legítima, tratada como "não posso afirmar". Nas outras, a
+    // exceção deve subir — falha ao ler o head ou os checks é falha da entrega, e engoli-la faria
+    // a pipeline seguir com dado ausente. Sem isto, uma leitura sem permissão na base derrubaria
+    // a entrega inteira num ponto onde a §7 manda preservar o PR e explicar a limitação.
+    try {
+      const r = await this.chamar(GITHUB_OPERATIONS.getCommitSha, pedido.workspaceId, {
+        owner: pedido.alvo.owner,
+        repo: pedido.alvo.repo,
+        ref: pedido.alvo.branchBase
+      })
+
+      if (!r.ok) return undefined
+      const sha = (r.data as { readonly sha?: string } | undefined)?.sha
+      return sha === undefined || sha === '' ? undefined : sha
+    } catch (erro) {
+      log.agent.warn('Não foi possível ler o commit da branch-base; a base não será reconferida', {
+        runId: pedido.runId,
+        erro: erro instanceof Error ? erro.message : String(erro)
+      })
+      return undefined
+    }
   }
 
   private async checksDoHead(
