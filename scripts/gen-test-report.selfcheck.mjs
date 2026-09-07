@@ -14,6 +14,7 @@ import { strict as assert } from 'node:assert'
 
 import {
   droppedHistory,
+  estadoAtualComparavel,
   hasHistoryEntry,
   keepHistory,
   perdaDeArquivos,
@@ -221,4 +222,41 @@ run('categoria que sumiu do config não é acusada', () => {
   assert.equal(perdaDeArquivos({ Banco: 67 }, { Banco: 67, Antiga: 10 }), null)
 })
 
-console.log('[selfcheck] OK — 26 checks')
+// --- Cobertura report-only (ADR-003 ponto 5, issue #327) ---------------------
+
+run('cobertura diferente NÃO é divergência: o ADR-003 a declara report-only', () => {
+  // O caso real da PR #326: dois arquivos de documentação, contagens idênticas,
+  // e o gate reprovando por uma décima. A cobertura do Banco está em 87.05, e
+  // uma única linha coberta a mais alterna o dígito entre execuções.
+  const a = doc([], ['| — | — | — | Banco | 1215 | 1201 | 0 | 87.0 | — | — |'])
+  const b = doc([], ['| — | — | — | Banco | 1215 | 1201 | 0 | 87.1 | — | — |'])
+  assert.equal(estadoAtualComparavel(a), estadoAtualComparavel(b))
+})
+
+run('número de testes diferente CONTINUA sendo divergência', () => {
+  const a = doc([], ['| — | — | — | Banco | 1215 | 1201 | 0 | 87.0 | — | — |'])
+  const b = doc([], ['| — | — | — | Banco | 1200 | 1201 | 0 | 87.0 | — | — |'])
+  assert.notEqual(estadoAtualComparavel(a), estadoAtualComparavel(b))
+})
+
+run('número de FALHAS diferente continua sendo divergência', () => {
+  // O contrapeso que guarda contra o erro de índice: neutralizar a célula errada
+  // apagaria justamente a coluna que a guarda existe para proteger.
+  const a = doc([], ['| — | — | — | Banco | 1215 | 1201 | 0 | 87.0 | — | — |'])
+  const b = doc([], ['| — | — | — | Banco | 1215 | 1201 | 9 | 87.0 | — | — |'])
+  assert.notEqual(estadoAtualComparavel(a), estadoAtualComparavel(b))
+})
+
+run('número de aprovados diferente continua sendo divergência', () => {
+  const a = doc([], ['| — | — | — | Banco | 1215 | 1201 | 0 | 87.0 | — | — |'])
+  const b = doc([], ['| — | — | — | Banco | 1215 | 1100 | 0 | 87.0 | — | — |'])
+  assert.notEqual(estadoAtualComparavel(a), estadoAtualComparavel(b))
+})
+
+run('a categoria continua sendo comparada', () => {
+  const a = doc([], ['| — | — | — | Banco | 1215 | 1201 | 0 | 87.0 | — | — |'])
+  const b = doc([], ['| — | — | — | Tela | 1215 | 1201 | 0 | 87.0 | — | — |'])
+  assert.notEqual(estadoAtualComparavel(a), estadoAtualComparavel(b))
+})
+
+console.log('[selfcheck] OK — 31 checks')

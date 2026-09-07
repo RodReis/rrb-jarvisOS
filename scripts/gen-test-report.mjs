@@ -173,6 +173,47 @@ function estadoAtualBlock(docRaw) {
 }
 
 /**
+ * O bloco "Estado atual" com a **cobertura neutralizada**, para a guarda comparar.
+ *
+ * Por que a cobertura sai da comparação: o ADR-003, ponto 5, decide que ela é
+ * *"report-only — publicada, não barra merge"*. Comparar a linha inteira faz a
+ * cobertura barrar merge, que é o contrário da decisão.
+ *
+ * O gatilho concreto foi a PR #326, que altera **dois arquivos de documentação**
+ * e nada mais. Ela reprovou porque a cobertura do Banco está em 87.05 — 5798 de
+ * 6660 linhas, ou 87.057% —, exatamente sobre a fronteira de arredondamento de
+ * uma casa. Uma **única** linha coberta a mais leva a 87.072, que arredonda para
+ * 87.1; em binário, 87.05 vira 87.04999999999999715 e `toFixed(1)` dá 87.0. Duas
+ * execuções do mesmo código alternam o dígito, e a guarda chama isso de número
+ * editado à mão.
+ *
+ * O que a guarda **continua** provando: testes, aprovados e falhas. É essa
+ * contagem que o ponto 1 do ADR-003 torna infalsificável, e ela não muda entre
+ * execuções do mesmo código — a Prova 0 do piso de arquivos já cobre o caso de
+ * execução incompleta.
+ *
+ * A cobertura segue vindo do `--json` do runner e **é publicada com o valor
+ * real** no arquivo; só não é o que decide se o merge passa.
+ */
+export function estadoAtualComparavel(docRaw) {
+  return estadoAtualBlock(docRaw)
+    .split('\n')
+    .map((linha) => {
+      // Só as linhas de dados da tabela: `| … | Categoria | testes | pass | falha | cob | … |`
+      if (!linha.startsWith('|')) return linha
+      const celulas = linha.split('|')
+      // Layout do `rowLine`: ['', Data, Issue, SPEC, Categoria, Testes, Pass,
+      // Falha, Cobertura, PR, Link, ''] — a cobertura é o índice 8. Errar isto
+      // apagaria a coluna de **falhas** da comparação, que é justamente o que a
+      // guarda existe para proteger. Fora desse formato, a linha passa intacta.
+      if (celulas.length !== 12) return linha
+      celulas[8] = ' cobertura-report-only '
+      return celulas.join('|')
+    })
+    .join('\n')
+}
+
+/**
  * Linhas do histórico já commitadas. Lê SÓ a seção após o marcador de
  * histórico — o "Estado atual" é sempre regenerado e nunca deve realimentar o
  * histórico.
@@ -473,8 +514,8 @@ function main() {
     //      mão sem forçar cada PR a pré-commitar metadados.
     //   2. HISTÓRICO — append-only por continência contra a base do PR (ver
     //      `droppedHistory`). Números certos e histórico zerado passavam batido.
-    const committed = estadoAtualBlock(existing)
-    const fresh = estadoAtualBlock(next)
+    const committed = estadoAtualComparavel(existing)
+    const fresh = estadoAtualComparavel(next)
     if (committed !== fresh) {
       console.error(
         '[gen-test-report] DIVERGÊNCIA de NÚMEROS: reports/TESTS.md não bate com uma execução limpa.\n' +
