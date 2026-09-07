@@ -26,6 +26,7 @@ const carregarArquitetura = vi.fn()
 const cortarPropostoDaArquitetura = vi.fn()
 const descartarAjusteDaArquitetura = vi.fn()
 const aplicarEventoDaJornada = vi.fn()
+const aprovarGate = vi.fn()
 
 const HASH = 'a'.repeat(64)
 
@@ -90,6 +91,7 @@ beforeEach(() => {
   cortarPropostoDaArquitetura.mockReset().mockResolvedValue(null)
   descartarAjusteDaArquitetura.mockReset().mockResolvedValue(null)
   aplicarEventoDaJornada.mockReset().mockResolvedValue({ resultado: 'avancou' })
+  aprovarGate.mockReset().mockResolvedValue({ reason: 'aprovado', mensagem: 'Aprovado.' })
 
   Object.defineProperty(window, 'jarvis', {
     value: {
@@ -98,6 +100,7 @@ beforeEach(() => {
       cortarPropostoDaArquitetura,
       descartarAjusteDaArquitetura,
       aplicarEventoDaJornada,
+      aprovarGate,
       sendLog: vi.fn()
     },
     configurable: true,
@@ -485,6 +488,79 @@ describe('o aceite do pacote', () => {
     await waitFor(() => {
       expect(aplicarEventoDaJornada).toHaveBeenCalledWith('p-1', 'pacote-aceito', 'jarvis')
     })
+  })
+
+  /*
+   * **O defeito que o PI relatou:** "o botão ACEITAR PACOTE não funciona".
+   *
+   * Ele funcionava — chamava o main a cada clique, e o main recusava as oito vezes com
+   * `aceite-ausente`. A etapa `pacote-aceito` está em `GATE_DA_ETAPA` e exige um `Approval` do
+   * gate `PROJECT_PACKAGE`; a tela chamava só `aplicarEventoDaJornada`, e o gate só era aprovável
+   * na tela do **roadmap**, que aparece depois desta etapa.
+   *
+   * Nenhum teste pegava porque o dublê não tinha `aprovarGate`: a chamada que faltava também
+   * faltava na prova.
+   */
+  it('aprova o gate PROJECT_PACKAGE antes de mover a etapa', async () => {
+    const user = userEvent.setup()
+    carregarArquitetura.mockResolvedValue(arquitetura())
+    montar('pacote-aceito')
+
+    await user.click(await screen.findByRole('button', { name: /aceitar o pacote/i }))
+
+    await waitFor(() =>
+      expect(aprovarGate).toHaveBeenCalledWith('p-1', 'PROJECT_PACKAGE', 'jarvis')
+    )
+    expect(aplicarEventoDaJornada).toHaveBeenCalledWith('p-1', 'pacote-aceito', 'jarvis')
+  })
+
+  it('gate recusado não move a etapa — e diz por quê', async () => {
+    const user = userEvent.setup()
+    carregarArquitetura.mockResolvedValue(arquitetura())
+    aprovarGate.mockResolvedValue({
+      reason: 'sem-revisoes',
+      mensagem: 'Nenhuma revisão a aprovar.'
+    })
+    montar('pacote-aceito')
+
+    await user.click(await screen.findByRole('button', { name: /aceitar o pacote/i }))
+
+    // Mover a etapa sem a evidência é o que o serviço da jornada recusa; tentar mesmo assim faria
+    // a tela pedir o que já sabe que vai falhar.
+    await screen.findByText('Nenhuma revisão a aprovar.')
+    expect(aplicarEventoDaJornada).not.toHaveBeenCalled()
+  })
+
+  it('a recusa traz a ação que destrava, não só a mensagem', async () => {
+    const user = userEvent.setup()
+    carregarArquitetura.mockResolvedValue(arquitetura())
+    aprovarGate.mockResolvedValue({
+      reason: 'marcos-pendentes',
+      mensagem: 'Faltam marcos commitados.',
+      problemas: [{ mensagem: 'docs/PRD.md sem commit', acao: 'Commite o PRD aceito.' }]
+    })
+    montar('pacote-aceito')
+
+    await user.click(await screen.findByRole('button', { name: /aceitar o pacote/i }))
+
+    // Bloqueio sem saída é beco: a spec proíbe o "aceitar mesmo assim" porque o caminho é o
+    // remédio, não um botão de contornar.
+    expect(await screen.findByText('docs/PRD.md sem commit')).toBeInTheDocument()
+    expect(screen.getByText('Commite o PRD aceito.')).toBeInTheDocument()
+  })
+
+  it('gate já aprovado segue em frente — não trava o PI numa etapa que pode avançar', async () => {
+    const user = userEvent.setup()
+    carregarArquitetura.mockResolvedValue(arquitetura())
+    aprovarGate.mockResolvedValue({ reason: 'ja-aprovado', mensagem: 'Já aprovado.' })
+    montar('pacote-aceito')
+
+    await user.click(await screen.findByRole('button', { name: /aceitar o pacote/i }))
+
+    // A evidência que o evento confere já existe: recusar aqui seria travar por um estado certo.
+    await waitFor(() =>
+      expect(aplicarEventoDaJornada).toHaveBeenCalledWith('p-1', 'pacote-aceito', 'jarvis')
+    )
   })
 
   it('sem revisão, a tela pede a geração em vez de oferecer o aceite', async () => {

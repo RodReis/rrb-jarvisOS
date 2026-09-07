@@ -30,7 +30,9 @@ import {
   TabPanel,
   Tabs
 } from '@design/ui'
+import type { AprovacaoOutcome } from '@shared/domain/aprovacoes'
 import { log } from '../lib/log'
+import { DesfechoDaAprovacao } from './aprovacao-recusada'
 
 /**
  * A arquitetura, as decisões, os testes e a revisão, com o gate do pacote (SPEC-Jornada-04).
@@ -494,6 +496,14 @@ export function ArquiteturaDoProjeto({
   const [desfecho, setDesfecho] = useState<ArquiteturaGeradaOutcome | null>(null)
   const [falhaNoAceite, setFalhaNoAceite] = useState(false)
   /**
+   * Por que o gate recusou o aceite, quando recusou.
+   *
+   * Estado próprio e não booleano: os motivos são nomeados no contrato (`sem-revisoes`,
+   * `sem-identidade`, `marcos-pendentes`) e cada um pede uma ação diferente do PI. Um "falhou"
+   * genérico o mandaria adivinhar qual.
+   */
+  const [recusaDoAceite, setRecusaDoAceite] = useState<AprovacaoOutcome | null>(null)
+  /**
    * O aviso de que a IA propôs ajustes, aberto **na chegada** deles (#332, defeito 5).
    *
    * A geração termina, o PI continua olhando o topo da tela, e a lista dos ajustes fica abaixo da
@@ -557,17 +567,38 @@ export function ArquiteturaDoProjeto({
   }, [projectId, workspace, carregar])
 
   /**
-   * O aceite do pacote (gate `PROJECT_PACKAGE`).
+   * O aceite do pacote — **aprovar o gate `PROJECT_PACKAGE` e então mover a etapa**.
    *
-   * Vai pelo **mesmo canal de evento** que move toda a jornada, e não por um canal próprio:
-   * `aplicarEventoDaJornada` é a única via de escrita da etapa, e uma segunda entrada só para a
-   * arquitetura criaria um caminho que escapa da checagem de ordem que ela faz.
+   * **O defeito que isto conserta.** A tela chamava só `aplicarEventoDaJornada`, e o main recusava
+   * toda vez com `aceite-ausente`: `pacote-aceito` está em `GATE_DA_ETAPA`, e o serviço da jornada
+   * confere se existe um `Approval` do gate antes de avançar. O `PROJECT_PACKAGE` só era aprovável
+   * na tela do **roadmap** — que aparece depois desta etapa. O aceite estava atrás da porta que ele
+   * mesmo destranca, e o PI clicava sem nada acontecer (medido: oito recusas seguidas na
+   * auditoria do projeto dele, uma por clique).
+   *
+   * **A ordem é gate primeiro, evento depois.** Aprovar grava a evidência que o evento vai
+   * conferir; inverter faria o evento recusar a si mesmo. É a mesma sequência que o roadmap já
+   * usa nos gates dele.
+   *
+   * **A recusa vira mensagem, não silêncio.** `aprovar` devolve motivos nomeados — sem revisões,
+   * sem identidade, já aprovado —, e engoli-los foi metade do defeito: o PI não tinha como saber
+   * se clicou, se falhou, ou o que fazer a seguir.
    */
   const aceitar = useCallback(async (): Promise<void> => {
     setOcupado(true)
     setFalhaNoAceite(false)
+    setRecusaDoAceite(null)
 
     try {
+      const aprovacao = await window.jarvis.aprovarGate(projectId, 'PROJECT_PACKAGE', workspace)
+
+      // `ja-aprovado` não é recusa do ponto de vista do PI: o gate já tem a evidência que o
+      // evento precisa, e travar aqui o deixaria preso numa etapa que pode avançar.
+      if (aprovacao.reason !== 'aprovado' && aprovacao.reason !== 'ja-aprovado') {
+        setRecusaDoAceite(aprovacao)
+        return
+      }
+
       await window.jarvis.aplicarEventoDaJornada(projectId, 'pacote-aceito', workspace)
       await carregar()
       onAceito?.()
@@ -780,6 +811,15 @@ export function ArquiteturaDoProjeto({
               {t('arquitetura.aceiteDescricao')}
             </InlineAlert>
           )}
+
+          {/*
+            A recusa do gate, com o motivo e a ação (#333).
+            
+            **Fora das abas e acima do aceite**: é a resposta ao clique que o PI acabou de dar na
+            trilha, e escondê-la atrás de uma aba faria o botão parecer inerte — que foi
+            exatamente o defeito relatado, oito cliques sem nada na tela.
+          */}
+          {recusaDoAceite !== null && <DesfechoDaAprovacao aprovacao={recusaDoAceite} />}
 
           {/*
             O aceite — a soleira do documento, e por isso no fim: aceitar é o que se faz depois de

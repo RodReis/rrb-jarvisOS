@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { GitBranch, ShieldCheck, Sparkles } from 'lucide-react'
 import type { WorkspaceId } from '@shared/domain/entities'
-import type { Approval, AprovacaoOutcome, AprovacaoReason, Gate } from '@shared/domain/aprovacoes'
+import type { Approval, AprovacaoOutcome, Gate } from '@shared/domain/aprovacoes'
 import { GATES } from '@shared/domain/aprovacoes'
 import type {
   MvpGerado,
@@ -16,6 +16,7 @@ import type {
 import { perguntasSemResposta } from '@shared/domain/roadmap-gerado'
 import { Badge, Button, EmptyState, InlineAlert, LoadingState, TabPanel, Tabs } from '@design/ui'
 import { log } from '../lib/log'
+import { DesfechoDaAprovacao } from './aprovacao-recusada'
 
 /**
  * O roadmap gerado por IA e os dois gates que o fecham (SPEC-Jornada-05).
@@ -99,24 +100,6 @@ const TOM_DA_GERACAO: Readonly<Record<ResultadoDoRoadmap, 'ok' | 'err' | 'warn'>
   'mvp-nao-escolhido': 'warn',
   'mvp-inelegivel': 'warn',
   'falha-de-escrita': 'err'
-}
-
-/**
- * Tom por desfecho da aprovação.
- *
- * `ja-aprovado` é **`ok`, não `warn`**: nada deu errado — a revisão já tem o aceite, que é
- * exatamente o estado desejado. Pintar de aviso ensinaria o PI a ler o critério 5 como problema.
- */
-const TOM_DA_APROVACAO: Readonly<Record<AprovacaoReason, 'ok' | 'err' | 'warn'>> = {
-  aprovado: 'ok',
-  'projeto-inexistente': 'err',
-  'ja-aprovado': 'ok',
-  'sem-identidade': 'warn',
-  'sem-revisoes': 'warn',
-  'dag-invalido': 'err',
-  // `warn`, e não `err`: nada quebrou — falta commitar o que já foi aceito, e cada pendência vem
-  // com a ação que a resolve. `err` diria ao PI que o app falhou, quando o que falta é um passo.
-  'marcos-pendentes': 'warn'
 }
 
 export function RoadmapDoProjeto({
@@ -422,29 +405,7 @@ export function RoadmapDoProjeto({
             acabou de dar, e escondê-lo atrás da aba que ele talvez já tenha deixado faria a
             recusa passar despercebida.
           */}
-          {aprovacao !== null && (
-            <InlineAlert tom={TOM_DA_APROVACAO[aprovacao.reason]} titulo={aprovacao.mensagem}>
-              {/*
-                As pendências de marco, uma por linha, **com a ação** (SPEC-Fases-04, critério 4).
-                Sem a ação o bloqueio seria um beco: a spec proíbe o "aceitar mesmo assim"
-                justamente porque o caminho de saída é o remédio, não um botão de contornar.
-              */}
-              {aprovacao.problemas !== undefined && aprovacao.problemas.length > 0 && (
-                <span className="flex flex-col gap-1">
-                  {aprovacao.problemas.map((problema) => (
-                    <span key={problema.mensagem} className="flex flex-col">
-                      <span>{problema.mensagem}</span>
-                      {problema.acao !== undefined && (
-                        <span className="text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto)]">
-                          {problema.acao}
-                        </span>
-                      )}
-                    </span>
-                  ))}
-                </span>
-              )}
-            </InlineAlert>
-          )}
+          {aprovacao !== null && <DesfechoDaAprovacao aprovacao={aprovacao} />}
         </>
       )}
     </section>

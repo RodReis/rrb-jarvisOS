@@ -27,6 +27,7 @@ const estadoDaJornada = vi.fn()
 const carregarArquitetura = vi.fn()
 const gerarArquiteturaPorIa = vi.fn()
 const aplicarEventoDaJornada = vi.fn()
+const aprovarGate = vi.fn()
 const marcosDoProjeto = vi.fn()
 const generationHistory = vi.fn()
 const onGenerationEvent = vi.fn()
@@ -80,6 +81,7 @@ beforeEach(() => {
   carregarArquitetura.mockReset().mockResolvedValue(null)
   gerarArquiteturaPorIa.mockReset().mockResolvedValue({ resultado: 'gerada', mensagem: 'ok' })
   aplicarEventoDaJornada.mockReset().mockResolvedValue({ resultado: 'avancou' })
+  aprovarGate.mockReset().mockResolvedValue({ reason: 'aprovado', mensagem: 'Aprovado.' })
   marcosDoProjeto.mockReset().mockResolvedValue({
     disponivel: true,
     linhas: [],
@@ -93,6 +95,7 @@ beforeEach(() => {
     carregarArquitetura,
     gerarArquiteturaPorIa,
     aplicarEventoDaJornada,
+    aprovarGate,
     marcosDoProjeto,
     generationHistory,
     onGenerationEvent
@@ -111,7 +114,7 @@ describe('o botão da trilha executa a ação da etapa', () => {
     await waitFor(() => expect(gerarArquiteturaPorIa).toHaveBeenCalledWith('p-1', 'jarvis'))
   })
 
-  it('aceitar o pacote vai pelo canal de evento da jornada', async () => {
+  it('aceitar o pacote aprova o gate e vai pelo canal de evento da jornada', async () => {
     const usuario = userEvent.setup()
     estadoDaJornada.mockResolvedValue(jornada('pacote-aceito'))
     carregarArquitetura.mockResolvedValue(arquitetura())
@@ -119,9 +122,16 @@ describe('o botão da trilha executa a ação da etapa', () => {
 
     await usuario.click(await screen.findByRole('button', { name: 'Aceitar o pacote' }))
 
+    /*
+     * **Os dois, nesta ordem.** A etapa `pacote-aceito` exige um `Approval` do gate, e o evento o
+     * confere antes de mover: aprovar depois faria o evento recusar a si mesmo. O defeito que o
+     * PI relatou era exatamente a metade que faltava — a tela chamava só o evento, e o main
+     * recusava toda vez com `aceite-ausente`.
+     */
     await waitFor(() =>
-      expect(aplicarEventoDaJornada).toHaveBeenCalledWith('p-1', 'pacote-aceito', 'jarvis')
+      expect(aprovarGate).toHaveBeenCalledWith('p-1', 'PROJECT_PACKAGE', 'jarvis')
     )
+    expect(aplicarEventoDaJornada).toHaveBeenCalledWith('p-1', 'pacote-aceito', 'jarvis')
   })
 
   it('há um botão só para o avanço: o do painel não voltou', async () => {
