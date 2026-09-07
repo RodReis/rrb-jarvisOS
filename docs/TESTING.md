@@ -359,7 +359,13 @@ evidência mentir:
 1. **Números** — recomputa os totais numa execução limpa e compara com a seção `## Estado atual`
    commitada. Divergiu → **CI falha**. O número só "cola" se sobreviver a uma reexecução
    independente. Compara só os números, não os rótulos Data/Issue/PR (que variam por PR de
-   propósito).
+   propósito) — **nem a cobertura** (desde 2026-09-06, issue #327). O ADR-003, ponto 5, decide
+   que a cobertura é *"report-only — publicada, não barra merge"*, e compará-la fazia exatamente
+   o contrário. O gatilho foi a PR #326, que altera **dois arquivos de documentação** e reprovou
+   por uma décima: a cobertura do Banco está em 87.05 (5798 de 6660 linhas), sobre a fronteira de
+   arredondamento, e **uma única linha coberta a mais** alterna o dígito entre execuções. A
+   cobertura continua vindo do `--json` do runner e é publicada com o valor real; ela só não
+   decide o merge. Testes, aprovados, falhas e categoria seguem comparados.
 2. **Histórico (append-only)** — prova que **toda linha da baseline continua no arquivo**.
    Append-only é verificável por **continência de conjunto**, não por igualdade: o histórico novo
    pode ter linhas a mais (a entrega atual), nunca a menos.
