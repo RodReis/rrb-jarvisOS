@@ -2200,7 +2200,7 @@ O diff da proposta de adoção usa subsequência comum mais longa, não compara�
 
 #### Vertical 3 — Evidência, retomada e métricas (critérios 13, 14 e 17)
 
-Terceira e última das entregas verticais planejadas para esta fatia.
+Terceira e última das entregas verticais planejadas para esta fatia. Na `main` pelo PR [#329](https://github.com/RodReis/rrb-jarvisOS/pull/329) (`83e3c13`).
 
 **O ledger sabia se o que chegou está bem-formado, nunca se chegou tudo.** `ledgerCompleto` já recusava hash vazio, mas nada auditava a *ausência*. É o mesmo desenho da Prova 0 do relatório de testes (issue #232): sem uma lista do que era **esperado**, a evidência incompleta concorda consigo mesma. `ci-manifesto-de-evidencia.ts` enumera o que a execução se comprometeu a produzir e recusa PASS quando falta artefato, quando o hash é vazio, quando o job que o produziu falhou, ou quando há mistura de execuções.
 
