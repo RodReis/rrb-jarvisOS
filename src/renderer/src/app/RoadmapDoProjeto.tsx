@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { GitBranch, ShieldCheck, Sparkles } from 'lucide-react'
 import type { WorkspaceId } from '@shared/domain/entities'
@@ -14,9 +14,12 @@ import type {
   SpecGerada
 } from '@shared/domain/roadmap-gerado'
 import { perguntasSemResposta } from '@shared/domain/roadmap-gerado'
+import type { AndamentoDaEtapa, EtapaDaGeracao } from '@shared/domain/geracao'
+import { ETAPAS_DA_ESCOLHA, ETAPAS_DO_ROADMAP, aplicarEtapa } from '@shared/domain/geracao'
 import { Badge, Button, EmptyState, InlineAlert, LoadingState, TabPanel, Tabs } from '@design/ui'
 import { log } from '../lib/log'
 import { DesfechoDaAprovacao } from './aprovacao-recusada'
+import { AndamentoDaGeracao } from './AndamentoDaGeracao'
 
 /**
  * O roadmap gerado por IA e os dois gates que o fecham (SPEC-Jornada-05).
@@ -119,6 +122,7 @@ export function RoadmapDoProjeto({
   const [ocupado, setOcupado] = useState<'nao' | 'gerando' | 'escolhendo' | 'aprovando'>('nao')
   const [desfecho, setDesfecho] = useState<RoadmapGeradoOutcome | null>(null)
   const [aprovacao, setAprovacao] = useState<AprovacaoOutcome | null>(null)
+  const [etapas, setEtapas] = useState<ReadonlyMap<EtapaDaGeracao, AndamentoDaEtapa>>(new Map())
 
   /**
    * As três leituras da tela, em paralelo. Devolve em vez de gravar: quem grava é o chamador, e
@@ -201,6 +205,24 @@ export function RoadmapDoProjeto({
   useEffect(() => {
     onOcupado?.(ocupado !== 'nao')
   }, [ocupado, onOcupado])
+
+  /*
+   * As duas gerações desta tela têm contratos diferentes: gerar o roadmap propõe MVPs e checa o
+   * grafo; escolher o MVP escreve a SPEC da fatia. `ocupado` já distingue as duas, e é ele que
+   * diz qual lista a barra deve percorrer — usar uma só deixaria a barra parada num percentual
+   * que não descreve a geração em curso.
+   */
+  const contrato = useMemo(
+    () => (ocupado === 'escolhendo' ? [...ETAPAS_DA_ESCOLHA] : [...ETAPAS_DO_ROADMAP]),
+    [ocupado]
+  )
+
+  useEffect(() => {
+    return window.jarvis.onGenerationEvent(({ evento }) => {
+      if (evento.tipo !== 'etapa') return
+      setEtapas((atuais) => aplicarEtapa(atuais, evento, contrato))
+    })
+  }, [contrato])
 
   /**
    * A escolha do MVP que entra na fila (critério 3).
@@ -314,6 +336,8 @@ export function RoadmapDoProjeto({
           </Button>
         </div>
       )}
+
+      <AndamentoDaGeracao etapas={etapas} gerando={trabalhando} contrato={contrato} />
 
       {desfecho !== null && desfecho.resultado !== 'gerado' && (
         <InlineAlert

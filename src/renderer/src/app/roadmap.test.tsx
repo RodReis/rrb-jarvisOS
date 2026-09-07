@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ComTrilha } from './trilha-de-teste'
@@ -27,6 +27,9 @@ const responderPerguntaDaSpec = vi.fn()
 const aprovarGate = vi.fn()
 const aplicarEventoDaJornada = vi.fn()
 const sendLog = vi.fn()
+const onGenerationEvent = vi.fn()
+/** O ouvinte que a tela registrou, para o teste emitir o que o main emitiria. */
+let emitir: ((evento: unknown) => void) | undefined
 
 const REVISOES = [
   { artefato: 'docs/PRD.md', hash: 'a'.repeat(64) },
@@ -157,6 +160,11 @@ beforeEach(() => {
   aprovarGate.mockReset()
   aplicarEventoDaJornada.mockReset().mockResolvedValue(null)
   sendLog.mockReset()
+  emitir = undefined
+  onGenerationEvent.mockReset().mockImplementation((cb: (e: unknown) => void) => {
+    emitir = cb
+    return () => {}
+  })
 
   Object.defineProperty(window, 'jarvis', {
     value: {
@@ -169,7 +177,8 @@ beforeEach(() => {
       responderPerguntaDaSpec,
       aprovarGate,
       aplicarEventoDaJornada,
-      sendLog
+      sendLog,
+      onGenerationEvent
     },
     configurable: true,
     writable: true
@@ -523,5 +532,107 @@ describe('o centro de aprovações', () => {
     await usuario.click(botoes[0]!)
 
     expect(await screen.findByText('Entre na sua conta para aprovar.')).toBeInTheDocument()
+  })
+})
+
+describe('o andamento das duas gerações desta tela (issue #337)', () => {
+  // A barra vive na tela com roadmap gerado: é o estado em que o PI clica "colocar na fila", o
+  // segundo dos dois atos que esta tela gera. O caso sem roadmap tem o próprio teste abaixo.
+  beforeEach(() => {
+    carregarRoadmapGerado.mockResolvedValue(roadmapGerado())
+    mvpsElegiveis.mockResolvedValue([roadmapGerado().mvps as never].flat().slice(0, 1))
+  })
+
+  /** Emite um anúncio como o main o emitiria, e espera o React aplicar. */
+  async function anunciar(
+    etapa: string,
+    estado: 'iniciada' | 'concluida' | 'falhou',
+    resumo?: string
+  ): Promise<void> {
+    await waitFor(() => expect(emitir).toBeDefined())
+    await act(async () => {
+      emitir?.({
+        traceId: 'etapas:p-1',
+        evento: { tipo: 'etapa', etapa, estado, ...(resumo === undefined ? {} : { resumo }) }
+      })
+    })
+  }
+
+  it('sem anúncio nenhum não há barra — 0% afirmaria que nada aconteceu', async () => {
+    renderizar()
+
+    await screen.findByRole('tablist')
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+  })
+
+  it('gerar o roadmap mostra a etapa em curso, não os nomes do PRD', async () => {
+    renderizar()
+    await screen.findByRole('tablist')
+
+    await anunciar('mvps', 'iniciada')
+
+    /*
+     * Duas ocorrências, e as duas são certas: o destaque de "o que acontece agora" e a linha da
+     * etapa na lista. O que se prova é o **nome desta geração** — a lista do PRD abre com
+     * "Pesquisa de mercado", que aqui nunca acontece e contaria no denominador sem nunca chegar.
+     */
+    expect(await screen.findAllByText('Proposta dos MVPs')).toHaveLength(2)
+    expect(screen.queryByText('Pesquisa de mercado')).not.toBeInTheDocument()
+  })
+
+  it('o progresso conta as quatro etapas do roadmap', async () => {
+    renderizar()
+    await screen.findByRole('tablist')
+
+    await anunciar('mvps', 'iniciada')
+    await anunciar('mvps', 'concluida', '3 MVPs propostos')
+
+    // 1 de 4. Com a lista do PRD, de cinco etapas, o mesmo anúncio daria 20%.
+    expect(await screen.findByRole('progressbar')).toHaveAttribute('aria-valuenow', '25')
+  })
+
+  it('a checagem de dependências é etapa própria: o ciclo não vira "validação falhou"', async () => {
+    renderizar()
+    await screen.findByRole('tablist')
+
+    await anunciar('validacao', 'concluida', 'todo MVP cita o que o sustenta')
+    await anunciar('dag', 'falhou', 'mvp-2 depende de mvp-3, que depende de mvp-2')
+
+    expect(
+      await screen.findByText('mvp-2 depende de mvp-3, que depende de mvp-2')
+    ).toBeInTheDocument()
+    expect(await screen.findAllByText('Checagem de dependências')).toHaveLength(2)
+  })
+
+  it('a correção aparece no resumo — um clique vira até três chamadas', async () => {
+    renderizar()
+    await screen.findByRole('tablist')
+
+    await anunciar('mvps', 'iniciada', 'correção 1 de 2')
+
+    expect(await screen.findByText('correção 1 de 2')).toBeInTheDocument()
+  })
+
+  it('escolher o MVP percorre as etapas da SPEC, não as do roadmap', async () => {
+    const usuario = userEvent.setup()
+    // Fica pendente: é enquanto a promessa não resolve que a tela está "escolhendo", e é esse
+    // estado que troca o contrato da barra.
+    escolherMvpDoRoadmap.mockReturnValue(new Promise(() => {}))
+
+    renderizar()
+    await screen.findAllByText(/Cadastro de cliente/)
+    await usuario.click(
+      screen.getByRole('button', { name: 'Colocar "Cadastro de cliente" na fila' })
+    )
+
+    await anunciar('spec', 'iniciada')
+
+    /*
+     * "Colocar na fila" parece um clique e é uma geração. A prova é o nome: `spec` só existe no
+     * contrato da escolha, e `mvps` — a primeira do roadmap — não pode aparecer, senão a barra
+     * estaria contando etapas que esta geração nunca vai executar.
+     */
+    expect(await screen.findAllByText('Escrita da SPEC da fatia')).toHaveLength(2)
+    expect(screen.queryByText('Proposta dos MVPs')).not.toBeInTheDocument()
   })
 })

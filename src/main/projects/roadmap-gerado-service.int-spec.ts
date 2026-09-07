@@ -77,6 +77,8 @@ let arquiteturaVigente:
 let commitFunciona: boolean
 let packDisponivel: boolean
 let marcosConcluidos: number
+/** Os anúncios de etapa que a tela receberia, em ordem (issue #337). */
+let anunciados: { etapa: string; estado: string; resumo?: string }[]
 
 function prd(): PrdRegistrado {
   return {
@@ -235,6 +237,7 @@ beforeEach(() => {
   commitFunciona = true
   packDisponivel = true
   marcosConcluidos = 0
+  anunciados = []
 
   service = new RoadmapGeradoService({
     repository: repo,
@@ -248,6 +251,9 @@ beforeEach(() => {
     } as never,
     audit: new AuditRepository(db, 'chave-de-teste'),
     userId: () => USER,
+    anunciarEtapa: (_projectId, etapa, estado, resumo) => {
+      anunciados.push({ etapa, estado, ...(resumo === undefined ? {} : { resumo }) })
+    },
     prdVigente: () => prdVigente,
     pacoteEstruturalId: () => (prdVigente === undefined ? undefined : PACOTE_ESTRUTURAL),
     arquiteturaVigente: () => arquiteturaVigente,
@@ -643,5 +649,98 @@ describe('regenerar depois do MVP_ENTRY preserva o aceito (critério 6)', () => 
     const r = await service.gerar(PROJETO, WS)
 
     expect(r.roadmap?.mvps.find((m) => m.id === 'mvp-1')?.fatias.map((f) => f.id)).toEqual(['f-1'])
+  })
+})
+
+describe('o andamento anunciado (issue #337)', () => {
+  it('a geração do roadmap percorre as quatro etapas, e diz o que cada uma produziu', async () => {
+    const r = await service.gerar(PROJETO, WS)
+
+    expect(r.resultado).toBe('gerado')
+    expect(anunciados.map((a) => `${a.etapa}:${a.estado}`)).toEqual([
+      'mvps:iniciada',
+      'mvps:concluida',
+      'validacao:iniciada',
+      'validacao:concluida',
+      'dag:concluida',
+      'gravacao:iniciada',
+      'gravacao:concluida'
+    ])
+
+    // O resumo é o que o PI lê enquanto espera: contar os MVPs é a diferença entre "algo
+    // aconteceu" e "o modelo propôs dois".
+    expect(anunciados.find((a) => a.etapa === 'mvps' && a.estado === 'concluida')?.resumo).toBe(
+      '2 MVPs propostos'
+    )
+  })
+
+  it('a tentativa de correção entra no resumo — um clique vira até três chamadas', async () => {
+    // A primeira saída não vem; a segunda vale. É o laço que o PI via como travamento.
+    respostas = [undefined as never, [mvp(), segundoMvp()]]
+
+    await service.gerar(PROJETO, WS)
+
+    expect(anunciados.filter((a) => a.etapa === 'mvps' && a.estado === 'iniciada')).toEqual([
+      { etapa: 'mvps', estado: 'iniciada' },
+      { etapa: 'mvps', estado: 'iniciada', resumo: 'correção 1 de 2' }
+    ])
+  })
+
+  it('escolher o MVP anuncia a SPEC: não é um clique, é uma geração', async () => {
+    await service.gerar(PROJETO, WS)
+    anunciados = []
+
+    const r = await service.escolherMvp(PROJETO, 'mvp-1', WS)
+
+    expect(r.resultado).toBe('gerado')
+    expect(anunciados.map((a) => `${a.etapa}:${a.estado}`)).toEqual([
+      'spec:iniciada',
+      'spec:concluida',
+      'validacao:iniciada',
+      'validacao:concluida',
+      'gravacao:iniciada',
+      'gravacao:concluida'
+    ])
+  })
+
+  it('o ciclo reprova a checagem de dependências, não a validação', async () => {
+    // A validação passou: os dois MVPs citam o que os sustenta. O que quebrou foi o grafo.
+    respostas = [[mvp({ dependeDe: ['mvp-2'] }), segundoMvp({ dependeDe: ['mvp-1'] })]]
+
+    await service.gerar(PROJETO, WS)
+
+    /*
+     * O validador devolve forma e grafo numa lista só. Na tela são duas etapas, e o PI precisa
+     * da distinção: "o modelo escreveu um MVP incompleto" e "as dependências fecharam um ciclo"
+     * pedem correções diferentes dele. Sem a separação, o ciclo apareceria como falha da
+     * validação e a checagem de dependências nunca chegaria a acontecer na barra.
+     */
+    const primeiraRodada = anunciados.slice(0, anunciados.findIndex((a) => a.etapa === 'dag') + 1)
+
+    expect(primeiraRodada.map((a) => `${a.etapa}:${a.estado}`)).toEqual([
+      'mvps:iniciada',
+      'mvps:concluida',
+      'validacao:iniciada',
+      'validacao:concluida',
+      'dag:falhou'
+    ])
+    // O resumo nomeia o ciclo pelos **títulos**, que é o que o PI reconhece na tela — um id
+    // como "mvp-2" não diz qual MVP ele leu.
+    expect(primeiraRodada.at(-1)?.resumo).toContain('Ciclo de dependência')
+  })
+
+  it('a gravação de conteúdo idêntico não mente que gravou documentos', async () => {
+    await service.gerar(PROJETO, WS)
+    respostas = [[mvp(), segundoMvp()]]
+    anunciados = []
+
+    await service.gerar(PROJETO, WS)
+
+    // Nada mudou. Dizer "STATUS.md gravado" faria o PI procurar uma alteração que não houve.
+    expect(anunciados.at(-1)).toEqual({
+      etapa: 'gravacao',
+      estado: 'concluida',
+      resumo: 'conteúdo idêntico — a revisão anterior foi preservada'
+    })
   })
 })

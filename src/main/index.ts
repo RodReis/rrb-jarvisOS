@@ -1198,6 +1198,7 @@ if (!app.requestSingleInstanceLock()) {
       projectService: projects,
       audit: storage.audit,
       userId: userIdAtual,
+      anunciarEtapa,
       prdVigente: (projectId) => prd.carregar(projectId),
       pacoteEstruturalId: (projectId) =>
         pacoteRepository.listarPacotes(userIdAtual(), projectId)[0]?.id,
