@@ -2163,7 +2163,7 @@ Esta entrega cobre os critérios **1, 2, 3, 4, 6, 7, 8 e 18**.
 - [x] **`src/shared/domain/ci-profile-perfis.ts`** — os dois perfis que a R2 exige (Node/npm e Python/pip em Windows/PowerShell) e a representação `legacy`
 - [x] **`EntregaService`** — resolve o perfil antes de escrever, e **bloqueia** quando ele é inválido
 - [x] **Vertical 2 (critérios 5, 9, 10, 11 e 12):** adoção por manifesto, identidade da evidência e reconferência da base — ver abaixo
-- [ ] **Vertical 3:** evidência por execução com manifesto de artefatos e hash, retomada após crash, métricas e smoke real
+- [x] **Vertical 3 (critérios 13, 14 e 17):** manifesto de evidência, retomada sem duplicar e métricas com indisponibilidade explícita — ver abaixo
 
 **Um defeito que o gerador legado tem e este não repete.** O docblock de `ci-workflow.ts` afirma que "quebra de linha entra escapada pelo mesmo mecanismo" das aspas simples. **Não entra.** Gerando o arquivo com um argv contendo `
 `, o YAML sai partido: `run: echo 'linha1` numa linha e `linha2'` solta na seguinte — arquivo que não faz parse. Aspas simples protegem contra o *shell*, e a ameaça aqui é do *formato*. O gerador novo serializa como string JSON quando há caractere de controle. Medido com contrafactual: removida a proteção, o teste reprova; recolocada, passa.
@@ -2196,6 +2196,27 @@ O diff da proposta de adoção usa subsequência comum mais longa, não compara�
 **Dois defeitos que os testes acharam.** Uma exceção na leitura da base derrubava a entrega inteira, num ponto em que a §7 manda preservar o PR e explicar a limitação — o `try` ficou só nessa consulta, cujo contrato inclui não saber; nas vizinhas a exceção deve subir. E o teste do adapter da M6-F04 afirmava o objeto normalizado inteiro e reprovou com os campos novos: a spec daquela fatia pede "SHA e conclusão normalizados" e não proíbe campos adicionais, então o teste passou a afirmar os dois escalares extraídos e a continuar provando que o objeto do GitHub fica fora.
 
 **Limites declarados:** (1) o teste do critério 5 prova a **política** de reúso sobre um modelo com contador de invocações, como a spec pede, mas não sobre o `test-report.mjs` real — o `--no-run` do CI já implementa o reúso, e amarrar o teste ao script é escopo da vertical 3. (2) `baseAvancou` é uma comparação de igualdade: o que a carrega é o ponto de chamada, não a função. (3) A leitura do perfil a partir de `ci-profile.json` no disco continua pendente; o perfil ainda chega pelo pedido. (4) A Emenda E1 (critérios 19 a 26) segue fora.
+
+
+#### Vertical 3 — Evidência, retomada e métricas (critérios 13, 14 e 17)
+
+Terceira e última das entregas verticais planejadas para esta fatia.
+
+**O ledger sabia se o que chegou está bem-formado, nunca se chegou tudo.** `ledgerCompleto` já recusava hash vazio, mas nada auditava a *ausência*. É o mesmo desenho da Prova 0 do relatório de testes (issue #232): sem uma lista do que era **esperado**, a evidência incompleta concorda consigo mesma. `ci-manifesto-de-evidencia.ts` enumera o que a execução se comprometeu a produzir e recusa PASS quando falta artefato, quando o hash é vazio, quando o job que o produziu falhou, ou quando há mistura de execuções.
+
+**A decisão mais sutil está na ordem das checagens.** Artefato de outra execução é descartado *antes* de procurar os ausentes, e por isso **não preenche a vaga** de um esperado. Se preenchesse, uma execução poderia ser "completada" por sobras de outra no mesmo diretório, e o relatório descreveria algo que nunca aconteceu.
+
+**Zero e "não sei" eram o mesmo valor.** `ci-metricas.ts` torna a distinção impossível de perder: ou há valor, ou há razão da ausência. `duracaoEntre` não assume "agora" para o fim que não chegou — isso transformaria um run interrompido numa duração plausível e falsa, que é a métrica mentindo na direção que agrada. `somar` **conta** as ausências em vez de tratá-las como zero: uma soma com ausentes é um limite inferior, não um total.
+
+**O type guard precisou apontar para o ramo real da união.** Escrito com a forma copiada à mão, `!medidaDisponivel(m)` não estreitava para o ramo ausente e ler `m.razao` no `else` não compilava. `Extract` do próprio tipo resolve — o compilador cobrou isso, não um teste.
+
+**A correlação com o CI entra no ledger** (migration 39): PR, base, tested SHA, run e tentativa do CI, revisão do perfil e instantes observados. Coluna JSON única e não dez colunas anuláveis, porque os campos são um bloco inteiro — ou a execução foi observada, ou não foi; dez colunas permitiriam estados que não existem, como tested SHA sem run id.
+
+**O dublê aprovava a idempotência sem que ela fosse observável.** Ele devolvia sempre o mesmo número de PR com `criado: false`, então o teste de retomada passaria mesmo se o serviço abrisse um PR novo a cada run. Agora ele mantém um PR por branch head, como a origem faz, e o teste afirma sobre o número devolvido. Um caso extra prova que o dublê não é complacente: head diferente recebe PR diferente.
+
+**Limites declarados:** (1) `validarEvidencia` é o contrato, e **ainda não tem ponto de montagem** no job de relatório — ligá-lo exige o perfil vir do pacote, que segue pendente. (2) O mesmo vale para `ci-metricas.ts`: `duracaoMs` do ledger continua `number`, porque mudá-lo tocaria o `PainelDeEntrega` e o banco, refatoração larga que esta fatia não pede. (3) Os critérios 15 e 16 continuam cobertos pelos testes da M9-F05, como a spec pede — kill-switch nos dois estados e origem sem proteção terminando explicável. (4) A Emenda E1 (critérios 19 a 26) e o smoke real seguem fora.
+
+**Instabilidade observada, e não é regressão.** Com cobertura ligada e a máquina carregada, `github-automacao.int-spec.ts` apareceu com 32 e depois 50 testes em `pending` — o arquivo sobe um servidor HTTP em porta efêmera. Isolado passa; três execuções seguintes da categoria deram 1208 aprovados e zero pendentes, de forma idêntica. Os números do relatório são os da execução limpa.
 
 ## Registro de entregas
 

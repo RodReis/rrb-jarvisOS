@@ -48,6 +48,7 @@ import {
 import {
   ledgerCompleto,
   type CheckDoLedger,
+  type CorrelacaoDeCi,
   type ExecutionLedger
 } from '@shared/domain/execution-ledger'
 import { GITHUB_OPERATIONS, type CheckNormalizado } from '@shared/domain/github-automation'
@@ -134,6 +135,13 @@ export interface ResultadoDaEntrega {
   readonly headSha?: string
   /** Os checks observados naquele head. Também exigidos pelo critério 1 em `MERGED`. */
   readonly checks?: readonly CheckDoLedger[]
+  /**
+   * A correlação com a execução de CI (SPEC-Pipeline-01 §8).
+   *
+   * Atravessa daqui para o ledger porque é aqui que os dados existem — o `encerrar` roda no
+   * `finally` e não tem acesso ao que foi observado na origem durante a espera.
+   */
+  readonly correlacaoDeCi?: CorrelacaoDeCi
   readonly bloqueio?: {
     readonly causa: string
     readonly acao: string
@@ -305,6 +313,12 @@ export class EntregaService {
       checks: resultado?.checks ?? [],
       artefatos: [],
       encerradoEm: new Date(this.agora()).toISOString(),
+      // A correlação com a execução de CI, quando ela foi observada (SPEC-Pipeline-01 §8).
+      // Ausente em `BLOCKED` que nem chegou ao CI — e ausência aqui é "não observado", que é
+      // exatamente o que o critério 17 exige que não vire zero.
+      ...(resultado?.correlacaoDeCi === undefined
+        ? {}
+        : { correlacaoDeCi: resultado.correlacaoDeCi }),
       // O par congelado pelo preflight, não uma nova resolução (SPEC-Fases-05, critério 5).
       // Resolver de novo aqui leria a política **no fim** do run, e um `de`/`para` editado no
       // meio faria o ledger nomear um modelo que não executou nada.
@@ -589,6 +603,9 @@ export class EntregaService {
     // tornaria o critério 4 letra morta — dois valores iguais por construção nunca divergem, e um
     // push de terceiro entre a verificação e o merge passaria despercebido.
     let headShaEsperado = await this.headNaOrigem(pedido)
+    // O instante em que **passamos a observar** o CI. Observado, não derivado: a §8 proíbe
+    // subtrair timestamps arbitrários para fingir medidas que ninguém viu.
+    const inicioDaEspera = new Date(this.agora()).toISOString()
 
     for (;;) {
       if (pedido.signal?.aborted === true) {
@@ -613,6 +630,17 @@ export class EntregaService {
         achadosAbertos: achados
       })
 
+      // A correlação é montada **aqui**, uma vez, e anexada ao desfecho num ponto só. Preenchê-la
+      // em cada um dos seis `return` do fluxo espalharia a mesma construção por lugares que
+      // divergiriam no dia em que alguém mexesse só num deles.
+      const correlacaoDeCi = this.correlacaoObservada(
+        pedido,
+        pullRequest,
+        baseNaAvaliacao,
+        checks,
+        inicioDaEspera
+      )
+
       const desfecho = await this.aplicarVeredicto(
         pedido,
         pullRequest,
@@ -621,7 +649,7 @@ export class EntregaService {
         checks.map((check) => ({ nome: check.nome, conclusao: check.conclusao ?? 'pendente' })),
         baseNaAvaliacao
       )
-      if (desfecho !== undefined) return desfecho
+      if (desfecho !== undefined) return { ...desfecho, correlacaoDeCi }
 
       // Reconciliação do head: alguém publicou depois da nossa verificação. O run passa a
       // verificar o commit novo — nunca mergeia o antigo, que já não é o head.
@@ -909,6 +937,40 @@ export class EntregaService {
 `,
       'utf8'
     )
+  }
+
+  /**
+   * A correlação com a execução de CI observada nesta volta (SPEC-Pipeline-01 §8).
+   *
+   * Campo que não foi observado **fica de fora** do objeto, e não entra como zero ou string
+   * vazia: o critério 17 é explícito, e `baseSha` ausente aqui significa "não consegui ler a
+   * base", que é diferente de "a base é o commit vazio".
+   *
+   * `headSha` **não** é parâmetro: o ledger já o grava em coluna própria desde a M9-F06, e
+   * repeti-lo aqui criaria duas fontes para o mesmo fato, que divergem no dia em que alguém
+   * atualiza só uma. `testedSha` só aparece quando difere do head do PR. A §7 distingue os dois — o provedor pode
+   * testar um merge commit sintético —, mas repetir o mesmo valor em dois campos sugeriria uma
+   * distinção que naquele caso não existe.
+   */
+  private correlacaoObservada(
+    pedido: PedidoDeEntrega,
+    pullRequest: number,
+    baseSha: string | undefined,
+    checks: readonly CheckNormalizado[],
+    iniciadoEm: string
+  ): CorrelacaoDeCi {
+    // A tentativa e o emissor vêm do próprio check, quando a origem os informa. Um valor
+    // inventado aqui contaminaria a comparação de identidade do critério 11.
+    const tentativa = checks.find((c) => c.tentativa !== undefined)?.tentativa
+
+    return {
+      pullRequest,
+      ...(baseSha === undefined ? {} : { baseSha }),
+      ...(tentativa === undefined ? {} : { tentativaDoCi: tentativa }),
+      ...(pedido.perfilDeCi === undefined ? {} : { revisaoDoPerfil: pedido.perfilDeCi.profileId }),
+      iniciadoEm,
+      observadoEm: new Date(this.agora()).toISOString()
+    }
   }
 
   private async shaDaBase(pedido: PedidoDeEntrega): Promise<string | undefined> {
