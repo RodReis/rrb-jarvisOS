@@ -343,3 +343,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | — | #314 | spec-pipeline-01-politica-pr-ci | Regras de Negócio | 1630 | 1630 | 0 | 77.0 | — | — |
 | — | #314 | spec-pipeline-01-politica-pr-ci | Banco | 1215 | 1201 | 0 | 87.0 | — | — |
 | — | #314 | spec-pipeline-01-politica-pr-ci | Tela | 636 | 635 | 0 | 75.2 | — | — |
+| 2026-09-06 | #327 | — | Regras de Negócio | 1630 | 1630 | 0 | 77.0 | #328 | [#328](https://github.com/RodReis/rrb-jarvisOS/pull/328) |
+| 2026-09-06 | #327 | — | Banco | 1215 | 1201 | 0 | 87.0 | #328 | [#328](https://github.com/RodReis/rrb-jarvisOS/pull/328) |
+| 2026-09-06 | #327 | — | Tela | 636 | 635 | 0 | 75.2 | #328 | [#328](https://github.com/RodReis/rrb-jarvisOS/pull/328) |
