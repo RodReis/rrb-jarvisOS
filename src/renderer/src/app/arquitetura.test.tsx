@@ -1,6 +1,7 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ComTrilha } from './trilha-de-teste'
 import { ArquiteturaDoProjeto } from './ArquiteturaDoProjeto'
 
 /**
@@ -58,13 +59,27 @@ function arquitetura(over: Record<string, unknown> = {}): Record<string, unknown
   }
 }
 
-function montar(): void {
+/**
+ * Monta o painel **junto do botão que a trilha desenha** (#332, defeito 4).
+ *
+ * O gerar e o aceitar saíram do painel por decisão do PI, e é a trilha que os oferece agora. A
+ * etapa escolhe qual dos dois: `arquitetura` gera, `pacote-aceito` aceita.
+ */
+function montar(etapa: 'arquitetura' | 'pacote-aceito' = 'arquitetura'): void {
   render(
-    <ArquiteturaDoProjeto
-      workspace="jarvis"
-      projectId="p-1"
-      nomeDoProjeto="Leituras"
-      onAceito={vi.fn()}
+    <ComTrilha
+      etapa={etapa}
+      painel={({ onAcaoDaEtapa, onOcupado }) => (
+        <ArquiteturaDoProjeto
+          workspace="jarvis"
+          projectId="p-1"
+          nomeDoProjeto="Leituras"
+          onAceito={vi.fn()}
+          etapa={etapa}
+          onAcaoDaEtapa={onAcaoDaEtapa}
+          onOcupado={onOcupado}
+        />
+      )}
     />
   )
 }
@@ -245,7 +260,7 @@ describe('os ajustes da análise de coerência (critério 4)', () => {
 
   it('ajuste pendente NÃO trava o aceite: é proposta sobre o desenho, não conflito interno', async () => {
     carregarArquitetura.mockResolvedValue(arquitetura({ ajustes: [AJUSTE] }))
-    montar()
+    montar('pacote-aceito')
 
     expect(await screen.findByRole('button', { name: /aceitar o pacote/i })).toBeEnabled()
   })
@@ -255,7 +270,7 @@ describe('o aceite do pacote', () => {
   it('vai pelo canal de evento da jornada, com o evento pacote-aceito', async () => {
     const user = userEvent.setup()
     carregarArquitetura.mockResolvedValue(arquitetura())
-    montar()
+    montar('pacote-aceito')
 
     await user.click(await screen.findByRole('button', { name: /aceitar o pacote/i }))
 
@@ -269,5 +284,16 @@ describe('o aceite do pacote', () => {
 
     expect(await screen.findByText(/nenhum documento ainda/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /aceitar o pacote/i })).not.toBeInTheDocument()
+  })
+
+  it('o aceite não aparece duplicado dentro do painel — ele mora na trilha', async () => {
+    // A regra do PI (#332): avanço e aceite ficam na trilha; dois botões com o mesmo nome, um
+    // do lado do outro, não dá. Este teste reprova se o botão do painel voltar.
+    carregarArquitetura.mockResolvedValue(arquitetura())
+    montar('pacote-aceito')
+
+    const painel = await screen.findByLabelText('Aceite do pacote')
+    expect(within(painel).queryByRole('button')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /aceitar o pacote/i })).toBeInTheDocument()
   })
 })

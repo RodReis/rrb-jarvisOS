@@ -470,7 +470,7 @@ export const RECURSOS = {
           'Os MVPs de {{nome}}, propostos a partir do PRD aceito e da arquitetura aprovada. Gerar propõe; escolher e aprovar são seus.',
         carregando: 'Carregando o roadmap…',
         gerar: 'Gerar roadmap',
-        regerar: 'Regerar roadmap',
+        regerar: 'Gerar de novo',
         vazio: 'Nenhum roadmap gerado ainda',
         vazioDescricao:
           'Os MVPs nascem do PRD aceito e da arquitetura aprovada. Gerar propõe o mapa; qual MVP entra na fila é sua escolha.',
@@ -1156,7 +1156,7 @@ export const RECURSOS = {
           'The MVPs for {{nome}}, proposed from the accepted PRD and the approved architecture. Generating proposes; choosing and approving are yours.',
         carregando: 'Loading the roadmap…',
         gerar: 'Generate roadmap',
-        regerar: 'Regenerate roadmap',
+        regerar: 'Generate again',
         vazio: 'No roadmap generated yet',
         vazioDescricao:
           'MVPs come from the accepted PRD and the approved architecture. Generating proposes the map; which MVP is queued is your call.',

@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ComTrilha } from './trilha-de-teste'
 import { RoadmapDoProjeto } from './RoadmapDoProjeto'
 
 /**
@@ -110,8 +111,28 @@ function comSpec(resposta?: string): Record<string, unknown> {
   })
 }
 
+/**
+ * Monta o painel **junto do botão que a trilha desenha** (#332, defeito 4).
+ *
+ * Aqui só a geração migrou: os aceites do roadmap são gates numa lista, cada linha com o próprio
+ * estado, e continuam no painel — ver a nota em `onAcaoDaEtapa` de `RoadmapDoProjeto`.
+ */
 function renderizar(): void {
-  render(<RoadmapDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Projeto Alfa" />)
+  render(
+    <ComTrilha
+      etapa="roadmap"
+      painel={({ onAcaoDaEtapa, onOcupado }) => (
+        <RoadmapDoProjeto
+          workspace="jarvis"
+          projectId="p-1"
+          nomeDoProjeto="Projeto Alfa"
+          etapa="roadmap"
+          onAcaoDaEtapa={onAcaoDaEtapa}
+          onOcupado={onOcupado}
+        />
+      )}
+    />
+  )
 }
 
 beforeEach(() => {
@@ -150,7 +171,7 @@ describe('gerar o roadmap', () => {
     gerarRoadmapPorIa.mockResolvedValue({ resultado: 'gerado', mensagem: 'Roadmap gerado.' })
 
     renderizar()
-    await usuario.click(await screen.findByRole('button', { name: 'Gerar roadmap' }))
+    await usuario.click(await screen.findByRole('button', { name: 'Gerar o roadmap' }))
 
     expect(gerarRoadmapPorIa).toHaveBeenCalledWith('p-1', 'jarvis')
   })
@@ -170,7 +191,7 @@ describe('gerar o roadmap', () => {
     })
 
     renderizar()
-    await usuario.click(await screen.findByRole('button', { name: 'Gerar roadmap' }))
+    await usuario.click(await screen.findByRole('button', { name: 'Gerar o roadmap' }))
 
     expect(await screen.findByText('Nenhuma rota autorizada')).toBeInTheDocument()
     expect(screen.getByText('Configure a assinatura.')).toBeInTheDocument()
@@ -185,18 +206,28 @@ describe('gerar o roadmap', () => {
     })
 
     renderizar()
-    await usuario.click(await screen.findByRole('button', { name: 'Gerar roadmap' }))
+    await usuario.click(await screen.findByRole('button', { name: 'Gerar o roadmap' }))
 
     expect(await screen.findByText('Ciclo de dependência: A → B.')).toBeInTheDocument()
     expect(screen.getByText('B depende de C, que não existe.')).toBeInTheDocument()
   })
 
-  it('com roadmap, o botão vira regerar', async () => {
+  it('com roadmap, o painel oferece "Gerar de novo" — e só ele', async () => {
     carregarRoadmapGerado.mockResolvedValue(roadmapGerado())
 
     renderizar()
 
-    expect(await screen.findByRole('button', { name: 'Regerar roadmap' })).toBeInTheDocument()
+    // A regra do PI (#332): o avanço mora na trilha, refazer mora no painel. Dois botões com o
+    // mesmo nome, um do lado do outro, não dá — e "Regerar roadmap" era o nome divergente.
+    expect(await screen.findByRole('button', { name: 'Gerar de novo' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Regerar roadmap' })).not.toBeInTheDocument()
+  })
+
+  it('sem roadmap, gerar é só o botão da trilha — o painel não duplica', async () => {
+    renderizar()
+
+    await screen.findByRole('button', { name: 'Gerar o roadmap' })
+    expect(screen.queryByRole('button', { name: 'Gerar de novo' })).not.toBeInTheDocument()
   })
 })
 

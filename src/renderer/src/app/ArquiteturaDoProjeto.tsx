@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ShieldCheck, Sparkles, X } from 'lucide-react'
+import { Sparkles, X } from 'lucide-react'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { DocumentoDaArquitetura } from '@shared/domain/arquitetura'
 import { DOCUMENTOS_DA_ARQUITETURA, SECOES_DA_ARQUITETURA } from '@shared/domain/arquitetura'
@@ -52,6 +52,22 @@ interface ArquiteturaDoProjetoProps {
   readonly nomeDoProjeto: string
   /** Relê a jornada depois do aceite — sem isto a trilha ficaria pedindo "Aceitar o pacote". */
   readonly onAceito?: () => void
+  /**
+   * A etapa atual da jornada. Este painel serve duas — `arquitetura` (gerar) e `pacote-aceito`
+   * (aceitar) — e o botão da trilha promete uma coisa diferente em cada uma. Sem saber onde a
+   * jornada está, o painel não teria como publicar a ação certa.
+   */
+  readonly etapa?: 'arquitetura' | 'pacote-aceito'
+  /**
+   * Publica no pai a ação que o botão da trilha dispara (#332, defeito 4).
+   *
+   * A regra do PI: **avanço e aceite ficam na trilha**; o painel guarda só `Gerar de novo`. Por
+   * isso o botão primário de gerar sai daqui quando a etapa é `arquitetura`, e o de aceitar sai
+   * quando é `pacote-aceito` — dois botões com o mesmo nome, um do lado do outro, não dá.
+   */
+  readonly onAcaoDaEtapa?: (acao: (() => void) | null) => void
+  /** Avisa o pai enquanto gera ou aceita: é o botão da trilha que mostra o carregando agora. */
+  readonly onOcupado?: (ocupado: boolean) => void
 }
 
 /** O rótulo de cada origem. **Dado, não lógica** — e o texto é o sinal, não a cor. */
@@ -300,7 +316,10 @@ export function ArquiteturaDoProjeto({
   workspace,
   projectId,
   nomeDoProjeto,
-  onAceito
+  onAceito,
+  etapa = 'arquitetura',
+  onAcaoDaEtapa,
+  onOcupado
 }: ArquiteturaDoProjetoProps): React.JSX.Element {
   const { t } = useTranslation()
   const [arquitetura, setArquitetura] = useState<ArquiteturaRegistrada | null>(null)
@@ -339,7 +358,7 @@ export function ArquiteturaDoProjeto({
     }
   }, [projectId, workspace])
 
-  async function gerar(): Promise<void> {
+  const gerar = useCallback(async (): Promise<void> => {
     setOcupado(true)
     try {
       const resultado = await window.jarvis.gerarArquiteturaPorIa(projectId, workspace)
@@ -350,7 +369,7 @@ export function ArquiteturaDoProjeto({
     } finally {
       setOcupado(false)
     }
-  }
+  }, [projectId, workspace, carregar])
 
   /**
    * O aceite do pacote (gate `PROJECT_PACKAGE`).
@@ -359,7 +378,7 @@ export function ArquiteturaDoProjeto({
    * `aplicarEventoDaJornada` é a única via de escrita da etapa, e uma segunda entrada só para a
    * arquitetura criaria um caminho que escapa da checagem de ordem que ela faz.
    */
-  async function aceitar(): Promise<void> {
+  const aceitar = useCallback(async (): Promise<void> => {
     setOcupado(true)
     setFalhaNoAceite(false)
 
@@ -373,7 +392,26 @@ export function ArquiteturaDoProjeto({
     } finally {
       setOcupado(false)
     }
-  }
+  }, [projectId, workspace, carregar, onAceito])
+
+  /*
+   * A ação da etapa vai para a trilha (#332, defeito 4).
+   *
+   * Na etapa `arquitetura` o botão da trilha diz "Gerar a arquitetura" e agora **gera**; na
+   * `pacote-aceito` ele diz "Aceitar o pacote" e aceita. Antes ele só rolava a página até um
+   * segundo botão de mesmo nome — e quem clicava no primeiro não via nada acontecer.
+   *
+   * A limpeza no retorno é o que impede a ação desta etapa de sobreviver à troca de painel.
+   */
+  useEffect(() => {
+    const acao = etapa === 'pacote-aceito' ? aceitar : gerar
+    onAcaoDaEtapa?.(() => void acao())
+    return () => onAcaoDaEtapa?.(null)
+  }, [etapa, gerar, aceitar, onAcaoDaEtapa])
+
+  useEffect(() => {
+    onOcupado?.(ocupado)
+  }, [ocupado, onOcupado])
 
   async function cortar(afirmacaoId: string): Promise<void> {
     setOcupado(true)
@@ -423,17 +461,27 @@ export function ArquiteturaDoProjeto({
         </p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <Button
-          variante="primaria"
-          onClick={() => void gerar()}
-          desabilitado={ocupado}
-          carregando={ocupado}
-          iconeInicial={<Sparkles aria-hidden="true" className="size-4" />}
-        >
-          {arquitetura === null ? t('arquitetura.gerar') : t('arquitetura.regerar')}
-        </Button>
-      </div>
+      {/*
+        **Só o "gerar de novo" fica aqui** (regra do PI, #332).
+
+        A primeira geração é o avanço da jornada e mora na trilha: dois botões com o mesmo nome,
+        um do lado do outro, é o defeito que esta correção fecha. Refazer é outra coisa — não
+        avança nada, desfaz um resultado que o PI leu e não gostou, e por isso pertence ao lado
+        do documento, em `secundaria`.
+      */}
+      {arquitetura !== null && (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            variante="secundaria"
+            onClick={() => void gerar()}
+            desabilitado={ocupado}
+            carregando={ocupado}
+            iconeInicial={<Sparkles aria-hidden="true" className="size-4" />}
+          >
+            {t('arquitetura.regerar')}
+          </Button>
+        </div>
+      )}
 
       {desfecho !== null && desfecho.resultado !== 'gerada' && (
         <InlineAlert
@@ -550,17 +598,11 @@ export function ArquiteturaDoProjeto({
               {t('arquitetura.aceiteDescricao')}
             </p>
 
-            <div className="mt-1 flex flex-wrap items-center gap-3">
-              <Button
-                variante="primaria"
-                onClick={() => void aceitar()}
-                desabilitado={ocupado}
-                carregando={ocupado}
-                iconeInicial={<ShieldCheck aria-hidden="true" className="size-4" />}
-              >
-                {t('arquitetura.aceitar')}
-              </Button>
-            </div>
+            {/*
+              O botão de aceitar saiu daqui e foi para a trilha (regra do PI, #332): aceite é
+              avanço da jornada. O texto acima continua sendo o que o PI precisa ler **antes** de
+              apertar — a soleira permanece, só a maçaneta mudou de lugar.
+            */}
           </section>
         </>
       )}

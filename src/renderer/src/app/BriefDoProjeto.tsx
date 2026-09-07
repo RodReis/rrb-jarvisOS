@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ShieldCheck, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type {
   Afirmacao,
@@ -43,6 +43,22 @@ interface BriefDoProjetoProps {
    * ficaria mostrando "Aceitar o brief" num brief já aceito.
    */
   readonly onAceito?: () => void
+  /**
+   * Publica no pai a ação que o botão da trilha dispara (#332, defeito 4).
+   *
+   * A regra do PI: **avanço e aceite ficam na trilha**. O botão de aceitar saiu daqui, senão
+   * seriam dois com o mesmo nome — o que o PI recusou explicitamente.
+   */
+  readonly onAcaoDaEtapa?: (acao: (() => void) | null) => void
+  /** Avisa o pai enquanto aceita: é o botão da trilha que mostra o carregando agora. */
+  readonly onOcupado?: (ocupado: boolean) => void
+  /**
+   * Por que o aceite não pode agir agora, ou `undefined` quando pode.
+   *
+   * Quem sabe é este painel — só ele conta as pendências materiais. Com o botão na trilha, sem
+   * este aviso ele sairia habilitado prometendo um aceite que o gate recusa.
+   */
+  readonly onBloqueioDoAceite?: (motivo: string | undefined) => void
 }
 
 /**
@@ -121,7 +137,10 @@ export function BriefDoProjeto({
   workspace,
   projectId,
   nomeDoProjeto,
-  onAceito
+  onAceito,
+  onAcaoDaEtapa,
+  onOcupado,
+  onBloqueioDoAceite
 }: BriefDoProjetoProps): React.JSX.Element {
   const { t } = useTranslation()
   const [brief, setBrief] = useState<BriefRegistrado | null>(null)
@@ -169,7 +188,7 @@ export function BriefDoProjeto({
    * A recusa por ordem é desfecho, não exceção — o outcome volta e a tela só relê. O que
    * vira mensagem é a falha técnica, porque aí o PI clicou e nada aconteceu.
    */
-  async function aceitar(): Promise<void> {
+  const aceitar = useCallback(async (): Promise<void> => {
     setOcupado(true)
     setFalhaNoAceite(false)
 
@@ -183,7 +202,30 @@ export function BriefDoProjeto({
     } finally {
       setOcupado(false)
     }
-  }
+  }, [projectId, workspace, carregar, onAceito])
+
+  /*
+   * O gate do aceite, calculado **antes** dos early returns para poder subir num efeito.
+   *
+   * Enquanto carrega, ou sem brief, não há o que aceitar: `false` mantém o botão da trilha
+   * travado em vez de prometer um aceite que ainda não existe.
+   */
+  const liberado = brief !== null && podeAceitar(brief)
+
+  /* O aceite migrou para a trilha (regra do PI, #332): a ação e o gate sobem juntos. */
+  useEffect(() => {
+    onAcaoDaEtapa?.(() => void aceitar())
+    return () => onAcaoDaEtapa?.(null)
+  }, [aceitar, onAcaoDaEtapa])
+
+  useEffect(() => {
+    onOcupado?.(ocupado)
+  }, [ocupado, onOcupado])
+
+  useEffect(() => {
+    if (carregando) return
+    onBloqueioDoAceite?.(liberado ? undefined : t('brief.aceiteBloqueado'))
+  }, [liberado, carregando, onBloqueioDoAceite, t])
 
   async function cortar(afirmacaoId: string): Promise<void> {
     setOcupado(true)
@@ -207,7 +249,6 @@ export function BriefDoProjeto({
   }
 
   const inferidos = propostos(brief)
-  const liberado = podeAceitar(brief)
   const materiais = brief.pendencias.filter((p) => p.material)
 
   /*
@@ -416,8 +457,10 @@ export function BriefDoProjeto({
           )}
 
           {/*
-            O aceite (critério 5). O botão desabilitado vem **com a razão junto**, nunca sozinho:
-            um alvo morto sem explicação faz o PI procurar o defeito no próprio brief.
+            O aceite (critério 5) — **o texto fica, o botão foi para a trilha** (regra do PI,
+            #332). O que o PI precisa ler antes de aceitar continua ao lado do brief; a razão do
+            bloqueio viaja com a ação e aparece sob o botão da trilha, para não haver duas
+            explicações do mesmo gate.
           */}
           <div className="flex flex-col gap-2 p-4">
             <h4
@@ -429,24 +472,6 @@ export function BriefDoProjeto({
             <p className="text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-secundario)]">
               {t('brief.aceiteDescricao')}
             </p>
-
-            <div className="mt-1 flex flex-col gap-2">
-              <Button
-                variante="primaria"
-                onClick={() => void aceitar()}
-                desabilitado={ocupado || !liberado}
-                carregando={ocupado}
-                iconeInicial={<ShieldCheck aria-hidden="true" className="size-4" />}
-              >
-                {t('brief.aceitar')}
-              </Button>
-
-              {!liberado && (
-                <span className="text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-secundario)]">
-                  {t('brief.aceiteBloqueado')}
-                </span>
-              )}
-            </div>
           </div>
         </aside>
       </div>

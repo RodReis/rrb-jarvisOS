@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PromptDoProjeto } from './PromptDoProjeto'
+import { ComTrilha } from './trilha-de-teste'
 import { BriefDoProjeto } from './BriefDoProjeto'
 
 /**
@@ -234,7 +235,14 @@ describe('PromptDoProjeto', () => {
 
 describe('BriefDoProjeto', () => {
   it('mostra o vazio antes de existir brief', async () => {
-    render(<BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" />)
+    render(
+      <ComTrilha
+        etapa="brief-aceito"
+        painel={(props) => (
+          <BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" {...props} />
+        )}
+      />
+    )
 
     expect(await screen.findByText('Nenhum brief ainda')).toBeInTheDocument()
   })
@@ -242,7 +250,14 @@ describe('BriefDoProjeto', () => {
   it('diz a origem de cada afirmação em texto, não em cor (princípio 2)', async () => {
     carregarBrief.mockResolvedValue(brief())
 
-    render(<BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" />)
+    render(
+      <ComTrilha
+        etapa="brief-aceito"
+        painel={(props) => (
+          <BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" {...props} />
+        )}
+      />
+    )
 
     // Verificável por texto: quem lê em escala de cinza recebe a mesma informação.
     expect(await screen.findByText('do seu prompt')).toBeInTheDocument()
@@ -258,7 +273,14 @@ describe('BriefDoProjeto', () => {
       })
     )
 
-    render(<BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" />)
+    render(
+      <ComTrilha
+        etapa="brief-aceito"
+        painel={(props) => (
+          <BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" {...props} />
+        )}
+      />
+    )
 
     // Descobrir os propostos lendo dez blocos seria pedir ao PI a varredura que a lista faz.
     const painel = await screen.findByRole('region', { name: /propostas pela IA/ })
@@ -275,7 +297,14 @@ describe('BriefDoProjeto', () => {
       })
     )
 
-    render(<BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" />)
+    render(
+      <ComTrilha
+        etapa="brief-aceito"
+        painel={(props) => (
+          <BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" {...props} />
+        )}
+      />
+    )
 
     await screen.findByText('Veio do PI.')
 
@@ -294,7 +323,14 @@ describe('BriefDoProjeto', () => {
     )
     cortarPropostoDoBrief.mockResolvedValue(brief({ afirmacoes: [] }))
 
-    render(<BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" />)
+    render(
+      <ComTrilha
+        etapa="brief-aceito"
+        painel={(props) => (
+          <BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" {...props} />
+        )}
+      />
+    )
 
     const botoes = await screen.findAllByRole('button', { name: /Cortar a afirmação/ })
     await usuario.click(botoes[0]!)
@@ -310,7 +346,14 @@ describe('BriefDoProjeto', () => {
       })
     )
 
-    render(<BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" />)
+    render(
+      <ComTrilha
+        etapa="brief-aceito"
+        painel={(props) => (
+          <BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" {...props} />
+        )}
+      />
+    )
 
     // Um número sem os itens obrigaria o PI a caçar os buracos pelos dez blocos.
     expect(await screen.findByText('Qual base de dados?')).toBeInTheDocument()
@@ -319,7 +362,14 @@ describe('BriefDoProjeto', () => {
   it('bloco sem afirmação não vira seção', async () => {
     carregarBrief.mockResolvedValue(brief())
 
-    render(<BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" />)
+    render(
+      <ComTrilha
+        etapa="brief-aceito"
+        painel={(props) => (
+          <BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" {...props} />
+        )}
+      />
+    )
 
     await screen.findByText('O leitor perde o fio das leituras.')
 
@@ -338,7 +388,14 @@ describe('BriefDoProjeto', () => {
   it('oferece o aceite quando nada material está pendente', async () => {
     carregarBrief.mockResolvedValue(brief())
 
-    render(<BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" />)
+    render(
+      <ComTrilha
+        etapa="brief-aceito"
+        painel={(props) => (
+          <BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" {...props} />
+        )}
+      />
+    )
 
     expect(await screen.findByRole('button', { name: /Aceitar o brief/ })).toBeEnabled()
   })
@@ -350,10 +407,20 @@ describe('BriefDoProjeto', () => {
       })
     )
 
-    render(<BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" />)
+    render(
+      <ComTrilha
+        etapa="brief-aceito"
+        painel={(props) => (
+          <BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" {...props} />
+        )}
+      />
+    )
 
-    // Alvo morto sem explicação faria o PI procurar o defeito no próprio brief.
-    expect(await screen.findByRole('button', { name: /Aceitar o brief/ })).toBeDisabled()
+    // Alvo morto sem explicação faria o PI procurar o defeito no próprio brief. O botão mora na
+    // trilha (regra do PI, #332) e a razão viaja junto com ele.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Aceitar o brief/ })).toBeDisabled()
+    )
     expect(screen.getByText(/Resolva as pendências para aceitar/)).toBeInTheDocument()
   })
 
@@ -364,7 +431,14 @@ describe('BriefDoProjeto', () => {
       })
     )
 
-    render(<BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" />)
+    render(
+      <ComTrilha
+        etapa="brief-aceito"
+        painel={(props) => (
+          <BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" {...props} />
+        )}
+      />
+    )
     await screen.findByRole('button', { name: /Aceitar o brief/ })
 
     expect(aplicarEventoDaJornada).not.toHaveBeenCalled()
@@ -374,7 +448,14 @@ describe('BriefDoProjeto', () => {
     const usuario = userEvent.setup()
     carregarBrief.mockResolvedValue(brief())
 
-    render(<BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" />)
+    render(
+      <ComTrilha
+        etapa="brief-aceito"
+        painel={(props) => (
+          <BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" {...props} />
+        )}
+      />
+    )
     await usuario.click(await screen.findByRole('button', { name: /Aceitar o brief/ }))
 
     // Uma segunda via de escrita da etapa escaparia da checagem de ordem que o evento faz.
@@ -389,11 +470,17 @@ describe('BriefDoProjeto', () => {
     carregarBrief.mockResolvedValue(brief())
 
     render(
-      <BriefDoProjeto
-        workspace="jarvis"
-        projectId="p-1"
-        nomeDoProjeto="Leituras"
-        onAceito={onAceito}
+      <ComTrilha
+        etapa="brief-aceito"
+        painel={(props) => (
+          <BriefDoProjeto
+            workspace="jarvis"
+            projectId="p-1"
+            nomeDoProjeto="Leituras"
+            onAceito={onAceito}
+            {...props}
+          />
+        )}
       />
     )
     await usuario.click(await screen.findByRole('button', { name: /Aceitar o brief/ }))
@@ -406,7 +493,14 @@ describe('BriefDoProjeto', () => {
     carregarBrief.mockResolvedValue(brief())
     aplicarEventoDaJornada.mockRejectedValue(new Error('ponte caiu'))
 
-    render(<BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" />)
+    render(
+      <ComTrilha
+        etapa="brief-aceito"
+        painel={(props) => (
+          <BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" {...props} />
+        )}
+      />
+    )
     await usuario.click(await screen.findByRole('button', { name: /Aceitar o brief/ }))
 
     // Sem isto o PI clica, nada acontece, e ele não sabe se aceitou.
@@ -427,7 +521,14 @@ describe('o painel de julgamento do brief', () => {
       })
     )
 
-    render(<BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" />)
+    render(
+      <ComTrilha
+        etapa="brief-aceito"
+        painel={(props) => (
+          <BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" {...props} />
+        )}
+      />
+    )
 
     // O PI vê quantas a IA inventou sem varrer os dez blocos.
     const painel = await screen.findByLabelText('Aceite do brief')
@@ -445,12 +546,22 @@ describe('o painel de julgamento do brief', () => {
       })
     )
 
-    render(<BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" />)
+    render(
+      <ComTrilha
+        etapa="brief-aceito"
+        painel={(props) => (
+          <BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" {...props} />
+        )}
+      />
+    )
 
-    // Com o aceite no rodapé, a razão do bloqueio ficava a uma tela de distância do botão.
+    // A lista das pendências continua no painel, ao lado do texto do aceite; o botão que elas
+    // travam mora na trilha (regra do PI, #332), desabilitado enquanto houver pendência material.
     const painel = await screen.findByLabelText('Aceite do brief')
     expect(within(painel).getByText('Qual base de dados?')).toBeInTheDocument()
-    expect(within(painel).getByRole('button', { name: /Aceitar o brief/ })).toBeDisabled()
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Aceitar o brief/ })).toBeDisabled()
+    )
   })
 
   it('a pergunta da pendência aparece uma vez só na tela', async () => {
@@ -462,7 +573,14 @@ describe('o painel de julgamento do brief', () => {
       })
     )
 
-    render(<BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" />)
+    render(
+      <ComTrilha
+        etapa="brief-aceito"
+        painel={(props) => (
+          <BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" {...props} />
+        )}
+      />
+    )
 
     expect(await screen.findAllByText('Qual base de dados?')).toHaveLength(1)
   })
@@ -470,10 +588,20 @@ describe('o painel de julgamento do brief', () => {
   it('sem pendência, o painel não mostra bloco de bloqueio', async () => {
     carregarBrief.mockResolvedValue(brief())
 
-    render(<BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" />)
+    render(
+      <ComTrilha
+        etapa="brief-aceito"
+        painel={(props) => (
+          <BriefDoProjeto workspace="jarvis" projectId="p-1" nomeDoProjeto="Leituras" {...props} />
+        )}
+      />
+    )
 
     const painel = await screen.findByLabelText('Aceite do brief')
     expect(within(painel).queryByText(/Falta decidir/)).not.toBeInTheDocument()
-    expect(within(painel).getByRole('button', { name: /Aceitar o brief/ })).toBeEnabled()
+    // E **nenhum botão dentro do painel**: o aceite é da trilha agora (regra do PI, #332). Este
+    // é o teste que reprova se o botão duplicado voltar.
+    expect(within(painel).queryByRole('button')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Aceitar o brief/ })).toBeEnabled()
   })
 })
