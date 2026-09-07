@@ -190,27 +190,66 @@ describe('os propostos, por documento (§ Gate)', () => {
     ancora: undefined
   })
 
-  it('lista os propostos do documento em bloco próprio', async () => {
+  it('reúne os propostos na aba "A revisar", agrupados por documento', async () => {
     carregarArquitetura.mockResolvedValue(arquitetura({ afirmacoes: [doPrototipo(), PROPOSTO] }))
     montar()
 
-    expect(await screen.findByText(/1 afirmações propostas pela IA/i)).toBeInTheDocument()
+    // A aba abre primeiro quando há pendência: é a resposta a "há algo a cortar aqui?", que antes
+    // exigia rolar a etapa inteira (#333).
+    const revisar = await screen.findByRole('tabpanel')
+    expect(within(revisar).getByText(/afirmações propostas pela IA/i)).toBeInTheDocument()
+    expect(
+      within(revisar).getByText('Guardar o histórico numa tabela separada.')
+    ).toBeInTheDocument()
   })
 
-  it('só o proposto tem botão de cortar, e o corte manda o id', async () => {
+  it('o proposto aparece uma vez por aba — a duplicação dentro do documento saiu', async () => {
+    /*
+     * **Este teste afirmava o defeito.** Ele esperava `toHaveLength(2)` com o comentário "duas
+     * ocorrências do mesmo proposto", porque o documento repetia acima das seções o que já
+     * mostrava no corpo — a mesma frase duas vezes na mesma tela, com botão nas duas. Era metade
+     * da altura desta etapa (#333).
+     *
+     * Agora cada aba mostra o proposto uma vez: na "A revisar" para decidir, na do documento para
+     * ler no contexto da seção. Os painéis inativos são desmontados pelo DS, então o que a árvore
+     * tem é o que a aba aberta mostra.
+     */
     const user = userEvent.setup()
     carregarArquitetura.mockResolvedValue(arquitetura({ afirmacoes: [doPrototipo(), PROPOSTO] }))
     montar()
 
     const cortar = await screen.findAllByRole('button', { name: /cortar a afirmação/i })
-    // Duas ocorrências do mesmo proposto: no bloco de propostos e na seção do documento.
-    expect(cortar).toHaveLength(2)
+    expect(cortar).toHaveLength(1)
 
     await user.click(cortar[0]!)
 
     await waitFor(() => {
       expect(cortarPropostoDaArquitetura).toHaveBeenCalledWith('p-1', 'a-2', 'jarvis')
     })
+  })
+
+  it('o corte continua ao alcance dentro da aba do documento', async () => {
+    // A garantia que o redesenho não pode perder: afirmação `proposto` distinguível e cortável.
+    const user = userEvent.setup()
+    carregarArquitetura.mockResolvedValue(arquitetura({ afirmacoes: [doPrototipo(), PROPOSTO] }))
+    montar()
+
+    // O proposto do fixture vive em DECISIONS: a aba certa é a dele.
+    await user.click(await screen.findByRole('tab', { name: 'Decisões' }))
+
+    const painel = screen.getByRole('tabpanel')
+    expect(
+      within(painel).getByText('Guardar o histórico numa tabela separada.')
+    ).toBeInTheDocument()
+
+    /*
+     * **Uma vez, não duas.** `getByRole` no singular é o que prova: com a duplicação de volta, o
+     * proposto aparece no bloco acima das seções e de novo no corpo, e a chamada falha por achar
+     * dois. `getAllByRole(...).toHaveLength(1)` diria o mesmo, mas a mensagem de erro do singular
+     * nomeia o defeito ("found multiple elements") sem que ninguém precise ler o teste.
+     */
+    expect(within(painel).getByRole('button', { name: /cortar a afirmação/i })).toBeInTheDocument()
+    expect(within(painel).getAllByText('Guardar o histórico numa tabela separada.')).toHaveLength(1)
   })
 })
 
@@ -273,6 +312,109 @@ describe('os ajustes da análise de coerência (critério 4)', () => {
  * rolando a página por conta própria. A lista fica abaixo da dobra, e quem acabou de clicar em
  * gerar está olhando o topo.
  */
+/**
+ * As abas (issue #333).
+ *
+ * O que elas resolvem: a etapa media 4.941px numa janela de 900 — cinco telas e meia para um
+ * projeto pequeno. Nenhuma aba passa de duas telas agora.
+ */
+describe('as abas do pacote (issue #333)', () => {
+  const AJUSTE = {
+    id: 'j-1',
+    tipo: 'tela-sem-requisito',
+    jornada: 'Entrar na conta',
+    observacao: 'A tela existe e nenhum requisito a pede.',
+    recomendacao: 'Confirmar se o login entra no escopo desta versão.'
+  }
+  const PROPOSTO = doPrototipo({
+    id: 'a-9',
+    documento: 'DECISIONS',
+    secao: 'Decisões estruturais',
+    texto: 'Guardar o histórico numa tabela separada.',
+    origem: 'proposto',
+    ancora: undefined
+  })
+
+  it('há uma aba por documento, mais a de revisão', async () => {
+    carregarArquitetura.mockResolvedValue(arquitetura())
+    montar()
+
+    await screen.findByRole('tablist')
+    // Quatro documentos + "A revisar".
+    expect(screen.getAllByRole('tab')).toHaveLength(5)
+  })
+
+  it('o contador aparece no rótulo da aba — sem precisar entrar nela', async () => {
+    carregarArquitetura.mockResolvedValue(
+      arquitetura({ afirmacoes: [PROPOSTO], ajustes: [AJUSTE] })
+    )
+    montar()
+
+    // 1 proposto + 1 ajuste. O defeito 5 da #332 foi o PI descobrir os oito rolando a página; o
+    // número no rótulo é o que torna a pendência visível de fora.
+    expect(await screen.findByRole('tab', { name: 'A revisar (2)' })).toBeInTheDocument()
+  })
+
+  it('sem pendência o rótulo diz isso, em vez de anunciar zero', async () => {
+    carregarArquitetura.mockResolvedValue(arquitetura())
+    montar()
+
+    // "A revisar (0)" seria ruído: anunciaria uma pendência que não existe.
+    expect(await screen.findByRole('tab', { name: 'Nada a revisar' })).toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: /\(0\)/ })).not.toBeInTheDocument()
+  })
+
+  it('abre no que pede decisão quando há pendência', async () => {
+    carregarArquitetura.mockResolvedValue(arquitetura({ ajustes: [AJUSTE] }))
+    montar()
+
+    expect(await screen.findByRole('tab', { name: 'A revisar (1)' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    )
+  })
+
+  it('sem nada a decidir, abre no primeiro documento — só resta ler', async () => {
+    carregarArquitetura.mockResolvedValue(arquitetura())
+    montar()
+
+    expect(await screen.findByRole('tab', { name: 'Arquitetura' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    )
+  })
+
+  it('as abas são operáveis por teclado', async () => {
+    const user = userEvent.setup()
+    carregarArquitetura.mockResolvedValue(arquitetura({ ajustes: [AJUSTE] }))
+    montar()
+
+    const primeira = await screen.findByRole('tab', { name: 'A revisar (1)' })
+    primeira.focus()
+    await user.keyboard('{ArrowRight}')
+
+    // A seta move o foco **e** a seleção, que é o padrão ARIA de abas automáticas.
+    await waitFor(() =>
+      expect(screen.getByRole('tab', { name: 'Arquitetura' })).toHaveAttribute(
+        'aria-selected',
+        'true'
+      )
+    )
+  })
+
+  it('o aceite fica fora das abas — alcançável de qualquer uma', async () => {
+    const user = userEvent.setup()
+    carregarArquitetura.mockResolvedValue(arquitetura({ ajustes: [AJUSTE] }))
+    montar('pacote-aceito')
+
+    await screen.findByLabelText('Aceite do pacote')
+    await user.click(screen.getByRole('tab', { name: 'Testes' }))
+
+    // Trocar de aba não pode esconder a soleira da etapa.
+    expect(screen.getByLabelText('Aceite do pacote')).toBeInTheDocument()
+  })
+})
+
 describe('a chegada dos ajustes', () => {
   const AJUSTE_NOVO = {
     id: 'j-9',

@@ -353,6 +353,17 @@ export const RECURSOS = {
       },
       arquitetura: {
         titulo: 'Arquitetura, decisões, testes e revisão',
+        // As abas (#333). "A revisar" primeiro porque é o que pede decisão; ler vem depois.
+        abasRotulo: 'Documentos do pacote de arquitetura',
+        abaRevisar: 'A revisar',
+        abaRevisarVazia: 'Nada a revisar',
+        revisarTitulo: 'O que pede a sua decisão antes do aceite',
+        revisarDescricao:
+          'Reunido aqui para você não precisar procurar documento por documento. Os ajustes falam dos seus protótipos; as afirmações propostas são inferências da IA dentro dos documentos.',
+        revisarVazio: 'Nada a revisar',
+        revisarVazioDescricao:
+          'A IA não inferiu nada por conta própria e não achou divergência entre os protótipos e o PRD. Leia os documentos e aceite quando estiver de acordo.',
+        revisarPropostosTitulo: 'Afirmações propostas pela IA',
         descricao:
           'O que o app derivou do PRD aceito e dos protótipos de {{nome}}. Cada afirmação diz o que a sustenta; fluxo só é prometido com a tela que o desenhou.',
         carregando: 'Carregando os documentos…',
@@ -1069,6 +1080,16 @@ export const RECURSOS = {
       },
       arquitetura: {
         titulo: 'Architecture, decisions, testing and review',
+        abasRotulo: 'Architecture package documents',
+        abaRevisar: 'To review',
+        abaRevisarVazia: 'Nothing to review',
+        revisarTitulo: 'What needs your decision before accepting',
+        revisarDescricao:
+          'Gathered here so you do not have to look document by document. Adjustments speak about your prototypes; proposed statements are AI inferences inside the documents.',
+        revisarVazio: 'Nothing to review',
+        revisarVazioDescricao:
+          'The AI inferred nothing on its own and found no divergence between the prototypes and the PRD. Read the documents and accept when you agree.',
+        revisarPropostosTitulo: 'Statements proposed by the AI',
         descricao:
           'What the app derived from the accepted PRD and the prototypes of {{nome}}. Every statement says what backs it; a flow is only promised with the screen that drew it.',
         carregando: 'Loading the documents…',
