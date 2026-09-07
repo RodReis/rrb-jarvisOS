@@ -13,8 +13,8 @@ Totais da última execução (regenerado, não acumulado):
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
 | — | — | — | Regras de Negócio | 1658 | 1658 | 0 | 77.2 | — | — |
-| — | — | — | Banco | 1222 | 1208 | 0 | 87.1 | — | — |
-| — | — | — | Tela | 636 | 635 | 0 | 75.2 | — | — |
+| — | — | — | Banco | 1223 | 1209 | 0 | 87.1 | — | — |
+| — | — | — | Tela | 648 | 647 | 0 | 75.6 | — | — |
 
 ## Histórico por entrega
 
@@ -352,3 +352,9 @@ Append-only — linhas de entregas passadas são imutáveis.
 | — | #314 | spec-pipeline-01-politica-pr-ci | Regras de Negócio | 1658 | 1658 | 0 | 77.2 | — | — |
 | — | #314 | spec-pipeline-01-politica-pr-ci | Banco | 1222 | 1208 | 0 | 87.1 | — | — |
 | — | #314 | spec-pipeline-01-politica-pr-ci | Tela | 636 | 635 | 0 | 75.2 | — | — |
+| 2026-09-07 | #332 | — | Regras de Negócio | 1658 | 1658 | 0 | 77.2 | #334 | [#334](https://github.com/RodReis/rrb-jarvisOS/pull/334) |
+| 2026-09-07 | #332 | — | Banco | 1223 | 1205 | 0 | 86.3 | #334 | [#334](https://github.com/RodReis/rrb-jarvisOS/pull/334) |
+| 2026-09-07 | #332 | — | Tela | 648 | 647 | 0 | 75.6 | #334 | [#334](https://github.com/RodReis/rrb-jarvisOS/pull/334) |
+| 2026-09-07 | #332 | — | Regras de Negócio | 1658 | 1658 | 0 | 77.2 | #334 | [#334](https://github.com/RodReis/rrb-jarvisOS/pull/334) |
+| 2026-09-07 | #332 | — | Banco | 1223 | 1209 | 0 | 87.1 | #334 | [#334](https://github.com/RodReis/rrb-jarvisOS/pull/334) |
+| 2026-09-07 | #332 | — | Tela | 648 | 647 | 0 | 75.6 | #334 | [#334](https://github.com/RodReis/rrb-jarvisOS/pull/334) |
