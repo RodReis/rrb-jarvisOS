@@ -327,7 +327,12 @@ function ConteudoDaEtapa({
     // o botão de gerar — a geração migrou para a etapa seguinte, que tem tela própria.
     case 'design':
       return (
-        <AnexosDeDesign workspace={workspace} projectId={projeto.id} nomeDoProjeto={projeto.nome} />
+        <AnexosDeDesign
+          workspace={workspace}
+          projectId={projeto.id}
+          nomeDoProjeto={projeto.nome}
+          onEtapaMudou={onRecarregar}
+        />
       )
 
     // A arquitetura, as decisões, os testes e a revisão gerados por IA, com o gate do pacote

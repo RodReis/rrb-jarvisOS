@@ -46,13 +46,24 @@ const PROTOTIPO = anexo({
   hash: 'b'.repeat(64)
 })
 
+/** O aviso de que a etapa mudou. Espião próprio para o teste da trilha poder afirmá-lo. */
+const onEtapaMudou = vi.fn()
+
 function renderizar(): void {
-  render(<AnexosDeDesign workspace="jarvis" projectId="p-1" nomeDoProjeto="Projeto Alfa" />)
+  render(
+    <AnexosDeDesign
+      workspace="jarvis"
+      projectId="p-1"
+      nomeDoProjeto="Projeto Alfa"
+      onEtapaMudou={onEtapaMudou}
+    />
+  )
 }
 
 beforeEach(() => {
   listarAnexos.mockReset().mockResolvedValue([])
   listarArquiteturas.mockReset().mockResolvedValue([])
+  onEtapaMudou.mockReset()
   escolherAnexo.mockReset()
   anexarDesign.mockReset()
   removerAnexo.mockReset().mockResolvedValue(true)
@@ -146,6 +157,48 @@ describe('o ato de anexar', () => {
         'jarvis'
       )
     )
+  })
+
+  /**
+   * O aviso que faz a trilha andar.
+   *
+   * O `AnexoService` conclui o marco `design-anexado` no ato do anexo, e esse marco transita
+   * `design → arquitetura`. Sem o aviso ao pai, a trilha continuava dizendo "Conclua 'Anexar
+   * design' para chegar aqui" enquanto o painel já dizia que os anexos estavam completos, e só
+   * recarregar a janela resolvia (issue #332).
+   */
+  it('avisa que a etapa mudou quando o anexo é registrado', async () => {
+    const usuario = userEvent.setup()
+    escolherAnexo.mockResolvedValue('C:/externo/DESIGN-SYSTEM.md')
+    anexarDesign.mockResolvedValue({ reason: 'anexado', anexo: anexo(), mensagem: 'ok' })
+
+    renderizar()
+    await screen.findByText(/Falta anexar/)
+
+    await usuario.click(screen.getAllByRole('button', { name: 'Anexar' })[0]!)
+
+    await waitFor(() => expect(onEtapaMudou).toHaveBeenCalled())
+  })
+
+  /**
+   * O aviso segue o **ato**, não o clique: uma recusa não move marco nenhum, e recarregar a
+   * jornada ali ensinaria a trilha a piscar sem ter mudado de etapa.
+   */
+  it('não avisa a trilha quando o anexo é recusado', async () => {
+    const usuario = userEvent.setup()
+    escolherAnexo.mockResolvedValue('C:/externo/foto.png')
+    anexarDesign.mockResolvedValue({
+      reason: 'tipo-incompativel',
+      mensagem: 'O arquivo escolhido não é um .md.'
+    })
+
+    renderizar()
+    await screen.findByText(/Falta anexar/)
+
+    await usuario.click(screen.getAllByRole('button', { name: 'Anexar' })[0]!)
+
+    await screen.findByRole('alert')
+    expect(onEtapaMudou).not.toHaveBeenCalled()
   })
 
   /**

@@ -32,6 +32,19 @@ interface AnexosDeDesignProps {
   readonly workspace: WorkspaceId
   readonly projectId: string
   readonly nomeDoProjeto: string
+  /**
+   * Avisa o pai de que a jornada mudou de etapa.
+   *
+   * O `AnexoService` conclui o marco `design-anexado` **no ato do anexo**, e esse marco transita
+   * `design → arquitetura`. Sem este aviso a trilha continua dizendo *"Conclua 'Anexar design'
+   * para chegar aqui"* enquanto o painel ao lado já diz que os anexos estão completos — duas
+   * leituras da mesma tela discordando, e a que bloqueia é a errada. Era preciso recarregar a
+   * janela para a trilha andar (issue #332).
+   *
+   * Os painéis das outras etapas recebem o mesmo aviso como `onAceito`; este era o único que
+   * mudava a etapa sem ter como dizê-lo.
+   */
+  readonly onEtapaMudou: () => void
 }
 
 /** O ícone de cada tipo. Mesmo vocabulário de ícone em toda a superfície (register product). */
@@ -50,7 +63,8 @@ const EXIGENCIAS: readonly Extract<TipoDeAnexo, 'design-system' | 'prototipo'>[]
 export function AnexosDeDesign({
   workspace,
   projectId,
-  nomeDoProjeto
+  nomeDoProjeto,
+  onEtapaMudou
 }: AnexosDeDesignProps): React.JSX.Element {
   const { t } = useTranslation()
   const [anexos, setAnexos] = useState<readonly Anexo[] | undefined>(undefined)
@@ -120,6 +134,9 @@ export function AnexosDeDesign({
         // O anexo mudou: a validação anterior descreve outro conjunto de arquivos.
         setValidacoes([])
         setFalhaAoAnexar(null)
+        // E o marco `design-anexado` acabou de sair no main: a trilha precisa saber, senão ela
+        // fica na etapa anterior até alguém recarregar a janela.
+        onEtapaMudou()
       } else {
         setFalhaAoAnexar(resultado.mensagem)
       }
