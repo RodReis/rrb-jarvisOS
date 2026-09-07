@@ -133,7 +133,14 @@ function pacote(cena: CenaDaArquitetura): ArquiteturaRegistrada {
     workspace_id: 'jarvis',
     projectId: 'p-1',
     pacoteEstruturalId: 'pac-1',
-    afirmacoes: cheio ? afirmacoesDoPacote() : afirmacoesDoPacote().slice(0, 4),
+    /*
+     * A cena magra é o caso **sem nada a revisar**: a IA não inferiu nada por conta própria e
+     * não achou divergência. É o que prova que a aba muda de rótulo em vez de anunciar "(0)", e
+     * que a tela abre no primeiro documento quando só resta ler.
+     */
+    afirmacoes: cheio
+      ? afirmacoesDoPacote()
+      : afirmacoesDoPacote().filter((a) => a.origem !== 'proposto'),
     ajustes: cheio ? AJUSTES : [],
     anexos: [
       {

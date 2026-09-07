@@ -145,7 +145,16 @@ function LinhaDaAfirmacao({
       className="flex flex-col gap-0.5 py-3.5"
     >
       <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
-        <p className="min-w-0 max-w-[58ch] flex-1 text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto)]">
+        {/*
+          Sem teto próprio de medida: quem limita agora é a **coluna** — mesma correção que o
+          brief já tinha (`BriefDoProjeto`), e que este painel não recebeu na época.
+
+          O `max-w-[58ch]` fazia sentido quando o documento ocupava a tela inteira. Dentro da
+          coluna de conteúdo ele sufoca duas vezes: medido, o texto usava 438px de uma coluna de
+          ~880px, com metade vazia à direita. Duas medidas empilhadas cortam pelo menor, e o
+          menor aqui era o teto que a coluna já garante.
+        */}
+        <p className="min-w-0 flex-1 text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto)]">
           {afirmacao.texto}
         </p>
 
