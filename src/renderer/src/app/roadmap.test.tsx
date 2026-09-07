@@ -280,9 +280,11 @@ describe('os MVPs propostos e a escolha (critérios 2 e 3)', () => {
     await screen.findAllByText(/Cadastro de cliente/)
 
     expect(
-      screen.getByRole('button', { name: 'Colocar "Cadastro de cliente" na fila' })
+      screen.getByRole('button', { name: 'Escolher "Cadastro de cliente" e gerar a SPEC' })
     ).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Colocar "Relatórios" na fila' })).toBeNull()
+    expect(
+      screen.queryByRole('button', { name: 'Escolher "Relatórios" e gerar a SPEC' })
+    ).toBeNull()
   })
 
   it('o MVP bloqueado diz por que não pode ser escolhido', async () => {
@@ -299,7 +301,7 @@ describe('os MVPs propostos e a escolha (critérios 2 e 3)', () => {
 
     renderizar()
     await usuario.click(
-      await screen.findByRole('button', { name: 'Colocar "Cadastro de cliente" na fila' })
+      await screen.findByRole('button', { name: 'Escolher "Cadastro de cliente" e gerar a SPEC' })
     )
 
     expect(escolherMvpDoRoadmap).toHaveBeenCalledWith('p-1', 'mvp-1', 'jarvis')
@@ -622,13 +624,13 @@ describe('o andamento das duas gerações desta tela (issue #337)', () => {
     renderizar()
     await screen.findAllByText(/Cadastro de cliente/)
     await usuario.click(
-      screen.getByRole('button', { name: 'Colocar "Cadastro de cliente" na fila' })
+      screen.getByRole('button', { name: 'Escolher "Cadastro de cliente" e gerar a SPEC' })
     )
 
     await anunciar('spec', 'iniciada')
 
     /*
-     * "Colocar na fila" parece um clique e é uma geração. A prova é o nome: `spec` só existe no
+     * Escolher o MVP parece um clique e é uma geração. A prova é o nome: `spec` só existe no
      * contrato da escolha, e `mvps` — a primeira do roadmap — não pode aparecer, senão a barra
      * estaria contando etapas que esta geração nunca vai executar.
      */

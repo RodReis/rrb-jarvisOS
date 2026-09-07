@@ -124,7 +124,7 @@ export const ETAPAS_DO_ROADMAP = ['mvps', 'validacao', 'dag', 'gravacao'] as con
  * As etapas de **escolher o MVP que entra na fila** (issue #337).
  *
  * Parece um clique e é uma geração: escolher produz a **SPEC da primeira fatia**, com chamada ao
- * modelo. O PI clicou em "Colocar na fila" e viu dois botões girando sem nada dizer o que
+ * modelo. O PI clicou para escolher o MVP e viu dois botões girando sem nada dizer o que
  * acontecia — a mesma queixa da geração do roadmap, numa ação que nem parecia gerar.
  */
 export const ETAPAS_DA_ESCOLHA = ['spec', 'validacao', 'gravacao'] as const

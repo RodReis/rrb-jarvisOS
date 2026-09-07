@@ -520,8 +520,8 @@ export const RECURSOS = {
         mvps: '{{count}} MVPs propostos',
         resultado: 'Resultado: {{texto}}',
         naFila: 'Na fila',
-        escolher: 'Colocar na fila',
-        escolherEste: 'Colocar "{{titulo}}" na fila',
+        escolher: 'Escolher e gerar a SPEC',
+        escolherEste: 'Escolher "{{titulo}}" e gerar a SPEC',
         inelegivel: 'Depende de um MVP que ainda não foi entregue.',
         origem: {
           prd: 'PRD',
@@ -1241,8 +1241,8 @@ export const RECURSOS = {
         mvps: '{{count}} proposed MVPs',
         resultado: 'Outcome: {{texto}}',
         naFila: 'Queued',
-        escolher: 'Queue this MVP',
-        escolherEste: 'Queue "{{titulo}}"',
+        escolher: 'Choose and generate the SPEC',
+        escolherEste: 'Choose "{{titulo}}" and generate the SPEC',
         inelegivel: 'Depends on an MVP that has not been delivered yet.',
         origem: {
           prd: 'PRD',

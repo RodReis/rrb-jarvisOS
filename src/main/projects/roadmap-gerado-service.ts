@@ -534,7 +534,7 @@ export class RoadmapGeradoService {
     let problemas: readonly string[] = []
 
     for (let tentativa = 0; tentativa <= TENTATIVAS_DE_CORRECAO_DO_ROADMAP; tentativa += 1) {
-      // "Colocar na fila" parece um clique e é uma geração: ela escreve a SPEC da primeira
+      // Escolher o MVP parece um clique e é uma geração: ela escreve a SPEC da primeira
       // fatia. O PI clicou e ficou sem saber o que acontecia — mesmo defeito do roadmap.
       this.anunciar(
         projectId,
