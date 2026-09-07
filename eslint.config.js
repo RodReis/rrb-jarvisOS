@@ -115,7 +115,12 @@ export default tseslint.config(
               // `SttEngine`, nunca com o runtime concreto. A `ignores` acima libera só a
               // implementação — trocar de engine tem de ser escrever outra, não caçar imports
               // espalhados pelo main.
-              group: ['faster-whisper*', 'whisper*', 'onnxruntime*'],
+              //
+              // Os padrões miram **pacote**, e por isso excluem o que começa com `.` ou `@/`:
+              // `whisper*` casava também `./faster-whisper-engine`, e o teste do engine ficava
+              // proibido de importar o engine que ele testa — a guarda reprovava por um acerto,
+              // como já aconteceu com a de superfície da ponte na entrega anterior.
+              group: ['faster-whisper', 'faster-whisper/*', 'whisper', 'whisper/*', 'onnxruntime*'],
               message:
                 'Critério 1 (SPEC-Voz-01): só a implementação do engine conhece o runtime de STT. O resto do app fala com a interface `SttEngine`.'
             }
