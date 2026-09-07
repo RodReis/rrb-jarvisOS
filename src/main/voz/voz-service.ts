@@ -11,13 +11,24 @@
  */
 
 import { transcrever, type SttEngine, type DesfechoDaTranscricao } from './stt-engine'
+import type { ConfiguracaoDaVoz } from './configuracao'
 import type { ModoDeCompute, ProntidaoDaVoz } from '@shared/domain/voz'
 
 export interface DepsDaVoz {
   readonly engine: SttEngine
-  /** Os ids dos artefatos que ainda faltam no disco. Vazio = tudo pronto. */
-  readonly artefatosFaltando: () => readonly string[]
+  /**
+   * Os ids dos artefatos que ainda faltam no disco. Vazio = tudo pronto.
+   *
+   * Assíncrona porque a resposta vem do **disco**, e não de uma anotação em memória: anotação e
+   * realidade divergem — o usuário apaga a pasta, um download morre pela metade — e quando
+   * divergem é a anotação que ganha, prometendo um runtime que não está lá.
+   */
+  readonly artefatosFaltando: () => Promise<readonly string[]>
   readonly computeAtual: () => ModoDeCompute
+  /** A configuração em vigor, lida do disco. */
+  readonly configuracaoAtual: () => Promise<ConfiguracaoDaVoz>
+  /** Grava a configuração escolhida em Settings (critério 6). */
+  readonly gravarConfiguracao: (pedida: Partial<ConfiguracaoDaVoz>) => Promise<ConfiguracaoDaVoz>
 }
 
 export class VozService {
@@ -36,8 +47,24 @@ export class VozService {
    * dizer isso ao usuário (critério 4).
    */
   async prontidao(): Promise<ProntidaoDaVoz> {
-    const faltando = this.deps.artefatosFaltando()
+    const faltando = await this.deps.artefatosFaltando()
 
     return { pronta: faltando.length === 0, faltando, compute: this.deps.computeAtual() }
+  }
+
+  /** O modelo e o idioma em vigor, para Settings desenhar o estado atual. */
+  async configuracao(): Promise<ConfiguracaoDaVoz> {
+    return this.deps.configuracaoAtual()
+  }
+
+  /**
+   * Troca modelo ou idioma, e devolve o que ficou valendo (critério 6).
+   *
+   * Devolve a configuração inteira e não `void` porque o pedido é **normalizado** ao gravar: a
+   * tela precisa saber o que de fato valeu, e não repetir a normalização do seu lado para
+   * adivinhar.
+   */
+  async configurar(pedida: Partial<ConfiguracaoDaVoz>): Promise<ConfiguracaoDaVoz> {
+    return this.deps.gravarConfiguracao(pedida)
   }
 }

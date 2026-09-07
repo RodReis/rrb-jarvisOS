@@ -46,6 +46,7 @@ sys.stdout = sys.stderr
 
 _modelo = None
 _carregado = None
+_compute_efetivo = None
 
 
 def _responder(payload):
@@ -53,33 +54,59 @@ def _responder(payload):
     _protocolo.flush()
 
 
-def _compute():
-    """CUDA quando dá, CPU int8 quando não (critério 7).
-
-    A escolha é medida tentando, não perguntando: \`torch.cuda.is_available()\` não vale aqui
-    porque quem decide é o CTranslate2, e ele tem os próprios requisitos de driver e cuDNN.
-    """
+def _tem_gpu():
+    """Se existe GPU que o CTranslate2 enxerga. Necessário para CUDA, e longe de suficiente."""
     try:
         import ctranslate2
 
-        if ctranslate2.get_cuda_device_count() > 0:
-            return "cuda", "float16"
+        return ctranslate2.get_cuda_device_count() > 0
     except Exception:
-        pass
+        return False
 
-    return "cpu", "int8"
+
+def _carregar(caminho):
+    """Carrega o modelo, caindo para CPU quando CUDA não completa (critério 7).
+
+    Três medições nesta máquina (RTX 5060), cada uma derrubando a anterior:
+
+    1. \`get_cuda_device_count()\` responde 1 — há placa.
+    2. \`WhisperModel(device="cuda")\` **carrega sem erro**.
+    3. A primeira transcrição morre em \`Library cublas64_12.dll is not found\`.
+
+    cuBLAS e cuDNN não vêm nas wheels pinadas, e o CTranslate2 só as procura quando o encoder
+    roda. Uma detecção que pergunta, ou que só carrega, promete um caminho que a transcrição
+    desmente — e o efeito é a voz falhar justamente em quem tem placa.
+
+    Por isso a prova é uma **transcrição de verdade**, sobre um décimo de segundo de silêncio: é
+    o caminho inteiro que o uso real percorre, e é barato. O que falhar nele vira CPU int8, que
+    não depende de biblioteca externa nenhuma.
+    """
+    import numpy as np
+    from faster_whisper import WhisperModel
+
+    if _tem_gpu():
+        try:
+            modelo = WhisperModel(caminho, device="cuda", compute_type="float16")
+            # \`transcribe\` é preguiçoso: devolve um gerador, e o encoder só roda quando alguém
+            # o consome. Sem o \`list\`, o teste passaria sem exercitar nada — e o erro voltaria
+            # na primeira fala do usuário, que é exatamente o que ele existe para evitar.
+            list(modelo.transcribe(np.zeros(1600, dtype=np.float32), language="pt")[0])
+            return modelo, "cuda"
+        except Exception as erro:
+            # Não é falha: é a informação de que esta máquina não tem o CUDA completo. Vai para
+            # o log, e a transcrição continua no caminho que sempre funciona.
+            print("CUDA indisponivel, usando CPU: " + str(erro), file=sys.stderr)
+
+    return WhisperModel(caminho, device="cpu", compute_type="int8"), "cpu-int8"
 
 
 def _garantir_modelo(caminho):
-    global _modelo, _carregado
+    global _modelo, _carregado, _compute_efetivo
 
     if _carregado == caminho:
         return _modelo
 
-    from faster_whisper import WhisperModel
-
-    dispositivo, tipo = _compute()
-    _modelo = WhisperModel(caminho, device=dispositivo, compute_type=tipo)
+    _modelo, _compute_efetivo = _carregar(caminho)
     _carregado = caminho
     return _modelo
 
@@ -120,8 +147,14 @@ def _tratar(pedido):
     acao = pedido.get("acao")
 
     if acao == "ping":
-        dispositivo, tipo = _compute()
-        return {"compute": "cuda" if dispositivo == "cuda" else "cpu-int8", "tipo": tipo}
+        # Carrega de verdade quando o pedido traz o modelo: só o carregamento sabe se CUDA
+        # completa. Sem modelo no pedido, responde o que já estiver carregado — e "desconhecido"
+        # enquanto nada foi, que é honesto sobre não saber.
+        caminho = pedido.get("modelo")
+        if caminho:
+            _garantir_modelo(caminho)
+
+        return {"compute": _compute_efetivo or "desconhecido"}
 
     if acao == "transcrever":
         return _transcrever(pedido)

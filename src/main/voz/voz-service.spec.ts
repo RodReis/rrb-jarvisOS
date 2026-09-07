@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { CONFIGURACAO_PADRAO } from './configuracao'
 import { VozService } from './voz-service'
 import type { SttEngine } from './stt-engine'
 
@@ -14,8 +15,10 @@ function engine(extra: Partial<SttEngine> = {}): SttEngine {
 function servico(e = engine(), faltando: readonly string[] = []): VozService {
   return new VozService({
     engine: e,
-    artefatosFaltando: () => faltando,
-    computeAtual: () => (faltando.length ? 'cpu-int8' : 'cuda')
+    artefatosFaltando: async () => faltando,
+    computeAtual: () => (faltando.length ? 'cpu-int8' : 'cuda'),
+    configuracaoAtual: async () => CONFIGURACAO_PADRAO,
+    gravarConfiguracao: async (pedida) => ({ ...CONFIGURACAO_PADRAO, ...pedida })
   })
 }
 

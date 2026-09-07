@@ -50,3 +50,20 @@ export interface ProntidaoDaVoz {
   readonly faltando: readonly string[]
   readonly compute: ModoDeCompute
 }
+
+/** O catálogo de modelos que a fatia oferece. Fechado: o que não está aqui não é escolhível. */
+export const MODELOS_DA_VOZ = ['tiny', 'base', 'small', 'medium'] as const
+
+export type ModeloDaVoz = (typeof MODELOS_DA_VOZ)[number]
+
+/**
+ * O que Settings altera (critério 6).
+ *
+ * Atravessa a ponte porque a tela precisa desenhar o estado atual e mandar o novo. Note o que
+ * **não** está aqui: caminho do modelo no disco. A tela escolhe `small`, não
+ * `C:/.../whisper-small` — é a mesma fronteira que impede a ponte de expor processo e comando.
+ */
+export interface ConfiguracaoDaVoz {
+  readonly modelo: ModeloDaVoz
+  readonly idioma: string
+}

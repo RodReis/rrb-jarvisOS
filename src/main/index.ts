@@ -1,8 +1,19 @@
 import { dirname, join, resolve } from 'node:path'
-import { mkdir, rename, rm } from 'node:fs/promises'
+import { access, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { spawn } from 'node:child_process'
 import { VozService } from './voz/voz-service'
 import { ARTEFATOS_DA_VOZ } from './voz/artefatos'
 import { baixarArtefato } from './voz/download-de-artefato'
+import { FasterWhisperEngine } from './voz/faster-whisper-engine'
+import { Sidecar } from './voz/sidecar'
+import {
+  artefatosFaltando,
+  CAMINHO_DO_SCRIPT,
+  DIRETORIO_DO_RUNTIME,
+  type DepsDaInstalacao
+} from './voz/instalacao'
+import { CAMINHO_DA_CONFIGURACAO, escreverConfiguracao, lerConfiguracao } from './voz/configuracao'
+import { caminhoDoPythonDaVoz, extrairTarGz, rodarPythonDaVoz } from './voz/runtime-no-disco'
 import { createWriteStream, mkdirSync, writeFileSync } from 'node:fs'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
@@ -1445,22 +1456,79 @@ if (!app.requestSingleInstanceLock()) {
     await reconciliacao.reconcileAll()
 
     /*
-     * A voz (SPEC-Voz-01), primeira entrega.
+     * A voz (SPEC-Voz-01), segunda entrega: o engine real.
      *
-     * O engine concreto — faster-whisper no sidecar Python — é a **segunda** entrega desta
-     * fatia. Aqui ele é o engine ausente: `disponivel()` responde `false`, então a tela mostra
-     * "runtime não instalado" com a ação de baixar, que é literalmente o estado da máquina de
-     * quem abre o app hoje. Não é dublê de teste disfarçado de produção: é o comportamento
-     * honesto enquanto o runtime não existe, e é o caminho do critério 4.
+     * O caminho do usuário na primeira execução não muda — sem os artefatos no disco,
+     * `disponivel()` responde `false` e a tela oferece baixar. O que muda é o depois: com os 29
+     * artefatos verificados, o engine extrai o runtime, instala as wheels e sobe o sidecar.
      */
-    const voz = new VozService({
-      engine: {
-        transcribe: () => Promise.reject(new Error('O runtime de voz ainda não foi instalado.')),
-        disponivel: async () => false,
-        encerrar: async () => undefined
+    const naVoz = (relativo: string): string => join(app.getPath('userData'), relativo)
+
+    const instalacaoDaVoz: DepsDaInstalacao = {
+      existe: async (relativo) =>
+        await access(naVoz(relativo)).then(
+          () => true,
+          () => false
+        ),
+      extrair: async (origem, destino) => {
+        await mkdir(naVoz(destino), { recursive: true })
+        await extrairTarGz(naVoz(origem), naVoz(destino))
       },
-      artefatosFaltando: () => ARTEFATOS_DA_VOZ.map((a) => a.id),
-      computeAtual: () => 'cpu-int8'
+      escrever: async (relativo, conteudo) => {
+        await mkdir(dirname(naVoz(relativo)), { recursive: true })
+        await writeFile(naVoz(relativo), conteudo, 'utf8')
+      },
+      rodarPython: async (args) => rodarPythonDaVoz(naVoz(DIRETORIO_DO_RUNTIME), args),
+      absoluto: naVoz
+    }
+
+    const engineDaVoz = new FasterWhisperEngine({
+      artefatos: ARTEFATOS_DA_VOZ,
+      instalacao: instalacaoDaVoz,
+      criarSidecar: () =>
+        new Sidecar({
+          spawn: (comando, argumentos) => spawn(comando, [...argumentos]),
+          comando: caminhoDoPythonDaVoz(naVoz(DIRETORIO_DO_RUNTIME)),
+          args: [naVoz(CAMINHO_DO_SCRIPT)],
+          // O primeiro pedido carrega o modelo Whisper, que leva segundos; o timeout do
+          // `Sidecar` precisa caber isso, senão a primeira transcrição de cada sessão falharia
+          // por impaciência e a segunda funcionaria — o pior padrão de erro que existe.
+          timeoutMs: 120_000
+        }),
+      lerConfiguracaoBruta: async () =>
+        await readFile(naVoz(CAMINHO_DA_CONFIGURACAO), 'utf8').then(
+          (texto) => texto,
+          () => undefined
+        ),
+      absoluto: naVoz,
+      registrarCompute: (modo) => log.sistema.info('Voz: modo de compute observado.', { modo })
+    })
+
+    // Encerrar o sidecar com o app é o critério 2: processo filho que sobrevive ao pai fica
+    // segurando o modelo na memória sem ninguém para falar com ele.
+    app.on('before-quit', () => void engineDaVoz.encerrar())
+
+    const voz = new VozService({
+      engine: engineDaVoz,
+      artefatosFaltando: () => artefatosFaltando(ARTEFATOS_DA_VOZ, instalacaoDaVoz.existe),
+      // O modo observado só existe depois de o sidecar responder. Antes disso a UI mostra o
+      // conservador: prometer CUDA que talvez não exista seria indicar um desempenho que a
+      // máquina pode não entregar.
+      computeAtual: () => engineDaVoz.compute ?? 'cpu-int8',
+      configuracaoAtual: async () =>
+        lerConfiguracao(
+          await readFile(naVoz(CAMINHO_DA_CONFIGURACAO), 'utf8').then(
+            (texto) => texto,
+            () => undefined
+          )
+        ),
+      gravarConfiguracao: async (pedida) => {
+        const texto = escreverConfiguracao(pedida)
+        await mkdir(dirname(naVoz(CAMINHO_DA_CONFIGURACAO)), { recursive: true })
+        await writeFile(naVoz(CAMINHO_DA_CONFIGURACAO), texto, 'utf8')
+
+        return lerConfiguracao(texto)
+      }
     })
 
     registerIpcHandlers({

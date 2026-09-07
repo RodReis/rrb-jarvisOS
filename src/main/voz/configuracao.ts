@@ -20,15 +20,10 @@
  * que ele não criou e não sabe consertar.
  */
 
-/** O catálogo de modelos que a fatia oferece. Fechado: o que não está aqui não é escolhível. */
-export const MODELOS_DA_VOZ = ['tiny', 'base', 'small', 'medium'] as const
+import { MODELOS_DA_VOZ, type ConfiguracaoDaVoz, type ModeloDaVoz } from '@shared/domain/voz'
 
-export type ModeloDaVoz = (typeof MODELOS_DA_VOZ)[number]
-
-export interface ConfiguracaoDaVoz {
-  readonly modelo: ModeloDaVoz
-  readonly idioma: string
-}
+export type { ConfiguracaoDaVoz, ModeloDaVoz }
+export { MODELOS_DA_VOZ }
 
 /** O default cravado pela spec: `small`, pt-BR fixo. */
 export const CONFIGURACAO_PADRAO: ConfiguracaoDaVoz = { modelo: 'small', idioma: 'pt' }

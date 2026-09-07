@@ -85,9 +85,27 @@ describe('script do sidecar — as regras que moram só aqui', () => {
     expect(SCRIPT_DO_SIDECAR).toContain('file=sys.stderr')
   })
 
-  it('decide o compute tentando, não perguntando (critério 7)', () => {
-    // Quem decide se CUDA serve é o CTranslate2, com os próprios requisitos de driver e cuDNN.
-    expect(SCRIPT_DO_SIDECAR).toContain('ctranslate2.get_cuda_device_count()')
-    expect(SCRIPT_DO_SIDECAR).toContain('"cpu", "int8"')
+  it('decide o compute transcrevendo, não perguntando nem só carregando (critério 7)', () => {
+    // Medido nesta máquina, e cada passo derrubou o anterior: `get_cuda_device_count()`
+    // responde 1, `WhisperModel(device="cuda")` **carrega sem erro**, e a primeira transcrição
+    // morre em `Library cublas64_12.dll is not found`. cuBLAS e cuDNN não vêm nas wheels, e o
+    // CTranslate2 só as procura quando o encoder roda.
+    expect(SCRIPT_DO_SIDECAR).toContain('device="cuda"')
+    expect(SCRIPT_DO_SIDECAR).toContain('np.zeros(1600, dtype=np.float32)')
+    expect(SCRIPT_DO_SIDECAR).toContain('device="cpu", compute_type="int8"')
+  })
+
+  it('consome o gerador na prova de CUDA — senão ela não prova nada', () => {
+    // `transcribe` devolve um gerador e o encoder só roda quando alguém o consome. Sem o
+    // `list`, a prova passaria sem exercitar nada, e o erro voltaria na primeira fala do
+    // usuário — que é exatamente o que ela existe para evitar.
+    expect(SCRIPT_DO_SIDECAR).toMatch(/list\(modelo\.transcribe\(/)
+  })
+
+  it('CUDA que falha vira log e CPU, não erro na tela', () => {
+    // Numa máquina com placa e sem CUDA completo, propagar mataria a voz justamente em quem tem
+    // GPU. O fallback foi exercitado de verdade no smoke, e é este ramo que rodou.
+    expect(SCRIPT_DO_SIDECAR).toContain('CUDA indisponivel, usando CPU')
+    expect(SCRIPT_DO_SIDECAR).toContain('file=sys.stderr')
   })
 })
