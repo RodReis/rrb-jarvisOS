@@ -173,6 +173,26 @@ comGit('MarcosService — painel', () => {
     expect(service.vista(PROJETO, WS).linhas[0]?.estado).toBe('commitado')
   })
 
+  it('reconhece documento acima do teto de saída do terminal — o truncamento mudaria o hash', () => {
+    /*
+     * O `spawnSync` do `TerminalEngine` recebia `maxBuffer: LIMITE_SAIDA_BYTES` (64 KB), e esse
+     * teto não trunca: ele **aborta** o comando com `ENOBUFS` e devolve o pedaço que coube. O
+     * hash calculado sobre esse pedaço é de um documento que não existe, e nunca bate com o da
+     * revisão — **todo** documento maior que o teto apareceria divergente para sempre, com o
+     * disco e o commit idênticos. Foi o que o teste do PI encontrou: um protótipo de 255 KB
+     * marcado como `commit desatualizado` com o `git status` limpo.
+     *
+     * O tamanho é o que separa o verde do vermelho aqui: um fixture pequeno passa com o defeito
+     * presente, e por isso o conteúdo precisa cruzar o teto de propósito.
+     */
+    const grande = `# PRD\n\n${'linha de conteúdo do documento aceito\n'.repeat(3000)}`
+    expect(Buffer.byteLength(grande, 'utf8')).toBeGreaterThan(64 * 1024)
+
+    documentos = [{ caminho: PRD, hash: commitar(PRD, grande) }]
+
+    expect(service.vista(PROJETO, WS).linhas[0]?.estado).toBe('commitado')
+  })
+
   it('marca `blob-divergente` quando o commit guarda uma revisão anterior à aceita', () => {
     // O caso do critério 1: PRD commitado, PI aceitou uma revisão posterior. "Existe commit"
     // diria versionado; a comparação de conteúdo diz a verdade.
