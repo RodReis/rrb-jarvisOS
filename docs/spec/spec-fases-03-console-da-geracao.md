@@ -2,7 +2,7 @@
 
 - MVP/Fatia: MVP-026 · M26-F03.
 - Issue: [#253](https://github.com/RodReis/rrb-jarvisOS/issues/253); épico [#250](https://github.com/RodReis/rrb-jarvisOS/issues/250).
-- Status: **aprovada-pi** (2026-09-04) — perguntas respondidas pelo PI nesta data, antes da redação.
+- Status: **aprovada-pi** (2026-09-04) — perguntas respondidas pelo PI nesta data, antes da redação. **Entregue** (PR #263). **Emenda E1** abaixo: **aprovada-pi** (2026-09-05) → fatia M26-F07, issue [#274](https://github.com/RodReis/rrb-jarvisOS/issues/274).
 - Depende de: M26-F02 (modelo por fase); M8-F02 (ponto único, `ContextPack`, ledger); M5-F04 (adapter Claude Code CLI, `generateStream`).
 
 ## Objetivo
@@ -29,7 +29,7 @@ Mostrar ao PI, **enquanto a IA gera**, o texto que ela produz e as ferramentas q
 - `ClaudeCodeAdapter.generateStream` passa a rodar `claude --print --model <id> --output-format stream-json --verbose` e a **parsear cada linha** em `GenerationEvent`. O texto final continua sendo montado dos `texto` — o contrato `AdapterChunk` existente é preservado (o console é um consumidor a mais, não um caminho novo).
 - Linha que não parseia vira `erro` de parser **sem derrubar a geração**: contrato de terceiro é risco declarado no MVP; o texto continua chegando.
 - Adapters `anthropic`, `gemini` e `ollama` emitem só `texto` e `uso` (não há ferramentas nessas rotas hoje). O adapter do Codex (F06) emite o conjunto completo a partir de `codex exec --json`.
-- Ferramentas que o CLI executa no `cwd` do projeto continuam sob a política do MVP-004 — esta fatia **não muda permissões**, só as torna visíveis.
+- Ferramentas que o CLI executa no `cwd` do projeto continuam sob a política do MVP-004 — esta fatia **não muda permissões**, só as torna visíveis. *(Superado pela Emenda E1 para as fases Planejamento e Especificação — ver abaixo.)*
 
 ## Persistência
 
@@ -72,3 +72,54 @@ Unitários do parser (fixtures reais de `stream-json`, inclusive linha corrompid
 - **Trace ligado ao ledger, não solto.** O ledger é o registro de uso que a M8-F02 e a M5-F03 governam; um trace sem ele seria uma segunda contabilidade.
 - **Resultado completo não persiste.** Com `Read` de arquivos grandes e `WebFetch`, o banco cresceria por geração; o resumo com tamanho original é o que a tela precisa.
 - **Parser falha aberto para o texto e fechado para o console.** O documento é o produto; o console é evidência. Trocar a ordem faria uma mudança de formato do CLI parar a jornada.
+
+---
+
+## Emenda E1 — Isolamento do CLI por fase (2026-09-05)
+
+- Status: **aprovada-pi** (2026-09-05). Fatia **M26-F07**, issue [#274](https://github.com/RodReis/rrb-jarvisOS/issues/274) (sub-issue do #250). Não reabre a #253.
+- Motivação: teste do PI em 2026-09-05 (refinamento, prompt pequeno) — muito código, muito lixo, nada sobre o prompt. Três causas no código; duas são bugs documentados e já têm card ([#271](https://github.com/RodReis/rrb-jarvisOS/issues/271) `request.system` descartado pelo adapter; [#272](https://github.com/RodReis/rrb-jarvisOS/issues/272) texto de mensagens `user` entrando no documento). A terceira é **decisão de produto**, e é esta emenda.
+- Evidência: o smoke da M26-F03 mediu **230.444 tokens de entrada** numa geração de refinamento. O `cwd` do CLI é `process.cwd()` — em dev, o repositório do próprio app: `CLAUDE.md` (184 linhas), `.claude/CLAUDE.md` (378), `rules/`, `hooks/`, `settings.json`, skills e MCPs do ambiente do PI entram no contexto de uma geração sobre **outro** projeto. Sem restrição de ferramentas, o modelo invocou a skill `claude-api` e rodou `Bash` fora do app.
+
+### Decisões do PI (2026-09-05)
+
+1. **cwd neutro** para o subprocess, nos dois adapters (`ClaudeCodeAdapter` **e** `CodexAdapter`). Nunca `process.cwd()`.
+2. Isolamento por fase: nas fases **Planejamento** e **Especificação** o CLI é um gerador de documento, sem persona de agente e sem ferramentas; na **Construção** o agente é legítimo.
+3. `--json-schema` **entra nesta fatia** — é a barreira que sobra quando o modelo desobedece o prompt.
+4. `cli-runs` em **`app.getPath('userData')`**, não dentro do workspace do JarvisOS (evita herdar `.claude/`/`CLAUDE.md` de diretório acima).
+5. Versão mínima dos CLIs = **a instalada no PC do PI em 2026-09-05**; o Code confirma cada flag em `claude --help` / `codex exec --help` e registra a versão em `ARCHITECTURE.md` § Providers.
+6. **Saída sempre em pt-BR**: o system de todas as etapas declara o idioma explicitamente (complemento em #271).
+
+### Regras
+
+**cwd.** Um diretório **vazio, criado por geração** sob `app.getPath('userData')/cli-runs/<traceId>` e removido ao fim (também em cancelamento e timeout). Sem `CLAUDE.md`, sem `.claude/`, sem `AGENTS.md`, sem `.git`. O comentário atual dos adapters ("o diretório do app, nunca o do usuário") está errado nas duas metades: em dev o diretório do app **é** o repo com toda a governança; no app empacotado `process.cwd()` é o que o atalho do Windows decidir.
+
+**Claude Code — fases Planejamento e Especificação** (`claude --print … --output-format stream-json --verbose`, acrescido de):
+
+| flag | efeito (docs do CLI) | por quê |
+|---|---|---|
+| `--system-prompt <request.system>` | substitui **todo** o system prompt padrão | tira a persona de agente de código; entra o contrato da etapa (`SISTEMA_DAS_PERGUNTAS`, `SISTEMA_DO_BRIEF`, …). Base: #271 |
+| `--tools ""` | nenhuma ferramenta disponível (Bash, Read, Skill, WebFetch…) | gerar documento não precisa de ferramenta; sem `Skill`, não há skill despejada |
+| `--setting-sources ""` | não carrega settings `user`/`project`/`local` | hooks, permissões e plugins do ambiente do PI não entram na geração. Se a versão instalada rejeitar lista vazia, `user` — e o Code registra a diferença |
+| `--strict-mcp-config` (sem `--mcp-config`) | ignora toda configuração de MCP | zero servidores MCP na geração |
+| `--no-session-persistence` | não grava sessão em disco | geração não deixa transcript fora do trace |
+| `--json-schema <schema da etapa>` | saída JSON validada pelo CLI (print mode) | o contrato deixa de depender só de obediência ao prompt; `lerPerguntasDoModelo` continua como segunda barreira |
+
+**Claude Code — fase Construção.** Não é este adapter: o run da Construção roda no container (M9/M26-F05), com ferramentas legítimas. Lá a regra é `--append-system-prompt` (mantém a persona de agente, acrescenta o contrato) e o console **trunca** resultados (#272). Esta emenda **não altera** o run — só registra a assimetria para o Code não aplicar `--tools ""` onde ele quebraria a construção.
+
+**Codex.** Mesmo cwd neutro. `codex exec` não tem flag de system prompt → `request.system` entra **antes** do prompt no stdin, separado por linha em branco e cabeçalho `INSTRUÇÕES:`/`PEDIDO:`. Flags: `--sandbox read-only` nas fases Planejamento/Especificação; `--skip-git-repo-check` (cwd neutro não é repositório Git e o `codex exec` recusa diretório fora de repo sem esta flag). O Code confirma cada flag em `codex exec --help` da versão instalada.
+
+**Flag inexistente = falha declarada.** Se a versão instalada não aceitar uma flag, a geração falha com mensagem que nomeia a flag e a versão mínima — nunca cai silenciosamente para a invocação sem isolamento. A versão mínima suportada de cada CLI fica registrada em `docs/ARCHITECTURE.md` § Providers.
+
+### Critérios de aceite
+
+1. Teste dos dois adapters com `spawnImpl` capturado: `cwd` ≠ `process.cwd()`, existe, está vazio no spawn e não existe após o `close` (inclusive por `SIGKILL`).
+2. Args do Claude Code nas fases Planejamento/Especificação contêm exatamente as flags da tabela, com `request.system` e o schema da etapa; em nenhum caso contêm `--dangerously-skip-permissions`.
+3. Fixture de `stream-json` com `tool_use` numa geração de Planejamento → evento `erro` no console ("ferramenta em fase sem ferramentas") e a geração termina; o documento não recebe o texto posterior ao `tool_use`.
+4. Smoke real do refinamento com prompt de até 500 caracteres: `tokensEntrada` medido pelo CLI **abaixo de 10.000** (hoje: 230.444). O número entra no relatório da fatia.
+5. Codex: args contêm `--sandbox read-only` e `--skip-git-repo-check`; o stdin começa por `request.system` quando definido.
+6. Flag rejeitada pelo CLI → `AdapterError` nomeando a flag; teste com `spawnImpl` que devolve o erro do CLI.
+
+### Depende de
+
+#271 e #272 (correções que esta fatia pressupõe). Ordem sugerida ao Code: #271 → #272 → M26-F07. `proplan:next` é decisão do PI no STATUS.md, não desta emenda.
