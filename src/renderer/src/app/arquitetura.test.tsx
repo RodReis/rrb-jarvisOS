@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ComTrilha } from './trilha-de-teste'
@@ -27,6 +27,10 @@ const cortarPropostoDaArquitetura = vi.fn()
 const descartarAjusteDaArquitetura = vi.fn()
 const aplicarEventoDaJornada = vi.fn()
 const aprovarGate = vi.fn()
+/** A assinatura dos eventos de geração (#337). Devolve o cancelador, como a ponte real. */
+const onGenerationEvent = vi.fn()
+/** O ouvinte que a tela registrou, para o teste emitir o que o main emitiria. */
+let emitir: ((evento: unknown) => void) | undefined
 
 const HASH = 'a'.repeat(64)
 
@@ -92,6 +96,11 @@ beforeEach(() => {
   descartarAjusteDaArquitetura.mockReset().mockResolvedValue(null)
   aplicarEventoDaJornada.mockReset().mockResolvedValue({ resultado: 'avancou' })
   aprovarGate.mockReset().mockResolvedValue({ reason: 'aprovado', mensagem: 'Aprovado.' })
+  emitir = undefined
+  onGenerationEvent.mockReset().mockImplementation((cb: (e: unknown) => void) => {
+    emitir = cb
+    return () => {}
+  })
 
   Object.defineProperty(window, 'jarvis', {
     value: {
@@ -101,6 +110,7 @@ beforeEach(() => {
       descartarAjusteDaArquitetura,
       aplicarEventoDaJornada,
       aprovarGate,
+      onGenerationEvent,
       sendLog: vi.fn()
     },
     configurable: true,
@@ -415,6 +425,91 @@ describe('as abas do pacote (issue #333)', () => {
 
     // Trocar de aba não pode esconder a soleira da etapa.
     expect(screen.getByLabelText('Aceite do pacote')).toBeInTheDocument()
+  })
+})
+
+/**
+ * A barra de andamento na arquitetura (issue #337).
+ *
+ * **O que ela conserta:** a barra existia desde a #287 com **um só call site**, o PRD. O PI gerou
+ * a arquitetura e o roadmap e viu o botão girar sem nada dizer o que acontecia — no roadmap,
+ * 58,9 segundos. A regra é da tela da etapa (SPEC-Jornada-03 § Emenda E2, item 1), não do PRD.
+ */
+describe('o andamento da geração (issue #337)', () => {
+  /** Emite um anúncio como o main o emitiria, e espera o React aplicar. */
+  async function anunciar(
+    etapa: string,
+    estado: 'iniciada' | 'concluida' | 'falhou',
+    resumo?: string
+  ): Promise<void> {
+    await waitFor(() => expect(emitir).toBeDefined())
+    await act(async () => {
+      emitir?.({
+        traceId: 'etapas:p-1',
+        evento: { tipo: 'etapa', etapa, estado, ...(resumo === undefined ? {} : { resumo }) }
+      })
+    })
+  }
+
+  it('sem anúncio nenhum não há barra — 0% afirmaria que nada aconteceu', async () => {
+    carregarArquitetura.mockResolvedValue(arquitetura())
+    montar()
+
+    await screen.findByRole('tablist')
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+  })
+
+  it('mostra a etapa em curso com o nome desta geração, não os do PRD', async () => {
+    carregarArquitetura.mockResolvedValue(arquitetura())
+    montar()
+    await screen.findByRole('tablist')
+
+    await anunciar('prototipos', 'iniciada')
+
+    /*
+     * Duas ocorrências, e as duas são certas: o destaque de "o que acontece agora" e a linha da
+     * etapa na lista. `findAll` porque o que se prova é o **nome desta geração** — a lista do PRD
+     * abre com "Pesquisa de mercado", que aqui nunca acontece e contaria no denominador sem
+     * nunca chegar.
+     */
+    expect(await screen.findAllByText('Leitura dos protótipos')).toHaveLength(2)
+    expect(screen.queryByText('Pesquisa de mercado')).not.toBeInTheDocument()
+  })
+
+  it('o progresso conta as etapas desta geração', async () => {
+    carregarArquitetura.mockResolvedValue(arquitetura())
+    montar()
+    await screen.findByRole('tablist')
+
+    await anunciar('prototipos', 'iniciada')
+    await anunciar('prototipos', 'concluida', '1 protótipo lido')
+
+    // 1 de 5 etapas da arquitetura. Com a lista do PRD daria o mesmo número por acidente, mas
+    // pararia em 80% no fim — `coerencia` não existe lá.
+    expect(await screen.findByRole('progressbar')).toHaveAttribute('aria-valuenow', '20')
+  })
+
+  it('a etapa que falha diz o que houve, em vez de sumir', async () => {
+    carregarArquitetura.mockResolvedValue(arquitetura())
+    montar()
+    await screen.findByRole('tablist')
+
+    await anunciar('documentos', 'falhou', 'a chamada não devolveu saída')
+
+    // Uma etapa que falhou e uma que não começou parecem iguais quando o único sinal é "não
+    // concluiu" — e são coisas opostas para quem decide se espera ou intervém.
+    expect(await screen.findByText('a chamada não devolveu saída')).toBeInTheDocument()
+  })
+
+  it('a correção aparece no resumo — um clique pode virar três chamadas', async () => {
+    carregarArquitetura.mockResolvedValue(arquitetura())
+    montar()
+    await screen.findByRole('tablist')
+
+    await anunciar('documentos', 'iniciada', 'correção 1 de 1')
+
+    // O PI clicou uma vez no roadmap e esperou 72s sobre três chamadas, sem saber disso.
+    expect(await screen.findByText('correção 1 de 1')).toBeInTheDocument()
   })
 })
 

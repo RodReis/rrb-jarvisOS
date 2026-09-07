@@ -31,8 +31,11 @@ import {
   Tabs
 } from '@design/ui'
 import type { AprovacaoOutcome } from '@shared/domain/aprovacoes'
+import type { AndamentoDaEtapa, EtapaDaGeracao } from '@shared/domain/geracao'
+import { ETAPAS_DA_ARQUITETURA, aplicarEtapa } from '@shared/domain/geracao'
 import { log } from '../lib/log'
 import { DesfechoDaAprovacao } from './aprovacao-recusada'
+import { AndamentoDaGeracao } from './AndamentoDaGeracao'
 
 /**
  * A arquitetura, as decisões, os testes e a revisão, com o gate do pacote (SPEC-Jornada-04).
@@ -504,6 +507,13 @@ export function ArquiteturaDoProjeto({
    */
   const [recusaDoAceite, setRecusaDoAceite] = useState<AprovacaoOutcome | null>(null)
   /**
+   * O andamento da geração **desta rodada** (issue #337).
+   *
+   * A barra existia só no PRD desde a #287, e o PI gerou a arquitetura vendo o botão girar sem
+   * nada dizer o que acontecia. A regra é da tela da etapa (SPEC-Jornada-03 § Emenda E2, item 1).
+   */
+  const [etapas, setEtapas] = useState<ReadonlyMap<EtapaDaGeracao, AndamentoDaEtapa>>(new Map())
+  /**
    * O aviso de que a IA propôs ajustes, aberto **na chegada** deles (#332, defeito 5).
    *
    * A geração termina, o PI continua olhando o topo da tela, e a lista dos ajustes fica abaixo da
@@ -548,6 +558,22 @@ export function ArquiteturaDoProjeto({
       ativo = false
     }
   }, [projectId, workspace])
+
+  /*
+   * A tela acompanha a geração que corre no **main**, inclusive a que começou antes de ela montar
+   * (SPEC-Jornada-03 § Emenda E2, item 4).
+   *
+   * `ETAPAS_DA_ARQUITETURA` e não a lista do PRD: o denominador tem de ser o desta geração, senão
+   * a barra pararia em 60% numa rodada que terminou.
+   */
+  useEffect(() => {
+    return window.jarvis.onGenerationEvent(({ evento }) => {
+      if (evento.tipo !== 'etapa') return
+
+      setEtapas((atuais) => aplicarEtapa(atuais, evento, [...ETAPAS_DA_ARQUITETURA]))
+      if (evento.etapa === 'gravacao' && evento.estado === 'concluida') void carregar()
+    })
+  }, [carregar])
 
   const gerar = useCallback(async (): Promise<void> => {
     setOcupado(true)
@@ -707,6 +733,19 @@ export function ArquiteturaDoProjeto({
           </Button>
         </div>
       )}
+
+      {/*
+        **A barra de andamento, no topo da etapa** (SPEC-Jornada-03 § Emenda E2, item 1; #337).
+        
+        Fora do bloco do "gerar de novo" de propósito: na **primeira** geração não há botão aqui —
+        ele mora na trilha (#332) —, e prendê-la ao botão deixaria justamente a primeira rodada
+        sem sinal nenhum, que é quando o PI mais precisa saber o que está acontecendo.
+      */}
+      <AndamentoDaGeracao
+        etapas={etapas}
+        gerando={ocupado}
+        contrato={[...ETAPAS_DA_ARQUITETURA]}
+      />
 
       {desfecho !== null && desfecho.resultado !== 'gerada' && (
         <InlineAlert

@@ -31,30 +31,55 @@ import { ETAPAS_DA_GERACAO, progressoDaGeracao } from '@shared/domain/geracao'
  * sistema — e essas o usuário não retematiza.
  */
 
-/** O nome de cada etapa na tela. Dado, não lógica — e em pt-BR, como toda a interface. */
+/**
+ * O nome de cada etapa na tela. Dado, não lógica — e em pt-BR, como toda a interface.
+ *
+ * `Record` completo de propósito: uma etapa nova no contrato quebra a compilação aqui, e não cai
+ * num rótulo vazio na tela do PI (issue #337).
+ *
+ * **`documentos`, `validacao` e `gravacao` são compartilhados** pelas três gerações e ganham
+ * nome genérico. Nomear "PRD, Landscape e Convention" era certo quando só o PRD tinha barra;
+ * com as três, o mesmo rótulo apareceria na arquitetura anunciando documentos que ela não gera.
+ */
 const NOME_DA_ETAPA: Readonly<Record<EtapaDaGeracao, string>> = {
   pesquisa: 'Pesquisa de mercado',
-  documentos: 'PRD, Landscape e Convention',
+  documentos: 'Escrita dos documentos',
   validacao: 'Validação da saída',
   contradicoes: 'Busca de contradições',
-  gravacao: 'Gravação dos documentos'
+  gravacao: 'Gravação dos documentos',
+  prototipos: 'Leitura dos protótipos',
+  coerencia: 'Análise de coerência',
+  mvps: 'Proposta dos MVPs',
+  dag: 'Checagem de dependências',
+  spec: 'Escrita da SPEC da fatia'
 }
 
 export function AndamentoDaGeracao({
   etapas,
-  gerando
+  gerando,
+  contrato = [...ETAPAS_DA_GERACAO]
 }: {
   readonly etapas: ReadonlyMap<EtapaDaGeracao, AndamentoDaEtapa>
   readonly gerando: boolean
+  /**
+   * As etapas desta geração, na ordem. O default é o do PRD, que foi quem estreou o componente.
+   *
+   * É a lista que dá o denominador: usar a do PRD na arquitetura contaria etapas que nunca
+   * chegam, e a barra pararia em 60% numa geração que terminou.
+   */
+  readonly contrato?: readonly EtapaDaGeracao[]
 }): React.JSX.Element | null {
   // Sem nenhum anúncio não há progresso a mostrar. Uma barra em 0% durante uma geração que não
   // reporta etapas afirmaria que nada aconteceu, o que é diferente de "não se sabe".
   if (etapas.size === 0) return null
 
-  const progresso = progressoDaGeracao(new Map([...etapas].map(([etapa, v]) => [etapa, v.estado])))
+  const progresso = progressoDaGeracao(
+    new Map([...etapas].map(([etapa, v]) => [etapa, v.estado])),
+    contrato
+  )
 
-  const emCurso = ETAPAS_DA_GERACAO.find((e) => etapas.get(e)?.estado === 'iniciada')
-  const atual = emCurso ?? [...ETAPAS_DA_GERACAO].reverse().find((e) => etapas.has(e))
+  const emCurso = contrato.find((e) => etapas.get(e)?.estado === 'iniciada')
+  const atual = emCurso ?? [...contrato].reverse().find((e) => etapas.has(e))
   const resumoAtual = atual === undefined ? undefined : etapas.get(atual)?.resumo
 
   return (
@@ -92,7 +117,7 @@ export function AndamentoDaGeracao({
       </div>
 
       <ul className="flex flex-col gap-1.5">
-        {ETAPAS_DA_GERACAO.map((etapa) => {
+        {contrato.map((etapa) => {
           const registro = etapas.get(etapa)
           const estado = registro?.estado
 
