@@ -1,9 +1,11 @@
 import { dirname, join, resolve } from 'node:path'
-import { mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, rename, rm } from 'node:fs/promises'
 import { VozService } from './voz/voz-service'
 import { ARTEFATOS_DA_VOZ } from './voz/artefatos'
 import { baixarArtefato } from './voz/download-de-artefato'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { createWriteStream, mkdirSync, writeFileSync } from 'node:fs'
+import { Readable } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
 import { app, BrowserWindow, nativeTheme, shell } from 'electron'
 import { IPC_EVENT_CHANNELS } from '@shared/contracts/ipc'
 import { AuthService } from './auth/auth-service'
@@ -1470,11 +1472,34 @@ if (!app.requestSingleInstanceLock()) {
         }
 
         return baixarArtefato(artefato, {
-          buscar: async (url) => Buffer.from(await (await fetch(url)).arrayBuffer()),
-          gravar: async (destino, dados) => {
+          buscar: async (url) => {
+            const resposta = await fetch(url)
+
+            // Sem isto, um 404 entraria como corpo HTML e sairia por "hash divergente" — falha
+            // fechada, mas acusando adulteração onde houve link quebrado.
+            if (!resposta.ok || resposta.body === null) {
+              throw new Error(`A origem respondeu ${resposta.status} ${resposta.statusText}.`)
+            }
+
+            const declarado = Number(resposta.headers.get('content-length'))
+
+            return {
+              pedacos: resposta.body as unknown as AsyncIterable<Uint8Array>,
+              totalBytes: Number.isFinite(declarado) && declarado > 0 ? declarado : undefined
+            }
+          },
+          gravarPedacos: async (destino, pedacos) => {
             const alvo = join(app.getPath('userData'), destino)
             await mkdir(dirname(alvo), { recursive: true })
-            await writeFile(alvo, dados)
+            // `Readable.from` + `pipeline` fecha o arquivo mesmo quando a origem morre no meio,
+            // que é o que impede um descritor pendurado a cada download interrompido.
+            await pipeline(Readable.from(pedacos), createWriteStream(alvo))
+          },
+          promover: async (temporario, destino) => {
+            const base = app.getPath('userData')
+            const alvo = join(base, destino)
+            await mkdir(dirname(alvo), { recursive: true })
+            await rename(join(base, temporario), alvo)
           },
           apagar: async (destino) => {
             await rm(join(app.getPath('userData'), destino), { force: true })
