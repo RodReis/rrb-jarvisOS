@@ -50,15 +50,30 @@ const PARTICAO_DO_PROTOTIPO = 'prototipo-validacao'
  * Roda no contexto do protótipo, então só pode usar DOM. Devolve JSON serializável — o que
  * atravessa `executeJavaScript` é estruturado, e uma referência a `Element` não atravessaria.
  *
- * As jornadas saem de headings e de `[data-jornada]`: são as duas formas em que um protótipo
- * declara "esta é a tela X". Ler todo o texto da página traria rótulo de botão como se fosse
- * tela, e o critério 4 passaria a prometer fluxo que ninguém desenhou.
+ * **Jornada e estado são duas perguntas, e por isso duas listas.**
+ *
+ * As jornadas saem de headings, de `[data-jornada]` e de `[data-screen-label]` — as formas em que
+ * um protótipo declara "esta é a tela X"; a última é como as ferramentas de design exportam o
+ * nome da tela. Ler todo o texto da página traria rótulo de botão como se fosse tela, e o
+ * critério 4 passaria a prometer fluxo que ninguém desenhou.
+ *
+ * O **estado**, porém, quase nunca está num heading: ele aparece no corpo de um cartão
+ * ("Assinatura necessária", "Nenhum resultado", "Carregando…"). Procurá-lo só entre as jornadas
+ * produzia o achado falso que o teste do PI encontrou — a validação afirmando que não há estado
+ * de bloqueio num protótipo que o mostra em três telas (issue #332). E `SINAIS_DO_ESTADO` diz
+ * exatamente por que isso não pode acontecer: um achado falso ensina o PI a ignorar a lista
+ * inteira.
+ *
+ * Por isso `textoVisivel` é uma segunda saída, e não mais jornadas: alargar `jornadas` para
+ * cobrir estado inventaria telas a partir de rótulo de cartão, e a arquitetura passaria a ancorar
+ * fluxo em tela que ninguém desenhou. Uma lista responde "que telas existem"; a outra, "o que
+ * esta página diz".
  */
 const SCRIPT_DE_EXTRACAO = `(() => {
   const texto = (el) => (el.textContent || '').trim()
   const jornadas = [
-    ...document.querySelectorAll('h1, h2, h3, [data-jornada], [data-estado]')
-  ].map(texto).filter((t) => t !== '')
+    ...document.querySelectorAll('h1, h2, h3, [data-jornada], [data-estado], [data-screen-label]')
+  ].map((el) => el.getAttribute('data-screen-label') || texto(el)).filter((t) => t !== '')
 
   const visiveis = [...document.body.querySelectorAll('*')].filter((el) => {
     const t = (el.textContent || '').trim()
@@ -67,7 +82,13 @@ const SCRIPT_DE_EXTRACAO = `(() => {
     return estilo.display !== 'none' && estilo.visibility !== 'hidden'
   })
 
-  return JSON.stringify({ jornadas, elementosVisiveis: visiveis.length })
+  // O texto visível da página, para a busca dos estados. Vem de \`body\`, e não da concatenação
+  // dos elementos filtrados acima: cada ancestral repete o texto dos filhos, e a string cresceria
+  // ao quadrado da profundidade sem acrescentar palavra nenhuma.
+  const corpo = document.body
+  const textoVisivel = (corpo ? corpo.innerText || corpo.textContent || '' : '').slice(0, 200000)
+
+  return JSON.stringify({ jornadas, elementosVisiveis: visiveis.length, textoVisivel })
 })()`
 
 /**
@@ -201,7 +222,8 @@ export async function carregarPrototipo(caminhoAbsoluto: string): Promise<Render
       carregou: true,
       errosDeConsole,
       elementosVisiveis: extraido.elementosVisiveis,
-      jornadas: extraido.jornadas
+      jornadas: extraido.jornadas,
+      textoVisivel: extraido.textoVisivel
     }
   } finally {
     // A janela some sempre, inclusive quando o protótipo trava: uma janela oculta vazada
@@ -226,7 +248,11 @@ export function lerHtml(caminhoAbsoluto: string): string {
 interface Extracao {
   readonly jornadas: readonly string[]
   readonly elementosVisiveis: number
+  readonly textoVisivel: string
 }
+
+/** Extração de quem não respondeu no formato. Constante para não repetir o literal em dois ramos. */
+const VAZIA: Extracao = { jornadas: [], elementosVisiveis: 0, textoVisivel: '' }
 
 /**
  * Interpreta o JSON do script. Qualquer coisa fora do formato vira extração vazia — o script
@@ -235,16 +261,17 @@ interface Extracao {
 function interpretarExtracao(bruto: string): Extracao {
   try {
     const parsed: unknown = JSON.parse(bruto)
-    if (typeof parsed !== 'object' || parsed === null) return { jornadas: [], elementosVisiveis: 0 }
+    if (typeof parsed !== 'object' || parsed === null) return VAZIA
     const obj = parsed as Record<string, unknown>
     return {
       jornadas: Array.isArray(obj.jornadas)
         ? obj.jornadas.filter((j) => typeof j === 'string')
         : [],
-      elementosVisiveis: typeof obj.elementosVisiveis === 'number' ? obj.elementosVisiveis : 0
+      elementosVisiveis: typeof obj.elementosVisiveis === 'number' ? obj.elementosVisiveis : 0,
+      textoVisivel: typeof obj.textoVisivel === 'string' ? obj.textoVisivel : ''
     }
   } catch {
-    return { jornadas: [], elementosVisiveis: 0 }
+    return VAZIA
   }
 }
 

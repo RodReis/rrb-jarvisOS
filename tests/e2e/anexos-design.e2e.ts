@@ -50,6 +50,34 @@ const HTML_BOM = `<!doctype html>
 </body></html>`
 
 /**
+ * Um protótipo como as ferramentas de design os exportam: a tela é declarada em
+ * `data-screen-label` e o estado aparece no **corpo** de um cartão, não num heading.
+ *
+ * O `HTML_BOM` acima põe cada estado num `h2` — a única forma que o extrator enxergava —, e por
+ * isso passava com o defeito presente. Este fixture é o protótipo real do PI reduzido ao osso:
+ * ele **mostra** o bloqueio ("Assinatura necessária", "Desbloqueie o painel"), e a validação
+ * afirmava que o estado não existe. Um achado falso ensina o PI a ignorar a lista inteira, que é
+ * o que `SINAIS_DO_ESTADO` diz existir para evitar (issue #332).
+ */
+const HTML_ESTADO_FORA_DO_HEADING = `<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Painel</title></head>
+<body>
+  <div data-screen-label="Dashboard">
+    <h1>Painel de cotações</h1>
+    <div class="card">
+      <span class="tag">Assinatura necessária</span>
+      <div class="card-title">Desbloqueie o painel de cotações</div>
+      <p>Assine para acompanhar a cotação na sua região.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">Nenhum material selecionado</div>
+      <p>Carregando as cotações do dia…</p>
+      <p>Erro ao consultar a fonte de preços.</p>
+    </div>
+  </div>
+</body></html>`
+
+/**
  * Um protótipo que **abre em branco**: o HTML é válido, mas o script que monta a tela quebra.
  * Nenhum parser estático distingue isto de um protótipo correto — só o render.
  */
@@ -362,4 +390,70 @@ test('protótipo que abre em branco é detectado pela validação', async () => 
 
   // E nada foi escrito.
   expect(existsSync(join(diretorio, 'docs/ARCHITECTURE.md'))).toBe(false)
+})
+
+/**
+ * O estado que o protótipo **mostra** fora de um heading.
+ *
+ * O extrator lia texto só de `h1, h2, h3, [data-jornada], [data-estado]`, e é assim que o
+ * `HTML_BOM` declara os quatro estados — por isso ele passava com o defeito presente. Protótipo
+ * de ferramenta de design não se parece com aquilo: a tela vem em `data-screen-label` e o estado
+ * aparece no corpo de um cartão. O teste do PI encontrou a consequência: a validação afirmando
+ * que não há estado de bloqueio num protótipo cujo cartão diz "Assinatura necessária" em três
+ * telas (issue #332).
+ *
+ * O que se afirma aqui é a **ausência** do achado falso, e a presença dos verdadeiros: o
+ * protótipo cobre bloqueio, vazio, loading e erro, então nenhuma das quatro perguntas de estado
+ * deve sair. Afirmar só "há menos achados" passaria com o extrator antigo.
+ */
+test('estado mostrado fora de heading é reconhecido pela validação', async () => {
+  const janela = await app.firstWindow()
+  await janela.waitForLoadState('domcontentloaded')
+
+  const projeto = await prepararProjeto(janela)
+  const projectId = projeto.project?.id ?? ''
+  const diretorio = projeto.project?.diretorio ?? ''
+
+  execFileSync('git', ['config', 'user.email', 'teste@jarvis'], { cwd: diretorio })
+  execFileSync('git', ['config', 'user.name', 'Teste'], { cwd: diretorio })
+
+  const origemDs = arquivoExterno('DESIGN-SYSTEM.md', '# DS')
+  const origemProto = arquivoExterno('painel.html', HTML_ESTADO_FORA_DO_HEADING)
+
+  const resultado = await janela.evaluate(
+    async ([id, ds, proto]: readonly string[]) => {
+      const bridge = (
+        window as unknown as {
+          jarvis: {
+            getWorkspace: () => Promise<string>
+            anexarDesign: (p: string, t: string, o: string, w: string) => Promise<unknown>
+            validarPrototipos: (p: string) => Promise<
+              readonly {
+                jornadasCobertas: readonly string[]
+                achados: readonly { id: string; pergunta: string }[]
+              }[]
+            >
+          }
+        }
+      ).jarvis
+      const workspace = await bridge.getWorkspace()
+      await bridge.anexarDesign(id ?? '', 'design-system', ds ?? '', workspace)
+      await bridge.anexarDesign(id ?? '', 'prototipo', proto ?? '', workspace)
+
+      const validacoes = await bridge.validarPrototipos(id ?? '')
+      return {
+        jornadas: validacoes[0]?.jornadasCobertas ?? [],
+        achados: validacoes.flatMap((v) => v.achados).map((a) => a.id)
+      }
+    },
+    [projectId, origemDs, origemProto]
+  )
+
+  // Os quatro estados estão na tela, então nenhuma pergunta de estado ausente se justifica.
+  const estadosAusentes = resultado.achados.filter((id) => id.includes(':estado-ausente:'))
+  expect(estadosAusentes).toEqual([])
+
+  // E a tela declarada em `data-screen-label` é jornada coberta: é ela que a arquitetura cita
+  // como âncora, e sem lê-la o fluxo do dashboard não teria tela que o desenhou.
+  expect(resultado.jornadas).toContain('Dashboard')
 })

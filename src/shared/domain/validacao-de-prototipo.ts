@@ -56,6 +56,19 @@ export interface RenderDoPrototipo {
   readonly elementosVisiveis: number
   /** Os textos das seções/telas que o protótipo declarou (headings, `[data-jornada]`). */
   readonly jornadas: readonly string[]
+  /**
+   * Todo o texto visível da página, para a busca dos estados.
+   *
+   * Separado de `jornadas` porque as duas respondem a perguntas diferentes: jornada é **nome de
+   * tela** e vira âncora da arquitetura; estado é um sinal que aparece no corpo de um cartão
+   * ("Assinatura necessária", "Nenhum resultado") e nunca num heading. Procurar estado entre as
+   * jornadas dava o achado falso da issue #332; alargar `jornadas` para cobri-lo inventaria tela
+   * a partir de rótulo de botão.
+   *
+   * Opcional porque o campo nasceu depois: um render antigo sem ele cai de volta nas jornadas, e
+   * um protótipo de uma tela só continua sendo avaliado.
+   */
+  readonly textoVisivel?: string
 }
 
 /**
@@ -203,7 +216,10 @@ export function analisarPrototipo(
 
   // (4) Estados exigidos pela spec. `pergunta`, nunca bloqueio: um protótipo de uma tela só pode
   // legitimamente não ter estado de bloqueio, e cabe ao PI dizer isso.
-  const texto = normalizar([...render.jornadas].join(' '))
+  // A busca é no **texto visível inteiro**, não só nas jornadas: o estado mora no corpo de um
+  // cartão, não num heading, e procurá-lo entre os títulos acusava falta do que a tela mostra
+  // (issue #332). As jornadas entram junto porque um render antigo não traz `textoVisivel`.
+  const texto = normalizar([render.textoVisivel ?? '', ...render.jornadas].join(' '))
   for (const estado of ESTADOS_EXIGIDOS) {
     if (SINAIS_DO_ESTADO[estado].some((sinal) => texto.includes(normalizar(sinal)))) continue
     achados.push({
