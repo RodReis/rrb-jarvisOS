@@ -422,15 +422,30 @@ export async function getChecksForHead(
     )
   )
 
-  const checks: CheckNormalizado[] = lista(resposta.corpo, 'check_runs').map((c) => ({
-    nome: texto(c, 'name') ?? '',
-    headSha: texto(c, 'head_sha') ?? '',
-    status: (texto(c, 'status') ?? 'queued') as CheckNormalizado['status'],
-    ...(texto(c, 'conclusion') === undefined
-      ? {}
-      : { conclusao: texto(c, 'conclusion') as NonNullable<CheckNormalizado['conclusao']> }),
-    ...(texto(c, 'html_url') === undefined ? {} : { url: texto(c, 'html_url') as string })
-  }))
+  const checks: CheckNormalizado[] = lista(resposta.corpo, 'check_runs').map((c) => {
+    // O emissor mora em `app.slug`, aninhado, e a tentativa em `check_suite.run_attempt`. Lidos
+    // com `?.` e conferidos por tipo: resposta de forma inesperada vira campo ausente, nunca uma
+    // exceção que derruba a consulta inteira — a mesma leitura defensiva de `lista` e `texto`.
+    // Ausente é ausente: `recusaDaEvidencia` não bloqueia por falta de dado, e as três checagens
+    // de sempre continuam valendo.
+    const app = (c as { app?: unknown }).app
+    const emissor = typeof app === 'object' && app !== null ? texto(app, 'slug') : undefined
+    const suite = (c as { check_suite?: unknown }).check_suite
+    const tentativa =
+      typeof suite === 'object' && suite !== null ? numero(suite, 'run_attempt') : undefined
+
+    return {
+      nome: texto(c, 'name') ?? '',
+      headSha: texto(c, 'head_sha') ?? '',
+      status: (texto(c, 'status') ?? 'queued') as CheckNormalizado['status'],
+      ...(texto(c, 'conclusion') === undefined
+        ? {}
+        : { conclusao: texto(c, 'conclusion') as NonNullable<CheckNormalizado['conclusao']> }),
+      ...(texto(c, 'html_url') === undefined ? {} : { url: texto(c, 'html_url') as string }),
+      ...(emissor === undefined ? {} : { emissor }),
+      ...(tentativa === undefined ? {} : { tentativa })
+    }
+  })
 
   return {
     data: checks,

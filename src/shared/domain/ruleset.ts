@@ -58,3 +58,24 @@ export function rulesetMudou(anterior: SnapshotDeRuleset, atual: RegraObservada)
 
   return antes.length !== agora.length || antes.some((contexto, i) => contexto !== agora[i])
 }
+
+/**
+ * A base avançou desde que a pipeline decidiu integrar? (SPEC-Pipeline-01, critério 12)
+ *
+ * `rulesetMudou` cobre metade do critério: a **regra** da origem mudou. Esta função cobre a outra
+ * metade, que não tinha nada: a **base** recebeu commits.
+ *
+ * Por que importa, e por que não basta o `headShaEsperado` do gate. O gate já recusa head do PR
+ * diferente do verificado, mas o head do PR não se move quando alguém mergeia outro PR na base. O
+ * CI verde continua verde, e continua descrevendo o código contra uma base que não existe mais —
+ * o caso clássico de dois PRs que passam sozinhos e quebram juntos.
+ *
+ * `strict` na proteção da branch faz a origem exigir o branch atualizado, e aí ela mesma recusa.
+ * Sem `strict`, ninguém recusa, e é justamente aí que esta verificação é a única que existe.
+ *
+ * **Não decide o que fazer.** Devolve o fato; reconciliar é do `EntregaService`, que tem como
+ * atualizar o branch e revalidar. Uma função pura que "resolvesse" precisaria de rede.
+ */
+export function baseAvancou(baseShaObservado: string, baseShaAgora: string): boolean {
+  return baseShaObservado !== baseShaAgora
+}

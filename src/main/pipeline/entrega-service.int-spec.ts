@@ -52,6 +52,15 @@ const REPO = 'projeto-alvo'
 const PR = 7
 const SHA_HEAD = 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0'
 const SHA_MERGE = 'f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3f2e1'
+/**
+ * O commit da branch-base, **distinto** do head da fatia.
+ *
+ * Antes, o dublê devolvia `origem.headSha` para qualquer ref, base inclusive. Isso fazia a
+ * reconferência da base (critério 12) comparar um valor consigo mesmo e concordar sempre — dublê
+ * complacente, que aprova a garantia sem que ela exista. Base e head são commits diferentes na
+ * vida real, e agora também aqui.
+ */
+const SHA_BASE = '1122334455667788990011223344556677889900'
 
 const COMANDOS = {
   test: ['npm', 'test'],
@@ -73,6 +82,8 @@ interface EstadoDaOrigem {
     conclusao?: string
   }[]
   headSha: string
+  /** O commit da branch-base. Avançá-lo entre a avaliação e o merge é o cenário do critério 12. */
+  baseSha: string
   merged: boolean
   /** O merge respondeu 200 mas a origem não confirma? É o cenário do critério 7. */
   mergeSemConfirmacao: boolean
@@ -96,6 +107,14 @@ let construcao: {
   bloqueio?: Record<string, string>
 }
 let pushes: string[]
+/**
+ * Gancho para o teste intervir **durante** a sequência de chamadas à origem.
+ *
+ * Necessário porque o critério 12 é sobre uma mudança que acontece *entre* duas chamadas: a base
+ * avança depois da avaliação e antes do merge. Montar o estado antes de `entregar` não reproduz
+ * isso — o valor já estaria mudado quando o gate leu, e a comparação concordaria consigo mesma.
+ */
+let chamadaExtra: ((operation: string, input: Record<string, unknown>) => void) | undefined
 
 function chamadasDe(operation: string): { input: Record<string, unknown> }[] {
   return chamadas.filter((c) => c.operation === operation)
@@ -112,6 +131,7 @@ function connectorFalso(): { call: (r: ConnectorRequest) => Promise<ConnectorOut
     call: async (request: ConnectorRequest): Promise<ConnectorOutcome> => {
       const input = (request.input ?? {}) as Record<string, unknown>
       chamadas.push({ operation: request.operation, input })
+      chamadaExtra?.(request.operation, input)
 
       const ok = (data: unknown): ConnectorOutcome =>
         ({
@@ -141,7 +161,11 @@ function connectorFalso(): { call: (r: ConnectorRequest) => Promise<ConnectorOut
           return ok({ branch: input.branch, revisoesExigidas: input.revisoesExigidas })
 
         case GITHUB_OPERATIONS.getCommitSha:
-          return ok({ ref: input.ref, sha: origem.headSha })
+          // A ref decide qual SHA volta: base e branch da fatia são commits diferentes.
+          return ok({
+            ref: input.ref,
+            sha: input.ref === 'main' ? origem.baseSha : origem.headSha
+          })
 
         // O adapter devolve o **array**, não um envelope. Ver o cabeçalho deste arquivo.
         case GITHUB_OPERATIONS.getChecksForHead:
@@ -269,6 +293,7 @@ beforeEach(() => {
   limpezas = []
 
   chamadas = []
+  chamadaExtra = undefined
   pushes = []
   achados = []
   autonomo = true
@@ -282,6 +307,7 @@ beforeEach(() => {
       { nome: NOME_DO_JOB_DE_CI, headSha: SHA_HEAD, status: 'completed', conclusao: 'success' }
     ],
     headSha: SHA_HEAD,
+    baseSha: SHA_BASE,
     merged: false,
     mergeSemConfirmacao: false
   }
@@ -935,5 +961,117 @@ describe('EntregaService — workflow a partir do perfil (SPEC-Pipeline-01, crit
     const yml = readFileSync(caminho, 'utf8')
     expect(yml).toContain('runs-on: ubuntu-latest')
     expect(yml).not.toContain('windows-latest')
+  })
+})
+
+describe('EntregaService — a base avançou entre a avaliação e o merge (critério 12)', () => {
+  it('base que avança depois da avaliação bloqueia em vez de mergear', async () => {
+    // O head do PR **não se move** quando alguém mergeia outro PR na base: o CI continua verde
+    // descrevendo o código contra uma base que já não existe. Sem `strict` na proteção, ninguém
+    // recusa, e esta reconferência é a única que existe.
+    let leiturasDaBase = 0
+    const original = origem.baseSha
+    chamadaExtra = (operation, input) => {
+      if (operation === GITHUB_OPERATIONS.getCommitSha && input.ref === 'main') {
+        leiturasDaBase += 1
+        // A primeira leitura é a da avaliação; entre ela e o merge, alguém mergeou na base.
+        if (leiturasDaBase >= 2) origem.baseSha = SHA_MERGE
+      }
+    }
+
+    const r = await montar().entregar(pedido())
+
+    expect(r.estadoFinal).toBe('BLOCKED')
+    expect(r.bloqueio?.causa).toBe('base-avancou')
+    expect(r.bloqueio?.mensagem).toContain(original.slice(0, 12))
+    // O ponto: nada foi mergeado.
+    expect(chamadasDe(GITHUB_OPERATIONS.squashMerge)).toHaveLength(0)
+  })
+
+  it('base estável mergeia normalmente', async () => {
+    const r = await montar().entregar(pedido())
+
+    expect(r.estadoFinal).toBe('MERGED')
+    expect(chamadasDe(GITHUB_OPERATIONS.squashMerge)).toHaveLength(1)
+  })
+
+  it('base ilegível não vira bloqueio nem afirmação de que nada mudou', async () => {
+    // "Não sei" não pode virar "não mudou" (a comparação concordaria consigo mesma), e também
+    // não vira bloqueio: a §7 manda preservar o PR e explicar a limitação.
+    chamadaExtra = (operation, input) => {
+      if (operation === GITHUB_OPERATIONS.getCommitSha && input.ref === 'main') {
+        throw new Error('sem permissão de leitura na base')
+      }
+    }
+
+    const r = await montar().entregar(pedido())
+
+    expect(r.estadoFinal).toBe('MERGED')
+  })
+})
+
+describe('EntregaService — adoção por manifesto, não por cabeçalho (critério 10)', () => {
+  it('preserva edição humana feita no arquivo que a pipeline gerou', async () => {
+    // O caso que a heurística do cabeçalho da vertical 1 errava: o arquivo é nosso, alguém o
+    // editou e **manteve** a primeira linha. "Começa com a nossa marca" respondia "pode
+    // reescrever", e a edição sumia. Com manifesto, a pergunta passa a ser se o conteúdo ainda é
+    // o que registramos.
+    const caminho = join(worktree, CAMINHO_DO_WORKFLOW)
+    const perfil = perfilNodeEmWindows('alvo')
+
+    await montar().entregar({ ...pedido(), perfilDeCi: perfil })
+    const gerado = readFileSync(caminho, 'utf8')
+
+    const editado = `${gerado}      - name: passo do time
+        run: make extra
+`
+    writeFileSync(caminho, editado, 'utf8')
+
+    await montar().entregar({ ...pedido(), perfilDeCi: perfil })
+
+    expect(readFileSync(caminho, 'utf8')).toBe(editado)
+  })
+
+  it('atualiza o arquivo intocado quando o perfil muda', async () => {
+    const caminho = join(worktree, CAMINHO_DO_WORKFLOW)
+
+    await montar().entregar({ ...pedido(), perfilDeCi: perfilNodeEmWindows('alvo') })
+    const primeiro = readFileSync(caminho, 'utf8')
+
+    await montar().entregar({ ...pedido(), perfilDeCi: perfilPythonEmWindows('alvo') })
+    const segundo = readFileSync(caminho, 'utf8')
+
+    expect(segundo).not.toBe(primeiro)
+    expect(segundo).toContain('pip install -r requirements.txt')
+  })
+
+  it('grava o manifesto ao lado do workflow, para a procedência viajar com o repositório', async () => {
+    await montar().entregar({ ...pedido(), perfilDeCi: perfilNodeEmWindows('alvo') })
+
+    const manifesto = join(worktree, '.github', 'ci-workflow-manifesto.json')
+    expect(existsSync(manifesto)).toBe(true)
+    const lido = JSON.parse(readFileSync(manifesto, 'utf8')) as Record<string, unknown>
+    expect(lido.profileId).toBe('alvo')
+    expect(typeof lido.hashDoConteudo).toBe('string')
+  })
+
+  it('manifesto corrompido é tratado como ausência: preserva em vez de derrubar a entrega', async () => {
+    const caminho = join(worktree, CAMINHO_DO_WORKFLOW)
+    const perfil = perfilNodeEmWindows('alvo')
+
+    await montar().entregar({ ...pedido(), perfilDeCi: perfil })
+    const gerado = readFileSync(caminho, 'utf8')
+    writeFileSync(join(worktree, '.github', 'ci-workflow-manifesto.json'), '{ nao é json', 'utf8')
+    writeFileSync(
+      caminho,
+      `${gerado}# alterado
+`,
+      'utf8'
+    )
+
+    const r = await montar().entregar({ ...pedido(), perfilDeCi: perfil })
+
+    expect(r.estadoFinal).toBe('MERGED')
+    expect(readFileSync(caminho, 'utf8')).toContain('# alterado')
   })
 })
