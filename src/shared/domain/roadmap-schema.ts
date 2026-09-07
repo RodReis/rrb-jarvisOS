@@ -355,7 +355,26 @@ export function lerSpecDoModelo(bruto: string, fatiaId: string): SpecGerada | un
 
   const spec = raiz['spec']
   if (typeof spec !== 'object' || spec === null) return undefined
-  const s = spec as Record<string, unknown>
+
+  /*
+   * O envelope duplicado, `{"spec":{"spec":{...}}}` (issue #337).
+   *
+   * A SPEC é a **única** saída da jornada cujo topo é um objeto; todas as outras são listas. Com
+   * `--json-schema`, o CLI pede o documento pela ferramenta `StructuredOutput`, cujo argumento
+   * já é o envelope `{"spec": ...}` — e o system também mostra o envelope, porque os outros
+   * providers só têm o texto. O modelo cumpre os dois e escreve o envelope do system dentro do
+   * argumento da ferramenta. Numa lista isso não acontece: `{"mvps":[...]}` dentro de `mvps`
+   * seria um objeto onde o schema pede array, e o CLI recusa antes de sair.
+   *
+   * A saída medida no banco do PI trazia a SPEC inteira, com os 5.612 tokens já pagos, e três
+   * tentativas foram descartadas aqui por um nível a mais. Desaninhar é o que separa "o modelo
+   * não conseguiu" de "o documento chegou e nós o jogamos fora".
+   */
+  const aninhado = (spec as Record<string, unknown>)['spec']
+  const s = (typeof aninhado === 'object' && aninhado !== null ? aninhado : spec) as Record<
+    string,
+    unknown
+  >
 
   const fluxo = listaDeTexto(s['fluxo'])
   const regras = listaDeTexto(s['regras'])
