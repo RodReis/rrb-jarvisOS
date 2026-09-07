@@ -14,7 +14,7 @@ import type {
   SpecGerada
 } from '@shared/domain/roadmap-gerado'
 import { perguntasSemResposta } from '@shared/domain/roadmap-gerado'
-import { Badge, Button, EmptyState, InlineAlert, LoadingState, Separator } from '@design/ui'
+import { Badge, Button, EmptyState, InlineAlert, LoadingState, TabPanel, Tabs } from '@design/ui'
 import { log } from '../lib/log'
 
 /**
@@ -81,6 +81,14 @@ const CHAVE_DA_ORIGEM: Readonly<Record<OrigemDoRoadmap, string>> = {
  * `pacote-ausente`, `bloqueado-sem-rota`, `sem-contexto`, `mvp-nao-escolhido` e `mvp-inelegivel`
  * são **`warn`, não `err`**: nada quebrou, falta um passo — e os cinco dizem qual.
  */
+/**
+ * Os valores das abas (#333). Constantes e não literais soltos: cada uma é comparada no gatilho
+ * e no painel, e um erro de digitação abriria a tela numa aba que não existe.
+ */
+const ABA_MVPS = 'mvps'
+const ABA_SPEC = 'spec'
+const ABA_GATES = 'gates'
+
 const TOM_DA_GERACAO: Readonly<Record<ResultadoDoRoadmap, 'ok' | 'err' | 'warn'>> = {
   gerado: 'ok',
   'projeto-inexistente': 'err',
@@ -352,34 +360,68 @@ export function RoadmapDoProjeto({
         <EmptyState titulo={t('roadmap.vazio')} descricao={t('roadmap.vazioDescricao')} />
       ) : (
         <>
-          <MapaDosMvps
-            roadmap={roadmap}
-            elegiveis={elegiveis}
-            ocupado={trabalhando}
-            escolhendo={ocupado === 'escolhendo'}
-            onEscolher={(id) => void escolher(id)}
-          />
+          {/*
+            **As abas** (#333). Aqui elas não separam documentos, e sim **etapas do trabalho**:
+            escolher o MVP, ler a SPEC que nasceu dele, aprovar os gates. Os três viviam
+            empilhados na mesma coluna, e cada um é uma tarefa distinta.
 
-          {roadmap.spec !== undefined && (
-            <SpecDaFatia
-              spec={roadmap.spec}
-              mvp={escolhido}
-              ocupado={trabalhando}
-              onResponder={(perguntaId, resposta) => void responder(perguntaId, resposta)}
-            />
-          )}
+            **Abre nos MVPs**, que é onde a etapa começa: sem MVP escolhido não há SPEC, e sem
+            SPEC os gates não têm o que aprovar. A ordem das abas é a ordem do trabalho.
+          */}
+          <Tabs
+            padrao={ABA_MVPS}
+            rotulo={t('roadmap.abasRotulo')}
+            abas={[
+              { valor: ABA_MVPS, rotulo: t('roadmap.abaMvps') },
+              { valor: ABA_SPEC, rotulo: t('roadmap.abaSpec') },
+              { valor: ABA_GATES, rotulo: t('roadmap.abaGates') }
+            ]}
+          >
+            <TabPanel valor={ABA_MVPS}>
+              <MapaDosMvps
+                roadmap={roadmap}
+                elegiveis={elegiveis}
+                ocupado={trabalhando}
+                escolhendo={ocupado === 'escolhendo'}
+                onEscolher={(id) => void escolher(id)}
+              />
+            </TabPanel>
 
-          <Separator />
+            <TabPanel valor={ABA_SPEC}>
+              {roadmap.spec === undefined ? (
+                /* A aba existe mesmo sem SPEC, e diz o que falta: escondê-la faria o PI procurar
+                   uma etapa que a trilha promete. */
+                <EmptyState
+                  titulo={t('roadmap.specAusente')}
+                  descricao={t('roadmap.specAusenteDescricao')}
+                />
+              ) : (
+                <SpecDaFatia
+                  spec={roadmap.spec}
+                  mvp={escolhido}
+                  ocupado={trabalhando}
+                  onResponder={(perguntaId, resposta) => void responder(perguntaId, resposta)}
+                />
+              )}
+            </TabPanel>
 
-          <CentroDeAprovacoes
-            projectId={projectId}
-            workspace={workspace}
-            aprovacoes={aprovacoes}
-            desabilitado={trabalhando}
-            aprovando={ocupado === 'aprovando'}
-            onAprovar={(gate) => void aprovar(gate)}
-          />
+            <TabPanel valor={ABA_GATES}>
+              <CentroDeAprovacoes
+                projectId={projectId}
+                workspace={workspace}
+                aprovacoes={aprovacoes}
+                desabilitado={trabalhando}
+                aprovando={ocupado === 'aprovando'}
+                onAprovar={(gate) => void aprovar(gate)}
+              />
+            </TabPanel>
+          </Tabs>
 
+          {/*
+            O desfecho da aprovação fica **fora das abas**: ele é a resposta ao clique que o PI
+            acabou de dar, e escondê-lo atrás da aba que ele talvez já tenha deixado faria a
+            recusa passar despercebida.
+          */}
           {aprovacao !== null && (
             <InlineAlert tom={TOM_DA_APROVACAO[aprovacao.reason]} titulo={aprovacao.mensagem}>
               {/*

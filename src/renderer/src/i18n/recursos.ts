@@ -285,6 +285,18 @@ export const RECURSOS = {
       },
       prd: {
         titulo: 'PRD, Landscape e Convention',
+        // As abas (#333). Mesma forma da arquitetura, com uma diferença: aqui a contradição
+        // trava o aceite, então a aba precisa dizer que o bloqueio é real.
+        abasRotulo: 'Documentos do pacote estrutural',
+        abaRevisar: 'A revisar',
+        abaRevisarVazia: 'Nada a revisar',
+        revisarTitulo: 'O que pede a sua decisão antes do aceite',
+        revisarDescricao:
+          'Reunido aqui para você não precisar procurar documento por documento. As contradições travam o aceite; as afirmações propostas, não — mas nenhuma delas veio de você.',
+        revisarVazio: 'Nada a revisar',
+        revisarVazioDescricao:
+          'A IA não inferiu nada por conta própria e nada no pacote se contradiz. Leia os documentos e aceite quando estiver de acordo.',
+        revisarPropostosTitulo: 'Afirmações propostas pela IA',
         descricao:
           'O que o app derivou do brief aceito de {{nome}}. Cada afirmação diz o que a sustenta; corte o que não serve antes de aceitar.',
         carregando: 'Carregando os documentos…',
@@ -488,6 +500,15 @@ export const RECURSOS = {
       },
       roadmap: {
         titulo: 'Roadmap e aprovações',
+        // As abas (#333). Aqui os rótulos são etapas do trabalho, não documentos: escolher o
+        // MVP, ler a SPEC que nasceu dele, e aprovar os gates.
+        abasRotulo: 'Etapas do roadmap',
+        abaMvps: 'MVPs',
+        abaSpec: 'SPEC da fatia',
+        abaGates: 'Aprovações',
+        specAusente: 'Nenhuma SPEC ainda',
+        specAusenteDescricao:
+          'A SPEC da primeira fatia nasce quando você escolhe o MVP que entra na fila. Escolha um na aba MVPs.',
         descricao:
           'Os MVPs de {{nome}}, propostos a partir do PRD aceito e da arquitetura aprovada. Gerar propõe; escolher e aprovar são seus.',
         carregando: 'Carregando o roadmap…',
@@ -1012,6 +1033,16 @@ export const RECURSOS = {
       },
       prd: {
         titulo: 'PRD, Landscape and Convention',
+        abasRotulo: 'Structural package documents',
+        abaRevisar: 'To review',
+        abaRevisarVazia: 'Nothing to review',
+        revisarTitulo: 'What needs your decision before accepting',
+        revisarDescricao:
+          'Gathered here so you do not have to look document by document. Contradictions block acceptance; proposed statements do not — but none of them came from you.',
+        revisarVazio: 'Nothing to review',
+        revisarVazioDescricao:
+          'The AI inferred nothing on its own and nothing in the package contradicts itself. Read the documents and accept when you agree.',
+        revisarPropostosTitulo: 'Statements proposed by the AI',
         descricao:
           'What the app derived from the accepted brief of {{nome}}. Every statement says what backs it; cut what does not fit before accepting.',
         carregando: 'Loading the documents…',
@@ -1192,6 +1223,13 @@ export const RECURSOS = {
       },
       roadmap: {
         titulo: 'Roadmap and approvals',
+        abasRotulo: 'Roadmap stages',
+        abaMvps: 'MVPs',
+        abaSpec: 'Slice SPEC',
+        abaGates: 'Approvals',
+        specAusente: 'No SPEC yet',
+        specAusenteDescricao:
+          'The first slice SPEC is born when you choose the MVP that enters the queue. Choose one in the MVPs tab.',
         descricao:
           'The MVPs for {{nome}}, proposed from the accepted PRD and the approved architecture. Generating proposes; choosing and approving are yours.',
         carregando: 'Loading the roadmap…',

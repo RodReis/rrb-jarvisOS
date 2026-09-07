@@ -15,10 +15,21 @@ import type {
 import {
   SECOES_DO_PRD,
   afirmacoesDoDocumento,
+  pendenciasDeRevisaoDoPrd,
   podeAceitarPrd,
-  propostosDoDocumento
+  propostosPorDocumentoDoPrd
 } from '@shared/domain/prd'
-import { Button, EmptyState, Field, InlineAlert, Input, LoadingState } from '@design/ui'
+import {
+  Button,
+  Disclosure,
+  EmptyState,
+  Field,
+  InlineAlert,
+  Input,
+  LoadingState,
+  TabPanel,
+  Tabs
+} from '@design/ui'
 import type { Resposta, RespostaOutcome, VistaDoWizard } from '@shared/domain/wizard'
 import type { AndamentoDaEtapa, EtapaDaGeracao } from '@shared/domain/geracao'
 import { aplicarEtapa } from '@shared/domain/geracao'
@@ -80,6 +91,14 @@ interface PrdDoProjetoProps {
 }
 
 /** O rótulo de cada origem. **Dado, não lógica** — e o texto é o sinal, não a cor. */
+/**
+ * O valor da aba que reúne o que pede decisão (#333).
+ *
+ * Constante e não literal solto: é comparada em três lugares, e um erro de digitação num deles
+ * abriria a tela numa aba que não existe. Sublinhados para nunca colidir com nome de documento.
+ */
+const ABA_REVISAR = '__revisar__'
+
 const CHAVE_DA_ORIGEM: Readonly<Record<OrigemDoPrd, string>> = {
   brief: 'prd.origem.brief',
   decisao: 'prd.origem.decisao',
@@ -201,7 +220,6 @@ function DocumentoDoPrd({
 }): React.JSX.Element {
   const { t } = useTranslation()
   const afirmacoes = afirmacoesDoDocumento(prd, documento)
-  const inferidos = propostosDoDocumento(prd, documento)
   const bloqueio = documento === 'LANDSCAPE' ? prd.bloqueioDoLandscape : undefined
 
   return (
@@ -231,34 +249,14 @@ function DocumentoDoPrd({
       )}
 
       {/*
-        Os propostos do documento, como conjunto (§ Gate). Fica **acima** das seções porque é o
-        que o PI precisa julgar antes de aceitar — descobri-los lendo o documento inteiro seria
-        pedir que ele fizesse a varredura que esta lista faz por ele.
-      */}
-      {inferidos.length > 0 && (
-        <section
-          data-jos-propostos={documento}
-          className="flex flex-col gap-1 rounded-[var(--jos-raio-card)] border border-[rgba(var(--jos-borda-rgb),0.16)] bg-[var(--jos-cor-superficie-elevada)] p-4"
-        >
-          <h5 className="text-[length:var(--jos-texto-corpo)] font-[var(--jos-peso-semi)] text-[var(--jos-cor-texto)]">
-            {t('prd.propostosTitulo', { count: inferidos.length })}
-          </h5>
-          <p className="max-w-[62ch] text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-secundario)]">
-            {t('prd.propostosDescricao')}
-          </p>
+        **O bloco de propostos saiu daqui** (#333), pela mesma razão da arquitetura: ele repetia,
+        acima das seções, as mesmas afirmações que apareciam abaixo no corpo — a mesma frase duas
+        vezes na mesma tela, com o botão `Cortar` nas duas.
 
-          <ul className="mt-1 divide-y divide-[rgba(var(--jos-borda-rgb),0.10)]">
-            {inferidos.map((a) => (
-              <LinhaDaAfirmacao
-                key={a.id}
-                afirmacao={a}
-                onCortar={() => onCortar(a.id)}
-                ocupado={ocupado}
-              />
-            ))}
-          </ul>
-        </section>
-      )}
+        As propostas continuam **no corpo**, onde se leem no contexto da seção que as gerou, e
+        agora também na aba "A revisar", que as reúne para o PI julgar sem procurar documento por
+        documento.
+      */}
 
       {/* Seção sem afirmação não vira cabeçalho: o documento mostra o que tem. */}
       {SECOES_DO_PRD[documento].map((secao) => {
@@ -291,6 +289,141 @@ function DocumentoDoPrd({
         </p>
       )}
     </section>
+  )
+}
+
+/**
+ * A aba **A revisar** do PRD (issue #333).
+ *
+ * Espelha a da arquitetura, com uma diferença que muda o desenho: aqui as **contradições travam
+ * o aceite**. Elas vêm primeiro e mantêm o alerta em `warn` com o botão que abre o pop-up —
+ * enquanto houver contradição pendente, o botão da trilha recusa o aceite e esta é a única saída.
+ *
+ * As propostas vêm depois, agrupadas por documento e colapsadas: elas não travam nada, e abrir
+ * as três de uma vez devolveria a rolagem que as abas tiraram.
+ */
+function OQuePedeDecisaoNoPrd({
+  prd,
+  vista,
+  onCortar,
+  onResponder,
+  ocupado
+}: {
+  readonly prd: PrdRegistrado
+  readonly vista: VistaDoWizard | null
+  readonly onCortar: (afirmacaoId: string) => void
+  readonly onResponder: () => void
+  readonly ocupado: boolean
+}): React.JSX.Element {
+  const { t } = useTranslation()
+  const grupos = propostosPorDocumentoDoPrd(prd)
+
+  if (prd.contradicoes.length === 0 && grupos.length === 0) {
+    return <EmptyState titulo={t('prd.revisarVazio')} descricao={t('prd.revisarVazioDescricao')} />
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-1">
+        <h4 className="text-[length:var(--jos-texto-realce)] font-[var(--jos-peso-semi)] text-[var(--jos-cor-texto)]">
+          {t('prd.revisarTitulo')}
+        </h4>
+        <p className="max-w-[62ch] text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto-secundario)]">
+          {t('prd.revisarDescricao')}
+        </p>
+      </div>
+
+      {/*
+        As contradições (critério 6) **primeiro, e sem colapsar**: são o único bloqueio real do
+        gate. Escondê-las atrás de um bloco fechado faria o PI procurar por que o aceite recusa.
+      */}
+      {prd.contradicoes.length > 0 && (
+        <section
+          data-jos-contradicoes
+          data-testid="prd-contradicoes"
+          className="flex flex-col gap-2"
+        >
+          <InlineAlert
+            tom="warn"
+            titulo={t('prd.contradicoesTitulo', { count: prd.contradicoes.length })}
+          >
+            {vista?.estado.tipo === 'concluido'
+              ? t('prd.contradicoesRespondidas')
+              : t('prd.contradicoesDescricao')}
+          </InlineAlert>
+
+          <ul className="flex flex-col gap-3">
+            {prd.contradicoes.map((c) => (
+              <li
+                key={c.id}
+                data-jos-contradicao={c.id}
+                className="flex flex-col gap-1 rounded-[var(--jos-raio-card)] border border-[rgba(var(--jos-borda-rgb),0.16)] p-4"
+              >
+                <p className="text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto)]">
+                  {c.enunciado}
+                </p>
+                <p className="text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-secundario)]">
+                  {t('prd.recomendacao', { texto: recomendacaoDaContradicao(c) })}
+                </p>
+              </li>
+            ))}
+          </ul>
+
+          {vista?.estado.tipo === 'pergunta' && (
+            <div>
+              <Button
+                variante="primaria"
+                onClick={onResponder}
+                desabilitado={ocupado}
+                iconeInicial={<MessagesSquare aria-hidden="true" className="size-4" />}
+              >
+                {t('prd.responderContradicoes')}
+              </Button>
+            </div>
+          )}
+        </section>
+      )}
+
+      {grupos.length > 0 && (
+        <section data-jos-propostos-do-pacote className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <h5 className="text-[length:var(--jos-texto-corpo)] font-[var(--jos-peso-semi)] text-[var(--jos-cor-texto)]">
+              {t('prd.revisarPropostosTitulo')}
+            </h5>
+            {/* O aviso que não pode sumir: sem ele, uma inferência da IA se lê como fato. */}
+            <p className="max-w-[62ch] text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-secundario)]">
+              {t('prd.propostosDescricao')}
+            </p>
+          </div>
+
+          {/* Um bloco por documento, só o primeiro aberto: reunir sem recriar a pilha. */}
+          {grupos.map(({ documento, propostos }, indice) => (
+            <div key={documento} data-jos-propostos={documento}>
+              <Disclosure
+                abertoPorPadrao={indice === 0}
+                rotulo={t(`prd.documentos.${documento}` as `prd.documentos.${DocumentoDoPacote}`)}
+                resumo={
+                  <span className="font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] uppercase tracking-[2px] text-[var(--jos-cor-texto-suave)]">
+                    {propostos.length}
+                  </span>
+                }
+              >
+                <ul className="divide-y divide-[rgba(var(--jos-borda-rgb),0.10)]">
+                  {propostos.map((a) => (
+                    <LinhaDaAfirmacao
+                      key={a.id}
+                      afirmacao={a}
+                      onCortar={() => onCortar(a.id)}
+                      ocupado={ocupado}
+                    />
+                  ))}
+                </ul>
+              </Disclosure>
+            </div>
+          ))}
+        </section>
+      )}
+    </div>
   )
 }
 
@@ -535,6 +668,14 @@ export function PrdDoProjeto({
 
   if (carregando) return <LoadingState rotulo={t('prd.carregando')} />
 
+  /*
+   * Quantos itens pedem decisão: propostos mais contradições (#333).
+   *
+   * A contradição entra porque **trava o aceite** — omiti-la anunciaria "nada a revisar" numa
+   * tela que recusa aceitar. É a diferença entre este contador e o da arquitetura.
+   */
+  const pendencias = prd === null ? 0 : pendenciasDeRevisaoDoPrd(prd)
+
   return (
     <div className="flex flex-col gap-5" aria-labelledby={`prd-${projectId}`}>
       <div className="flex flex-col gap-1">
@@ -625,66 +766,54 @@ export function PrdDoProjeto({
       ) : (
         <>
           {/*
-            As contradições (critério 6). Ficam no **topo** dos documentos e travam o aceite: são
-            o único bloqueio real do gate, e o PI precisa vê-las antes de ler o que elas
-            contradizem. Cada uma traz a pergunta e a recomendação — nunca a correção aplicada.
+            **As abas** (#333), mesma forma da arquitetura: um painel por documento, mais "A
+            revisar" reunindo o que pede decisão. O DS esvazia o painel inativo, então a altura
+            cai de verdade.
+
+            **"A revisar" abre primeiro quando há pendência.** No PRD isso importa mais que na
+            arquitetura: contradição **trava o aceite**, e a tela que abrisse no documento faria o
+            PI descobrir o bloqueio só ao tentar aceitar.
           */}
-          {prd.contradicoes.length > 0 && (
-            <section
-              data-jos-contradicoes
-              data-testid="prd-contradicoes"
-              className="flex flex-col gap-2"
-            >
-              <InlineAlert
-                tom="warn"
-                titulo={t('prd.contradicoesTitulo', { count: prd.contradicoes.length })}
-              >
-                {vista?.estado.tipo === 'concluido'
-                  ? t('prd.contradicoesRespondidas')
-                  : t('prd.contradicoesDescricao')}
-              </InlineAlert>
+          <Tabs
+            padrao={pendencias > 0 ? ABA_REVISAR : DOCUMENTOS_DO_PACOTE[0]}
+            rotulo={t('prd.abasRotulo')}
+            abas={[
+              {
+                valor: ABA_REVISAR,
+                // O número no rótulo, não num badge: texto atravessa leitor de tela e escala de
+                // cinza. Sem pendência o rótulo muda, porque "(0)" anuncia o que não existe.
+                rotulo:
+                  pendencias > 0
+                    ? `${t('prd.abaRevisar')} (${pendencias})`
+                    : t('prd.abaRevisarVazia')
+              },
+              ...DOCUMENTOS_DO_PACOTE.map((documento) => ({
+                valor: documento,
+                rotulo: t(`prd.documentos.${documento}` as `prd.documentos.${DocumentoDoPacote}`)
+              }))
+            ]}
+          >
+            <TabPanel valor={ABA_REVISAR}>
+              <OQuePedeDecisaoNoPrd
+                prd={prd}
+                vista={vista}
+                onCortar={(id) => void cortar(id)}
+                onResponder={() => setRespondendo(true)}
+                ocupado={ocupado}
+              />
+            </TabPanel>
 
-              <ul className="flex flex-col gap-3">
-                {prd.contradicoes.map((c) => (
-                  <li
-                    key={c.id}
-                    data-jos-contradicao={c.id}
-                    className="flex flex-col gap-1 rounded-[var(--jos-raio-card)] border border-[rgba(var(--jos-borda-rgb),0.16)] p-4"
-                  >
-                    <p className="max-w-[58ch] text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto)]">
-                      {c.enunciado}
-                    </p>
-                    <p className="max-w-[58ch] text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-secundario)]">
-                      {t('prd.recomendacao', { texto: recomendacaoDaContradicao(c) })}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-
-              {vista?.estado.tipo === 'pergunta' && (
-                <div>
-                  <Button
-                    variante="primaria"
-                    onClick={() => setRespondendo(true)}
-                    desabilitado={ocupado}
-                    iconeInicial={<MessagesSquare aria-hidden="true" className="size-4" />}
-                  >
-                    {t('prd.responderContradicoes')}
-                  </Button>
-                </div>
-              )}
-            </section>
-          )}
-
-          {DOCUMENTOS_DO_PACOTE.map((documento) => (
-            <DocumentoDoPrd
-              key={documento}
-              documento={documento}
-              prd={prd}
-              onCortar={(id) => void cortar(id)}
-              ocupado={ocupado}
-            />
-          ))}
+            {DOCUMENTOS_DO_PACOTE.map((documento) => (
+              <TabPanel key={documento} valor={documento}>
+                <DocumentoDoPrd
+                  documento={documento}
+                  prd={prd}
+                  onCortar={(id) => void cortar(id)}
+                  ocupado={ocupado}
+                />
+              </TabPanel>
+            ))}
+          </Tabs>
 
           {falhaNoAceite && (
             <InlineAlert tom="err" titulo={t('prd.aceiteFalhou')}>

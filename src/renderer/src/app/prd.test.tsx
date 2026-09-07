@@ -168,13 +168,15 @@ describe('termo de pesquisa (critério 3)', () => {
 })
 
 describe('documentos e origem', () => {
-  it('mostra os três documentos como um só gate', async () => {
+  it('mostra os três documentos como um só gate — uma aba cada', async () => {
     carregarPrd.mockResolvedValue(prd())
     montar()
 
-    expect(await screen.findByRole('heading', { name: 'PRD' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Landscape' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Convention' })).toBeInTheDocument()
+    // Continuam sendo um gate só: as três abas vivem no mesmo painel, com um aceite só no fim.
+    // O que mudou é que elas não se empilham mais numa coluna de cinco telas (#333).
+    expect(await screen.findByRole('tab', { name: 'PRD' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Landscape' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Convention' })).toBeInTheDocument()
   })
 
   it('a origem é dita em texto — legível sem depender de cor', async () => {
@@ -204,6 +206,9 @@ describe('documentos e origem', () => {
     )
     montar()
 
+    // A afirmação vive no Landscape: a aba dele é onde ela se lê.
+    await userEvent.click(await screen.findByRole('tab', { name: 'Landscape' }))
+
     expect(await screen.findByText('https://exemplo.dev/a')).toBeInTheDocument()
   })
 
@@ -220,15 +225,20 @@ describe('documentos e origem', () => {
 
     await screen.findAllByText('Inferido.')
 
-    // Duas ocorrências do mesmo proposto (lista de propostos + corpo do documento), e nenhuma
-    // para a afirmação ancorada no brief.
-    expect(screen.getAllByRole('button', { name: /Cortar a afirmação: Inferido/i })).toHaveLength(2)
+    /*
+     * **Este teste afirmava o defeito.** Ele esperava duas ocorrências do mesmo proposto — a
+     * lista acima das seções e o corpo do documento —, a mesma frase duas vezes com botão nas
+     * duas. Era metade da altura da etapa (#333).
+     *
+     * Agora cada aba mostra o proposto uma vez, e a afirmação ancorada no brief segue sem corte.
+     */
+    expect(screen.getAllByRole('button', { name: /Cortar a afirmação: Inferido/i })).toHaveLength(1)
     expect(
       screen.queryByRole('button', { name: /Cortar a afirmação: O produto organiza/i })
     ).toBeNull()
   })
 
-  it('os propostos aparecem como conjunto, no documento a que pertencem', async () => {
+  it('os propostos aparecem reunidos na aba "A revisar", agrupados por documento', async () => {
     carregarPrd.mockResolvedValue(
       prd({
         afirmacoes: [
@@ -243,9 +253,11 @@ describe('documentos e origem', () => {
     )
     montar()
 
-    const lista = await screen.findByText(/1 afirmações propostas pela IA/i)
-
-    expect(lista).toBeInTheDocument()
+    // A aba abre primeiro quando há pendência: é a resposta a "há algo a cortar aqui?", que
+    // antes exigia rolar a etapa inteira (#333).
+    const painel = await screen.findByRole('tabpanel')
+    expect(within(painel).getByText(/Afirmações propostas pela IA/i)).toBeInTheDocument()
+    expect(within(painel).getByText('Inferido no PRD.')).toBeInTheDocument()
   })
 
   it('cortar manda um id, não a lista do que sobra', async () => {
@@ -283,6 +295,10 @@ describe('bloqueio do Landscape (critério 4)', () => {
     carregarPrd.mockResolvedValue(COM_BLOQUEIO)
     montar()
 
+    // O bloqueio continua **dentro** do Landscape, e não num alerta global: é ali que a lacuna
+    // está, e é ali que mora a ação que a destrava.
+    await userEvent.click(await screen.findByRole('tab', { name: 'Landscape' }))
+
     expect(await screen.findByText(/Confirme um termo e gere de novo/i)).toBeInTheDocument()
   })
 
@@ -293,6 +309,100 @@ describe('bloqueio do Landscape (critério 4)', () => {
     await waitFor(() =>
       expect(screen.getByRole('button', { name: /Aceitar o PRD/i })).toBeEnabled()
     )
+  })
+})
+
+/**
+ * As abas do PRD (issue #333). Mesma forma da arquitetura, com uma diferença que estes testes
+ * fixam: **contradição conta como pendência**, porque ela trava o aceite.
+ */
+describe('as abas do pacote estrutural (issue #333)', () => {
+  const PROPOSTO = afirmacao({
+    id: 'p-9',
+    texto: 'Inferido pela IA.',
+    origem: 'proposto',
+    referencia: undefined
+  })
+
+  it('há uma aba por documento, mais a de revisão', async () => {
+    carregarPrd.mockResolvedValue(prd())
+    montar()
+
+    await screen.findByRole('tablist')
+    // PRD, Landscape, Convention + "A revisar".
+    expect(screen.getAllByRole('tab')).toHaveLength(4)
+  })
+
+  it('o contador aparece no rótulo — sem precisar entrar na aba', async () => {
+    carregarPrd.mockResolvedValue(prd({ afirmacoes: [afirmacao(), PROPOSTO] }))
+    montar()
+
+    expect(await screen.findByRole('tab', { name: 'A revisar (1)' })).toBeInTheDocument()
+  })
+
+  it('a contradição conta no contador — ela trava o aceite', async () => {
+    carregarPrd.mockResolvedValue(
+      prd({
+        afirmacoes: [afirmacao(), PROPOSTO],
+        contradicoes: [
+          {
+            id: 'c-1',
+            etapa: 'prd',
+            afirmacoes: ['a-1', 'p-9'],
+            titulo: 'Local ou nuvem',
+            enunciado: 'O produto é local ou na nuvem?',
+            opcoes: [
+              { id: 'a', rotulo: 'Local', impacto: 'Sem sync.' },
+              { id: 'b', rotulo: 'Nuvem', impacto: 'Exige conta.' }
+            ],
+            recomendada: 'a',
+            justificativa: 'Local, como o brief diz.',
+            aceitaTextoLivre: true,
+            delegavel: true
+          }
+        ]
+      })
+    )
+    montar()
+
+    // 1 proposto + 1 contradição. Omitir a contradição anunciaria "nada a revisar" numa tela que
+    // recusa aceitar — é o que separa este contador do da arquitetura, onde ajuste não trava.
+    expect(await screen.findByRole('tab', { name: 'A revisar (2)' })).toBeInTheDocument()
+  })
+
+  it('sem pendência o rótulo diz isso e a tela abre no primeiro documento', async () => {
+    carregarPrd.mockResolvedValue(prd())
+    montar()
+
+    expect(await screen.findByRole('tab', { name: 'Nada a revisar' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'PRD' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('o corte continua ao alcance dentro da aba do documento', async () => {
+    // A garantia que o redesenho não pode perder: `proposto` distinguível e cortável.
+    const user = userEvent.setup()
+    carregarPrd.mockResolvedValue(prd({ afirmacoes: [afirmacao(), PROPOSTO] }))
+    montar()
+
+    await user.click(await screen.findByRole('tab', { name: 'PRD' }))
+
+    const painel = screen.getByRole('tabpanel')
+    expect(within(painel).getByText('Inferido pela IA.')).toBeInTheDocument()
+    expect(
+      within(painel).getByRole('button', { name: /Cortar a afirmação: Inferido/i })
+    ).toBeInTheDocument()
+    expect(within(painel).getAllByText('Inferido pela IA.')).toHaveLength(1)
+  })
+
+  it('o aceite fica fora das abas — alcançável de qualquer uma', async () => {
+    const user = userEvent.setup()
+    carregarPrd.mockResolvedValue(prd())
+    montar('prd-aceito')
+
+    await screen.findByLabelText('Aceite do PRD')
+    await user.click(screen.getByRole('tab', { name: 'Convention' }))
+
+    expect(screen.getByLabelText('Aceite do PRD')).toBeInTheDocument()
   })
 })
 
