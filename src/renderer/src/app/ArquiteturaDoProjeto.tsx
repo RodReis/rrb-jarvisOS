@@ -741,11 +741,7 @@ export function ArquiteturaDoProjeto({
         ele mora na trilha (#332) —, e prendê-la ao botão deixaria justamente a primeira rodada
         sem sinal nenhum, que é quando o PI mais precisa saber o que está acontecendo.
       */}
-      <AndamentoDaGeracao
-        etapas={etapas}
-        gerando={ocupado}
-        contrato={[...ETAPAS_DA_ARQUITETURA]}
-      />
+      <AndamentoDaGeracao etapas={etapas} gerando={ocupado} contrato={[...ETAPAS_DA_ARQUITETURA]} />
 
       {desfecho !== null && desfecho.resultado !== 'gerada' && (
         <InlineAlert
