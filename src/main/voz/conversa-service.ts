@@ -24,6 +24,7 @@ import type { ContextPack } from '@shared/domain/context-pack'
 import type { DesfechoDaConversa, TrocaDaConversa } from '@shared/domain/voz'
 import { systemDaPersona } from './persona'
 import { textoDoSnapshot, type SnapshotDoApp } from './snapshot-do-app'
+import { log } from '../logging/logger'
 
 export type { DesfechoDaConversa, TrocaDaConversa }
 
@@ -89,7 +90,12 @@ export class ConversaService {
     const texto = pergunta.trim()
     // Transcrição vazia acontece — um clique curto, um ruído. Chamar o modelo com nada gastaria a
     // ida e voltaria com uma resposta a uma pergunta que ninguém fez.
-    if (texto === '') return { estado: 'sem-pergunta' }
+    if (texto === '') {
+      // Antes era mudo, e foi exatamente o desfecho das três tentativas "nada aconteceu" do PI:
+      // a transcrição chegou vazia, ninguém disse, e a tela voltou ao normal.
+      log.sistema.info('Conversa sem pergunta: a transcrição chegou vazia')
+      return { estado: 'sem-pergunta' }
+    }
 
     /*
      * A disponibilidade é verificada **antes** de montar o contexto.
@@ -100,6 +106,10 @@ export class ConversaService {
      */
     const rota = await this.deps.rotaDisponivel()
     if (!rota.ok) {
+      // A frase é estática, então pode ir ao log: ela diz qual das duas indisponibilidades foi.
+      log.sistema.warn('Conversa recusada: rota local indisponível', {
+        proximaAcao: rota.proximaAcao
+      })
       return { estado: 'indisponivel', proximaAcao: rota.proximaAcao }
     }
 
@@ -137,11 +147,21 @@ export class ConversaService {
       }
 
       const limpa = resposta.trim()
-      if (limpa === '') return { estado: 'falhou', motivo: 'O modelo não respondeu nada.' }
+      if (limpa === '') {
+        log.sistema.error('Conversa falhou: o modelo não respondeu nada')
+        return { estado: 'falhou', motivo: 'O modelo não respondeu nada.' }
+      }
 
       this.historico.push({ pergunta: texto, resposta: limpa })
+      // Tamanhos, nunca o conteúdo: pergunta e resposta são a conversa do usuário.
+      log.sistema.info('Conversa respondida', {
+        caracteresDaPergunta: texto.length,
+        caracteresDaResposta: limpa.length,
+        trocasNoHistorico: this.historico.length
+      })
       return { estado: 'ok', resposta: limpa }
     } catch (erro) {
+      log.sistema.error('Conversa falhou', { error: erro })
       return { estado: 'falhou', motivo: erro instanceof Error ? erro.message : String(erro) }
     }
   }

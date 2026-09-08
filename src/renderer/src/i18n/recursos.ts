@@ -109,6 +109,10 @@ export const RECURSOS = {
         falhou: 'Nao foi possivel transcrever. Tentar de novo.',
         microfoneIndisponivel:
           'O microfone nao esta disponivel. Verifique a permissao do sistema e o dispositivo padrao.',
+        // Gravou, mas o VAD nao achou fala (SPEC-Voz-01, criterio 2: todo desfecho tem proxima acao).
+        semFalaTitulo: 'Nao ouvi nada',
+        semFala:
+          'O microfone gravou, mas nenhuma fala foi detectada. Fale mais perto, ou confira qual microfone e o padrao do sistema.',
         compute: {
           gpu: 'GPU (CUDA)',
           cpu: 'CPU (int8)'
@@ -958,6 +962,9 @@ export const RECURSOS = {
         falhou: 'Could not transcribe. Try again.',
         microfoneIndisponivel:
           'The microphone is unavailable. Check system permission and the default device.',
+        semFalaTitulo: 'I heard nothing',
+        semFala:
+          'The microphone recorded, but no speech was detected. Speak closer, or check which microphone is the system default.',
         compute: {
           gpu: 'GPU (CUDA)',
           cpu: 'CPU (int8)'

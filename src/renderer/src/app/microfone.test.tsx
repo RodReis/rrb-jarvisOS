@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Microfone } from './Microfone'
@@ -52,7 +52,9 @@ beforeEach(() => {
     perguntarAoJarvis,
     historicoDaConversa,
     falar,
-    onVozHotkey
+    onVozHotkey,
+    // O helper de log do renderer chama isto; sem o dublê, o primeiro log derrubaria o teste.
+    sendLog: vi.fn()
   })
 })
 
@@ -391,5 +393,212 @@ describe('a conversa não ganha canal de ação (critério 8)', () => {
     expect(
       daConversa.filter((k) => /exec|run|command|comando|arquivo|file|deploy|connector/i.test(k))
     ).toEqual([])
+  })
+})
+
+describe('soltar antes de a captura abrir não trava a tela', () => {
+  it('transcreve mesmo quando o pointerup chega durante a permissão do microfone', async () => {
+    /*
+     * **O defeito que este teste prende, reproduzido pelo PI no app real.**
+     *
+     * `comecar` só marca `gravando` **depois** do `await capturar()`, que espera a permissão do
+     * microfone. Se o dedo sai do botão nesse meio-tempo — e ele sai, porque a permissão pode
+     * levar centenas de milissegundos —, `terminar` encontra o estado ainda em `ocioso`, sai
+     * pela guarda, e a captura **fica aberta**. A tela trava em "OUVINDO..." para sempre, sem
+     * erro em lugar nenhum: nem no log, nem no banco, nem na cara do usuário.
+     *
+     * A guarda lia `estado` da closure do render em que a função nasceu, e não o valor corrente.
+     */
+    let liberarCaptura: (() => void) | undefined
+    const capturaLenta = async (): Promise<() => Promise<Int16Array>> => {
+      await new Promise<void>((r) => (liberarCaptura = r))
+      return async () => new Int16Array(16_000)
+    }
+
+    transcreverAudio.mockResolvedValue({
+      estado: 'ok',
+      resultado: { texto: 'falei durante a permissão', idioma: 'pt', segmentos: [] }
+    })
+
+    montar(capturaLenta)
+    const botao = await screen.findByRole('button', { name: /segure para falar/i })
+
+    // O dedo desce e sobe **antes** de a permissão resolver.
+    await userEvent.pointer([{ keys: '[MouseLeft>]', target: botao }, { keys: '[/MouseLeft]' }])
+    await act(async () => liberarCaptura?.())
+
+    // Sem a correção, a tela fica em "OUVINDO..." e a transcrição nunca é pedida.
+    await waitFor(() => expect(transcreverAudio).toHaveBeenCalled())
+    await screen.findByRole('button', { name: /segure para falar/i })
+  })
+})
+
+describe('duas gravações seguidas — o gesto repetido não trava', () => {
+  it('a segunda vez também transcreve', async () => {
+    /*
+     * O PI falou **três vezes** e nenhuma transcreveu, com a captura rodando no renderer (os
+     * avisos de `ScriptProcessorNode` provam). Se a primeira deixa estado sujo, a segunda entra
+     * pela guarda e sai calada — sem erro em lugar nenhum.
+     */
+    transcreverAudio.mockResolvedValue({
+      estado: 'ok',
+      resultado: { texto: 'primeira', idioma: 'pt', segmentos: [] }
+    })
+
+    montar()
+    await segurarEsoltar()
+    await waitFor(() => expect(transcreverAudio).toHaveBeenCalledTimes(1))
+    await screen.findByRole('button', { name: /segure para falar/i })
+
+    await segurarEsoltar()
+    await waitFor(() => expect(transcreverAudio).toHaveBeenCalledTimes(2))
+  })
+
+  it('soltar cedo duas vezes seguidas não deixa a tela presa em Ouvindo', async () => {
+    // O caso do PI: se a primeira solta cedo e não limpa o estado, a segunda nunca começa.
+    let liberar: (() => void) | undefined
+    const capturaLenta = async (): Promise<() => Promise<Int16Array>> => {
+      await new Promise<void>((r) => (liberar = r))
+      return async () => new Int16Array(16_000)
+    }
+
+    transcreverAudio.mockResolvedValue({
+      estado: 'ok',
+      resultado: { texto: 'dito', idioma: 'pt', segmentos: [] }
+    })
+
+    montar(capturaLenta)
+    const botao = await screen.findByRole('button', { name: /segure para falar/i })
+
+    await userEvent.pointer([{ keys: '[MouseLeft>]', target: botao }, { keys: '[/MouseLeft]' }])
+    await act(async () => liberar?.())
+    await waitFor(() => expect(transcreverAudio).toHaveBeenCalledTimes(1))
+    await screen.findByRole('button', { name: /segure para falar/i })
+
+    await userEvent.pointer([{ keys: '[MouseLeft>]', target: botao }, { keys: '[/MouseLeft]' }])
+    await act(async () => liberar?.())
+    await waitFor(() => expect(transcreverAudio).toHaveBeenCalledTimes(2))
+  })
+})
+
+describe('o ponteiro saindo do botão não descarta a gravação', () => {
+  it('atravessar a borda com o dedo pressionado não descarta a gravação', async () => {
+    /*
+     * **O caso do PI.** `onPointerLeave` existe porque soltar o botão fora dele é comum — mas ele
+     * dispara também quando o ponteiro **atravessa** a borda com o botão ainda pressionado, que é
+     * o que acontece ao segurar e falar: a mão se mexe.
+     *
+     * Nesse caminho `terminar` roda no meio da gravação, encerra a captura e devolve a tela a
+     * `ocioso`. O `pointerup` que vem depois encontra o estado já limpo, sai pela guarda, e o
+     * enunciado inteiro é descartado sem erro nenhum — nem no log, nem no banco.
+     */
+    transcreverAudio.mockResolvedValue({
+      estado: 'ok',
+      resultado: { texto: 'falei enquanto movia o mouse', idioma: 'pt', segmentos: [] }
+    })
+
+    montar()
+    const botao = await screen.findByRole('button', { name: /segure para falar/i })
+
+    await userEvent.pointer({ keys: '[MouseLeft>]', target: botao })
+    await screen.findByRole('button', { name: /ouvindo/i })
+
+    /*
+     * A mão se mexe: o ponteiro atravessa a borda do botão, ainda pressionado.
+     *
+     * No navegador real a captura faz o `pointerup` voltar ao botão mesmo aqui; o jsdom não
+     * implementa `setPointerCapture`, então o que este teste mede é o essencial e verificável:
+     * **atravessar a borda não pode encerrar a gravação**. Era `onPointerLeave` que fazia isso,
+     * e por isso ele deixou de encerrar.
+     */
+    /*
+     * O evento é disparado **direto**, e não com `userEvent.pointer({ target: body })`: medido
+     * neste projeto, mover o ponteiro para outro elemento no jsdom **não** emite `pointerleave`
+     * no anterior. Um teste escrito daquele jeito passa com o defeito presente — foi o que
+     * aconteceu na primeira tentativa, e o contrafactual denunciou.
+     */
+    fireEvent.pointerLeave(botao)
+
+    // Ainda gravando: a saída do ponteiro não descartou o enunciado.
+    await screen.findByRole('button', { name: /ouvindo/i })
+    expect(transcreverAudio).not.toHaveBeenCalled()
+
+    /*
+     * Que o `pointerup` volte ao botão depois da saída é o que `setPointerCapture` garante, e o
+     * jsdom não a implementa — medir isso aqui seria medir o dublê. O que se prende nesta camada
+     * é o defeito que o PI viu: a gravação **não** é descartada ao atravessar a borda.
+     */
+    expect(await screen.findByRole('button', { name: /ouvindo/i })).toBeInTheDocument()
+  })
+})
+
+describe('o botão captura o ponteiro (SPEC-Voz-01, gesto de segurar)', () => {
+  it('pede setPointerCapture no pointerdown', async () => {
+    /*
+     * A captura é o que faz `pointerup` chegar ao botão mesmo com a mão fora dele. Sem ela, o
+     * gesto depende de o dedo terminar exatamente onde começou — e falar segurando move a mão.
+     *
+     * jsdom não implementa a API, então o teste a instala como espião: o que se mede é que a
+     * tela **pede** a captura, que é a decisão; o comportamento do navegador é do navegador.
+     */
+    const capturados: number[] = []
+    Object.defineProperty(HTMLElement.prototype, 'setPointerCapture', {
+      configurable: true,
+      writable: true,
+      value: function (id: number) {
+        capturados.push(id)
+      }
+    })
+
+    try {
+      montar()
+      const botao = await screen.findByRole('button', { name: /segure para falar/i })
+      await userEvent.pointer({ keys: '[MouseLeft>]', target: botao })
+
+      expect(capturados.length).toBeGreaterThan(0)
+    } finally {
+      delete (HTMLElement.prototype as { setPointerCapture?: unknown }).setPointerCapture
+    }
+  })
+})
+
+describe('gravou, mas não achou fala — próxima ação, não silêncio (SPEC-Voz-01, critério 2)', () => {
+  it('avisa "não ouvi nada" e não chama a conversa', async () => {
+    /*
+     * **O caso das três tentativas do PI.** O sidecar respondeu `ok` com texto vazio (o VAD não
+     * achou fala), a tela mandou a pergunta vazia para a conversa, recebeu `sem-pergunta` e
+     * voltou ao normal calada. O usuário não tinha como distinguir "não te ouvi" de "quebrou".
+     */
+    transcreverAudio.mockResolvedValue({
+      estado: 'ok',
+      resultado: { texto: '   ', idioma: 'pt', segmentos: [] }
+    })
+
+    montar()
+    await segurarEsoltar()
+
+    expect(await screen.findByText(/nao ouvi nada/i)).toBeInTheDocument()
+    expect(perguntarAoJarvis).not.toHaveBeenCalled()
+    // É aviso, não erro: nada quebrou, é próxima ação para o usuário.
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await screen.findByRole('button', { name: /segure para falar/i })
+  })
+
+  it('o aviso some na gravação seguinte', async () => {
+    transcreverAudio.mockResolvedValueOnce({
+      estado: 'ok',
+      resultado: { texto: '', idioma: 'pt', segmentos: [] }
+    })
+    montar()
+    await segurarEsoltar()
+    await screen.findByText(/nao ouvi nada/i)
+
+    transcreverAudio.mockResolvedValueOnce({
+      estado: 'ok',
+      resultado: { texto: 'agora sim', idioma: 'pt', segmentos: [] }
+    })
+    await segurarEsoltar()
+
+    await waitFor(() => expect(screen.queryByText(/nao ouvi nada/i)).not.toBeInTheDocument())
   })
 })
