@@ -1616,6 +1616,101 @@ const MIGRATIONS: readonly string[] = [
   // por ele, e mudar depois nao alcancaria nenhuma linha ja gravada.
   `
   ALTER TABLE user_profile ADD COLUMN voz_da_fala TEXT;
+  `,
+
+  // 42 - o contexto pode nao vir de um projeto (SPEC-Voz-03, emenda E1).
+  //
+  // A conversa por voz pergunta sobre o **app** - a fila, os aceites pendentes -, nao sobre um
+  // projeto. O manifesto dela traz persona, snapshot e historico: texto que o app escreveu sobre
+  // si mesmo, sem arquivo em disco e sem projeto a que pertencer.
+  //
+  // **Recriacao da tabela, e nao ALTER.** O SQLite nao tem `DROP NOT NULL`: a unica forma de
+  // afrouxar a coluna e criar a tabela nova, copiar as linhas e trocar. E a operacao mais
+  // delicada do arquivo, por isso ela roda dentro da transacao da migration (ver `migrate`) e
+  // copia **coluna a coluna**, nomeadas - um `INSERT ... SELECT *` dependeria da ordem das
+  // colunas e quebraria silenciosamente no dia em que alguem acrescentasse uma.
+  //
+  // O indice e recriado porque ele morre com a tabela antiga. `project_id` continua nele: as
+  // consultas por projeto sao a maioria, e um pack do app simplesmente nao aparece nelas - que e
+  // o comportamento certo, porque ele nao pertence a projeto nenhum.
+  `
+  CREATE TABLE context_pack_novo (
+    id            TEXT PRIMARY KEY,
+    user_id       TEXT NOT NULL,
+    workspace_id  TEXT NOT NULL,
+    -- NULL = contexto do proprio app, sem projeto (E1). Ausencia e afirmacao, nao lacuna.
+    project_id    TEXT,
+    tarefa        TEXT NOT NULL,
+    regras        TEXT NOT NULL,
+    falhas        TEXT NOT NULL,
+    resumo_anterior TEXT,
+    etapa         TEXT NOT NULL,
+    unmetered     INTEGER NOT NULL,
+    teto_de_tokens INTEGER NOT NULL,
+    tokens_estimados INTEGER NOT NULL,
+    estimado_usd  REAL,
+    motivo_da_expansao TEXT,
+    excecao_motivo TEXT,
+    excecao_teto_bytes INTEGER,
+    excecao_autorizado_por TEXT,
+    excecao_autorizado_em TEXT,
+    rota          TEXT NOT NULL,
+    pack_anterior TEXT,
+    hash          TEXT NOT NULL UNIQUE,
+    created_at    TEXT NOT NULL
+  );
+
+  INSERT INTO context_pack_novo
+    (id, user_id, workspace_id, project_id, tarefa, regras, falhas, resumo_anterior,
+     etapa, unmetered, teto_de_tokens, tokens_estimados, estimado_usd, motivo_da_expansao,
+     excecao_motivo, excecao_teto_bytes, excecao_autorizado_por, excecao_autorizado_em,
+     rota, pack_anterior, hash, created_at)
+  SELECT
+     id, user_id, workspace_id, project_id, tarefa, regras, falhas, resumo_anterior,
+     etapa, unmetered, teto_de_tokens, tokens_estimados, estimado_usd, motivo_da_expansao,
+     excecao_motivo, excecao_teto_bytes, excecao_autorizado_por, excecao_autorizado_em,
+     rota, pack_anterior, hash, created_at
+  FROM context_pack;
+
+  DROP TABLE context_pack;
+  ALTER TABLE context_pack_novo RENAME TO context_pack;
+  CREATE INDEX idx_context_pack_projeto ON context_pack(user_id, project_id, created_at);
+  `,
+
+  // 43 - a persona da conversa por voz (SPEC-Voz-03, criterio 5).
+  //
+  // **Tabela propria, e nao coluna em `user_profile`** - ao contrario das preferencias de voz das
+  // migrations 40 e 41. O motivo nao e preferencia: `user_profile` e escopado so a `user_id`, e a
+  // persona e do par **usuario + espaco** (regra inviolavel do CLAUDE.md). O JARVIS OS tem a dele;
+  // a da NOA e conteudo futuro, sem mudanca de schema.
+  //
+  // Uma linha por escopo, com `texto_livre` guardando **so** a parte editavel. O bloco fixo de
+  // sistema - respostas curtas, pt-BR, sem markdown - **nao mora aqui**: ele e do produto, nao do
+  // usuario, e persisti-lo permitiria que uma edicao no banco o removesse. Esvaziar o texto livre
+  // deixa o bloco fixo valendo, que e o que o criterio 5 exige.
+  //
+  // Ausencia de linha = persona de fabrica valendo, nunca erro; nada e semeado no boot.
+  `
+  CREATE TABLE persona (
+    user_id      TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    texto_livre  TEXT NOT NULL,
+    updated_at   TEXT NOT NULL,
+    PRIMARY KEY (user_id, workspace_id)
+  );
+  `,
+
+  // 44 - a janela de historico da conversa (SPEC-Voz-03, criterio 7).
+  //
+  // **Coluna em `user_profile`, e nao tabela** - ao contrario da persona da migration 43. A
+  // diferenca e o escopo: a persona e do par usuario+espaco porque cada espaco tem a sua; quantas
+  // trocas entram no contexto e preferencia do **usuario**, igual as das migrations 40 e 41, e
+  // nao muda ao trocar de espaco.
+  //
+  // `NULL` = usar o default de fabrica (dez trocas, cravado na spec), como toda preferencia de
+  // voz. Semear o numero aqui obrigaria uma migration nova para mudar o default de fabrica.
+  `
+  ALTER TABLE user_profile ADD COLUMN conversa_janela INTEGER;
   `
 ]
 

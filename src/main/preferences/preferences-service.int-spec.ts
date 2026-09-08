@@ -42,7 +42,8 @@ function perfil(id: string) {
     vozIdioma: null,
     vozHotkey: null,
     vozTimeoutMs: null,
-    vozDaFala: null
+    vozDaFala: null,
+    conversaJanela: null
   }
 }
 
@@ -76,7 +77,8 @@ describe('padrões do produto', () => {
       vozIdioma: 'pt',
       vozHotkey: 'Control+Shift+Space',
       vozTimeoutMs: 60_000,
-      vozDaFala: 'pt_BR-faber-medium'
+      vozDaFala: 'pt_BR-faber-medium',
+      conversaJanela: 10
     })
   })
 

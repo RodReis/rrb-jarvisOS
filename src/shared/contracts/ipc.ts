@@ -107,7 +107,14 @@ import type {
 import type { CapacidadeResolvida } from '../domain/skills'
 
 /** Canais de request/response (renderer → main → renderer). */
-import type { DesfechoDaTranscricao, DesfechoDoDownload, ProntidaoDaVoz } from '@shared/domain/voz'
+import type {
+  DesfechoDaConversa,
+  DesfechoDaTranscricao,
+  DesfechoDoDownload,
+  PersonaEditavel,
+  ProntidaoDaVoz,
+  TrocaDaConversa
+} from '@shared/domain/voz'
 import type { DesfechoDaFala, ProntidaoDoTts } from '@shared/domain/visemes'
 
 export const IPC_CHANNELS = {
@@ -209,6 +216,28 @@ export const IPC_CHANNELS = {
    */
   ttsFalar: 'tts:falar',
   ttsProntidao: 'tts:prontidao',
+  /*
+   * Conversa com a persona (SPEC-Voz-03). **Dois canais, e nenhum de ação.**
+   *
+   * `perguntar` leva texto e devolve texto; `historico` devolve as trocas da sessão para a tela
+   * desenhar. A conversa **responde** — não executa comando, não toca arquivo, não dispara
+   * conector (critério 8). Um canal a mais aqui seria exatamente o canal de ação que a spec põe
+   * fora do escopo, atrás de Policy Engine e aprovação em fatia própria.
+   *
+   * Não há canal de prontidão da conversa: a rota local é verificada **dentro** do
+   * `perguntar`, e o desfecho `indisponivel` já traz a próxima ação. Perguntar antes daria à
+   * tela um estado que pode mudar entre a pergunta e o envio.
+   */
+  conversaPerguntar: 'conversa:perguntar',
+  conversaHistorico: 'conversa:historico',
+  /*
+   * A persona editável (SPEC-Voz-03, critério 5). Ler e gravar o **texto livre**, e só ele: o
+   * bloco fixo de sistema é do produto e nunca atravessa a ponte como dado gravável — se
+   * atravessasse, uma edição poderia removê-lo e a resposta voltaria em markdown para ser lida
+   * em voz alta.
+   */
+  personaLer: 'persona:ler',
+  personaSalvar: 'persona:salvar',
   approvalList: 'approval:list',
   approvalResolve: 'approval:resolve',
   /**
@@ -741,6 +770,13 @@ export interface PreferencesSnapshot {
   readonly vozHotkey: HotkeyDeVoz
   readonly vozTimeoutMs: number
   readonly vozDaFala: VozDaFalaPreferida
+  /**
+   * Quantas trocas da sessão entram no contexto da conversa (SPEC-Voz-03, critério 7).
+   *
+   * Sempre resolvido: `null` no banco vira o default de fábrica aqui, como toda preferência —
+   * quem lê recebe um número usável e não precisa conhecer o valor de fábrica.
+   */
+  readonly conversaJanela: number
 }
 
 /**
@@ -848,6 +884,20 @@ export interface JarvisBridge {
    */
   falar(texto: string, voz: string): Promise<DesfechoDaFala>
   prontidaoDoTts(): Promise<ProntidaoDoTts>
+
+  /*
+   * Conversa com a persona (SPEC-Voz-03, critério 8). Texto entra, texto sai — nenhum campo
+   * carrega comando, caminho ou processo, e não há método que execute coisa alguma.
+   */
+  perguntarAoJarvis(pergunta: string, workspace: WorkspaceId): Promise<DesfechoDaConversa>
+  historicoDaConversa(): Promise<readonly TrocaDaConversa[]>
+
+  /*
+   * A persona editável (critério 5). O que trafega é o **texto livre**; o bloco fixo vem junto
+   * como leitura, para a tela exibi-lo, e nunca volta como escrita.
+   */
+  lerPersona(workspace: WorkspaceId): Promise<PersonaEditavel>
+  salvarPersona(textoLivre: string, workspace: WorkspaceId): Promise<PersonaEditavel>
   /**
    * Resolve uma aprovação pendente. O retorno varia com o que estava pausado: uma etapa de
    * filesystem devolve o `ExecutionRun` retomado (F01); um comando devolve o

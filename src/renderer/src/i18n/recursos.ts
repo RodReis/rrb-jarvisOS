@@ -118,6 +118,19 @@ export const RECURSOS = {
             'O arquivo baixado nao passou na verificacao de integridade e foi descartado. Tentar de novo.',
           bloqueado: 'A origem do download nao esta na lista permitida.',
           falhou: 'O download nao concluiu. Verifique a conexao e tente de novo.'
+        },
+        // A conversa com a persona (SPEC-Voz-03).
+        conversa: {
+          pensando: 'Pensando...',
+          falando: 'Falando...',
+          // O rotulo de quem falou. A tela mostra a troca, e sem isso as duas falas se
+          // confundiriam num bloco de texto so.
+          voce: 'Voce',
+          jarvis: 'JARVIS',
+          // A recusa da rota local vem **do main**, com a proxima acao ja escolhida: servico fora
+          // e modelo ausente pedem coisas diferentes, e um texto fixo aqui achataria as duas.
+          indisponivel: 'A conversa nao esta disponivel',
+          falhou: 'A conversa falhou. Tentar de novo.'
         }
       },
       janela: {
@@ -739,6 +752,26 @@ export const RECURSOS = {
         vozMinutos: '{{valor}} minutos',
         vozDaFala: 'Voz do JARVIS',
         vozDaFalaDescricao: 'Como o app fala com voce. Ouca as duas antes de escolher.',
+        // A persona da conversa (SPEC-Voz-03, criterio 5).
+        persona: 'Persona do JARVIS',
+        personaDescricao:
+          'Como o JARVIS se apresenta e conversa no {{espaco}}. Vale na proxima resposta, sem reiniciar o app.',
+        personaTextoLivre: 'Tom e estilo',
+        personaTextoLivreDescricao:
+          'Nome, tratamento, jeito de falar. Deixe vazio para o JARVIS responder sem tom proprio.',
+        personaPlaceholder:
+          'Voce e o JARVIS, assistente do operador. Trate-o por "operador". Seja cordial e direto.',
+        personaSalvar: 'Salvar a persona',
+        personaSalva: 'Persona salva.',
+        personaLimite: 'Texto longo demais: {{atual}} de {{teto}} caracteres.',
+        personaBlocoFixo: 'O que o produto garante',
+        personaBlocoFixoDescricao:
+          'Estas regras valem sempre, mesmo com o campo acima vazio. Elas existem porque a resposta e falada em voz alta.',
+        janelaDaConversa: 'Memoria da conversa',
+        janelaDaConversaDescricao:
+          'Quantas trocas o JARVIS leva em conta ao responder. Mais trocas resolvem perguntas encadeadas; menos deixam cada resposta mais rapida. A conversa some ao fechar o app.',
+        janelaSemHistorico: 'Sem memoria: cada pergunta e independente',
+        janelaTrocas: 'As ultimas {{n}} trocas',
         vozDaFalaSemVoz: 'Nenhuma voz baixada',
         vozDaFalaBaixar: 'Baixe uma voz na secao de artefatos para o app poder falar.',
         vozDaFalaOuvir: 'Ouvir',
@@ -934,6 +967,14 @@ export const RECURSOS = {
             'The downloaded file failed the integrity check and was discarded. Try again.',
           bloqueado: 'The download origin is not on the allowed list.',
           falhou: 'The download did not finish. Check your connection and try again.'
+        },
+        conversa: {
+          pensando: 'Thinking...',
+          falando: 'Speaking...',
+          voce: 'You',
+          jarvis: 'JARVIS',
+          indisponivel: 'The conversation is unavailable',
+          falhou: 'The conversation failed. Try again.'
         }
       },
       janela: {
@@ -1484,6 +1525,25 @@ export const RECURSOS = {
         vozMinutos: '{{valor}} minutes',
         vozDaFala: 'JARVIS voice',
         vozDaFalaDescricao: 'How the app speaks to you. Listen to both before choosing.',
+        persona: 'JARVIS persona',
+        personaDescricao:
+          'How JARVIS introduces itself and talks in {{espaco}}. Applies to the next answer, no restart needed.',
+        personaTextoLivre: 'Tone and style',
+        personaTextoLivreDescricao:
+          'Name, form of address, way of speaking. Leave empty for JARVIS to answer with no tone of its own.',
+        personaPlaceholder:
+          'You are JARVIS, assistant to the operator. Address them as "operator". Be warm and direct.',
+        personaSalvar: 'Save persona',
+        personaSalva: 'Persona saved.',
+        personaLimite: 'Text too long: {{atual}} of {{teto}} characters.',
+        personaBlocoFixo: 'What the product guarantees',
+        personaBlocoFixoDescricao:
+          'These rules always apply, even with the field above empty. They exist because the answer is spoken aloud.',
+        janelaDaConversa: 'Conversation memory',
+        janelaDaConversaDescricao:
+          'How many exchanges JARVIS takes into account when answering. More exchanges resolve follow-up questions; fewer keep each answer faster. The conversation is cleared when the app closes.',
+        janelaSemHistorico: 'No memory: each question stands alone',
+        janelaTrocas: 'The last {{n}} exchanges',
         vozDaFalaSemVoz: 'No voice downloaded',
         vozDaFalaBaixar: 'Download a voice in the artefacts section so the app can speak.',
         vozDaFalaOuvir: 'Listen',

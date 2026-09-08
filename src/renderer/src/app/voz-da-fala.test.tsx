@@ -56,6 +56,7 @@ function preferencias(extra: Partial<PreferencesSnapshot> = {}): PreferencesSnap
     vozHotkey: 'Control+Shift+Space',
     vozTimeoutMs: 60_000,
     vozDaFala: 'pt_BR-faber-medium',
+    conversaJanela: 10,
     ...extra
   }
 }

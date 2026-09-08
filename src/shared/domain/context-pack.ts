@@ -41,7 +41,16 @@ export const ORIGENS_DE_CONTEXTO = [
   /** Decisão, ADR ou regra de domínio já aprovada, anexada por ser aplicável. */
   'decisao-aprovada',
   /** Evidência externa coletada pelo ResearchAdapter (SPEC-Conectores-06). */
-  'evidencia-externa'
+  'evidencia-externa',
+  /**
+   * Resumo que o **app fez do próprio estado** — não veio de arquivo nenhum (SPEC-Voz-03, E1).
+   *
+   * É a origem que distingue "isto o `rg` achou no disco" de "isto o app escreveu sobre si
+   * mesmo agora". A diferença importa para quem audita: um item de arquivo pode ser reaberto e
+   * conferido meses depois; um resumo do estado descreve um instante que já passou, e o hash
+   * prova o texto exato que o modelo viu, não um arquivo a reler.
+   */
+  'estado-do-app'
 ] as const
 
 export type OrigemDeContexto = (typeof ORIGENS_DE_CONTEXTO)[number]
@@ -54,9 +63,21 @@ export type OrigemDeContexto = (typeof ORIGENS_DE_CONTEXTO)[number]
  * esta versão?" tem resposta binária, meses depois, sem depender de o arquivo não ter mudado.
  */
 export interface ContextItem {
-  /** Caminho relativo à raiz do projeto. Relativo, não absoluto: o manifesto viaja. */
+  /**
+   * Caminho relativo à raiz do projeto. Relativo, não absoluto: o manifesto viaja.
+   *
+   * Para a origem `estado-do-app` não há arquivo, e o campo carrega um **identificador lógico**
+   * (`app://snapshot`, `app://persona`) — o esquema `app://` é o que impede confundir os dois ao
+   * ler o manifesto, e nenhum caminho de arquivo o produz.
+   */
   readonly caminho: string
-  /** SHA-256 do conteúdo exato enviado. Ver `hashDoConteudo` no main. */
+  /**
+   * SHA-256 do conteúdo exato enviado. Ver `hashDoConteudo` no main.
+   *
+   * Na origem `estado-do-app` é o hash do **texto gerado**, não de um arquivo relido. A pergunta
+   * que ele responde continua a mesma — "o modelo viu exatamente isto?" —, mas a resposta não
+   * depende de o arquivo ainda existir.
+   */
   readonly hash: string
   readonly origem: OrigemDeContexto
   /** Bytes do conteúdo enviado — o insumo do teto de contexto, medido e não estimado. */
@@ -140,7 +161,17 @@ export interface ContextPack {
   readonly id: string
   readonly user_id: string
   readonly workspace_id: WorkspaceId
-  readonly projectId: string
+  /**
+   * O projeto sobre o qual a geração acontece. **Ausente** quando o contexto é do próprio app
+   * (SPEC-Voz-03, E1) — a conversa por voz pergunta sobre a fila e os aceites, não sobre um
+   * projeto.
+   *
+   * Ausente é uma afirmação, não um campo por preencher: diz que **não há** projeto, e é o que
+   * faz a verificação contra o `ProjectRepository` ser pulada em vez de falhar. Um pack de
+   * geração documental sem `projectId` continua sendo recusado, porque quem o monta sempre o
+   * declara.
+   */
+  readonly projectId?: string
   /** A SPEC ou tarefa que motivou a geração (spec § ContextPack: "SPEC/tarefa"). */
   readonly tarefa: string
   readonly itens: readonly ContextItem[]

@@ -123,6 +123,10 @@ describe('migrations', () => {
     antigo.exec('DROP TABLE project_model_override')
     antigo.exec('DROP TABLE generation_trace')
     antigo.exec('DROP TABLE generation_trace_event')
+    antigo.exec('DROP TABLE persona')
+    // A 44 acrescenta coluna a uma tabela que a v1 já tem: desfazer é remover a coluna, não a
+    // tabela — dropar `user_profile` levaria junto o perfil que a v1 gravou.
+    antigo.exec('ALTER TABLE user_profile DROP COLUMN conversa_janela')
     antigo.pragma('user_version = 1')
     antigo.close()
 
@@ -306,7 +310,8 @@ describe('perfil de usuário', () => {
       vozIdioma: null,
       vozHotkey: null,
       vozTimeoutMs: null,
-      vozDaFala: null
+      vozDaFala: null,
+      conversaJanela: null
     }
 
     profiles.save(perfil)
@@ -332,7 +337,8 @@ describe('perfil de usuário', () => {
       vozIdioma: null,
       vozHotkey: null,
       vozTimeoutMs: null,
-      vozDaFala: null
+      vozDaFala: null,
+      conversaJanela: null
     }
 
     profiles.save(padrao)
@@ -376,7 +382,8 @@ describe('instrumentação do logger (critério de aceite 7)', () => {
         vozIdioma: null,
         vozHotkey: null,
         vozTimeoutMs: null,
-        vozDaFala: null
+        vozDaFala: null,
+        conversaJanela: null
       })
     ).toThrow()
     expect(logDb.error).toHaveBeenCalledWith(

@@ -31,7 +31,8 @@ const PERFIL = {
   vozIdioma: null,
   vozHotkey: null,
   vozTimeoutMs: null,
-  vozDaFala: null
+  vozDaFala: null,
+  conversaJanela: null
 }
 
 function mockarPonte(): void {

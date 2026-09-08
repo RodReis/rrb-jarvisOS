@@ -137,7 +137,7 @@ export function AppShell({ perfil, onSair }: AppShellProps = {}): React.JSX.Elem
    */
   const MODULOS: Readonly<Record<string, React.JSX.Element>> = {
     operator: <AprovacoesPendentes workspace={workspace} />,
-    voz: <Microfone workspace={workspace} />,
+    voz: <Microfone workspace={workspace} vozDaFala={preferencias.vozDaFala} />,
     projects: <ProjetosLocais workspace={workspace} />,
     terminal: <TerminalControlado workspace={workspace} />,
     /*

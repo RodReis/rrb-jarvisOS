@@ -95,6 +95,17 @@ export default tseslint.config(
     files: ['src/main/**/*.ts'],
     ignores: [
       'src/main/ai/anthropic-adapter.ts',
+      /*
+       * O adapter do Ollama é quem fala com o Ollama; o ponto único é quem o chama.
+       *
+       * `index.ts` entra porque é a **composição**: é lá que o adapter é construído e entregue
+       * ao `AiCallService`, e que a rota local é perguntada — "o serviço está no ar?" não é
+       * chamada de modelo. Liberar a composição é diferente de liberar o app: nenhum outro
+       * arquivo do main alcança o adapter, que é a garantia do critério 2.
+       */
+      'src/main/ai/ollama-adapter.ts',
+      'src/main/ai/call-provider.ts',
+      'src/main/index.ts',
       'src/main/ai/*.int-spec.ts',
       // A implementação do engine de STT é quem pode importar o runtime dele.
       'src/main/voz/faster-whisper-engine.ts',
@@ -109,6 +120,25 @@ export default tseslint.config(
               group: ['@anthropic-ai/*'],
               message:
                 'Critério 1 (SPEC-Providers-02): só o adapter do provider importa o SDK dele. O resto do app fala com a interface `AiAdapter` — é isso que torna trocar de provider uma questão de escrever outro adapter.'
+            },
+            {
+              /*
+               * A conversa por voz passa pelo ponto único, sem caminho paralelo (SPEC-Voz-03,
+               * critério 2 e emenda E1).
+               *
+               * A restrição mira o **módulo**, e não um pacote npm: o Ollama fala por `fetch`
+               * HTTP e não tem SDK a bloquear, então uma guarda por pacote não existiria e a
+               * garantia ficaria só na revisão. Quem quiser conversar com o modelo local usa o
+               * `AiCallService` — que roteia, audita, mede custo e verifica o `ContextPack`. Um
+               * import direto daqui seria mais curto e deixaria a auditoria sem saber que a
+               * chamada aconteceu.
+               *
+               * O `call-provider` está na `ignores` porque **é** o ponto único, e o
+               * `ollama-adapter` porque é o adapter.
+               */
+              group: ['**/ollama-adapter', '**/ai/ollama-adapter*'],
+              message:
+                'Critério 2 (SPEC-Voz-03): toda chamada de modelo passa pelo ponto único (`AiCallService`). Só ele e o próprio adapter importam o `ollama-adapter` — um caminho direto deixaria a chamada fora do `AuditEvent` e do `CostEvent`.'
             },
             {
               // Mesmo desenho, mesma razão (SPEC-Voz-01, critério 1): o app fala com

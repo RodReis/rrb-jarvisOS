@@ -14,6 +14,9 @@ import type { DesfechoDaTranscricao, ProntidaoDaVoz } from '@shared/domain/voz'
 const transcreverAudio = vi.fn()
 const prontidaoDaVoz = vi.fn()
 const baixarArtefatoDeVoz = vi.fn()
+const perguntarAoJarvis = vi.fn()
+const historicoDaConversa = vi.fn()
+const falar = vi.fn()
 
 /**
  * A assinatura do canal da hotkey, guardando o ouvinte.
@@ -37,12 +40,18 @@ beforeEach(() => {
   transcreverAudio.mockReset()
   prontidaoDaVoz.mockReset().mockResolvedValue(prontidao())
   baixarArtefatoDeVoz.mockReset().mockResolvedValue({ estado: 'ok' })
+  perguntarAoJarvis.mockReset().mockResolvedValue({ estado: 'ok', resposta: 'Dois aguardando.' })
+  historicoDaConversa.mockReset().mockResolvedValue([])
+  falar.mockReset().mockResolvedValue({ estado: 'indisponivel' })
   avisarHotkey = undefined
   onVozHotkey.mockClear()
   vi.stubGlobal('jarvis', {
     transcreverAudio,
     prontidaoDaVoz,
     baixarArtefatoDeVoz,
+    perguntarAoJarvis,
+    historicoDaConversa,
+    falar,
     onVozHotkey
   })
 })
@@ -60,9 +69,26 @@ function capturaFalsa(amostras = 16_000): () => Promise<() => Promise<Int16Array
   return async () => async () => new Int16Array(amostras)
 }
 
+/**
+ * Um reprodutor de mentira: Web Audio não existe em jsdom.
+ *
+ * `terminou` resolve na hora porque o que se mede aqui é **que a fala foi pedida**, não quanto
+ * ela dura; um dublê que nunca resolvesse travaria o teste no `await`.
+ */
+function reprodutorFalso(): { tocar: () => { terminou: Promise<void> }; cancelar: () => void } {
+  return { tocar: () => ({ terminou: Promise.resolve(), cancelar: () => {} }), cancelar: () => {} }
+}
+
 function montar(capturar = capturaFalsa()): ReturnType<typeof render> {
   // Devolve o resultado do `render` porque o teste de desmontagem precisa do `unmount`.
-  return render(<Microfone workspace="jarvis" capturar={capturar} />)
+  return render(
+    <Microfone
+      workspace="jarvis"
+      vozDaFala="pt_BR-faber-medium"
+      capturar={capturar}
+      criarFala={reprodutorFalso as never}
+    />
+  )
 }
 
 describe('runtime ausente é convite, não erro (critério 4)', () => {
@@ -216,5 +242,154 @@ describe('a hotkey global conduz a gravação (critério 5)', () => {
     unmount()
 
     expect(avisarHotkey).toBeUndefined()
+  })
+})
+
+/**
+ * O loop fechado: falar → transcrever → responder → falar (SPEC-Voz-03, critérios 1, 4 e 8).
+ *
+ * O que estes testes prendem é a **costura**, que é onde a fatia pode falhar sem nenhuma peça
+ * estar quebrada: a transcrição vira pergunta sozinha, a resposta é falada, e a recusa da rota
+ * local chega aos dois canais — tela e voz.
+ */
+async function segurarEsoltar(): Promise<void> {
+  const botao = await screen.findByRole('button', { name: /segure para falar/i })
+  await userEvent.pointer([{ keys: '[MouseLeft>]', target: botao }, { keys: '[/MouseLeft]' }])
+}
+
+describe('a transcrição vira pergunta e a resposta vira fala (critério 1)', () => {
+  beforeEach(() => {
+    transcreverAudio.mockResolvedValue({
+      estado: 'ok',
+      resultado: { texto: 'o que está na fila?', idioma: 'pt', segmentos: [] }
+    })
+  })
+
+  it('pergunta ao JARVIS com o texto transcrito, sem o usuário pedir', async () => {
+    // O loop fecha sozinho: soltar o botão não devolve texto na tela para alguém clicar em
+    // "enviar" — a transcrição **é** a pergunta.
+    montar()
+    await segurarEsoltar()
+
+    await waitFor(() =>
+      expect(perguntarAoJarvis).toHaveBeenCalledWith('o que está na fila?', 'jarvis')
+    )
+  })
+
+  it('fala a resposta pelo TTS local', async () => {
+    falar.mockResolvedValue({ estado: 'ok', fala: { pcm: new Int16Array(8), sampleRate: 22_050 } })
+    montar()
+    await segurarEsoltar()
+
+    await waitFor(() =>
+      expect(falar).toHaveBeenCalledWith('Dois aguardando.', 'pt_BR-faber-medium')
+    )
+  })
+
+  it('mostra a troca na tela, com quem falou em cada linha', async () => {
+    historicoDaConversa.mockResolvedValue([
+      { pergunta: 'o que está na fila?', resposta: 'Dois aguardando.' }
+    ])
+    montar()
+    await segurarEsoltar()
+
+    expect(await screen.findByText(/Dois aguardando\./)).toBeInTheDocument()
+    // Sem o rótulo, as duas falas viram um bloco de texto onde não se sabe quem disse o quê.
+    expect(await screen.findByText(/JARVIS:/)).toBeInTheDocument()
+  })
+
+  it('não fala quando o TTS está indisponível, e não acusa erro por isso', async () => {
+    // A resposta já está na tela: uma tarja vermelha diria que a conversa falhou quando o que
+    // faltou foi o som.
+    falar.mockResolvedValue({ estado: 'indisponivel' })
+    historicoDaConversa.mockResolvedValue([{ pergunta: 'oi', resposta: 'Olá.' }])
+    montar()
+    await segurarEsoltar()
+
+    await screen.findByText(/Olá\./)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('libera o botão só quando a fala termina', async () => {
+    // Sem isto o usuário veria "segure para falar" enquanto o JARVIS ainda responde, e um novo
+    // aperto abriria uma segunda conversa por cima da primeira.
+    let responder: (v: unknown) => void = () => {}
+    perguntarAoJarvis.mockReturnValue(new Promise((r) => (responder = r)))
+    montar()
+    await segurarEsoltar()
+
+    const botao = await screen.findByRole('button', { name: /pensando/i })
+    expect(botao).toBeDisabled()
+
+    await act(async () => responder({ estado: 'ok', resposta: 'pronto' }))
+    await screen.findByRole('button', { name: /segure para falar/i })
+  })
+})
+
+describe('a rota local fora recusa nos dois canais (critério 4)', () => {
+  beforeEach(() => {
+    transcreverAudio.mockResolvedValue({
+      estado: 'ok',
+      resultado: { texto: 'oi', idioma: 'pt', segmentos: [] }
+    })
+    perguntarAoJarvis.mockResolvedValue({
+      estado: 'indisponivel',
+      proximaAcao: 'O modelo qwen3:8b não está baixado. Rode ollama pull qwen3:8b.'
+    })
+  })
+
+  it('mostra a próxima ação que o main escolheu, sem reescrevê-la', async () => {
+    /*
+     * O texto vem pronto do main porque só ele sabe **qual** indisponibilidade ocorreu. Uma
+     * frase fixa aqui achataria "suba o Ollama" e "baixe o modelo" numa que não resolve nem uma
+     * nem outra — e ela é falada, onde não há como reler procurando qual metade se aplica.
+     */
+    montar()
+    await segurarEsoltar()
+
+    expect(await screen.findByText(/ollama pull qwen3:8b/i)).toBeInTheDocument()
+  })
+
+  it('fala a recusa, e o texto falado é o mesmo da tela', async () => {
+    falar.mockResolvedValue({ estado: 'ok', fala: { pcm: new Int16Array(4), sampleRate: 22_050 } })
+    montar()
+    await segurarEsoltar()
+
+    // Frase estática pelo TTS: anunciar "o modelo caiu" não pode depender do modelo que caiu.
+    await waitFor(() =>
+      expect(falar).toHaveBeenCalledWith(
+        'O modelo qwen3:8b não está baixado. Rode ollama pull qwen3:8b.',
+        'pt_BR-faber-medium'
+      )
+    )
+  })
+
+  it('volta a aceitar a próxima pergunta depois da recusa', async () => {
+    // Recusa não é estado terminal: o usuário sobe o Ollama e tenta de novo sem reabrir o app.
+    montar()
+    await segurarEsoltar()
+
+    await screen.findByText(/ollama pull/i)
+    await screen.findByRole('button', { name: /segure para falar/i })
+  })
+})
+
+describe('a conversa não ganha canal de ação (critério 8)', () => {
+  it('a ponte usada pela tela não expõe nada que execute', async () => {
+    /*
+     * Guarda de superfície do lado do renderer: a tela fala com `perguntarAoJarvis`,
+     * `historicoDaConversa` e `falar` — texto entrando e saindo. Um método que rodasse comando,
+     * tocasse arquivo ou disparasse conector a partir de uma resposta seria o canal de ação que
+     * a spec põe fora do escopo, atrás de Policy Engine e aprovação.
+     */
+    montar()
+    await screen.findByRole('button', { name: /segure para falar/i })
+
+    const daConversa = Object.keys(window.jarvis).filter((k) => /conversa|jarvis$/i.test(k))
+    expect(daConversa.length).toBeGreaterThan(0)
+
+    expect(
+      daConversa.filter((k) => /exec|run|command|comando|arquivo|file|deploy|connector/i.test(k))
+    ).toEqual([])
   })
 })

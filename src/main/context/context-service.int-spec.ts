@@ -11,6 +11,7 @@
  * leitura. Os arquivos são escritos aqui e lidos pelo serviço, como em produção.
  */
 
+import { createHash } from 'node:crypto'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -29,6 +30,24 @@ const { AuditRepository } = await import('../storage/audit-repository')
 const { ProjectRepository } = await import('../projects/project-repository')
 const { ContextRepository } = await import('./context-repository')
 const { ContextService, fingerprintDaFalha, hashDoPack } = await import('./context-service')
+
+/**
+ * O hash de um pack de projeto conhecido, medido com o código correto.
+ *
+ * Cravado de propósito: comparar `hashDoPack` consigo mesma não detecta que a função inteira
+ * mudou. Se este número mudar, o canônico mudou — e `findByHash` deixou de reconhecer todo pack
+ * já gravado, com o dedupe parando de funcionar em silêncio para o histórico inteiro.
+ */
+const HASH_CANONICO_DE_REFERENCIA =
+  '664a0df9ce57587e974727a9e64e2fb5d25bdc9f5c73cb725e388ecd75d3e819'
+
+/**
+ * O mesmo pack, sem `projectId`. É este que o sentinela quebraria.
+ *
+ * `''` é a escolha que preserva o hash dos packs gravados (ver o comentário no `hashDoPack`);
+ * qualquer outro texto mudaria este número, e é isso que o valor fixo prende.
+ */
+const HASH_SEM_PROJETO = 'a343da6688511e1e5aaed3ca48c7ef2fb6e744f19d202807db64081e89e84876'
 
 const USER = 'u-1'
 const PROJETO = 'p-1'
@@ -554,5 +573,194 @@ describe('o manifesto é imutável', () => {
     ).pack
 
     expect(service.listar(PROJETO)[0]?.id).toBe(ultimo?.id)
+  })
+})
+
+/**
+ * Contexto que não vem de arquivo (SPEC-Voz-03, emenda E1 — critério 10).
+ *
+ * A conversa por voz pergunta sobre o **app**: a fila, os aceites pendentes. O manifesto dela
+ * traz persona, snapshot e histórico — texto que o app escreveu sobre si mesmo, sem projeto e
+ * sem arquivo em disco.
+ *
+ * O que estes testes precisam provar não é só que o pack do app é aceito: é que aceitá-lo
+ * **não afrouxou** o caminho documental. Por isso cada bloco tem o par — o pack do app passa, e
+ * o pack de geração continua sendo recusado pela mesma guarda de antes.
+ */
+describe('contexto do app, sem projeto (E1)', () => {
+  const partes = [
+    {
+      nome: 'persona',
+      texto: 'Você é o JARVIS. Responda curto, em pt-BR.',
+      motivo: 'persona ativa'
+    },
+    { nome: 'snapshot', texto: 'Fila: 2 ativos, 1 aguardando aceite.', motivo: 'estado do app' }
+  ]
+
+  function pedidoDoApp(parcial: Partial<Parameters<typeof service.montarDoApp>[0]> = {}) {
+    return {
+      tarefa: 'conversa-de-voz',
+      etapa: 'conversa',
+      partes,
+      rota: 'ollama' as const,
+      ...parcial
+    }
+  }
+
+  it('monta e grava um pack sem projectId', () => {
+    const pack = service.montarDoApp(pedidoDoApp(), 'jarvis')
+
+    expect(pack.projectId).toBeUndefined()
+    expect(pack.itens).toHaveLength(2)
+    // Prova por efeito: a linha existe no banco com a coluna nula, não só no objeto devolvido.
+    expect(packsNoBanco()).toBe(1)
+    const row = db.prepare('SELECT project_id FROM context_pack WHERE id = ?').get(pack.id) as {
+      project_id: string | null
+    }
+    expect(row.project_id).toBeNull()
+  })
+
+  it('o pack releito do banco continua sem projectId — a chave é omitida, não nula', () => {
+    // `projectId: null` faria `!== undefined` ser verdade para um pack que não tem projeto, e
+    // todo código que checa a ausência passaria a ver um projeto inexistente.
+    const pack = service.montarDoApp(pedidoDoApp(), 'jarvis')
+    const relido = repository.findById(USER, pack.id)
+
+    expect(relido).toBeDefined()
+    expect(relido?.projectId).toBeUndefined()
+    expect('projectId' in (relido as object)).toBe(false)
+  })
+
+  it('cada item declara a origem `estado-do-app` e hasheia o texto gerado', () => {
+    const pack = service.montarDoApp(pedidoDoApp(), 'jarvis')
+
+    for (const item of pack.itens) {
+      expect(item.origem).toBe('estado-do-app')
+      // `app://` é o que impede confundir com caminho de arquivo ao ler o manifesto.
+      expect(item.caminho).toMatch(/^app:\/\//)
+      expect(item.hash).toMatch(/^[0-9a-f]{64}$/)
+    }
+
+    // O hash é do texto exato que o modelo viu — a mesma pergunta que o hash de arquivo responde.
+    const persona = pack.itens.find((i) => i.caminho === 'app://persona')
+    expect(persona?.hash).toBe(createHash('sha256').update(partes[0].texto, 'utf8').digest('hex'))
+    expect(persona?.bytes).toBe(Buffer.byteLength(partes[0].texto, 'utf8'))
+  })
+
+  it('o teto de contexto continua valendo — bytes são medidos, não estimados', () => {
+    const pack = service.montarDoApp(pedidoDoApp(), 'jarvis')
+
+    expect(pack.orcamento.tokensEstimados).toBeGreaterThan(0)
+    expect(pack.orcamento.tetoDeTokens).toBeGreaterThan(0)
+    // Rota local: sem custo em USD, mas com teto de tokens. `null` e `0` são estados diferentes.
+    expect(pack.orcamento.unmetered).toBe(true)
+    expect(pack.orcamento.estimadoUsd).toBeNull()
+  })
+
+  it('reusa o pack quando o contexto é byte a byte idêntico', () => {
+    // O manifesto descreve o **envio**, não a intenção: dois envios idênticos são o mesmo envio.
+    const a = service.montarDoApp(pedidoDoApp(), 'jarvis')
+    const b = service.montarDoApp(pedidoDoApp(), 'jarvis')
+
+    expect(b.id).toBe(a.id)
+    expect(packsNoBanco()).toBe(1)
+  })
+
+  it('texto diferente produz pack diferente', () => {
+    const a = service.montarDoApp(pedidoDoApp(), 'jarvis')
+    const b = service.montarDoApp(
+      pedidoDoApp({
+        partes: [{ nome: 'snapshot', texto: 'Fila: 3 ativos.', motivo: 'estado do app' }]
+      }),
+      'jarvis'
+    )
+
+    expect(b.id).not.toBe(a.id)
+    expect(packsNoBanco()).toBe(2)
+  })
+
+  it('audita a montagem sem copiar o conteúdo enviado', () => {
+    // O snapshot fala da fila e dos projetos do usuário. Responder "o que foi enviado?" não
+    // exige repetir o que foi enviado (ADR-004).
+    const pack = service.montarDoApp(pedidoDoApp(), 'jarvis')
+    const eventos = db
+      .prepare("SELECT payload FROM audit_event WHERE type = 'context-pack'")
+      .all() as readonly { payload: string }[]
+
+    expect(eventos).toHaveLength(1)
+    const payload = eventos[0].payload
+    expect(payload).toContain(pack.hash)
+    expect(payload).toContain('estado-do-app')
+    expect(payload).not.toContain('Fila: 2 ativos')
+    expect(payload).not.toContain('Você é o JARVIS')
+  })
+})
+
+describe('o caminho documental não afrouxou (contrafactual do critério 10)', () => {
+  it('geração continua exigindo projeto conhecido', () => {
+    const desfecho = service.montar(pedido({ projectId: 'projeto-que-nao-existe' }), 'jarvis')
+
+    expect(desfecho.reason).toBe('projeto-desconhecido')
+    expect(packsNoBanco()).toBe(0)
+  })
+
+  it('geração continua recusando contexto vazio', () => {
+    // Nenhum arquivo legível: a guarda que a E1 **não** relaxou. Se um dia alguém tentar
+    // reaproveitar o caminho do app para geração, é aqui que reprova.
+    const desfecho = service.montar(
+      pedido({ candidatos: [candidato({ caminho: 'docs/nao-existe.md' })] }),
+      'jarvis'
+    )
+
+    expect(desfecho.reason).toBe('contexto-vazio')
+    expect(packsNoBanco()).toBe(0)
+  })
+
+  it('o hash dos packs de projeto não mudou com o campo opcional', () => {
+    /*
+     * A regressão que este teste existe para pegar: se o `projectId` entrasse no canônico com um
+     * sentinela (`'sem-projeto'`) em vez de `?? ''`, todo pack já gravado passaria a hashear
+     * diferente — `findByHash` deixaria de reconhecê-los e o dedupe silenciosamente pararia de
+     * funcionar para o histórico inteiro.
+     */
+    const entrada = {
+      user_id: USER,
+      workspace_id: 'jarvis' as const,
+      projectId: PROJETO,
+      tarefa: 'SPEC-Planejamento-02',
+      itens: [],
+      regras: [],
+      falhasAbertas: [],
+      orcamento: {
+        etapa: 'contexto',
+        unmetered: false,
+        tetoDeTokens: 100,
+        tokensEstimados: 10,
+        estimadoUsd: 0.01
+      },
+      rota: 'anthropic' as const
+    }
+
+    /*
+     * O valor é **cravado**, não comparado contra outra chamada da mesma função.
+     *
+     * A primeira versão deste teste comparava `comProjeto !== semProjeto` e passava mesmo
+     * trocando o `?? ''` por um sentinela — os dois mudavam juntos, e a asserção continuava
+     * verdadeira. Um teste que só compara a função consigo mesma não pode detectar que a função
+     * inteira mudou. O número abaixo saiu de uma execução com o código correto; se ele mudar, é
+     * porque o canônico mudou, e todo pack gravado deixou de ser reconhecível.
+     */
+    expect(hashDoPack(entrada)).toBe(HASH_CANONICO_DE_REFERENCIA)
+
+    /*
+     * E o hash do pack **sem** projeto também é cravado, porque é ele que o sentinela mudaria.
+     *
+     * A primeira versão deste bloco só afirmava `semProjeto !== comProjeto`, e trocar o `?? ''`
+     * por `?? 'sem-projeto'` continuava passando: os dois seguiam diferentes entre si. O valor
+     * fixo é o que prende a escolha — `''` e não outra coisa — e com ela a promessa de que
+     * ausência hasheia como ausência.
+     */
+    expect(hashDoPack({ ...entrada, projectId: undefined })).toBe(HASH_SEM_PROJETO)
+    expect(HASH_SEM_PROJETO).not.toBe(HASH_CANONICO_DE_REFERENCIA)
   })
 })

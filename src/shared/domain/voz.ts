@@ -50,3 +50,98 @@ export interface ProntidaoDaVoz {
   readonly faltando: readonly string[]
   readonly compute: ModoDeCompute
 }
+
+/** Uma troca da conversa. O histórico da sessão é uma lista disto (SPEC-Voz-03, critério 7). */
+export interface TrocaDaConversa {
+  readonly pergunta: string
+  readonly resposta: string
+}
+
+/**
+ * O desfecho de uma pergunta à persona (SPEC-Voz-03), do ponto de vista de quem desenha a tela
+ * **e** de quem vai falar.
+ *
+ * `indisponivel` carrega a `proximaAcao` porque o critério 4 exige recusa **com** próxima ação,
+ * visual e falada. Um estado sem texto obrigaria a tela a inventar a frase e a fala a ficar muda.
+ * Ela é escolhida no main, onde se sabe qual das duas indisponibilidades ocorreu: serviço fora
+ * pede subir o Ollama, modelo ausente pede `ollama pull` — próximas ações diferentes que um
+ * estado só, sem texto, achataria numa frase que não resolve nem uma nem outra.
+ */
+export type DesfechoDaConversa =
+  | { readonly estado: 'ok'; readonly resposta: string }
+  | { readonly estado: 'sem-pergunta' }
+  | { readonly estado: 'indisponivel'; readonly proximaAcao: string }
+  | { readonly estado: 'falhou'; readonly motivo: string }
+
+/**
+ * Quantas trocas da sessão entram no contexto da conversa (SPEC-Voz-03, critério 7).
+ *
+ * Dez é o default cravado na spec. É configurável porque a janela troca contexto por custo: cada
+ * troca a mais é prompt a mais em toda pergunta seguinte, e quem conversa longo quer o
+ * follow-up funcionando enquanto quem faz perguntas soltas não quer pagar por isso.
+ */
+export const JANELA_PADRAO_DA_CONVERSA = 10
+
+/** Os limites da janela. Fora deles a preferência é recusada na escrita. */
+export const JANELA_MINIMA_DA_CONVERSA = 0
+export const JANELA_MAXIMA_DA_CONVERSA = 50
+
+/**
+ * A janela do histórico é válida?
+ *
+ * Fronteira de confiança e teto por construção: cada troca guardada é prompt a mais em **toda**
+ * pergunta seguinte, e um número vindo do renderer sem limite deixaria a conversa arrastar a
+ * sessão inteira para dentro de cada chamada até estourar o contexto do modelo.
+ *
+ * Zero é válido e significa **sem histórico** — perguntas independentes, sem follow-up. É
+ * escolha legítima de quem não quer pagar contexto por ela, não ausência de configuração; quem
+ * quer o default deixa `null`.
+ */
+export function ehJanelaDaConversa(valor: unknown): valor is number {
+  return (
+    typeof valor === 'number' &&
+    Number.isInteger(valor) &&
+    valor >= JANELA_MINIMA_DA_CONVERSA &&
+    valor <= JANELA_MAXIMA_DA_CONVERSA
+  )
+}
+
+/**
+ * A persona como a tela de Settings a vê (SPEC-Voz-03, critério 5).
+ *
+ * Os dois blocos viajam juntos, com donos diferentes: `textoLivre` é do usuário e volta como
+ * escrita; `blocoFixo` é do produto e vai **só de ida**, para a tela exibi-lo como leitura. Se
+ * ele voltasse como dado gravável, uma edição poderia removê-lo, e a resposta voltaria em
+ * markdown para ser lida em voz alta — que é exatamente o que o critério 5 impede.
+ */
+export interface PersonaEditavel {
+  readonly textoLivre: string
+  readonly blocoFixo: string
+  /** Teto do texto livre, para a tela mostrar o limite em vez de recusar em silêncio. */
+  readonly teto: number
+}
+
+/**
+ * O modelo da rota `conversa-de-voz` quando o usuário ainda não escolheu (SPEC-Voz-03, decisão 1
+ * do PI: "Qwen3 8B via Ollama, default da rota, configurável em Settings").
+ *
+ * **Default da rota, não do provider.** `MODELO_PADRAO.ollama` é `llama3.1` e serve as outras
+ * rotas locais; usá-lo aqui faria a conversa recusar por "modelo não baixado" numa máquina com o
+ * Ollama no ar e o `qwen3:8b` instalado — que foi exatamente o que o E2E no app real mostrou. O
+ * default de uma rota é fato sobre a rota, e é por isso que ele mora ao lado dela.
+ *
+ * Trocar continua sendo Settings: o modelo ativo do provider, quando o usuário o define, vence
+ * este valor.
+ */
+export const MODELO_PADRAO_DA_CONVERSA = 'qwen3:8b'
+
+/**
+ * As janelas que Settings oferece (SPEC-Voz-03, critério 7).
+ *
+ * Lista fechada e não campo livre: o custo do número não é óbvio para quem escolhe — cada troca
+ * guardada é prompt a mais em **toda** pergunta seguinte —, e um campo aberto convidaria a digitar
+ * 500 sem sinal de que isso arrasta a sessão inteira para dentro de cada chamada.
+ *
+ * Zero está na lista porque é escolha legítima: perguntas independentes, sem follow-up.
+ */
+export const JANELAS_DA_CONVERSA = [0, 5, 10, 20, 50] as const

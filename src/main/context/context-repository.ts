@@ -31,7 +31,8 @@ interface PackRow {
   readonly id: string
   readonly user_id: string
   readonly workspace_id: string
-  readonly project_id: string
+  /** `null` = contexto do próprio app, sem projeto (SPEC-Voz-03, E1). */
+  readonly project_id: string | null
   readonly tarefa: string
   readonly regras: string
   readonly falhas: string
@@ -181,7 +182,9 @@ export class ContextRepository {
         pack.id,
         pack.user_id,
         pack.workspace_id,
-        pack.projectId,
+        // `?? null` e não o valor direto: o driver recusa `undefined` como parâmetro, e o campo
+        // é opcional desde a E1. `null` na coluna é o que afirma "não há projeto".
+        pack.projectId ?? null,
         pack.tarefa,
         JSON.stringify(pack.regras),
         JSON.stringify(pack.falhasAbertas),
@@ -301,7 +304,10 @@ export class ContextRepository {
       id: row.id,
       user_id: row.user_id,
       workspace_id: row.workspace_id as WorkspaceId,
-      projectId: row.project_id,
+      // Omitido quando a coluna é `null`, e não `projectId: null`: o tipo diz `string |
+      // undefined`, e uma chave presente com `null` faria `pack.projectId !== undefined` ser
+      // verdade para um pack que não tem projeto — o oposto do que a leitura precisa dizer.
+      ...(row.project_id === null ? {} : { projectId: row.project_id }),
       tarefa: row.tarefa,
       itens: itens.map(toItem),
       regras: lerLista(row.regras, 'regras'),

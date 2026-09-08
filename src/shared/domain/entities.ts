@@ -115,6 +115,11 @@ export interface UserProfile {
   readonly vozTimeoutMs: number | null
   /** A voz com que o app fala (SPEC-Voz-02). `null` = default de fábrica. Ver a migration 41. */
   readonly vozDaFala: VozDaFalaPreferida | null
+  /**
+   * Quantas trocas entram no contexto da conversa (SPEC-Voz-03, critério 7). `null` = default de
+   * fábrica (`JANELA_PADRAO_DA_CONVERSA`). Ver a migration 44.
+   */
+  readonly conversaJanela: number | null
 }
 
 /** O que a tela de Settings e a CHOICE alteram. Todos opcionais: a UI muda um de cada vez. */
@@ -128,6 +133,7 @@ export interface UserPreferences {
   readonly vozHotkey?: HotkeyDeVoz
   readonly vozTimeoutMs?: number
   readonly vozDaFala?: VozDaFalaPreferida
+  readonly conversaJanela?: number
 }
 
 /**
