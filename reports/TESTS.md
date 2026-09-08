@@ -12,7 +12,7 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 1737 | 1737 | 0 | 78.2 | — | — |
+| — | — | — | Regras de Negócio | 1748 | 1748 | 0 | 78.4 | — | — |
 | — | — | — | Banco | 1238 | 1224 | 0 | 86.7 | — | — |
 | — | — | — | Tela | 692 | 691 | 0 | 76.1 | — | — |
 
@@ -367,3 +367,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | — | #202 | spec-voz-02-tts-piper-fonemas | Regras de Negócio | 1737 | 1737 | 0 | 78.2 | — | — |
 | — | #202 | spec-voz-02-tts-piper-fonemas | Banco | 1238 | 1224 | 0 | 86.7 | — | — |
 | — | #202 | spec-voz-02-tts-piper-fonemas | Tela | 692 | 691 | 0 | 76.1 | — | — |
+| 2026-09-08 | #345 | spec-voz-01-stt-local-push-to-talk | Regras de Negócio | 1748 | 1748 | 0 | 78.4 | #346 | [#346](https://github.com/RodReis/rrb-jarvisOS/pull/346) |
+| 2026-09-08 | #345 | spec-voz-01-stt-local-push-to-talk | Banco | 1238 | 1224 | 0 | 86.7 | #346 | [#346](https://github.com/RodReis/rrb-jarvisOS/pull/346) |
+| 2026-09-08 | #345 | spec-voz-01-stt-local-push-to-talk | Tela | 692 | 691 | 0 | 76.1 | #346 | [#346](https://github.com/RodReis/rrb-jarvisOS/pull/346) |
