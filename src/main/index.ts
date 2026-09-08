@@ -8,9 +8,10 @@ import { Sidecar } from './voz/sidecar'
 import { criarEngineFasterWhisper } from './voz/engine-faster-whisper'
 import { criarEnginePiper } from './voz/engine-piper'
 import { HotkeyDaVoz } from './voz/hotkey-da-voz'
+import { prepararRuntime, runtimeUsavel } from './voz/preparo-do-runtime'
 import type { ModoDeCompute } from '@shared/domain/voz'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
-import { spawn } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import { app, BrowserWindow, globalShortcut, nativeTheme, shell } from 'electron'
 import { IPC_EVENT_CHANNELS } from '@shared/contracts/ipc'
 import { AuthService } from './auth/auth-service'
@@ -1533,8 +1534,60 @@ if (!app.requestSingleInstanceLock()) {
      * aqui faria o STT — que nunca precisou delas — reportar-se indisponível até o usuário baixar
      * uma voz para o app falar. Seriam duas capacidades independentes amarradas por um filtro.
      */
-    const faltandoNoDisco = (): readonly string[] =>
-      faltandoDentre(ARTEFATOS_DA_VOZ.filter((a) => grupoDoArtefato(a.id) !== 'vozes'))
+    /**
+     * O que falta para transcrever, medido pelo que **roda** — não pelo que foi baixado.
+     *
+     * A pergunta antiga era "o destino do download existe?", e ela respondia sim para
+     * `runtime/python.tar.gz` fechado: a tela dizia pronta e o sidecar não subia (FIX #345). O
+     * runtime só sai da lista quando o interpretador está extraído **e** as dependências
+     * instaladas, que é exatamente o que o sidecar precisa encontrar.
+     */
+    /**
+     * Roda um processo até o fim, rejeitando com a saída quando o código não é zero.
+     *
+     * `execFile` e não `spawn` com shell: os argumentos vão como lista, então caminho com espaço
+     * — `C:\Users\...\AppData\Roaming` é o caso normal aqui — não precisa de aspas e
+     * nada do que vier neles é interpretado como comando.
+     *
+     * O `stderr` entra na mensagem porque é onde `tar` e `pip` explicam a falha; sem ele a
+     * rejeição seria "código 1", que não diz o que fazer.
+     */
+    const executarProcesso = (comando: string, args: readonly string[]): Promise<void> =>
+      new Promise((resolver, rejeitar) => {
+        execFile(
+          comando,
+          [...args],
+          { maxBuffer: 32 * 1024 * 1024 },
+          (erro, _saida, saidaDeErro) => {
+            if (erro === null) return resolver()
+            rejeitar(
+              new Error(`${erro.message}${saidaDeErro === '' ? '' : ` — ${saidaDeErro.trim()}`}`)
+            )
+          }
+        )
+      })
+
+    const faltandoNoDisco = (): readonly string[] => {
+      const doStt = ARTEFATOS_DA_VOZ.filter((a) => grupoDoArtefato(a.id) !== 'vozes')
+
+      /*
+       * O modelo é medido por presença; runtime e wheels, por **usabilidade**.
+       *
+       * O modelo do Whisper é lido do disco como está — baixou, serve. O runtime e as wheels
+       * precisam de um passo a mais depois do download (extrair, instalar), e é por medi-los como
+       * arquivo presente que a tela declarou pronta uma voz que não subia (FIX #345). Enquanto o
+       * preparo não terminar, os dois continuam na lista: baixá-los de novo é barato e é o que a
+       * tela sabe oferecer, e o preparo roda ao fim do download sem rebaixar nada.
+       */
+      const preparado = runtimeUsavel({ diretorioDaVoz, existe: existsSync })
+      const dependeDoPreparo = (id: string): boolean =>
+        grupoDoArtefato(id) === 'runtime' || grupoDoArtefato(id) === 'wheels'
+
+      const faltando = faltandoDentre(doStt.filter((a) => !dependeDoPreparo(a.id)))
+      if (preparado) return faltando
+
+      return [...faltando, ...doStt.filter((a) => dependeDoPreparo(a.id)).map((a) => a.id)]
+    }
 
     /*
      * O sidecar do TTS é um **segundo processo**, não outra operação no mesmo (decisão 3 do PI).
@@ -1656,7 +1709,7 @@ if (!app.requestSingleInstanceLock()) {
           return { estado: 'falhou', motivo: 'Artefato desconhecido.' }
         }
 
-        return baixarArtefato(artefato, {
+        const desfecho = await baixarArtefato(artefato, {
           buscar: async (url) => Buffer.from(await (await fetch(url)).arrayBuffer()),
           gravar: async (destino, dados) => {
             const alvo = join(app.getPath('userData'), destino)
@@ -1675,6 +1728,38 @@ if (!app.requestSingleInstanceLock()) {
           // Fail closed: só as URLs pinadas no catálogo passam.
           permitido: (url) => ARTEFATOS_DA_VOZ.some((a) => a.url === url)
         })
+
+        /*
+         * Baixado não é utilizável (FIX #345).
+         *
+         * O tarball do Python e as 28 wheels chegam fechados; sem este passo o sidecar procura um
+         * `python.exe` que nunca existiu. O preparo roda **depois de cada download** porque é a
+         * tela que decide a ordem dos artefatos, e só ele sabe dizer se o conjunto já está
+         * completo — é idempotente e sai por `nada-a-fazer` enquanto faltar peça.
+         *
+         * O desfecho do **download** é o que volta: extrair é passo do produto, não do arquivo
+         * que o usuário pediu, e um preparo que falha não torna falso o "baixou". A falha vai
+         * para o log, e a prontidão — que agora mede usabilidade — mantém o item na lista, então
+         * a tela continua oferecendo a ação certa em vez de declarar pronto.
+         */
+        if (desfecho.estado === 'ok') {
+          const preparo = await prepararRuntime({
+            diretorioDaVoz,
+            existe: existsSync,
+            wheels: () =>
+              ARTEFATOS_DA_VOZ.filter((a) => grupoDoArtefato(a.id) === 'wheels')
+                .map((a) => join(app.getPath('userData'), a.destino))
+                .filter((c) => existsSync(c)),
+            executar: executarProcesso,
+            registrar: (msg, ctx) => log.sistema.info(msg, ctx ?? {})
+          })
+
+          if (preparo.estado === 'falhou') {
+            log.sistema.error('O preparo do runtime da voz falhou', { motivo: preparo.motivo })
+          }
+        }
+
+        return desfecho
       },
       audit: storage.audit,
       workspaces,
