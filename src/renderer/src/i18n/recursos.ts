@@ -118,6 +118,19 @@ export const RECURSOS = {
             'O arquivo baixado nao passou na verificacao de integridade e foi descartado. Tentar de novo.',
           bloqueado: 'A origem do download nao esta na lista permitida.',
           falhou: 'O download nao concluiu. Verifique a conexao e tente de novo.'
+        },
+        // A conversa com a persona (SPEC-Voz-03).
+        conversa: {
+          pensando: 'Pensando...',
+          falando: 'Falando...',
+          // O rotulo de quem falou. A tela mostra a troca, e sem isso as duas falas se
+          // confundiriam num bloco de texto so.
+          voce: 'Voce',
+          jarvis: 'JARVIS',
+          // A recusa da rota local vem **do main**, com a proxima acao ja escolhida: servico fora
+          // e modelo ausente pedem coisas diferentes, e um texto fixo aqui achataria as duas.
+          indisponivel: 'A conversa nao esta disponivel',
+          falhou: 'A conversa falhou. Tentar de novo.'
         }
       },
       janela: {
@@ -934,6 +947,14 @@ export const RECURSOS = {
             'The downloaded file failed the integrity check and was discarded. Try again.',
           bloqueado: 'The download origin is not on the allowed list.',
           falhou: 'The download did not finish. Check your connection and try again.'
+        },
+        conversa: {
+          pensando: 'Thinking...',
+          falando: 'Speaking...',
+          voce: 'You',
+          jarvis: 'JARVIS',
+          indisponivel: 'The conversation is unavailable',
+          falhou: 'The conversation failed. Try again.'
         }
       },
       janela: {
