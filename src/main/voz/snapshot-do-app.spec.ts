@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { montarSnapshot, textoDoSnapshot, type FontesDoSnapshot } from './snapshot-do-app'
-import type { Project } from '@shared/domain/entities'
+import type { Project } from '@shared/domain/projects'
 import type { PipelineRun, VistaDaFila } from '@shared/domain/pipeline'
 
 /**

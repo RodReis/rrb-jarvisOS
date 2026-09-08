@@ -24,7 +24,7 @@
 
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { PipelineRun, VistaDaFila } from '@shared/domain/pipeline'
-import type { Project } from '@shared/domain/entities'
+import type { Project } from '@shared/domain/projects'
 
 /** O que o snapshot precisa ler. Injetado: o teste de contrato roda sem banco. */
 export interface FontesDoSnapshot {
