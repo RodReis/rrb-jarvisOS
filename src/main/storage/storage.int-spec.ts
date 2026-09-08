@@ -74,6 +74,8 @@ describe('migrations', () => {
     antigo.exec('ALTER TABLE user_profile DROP COLUMN voz_idioma')
     antigo.exec('ALTER TABLE user_profile DROP COLUMN voz_hotkey')
     antigo.exec('ALTER TABLE user_profile DROP COLUMN voz_timeout_ms')
+    // A v41 acrescenta a voz da fala (SPEC-Voz-02).
+    antigo.exec('ALTER TABLE user_profile DROP COLUMN voz_da_fala')
     antigo.exec('DROP TABLE allowed_directory')
     antigo.exec('DROP TABLE workflow')
     antigo.exec('DROP TABLE automation')
@@ -303,7 +305,8 @@ describe('perfil de usuário', () => {
       vozModelo: null,
       vozIdioma: null,
       vozHotkey: null,
-      vozTimeoutMs: null
+      vozTimeoutMs: null,
+      vozDaFala: null
     }
 
     profiles.save(perfil)
@@ -328,7 +331,8 @@ describe('perfil de usuário', () => {
       vozModelo: null,
       vozIdioma: null,
       vozHotkey: null,
-      vozTimeoutMs: null
+      vozTimeoutMs: null,
+      vozDaFala: null
     }
 
     profiles.save(padrao)
@@ -371,7 +375,8 @@ describe('instrumentação do logger (critério de aceite 7)', () => {
         vozModelo: null,
         vozIdioma: null,
         vozHotkey: null,
-        vozTimeoutMs: null
+        vozTimeoutMs: null,
+        vozDaFala: null
       })
     ).toThrow()
     expect(logDb.error).toHaveBeenCalledWith(

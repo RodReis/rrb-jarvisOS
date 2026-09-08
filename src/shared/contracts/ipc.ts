@@ -17,6 +17,7 @@ import type {
   ModeloDeVoz,
   ResolvedTheme,
   ThemePreference,
+  VozDaFalaPreferida,
   UserPreferences,
   WorkspaceId
 } from '../domain/entities'
@@ -739,6 +740,7 @@ export interface PreferencesSnapshot {
   readonly vozIdioma: IdiomaDeVoz
   readonly vozHotkey: HotkeyDeVoz
   readonly vozTimeoutMs: number
+  readonly vozDaFala: VozDaFalaPreferida
 }
 
 /**

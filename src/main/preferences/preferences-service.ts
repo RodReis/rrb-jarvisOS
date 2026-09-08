@@ -17,6 +17,7 @@ import {
   isModeloDeVoz,
   isThemePreference,
   isTimeoutDeVoz,
+  isVozDaFala,
   VOZ_PADRAO,
   type AccentColor,
   type ResolvedTheme,
@@ -61,7 +62,8 @@ export class PreferencesService {
       vozModelo: profile.vozModelo ?? VOZ_PADRAO.modelo,
       vozIdioma: profile.vozIdioma ?? VOZ_PADRAO.idioma,
       vozHotkey: profile.vozHotkey ?? VOZ_PADRAO.hotkey,
-      vozTimeoutMs: profile.vozTimeoutMs ?? VOZ_PADRAO.timeoutMs
+      vozTimeoutMs: profile.vozTimeoutMs ?? VOZ_PADRAO.timeoutMs,
+      vozDaFala: profile.vozDaFala ?? VOZ_PADRAO.vozDaFala
     }
   }
 
@@ -83,7 +85,8 @@ export class PreferencesService {
         vozModelo: VOZ_PADRAO.modelo,
         vozIdioma: VOZ_PADRAO.idioma,
         vozHotkey: VOZ_PADRAO.hotkey,
-        vozTimeoutMs: VOZ_PADRAO.timeoutMs
+        vozTimeoutMs: VOZ_PADRAO.timeoutMs,
+        vozDaFala: VOZ_PADRAO.vozDaFala
       }
     }
 
@@ -116,7 +119,8 @@ export class PreferencesService {
       ...(isHotkeyDeVoz(preferences.vozHotkey) ? { vozHotkey: preferences.vozHotkey } : {}),
       ...(isTimeoutDeVoz(preferences.vozTimeoutMs)
         ? { vozTimeoutMs: preferences.vozTimeoutMs }
-        : {})
+        : {}),
+      ...(isVozDaFala(preferences.vozDaFala) ? { vozDaFala: preferences.vozDaFala } : {})
     }
 
     if (Object.keys(validadas).length === 0) {

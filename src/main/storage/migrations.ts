@@ -1603,6 +1603,19 @@ const MIGRATIONS: readonly string[] = [
   ALTER TABLE user_profile ADD COLUMN voz_idioma     TEXT;
   ALTER TABLE user_profile ADD COLUMN voz_hotkey     TEXT;
   ALTER TABLE user_profile ADD COLUMN voz_timeout_ms INTEGER;
+  `,
+
+  // 41 - a voz da fala (SPEC-Voz-02, criterio 5).
+  //
+  // Uma coluna a mais em `user_profile`, pela mesma razao da 40: e um campo escalar de
+  // preferencia, e a alternativa seria uma tabela com uma linha por usuario para guardar um id.
+  //
+  // Anulavel pelo mesmo desenho: nulo significa **usar o default de fabrica**, resolvido na
+  // leitura. Aqui isso pesa mais que nas outras quatro, porque a spec diz que o default e
+  // escolhido pelo PI **ouvindo** - cravar `NOT NULL DEFAULT` numa das vozes agora seria decidir
+  // por ele, e mudar depois nao alcancaria nenhuma linha ja gravada.
+  `
+  ALTER TABLE user_profile ADD COLUMN voz_da_fala TEXT;
   `
 ]
 

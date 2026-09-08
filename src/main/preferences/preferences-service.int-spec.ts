@@ -41,7 +41,8 @@ function perfil(id: string) {
     vozModelo: null,
     vozIdioma: null,
     vozHotkey: null,
-    vozTimeoutMs: null
+    vozTimeoutMs: null,
+    vozDaFala: null
   }
 }
 
@@ -74,7 +75,8 @@ describe('padrões do produto', () => {
       vozModelo: 'small',
       vozIdioma: 'pt',
       vozHotkey: 'Control+Shift+Space',
-      vozTimeoutMs: 60_000
+      vozTimeoutMs: 60_000,
+      vozDaFala: 'pt_BR-faber-medium'
     })
   })
 

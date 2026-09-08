@@ -20,7 +20,8 @@ import {
   isHotkeyDeVoz,
   isIdiomaDeVoz,
   isModeloDeVoz,
-  isTimeoutDeVoz
+  isTimeoutDeVoz,
+  isVozDaFala
 } from '@shared/domain/entities'
 import { log } from '../logging/logger'
 
@@ -35,6 +36,7 @@ interface ProfileRow {
   readonly voz_modelo: string | null
   readonly voz_idioma: string | null
   readonly voz_hotkey: string | null
+  readonly voz_da_fala: string | null
   readonly voz_timeout_ms: number | null
 }
 
@@ -64,7 +66,8 @@ function toProfile(row: ProfileRow): UserProfile {
     vozModelo: isModeloDeVoz(row.voz_modelo) ? row.voz_modelo : null,
     vozIdioma: isIdiomaDeVoz(row.voz_idioma) ? row.voz_idioma : null,
     vozHotkey: isHotkeyDeVoz(row.voz_hotkey) ? row.voz_hotkey : null,
-    vozTimeoutMs: isTimeoutDeVoz(row.voz_timeout_ms) ? row.voz_timeout_ms : null
+    vozTimeoutMs: isTimeoutDeVoz(row.voz_timeout_ms) ? row.voz_timeout_ms : null,
+    vozDaFala: isVozDaFala(row.voz_da_fala) ? row.voz_da_fala : null
   }
 }
 
@@ -120,7 +123,8 @@ export class UserProfileRepository {
                   voz_modelo     = COALESCE(?, voz_modelo),
                   voz_idioma     = COALESCE(?, voz_idioma),
                   voz_hotkey     = COALESCE(?, voz_hotkey),
-                  voz_timeout_ms = COALESCE(?, voz_timeout_ms)
+                  voz_timeout_ms = COALESCE(?, voz_timeout_ms),
+                  voz_da_fala    = COALESCE(?, voz_da_fala)
             WHERE id = ?`
         )
         .run(
@@ -132,6 +136,7 @@ export class UserProfileRepository {
           preferences.vozIdioma ?? null,
           preferences.vozHotkey ?? null,
           preferences.vozTimeoutMs ?? null,
+          preferences.vozDaFala ?? null,
           userId
         )
 
