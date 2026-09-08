@@ -114,7 +114,9 @@ export class PreferencesService {
       ...(isModeloDeVoz(preferences.vozModelo) ? { vozModelo: preferences.vozModelo } : {}),
       ...(isIdiomaDeVoz(preferences.vozIdioma) ? { vozIdioma: preferences.vozIdioma } : {}),
       ...(isHotkeyDeVoz(preferences.vozHotkey) ? { vozHotkey: preferences.vozHotkey } : {}),
-      ...(isTimeoutDeVoz(preferences.vozTimeoutMs) ? { vozTimeoutMs: preferences.vozTimeoutMs } : {})
+      ...(isTimeoutDeVoz(preferences.vozTimeoutMs)
+        ? { vozTimeoutMs: preferences.vozTimeoutMs }
+        : {})
     }
 
     if (Object.keys(validadas).length === 0) {

@@ -70,7 +70,10 @@ describe('engine faster-whisper — o contrato do SttEngine (critério 1)', () =
 
   it('descarta segmento sem texto em vez de inventar um vazio', async () => {
     const { sidecar } = sidecarFalso({
-      segmentos: [{ inicioMs: 0, fimMs: 10 }, { inicioMs: 10, fimMs: 20, texto: 'ok' }]
+      segmentos: [
+        { inicioMs: 0, fimMs: 10 },
+        { inicioMs: 10, fimMs: 20, texto: 'ok' }
+      ]
     })
     const engine = criarEngineFasterWhisper({ sidecar, configuracao: () => CONFIG })
 

@@ -146,6 +146,7 @@ describe('ponte do preload', () => {
       'onAiStreamEvent',
       'onAuthChanged',
       'onGenerationEvent',
+      'onVozHotkey',
       'pendenciasDeLimpeza',
       'pickAllowedDirectory',
       'pickProjectDirectory',

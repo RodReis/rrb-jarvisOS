@@ -69,7 +69,8 @@ export function criarEngineFasterWhisper(deps: DepsDoEngine): SttEngine {
     async disponivel(): Promise<boolean> {
       // Presença no disco, não `pedir` ao sidecar: subir o processo Python só para descobrir
       // que o modelo falta gastaria segundos para dar a resposta que o `existsSync` dá.
-      const presentes = deps.artefatosPresentes ?? ((): boolean => existsSync(deps.configuracao().modelo))
+      const presentes =
+        deps.artefatosPresentes ?? ((): boolean => existsSync(deps.configuracao().modelo))
       return presentes()
     },
 
