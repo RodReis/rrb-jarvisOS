@@ -25,6 +25,15 @@ function snapshot(): SnapshotDoApp {
   }
 }
 
+/**
+ * A rota local fora, com a frase que quem a checou escolheu.
+ *
+ * O texto é arbitrário de propósito: qual frase cabe a cada indisponibilidade é assunto de
+ * `rota-local.spec.ts`. O que este arquivo prende é que o serviço **repassa** o que recebeu, sem
+ * substituir por um texto próprio.
+ */
+const FORA = { ok: false, proximaAcao: 'Suba o Ollama e tente de novo.' } as const
+
 function packFalso(id = 'pack-1'): ContextPack {
   return { id, itens: [] } as unknown as ContextPack
 }
@@ -55,7 +64,7 @@ function deps(parcial: Partial<DepsDaConversa> = {}): {
       },
       persona: () => 'Você é o JARVIS.',
       snapshot,
-      rotaDisponivel: async () => true,
+      rotaDisponivel: async () => ({ ok: true }) as const,
       userId: () => 'u-1',
       janelaDoHistorico: () => 10,
       ...parcial
@@ -116,7 +125,7 @@ describe('o ContextPack da conversa (critério 3)', () => {
   it('não monta contexto quando a rota está fora — nada de manifesto órfão', async () => {
     // Montar o pack grava e audita. Fazê-lo para depois descobrir que a rota caiu deixaria no
     // banco o registro de um envio que nunca aconteceu.
-    const { deps: d, packs } = deps({ rotaDisponivel: async () => false })
+    const { deps: d, packs } = deps({ rotaDisponivel: async () => FORA })
     await new ConversaService(d).perguntar('oi', 'jarvis')
 
     expect(packs).toHaveLength(0)
@@ -125,14 +134,18 @@ describe('o ContextPack da conversa (critério 3)', () => {
 
 describe('a rota local fora recusa com próxima ação (critério 4)', () => {
   it('devolve indisponivel com a frase, e não chama o modelo', async () => {
-    const { deps: d, pedidos } = deps({ rotaDisponivel: async () => false })
+    const { deps: d, pedidos } = deps({ rotaDisponivel: async () => FORA })
     const desfecho = await new ConversaService(d).perguntar('oi', 'jarvis')
 
     expect(desfecho.estado).toBe('indisponivel')
     if (desfecho.estado === 'indisponivel') {
-      // A frase é estática: anunciar "o modelo caiu" não pode depender do modelo que caiu.
-      expect(desfecho.proximaAcao).toContain('Ollama')
-      expect(desfecho.proximaAcao.length).toBeGreaterThan(0)
+      /*
+       * A frase vem de quem **sabe qual** indisponibilidade ocorreu, e o serviço a repassa
+       * intacta. Ele não a escolhe: serviço fora e modelo ausente pedem ações diferentes
+       * (`rota-local.spec.ts` prende as duas), e um texto fixo aqui achataria as duas numa que
+       * não resolve nem uma nem outra.
+       */
+      expect(desfecho.proximaAcao).toBe(FORA.proximaAcao)
     }
     expect(pedidos).toHaveLength(0)
   })

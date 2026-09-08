@@ -103,6 +103,39 @@ export class OllamaAdapter implements AiAdapter {
     }
   }
 
+  /**
+   * Quais modelos estão baixados **agora** (SPEC-Voz-03, critério 4).
+   *
+   * Mesmo `GET /api/tags` do healthcheck, lendo o corpo que ele descarta. Servidor de pé e
+   * modelo ausente são duas indisponibilidades com próximas ações diferentes — "suba o Ollama"
+   * contra `ollama pull <modelo>` —, e sem a lista as duas chegariam à tela como a mesma frase.
+   *
+   * Nunca lança, pela mesma razão de `disponivel`: lista vazia é a resposta para servidor fora.
+   * Quem pergunta quer decidir se chama, não tratar exceção.
+   */
+  async modelosInstalados(): Promise<readonly string[]> {
+    const controle = new AbortController()
+    const relogio = setTimeout(() => controle.abort(), OLLAMA_HEALTHCHECK_TIMEOUT_MS)
+
+    try {
+      const resposta = await this.fetchImpl(`${this.baseURL}/api/tags`, {
+        signal: controle.signal
+      })
+      if (!resposta.ok) return []
+
+      // `?.` em cada nível: um corpo inesperado não pode derrubar o serviço — `ok` do conector
+      // não garante forma, e o caminho de falha correto aqui é a recusa que já existe.
+      const corpo = (await resposta.json()) as { models?: { name?: unknown }[] } | null
+      return (corpo?.models ?? [])
+        .map((m) => m?.name)
+        .filter((n): n is string => typeof n === 'string')
+    } catch {
+      return []
+    } finally {
+      clearTimeout(relogio)
+    }
+  }
+
   async *generateStream(request: AdapterRequest): AsyncIterable<AdapterChunk> {
     let resposta: Response
     try {

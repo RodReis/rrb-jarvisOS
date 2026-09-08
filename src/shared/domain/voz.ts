@@ -50,3 +50,25 @@ export interface ProntidaoDaVoz {
   readonly faltando: readonly string[]
   readonly compute: ModoDeCompute
 }
+
+/** Uma troca da conversa. O histórico da sessão é uma lista disto (SPEC-Voz-03, critério 7). */
+export interface TrocaDaConversa {
+  readonly pergunta: string
+  readonly resposta: string
+}
+
+/**
+ * O desfecho de uma pergunta à persona (SPEC-Voz-03), do ponto de vista de quem desenha a tela
+ * **e** de quem vai falar.
+ *
+ * `indisponivel` carrega a `proximaAcao` porque o critério 4 exige recusa **com** próxima ação,
+ * visual e falada. Um estado sem texto obrigaria a tela a inventar a frase e a fala a ficar muda.
+ * Ela é escolhida no main, onde se sabe qual das duas indisponibilidades ocorreu: serviço fora
+ * pede subir o Ollama, modelo ausente pede `ollama pull` — próximas ações diferentes que um
+ * estado só, sem texto, achataria numa frase que não resolve nem uma nem outra.
+ */
+export type DesfechoDaConversa =
+  | { readonly estado: 'ok'; readonly resposta: string }
+  | { readonly estado: 'sem-pergunta' }
+  | { readonly estado: 'indisponivel'; readonly proximaAcao: string }
+  | { readonly estado: 'falhou'; readonly motivo: string }

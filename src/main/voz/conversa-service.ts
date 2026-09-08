@@ -21,26 +21,11 @@
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { AiRequest, AiStreamEvent } from '@shared/domain/ai'
 import type { ContextPack } from '@shared/domain/context-pack'
+import type { DesfechoDaConversa, TrocaDaConversa } from '@shared/domain/voz'
 import { systemDaPersona } from './persona'
 import { textoDoSnapshot, type SnapshotDoApp } from './snapshot-do-app'
 
-/** Uma troca da conversa. O histórico é isto, em memória. */
-export interface TrocaDaConversa {
-  readonly pergunta: string
-  readonly resposta: string
-}
-
-/**
- * O desfecho de uma pergunta, do ponto de vista de quem desenha a tela **e** de quem vai falar.
- *
- * `indisponivel` traz a `proximaAcao` porque a spec exige recusa **com** próxima ação, visual e
- * falada. Um estado sem texto obrigaria a tela a inventar a frase, e a fala a ficar muda.
- */
-export type DesfechoDaConversa =
-  | { readonly estado: 'ok'; readonly resposta: string }
-  | { readonly estado: 'sem-pergunta' }
-  | { readonly estado: 'indisponivel'; readonly proximaAcao: string }
-  | { readonly estado: 'falhou'; readonly motivo: string }
+export type { DesfechoDaConversa, TrocaDaConversa }
 
 export interface DepsDaConversa {
   /** O ponto único. Tipado ao mínimo que este serviço usa — o resto não lhe diz respeito. */
@@ -62,21 +47,19 @@ export interface DepsDaConversa {
   ) => ContextPack
   readonly persona: (workspace: WorkspaceId) => string
   readonly snapshot: (workspace: WorkspaceId) => SnapshotDoApp
-  /** Se a rota local está no ar **agora**. Separado da chamada: a recusa é outra ação. */
-  readonly rotaDisponivel: () => Promise<boolean>
+  /**
+   * Se a rota local pode atender **agora**, e a próxima ação quando não pode.
+   *
+   * Separado da chamada porque a recusa é outra ação, e devolve texto em vez de booleano porque
+   * o critério 4 exige dois cenários com próximas ações diferentes: serviço fora pede subir o
+   * Ollama, modelo ausente pede baixá-lo. Quem sabe qual é o main, que enxerga o adapter; este
+   * serviço só precisa saber que não vai chamar e o que dizer a respeito.
+   */
+  readonly rotaDisponivel: () => Promise<{ ok: true } | { ok: false; proximaAcao: string }>
   readonly userId: () => string
   /** Quantas trocas do histórico entram no contexto. Configurável (critério 7). */
   readonly janelaDoHistorico: () => number
 }
-
-/**
- * A frase da recusa quando a rota local está fora.
- *
- * **Texto estático, nunca gerado** (decisão do Cowork na spec): anunciar "o modelo caiu" não pode
- * depender do modelo que caiu. A F02 fala esta frase como falaria qualquer outra.
- */
-const RECUSA_ROTA_LOCAL =
-  'O modelo local não está respondendo. Suba o Ollama e verifique se o modelo configurado foi baixado.'
 
 export class ConversaService {
   /**
@@ -113,8 +96,9 @@ export class ConversaService {
      * descobrir que a rota está fora deixaria manifestos órfãos no banco, de envios que nunca
      * aconteceram — e "o que foi enviado?" passaria a ter respostas que não foram.
      */
-    if (!(await this.deps.rotaDisponivel())) {
-      return { estado: 'indisponivel', proximaAcao: RECUSA_ROTA_LOCAL }
+    const rota = await this.deps.rotaDisponivel()
+    if (!rota.ok) {
+      return { estado: 'indisponivel', proximaAcao: rota.proximaAcao }
     }
 
     try {
