@@ -14,7 +14,7 @@ Totais da última execução (regenerado, não acumulado):
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
 | — | — | — | Regras de Negócio | 1785 | 1785 | 0 | 78.4 | — | — |
 | — | — | — | Banco | 1248 | 1234 | 0 | 86.5 | — | — |
-| — | — | — | Tela | 714 | 713 | 0 | 76.4 | — | — |
+| — | — | — | Tela | 721 | 720 | 0 | 76.5 | — | — |
 
 ## Histórico por entrega
 
@@ -373,3 +373,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-08 | #204 | spec-voz-03-persona-ponto-unico | Regras de Negócio | 1785 | 1785 | 0 | 78.4 | #347 | [#347](https://github.com/RodReis/rrb-jarvisOS/pull/347) |
 | 2026-09-08 | #204 | spec-voz-03-persona-ponto-unico | Banco | 1248 | 1234 | 0 | 86.5 | #347 | [#347](https://github.com/RodReis/rrb-jarvisOS/pull/347) |
 | 2026-09-08 | #204 | spec-voz-03-persona-ponto-unico | Tela | 714 | 713 | 0 | 76.4 | #347 | [#347](https://github.com/RodReis/rrb-jarvisOS/pull/347) |
+| 2026-09-08 | #348 | spec-voz-01-stt-local-push-to-talk | Regras de Negócio | 1785 | 1785 | 0 | 78.4 | #349 | [#349](https://github.com/RodReis/rrb-jarvisOS/pull/349) |
+| 2026-09-08 | #348 | spec-voz-01-stt-local-push-to-talk | Banco | 1248 | 1234 | 0 | 86.5 | #349 | [#349](https://github.com/RodReis/rrb-jarvisOS/pull/349) |
+| 2026-09-08 | #348 | spec-voz-01-stt-local-push-to-talk | Tela | 721 | 720 | 0 | 76.5 | #349 | [#349](https://github.com/RodReis/rrb-jarvisOS/pull/349) |
