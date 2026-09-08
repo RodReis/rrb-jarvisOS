@@ -72,3 +72,36 @@ export type DesfechoDaConversa =
   | { readonly estado: 'sem-pergunta' }
   | { readonly estado: 'indisponivel'; readonly proximaAcao: string }
   | { readonly estado: 'falhou'; readonly motivo: string }
+
+/**
+ * Quantas trocas da sessão entram no contexto da conversa (SPEC-Voz-03, critério 7).
+ *
+ * Dez é o default cravado na spec. É configurável porque a janela troca contexto por custo: cada
+ * troca a mais é prompt a mais em toda pergunta seguinte, e quem conversa longo quer o
+ * follow-up funcionando enquanto quem faz perguntas soltas não quer pagar por isso.
+ */
+export const JANELA_PADRAO_DA_CONVERSA = 10
+
+/** Os limites da janela. Fora deles a preferência é recusada na escrita. */
+export const JANELA_MINIMA_DA_CONVERSA = 0
+export const JANELA_MAXIMA_DA_CONVERSA = 50
+
+/**
+ * A janela do histórico é válida?
+ *
+ * Fronteira de confiança e teto por construção: cada troca guardada é prompt a mais em **toda**
+ * pergunta seguinte, e um número vindo do renderer sem limite deixaria a conversa arrastar a
+ * sessão inteira para dentro de cada chamada até estourar o contexto do modelo.
+ *
+ * Zero é válido e significa **sem histórico** — perguntas independentes, sem follow-up. É
+ * escolha legítima de quem não quer pagar contexto por ela, não ausência de configuração; quem
+ * quer o default deixa `null`.
+ */
+export function ehJanelaDaConversa(valor: unknown): valor is number {
+  return (
+    typeof valor === 'number' &&
+    Number.isInteger(valor) &&
+    valor >= JANELA_MINIMA_DA_CONVERSA &&
+    valor <= JANELA_MAXIMA_DA_CONVERSA
+  )
+}

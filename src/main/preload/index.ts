@@ -15,7 +15,13 @@ import {
 } from '@shared/contracts/ipc'
 import type { AlvoDaPublicacao, PublicacaoOutcome } from '@shared/domain/publicacao'
 import type { ExecutionLedger } from '@shared/domain/execution-ledger'
-import type { DesfechoDaTranscricao, DesfechoDoDownload, ProntidaoDaVoz } from '@shared/domain/voz'
+import type {
+  DesfechoDaConversa,
+  DesfechoDaTranscricao,
+  DesfechoDoDownload,
+  ProntidaoDaVoz,
+  TrocaDaConversa
+} from '@shared/domain/voz'
 import type { DesfechoDaFala, ProntidaoDoTts } from '@shared/domain/visemes'
 import type { PendenciaDeLimpeza } from '@shared/domain/limpeza'
 import type { MergePolicyOutcome, PoliticaDeMerge, VistaDaFila } from '@shared/domain/pipeline'
@@ -212,6 +218,19 @@ const bridge: JarvisBridge = {
   falar: (texto: string, voz: string): Promise<DesfechoDaFala> =>
     ipcRenderer.invoke(IPC_CHANNELS.ttsFalar, texto, voz),
   prontidaoDoTts: (): Promise<ProntidaoDoTts> => ipcRenderer.invoke(IPC_CHANNELS.ttsProntidao),
+
+  /*
+   * Conversa com a persona (SPEC-Voz-03, critério 8).
+   *
+   * **Texto entra, texto sai.** A conversa responde; não executa. Não há aqui — nem no main —
+   * canal que rode comando, toque arquivo ou dispare conector a partir de uma resposta falada:
+   * comando de voz com efeito é fatia futura, atrás de Policy Engine e aprovação, nunca
+   * subproduto de uma pergunta.
+   */
+  perguntarAoJarvis: (pergunta: string, workspace: WorkspaceId): Promise<DesfechoDaConversa> =>
+    ipcRenderer.invoke(IPC_CHANNELS.conversaPerguntar, pergunta, workspace),
+  historicoDaConversa: (): Promise<readonly TrocaDaConversa[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.conversaHistorico),
   resolveApproval: (
     id: string,
     decision: ApprovalDecision

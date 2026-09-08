@@ -218,7 +218,8 @@ export class AuthService {
       vozIdioma: existente?.vozIdioma ?? null,
       vozHotkey: existente?.vozHotkey ?? null,
       vozTimeoutMs: existente?.vozTimeoutMs ?? null,
-      vozDaFala: existente?.vozDaFala ?? null
+      vozDaFala: existente?.vozDaFala ?? null,
+      conversaJanela: existente?.conversaJanela ?? null
     })
 
     const expiresAt = new Date(agora.getTime() + OFFLINE_SESSION_MAX_DAYS * MS_POR_DIA)

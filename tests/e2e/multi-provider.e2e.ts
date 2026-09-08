@@ -175,6 +175,9 @@ test('as cinco rotas padrão existem e são editáveis pela ponte real', async (
   expect(Object.keys(antes.rotas).sort()).toEqual([
     'chat',
     'code',
+    // A conversa por voz é rota como as outras — configuração, não caminho paralelo
+    // (SPEC-Voz-03). Ela aparece aqui porque trocar o modelo dela é Settings.
+    'conversa-de-voz',
     'embedding',
     'summarize',
     'vision'

@@ -1698,6 +1698,19 @@ const MIGRATIONS: readonly string[] = [
     updated_at   TEXT NOT NULL,
     PRIMARY KEY (user_id, workspace_id)
   );
+  `,
+
+  // 44 - a janela de historico da conversa (SPEC-Voz-03, criterio 7).
+  //
+  // **Coluna em `user_profile`, e nao tabela** - ao contrario da persona da migration 43. A
+  // diferenca e o escopo: a persona e do par usuario+espaco porque cada espaco tem a sua; quantas
+  // trocas entram no contexto e preferencia do **usuario**, igual as das migrations 40 e 41, e
+  // nao muda ao trocar de espaco.
+  //
+  // `NULL` = usar o default de fabrica (dez trocas, cravado na spec), como toda preferencia de
+  // voz. Semear o numero aqui obrigaria uma migration nova para mudar o default de fabrica.
+  `
+  ALTER TABLE user_profile ADD COLUMN conversa_janela INTEGER;
   `
 ]
 

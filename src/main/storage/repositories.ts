@@ -23,6 +23,7 @@ import {
   isTimeoutDeVoz,
   isVozDaFala
 } from '@shared/domain/entities'
+import { ehJanelaDaConversa } from '@shared/domain/voz'
 import { log } from '../logging/logger'
 
 interface ProfileRow {
@@ -37,6 +38,7 @@ interface ProfileRow {
   readonly voz_idioma: string | null
   readonly voz_hotkey: string | null
   readonly voz_da_fala: string | null
+  readonly conversa_janela: number | null
   readonly voz_timeout_ms: number | null
 }
 
@@ -67,7 +69,8 @@ function toProfile(row: ProfileRow): UserProfile {
     vozIdioma: isIdiomaDeVoz(row.voz_idioma) ? row.voz_idioma : null,
     vozHotkey: isHotkeyDeVoz(row.voz_hotkey) ? row.voz_hotkey : null,
     vozTimeoutMs: isTimeoutDeVoz(row.voz_timeout_ms) ? row.voz_timeout_ms : null,
-    vozDaFala: isVozDaFala(row.voz_da_fala) ? row.voz_da_fala : null
+    vozDaFala: isVozDaFala(row.voz_da_fala) ? row.voz_da_fala : null,
+    conversaJanela: ehJanelaDaConversa(row.conversa_janela) ? row.conversa_janela : null
   }
 }
 
@@ -124,7 +127,8 @@ export class UserProfileRepository {
                   voz_idioma     = COALESCE(?, voz_idioma),
                   voz_hotkey     = COALESCE(?, voz_hotkey),
                   voz_timeout_ms = COALESCE(?, voz_timeout_ms),
-                  voz_da_fala    = COALESCE(?, voz_da_fala)
+                  voz_da_fala     = COALESCE(?, voz_da_fala),
+                  conversa_janela = COALESCE(?, conversa_janela)
             WHERE id = ?`
         )
         .run(
@@ -137,6 +141,7 @@ export class UserProfileRepository {
           preferences.vozHotkey ?? null,
           preferences.vozTimeoutMs ?? null,
           preferences.vozDaFala ?? null,
+          preferences.conversaJanela ?? null,
           userId
         )
 

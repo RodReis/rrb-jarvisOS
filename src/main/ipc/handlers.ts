@@ -1,5 +1,6 @@
 import type { VozService } from '../voz/voz-service'
 import type { TtsService } from '../voz/tts-service'
+import type { ConversaService } from '../voz/conversa-service'
 import type { DesfechoDoDownload } from '@shared/domain/voz'
 import { app, dialog, ipcMain } from 'electron'
 import {
@@ -410,6 +411,8 @@ export interface IpcDependencies {
   readonly voz: VozService
   /** O serviço de fala (SPEC-Voz-02). Sidecar próprio, injetado pela mesma razão. */
   readonly tts: TtsService
+  /** A conversa com a persona (SPEC-Voz-03). Injetada como o resto — o IPC não conhece o modelo. */
+  readonly conversa: ConversaService
   readonly baixarArtefatoDeVoz: (id: string) => Promise<DesfechoDoDownload>
   /** Ausente quando as credenciais não estão configuradas — o app roda sem login. */
   readonly auth?: AuthService
@@ -818,6 +821,26 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
   })
 
   ipcMain.handle(IPC_CHANNELS.ttsProntidao, async () => deps.tts.prontidao())
+
+  /*
+   * Conversa com a persona (SPEC-Voz-03).
+   *
+   * A validação de entrada é fronteira de confiança, como em toda a ponte: o renderer manda o
+   * que quiser, e tratar `pergunta` como string sem checar seria confiar no chamador. Entrada
+   * malformada vira desfecho nomeado — a tela sabe desenhar `falhou`, não sabe desenhar uma
+   * exceção que atravessou o IPC.
+   */
+  ipcMain.handle(
+    IPC_CHANNELS.conversaPerguntar,
+    async (_event, pergunta: unknown, workspace: unknown) => {
+      if (typeof pergunta !== 'string' || !isWorkspaceId(workspace)) {
+        return { estado: 'falhou' as const, motivo: 'Pergunta malformada.' }
+      }
+      return deps.conversa.perguntar(pergunta, workspace)
+    }
+  )
+
+  ipcMain.handle(IPC_CHANNELS.conversaHistorico, async () => deps.conversa.trocas())
 
   ipcMain.handle(IPC_CHANNELS.approvalList, (_event, workspace: unknown) => {
     if (!isWorkspaceId(workspace)) return []

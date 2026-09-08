@@ -25,6 +25,7 @@ import {
   type UserPreferences,
   type UserProfile
 } from '@shared/domain/entities'
+import { ehJanelaDaConversa, JANELA_PADRAO_DA_CONVERSA } from '@shared/domain/voz'
 import { log } from '../logging/logger'
 import type { UserProfileRepository } from '../storage/repositories'
 
@@ -63,7 +64,12 @@ export class PreferencesService {
       vozIdioma: profile.vozIdioma ?? VOZ_PADRAO.idioma,
       vozHotkey: profile.vozHotkey ?? VOZ_PADRAO.hotkey,
       vozTimeoutMs: profile.vozTimeoutMs ?? VOZ_PADRAO.timeoutMs,
-      vozDaFala: profile.vozDaFala ?? VOZ_PADRAO.vozDaFala
+      vozDaFala: profile.vozDaFala ?? VOZ_PADRAO.vozDaFala,
+      /*
+       * `??` e não `||`: zero é escolha legítima — "sem histórico", perguntas independentes —, e
+       * `||` a trocaria pelo default de dez, dando ao usuário o oposto do que ele pediu.
+       */
+      conversaJanela: profile.conversaJanela ?? JANELA_PADRAO_DA_CONVERSA
     }
   }
 
@@ -86,7 +92,8 @@ export class PreferencesService {
         vozIdioma: VOZ_PADRAO.idioma,
         vozHotkey: VOZ_PADRAO.hotkey,
         vozTimeoutMs: VOZ_PADRAO.timeoutMs,
-        vozDaFala: VOZ_PADRAO.vozDaFala
+        vozDaFala: VOZ_PADRAO.vozDaFala,
+        conversaJanela: JANELA_PADRAO_DA_CONVERSA
       }
     }
 
@@ -120,7 +127,10 @@ export class PreferencesService {
       ...(isTimeoutDeVoz(preferences.vozTimeoutMs)
         ? { vozTimeoutMs: preferences.vozTimeoutMs }
         : {}),
-      ...(isVozDaFala(preferences.vozDaFala) ? { vozDaFala: preferences.vozDaFala } : {})
+      ...(isVozDaFala(preferences.vozDaFala) ? { vozDaFala: preferences.vozDaFala } : {}),
+      ...(ehJanelaDaConversa(preferences.conversaJanela)
+        ? { conversaJanela: preferences.conversaJanela }
+        : {})
     }
 
     if (Object.keys(validadas).length === 0) {

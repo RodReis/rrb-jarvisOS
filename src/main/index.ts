@@ -9,6 +9,10 @@ import { criarEngineFasterWhisper } from './voz/engine-faster-whisper'
 import { criarEnginePiper } from './voz/engine-piper'
 import { HotkeyDaVoz } from './voz/hotkey-da-voz'
 import { prepararRuntime, runtimeUsavel } from './voz/preparo-do-runtime'
+import { ConversaService } from './voz/conversa-service'
+import { criarRotaLocal } from './voz/rota-local'
+import { montarSnapshot } from './voz/snapshot-do-app'
+import { PersonaRepository } from './voz/persona-repository'
 import type { ModoDeCompute } from '@shared/domain/voz'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { execFile, spawn } from 'node:child_process'
@@ -1641,6 +1645,41 @@ if (!app.requestSingleInstanceLock()) {
     })
 
     /*
+     * A conversa com a persona (SPEC-Voz-03).
+     *
+     * **Tudo passa pelo ponto único.** O serviço recebe o `AiCallService`, não o adapter: é ele
+     * que roteia, audita, mede custo e verifica o `ContextPack`. Passar o `ollamaAdapter` aqui
+     * seria mais curto e mataria o critério 2 — a auditoria não saberia que a conversa
+     * aconteceu, e a rota deixaria de ser configuração.
+     *
+     * O adapter aparece **só** para responder "a rota local pode atender agora?", que é pergunta
+     * sobre o serviço local e não chamada de modelo.
+     */
+    const personas = new PersonaRepository(storage.db)
+
+    const conversa = new ConversaService({
+      ai,
+      montarContexto: (entrada, workspace) => contexts.montarDoApp(entrada, workspace),
+      persona: (workspace) => personas.buscar(userIdAtual(), workspace).texto_livre,
+      snapshot: (workspace) =>
+        montarSnapshot(
+          {
+            projetos: (w) => projectRepository.list(userIdAtual(), w),
+            fila: (projectId, w) => fila.vista(projectId, w)
+          },
+          workspace
+        ),
+      rotaDisponivel: criarRotaLocal({
+        disponivel: () => ollamaAdapter.disponivel(),
+        modelosInstalados: () => ollamaAdapter.modelosInstalados(),
+        // O modelo da rota é o ativo do provider — configurável em Settings, como toda rota.
+        modeloConfigurado: () => routingRepo.modeloAtivo(userIdAtual(), 'jarvis', 'ollama')
+      }),
+      userId: userIdAtual,
+      janelaDoHistorico: () => preferences.atual().conversaJanela
+    })
+
+    /*
      * A hotkey global (critério 5).
      *
      * Ela avisa a **tela**, que é quem tem o microfone: `getUserMedia` é Web API do renderer, e
@@ -1700,6 +1739,7 @@ if (!app.requestSingleInstanceLock()) {
     registerIpcHandlers({
       voz,
       tts,
+      conversa,
       // A hotkey vive no SO, não no banco: salvar sem re-registrar deixaria o atalho antigo
       // valendo até o próximo boot (critério 6).
       aoSalvarPreferencias: aplicarHotkeyDaVoz,
