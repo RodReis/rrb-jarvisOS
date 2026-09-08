@@ -57,3 +57,43 @@ Fechar o loop de voz: a transcrição da F01 vira pergunta, a **persona JARVIS**
 - **A recusa falada usa frase fixa local** (áudio da F02 sobre texto estático), não LLM — anunciar “o modelo caiu” não pode depender do modelo que caiu.
 - **Janela de histórico default 10 trocas, em memória** — persistência é F05/MVP-007.
 - **Persona escopada por workspace desde a migration** — a da NOA é só conteúdo futuro, não mudança de schema.
+
+## Emenda E1 — O `ContextPack` admite contexto que não vem de arquivo (2026-09-08)
+
+- Status: **aprovada-pi** (2026-09-08). Continua na fatia **M17-F03**, issue [#204](https://github.com/RodReis/rrb-jarvisOS/issues/204) — não nasce fatia nova.
+- Motivação: ao começar a fatia, o Code verificou que o formato do pack **não aceita** o pack que o critério 3 exige. É exatamente o caso que a § Decisões cravadas pelo Cowork previu (*"o Code aponta o problema técnico e a correção passa pelo PI"*), e a decisão do PI é mudar o contrato, não contornar o gate.
+- Análise completa, com as três opções e o custo medido: `docs/spec/proposta-contextpack-conversa.md` (PR [#343](https://github.com/RodReis/rrb-jarvisOS/pull/343)). O PI escolheu a **opção A**.
+
+### O problema, verificado no código
+
+Duas paredes duras, ambas confirmadas lendo os arquivos:
+
+1. **`projectId` é obrigatório e verificado contra o repositório** — `context-service.ts:219` faz `projects.findById(...)` e recusa com `projeto-desconhecido`. Uma conversa com o JARVIS não tem projeto: perguntar *"o que está na fila?"* é sobre o **app**, e é justamente o que o critério 6 pede que o snapshot responda. No banco, `project_id TEXT NOT NULL`.
+2. **`itens` não pode ser vazio, e um item só nasce de arquivo em disco** — `context-service.ts:274` recusa com `contexto-vazio`; o item carrega `caminho` relativo à raiz do projeto e `hash` do conteúdo lido por `readFileSync`, depois de `resolverDentroDoProjeto` recusar tudo fora do diretório. Persona, snapshot e histórico nascem **em memória**, a partir do banco local: não têm caminho relativo nem arquivo a hashear.
+
+Os três contornos disponíveis eram todos o defeito que a spec nomeia. `diagnostico: true` é o carve-out **nomeado**, e o comentário em `call-provider.ts:222-224` já recusa este uso: ele existe porque *"o painel de teste do Settings verifica se o provider responde e não gera nada para projeto nenhum"*, e é a única exceção justamente para que *"todo esquecimento"* não vire *"diagnóstico por omissão"* — uma conversa **gera**, e para um usuário.
+
+### Decisão do PI (2026-09-08) — opção A
+
+1. **`ContextPack.projectId` passa a ser opcional.** Ausente significa **contexto do app, não de um projeto** — não é "faltou preencher". A verificação contra o `ProjectRepository` só roda quando o campo vem.
+2. **`ORIGENS_DE_CONTEXTO` ganha `'estado-do-app'`.** A união é fechada de propósito: quem audita precisa distinguir "o usuário anexou" de "o `rg` casou", e agora também de "o app resumiu o próprio estado".
+3. **Item dessa origem tem `hash` do texto gerado**, não de arquivo lido, e `caminho` vira identificador lógico (`app://snapshot`, `app://persona`, `app://historico`). `bytes` continua **medido**, então o teto de contexto continua valendo por construção.
+4. **A recusa `contexto-vazio` continua valendo** — o pack da conversa nunca é vazio: ele sempre traz ao menos persona e snapshot. O que muda é de onde os itens podem vir, não se eles podem faltar.
+5. **Migration de recriação** da tabela `context_pack` com `project_id` anulável (SQLite não tem `DROP NOT NULL`), preservando as linhas existentes.
+
+### Regras
+
+**O gate não é afrouxado, é generalizado.** Pack declarado, hasheado, auditado e com teto de tokens continuam obrigatórios para a conversa — o critério 3 desta spec vale sem exceção. O que a emenda remove é a premissa de que *todo* contexto vem de arquivo de projeto, que era verdade quando o único chamador era geração documental.
+
+**Hash dos packs existentes preservado.** O campo novo segue o padrão que o `hashDoPack` já usa para `pathsPermitidos` (`context-service.ts:152-158`): o `?? ''` no fim faz *"ausência continuar hasheando como ausência"*, então nenhum pack gravado é invalidado. O `projectId` ausente hasheia como string vazia, pela mesma regra.
+
+**O MVP-019 herda isto.** O push (briefing, anúncio proativo) tem o mesmo problema: ele também monta contexto do estado do app sem projeto. A emenda serve as duas fatias, e é parte do argumento da opção A — a alternativa (pack separado para conversa) obrigaria uma terceira estrutura no 019.
+
+### Critério de aceite acrescentado
+
+10. **Contexto sintético é declarado como tal:** um pack sem `projectId` é aceito, seus itens de origem `'estado-do-app'` hasheiam o texto gerado, e o manifesto **distingue** esses itens dos que vieram de arquivo. Contrafactual: um pack de geração documental continua exigindo `projectId` e recusando `contexto-vazio`. Teste dos dois lados, e teste de que os packs já gravados mantêm o hash.
+
+### Duas decisões menores tomadas junto (2026-09-08)
+
+- **Guarda de lint para o Ollama:** não existe hoje — o bloco `no-restricted-imports` do `eslint.config.js` cobre `@anthropic-ai/*` e os runtimes de whisper, e o Ollama fala por `fetch` HTTP sem SDK npm, então não há pacote a restringir. A restrição passa a mirar o **módulo** (`ollama-adapter`) em vez do pacote, para a garantia de "nenhum caminho paralelo ao ponto único" ser estrutural e não só de revisão.
+- **A `Persona` não vai para a aba `voz`.** Ela é escopada a `user_id + workspace_id`, e o critério de agrupamento escrito na própria tela (`Settings.tsx:32-38`) põe o que é do par usuário+espaço nas abas `ia`/`roteamento`/`conectores`. A persona entra na aba **`ia`**, e o comentário da tela continua verdadeiro.
