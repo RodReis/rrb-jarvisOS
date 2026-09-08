@@ -1675,6 +1675,29 @@ const MIGRATIONS: readonly string[] = [
   DROP TABLE context_pack;
   ALTER TABLE context_pack_novo RENAME TO context_pack;
   CREATE INDEX idx_context_pack_projeto ON context_pack(user_id, project_id, created_at);
+  `,
+
+  // 43 - a persona da conversa por voz (SPEC-Voz-03, criterio 5).
+  //
+  // **Tabela propria, e nao coluna em `user_profile`** - ao contrario das preferencias de voz das
+  // migrations 40 e 41. O motivo nao e preferencia: `user_profile` e escopado so a `user_id`, e a
+  // persona e do par **usuario + espaco** (regra inviolavel do CLAUDE.md). O JARVIS OS tem a dele;
+  // a da NOA e conteudo futuro, sem mudanca de schema.
+  //
+  // Uma linha por escopo, com `texto_livre` guardando **so** a parte editavel. O bloco fixo de
+  // sistema - respostas curtas, pt-BR, sem markdown - **nao mora aqui**: ele e do produto, nao do
+  // usuario, e persisti-lo permitiria que uma edicao no banco o removesse. Esvaziar o texto livre
+  // deixa o bloco fixo valendo, que e o que o criterio 5 exige.
+  //
+  // Ausencia de linha = persona de fabrica valendo, nunca erro; nada e semeado no boot.
+  `
+  CREATE TABLE persona (
+    user_id      TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    texto_livre  TEXT NOT NULL,
+    updated_at   TEXT NOT NULL,
+    PRIMARY KEY (user_id, workspace_id)
+  );
   `
 ]
 
