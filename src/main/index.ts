@@ -1740,6 +1740,7 @@ if (!app.requestSingleInstanceLock()) {
       voz,
       tts,
       conversa,
+      personas,
       // A hotkey vive no SO, não no banco: salvar sem re-registrar deixaria o atalho antigo
       // valendo até o próximo boot (critério 6).
       aoSalvarPreferencias: aplicarHotkeyDaVoz,

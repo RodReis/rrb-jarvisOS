@@ -752,6 +752,21 @@ export const RECURSOS = {
         vozMinutos: '{{valor}} minutos',
         vozDaFala: 'Voz do JARVIS',
         vozDaFalaDescricao: 'Como o app fala com voce. Ouca as duas antes de escolher.',
+        // A persona da conversa (SPEC-Voz-03, criterio 5).
+        persona: 'Persona do JARVIS',
+        personaDescricao:
+          'Como o JARVIS se apresenta e conversa no {{espaco}}. Vale na proxima resposta, sem reiniciar o app.',
+        personaTextoLivre: 'Tom e estilo',
+        personaTextoLivreDescricao:
+          'Nome, tratamento, jeito de falar. Deixe vazio para o JARVIS responder sem tom proprio.',
+        personaPlaceholder:
+          'Voce e o JARVIS, assistente do operador. Trate-o por "operador". Seja cordial e direto.',
+        personaSalvar: 'Salvar a persona',
+        personaSalva: 'Persona salva.',
+        personaLimite: 'Texto longo demais: {{atual}} de {{teto}} caracteres.',
+        personaBlocoFixo: 'O que o produto garante',
+        personaBlocoFixoDescricao:
+          'Estas regras valem sempre, mesmo com o campo acima vazio. Elas existem porque a resposta e falada em voz alta.',
         vozDaFalaSemVoz: 'Nenhuma voz baixada',
         vozDaFalaBaixar: 'Baixe uma voz na secao de artefatos para o app poder falar.',
         vozDaFalaOuvir: 'Ouvir',
@@ -1505,6 +1520,20 @@ export const RECURSOS = {
         vozMinutos: '{{valor}} minutes',
         vozDaFala: 'JARVIS voice',
         vozDaFalaDescricao: 'How the app speaks to you. Listen to both before choosing.',
+        persona: 'JARVIS persona',
+        personaDescricao:
+          'How JARVIS introduces itself and talks in {{espaco}}. Applies to the next answer, no restart needed.',
+        personaTextoLivre: 'Tone and style',
+        personaTextoLivreDescricao:
+          'Name, form of address, way of speaking. Leave empty for JARVIS to answer with no tone of its own.',
+        personaPlaceholder:
+          'You are JARVIS, assistant to the operator. Address them as "operator". Be warm and direct.',
+        personaSalvar: 'Save persona',
+        personaSalva: 'Persona saved.',
+        personaLimite: 'Text too long: {{atual}} of {{teto}} characters.',
+        personaBlocoFixo: 'What the product guarantees',
+        personaBlocoFixoDescricao:
+          'These rules always apply, even with the field above empty. They exist because the answer is spoken aloud.',
         vozDaFalaSemVoz: 'No voice downloaded',
         vozDaFalaBaixar: 'Download a voice in the artefacts section so the app can speak.',
         vozDaFalaOuvir: 'Listen',

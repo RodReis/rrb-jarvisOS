@@ -1,6 +1,14 @@
 import type { VozService } from '../voz/voz-service'
 import type { TtsService } from '../voz/tts-service'
 import type { ConversaService } from '../voz/conversa-service'
+import type { PersonaRepository } from '../voz/persona-repository'
+import {
+  BLOCO_FIXO_DA_PERSONA,
+  isTextoLivreValido,
+  TETO_DO_TEXTO_LIVRE,
+  TEXTO_LIVRE_PADRAO
+} from '../voz/persona'
+import type { PersonaEditavel } from '@shared/domain/voz'
 import type { DesfechoDoDownload } from '@shared/domain/voz'
 import { app, dialog, ipcMain } from 'electron'
 import {
@@ -413,6 +421,8 @@ export interface IpcDependencies {
   readonly tts: TtsService
   /** A conversa com a persona (SPEC-Voz-03). Injetada como o resto — o IPC não conhece o modelo. */
   readonly conversa: ConversaService
+  /** A persona por escopo (SPEC-Voz-03, critério 5). */
+  readonly personas: PersonaRepository
   readonly baixarArtefatoDeVoz: (id: string) => Promise<DesfechoDoDownload>
   /** Ausente quando as credenciais não estão configuradas — o app roda sem login. */
   readonly auth?: AuthService
@@ -841,6 +851,42 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
   )
 
   ipcMain.handle(IPC_CHANNELS.conversaHistorico, async () => deps.conversa.trocas())
+
+  /*
+   * A persona editável (critério 5).
+   *
+   * O `blocoFixo` vai na resposta como **leitura** — a tela precisa exibi-lo para o usuário
+   * entender o que o produto garante — e nunca volta na escrita: `salvarPersona` recebe só o
+   * texto livre. Aceitá-lo de volta permitiria que uma edição o removesse, e a resposta voltaria
+   * em markdown para ser lida em voz alta.
+   */
+  ipcMain.handle(IPC_CHANNELS.personaLer, async (_event, workspace: unknown) => {
+    if (!isWorkspaceId(workspace)) return personaEditavel(TEXTO_LIVRE_PADRAO)
+    return personaEditavel(deps.personas.buscar(deps.userId(), workspace).texto_livre)
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.personaSalvar,
+    async (_event, textoLivre: unknown, workspace: unknown) => {
+      /*
+       * Teto na fronteira, não na tela: o texto entra no `system` de **toda** conversa, e uma
+       * persona de 100 KB consumiria o contexto inteiro — o snapshot e o histórico ficariam de
+       * fora, e o usuário veria o JARVIS "esquecer" o estado do app sem explicação.
+       *
+       * Texto inválido devolve o que está gravado, sem escrever: a tela mostra o valor real em
+       * vez de exibir uma edição que não aconteceu.
+       */
+      if (!isWorkspaceId(workspace) || !isTextoLivreValido(textoLivre)) {
+        const atual = isWorkspaceId(workspace)
+          ? deps.personas.buscar(deps.userId(), workspace).texto_livre
+          : TEXTO_LIVRE_PADRAO
+        return personaEditavel(atual)
+      }
+
+      const salva = deps.personas.salvar(deps.userId(), workspace, textoLivre)
+      return personaEditavel(salva.texto_livre)
+    }
+  )
 
   ipcMain.handle(IPC_CHANNELS.approvalList, (_event, workspace: unknown) => {
     if (!isWorkspaceId(workspace)) return []
@@ -2490,4 +2536,14 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     })
     deps.minimizeToTray()
   })
+}
+
+/**
+ * Monta o que a tela de Settings recebe da persona.
+ *
+ * O bloco fixo e o teto vêm daqui e não da tela: são regra do produto, e duplicá-los no renderer
+ * criaria uma segunda verdade que diverge no dia em que uma das duas mudar.
+ */
+function personaEditavel(textoLivre: string): PersonaEditavel {
+  return { textoLivre, blocoFixo: BLOCO_FIXO_DA_PERSONA, teto: TETO_DO_TEXTO_LIVRE }
 }

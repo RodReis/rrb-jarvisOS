@@ -105,3 +105,18 @@ export function ehJanelaDaConversa(valor: unknown): valor is number {
     valor <= JANELA_MAXIMA_DA_CONVERSA
   )
 }
+
+/**
+ * A persona como a tela de Settings a vê (SPEC-Voz-03, critério 5).
+ *
+ * Os dois blocos viajam juntos, com donos diferentes: `textoLivre` é do usuário e volta como
+ * escrita; `blocoFixo` é do produto e vai **só de ida**, para a tela exibi-lo como leitura. Se
+ * ele voltasse como dado gravável, uma edição poderia removê-lo, e a resposta voltaria em
+ * markdown para ser lida em voz alta — que é exatamente o que o critério 5 impede.
+ */
+export interface PersonaEditavel {
+  readonly textoLivre: string
+  readonly blocoFixo: string
+  /** Teto do texto livre, para a tela mostrar o limite em vez de recusar em silêncio. */
+  readonly teto: number
+}

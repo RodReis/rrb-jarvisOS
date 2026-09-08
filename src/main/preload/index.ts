@@ -19,6 +19,7 @@ import type {
   DesfechoDaConversa,
   DesfechoDaTranscricao,
   DesfechoDoDownload,
+  PersonaEditavel,
   ProntidaoDaVoz,
   TrocaDaConversa
 } from '@shared/domain/voz'
@@ -231,6 +232,16 @@ const bridge: JarvisBridge = {
     ipcRenderer.invoke(IPC_CHANNELS.conversaPerguntar, pergunta, workspace),
   historicoDaConversa: (): Promise<readonly TrocaDaConversa[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.conversaHistorico),
+
+  /*
+   * A persona editável (critério 5). O bloco fixo vem na leitura para a tela exibi-lo, e a
+   * escrita leva **só** o texto livre — o formato de voz é garantia do produto, não campo de
+   * formulário.
+   */
+  lerPersona: (workspace: WorkspaceId): Promise<PersonaEditavel> =>
+    ipcRenderer.invoke(IPC_CHANNELS.personaLer, workspace),
+  salvarPersona: (textoLivre: string, workspace: WorkspaceId): Promise<PersonaEditavel> =>
+    ipcRenderer.invoke(IPC_CHANNELS.personaSalvar, textoLivre, workspace),
   resolveApproval: (
     id: string,
     decision: ApprovalDecision

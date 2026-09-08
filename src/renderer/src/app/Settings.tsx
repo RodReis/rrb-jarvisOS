@@ -23,6 +23,7 @@ import { ProvidersDoWorkspace } from './ProvidersDoWorkspace'
 import { DiretoriosPermitidos } from './DiretoriosPermitidos'
 import { ChamadaDeIa } from './ChamadaDeIa'
 import { PreferenciasDeVoz } from './PreferenciasDeVoz'
+import { PersonaDoJarvis } from './PersonaDoJarvis'
 
 /**
  * Tela de configurações (SPEC-Fundacao-05 + SPEC-CHOICE-01 crit. 5), reorganizada em **cinco
@@ -181,7 +182,11 @@ export function Settings({
         {/* Daqui para baixo, tudo é escopado ao espaço ativo. O orçamento vem antes do painel
             de chamada: quem vai disparar precisa ver o teto primeiro — depois, o número
             apareceria como explicação de um bloqueio já sofrido em vez de aviso antes dele. */}
+        {/* A persona é do par usuário+espaço, como credenciais e orçamento — por isso mora aqui e
+            não na aba `voz`, que é do usuário (SPEC-Voz-03). Vem primeiro porque é o que o
+            operador ajusta com mais frequência; credencial e orçamento se configuram uma vez. */}
         <TabPanel valor="ia">
+          <PersonaDoJarvis workspace={workspace} nomeDoEspaco={nomeDoEspaco} />
           <CredenciaisDoWorkspace workspace={workspace} nomeDoEspaco={nomeDoEspaco} />
           <OrcamentoDoWorkspace workspace={workspace} nomeDoEspaco={nomeDoEspaco} />
           <ChamadaDeIa workspace={workspace} nomeDoEspaco={nomeDoEspaco} />

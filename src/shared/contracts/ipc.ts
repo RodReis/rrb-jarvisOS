@@ -111,6 +111,7 @@ import type {
   DesfechoDaConversa,
   DesfechoDaTranscricao,
   DesfechoDoDownload,
+  PersonaEditavel,
   ProntidaoDaVoz,
   TrocaDaConversa
 } from '@shared/domain/voz'
@@ -229,6 +230,14 @@ export const IPC_CHANNELS = {
    */
   conversaPerguntar: 'conversa:perguntar',
   conversaHistorico: 'conversa:historico',
+  /*
+   * A persona editável (SPEC-Voz-03, critério 5). Ler e gravar o **texto livre**, e só ele: o
+   * bloco fixo de sistema é do produto e nunca atravessa a ponte como dado gravável — se
+   * atravessasse, uma edição poderia removê-lo e a resposta voltaria em markdown para ser lida
+   * em voz alta.
+   */
+  personaLer: 'persona:ler',
+  personaSalvar: 'persona:salvar',
   approvalList: 'approval:list',
   approvalResolve: 'approval:resolve',
   /**
@@ -882,6 +891,13 @@ export interface JarvisBridge {
    */
   perguntarAoJarvis(pergunta: string, workspace: WorkspaceId): Promise<DesfechoDaConversa>
   historicoDaConversa(): Promise<readonly TrocaDaConversa[]>
+
+  /*
+   * A persona editável (critério 5). O que trafega é o **texto livre**; o bloco fixo vem junto
+   * como leitura, para a tela exibi-lo, e nunca volta como escrita.
+   */
+  lerPersona(workspace: WorkspaceId): Promise<PersonaEditavel>
+  salvarPersona(textoLivre: string, workspace: WorkspaceId): Promise<PersonaEditavel>
   /**
    * Resolve uma aprovação pendente. O retorno varia com o que estava pausado: uma etapa de
    * filesystem devolve o `ExecutionRun` retomado (F01); um comando devolve o
