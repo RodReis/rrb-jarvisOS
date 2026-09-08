@@ -23,7 +23,14 @@ import type { WorkspaceId } from './entities'
  * O chamador declara o tipo no `request` (spec § Fora: agentes que o declaram sozinhos são
  * Corte 3+/4).
  */
-export const TASK_TYPES = ['chat', 'code', 'embedding', 'summarize', 'vision'] as const
+export const TASK_TYPES = [
+  'chat',
+  'code',
+  'embedding',
+  'summarize',
+  'vision',
+  'conversa-de-voz'
+] as const
 
 export type TaskType = (typeof TASK_TYPES)[number]
 
@@ -33,7 +40,8 @@ export const ROTULO_DO_TASK_TYPE: Readonly<Record<TaskType, string>> = {
   code: 'Código',
   embedding: 'Embedding',
   summarize: 'Resumo',
-  vision: 'Visão'
+  vision: 'Visão',
+  'conversa-de-voz': 'Conversa por voz'
 }
 
 /**
@@ -84,7 +92,24 @@ export const ROTEAMENTO_PADRAO: Readonly<Record<TaskType, ProviderRoute>> = {
     preferencia: ['gemini', 'anthropic', 'ollama'],
     preferirLocal: true
   },
-  vision: { taskType: 'vision', preferencia: ['gemini', 'anthropic'], preferirLocal: false }
+  vision: { taskType: 'vision', preferencia: ['gemini', 'anthropic'], preferirLocal: false },
+  /*
+   * **Lista de um só, e isso é a decisão, não uma lacuna** (SPEC-Voz-03, decisão 2 do PI).
+   *
+   * Todas as outras rotas listam alternativas porque o fallback é a razão de existir da
+   * estrutura. Esta não: o que trafega é a **fala do usuário**, transcrita, e mandá-la para a
+   * nuvem quando o Ollama cai seria trocar privacidade por disponibilidade sem ninguém pedir.
+   * O Done do épico #193 diz "conversa de voz completa sem nenhuma chamada cloud".
+   *
+   * A consequência é declarada: Ollama fora significa **recusa com próxima ação**, não degradação
+   * silenciosa. O usuário pode acrescentar um provider aqui em Settings — a lista é editável como
+   * as outras —, mas isso é ato dele, não default do produto.
+   */
+  'conversa-de-voz': {
+    taskType: 'conversa-de-voz',
+    preferencia: ['ollama'],
+    preferirLocal: true
+  }
 }
 
 /** O conjunto de regras de um escopo (`user_id` + `workspace_id`), espelhando F01 e F03. */

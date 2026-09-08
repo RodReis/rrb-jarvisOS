@@ -231,8 +231,14 @@ describe('editor de rotas (critérios 3 e 8)', () => {
     const usuario = userEvent.setup()
     await montar()
 
+    /*
+     * O `$` no fim é load-bearing: a M17-F03 acrescentou a rota **Conversa por voz**, cujo
+     * rótulo contém "Conversa". Sem a âncora, `/em Conversa/i` casa as duas linhas e o
+     * `getByRole` estoura com "found multiple elements" — foi assim que dois testes deste
+     * arquivo reprovaram quando o tipo de tarefa novo entrou.
+     */
     // `chat` padrão: anthropic, gemini, ollama. Subir o gemini o põe em primeiro.
-    await usuario.click(screen.getByRole('button', { name: /Subir Google Gemini em Conversa/i }))
+    await usuario.click(screen.getByRole('button', { name: /Subir Google Gemini em Conversa$/i }))
 
     await waitFor(() =>
       expect(setRoute).toHaveBeenCalledWith(
@@ -250,7 +256,7 @@ describe('editor de rotas (critérios 3 e 8)', () => {
     await montar()
 
     await usuario.click(
-      screen.getByRole('button', { name: /Descer Anthropic \(Claude API\) em Conversa/i })
+      screen.getByRole('button', { name: /Descer Anthropic \(Claude API\) em Conversa$/i })
     )
 
     await waitFor(() =>
@@ -265,10 +271,10 @@ describe('editor de rotas (critérios 3 e 8)', () => {
     await montar()
 
     expect(
-      screen.getByRole('button', { name: /Subir Anthropic \(Claude API\) em Conversa/i })
+      screen.getByRole('button', { name: /Subir Anthropic \(Claude API\) em Conversa$/i })
     ).toBeDisabled()
     expect(
-      screen.getByRole('button', { name: /Descer Ollama \(local\) em Conversa/i })
+      screen.getByRole('button', { name: /Descer Ollama \(local\) em Conversa$/i })
     ).toBeDisabled()
   })
 
@@ -278,7 +284,7 @@ describe('editor de rotas (critérios 3 e 8)', () => {
 
     // `chat` padrão não lista o claude-code.
     await usuario.click(
-      screen.getByRole('button', { name: /Incluir Claude Code CLI em Conversa/i })
+      screen.getByRole('button', { name: /Incluir Claude Code CLI em Conversa$/i })
     )
 
     await waitFor(() =>
@@ -334,7 +340,7 @@ describe('editor de rotas (critérios 3 e 8)', () => {
     setRoute.mockRejectedValue(new Error('ipc caiu'))
     await montar()
 
-    await usuario.click(screen.getByRole('button', { name: /Subir Google Gemini em Conversa/i }))
+    await usuario.click(screen.getByRole('button', { name: /Subir Google Gemini em Conversa$/i }))
 
     expect(await screen.findByText(/não foi possível salvar a rota/i)).toBeInTheDocument()
   })
@@ -372,7 +378,7 @@ describe('operável por teclado (critério 5)', () => {
 
     // Reordenar por **botão** e não por arrastar é o que torna a operação possível sem mouse:
     // arrastar exigiria um alvo grande e um gesto que o teclado não tem.
-    const subir = screen.getByRole('button', { name: /Subir Google Gemini em Conversa/i })
+    const subir = screen.getByRole('button', { name: /Subir Google Gemini em Conversa$/i })
     subir.focus()
     expect(subir).toHaveFocus()
 
@@ -392,7 +398,7 @@ describe('operável por teclado (critério 5)', () => {
     expect(conversa).toBeDefined()
     expect(
       within(conversa as HTMLElement).getByRole('button', {
-        name: /Subir Google Gemini em Conversa/i
+        name: /Subir Google Gemini em Conversa$/i
       })
     ).toBeInTheDocument()
   })
@@ -517,7 +523,7 @@ describe('modelos por fase (SPEC-Fases-02)', () => {
     // Recolhido, mas presente: a SPEC-Providers-04 continua valendo, e MVP-007/017/021 vão
     // consumir o `ProviderRoute`.
     expect(
-      screen.getByRole('button', { name: /Subir Google Gemini em Conversa/i })
+      screen.getByRole('button', { name: /Subir Google Gemini em Conversa$/i })
     ).toBeInTheDocument()
   })
 
