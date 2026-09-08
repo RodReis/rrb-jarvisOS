@@ -92,7 +92,54 @@ export const ETAPAS_DA_GERACAO = [
   'gravacao'
 ] as const
 
-export type EtapaDaGeracao = (typeof ETAPAS_DA_GERACAO)[number]
+/**
+ * As etapas da geração da **arquitetura** (issue #337).
+ *
+ * Não são as do PRD, e é por isso que a lista existe: `pesquisa` não acontece aqui, e no lugar
+ * das contradições vem a **análise de coerência** — a leitura dos protótipos contra o PRD, que é
+ * o que produz os ajustes. Reaproveitar a lista do PRD daria porcentagem sobre etapas que nunca
+ * chegam, e a barra pararia em 60% numa geração que terminou.
+ *
+ * `prototipos` é a validação determinística que roda **antes da IA**, e ela é o gate: nomeá-la
+ * separado é o que deixa o PI ver que o custo ainda não começou quando ela falha.
+ */
+export const ETAPAS_DA_ARQUITETURA = [
+  'prototipos',
+  'documentos',
+  'validacao',
+  'coerencia',
+  'gravacao'
+] as const
+
+/**
+ * As etapas da geração do **roadmap** (issue #337).
+ *
+ * `dag` é o validador de ciclo entre MVPs — o passo que nomeia a dependência circular e pede ao
+ * modelo que a desfaça. É próprio desta geração, e sem ele o PI via 58,9 segundos de espera sem
+ * saber que havia uma correção em curso.
+ */
+export const ETAPAS_DO_ROADMAP = ['mvps', 'validacao', 'dag', 'gravacao'] as const
+
+/**
+ * As etapas de **escolher o MVP que entra na fila** (issue #337).
+ *
+ * Parece um clique e é uma geração: escolher produz a **SPEC da primeira fatia**, com chamada ao
+ * modelo. O PI clicou para escolher o MVP e viu dois botões girando sem nada dizer o que
+ * acontecia — a mesma queixa da geração do roadmap, numa ação que nem parecia gerar.
+ */
+export const ETAPAS_DA_ESCOLHA = ['spec', 'validacao', 'gravacao'] as const
+
+/**
+ * Toda etapa que qualquer geração pode anunciar.
+ *
+ * União das três listas: o canal é um só, e o tipo precisa aceitar o que qualquer serviço emite.
+ * Quem decide **quais** contam para o progresso é a lista da geração, não este tipo.
+ */
+export type EtapaDaGeracao =
+  | (typeof ETAPAS_DA_GERACAO)[number]
+  | (typeof ETAPAS_DA_ARQUITETURA)[number]
+  | (typeof ETAPAS_DO_ROADMAP)[number]
+  | (typeof ETAPAS_DA_ESCOLHA)[number]
 
 /**
  * Em que ponto uma etapa está.
@@ -110,12 +157,15 @@ export type EstadoDaEtapa = 'iniciada' | 'concluida' | 'falhou'
  * não há como saber quanto dela já passou, e inventar meio passo faria a barra andar por
  * suposição em vez de por fato.
  */
-export function progressoDaGeracao(etapas: ReadonlyMap<EtapaDaGeracao, EstadoDaEtapa>): number {
+export function progressoDaGeracao(
+  etapas: ReadonlyMap<EtapaDaGeracao, EstadoDaEtapa>,
+  contrato: readonly EtapaDaGeracao[] = [...ETAPAS_DA_GERACAO]
+): number {
   let concluidas = 0
-  for (const etapa of ETAPAS_DA_GERACAO) {
+  for (const etapa of contrato) {
     if (etapas.get(etapa) === 'concluida') concluidas += 1
   }
-  return Math.round((concluidas / ETAPAS_DA_GERACAO.length) * 100)
+  return Math.round((concluidas / contrato.length) * 100)
 }
 
 /** O andamento de uma etapa: em que ponto está e o que ela produziu quando terminou. */
@@ -145,9 +195,11 @@ export function aplicarEtapa(
     readonly etapa: EtapaDaGeracao
     readonly estado: EstadoDaEtapa
     readonly resumo?: string
-  }
+  },
+  /** A lista da geração em curso. A primeira dela é a fronteira da rodada nova. */
+  contrato: readonly EtapaDaGeracao[] = [...ETAPAS_DA_GERACAO]
 ): ReadonlyMap<EtapaDaGeracao, AndamentoDaEtapa> {
-  const rodadaNova = evento.etapa === ETAPAS_DA_GERACAO[0] && evento.estado === 'iniciada'
+  const rodadaNova = evento.etapa === contrato[0] && evento.estado === 'iniciada'
   const mapa = new Map(rodadaNova ? [] : anterior)
 
   // O andamento é **substituído**, não mesclado: um estado sem resumo apaga o resumo anterior.

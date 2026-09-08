@@ -13,7 +13,9 @@ import {
   landscapePendente,
   podeAceitarPrd,
   contradicaoGravada,
+  pendenciasDeRevisaoDoPrd,
   propostosDoDocumento,
+  propostosPorDocumentoDoPrd,
   renderizarDocumentoDoPrd,
   validarPrd
 } from './prd'
@@ -201,6 +203,59 @@ describe('validarPrd — invariante 9 e Convention (critério 5)', () => {
     expect(validarPrd(conteudo([variante]), CONTEXTO).problemas[0]?.recusa).toBe(
       'regra-de-outro-projeto'
     )
+  })
+})
+
+/*
+ * A aba "A revisar" do PRD (#333). Espelha a da arquitetura, com uma diferença que os testes
+ * fixam: **contradição conta como pendência**, porque ela trava o aceite de verdade.
+ */
+describe('o que o PRD tem a revisar (issue #333)', () => {
+  const PROPOSTO_PRD: AfirmacaoDoPrd = {
+    id: 'a-9',
+    documento: 'PRD',
+    secao: 'Escopo',
+    texto: 'A IA inferiu que o produto precisa de exportação.',
+    origem: 'proposto'
+  }
+  const PROPOSTO_LANDSCAPE: AfirmacaoDoPrd = {
+    id: 'a-10',
+    documento: 'LANDSCAPE',
+    secao: 'Concorrentes',
+    texto: 'A IA inferiu que o mercado tem dois líderes.',
+    origem: 'proposto'
+  }
+  const CONTRADICAO = contradicaoGravada({
+    id: 'c-1',
+    afirmacoes: ['a-1', 'b-2'],
+    pergunta: 'Qual vale?',
+    recomendacao: 'A de b-2.'
+  })
+
+  it('agrupa os propostos por documento, na ordem dos documentos', () => {
+    const c = conteudo([DO_BRIEF, PROPOSTO_LANDSCAPE, PROPOSTO_PRD])
+
+    // A ordem é a de `DOCUMENTOS_DO_PACOTE`, não a de chegada: o PI lê a aba na mesma sequência
+    // em que lê as outras, e uma ordem por chegada mudaria a cada geração.
+    expect(propostosPorDocumentoDoPrd(c).map((g) => g.documento)).toEqual(['PRD', 'LANDSCAPE'])
+  })
+
+  it('omite documento sem proposto', () => {
+    const c = conteudo([DO_BRIEF, PROPOSTO_PRD])
+
+    expect(propostosPorDocumentoDoPrd(c)).toHaveLength(1)
+  })
+
+  it('conta a contradição junto com os propostos — ela trava o aceite', () => {
+    const c = { ...conteudo([DO_BRIEF, PROPOSTO_PRD]), contradicoes: [CONTRADICAO] }
+
+    // 1 proposto + 1 contradição. Omitir a contradição anunciaria "nada a revisar" numa tela que
+    // recusa aceitar — é a diferença entre esta aba e a da arquitetura, onde ajuste não trava.
+    expect(pendenciasDeRevisaoDoPrd(c)).toBe(2)
+  })
+
+  it('conta zero quando nada foi inferido e nada se contradiz', () => {
+    expect(pendenciasDeRevisaoDoPrd(conteudo([DO_BRIEF]))).toBe(0)
   })
 })
 

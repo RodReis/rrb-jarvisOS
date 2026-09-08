@@ -122,6 +122,7 @@ import { faseDaEtapa, type Fase } from '@shared/domain/fase'
 import type { RotaComModelo } from '@shared/domain/modelo-da-fase'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { AiProvider, AiStreamEvent } from '@shared/domain/ai'
+import type { EstadoDaEtapa, EtapaDaGeracao } from '@shared/domain/geracao'
 import type { EstadoDasRotas } from '@shared/domain/rota-de-geracao'
 import { GitRunner } from './projects/git-runner'
 import { DockerRunner, prepararGitMeta, TIMEOUT_DOCKER_MS } from './pipeline/docker-runner'
@@ -948,6 +949,36 @@ if (!app.requestSingleInstanceLock()) {
      * Recebe o `ConnectorService`, e **não** o `TavilyAdapter`, pela mesma razão do
      * `PacoteService`: o gate de créditos vive dentro do `call()`.
      */
+    /**
+     * Anuncia a etapa de uma geração para a tela (issue #337).
+     *
+     * **Uma função, injetada nos serviços que geram** — PRD, arquitetura e roadmap. Ela nasceu
+     * inline no `PrdService` (#287) e ficou só lá: o PI gerou a arquitetura e o roadmap e viu o
+     * botão girar sem nada dizer o que acontecia. Três cópias divergiriam na primeira correção
+     * feita numa delas.
+     *
+     * O `traceId` é derivado do projeto (`etapas:<projectId>`) em vez de sorteado: as etapas
+     * atravessam várias chamadas ao modelo, e um id novo a cada anúncio faria a tela tratar cada
+     * etapa como uma geração diferente. Derivado, ele é o mesmo do começo ao fim — e não colide
+     * com os traces do console, que são UUID.
+     *
+     * `isDestroyed` pela mesma razão do console: a corrida entre a geração e o fechamento da
+     * janela é normal, e um `send` para janela morta lança de dentro do Electron.
+     */
+    const anunciarEtapa = (
+      projectId: string,
+      etapa: EtapaDaGeracao,
+      estado: EstadoDaEtapa,
+      resumo?: string
+    ): void => {
+      if (janela === undefined || janela.isDestroyed()) return
+
+      janela.webContents.send(IPC_EVENT_CHANNELS.generationEvent, {
+        traceId: `etapas:${projectId}`,
+        evento: { tipo: 'etapa', etapa, estado, ...(resumo === undefined ? {} : { resumo }) }
+      })
+    }
+
     const prd = new PrdService({
       repository: new PrdRepository(storage.db),
       pacotes: pacoteRepository,
@@ -986,14 +1017,7 @@ if (!app.requestSingleInstanceLock()) {
        * `isDestroyed` pela mesma razão do console: a corrida entre a geração e o fechamento da
        * janela é normal, e um `send` para janela morta lança de dentro do Electron.
        */
-      anunciarEtapa: (projectId, etapa, estado, resumo) => {
-        if (janela === undefined || janela.isDestroyed()) return
-
-        janela.webContents.send(IPC_EVENT_CHANNELS.generationEvent, {
-          traceId: `etapas:${projectId}`,
-          evento: { tipo: 'etapa', etapa, estado, ...(resumo === undefined ? {} : { resumo }) }
-        })
-      },
+      anunciarEtapa,
       montarContexto: montarContextoDoPrompt,
       estadoDasRotas: (projectId, workspace) =>
         estadoDasRotasDoProjeto(projectId, workspace, 'planejamento'),
@@ -1089,6 +1113,7 @@ if (!app.requestSingleInstanceLock()) {
      * semântica do modelo **acrescenta** e nunca substitui a validação determinística.
      */
     const arquitetura = new ArquiteturaService({
+      anunciarEtapa,
       repository: new ArquiteturaRepository(storage.db),
       anexos: anexoRepository,
       projects: projectRepository,
@@ -1173,6 +1198,7 @@ if (!app.requestSingleInstanceLock()) {
       projectService: projects,
       audit: storage.audit,
       userId: userIdAtual,
+      anunciarEtapa,
       prdVigente: (projectId) => prd.carregar(projectId),
       pacoteEstruturalId: (projectId) =>
         pacoteRepository.listarPacotes(userIdAtual(), projectId)[0]?.id,

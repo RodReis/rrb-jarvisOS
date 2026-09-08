@@ -17,10 +17,25 @@ import {
   TIPOS_DE_AJUSTE,
   afirmacoesDoDocumentoDaArquitetura,
   ajustesDoTipo,
-  propostosDoDocumentoDaArquitetura
+  pendenciasDeRevisao,
+  propostosPorDocumento
 } from '@shared/domain/arquitetura-gerada'
-import { Button, Dialog, EmptyState, InlineAlert, LoadingState } from '@design/ui'
+import {
+  Button,
+  Dialog,
+  Disclosure,
+  EmptyState,
+  InlineAlert,
+  LoadingState,
+  TabPanel,
+  Tabs
+} from '@design/ui'
+import type { AprovacaoOutcome } from '@shared/domain/aprovacoes'
+import type { AndamentoDaEtapa, EtapaDaGeracao } from '@shared/domain/geracao'
+import { ETAPAS_DA_ARQUITETURA, aplicarEtapa } from '@shared/domain/geracao'
 import { log } from '../lib/log'
+import { DesfechoDaAprovacao } from './aprovacao-recusada'
+import { AndamentoDaGeracao } from './AndamentoDaGeracao'
 
 /**
  * A arquitetura, as decisões, os testes e a revisão, com o gate do pacote (SPEC-Jornada-04).
@@ -79,6 +94,15 @@ const CHAVE_DA_ORIGEM: Readonly<Record<OrigemDaArquitetura, string>> = {
 }
 
 /** O rótulo de cada tipo de ajuste. Mapa fechado: um tipo novo quebra a compilação aqui. */
+/**
+ * O valor da aba que reúne o que pede decisão (#333).
+ *
+ * Constante e não literal solto: ela é comparada em três lugares (o default, o gatilho e o
+ * painel), e um erro de digitação num deles abriria a tela numa aba que não existe.
+ * `__revisar__` com sublinhados para nunca colidir com um nome de documento.
+ */
+const ABA_REVISAR = '__revisar__'
+
 const CHAVE_DO_AJUSTE: Readonly<Record<TipoDeAjuste, string>> = {
   'tela-sem-requisito': 'arquitetura.ajustes.telaSemRequisito',
   'requisito-sem-tela': 'arquitetura.ajustes.requisitoSemTela',
@@ -126,7 +150,16 @@ function LinhaDaAfirmacao({
       className="flex flex-col gap-0.5 py-3.5"
     >
       <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
-        <p className="min-w-0 max-w-[58ch] flex-1 text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto)]">
+        {/*
+          Sem teto próprio de medida: quem limita agora é a **coluna** — mesma correção que o
+          brief já tinha (`BriefDoProjeto`), e que este painel não recebeu na época.
+
+          O `max-w-[58ch]` fazia sentido quando o documento ocupava a tela inteira. Dentro da
+          coluna de conteúdo ele sufoca duas vezes: medido, o texto usava 438px de uma coluna de
+          ~880px, com metade vazia à direita. Duas medidas empilhadas cortam pelo menor, e o
+          menor aqui era o teto que a coluna já garante.
+        */}
+        <p className="min-w-0 flex-1 text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto)]">
           {afirmacao.texto}
         </p>
 
@@ -178,7 +211,6 @@ function DocumentoDaArquiteturaGerada({
 }): React.JSX.Element {
   const { t } = useTranslation()
   const afirmacoes = afirmacoesDoDocumentoDaArquitetura(arquitetura, documento)
-  const inferidos = propostosDoDocumentoDaArquitetura(arquitetura, documento)
 
   return (
     <section data-jos-documento={documento} className="flex flex-col gap-4">
@@ -196,34 +228,15 @@ function DocumentoDaArquiteturaGerada({
       </div>
 
       {/*
-        Os propostos do documento, como conjunto. Fica **acima** das seções porque é o que o PI
-        precisa julgar antes de aceitar — descobri-los lendo o documento inteiro seria pedir que
-        ele fizesse a varredura que esta lista faz por ele.
-      */}
-      {inferidos.length > 0 && (
-        <section
-          data-jos-propostos={documento}
-          className="flex flex-col gap-1 rounded-[var(--jos-raio-card)] border border-[rgba(var(--jos-borda-rgb),0.16)] bg-[var(--jos-cor-superficie-elevada)] p-4"
-        >
-          <h5 className="text-[length:var(--jos-texto-corpo)] font-[var(--jos-peso-semi)] text-[var(--jos-cor-texto)]">
-            {t('arquitetura.propostosTitulo', { count: inferidos.length })}
-          </h5>
-          <p className="max-w-[62ch] text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-secundario)]">
-            {t('arquitetura.propostosDescricao')}
-          </p>
+        **O bloco de propostos saiu daqui** (#333). Ele repetia, acima das seções, as mesmas
+        afirmações que apareciam abaixo no corpo do documento — a mesma frase duas vezes na
+        mesma tela, com o botão `Cortar` nas duas. Era metade da altura desta etapa.
 
-          <ul className="mt-1 divide-y divide-[rgba(var(--jos-borda-rgb),0.10)]">
-            {inferidos.map((a) => (
-              <LinhaDaAfirmacao
-                key={a.id}
-                afirmacao={a}
-                onCortar={() => onCortar(a.id)}
-                ocupado={ocupado}
-              />
-            ))}
-          </ul>
-        </section>
-      )}
+        As propostas continuam **no corpo**, onde se leem no contexto da seção que as gerou, e
+        agora também na aba "A revisar", que as reúne para o PI julgar sem procurar documento por
+        documento. Lá elas são as mesmas linhas, com o mesmo corte: um lugar para ler, um para
+        decidir, e a mesma verdade nos dois.
+      */}
 
       {/* Seção sem afirmação não vira cabeçalho: o documento mostra o que tem. */}
       {SECOES_DA_ARQUITETURA[documento].map((secao) => {
@@ -312,6 +325,164 @@ function LinhaDoAjuste({
   )
 }
 
+/**
+ * A aba **A revisar**: tudo o que pede decisão do PI, num lugar só (issue #333).
+ *
+ * **Por que ela existe.** As propostas da IA nasciam espalhadas pelos quatro documentos e os
+ * ajustes de coerência ficavam no topo da página. Para saber se havia algo a cortar, o PI rolava
+ * a etapa inteira — 4.941px medidos numa janela de 900 — e rolava de volta para agir.
+ *
+ * **Reunir não é misturar.** Os ajustes ficam separados das propostas porque são coisas
+ * diferentes: ajuste fala do protótipo que o PI desenhou e só se descarta; proposta é inferência
+ * dentro do documento e se corta. E as propostas seguem **agrupadas por documento**, porque uma
+ * inferência sobre a estratégia de teste se julga com outra cabeça que uma sobre os módulos.
+ *
+ * O que ela **não** faz é substituir a leitura: cada proposta continua no corpo do documento, na
+ * seção que a gerou. Aqui é onde se decide; lá é onde se entende.
+ */
+function OQuePedeDecisao({
+  arquitetura,
+  onCortar,
+  onDescartar,
+  ocupado
+}: {
+  readonly arquitetura: ArquiteturaRegistrada
+  readonly onCortar: (afirmacaoId: string) => void
+  readonly onDescartar: (ajusteId: string) => void
+  readonly ocupado: boolean
+}): React.JSX.Element {
+  const { t } = useTranslation()
+  const grupos = propostosPorDocumento(arquitetura)
+
+  if (arquitetura.ajustes.length === 0 && grupos.length === 0) {
+    return (
+      <EmptyState
+        titulo={t('arquitetura.revisarVazio')}
+        descricao={t('arquitetura.revisarVazioDescricao')}
+      />
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-1">
+        <h4 className="text-[length:var(--jos-texto-realce)] font-[var(--jos-peso-semi)] text-[var(--jos-cor-texto)]">
+          {t('arquitetura.revisarTitulo')}
+        </h4>
+        <p className="max-w-[62ch] text-[length:var(--jos-texto-corpo)] text-[var(--jos-cor-texto-secundario)]">
+          {t('arquitetura.revisarDescricao')}
+        </p>
+      </div>
+
+      {/*
+        Os ajustes primeiro: eles falam do material que o PI **fez**, e decidir sobre o próprio
+        desenho vem antes de decidir sobre o que a IA inferiu a partir dele.
+      */}
+      {arquitetura.ajustes.length > 0 && (
+        <section data-jos-ajustes id="arquitetura-ajustes" className="flex flex-col gap-2">
+          <InlineAlert
+            tom="warn"
+            titulo={t('arquitetura.ajustesTitulo', { count: arquitetura.ajustes.length })}
+          >
+            {t('arquitetura.ajustesDescricao')}
+          </InlineAlert>
+
+          {/*
+            Agrupados por tipo: uma tela sem requisito se julga com outra cabeça que um requisito
+            sem tela, e misturá-los faria o PI reclassificar item a item.
+
+            **Colapsados, só o primeiro aberto** (#333) — pela mesma razão das propostas: oito
+            ajustes abertos somavam 921px e devolviam a rolagem que as abas tinham acabado de
+            tirar. A contagem no `resumo` diz de quantos é cada grupo com o bloco fechado.
+          */}
+          {TIPOS_DE_AJUSTE.filter((tipo) => ajustesDoTipo(arquitetura, tipo).length > 0).map(
+            (tipo, indice) => {
+              const doTipo = ajustesDoTipo(arquitetura, tipo)
+
+              return (
+                <div key={tipo} data-jos-ajuste-grupo={tipo}>
+                  <Disclosure
+                    abertoPorPadrao={indice === 0}
+                    rotulo={t(CHAVE_DO_AJUSTE[tipo])}
+                    resumo={
+                      <span className="font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] uppercase tracking-[2px] text-[var(--jos-cor-texto-suave)]">
+                        {doTipo.length}
+                      </span>
+                    }
+                  >
+                    <ul className="flex flex-col gap-3">
+                      {doTipo.map((a) => (
+                        <LinhaDoAjuste
+                          key={a.id}
+                          ajuste={a}
+                          onDescartar={() => onDescartar(a.id)}
+                          ocupado={ocupado}
+                        />
+                      ))}
+                    </ul>
+                  </Disclosure>
+                </div>
+              )
+            }
+          )}
+        </section>
+      )}
+
+      {grupos.length > 0 && (
+        <section data-jos-propostos-do-pacote className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <h5 className="text-[length:var(--jos-texto-corpo)] font-[var(--jos-peso-semi)] text-[var(--jos-cor-texto)]">
+              {t('arquitetura.revisarPropostosTitulo')}
+            </h5>
+            {/* O aviso que não pode sumir do redesenho: sem ele, uma inferência da IA se lê
+                como fato apurado. É a garantia inteira desta tela. */}
+            <p className="max-w-[62ch] text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-secundario)]">
+              {t('arquitetura.propostosDescricao')}
+            </p>
+          </div>
+
+          {/*
+            **Um bloco por documento, e só o primeiro aberto.**
+
+            Reunir as propostas resolveu a procura e criou uma pilha nova: com 18 itens medidos, a
+            aba sozinha dava 2.654px — quase três telas, e é a aba que abre primeiro. Colapsar
+            devolve a visão de conjunto que a reunião prometia.
+
+            A contagem vai no `resumo`, que o DS mantém **visível com o bloco fechado**: é ela que
+            justifica abrir, e escondê-la faria o PI abrir os quatro para descobrir onde há o quê.
+          */}
+          {grupos.map(({ documento, propostos }, indice) => (
+            <div key={documento} data-jos-propostos={documento}>
+              <Disclosure
+                abertoPorPadrao={indice === 0}
+                rotulo={t(
+                  `arquitetura.documentos.${documento}` as `arquitetura.documentos.${DocumentoDaArquitetura}`
+                )}
+                resumo={
+                  <span className="font-[family-name:var(--jos-fonte-mono)] text-[length:var(--jos-texto-micro)] uppercase tracking-[2px] text-[var(--jos-cor-texto-suave)]">
+                    {propostos.length}
+                  </span>
+                }
+              >
+                <ul className="divide-y divide-[rgba(var(--jos-borda-rgb),0.10)]">
+                  {propostos.map((a) => (
+                    <LinhaDaAfirmacao
+                      key={a.id}
+                      afirmacao={a}
+                      onCortar={() => onCortar(a.id)}
+                      ocupado={ocupado}
+                    />
+                  ))}
+                </ul>
+              </Disclosure>
+            </div>
+          ))}
+        </section>
+      )}
+    </div>
+  )
+}
+
 export function ArquiteturaDoProjeto({
   workspace,
   projectId,
@@ -327,6 +498,21 @@ export function ArquiteturaDoProjeto({
   const [ocupado, setOcupado] = useState(false)
   const [desfecho, setDesfecho] = useState<ArquiteturaGeradaOutcome | null>(null)
   const [falhaNoAceite, setFalhaNoAceite] = useState(false)
+  /**
+   * Por que o gate recusou o aceite, quando recusou.
+   *
+   * Estado próprio e não booleano: os motivos são nomeados no contrato (`sem-revisoes`,
+   * `sem-identidade`, `marcos-pendentes`) e cada um pede uma ação diferente do PI. Um "falhou"
+   * genérico o mandaria adivinhar qual.
+   */
+  const [recusaDoAceite, setRecusaDoAceite] = useState<AprovacaoOutcome | null>(null)
+  /**
+   * O andamento da geração **desta rodada** (issue #337).
+   *
+   * A barra existia só no PRD desde a #287, e o PI gerou a arquitetura vendo o botão girar sem
+   * nada dizer o que acontecia. A regra é da tela da etapa (SPEC-Jornada-03 § Emenda E2, item 1).
+   */
+  const [etapas, setEtapas] = useState<ReadonlyMap<EtapaDaGeracao, AndamentoDaEtapa>>(new Map())
   /**
    * O aviso de que a IA propôs ajustes, aberto **na chegada** deles (#332, defeito 5).
    *
@@ -373,6 +559,22 @@ export function ArquiteturaDoProjeto({
     }
   }, [projectId, workspace])
 
+  /*
+   * A tela acompanha a geração que corre no **main**, inclusive a que começou antes de ela montar
+   * (SPEC-Jornada-03 § Emenda E2, item 4).
+   *
+   * `ETAPAS_DA_ARQUITETURA` e não a lista do PRD: o denominador tem de ser o desta geração, senão
+   * a barra pararia em 60% numa rodada que terminou.
+   */
+  useEffect(() => {
+    return window.jarvis.onGenerationEvent(({ evento }) => {
+      if (evento.tipo !== 'etapa') return
+
+      setEtapas((atuais) => aplicarEtapa(atuais, evento, [...ETAPAS_DA_ARQUITETURA]))
+      if (evento.etapa === 'gravacao' && evento.estado === 'concluida') void carregar()
+    })
+  }, [carregar])
+
   const gerar = useCallback(async (): Promise<void> => {
     setOcupado(true)
     try {
@@ -391,17 +593,38 @@ export function ArquiteturaDoProjeto({
   }, [projectId, workspace, carregar])
 
   /**
-   * O aceite do pacote (gate `PROJECT_PACKAGE`).
+   * O aceite do pacote — **aprovar o gate `PROJECT_PACKAGE` e então mover a etapa**.
    *
-   * Vai pelo **mesmo canal de evento** que move toda a jornada, e não por um canal próprio:
-   * `aplicarEventoDaJornada` é a única via de escrita da etapa, e uma segunda entrada só para a
-   * arquitetura criaria um caminho que escapa da checagem de ordem que ela faz.
+   * **O defeito que isto conserta.** A tela chamava só `aplicarEventoDaJornada`, e o main recusava
+   * toda vez com `aceite-ausente`: `pacote-aceito` está em `GATE_DA_ETAPA`, e o serviço da jornada
+   * confere se existe um `Approval` do gate antes de avançar. O `PROJECT_PACKAGE` só era aprovável
+   * na tela do **roadmap** — que aparece depois desta etapa. O aceite estava atrás da porta que ele
+   * mesmo destranca, e o PI clicava sem nada acontecer (medido: oito recusas seguidas na
+   * auditoria do projeto dele, uma por clique).
+   *
+   * **A ordem é gate primeiro, evento depois.** Aprovar grava a evidência que o evento vai
+   * conferir; inverter faria o evento recusar a si mesmo. É a mesma sequência que o roadmap já
+   * usa nos gates dele.
+   *
+   * **A recusa vira mensagem, não silêncio.** `aprovar` devolve motivos nomeados — sem revisões,
+   * sem identidade, já aprovado —, e engoli-los foi metade do defeito: o PI não tinha como saber
+   * se clicou, se falhou, ou o que fazer a seguir.
    */
   const aceitar = useCallback(async (): Promise<void> => {
     setOcupado(true)
     setFalhaNoAceite(false)
+    setRecusaDoAceite(null)
 
     try {
+      const aprovacao = await window.jarvis.aprovarGate(projectId, 'PROJECT_PACKAGE', workspace)
+
+      // `ja-aprovado` não é recusa do ponto de vista do PI: o gate já tem a evidência que o
+      // evento precisa, e travar aqui o deixaria preso numa etapa que pode avançar.
+      if (aprovacao.reason !== 'aprovado' && aprovacao.reason !== 'ja-aprovado') {
+        setRecusaDoAceite(aprovacao)
+        return
+      }
+
       await window.jarvis.aplicarEventoDaJornada(projectId, 'pacote-aceito', workspace)
       await carregar()
       onAceito?.()
@@ -466,6 +689,15 @@ export function ArquiteturaDoProjeto({
 
   if (carregando) return <LoadingState rotulo={t('arquitetura.carregando')} />
 
+  /*
+   * Quantos itens pedem decisão: propostos mais ajustes (#333).
+   *
+   * É o número no rótulo da aba, e é ele que decide qual aba abre primeiro — com pendência, a
+   * tela abre no que precisa ser decidido; sem nenhuma, abre no primeiro documento, porque aí só
+   * resta ler.
+   */
+  const pendencias = arquitetura === null ? 0 : pendenciasDeRevisao(arquitetura)
+
   return (
     <div className="flex flex-col gap-5" aria-labelledby={`arquitetura-${projectId}`}>
       <div className="flex flex-col gap-1">
@@ -501,6 +733,15 @@ export function ArquiteturaDoProjeto({
           </Button>
         </div>
       )}
+
+      {/*
+        **A barra de andamento, no topo da etapa** (SPEC-Jornada-03 § Emenda E2, item 1; #337).
+        
+        Fora do bloco do "gerar de novo" de propósito: na **primeira** geração não há botão aqui —
+        ele mora na trilha (#332) —, e prendê-la ao botão deixaria justamente a primeira rodada
+        sem sinal nenhum, que é quando o PI mais precisa saber o que está acontecendo.
+      */}
+      <AndamentoDaGeracao etapas={etapas} gerando={ocupado} contrato={[...ETAPAS_DA_ARQUITETURA]} />
 
       {desfecho !== null && desfecho.resultado !== 'gerada' && (
         <InlineAlert
@@ -545,58 +786,75 @@ export function ArquiteturaDoProjeto({
       ) : (
         <>
           {/*
-            Os ajustes de coerência (critério 4). Ficam no **topo** dos documentos porque falam do
-            material que os originou — e **não travam o aceite**: são propostas de mudança no
-            desenho do PI, não conflitos internos do documento. Travá-las obrigaria o PI a
-            redesenhar o protótipo antes de aceitar uma arquitetura que já está coerente com o que
-            ele desenhou.
+            **As abas** (#333). A etapa media 4.941px numa janela de 900 — cinco telas e meia de
+            rolagem para um projeto pequeno — porque os quatro documentos, as propostas repetidas
+            e os ajustes viviam empilhados na mesma coluna.
+
+            O componente do DS **desmonta** o painel inativo (sem `forceMount`), então a altura
+            cai de verdade: não é conteúdo escondido com altura zero, é conteúdo que não existe no
+            documento enquanto a aba está fechada.
+
+            **"A revisar" vem primeiro** porque decidir precede ler: é ela que responde "há algo a
+            cortar aqui?", a pergunta que fazia o PI rolar a etapa inteira. O contador no próprio
+            rótulo é o que torna a resposta visível **sem** entrar na aba.
           */}
-          {arquitetura.ajustes.length > 0 && (
-            <section data-jos-ajustes id="arquitetura-ajustes" className="flex flex-col gap-2">
-              <InlineAlert
-                tom="warn"
-                titulo={t('arquitetura.ajustesTitulo', { count: arquitetura.ajustes.length })}
-              >
-                {t('arquitetura.ajustesDescricao')}
-              </InlineAlert>
-
-              {/* Agrupados por tipo: uma tela sem requisito se julga com outra cabeça que um
-                  requisito sem tela, e misturá-los faria o PI reclassificar item a item. */}
-              {TIPOS_DE_AJUSTE.map((tipo) => {
-                const doTipo = ajustesDoTipo(arquitetura, tipo)
-                if (doTipo.length === 0) return null
-
-                return (
-                  <ul key={tipo} className="flex flex-col gap-3">
-                    {doTipo.map((a) => (
-                      <LinhaDoAjuste
-                        key={a.id}
-                        ajuste={a}
-                        onDescartar={() => void descartar(a.id)}
-                        ocupado={ocupado}
-                      />
-                    ))}
-                  </ul>
+          <Tabs
+            padrao={pendencias > 0 ? ABA_REVISAR : DOCUMENTOS_DA_ARQUITETURA[0]}
+            rotulo={t('arquitetura.abasRotulo')}
+            abas={[
+              {
+                valor: ABA_REVISAR,
+                // O número entra no **rótulo**, e não num badge ao lado: um badge é forma, e
+                // forma sozinha não atravessa leitor de tela nem escala de cinza. Sem pendência
+                // o rótulo muda de texto em vez de mostrar "(0)" — zero anunciado é ruído.
+                rotulo:
+                  pendencias > 0
+                    ? `${t('arquitetura.abaRevisar')} (${pendencias})`
+                    : t('arquitetura.abaRevisarVazia')
+              },
+              ...DOCUMENTOS_DA_ARQUITETURA.map((documento) => ({
+                valor: documento,
+                rotulo: t(
+                  `arquitetura.documentos.${documento}` as `arquitetura.documentos.${DocumentoDaArquitetura}`
                 )
-              })}
-            </section>
-          )}
+              }))
+            ]}
+          >
+            <TabPanel valor={ABA_REVISAR}>
+              <OQuePedeDecisao
+                arquitetura={arquitetura}
+                onCortar={(id) => void cortar(id)}
+                onDescartar={(id) => void descartar(id)}
+                ocupado={ocupado}
+              />
+            </TabPanel>
 
-          {DOCUMENTOS_DA_ARQUITETURA.map((documento) => (
-            <DocumentoDaArquiteturaGerada
-              key={documento}
-              documento={documento}
-              arquitetura={arquitetura}
-              onCortar={(id) => void cortar(id)}
-              ocupado={ocupado}
-            />
-          ))}
+            {DOCUMENTOS_DA_ARQUITETURA.map((documento) => (
+              <TabPanel key={documento} valor={documento}>
+                <DocumentoDaArquiteturaGerada
+                  documento={documento}
+                  arquitetura={arquitetura}
+                  onCortar={(id) => void cortar(id)}
+                  ocupado={ocupado}
+                />
+              </TabPanel>
+            ))}
+          </Tabs>
 
           {falhaNoAceite && (
             <InlineAlert tom="err" titulo={t('arquitetura.aceiteFalhou')}>
               {t('arquitetura.aceiteDescricao')}
             </InlineAlert>
           )}
+
+          {/*
+            A recusa do gate, com o motivo e a ação (#333).
+            
+            **Fora das abas e acima do aceite**: é a resposta ao clique que o PI acabou de dar na
+            trilha, e escondê-la atrás de uma aba faria o botão parecer inerte — que foi
+            exatamente o defeito relatado, oito cliques sem nada na tela.
+          */}
+          {recusaDoAceite !== null && <DesfechoDaAprovacao aprovacao={recusaDoAceite} />}
 
           {/*
             O aceite — a soleira do documento, e por isso no fim: aceitar é o que se faz depois de

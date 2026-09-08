@@ -451,6 +451,36 @@ export function propostosDoDocumento(
   return conteudo.afirmacoes.filter((a) => a.documento === documento && a.origem === 'proposto')
 }
 
+/**
+ * O que o pacote inteiro tem a revisar: os propostos de cada documento, **agrupados por
+ * documento**, e só os documentos que têm algum (issue #333).
+ *
+ * Espelha `propostosPorDocumento` da arquitetura, e pela mesma razão: a aba "A revisar" reúne num
+ * lugar o que estava espalhado, sem perder o agrupamento — uma inferência sobre o mercado se
+ * julga com outra cabeça que uma sobre o produto.
+ */
+export function propostosPorDocumentoDoPrd(conteudo: ConteudoDoPrd): readonly {
+  readonly documento: DocumentoDoPacote
+  readonly propostos: readonly AfirmacaoDoPrd[]
+}[] {
+  return DOCUMENTOS_DO_PACOTE.map((documento) => ({
+    documento,
+    propostos: propostosDoDocumento(conteudo, documento)
+  })).filter((grupo) => grupo.propostos.length > 0)
+}
+
+/**
+ * Quantos itens pedem decisão do PI: propostos mais contradições (issue #333).
+ *
+ * É o número do contador na aba. **As contradições contam** porque são o único bloqueio real do
+ * gate — travam o aceite, ao contrário dos ajustes da arquitetura, que são propostas sobre o
+ * desenho. Um contador que as omitisse anunciaria "nada a revisar" numa tela que recusa aceitar.
+ */
+export function pendenciasDeRevisaoDoPrd(conteudo: ConteudoDoPrd): number {
+  const propostos = conteudo.afirmacoes.filter((a) => a.origem === 'proposto').length
+  return propostos + conteudo.contradicoes.length
+}
+
 /** As afirmações de um documento, na ordem em que o modelo as produziu. */
 export function afirmacoesDoDocumento(
   conteudo: ConteudoDoPrd,

@@ -38,6 +38,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { AiProvider } from '@shared/domain/ai'
+import type { EstadoDaEtapa, EtapaDaGeracao } from '@shared/domain/geracao'
 import type { Anexo } from '@shared/domain/anexos-de-design'
 import { pendenciasDoGate } from '@shared/domain/anexos-de-design'
 import type { DocumentoDaArquitetura } from '@shared/domain/arquitetura'
@@ -143,6 +144,22 @@ export interface ArquiteturaServiceDeps {
     readonly requisitos: readonly RequisitoParaOModelo[]
     readonly jornadas: readonly JornadaParaOModelo[]
   }) => Promise<{ readonly ajustes?: readonly AjusteProposto[] }>
+  /**
+   * Anuncia em que ponto da geração o serviço está (issue #337).
+   *
+   * A barra de andamento existe desde a #287 e tinha **um só call site**, o PRD — o PI gerou a
+   * arquitetura e viu o botão girar sem nada dizer o que acontecia. A regra é da tela da etapa
+   * (SPEC-Jornada-03 § Emenda E2, item 1), não do PRD.
+   *
+   * Opcional pela mesma razão que no `PrdService`: o serviço gera com ou sem alguém olhando, e
+   * um call site que esqueça de injetá-la não deve perder a chamada que já foi paga.
+   */
+  readonly anunciarEtapa?: (
+    projectId: string,
+    etapa: EtapaDaGeracao,
+    estado: EstadoDaEtapa,
+    resumo?: string
+  ) => void
 }
 
 /**
@@ -207,6 +224,27 @@ export class ArquiteturaService {
    *
    * A ordem das guardas é a garantia — ver o cabeçalho do arquivo.
    */
+  /**
+   * Anuncia uma etapa, e **nunca deixa isso derrubar a geração** (issue #337).
+   *
+   * O `try` não é zelo genérico: `anunciarEtapa` termina num `webContents.send`, e uma janela
+   * destruída entre o início da geração e este ponto lança de dentro do Electron. Sem o bloqueio,
+   * fechar a janela durante a geração mataria o pacote quase pronto — o PI perderia a chamada que
+   * já pagou por causa da barra de progresso dela. Mesma decisão do `PrdService`.
+   */
+  private anunciar(
+    projectId: string,
+    etapa: EtapaDaGeracao,
+    estado: EstadoDaEtapa,
+    resumo?: string
+  ): void {
+    try {
+      this.deps.anunciarEtapa?.(projectId, etapa, estado, resumo)
+    } catch (erro) {
+      log.agent.warn('Falha ao anunciar a etapa da geração', { projectId, etapa, estado, erro })
+    }
+  }
+
   async gerar(projectId: string, workspaceId: WorkspaceId): Promise<ArquiteturaGeradaOutcome> {
     const userId = this.userId()
 
@@ -239,9 +277,18 @@ export class ArquiteturaService {
 
     // (3) A validação determinística **antes da IA**, e ela é o que o gate mede. A leitura
     // semântica do modelo vem depois, e acrescenta — nunca substitui (decisão do Cowork).
+    this.anunciar(projectId, 'prototipos', 'iniciada')
     const validacoes = await this.deps.validarPrototipos(projectId)
     const impedem = achadosQueImpedem(validacoes)
     if (impedem.length > 0) {
+      // `falhou` com o número: o PI vê que o custo ainda não começou, e quantos achados barram.
+      this.anunciar(
+        projectId,
+        'prototipos',
+        'falhou',
+        `${impedem.length} achado(s) impedem descrever os fluxos`
+      )
+
       this.audit.append({
         user_id: userId,
         workspace_id: workspaceId,
@@ -256,6 +303,15 @@ export class ArquiteturaService {
           'Os protótipos anexados têm problemas que impedem descrever os fluxos. Resolva-os e gere de novo.'
       }
     }
+
+    this.anunciar(
+      projectId,
+      'prototipos',
+      'concluida',
+      validacoes.length === 0
+        ? 'nenhum protótipo a validar'
+        : `${validacoes.length} protótipo(s) lidos, sem impedimento`
+    )
 
     // (4) A rota, antes de qualquer chamada (critério 7).
     const rota = escolherRota(await this.deps.estadoDasRotas(projectId, workspaceId))
@@ -325,6 +381,22 @@ export class ArquiteturaService {
 
     // (5) Uma tentativa de correção, não um laço: ver `TENTATIVAS_DE_CORRECAO_DA_ARQUITETURA`.
     for (let tentativa = 0; tentativa <= TENTATIVAS_DE_CORRECAO_DA_ARQUITETURA; tentativa += 1) {
+      /*
+       * **A tentativa aparece no resumo** (issue #337).
+       *
+       * Um clique pode virar três chamadas ao modelo, e sem isto o PI vê um botão girando por
+       * mais de um minuto sem saber que houve correção — foi o que aconteceu com ele na geração
+       * do roadmap: um clique, três tentativas, 72 segundos de silêncio.
+       */
+      this.anunciar(
+        projectId,
+        'documentos',
+        'iniciada',
+        tentativa === 0
+          ? undefined
+          : `correção ${tentativa} de ${TENTATIVAS_DE_CORRECAO_DA_ARQUITETURA}`
+      )
+
       const resposta = await this.deps.gerarDocumentos({
         projectId,
         workspace: workspaceId,
@@ -338,8 +410,17 @@ export class ArquiteturaService {
 
       if (resposta.afirmacoes === undefined) {
         problemas = ['A chamada ao modelo não devolveu saída.']
+        this.anunciar(projectId, 'documentos', 'falhou', 'a chamada não devolveu saída')
         continue
       }
+
+      this.anunciar(
+        projectId,
+        'documentos',
+        'concluida',
+        `${resposta.afirmacoes.length} afirmações escritas`
+      )
+      this.anunciar(projectId, 'validacao', 'iniciada')
 
       const candidato: ConteudoDaArquitetura = {
         projectId,
@@ -356,6 +437,12 @@ export class ArquiteturaService {
 
       if (!validacao.valido) {
         problemas = validacao.problemas.map((p) => p.mensagem)
+        this.anunciar(
+          projectId,
+          'validacao',
+          'falhou',
+          `${problemas.length} problema(s) na saída do modelo`
+        )
 
         this.audit.append({
           user_id: userId,
@@ -372,6 +459,9 @@ export class ArquiteturaService {
         continue
       }
 
+      this.anunciar(projectId, 'validacao', 'concluida', 'toda afirmação tem o que a sustenta')
+      this.anunciar(projectId, 'coerencia', 'iniciada')
+
       // (6) A análise de coerência. Falha **não** vira "nenhum ajuste": ficaria liberando o gate
       // por uma falha de infraestrutura, que é o oposto do critério 4.
       const analise = await this.deps.analisarCoerencia({
@@ -385,8 +475,19 @@ export class ArquiteturaService {
 
       if (analise.ajustes === undefined) {
         problemas = ['A análise de coerência entre os protótipos e o PRD não devolveu saída.']
+        this.anunciar(projectId, 'coerencia', 'falhou', 'a análise não devolveu saída')
         continue
       }
+
+      this.anunciar(
+        projectId,
+        'coerencia',
+        'concluida',
+        analise.ajustes.length === 0
+          ? 'protótipos e PRD batem'
+          : `${analise.ajustes.length} ajuste(s) propostos`
+      )
+      this.anunciar(projectId, 'gravacao', 'iniciada')
 
       const conteudo: ConteudoDaArquitetura = { ...candidato, ajustes: analise.ajustes }
 
@@ -531,6 +632,9 @@ export class ArquiteturaService {
 
     const escrita = escrever(projeto.diretorio, documentos)
     if (!escrita.ok) {
+      // A gravação é o único passo que toca o disco: anunciar a falha aqui é o que separa "a IA
+      // não respondeu" de "respondeu e o disco recusou", que pedem coisas diferentes do PI.
+      this.anunciar(conteudo.projectId, 'gravacao', 'falhou', escrita.mensagem)
       return { resultado: 'falha-de-escrita', mensagem: escrita.mensagem }
     }
 
@@ -540,6 +644,15 @@ export class ArquiteturaService {
     // regenerar sem mudança não pede novo aceite.
     const jaExiste = this.repository.findByHash(userId, hash)
     if (jaExiste !== undefined) {
+      // Os arquivos foram escritos, mas a **revisão** é a mesma: dizer "gravados" aqui esconderia
+      // que nenhum aceite novo é pedido, que é o fato que interessa ao PI.
+      this.anunciar(
+        conteudo.projectId,
+        'gravacao',
+        'concluida',
+        'conteúdo idêntico — a revisão anterior foi preservada'
+      )
+
       return {
         resultado: 'gerada',
         arquitetura: jaExiste,
@@ -610,6 +723,13 @@ export class ArquiteturaService {
       afirmacoes: conteudo.afirmacoes.length,
       commitado: marco?.commitado === true
     })
+
+    this.anunciar(
+      conteudo.projectId,
+      'gravacao',
+      'concluida',
+      `${documentos.length} documentos gravados`
+    )
 
     return {
       resultado: 'gerada',

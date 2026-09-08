@@ -491,6 +491,37 @@ export function propostosDoDocumentoDaArquitetura(
   return conteudo.afirmacoes.filter((a) => a.documento === documento && a.origem === 'proposto')
 }
 
+/**
+ * O que o pacote inteiro tem a revisar: os propostos de cada documento, **agrupados por
+ * documento**, e só os documentos que têm algum (issue #333).
+ *
+ * A aba "A revisar" reúne num lugar o que hoje aparece espalhado pelos quatro documentos, e essa
+ * era a razão de o PI rolar a tela inteira para descobrir se havia algo a cortar. **O agrupamento
+ * sobrevive à reunião** — é o que `propostosDoDocumentoDaArquitetura` protege: uma inferência
+ * sobre a estratégia de teste se julga com outra cabeça que uma sobre os módulos, e uma lista
+ * corrida faria o PI reclassificar item a item.
+ */
+export function propostosPorDocumento(conteudo: ConteudoDaArquitetura): readonly {
+  readonly documento: DocumentoDaArquitetura
+  readonly propostos: readonly AfirmacaoDaArquitetura[]
+}[] {
+  return DOCUMENTOS_DA_ARQUITETURA.map((documento) => ({
+    documento,
+    propostos: propostosDoDocumentoDaArquitetura(conteudo, documento)
+  })).filter((grupo) => grupo.propostos.length > 0)
+}
+
+/**
+ * Quantos itens o PI ainda tem para julgar no pacote: propostos mais ajustes (issue #333).
+ *
+ * É o número do contador na aba, e existe para que *"há 8 ajustes"* seja visível **sem** entrar
+ * nela — o defeito 5 da #332 foi exatamente o PI descobrir os oito rolando a página.
+ */
+export function pendenciasDeRevisao(conteudo: ConteudoDaArquitetura): number {
+  const propostos = conteudo.afirmacoes.filter((a) => a.origem === 'proposto').length
+  return propostos + conteudo.ajustes.length
+}
+
 /** As afirmações de um documento, na ordem em que o modelo as produziu. */
 export function afirmacoesDoDocumentoDaArquitetura(
   conteudo: ConteudoDaArquitetura,

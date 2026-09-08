@@ -220,6 +220,30 @@ describe('lerSpecDoModelo', () => {
     expect(spec?.fatiaId).toBe('f-1')
   })
 
+  it('o envelope duplicado lê igual: a SPEC chegou, e um nível a mais não a descarta', () => {
+    /*
+     * O defeito da #337, medido no banco do PI: três tentativas devolveram
+     * `{"spec":{"spec":{...}}}` com a SPEC inteira, e as três foram jogadas fora aqui.
+     *
+     * A causa é a soma de duas instruções corretas. O system mostra o envelope, porque os
+     * outros providers só têm o texto da resposta; com `--json-schema`, o CLI do Claude pede o
+     * documento pela ferramenta `StructuredOutput`, cujo argumento **já é** o envelope. O
+     * modelo obedece aos dois. É o único envelope de objeto da jornada: numa lista o nível
+     * extra seria um objeto onde o schema pede array, e o CLI recusaria antes de sair.
+     */
+    const spec = lerSpecDoModelo(JSON.stringify({ spec: { spec: SPEC_JSON } }), 'f-1')
+
+    expect(spec?.titulo).toBe('Formulário')
+    expect(spec?.fatiaId).toBe('f-1')
+  })
+
+  it('o desaninhamento não engole saída inválida: um nível a mais ainda precisa ser SPEC', () => {
+    // Sem isto, tolerar o duplo viraria tolerar qualquer objeto sob `spec`.
+    const invalido = { spec: { spec: { titulo: 'Só o título' } } }
+
+    expect(lerSpecDoModelo(JSON.stringify(invalido), 'f-1')).toBeUndefined()
+  })
+
   it('sem a chave spec devolve undefined', () => {
     expect(lerSpecDoModelo(JSON.stringify({ outra: {} }), 'f-1')).toBeUndefined()
   })

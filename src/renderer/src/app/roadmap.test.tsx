@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ComTrilha } from './trilha-de-teste'
@@ -27,6 +27,9 @@ const responderPerguntaDaSpec = vi.fn()
 const aprovarGate = vi.fn()
 const aplicarEventoDaJornada = vi.fn()
 const sendLog = vi.fn()
+const onGenerationEvent = vi.fn()
+/** O ouvinte que a tela registrou, para o teste emitir o que o main emitiria. */
+let emitir: ((evento: unknown) => void) | undefined
 
 const REVISOES = [
   { artefato: 'docs/PRD.md', hash: 'a'.repeat(64) },
@@ -135,6 +138,17 @@ function renderizar(): void {
   )
 }
 
+/**
+ * Renderiza e abre uma aba (issue #333).
+ *
+ * A etapa virou três abas — MVPs, SPEC da fatia e Aprovações —, e a tela abre nos MVPs, que é
+ * onde o trabalho começa. Os testes de SPEC e de gate precisam dizer onde estão olhando.
+ */
+async function abrirAba(nome: 'MVPs' | 'SPEC da fatia' | 'Aprovações'): Promise<void> {
+  renderizar()
+  await userEvent.click(await screen.findByRole('tab', { name: nome }))
+}
+
 beforeEach(() => {
   carregarRoadmapGerado.mockReset().mockResolvedValue(null)
   mvpsElegiveis.mockReset().mockResolvedValue([])
@@ -146,6 +160,11 @@ beforeEach(() => {
   aprovarGate.mockReset()
   aplicarEventoDaJornada.mockReset().mockResolvedValue(null)
   sendLog.mockReset()
+  emitir = undefined
+  onGenerationEvent.mockReset().mockImplementation((cb: (e: unknown) => void) => {
+    emitir = cb
+    return () => {}
+  })
 
   Object.defineProperty(window, 'jarvis', {
     value: {
@@ -158,7 +177,8 @@ beforeEach(() => {
       responderPerguntaDaSpec,
       aprovarGate,
       aplicarEventoDaJornada,
-      sendLog
+      sendLog,
+      onGenerationEvent
     },
     configurable: true,
     writable: true
@@ -260,9 +280,11 @@ describe('os MVPs propostos e a escolha (critérios 2 e 3)', () => {
     await screen.findAllByText(/Cadastro de cliente/)
 
     expect(
-      screen.getByRole('button', { name: 'Colocar "Cadastro de cliente" na fila' })
+      screen.getByRole('button', { name: 'Escolher "Cadastro de cliente" e gerar a SPEC' })
     ).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Colocar "Relatórios" na fila' })).toBeNull()
+    expect(
+      screen.queryByRole('button', { name: 'Escolher "Relatórios" e gerar a SPEC' })
+    ).toBeNull()
   })
 
   it('o MVP bloqueado diz por que não pode ser escolhido', async () => {
@@ -279,7 +301,7 @@ describe('os MVPs propostos e a escolha (critérios 2 e 3)', () => {
 
     renderizar()
     await usuario.click(
-      await screen.findByRole('button', { name: 'Colocar "Cadastro de cliente" na fila' })
+      await screen.findByRole('button', { name: 'Escolher "Cadastro de cliente" e gerar a SPEC' })
     )
 
     expect(escolherMvpDoRoadmap).toHaveBeenCalledWith('p-1', 'mvp-1', 'jarvis')
@@ -296,20 +318,53 @@ describe('os MVPs propostos e a escolha (critérios 2 e 3)', () => {
   })
 })
 
+/**
+ * As abas do roadmap (issue #333).
+ *
+ * Aqui elas não separam documentos, e sim **etapas do trabalho**: escolher o MVP, ler a SPEC que
+ * nasceu dele, aprovar os gates. A ordem das abas é a ordem em que as coisas acontecem.
+ */
+describe('as abas do roadmap (issue #333)', () => {
+  it('são três: MVPs, SPEC e aprovações', async () => {
+    carregarRoadmapGerado.mockResolvedValue(roadmapGerado())
+    renderizar()
+
+    await screen.findByRole('tablist')
+    expect(screen.getAllByRole('tab')).toHaveLength(3)
+  })
+
+  it('abre nos MVPs — é onde a etapa começa', async () => {
+    carregarRoadmapGerado.mockResolvedValue(roadmapGerado())
+    renderizar()
+
+    // Sem MVP escolhido não há SPEC, e sem SPEC os gates não têm o que aprovar.
+    expect(await screen.findByRole('tab', { name: 'MVPs' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    )
+  })
+})
+
 describe('a SPEC e as perguntas abertas (critério 4)', () => {
-  it('sem MVP escolhido, nenhuma SPEC aparece', async () => {
+  it('sem MVP escolhido, a aba diz o que falta em vez de sumir', async () => {
     carregarRoadmapGerado.mockResolvedValue(roadmapGerado())
 
-    renderizar()
-    await screen.findAllByText(/Cadastro de cliente/)
+    await abrirAba('SPEC da fatia')
 
+    /*
+     * **A aba existe mesmo sem SPEC** (#333). Escondê-la faria o PI procurar uma etapa que a
+     * própria trilha promete, e "não está aqui" não diz o que fazer. O que sumiu foi a SPEC, não
+     * a explicação: a aba nomeia o passo que a destrava.
+     */
+    expect(await screen.findByText('Nenhuma SPEC ainda')).toBeInTheDocument()
+    expect(screen.getByText(/escolhe o MVP que entra na fila/i)).toBeInTheDocument()
     expect(screen.queryByText(/^SPEC —/)).toBeNull()
   })
 
   it('a pergunta aberta diz que trava o aceite', async () => {
     carregarRoadmapGerado.mockResolvedValue(comSpec())
 
-    renderizar()
+    await abrirAba('SPEC da fatia')
 
     expect(await screen.findByText('1 decisões em aberto')).toBeInTheDocument()
     expect(screen.getByText(/não pode ser aceita enquanto houver pergunta/)).toBeInTheDocument()
@@ -318,7 +373,7 @@ describe('a SPEC e as perguntas abertas (critério 4)', () => {
   it('cada opção mostra o impacto, e a recomendada vem marcada', async () => {
     carregarRoadmapGerado.mockResolvedValue(comSpec())
 
-    renderizar()
+    await abrirAba('SPEC da fatia')
     await screen.findByText('E-mail é obrigatório?')
 
     expect(screen.getByText('Todo cliente tem contato.')).toBeInTheDocument()
@@ -334,7 +389,7 @@ describe('a SPEC e as perguntas abertas (critério 4)', () => {
     carregarRoadmapGerado.mockResolvedValue(comSpec())
     responderPerguntaDaSpec.mockResolvedValue({ resultado: 'gerado', mensagem: 'ok' })
 
-    renderizar()
+    await abrirAba('SPEC da fatia')
     await usuario.click(await screen.findByRole('button', { name: 'Escolher "Não, opcional"' }))
 
     expect(responderPerguntaDaSpec).toHaveBeenCalledWith('p-1', 'p-1', 'b', 'jarvis')
@@ -343,7 +398,7 @@ describe('a SPEC e as perguntas abertas (critério 4)', () => {
   it('a opção escolhida vira selo, não botão', async () => {
     carregarRoadmapGerado.mockResolvedValue(comSpec('a'))
 
-    renderizar()
+    await abrirAba('SPEC da fatia')
     await screen.findByText('E-mail é obrigatório?')
 
     expect(screen.getByText('Escolhida')).toBeInTheDocument()
@@ -353,7 +408,7 @@ describe('a SPEC e as perguntas abertas (critério 4)', () => {
   it('respondida tudo, a tela diz que a SPEC pode ser aceita', async () => {
     carregarRoadmapGerado.mockResolvedValue(comSpec('a'))
 
-    renderizar()
+    await abrirAba('SPEC da fatia')
 
     expect(await screen.findByText('Todas as decisões foram tomadas')).toBeInTheDocument()
   })
@@ -361,7 +416,7 @@ describe('a SPEC e as perguntas abertas (critério 4)', () => {
   it('mostra as seções da SPEC gerada', async () => {
     carregarRoadmapGerado.mockResolvedValue(comSpec())
 
-    renderizar()
+    await abrirAba('SPEC da fatia')
     await screen.findByText('E-mail é obrigatório?')
 
     expect(screen.getByText('Critérios de aceite')).toBeInTheDocument()
@@ -376,18 +431,35 @@ describe('o centro de aprovações', () => {
   })
 
   it('mostra o que cada gate cobre antes do botão', async () => {
-    renderizar()
+    await abrirAba('Aprovações')
 
     expect(await screen.findByText('docs/PRD.md')).toBeInTheDocument()
     expect(screen.getByText('docs/ARCHITECTURE.md')).toBeInTheDocument()
     expect(screen.getByText('docs/spec/spec-x.md')).toBeInTheDocument()
   })
 
+  it('trocar de aba não perde o que a aprovação respondeu', async () => {
+    const usuario = userEvent.setup()
+    // `marcos-pendentes` é motivo real do contrato; um valor inventado cairia fora do mapa de
+    // tom e o alerta nem renderizaria — o teste passaria a medir o próprio dublê.
+    aprovarGate.mockResolvedValue({ reason: 'marcos-pendentes', mensagem: 'Faltam marcos.' })
+
+    await abrirAba('Aprovações')
+    await usuario.click((await screen.findAllByRole('button', { name: 'Aprovar' }))[0]!)
+    await screen.findByText('Faltam marcos.')
+
+    await usuario.click(screen.getByRole('tab', { name: 'MVPs' }))
+
+    // O desfecho mora **fora** das abas: é a resposta ao clique que o PI acabou de dar, e
+    // escondê-lo atrás da aba que ele deixou faria a recusa passar despercebida (#333).
+    expect(screen.getByText('Faltam marcos.')).toBeInTheDocument()
+  })
+
   it('aprovar manda só o gate: a identidade vem da sessão no main', async () => {
     const usuario = userEvent.setup()
     aprovarGate.mockResolvedValue({ reason: 'aprovado', mensagem: 'Aprovado.' })
 
-    renderizar()
+    await abrirAba('Aprovações')
     const botoes = await screen.findAllByRole('button', { name: 'Aprovar' })
     await usuario.click(botoes[0]!)
 
@@ -399,7 +471,7 @@ describe('o centro de aprovações', () => {
     const usuario = userEvent.setup()
     aprovarGate.mockResolvedValue({ reason: 'aprovado', mensagem: 'Aprovado.' })
 
-    renderizar()
+    await abrirAba('Aprovações')
     const botoes = await screen.findAllByRole('button', { name: 'Aprovar' })
     await usuario.click(botoes[1]!)
 
@@ -412,7 +484,7 @@ describe('o centro de aprovações', () => {
     const usuario = userEvent.setup()
     aprovarGate.mockResolvedValue({ reason: 'aprovado', mensagem: 'Aprovado.' })
 
-    renderizar()
+    await abrirAba('Aprovações')
     const botoes = await screen.findAllByRole('button', { name: 'Aprovar' })
     await usuario.click(botoes[2]!)
 
@@ -434,7 +506,7 @@ describe('o centro de aprovações', () => {
       }
     ])
 
-    renderizar()
+    await abrirAba('Aprovações')
     await screen.findByText('docs/PRD.md')
 
     expect(await screen.findByText('Aprovado')).toBeInTheDocument()
@@ -444,7 +516,7 @@ describe('o centro de aprovações', () => {
   it('gate sem revisões diz que não há o que aprovar', async () => {
     revisoesDoGate.mockResolvedValue([])
 
-    renderizar()
+    await abrirAba('Aprovações')
 
     const semObjeto = await screen.findAllByText('Nada a aprovar ainda neste gate.')
     expect(semObjeto.length).toBeGreaterThan(0)
@@ -457,10 +529,112 @@ describe('o centro de aprovações', () => {
       mensagem: 'Entre na sua conta para aprovar.'
     })
 
-    renderizar()
+    await abrirAba('Aprovações')
     const botoes = await screen.findAllByRole('button', { name: 'Aprovar' })
     await usuario.click(botoes[0]!)
 
     expect(await screen.findByText('Entre na sua conta para aprovar.')).toBeInTheDocument()
+  })
+})
+
+describe('o andamento das duas gerações desta tela (issue #337)', () => {
+  // A barra vive na tela com roadmap gerado: é o estado em que o PI clica "colocar na fila", o
+  // segundo dos dois atos que esta tela gera. O caso sem roadmap tem o próprio teste abaixo.
+  beforeEach(() => {
+    carregarRoadmapGerado.mockResolvedValue(roadmapGerado())
+    mvpsElegiveis.mockResolvedValue([roadmapGerado().mvps as never].flat().slice(0, 1))
+  })
+
+  /** Emite um anúncio como o main o emitiria, e espera o React aplicar. */
+  async function anunciar(
+    etapa: string,
+    estado: 'iniciada' | 'concluida' | 'falhou',
+    resumo?: string
+  ): Promise<void> {
+    await waitFor(() => expect(emitir).toBeDefined())
+    await act(async () => {
+      emitir?.({
+        traceId: 'etapas:p-1',
+        evento: { tipo: 'etapa', etapa, estado, ...(resumo === undefined ? {} : { resumo }) }
+      })
+    })
+  }
+
+  it('sem anúncio nenhum não há barra — 0% afirmaria que nada aconteceu', async () => {
+    renderizar()
+
+    await screen.findByRole('tablist')
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+  })
+
+  it('gerar o roadmap mostra a etapa em curso, não os nomes do PRD', async () => {
+    renderizar()
+    await screen.findByRole('tablist')
+
+    await anunciar('mvps', 'iniciada')
+
+    /*
+     * Duas ocorrências, e as duas são certas: o destaque de "o que acontece agora" e a linha da
+     * etapa na lista. O que se prova é o **nome desta geração** — a lista do PRD abre com
+     * "Pesquisa de mercado", que aqui nunca acontece e contaria no denominador sem nunca chegar.
+     */
+    expect(await screen.findAllByText('Proposta dos MVPs')).toHaveLength(2)
+    expect(screen.queryByText('Pesquisa de mercado')).not.toBeInTheDocument()
+  })
+
+  it('o progresso conta as quatro etapas do roadmap', async () => {
+    renderizar()
+    await screen.findByRole('tablist')
+
+    await anunciar('mvps', 'iniciada')
+    await anunciar('mvps', 'concluida', '3 MVPs propostos')
+
+    // 1 de 4. Com a lista do PRD, de cinco etapas, o mesmo anúncio daria 20%.
+    expect(await screen.findByRole('progressbar')).toHaveAttribute('aria-valuenow', '25')
+  })
+
+  it('a checagem de dependências é etapa própria: o ciclo não vira "validação falhou"', async () => {
+    renderizar()
+    await screen.findByRole('tablist')
+
+    await anunciar('validacao', 'concluida', 'todo MVP cita o que o sustenta')
+    await anunciar('dag', 'falhou', 'mvp-2 depende de mvp-3, que depende de mvp-2')
+
+    expect(
+      await screen.findByText('mvp-2 depende de mvp-3, que depende de mvp-2')
+    ).toBeInTheDocument()
+    expect(await screen.findAllByText('Checagem de dependências')).toHaveLength(2)
+  })
+
+  it('a correção aparece no resumo — um clique vira até três chamadas', async () => {
+    renderizar()
+    await screen.findByRole('tablist')
+
+    await anunciar('mvps', 'iniciada', 'correção 1 de 2')
+
+    expect(await screen.findByText('correção 1 de 2')).toBeInTheDocument()
+  })
+
+  it('escolher o MVP percorre as etapas da SPEC, não as do roadmap', async () => {
+    const usuario = userEvent.setup()
+    // Fica pendente: é enquanto a promessa não resolve que a tela está "escolhendo", e é esse
+    // estado que troca o contrato da barra.
+    escolherMvpDoRoadmap.mockReturnValue(new Promise(() => {}))
+
+    renderizar()
+    await screen.findAllByText(/Cadastro de cliente/)
+    await usuario.click(
+      screen.getByRole('button', { name: 'Escolher "Cadastro de cliente" e gerar a SPEC' })
+    )
+
+    await anunciar('spec', 'iniciada')
+
+    /*
+     * Escolher o MVP parece um clique e é uma geração. A prova é o nome: `spec` só existe no
+     * contrato da escolha, e `mvps` — a primeira do roadmap — não pode aparecer, senão a barra
+     * estaria contando etapas que esta geração nunca vai executar.
+     */
+    expect(await screen.findAllByText('Escrita da SPEC da fatia')).toHaveLength(2)
+    expect(screen.queryByText('Proposta dos MVPs')).not.toBeInTheDocument()
   })
 })

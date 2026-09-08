@@ -23,7 +23,9 @@ import {
   cortarPropostoDaArquitetura,
   descartarAjuste,
   exigeAncoraEmPrototipo,
+  pendenciasDeRevisao,
   propostosDoDocumentoDaArquitetura,
+  propostosPorDocumento,
   validarArquitetura
 } from './arquitetura-gerada'
 
@@ -314,6 +316,64 @@ describe('propostos e cortes', () => {
     const c = cortarPropostoDaArquitetura(conteudo([DO_PRD, PROPOSTO]), 'a-1')
 
     expect(c.afirmacoes).toHaveLength(2)
+  })
+})
+
+/*
+ * A aba "A revisar" reúne num lugar o que estava espalhado pelos quatro documentos (#333). O que
+ * estes testes protegem é que **reunir não é misturar**: o agrupamento por documento sobrevive.
+ */
+describe('o que o pacote tem a revisar (issue #333)', () => {
+  const PROPOSTO_DECISIONS: AfirmacaoDaArquitetura = {
+    id: 'a-3',
+    documento: 'DECISIONS',
+    secao: 'Decisões estruturais',
+    texto: 'Guardar o histórico de alterações numa tabela separada.',
+    origem: 'proposto'
+  }
+  const PROPOSTO_TESTING: AfirmacaoDaArquitetura = {
+    id: 'a-4',
+    documento: 'TESTING',
+    secao: 'Estratégia',
+    texto: 'Cobrir a fronteira do provider com teste montado.',
+    origem: 'proposto'
+  }
+  const AJUSTE: AjusteProposto = {
+    id: 'j-1',
+    tipo: 'tela-sem-requisito',
+    jornada: 'Entrar na conta',
+    observacao: 'A tela existe e nenhum requisito a pede.',
+    recomendacao: 'Confirmar se o login entra no escopo desta versão.'
+  }
+
+  it('agrupa os propostos por documento, na ordem dos documentos', () => {
+    const c = conteudo([DO_PRD, PROPOSTO_TESTING, PROPOSTO_DECISIONS])
+
+    // A ordem é a de `DOCUMENTOS_DA_ARQUITETURA`, não a de chegada: o PI lê a aba na mesma
+    // sequência em que lê as outras, e uma ordem por chegada mudaria a cada geração.
+    expect(propostosPorDocumento(c).map((g) => g.documento)).toEqual(['DECISIONS', 'TESTING'])
+  })
+
+  it('omite documento sem proposto — cabeçalho vazio seria ruído', () => {
+    const c = conteudo([DO_PRD, PROPOSTO_DECISIONS])
+
+    expect(propostosPorDocumento(c)).toHaveLength(1)
+    expect(propostosPorDocumento(c)[0]?.propostos).toHaveLength(1)
+  })
+
+  it('não devolve nada quando nada foi inferido', () => {
+    expect(propostosPorDocumento(conteudo([DO_PRD, DO_PROTOTIPO]))).toEqual([])
+  })
+
+  it('conta propostos e ajustes juntos — é o número do contador da aba', () => {
+    const c = conteudo([DO_PRD, PROPOSTO_DECISIONS, PROPOSTO_TESTING], [AJUSTE])
+
+    // 2 propostos + 1 ajuste. O `DO_PRD` não entra: ele não pede decisão nenhuma.
+    expect(pendenciasDeRevisao(c)).toBe(3)
+  })
+
+  it('conta zero quando não há o que revisar — a aba não deve anunciar pendência inexistente', () => {
+    expect(pendenciasDeRevisao(conteudo([DO_PRD]))).toBe(0)
   })
 })
 

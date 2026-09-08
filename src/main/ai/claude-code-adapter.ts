@@ -109,7 +109,8 @@ export function flagRecusada(stderr: string): string | undefined {
  * entrada, 955 de saída); com ela, chamou a ferramenta direto (1261 / 676).
  */
 export const DICA_DA_SAIDA_ESTRUTURADA =
-  'Entregue o JSON chamando a ferramenta StructuredOutput, não como texto.'
+  'Entregue o JSON chamando a ferramenta StructuredOutput, não como texto. ' +
+  'O argumento da ferramenta **é** o objeto que o formato acima descreve — não o embrulhe de novo.'
 
 export class ClaudeCodeAdapter implements AiAdapter {
   readonly nome = 'claude-code'
@@ -155,6 +156,12 @@ export class ClaudeCodeAdapter implements AiAdapter {
     // isso faz o modelo escrever o JSON em texto, levar o `enforce` do CLI e gerar o documento
     // **duas vezes** — foi o que estourou o timeout dos documentos do PRD. A dica mora no adapter
     // porque a `StructuredOutput` é detalhe deste CLI, não do contrato da etapa.
+    //
+    // A dica diz também para **não embrulhar de novo** (#337). O system mostra o envelope, o
+    // argumento da ferramenta já é esse envelope, e o modelo obedeceu aos dois: a SPEC chegou
+    // como `{"spec":{"spec":{...}}}` e foi descartada na leitura. O leitor tolera o duplo, mas
+    // tolerar não é motivo para continuar pedindo errado — cada rodada perdida é uma chamada
+    // paga.
     if (request.system !== undefined && request.system !== '') {
       base.push(
         '--system-prompt',

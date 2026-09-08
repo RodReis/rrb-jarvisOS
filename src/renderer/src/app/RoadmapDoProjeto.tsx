@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { GitBranch, ShieldCheck, Sparkles } from 'lucide-react'
 import type { WorkspaceId } from '@shared/domain/entities'
-import type { Approval, AprovacaoOutcome, AprovacaoReason, Gate } from '@shared/domain/aprovacoes'
+import type { Approval, AprovacaoOutcome, Gate } from '@shared/domain/aprovacoes'
 import { GATES } from '@shared/domain/aprovacoes'
 import type {
   MvpGerado,
@@ -14,8 +14,12 @@ import type {
   SpecGerada
 } from '@shared/domain/roadmap-gerado'
 import { perguntasSemResposta } from '@shared/domain/roadmap-gerado'
-import { Badge, Button, EmptyState, InlineAlert, LoadingState, Separator } from '@design/ui'
+import type { AndamentoDaEtapa, EtapaDaGeracao } from '@shared/domain/geracao'
+import { ETAPAS_DA_ESCOLHA, ETAPAS_DO_ROADMAP, aplicarEtapa } from '@shared/domain/geracao'
+import { Badge, Button, EmptyState, InlineAlert, LoadingState, TabPanel, Tabs } from '@design/ui'
 import { log } from '../lib/log'
+import { DesfechoDaAprovacao } from './aprovacao-recusada'
+import { AndamentoDaGeracao } from './AndamentoDaGeracao'
 
 /**
  * O roadmap gerado por IA e os dois gates que o fecham (SPEC-Jornada-05).
@@ -81,6 +85,14 @@ const CHAVE_DA_ORIGEM: Readonly<Record<OrigemDoRoadmap, string>> = {
  * `pacote-ausente`, `bloqueado-sem-rota`, `sem-contexto`, `mvp-nao-escolhido` e `mvp-inelegivel`
  * são **`warn`, não `err`**: nada quebrou, falta um passo — e os cinco dizem qual.
  */
+/**
+ * Os valores das abas (#333). Constantes e não literais soltos: cada uma é comparada no gatilho
+ * e no painel, e um erro de digitação abriria a tela numa aba que não existe.
+ */
+const ABA_MVPS = 'mvps'
+const ABA_SPEC = 'spec'
+const ABA_GATES = 'gates'
+
 const TOM_DA_GERACAO: Readonly<Record<ResultadoDoRoadmap, 'ok' | 'err' | 'warn'>> = {
   gerado: 'ok',
   'projeto-inexistente': 'err',
@@ -91,24 +103,6 @@ const TOM_DA_GERACAO: Readonly<Record<ResultadoDoRoadmap, 'ok' | 'err' | 'warn'>
   'mvp-nao-escolhido': 'warn',
   'mvp-inelegivel': 'warn',
   'falha-de-escrita': 'err'
-}
-
-/**
- * Tom por desfecho da aprovação.
- *
- * `ja-aprovado` é **`ok`, não `warn`**: nada deu errado — a revisão já tem o aceite, que é
- * exatamente o estado desejado. Pintar de aviso ensinaria o PI a ler o critério 5 como problema.
- */
-const TOM_DA_APROVACAO: Readonly<Record<AprovacaoReason, 'ok' | 'err' | 'warn'>> = {
-  aprovado: 'ok',
-  'projeto-inexistente': 'err',
-  'ja-aprovado': 'ok',
-  'sem-identidade': 'warn',
-  'sem-revisoes': 'warn',
-  'dag-invalido': 'err',
-  // `warn`, e não `err`: nada quebrou — falta commitar o que já foi aceito, e cada pendência vem
-  // com a ação que a resolve. `err` diria ao PI que o app falhou, quando o que falta é um passo.
-  'marcos-pendentes': 'warn'
 }
 
 export function RoadmapDoProjeto({
@@ -128,6 +122,7 @@ export function RoadmapDoProjeto({
   const [ocupado, setOcupado] = useState<'nao' | 'gerando' | 'escolhendo' | 'aprovando'>('nao')
   const [desfecho, setDesfecho] = useState<RoadmapGeradoOutcome | null>(null)
   const [aprovacao, setAprovacao] = useState<AprovacaoOutcome | null>(null)
+  const [etapas, setEtapas] = useState<ReadonlyMap<EtapaDaGeracao, AndamentoDaEtapa>>(new Map())
 
   /**
    * As três leituras da tela, em paralelo. Devolve em vez de gravar: quem grava é o chamador, e
@@ -210,6 +205,24 @@ export function RoadmapDoProjeto({
   useEffect(() => {
     onOcupado?.(ocupado !== 'nao')
   }, [ocupado, onOcupado])
+
+  /*
+   * As duas gerações desta tela têm contratos diferentes: gerar o roadmap propõe MVPs e checa o
+   * grafo; escolher o MVP escreve a SPEC da fatia. `ocupado` já distingue as duas, e é ele que
+   * diz qual lista a barra deve percorrer — usar uma só deixaria a barra parada num percentual
+   * que não descreve a geração em curso.
+   */
+  const contrato = useMemo(
+    () => (ocupado === 'escolhendo' ? [...ETAPAS_DA_ESCOLHA] : [...ETAPAS_DO_ROADMAP]),
+    [ocupado]
+  )
+
+  useEffect(() => {
+    return window.jarvis.onGenerationEvent(({ evento }) => {
+      if (evento.tipo !== 'etapa') return
+      setEtapas((atuais) => aplicarEtapa(atuais, evento, contrato))
+    })
+  }, [contrato])
 
   /**
    * A escolha do MVP que entra na fila (critério 3).
@@ -324,6 +337,8 @@ export function RoadmapDoProjeto({
         </div>
       )}
 
+      <AndamentoDaGeracao etapas={etapas} gerando={trabalhando} contrato={contrato} />
+
       {desfecho !== null && desfecho.resultado !== 'gerado' && (
         <InlineAlert
           tom={TOM_DA_GERACAO[desfecho.resultado]}
@@ -352,57 +367,69 @@ export function RoadmapDoProjeto({
         <EmptyState titulo={t('roadmap.vazio')} descricao={t('roadmap.vazioDescricao')} />
       ) : (
         <>
-          <MapaDosMvps
-            roadmap={roadmap}
-            elegiveis={elegiveis}
-            ocupado={trabalhando}
-            escolhendo={ocupado === 'escolhendo'}
-            onEscolher={(id) => void escolher(id)}
-          />
+          {/*
+            **As abas** (#333). Aqui elas não separam documentos, e sim **etapas do trabalho**:
+            escolher o MVP, ler a SPEC que nasceu dele, aprovar os gates. Os três viviam
+            empilhados na mesma coluna, e cada um é uma tarefa distinta.
 
-          {roadmap.spec !== undefined && (
-            <SpecDaFatia
-              spec={roadmap.spec}
-              mvp={escolhido}
-              ocupado={trabalhando}
-              onResponder={(perguntaId, resposta) => void responder(perguntaId, resposta)}
-            />
-          )}
+            **Abre nos MVPs**, que é onde a etapa começa: sem MVP escolhido não há SPEC, e sem
+            SPEC os gates não têm o que aprovar. A ordem das abas é a ordem do trabalho.
+          */}
+          <Tabs
+            padrao={ABA_MVPS}
+            rotulo={t('roadmap.abasRotulo')}
+            abas={[
+              { valor: ABA_MVPS, rotulo: t('roadmap.abaMvps') },
+              { valor: ABA_SPEC, rotulo: t('roadmap.abaSpec') },
+              { valor: ABA_GATES, rotulo: t('roadmap.abaGates') }
+            ]}
+          >
+            <TabPanel valor={ABA_MVPS}>
+              <MapaDosMvps
+                roadmap={roadmap}
+                elegiveis={elegiveis}
+                ocupado={trabalhando}
+                escolhendo={ocupado === 'escolhendo'}
+                onEscolher={(id) => void escolher(id)}
+              />
+            </TabPanel>
 
-          <Separator />
-
-          <CentroDeAprovacoes
-            projectId={projectId}
-            workspace={workspace}
-            aprovacoes={aprovacoes}
-            desabilitado={trabalhando}
-            aprovando={ocupado === 'aprovando'}
-            onAprovar={(gate) => void aprovar(gate)}
-          />
-
-          {aprovacao !== null && (
-            <InlineAlert tom={TOM_DA_APROVACAO[aprovacao.reason]} titulo={aprovacao.mensagem}>
-              {/*
-                As pendências de marco, uma por linha, **com a ação** (SPEC-Fases-04, critério 4).
-                Sem a ação o bloqueio seria um beco: a spec proíbe o "aceitar mesmo assim"
-                justamente porque o caminho de saída é o remédio, não um botão de contornar.
-              */}
-              {aprovacao.problemas !== undefined && aprovacao.problemas.length > 0 && (
-                <span className="flex flex-col gap-1">
-                  {aprovacao.problemas.map((problema) => (
-                    <span key={problema.mensagem} className="flex flex-col">
-                      <span>{problema.mensagem}</span>
-                      {problema.acao !== undefined && (
-                        <span className="text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto)]">
-                          {problema.acao}
-                        </span>
-                      )}
-                    </span>
-                  ))}
-                </span>
+            <TabPanel valor={ABA_SPEC}>
+              {roadmap.spec === undefined ? (
+                /* A aba existe mesmo sem SPEC, e diz o que falta: escondê-la faria o PI procurar
+                   uma etapa que a trilha promete. */
+                <EmptyState
+                  titulo={t('roadmap.specAusente')}
+                  descricao={t('roadmap.specAusenteDescricao')}
+                />
+              ) : (
+                <SpecDaFatia
+                  spec={roadmap.spec}
+                  mvp={escolhido}
+                  ocupado={trabalhando}
+                  onResponder={(perguntaId, resposta) => void responder(perguntaId, resposta)}
+                />
               )}
-            </InlineAlert>
-          )}
+            </TabPanel>
+
+            <TabPanel valor={ABA_GATES}>
+              <CentroDeAprovacoes
+                projectId={projectId}
+                workspace={workspace}
+                aprovacoes={aprovacoes}
+                desabilitado={trabalhando}
+                aprovando={ocupado === 'aprovando'}
+                onAprovar={(gate) => void aprovar(gate)}
+              />
+            </TabPanel>
+          </Tabs>
+
+          {/*
+            O desfecho da aprovação fica **fora das abas**: ele é a resposta ao clique que o PI
+            acabou de dar, e escondê-lo atrás da aba que ele talvez já tenha deixado faria a
+            recusa passar despercebida.
+          */}
+          {aprovacao !== null && <DesfechoDaAprovacao aprovacao={aprovacao} />}
         </>
       )}
     </section>

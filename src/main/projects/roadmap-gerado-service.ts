@@ -39,6 +39,7 @@ import { dirname, join, relative, resolve } from 'node:path'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { AiProvider } from '@shared/domain/ai'
 import type { AfirmacaoDaArquitetura } from '@shared/domain/arquitetura-gerada'
+import type { EstadoDaEtapa, EtapaDaGeracao } from '@shared/domain/geracao'
 import type { PrdRegistrado } from '@shared/domain/prd'
 import type {
   ConteudoDoRoadmap,
@@ -150,6 +151,22 @@ export interface RoadmapGeradoServiceDeps {
     readonly arquitetura: readonly AfirmacaoParaOModelo[]
     readonly correcao?: readonly string[]
   }) => Promise<{ readonly spec?: SpecGerada }>
+  /**
+   * Anuncia a etapa em curso para a tela (issue #337).
+   *
+   * O PI clicou em gerar o roadmap e ficou 58,9 segundos com o botão girando e nada na tela.
+   * Escolher o MVP é o mesmo caso: parece um clique e é uma geração — ela produz a SPEC da
+   * primeira fatia.
+   *
+   * Opcional pela mesma razão do `ArquiteturaService`: a geração acontece com ou sem alguém
+   * olhando, e um call site que esqueça de injetá-la não deve perder a chamada já paga.
+   */
+  readonly anunciarEtapa?: (
+    projectId: string,
+    etapa: EtapaDaGeracao,
+    estado: EstadoDaEtapa,
+    resumo?: string
+  ) => void
 }
 
 /**
@@ -192,6 +209,53 @@ export class RoadmapGeradoService {
     this.audit = deps.audit
     this.userId = deps.userId
     this.deps = deps
+  }
+
+  /**
+   * Anuncia uma etapa, e **nunca deixa isso derrubar a geração** (issue #337).
+   *
+   * Mesma proteção do `ArquiteturaService`: `anunciarEtapa` termina num `webContents.send`, e
+   * uma janela destruída no meio da geração lança de dentro do Electron. Sem o bloqueio, fechar
+   * a janela perderia a chamada ao modelo que o PI já pagou.
+   */
+  private anunciar(
+    projectId: string,
+    etapa: EtapaDaGeracao,
+    estado: EstadoDaEtapa,
+    resumo?: string
+  ): void {
+    try {
+      this.deps.anunciarEtapa?.(projectId, etapa, estado, resumo)
+    } catch (erro) {
+      log.agent.warn('Falha ao anunciar a etapa da geração', { projectId, etapa, estado, erro })
+    }
+  }
+
+  /**
+   * Fecha a etapa `gravacao` a partir do desfecho de `persistir`.
+   *
+   * A gravação é o único passo que toca o disco, e é onde o PI precisa da distinção: uma falha
+   * aqui não é "a IA errou", é o arquivo que não pôde ser escrito. O caso em que a revisão já
+   * existia também não é "documentos gravados" — nada mudou, e dizer o contrário faria o PI
+   * procurar uma alteração que não houve.
+   */
+  private anunciarGravacao(
+    projectId: string,
+    desfecho: RoadmapGeradoOutcome,
+    oQueFoiGravado: string
+  ): void {
+    if (desfecho.resultado !== 'gerado') {
+      this.anunciar(projectId, 'gravacao', 'falhou', desfecho.mensagem)
+      return
+    }
+
+    const identico = desfecho.mensagem.includes('idêntico')
+    this.anunciar(
+      projectId,
+      'gravacao',
+      'concluida',
+      identico ? 'conteúdo idêntico — a revisão anterior foi preservada' : oQueFoiGravado
+    )
   }
 
   /** A revisão vigente, ou `undefined` enquanto nenhuma foi gerada. */
@@ -277,6 +341,18 @@ export class RoadmapGeradoService {
 
     // (4) O laço de correção: o validador de DAG nomeia o ciclo, e o modelo desfaz.
     for (let tentativa = 0; tentativa <= TENTATIVAS_DE_CORRECAO_DO_ROADMAP; tentativa += 1) {
+      /*
+       * Um clique do PI vira até três chamadas ao modelo, e antes da #337 ele não via nenhuma —
+       * o que na tela parecia travamento era o laço de correção rodando. A tentativa entra no
+       * resumo para que a espera longa tenha explicação.
+       */
+      this.anunciar(
+        projectId,
+        'mvps',
+        'iniciada',
+        tentativa > 0 ? `correção ${tentativa} de ${TENTATIVAS_DE_CORRECAO_DO_ROADMAP}` : undefined
+      )
+
       const resposta = await this.deps.gerarMvps({
         projectId,
         workspace: workspaceId,
@@ -290,10 +366,18 @@ export class RoadmapGeradoService {
 
       if (resposta.mvps === undefined) {
         problemas = ['A chamada ao modelo não devolveu saída.']
+        this.anunciar(projectId, 'mvps', 'falhou', 'a chamada não devolveu saída')
         continue
       }
 
       const mvps = this.preservarCongelados(resposta.mvps, projectId)
+      this.anunciar(
+        projectId,
+        'mvps',
+        'concluida',
+        `${mvps.length} ${mvps.length === 1 ? 'MVP proposto' : 'MVPs propostos'}`
+      )
+      this.anunciar(projectId, 'validacao', 'iniciada')
       const candidato: ConteudoDoRoadmap = { projectId, mvps }
 
       const validacao = validarRoadmapGerado(candidato, {
@@ -303,6 +387,19 @@ export class RoadmapGeradoService {
 
       if (!validacao.valido) {
         problemas = validacao.problemas.map((p) => p.mensagem)
+
+        /*
+         * O validador devolve forma e grafo numa lista só, mas na tela são duas etapas: o PI
+         * precisa saber se o modelo escreveu um MVP incompleto ou se as dependências fecharam
+         * um ciclo. `dag-invalido` é o que separa as duas.
+         */
+        const soDag = validacao.problemas.every((p) => p.recusa === 'dag-invalido')
+        if (soDag) {
+          this.anunciar(projectId, 'validacao', 'concluida', 'todo MVP cita o que o sustenta')
+          this.anunciar(projectId, 'dag', 'falhou', validacao.problemas[0]?.mensagem)
+        } else {
+          this.anunciar(projectId, 'validacao', 'falhou', validacao.problemas[0]?.mensagem)
+        }
 
         this.audit.append({
           user_id: userId,
@@ -314,7 +411,11 @@ export class RoadmapGeradoService {
         continue
       }
 
-      return this.persistir(candidato, {
+      this.anunciar(projectId, 'validacao', 'concluida', 'todo MVP cita o que o sustenta')
+      this.anunciar(projectId, 'dag', 'concluida', 'nenhuma dependência circular')
+      this.anunciar(projectId, 'gravacao', 'iniciada')
+
+      const gravado = this.persistir(candidato, {
         projeto,
         pacoteEstruturalId: base.pacoteEstruturalId,
         arquiteturaId: base.arquiteturaId,
@@ -326,6 +427,9 @@ export class RoadmapGeradoService {
         rota: rota.decisao,
         commitarMarco: true
       })
+
+      this.anunciarGravacao(projectId, gravado, 'STATUS.md e os documentos dos MVPs')
+      return gravado
     }
 
     // Esgotou as tentativas. Bloqueia com o diagnóstico, em vez de gravar o que o validador
@@ -430,6 +534,15 @@ export class RoadmapGeradoService {
     let problemas: readonly string[] = []
 
     for (let tentativa = 0; tentativa <= TENTATIVAS_DE_CORRECAO_DO_ROADMAP; tentativa += 1) {
+      // Escolher o MVP parece um clique e é uma geração: ela escreve a SPEC da primeira
+      // fatia. O PI clicou e ficou sem saber o que acontecia — mesmo defeito do roadmap.
+      this.anunciar(
+        projectId,
+        'spec',
+        'iniciada',
+        tentativa > 0 ? `correção ${tentativa} de ${TENTATIVAS_DE_CORRECAO_DO_ROADMAP}` : undefined
+      )
+
       const resposta = await this.deps.gerarSpec({
         projectId,
         workspace: workspaceId,
@@ -444,8 +557,12 @@ export class RoadmapGeradoService {
 
       if (resposta.spec === undefined) {
         problemas = ['A chamada ao modelo não devolveu a especificação.']
+        this.anunciar(projectId, 'spec', 'falhou', 'a chamada não devolveu a especificação')
         continue
       }
+
+      this.anunciar(projectId, 'spec', 'concluida', resposta.spec.titulo)
+      this.anunciar(projectId, 'validacao', 'iniciada')
 
       const candidato: ConteudoDoRoadmap = {
         projectId,
@@ -461,6 +578,8 @@ export class RoadmapGeradoService {
       if (!validacao.valido) {
         problemas = validacao.problemas.map((p) => p.mensagem)
 
+        this.anunciar(projectId, 'validacao', 'falhou', validacao.problemas[0]?.mensagem)
+
         this.audit.append({
           user_id: userId,
           workspace_id: workspaceId,
@@ -471,7 +590,10 @@ export class RoadmapGeradoService {
         continue
       }
 
-      return this.persistir(candidato, {
+      this.anunciar(projectId, 'validacao', 'concluida', 'a SPEC cita o que a sustenta')
+      this.anunciar(projectId, 'gravacao', 'iniciada')
+
+      const gravado = this.persistir(candidato, {
         projeto,
         pacoteEstruturalId: atual.pacoteEstruturalId,
         arquiteturaId: atual.arquiteturaId,
@@ -482,6 +604,9 @@ export class RoadmapGeradoService {
         rota: rota.decisao,
         commitarMarco: true
       })
+
+      this.anunciarGravacao(projectId, gravado, 'a SPEC da fatia')
+      return gravado
     }
 
     this.audit.append({
