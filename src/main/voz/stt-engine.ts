@@ -79,7 +79,20 @@ export async function transcrever(
   try {
     if (!(await engine.disponivel())) return { estado: 'indisponivel' }
 
-    return { estado: 'ok', resultado: await engine.transcribe(pcm) }
+    const resultado = await engine.transcribe(pcm)
+
+    /*
+     * Tamanhos, nunca conteúdo: o texto é a fala do usuário e o áudio não sai daqui (critério
+     * 8). `caracteres: 0` é a linha que faltou quando o PI tentou três vezes e "nada aconteceu":
+     * o sidecar respondia, o VAD não achava fala, e nenhuma camada dizia isso.
+     */
+    log.sistema.info('Transcrição concluída', {
+      amostras: pcm.length,
+      caracteres: resultado.texto.length,
+      segmentos: resultado.segmentos.length
+    })
+
+    return { estado: 'ok', resultado }
   } catch (erro) {
     /*
      * O motivo vai para o log **antes** de virar desfecho.

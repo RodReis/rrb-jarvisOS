@@ -31,12 +31,20 @@ interface ButtonProps extends PropsDeComposicao {
    * é a primeira. `onClick` não a expressa: ele dispara uma vez, no fim, e um botão de falar
    * que só reage ao clique gravaria sempre zero segundo.
    *
-   * `onPointerLeave` e não só `onPointerUp` porque soltar o botão **fora** dele é comum, e sem
-   * o par a ação ficaria aberta — no microfone, gravando até o timeout duro.
+   * **Quem usa isto deve capturar o ponteiro** no `pointerdown`
+   * (`evento.currentTarget.setPointerCapture(evento.pointerId)`): sem a captura, atravessar a
+   * borda do botão com o dedo pressionado dispara `pointerleave` no meio da ação, e uma
+   * gravação em curso é descartada porque a mão se mexeu. Com ela, todos os eventos do ponteiro
+   * chegam ao botão mesmo fora dele, e `pointerup` sempre fecha o par.
+   *
+   * `onPointerLeave` continua exposto para quem **não** captura — soltar fora do botão é comum.
+   * `onPointerCancel` é o encerramento que sobra quando o SO toma o ponteiro (gesto do sistema,
+   * janela perdendo foco): sem ele, a ação capturada ficaria aberta sem nada a fechar.
    */
   readonly onPointerDown?: React.PointerEventHandler<HTMLButtonElement>
   readonly onPointerUp?: React.PointerEventHandler<HTMLButtonElement>
   readonly onPointerLeave?: React.PointerEventHandler<HTMLButtonElement>
+  readonly onPointerCancel?: React.PointerEventHandler<HTMLButtonElement>
   readonly desabilitado?: boolean
   /**
    * Estado de carregamento.
@@ -128,6 +136,7 @@ export function Button({
   onPointerDown,
   onPointerUp,
   onPointerLeave,
+  onPointerCancel,
   desabilitado = false,
   carregando = false,
   tipo = 'button',
@@ -146,6 +155,7 @@ export function Button({
       onPointerDown={onPointerDown}
       onPointerUp={onPointerUp}
       onPointerLeave={onPointerLeave}
+      onPointerCancel={onPointerCancel}
       disabled={desabilitado || carregando}
       aria-busy={carregando || undefined}
       style={{ height: ALTURA_CONTROLE }}
