@@ -1,10 +1,12 @@
 import { dirname, join, resolve } from 'node:path'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { VozService } from './voz/voz-service'
-import { ARTEFATOS_DA_VOZ } from './voz/artefatos'
-import { baixarArtefato } from './voz/download-de-artefato'
+import { TtsService } from './voz/tts-service'
+import { ARTEFATOS_DA_VOZ, VOZES_DO_CATALOGO, grupoDoArtefato } from './voz/artefatos'
+import { baixarArtefato, type Artefato } from './voz/download-de-artefato'
 import { Sidecar } from './voz/sidecar'
 import { criarEngineFasterWhisper } from './voz/engine-faster-whisper'
+import { criarEnginePiper } from './voz/engine-piper'
 import { HotkeyDaVoz } from './voz/hotkey-da-voz'
 import type { ModoDeCompute } from '@shared/domain/voz'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
@@ -1518,16 +1520,71 @@ if (!app.requestSingleInstanceLock()) {
       }
     })
 
-    /** Quais artefatos ainda não estão no disco. Vazio = a voz pode transcrever. */
+    /** Quais artefatos ainda não estão no disco, dentre os que a pergunta considera. */
+    const faltandoDentre = (artefatos: readonly Artefato[]): readonly string[] =>
+      artefatos
+        .filter((a) => !existsSync(join(app.getPath('userData'), a.destino)))
+        .map((a) => a.id)
+
+    /**
+     * O que falta para **transcrever**: tudo menos as vozes do TTS.
+     *
+     * As vozes ficam de fora de propósito. Elas entraram no catálogo com a M17-F02, e incluí-las
+     * aqui faria o STT — que nunca precisou delas — reportar-se indisponível até o usuário baixar
+     * uma voz para o app falar. Seriam duas capacidades independentes amarradas por um filtro.
+     */
     const faltandoNoDisco = (): readonly string[] =>
-      ARTEFATOS_DA_VOZ.filter((a) => !existsSync(join(app.getPath('userData'), a.destino))).map(
-        (a) => a.id
-      )
+      faltandoDentre(ARTEFATOS_DA_VOZ.filter((a) => grupoDoArtefato(a.id) !== 'vozes'))
+
+    /*
+     * O sidecar do TTS é um **segundo processo**, não outra operação no mesmo (decisão 3 do PI).
+     *
+     * Duas razões medidas. Isolamento de crash: matar a síntese no meio de uma fala não pode
+     * derrubar a transcrição, e vice-versa (critério 4) — no mesmo processo, um `SIGKILL` levaria
+     * as duas. E disputa de recurso: o Whisper quer a GPU, o Piper roda em CPU; compartilhar o
+     * processo os poria na mesma fila de inferência sem necessidade.
+     *
+     * O timeout é menor que o do STT porque o custo é outro: medido no spike, carregar uma voz
+     * leva ~1,2 s e sintetizar uma frase, ~80 ms. Dois minutos aqui seriam uma tela travada por
+     * dois minutos antes de admitir a falha.
+     */
+    const sidecarDoTts = new Sidecar({
+      spawn: (comando, args) => spawn(comando, [...args], { stdio: 'pipe' }),
+      comando: diretorioDaVoz('runtime', 'python', 'python.exe'),
+      args: [join(__dirname, 'sidecar-tts.py')],
+      timeoutMs: 30_000
+    })
+
+    const engineDoTts = criarEnginePiper({
+      sidecar: sidecarDoTts,
+      vozes: () =>
+        VOZES_DO_CATALOGO.map((v) => ({
+          id: v.id,
+          rotulo: v.rotulo,
+          caminho: join(app.getPath('userData'), v.destino)
+        })),
+      registrarTimeline: (voz, timeline) => {
+        if (timelineRelatada.get(voz) === timeline) return
+        timelineRelatada.set(voz, timeline)
+        // O critério 3 pede que o caminho seja observável. Sem isto, o dia em que uma voz
+        // perdesse o alinhamento numa revisão nova passaria despercebido: a fala continuaria
+        // saindo, só que com a boca estimada.
+        log.sistema.info('Caminho da timeline de visemes definido pela voz', { voz, timeline })
+      }
+    })
+
+    const timelineRelatada = new Map<string, 'exato' | 'estimado'>()
 
     const voz = new VozService({
       engine: engineDaVoz,
       artefatosFaltando: faltandoNoDisco,
       computeAtual: () => computeRelatado
+    })
+
+    const tts = new TtsService({
+      engine: engineDoTts,
+      vozesFaltando: () =>
+        faltandoDentre(ARTEFATOS_DA_VOZ.filter((a) => grupoDoArtefato(a.id) === 'vozes'))
     })
 
     /*
@@ -1582,10 +1639,14 @@ if (!app.requestSingleInstanceLock()) {
     app.on('will-quit', () => {
       hotkeyDaVoz.liberar()
       void engineDaVoz.encerrar()
+      // O segundo sidecar morre junto: são processos separados por isolamento de crash, não
+      // porque um deles deva sobreviver ao app.
+      void engineDoTts.encerrar()
     })
 
     registerIpcHandlers({
       voz,
+      tts,
       // A hotkey vive no SO, não no banco: salvar sem re-registrar deixaria o atalho antigo
       // valendo até o próximo boot (critério 6).
       aoSalvarPreferencias: aplicarHotkeyDaVoz,

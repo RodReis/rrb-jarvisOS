@@ -81,9 +81,19 @@
       "sha256": "815e7be7a7806d54abb586dc943addc79e8b2ee16915059658cbeff4b1b43bf4"
     },
     {
+      "arquivo": "ml_dtypes-0.6.0-cp312-cp312-win_amd64.whl",
+      "url": "https://files.pythonhosted.org/packages/ba/db/9c61ec2760b5cbfb1c6558d5c991a6d8fd3271053c32db20506a9a90272b/ml_dtypes-0.6.0-cp312-cp312-win_amd64.whl",
+      "sha256": "2a3e9d53925597fbffafd2a37048dadeddd0bdaba58058f6ae0869ed709a184d"
+    },
+    {
       "arquivo": "numpy-2.5.3-cp312-cp312-win_amd64.whl",
       "url": "https://files.pythonhosted.org/packages/3c/a1/accf6d4f0c80c5d9ba9735d6b1550e444180599f34dec69ca01360f717ad/numpy-2.5.3-cp312-cp312-win_amd64.whl",
       "sha256": "0a59a421a32580a009e8a1751345bf829631b990dc1794b80514ab722b435def"
+    },
+    {
+      "arquivo": "onnx-1.22.0-cp312-abi3-win_amd64.whl",
+      "url": "https://files.pythonhosted.org/packages/13/a8/734725bb703c5fabb687f79c79e51249475212b3eb37771ac4a4ac9b487f/onnx-1.22.0-cp312-abi3-win_amd64.whl",
+      "sha256": "72ccebab3bac07215c204ce8848d42e78eaaa666badbf72d25cd359b9f269e3a"
     },
     {
       "arquivo": "onnxruntime-1.29.0-cp312-cp312-win_amd64.whl",
@@ -94,6 +104,16 @@
       "arquivo": "packaging-26.3-py3-none-any.whl",
       "url": "https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl",
       "sha256": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c"
+    },
+    {
+      "arquivo": "pathvalidate-3.3.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/9a/70/875f4a23bfc4731703a5835487d0d2fb999031bd415e7d17c0ae615c18b7/pathvalidate-3.3.1-py3-none-any.whl",
+      "sha256": "5263baab691f8e1af96092fa5137ee17df5bdfbd6cff1fcac4d6ef4bc2e1735f"
+    },
+    {
+      "arquivo": "piper_tts-1.8.0-cp39-abi3-win_amd64.whl",
+      "url": "https://files.pythonhosted.org/packages/12/9c/c736d1961cf9ce0655278731b9430df41892ca2ded7b09dabcb340612158/piper_tts-1.8.0-cp39-abi3-win_amd64.whl",
+      "sha256": "5da9bfdb05dfe15da3536859d422e605483ffa6d2b3ec2c5b9593bae6b5aa6a4"
     },
     {
       "arquivo": "protobuf-7.36.1-cp310-abi3-win_amd64.whl",

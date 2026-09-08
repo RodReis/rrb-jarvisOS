@@ -12,15 +12,9 @@
  * dessincronizar da outra silenciosamente, que é o defeito mais caro de achar depois.
  */
 
-import type { SpeechHandle } from '@shared/domain/visemes'
+import type { DesfechoDaFala, SpeechHandle, VozInstalada } from '@shared/domain/visemes'
 
-/** Uma voz instalada, do ponto de vista de quem escolhe em Settings. */
-export interface VozInstalada {
-  readonly id: string
-  readonly rotulo: string
-  /** Se esta voz devolve durações exatas por fonema, ou cai na estimativa (achado do spike). */
-  readonly timeline: 'exato' | 'estimado'
-}
+export type { DesfechoDaFala, VozInstalada }
 
 /**
  * O engine de síntese. Implementação concreta importa o runtime dela; ninguém mais.
@@ -40,19 +34,12 @@ export interface TtsEngine {
 }
 
 /**
- * O desfecho de uma fala, do ponto de vista de quem desenha a tela.
+ * Sintetiza um enunciado, traduzindo tudo em desfecho tratado.
  *
- * `sem-texto` existe pelo mesmo motivo que `sem-audio` no STT: o spike mostrou que o Piper devolve
+ * `sem-texto` existe pelo mesmo motivo que `sem-audio` no STT: o spike mediu que o Piper devolve
  * **zero chunks** para string vazia, e chamar o engine nesse caso gastaria a inicialização para
  * receber um erro que culpa o engine por um acidente de quem chamou.
  */
-export type DesfechoDaFala =
-  | { readonly estado: 'ok'; readonly fala: SpeechHandle }
-  | { readonly estado: 'sem-texto' }
-  | { readonly estado: 'indisponivel' }
-  | { readonly estado: 'falhou'; readonly motivo: string }
-
-/** Sintetiza um enunciado, traduzindo tudo em desfecho tratado. */
 export async function falar(
   engine: TtsEngine,
   texto: string,

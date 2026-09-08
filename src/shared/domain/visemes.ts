@@ -75,6 +75,35 @@ export interface SpeechHandle {
   readonly timeline: 'exato' | 'estimado'
 }
 
+/** Uma voz instalada, do ponto de vista de quem escolhe em Settings. */
+export interface VozInstalada {
+  readonly id: string
+  readonly rotulo: string
+  /** Se esta voz devolve durações exatas por fonema, ou cai na estimativa (achado do spike). */
+  readonly timeline: 'exato' | 'estimado'
+}
+
+/** O que falta para o app falar, e o que já dá para ouvir. */
+export interface ProntidaoDoTts {
+  readonly pronta: boolean
+  /** Os ids dos artefatos de voz que ainda faltam. Vazio quando há voz no disco. */
+  readonly faltando: readonly string[]
+  readonly vozes: readonly VozInstalada[]
+}
+
+/**
+ * O desfecho de uma fala, do ponto de vista de quem desenha a tela.
+ *
+ * Cada estado é uma **próxima ação** diferente, pela mesma régua do STT: `indisponivel` pede
+ * baixar uma voz, `falhou` pede tentar de novo, `sem-texto` não pede nada. Fundir os dois
+ * primeiros daria à primeira execução do app a ação errada.
+ */
+export type DesfechoDaFala =
+  | { readonly estado: 'ok'; readonly fala: SpeechHandle }
+  | { readonly estado: 'sem-texto' }
+  | { readonly estado: 'indisponivel' }
+  | { readonly estado: 'falhou'; readonly motivo: string }
+
 /**
  * Fonema (IPA do espeak-ng) → viseme.
  *

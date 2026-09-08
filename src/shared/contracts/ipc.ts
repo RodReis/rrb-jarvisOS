@@ -107,6 +107,7 @@ import type { CapacidadeResolvida } from '../domain/skills'
 
 /** Canais de request/response (renderer → main → renderer). */
 import type { DesfechoDaTranscricao, DesfechoDoDownload, ProntidaoDaVoz } from '@shared/domain/voz'
+import type { DesfechoDaFala, ProntidaoDoTts } from '@shared/domain/visemes'
 
 export const IPC_CHANNELS = {
   /** Metadados do app (nome, versão, ambiente). Sem segredo, sem caminho de disco. */
@@ -187,15 +188,26 @@ export const IPC_CHANNELS = {
   executionRunReal: 'execution:run-real',
   executionList: 'execution:list',
   /*
-   * Voz (SPEC-Voz-01). Três canais e nada mais: transcrever um enunciado, perguntar se o
-   * runtime está pronto, e mandar baixar o que falta.
+   * Voz (SPEC-Voz-01). Três canais: transcrever um enunciado, perguntar se o runtime está pronto,
+   * e mandar baixar o que falta.
    *
    * Nenhum deles carrega processo, caminho de modelo ou comando (critério 3) — com isso na
    * mão, a tela deixaria de falar com uma capacidade e passaria a falar com uma implementação.
+   * A mesma régua vale para os canais de fala logo abaixo.
    */
   vozTranscrever: 'voz:transcrever',
   vozProntidao: 'voz:prontidao',
   vozBaixarArtefato: 'voz:baixar-artefato',
+  /*
+   * Fala (SPEC-Voz-02). Dois canais: sintetizar um texto e perguntar quais vozes existem.
+   *
+   * **Não há canal de reprodução.** O áudio volta como PCM no desfecho do `tts:falar` e quem toca
+   * é o renderer, com Web Audio — que é Web API, não Node (critério 6). Um canal "tocar" poria o
+   * main no caminho do som sem necessidade, e `cancel()` viraria ida e volta pela ponte em vez de
+   * parar a fonte que já está na mão de quem toca.
+   */
+  ttsFalar: 'tts:falar',
+  ttsProntidao: 'tts:prontidao',
   approvalList: 'approval:list',
   approvalResolve: 'approval:resolve',
   /**
@@ -827,6 +839,13 @@ export interface JarvisBridge {
   transcreverAudio(pcm: Int16Array, workspace: WorkspaceId): Promise<DesfechoDaTranscricao>
   prontidaoDaVoz(): Promise<ProntidaoDaVoz>
   baixarArtefatoDeVoz(id: string): Promise<DesfechoDoDownload>
+
+  /*
+   * Fala (SPEC-Voz-02, critério 6). O que volta é PCM mais a timeline de bocas; quem toca é o
+   * renderer, com Web Audio. Nenhum campo carrega processo, caminho de voz nem comando.
+   */
+  falar(texto: string, voz: string): Promise<DesfechoDaFala>
+  prontidaoDoTts(): Promise<ProntidaoDoTts>
   /**
    * Resolve uma aprovação pendente. O retorno varia com o que estava pausado: uma etapa de
    * filesystem devolve o `ExecutionRun` retomado (F01); um comando devolve o

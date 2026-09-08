@@ -9,9 +9,9 @@
  *
  * Cada valor aqui foi obtido baixando o arquivo e calculando o SHA-256, e depois **conferido
  * contra a fonte**: o runtime contra o `SHA256SUMS` do release e o digest da API do GitHub; o
- * `model.bin` contra o oid LFS do Hugging Face; as 24 wheels contra os digests que o PyPI
- * publica por arquivo. Hash inventado seria pior que nenhum — pareceria verificação e recusaria
- * todo download legítimo.
+ * `model.bin` e as vozes contra o conteúdo servido pela **revisão pinada** do Hugging Face; as
+ * wheels contra os digests que o PyPI publica por arquivo. Hash inventado seria pior que nenhum —
+ * pareceria verificação e recusaria todo download legítimo.
  *
  * ## Por que tudo é pinado por revisão, e não por tag móvel
  *
@@ -22,9 +22,11 @@
  *
  * ## As wheels moram em JSON, e não aqui
  *
- * São 24 arquivos — seis dependências diretas do faster-whisper mais as transitivas —, e a lista
- * saiu do resolvedor do pip, não de digitação. Deixá-las neste arquivo transformaria uma lista
- * gerada em código a revisar linha a linha; num JSON, atualizar é rodar o resolvedor de novo.
+ * São 28 arquivos — as dependências diretas do faster-whisper e do piper-tts mais as transitivas
+ * —, e a lista saiu do resolvedor do pip, não de digitação. Deixá-las neste arquivo transformaria
+ * uma lista gerada em código a revisar linha a linha; num JSON, atualizar é rodar o resolvedor de
+ * novo. As duas bibliotecas compartilham sete wheels (numpy, onnxruntime, protobuf e outras), nas
+ * **mesmas** versões — por isso o TTS acrescentou só quatro.
  */
 
 import wheels from './wheels-da-voz.json'
@@ -43,6 +45,52 @@ const modelo = (arquivo: string, sha256: string): Artefato => ({
   sha256,
   destino: `voz/models/whisper-small/${arquivo}`
 })
+
+/** O commit do catálogo de vozes do Piper. Mesma razão do modelo: `main` moveria sob o hash. */
+const REVISAO_DAS_VOZES = '1162a9173d0ce503555aed757976b7a9912eae4c'
+
+/**
+ * Uma voz do Piper são **dois** arquivos: o `.onnx` e o `.onnx.json`.
+ *
+ * O `PiperVoice.load` adivinha o caminho do config a partir do modelo e abre os dois. Baixar só o
+ * `.onnx` — que é o grande e parece "a voz" — faria a falha aparecer como erro do runtime, longe
+ * da causa. É o mesmo motivo pelo qual o modelo do Whisper são quatro arquivos e não um.
+ */
+const voz = (
+  nome: string,
+  caminho: string,
+  shaModelo: string,
+  shaConfig: string
+): readonly Artefato[] => [
+  {
+    id: `voz-piper/${nome}.onnx`,
+    url: `https://huggingface.co/rhasspy/piper-voices/resolve/${REVISAO_DAS_VOZES}/${caminho}/${nome}.onnx`,
+    sha256: shaModelo,
+    destino: `voz/vozes/${nome}.onnx`
+  },
+  {
+    id: `voz-piper/${nome}.onnx.json`,
+    url: `https://huggingface.co/rhasspy/piper-voices/resolve/${REVISAO_DAS_VOZES}/${caminho}/${nome}.onnx.json`,
+    sha256: shaConfig,
+    destino: `voz/vozes/${nome}.onnx.json`
+  }
+]
+
+/**
+ * As vozes pt-BR (SPEC-Voz-02, critério 5 — o PI escolhe o default ouvindo).
+ *
+ * As duas do mínimo verificável da spec. A `faber` devolve alinhamento exato por fonema; a
+ * `edresson` **não** — ela perde o alinhamento em silêncio (medido em `reports/spike-visemes-piper.md`)
+ * e cai no caminho estimado. Decisão do PI em 2026-09-08: manter as duas, com a `edresson`
+ * provando o plano B em produção em vez de ele existir só em teste.
+ *
+ * A terceira voz que a spec condiciona à qualidade do catálogo não entrou: nenhuma outra pt-BR do
+ * catálogo tem qualidade equivalente, e a spec pede verificação, não promessa.
+ */
+export const VOZES_DO_CATALOGO = [
+  { id: 'pt_BR-faber-medium', rotulo: 'Faber', destino: 'voz/vozes/pt_BR-faber-medium.onnx' },
+  { id: 'pt_BR-edresson-low', rotulo: 'Edresson', destino: 'voz/vozes/pt_BR-edresson-low.onnx' }
+] as const
 
 export const ARTEFATOS_DA_VOZ: readonly Artefato[] = [
   {
@@ -67,6 +115,19 @@ export const ARTEFATOS_DA_VOZ: readonly Artefato[] = [
     modelo('vocabulary.txt', '34ce3fe1c5041027b3f8d42912270993f986dbc4bb34cf27f951e34a1e453913')
   ],
 
+  ...voz(
+    'pt_BR-faber-medium',
+    'pt/pt_BR/faber/medium',
+    '858555e3a064209c57088fe6bd70c4c3dc54d03eaa00c45d5ecaf43a33f95aa7',
+    '7e694de195ae3fc36dd732c445eb04fb49b649854893cb5506b978f0d50a1d6f'
+  ),
+  ...voz(
+    'pt_BR-edresson-low',
+    'pt/pt_BR/edresson/low',
+    'de4cecee38b30bb1a6378a337af605d59f0c377df702c6a6752870db8991cd84',
+    'f138992d2e777d1e3aa0bbb14c2d324307b0f342c1bcf20978765b3bea506c56'
+  ),
+
   ...wheels.wheels.map((w) => ({
     id: `wheel/${w.arquivo}`,
     url: w.url,
@@ -76,16 +137,20 @@ export const ARTEFATOS_DA_VOZ: readonly Artefato[] = [
 ]
 
 /**
- * Os três grupos, na ordem em que a tela os apresenta.
+ * Os grupos, na ordem em que a tela os apresenta.
  *
- * A lista crua tem 29 itens, e mostrá-la ao usuário seria uma barra de progresso com nomes de
- * pacote Python. O que ele precisa saber é que faltam **runtime**, **modelo** ou **bibliotecas**
- * — e o download de cada item continua individual, com hash próprio.
+ * A lista crua tem dezenas de itens, e mostrá-la ao usuário seria uma barra de progresso com nomes
+ * de pacote Python. O que ele precisa saber é que faltam **runtime**, **modelo**, **vozes** ou
+ * **bibliotecas** — e o download de cada item continua individual, com hash próprio.
+ *
+ * `vozes` é grupo próprio porque a ação do usuário é diferente: o modelo do STT é obrigatório para
+ * ouvir, e a voz é escolha — ele pode querer uma e não a outra (critério 5).
  */
-export type GrupoDeArtefato = 'runtime' | 'modelo' | 'wheels'
+export type GrupoDeArtefato = 'runtime' | 'modelo' | 'vozes' | 'wheels'
 
 export function grupoDoArtefato(id: string): GrupoDeArtefato {
   if (id.startsWith('wheel/')) return 'wheels'
+  if (id.startsWith('voz-piper/')) return 'vozes'
   if (id.startsWith('modelo-')) return 'modelo'
   return 'runtime'
 }
