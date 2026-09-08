@@ -2133,7 +2133,7 @@ Status: **entregue** — spec `aprovada-pi` (2026-08-30); issue [#206](https://g
 
 ### Fatia 01 — STT local e push-to-talk (`docs/spec/spec-voz-01-stt-local-push-to-talk.md`)
 
-Status: **primeira de duas entregas na `main`** — spec `aprovada-pi` (2026-08-30); issue [#200](https://github.com/RodReis/rrb-jarvisOS/issues/200), PR [#299](https://github.com/RodReis/rrb-jarvisOS/pull/299).
+Status: **as duas entregas na `main`** — spec `aprovada-pi` (2026-08-30); issue [#200](https://github.com/RodReis/rrb-jarvisOS/issues/200), PRs [#299](https://github.com/RodReis/rrb-jarvisOS/pull/299) (esqueleto) e [#338](https://github.com/RodReis/rrb-jarvisOS/pull/338) (engine real, `076113c`). Sete dos nove critérios fechados; **5 e 9 são do PI**.
 
 **Fatiada em duas por decisão do PI (2026-09-06).** Dois dos nove critérios exigem o PI na frente do app — falar ao microfone (5) e medir a latência na máquina dele (9) —, e a fatia baixa ~100 MB de runtime Python mais o modelo. Entregar o esqueleto primeiro põe a arquitetura sob revisão antes de horas gastas no runtime.
 
