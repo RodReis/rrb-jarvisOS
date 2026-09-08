@@ -142,3 +142,88 @@ test.describe('teclado', () => {
     )
   })
 })
+
+/**
+ * A barra de andamento durante a geração (issue #337).
+ *
+ * **Por que ela só pode ser medida aqui.** A barra nasceu na #287 e nunca teve gate visual. Ela
+ * distingue os estados das etapas por **forma**, não por cor — cheio para concluída, anel para a
+ * que acontece agora, vazado para o que não começou — porque o acento é escolhido pelo usuário
+ * entre oito cores e três delas destroem o sinal. Forma de 8px é exatamente o que a M25-F01
+ * pegou renderizando a 2px com todos os testes de tela verdes.
+ *
+ * A cena `gerando` congela quatro estados numa captura: duas concluídas, uma em curso, uma
+ * falhada com o motivo.
+ */
+test.describe('o andamento da geração (issue #337)', () => {
+  async function abrirGerando(page: Page, modo: string, cena = 'gerando'): Promise<void> {
+    await page.setViewportSize(JANELA)
+    await page.goto(`/?galeria=arquitetura&cena=${cena}&modo=${modo}`)
+    await page.waitForSelector('[data-jos-progresso]')
+  }
+
+  for (const modo of MODOS) {
+    test(`os marcadores de estado têm tamanho de verdade — ${modo}`, async ({ page }) => {
+      await abrirGerando(page, modo)
+
+      /*
+       * O marcador é o que carrega o estado sem depender de cor. Um marcador que renderiza a
+       * 2px continua passando em todo teste de tela — ele existe, tem o `data-jos-estado` certo
+       * e o texto ao lado. Só a medida real reprova.
+       */
+      const marcadores = page.locator('[data-jos-etapa] span[aria-hidden="true"]')
+      const total = await marcadores.count()
+      expect(total).toBe(5)
+
+      for (let i = 0; i < total; i += 1) {
+        const caixa = await marcadores.nth(i).boundingBox()
+        expect(caixa?.width, `o marcador ${i} sumiu`).toBeGreaterThanOrEqual(7)
+        expect(caixa?.height, `o marcador ${i} sumiu`).toBeGreaterThanOrEqual(7)
+      }
+    })
+  }
+
+  test('a etapa em curso se distingue da concluída sem usar cor', async ({ page }) => {
+    await abrirGerando(page, 'dark')
+
+    /*
+     * O princípio 2 do produto na forma medível: em escala de cinza os dois marcadores ainda
+     * precisam ser diferentes. A concluída é preenchida e a em curso é um anel, então a
+     * espessura de borda os separa — não o matiz.
+     */
+    const borda = async (etapa: string): Promise<string> =>
+      page.evaluate((sel) => {
+        const el = document.querySelector(`[data-jos-etapa="${sel}"] span[aria-hidden="true"]`)
+        return el === null ? '' : getComputedStyle(el).borderTopWidth
+      }, etapa)
+
+    const concluida = await borda('prototipos')
+    const emCurso = await borda('coerencia')
+
+    expect(emCurso).not.toBe(concluida)
+    expect(parseFloat(emCurso)).toBeGreaterThan(0)
+  })
+
+  test('a barra fica acima da dobra, junto do topo da etapa', async ({ page }) => {
+    await abrirGerando(page, 'dark')
+
+    /*
+     * A regra da SPEC-Jornada-03 § Emenda E2: o andamento fica **junto do botão que dispara**.
+     * Ela existe porque a barra nasceu no fim de uma página longa (#318) e o PI, olhando o topo
+     * depois de clicar, rolava a tela inteira para saber onde a rodada estava.
+     */
+    const caixa = await page.locator('[data-jos-progresso]').boundingBox()
+
+    expect(caixa?.y, 'a barra caiu abaixo da dobra').toBeLessThan(JANELA.height)
+  })
+
+  test('a etapa que falhou diz "falhou" em texto, e o motivo aparece', async ({ page }) => {
+    await abrirGerando(page, 'dark', 'gerando-falhou')
+
+    // Cor sozinha não atravessa daltonismo nem escala de cinza. O texto atravessa.
+    const linha = page.locator('[data-jos-etapa="coerencia"]')
+
+    await expect(linha).toContainText('falhou')
+    await expect(page.locator('[data-jos-progresso]')).toContainText('a análise não devolveu saída')
+  })
+})

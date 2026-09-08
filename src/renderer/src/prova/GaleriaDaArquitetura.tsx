@@ -21,7 +21,30 @@ import { ArquiteturaDoProjeto } from '../app/ArquiteturaDoProjeto'
  * projeto pequeno produz, que é justamente o que torna o número interessante.
  */
 
-export type CenaDaArquitetura = 'pacote-cheio' | 'pacote-magro'
+export type CenaDaArquitetura =
+  | 'pacote-cheio'
+  | 'pacote-magro'
+  /**
+   * A barra de andamento no meio de uma geração (issue #337).
+   *
+   * A barra existe desde a #287 e **nunca teve gate visual**. Ela é o componente da jornada
+   * cujo estado o PI mais olha e menos consegue reproduzir: só aparece durante a geração, e
+   * durante ela ninguém está tirando print. Nenhum teste de tela mede o que ela pede aqui —
+   * jsdom não tem layout, e o marcador que distingue "concluída" de "acontecendo agora" é
+   * **forma**, de 8px, exatamente o tipo de coisa que a M25-F01 pegou renderizando a 2px.
+   *
+   * A cena congela o instante mais informativo: duas etapas concluídas, uma falhada com o
+   * motivo, uma acontecendo, uma ainda por vir. Os quatro estados numa captura só.
+   */
+  | 'gerando'
+  /**
+   * A geração que parou (issue #337).
+   *
+   * Cena separada de `gerando` porque o resumo mostrado é o da **etapa em curso**: uma etapa
+   * falhada com outra correndo depois esconderia o motivo da falha, que é justamente o que o PI
+   * precisa ler. No serviço isso não acontece — a etapa que falha é a última da rodada.
+   */
+  | 'gerando-falhou'
 
 interface GaleriaProps {
   readonly modo: ModoUi
@@ -125,7 +148,9 @@ const AJUSTES: readonly AjusteProposto[] = [
 ]
 
 function pacote(cena: CenaDaArquitetura): ArquiteturaRegistrada {
-  const cheio = cena === 'pacote-cheio'
+  // `gerando` usa o pacote cheio: a barra aparece **acima** do documento já existente, que é a
+  // posição que o gate mede. Com o magro, a captura mediria a barra sobre outra página.
+  const cheio = cena !== 'pacote-magro'
 
   return {
     id: 'r-1',
@@ -167,9 +192,51 @@ function pacote(cena: CenaDaArquitetura): ArquiteturaRegistrada {
  * Instala o dublê da ponte antes de a tela montar — no módulo, e não num efeito, senão a captura
  * pega o estado de carregamento.
  */
+/**
+ * Os anúncios que a cena `gerando` congela, na ordem em que o main os emitiria.
+ *
+ * Três concluídas, uma em curso e uma por vir: os três estados que a barra distingue **por
+ * forma** aparecem juntos, que é o que o gate mede. A falha tem cena própria — o resumo exibido
+ * é o da etapa em curso, então uma etapa falhada no meio esconderia o próprio motivo.
+ */
+const ANDAMENTO_CONGELADO: readonly {
+  readonly etapa: string
+  readonly estado: string
+  readonly resumo?: string
+}[] = [
+  { etapa: 'prototipos', estado: 'concluida', resumo: '2 protótipos lidos' },
+  { etapa: 'documentos', estado: 'concluida', resumo: '4 documentos escritos' },
+  { etapa: 'validacao', estado: 'concluida', resumo: 'toda afirmação tem o que a sustenta' },
+  { etapa: 'coerencia', estado: 'iniciada' }
+]
+
+/** O mesmo andamento, interrompido: a última etapa falhou e nada correu depois dela. */
+const ANDAMENTO_FALHADO: typeof ANDAMENTO_CONGELADO = [
+  ...ANDAMENTO_CONGELADO.slice(0, 3),
+  { etapa: 'coerencia', estado: 'falhou', resumo: 'a análise não devolveu saída' }
+]
+
 function instalarPonte(cena: CenaDaArquitetura): void {
   Object.defineProperty(window, 'jarvis', {
     value: {
+      /*
+       * A assinatura dos eventos de etapa. Na cena `gerando` ela entrega o andamento congelado
+       * de uma vez; nas outras, registra e não emite nada — que é o que a tela vê fora de uma
+       * geração, e é o que faz a barra não existir ali.
+       */
+      onGenerationEvent: (ouvinte: (e: { evento: unknown }) => void): (() => void) => {
+        const andamento =
+          cena === 'gerando'
+            ? ANDAMENTO_CONGELADO
+            : cena === 'gerando-falhou'
+              ? ANDAMENTO_FALHADO
+              : []
+
+        for (const anuncio of andamento) {
+          ouvinte({ evento: { tipo: 'etapa', ...anuncio } })
+        }
+        return () => {}
+      },
       carregarArquitetura: async (): Promise<ArquiteturaRegistrada> => pacote(cena),
       gerarArquiteturaPorIa: async () => ({ resultado: 'gerada' as const, mensagem: 'ok' }),
       cortarPropostoDaArquitetura: async (): Promise<ArquiteturaRegistrada> => pacote(cena),

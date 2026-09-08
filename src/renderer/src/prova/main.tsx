@@ -70,7 +70,7 @@ const CENAS_POR_GALERIA: Readonly<Record<string, readonly string[]>> = {
   // O painel de marcos (M26-F04): em dia, bloqueando a Construção, e sem Git disponível.
   marcos: ['em-dia', 'pendente', 'sem-git'],
   // O pacote de arquitetura (#333): o tamanho que um projeto pequeno produz, e um enxuto ao lado.
-  arquitetura: ['pacote-cheio', 'pacote-magro']
+  arquitetura: ['pacote-cheio', 'pacote-magro', 'gerando', 'gerando-falhou']
 }
 
 const cenaBruta = params.get('cena')
