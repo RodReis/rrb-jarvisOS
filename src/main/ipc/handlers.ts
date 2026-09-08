@@ -1,4 +1,5 @@
 import type { VozService } from '../voz/voz-service'
+import type { TtsService } from '../voz/tts-service'
 import type { DesfechoDoDownload } from '@shared/domain/voz'
 import { app, dialog, ipcMain } from 'electron'
 import {
@@ -407,6 +408,8 @@ export interface IpcDependencies {
   readonly approvals: ApprovalRepository
   /** O serviço de voz (SPEC-Voz-01). Injetado como todo o resto — o IPC não conhece o engine. */
   readonly voz: VozService
+  /** O serviço de fala (SPEC-Voz-02). Sidecar próprio, injetado pela mesma razão. */
+  readonly tts: TtsService
   readonly baixarArtefatoDeVoz: (id: string) => Promise<DesfechoDoDownload>
   /** Ausente quando as credenciais não estão configuradas — o app roda sem login. */
   readonly auth?: AuthService
@@ -781,9 +784,9 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
   /*
    * Voz (SPEC-Voz-01, critério 3).
    *
-   * Três canais, e o que eles **devolvem** é o ponto: texto ou desfecho nomeado. Nada de
-   * caminho de modelo, comando ou PID — com isso na mão, a tela deixaria de falar com uma
-   * capacidade e passaria a falar com uma implementação.
+   * O que eles **devolvem** é o ponto: texto ou desfecho nomeado. Nada de caminho de modelo,
+   * comando ou PID — com isso na mão, a tela deixaria de falar com uma capacidade e passaria a
+   * falar com uma implementação.
    */
   ipcMain.handle(IPC_CHANNELS.vozTranscrever, async (_event, pcm: unknown) => {
     // O PCM atravessa a ponte como `Int16Array`; qualquer outra coisa é chamada malformada, e
@@ -800,6 +803,21 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     }
     return deps.baixarArtefatoDeVoz(id)
   })
+
+  /*
+   * Fala (SPEC-Voz-02, critério 6). Mesma régua: o que volta é PCM mais a timeline de bocas, e
+   * nenhum campo carrega processo, caminho de voz ou comando.
+   */
+  ipcMain.handle(IPC_CHANNELS.ttsFalar, async (_event, texto: unknown, voz: unknown) => {
+    // Entrada malformada vira desfecho nomeado em vez de exceção opaca: a ponte recebe o que o
+    // renderer mandar, e confiar no tipo aqui seria confiar no chamador.
+    if (typeof texto !== 'string' || typeof voz !== 'string') {
+      return { estado: 'falhou' as const, motivo: 'Pedido de fala malformado.' }
+    }
+    return deps.tts.falar(texto, voz)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.ttsProntidao, async () => deps.tts.prontidao())
 
   ipcMain.handle(IPC_CHANNELS.approvalList, (_event, workspace: unknown) => {
     if (!isWorkspaceId(workspace)) return []

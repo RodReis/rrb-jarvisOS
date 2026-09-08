@@ -113,6 +113,8 @@ export interface UserProfile {
   readonly vozIdioma: IdiomaDeVoz | null
   readonly vozHotkey: HotkeyDeVoz | null
   readonly vozTimeoutMs: number | null
+  /** A voz com que o app fala (SPEC-Voz-02). `null` = default de fábrica. Ver a migration 41. */
+  readonly vozDaFala: VozDaFalaPreferida | null
 }
 
 /** O que a tela de Settings e a CHOICE alteram. Todos opcionais: a UI muda um de cada vez. */
@@ -125,6 +127,7 @@ export interface UserPreferences {
   readonly vozIdioma?: IdiomaDeVoz
   readonly vozHotkey?: HotkeyDeVoz
   readonly vozTimeoutMs?: number
+  readonly vozDaFala?: VozDaFalaPreferida
 }
 
 /**
@@ -163,12 +166,17 @@ export const VOZ_PADRAO = {
   modelo: 'small',
   idioma: 'pt',
   hotkey: 'Control+Shift+Space',
-  timeoutMs: 60_000
+  timeoutMs: 60_000,
+  // A voz de fábrica **não** é a escolha do PI: a spec pede que ele decida ouvindo, em Settings.
+  // A `faber` está aqui por ser a única das duas com timeline exata de visemes (medido no spike),
+  // e um default que já anima a boca certo é o menos errado enquanto a escolha não acontece.
+  vozDaFala: 'pt_BR-faber-medium'
 } as const satisfies {
   modelo: ModeloDeVoz
   idioma: IdiomaDeVoz
   hotkey: HotkeyDeVoz
   timeoutMs: number
+  vozDaFala: VozDaFalaPreferida
 }
 
 /**
@@ -214,6 +222,26 @@ export type HotkeyDeVoz = (typeof HOTKEYS_DE_VOZ)[number]
 
 export function isHotkeyDeVoz(value: unknown): value is HotkeyDeVoz {
   return typeof value === 'string' && (HOTKEYS_DE_VOZ as readonly string[]).includes(value)
+}
+
+/**
+ * As vozes com que o app fala (SPEC-Voz-02, critério 5).
+ *
+ * Lista fechada pela mesma razão dos modelos: cada valor precisa de artefato com hash pinado no
+ * catálogo, e um id digitado à mão viraria download recusado por integridade — erro que culpa o
+ * arquivo por um engano de digitação.
+ *
+ * A `faber` é o primeiro item e o default de fábrica, mas **isso não é a escolha do PI**: a spec
+ * pede que ele decida ouvindo, em Settings. Ela está aqui porque é a única das duas que entrega
+ * timeline exata de visemes, e um default que já anima a boca certo é o menos errado enquanto a
+ * escolha não acontece.
+ */
+export const VOZES_DA_FALA = ['pt_BR-faber-medium', 'pt_BR-edresson-low'] as const
+
+export type VozDaFalaPreferida = (typeof VOZES_DA_FALA)[number]
+
+export function isVozDaFala(value: unknown): value is VozDaFalaPreferida {
+  return typeof value === 'string' && (VOZES_DA_FALA as readonly string[]).includes(value)
 }
 
 /**

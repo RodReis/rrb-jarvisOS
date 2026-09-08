@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 1695 | 1695 | 0 | 77.7 | — | — |
-| — | — | — | Banco | 1231 | 1217 | 0 | 86.9 | — | — |
-| — | — | — | Tela | 683 | 682 | 0 | 75.3 | — | — |
+| — | — | — | Regras de Negócio | 1737 | 1737 | 0 | 78.2 | — | — |
+| — | — | — | Banco | 1238 | 1224 | 0 | 86.7 | — | — |
+| — | — | — | Tela | 692 | 691 | 0 | 76.1 | — | — |
 
 ## Histórico por entrega
 
@@ -364,3 +364,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | — | #200 | spec-voz-01-stt-local-push-to-talk | Regras de Negócio | 1695 | 1695 | 0 | 77.7 | — | — |
 | — | #200 | spec-voz-01-stt-local-push-to-talk | Banco | 1231 | 1217 | 0 | 86.9 | — | — |
 | — | #200 | spec-voz-01-stt-local-push-to-talk | Tela | 683 | 682 | 0 | 75.3 | — | — |
+| — | #202 | spec-voz-02-tts-piper-fonemas | Regras de Negócio | 1737 | 1737 | 0 | 78.2 | — | — |
+| — | #202 | spec-voz-02-tts-piper-fonemas | Banco | 1238 | 1224 | 0 | 86.7 | — | — |
+| — | #202 | spec-voz-02-tts-piper-fonemas | Tela | 692 | 691 | 0 | 76.1 | — | — |

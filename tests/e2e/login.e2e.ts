@@ -162,6 +162,8 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'estadoDoCodex',
     'estadoDoRefinamento',
     'estadoDoSandbox',
+    // A fala (SPEC-Voz-02): devolve PCM e a timeline de bocas, nunca caminho de voz nem comando.
+    'falar',
     // O console da geração (SPEC-Fases-03): dois canais de leitura da trilha gravada. Nenhum
     // devolve segredo — o que atravessa é evento de geração, e o redator roda antes de gravar.
     'generationEvents',
@@ -227,6 +229,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'pickAllowedDirectory',
     'pickProjectDirectory',
     'prontidaoDaVoz',
+    'prontidaoDoTts',
     'proporTermoDePesquisa',
     'publicarNoGitHub',
     'removeAllowedCommand',

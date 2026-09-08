@@ -137,7 +137,8 @@ function semearSessaoAtiva(diasAtras = 0): void {
     vozModelo: null,
     vozIdioma: null,
     vozHotkey: null,
-    vozTimeoutMs: null
+    vozTimeoutMs: null,
+    vozDaFala: null
   })
 
   sessions.save({

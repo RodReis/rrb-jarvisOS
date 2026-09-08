@@ -30,5 +30,6 @@ export const LOCAL_USER_PROFILE: UserProfile = {
   vozModelo: null,
   vozIdioma: null,
   vozHotkey: null,
-  vozTimeoutMs: null
+  vozTimeoutMs: null,
+  vozDaFala: null
 }

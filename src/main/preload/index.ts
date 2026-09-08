@@ -16,6 +16,7 @@ import {
 import type { AlvoDaPublicacao, PublicacaoOutcome } from '@shared/domain/publicacao'
 import type { ExecutionLedger } from '@shared/domain/execution-ledger'
 import type { DesfechoDaTranscricao, DesfechoDoDownload, ProntidaoDaVoz } from '@shared/domain/voz'
+import type { DesfechoDaFala, ProntidaoDoTts } from '@shared/domain/visemes'
 import type { PendenciaDeLimpeza } from '@shared/domain/limpeza'
 import type { MergePolicyOutcome, PoliticaDeMerge, VistaDaFila } from '@shared/domain/pipeline'
 import type { ContextPack, ContextPackOutcome, FalhaRegistrada } from '@shared/domain/context-pack'
@@ -202,6 +203,15 @@ const bridge: JarvisBridge = {
   prontidaoDaVoz: (): Promise<ProntidaoDaVoz> => ipcRenderer.invoke(IPC_CHANNELS.vozProntidao),
   baixarArtefatoDeVoz: (id: string): Promise<DesfechoDoDownload> =>
     ipcRenderer.invoke(IPC_CHANNELS.vozBaixarArtefato, id),
+
+  /*
+   * Fala (SPEC-Voz-02, critério 6). O PCM sintetizado volta por aqui e quem toca é o renderer,
+   * com Web Audio — também Web API. Não há canal de reprodução: pôr o main no caminho do som
+   * faria `cancel()` atravessar a ponte para parar uma fonte que já está do lado de cá.
+   */
+  falar: (texto: string, voz: string): Promise<DesfechoDaFala> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ttsFalar, texto, voz),
+  prontidaoDoTts: (): Promise<ProntidaoDoTts> => ipcRenderer.invoke(IPC_CHANNELS.ttsProntidao),
   resolveApproval: (
     id: string,
     decision: ApprovalDecision
