@@ -222,6 +222,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     // A assinatura ao vivo do console. Canal único; quem separa uma geração da seguinte é o
     // painel, pelo `traceId` que viaja no payload.
     'onGenerationEvent',
+    'onVozHotkey',
     'pendenciasDeLimpeza',
     'pickAllowedDirectory',
     'pickProjectDirectory',
