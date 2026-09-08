@@ -22,6 +22,7 @@ import { CredenciaisDeConector } from './CredenciaisDeConector'
 import { ProvidersDoWorkspace } from './ProvidersDoWorkspace'
 import { DiretoriosPermitidos } from './DiretoriosPermitidos'
 import { ChamadaDeIa } from './ChamadaDeIa'
+import { PreferenciasDeVoz } from './PreferenciasDeVoz'
 
 /**
  * Tela de configurações (SPEC-Fundacao-05 + SPEC-CHOICE-01 crit. 5), reorganizada em **cinco
@@ -94,7 +95,8 @@ export function Settings({
           { valor: 'permissoes', rotulo: t('settings.abaPermissoes') },
           { valor: 'ia', rotulo: t('settings.abaIa') },
           { valor: 'roteamento', rotulo: t('settings.abaRoteamento') },
-          { valor: 'conectores', rotulo: t('settings.abaConectores') }
+          { valor: 'conectores', rotulo: t('settings.abaConectores') },
+          { valor: 'voz', rotulo: t('settings.abaVoz') }
         ]}
       >
         <TabPanel valor="geral">
@@ -194,6 +196,13 @@ export function Settings({
         <TabPanel valor="conectores">
           <CredenciaisDeConector workspace={workspace} nomeDoEspaco={nomeDoEspaco} />
           <ConectorGitHub workspace={workspace} nomeDoEspaco={nomeDoEspaco} />
+        </TabPanel>
+
+        {/* Voz é do **usuário**, como Geral e Permissões: o microfone e o runtime são da
+            máquina, e trocar de espaço não troca a voz de quem fala com ela. Por isso vem
+            depois das abas escopadas, e não entre elas. */}
+        <TabPanel valor="voz">
+          <PreferenciasDeVoz preferencias={preferencias} onSalvar={onSalvar} />
         </TabPanel>
       </Tabs>
     </section>

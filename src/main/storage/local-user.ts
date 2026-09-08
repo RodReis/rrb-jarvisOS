@@ -25,5 +25,10 @@ export const LOCAL_USER_PROFILE: UserProfile = {
   theme: 'sistema',
   // `null` = ainda não escolheu; o `PreferencesService` resolve para o default de fábrica.
   accentNoa: null,
-  accentJarvis: null
+  accentJarvis: null,
+  // Idem para a voz: `null` = ainda não escolheu (SPEC-Voz-01, migration 40).
+  vozModelo: null,
+  vozIdioma: null,
+  vozHotkey: null,
+  vozTimeoutMs: null
 }

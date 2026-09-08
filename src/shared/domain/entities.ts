@@ -108,6 +108,11 @@ export interface UserProfile {
   readonly theme: ThemePreference
   readonly accentNoa: AccentColor | null
   readonly accentJarvis: AccentColor | null
+  /** Preferências de voz (SPEC-Voz-01). `null` = usar o default de fábrica. Ver a migration 40. */
+  readonly vozModelo: ModeloDeVoz | null
+  readonly vozIdioma: IdiomaDeVoz | null
+  readonly vozHotkey: HotkeyDeVoz | null
+  readonly vozTimeoutMs: number | null
 }
 
 /** O que a tela de Settings e a CHOICE alteram. Todos opcionais: a UI muda um de cada vez. */
@@ -116,6 +121,99 @@ export interface UserPreferences {
   readonly theme?: ThemePreference
   readonly accentNoa?: AccentColor
   readonly accentJarvis?: AccentColor
+  readonly vozModelo?: ModeloDeVoz
+  readonly vozIdioma?: IdiomaDeVoz
+  readonly vozHotkey?: HotkeyDeVoz
+  readonly vozTimeoutMs?: number
+}
+
+/**
+ * Os modelos Whisper que o app oferece (SPEC-Voz-01, critério 6).
+ *
+ * Lista fechada, e não campo livre: cada valor precisa de um repositório com hash pinado no
+ * catálogo de artefatos, e um nome digitado à mão viraria download recusado por integridade —
+ * erro que culpa o arquivo por um engano de digitação.
+ */
+export const MODELOS_DE_VOZ = ['tiny', 'base', 'small', 'medium'] as const
+
+export type ModeloDeVoz = (typeof MODELOS_DE_VOZ)[number]
+
+export function isModeloDeVoz(value: unknown): value is ModeloDeVoz {
+  return typeof value === 'string' && (MODELOS_DE_VOZ as readonly string[]).includes(value)
+}
+
+/** Os idiomas de transcrição. `pt` é o default cravado pelo PI. */
+export const IDIOMAS_DE_VOZ = ['pt', 'en'] as const
+
+export type IdiomaDeVoz = (typeof IDIOMAS_DE_VOZ)[number]
+
+export function isIdiomaDeVoz(value: unknown): value is IdiomaDeVoz {
+  return typeof value === 'string' && (IDIOMAS_DE_VOZ as readonly string[]).includes(value)
+}
+
+/**
+ * Os defaults de fábrica da voz.
+ *
+ * `small` e `pt` são decisão do PI (spec § Perguntas resolvidas, 2 e 6). A hotkey e o teto de
+ * gravação são as decisões do PI de 2026-09-07: `Ctrl+Shift+Space` por não colidir com o menu de
+ * janela do Windows nem com launchers, e 60 s de teto — a proteção contra o toggle esquecido,
+ * que existe porque a hotkey abre e fecha em toques separados.
+ */
+export const VOZ_PADRAO = {
+  modelo: 'small',
+  idioma: 'pt',
+  hotkey: 'Control+Shift+Space',
+  timeoutMs: 60_000
+} as const satisfies {
+  modelo: ModeloDeVoz
+  idioma: IdiomaDeVoz
+  hotkey: HotkeyDeVoz
+  timeoutMs: number
+}
+
+/**
+ * Os limites do teto de gravação, em milissegundos.
+ *
+ * Piso de 5 s porque um teto menor cortaria a frase antes de ela terminar, e o usuário leria
+ * como transcrição ruim em vez de configuração apertada. Teto de 5 min porque acima disso o
+ * buffer PCM em memória passa de dezenas de MB — e o que a proteção existe para pegar (o toggle
+ * esquecido) já foi pego muito antes.
+ */
+export const VOZ_TIMEOUT_MINIMO_MS = 5_000
+export const VOZ_TIMEOUT_MAXIMO_MS = 300_000
+
+export function isTimeoutDeVoz(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    value >= VOZ_TIMEOUT_MINIMO_MS &&
+    value <= VOZ_TIMEOUT_MAXIMO_MS
+  )
+}
+
+/**
+ * As combinações de hotkey que o app aceita (SPEC-Voz-01, critério 5).
+ *
+ * **Lista fechada, e não string livre validada por formato.** O que se registra aqui é um atalho
+ * *global*: ele intercepta a tecla no sistema inteiro, não só na janela do app. Aceitar qualquer
+ * acelerador que o Electron entenda deixaria o renderer — que é fronteira de confiança — sequestrar
+ * `Control+C` ou `Alt+Tab` para a máquina toda, e o usuário não teria como desfazer sem editar o
+ * banco. Escolher entre quatro combinações conhecidas cobre o caso real e fecha isso por
+ * construção.
+ *
+ * Todas exigem dois modificadores e nenhuma é atalho consagrado do SO ou do app.
+ */
+export const HOTKEYS_DE_VOZ = [
+  'Control+Shift+Space',
+  'Control+Shift+J',
+  'Control+Alt+Space',
+  'Control+Alt+J'
+] as const
+
+export type HotkeyDeVoz = (typeof HOTKEYS_DE_VOZ)[number]
+
+export function isHotkeyDeVoz(value: unknown): value is HotkeyDeVoz {
+  return typeof value === 'string' && (HOTKEYS_DE_VOZ as readonly string[]).includes(value)
 }
 
 /**
@@ -397,7 +495,11 @@ export const AUDIT_EVENT_TYPES = [
   // (esperado, obtido) do hash, que depois de um artefato adulterado ser apagado é a única
   // testemunha que sobra.
   'voz.download.inicio',
-  'voz.download.fim'
+  'voz.download.fim',
+  // Registrar a hotkey global é mudança observável **fora** do app: o atalho passa a interceptar
+  // a tecla no sistema inteiro. A recusa também entra — silêncio esconderia um atalho que nunca
+  // funcionou porque outro app já o tinha, e o usuário leria como microfone quebrado.
+  'voz.hotkey.registro'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]

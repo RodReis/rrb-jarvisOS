@@ -133,7 +133,11 @@ function semearSessaoAtiva(diasAtras = 0): void {
     locale: 'pt-BR',
     theme: 'sistema',
     accentNoa: null,
-    accentJarvis: null
+    accentJarvis: null,
+    vozModelo: null,
+    vozIdioma: null,
+    vozHotkey: null,
+    vozTimeoutMs: null
   })
 
   sessions.save({

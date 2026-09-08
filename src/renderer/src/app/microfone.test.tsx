@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Microfone } from './Microfone'
@@ -15,6 +15,20 @@ const transcreverAudio = vi.fn()
 const prontidaoDaVoz = vi.fn()
 const baixarArtefatoDeVoz = vi.fn()
 
+/**
+ * A assinatura do canal da hotkey, guardando o ouvinte.
+ *
+ * Guardar o callback é o ponto: o que os testes da hotkey medem é o que a tela faz **ao ser
+ * avisada** pelo main, e um dublê que só conta chamadas de assinatura nunca chegaria lá.
+ */
+let avisarHotkey: ((gravando: boolean) => void) | undefined
+const onVozHotkey = vi.fn((ouvinte: (gravando: boolean) => void) => {
+  avisarHotkey = ouvinte
+  return () => {
+    avisarHotkey = undefined
+  }
+})
+
 function prontidao(extra: Partial<ProntidaoDaVoz> = {}): ProntidaoDaVoz {
   return { pronta: true, faltando: [], compute: 'cuda', ...extra }
 }
@@ -23,7 +37,14 @@ beforeEach(() => {
   transcreverAudio.mockReset()
   prontidaoDaVoz.mockReset().mockResolvedValue(prontidao())
   baixarArtefatoDeVoz.mockReset().mockResolvedValue({ estado: 'ok' })
-  vi.stubGlobal('jarvis', { transcreverAudio, prontidaoDaVoz, baixarArtefatoDeVoz })
+  avisarHotkey = undefined
+  onVozHotkey.mockClear()
+  vi.stubGlobal('jarvis', {
+    transcreverAudio,
+    prontidaoDaVoz,
+    baixarArtefatoDeVoz,
+    onVozHotkey
+  })
 })
 
 afterEach(() => {
@@ -39,8 +60,9 @@ function capturaFalsa(amostras = 16_000): () => Promise<() => Promise<Int16Array
   return async () => async () => new Int16Array(amostras)
 }
 
-function montar(capturar = capturaFalsa()): void {
-  render(<Microfone workspace="jarvis" capturar={capturar} />)
+function montar(capturar = capturaFalsa()): ReturnType<typeof render> {
+  // Devolve o resultado do `render` porque o teste de desmontagem precisa do `unmount`.
+  return render(<Microfone workspace="jarvis" capturar={capturar} />)
 }
 
 describe('runtime ausente é convite, não erro (critério 4)', () => {
@@ -160,5 +182,39 @@ describe('o áudio não sobrevive à transcrição (critério 8)', () => {
 
     // O que a tela guarda é o **texto**. Nenhum elemento carrega áudio em atributo de dado.
     expect(document.body.innerHTML).not.toMatch(/data:audio|blob:|Int16Array/)
+  })
+})
+
+describe('a hotkey global conduz a gravação (critério 5)', () => {
+  it('assina o canal do main ao montar — o atalho chega com a janela minimizada', async () => {
+    montar()
+    await screen.findByRole('button', { name: /segure para falar/i })
+
+    expect(onVozHotkey).toHaveBeenCalledTimes(1)
+  })
+
+  it('o aviso de abrir começa a gravação, e o de fechar transcreve', async () => {
+    transcreverAudio.mockResolvedValue({
+      estado: 'ok',
+      resultado: { texto: 'dito pela hotkey', idioma: 'pt', segmentos: [] }
+    })
+    montar()
+    await screen.findByRole('button', { name: /segure para falar/i })
+
+    // O main só avisa: quem tem o microfone é a tela (`getUserMedia` é Web API do renderer).
+    await act(async () => avisarHotkey?.(true))
+    await screen.findByRole('button', { name: /ouvindo/i })
+
+    await act(async () => avisarHotkey?.(false))
+    await screen.findByText('dito pela hotkey')
+  })
+
+  it('cancela a assinatura ao desmontar — canal não fica pendurado', async () => {
+    const { unmount } = montar()
+    await screen.findByRole('button', { name: /segure para falar/i })
+
+    unmount()
+
+    expect(avisarHotkey).toBeUndefined()
   })
 })

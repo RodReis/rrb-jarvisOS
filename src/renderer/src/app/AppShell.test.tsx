@@ -140,6 +140,9 @@ function mockarPonte(): void {
       prontidaoDaVoz: vi.fn(async () => ({ pronta: false, faltando: [], compute: 'cpu-int8' })),
       transcreverAudio: vi.fn(async () => ({ estado: 'sem-audio' })),
       baixarArtefatoDeVoz: vi.fn(async () => ({ estado: 'ok' })),
+      // A tela do microfone assina o canal da hotkey ao montar; sem isto o efeito estoura
+      // antes de o teste chegar ao que ele mede.
+      onVozHotkey: vi.fn(() => () => undefined),
       listProjects: vi.fn(async () => []),
       createProject: vi.fn(),
       openProject: vi.fn(),
@@ -480,13 +483,14 @@ describe('Settings (SPEC-05)', () => {
     expect(screen.getByLabelText('Idioma')).toBeInTheDocument()
   })
 
-  it('organiza as seções em cinco abas, com só a ativa montada', async () => {
+  it('organiza as seções em seis abas, com só a ativa montada', async () => {
     await abrirSettings()
 
     // A régua completa (decisão do PI, 2026-08-30): escopo do usuário à esquerda, escopo do
-    // espaço à direita.
+    // espaço à direita. **Voz** entra depois das escopadas (SPEC-Voz-01, critério 6): o
+    // microfone e o runtime são da máquina, e trocar de espaço não troca a voz de quem fala.
     const abas = screen.getAllByRole('tab').map((tab) => tab.textContent)
-    expect(abas).toEqual(['Geral', 'Permissões', 'IA', 'Modelos', 'Conectores'])
+    expect(abas).toEqual(['Geral', 'Permissões', 'IA', 'Modelos', 'Conectores', 'Voz'])
 
     // A aba padrão é Geral, e as seções das outras abas **não estão no DOM** — é o que
     // garante que as buscas de dados das seções escopadas só disparam quando a aba abre.

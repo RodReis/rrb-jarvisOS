@@ -69,6 +69,11 @@ describe('migrations', () => {
     antigo.exec('ALTER TABLE user_profile DROP COLUMN github_client_id')
     antigo.exec('ALTER TABLE user_profile DROP COLUMN accent_noa')
     antigo.exec('ALTER TABLE user_profile DROP COLUMN accent_jarvis')
+    // A v40 acrescenta as quatro colunas de voz a `user_profile` (SPEC-Voz-01).
+    antigo.exec('ALTER TABLE user_profile DROP COLUMN voz_modelo')
+    antigo.exec('ALTER TABLE user_profile DROP COLUMN voz_idioma')
+    antigo.exec('ALTER TABLE user_profile DROP COLUMN voz_hotkey')
+    antigo.exec('ALTER TABLE user_profile DROP COLUMN voz_timeout_ms')
     antigo.exec('DROP TABLE allowed_directory')
     antigo.exec('DROP TABLE workflow')
     antigo.exec('DROP TABLE automation')
@@ -294,7 +299,11 @@ describe('perfil de usuário', () => {
       locale: 'pt-BR' as const,
       theme: 'sistema' as const,
       accentNoa: null,
-      accentJarvis: null
+      accentJarvis: null,
+      vozModelo: null,
+      vozIdioma: null,
+      vozHotkey: null,
+      vozTimeoutMs: null
     }
 
     profiles.save(perfil)
@@ -315,7 +324,11 @@ describe('perfil de usuário', () => {
       locale: 'pt-BR' as const,
       theme: 'sistema' as const,
       accentNoa: null,
-      accentJarvis: null
+      accentJarvis: null,
+      vozModelo: null,
+      vozIdioma: null,
+      vozHotkey: null,
+      vozTimeoutMs: null
     }
 
     profiles.save(padrao)
@@ -354,7 +367,11 @@ describe('instrumentação do logger (critério de aceite 7)', () => {
         locale: 'pt-BR',
         theme: 'sistema',
         accentNoa: null,
-        accentJarvis: null
+        accentJarvis: null,
+        vozModelo: null,
+        vozIdioma: null,
+        vozHotkey: null,
+        vozTimeoutMs: null
       })
     ).toThrow()
     expect(logDb.error).toHaveBeenCalledWith(

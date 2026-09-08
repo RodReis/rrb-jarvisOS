@@ -253,6 +253,21 @@ const bridge: JarvisBridge = {
    * existe do lado do renderer. Quem separa uma geração da seguinte é o painel, pelo `traceId`
    * do primeiro evento que chega — o transporte continua sendo um canal só.
    */
+  /**
+   * Avisa a tela que a hotkey global abriu ou fechou a gravação (SPEC-Voz-01, critério 5).
+   *
+   * O microfone é do renderer — `getUserMedia` é Web API —, então o main só pode **pedir**.
+   * O payload não carrega processo, atalho nem estado interno: um booleano é tudo o que a tela
+   * precisa para começar ou encerrar a captura.
+   */
+  onVozHotkey: (listener: (gravando: boolean) => void): (() => void) => {
+    const wrapped = (_event: unknown, gravando: boolean): void => listener(gravando)
+
+    ipcRenderer.on(IPC_EVENT_CHANNELS.vozHotkey, wrapped)
+
+    return () => ipcRenderer.removeListener(IPC_EVENT_CHANNELS.vozHotkey, wrapped)
+  },
+
   onGenerationEvent: (listener: (payload: EventoDaGeracao) => void): (() => void) => {
     // Mesmo recorte do `onAiStreamEvent`: o `IpcRendererEvent` fica de fora porque carrega
     // `sender`, um objeto do Electron que não pode vazar para o renderer.

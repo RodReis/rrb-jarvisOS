@@ -5,26 +5,87 @@
  * credencial nenhuma: a política aceita exatamente estas URLs (fail closed), e o conteúdo só
  * entra se o SHA-256 conferir.
  *
- * Os hashes ficam **vazios nesta primeira entrega** e são preenchidos na segunda, quando o
- * runtime real for escolhido e medido. Um hash inventado agora seria pior que nenhum: ele
- * pareceria verificação e recusaria todo download legítimo — ou, se copiado errado, aceitaria o
- * que não devia. Enquanto vazio, `sha256: ''` nunca confere com hash algum, então o catálogo
- * **falha fechado** por construção: nada é gravado até alguém pinar o valor medido.
+ * ## Os hashes são medidos, não copiados
+ *
+ * Cada valor aqui foi obtido baixando o arquivo e calculando o SHA-256, e depois **conferido
+ * contra a fonte**: o runtime contra o `SHA256SUMS` do release e o digest da API do GitHub; o
+ * `model.bin` contra o oid LFS do Hugging Face; as 24 wheels contra os digests que o PyPI
+ * publica por arquivo. Hash inventado seria pior que nenhum — pareceria verificação e recusaria
+ * todo download legítimo.
+ *
+ * ## Por que tudo é pinado por revisão, e não por tag móvel
+ *
+ * `main`, `latest` e `resolve/main` apontam para conteúdo que muda. Um hash pinado contra alvo
+ * móvel passa a recusar o download no dia em que o upstream publicar qualquer coisa — e o
+ * usuário veria "falha de integridade" sobre um arquivo legítimo. Por isso o runtime traz a tag
+ * do release, o modelo traz o commit e as wheels trazem a URL imutável do PyPI.
+ *
+ * ## As wheels moram em JSON, e não aqui
+ *
+ * São 24 arquivos — seis dependências diretas do faster-whisper mais as transitivas —, e a lista
+ * saiu do resolvedor do pip, não de digitação. Deixá-las neste arquivo transformaria uma lista
+ * gerada em código a revisar linha a linha; num JSON, atualizar é rodar o resolvedor de novo.
  */
 
+import wheels from './wheels-da-voz.json'
 import type { Artefato } from './download-de-artefato'
+
+/** O release do python-build-standalone que o app usa. Tag fixa: `latest` mudaria o hash. */
+const RUNTIME =
+  'https://github.com/astral-sh/python-build-standalone/releases/download/20260901/cpython-3.12.14%2B20260901-x86_64-pc-windows-msvc-install_only.tar.gz'
+
+/** O commit do repositório do modelo. `resolve/main` moveria debaixo do hash pinado. */
+const REVISAO_DO_MODELO = '536b0662742c02347bc0e980a01041f333bce120'
+
+const modelo = (arquivo: string, sha256: string): Artefato => ({
+  id: `modelo-whisper-small/${arquivo}`,
+  url: `https://huggingface.co/Systran/faster-whisper-small/resolve/${REVISAO_DO_MODELO}/${arquivo}`,
+  sha256,
+  destino: `voz/models/whisper-small/${arquivo}`
+})
 
 export const ARTEFATOS_DA_VOZ: readonly Artefato[] = [
   {
     id: 'runtime-python',
-    url: 'https://github.com/astral-sh/python-build-standalone/releases/download/PENDENTE/python.tar.gz',
-    sha256: '',
+    url: RUNTIME,
+    sha256: 'e90c1b6419da3bd812dd73bb3de40287a21abf153438147639ec5e20375ea93f',
     destino: 'voz/runtime/python.tar.gz'
   },
-  {
-    id: 'modelo-whisper-small',
-    url: 'https://huggingface.co/Systran/faster-whisper-small/resolve/PENDENTE/model.bin',
-    sha256: '',
-    destino: 'voz/models/whisper-small/model.bin'
-  }
+
+  /*
+   * O modelo são **quatro** arquivos, não um.
+   *
+   * O faster-whisper abre um diretório e espera encontrar os quatro: sem `config.json` ele não
+   * sabe a arquitetura, sem `tokenizer.json` não decodifica. Baixar só o `model.bin` — que é o
+   * grande e parece "o modelo" — deixaria o diretório inválido e a falha apareceria como erro
+   * do runtime, longe da causa.
+   */
+  ...[
+    modelo('model.bin', '3e305921506d8872816023e4c273e75d2419fb89b24da97b4fe7bce14170d671'),
+    modelo('config.json', 'b55496ac7940a7ae47d2c01eab40edfd8701feec1229d9cce3b40014383fb828'),
+    modelo('tokenizer.json', 'fb7b63191e9bb045082c79fd742a3106a12c99513ab30df4a0d47fa6cb6fd0ab'),
+    modelo('vocabulary.txt', '34ce3fe1c5041027b3f8d42912270993f986dbc4bb34cf27f951e34a1e453913')
+  ],
+
+  ...wheels.wheels.map((w) => ({
+    id: `wheel/${w.arquivo}`,
+    url: w.url,
+    sha256: w.sha256,
+    destino: `voz/wheels/${w.arquivo}`
+  }))
 ]
+
+/**
+ * Os três grupos, na ordem em que a tela os apresenta.
+ *
+ * A lista crua tem 29 itens, e mostrá-la ao usuário seria uma barra de progresso com nomes de
+ * pacote Python. O que ele precisa saber é que faltam **runtime**, **modelo** ou **bibliotecas**
+ * — e o download de cada item continua individual, com hash próprio.
+ */
+export type GrupoDeArtefato = 'runtime' | 'modelo' | 'wheels'
+
+export function grupoDoArtefato(id: string): GrupoDeArtefato {
+  if (id.startsWith('wheel/')) return 'wheels'
+  if (id.startsWith('modelo-')) return 'modelo'
+  return 'runtime'
+}

@@ -11,8 +11,13 @@ import type { PreferencesSnapshot } from '@shared/contracts/ipc'
 import {
   ACCENT_DEFAULT,
   isAccentColor,
+  isHotkeyDeVoz,
+  isIdiomaDeVoz,
   isLocale,
+  isModeloDeVoz,
   isThemePreference,
+  isTimeoutDeVoz,
+  VOZ_PADRAO,
   type AccentColor,
   type ResolvedTheme,
   type ThemePreference,
@@ -51,7 +56,12 @@ export class PreferencesService {
       // `null` (não escolheu) resolve para o default de fábrica: o renderer sempre recebe uma cor
       // pintável e não precisa conhecer o valor de fábrica.
       accentNoa: profile.accentNoa ?? ACCENT_DEFAULT.noa,
-      accentJarvis: profile.accentJarvis ?? ACCENT_DEFAULT.jarvis
+      accentJarvis: profile.accentJarvis ?? ACCENT_DEFAULT.jarvis,
+      // Mesma resolução de `null → fábrica` do acento: quem lê recebe valor pintável.
+      vozModelo: profile.vozModelo ?? VOZ_PADRAO.modelo,
+      vozIdioma: profile.vozIdioma ?? VOZ_PADRAO.idioma,
+      vozHotkey: profile.vozHotkey ?? VOZ_PADRAO.hotkey,
+      vozTimeoutMs: profile.vozTimeoutMs ?? VOZ_PADRAO.timeoutMs
     }
   }
 
@@ -69,7 +79,11 @@ export class PreferencesService {
         theme: 'sistema',
         resolvedTheme: this.temaDoSistema(),
         accentNoa: ACCENT_DEFAULT.noa,
-        accentJarvis: ACCENT_DEFAULT.jarvis
+        accentJarvis: ACCENT_DEFAULT.jarvis,
+        vozModelo: VOZ_PADRAO.modelo,
+        vozIdioma: VOZ_PADRAO.idioma,
+        vozHotkey: VOZ_PADRAO.hotkey,
+        vozTimeoutMs: VOZ_PADRAO.timeoutMs
       }
     }
 
@@ -90,7 +104,19 @@ export class PreferencesService {
       // Acento fora da paleta é descartado como locale/theme inválidos: o renderer é fronteira de
       // confiança, e um hex arbitrário reabriria o contraste que a paleta fechada fechou.
       ...(acentoValido(preferences.accentNoa) ? { accentNoa: preferences.accentNoa } : {}),
-      ...(acentoValido(preferences.accentJarvis) ? { accentJarvis: preferences.accentJarvis } : {})
+      ...(acentoValido(preferences.accentJarvis) ? { accentJarvis: preferences.accentJarvis } : {}),
+      /*
+       * As de voz passam pela mesma peneira, e a **hotkey** é a que mais importa: ela registra um
+       * atalho global, que intercepta a tecla no sistema inteiro. Uma string vinda do renderer sem
+       * validação deixaria a fronteira de confiança sequestrar qualquer combinação para a máquina
+       * toda, e desfazer exigiria editar o banco.
+       */
+      ...(isModeloDeVoz(preferences.vozModelo) ? { vozModelo: preferences.vozModelo } : {}),
+      ...(isIdiomaDeVoz(preferences.vozIdioma) ? { vozIdioma: preferences.vozIdioma } : {}),
+      ...(isHotkeyDeVoz(preferences.vozHotkey) ? { vozHotkey: preferences.vozHotkey } : {}),
+      ...(isTimeoutDeVoz(preferences.vozTimeoutMs)
+        ? { vozTimeoutMs: preferences.vozTimeoutMs }
+        : {})
     }
 
     if (Object.keys(validadas).length === 0) {

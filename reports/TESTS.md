@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 1673 | 1673 | 0 | 77.5 | — | — |
-| — | — | — | Banco | 1228 | 1214 | 0 | 87.0 | — | — |
-| — | — | — | Tela | 680 | 679 | 0 | 75.7 | — | — |
+| — | — | — | Regras de Negócio | 1695 | 1695 | 0 | 77.7 | — | — |
+| — | — | — | Banco | 1231 | 1217 | 0 | 86.9 | — | — |
+| — | — | — | Tela | 683 | 682 | 0 | 75.3 | — | — |
 
 ## Histórico por entrega
 
@@ -361,3 +361,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-07 | #333 | — | Regras de Negócio | 1667 | 1667 | 0 | 77.3 | — | — |
 | 2026-09-07 | #333 | — | Banco | 1223 | 1209 | 0 | 87.0 | — | — |
 | 2026-09-07 | #333 | — | Tela | 665 | 664 | 0 | 75.7 | — | — |
+| — | #200 | spec-voz-01-stt-local-push-to-talk | Regras de Negócio | 1695 | 1695 | 0 | 77.7 | — | — |
+| — | #200 | spec-voz-01-stt-local-push-to-talk | Banco | 1231 | 1217 | 0 | 86.9 | — | — |
+| — | #200 | spec-voz-01-stt-local-push-to-talk | Tela | 683 | 682 | 0 | 75.3 | — | — |

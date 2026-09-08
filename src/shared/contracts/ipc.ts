@@ -11,7 +11,10 @@ import type {
   AccentColor,
   AuditEvent,
   AuditEventType,
+  HotkeyDeVoz,
+  IdiomaDeVoz,
   Locale,
+  ModeloDeVoz,
   ResolvedTheme,
   ThemePreference,
   UserPreferences,
@@ -644,7 +647,17 @@ export const IPC_EVENT_CHANNELS = {
    * aqui vão as ferramentas e o uso. Um canal só obrigaria cada consumidor a filtrar o que não
    * lhe diz respeito.
    */
-  generationEvent: 'geracao:evento'
+  generationEvent: 'geracao:evento',
+  /**
+   * O toggle da hotkey global de voz (SPEC-Voz-01, critério 5).
+   *
+   * Canal de **evento** e não `invoke`, porque quem inicia é o main: o atalho é global e chega
+   * mesmo com a janela minimizada. O renderer não pode perguntar "alguém apertou?" — ele precisa
+   * ser avisado, e é ele quem tem o microfone (`getUserMedia` é Web API).
+   *
+   * O payload é só `gravando`: o main sabe **se** a gravação deve estar aberta, não o áudio.
+   */
+  vozHotkey: 'voz:hotkey'
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]
@@ -703,6 +716,17 @@ export interface PreferencesSnapshot {
   readonly resolvedTheme: ResolvedTheme
   readonly accentNoa: AccentColor
   readonly accentJarvis: AccentColor
+  /**
+   * As preferências de voz, também **já resolvidas** — nunca `null` aqui.
+   *
+   * Mesma razão do acento: o renderer pinta o `Select` no valor corrente sem precisar saber qual
+   * é o default de fábrica. Um `null` atravessando obrigaria cada tela que lê isto a repetir a
+   * regra, e a primeira que esquecesse mostraria campo vazio.
+   */
+  readonly vozModelo: ModeloDeVoz
+  readonly vozIdioma: IdiomaDeVoz
+  readonly vozHotkey: HotkeyDeVoz
+  readonly vozTimeoutMs: number
 }
 
 /**
@@ -882,6 +906,8 @@ export interface JarvisBridge {
    *
    * Devolve a função que cancela a assinatura.
    */
+  /** Avisa a tela que a hotkey global abriu ou fechou a gravação (SPEC-Voz-01, critério 5). */
+  onVozHotkey(listener: (gravando: boolean) => void): () => void
   onGenerationEvent(listener: (payload: EventoDaGeracao) => void): () => void
   /** As gerações anteriores de uma etapa, da mais recente para a mais antiga (critério 6). */
   generationHistory(

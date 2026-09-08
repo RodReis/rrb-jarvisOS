@@ -37,7 +37,11 @@ function perfil(id: string) {
     locale: 'pt-BR' as const,
     theme: 'sistema' as const,
     accentNoa: null,
-    accentJarvis: null
+    accentJarvis: null,
+    vozModelo: null,
+    vozIdioma: null,
+    vozHotkey: null,
+    vozTimeoutMs: null
   }
 }
 
@@ -64,7 +68,13 @@ describe('padrões do produto', () => {
       resolvedTheme: 'escuro',
       // Acento não escolhido resolve para o default de fábrica.
       accentNoa: '#C4C4C4',
-      accentJarvis: '#C4C4C4'
+      accentJarvis: '#C4C4C4',
+      // As de voz seguem a mesma regra: `null` no banco resolve para o valor de fábrica, então
+      // o renderer sempre recebe algo pintável e não precisa conhecer o padrão (SPEC-Voz-01).
+      vozModelo: 'small',
+      vozIdioma: 'pt',
+      vozHotkey: 'Control+Shift+Space',
+      vozTimeoutMs: 60_000
     })
   })
 

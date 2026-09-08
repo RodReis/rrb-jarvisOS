@@ -26,7 +26,11 @@ const PERFIL = {
   locale: 'pt-BR' as const,
   theme: 'sistema' as const,
   accentNoa: null,
-  accentJarvis: null
+  accentJarvis: null,
+  vozModelo: null,
+  vozIdioma: null,
+  vozHotkey: null,
+  vozTimeoutMs: null
 }
 
 function mockarPonte(): void {
@@ -61,6 +65,9 @@ function mockarPonte(): void {
       prontidaoDaVoz: vi.fn(async () => ({ pronta: false, faltando: [], compute: 'cpu-int8' })),
       transcreverAudio: vi.fn(async () => ({ estado: 'sem-audio' })),
       baixarArtefatoDeVoz: vi.fn(async () => ({ estado: 'ok' })),
+      // A tela do microfone assina o canal da hotkey ao montar; sem isto o efeito estoura
+      // antes de o teste chegar ao que ele mede.
+      onVozHotkey: vi.fn(() => () => undefined),
       listProjects: vi.fn(async () => []),
       createProject: vi.fn(),
       openProject: vi.fn(),

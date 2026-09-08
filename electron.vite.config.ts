@@ -1,14 +1,37 @@
 import { resolve } from 'node:path'
+import { copyFileSync, mkdirSync } from 'node:fs'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
+import type { Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 // A estrutura segue docs/ARCHITECTURE.md (src/main, src/renderer, src/shared), não a
 // convenção padrão do electron-vite (que espera o preload em src/preload) — por isso
 // os entry points são explícitos.
+/**
+ * O sidecar de voz é **script Python**, não módulo do bundle (SPEC-Voz-01).
+ *
+ * O Rollup não o enxerga: nada o importa — quem o executa é o runtime Python, por caminho. Sem
+ * copiá-lo, `out/main/` sai sem o arquivo e a transcrição falha em produção com "arquivo não
+ * encontrado", enquanto passa em desenvolvimento, onde o caminho ainda alcança `src/`.
+ */
+function copiarSidecarDeVoz(): Plugin {
+  return {
+    name: 'copiar-sidecar-de-voz',
+    writeBundle(): void {
+      const destino = resolve(__dirname, 'out/main')
+      mkdirSync(destino, { recursive: true })
+      copyFileSync(
+        resolve(__dirname, 'src/main/voz/sidecar-stt.py'),
+        resolve(destino, 'sidecar-stt.py')
+      )
+    }
+  }
+}
+
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
+    plugins: [externalizeDepsPlugin(), copiarSidecarDeVoz()],
     build: {
       rollupOptions: {
         input: { index: resolve(__dirname, 'src/main/index.ts') }
