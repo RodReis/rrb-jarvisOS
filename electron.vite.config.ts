@@ -9,22 +9,26 @@ import tailwindcss from '@tailwindcss/vite'
 // convenção padrão do electron-vite (que espera o preload em src/preload) — por isso
 // os entry points são explícitos.
 /**
- * O sidecar de voz é **script Python**, não módulo do bundle (SPEC-Voz-01).
+ * Os sidecares de voz são **scripts Python**, não módulos do bundle (SPEC-Voz-01 e SPEC-Voz-02).
  *
- * O Rollup não o enxerga: nada o importa — quem o executa é o runtime Python, por caminho. Sem
- * copiá-lo, `out/main/` sai sem o arquivo e a transcrição falha em produção com "arquivo não
+ * O Rollup não os enxerga: nada os importa — quem os executa é o runtime Python, por caminho. Sem
+ * copiá-los, `out/main/` sai sem os arquivos e a voz falha em produção com "arquivo não
  * encontrado", enquanto passa em desenvolvimento, onde o caminho ainda alcança `src/`.
+ *
+ * São dois porque os processos são separados (SPEC-Voz-02, decisão 3 do PI): transcrever e falar
+ * não podem se derrubar, e o Whisper quer a GPU enquanto o Piper roda em CPU.
  */
+const SIDECARES_DE_VOZ = ['sidecar-stt.py', 'sidecar-tts.py'] as const
+
 function copiarSidecarDeVoz(): Plugin {
   return {
     name: 'copiar-sidecar-de-voz',
     writeBundle(): void {
       const destino = resolve(__dirname, 'out/main')
       mkdirSync(destino, { recursive: true })
-      copyFileSync(
-        resolve(__dirname, 'src/main/voz/sidecar-stt.py'),
-        resolve(destino, 'sidecar-stt.py')
-      )
+      for (const arquivo of SIDECARES_DE_VOZ) {
+        copyFileSync(resolve(__dirname, 'src/main/voz', arquivo), resolve(destino, arquivo))
+      }
     }
   }
 }
