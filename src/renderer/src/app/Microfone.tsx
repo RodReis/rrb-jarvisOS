@@ -125,6 +125,23 @@ export function Microfone({
     }
   }
 
+  /*
+   * A hotkey global chega como **evento do main** (critério 5): o atalho funciona com a janela
+   * minimizada, e é aqui que o microfone vive — `getUserMedia` é Web API do renderer.
+   *
+   * O efeito lê `comecar`/`terminar` por ref, e não das dependências: as duas são recriadas a
+   * cada render (fecham sobre `estado`), e listá-las reassinaria o canal a cada tecla — a
+   * assinatura sairia e voltaria no meio da própria gravação que ela conduz.
+   */
+  const acoes = useRef({ comecar, terminar })
+  acoes.current = { comecar, terminar }
+
+  useEffect(() => {
+    return window.jarvis.onVozHotkey((gravando) => {
+      void (gravando ? acoes.current.comecar() : acoes.current.terminar())
+    })
+  }, [])
+
   if (prontidao === undefined) return <Card>{t('voz.verificando')}</Card>
 
   const rotuloDoCompute = prontidao.compute === 'cuda' ? t('voz.compute.gpu') : t('voz.compute.cpu')

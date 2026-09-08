@@ -15,7 +15,13 @@ import type {
   UserPreferences,
   UserProfile
 } from '@shared/domain/entities'
-import { isAccentColor } from '@shared/domain/entities'
+import {
+  isAccentColor,
+  isHotkeyDeVoz,
+  isIdiomaDeVoz,
+  isModeloDeVoz,
+  isTimeoutDeVoz
+} from '@shared/domain/entities'
 import { log } from '../logging/logger'
 
 interface ProfileRow {
@@ -26,6 +32,10 @@ interface ProfileRow {
   readonly theme: string
   readonly accent_noa: string | null
   readonly accent_jarvis: string | null
+  readonly voz_modelo: string | null
+  readonly voz_idioma: string | null
+  readonly voz_hotkey: string | null
+  readonly voz_timeout_ms: number | null
 }
 
 /**
@@ -45,7 +55,16 @@ function toProfile(row: ProfileRow): UserProfile {
     locale: row.locale as Locale,
     theme: row.theme as ThemePreference,
     accentNoa: toAccent(row.accent_noa),
-    accentJarvis: toAccent(row.accent_jarvis)
+    accentJarvis: toAccent(row.accent_jarvis),
+    /*
+     * Valor fora do conjunto conhecido vira `null`, pela mesma razão de `toAccent`: uma coluna
+     * com modelo que o catálogo não tem mais (schema antigo, edição manual) cairia no default
+     * em runtime, em vez de pedir o download de um artefato que não existe.
+     */
+    vozModelo: isModeloDeVoz(row.voz_modelo) ? row.voz_modelo : null,
+    vozIdioma: isIdiomaDeVoz(row.voz_idioma) ? row.voz_idioma : null,
+    vozHotkey: isHotkeyDeVoz(row.voz_hotkey) ? row.voz_hotkey : null,
+    vozTimeoutMs: isTimeoutDeVoz(row.voz_timeout_ms) ? row.voz_timeout_ms : null
   }
 }
 
@@ -94,10 +113,14 @@ export class UserProfileRepository {
       this.db
         .prepare(
           `UPDATE user_profile
-              SET locale        = COALESCE(?, locale),
-                  theme         = COALESCE(?, theme),
-                  accent_noa    = COALESCE(?, accent_noa),
-                  accent_jarvis = COALESCE(?, accent_jarvis)
+              SET locale         = COALESCE(?, locale),
+                  theme          = COALESCE(?, theme),
+                  accent_noa     = COALESCE(?, accent_noa),
+                  accent_jarvis  = COALESCE(?, accent_jarvis),
+                  voz_modelo     = COALESCE(?, voz_modelo),
+                  voz_idioma     = COALESCE(?, voz_idioma),
+                  voz_hotkey     = COALESCE(?, voz_hotkey),
+                  voz_timeout_ms = COALESCE(?, voz_timeout_ms)
             WHERE id = ?`
         )
         .run(
@@ -105,6 +128,10 @@ export class UserProfileRepository {
           preferences.theme ?? null,
           preferences.accentNoa ?? null,
           preferences.accentJarvis ?? null,
+          preferences.vozModelo ?? null,
+          preferences.vozIdioma ?? null,
+          preferences.vozHotkey ?? null,
+          preferences.vozTimeoutMs ?? null,
           userId
         )
 

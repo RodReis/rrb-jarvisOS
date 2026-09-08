@@ -3,8 +3,13 @@ import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { VozService } from './voz/voz-service'
 import { ARTEFATOS_DA_VOZ } from './voz/artefatos'
 import { baixarArtefato } from './voz/download-de-artefato'
-import { mkdirSync, writeFileSync } from 'node:fs'
-import { app, BrowserWindow, nativeTheme, shell } from 'electron'
+import { Sidecar } from './voz/sidecar'
+import { criarEngineFasterWhisper } from './voz/engine-faster-whisper'
+import { HotkeyDaVoz } from './voz/hotkey-da-voz'
+import type { ModoDeCompute } from '@shared/domain/voz'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { spawn } from 'node:child_process'
+import { app, BrowserWindow, globalShortcut, nativeTheme, shell } from 'electron'
 import { IPC_EVENT_CHANNELS } from '@shared/contracts/ipc'
 import { AuthService } from './auth/auth-service'
 import { createSupabaseClient, readSupabaseConfig } from './auth/supabase-client'
@@ -1469,26 +1474,121 @@ if (!app.requestSingleInstanceLock()) {
     await reconciliacao.reconcileAll()
 
     /*
-     * A voz (SPEC-Voz-01), primeira entrega.
+     * A voz (SPEC-Voz-01), segunda entrega: o engine real.
      *
-     * O engine concreto — faster-whisper no sidecar Python — é a **segunda** entrega desta
-     * fatia. Aqui ele é o engine ausente: `disponivel()` responde `false`, então a tela mostra
-     * "runtime não instalado" com a ação de baixar, que é literalmente o estado da máquina de
-     * quem abre o app hoje. Não é dublê de teste disfarçado de produção: é o comportamento
-     * honesto enquanto o runtime não existe, e é o caminho do critério 4.
+     * **Esta é a única linha do app que escolhe faster-whisper.** Todo o resto fala com a
+     * interface `SttEngine` — trocar por whisper.cpp é criar outro engine aqui, não refatorar
+     * (invariante do épico #193).
+     *
+     * O modo de compute é lido do que o sidecar **relatou** na última transcrição, e não
+     * presumido: a queda para CPU acontece dentro do processo Python (uma GPU pode existir sem
+     * as bibliotecas CUDA — medido nesta máquina), e a UI precisa indicar o modo verdadeiro.
+     * Antes da primeira transcrição não há relato, e `cpu-int8` é o palpite honesto: prometer
+     * GPU e entregar CPU seria pior que o contrário.
      */
-    const voz = new VozService({
-      engine: {
-        transcribe: () => Promise.reject(new Error('O runtime de voz ainda não foi instalado.')),
-        disponivel: async () => false,
-        encerrar: async () => undefined
+    const diretorioDaVoz = (...partes: string[]): string =>
+      join(app.getPath('userData'), 'voz', ...partes)
+
+    let computeRelatado: ModoDeCompute = 'cpu-int8'
+
+    const sidecarDaVoz = new Sidecar({
+      spawn: (comando, args) => spawn(comando, [...args], { stdio: 'pipe' }),
+      comando: diretorioDaVoz('runtime', 'python', 'python.exe'),
+      args: [join(__dirname, 'sidecar-stt.py')],
+      // Generoso de propósito: a primeira chamada carrega o modelo Whisper do disco, que leva
+      // segundos. Um teto apertado transformaria o boot do engine em "falha de transcrição".
+      timeoutMs: 120_000
+    })
+
+    const engineDaVoz = criarEngineFasterWhisper({
+      sidecar: sidecarDaVoz,
+      configuracao: () => {
+        const prefs = preferences.atual()
+        return {
+          modelo: diretorioDaVoz('models', `whisper-${prefs.vozModelo}`),
+          idioma: prefs.vozIdioma
+        }
       },
-      artefatosFaltando: () => ARTEFATOS_DA_VOZ.map((a) => a.id),
-      computeAtual: () => 'cpu-int8'
+      // Lida a cada chamada e não guardada: é o que faz Settings valer na seguinte (critério 6).
+      artefatosPresentes: () => faltandoNoDisco().length === 0,
+      registrarCompute: (modo) => {
+        if (modo === computeRelatado) return
+        computeRelatado = modo
+        log.sistema.info('Modo de compute da voz definido pelo runtime', { modo })
+      }
+    })
+
+    /** Quais artefatos ainda não estão no disco. Vazio = a voz pode transcrever. */
+    const faltandoNoDisco = (): readonly string[] =>
+      ARTEFATOS_DA_VOZ.filter((a) => !existsSync(join(app.getPath('userData'), a.destino))).map(
+        (a) => a.id
+      )
+
+    const voz = new VozService({
+      engine: engineDaVoz,
+      artefatosFaltando: faltandoNoDisco,
+      computeAtual: () => computeRelatado
+    })
+
+    /*
+     * A hotkey global (critério 5).
+     *
+     * Ela avisa a **tela**, que é quem tem o microfone: `getUserMedia` é Web API do renderer, e
+     * mover a captura para cá quebraria a fronteira que o critério 3 protege. O main decide
+     * quando abre e fecha; o renderer captura.
+     *
+     * Registrar é ação observável do sistema — o atalho passa a interceptar a tecla fora do app
+     * —, então vai para a auditoria com a combinação e se o SO aceitou.
+     */
+    const hotkeyDaVoz = new HotkeyDaVoz({
+      atalho: {
+        register: (acelerador, aoAcionar) => globalShortcut.register(acelerador, aoAcionar),
+        unregister: (acelerador) => globalShortcut.unregister(acelerador)
+      },
+      aoAlternar: (gravando) => {
+        // `isDestroyed` pela mesma razão do `generationEvent`: o atalho é global e chega mesmo
+        // com a janela fechando, e um `send` para janela morta lançaria dentro do callback.
+        if (janela !== undefined && !janela.isDestroyed()) {
+          janela.webContents.send(IPC_EVENT_CHANNELS.vozHotkey, gravando)
+        }
+      },
+      auditar: ({ acelerador, registrado }) =>
+        storage.audit.append({
+          user_id: userIdAtual(),
+          type: 'voz.hotkey.registro',
+          payload: { acelerador, registrado }
+        })
+    })
+
+    const aplicarHotkeyDaVoz = (): void => {
+      const prefs = preferences.atual()
+      if (!hotkeyDaVoz.registrar(prefs.vozHotkey, prefs.vozTimeoutMs)) {
+        // Atalho ocupado por outro app é conflito de teclado, não falha do produto: o resto da
+        // voz continua funcionando pelo botão da tela, e derrubar o boot por isso seria pior.
+        log.sistema.warn('A hotkey de voz não pôde ser registrada; o botão da tela segue valendo', {
+          acelerador: prefs.vozHotkey
+        })
+      }
+    }
+
+    aplicarHotkeyDaVoz()
+
+    /*
+     * O sidecar morre com o app (critério 2), e o atalho global é liberado junto.
+     *
+     * Sem liberar, o acelerador continuaria registrado no SO depois de o app sair — a próxima
+     * tecla apertada iria para um processo que não existe mais.
+     */
+    app.on('will-quit', () => {
+      hotkeyDaVoz.liberar()
+      void engineDaVoz.encerrar()
     })
 
     registerIpcHandlers({
       voz,
+      // A hotkey vive no SO, não no banco: salvar sem re-registrar deixaria o atalho antigo
+      // valendo até o próximo boot (critério 6).
+      aoSalvarPreferencias: aplicarHotkeyDaVoz,
       baixarArtefatoDeVoz: async (id) => {
         const artefato = ARTEFATOS_DA_VOZ.find((a) => a.id === id)
         if (artefato === undefined) {

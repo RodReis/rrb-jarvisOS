@@ -2143,10 +2143,25 @@ Status: **primeira de duas entregas na `main`** — spec `aprovada-pi` (2026-08-
 - [x] **`src/main/voz/voz-service.ts`** + handlers + três canais de ponte
 - [x] **`src/renderer/src/app/Microfone.tsx`** e `captura-de-audio.ts` — `getUserMedia` é Web API; a captura é injetada porque jsdom não a tem
 - [x] **`Button` ganha o gesto de segurar** — no design system, não como exceção na tela
-- [ ] **2ª entrega:** engine faster-whisper real, hashes medidos, critério 6 (Settings), hotkey global
-- [ ] **Do PI:** critérios 5 e 9
+- [x] **`src/main/voz/sidecar-stt.py`** — o script do sidecar: carrega o modelo uma vez, transcreve por enunciado, cai para CPU e **não abre arquivo para escrita**
+- [x] **`src/main/voz/engine-faster-whisper.ts`** — o `SttEngine` concreto, e o **único** arquivo do app que sabe que faster-whisper existe
+- [x] **Hashes medidos e conferidos em duas fontes** — 29 artefatos: runtime, 4 arquivos do modelo e 24 wheels
+- [x] **`src/main/voz/hotkey-da-voz.ts`** + canal de evento — toggle, teto de gravação, troca sem restart
+- [x] **Migração 40 + aba Voz em Settings** — modelo, idioma, atalho e teto, todos de lista fechada
+- [x] **`sem-audio-em-disco.int-spec.ts`** — a varredura do `userData` do critério 8, com contrafactual medido
+- [ ] **Do PI:** critérios 5 e 9 (falar ao microfone no app e medir a latência na máquina dele)
 
-**Limites declarados:** os hashes do catálogo estão vazios e falham fechado por construção; o engine composto é o **ausente** (a tela oferece baixar, que é o caminho do critério 4); o critério 8 está garantido por construção e testado nos três níveis, mas a varredura do `userData` fecha na segunda entrega, quando houver sessão de uso real.
+**Como os hashes foram obtidos, e por que importa.** Cada um dos 29 artefatos foi **baixado e medido**, e depois conferido contra a fonte: o runtime contra o `SHA256SUMS` do release **e** o digest da API do GitHub; o `model.bin` contra o oid LFS do Hugging Face; as 24 wheels contra o digest que o PyPI publica por arquivo. Tudo pinado por **revisão imutável** — tag do release, commit do modelo, URL de arquivo do PyPI: um hash pinado contra alvo móvel (`latest`, `resolve/main`) passaria a recusar o download no dia em que o upstream publicasse qualquer coisa, e o usuário leria "falha de integridade" sobre um arquivo legítimo.
+
+**Duas premissas do catálogo anterior estavam erradas, e só o download real mostrou.** (1) O modelo é **quatro** arquivos, não um: o faster-whisper abre um diretório e espera `config.json`, `tokenizer.json` e `vocabulary.txt` além do `model.bin` — baixar só o grande deixaria o diretório inválido, e a falha apareceria como erro do runtime, longe da causa. (2) As wheels são **24**, não uma: seis dependências diretas mais as transitivas, 84 MB. A lista saiu do resolvedor do pip e mora em JSON, não em código — deixá-la no `.ts` transformaria uma lista gerada em código a revisar linha a linha.
+
+**Dois defeitos achados pelo smoke com fala de verdade, ambos invisíveis para dublê.** O áudio veio de TTS do Windows em pt-BR, 16 kHz mono. (1) **O `UnicodeDecodeError`**: no Windows o stdout do Python assume a code page do console (cp1252), e a primeira palavra acentuada quebra a linha JSON — em pt-BR, isso é toda transcrição. (2) **A queda para CPU não cobria a inferência**: o `WhisperModel` **constrói com sucesso** em `device="cuda"` numa máquina com GPU mas sem as bibliotecas CUDA, e só estoura na primeira transcrição (`Library cublas64_12.dll is not found`). O `try` envolvia apenas a construção, então o critério 7 ficava furado exatamente na máquina que ele existe para atender — e pior, **o erro chegava como transcrição vazia**, desfecho `ok` com texto em branco, que a tela não distingue de silêncio. A correção materializa os segmentos dentro do `try`: o `transcribe` devolve gerador preguiçoso, e deixar a iteração para o chamador poria o erro fora do bloco que existe para pegá-lo.
+
+**Medições do smoke** (Ryzen 7 9800X3D, sem CUDA Toolkit instalado, portanto CPU `int8`): 5,30 s de áudio transcritos em **2,79 s** na primeira chamada e **0,91 s** na segunda — a diferença é o modelo já carregado, que é o que o processo de vida longa existe para conseguir. Texto reconhecido: *"Abrir o painel de projetos do Jarvis e mostrar o Rudma."* — o "roadmap" virou "Rudma", erro do modelo `small`, não do código.
+
+**A hotkey é lista fechada, e isso é decisão de segurança.** Quatro combinações, não campo livre: o que se registra é um atalho **global**, que intercepta a tecla no sistema inteiro. Aceitar qualquer acelerador deixaria o renderer — fronteira de confiança — sequestrar `Control+C` para a máquina toda, e desfazer exigiria editar o banco. Mesma razão para o modelo ser enum: cada valor precisa de artefato com hash pinado, e um nome digitado viraria download recusado por integridade.
+
+**Limites declarados:** (1) o catálogo cobre **Windows x64** — o runtime e três wheels são específicos de plataforma, e Linux/macOS exigem outro conjunto medido; (2) o modelo `small` é o único com artefatos pinados, então trocar para `tiny`/`base`/`medium` em Settings oferece a opção mas o download recusaria por falta de entrada no catálogo — a fatia que os pinar é pequena e ficou fora por não ter sido pedida; (3) os critérios 5 e 9 continuam do PI: falar ao microfone no app real e medir a latência dele.
 
 ## MVP-027 — Política de PR e CI multiplataforma
 

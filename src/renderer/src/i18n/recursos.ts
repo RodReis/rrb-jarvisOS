@@ -721,6 +721,22 @@ export const RECURSOS = {
         abaIa: 'IA',
         abaRoteamento: 'Modelos',
         abaConectores: 'Conectores',
+        abaVoz: 'Voz',
+        vozDescricao:
+          'A transcricao roda nesta maquina. Nenhum audio sai daqui e nada e gravado em disco.',
+        vozModelo: 'Modelo de transcricao',
+        vozModeloDescricao:
+          'Modelos maiores acertam mais e demoram mais. Trocar aqui vale na proxima fala; o modelo novo e baixado no primeiro uso.',
+        vozIdioma: 'Idioma da fala',
+        vozIdiomaDescricao: 'O idioma esperado do que voce fala, nao o da interface.',
+        vozHotkey: 'Atalho global',
+        vozHotkeyDescricao:
+          'Funciona com a janela minimizada. Um toque abre o microfone, outro encerra e transcreve.',
+        vozTimeout: 'Encerrar sozinho apos',
+        vozTimeoutDescricao:
+          'Protege contra o atalho esquecido: passado esse tempo, a gravacao encerra e transcreve o que houver.',
+        vozSegundos: '{{valor}} segundos',
+        vozMinutos: '{{valor}} minutos',
         idioma: 'Idioma',
         idiomaDescricao: 'Aplica imediatamente, sem reiniciar.',
         tema: 'Tema',
@@ -1438,6 +1454,22 @@ export const RECURSOS = {
         abaIa: 'AI',
         abaRoteamento: 'Models',
         abaConectores: 'Connectors',
+        abaVoz: 'Voice',
+        vozDescricao:
+          'Transcription runs on this machine. No audio leaves it and nothing is written to disk.',
+        vozModelo: 'Transcription model',
+        vozModeloDescricao:
+          'Larger models are more accurate and slower. A change applies to your next utterance; the new model downloads on first use.',
+        vozIdioma: 'Spoken language',
+        vozIdiomaDescricao: 'The language you speak, not the interface language.',
+        vozHotkey: 'Global shortcut',
+        vozHotkeyDescricao:
+          'Works with the window minimised. One press opens the microphone, another ends it and transcribes.',
+        vozTimeout: 'Stop automatically after',
+        vozTimeoutDescricao:
+          'Guards against a forgotten shortcut: after this long, recording ends and transcribes whatever it captured.',
+        vozSegundos: '{{valor}} seconds',
+        vozMinutos: '{{valor}} minutes',
         idioma: 'Language',
         idiomaDescricao: 'Applies immediately, no restart needed.',
         tema: 'Theme',

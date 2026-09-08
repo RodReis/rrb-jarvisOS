@@ -69,6 +69,11 @@ describe('migrations', () => {
     antigo.exec('ALTER TABLE user_profile DROP COLUMN github_client_id')
     antigo.exec('ALTER TABLE user_profile DROP COLUMN accent_noa')
     antigo.exec('ALTER TABLE user_profile DROP COLUMN accent_jarvis')
+    // A v40 acrescenta as quatro colunas de voz a `user_profile` (SPEC-Voz-01).
+    antigo.exec('ALTER TABLE user_profile DROP COLUMN voz_modelo')
+    antigo.exec('ALTER TABLE user_profile DROP COLUMN voz_idioma')
+    antigo.exec('ALTER TABLE user_profile DROP COLUMN voz_hotkey')
+    antigo.exec('ALTER TABLE user_profile DROP COLUMN voz_timeout_ms')
     antigo.exec('DROP TABLE allowed_directory')
     antigo.exec('DROP TABLE workflow')
     antigo.exec('DROP TABLE automation')

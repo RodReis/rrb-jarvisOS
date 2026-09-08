@@ -39,7 +39,7 @@ flowchart LR
 | **Terminal Executor** | Comandos reais pós-validação | Allowlist, cwd permitido, timeout, sem admin no MVP |
 | **Provider Adapters** | OpenAI, Claude (API + Code CLI), Gemini, Google Workspace, ElevenLabs, Ollama | BudgetPolicy **antes** da chamada; custo/latência medidos |
 | **Memory & Knowledge** | Ingestão, índices textual/vetorial/grafo, RAG rastreável | RLS herdada da fonte em todo índice; `inferred` ≠ `confirmed`; exclusão remove de todos os índices |
-| **Voice Layer** | STT/TTS online no MVP; offline como evolução | Entra depois do Command Center textual; mesma política de aprovação |
+| **Voice Layer** | **STT local** (faster-whisper em sidecar Python, SPEC-Voz-01); TTS local na F02 | Nenhum áudio sai da máquina nem toca o disco; runtime e modelo baixados no 1º uso com **SHA-256 pinado** e `AuditEvent` nos dois extremos; `SttEngine` é interface injetada — o engine concreto tem **um** ponto de composição |
 | **Supabase** | Dev: metadados/RLS/migrações. Prod: espelho sync/auth/auditoria | Local é fonte de verdade operacional |
 
 ## Dados

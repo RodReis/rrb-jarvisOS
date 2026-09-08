@@ -1581,6 +1581,28 @@ const MIGRATIONS: readonly string[] = [
   // e, dentro do bloco, campo ausente significa **nao observado**, nunca zero (criterio 17).
   `
   ALTER TABLE execution_ledger ADD COLUMN correlacao_ci TEXT;
+  `,
+
+  // 40 - as preferencias de voz (SPEC-Voz-01, criterio 6).
+  //
+  // Em `user_profile` e nao numa tabela `voice_config`, pelo mesmo argumento da 14: sao quatro
+  // colunas para quatro campos escalares, do jeito que `theme`, `accent_*` e `github_client_id`
+  // entraram. Uma tabela com uma linha por usuario seria a estrutura de amanha paga hoje.
+  //
+  // Todas anulaveis, e nulo significa **usar o default de fabrica** - nunca "vazio". E o mesmo
+  // desenho de `accent_noa`: o servico resolve o nulo na leitura, entao o renderer sempre recebe
+  // valor pintavel e nao precisa conhecer o padrao. Um `NOT NULL DEFAULT 'small'` cravaria a
+  // escolha de hoje em toda linha ja gravada, e mudar o default de fabrica amanha nao alcancaria
+  // ninguem.
+  //
+  // `voz_timeout_ms` e coluna e nao constante porque a spec o pos em Settings: ele existe para
+  // proteger o **toggle esquecido** da hotkey, e quanto tempo e demais depende de como a pessoa
+  // fala, nao de como o app foi compilado.
+  `
+  ALTER TABLE user_profile ADD COLUMN voz_modelo     TEXT;
+  ALTER TABLE user_profile ADD COLUMN voz_idioma     TEXT;
+  ALTER TABLE user_profile ADD COLUMN voz_hotkey     TEXT;
+  ALTER TABLE user_profile ADD COLUMN voz_timeout_ms INTEGER;
   `
 ]
 

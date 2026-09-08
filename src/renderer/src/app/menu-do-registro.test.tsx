@@ -58,6 +58,9 @@ beforeEach(() => {
     prontidaoDaVoz: vi.fn(async () => ({ pronta: false, faltando: [], compute: 'cpu-int8' })),
     transcreverAudio: vi.fn(async () => ({ estado: 'sem-audio' })),
     baixarArtefatoDeVoz: vi.fn(async () => ({ estado: 'ok' })),
+    // A tela do microfone assina o canal da hotkey ao montar; sem isto o efeito estoura antes
+    // de o teste chegar ao que ele mede.
+    onVozHotkey: vi.fn(() => () => undefined),
     listProjects: vi.fn(async () => []),
     listPermittedDirectories: vi.fn(async () => []),
     // O Terminal é um dos itens visíveis, e o critério 2 abre **todos** eles: sem estes, o

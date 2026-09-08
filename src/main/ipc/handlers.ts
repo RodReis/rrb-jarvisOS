@@ -324,6 +324,14 @@ export interface IpcDependencies {
   readonly workspaces: WorkspaceService
   readonly preferences: PreferencesService
   /**
+   * Reaplica o que vive **fora** do banco depois de salvar (SPEC-Voz-01, critério 6).
+   *
+   * A hotkey é registrada no SO, não no SQLite: gravar a preferência nova sem re-registrar
+   * deixaria o atalho antigo valendo até o próximo boot — e o critério pede que a mudança valha
+   * na chamada seguinte, sem restart.
+   */
+  readonly aoSalvarPreferencias?: () => void
+  /**
    * Dono da auditoria consultada pelo canal `audit:list`.
    *
    * É função e não string desde a F03: o usuário deixa de ser fixo — antes do login é o
@@ -524,6 +532,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 
     try {
       const resultado = deps.preferences.salvar(pedido)
+      deps.aoSalvarPreferencias?.()
       log.ipc.info('Preferências atualizadas', {
         canal: IPC_CHANNELS.preferencesSave,
         direction: 'out',
