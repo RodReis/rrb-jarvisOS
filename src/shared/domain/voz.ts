@@ -120,3 +120,17 @@ export interface PersonaEditavel {
   /** Teto do texto livre, para a tela mostrar o limite em vez de recusar em silêncio. */
   readonly teto: number
 }
+
+/**
+ * O modelo da rota `conversa-de-voz` quando o usuário ainda não escolheu (SPEC-Voz-03, decisão 1
+ * do PI: "Qwen3 8B via Ollama, default da rota, configurável em Settings").
+ *
+ * **Default da rota, não do provider.** `MODELO_PADRAO.ollama` é `llama3.1` e serve as outras
+ * rotas locais; usá-lo aqui faria a conversa recusar por "modelo não baixado" numa máquina com o
+ * Ollama no ar e o `qwen3:8b` instalado — que foi exatamente o que o E2E no app real mostrou. O
+ * default de uma rota é fato sobre a rota, e é por isso que ele mora ao lado dela.
+ *
+ * Trocar continua sendo Settings: o modelo ativo do provider, quando o usuário o define, vence
+ * este valor.
+ */
+export const MODELO_PADRAO_DA_CONVERSA = 'qwen3:8b'

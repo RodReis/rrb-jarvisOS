@@ -10,6 +10,8 @@ import { criarEnginePiper } from './voz/engine-piper'
 import { HotkeyDaVoz } from './voz/hotkey-da-voz'
 import { prepararRuntime, runtimeUsavel } from './voz/preparo-do-runtime'
 import { ConversaService } from './voz/conversa-service'
+import { MODELO_PADRAO } from '@shared/domain/ai'
+import { MODELO_PADRAO_DA_CONVERSA } from '@shared/domain/voz'
 import { criarRotaLocal } from './voz/rota-local'
 import { montarSnapshot } from './voz/snapshot-do-app'
 import { PersonaRepository } from './voz/persona-repository'
@@ -1657,6 +1659,16 @@ if (!app.requestSingleInstanceLock()) {
      */
     const personas = new PersonaRepository(storage.db)
 
+    /*
+     * O modelo da conversa, resolvido **uma vez** e usado nos dois lugares: a checagem da rota e
+     * a chamada. Duas resoluções independentes divergiriam no dia em que uma delas mudasse — e a
+     * checagem aprovaria um modelo enquanto a chamada pediria outro.
+     */
+    const modeloDaConversa = (): string => {
+      const ativo = routingRepo.modeloAtivo(userIdAtual(), 'jarvis', 'ollama')
+      return ativo === MODELO_PADRAO.ollama ? MODELO_PADRAO_DA_CONVERSA : ativo
+    }
+
     const conversa = new ConversaService({
       ai,
       montarContexto: (entrada, workspace) => contexts.montarDoApp(entrada, workspace),
@@ -1672,9 +1684,9 @@ if (!app.requestSingleInstanceLock()) {
       rotaDisponivel: criarRotaLocal({
         disponivel: () => ollamaAdapter.disponivel(),
         modelosInstalados: () => ollamaAdapter.modelosInstalados(),
-        // O modelo da rota é o ativo do provider — configurável em Settings, como toda rota.
-        modeloConfigurado: () => routingRepo.modeloAtivo(userIdAtual(), 'jarvis', 'ollama')
+        modeloConfigurado: modeloDaConversa
       }),
+      modeloDaConversa,
       userId: userIdAtual,
       janelaDoHistorico: () => preferences.atual().conversaJanela
     })

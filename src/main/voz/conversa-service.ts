@@ -56,6 +56,8 @@ export interface DepsDaConversa {
    * serviço só precisa saber que não vai chamar e o que dizer a respeito.
    */
   readonly rotaDisponivel: () => Promise<{ ok: true } | { ok: false; proximaAcao: string }>
+  /** O modelo da rota — o mesmo que `rotaDisponivel` verifica. Fonte única, de propósito. */
+  readonly modeloDaConversa: () => string
   readonly userId: () => string
   /** Quantas trocas do histórico entram no contexto. Configurável (critério 7). */
   readonly janelaDoHistorico: () => number
@@ -108,7 +110,19 @@ export class ConversaService {
         taskType: 'conversa-de-voz',
         prompt: texto,
         system: systemDaPersona(this.deps.persona(workspace)),
-        contextPackId: pack.id
+        contextPackId: pack.id,
+        /*
+         * O modelo é **declarado**, e vem da mesma fonte que `rotaDisponivel` acabou de checar.
+         *
+         * Sem isto o ponto único resolve pela rota, que cai no default do **provider**
+         * (`llama3.1`) quando o usuário não escolheu — e a checagem aprovaria o `qwen3:8b`
+         * enquanto a chamada pediria outro modelo, que o Ollama recusa com 404. Foi assim no
+         * app real: a rota dizia "pode ir" e a chamada morria logo depois.
+         *
+         * Uma fonte só para as duas perguntas é o que impede a checagem de aprovar uma coisa e
+         * a chamada de fazer outra.
+         */
+        model: this.deps.modeloDaConversa()
       }
 
       let resposta = ''

@@ -65,6 +65,7 @@ function deps(parcial: Partial<DepsDaConversa> = {}): {
       persona: () => 'Você é o JARVIS.',
       snapshot,
       rotaDisponivel: async () => ({ ok: true }) as const,
+      modeloDaConversa: () => 'qwen3:8b',
       userId: () => 'u-1',
       janelaDoHistorico: () => 10,
       ...parcial
@@ -129,6 +130,20 @@ describe('o ContextPack da conversa (critério 3)', () => {
     await new ConversaService(d).perguntar('oi', 'jarvis')
 
     expect(packs).toHaveLength(0)
+  })
+})
+
+describe('a chamada declara o modelo que a checagem aprovou', () => {
+  it('manda o modelo da conversa, e não deixa o ponto único resolver', async () => {
+    /*
+     * Regressão medida no app real: sem `model` declarado, o ponto único cai no default do
+     * **provider** (`llama3.1`), e a checagem da rota — que aprovou o `qwen3:8b` — passaria a
+     * garantir um modelo diferente do que a chamada pede. O Ollama recusa com 404 logo depois.
+     */
+    const { deps: d, pedidos } = deps({ modeloDaConversa: () => 'qwen3:8b' })
+    await new ConversaService(d).perguntar('oi', 'jarvis')
+
+    expect(pedidos[0].model).toBe('qwen3:8b')
   })
 })
 
@@ -276,6 +291,9 @@ describe('nenhum caminho de ação (critério 8)', () => {
     expect(chaves).toEqual([
       'ai',
       'janelaDoHistorico',
+      // `modeloDaConversa` é **leitura de configuração**: devolve o nome do modelo da rota, o
+      // mesmo que `rotaDisponivel` verifica. Não alcança nada nem executa nada.
+      'modeloDaConversa',
       'montarContexto',
       'persona',
       'rotaDisponivel',
