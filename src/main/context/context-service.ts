@@ -70,6 +70,29 @@ export interface CandidatoDeContexto {
   readonly linhas?: { readonly de: number; readonly ate: number }
 }
 
+/**
+ * Uma parte do contexto que o app escreveu sobre si mesmo (SPEC-Voz-03, E1).
+ *
+ * Texto pronto, não caminho: quem monta o snapshot ou a persona já resolveu o conteúdo, e pedir
+ * um caminho aqui obrigaria a gravar num arquivo para logo reler — o segundo caminho que a
+ * emenda existe para não precisar.
+ */
+export interface ParteDoApp {
+  /** Vira `app://<nome>` no manifesto. Curto e estável: `snapshot`, `persona`, `historico`. */
+  readonly nome: string
+  readonly texto: string
+  /** Por que esta parte entrou — a mesma pergunta que o `motivo` de um item de arquivo responde. */
+  readonly motivo: string
+}
+
+/** O pedido de montagem de um pack do app — sem projeto, sem arquivo (SPEC-Voz-03, E1). */
+export interface PedidoDeContextoDoApp {
+  readonly tarefa: string
+  readonly etapa: string
+  readonly partes: readonly ParteDoApp[]
+  readonly rota: AiProvider
+}
+
 /** O pedido de montagem, como o IPC o entrega. */
 export interface PedidoDeContexto {
   readonly projectId: string
@@ -126,7 +149,18 @@ export function hashDoPack(entrada: Omit<ContextPack, 'id' | 'hash' | 'created_a
   const canonico = [
     entrada.user_id,
     entrada.workspace_id,
-    entrada.projectId,
+    /*
+     * O campo virou opcional na E1 da SPEC-Voz-03 (pack do app, sem projeto).
+     *
+     * `?? ''` pela mesma razão do `pathsPermitidos` no fim desta lista: **ausência continua
+     * hasheando como ausência**, então todo pack já gravado — que sempre traz o campo — mantém
+     * o hash exato que tinha. Nenhuma linha do banco é invalidada.
+     *
+     * A string vazia não colide com projeto nenhum porque id de projeto é UUID; e mesmo que um
+     * dia não fosse, o `tarefa` da linha seguinte separaria os dois. Não se troca por um
+     * sentinela tipo `'sem-projeto'` justamente porque **isso** mudaria o hash dos gravados.
+     */
+    entrada.projectId ?? '',
     entrada.tarefa,
     entrada.rota,
     entrada.packAnterior ?? '',
@@ -561,6 +595,114 @@ export class ContextService {
       // o item não entra, e o manifesto registra o que entrou.
       return undefined
     }
+  }
+
+  /**
+   * Monta o pack de uma conversa com o app (SPEC-Voz-03, critério 3 e emenda E1).
+   *
+   * ## Por que é um método próprio, e não um `projectId` opcional em `montar`
+   *
+   * `montar` existe para geração documental: ele recebe **candidatos** — caminhos de arquivo —,
+   * resolve cada um contra a raiz do projeto, detecta segredo, mede leitura ampla. Nada disso se
+   * aplica a um texto que o app escreveu sobre si mesmo, e passar por ali exigiria que metade
+   * das guardas soubesse "isto aqui não vale quando não há projeto".
+   *
+   * O caminho documental fica **intocado**: quem chama `montar` continua obrigado a declarar
+   * projeto e a ter ao menos um arquivo legível. É o contrafactual do critério 10.
+   *
+   * ## O que os dois compartilham, e por que isso importa
+   *
+   * Hash canônico, dedupe por hash, persistência e auditoria são os **mesmos** — `hashDoPack`,
+   * `findByHash`, `repository.save`, `audit.append`. Duplicar qualquer um deles criaria a
+   * segunda fonte que a spec passa a fatia inteira evitando: "qual pack esta chamada usou?"
+   * precisa ter uma resposta só, venha ela de arquivo ou do estado do app.
+   */
+  montarDoApp(entrada: PedidoDeContextoDoApp, workspaceId: WorkspaceId): ContextPack {
+    const userId = this.userId()
+
+    const itens: readonly ContextItem[] = entrada.partes.map((parte) => ({
+      // `app://` e não um caminho relativo: nenhum arquivo produz este esquema, então ler o
+      // manifesto meses depois não deixa dúvida sobre o que veio do disco e o que o app escreveu.
+      caminho: `app://${parte.nome}`,
+      hash: createHash('sha256').update(parte.texto, 'utf8').digest('hex'),
+      origem: 'estado-do-app',
+      bytes: Buffer.byteLength(parte.texto, 'utf8'),
+      motivo: parte.motivo
+    }))
+
+    const tokensDoContexto = tokensDosItens(itens)
+    const orcamento: OrcamentoDaEtapa = {
+      etapa: entrada.etapa,
+      // A rota da conversa é local por decisão do PI, mas `isRotaUnmetered` decide isto e não
+      // uma constante: se um dia a rota mudar em Settings, o orçamento acompanha sozinho.
+      unmetered: isRotaUnmetered(entrada.rota),
+      tetoDeTokens: TETO_DE_TOKENS_PADRAO,
+      tokensEstimados: tokensDoContexto + MAX_TOKENS_PADRAO,
+      estimadoUsd: isRotaUnmetered(entrada.rota)
+        ? null
+        : calcularCustoUsd(entrada.rota, MODELO_PADRAO[entrada.rota], {
+            tokensEntrada: tokensDoContexto,
+            tokensSaida: MAX_TOKENS_PADRAO
+          })
+    }
+
+    const semHash: Omit<ContextPack, 'id' | 'hash' | 'created_at'> = {
+      user_id: userId,
+      workspace_id: workspaceId,
+      // Sem `projectId`: é o que a emenda E1 tornou possível, e a ausência **afirma** que não há
+      // projeto — a conversa pergunta sobre o app.
+      tarefa: entrada.tarefa,
+      itens,
+      regras: [],
+      // Falhas abertas são por projeto (`listFalhas` exige `projectId`), e uma conversa não tem.
+      // O que o app sabe de errado entra pelo snapshot, como texto, não por este campo.
+      falhasAbertas: [],
+      orcamento,
+      rota: entrada.rota
+    }
+
+    const hash = hashDoPack(semHash)
+
+    /*
+     * O dedupe vale aqui **e é o comportamento certo**, ainda que pareça estranho numa conversa.
+     *
+     * Duas perguntas diferentes produzem packs diferentes, porque a janela de histórico entra no
+     * texto. Duas perguntas com contexto byte a byte idêntico — a primeira pergunta de duas
+     * sessões, digamos — reusam o mesmo manifesto, e isso é exato: o que foi enviado ao modelo
+     * foi de fato o mesmo. O manifesto descreve o envio, não a intenção de quem perguntou.
+     */
+    const existente = this.repository.findByHash(userId, hash)
+    if (existente !== undefined) return existente
+
+    const pack: ContextPack = {
+      id: randomUUID(),
+      ...semHash,
+      hash,
+      created_at: new Date().toISOString()
+    }
+
+    this.repository.save(pack)
+
+    this.audit.append({
+      user_id: userId,
+      workspace_id: workspaceId,
+      type: 'context-pack',
+      // Nomes e hashes, **nunca o conteúdo** — o snapshot fala de projetos e fila do usuário, e
+      // repetir isso na auditoria seria copiar o dado para responder "o que foi enviado?".
+      payload: {
+        reason: 'montado',
+        packId: pack.id,
+        origem: 'estado-do-app',
+        hash: pack.hash,
+        itens: itens.length,
+        tokensEstimados: orcamento.tokensEstimados,
+        tetoDeTokens: orcamento.tetoDeTokens,
+        unmetered: orcamento.unmetered,
+        rota: pack.rota
+      }
+    })
+
+    return pack
   }
 
   /** Recusa auditada. **Toda** recusa audita — a tentativa barrada é o fato interessante. */

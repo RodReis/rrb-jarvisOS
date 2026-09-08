@@ -1616,6 +1616,65 @@ const MIGRATIONS: readonly string[] = [
   // por ele, e mudar depois nao alcancaria nenhuma linha ja gravada.
   `
   ALTER TABLE user_profile ADD COLUMN voz_da_fala TEXT;
+  `,
+
+  // 42 - o contexto pode nao vir de um projeto (SPEC-Voz-03, emenda E1).
+  //
+  // A conversa por voz pergunta sobre o **app** - a fila, os aceites pendentes -, nao sobre um
+  // projeto. O manifesto dela traz persona, snapshot e historico: texto que o app escreveu sobre
+  // si mesmo, sem arquivo em disco e sem projeto a que pertencer.
+  //
+  // **Recriacao da tabela, e nao ALTER.** O SQLite nao tem `DROP NOT NULL`: a unica forma de
+  // afrouxar a coluna e criar a tabela nova, copiar as linhas e trocar. E a operacao mais
+  // delicada do arquivo, por isso ela roda dentro da transacao da migration (ver `migrate`) e
+  // copia **coluna a coluna**, nomeadas - um `INSERT ... SELECT *` dependeria da ordem das
+  // colunas e quebraria silenciosamente no dia em que alguem acrescentasse uma.
+  //
+  // O indice e recriado porque ele morre com a tabela antiga. `project_id` continua nele: as
+  // consultas por projeto sao a maioria, e um pack do app simplesmente nao aparece nelas - que e
+  // o comportamento certo, porque ele nao pertence a projeto nenhum.
+  `
+  CREATE TABLE context_pack_novo (
+    id            TEXT PRIMARY KEY,
+    user_id       TEXT NOT NULL,
+    workspace_id  TEXT NOT NULL,
+    -- NULL = contexto do proprio app, sem projeto (E1). Ausencia e afirmacao, nao lacuna.
+    project_id    TEXT,
+    tarefa        TEXT NOT NULL,
+    regras        TEXT NOT NULL,
+    falhas        TEXT NOT NULL,
+    resumo_anterior TEXT,
+    etapa         TEXT NOT NULL,
+    unmetered     INTEGER NOT NULL,
+    teto_de_tokens INTEGER NOT NULL,
+    tokens_estimados INTEGER NOT NULL,
+    estimado_usd  REAL,
+    motivo_da_expansao TEXT,
+    excecao_motivo TEXT,
+    excecao_teto_bytes INTEGER,
+    excecao_autorizado_por TEXT,
+    excecao_autorizado_em TEXT,
+    rota          TEXT NOT NULL,
+    pack_anterior TEXT,
+    hash          TEXT NOT NULL UNIQUE,
+    created_at    TEXT NOT NULL
+  );
+
+  INSERT INTO context_pack_novo
+    (id, user_id, workspace_id, project_id, tarefa, regras, falhas, resumo_anterior,
+     etapa, unmetered, teto_de_tokens, tokens_estimados, estimado_usd, motivo_da_expansao,
+     excecao_motivo, excecao_teto_bytes, excecao_autorizado_por, excecao_autorizado_em,
+     rota, pack_anterior, hash, created_at)
+  SELECT
+     id, user_id, workspace_id, project_id, tarefa, regras, falhas, resumo_anterior,
+     etapa, unmetered, teto_de_tokens, tokens_estimados, estimado_usd, motivo_da_expansao,
+     excecao_motivo, excecao_teto_bytes, excecao_autorizado_por, excecao_autorizado_em,
+     rota, pack_anterior, hash, created_at
+  FROM context_pack;
+
+  DROP TABLE context_pack;
+  ALTER TABLE context_pack_novo RENAME TO context_pack;
+  CREATE INDEX idx_context_pack_projeto ON context_pack(user_id, project_id, created_at);
   `
 ]
 
