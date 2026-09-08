@@ -23,6 +23,8 @@
  * baixou o runtime veria "tentar de novo", que nunca vai funcionar.
  */
 
+import { log } from '../logging/logger'
+
 /** Um trecho reconhecido, com os tempos que o engine reportou. */
 export interface SegmentoDaFala {
   readonly inicioMs: number
@@ -79,6 +81,19 @@ export async function transcrever(
 
     return { estado: 'ok', resultado: await engine.transcribe(pcm) }
   } catch (erro) {
+    /*
+     * O motivo vai para o log **antes** de virar desfecho.
+     *
+     * A tela mostra "não foi possível transcrever, tentar de novo" — próxima ação correta para
+     * quem está falando, e inútil para quem vai consertar. Sem esta linha o `motivo` existe,
+     * atravessa a ponte e some na renderização: o erro é verdadeiro e esconde a causa, e o log
+     * de erro do dia fica vazio para uma falha que o usuário viu na tela.
+     *
+     * Amostras, nunca o áudio (critério 8): o tamanho ajuda a distinguir "clique curto" de
+     * "sidecar caiu", e o buffer continua sem lugar onde ficar.
+     */
+    log.sistema.error('A transcrição falhou', { error: erro, amostras: pcm.length })
+
     return { estado: 'falhou', motivo: erro instanceof Error ? erro.message : String(erro) }
   }
 }
