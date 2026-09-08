@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Button, Field, Textarea } from '@design/ui'
+import { Button, Field, Select, Textarea } from '@design/ui'
 import type { WorkspaceId } from '@shared/domain/entities'
-import type { PersonaEditavel } from '@shared/domain/voz'
+import { JANELAS_DA_CONVERSA, type PersonaEditavel } from '@shared/domain/voz'
 
 /**
  * A persona editável do JARVIS (SPEC-Voz-03, critério 5).
@@ -32,10 +32,15 @@ import type { PersonaEditavel } from '@shared/domain/voz'
  */
 export function PersonaDoJarvis({
   workspace,
-  nomeDoEspaco
+  nomeDoEspaco,
+  janela,
+  onSalvarJanela
 }: {
   readonly workspace: WorkspaceId
   readonly nomeDoEspaco: string
+  /** Quantas trocas entram no contexto (critério 7). Preferência do usuário, resolvida no main. */
+  readonly janela: number
+  readonly onSalvarJanela: (janela: number) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
   const [persona, setPersona] = useState<PersonaEditavel | undefined>(undefined)
@@ -125,6 +130,29 @@ export function PersonaDoJarvis({
           </p>
         )}
       </div>
+
+      {/*
+       * A janela do histórico (critério 7).
+       *
+       * Fica junto da persona porque as duas descrevem **como o JARVIS conversa** — uma o tom,
+       * outra a memória da sessão. Na aba de voz elas ficariam separadas do que as governa.
+       */}
+      <Field
+        rotulo={t('settings.janelaDaConversa')}
+        descricao={t('settings.janelaDaConversaDescricao')}
+      >
+        {(atributos) => (
+          <Select
+            {...atributos}
+            valor={String(janela)}
+            onMudar={(valor) => onSalvarJanela(Number(valor))}
+            opcoes={JANELAS_DA_CONVERSA.map((n) => ({
+              valor: String(n),
+              rotulo: n === 0 ? t('settings.janelaSemHistorico') : t('settings.janelaTrocas', { n })
+            }))}
+          />
+        )}
+      </Field>
 
       {/*
        * O bloco fixo, como leitura. `<pre>` porque ele é uma lista de regras em linhas, e um

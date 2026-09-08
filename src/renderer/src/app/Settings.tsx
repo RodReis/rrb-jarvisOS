@@ -186,7 +186,12 @@ export function Settings({
             não na aba `voz`, que é do usuário (SPEC-Voz-03). Vem primeiro porque é o que o
             operador ajusta com mais frequência; credencial e orçamento se configuram uma vez. */}
         <TabPanel valor="ia">
-          <PersonaDoJarvis workspace={workspace} nomeDoEspaco={nomeDoEspaco} />
+          <PersonaDoJarvis
+            workspace={workspace}
+            nomeDoEspaco={nomeDoEspaco}
+            janela={preferencias.conversaJanela}
+            onSalvarJanela={(conversaJanela) => onSalvar({ conversaJanela })}
+          />
           <CredenciaisDoWorkspace workspace={workspace} nomeDoEspaco={nomeDoEspaco} />
           <OrcamentoDoWorkspace workspace={workspace} nomeDoEspaco={nomeDoEspaco} />
           <ChamadaDeIa workspace={workspace} nomeDoEspaco={nomeDoEspaco} />

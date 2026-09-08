@@ -38,6 +38,7 @@ beforeEach(() => {
   salvarPersona
     .mockReset()
     .mockImplementation(async (texto: string) => persona({ textoLivre: texto }))
+  onSalvarJanela.mockReset()
   vi.stubGlobal('jarvis', { lerPersona, salvarPersona })
 })
 
@@ -45,8 +46,17 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-function montar(espaco = 'JARVIS OS'): ReturnType<typeof render> {
-  return render(<PersonaDoJarvis workspace="jarvis" nomeDoEspaco={espaco} />)
+const onSalvarJanela = vi.fn()
+
+function montar(espaco = 'JARVIS OS', janela = 10): ReturnType<typeof render> {
+  return render(
+    <PersonaDoJarvis
+      workspace="jarvis"
+      nomeDoEspaco={espaco}
+      janela={janela}
+      onSalvarJanela={onSalvarJanela}
+    />
+  )
 }
 
 describe('os dois blocos têm donos diferentes, e a tela mostra isso', () => {
@@ -173,5 +183,28 @@ describe('a persona é do espaço, não do usuário', () => {
     montar('JARVIS OS')
 
     expect(await screen.findByText(/JARVIS OS/)).toBeInTheDocument()
+  })
+})
+
+describe('a memória da conversa é configurável (critério 7)', () => {
+  it('oferece as janelas e salva a escolhida', async () => {
+    montar()
+
+    const seletor = await screen.findByRole('combobox', { name: /mem[óo]ria/i })
+    await userEvent.click(seletor)
+    await userEvent.click(await screen.findByRole('option', { name: /5 trocas/i }))
+
+    expect(onSalvarJanela).toHaveBeenCalledWith(5)
+  })
+
+  it('zero é escolha nomeada, não campo em branco', async () => {
+    /*
+     * "Sem memória" é configuração legítima — perguntas independentes, sem follow-up, sem pagar
+     * contexto por ele. Uma opção rotulada "0" pareceria ausência de valor.
+     */
+    montar()
+
+    await userEvent.click(await screen.findByRole('combobox', { name: /mem[óo]ria/i }))
+    expect(await screen.findByRole('option', { name: /cada pergunta/i })).toBeInTheDocument()
   })
 })

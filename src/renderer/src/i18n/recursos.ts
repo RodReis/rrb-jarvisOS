@@ -767,6 +767,11 @@ export const RECURSOS = {
         personaBlocoFixo: 'O que o produto garante',
         personaBlocoFixoDescricao:
           'Estas regras valem sempre, mesmo com o campo acima vazio. Elas existem porque a resposta e falada em voz alta.',
+        janelaDaConversa: 'Memoria da conversa',
+        janelaDaConversaDescricao:
+          'Quantas trocas o JARVIS leva em conta ao responder. Mais trocas resolvem perguntas encadeadas; menos deixam cada resposta mais rapida. A conversa some ao fechar o app.',
+        janelaSemHistorico: 'Sem memoria: cada pergunta e independente',
+        janelaTrocas: 'As ultimas {{n}} trocas',
         vozDaFalaSemVoz: 'Nenhuma voz baixada',
         vozDaFalaBaixar: 'Baixe uma voz na secao de artefatos para o app poder falar.',
         vozDaFalaOuvir: 'Ouvir',
@@ -1534,6 +1539,11 @@ export const RECURSOS = {
         personaBlocoFixo: 'What the product guarantees',
         personaBlocoFixoDescricao:
           'These rules always apply, even with the field above empty. They exist because the answer is spoken aloud.',
+        janelaDaConversa: 'Conversation memory',
+        janelaDaConversaDescricao:
+          'How many exchanges JARVIS takes into account when answering. More exchanges resolve follow-up questions; fewer keep each answer faster. The conversation is cleared when the app closes.',
+        janelaSemHistorico: 'No memory: each question stands alone',
+        janelaTrocas: 'The last {{n}} exchanges',
         vozDaFalaSemVoz: 'No voice downloaded',
         vozDaFalaBaixar: 'Download a voice in the artefacts section so the app can speak.',
         vozDaFalaOuvir: 'Listen',

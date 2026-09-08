@@ -134,3 +134,14 @@ export interface PersonaEditavel {
  * este valor.
  */
 export const MODELO_PADRAO_DA_CONVERSA = 'qwen3:8b'
+
+/**
+ * As janelas que Settings oferece (SPEC-Voz-03, critério 7).
+ *
+ * Lista fechada e não campo livre: o custo do número não é óbvio para quem escolhe — cada troca
+ * guardada é prompt a mais em **toda** pergunta seguinte —, e um campo aberto convidaria a digitar
+ * 500 sem sinal de que isso arrasta a sessão inteira para dentro de cada chamada.
+ *
+ * Zero está na lista porque é escolha legítima: perguntas independentes, sem follow-up.
+ */
+export const JANELAS_DA_CONVERSA = [0, 5, 10, 20, 50] as const
