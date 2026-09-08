@@ -152,9 +152,6 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'createWorkflow',
     'definirPoliticaDeMerge',
     'descartarAjusteDaArquitetura',
-    // O perfil isolado do Codex (SPEC-Multi-Executor-02): quatro canais, **nenhum** com segredo.
-    // Quem autentica é o PI, direto no CLI, e o que passa aqui é estado, gatilho e decisão de
-    // cobrança — não há parâmetro onde token, chave ou senha caibam (critério 1).
     'entrarNoCodex',
     'escolherAnexo',
     'escolherMvpDoRoadmap',
@@ -162,10 +159,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'estadoDoCodex',
     'estadoDoRefinamento',
     'estadoDoSandbox',
-    // A fala (SPEC-Voz-02): devolve PCM e a timeline de bocas, nunca caminho de voz nem comando.
     'falar',
-    // O console da geração (SPEC-Fases-03): dois canais de leitura da trilha gravada. Nenhum
-    // devolve segredo — o que atravessa é evento de geração, e o redator roda antes de gravar.
     'generationEvents',
     'generationHistory',
     'gerarArquiteturaPorIa',
@@ -189,10 +183,12 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'getRouting',
     'getWizardState',
     'getWorkspace',
+    'historicoDaConversa',
     'historicoDoRefinamento',
     'importProject',
     'jornadaDeVarios',
     'ledgerDoRun',
+    'lerPersona',
     'lerPoliticaDeMerge',
     'lerPromptDoProjeto',
     'listAllowedCommands',
@@ -221,11 +217,10 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'mvpsElegiveis',
     'onAiStreamEvent',
     'onAuthChanged',
-    // A assinatura ao vivo do console. Canal único; quem separa uma geração da seguinte é o
-    // painel, pelo `traceId` que viaja no payload.
     'onGenerationEvent',
     'onVozHotkey',
     'pendenciasDeLimpeza',
+    'perguntarAoJarvis',
     'pickAllowedDirectory',
     'pickProjectDirectory',
     'prontidaoDaVoz',
@@ -253,6 +248,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'runWorkflowReal',
     'runWorkflowSimulated',
     'sairDoCodex',
+    'salvarPersona',
     'salvarPromptDoProjeto',
     'savePlanningAnswers',
     'savePreferences',
