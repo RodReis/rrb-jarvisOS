@@ -26,7 +26,11 @@ const PERFIL = {
   locale: 'pt-BR' as const,
   theme: 'sistema' as const,
   accentNoa: null,
-  accentJarvis: null
+  accentJarvis: null,
+  vozModelo: null,
+  vozIdioma: null,
+  vozHotkey: null,
+  vozTimeoutMs: null
 }
 
 function mockarPonte(): void {

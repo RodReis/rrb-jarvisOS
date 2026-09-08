@@ -211,7 +211,13 @@ export class AuthService {
       locale: existente?.locale ?? 'pt-BR',
       theme: existente?.theme ?? 'sistema',
       accentNoa: existente?.accentNoa ?? null,
-      accentJarvis: existente?.accentJarvis ?? null
+      accentJarvis: existente?.accentJarvis ?? null,
+      // Idem para a voz (SPEC-Voz-01): quem já configurou modelo, idioma, atalho ou teto
+      // mantém a escolha ao reautenticar — `save` só atualiza identidade.
+      vozModelo: existente?.vozModelo ?? null,
+      vozIdioma: existente?.vozIdioma ?? null,
+      vozHotkey: existente?.vozHotkey ?? null,
+      vozTimeoutMs: existente?.vozTimeoutMs ?? null
     })
 
     const expiresAt = new Date(agora.getTime() + OFFLINE_SESSION_MAX_DAYS * MS_POR_DIA)

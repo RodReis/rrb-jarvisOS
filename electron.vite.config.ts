@@ -1,6 +1,7 @@
 import { resolve } from 'node:path'
 import { copyFileSync, mkdirSync } from 'node:fs'
-import { defineConfig, externalizeDepsPlugin, type Plugin } from 'electron-vite'
+import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
+import type { Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 

@@ -299,7 +299,11 @@ describe('perfil de usuário', () => {
       locale: 'pt-BR' as const,
       theme: 'sistema' as const,
       accentNoa: null,
-      accentJarvis: null
+      accentJarvis: null,
+      vozModelo: null,
+      vozIdioma: null,
+      vozHotkey: null,
+      vozTimeoutMs: null
     }
 
     profiles.save(perfil)
@@ -320,7 +324,11 @@ describe('perfil de usuário', () => {
       locale: 'pt-BR' as const,
       theme: 'sistema' as const,
       accentNoa: null,
-      accentJarvis: null
+      accentJarvis: null,
+      vozModelo: null,
+      vozIdioma: null,
+      vozHotkey: null,
+      vozTimeoutMs: null
     }
 
     profiles.save(padrao)
@@ -359,7 +367,11 @@ describe('instrumentação do logger (critério de aceite 7)', () => {
         locale: 'pt-BR',
         theme: 'sistema',
         accentNoa: null,
-        accentJarvis: null
+        accentJarvis: null,
+        vozModelo: null,
+        vozIdioma: null,
+        vozHotkey: null,
+        vozTimeoutMs: null
       })
     ).toThrow()
     expect(logDb.error).toHaveBeenCalledWith(
