@@ -1,6 +1,6 @@
 # MVP-018 — Escuta contínua e Modo Boas-Vindas
 
-- Status: épico criado em 2026-08-30; divisão aprovada pelo PI na mesma data. **Redigido em 2026-09-10**: as três SPECs previstas ficaram `aprovada-pi` na mesma data, e o PI criou uma **quarta fatia (M18-F04)**, ainda sem SPEC.
+- Status: épico criado em 2026-08-30; divisão aprovada pelo PI na mesma data. **Redigido em 2026-09-10**: as três SPECs previstas mais uma **quarta fatia criada na mesma rodada** ficaram `aprovada-pi`. **Vinte e três decisões do PI**, nenhuma pergunta em aberto.
 - GitHub: épico [#194](https://github.com/RodReis/rrb-jarvisOS/issues/194).
 - Fila: **não altera `next`.** A redação foi autorizada em paralelo à Pipeline de Desenvolvimento; a construção corrente é a M10-F01 ([#116](https://github.com/RodReis/rrb-jarvisOS/issues/116)). SPEC aprovada habilita o Backlog, nada mais.
 - Depende de: **MVP-017 (fechado em 2026-09-10)**. Não depende de: MVP-019.
@@ -17,7 +17,7 @@ O MVP-017 entrega a conversa; este MVP muda o gatilho. A detecção de wake word
 | M18-F01 | Engine de wake word local, global nos dois espaços | `spec-escuta-01-wake-word.md` | **`aprovada-pi` (2026-09-10)** |
 | M18-F02 | Arbitração wake word ↔ push-to-talk + estados do microfone | `spec-escuta-02-arbitracao-microfone.md` | **`aprovada-pi` (2026-09-10)** |
 | M18-F03 | Modo Boas-Vindas (saudação + mídia local na chegada) | `spec-escuta-03-boas-vindas.md` | **`aprovada-pi` (2026-09-10)** |
-| M18-F04 | Cronograma de atividades configurável | `spec-escuta-04-cronograma.md` | a redigir |
+| M18-F04 | Cronograma de atividades configurável | `spec-escuta-04-cronograma.md` | **`aprovada-pi` (2026-09-10)** |
 
 Ordem: F01 → F02 → F03 → F04.
 
@@ -25,7 +25,8 @@ Ordem: F01 → F02 → F03 → F04.
 
 - Wake word detectado localmente; nenhum áudio sai da máquina antes do disparo.
 - O pipeline pós-ativação é o do MVP-017; este MVP não cria engine nova.
-- **Conversa por voz continua não executando ação** (invariante herdado do MVP-017). A mídia local da F03 não abre essa porta: é o próprio app reproduzindo um arquivo que o PI escolheu antes, disparado por evento do sistema — nada lê intenção de fala e a transforma em efeito. Quando o cronograma da F04 chegar, é ele quem carrega Policy Engine e aprovação.
+- **Conversa por voz continua não executando ação** (invariante herdado do MVP-017). Nem a mídia local da F03 nem o cronograma da F04 abrem essa porta: os gatilhos são evento do sistema, evento do app ou relógio, sobre atividades que o PI configurou antes — nenhum caminho lê intenção de fala e a transforma em efeito.
+- **As guardas de "não me incomode" moram num lugar só** (F03) e são herdadas pela F04, nunca reimplementadas.
 
 ## Decisões do PI (2026-09-10)
 
@@ -53,21 +54,27 @@ Ordem: F01 → F02 → F03 → F04.
 14. **Gatilho: primeiro desbloqueio do dia** (`powerMonitor`), sem câmera e sem sensor.
 15. **Saudação pela persona com queda para frase fixa** — chegada nunca fica muda nem pendurada esperando o Ollama.
 16. **As quatro guardas:** janela de horário, respeita o kill switch da escuta, silêncio se houver áudio tocando, teto de uma por período.
-17. **Música: local agora, Spotify no MVP-020.** O PI pediu música na chegada; antecipar o conector traria OAuth, Vault, Policy Engine e rate limit para dentro de uma fatia de saudação, e duplicaria o MVP-020.
+17. **Música: local agora, Spotify no MVP-020.** Antecipar o conector traria OAuth, Vault, Policy Engine e rate limit para dentro de uma fatia de saudação, e duplicaria o MVP-020.
 18. **Gancho: evento `boas-vindas` publicado, sem consumidor obrigatório.**
 
-### Fatia 04 — nova, criada nesta rodada
+### Fatia 04 — cronograma
 
-19. **O cronograma de atividades configurável vira fatia própria**, depois da F03. É escopo novo — sequência de ações disparada por evento, com ordem, condições, Policy Engine e aprovação — e é a mesma família da fatia de "comandos com efeito" que o PI tirou da M17-F05 em 2026-09-09. Fica em `docs/mvp/`, a redigir; nenhuma issue nasce antes da SPEC.
+19. **O cronograma de atividades configurável é fatia própria**, depois da F03 — escopo novo, da mesma família da fatia de "comandos com efeito" tirada da M17-F05 em 2026-09-09.
+20. **Dois gatilhos:** evento publicado pelo app (hoje o `boas-vindas`) **e** horário declarado pelo PI.
+21. **Catálogo fechado em duas atividades:** falar e tocar mídia local. Abrir app, abrir URL e comandos pela allowlist ficam para fatias próprias.
+22. **A aprovação acontece ao configurar, não ao executar.** O Policy Engine classifica no salvamento e **atividade acima do tier permitido não pode nem ser salva**; o que foi salvo roda sozinho. O ato sensível passa a ser **mudar a sequência**, que é auditado.
+23. **Falha no meio não aborta:** as demais atividades seguem e o resultado vira resumo do que rodou e do que não rodou.
 
 ## Riscos conhecidos do MVP
 
 - **Falso positivo (F01).** "Amigo" é palavra corrente em pt-BR, e o PI trabalha falando sobre o próprio projeto. A SPEC responde com frase de duas palavras, dataset negativo dirigido e contrafactual obrigatório — mas o veredito é o uso real.
 - **Supressão do próprio áudio (F02).** Depende de o app conhecer exatamente o que está tocando; qualquer caminho de reprodução fora dessa referência reabre o auto-disparo.
 - **Falar primeiro (F03)** é a decisão mais fácil de odiar depois. Daí as quatro guardas e o liga/desliga próprio.
+- **O modelo de aprovação da F04 é seguro por causa do catálogo pequeno, não por si.** A primeira fatia que acrescentar atividade com efeito real precisa reabrir a decisão 22 — e o critério 4 daquela SPEC é o que avisa, recusando o salvamento em vez de deixar passar calado.
 
 ## Done do épico
 
 - A palavra de ativação abre a conversa sem toque, nos dois espaços.
 - Push-to-talk continua funcionando como caminho secundário, sem conflito.
 - Modo Boas-Vindas dispara saudação personalizada por horário/chegada.
+- O PI monta a sequência da chegada e das rotinas, e ela roda sozinha dentro do que foi autorizado.
