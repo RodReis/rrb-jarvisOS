@@ -2256,7 +2256,7 @@ Status: **em implementação** — spec `aprovada-pi` (2026-09-09); issue [#352]
 - [ ] Prova no app real: escolher dispositivos físicos, medir RMS/latência e registrar os valores em `reports/TESTS.md`.
 - [x] Prova visual nos dois temas e com movimento reduzido; coluna medida abaixo do teto de 780 px no viewport 1280×900.
 
-**Evidência automatizada:** Regras 1789, Banco 1234 e Tela 728, zero falhas; prova visual 3/3 e build de produção verde. **Bloqueio da prova física:** `npm run dev` sobe o renderer em `5180`, mas o processo Electron desta máquina cai ao importar `BrowserWindow` do pacote `electron`; sem janela viva não foi possível medir RMS do hardware, confirmar `setSinkId` no dispositivo físico nem medir latência do loop. Esses três itens permanecem `not_run`, não `pass`.
+**Evidência automatizada:** Regras 1789, Banco 1234 e Tela 728, zero falhas; prova visual 3/3, build de produção verde e `npm run dev` vivo nesta máquina. O bloqueio era ambiente herdado: `ELECTRON_RUN_AS_NODE=1` fazia o binário do Electron rodar como Node puro e mascarava a falha como import ESM de `BrowserWindow`. O script `dev` agora limpa essa variável antes de chamar o `electron-vite`. **Limite restante:** RMS do hardware, `setSinkId` físico e latência do loop completo ainda dependem do teste com microfone/saída reais do PI; permanecem `not_run`, não `pass`.
 
 ## MVP-027 — Política de PR e CI multiplataforma
 
