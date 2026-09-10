@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 1785 | 1785 | 0 | 78.4 | — | — |
+| — | — | — | Regras de Negócio | 1786 | 1786 | 0 | 78.4 | — | — |
 | — | — | — | Banco | 1248 | 1234 | 0 | 86.5 | — | — |
-| — | — | — | Tela | 721 | 720 | 0 | 76.5 | — | — |
+| — | — | — | Tela | 728 | 727 | 0 | 76.8 | — | — |
 
 ## Histórico por entrega
 
@@ -376,3 +376,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-08 | #348 | spec-voz-01-stt-local-push-to-talk | Regras de Negócio | 1785 | 1785 | 0 | 78.4 | #349 | [#349](https://github.com/RodReis/rrb-jarvisOS/pull/349) |
 | 2026-09-08 | #348 | spec-voz-01-stt-local-push-to-talk | Banco | 1248 | 1234 | 0 | 86.5 | #349 | [#349](https://github.com/RodReis/rrb-jarvisOS/pull/349) |
 | 2026-09-08 | #348 | spec-voz-01-stt-local-push-to-talk | Tela | 721 | 720 | 0 | 76.5 | #349 | [#349](https://github.com/RodReis/rrb-jarvisOS/pull/349) |
+| 2026-09-10 | #351 | spec-voz-04-mascote-lipsync | Regras de Negócio | 1786 | 1786 | 0 | 78.4 | #353 | [#353](https://github.com/RodReis/rrb-jarvisOS/pull/353) |
+| 2026-09-10 | #351 | spec-voz-04-mascote-lipsync | Banco | 1248 | 1234 | 0 | 86.5 | #353 | [#353](https://github.com/RodReis/rrb-jarvisOS/pull/353) |
+| 2026-09-10 | #351 | spec-voz-04-mascote-lipsync | Tela | 728 | 727 | 0 | 76.8 | #353 | [#353](https://github.com/RodReis/rrb-jarvisOS/pull/353) |

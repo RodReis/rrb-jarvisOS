@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Button, Card, InlineAlert } from '@design/ui'
+import { Button, Card, InlineAlert, VoiceMascot, type EstadoDoMascote } from '@design/ui'
 import type { WorkspaceId } from '@shared/domain/entities'
+import type { VisemeEvent } from '@shared/domain/visemes'
 import type { DesfechoDaTranscricao, ProntidaoDaVoz } from '@shared/domain/voz'
 import { capturarPcm, type CapturaDeAudio } from './captura-de-audio'
 import { criarReprodutor } from './reproducao-de-fala'
@@ -72,6 +73,9 @@ export function Microfone({
   const [aviso, setAviso] = useState<string | undefined>(undefined)
   const [baixando, setBaixando] = useState(false)
   const [trocas, setTrocas] = useState<readonly TrocaDaConversa[]>([])
+  const [falaAtual, setFalaAtual] =
+    useState<ReturnType<ReturnType<typeof criarReprodutor>['tocar']>>()
+  const [visemesDaFala, setVisemesDaFala] = useState<readonly VisemeEvent[]>([])
   const encerrarCaptura = useRef<(() => Promise<Int16Array>) | undefined>(undefined)
 
   /*
@@ -300,11 +304,20 @@ export function Microfone({
    */
   async function falar(texto: string): Promise<void> {
     marcar('falando')
+    setVisemesDaFala([])
+    setFalaAtual(undefined)
 
     const fala = await window.jarvis.falar(texto, vozDaFala)
     if (fala.estado !== 'ok') return
 
-    await reprodutor.current?.tocar(fala.fala).terminou
+    const emCurso = reprodutor.current?.tocar(fala.fala)
+    if (emCurso === undefined) return
+
+    setVisemesDaFala(fala.fala.visemes)
+    setFalaAtual(emCurso)
+    await emCurso.terminou
+    setVisemesDaFala([])
+    setFalaAtual(undefined)
   }
 
   /*
@@ -345,6 +358,14 @@ export function Microfone({
   }
 
   const rotuloDoBotao = ROTULO_DO_ESTADO[estado] ?? t('voz.segureParaFalar')
+  const estadoDoMascote: EstadoDoMascote =
+    estado === 'gravando'
+      ? 'ouvindo'
+      : estado === 'transcrevendo' || estado === 'pensando'
+        ? 'pensando'
+        : estado === 'falando'
+          ? 'falando'
+          : 'idle'
 
   // Segurar para falar só vale de `ocioso`: durante transcrição, resposta ou fala, um novo
   // aperto abriria uma segunda conversa por cima da primeira.
@@ -354,6 +375,13 @@ export function Microfone({
     <Card>
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between gap-3">
+          <VoiceMascot
+            modulo="jarvis"
+            tamanho="medio"
+            estado={estadoDoMascote}
+            visemes={visemesDaFala}
+            relogioDaFala={falaAtual?.posicaoMs}
+          />
           <h2 className="text-[length:var(--jos-texto-titulo)]">{t('voz.titulo')}</h2>
           <span className="text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-suave)]">
             {rotuloDoCompute}

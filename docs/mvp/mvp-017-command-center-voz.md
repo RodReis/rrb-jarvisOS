@@ -1,8 +1,8 @@
 # MVP-017 — Command Center: voz, persona e mascote
 
-- Status: épico criado em 2026-08-30; divisão aprovada pelo PI na mesma data. **As cinco SPECs estão `aprovada-pi`**: F01, F02 e F03 em 2026-08-30 (issues [#200](https://github.com/RodReis/rrb-jarvisOS/issues/200), [#202](https://github.com/RodReis/rrb-jarvisOS/issues/202) e [#204](https://github.com/RodReis/rrb-jarvisOS/issues/204), **as três entregues e `proplan:finalizado` em 2026-09-08**); F04 e F05 em **2026-09-09**, com as issues-fatia nascendo quando as SPECs chegarem à `main`.
+- Status: épico criado em 2026-08-30; divisão aprovada pelo PI na mesma data. **As cinco SPECs estão `aprovada-pi`**: F01, F02 e F03 em 2026-08-30 (issues [#200](https://github.com/RodReis/rrb-jarvisOS/issues/200), [#202](https://github.com/RodReis/rrb-jarvisOS/issues/202) e [#204](https://github.com/RodReis/rrb-jarvisOS/issues/204), **as três entregues e `proplan:finalizado` em 2026-09-08**); F04 e F05 em **2026-09-09** (issues [#351](https://github.com/RodReis/rrb-jarvisOS/issues/351) e [#352](https://github.com/RodReis/rrb-jarvisOS/issues/352)).
 - GitHub: épico [#193](https://github.com/RodReis/rrb-jarvisOS/issues/193).
-- Fila: **depois do MVP-009**, antes dos MVP-010–016 (decisão do PI, 2026-08-30). A cabeça de 2026-09-08 (#202 → #204) foi entregue; F04 e F05 fecham o MVP.
+- Fila: **depois do MVP-009**, antes dos MVP-010–016 (decisão do PI, 2026-08-30). A cabeça de 2026-09-09 é a F04 ([#351](https://github.com/RodReis/rrb-jarvisOS/issues/351)); a F05 ([#352](https://github.com/RodReis/rrb-jarvisOS/issues/352)) assume depois e fecha o MVP.
 - Depende de: MVP-005 (ponto único de IA, entregue). Não depende de: MVP-006, MVP-007.
 - Resultado: conversa de voz completa e 100% local no Command Center — falar → Whisper (STT) → persona JARVIS no ponto único de IA → Piper (TTS) → mascote com lip-sync por visemes, na tela do protótipo.
 
@@ -42,8 +42,8 @@ O padrão de dispositivos é **do app, não do sistema**. Medido no app real: `g
 | M17-F01 | STT local (faster-whisper) atrás de interface Engine + push-to-talk | `spec-voz-01-stt-local-push-to-talk.md` — **`aprovada-pi` (2026-08-30)** · issue [#200](https://github.com/RodReis/rrb-jarvisOS/issues/200) · **finalizada** |
 | M17-F02 | TTS Piper com timeline de visemes | `spec-voz-02-tts-piper-fonemas.md` — **`aprovada-pi` (2026-08-30)** · issue [#202](https://github.com/RodReis/rrb-jarvisOS/issues/202) · **finalizada** |
 | M17-F03 | Persona JARVIS no ponto único de IA | `spec-voz-03-persona-ponto-unico.md` — **`aprovada-pi` (2026-08-30)** · issue [#204](https://github.com/RodReis/rrb-jarvisOS/issues/204) · **finalizada** |
-| M17-F04 | Mascote com lip-sync por visemes + estados | `spec-voz-04-mascote-lipsync.md` — **`aprovada-pi` (2026-09-09)** |
-| M17-F05 | Tela do Command Center (ondas, legenda, histórico) e seletor de dispositivos | `spec-voz-05-ui-command-center.md` — **`aprovada-pi` (2026-09-09)** |
+| M17-F04 | Mascote com lip-sync por visemes + estados | `spec-voz-04-mascote-lipsync.md` — **`aprovada-pi` (2026-09-09)** · issue [#351](https://github.com/RodReis/rrb-jarvisOS/issues/351) · **em implementação** |
+| M17-F05 | Tela do Command Center (ondas, legenda, histórico) e seletor de dispositivos | `spec-voz-05-ui-command-center.md` — **`aprovada-pi` (2026-09-09)** · issue [#352](https://github.com/RodReis/rrb-jarvisOS/issues/352) · **próxima** |
 
 Ordem: F01 → F02 → F03 → F04 → F05. A F05 consome o `posicaoMs()` que a F04 introduz no relógio de áudio — inverter a ordem duplicaria esse relógio.
 
