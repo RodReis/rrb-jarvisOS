@@ -21,6 +21,7 @@ export default tseslint.config(
       '.codex/**',
       '.gemini/**',
       '.antigravity/**',
+      '.worktrees/**',
       'graphify-out/**'
     ]
   },
@@ -56,7 +57,6 @@ export default tseslint.config(
             {
               group: [
                 // Domínio/produto e a ponte IPC: o DS recebe dado por props, nunca o busca.
-                '@shared/*',
                 '@renderer/*',
                 '**/src/shared/*',
                 '**/src/renderer/*',
@@ -71,6 +71,11 @@ export default tseslint.config(
               ],
               message:
                 'Fronteira do design system (SPEC-DesignSystem-01): src/design/ não importa domínio, renderer, main, Electron/Node nem Supabase. Dados entram por props tipadas.'
+            },
+            {
+              regex: '^@shared/(?!domain/visemes$).*',
+              message:
+                'Fronteira do design system (SPEC-DesignSystem-01): src/design/ só importa de @shared o contrato visual puro @shared/domain/visemes, exigido pela SPEC-Voz-04.'
             }
           ]
         }
@@ -167,6 +172,11 @@ export default tseslint.config(
     rules: {
       'no-restricted-syntax': [
         'error',
+        {
+          selector: 'SwitchStatement[discriminant.name=/viseme/i]',
+          message:
+            'SPEC-Voz-04: viseme vira pose por mapa exaustivo (`Record<Viseme, PoseDaBoca>`), não por switch.'
+        },
         {
           // Cor literal em qualquer string: `#rgb`, `#rrggbb`, `rgb(...)`, `hsl(...)`.
           // `rgba(var(--jos-borda-rgb), .12)` passa — o RGB vem do tema, só o alfa é do uso.

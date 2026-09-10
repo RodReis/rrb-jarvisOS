@@ -63,4 +63,11 @@ export {
 } from './Notificacoes'
 
 // Identidades NOA e JARVIS (SPEC-DesignSystem-05) — F05
-export { VoiceMascot, type VoiceMascotProps } from './VoiceMascot'
+export {
+  VoiceMascot,
+  POSE_DA_BOCA_POR_VISEME,
+  poseDaTimeline,
+  type EstadoDoMascote,
+  type PoseDaBoca,
+  type VoiceMascotProps
+} from './VoiceMascot'

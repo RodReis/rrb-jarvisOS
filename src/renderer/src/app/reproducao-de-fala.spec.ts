@@ -20,13 +20,18 @@ function ambienteFalso(): {
   criarContexto: () => AudioContext
   fontes: FonteFalsa[]
   contextosAbertos: () => number
+  avancarAudio: (segundos: number) => void
 } {
   const fontes: FonteFalsa[] = []
   let abertos = 0
+  let currentTime = 0
 
   const criarContexto = (): AudioContext => {
     abertos++
     return {
+      get currentTime() {
+        return currentTime
+      },
       createBuffer: (_canais: number, tamanho: number) => ({
         getChannelData: () => new Float32Array(tamanho)
       }),
@@ -60,7 +65,14 @@ function ambienteFalso(): {
     } as unknown as AudioContext
   }
 
-  return { criarContexto, fontes, contextosAbertos: () => abertos }
+  return {
+    criarContexto,
+    fontes,
+    contextosAbertos: () => abertos,
+    avancarAudio: (segundos: number) => {
+      currentTime += segundos
+    }
+  }
 }
 
 function fala(amostras = 100, sampleRate = 22050): SpeechHandle {
@@ -187,5 +199,18 @@ describe('reprodução da fala', () => {
 
     expect(canal?.[0]).toBeGreaterThanOrEqual(-1)
     expect(canal?.[1]).toBeLessThanOrEqual(1)
+  })
+
+  it('expõe a posição pelo relógio do AudioContext, não pelo relógio de parede', () => {
+    const amb = ambienteFalso()
+    const relogioDeParede = vi.spyOn(Date, 'now').mockReturnValue(8_000)
+    const reprodutor = criarReprodutor(amb)
+
+    const emCurso = reprodutor.tocar(fala())
+    relogioDeParede.mockReturnValue(12_000)
+    amb.avancarAudio(0.125)
+
+    expect(emCurso.posicaoMs()).toBe(125)
+    relogioDeParede.mockRestore()
   })
 })

@@ -2230,6 +2230,19 @@ Status: **entregue na PR [#347](https://github.com/RodReis/rrb-jarvisOS/pull/347
 
 **Limites declarados:** (1) **o critério 1 no app do PI é dele** — falar ao microfone e ouvir a resposta, como nas fatias anteriores; (2) **a fala não foi exercitada ponta a ponta** porque nenhuma voz Piper está baixada nesta máquina, e o caminho é o mesmo já provado na F02; (3) **a interceptação de rede é do renderer**, que é onde ela vale — o roteamento do main é medido em `multi-provider.e2e.ts`, contra os adapters reais.
 
+### Fatia 04 — Mascote com lip-sync por visemes e estados (`docs/spec/spec-voz-04-mascote-lipsync.md`)
+
+Status: **em implementação** — spec `aprovada-pi` (2026-09-09); issue [#351](https://github.com/RodReis/rrb-jarvisOS/issues/351). F04 consome a timeline de visemes da F02 e os estados do loop da F03; a F05 ([#352](https://github.com/RodReis/rrb-jarvisOS/issues/352)) consome o `posicaoMs()` introduzido aqui.
+
+- [x] **Verificação obrigatória do asset:** `src/design/assets/jarvis-cabeca.jpg` é a cabeça mecânica do protótipo; a boca fica na mandíbula/grade, sem lábios humanos e sem asset novo.
+- [x] **`src/renderer/src/app/reproducao-de-fala.ts`** expõe `posicaoMs()` baseado em `AudioContext.currentTime`, não em `Date.now()`.
+- [x] **`src/design/ui/VoiceMascot.tsx`** troca o laço `talk_420ms` por pose geométrica paramétrica (`abertura`, `largura`, `intensidade`) dirigida por `VisemeEvent[]`.
+- [x] **Quatro estados do mascote:** `idle`, `ouvindo`, `pensando`, `falando`, com `data-estado`, olhos coerentes e anúncio `aria-live` em pt-BR.
+- [x] **Atualização fora do React por quadro:** `requestAnimationFrame` escreve custom properties CSS por `ref`; teste conta renders e não vê render por frame.
+- [x] **Guarda de contrato:** `Record<Viseme, PoseDaBoca>` exaustivo; lint barra `switch` sobre `viseme` no DS.
+- [x] **Prova visual:** `GaleriaDoMascote` cobre 15 poses, 4 estados e `prefers-reduced-motion` mantendo lip-sync.
+- [x] **Verificação no app real:** build atual monta os mascotes com `data-estado="idle"` e a fala longa pt-BR no perfil real (`pt_BR-faber-medium`) retorna `timeline="exato"`, 196 visemes, 203264 amostras a 22050 Hz, último viseme em 9218,322 ms e áudio de 9218 ms. A sincronização visual boca→timeline é provada pela galeria/Playwright e pelo relógio `AudioContext.currentTime`; sem teste humano de microfone nesta execução.
+
 ## MVP-027 — Política de PR e CI multiplataforma
 
 ### Fatia 01 — Perfil de CI por projeto (`docs/spec/spec-pipeline-01-politica-pr-ci.md`)

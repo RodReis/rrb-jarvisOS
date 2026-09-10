@@ -15,6 +15,7 @@ import type { CenaDeProjetos } from './GaleriaDeProjetos'
 import { GaleriaDoBrief, type CenaDoBrief } from './GaleriaDoBrief'
 import { GaleriaDeMarcos, type CenaDeMarcos } from './GaleriaDeMarcos'
 import { GaleriaDaArquitetura, type CenaDaArquitetura } from './GaleriaDaArquitetura'
+import { GaleriaDoMascote } from './GaleriaDoMascote'
 import { initI18n } from '@renderer/i18n'
 import type { ModoUi, Modulo } from '@design/tokens/semantic'
 import type { CorAcento } from '@design/tokens/acento'
@@ -142,6 +143,7 @@ const GALERIAS = {
       cena={(cenaBruta ?? 'pacote-cheio') as CenaDaArquitetura}
     />
   ),
+  mascote: () => <GaleriaDoMascote modo={modo} acento={acento ?? undefined} />,
   planejamento: () => (
     <GaleriaDaJornadaDePlanejamento
       modo={modo}

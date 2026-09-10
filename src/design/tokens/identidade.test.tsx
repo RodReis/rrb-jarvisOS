@@ -1,10 +1,11 @@
-import { render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { act, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { VISEMES, type VisemeEvent } from '@shared/domain/visemes'
 import { ACENTO_PADRAO, contraste, CONTRASTE_MINIMO, PALETA_ACENTO } from './acento'
 import { atmosfera, identidade, IDENTIDADES, TILE_MASCOTE } from './identidade'
 import { FundoDaIdentidade, ProvedorDeTema, variaveisDoTema } from './provider'
 import { bordaRgb, papeis, STATUS, type ModoUi, type Modulo } from './semantic'
-import { VoiceMascot } from '../ui/VoiceMascot'
+import { POSE_DA_BOCA_POR_VISEME, poseDaTimeline, VoiceMascot } from '../ui/VoiceMascot'
 
 /**
  * Identidades NOA e JARVIS (SPEC-DesignSystem-05, critérios 1–7).
@@ -17,6 +18,10 @@ import { VoiceMascot } from '../ui/VoiceMascot'
 
 const MODULOS: readonly Modulo[] = ['jarvis', 'noa']
 const MODOS: readonly ModoUi[] = ['dark', 'light']
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
 
 /** Tema-base para `variaveisDoTema`, com o acento default de cada módulo. */
 function tema(
@@ -32,6 +37,45 @@ function tema(
     superficie: modulo,
     ...sobrepor
   })
+}
+
+function timelineComTodosOsVisemes(): readonly VisemeEvent[] {
+  return VISEMES.map((viseme, i) => ({ viseme, startMs: i * 100, endMs: i * 100 + 100 }))
+}
+
+function boca(): HTMLElement {
+  const el = document.querySelector('[data-boca]')
+  if (!(el instanceof HTMLElement)) throw new Error('boca não renderizada')
+  return el
+}
+
+function expectBocaFechada(): void {
+  expect(boca().style.getPropertyValue('--jos-boca-abertura')).toBe(
+    String(POSE_DA_BOCA_POR_VISEME.silencio.abertura)
+  )
+}
+
+function mockRaf(): { rodarQuadro: () => void } {
+  const fila = new Map<number, FrameRequestCallback>()
+  let id = 0
+  vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+    id++
+    fila.set(id, cb)
+    return id
+  })
+  vi.stubGlobal('cancelAnimationFrame', (quadro: number) => {
+    fila.delete(quadro)
+  })
+
+  return {
+    rodarQuadro: () => {
+      const [quadro, cb] = [...fila.entries()][0] ?? []
+      if (quadro !== undefined && cb !== undefined) {
+        fila.delete(quadro)
+        cb(performance.now())
+      }
+    }
+  }
 }
 
 describe('contrato de identidade', () => {
@@ -242,6 +286,134 @@ describe('critério 6 — o mascote não invoca API de voz', () => {
   it('a voz pode ser ligada por prop no NOA — o default não é uma parede', () => {
     render(<VoiceMascot modulo="noa" voz falando />)
     expect(screen.getByText('NOA está falando')).toBeInTheDocument()
+  })
+})
+
+describe('SPEC-Voz-04 — lip-sync por visemes', () => {
+  it('a pose é exaustiva para os 15 visemes', () => {
+    expect(Object.keys(POSE_DA_BOCA_POR_VISEME).sort()).toEqual([...VISEMES].sort())
+  })
+
+  it('a boca segue o meio de cada evento da timeline', () => {
+    const timeline = timelineComTodosOsVisemes()
+
+    for (const [i, evento] of timeline.entries()) {
+      expect(poseDaTimeline(timeline, evento.startMs + 50, i).pose).toEqual(
+        POSE_DA_BOCA_POR_VISEME[evento.viseme]
+      )
+    }
+  })
+
+  it('timeline vazia mantém a boca fechada e não reativa o laço genérico', () => {
+    render(<VoiceMascot modulo="jarvis" estado="falando" visemes={[]} relogioDaFala={() => 50} />)
+
+    expectBocaFechada()
+    expect(boca().className).not.toContain('talk_420ms')
+  })
+
+  it('fim ou cancelamento fecha a boca no mesmo quadro', () => {
+    const raf = mockRaf()
+    let tempo = 50
+    const { rerender } = render(
+      <VoiceMascot
+        modulo="jarvis"
+        estado="falando"
+        visemes={[{ viseme: 'aa', startMs: 0, endMs: 100 }]}
+        relogioDaFala={() => tempo}
+      />
+    )
+
+    act(() => raf.rodarQuadro())
+    expect(boca().style.getPropertyValue('--jos-boca-abertura')).toBe(
+      String(POSE_DA_BOCA_POR_VISEME.aa.abertura)
+    )
+
+    rerender(
+      <VoiceMascot
+        modulo="jarvis"
+        estado="idle"
+        visemes={[{ viseme: 'aa', startMs: 0, endMs: 100 }]}
+        relogioDaFala={() => tempo}
+      />
+    )
+
+    expectBocaFechada()
+
+    tempo = 250
+    rerender(
+      <VoiceMascot
+        modulo="jarvis"
+        estado="falando"
+        visemes={[{ viseme: 'ou', startMs: 200, endMs: 300 }]}
+        relogioDaFala={() => tempo}
+      />
+    )
+    act(() => raf.rodarQuadro())
+    expect(boca().style.getPropertyValue('--jos-boca-abertura')).toBe(
+      String(POSE_DA_BOCA_POR_VISEME.ou.abertura)
+    )
+  })
+
+  it('requestAnimationFrame não causa re-render por quadro', () => {
+    const raf = mockRaf()
+    let renders = 0
+
+    function Contador(): React.JSX.Element {
+      renders++
+      return (
+        <VoiceMascot
+          modulo="jarvis"
+          estado="falando"
+          visemes={[{ viseme: 'aa', startMs: 0, endMs: 5_000 }]}
+          relogioDaFala={() => 50}
+        />
+      )
+    }
+
+    render(<Contador />)
+    for (let i = 0; i < 60; i++) act(() => raf.rodarQuadro())
+
+    expect(renders).toBe(1)
+  })
+
+  it('os quatro estados são distinguíveis e anunciados em pt-BR', () => {
+    const { rerender } = render(<VoiceMascot modulo="jarvis" estado="idle" />)
+    expect(screen.getByAltText('JARVIS OS').closest('[data-mascote]')).toHaveAttribute(
+      'data-estado',
+      'idle'
+    )
+    expect(screen.getByText('JARVIS OS em repouso')).toBeInTheDocument()
+
+    rerender(<VoiceMascot modulo="jarvis" estado="ouvindo" />)
+    expect(screen.getByAltText('JARVIS OS').closest('[data-mascote]')).toHaveAttribute(
+      'data-estado',
+      'ouvindo'
+    )
+    expect(screen.getByText('JARVIS OS está ouvindo')).toBeInTheDocument()
+
+    rerender(<VoiceMascot modulo="jarvis" estado="pensando" />)
+    expect(screen.getByAltText('JARVIS OS').closest('[data-mascote]')).toHaveAttribute(
+      'data-estado',
+      'pensando'
+    )
+    expect(screen.getByText('JARVIS OS está pensando')).toBeInTheDocument()
+
+    rerender(<VoiceMascot modulo="jarvis" estado="falando" />)
+    expect(screen.getByAltText('JARVIS OS').closest('[data-mascote]')).toHaveAttribute(
+      'data-estado',
+      'falando'
+    )
+    expect(screen.getByText('JARVIS OS está falando')).toBeInTheDocument()
+  })
+
+  it('com voz=false nenhum estado novo aparece', () => {
+    render(<VoiceMascot modulo="noa" voz={false} estado="falando" />)
+
+    expect(screen.getByAltText('NOA').closest('[data-mascote]')).toHaveAttribute(
+      'data-estado',
+      'idle'
+    )
+    expect(screen.queryByText(/está falando|está ouvindo|está pensando/)).not.toBeInTheDocument()
   })
 })
 

@@ -12,9 +12,12 @@
  * montá-lo num teste ou numa galeria sem o navegador começar a falar.
  */
 
+import { useEffect, useMemo, useRef } from 'react'
 import { identidade, MASCARA_MASCOTE, TILE_MASCOTE } from '../tokens/identidade'
 import type { Modulo } from '../tokens/semantic'
 import { cx } from './base'
+import type { Viseme, VisemeEvent } from '@shared/domain/visemes'
+import type { CSSProperties } from 'react'
 
 /**
  * Imagens do bundle. `import` e não caminho em string: o bundler resolve e versiona o arquivo,
@@ -45,6 +48,60 @@ const POR_TAMANHO = {
   grande: 'size-40'
 } as const
 
+export type EstadoDoMascote = 'idle' | 'ouvindo' | 'pensando' | 'falando'
+
+export interface PoseDaBoca {
+  readonly abertura: number
+  readonly largura: number
+  readonly intensidade: number
+}
+
+const BOCA_FECHADA: PoseDaBoca = { abertura: 0.18, largura: 0.58, intensidade: 0.35 }
+
+export const POSE_DA_BOCA_POR_VISEME: Readonly<Record<Viseme, PoseDaBoca>> = {
+  silencio: BOCA_FECHADA,
+  pbm: { abertura: 0.08, largura: 0.52, intensidade: 0.25 },
+  fv: { abertura: 0.22, largura: 0.7, intensidade: 0.56 },
+  th: { abertura: 0.28, largura: 0.74, intensidade: 0.62 },
+  dnt: { abertura: 0.24, largura: 0.64, intensidade: 0.52 },
+  kg: { abertura: 0.36, largura: 0.6, intensidade: 0.58 },
+  ch: { abertura: 0.38, largura: 0.5, intensidade: 0.7 },
+  sz: { abertura: 0.16, largura: 0.76, intensidade: 0.48 },
+  rr: { abertura: 0.34, largura: 0.68, intensidade: 0.66 },
+  aa: { abertura: 1, largura: 0.82, intensidade: 1 },
+  ee: { abertura: 0.42, largura: 1, intensidade: 0.82 },
+  ih: { abertura: 0.32, largura: 0.92, intensidade: 0.72 },
+  oh: { abertura: 0.72, largura: 0.62, intensidade: 0.88 },
+  ou: { abertura: 0.58, largura: 0.44, intensidade: 0.8 },
+  nasal: { abertura: 0.22, largura: 0.56, intensidade: 0.45 }
+}
+
+export function poseDaTimeline(
+  visemes: readonly VisemeEvent[],
+  posicaoMs: number,
+  cursorInicial = 0
+): { pose: PoseDaBoca; cursor: number } {
+  if (visemes.length === 0) return { pose: BOCA_FECHADA, cursor: 0 }
+
+  let cursor = Math.min(cursorInicial, visemes.length - 1)
+  while (cursor > 0 && posicaoMs < visemes[cursor].startMs) cursor--
+  while (cursor < visemes.length - 1 && posicaoMs >= visemes[cursor].endMs) cursor++
+
+  const evento = visemes[cursor]
+  if (posicaoMs < evento.startMs || posicaoMs >= evento.endMs) {
+    return { pose: BOCA_FECHADA, cursor }
+  }
+
+  return { pose: POSE_DA_BOCA_POR_VISEME[evento.viseme], cursor }
+}
+
+function aplicarPose(el: HTMLElement | null, pose: PoseDaBoca): void {
+  if (el === null) return
+  el.style.setProperty('--jos-boca-abertura', String(pose.abertura))
+  el.style.setProperty('--jos-boca-largura', String(pose.largura))
+  el.style.setProperty('--jos-boca-intensidade', String(pose.intensidade))
+}
+
 export interface VoiceMascotProps {
   readonly modulo: Modulo
   /**
@@ -53,6 +110,9 @@ export interface VoiceMascotProps {
    */
   readonly falando?: boolean
   readonly ouvindo?: boolean
+  readonly estado?: EstadoDoMascote
+  readonly visemes?: readonly VisemeEvent[]
+  readonly relogioDaFala?: () => number
   readonly tamanho?: keyof typeof POR_TAMANHO
   /**
    * Habilita os estados de fala.
@@ -68,6 +128,9 @@ export function VoiceMascot({
   modulo,
   falando = false,
   ouvindo = false,
+  estado: estadoControlado,
+  visemes = [],
+  relogioDaFala,
   tamanho = 'medio',
   voz
 }: VoiceMascotProps): React.JSX.Element {
@@ -79,7 +142,40 @@ export function VoiceMascot({
   const fala = vozAtiva && falando
   const escuta = vozAtiva && ouvindo
 
-  const estado = fala ? 'falando' : escuta ? 'ouvindo' : 'parado'
+  const estadoDerivado: EstadoDoMascote = fala ? 'falando' : escuta ? 'ouvindo' : 'idle'
+  const estado = vozAtiva ? (estadoControlado ?? estadoDerivado) : 'idle'
+  const boca = useRef<HTMLSpanElement | null>(null)
+  const cursor = useRef(0)
+  const sincronizarBoca = vozAtiva && estado === 'falando' && tamanho !== 'rail'
+  const relogio = useMemo(() => relogioDaFala ?? (() => 0), [relogioDaFala])
+
+  useEffect(() => {
+    cursor.current = 0
+    if (!sincronizarBoca || visemes.length === 0) {
+      aplicarPose(boca.current, BOCA_FECHADA)
+      return
+    }
+
+    let quadro = 0
+    const animar = (): void => {
+      const atual = poseDaTimeline(visemes, relogio(), cursor.current)
+      cursor.current = atual.cursor
+      aplicarPose(boca.current, atual.pose)
+      quadro = requestAnimationFrame(animar)
+    }
+
+    animar()
+    return () => {
+      cancelAnimationFrame(quadro)
+      aplicarPose(boca.current, BOCA_FECHADA)
+    }
+  }, [relogio, sincronizarBoca, visemes])
+
+  const estiloDaBoca = {
+    '--jos-boca-abertura': String(BOCA_FECHADA.abertura),
+    '--jos-boca-largura': String(BOCA_FECHADA.largura),
+    '--jos-boca-intensidade': String(BOCA_FECHADA.intensidade)
+  } as CSSProperties
 
   return (
     <div
@@ -133,11 +229,34 @@ export function VoiceMascot({
            */}
           <span
             aria-hidden
-            style={{ animationPlayState: fala ? 'running' : 'paused' }}
-            className="pointer-events-none absolute bottom-[22%] h-[6%] w-[18%] rounded-full bg-[var(--jos-cor-acento)] opacity-70 motion-safe:animate-[talk_420ms_ease-in-out_infinite]"
-          />
+            ref={boca}
+            style={{ ...estiloDaBoca, transitionDuration: '50ms' }}
+            data-boca
+            className={cx(
+              'pointer-events-none absolute bottom-[21%] grid h-[13%] w-[24%] place-items-end',
+              'transition-[width,opacity] ease-linear'
+            )}
+          >
+            <span
+              style={{ transitionDuration: '50ms' }}
+              className={cx(
+                'block h-[calc(var(--jos-boca-abertura)*100%)] w-[calc(var(--jos-boca-largura)*100%)]',
+                'rounded-b-full rounded-t-[var(--jos-raio-sm)] bg-[var(--jos-cor-acento)]',
+                'opacity-[var(--jos-boca-intensidade)] shadow-[0_0_12px_-3px_var(--jos-cor-acento)]',
+                'transition-[height,width,opacity] ease-linear'
+              )}
+            />
+            <span className="absolute inset-x-[18%] bottom-[22%] h-px bg-[rgba(var(--jos-borda-rgb),0.72)] opacity-[var(--jos-boca-intensidade)]" />
+            <span className="absolute inset-x-[24%] bottom-[45%] h-px bg-[rgba(var(--jos-borda-rgb),0.5)] opacity-[var(--jos-boca-intensidade)]" />
+          </span>
           <span
             aria-hidden
+            data-olhos
+            style={{
+              animationDuration:
+                estado === 'falando' ? '1.9s' : estado === 'pensando' ? '4.2s' : '7s',
+              opacity: estado === 'falando' ? 1 : estado === 'pensando' ? 0.55 : 0.75
+            }}
             className="pointer-events-none absolute top-[38%] h-[4%] w-[34%] motion-safe:animate-[eyeblink_7s_ease-in-out_infinite]"
           />
         </>
@@ -157,7 +276,9 @@ export function VoiceMascot({
           ? `${id.nome} está falando`
           : estado === 'ouvindo'
             ? `${id.nome} está ouvindo`
-            : `${id.nome} em repouso`}
+            : estado === 'pensando'
+              ? `${id.nome} está pensando`
+              : `${id.nome} em repouso`}
       </span>
     </div>
   )

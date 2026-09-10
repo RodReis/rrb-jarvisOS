@@ -23,6 +23,8 @@ import type { SpeechHandle } from '@shared/domain/visemes'
 export interface FalaEmCurso {
   /** Para a fala imediatamente. Idempotente: chamar duas vezes não estoura. */
   readonly cancelar: () => void
+  /** Posição do áudio em milissegundos, medida no relógio do `AudioContext` que está tocando. */
+  readonly posicaoMs: () => number
   /** Resolve quando o áudio termina, ou imediatamente se foi cancelado. */
   readonly terminou: Promise<void>
 }
@@ -96,9 +98,14 @@ export function criarReprodutor(deps?: DepsDaReproducao): {
       }
 
       emCurso = { fonte, contexto, parar }
+      const inicioSegundos = contexto.currentTime
       fonte.start()
 
-      return { cancelar: parar, terminou }
+      return {
+        cancelar: parar,
+        posicaoMs: () => Math.max(0, (contexto.currentTime - inicioSegundos) * 1000),
+        terminou
+      }
     }
   }
 }
