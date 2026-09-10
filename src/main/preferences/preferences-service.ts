@@ -13,6 +13,7 @@ import {
   isAccentColor,
   isHotkeyDeVoz,
   isDeviceId,
+  isDeviceLabel,
   isIdiomaDeVoz,
   isLocale,
   isModeloDeVoz,
@@ -72,7 +73,9 @@ export class PreferencesService {
        */
       conversaJanela: profile.conversaJanela ?? JANELA_PADRAO_DA_CONVERSA,
       vozEntradaId: profile.vozEntradaId ?? null,
-      vozSaidaId: profile.vozSaidaId ?? null
+      vozSaidaId: profile.vozSaidaId ?? null,
+      vozEntradaRotulo: profile.vozEntradaRotulo ?? null,
+      vozSaidaRotulo: profile.vozSaidaRotulo ?? null
     }
   }
 
@@ -98,7 +101,9 @@ export class PreferencesService {
         vozDaFala: VOZ_PADRAO.vozDaFala,
         conversaJanela: JANELA_PADRAO_DA_CONVERSA,
         vozEntradaId: null,
-        vozSaidaId: null
+        vozSaidaId: null,
+        vozEntradaRotulo: null,
+        vozSaidaRotulo: null
       }
     }
 
@@ -137,7 +142,13 @@ export class PreferencesService {
         ? { conversaJanela: preferences.conversaJanela }
         : {}),
       ...(isDeviceId(preferences.vozEntradaId) ? { vozEntradaId: preferences.vozEntradaId } : {}),
-      ...(isDeviceId(preferences.vozSaidaId) ? { vozSaidaId: preferences.vozSaidaId } : {})
+      ...(isDeviceId(preferences.vozSaidaId) ? { vozSaidaId: preferences.vozSaidaId } : {}),
+      ...(isDeviceLabel(preferences.vozEntradaRotulo)
+        ? { vozEntradaRotulo: preferences.vozEntradaRotulo }
+        : {}),
+      ...(isDeviceLabel(preferences.vozSaidaRotulo)
+        ? { vozSaidaRotulo: preferences.vozSaidaRotulo }
+        : {})
     }
 
     if (Object.keys(validadas).length === 0) {

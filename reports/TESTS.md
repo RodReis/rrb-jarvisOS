@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 1789 | 1789 | 0 | 78.0 | — | — |
+| — | — | — | Regras de Negócio | 1792 | 1792 | 0 | 78.1 | — | — |
 | — | — | — | Banco | 1248 | 1234 | 0 | 86.6 | — | — |
-| — | — | — | Tela | 729 | 728 | 0 | 76.3 | — | — |
+| — | — | — | Tela | 732 | 731 | 0 | 76.4 | — | — |
 
 ## Histórico por entrega
 
@@ -382,3 +382,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-10 | #352 | spec-voz-05-ui-command-center | Regras de Negócio | 1789 | 1789 | 0 | 78.0 | #354 | [#354](https://github.com/RodReis/rrb-jarvisOS/pull/354) |
 | 2026-09-10 | #352 | spec-voz-05-ui-command-center | Banco | 1248 | 1234 | 0 | 86.6 | #354 | [#354](https://github.com/RodReis/rrb-jarvisOS/pull/354) |
 | 2026-09-10 | #352 | spec-voz-05-ui-command-center | Tela | 729 | 728 | 0 | 76.3 | #354 | [#354](https://github.com/RodReis/rrb-jarvisOS/pull/354) |
+| 2026-09-10 | #352 | spec-voz-05-ui-command-center | Regras de Negócio | 1792 | 1792 | 0 | 78.1 | #354 | [#354](https://github.com/RodReis/rrb-jarvisOS/pull/354) |
+| 2026-09-10 | #352 | spec-voz-05-ui-command-center | Banco | 1248 | 1234 | 0 | 86.6 | #354 | [#354](https://github.com/RodReis/rrb-jarvisOS/pull/354) |
+| 2026-09-10 | #352 | spec-voz-05-ui-command-center | Tela | 732 | 731 | 0 | 76.4 | #354 | [#354](https://github.com/RodReis/rrb-jarvisOS/pull/354) |

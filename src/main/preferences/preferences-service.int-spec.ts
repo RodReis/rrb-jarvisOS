@@ -80,7 +80,9 @@ describe('padrões do produto', () => {
       vozDaFala: 'pt_BR-faber-medium',
       conversaJanela: 10,
       vozEntradaId: null,
-      vozSaidaId: null
+      vozSaidaId: null,
+      vozEntradaRotulo: null,
+      vozSaidaRotulo: null
     })
   })
 

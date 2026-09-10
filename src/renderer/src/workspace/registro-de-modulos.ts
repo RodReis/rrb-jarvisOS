@@ -20,6 +20,18 @@
  */
 
 import type { SubModuloJarvis } from './navegacao'
+import type { ReactNode } from 'react'
+import type { PreferencesSnapshot } from '@shared/contracts/ipc'
+import type { UserPreferences, WorkspaceId } from '@shared/domain/entities'
+
+export interface ContextoDoModulo {
+  readonly workspace: WorkspaceId
+  readonly preferencias: PreferencesSnapshot
+  readonly erroPreferencias: string | null
+  readonly salvar: (mudanca: UserPreferences) => Promise<void>
+  readonly uiTheme: 'light' | 'dark'
+  readonly nomeDoEspaco: string
+}
 
 /** Os grupos do protótipo (JARVISOS §2). Identificadores em inglês/ASCII; rótulo vem do i18n. */
 export type GrupoDoMenu =
@@ -58,6 +70,8 @@ export interface ModuloRegistrado {
   readonly rota: string
   /** Se o módulo existe **agora**. Item indisponível não vira menu nem rota. */
   readonly disponivel: () => boolean
+  /** Tela pertencente ao registro; AppShell apenas projeta rota para conteúdo. */
+  readonly renderizar?: (contexto: ContextoDoModulo) => ReactNode
 }
 
 /** Um grupo com os itens que ele mostra. */

@@ -1718,6 +1718,12 @@ const MIGRATIONS: readonly string[] = [
   `
   ALTER TABLE user_profile ADD COLUMN voz_entrada_id TEXT;
   ALTER TABLE user_profile ADD COLUMN voz_saida_id   TEXT;
+  `,
+
+  // 46 - nomes dos dispositivos escolhidos, para avisos compreensíveis quando o id desaparecer.
+  `
+  ALTER TABLE user_profile ADD COLUMN voz_entrada_rotulo TEXT;
+  ALTER TABLE user_profile ADD COLUMN voz_saida_rotulo   TEXT;
   `
 ]
 

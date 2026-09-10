@@ -27,7 +27,8 @@ const reprodutorDaProva = () => ({
     cancelar: () => {},
     posicaoMs: () => 0,
     terminou: Promise.resolve(),
-    saidaAplicada: Promise.resolve(true)
+    saidaAplicada: Promise.resolve(true),
+    nivelRms: () => 2_000
   })
 })
 

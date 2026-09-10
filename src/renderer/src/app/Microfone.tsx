@@ -14,6 +14,7 @@ import type { VisemeEvent } from '@shared/domain/visemes'
 import type { DesfechoDaTranscricao, ProntidaoDaVoz } from '@shared/domain/voz'
 import { capturarPcm, type CapturaDeAudio } from './captura-de-audio'
 import { criarReprodutor } from './reproducao-de-fala'
+import { criarMedidorDeEntrada, type MedidorDeEntrada } from './medidor-de-audio'
 import { log } from '../lib/log'
 import type { TrocaDaConversa } from '@shared/domain/voz'
 
@@ -55,10 +56,12 @@ export function Microfone({
   workspace,
   vozDaFala,
   entradaId,
+  entradaRotulo,
   saidaId,
   onSalvarDispositivo,
   capturar = capturarPcm,
-  criarFala = criarReprodutor
+  criarFala = criarReprodutor,
+  criarMedidor = criarMedidorDeEntrada
 }: {
   readonly workspace: WorkspaceId
   /**
@@ -67,15 +70,19 @@ export function Microfone({
    */
   readonly vozDaFala: string
   readonly entradaId?: string | null
+  readonly entradaRotulo?: string | null
   readonly saidaId?: string | null
   readonly onSalvarDispositivo?: (mudanca: {
     readonly vozEntradaId?: string
     readonly vozSaidaId?: string
+    readonly vozEntradaRotulo?: string
+    readonly vozSaidaRotulo?: string
   }) => Promise<void>
   /** Injetada para teste: `getUserMedia` não existe em jsdom, e dublar aqui mede a lógica. */
   readonly capturar?: CapturaDeAudio
   /** Injetado pela mesma razão: Web Audio também não existe em jsdom. */
   readonly criarFala?: typeof criarReprodutor
+  readonly criarMedidor?: typeof criarMedidorDeEntrada
 }): React.JSX.Element {
   const { t } = useTranslation()
   const [prontidao, setProntidao] = useState<ProntidaoDaVoz | undefined>(undefined)
@@ -94,14 +101,15 @@ export function Microfone({
     useState<ReturnType<ReturnType<typeof criarReprodutor>['tocar']>>()
   const [visemesDaFala, setVisemesDaFala] = useState<readonly VisemeEvent[]>([])
   const [dispositivos, setDispositivos] = useState<readonly MediaDeviceInfo[]>([])
-  const [permissaoConcedida, setPermissaoConcedida] = useState(
-    Boolean(entradaId && capturar !== capturarPcm)
-  )
-  const [legenda, setLegenda] = useState('')
+  const [permissaoConcedida, setPermissaoConcedida] = useState(Boolean(entradaId))
   const [entradaEfetivaId, setEntradaEfetivaId] = useState(entradaId ?? '')
   const [saidaEfetivaId, setSaidaEfetivaId] = useState(saidaId ?? '')
-  const [nivel, setNivel] = useState(0)
   const encerrarCaptura = useRef<(() => Promise<Int16Array>) | undefined>(undefined)
+  const medidor = useRef<MedidorDeEntrada | undefined>(undefined)
+  const nivelEntrada = useRef(0)
+  const ondas = useRef<HTMLDivElement | null>(null)
+  const barraDoMedidor = useRef<HTMLSpanElement | null>(null)
+  const legenda = useRef<HTMLSpanElement | null>(null)
 
   /*
    * O estado **corrente**, para as guardas de `comecar`/`terminar`.
@@ -146,10 +154,18 @@ export function Microfone({
       const fallback = entradasDisponiveis[0]
       if (fallback) {
         setEntradaEfetivaId(fallback.deviceId)
-        setAviso(t('voz.dispositivoAusente', { ausente: entradaId, atual: fallback.label }))
+        setAviso(
+          t('voz.dispositivoAusente', {
+            ausente: entradaRotulo || t('voz.dispositivoSemNome'),
+            atual: fallback.label
+          })
+        )
       }
+    } else if (entradaId) {
+      setEntradaEfetivaId(entradaId)
+      setAviso(undefined)
     }
-  }, [entradaId, t])
+  }, [entradaId, entradaRotulo, t])
 
   async function pedirPermissao(): Promise<void> {
     try {
@@ -163,49 +179,52 @@ export function Microfone({
   }
 
   useEffect(() => {
-    if (!entradaId || capturar !== capturarPcm) return
+    if (!entradaId || !navigator.mediaDevices) return
     void Promise.resolve().then(pedirPermissao)
     // A preferência existente autoriza validar dispositivos no boot da tela.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entradaId])
 
   useEffect(() => {
-    if (!permissaoConcedida || !entradaEfetivaId || capturar !== capturarPcm) return
+    if (!permissaoConcedida || !entradaEfetivaId || estado !== 'ocioso') return
     let ativo = true
-    let quadro = 0
-    let contexto: AudioContext | undefined
-    let stream: MediaStream | undefined
-
-    void navigator.mediaDevices
-      .getUserMedia({ audio: { deviceId: { exact: entradaEfetivaId } } })
-      .then((aberto) => {
+    void criarMedidor(entradaEfetivaId)
+      .then((novoMedidor) => {
         if (!ativo) {
-          aberto.getTracks().forEach((trilha) => trilha.stop())
+          void novoMedidor.parar()
           return
         }
-        stream = aberto
-        contexto = new AudioContext()
-        const analisador = contexto.createAnalyser()
-        analisador.fftSize = 1024
-        contexto.createMediaStreamSource(aberto).connect(analisador)
-        const amostras = new Float32Array(analisador.fftSize)
-        const medir = (): void => {
-          analisador.getFloatTimeDomainData(amostras)
-          const soma = amostras.reduce((total, amostra) => total + amostra * amostra, 0)
-          setNivel(Math.round(Math.sqrt(soma / amostras.length) * 32_767))
-          quadro = requestAnimationFrame(medir)
-        }
-        medir()
+        medidor.current = novoMedidor
       })
       .catch(() => setErro(t('voz.microfoneIndisponivel')))
 
     return () => {
       ativo = false
-      cancelAnimationFrame(quadro)
-      stream?.getTracks().forEach((trilha) => trilha.stop())
-      void contexto?.close()
+      const atual = medidor.current
+      medidor.current = undefined
+      void atual?.parar()
     }
-  }, [capturar, entradaEfetivaId, permissaoConcedida, t])
+  }, [criarMedidor, entradaEfetivaId, estado, permissaoConcedida, t])
+
+  useEffect(() => {
+    let quadro = 0
+    const atualizar = (): void => {
+      const nivel =
+        estado === 'falando'
+          ? (falaAtual?.nivelRms() ?? 0)
+          : (medidor.current?.nivelRms() ?? nivelEntrada.current)
+      barraDoMedidor.current?.style.setProperty('width', `${Math.min(100, nivel / 32.767)}%`)
+      barraDoMedidor.current?.parentElement?.setAttribute('aria-valuenow', String(nivel))
+      const ativo = estado === 'gravando' || estado === 'falando'
+      ondas.current?.querySelectorAll<HTMLElement>('[data-barra-da-onda]').forEach((barra, i) => {
+        const altura = ativo ? Math.max(8, Math.min(54, nivel / 80 + ((i * 7) % 10))) : 4
+        barra.style.height = `${altura}px`
+      })
+      quadro = requestAnimationFrame(atualizar)
+    }
+    quadro = requestAnimationFrame(atualizar)
+    return () => cancelAnimationFrame(quadro)
+  }, [estado, falaAtual])
 
   /*
    * A consulta inicial roda **dentro** da promessa, não no corpo do efeito: `setState` síncrono
@@ -252,7 +271,12 @@ export function Microfone({
     marcar('gravando')
 
     try {
-      encerrarCaptura.current = await capturar(entradaEfetivaId || undefined)
+      const medidorAtual = medidor.current
+      medidor.current = undefined
+      await medidorAtual?.parar()
+      encerrarCaptura.current = await capturar(entradaEfetivaId || undefined, (valor) => {
+        nivelEntrada.current = valor
+      })
     } catch {
       // Microfone negado ou ausente. Não é falha do runtime — a próxima ação é do sistema
       // operacional, não do app.
@@ -400,6 +424,7 @@ export function Microfone({
     marcar('falando')
     setVisemesDaFala([])
     setFalaAtual(undefined)
+    if (legenda.current) legenda.current.textContent = ''
 
     const fala = await window.jarvis.falar(texto, vozDaFala)
     if (fala.estado !== 'ok') return
@@ -415,12 +440,14 @@ export function Microfone({
     const duracaoMs = (fala.fala.pcm.length / fala.fala.sampleRate) * 1000
     const revelar = (): void => {
       const proporcao = Math.min(1, emCurso.posicaoMs() / Math.max(1, duracaoMs))
-      setLegenda(texto.slice(0, Math.ceil(texto.length * proporcao)))
+      if (legenda.current) {
+        legenda.current.textContent = texto.slice(0, Math.ceil(texto.length * proporcao))
+      }
       if (proporcao < 1) requestAnimationFrame(revelar)
     }
     requestAnimationFrame(revelar)
     await emCurso.terminou
-    setLegenda(texto)
+    if (legenda.current) legenda.current.textContent = texto
     setVisemesDaFala([])
     setFalaAtual(undefined)
   }
@@ -485,7 +512,7 @@ export function Microfone({
       data-testid="command-center"
     >
       <header className="w-full">
-        <h2 className="text-[length:var(--jos-texto-titulo)]">Command Center</h2>
+        <h2 className="text-[length:var(--jos-texto-titulo)]">{t('shell.commandCenter')}</h2>
         <p className="text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-suave)]">
           J.A.R.V.I.S · JUST A RATHER VERY INTELLIGENT SYSTEM
         </p>
@@ -505,6 +532,7 @@ export function Microfone({
         </div>
 
         <div
+          ref={ondas}
           className="flex h-14 w-full items-end justify-center gap-1"
           data-fonte-da-onda={
             estado === 'gravando' ? 'entrada' : estado === 'falando' ? 'saida' : 'repouso'
@@ -514,19 +542,15 @@ export function Microfone({
           {Array.from({ length: 21 }, (_, i) => (
             <span
               key={i}
+              data-barra-da-onda
               className="w-1 bg-[var(--jos-cor-acento)] transition-[height] motion-reduce:transition-none"
-              style={{
-                height:
-                  estado === 'gravando' || estado === 'falando'
-                    ? `${Math.max(8, Math.min(54, nivel / 80 + ((i * 7) % 10)))}px`
-                    : '4px'
-              }}
+              style={{ height: '4px' }}
             />
           ))}
         </div>
 
         <p aria-live="polite" className="min-h-7 text-center text-[length:var(--jos-texto-corpo)]">
-          {legenda}
+          <span ref={legenda} />
           {estado === 'falando' ? <span aria-hidden> |</span> : null}
         </p>
 
@@ -607,7 +631,11 @@ export function Microfone({
                     opcoes={entradas.map((d) => ({ valor: d.deviceId, rotulo: d.label }))}
                     onMudar={(valor) => {
                       setEntradaEfetivaId(valor)
-                      void onSalvarDispositivo?.({ vozEntradaId: valor })
+                      const rotulo = entradas.find((d) => d.deviceId === valor)?.label
+                      void onSalvarDispositivo?.({
+                        vozEntradaId: valor,
+                        vozEntradaRotulo: rotulo
+                      })
                     }}
                   />
                 )}
@@ -617,12 +645,13 @@ export function Microfone({
                 aria-label={t('voz.nivelEntrada')}
                 aria-valuemin={0}
                 aria-valuemax={32767}
-                aria-valuenow={nivel}
+                aria-valuenow={0}
                 className="h-2 w-full overflow-hidden bg-[rgba(var(--jos-borda-rgb),0.12)]"
               >
                 <span
+                  ref={barraDoMedidor}
                   className="block h-full bg-[var(--jos-cor-acento)]"
-                  style={{ width: `${Math.min(100, nivel / 32.767)}%` }}
+                  style={{ width: '0%' }}
                 />
               </div>
             </div>
@@ -635,7 +664,11 @@ export function Microfone({
                   opcoes={saidas.map((d) => ({ valor: d.deviceId, rotulo: d.label }))}
                   onMudar={(valor) => {
                     setSaidaEfetivaId(valor)
-                    void onSalvarDispositivo?.({ vozSaidaId: valor })
+                    const rotulo = saidas.find((d) => d.deviceId === valor)?.label
+                    void onSalvarDispositivo?.({
+                      vozSaidaId: valor,
+                      vozSaidaRotulo: rotulo
+                    })
                   }}
                 />
               )}

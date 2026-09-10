@@ -117,6 +117,7 @@ export const RECURSOS = {
         saidaSemSuporte: 'Este ambiente nao permite escolher a saida de audio.',
         nivelEntrada: 'Nivel do microfone',
         dispositivoAusente: 'O dispositivo salvo {{ausente}} sumiu. Usando {{atual}}.',
+        dispositivoSemNome: 'sem nome registrado',
         // Gravou, mas o VAD nao achou fala (SPEC-Voz-01, criterio 2: todo desfecho tem proxima acao).
         semFalaTitulo: 'Nao ouvi nada',
         semFala:
@@ -978,6 +979,7 @@ export const RECURSOS = {
         saidaSemSuporte: 'This environment does not support choosing an audio output.',
         nivelEntrada: 'Microphone level',
         dispositivoAusente: 'Saved device {{ausente}} disappeared. Using {{atual}}.',
+        dispositivoSemNome: 'without a saved name',
         semFalaTitulo: 'I heard nothing',
         semFala:
           'The microphone recorded, but no speech was detected. Speak closer, or check which microphone is the system default.',

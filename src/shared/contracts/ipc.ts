@@ -780,6 +780,8 @@ export interface PreferencesSnapshot {
   /** `null` exige escolha explícita antes da primeira gravação. */
   readonly vozEntradaId?: string | null
   readonly vozSaidaId?: string | null
+  readonly vozEntradaRotulo?: string | null
+  readonly vozSaidaRotulo?: string | null
 }
 
 /**

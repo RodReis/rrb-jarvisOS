@@ -10,11 +10,14 @@
  */
 
 /** Começa a capturar e devolve a função que encerra e entrega o PCM. */
-export type CapturaDeAudio = (deviceId?: string) => Promise<() => Promise<Int16Array>>
+export type CapturaDeAudio = (
+  deviceId?: string,
+  onNivelRms?: (nivel: number) => void
+) => Promise<() => Promise<Int16Array>>
 
 const TAXA_DO_WHISPER = 16_000
 
-export const capturarPcm: CapturaDeAudio = async (deviceId) => {
+export const capturarPcm: CapturaDeAudio = async (deviceId, onNivelRms) => {
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: {
       channelCount: 1,
@@ -30,7 +33,13 @@ export const capturarPcm: CapturaDeAudio = async (deviceId) => {
   const pedacos: Float32Array[] = []
 
   processador.onaudioprocess = (evento) => {
-    pedacos.push(new Float32Array(evento.inputBuffer.getChannelData(0)))
+    const pedaco = new Float32Array(evento.inputBuffer.getChannelData(0))
+    pedacos.push(pedaco)
+    if (onNivelRms) {
+      let soma = 0
+      for (const amostra of pedaco) soma += amostra * amostra
+      onNivelRms(Math.round(Math.sqrt(soma / pedaco.length) * 32_767))
+    }
   }
 
   fonte.connect(processador)

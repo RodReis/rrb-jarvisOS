@@ -42,6 +42,8 @@ interface ProfileRow {
   readonly voz_timeout_ms: number | null
   readonly voz_entrada_id: string | null
   readonly voz_saida_id: string | null
+  readonly voz_entrada_rotulo: string | null
+  readonly voz_saida_rotulo: string | null
 }
 
 /**
@@ -74,7 +76,9 @@ function toProfile(row: ProfileRow): UserProfile {
     vozDaFala: isVozDaFala(row.voz_da_fala) ? row.voz_da_fala : null,
     conversaJanela: ehJanelaDaConversa(row.conversa_janela) ? row.conversa_janela : null,
     vozEntradaId: row.voz_entrada_id,
-    vozSaidaId: row.voz_saida_id
+    vozSaidaId: row.voz_saida_id,
+    vozEntradaRotulo: row.voz_entrada_rotulo,
+    vozSaidaRotulo: row.voz_saida_rotulo
   }
 }
 
@@ -134,7 +138,9 @@ export class UserProfileRepository {
                   voz_da_fala     = COALESCE(?, voz_da_fala),
                   conversa_janela = COALESCE(?, conversa_janela),
                   voz_entrada_id   = COALESCE(?, voz_entrada_id),
-                  voz_saida_id     = COALESCE(?, voz_saida_id)
+                  voz_saida_id     = COALESCE(?, voz_saida_id),
+                  voz_entrada_rotulo = COALESCE(?, voz_entrada_rotulo),
+                  voz_saida_rotulo   = COALESCE(?, voz_saida_rotulo)
             WHERE id = ?`
         )
         .run(
@@ -150,6 +156,8 @@ export class UserProfileRepository {
           preferences.conversaJanela ?? null,
           preferences.vozEntradaId ?? null,
           preferences.vozSaidaId ?? null,
+          preferences.vozEntradaRotulo ?? null,
+          preferences.vozSaidaRotulo ?? null,
           userId
         )
 

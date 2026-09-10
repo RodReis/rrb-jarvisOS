@@ -91,11 +91,17 @@ function reprodutorFalso(): {
       terminou: Promise.resolve(),
       cancelar: () => {},
       posicaoMs: () => Number.MAX_SAFE_INTEGER,
-      saidaAplicada: Promise.resolve(true)
+      saidaAplicada: Promise.resolve(true),
+      nivelRms: () => 2_000
     }),
     cancelar: () => {}
   }
 }
+
+const criarMedidorFalso = async (): Promise<{
+  nivelRms: () => number
+  parar: () => Promise<void>
+}> => ({ nivelRms: () => 0, parar: async () => {} })
 
 function montar(capturar = capturaFalsa()): ReturnType<typeof render> {
   // Devolve o resultado do `render` porque o teste de desmontagem precisa do `unmount`.
@@ -106,6 +112,7 @@ function montar(capturar = capturaFalsa()): ReturnType<typeof render> {
       entradaId="microfone-teste"
       capturar={capturar}
       criarFala={reprodutorFalso as never}
+      criarMedidor={criarMedidorFalso}
     />
   )
 }
@@ -128,6 +135,7 @@ describe('primeiro uso escolhe dispositivo (SPEC-Voz-05)', () => {
         vozDaFala="pt_BR-faber-medium"
         capturar={capturaFalsa()}
         criarFala={reprodutorFalso as never}
+        criarMedidor={criarMedidorFalso}
       />
     )
 
@@ -137,6 +145,46 @@ describe('primeiro uso escolhe dispositivo (SPEC-Voz-05)', () => {
     expect(screen.getByRole('button', { name: /segure para falar/i })).toBeDisabled()
     await userEvent.click(screen.getAllByRole('combobox')[0])
     expect(await screen.findByText('Headset USB')).toBeInTheDocument()
+  })
+})
+
+describe('dispositivo salvo ausente (SPEC-Voz-05, critério 4)', () => {
+  function montarComDispositivos(dispositivos: readonly object[]): void {
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
+        enumerateDevices: vi.fn().mockResolvedValue(dispositivos)
+      }
+    })
+    render(
+      <Microfone
+        workspace="jarvis"
+        vozDaFala="pt_BR-faber-medium"
+        entradaId="microfone-antigo"
+        entradaRotulo="Headset antigo"
+        capturar={capturaFalsa()}
+        criarFala={reprodutorFalso as never}
+        criarMedidor={criarMedidorFalso}
+      />
+    )
+  }
+
+  it('nomeia o salvo que sumiu e o fallback usado', async () => {
+    montarComDispositivos([
+      { kind: 'audioinput', deviceId: 'microfone-atual', label: 'Headset USB', groupId: '' }
+    ])
+
+    expect(await screen.findByText(/Headset antigo.*Headset USB/i)).toBeInTheDocument()
+  })
+
+  it('não avisa quando o dispositivo salvo voltou', async () => {
+    montarComDispositivos([
+      { kind: 'audioinput', deviceId: 'microfone-antigo', label: 'Headset antigo', groupId: '' }
+    ])
+
+    await screen.findAllByRole('combobox')
+    expect(screen.queryByText(/sumiu/i)).not.toBeInTheDocument()
   })
 })
 

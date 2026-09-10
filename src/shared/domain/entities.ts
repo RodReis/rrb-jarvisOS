@@ -123,6 +123,8 @@ export interface UserProfile {
   /** Dispositivos de voz escolhidos. `null` = escolha ainda não feita. */
   readonly vozEntradaId?: string | null
   readonly vozSaidaId?: string | null
+  readonly vozEntradaRotulo?: string | null
+  readonly vozSaidaRotulo?: string | null
 }
 
 /** O que a tela de Settings e a CHOICE alteram. Todos opcionais: a UI muda um de cada vez. */
@@ -139,9 +141,15 @@ export interface UserPreferences {
   readonly conversaJanela?: number
   readonly vozEntradaId?: string
   readonly vozSaidaId?: string
+  readonly vozEntradaRotulo?: string
+  readonly vozSaidaRotulo?: string
 }
 
 export function isDeviceId(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0 && value.length <= 512
+}
+
+export function isDeviceLabel(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0 && value.length <= 512
 }
 

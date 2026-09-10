@@ -130,6 +130,8 @@ describe('migrations', () => {
     // A 45 persiste as escolhas explícitas de entrada e saída (SPEC-Voz-05).
     antigo.exec('ALTER TABLE user_profile DROP COLUMN voz_entrada_id')
     antigo.exec('ALTER TABLE user_profile DROP COLUMN voz_saida_id')
+    antigo.exec('ALTER TABLE user_profile DROP COLUMN voz_entrada_rotulo')
+    antigo.exec('ALTER TABLE user_profile DROP COLUMN voz_saida_rotulo')
     antigo.pragma('user_version = 1')
     antigo.close()
 

@@ -97,6 +97,21 @@ describe('reprodução da fala', () => {
     expect(setSinkId).toHaveBeenCalledWith('alto-falante-2')
   })
 
+  it('só inicia o áudio depois de aplicar a saída escolhida', async () => {
+    const amb = ambienteFalso()
+    let liberarSaida: (() => void) | undefined
+    const setSinkId = vi.fn(() => new Promise<void>((resolve) => (liberarSaida = resolve)))
+    const reprodutor = criarReprodutor({
+      criarContexto: () => Object.assign(amb.criarContexto(), { setSinkId })
+    })
+
+    reprodutor.tocar(fala(), 'alto-falante-2')
+    expect(amb.fontes[0].tocando).toBe(false)
+
+    liberarSaida?.()
+    await vi.waitFor(() => expect(amb.fontes[0].tocando).toBe(true))
+  })
+
   it('degrada para saída padrão quando ambiente não suporta setSinkId', async () => {
     const reprodutor = criarReprodutor(ambienteFalso())
     const emCurso = reprodutor.tocar(fala(), 'alto-falante-2')
@@ -230,5 +245,13 @@ describe('reprodução da fala', () => {
 
     expect(emCurso.posicaoMs()).toBe(125)
     relogioDeParede.mockRestore()
+  })
+
+  it('expõe RMS da saída a partir da janela corrente do PCM', () => {
+    const amb = ambienteFalso()
+    const emCurso = criarReprodutor(amb).tocar(fala(2_000, 1_000))
+    amb.avancarAudio(0.5)
+
+    expect(emCurso.nivelRms()).toBe(1_000)
   })
 })
