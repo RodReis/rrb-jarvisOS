@@ -77,9 +77,31 @@ function capturaFalsa(amostras = 16_000): () => Promise<() => Promise<Int16Array
  * `terminou` resolve na hora porque o que se mede aqui é **que a fala foi pedida**, não quanto
  * ela dura; um dublê que nunca resolvesse travaria o teste no `await`.
  */
-function reprodutorFalso(): { tocar: () => { terminou: Promise<void> }; cancelar: () => void } {
-  return { tocar: () => ({ terminou: Promise.resolve(), cancelar: () => {} }), cancelar: () => {} }
+function reprodutorFalso(): {
+  tocar: () => {
+    terminou: Promise<void>
+    cancelar: () => void
+    posicaoMs: () => number
+    saidaAplicada: Promise<boolean>
+  }
+  cancelar: () => void
+} {
+  return {
+    tocar: () => ({
+      terminou: Promise.resolve(),
+      cancelar: () => {},
+      posicaoMs: () => Number.MAX_SAFE_INTEGER,
+      saidaAplicada: Promise.resolve(true),
+      nivelRms: () => 2_000
+    }),
+    cancelar: () => {}
+  }
 }
+
+const criarMedidorFalso = async (): Promise<{
+  nivelRms: () => number
+  parar: () => Promise<void>
+}> => ({ nivelRms: () => 0, parar: async () => {} })
 
 function montar(capturar = capturaFalsa()): ReturnType<typeof render> {
   // Devolve o resultado do `render` porque o teste de desmontagem precisa do `unmount`.
@@ -87,11 +109,84 @@ function montar(capturar = capturaFalsa()): ReturnType<typeof render> {
     <Microfone
       workspace="jarvis"
       vozDaFala="pt_BR-faber-medium"
+      entradaId="microfone-teste"
       capturar={capturar}
       criarFala={reprodutorFalso as never}
+      criarMedidor={criarMedidorFalso}
     />
   )
 }
+
+describe('primeiro uso escolhe dispositivo (SPEC-Voz-05)', () => {
+  it('pede permissão e mantém falar bloqueado até escolher microfone', async () => {
+    const getUserMedia = vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] })
+    const enumerateDevices = vi.fn().mockResolvedValue([
+      { kind: 'audioinput', deviceId: 'headset', label: 'Headset USB', groupId: '' },
+      { kind: 'audiooutput', deviceId: 'caixas', label: 'Caixas', groupId: '' }
+    ])
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia, enumerateDevices }
+    })
+
+    render(
+      <Microfone
+        workspace="jarvis"
+        vozDaFala="pt_BR-faber-medium"
+        capturar={capturaFalsa()}
+        criarFala={reprodutorFalso as never}
+        criarMedidor={criarMedidorFalso}
+      />
+    )
+
+    await userEvent.click(await screen.findByRole('button', { name: /permitir e escolher/i }))
+
+    expect(await screen.findByRole('meter', { name: /nivel do microfone/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /segure para falar/i })).toBeDisabled()
+    await userEvent.click(screen.getAllByRole('combobox')[0])
+    expect(await screen.findByText('Headset USB')).toBeInTheDocument()
+  })
+})
+
+describe('dispositivo salvo ausente (SPEC-Voz-05, critério 4)', () => {
+  function montarComDispositivos(dispositivos: readonly object[]): void {
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
+        enumerateDevices: vi.fn().mockResolvedValue(dispositivos)
+      }
+    })
+    render(
+      <Microfone
+        workspace="jarvis"
+        vozDaFala="pt_BR-faber-medium"
+        entradaId="microfone-antigo"
+        entradaRotulo="Headset antigo"
+        capturar={capturaFalsa()}
+        criarFala={reprodutorFalso as never}
+        criarMedidor={criarMedidorFalso}
+      />
+    )
+  }
+
+  it('nomeia o salvo que sumiu e o fallback usado', async () => {
+    montarComDispositivos([
+      { kind: 'audioinput', deviceId: 'microfone-atual', label: 'Headset USB', groupId: '' }
+    ])
+
+    expect(await screen.findByText(/Headset antigo.*Headset USB/i)).toBeInTheDocument()
+  })
+
+  it('não avisa quando o dispositivo salvo voltou', async () => {
+    montarComDispositivos([
+      { kind: 'audioinput', deviceId: 'microfone-antigo', label: 'Headset antigo', groupId: '' }
+    ])
+
+    await screen.findAllByRole('combobox')
+    expect(screen.queryByText(/sumiu/i)).not.toBeInTheDocument()
+  })
+})
 
 describe('runtime ausente é convite, não erro (critério 4)', () => {
   it('oferece baixar quando falta artefato, em vez de dizer que falhou', async () => {

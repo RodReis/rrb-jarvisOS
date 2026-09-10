@@ -27,6 +27,10 @@ export interface FalaEmCurso {
   readonly posicaoMs: () => number
   /** Resolve quando o áudio termina, ou imediatamente se foi cancelado. */
   readonly terminou: Promise<void>
+  /** `false` = ambiente recusou saída explícita e o áudio seguiu no destino padrão. */
+  readonly saidaAplicada: Promise<boolean>
+  /** Energia da janela corrente do PCM, em unidades Int16. */
+  readonly nivelRms: () => number
 }
 
 /** O que este módulo precisa do ambiente. Injetado para o teste rodar sem Web Audio real. */
@@ -34,8 +38,10 @@ export interface DepsDaReproducao {
   readonly criarContexto: () => AudioContext
 }
 
+type ContextoComSaida = AudioContext & { setSinkId?: (sinkId: string) => Promise<void> }
+
 export function criarReprodutor(deps?: DepsDaReproducao): {
-  tocar: (fala: SpeechHandle) => FalaEmCurso
+  tocar: (fala: SpeechHandle, saidaId?: string) => FalaEmCurso
   cancelar: () => void
 } {
   const criarContexto = deps?.criarContexto ?? ((): AudioContext => new AudioContext())
@@ -52,12 +58,21 @@ export function criarReprodutor(deps?: DepsDaReproducao): {
   return {
     cancelar,
 
-    tocar(fala: SpeechHandle): FalaEmCurso {
+    tocar(fala: SpeechHandle, saidaId?: string): FalaEmCurso {
       // **Antes** de criar a nova: se a anterior continuasse, as duas sairiam pelo mesmo
       // destino e o usuário ouviria as vozes sobrepostas (critério 7).
       cancelar()
 
       const contexto = criarContexto()
+      const selecionarSaida = (contexto as ContextoComSaida).setSinkId
+      const saidaAplicada = saidaId
+        ? selecionarSaida
+          ? selecionarSaida.call(contexto, saidaId).then(
+              () => true,
+              () => false
+            )
+          : Promise.resolve(false)
+        : Promise.resolve(true)
       const buffer = contexto.createBuffer(1, fala.pcm.length, fala.sampleRate)
       const canal = buffer.getChannelData(0)
 
@@ -70,6 +85,8 @@ export function criarReprodutor(deps?: DepsDaReproducao): {
       fonte.connect(contexto.destination)
 
       let encerrado = false
+      let iniciado = false
+      let inicioSegundos = contexto.currentTime
       let resolver: () => void = () => {}
       const terminou = new Promise<void>((r) => {
         resolver = r
@@ -79,7 +96,7 @@ export function criarReprodutor(deps?: DepsDaReproducao): {
         if (encerrado) return
         encerrado = true
         try {
-          fonte.stop()
+          if (iniciado) fonte.stop()
         } catch {
           // `stop()` numa fonte que já terminou lança. Não é erro: o objetivo — não estar
           // tocando — já está cumprido.
@@ -98,13 +115,30 @@ export function criarReprodutor(deps?: DepsDaReproducao): {
       }
 
       emCurso = { fonte, contexto, parar }
-      const inicioSegundos = contexto.currentTime
-      fonte.start()
+      const iniciar = (): void => {
+        if (encerrado) return
+        inicioSegundos = contexto.currentTime
+        iniciado = true
+        fonte.start()
+      }
+      if (saidaId) void saidaAplicada.then(iniciar)
+      else iniciar()
 
       return {
         cancelar: parar,
         posicaoMs: () => Math.max(0, (contexto.currentTime - inicioSegundos) * 1000),
-        terminou
+        terminou,
+        saidaAplicada,
+        nivelRms: () => {
+          if (!iniciado || encerrado || fala.pcm.length === 0) return 0
+          const centro = Math.floor((contexto.currentTime - inicioSegundos) * fala.sampleRate)
+          const inicio = Math.max(0, centro - 256)
+          const fim = Math.min(fala.pcm.length, centro + 256)
+          if (fim <= inicio) return 0
+          let soma = 0
+          for (let i = inicio; i < fim; i++) soma += fala.pcm[i] * fala.pcm[i]
+          return Math.round(Math.sqrt(soma / (fim - inicio)))
+        }
       }
     }
   }

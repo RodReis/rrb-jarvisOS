@@ -1711,6 +1711,19 @@ const MIGRATIONS: readonly string[] = [
   // voz. Semear o numero aqui obrigaria uma migration nova para mudar o default de fabrica.
   `
   ALTER TABLE user_profile ADD COLUMN conversa_janela INTEGER;
+  `,
+
+  // 45 - dispositivos escolhidos pelo usuario (SPEC-Voz-05).
+  // NULL preserva a decisão explícita no primeiro uso: app não escolhe o default calado.
+  `
+  ALTER TABLE user_profile ADD COLUMN voz_entrada_id TEXT;
+  ALTER TABLE user_profile ADD COLUMN voz_saida_id   TEXT;
+  `,
+
+  // 46 - nomes dos dispositivos escolhidos, para avisos compreensíveis quando o id desaparecer.
+  `
+  ALTER TABLE user_profile ADD COLUMN voz_entrada_rotulo TEXT;
+  ALTER TABLE user_profile ADD COLUMN voz_saida_rotulo   TEXT;
   `
 ]
 

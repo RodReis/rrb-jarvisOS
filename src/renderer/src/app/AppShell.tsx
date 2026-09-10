@@ -26,13 +26,8 @@ import {
   type RotasPorWorkspace,
   type SubModuloJarvis
 } from '../workspace/navegacao'
-import { MODULOS_DO_APP } from '../workspace/modulos'
+import { MODULOS_RENDERIZAVEIS } from '../workspace/modulos-renderizaveis'
 import { gruposVisiveis } from '../workspace/registro-de-modulos'
-import { Microfone } from './Microfone'
-import { Settings } from './Settings'
-import { AprovacoesPendentes } from './AprovacoesPendentes'
-import { TerminalControlado } from './TerminalControlado'
-import { ProjetosLocais } from './ProjetosLocais'
 
 /**
  * AppShell do renderer (SPEC-DesignSystem-04a).
@@ -135,31 +130,18 @@ export function AppShell({ perfil, onSair }: AppShellProps = {}): React.JSX.Elem
    * placeholder" acima de três telas já entregues. Aqui a pergunta "esta rota tem módulo?" tem
    * uma resposta só, e o cabeçalho de placeholder passa a depender dela.
    */
-  const MODULOS: Readonly<Record<string, React.JSX.Element>> = {
-    operator: <AprovacoesPendentes workspace={workspace} />,
-    voz: <Microfone workspace={workspace} vozDaFala={preferencias.vozDaFala} />,
-    projects: <ProjetosLocais workspace={workspace} />,
-    terminal: <TerminalControlado workspace={workspace} />,
-    /*
-     * O Settings entra no mapa como qualquer módulo (decisão do PI, 2026-09-05).
-     *
-     * Era um ramo `if` antes do mapa, e a exceção obrigaria o teste do critério 2 — "nenhuma
-     * rota visível cai no placeholder" — a abrir uma brecha justamente para ele. Exceção no
-     * teste que guarda a garantia da fatia enfraquece a garantia; a própria `navegacao.ts` já
-     * avisa que "caso especial é onde vazamento se esconde".
-     */
-    settings: (
-      <Settings
-        preferencias={preferencias}
-        erro={erroPreferencias}
-        onSalvar={(mudanca) => void salvar(mudanca)}
-        uiTheme={uiTheme}
-        workspace={workspace}
-        nomeDoEspaco={nomeEspaco}
-      />
-    )
-  }
-  const moduloDaRota = MODULOS[rotaAtiva] ?? null
+  const registroDaRota = MODULOS_RENDERIZAVEIS.find(
+    (modulo) => modulo.rota === rotaAtiva && modulo.disponivel()
+  )
+  const moduloDaRota =
+    registroDaRota?.renderizar?.({
+      workspace,
+      preferencias,
+      erroPreferencias,
+      salvar,
+      uiTheme,
+      nomeDoEspaco: nomeEspaco
+    }) ?? null
   const outroEspaco: WorkspaceId = workspace === 'jarvis' ? 'noa' : 'jarvis'
 
   // Sub-módulo ativo do JARVIS: derivado da rota, não guardado em estado próprio. Duas fontes
@@ -227,7 +209,7 @@ export function AppShell({ perfil, onSair }: AppShellProps = {}): React.JSX.Elem
    */
   const gruposDaSidebar =
     workspace === 'jarvis'
-      ? gruposVisiveis(MODULOS_DO_APP, subModulo).map((g) => ({
+      ? gruposVisiveis(MODULOS_RENDERIZAVEIS, subModulo).map((g) => ({
           titulo: t(`grupoDoMenu.${g.grupo}`),
           rotas: g.itens.map((i) => i.rota)
         }))
@@ -329,8 +311,8 @@ export function AppShell({ perfil, onSair }: AppShellProps = {}): React.JSX.Elem
         </p>
       )}
 
-      {rotaAtiva === 'settings' ? (
-        MODULOS[rotaAtiva]
+      {moduloDaRota !== null ? (
+        moduloDaRota
       ) : (
         <section
           aria-label={t('conteudo.de', { rota: t(`navegacao.${rotaAtiva}`) })}

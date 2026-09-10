@@ -1,11 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Button, Card, InlineAlert, VoiceMascot, type EstadoDoMascote } from '@design/ui'
+import {
+  Button,
+  Card,
+  Field,
+  InlineAlert,
+  Select,
+  VoiceMascot,
+  type EstadoDoMascote
+} from '@design/ui'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { VisemeEvent } from '@shared/domain/visemes'
 import type { DesfechoDaTranscricao, ProntidaoDaVoz } from '@shared/domain/voz'
 import { capturarPcm, type CapturaDeAudio } from './captura-de-audio'
 import { criarReprodutor } from './reproducao-de-fala'
+import { criarMedidorDeEntrada, type MedidorDeEntrada } from './medidor-de-audio'
 import { log } from '../lib/log'
 import type { TrocaDaConversa } from '@shared/domain/voz'
 
@@ -46,8 +55,13 @@ type EstadoDoMicrofone = 'ocioso' | 'gravando' | 'transcrevendo' | 'pensando' | 
 export function Microfone({
   workspace,
   vozDaFala,
+  entradaId,
+  entradaRotulo,
+  saidaId,
+  onSalvarDispositivo,
   capturar = capturarPcm,
-  criarFala = criarReprodutor
+  criarFala = criarReprodutor,
+  criarMedidor = criarMedidorDeEntrada
 }: {
   readonly workspace: WorkspaceId
   /**
@@ -55,10 +69,20 @@ export function Microfone({
    * preferências resolvidas — consultá-las aqui daria à tela um segundo dono do mesmo valor.
    */
   readonly vozDaFala: string
+  readonly entradaId?: string | null
+  readonly entradaRotulo?: string | null
+  readonly saidaId?: string | null
+  readonly onSalvarDispositivo?: (mudanca: {
+    readonly vozEntradaId?: string
+    readonly vozSaidaId?: string
+    readonly vozEntradaRotulo?: string
+    readonly vozSaidaRotulo?: string
+  }) => Promise<void>
   /** Injetada para teste: `getUserMedia` não existe em jsdom, e dublar aqui mede a lógica. */
   readonly capturar?: CapturaDeAudio
   /** Injetado pela mesma razão: Web Audio também não existe em jsdom. */
   readonly criarFala?: typeof criarReprodutor
+  readonly criarMedidor?: typeof criarMedidorDeEntrada
 }): React.JSX.Element {
   const { t } = useTranslation()
   const [prontidao, setProntidao] = useState<ProntidaoDaVoz | undefined>(undefined)
@@ -76,7 +100,16 @@ export function Microfone({
   const [falaAtual, setFalaAtual] =
     useState<ReturnType<ReturnType<typeof criarReprodutor>['tocar']>>()
   const [visemesDaFala, setVisemesDaFala] = useState<readonly VisemeEvent[]>([])
+  const [dispositivos, setDispositivos] = useState<readonly MediaDeviceInfo[]>([])
+  const [permissaoConcedida, setPermissaoConcedida] = useState(Boolean(entradaId))
+  const [entradaEfetivaId, setEntradaEfetivaId] = useState(entradaId ?? '')
+  const [saidaEfetivaId, setSaidaEfetivaId] = useState(saidaId ?? '')
   const encerrarCaptura = useRef<(() => Promise<Int16Array>) | undefined>(undefined)
+  const medidor = useRef<MedidorDeEntrada | undefined>(undefined)
+  const nivelEntrada = useRef(0)
+  const ondas = useRef<HTMLDivElement | null>(null)
+  const barraDoMedidor = useRef<HTMLSpanElement | null>(null)
+  const legenda = useRef<HTMLSpanElement | null>(null)
 
   /*
    * O estado **corrente**, para as guardas de `comecar`/`terminar`.
@@ -112,6 +145,86 @@ export function Microfone({
   const consultar = useCallback(async (): Promise<void> => {
     setProntidao(await window.jarvis.prontidaoDaVoz())
   }, [])
+
+  const listarDispositivos = useCallback(async (): Promise<void> => {
+    const lista = await navigator.mediaDevices.enumerateDevices()
+    setDispositivos(lista.filter((d) => d.kind === 'audioinput' || d.kind === 'audiooutput'))
+    const entradasDisponiveis = lista.filter((d) => d.kind === 'audioinput')
+    if (entradaId && !entradasDisponiveis.some((d) => d.deviceId === entradaId)) {
+      const fallback = entradasDisponiveis[0]
+      if (fallback) {
+        setEntradaEfetivaId(fallback.deviceId)
+        setAviso(
+          t('voz.dispositivoAusente', {
+            ausente: entradaRotulo || t('voz.dispositivoSemNome'),
+            atual: fallback.label
+          })
+        )
+      }
+    } else if (entradaId) {
+      setEntradaEfetivaId(entradaId)
+      setAviso(undefined)
+    }
+  }, [entradaId, entradaRotulo, t])
+
+  async function pedirPermissao(): Promise<void> {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      stream.getTracks().forEach((trilha) => trilha.stop())
+      setPermissaoConcedida(true)
+      await listarDispositivos()
+    } catch {
+      setErro(t('voz.microfoneIndisponivel'))
+    }
+  }
+
+  useEffect(() => {
+    if (!entradaId || !navigator.mediaDevices) return
+    void Promise.resolve().then(pedirPermissao)
+    // A preferência existente autoriza validar dispositivos no boot da tela.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entradaId])
+
+  useEffect(() => {
+    if (!permissaoConcedida || !entradaEfetivaId || estado !== 'ocioso') return
+    let ativo = true
+    void criarMedidor(entradaEfetivaId)
+      .then((novoMedidor) => {
+        if (!ativo) {
+          void novoMedidor.parar()
+          return
+        }
+        medidor.current = novoMedidor
+      })
+      .catch(() => setErro(t('voz.microfoneIndisponivel')))
+
+    return () => {
+      ativo = false
+      const atual = medidor.current
+      medidor.current = undefined
+      void atual?.parar()
+    }
+  }, [criarMedidor, entradaEfetivaId, estado, permissaoConcedida, t])
+
+  useEffect(() => {
+    let quadro = 0
+    const atualizar = (): void => {
+      const nivel =
+        estado === 'falando'
+          ? (falaAtual?.nivelRms() ?? 0)
+          : (medidor.current?.nivelRms() ?? nivelEntrada.current)
+      barraDoMedidor.current?.style.setProperty('width', `${Math.min(100, nivel / 32.767)}%`)
+      barraDoMedidor.current?.parentElement?.setAttribute('aria-valuenow', String(nivel))
+      const ativo = estado === 'gravando' || estado === 'falando'
+      ondas.current?.querySelectorAll<HTMLElement>('[data-barra-da-onda]').forEach((barra, i) => {
+        const altura = ativo ? Math.max(8, Math.min(54, nivel / 80 + ((i * 7) % 10))) : 4
+        barra.style.height = `${altura}px`
+      })
+      quadro = requestAnimationFrame(atualizar)
+    }
+    quadro = requestAnimationFrame(atualizar)
+    return () => cancelAnimationFrame(quadro)
+  }, [estado, falaAtual])
 
   /*
    * A consulta inicial roda **dentro** da promessa, não no corpo do efeito: `setState` síncrono
@@ -158,7 +271,12 @@ export function Microfone({
     marcar('gravando')
 
     try {
-      encerrarCaptura.current = await capturar()
+      const medidorAtual = medidor.current
+      medidor.current = undefined
+      await medidorAtual?.parar()
+      encerrarCaptura.current = await capturar(entradaEfetivaId || undefined, (valor) => {
+        nivelEntrada.current = valor
+      })
     } catch {
       // Microfone negado ou ausente. Não é falha do runtime — a próxima ação é do sistema
       // operacional, não do app.
@@ -306,16 +424,30 @@ export function Microfone({
     marcar('falando')
     setVisemesDaFala([])
     setFalaAtual(undefined)
+    if (legenda.current) legenda.current.textContent = ''
 
     const fala = await window.jarvis.falar(texto, vozDaFala)
     if (fala.estado !== 'ok') return
 
-    const emCurso = reprodutor.current?.tocar(fala.fala)
+    const emCurso = reprodutor.current?.tocar(fala.fala, saidaEfetivaId || undefined)
     if (emCurso === undefined) return
+    void emCurso.saidaAplicada.then((aplicada) => {
+      if (!aplicada) setAviso(t('voz.saidaSemSuporte'))
+    })
 
     setVisemesDaFala(fala.fala.visemes)
     setFalaAtual(emCurso)
+    const duracaoMs = (fala.fala.pcm.length / fala.fala.sampleRate) * 1000
+    const revelar = (): void => {
+      const proporcao = Math.min(1, emCurso.posicaoMs() / Math.max(1, duracaoMs))
+      if (legenda.current) {
+        legenda.current.textContent = texto.slice(0, Math.ceil(texto.length * proporcao))
+      }
+      if (proporcao < 1) requestAnimationFrame(revelar)
+    }
+    requestAnimationFrame(revelar)
     await emCurso.terminou
+    if (legenda.current) legenda.current.textContent = texto
     setVisemesDaFala([])
     setFalaAtual(undefined)
   }
@@ -370,23 +502,57 @@ export function Microfone({
   // Segurar para falar só vale de `ocioso`: durante transcrição, resposta ou fala, um novo
   // aperto abriria uma segunda conversa por cima da primeira.
   const ocupado = estado !== 'ocioso' && estado !== 'gravando'
+  const entradas = dispositivos.filter((d) => d.kind === 'audioinput')
+  const saidas = dispositivos.filter((d) => d.kind === 'audiooutput')
+  const escolhaPendente = !entradaEfetivaId
 
   return (
-    <Card>
-      <div className="flex flex-col gap-4">
+    <div
+      className="mx-auto flex min-h-[min(720px,calc(100vh-12rem))] w-full max-w-5xl flex-col items-center gap-6 py-4"
+      data-testid="command-center"
+    >
+      <header className="w-full">
+        <h2 className="text-[length:var(--jos-texto-titulo)]">{t('shell.commandCenter')}</h2>
+        <p className="text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-suave)]">
+          J.A.R.V.I.S · JUST A RATHER VERY INTELLIGENT SYSTEM
+        </p>
+      </header>
+      <div className="flex w-full max-w-3xl flex-col items-center gap-5">
         <div className="flex items-center justify-between gap-3">
           <VoiceMascot
             modulo="jarvis"
-            tamanho="medio"
+            tamanho="grande"
             estado={estadoDoMascote}
             visemes={visemesDaFala}
             relogioDaFala={falaAtual?.posicaoMs}
           />
-          <h2 className="text-[length:var(--jos-texto-titulo)]">{t('voz.titulo')}</h2>
           <span className="text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-suave)]">
             {rotuloDoCompute}
           </span>
         </div>
+
+        <div
+          ref={ondas}
+          className="flex h-14 w-full items-end justify-center gap-1"
+          data-fonte-da-onda={
+            estado === 'gravando' ? 'entrada' : estado === 'falando' ? 'saida' : 'repouso'
+          }
+          aria-label={t('voz.ondas')}
+        >
+          {Array.from({ length: 21 }, (_, i) => (
+            <span
+              key={i}
+              data-barra-da-onda
+              className="w-1 bg-[var(--jos-cor-acento)] transition-[height] motion-reduce:transition-none"
+              style={{ height: '4px' }}
+            />
+          ))}
+        </div>
+
+        <p aria-live="polite" className="min-h-7 text-center text-[length:var(--jos-texto-corpo)]">
+          <span ref={legenda} />
+          {estado === 'falando' ? <span aria-hidden> |</span> : null}
+        </p>
 
         {erro !== undefined && (
           <InlineAlert tom="err" titulo={t('voz.problema')}>
@@ -400,7 +566,7 @@ export function Microfone({
           </InlineAlert>
         )}
 
-        {prontidao.pronta ? (
+        {prontidao.pronta && permissaoConcedida ? (
           <Button
             /*
              * **O ponteiro é capturado no `pointerdown`**, e é isso que faz o gesto sobreviver
@@ -436,10 +602,12 @@ export function Microfone({
              * o enunciado no meio, calado. Com a captura, `pointerup` chega mesmo fora do botão,
              * então o caso que ele cobria já está coberto pelo par certo.
              */
-            desabilitado={ocupado}
+            desabilitado={ocupado || escolhaPendente}
           >
             {rotuloDoBotao}
           </Button>
+        ) : prontidao.pronta ? (
+          <Button onClick={() => void pedirPermissao()}>{t('voz.escolherMicrofone')}</Button>
         ) : (
           <div className="flex flex-col gap-2">
             <p className="text-[length:var(--jos-texto-mini)] text-[var(--jos-cor-texto-suave)]">
@@ -448,6 +616,63 @@ export function Microfone({
             <Button onClick={() => void baixar()} desabilitado={baixando}>
               {baixando ? t('voz.baixando') : t('voz.baixar')}
             </Button>
+          </div>
+        )}
+
+        {permissaoConcedida && (
+          <div className="grid w-full gap-4 md:grid-cols-2">
+            <div className="flex flex-col gap-2">
+              <Field rotulo={t('voz.entrada')}>
+                {(campo) => (
+                  <Select
+                    {...campo}
+                    valor={entradaEfetivaId}
+                    placeholder={t('voz.selecione')}
+                    opcoes={entradas.map((d) => ({ valor: d.deviceId, rotulo: d.label }))}
+                    onMudar={(valor) => {
+                      setEntradaEfetivaId(valor)
+                      const rotulo = entradas.find((d) => d.deviceId === valor)?.label
+                      void onSalvarDispositivo?.({
+                        vozEntradaId: valor,
+                        vozEntradaRotulo: rotulo
+                      })
+                    }}
+                  />
+                )}
+              </Field>
+              <div
+                role="meter"
+                aria-label={t('voz.nivelEntrada')}
+                aria-valuemin={0}
+                aria-valuemax={32767}
+                aria-valuenow={0}
+                className="h-2 w-full overflow-hidden bg-[rgba(var(--jos-borda-rgb),0.12)]"
+              >
+                <span
+                  ref={barraDoMedidor}
+                  className="block h-full bg-[var(--jos-cor-acento)]"
+                  style={{ width: '0%' }}
+                />
+              </div>
+            </div>
+            <Field rotulo={t('voz.saida')}>
+              {(campo) => (
+                <Select
+                  {...campo}
+                  valor={saidaEfetivaId}
+                  placeholder={t('voz.selecione')}
+                  opcoes={saidas.map((d) => ({ valor: d.deviceId, rotulo: d.label }))}
+                  onMudar={(valor) => {
+                    setSaidaEfetivaId(valor)
+                    const rotulo = saidas.find((d) => d.deviceId === valor)?.label
+                    void onSalvarDispositivo?.({
+                      vozSaidaId: valor,
+                      vozSaidaRotulo: rotulo
+                    })
+                  }}
+                />
+              )}
+            </Field>
           </div>
         )}
 
@@ -484,7 +709,7 @@ export function Microfone({
           </ol>
         )}
       </div>
-    </Card>
+    </div>
   )
 }
 

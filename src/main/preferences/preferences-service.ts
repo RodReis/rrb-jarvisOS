@@ -12,6 +12,8 @@ import {
   ACCENT_DEFAULT,
   isAccentColor,
   isHotkeyDeVoz,
+  isDeviceId,
+  isDeviceLabel,
   isIdiomaDeVoz,
   isLocale,
   isModeloDeVoz,
@@ -69,7 +71,11 @@ export class PreferencesService {
        * `??` e não `||`: zero é escolha legítima — "sem histórico", perguntas independentes —, e
        * `||` a trocaria pelo default de dez, dando ao usuário o oposto do que ele pediu.
        */
-      conversaJanela: profile.conversaJanela ?? JANELA_PADRAO_DA_CONVERSA
+      conversaJanela: profile.conversaJanela ?? JANELA_PADRAO_DA_CONVERSA,
+      vozEntradaId: profile.vozEntradaId ?? null,
+      vozSaidaId: profile.vozSaidaId ?? null,
+      vozEntradaRotulo: profile.vozEntradaRotulo ?? null,
+      vozSaidaRotulo: profile.vozSaidaRotulo ?? null
     }
   }
 
@@ -93,7 +99,11 @@ export class PreferencesService {
         vozHotkey: VOZ_PADRAO.hotkey,
         vozTimeoutMs: VOZ_PADRAO.timeoutMs,
         vozDaFala: VOZ_PADRAO.vozDaFala,
-        conversaJanela: JANELA_PADRAO_DA_CONVERSA
+        conversaJanela: JANELA_PADRAO_DA_CONVERSA,
+        vozEntradaId: null,
+        vozSaidaId: null,
+        vozEntradaRotulo: null,
+        vozSaidaRotulo: null
       }
     }
 
@@ -130,6 +140,14 @@ export class PreferencesService {
       ...(isVozDaFala(preferences.vozDaFala) ? { vozDaFala: preferences.vozDaFala } : {}),
       ...(ehJanelaDaConversa(preferences.conversaJanela)
         ? { conversaJanela: preferences.conversaJanela }
+        : {}),
+      ...(isDeviceId(preferences.vozEntradaId) ? { vozEntradaId: preferences.vozEntradaId } : {}),
+      ...(isDeviceId(preferences.vozSaidaId) ? { vozSaidaId: preferences.vozSaidaId } : {}),
+      ...(isDeviceLabel(preferences.vozEntradaRotulo)
+        ? { vozEntradaRotulo: preferences.vozEntradaRotulo }
+        : {}),
+      ...(isDeviceLabel(preferences.vozSaidaRotulo)
+        ? { vozSaidaRotulo: preferences.vozSaidaRotulo }
         : {})
     }
 

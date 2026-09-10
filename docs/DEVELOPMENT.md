@@ -2232,7 +2232,7 @@ Status: **entregue na PR [#347](https://github.com/RodReis/rrb-jarvisOS/pull/347
 
 ### Fatia 04 — Mascote com lip-sync por visemes e estados (`docs/spec/spec-voz-04-mascote-lipsync.md`)
 
-Status: **em implementação** — spec `aprovada-pi` (2026-09-09); issue [#351](https://github.com/RodReis/rrb-jarvisOS/issues/351). F04 consome a timeline de visemes da F02 e os estados do loop da F03; a F05 ([#352](https://github.com/RodReis/rrb-jarvisOS/issues/352)) consome o `posicaoMs()` introduzido aqui.
+Status: **entregue e aceita** — issue [#351](https://github.com/RodReis/rrb-jarvisOS/issues/351), PR [#353](https://github.com/RodReis/rrb-jarvisOS/pull/353), mergeada em 2026-09-09. F04 entrega o `posicaoMs()` consumido pela F05.
 
 - [x] **Verificação obrigatória do asset:** `src/design/assets/jarvis-cabeca.jpg` é a cabeça mecânica do protótipo; a boca fica na mandíbula/grade, sem lábios humanos e sem asset novo.
 - [x] **`src/renderer/src/app/reproducao-de-fala.ts`** expõe `posicaoMs()` baseado em `AudioContext.currentTime`, não em `Date.now()`.
@@ -2242,6 +2242,22 @@ Status: **em implementação** — spec `aprovada-pi` (2026-09-09); issue [#351]
 - [x] **Guarda de contrato:** `Record<Viseme, PoseDaBoca>` exaustivo; lint barra `switch` sobre `viseme` no DS.
 - [x] **Prova visual:** `GaleriaDoMascote` cobre 15 poses, 4 estados e `prefers-reduced-motion` mantendo lip-sync.
 - [x] **Verificação no app real:** build atual monta os mascotes com `data-estado="idle"` e a fala longa pt-BR no perfil real (`pt_BR-faber-medium`) retorna `timeline="exato"`, 196 visemes, 203264 amostras a 22050 Hz, último viseme em 9218,322 ms e áudio de 9218 ms. A sincronização visual boca→timeline é provada pela galeria/Playwright e pelo relógio `AudioContext.currentTime`; sem teste humano de microfone nesta execução.
+
+### Fatia 05 — Tela do Command Center e seletor de dispositivos (`docs/spec/spec-voz-05-ui-command-center.md`)
+
+Status: **em implementação** — spec `aprovada-pi` (2026-09-09); issue [#352](https://github.com/RodReis/rrb-jarvisOS/issues/352), branch `feat/m17-f05-command-center-dispositivos`.
+
+- [x] Captura aplica `deviceId: { exact }`; ids persistem pela migration 45 e rótulos pela migration 46, permitindo aviso legível quando o dispositivo some.
+- [x] Primeiro uso pede permissão e escolha antes de liberar o push-to-talk; rótulos só aparecem após permissão.
+- [x] Saída usa `AudioContext.setSinkId` e só inicia o `AudioBufferSourceNode` depois da escolha resolver; ausência/recusa degrada para destino padrão com aviso.
+- [x] Medidor RMS usa `AnalyserNode` testável; durante gravação o RMS vem do mesmo PCM capturado, sem segundo stream. Ondas de saída leem a janela corrente do PCM reproduzido.
+- [x] Command Center deixa o card antigo: mascote grande, ondas, legenda sincronizada por `posicaoMs()`, botão e histórico no eixo central. Ondas e legenda atualizam por `ref`, sem redesenhar a árvore React por quadro.
+- [x] Command Center e demais telas são renderizadores do registro de módulos; `AppShell` apenas projeta rota para conteúdo, sem literal `voz`/`settings`.
+- [x] Testes focados: captura exata, medidor com `AnalyserNode` dublê, RMS de saída, espera por `setSinkId`, dispositivo sumiu/voltou, registro com renderizador, storage/preferências e regressões do shell.
+- [ ] Prova no app real: escolher dispositivos físicos, medir RMS/latência e registrar os valores em `reports/TESTS.md`.
+- [x] Prova visual nos dois temas e com movimento reduzido; coluna medida abaixo do teto de 780 px no viewport 1280×900.
+
+**Evidência automatizada:** Regras 1792, Banco 1234 e Tela 731, zero falhas; suíte integral com 3757 aprovados, 14 ignorados e 1 todo; build de produção verde. A primeira geração do relatório perdeu um worker de Banco e registrou 1225 aprovados; foi descartada e a categoria foi reexecutada limpa antes do carimbo. Prova visual local 3/3 após as correções; `npm run dev` vivo permanece evidência do SHA anterior até nova execução no CI. O bloqueio era ambiente herdado: `ELECTRON_RUN_AS_NODE=1` fazia o binário do Electron rodar como Node puro e mascarava a falha como import ESM de `BrowserWindow`. O script `dev` agora limpa essa variável antes de chamar o `electron-vite`. **Limite restante:** RMS do hardware, `setSinkId` físico e latência do loop completo ainda dependem do teste com microfone/saída reais do PI; permanecem `not_run`, não `pass`.
 
 ## MVP-027 — Política de PR e CI multiplataforma
 
