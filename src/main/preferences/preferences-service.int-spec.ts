@@ -78,7 +78,9 @@ describe('padrões do produto', () => {
       vozHotkey: 'Control+Shift+Space',
       vozTimeoutMs: 60_000,
       vozDaFala: 'pt_BR-faber-medium',
-      conversaJanela: 10
+      conversaJanela: 10,
+      vozEntradaId: null,
+      vozSaidaId: null
     })
   })
 

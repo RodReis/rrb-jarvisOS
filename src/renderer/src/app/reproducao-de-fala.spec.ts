@@ -85,6 +85,24 @@ function fala(amostras = 100, sampleRate = 22050): SpeechHandle {
 }
 
 describe('reprodução da fala', () => {
+  it('aplica a saída escolhida no contexto', () => {
+    const amb = ambienteFalso()
+    const setSinkId = vi.fn().mockResolvedValue(undefined)
+    const reprodutor = criarReprodutor({
+      criarContexto: () => Object.assign(amb.criarContexto(), { setSinkId })
+    })
+
+    reprodutor.tocar(fala(), 'alto-falante-2')
+
+    expect(setSinkId).toHaveBeenCalledWith('alto-falante-2')
+  })
+
+  it('degrada para saída padrão quando ambiente não suporta setSinkId', async () => {
+    const reprodutor = criarReprodutor(ambienteFalso())
+    const emCurso = reprodutor.tocar(fala(), 'alto-falante-2')
+    await expect(emCurso.saidaAplicada).resolves.toBe(false)
+  })
+
   it('nunca deixa duas fontes tocando ao mesmo tempo', () => {
     // O critério 7 literal: contar fontes ativas. Sem o cancelamento da anterior, as duas sairiam
     // pelo mesmo destino e o usuário ouviria as vozes sobrepostas.

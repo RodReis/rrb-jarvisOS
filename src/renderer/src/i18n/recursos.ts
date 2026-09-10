@@ -109,6 +109,14 @@ export const RECURSOS = {
         falhou: 'Nao foi possivel transcrever. Tentar de novo.',
         microfoneIndisponivel:
           'O microfone nao esta disponivel. Verifique a permissao do sistema e o dispositivo padrao.',
+        escolherMicrofone: 'Permitir e escolher microfone',
+        entrada: 'Microfone',
+        saida: 'Alto-falantes',
+        selecione: 'Selecione um dispositivo',
+        ondas: 'Nivel do audio',
+        saidaSemSuporte: 'Este ambiente nao permite escolher a saida de audio.',
+        nivelEntrada: 'Nivel do microfone',
+        dispositivoAusente: 'O dispositivo salvo {{ausente}} sumiu. Usando {{atual}}.',
         // Gravou, mas o VAD nao achou fala (SPEC-Voz-01, criterio 2: todo desfecho tem proxima acao).
         semFalaTitulo: 'Nao ouvi nada',
         semFala:
@@ -962,6 +970,14 @@ export const RECURSOS = {
         falhou: 'Could not transcribe. Try again.',
         microfoneIndisponivel:
           'The microphone is unavailable. Check system permission and the default device.',
+        escolherMicrofone: 'Allow and choose microphone',
+        entrada: 'Microphone',
+        saida: 'Speakers',
+        selecione: 'Select a device',
+        ondas: 'Audio level',
+        saidaSemSuporte: 'This environment does not support choosing an audio output.',
+        nivelEntrada: 'Microphone level',
+        dispositivoAusente: 'Saved device {{ausente}} disappeared. Using {{atual}}.',
         semFalaTitulo: 'I heard nothing',
         semFala:
           'The microphone recorded, but no speech was detected. Speak closer, or check which microphone is the system default.',

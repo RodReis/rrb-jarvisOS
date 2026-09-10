@@ -10,13 +10,18 @@
  */
 
 /** Começa a capturar e devolve a função que encerra e entrega o PCM. */
-export type CapturaDeAudio = () => Promise<() => Promise<Int16Array>>
+export type CapturaDeAudio = (deviceId?: string) => Promise<() => Promise<Int16Array>>
 
 const TAXA_DO_WHISPER = 16_000
 
-export const capturarPcm: CapturaDeAudio = async () => {
+export const capturarPcm: CapturaDeAudio = async (deviceId) => {
   const stream = await navigator.mediaDevices.getUserMedia({
-    audio: { channelCount: 1, sampleRate: TAXA_DO_WHISPER, echoCancellation: true }
+    audio: {
+      channelCount: 1,
+      sampleRate: TAXA_DO_WHISPER,
+      echoCancellation: true,
+      ...(deviceId ? { deviceId: { exact: deviceId } } : {})
+    }
   })
 
   const contexto = new AudioContext({ sampleRate: TAXA_DO_WHISPER })

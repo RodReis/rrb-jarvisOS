@@ -127,6 +127,9 @@ describe('migrations', () => {
     // A 44 acrescenta coluna a uma tabela que a v1 já tem: desfazer é remover a coluna, não a
     // tabela — dropar `user_profile` levaria junto o perfil que a v1 gravou.
     antigo.exec('ALTER TABLE user_profile DROP COLUMN conversa_janela')
+    // A 45 persiste as escolhas explícitas de entrada e saída (SPEC-Voz-05).
+    antigo.exec('ALTER TABLE user_profile DROP COLUMN voz_entrada_id')
+    antigo.exec('ALTER TABLE user_profile DROP COLUMN voz_saida_id')
     antigo.pragma('user_version = 1')
     antigo.close()
 

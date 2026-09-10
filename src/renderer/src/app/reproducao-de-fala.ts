@@ -27,6 +27,8 @@ export interface FalaEmCurso {
   readonly posicaoMs: () => number
   /** Resolve quando o áudio termina, ou imediatamente se foi cancelado. */
   readonly terminou: Promise<void>
+  /** `false` = ambiente recusou saída explícita e o áudio seguiu no destino padrão. */
+  readonly saidaAplicada: Promise<boolean>
 }
 
 /** O que este módulo precisa do ambiente. Injetado para o teste rodar sem Web Audio real. */
@@ -34,8 +36,10 @@ export interface DepsDaReproducao {
   readonly criarContexto: () => AudioContext
 }
 
+type ContextoComSaida = AudioContext & { setSinkId?: (sinkId: string) => Promise<void> }
+
 export function criarReprodutor(deps?: DepsDaReproducao): {
-  tocar: (fala: SpeechHandle) => FalaEmCurso
+  tocar: (fala: SpeechHandle, saidaId?: string) => FalaEmCurso
   cancelar: () => void
 } {
   const criarContexto = deps?.criarContexto ?? ((): AudioContext => new AudioContext())
@@ -52,12 +56,21 @@ export function criarReprodutor(deps?: DepsDaReproducao): {
   return {
     cancelar,
 
-    tocar(fala: SpeechHandle): FalaEmCurso {
+    tocar(fala: SpeechHandle, saidaId?: string): FalaEmCurso {
       // **Antes** de criar a nova: se a anterior continuasse, as duas sairiam pelo mesmo
       // destino e o usuário ouviria as vozes sobrepostas (critério 7).
       cancelar()
 
       const contexto = criarContexto()
+      const selecionarSaida = (contexto as ContextoComSaida).setSinkId
+      const saidaAplicada = saidaId
+        ? selecionarSaida
+          ? selecionarSaida.call(contexto, saidaId).then(
+              () => true,
+              () => false
+            )
+          : Promise.resolve(false)
+        : Promise.resolve(true)
       const buffer = contexto.createBuffer(1, fala.pcm.length, fala.sampleRate)
       const canal = buffer.getChannelData(0)
 
@@ -104,7 +117,8 @@ export function criarReprodutor(deps?: DepsDaReproducao): {
       return {
         cancelar: parar,
         posicaoMs: () => Math.max(0, (contexto.currentTime - inicioSegundos) * 1000),
-        terminou
+        terminou,
+        saidaAplicada
       }
     }
   }

@@ -2232,7 +2232,7 @@ Status: **entregue na PR [#347](https://github.com/RodReis/rrb-jarvisOS/pull/347
 
 ### Fatia 04 — Mascote com lip-sync por visemes e estados (`docs/spec/spec-voz-04-mascote-lipsync.md`)
 
-Status: **em implementação** — spec `aprovada-pi` (2026-09-09); issue [#351](https://github.com/RodReis/rrb-jarvisOS/issues/351). F04 consome a timeline de visemes da F02 e os estados do loop da F03; a F05 ([#352](https://github.com/RodReis/rrb-jarvisOS/issues/352)) consome o `posicaoMs()` introduzido aqui.
+Status: **entregue e aceita** — issue [#351](https://github.com/RodReis/rrb-jarvisOS/issues/351), PR [#353](https://github.com/RodReis/rrb-jarvisOS/pull/353), mergeada em 2026-09-09. F04 entrega o `posicaoMs()` consumido pela F05.
 
 - [x] **Verificação obrigatória do asset:** `src/design/assets/jarvis-cabeca.jpg` é a cabeça mecânica do protótipo; a boca fica na mandíbula/grade, sem lábios humanos e sem asset novo.
 - [x] **`src/renderer/src/app/reproducao-de-fala.ts`** expõe `posicaoMs()` baseado em `AudioContext.currentTime`, não em `Date.now()`.
@@ -2242,6 +2242,21 @@ Status: **em implementação** — spec `aprovada-pi` (2026-09-09); issue [#351]
 - [x] **Guarda de contrato:** `Record<Viseme, PoseDaBoca>` exaustivo; lint barra `switch` sobre `viseme` no DS.
 - [x] **Prova visual:** `GaleriaDoMascote` cobre 15 poses, 4 estados e `prefers-reduced-motion` mantendo lip-sync.
 - [x] **Verificação no app real:** build atual monta os mascotes com `data-estado="idle"` e a fala longa pt-BR no perfil real (`pt_BR-faber-medium`) retorna `timeline="exato"`, 196 visemes, 203264 amostras a 22050 Hz, último viseme em 9218,322 ms e áudio de 9218 ms. A sincronização visual boca→timeline é provada pela galeria/Playwright e pelo relógio `AudioContext.currentTime`; sem teste humano de microfone nesta execução.
+
+### Fatia 05 — Tela do Command Center e seletor de dispositivos (`docs/spec/spec-voz-05-ui-command-center.md`)
+
+Status: **em implementação** — spec `aprovada-pi` (2026-09-09); issue [#352](https://github.com/RodReis/rrb-jarvisOS/issues/352), branch `feat/m17-f05-command-center-dispositivos`.
+
+- [x] Captura aplica `deviceId: { exact }`; escolha de entrada e saída persiste no perfil pela migration 45.
+- [x] Primeiro uso pede permissão e escolha antes de liberar o push-to-talk; rótulos só aparecem após permissão.
+- [x] Saída usa `AudioContext.setSinkId`; ausência/recusa degrada para destino padrão com aviso.
+- [x] Medidor RMS usa `AnalyserNode`; ondas declaram fonte `entrada`, `saida` ou `repouso` pelo estado real.
+- [x] Command Center deixa o card antigo: mascote grande, ondas, legenda sincronizada por `posicaoMs()`, botão e histórico no eixo central.
+- [x] Testes focados: captura exata, fallback de saída, primeira escolha, storage/preferências e regressões do shell.
+- [ ] Prova no app real: escolher dispositivos físicos, medir RMS/latência e registrar os valores em `reports/TESTS.md`.
+- [x] Prova visual nos dois temas e com movimento reduzido; coluna medida abaixo do teto de 780 px no viewport 1280×900.
+
+**Evidência automatizada:** Regras 1789, Banco 1234 e Tela 728, zero falhas; prova visual 3/3 e build de produção verde. **Bloqueio da prova física:** `npm run dev` sobe o renderer em `5180`, mas o processo Electron desta máquina cai ao importar `BrowserWindow` do pacote `electron`; sem janela viva não foi possível medir RMS do hardware, confirmar `setSinkId` no dispositivo físico nem medir latência do loop. Esses três itens permanecem `not_run`, não `pass`.
 
 ## MVP-027 — Política de PR e CI multiplataforma
 

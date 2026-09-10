@@ -120,6 +120,9 @@ export interface UserProfile {
    * fábrica (`JANELA_PADRAO_DA_CONVERSA`). Ver a migration 44.
    */
   readonly conversaJanela: number | null
+  /** Dispositivos de voz escolhidos. `null` = escolha ainda não feita. */
+  readonly vozEntradaId?: string | null
+  readonly vozSaidaId?: string | null
 }
 
 /** O que a tela de Settings e a CHOICE alteram. Todos opcionais: a UI muda um de cada vez. */
@@ -134,6 +137,12 @@ export interface UserPreferences {
   readonly vozTimeoutMs?: number
   readonly vozDaFala?: VozDaFalaPreferida
   readonly conversaJanela?: number
+  readonly vozEntradaId?: string
+  readonly vozSaidaId?: string
+}
+
+export function isDeviceId(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0 && value.length <= 512
 }
 
 /**

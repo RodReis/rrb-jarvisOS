@@ -16,6 +16,7 @@ import { GaleriaDoBrief, type CenaDoBrief } from './GaleriaDoBrief'
 import { GaleriaDeMarcos, type CenaDeMarcos } from './GaleriaDeMarcos'
 import { GaleriaDaArquitetura, type CenaDaArquitetura } from './GaleriaDaArquitetura'
 import { GaleriaDoMascote } from './GaleriaDoMascote'
+import { GaleriaDoCommandCenter } from './GaleriaDoCommandCenter'
 import { initI18n } from '@renderer/i18n'
 import type { ModoUi, Modulo } from '@design/tokens/semantic'
 import type { CorAcento } from '@design/tokens/acento'
@@ -144,6 +145,7 @@ const GALERIAS = {
     />
   ),
   mascote: () => <GaleriaDoMascote modo={modo} acento={acento ?? undefined} />,
+  'command-center': () => <GaleriaDoCommandCenter modo={modo} />,
   planejamento: () => (
     <GaleriaDaJornadaDePlanejamento
       modo={modo}
@@ -187,7 +189,13 @@ const galeria = GALERIAS[qual as keyof typeof GALERIAS]()
  * `await` no topo: o Vite serve como ESM, e renderizar antes de o i18next resolver deixaria o
  * primeiro frame com as chaves — exatamente o que a captura pegaria.
  */
-const TRADUZ_POR_I18N: readonly string[] = ['planejamento', 'brief', 'projetos', 'arquitetura']
+const TRADUZ_POR_I18N: readonly string[] = [
+  'planejamento',
+  'brief',
+  'projetos',
+  'arquitetura',
+  'command-center'
+]
 if (TRADUZ_POR_I18N.includes(qual)) await initI18n('pt-BR')
 
 createRoot(raiz).render(<StrictMode>{galeria}</StrictMode>)

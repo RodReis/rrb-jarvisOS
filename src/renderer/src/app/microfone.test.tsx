@@ -77,8 +77,24 @@ function capturaFalsa(amostras = 16_000): () => Promise<() => Promise<Int16Array
  * `terminou` resolve na hora porque o que se mede aqui é **que a fala foi pedida**, não quanto
  * ela dura; um dublê que nunca resolvesse travaria o teste no `await`.
  */
-function reprodutorFalso(): { tocar: () => { terminou: Promise<void> }; cancelar: () => void } {
-  return { tocar: () => ({ terminou: Promise.resolve(), cancelar: () => {} }), cancelar: () => {} }
+function reprodutorFalso(): {
+  tocar: () => {
+    terminou: Promise<void>
+    cancelar: () => void
+    posicaoMs: () => number
+    saidaAplicada: Promise<boolean>
+  }
+  cancelar: () => void
+} {
+  return {
+    tocar: () => ({
+      terminou: Promise.resolve(),
+      cancelar: () => {},
+      posicaoMs: () => Number.MAX_SAFE_INTEGER,
+      saidaAplicada: Promise.resolve(true)
+    }),
+    cancelar: () => {}
+  }
 }
 
 function montar(capturar = capturaFalsa()): ReturnType<typeof render> {
@@ -87,11 +103,42 @@ function montar(capturar = capturaFalsa()): ReturnType<typeof render> {
     <Microfone
       workspace="jarvis"
       vozDaFala="pt_BR-faber-medium"
+      entradaId="microfone-teste"
       capturar={capturar}
       criarFala={reprodutorFalso as never}
     />
   )
 }
+
+describe('primeiro uso escolhe dispositivo (SPEC-Voz-05)', () => {
+  it('pede permissão e mantém falar bloqueado até escolher microfone', async () => {
+    const getUserMedia = vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] })
+    const enumerateDevices = vi.fn().mockResolvedValue([
+      { kind: 'audioinput', deviceId: 'headset', label: 'Headset USB', groupId: '' },
+      { kind: 'audiooutput', deviceId: 'caixas', label: 'Caixas', groupId: '' }
+    ])
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia, enumerateDevices }
+    })
+
+    render(
+      <Microfone
+        workspace="jarvis"
+        vozDaFala="pt_BR-faber-medium"
+        capturar={capturaFalsa()}
+        criarFala={reprodutorFalso as never}
+      />
+    )
+
+    await userEvent.click(await screen.findByRole('button', { name: /permitir e escolher/i }))
+
+    expect(await screen.findByRole('meter', { name: /nivel do microfone/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /segure para falar/i })).toBeDisabled()
+    await userEvent.click(screen.getAllByRole('combobox')[0])
+    expect(await screen.findByText('Headset USB')).toBeInTheDocument()
+  })
+})
 
 describe('runtime ausente é convite, não erro (critério 4)', () => {
   it('oferece baixar quando falta artefato, em vez de dizer que falhou', async () => {
