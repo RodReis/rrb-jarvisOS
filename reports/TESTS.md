@@ -379,3 +379,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-10 | #351 | spec-voz-04-mascote-lipsync | Regras de Negócio | 1786 | 1786 | 0 | 78.4 | #353 | [#353](https://github.com/RodReis/rrb-jarvisOS/pull/353) |
 | 2026-09-10 | #351 | spec-voz-04-mascote-lipsync | Banco | 1248 | 1234 | 0 | 86.5 | #353 | [#353](https://github.com/RodReis/rrb-jarvisOS/pull/353) |
 | 2026-09-10 | #351 | spec-voz-04-mascote-lipsync | Tela | 728 | 727 | 0 | 76.8 | #353 | [#353](https://github.com/RodReis/rrb-jarvisOS/pull/353) |
+| 2026-09-10 | #352 | spec-voz-05-ui-command-center | Regras de Negócio | 1789 | 1789 | 0 | 78.0 | #354 | [#354](https://github.com/RodReis/rrb-jarvisOS/pull/354) |
+| 2026-09-10 | #352 | spec-voz-05-ui-command-center | Banco | 1248 | 1234 | 0 | 86.6 | #354 | [#354](https://github.com/RodReis/rrb-jarvisOS/pull/354) |
+| 2026-09-10 | #352 | spec-voz-05-ui-command-center | Tela | 729 | 728 | 0 | 76.3 | #354 | [#354](https://github.com/RodReis/rrb-jarvisOS/pull/354) |
