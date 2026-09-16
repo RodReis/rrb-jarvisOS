@@ -199,13 +199,16 @@ export class CodingExecutorRuntime {
 
   /** O desfecho da recusa: status próprio, uso vazio, adapter intocado (critério 4). */
   private recusar(request: ExecutorRequest, recusa: Recusa): ExecutorResult {
+    // A mensagem cita nome de executor e revisão, dados que vêm do request/adapter — a mesma
+    // regra 5 que se aplica a toda evidência se aplica aqui.
+    const mensagem = redigirSegredos(recusa.mensagem)
     const resultado: ExecutorResult = {
       status: 'recusado',
       attemptId: request.attemptId,
-      resumo: recusa.mensagem,
+      resumo: mensagem,
       pathsAlterados: [],
       validacoes: [],
-      evidencias: [recusa.mensagem],
+      evidencias: [mensagem],
       // A assinatura da recusa é o **motivo**, não a mensagem: é o que agrupa "recusado pelo
       // mesmo problema" na auditoria, e a mensagem carrega nomes que variam por executor.
       assinaturaDeFalha: `recusa:${recusa.motivo}`,
@@ -259,9 +262,12 @@ export class CodingExecutorRuntime {
       // executasse comando — que é o `ConstrutorService`, outra camada.
       validacoes: [],
       evidencias,
+      // O adapter pode reportar seu próprio `duracaoMs` (tempo do modelo); só cai para o
+      // wall-clock do runtime quando ele não o reportou — sobrescrever sempre perderia o
+      // número que o adapter mediu em favor de um que inclui spawn, stream e teardown.
       ...(estado.uso === undefined
         ? {}
-        : { uso: { ...estado.uso, duracaoMs: contexto.duracaoMs } }),
+        : { uso: { ...estado.uso, duracaoMs: estado.uso.duracaoMs ?? contexto.duracaoMs } }),
       ...(estado.sessao === undefined ? {} : { sessaoRetomavel: estado.sessao }),
       ...(assinatura === undefined ? {} : { assinaturaDeFalha: assinatura }),
       diagnosticos: estado.diagnosticos

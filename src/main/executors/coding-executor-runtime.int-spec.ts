@@ -71,7 +71,8 @@ const cenarioDoFake = (): CenarioDoContrato => ({
     new FakeCodingExecutorAdapter({
       eventos: [{ tipo: 'started' }, { tipo: 'done' }],
       modosSuportados: ['unmetered'],
-      revisoesSuportadas: ['revisao-padrao']
+      revisoesSuportadas: ['revisao-padrao'],
+      suportaSchemaDeSaida: false
     })
 })
 
@@ -117,6 +118,49 @@ describe('CodingExecutorRuntime — redaction da evidencia (regra 5)', () => {
     expect(resultado.evidencias.join('\n')).not.toContain(
       'ghp_abcdefghijklmnopqrstuvwxyz0123456789'
     )
+  })
+
+  it('redige segredo que aparecer na mensagem de recusa', async () => {
+    const runtime = new CodingExecutorRuntime()
+    const adapter = new FakeCodingExecutorAdapter({
+      eventos: [],
+      modosSuportados: ['unmetered']
+    })
+    // Força a recusa pelo motivo "executor": o nome do adapter entra na mensagem de erro, e
+    // aqui carrega um padrão de segredo reconhecível — artificial, mas prova que a redação
+    // roda também no caminho da recusa, não só no caminho normal de execução.
+    Object.defineProperty(adapter, 'nome', {
+      value: 'ghp_abcdefghijklmnopqrstuvwxyz0123456789',
+      writable: false
+    })
+
+    const resultado = await runtime.executar(
+      requestDeTeste({ executor: 'outro-executor' }),
+      adapter
+    )
+
+    expect(resultado.status).toBe('recusado')
+    expect(resultado.resumo).not.toContain('ghp_abcdefghijklmnopqrstuvwxyz0123456789')
+    expect(resultado.evidencias.join('\n')).not.toContain(
+      'ghp_abcdefghijklmnopqrstuvwxyz0123456789'
+    )
+  })
+})
+
+describe('CodingExecutorRuntime — duracaoMs do adapter (uso)', () => {
+  it('preserva o duracaoMs que o adapter reportou, nao o sobrescreve pelo wall-clock do runtime', async () => {
+    const runtime = new CodingExecutorRuntime()
+    const adapter = new FakeCodingExecutorAdapter({
+      eventos: [
+        { tipo: 'started' },
+        { tipo: 'usage', tokensEntrada: 10, tokensSaida: 5, duracaoMs: 8000 },
+        { tipo: 'done' }
+      ]
+    })
+
+    const resultado = await runtime.executar(requestDeTeste(), adapter)
+
+    expect(resultado.uso?.duracaoMs).toBe(8000)
   })
 })
 

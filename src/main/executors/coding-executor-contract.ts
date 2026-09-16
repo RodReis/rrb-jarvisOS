@@ -196,6 +196,19 @@ export function rodarContractDoExecutor(nome: string, criarCenario: () => Cenari
       expect(execucoes(adapter)).toBe(0)
     })
 
+    it('schema de saida incompativel recusa sem tocar o executor (criterio 4)', async () => {
+      const runtime = new CodingExecutorRuntime()
+      const adapter = criarCenario().restrito()
+      const resultado = await runtime.executar(
+        requestDeTeste({ schemaDeSaida: '{"type":"object"}' }),
+        adapter
+      )
+
+      expect(resultado.status).toBe('recusado')
+      expect(resultado.assinaturaDeFalha).toBe('recusa:schema')
+      expect(execucoes(adapter)).toBe(0)
+    })
+
     it('o adapter nao recebe credencial, so referencia opaca (criterio 5)', async () => {
       const runtime = new CodingExecutorRuntime()
       const adapter = criarCenario().sucesso()
