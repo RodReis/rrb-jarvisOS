@@ -1,4 +1,4 @@
-# CLAUDE.md — rrb-jarvisOS
+# CLAUDE.md — rrb-jarvisOS - Code/Codex
 
 Desktop app **local-first** (Electron + React + TypeScript) com dois espaços de usuário — **NOA** (pessoal) e **JARVIS OS** (profissional/operacional) — sobre uma plataforma compartilhada (**Desenvolvimento**). Sync/auth via Supabase Cloud como espelho, nunca como fonte de verdade operacional. Base: `docs/DECISIONS.md` (ADR-001).
 
@@ -7,6 +7,7 @@ Desktop app **local-first** (Electron + React + TypeScript) com dois espaços de
 | Doc | O que é |
 |---|---|
 | `docs/DEVELOPMENT.md` | **Sua ordem de execução e status por item (você é o dono; atualize a cada entrega junto com STATUS.md)** |
+| `docs/APRENDIZADOS.md` | Consolidação da seção **Aprendizado** dos comentários de encerramento, mantida pelo Cowork. Curto, com teto e regra de promoção: leitura obrigatória do Code/Codex no passo 1 de todo card |
 | `docs/ARCHITECTURE.md` | Desenho, módulos, dados, resiliência |
 | `docs/DECISIONS.md` | ADRs (ler antes de propor mudança estrutural) |
 | `docs/CONVENTION.md` | Contrato do processo (labels `proplan:*`) e contrato de dados das entidades |
@@ -17,12 +18,28 @@ Desktop app **local-first** (Electron + React + TypeScript) com dois espaços de
 | `docs/GUIA-PRS-CLAUDE-CODE.md` | rotina de autoria, revisão, CI e evidência das PRs deste repositório; distingue orientação operacional de evolução da pipeline |
 | `docs/spec/` | Specs por fatia — só implemente fatia com spec `aprovada-pi` |
 | `docs/mvp/` | MVPs (épicos) com checklist das fatias previstas |
+| `docs/iniciais/` | **Fonte canônica do escopo comprometido** — requisitos, plano, fronteiras e PRD do design system. Tudo que está lá é escopo a entregar até o fim |
+| `docs/RASTREABILIDADE.md` | Matriz normativa que prova para onde cada requisito aprovado foi: `mantido`, `transferido`, `absorvido`, `adiado` ou `excluído`. Ausência na matriz bloqueia aprovação documental |
+| `docs/FORA-DE-ESCOPO.md` | **View gerada** da matriz — só o que saiu (`transferido`/`adiado`/`excluído`). Somente leitura; editar à mão é violação de processo |
+| `docs/DIMENSIONAMENTO.md` | Escalas T (tamanho) e R (risco) de MVP — obrigatórias no cabeçalho de todo MVP |
+
 
 ## Papéis e governança
 
 - **Rodrigo Reis (PI)** — decide escopo, prioridades e trade-offs; aprova specs e aceita entregas. **Não executa o fluxo**: não cria issue, não commita, não abre PR e não faz merge. O aceite é dele; a execução é do Code.
 - **Claude Cowork (planejamento)** — especifica e mantém `docs/` e as specs em `docs/spec/`. Antes de finalizar qualquer spec, apresenta as perguntas abertas e dúvidas ao PI — spec só vira `aprovada-pi` com todas resolvidas (evitar retrabalho). Quando a spec vira `aprovada-pi`, **cria a issue-fatia no board** (coluna Backlog, assignee PI) — ou, se a issue foi pré-criada em `proplan:planejado`, troca o label para `proplan:backlog` na mesma issue, sem criar outra. **Nunca implementa código** — implementação é exclusiva do Claude Code.
-- **Claude Code (você)** — planeja, codifica, testa (código, UX e UI — pode usar as skills do impeccable), atualiza a documentação e **sempre commita todos os documentos de `docs/`** junto da entrega. Implementa a partir deste arquivo + `docs/` + spec da feature em `docs/spec/`. **Não cria a issue** (é do Cowork) — pega o card, move pelo fluxo e entrega com PR. Pode criticar arquitetura, **não escopo**. Sem spec para a tarefa, ou spec ambígua → perguntar ao PI antes de codificar, nunca assumir. Deve apontar problemas técnicos da spec — a correção passa pelo PI.
+- **Claude Code (você)** — planeja, codifica, testa (código, UX e UI — pode usar as skills do impeccable), atualiza a documentação e **sempre commita todos os documentos de `docs/` do cowork e o CLAUDE.md** junto da entrega. Implementa a partir deste arquivo + `docs/` + spec da feature em `docs/spec/`. **Não cria a issue de fatia** (é do Cowork) — pega o card, coloca para `proplan:todo` move pelo fluxo e entrega com PR. **Exceção: cria a própria issue `[FIX]`** de bug com comportamento correto já documentado (`docs/ARCHITECTURE.md`/spec existente/`STATUS.md`), citando a fonte no corpo — ver *Correção: o Code cria a própria issue* abaixo. Reclassificar fatia como `[FIX]` para pular spec e aval é proibido. Pode criticar arquitetura, **não escopo**. Sem spec para a tarefa, ou spec ambígua → perguntar ao PI antes de codificar, nunca assumir. Deve apontar problemas técnicos da spec — a correção passa pelo PI.
+
+## Ciclo de vida do card — labels `proplan:*` e quem move
+
+| Transição | Quem | Quando |
+|---|---|---|
+| → `planejado` | Cowork | spec em rascunho, dúvidas abertas com o PI |
+| `planejado` → `backlog` | Cowork | dúvidas resolvidas; **mesma issue** (troca o label, não cria outra), assignee PI, corpo com link para a Slice do PRD |
+| `backlog` → `todo` | Cowork | os próximos 5 cards da ordem de implementação |
+| `todo` → `doing` | Code/Codex | ao iniciar o card — sempre o primeiro `todo` da ordem |
+| `doing` → `done` | Code/Codex | após confirmar o merge na origem **e publicar o comentário de encerramento** na issue; link do PR no corpo da issue |
+| `done` → `finalizado` + fechar a issue | **PI** | aceite. Só o PI. Nenhuma automação fecha issue |
 
 ### Hierarquia: MVP (épico) → fatia
 
@@ -143,6 +160,50 @@ mantém honesto — sem parágrafo que define o certo, não é bug.
 Fluxo do FIX auto-criado: cria em Backlog → todo/doing → PR com `refs #N`
 (nunca `closes`) → done após o merge. **Só o dono** fecha e aceita.
 
+### Encerramento de card (obrigatório)
+
+Depois do merge confirmado na origem e **antes** de aplicar `proplan:done`, o Code/Codex publica na issue do card um comentário de encerramento com três seções: **Resumo da implementação**, **Aprendizado** e **Imprevistos**. Formato, regras de conteúdo e comandos: skill `fechar-card`.
+
+`proplan:done` só pode ser aplicada se esse comentário existir — issue em `proplan:done` sem comentário de encerramento é violação de processo e o PI devolve o card. Seção sem conteúdo real recebe "Nenhum": ninguém inventa aprendizado nem imprevisto para preencher template. Aprendizado só entra com fonte verificável (doc oficial, commit, log, comando). O comentário na issue é a fonte de verdade da entrega; o resumo no chat só aponta para ele. A seção **Aprendizado** é consolidada pelo Cowork em `docs/APRENDIZADOS.md` no fecho de cada MVP — protocolo no cabeçalho daquele arquivo.
+
+Não existe gate de aprovação de spec (decisão do PI). O que trava uma entrega é **CI verde** e **aceite do PI** — nada mais.
+
+O Code/Codex só para quando `todo` está vazio ou quando cai num dos dois casos abaixo.
+
+## Escopo comprometido — nenhum requisito desaparece
+
+Fonte canônica do escopo: **`docs/iniciais/`**. Tudo que está definido lá — requisito ou
+funcionalidade — é escopo comprometido até o fim do produto, tanto na **especificação** quanto
+na **implementação**, salvo decisão explícita do PI registrada em `docs/RASTREABILIDADE.md`.
+
+- **Fatiar não reduz escopo.** Decomposição em MVP, SPEC ou fatia altera ordem e unidade de
+  entrega, nunca o resultado comprometido.
+- **Requisito não pode desaparecer.** Todo requisito removido do MVP de origem é classificado
+  como `transferido`, `absorvido`, `adiado` ou `excluído`, com motivo, destino quando
+  aplicável, gatilho, decisor e data na matriz. `transferido` continua obrigatório e aponta
+  para um MVP posterior **nomeado**. `adiado` sem gatilho **e** data de reavaliação não
+  existe — é exclusão, e exige ser assinada como tal.
+- **Mudança de destino exige decisão explícita do PI.** Cowork e Code **propõem**; nenhum dos
+  dois reclassifica requisito por conta própria — nem por simplificação de implementação,
+  nem por "ficou óbvio que não precisa", nem por omissão silenciosa numa SPEC.
+- **Aprovação de uma fatia não aprova cortes no MVP**, e aprovação de uma SPEC não aprova o
+  que ela deixou de fora. Aceite de fatia é aceite daquela fatia.
+- **Ausência na matriz bloqueia aprovação documental.** SPEC não vira `aprovada-pi`, e MVP
+  não é aprovado, se tocar requisito sem linha válida na matriz. Isto **não** cria novo gate
+  de entrega: o que trava entrega continua sendo CI verde e aceite do PI. O comentário de
+  encerramento do card cita os IDs entregues — como evidência, não como gate.
+- **`docs/FORA-DE-ESCOPO.md` é view gerada da matriz**, nunca fonte. Alternativa técnica
+  proposta e não escolhida não entra lá: isso é decisão, e mora no ADR ou na seção de
+  decisões da SPEC.
+
+### Dimensionamento do MVP (obrigatório)
+
+Todo MVP novo ou reaberto declara no cabeçalho **T (tamanho)** e **R (risco)** calculados por
+`docs/DIMENSIONAMENTO.md`, com a conta à vista — faixa sem conta não é verificável. T e R são
+independentes e ambos obrigatórios. `T-enorme` ou `R-crítico` não veta nada por si: obriga
+decisão registrada do PI antes da primeira fatia. Ao fechar o MVP, o Cowork registra o real
+medido e propõe recalibração quando divergir mais de uma faixa.
+
 ## Regras técnicas invioláveis (resumo — detalhe no ARCHITECTURE.md)
 
 - Renderer **nunca** acessa Node, segredo ou executa comando direto. IPC mínimo e tipado via preload; `contextIsolation` on, `nodeIntegration` off.
@@ -155,8 +216,37 @@ Fluxo do FIX auto-criado: cria em Backlog → todo/doing → PR com `refs #N`
 
 Priorizam cautela sobre velocidade; em tarefa trivial, bom senso.
 
-- **Pense antes de codificar.** Não presuma: declare suposições, exponha interpretações alternativas, aponte a abordagem mais simples. Em dúvida, pare e pergunte ao PI (já é regra: sem spec → perguntar).
-- **Simplicidade primeiro.** Código mínimo que resolve. Sem abstração de uso único, sem flexibilidade não pedida, sem tratar cenário impossível.
+- **Pense antes de codificar.** Não presuma: declare suposições, exponha interpretações alternativas, aponte a abordagem de **maior valor** e o custo de cada uma (nunca "a mais simples" como recomendação — ver critério abaixo). Em dúvida, pare e pergunte ao PI (já é regra: sem spec → perguntar).
+- **Recomendação por valor, nunca por conveniência.** Toda recomendação — técnica, de
+  implementação, de alternativa ou de corte — é decidida pelo que é **melhor para o
+  projeto**, nunca pelo que é mais fácil, mais simples, menor ou mais barato de implementar.
+  Critérios, em ordem lexicográfica de desempate:
+  1. **Segurança e integridade do dado** — Policy Engine, Vault, auditoria, RLS, escopo de
+     entidade, IPC. Perde aqui, perde: nenhuma outra dimensão compensa.
+  2. **Valor operacional** — frequência de uso real × dor que evita. O que o PI usa todo dia
+     vale mais que o que ele usaria uma vez por trimestre.
+  3. **Valor técnico e reversibilidade** — durabilidade da decisão e custo de errar. Decisão
+     irreversível (formato de dado persistido, protocolo de sync, migração destrutiva) puxa
+     para a opção conservadora mesmo com menos valor nas linhas acima.
+  4. **Custo de implementação** — entra **somente como desempate** entre opções equivalentes
+     nas três linhas anteriores.
+
+  - **Custo é dado declarado, nunca justificativa.** O Code informa esforço, complexidade e
+    impacto em prazo em toda proposta — o PI decide trade-off e precisa do número. O que é
+    proibido é *usar* o custo como razão: "recomendo A porque é mais simples" é resposta
+    inválida; "recomendo A por [1-3]; A custa ~X, B custa ~Y" é a forma correta.
+  - **Opções apresentadas não são descartáveis.** Toda proposta mostra as opções reais que
+    existiam, o que cada uma entrega e o que cada uma custa. Opção única só é admissível
+    quando não há alternativa real, e isso precisa estar dito. Opção recusada pelo PI vira
+    registro de decisão (ADR ou seção de decisões da SPEC), não some.
+  - **Bloqueio se declara, não se contorna.** Se a opção de maior valor não cabe no prazo ou
+    no orçamento, o Code recomenda **essa** e declara o bloqueio. Quem corta é o PI — nunca o
+    Code por antecipação.
+- **Simplicidade primeiro — na implementação, não na escolha.** As duas regras governam coisas
+  diferentes: o critério de valor escolhe **entre** opções; a simplicidade governa **como se
+  implementa** a opção escolhida. Código mínimo que resolve. Sem abstração de uso único, sem
+  flexibilidade não pedida, sem tratar cenário impossível. Escolher a opção certa nunca
+  autoriza código especulativo; simplicidade de código nunca autoriza escolher a opção pior.
 - **Alterações cirúrgicas.** Cada linha alterada rastreável ao pedido. Não refatore o que não quebrou; mantenha o estilo existente; código morto não relacionado se aponta, não se apaga. **Exceção:** atualizar `docs/` é escopo obrigatório da entrega, não "melhoria adjacente".
 - **Execução verificável.** Traduza tarefa em critério checável ("adicionar validação" → "teste para entrada inválida passa"). `dev`, `test`, `lint` verdes é o piso.
 
@@ -220,7 +310,9 @@ O repo tem um grafo de conhecimento persistente em `graphify-out/` (gerado pela 
 - **Ao final de cada entrega** (junto com STATUS.md/DEVELOPMENT.md): Sempre me pergunta se pode ou não fazer o comando `/graphify . --update` — incremental, re-extrai só arquivos novos/alterados via manifest. Não recrie o grafo do zero.
 - `graphify-out/` é artefato local (cache), não entra em commit.
 
-## Skills relevantes a usar (Claude Code)
+## Skills relevantes a usar (Code/Codex)
+
+`gstack:*`, `fechar-card` e `impeccable` estão instalados globalmente na máquina do PI (Windows) — o Code/Codex os usa normalmente lá. Em qualquer ambiente onde uma dessas skills não exista, isso não é desculpa para pular a disciplina que ela representa: aplicar o equivalente manual (revisão de design, acabamento visual, **comentário de encerramento com as três seções**) e registrar na PR.
 
 - `superpowers:brainstorming` — antes de implementar feature não-trivial
 - `superpowers:writing-plans` — pra task com mais de 1 etapa de DB/API

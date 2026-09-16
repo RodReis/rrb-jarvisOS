@@ -32,3 +32,6 @@ graphify-out
 # Artefatos do Playwright (E2E) — saída de execução, não fonte.
 test-results
 playwright-report
+
+# Estado local de skills de terceiros — não é fonte do projeto.
+.superpowers/
