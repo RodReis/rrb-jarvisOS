@@ -147,11 +147,11 @@ O contrato comum dos registros/eventos possui envelope versionado por tipo, orig
 
 Fonte: `docs/superpowers/specs/2026-08-30-mvp-007-memoria-compartilhada-design.md`.
 
-### Pipeline V2 aprovada (não implementada)
+### Pipeline V2 aprovada (em implementação)
 
 `MVP-010 Multi-executor → MVP-011 Squads limitados → MVP-012 Scheduler concorrente → MVP-013 Execução contínua`.
 
-- `CodingExecutorRuntime` é irmão de `AIProviderRuntime` e `ConnectorRuntime`; Claude Code e Codex implementam adapters próprios.
+- `CodingExecutorRuntime` é irmão de `AIProviderRuntime` e `ConnectorRuntime`; Claude Code e Codex implementam adapters próprios. **O contrato e o runtime existem** em `src/main/executors/` desde a M10-F01: tipos, máquina de estados da tentativa (em memória), recusa antes do spawn e contract test reutilizável. Os adapters concretos são F02/F03; a persistência do estado da tentativa e a migração do `ConstrutorService` da V1 ficam para a fatia que as pedir.
 - V1 mantém um slot global; V2 permite dois executores globais e até duas fatias independentes por projeto.
 - O núcleo determinístico continua dono de gates, fila, efeitos externos, Git e merge; Squads não ampliam a SPEC.
 - A V2 termina no merge do DAG aprovado. Deploy e produção permanecem fora.
