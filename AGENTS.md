@@ -1,4 +1,4 @@
-# CLAUDE.md — rrb-jarvisOS - Code
+# AGENTS.md — rrb-jarvisOS - Codex
 
 Desktop app **local-first** (Electron + React + TypeScript) com dois espaços de usuário — **NOA** (pessoal) e **JARVIS OS** (profissional/operacional) — sobre uma plataforma compartilhada (**Desenvolvimento**). Sync/auth via Supabase Cloud como espelho, nunca como fonte de verdade operacional. Base: `docs/DECISIONS.md` (ADR-001).
 
@@ -7,7 +7,7 @@ Desktop app **local-first** (Electron + React + TypeScript) com dois espaços de
 | Doc | O que é |
 |---|---|
 | `docs/DEVELOPMENT.md` | **Sua ordem de execução e status por item (você é o dono; atualize a cada entrega junto com STATUS.md)** |
-| `docs/APRENDIZADOS.md` | Consolidação da seção **Aprendizado** dos comentários de encerramento, mantida pelo Cowork. Curto, com teto e regra de promoção: leitura obrigatória do Code no passo 1 de todo card |
+| `docs/APRENDIZADOS.md` | Consolidação da seção **Aprendizado** dos comentários de encerramento, mantida pelo Cowork. Curto, com teto e regra de promoção: leitura obrigatória do Code/Codex no passo 1 de todo card |
 | `docs/ARCHITECTURE.md` | Desenho, módulos, dados, resiliência |
 | `docs/DECISIONS.md` | ADRs (ler antes de propor mudança estrutural) |
 | `docs/CONVENTION.md` | Contrato do processo (labels `proplan:*`) e contrato de dados das entidades |
@@ -15,7 +15,7 @@ Desktop app **local-first** (Electron + React + TypeScript) com dois espaços de
 | `docs/LANDSCAPE.md` | Mapa do território: domínios, módulos e onde cada documento mora |
 | `docs/TESTING.md` | processo obrigatório de testes, QA, relatório e evidência por SPEC/issue |
 | `docs/CI-PR.md` | política de PR rápida: jobs paralelos, gate único, medição de duração e limites |
-| `docs/GUIA-PRS-CLAUDE-CODE.md` | rotina de autoria, revisão, CI e evidência das PRs deste repositório; distingue orientação operacional de evolução da pipeline |
+| `docs/GUIA-PRS-CODE.md` | rotina de autoria, revisão, CI e evidência das PRs deste repositório; distingue orientação operacional de evolução da pipeline |
 | `docs/spec/` | Specs por fatia — só implemente fatia com spec `aprovada-pi` |
 | `docs/mvp/` | MVPs (épicos) com checklist das fatias previstas |
 | `docs/iniciais/` | **Fonte canônica do escopo comprometido** — requisitos, plano, fronteiras e PRD do design system. Tudo que está lá é escopo a entregar até o fim |
@@ -27,8 +27,8 @@ Desktop app **local-first** (Electron + React + TypeScript) com dois espaços de
 ## Papéis e governança
 
 - **Rodrigo Reis (PI)** — decide escopo, prioridades e trade-offs; aprova specs e aceita entregas. **Não executa o fluxo**: não cria issue, não commita, não abre PR e não faz merge. O aceite é dele; a execução é do Code.
-- **Claude Cowork (planejamento)** — especifica e mantém `docs/` e as specs em `docs/spec/`. Antes de finalizar qualquer spec, apresenta as perguntas abertas e dúvidas ao PI — spec só vira `aprovada-pi` com todas resolvidas (evitar retrabalho). Quando a spec vira `aprovada-pi`, **cria a issue-fatia no board** (coluna Backlog, assignee PI) — ou, se a issue foi pré-criada em `proplan:planejado`, troca o label para `proplan:backlog` na mesma issue, sem criar outra. **Nunca implementa código** — implementação é exclusiva do Claude Code.
-- **Claude Code (você)** — planeja, codifica, testa (código, UX e UI — pode usar as skills do impeccable), atualiza a documentação e **sempre commita todos os documentos de `docs/` do cowork e o CLAUDE.md** junto da entrega. Implementa a partir deste arquivo + `docs/` + spec da feature em `docs/spec/`. **Não cria a issue de fatia** (é do Cowork) — pega o card, coloca para `proplan:todo` move pelo fluxo e entrega com PR. **Exceção: cria a própria issue `[FIX]`** de bug com comportamento correto já documentado (`docs/ARCHITECTURE.md`/spec existente/`STATUS.md`), citando a fonte no corpo — ver *Correção: o Code cria a própria issue* abaixo. Reclassificar fatia como `[FIX]` para pular spec e aval é proibido. Pode criticar arquitetura, **não escopo**. Sem spec para a tarefa, ou spec ambígua → perguntar ao PI antes de codificar, nunca assumir. Deve apontar problemas técnicos da spec — a correção passa pelo PI.
+- **Codex Cowork (planejamento)** — especifica e mantém `docs/` e as specs em `docs/spec/`. Antes de finalizar qualquer spec, apresenta as perguntas abertas e dúvidas ao PI — spec só vira `aprovada-pi` com todas resolvidas (evitar retrabalho). Quando a spec vira `aprovada-pi`, **cria a issue-fatia no board** (coluna Backlog, assignee PI) — ou, se a issue foi pré-criada em `proplan:planejado`, troca o label para `proplan:backlog` na mesma issue, sem criar outra. **Nunca implementa código** — implementação é exclusiva do Codex.
+- **Codex (você)** — planeja, codifica, testa (código, UX e UI — pode usar as skills do impeccable), atualiza a documentação e **sempre commita todos os documentos de `docs/` do cowork e o AGENTS.md** junto da entrega. Implementa a partir deste arquivo + `docs/` + spec da feature em `docs/spec/`. **Não cria a issue de fatia** (é do Cowork) — pega o card, coloca para `proplan:todo` move pelo fluxo e entrega com PR. **Exceção: cria a própria issue `[FIX]`** de bug com comportamento correto já documentado (`docs/ARCHITECTURE.md`/spec existente/`STATUS.md`), citando a fonte no corpo — ver *Correção: o Code cria a própria issue* abaixo. Reclassificar fatia como `[FIX]` para pular spec e aval é proibido. Pode criticar arquitetura, **não escopo**. Sem spec para a tarefa, ou spec ambígua → perguntar ao PI antes de codificar, nunca assumir. Deve apontar problemas técnicos da spec — a correção passa pelo PI.
 
 ## Ciclo de vida do card — labels `proplan:*` e quem move
 
@@ -37,8 +37,8 @@ Desktop app **local-first** (Electron + React + TypeScript) com dois espaços de
 | → `planejado` | Cowork | spec em rascunho, dúvidas abertas com o PI |
 | `planejado` → `backlog` | Cowork | dúvidas resolvidas; **mesma issue** (troca o label, não cria outra), assignee PI, corpo com link para a Slice do PRD |
 | `backlog` → `todo` | Cowork | os próximos 5 cards da ordem de implementação |
-| `todo` → `doing` | Code | ao iniciar o card — sempre o primeiro `todo` da ordem |
-| `doing` → `done` | Code | após confirmar o merge na origem **e publicar o comentário de encerramento** na issue; link do PR no corpo da issue |
+| `todo` → `doing` | Code/Codex | ao iniciar o card — sempre o primeiro `todo` da ordem |
+| `doing` → `done` | Code/Codex | após confirmar o merge na origem **e publicar o comentário de encerramento** na issue; link do PR no corpo da issue |
 | `done` → `finalizado` + fechar a issue | **PI** | aceite. Só o PI. Nenhuma automação fecha issue |
 
 ### Hierarquia: MVP (épico) → fatia
@@ -162,13 +162,13 @@ Fluxo do FIX auto-criado: cria em Backlog → todo/doing → PR com `refs #N`
 
 ### Encerramento de card (obrigatório)
 
-Depois do merge confirmado na origem e **antes** de aplicar `proplan:done`, o Code publica na issue do card um comentário de encerramento com três seções: **Resumo da implementação**, **Aprendizado** e **Imprevistos**. Formato, regras de conteúdo e comandos: skill `fechar-card`.
+Depois do merge confirmado na origem e **antes** de aplicar `proplan:done`, o Code/Codex publica na issue do card um comentário de encerramento com três seções: **Resumo da implementação**, **Aprendizado** e **Imprevistos**. Formato, regras de conteúdo e comandos: skill `fechar-card`.
 
 `proplan:done` só pode ser aplicada se esse comentário existir — issue em `proplan:done` sem comentário de encerramento é violação de processo e o PI devolve o card. Seção sem conteúdo real recebe "Nenhum": ninguém inventa aprendizado nem imprevisto para preencher template. Aprendizado só entra com fonte verificável (doc oficial, commit, log, comando). O comentário na issue é a fonte de verdade da entrega; o resumo no chat só aponta para ele. A seção **Aprendizado** é consolidada pelo Cowork em `docs/APRENDIZADOS.md` no fecho de cada MVP — protocolo no cabeçalho daquele arquivo.
 
 Não existe gate de aprovação de spec (decisão do PI). O que trava uma entrega é **CI verde** e **aceite do PI** — nada mais.
 
-O Code só para quando `todo` está vazio ou quando cai num dos dois casos abaixo.
+O Code/Codex só para quando `todo` está vazio ou quando cai num dos dois casos abaixo.
 
 ## Escopo comprometido — nenhum requisito desaparece
 
@@ -252,7 +252,7 @@ Priorizam cautela sobre velocidade; em tarefa trivial, bom senso.
 
 ## Processo de PR, CI e Testing/QA
 
-O processo vigente está em `docs/CI-PR.md`, `docs/TESTING.md` e `docs/GUIA-PRS-CLAUDE-CODE.md`.
+O processo vigente está em `docs/CI-PR.md`, `docs/TESTING.md` e `docs/GUIA-PRS-CODE.md`.
 Ao preparar, revisar ou integrar PR neste repositório, trate estes documentos como contrato
 operacional. Não use memória de conversa para substituir regra versionada.
 
@@ -310,9 +310,9 @@ O repo tem um grafo de conhecimento persistente em `graphify-out/` (gerado pela 
 - **Ao final de cada entrega** (junto com STATUS.md/DEVELOPMENT.md): Sempre me pergunta se pode ou não fazer o comando `/graphify . --update` — incremental, re-extrai só arquivos novos/alterados via manifest. Não recrie o grafo do zero.
 - `graphify-out/` é artefato local (cache), não entra em commit.
 
-## Skills relevantes a usar (Code)
+## Skills relevantes a usar (Code/Codex)
 
-`gstack:*`, `fechar-card` e `impeccable` estão instalados globalmente na máquina do PI (Windows) — o Code os usa normalmente lá. Em qualquer ambiente onde uma dessas skills não exista, isso não é desculpa para pular a disciplina que ela representa: aplicar o equivalente manual (revisão de design, acabamento visual, **comentário de encerramento com as três seções**) e registrar na PR.
+`gstack:*`, `fechar-card` e `impeccable` estão instalados globalmente na máquina do PI (Windows) — o Code/Codex os usa normalmente lá. Em qualquer ambiente onde uma dessas skills não exista, isso não é desculpa para pular a disciplina que ela representa: aplicar o equivalente manual (revisão de design, acabamento visual, **comentário de encerramento com as três seções**) e registrar na PR.
 
 - `superpowers:brainstorming` — antes de implementar feature não-trivial
 - `superpowers:writing-plans` — pra task com mais de 1 etapa de DB/API

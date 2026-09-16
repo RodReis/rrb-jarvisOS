@@ -13,7 +13,7 @@ Totais da última execução (regenerado, não acumulado):
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
 | — | — | — | Regras de Negócio | 1813 | 1813 | 0 | 78.1 | — | — |
-| — | — | — | Banco | 1268 | 1254 | 0 | 86.8 | — | — |
+| — | — | — | Banco | 1291 | 1277 | 0 | 86.9 | — | — |
 | — | — | — | Tela | 732 | 731 | 0 | 76.4 | — | — |
 
 ## Histórico por entrega
@@ -391,3 +391,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | — | #116 | spec-multi-executor-01-runtime | Regras de Negócio | 1813 | 1813 | 0 | 78.1 | — | — |
 | — | #116 | spec-multi-executor-01-runtime | Banco | 1268 | 1254 | 0 | 86.8 | — | — |
 | — | #116 | spec-multi-executor-01-runtime | Tela | 732 | 731 | 0 | 76.4 | — | — |
+| 2026-09-16 | #118 | spec-multi-executor-03-codex-exec-adapter | Regras de Negócio | 1813 | 1813 | 0 | 78.1 | #363 | [#363](https://github.com/RodReis/rrb-jarvisOS/pull/363) |
+| 2026-09-16 | #118 | spec-multi-executor-03-codex-exec-adapter | Banco | 1291 | 1277 | 0 | 86.9 | #363 | [#363](https://github.com/RodReis/rrb-jarvisOS/pull/363) |
+| 2026-09-16 | #118 | spec-multi-executor-03-codex-exec-adapter | Tela | 732 | 731 | 0 | 76.4 | #363 | [#363](https://github.com/RodReis/rrb-jarvisOS/pull/363) |
