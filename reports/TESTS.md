@@ -13,7 +13,7 @@ Totais da última execução (regenerado, não acumulado):
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
 | — | — | — | Regras de Negócio | 1813 | 1813 | 0 | 78.1 | — | — |
-| — | — | — | Banco | 1265 | 1251 | 0 | 86.8 | — | — |
+| — | — | — | Banco | 1268 | 1254 | 0 | 86.8 | — | — |
 | — | — | — | Tela | 732 | 731 | 0 | 76.4 | — | — |
 
 ## Histórico por entrega
@@ -387,4 +387,7 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-10 | #352 | spec-voz-05-ui-command-center | Tela | 732 | 731 | 0 | 76.4 | #354 | [#354](https://github.com/RodReis/rrb-jarvisOS/pull/354) |
 | — | #116 | spec-multi-executor-01-runtime | Regras de Negócio | 1813 | 1813 | 0 | 78.1 | — | — |
 | — | #116 | spec-multi-executor-01-runtime | Banco | 1265 | 1251 | 0 | 86.8 | — | — |
+| — | #116 | spec-multi-executor-01-runtime | Tela | 732 | 731 | 0 | 76.4 | — | — |
+| — | #116 | spec-multi-executor-01-runtime | Regras de Negócio | 1813 | 1813 | 0 | 78.1 | — | — |
+| — | #116 | spec-multi-executor-01-runtime | Banco | 1268 | 1254 | 0 | 86.8 | — | — |
 | — | #116 | spec-multi-executor-01-runtime | Tela | 732 | 731 | 0 | 76.4 | — | — |
