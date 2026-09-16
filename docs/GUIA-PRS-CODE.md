@@ -1,6 +1,6 @@
-# Guia de PRs para o Claude Code — rrb-jarvisOS
+# Guia de PRs para o Claude Code/Codex — rrb-jarvisOS
 
-**Natureza:** orientação operacional deste repositório, solicitada pelo PI em 2026-09-06. Não é uma nova fatia de produto. Complementa `CLAUDE.md`, `TESTING.md` e `REVIEW.md`; não substitui SPECs nem altera permissões ou proteção remota.
+**Natureza:** orientação operacional deste repositório, solicitada pelo PI em 2026-09-06. Não é uma nova fatia de produto. Complementa `CLAUDE.md`, `AGENTS.md`, `TESTING.md` e `REVIEW.md`; não substitui SPECs nem altera permissões ou proteção remota.
 
 ## 1. O que executar como rotina
 
