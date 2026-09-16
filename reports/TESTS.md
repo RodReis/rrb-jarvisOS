@@ -394,3 +394,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-16 | #118 | spec-multi-executor-03-codex-exec-adapter | Regras de Negócio | 1813 | 1813 | 0 | 78.1 | #363 | [#363](https://github.com/RodReis/rrb-jarvisOS/pull/363) |
 | 2026-09-16 | #118 | spec-multi-executor-03-codex-exec-adapter | Banco | 1291 | 1277 | 0 | 86.9 | #363 | [#363](https://github.com/RodReis/rrb-jarvisOS/pull/363) |
 | 2026-09-16 | #118 | spec-multi-executor-03-codex-exec-adapter | Tela | 732 | 731 | 0 | 76.4 | #363 | [#363](https://github.com/RodReis/rrb-jarvisOS/pull/363) |
+| 2026-09-16 | #119 | spec-multi-executor-04-roteamento-revisao-cruzada | Regras de Negócio | 1823 | 1823 | 0 | 78.3 | #365 | [#365](https://github.com/RodReis/rrb-jarvisOS/pull/365) |
+| 2026-09-16 | #119 | spec-multi-executor-04-roteamento-revisao-cruzada | Banco | 1291 | 1277 | 0 | 86.9 | #365 | [#365](https://github.com/RodReis/rrb-jarvisOS/pull/365) |
+| 2026-09-16 | #119 | spec-multi-executor-04-roteamento-revisao-cruzada | Tela | 732 | 731 | 0 | 76.4 | #365 | [#365](https://github.com/RodReis/rrb-jarvisOS/pull/365) |
