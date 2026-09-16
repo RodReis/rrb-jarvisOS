@@ -139,10 +139,7 @@ export function rodarContractDoExecutor(nome: string, criarCenario: () => Cenari
 
     it('retomada: a sessao do executor volta no resultado (criterio 1)', async () => {
       const runtime = new CodingExecutorRuntime()
-      const resultado = await runtime.executar(
-        requestDeTeste(),
-        criarCenario().comSessao('ses-42')
-      )
+      const resultado = await runtime.executar(requestDeTeste(), criarCenario().comSessao('ses-42'))
 
       expect(resultado.sessaoRetomavel).toBe('ses-42')
     })

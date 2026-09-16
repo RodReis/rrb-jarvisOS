@@ -13,10 +13,7 @@ import { validarRequest } from './validar-request'
 /** Um adapter de mentira só com os campos declarativos que a validação lê. */
 function adapterQueSuporta(
   parcial: Partial<
-    Pick<
-      CodingExecutorAdapter,
-      'modosSuportados' | 'revisoesSuportadas' | 'suportaSchemaDeSaida'
-    >
+    Pick<CodingExecutorAdapter, 'modosSuportados' | 'revisoesSuportadas' | 'suportaSchemaDeSaida'>
   > = {}
 ): CodingExecutorAdapter {
   return {

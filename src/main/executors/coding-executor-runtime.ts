@@ -259,7 +259,9 @@ export class CodingExecutorRuntime {
       // executasse comando — que é o `ConstrutorService`, outra camada.
       validacoes: [],
       evidencias,
-      ...(estado.uso === undefined ? {} : { uso: { ...estado.uso, duracaoMs: contexto.duracaoMs } }),
+      ...(estado.uso === undefined
+        ? {}
+        : { uso: { ...estado.uso, duracaoMs: contexto.duracaoMs } }),
       ...(estado.sessao === undefined ? {} : { sessaoRetomavel: estado.sessao }),
       ...(assinatura === undefined ? {} : { assinaturaDeFalha: assinatura }),
       diagnosticos: estado.diagnosticos
@@ -276,11 +278,7 @@ export class CodingExecutorRuntime {
    * `redact` antes do log porque o contexto é objeto: ele apaga valor de campo sensível por
    * nome, o que `redigirSegredos` (que age sobre texto) não alcança.
    */
-  private registrar(
-    request: ExecutorRequest,
-    resultado: ExecutorResult,
-    duracaoMs: number
-  ): void {
+  private registrar(request: ExecutorRequest, resultado: ExecutorResult, duracaoMs: number): void {
     const contexto = redact({
       correlationId: request.attemptId,
       runId: request.runId,

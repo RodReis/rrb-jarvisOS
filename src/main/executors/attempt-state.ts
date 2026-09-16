@@ -82,10 +82,7 @@ function comDiagnostico(estado: EstadoDaTentativa, motivo: string): EstadoDaTent
  * `done` não pode trocar o desfecho, e checar isso antes de qualquer outra coisa é o que
  * torna a garantia independente do tipo do evento atrasado.
  */
-export function aplicarEvento(
-  estado: EstadoDaTentativa,
-  evento: ExecutorEvent
-): EstadoDaTentativa {
+export function aplicarEvento(estado: EstadoDaTentativa, evento: ExecutorEvent): EstadoDaTentativa {
   if (isTerminal(estado.fase)) {
     return comDiagnostico(estado, `evento ${evento.tipo} apos estado terminal ${estado.fase}`)
   }
