@@ -54,6 +54,7 @@ import { isBudgetLimitsInput, type BudgetSnapshot } from '@shared/domain/budget'
 import { isProviderRoute, isTaskType } from '@shared/domain/routing'
 import type { PhaseModelService } from '../ai/phase-model-service'
 import type { CodexProfileService } from '../ai/codex-profile-service'
+import type { ExecutorOperationalService } from '../executors/executor-operational-service'
 import type { PhaseModelPolicy, ProjectModelOverride } from '@shared/domain/modelo-da-fase'
 import {
   isModeloEscolhido,
@@ -62,6 +63,7 @@ import {
 } from '@shared/domain/modelo-da-fase'
 import type { CodexBillingMode, CodexProfileState } from '@shared/domain/codex-profile'
 import { isCodexBillingMode } from '@shared/domain/codex-profile'
+import type { ExecutorOperationalView } from '@shared/domain/executor-operacional'
 import { isFase } from '@shared/domain/fase'
 import { isEtapa } from '@shared/domain/jornada'
 import type { GenerationEvent, GenerationTrace } from '@shared/domain/geracao'
@@ -438,6 +440,7 @@ export interface IpcDependencies {
   readonly phaseModels: PhaseModelService
   /** O perfil isolado do Codex (SPEC-Multi-Executor-02): saúde, login e modo de cobrança. */
   readonly codex: CodexProfileService
+  readonly executorsOperational: ExecutorOperationalService
   /**
    * A trilha das gerações (SPEC-Fases-03). O renderer só **lê** por aqui — quem grava é o ponto
    * único, e não há canal que escreva evento.
@@ -1210,6 +1213,40 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       // `true` — um valor truthy qualquer vindo do renderer não pode virar autorização de gasto.
       if (!isCodexBillingMode(modo)) return undefined
       return deps.codex.aplicarModo(modo, habilitado === true)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.executorView,
+    async (_event, projectId: unknown, workspace: unknown): Promise<ExecutorOperationalView> => {
+      const escopo = isWorkspaceId(workspace) ? workspace : 'jarvis'
+      const id = typeof projectId === 'string' ? projectId : ''
+      return await deps.executorsOperational.view(id, escopo)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.executorSavePreference,
+    async (
+      _event,
+      projectId: unknown,
+      executores: unknown,
+      fallbackPermitido: unknown,
+      tetoUsd: unknown,
+      workspace: unknown
+    ): Promise<ExecutorOperationalView> => {
+      const escopo = isWorkspaceId(workspace) ? workspace : 'jarvis'
+      return await deps.executorsOperational.save({
+        projectId: typeof projectId === 'string' ? projectId : '',
+        workspaceId: escopo,
+        executores: Array.isArray(executores)
+          ? executores.filter((e): e is string => typeof e === 'string')
+          : [],
+        fallbackPermitido: fallbackPermitido === true,
+        ...(typeof tetoUsd === 'number' && Number.isFinite(tetoUsd) && tetoUsd >= 0
+          ? { tetoUsd }
+          : {})
+      })
     }
   )
 

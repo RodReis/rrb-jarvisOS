@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 1823 | 1823 | 0 | 78.3 | — | — |
+| — | — | — | Regras de Negócio | 1825 | 1825 | 0 | 78.2 | — | — |
 | — | — | — | Banco | 1291 | 1277 | 0 | 86.9 | — | — |
-| — | — | — | Tela | 732 | 731 | 0 | 76.4 | — | — |
+| — | — | — | Tela | 735 | 734 | 0 | 76.5 | — | — |
 
 ## Histórico por entrega
 
@@ -397,3 +397,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-09-16 | #119 | spec-multi-executor-04-roteamento-revisao-cruzada | Regras de Negócio | 1823 | 1823 | 0 | 78.3 | #365 | [#365](https://github.com/RodReis/rrb-jarvisOS/pull/365) |
 | 2026-09-16 | #119 | spec-multi-executor-04-roteamento-revisao-cruzada | Banco | 1291 | 1277 | 0 | 86.9 | #365 | [#365](https://github.com/RodReis/rrb-jarvisOS/pull/365) |
 | 2026-09-16 | #119 | spec-multi-executor-04-roteamento-revisao-cruzada | Tela | 732 | 731 | 0 | 76.4 | #365 | [#365](https://github.com/RodReis/rrb-jarvisOS/pull/365) |
+| — | #120 | spec-multi-executor-05-ui-prova-operacional | Regras de Negócio | 1825 | 1825 | 0 | 78.2 | — | — |
+| — | #120 | spec-multi-executor-05-ui-prova-operacional | Banco | 1291 | 1277 | 0 | 86.9 | — | — |
+| — | #120 | spec-multi-executor-05-ui-prova-operacional | Tela | 735 | 734 | 0 | 76.5 | — | — |

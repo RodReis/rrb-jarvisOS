@@ -29,6 +29,7 @@ import type { MergePolicyOutcome, PoliticaDeMerge, VistaDaFila } from '@shared/d
 import type { ContextPack, ContextPackOutcome, FalhaRegistrada } from '@shared/domain/context-pack'
 import type { CapacidadeResolvida } from '@shared/domain/skills'
 import type { CodexBillingMode, CodexProfileState } from '@shared/domain/codex-profile'
+import type { ExecutorOperationalView } from '@shared/domain/executor-operacional'
 import type { AuthSnapshot } from '@shared/contracts/auth'
 import type { LogInput } from '@shared/contracts/logging'
 import type { PolicyContext, PolicyDecision } from '@shared/policies'
@@ -350,6 +351,23 @@ const bridge: JarvisBridge = {
     habilitado: boolean
   ): Promise<CodexBillingMode | undefined> =>
     ipcRenderer.invoke(IPC_CHANNELS.codexSetModo, modo, habilitado),
+  executorView: (projectId: string, workspace: WorkspaceId): Promise<ExecutorOperationalView> =>
+    ipcRenderer.invoke(IPC_CHANNELS.executorView, projectId, workspace),
+  saveExecutorPreference: (
+    projectId: string,
+    executores: readonly string[],
+    fallbackPermitido: boolean,
+    tetoUsd: number | undefined,
+    workspace: WorkspaceId
+  ): Promise<ExecutorOperationalView> =>
+    ipcRenderer.invoke(
+      IPC_CHANNELS.executorSavePreference,
+      projectId,
+      executores,
+      fallbackPermitido,
+      tetoUsd,
+      workspace
+    ),
   getProviderModels: (provider: AiProvider): Promise<readonly string[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.providerModels, provider),
   setProviderModel: (
