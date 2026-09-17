@@ -36,6 +36,8 @@ import { PhaseModelService } from './ai/phase-model-service'
 import { CodexProfileService } from './ai/codex-profile-service'
 import { CodexAdapter } from './ai/codex-adapter'
 import { abrirRunNeutro, type RunNeutro } from './ai/cwd-neutro'
+import { ExecutorPreferenceRepository } from './executors/executor-preference-repository'
+import { ExecutorOperationalService } from './executors/executor-operational-service'
 import {
   SCHEMA_DAS_AFIRMACOES,
   SCHEMA_DO_BRIEF,
@@ -449,6 +451,15 @@ if (!app.requestSingleInstanceLock()) {
       }),
       storage.audit
     )
+
+    const executorPreferences = new ExecutorPreferenceRepository(storage.db)
+    const executorsOperational = new ExecutorOperationalService({
+      userId: userIdAtual,
+      repository: executorPreferences,
+      codex: codexProfile,
+      claudeDisponivel: () => claudeCodeAdapter.disponivel(),
+      headSha: () => ''
+    })
 
     // Estado de quota das rotas subscription_limited (SPEC-Entrega-04, critério 12). Construído
     // aqui pela mesma razão do `budget`: é dependência do ponto único, não consulta opcional —
@@ -1860,6 +1871,7 @@ if (!app.requestSingleInstanceLock()) {
       routingRepo,
       phaseModels,
       codex: codexProfile,
+      executorsOperational,
       generationTraces,
       connectors,
       connectorCredits,

@@ -9,6 +9,7 @@ import { log } from '../lib/log'
 import { TrilhaDaJornada } from './TrilhaDaJornada'
 import { ConsoleDaGeracao } from './ConsoleDaGeracao'
 import { MarcosDoProjeto } from './MarcosDoProjeto'
+import { ExecutoresDoProjeto } from './ExecutoresDoProjeto'
 import { WizardDoProjeto } from './WizardDoProjeto'
 import { AnexosDeDesign } from './AnexosDeDesign'
 import { ArquiteturaDoProjeto } from './ArquiteturaDoProjeto'
@@ -234,6 +235,8 @@ export function ProjetoAberto({
               dos sete painéis divergiria na primeira correção feita só numa delas.
             */}
             <MarcosDoProjeto projectId={projeto.id} workspace={workspace} />
+
+            <ExecutoresDoProjeto projectId={projeto.id} workspace={workspace} />
           </div>
         </div>
       )}

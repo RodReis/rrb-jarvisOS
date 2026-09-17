@@ -2129,6 +2129,21 @@ Status: **entregue** — spec `aprovada-pi` (2026-08-30); issue [#206](https://g
 
 **Limites declarados:** `migrarRota` sem ponto de ligação (a rota não é persistida em disco hoje); sem E2E do menu (o AppShell não monta sem consentimento do Google); verificação visual contra os mockups pendente do PI.
 
+## MVP-010 — Multi-executor Claude + Codex
+
+### Fatia 05 — UI e prova operacional (`docs/spec/spec-multi-executor-05-ui-prova-operacional.md`)
+
+Status: **em implementação** — spec `aprovada-pi` (2026-08-29); issue [#120](https://github.com/RodReis/rrb-jarvisOS/issues/120), branch `feat/m10-f05-ui-prova-operacional`. Depende da F04, que está `proplan:done`.
+
+- [x] **Migration 47** (`project_executor_policy`) — preferência por projeto, fallback permitido e teto monetário opcional.
+- [x] **Domínio `executor-operacional`** — visão fechada de elegibilidade, `quota_unknown` explícita e bloqueio de modo pago sem teto.
+- [x] **IPC `executor:view` / `executor:save-preference`** — leitura/edição sem segredo, sem canal genérico e com validação de forma na fronteira.
+- [x] **Painel `ExecutoresDoProjeto`** — preferência do writer, fallback, teto, estados Claude/Codex e prévia de writer/revisor dentro do projeto aberto.
+- [x] **Evidência automatizada focada:** `npm run typecheck`; `npm run lint`; `npx vitest run src/shared/domain/executor-operacional.spec.ts src/main/preload/preload.spec.ts src/main/storage/storage.int-spec.ts` (38 testes).
+- [ ] Jornada E2E real Claude ↔ Codex em repositório exclusivo — **not_run** até haver repositório descartável e orçamento/autorização explícitos para executar o smoke real.
+
+**Limite declarado:** a UI já registra e projeta a escolha operacional; a prova real completa ainda não foi rodada e não deve ser marcada como `pass` por teste dublado.
+
 ## MVP-017 — Command Center: voz, persona e mascote
 
 ### Fatia 01 — STT local e push-to-talk (`docs/spec/spec-voz-01-stt-local-push-to-talk.md`)

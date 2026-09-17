@@ -22,7 +22,13 @@ function categoryLogger(category: LogCategory): CategoryLogger {
     (msg: string, ctx?: LogContext): void => {
       // Sem a ponte não há para onde mandar — em teste de componente (jsdom) ela não existe,
       // e um logger que quebra a UI por não conseguir logar seria pior que o silêncio.
-      if (typeof window === 'undefined' || !window.jarvis) return
+      if (
+        typeof window === 'undefined' ||
+        !window.jarvis ||
+        typeof window.jarvis.sendLog !== 'function'
+      ) {
+        return
+      }
 
       // Redige já no renderer: o main redige de novo antes de gravar (defesa em profundidade),
       // mas assim o segredo nem chega a atravessar o IPC.

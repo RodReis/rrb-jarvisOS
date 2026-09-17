@@ -1724,6 +1724,24 @@ const MIGRATIONS: readonly string[] = [
   `
   ALTER TABLE user_profile ADD COLUMN voz_entrada_rotulo TEXT;
   ALTER TABLE user_profile ADD COLUMN voz_saida_rotulo   TEXT;
+  `,
+
+  // 47 - preferencia de executor por projeto (SPEC-Multi-Executor-05).
+  //
+  // Projeto, e nao workspace: o PI pode querer um projeto construindo por Codex e outro por
+  // Claude sem mudar a politica global. Ausencia de linha = padrao seguro (Claude primeiro,
+  // Codex como fallback, sem teto pago), resolvido no servico.
+  `
+  CREATE TABLE project_executor_policy (
+    user_id            TEXT NOT NULL,
+    workspace_id       TEXT NOT NULL,
+    project_id         TEXT NOT NULL,
+    executores         TEXT NOT NULL, -- JSON: ExecutorDeCodigo[], ordenado
+    fallback_permitido INTEGER NOT NULL,
+    teto_usd           REAL,
+    updated_at         TEXT NOT NULL,
+    PRIMARY KEY (user_id, workspace_id, project_id)
+  );
   `
 ]
 

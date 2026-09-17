@@ -47,6 +47,7 @@ import type {
   RotaComModelo
 } from '@shared/domain/modelo-da-fase'
 import type { CodexBillingMode, CodexProfileState } from '@shared/domain/codex-profile'
+import type { ExecutorOperationalView } from '@shared/domain/executor-operacional'
 import type {
   ConnectorCapability,
   ConnectorCredentialKey,
@@ -304,6 +305,8 @@ export const IPC_CHANNELS = {
   codexLogin: 'codex:login',
   codexLogout: 'codex:logout',
   codexSetModo: 'codex:set-modo',
+  executorView: 'executor:view',
+  executorSavePreference: 'executor:save-preference',
   routingGet: 'routing:get',
   routingSetRoute: 'routing:set-route',
   /**
@@ -1043,6 +1046,14 @@ export interface JarvisBridge {
    * é a recusa (regra 3: rate limit de assinatura não autoriza créditos nem API).
    */
   setModoDoCodex(modo: CodexBillingMode, habilitado: boolean): Promise<CodexBillingMode | undefined>
+  executorView(projectId: string, workspace: WorkspaceId): Promise<ExecutorOperationalView>
+  saveExecutorPreference(
+    projectId: string,
+    executores: readonly string[],
+    fallbackPermitido: boolean,
+    tetoUsd: number | undefined,
+    workspace: WorkspaceId
+  ): Promise<ExecutorOperationalView>
 
   /**
    * O modelo de cada fase no workspace, com o padrao preenchendo o que nunca foi editado
