@@ -243,6 +243,66 @@ describe('Ollama — NDJSON, sem credencial (critério 1)', () => {
     expect(autorizacao).toBeUndefined()
   })
 
+  it('com opções locais pede a janela e o formato; sem elas, o corpo é o de sempre', async () => {
+    const corpos: Record<string, unknown>[] = []
+    const url = await subir((req, res) => {
+      let corpo = ''
+      req.on('data', (d: Buffer) => (corpo += d.toString()))
+      req.on('end', () => {
+        corpos.push(JSON.parse(corpo) as Record<string, unknown>)
+        res.writeHead(200)
+        res.end(ndjson({ response: '{}', done: true, prompt_eval_count: 1, eval_count: 1 }))
+      })
+    })
+    const base = { model: 'qwen3:8b', prompt: 'oi', maxTokens: 10, timeoutMs: 5_000 }
+    const adapter = new OllamaAdapter(url)
+
+    await coletar(
+      adapter.generateStream({
+        ...base,
+        jsonSchema: '{"type":"string"}',
+        opcoesLocais: { numCtx: 8192, formato: '{"type":"object"}' }
+      })
+    )
+    await coletar(adapter.generateStream(base))
+    // `jsonSchema` sozinho não muda o corpo: o Ollama o ignorava e continua ignorando — quem
+    // quer o formato imposto pede em `opcoesLocais`, e as gerações de documento seguem iguais.
+    await coletar(adapter.generateStream({ ...base, jsonSchema: '{"type":"string"}' }))
+
+    expect(corpos[0]).toMatchObject({
+      format: { type: 'object' },
+      think: false,
+      options: { num_ctx: 8192, num_predict: 10 }
+    })
+    for (const corpo of corpos.slice(1)) {
+      expect(corpo).not.toHaveProperty('format')
+      expect(corpo).not.toHaveProperty('think')
+      expect(corpo.options).toEqual({ num_predict: 10 })
+    }
+  })
+
+  it('formato que não é JSON vira falha clara, sem chamar o servidor', async () => {
+    let chamadas = 0
+    const url = await subir((_req, res) => {
+      chamadas++
+      res.writeHead(200)
+      res.end()
+    })
+
+    await expect(
+      coletar(
+        new OllamaAdapter(url).generateStream({
+          model: 'qwen3:8b',
+          prompt: 'oi',
+          maxTokens: 10,
+          timeoutMs: 5_000,
+          opcoesLocais: { numCtx: 8192, formato: 'isto não é json' }
+        })
+      )
+    ).rejects.toThrow(/formato/i)
+    expect(chamadas).toBe(0)
+  })
+
   it('erro dentro do corpo com status 200 vira falha, não sucesso vazio', async () => {
     // O Ollama reporta "modelo não baixado" assim. Sem ramo próprio, a chamada terminaria
     // "com sucesso" e texto vazio — e o usuário não saberia o que aconteceu.

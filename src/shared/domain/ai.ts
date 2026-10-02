@@ -344,6 +344,21 @@ export interface AiRequest {
    * de por decisão.
    */
   readonly diagnostico?: boolean
+  /**
+   * Opções que só o servidor local (Ollama) entende (SPEC-Squads-02): a janela de contexto e o
+   * formato imposto à saída. Ausentes, a chamada é a de sempre.
+   *
+   * Campo próprio e **não** o `jsonSchema`: o Ollama ignora `jsonSchema` por desenho (ver acima),
+   * e passar a honrá-lo mudaria silenciosamente toda geração de documento que hoje sai pelo
+   * provider local. Quem quer o formato imposto o pede aqui, de propósito.
+   */
+  readonly opcoesLocais?: OpcoesLocais
+}
+
+/** O que o orquestrador local pede ao servidor: `num_ctx` e o JSON Schema (serializado) de `format`. */
+export interface OpcoesLocais {
+  readonly numCtx: number
+  readonly formato?: string
 }
 
 /**

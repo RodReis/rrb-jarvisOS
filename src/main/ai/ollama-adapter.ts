@@ -68,6 +68,38 @@ export function extrairLinhas(buffer: string): {
   return { linhas, resto }
 }
 
+/**
+ * O corpo de `/api/generate`.
+ *
+ * `opcoesLocais` pede a janela (`num_ctx`) e o formato imposto (`format`, mais `think: false` —
+ * saída estruturada de um modelo que "pensa" antes devolveria o raciocínio no lugar do JSON).
+ * Sem elas o corpo é exatamente o de sempre: `jsonSchema` sozinho continua ignorado, porque honrá-lo
+ * mudaria toda geração de documento que hoje sai por este provider.
+ */
+function corpoDaRequisicao(request: AdapterRequest): Record<string, unknown> {
+  const local = request.opcoesLocais
+  let formato: unknown
+  if (local?.formato !== undefined) {
+    try {
+      formato = JSON.parse(local.formato)
+    } catch (erro) {
+      throw new AdapterError('O formato pedido ao Ollama não é um JSON Schema válido.', erro)
+    }
+  }
+
+  return {
+    model: request.model,
+    prompt: request.prompt,
+    ...(request.system === undefined ? {} : { system: request.system }),
+    stream: true,
+    ...(formato === undefined ? {} : { format: formato, think: false }),
+    options: {
+      num_predict: request.maxTokens,
+      ...(local === undefined ? {} : { num_ctx: local.numCtx })
+    }
+  }
+}
+
 export class OllamaAdapter implements AiAdapter {
   readonly nome = 'ollama'
 
@@ -137,18 +169,16 @@ export class OllamaAdapter implements AiAdapter {
   }
 
   async *generateStream(request: AdapterRequest): AsyncIterable<AdapterChunk> {
+    // Fora do `try` de rede: formato inválido é erro de quem pediu, e não deve virar "não foi
+    // possível falar com o Ollama" — nem gastar uma chamada que já nasceu errada.
+    const corpo = corpoDaRequisicao(request)
+
     let resposta: Response
     try {
       resposta = await this.fetchImpl(`${this.baseURL}/api/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: request.model,
-          prompt: request.prompt,
-          ...(request.system === undefined ? {} : { system: request.system }),
-          stream: true,
-          options: { num_predict: request.maxTokens }
-        }),
+        body: JSON.stringify(corpo),
         ...(request.signal === undefined ? {} : { signal: request.signal })
       })
     } catch (erro) {

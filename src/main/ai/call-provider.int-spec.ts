@@ -255,6 +255,31 @@ describe('streaming ao chamador (critério 2)', () => {
     expect(adapter.recebido?.apiKey).toBe(SEGREDO)
   })
 
+  it('entrega as opções do modelo local ao adapter quando o pedido as traz — e só então', async () => {
+    const com = adapterFalso(ROTEIRO_OK)
+    await coletar(
+      servico(com).call(
+        {
+          provider: 'anthropic',
+          prompt: PROMPT,
+          contextPackId: PACK,
+          opcoesLocais: { numCtx: 8192, formato: '{"type":"object"}' }
+        },
+        { userId: USUARIO, workspace: 'jarvis' }
+      )
+    )
+    expect(com.recebido?.opcoesLocais).toEqual({ numCtx: 8192, formato: '{"type":"object"}' })
+
+    const sem = adapterFalso(ROTEIRO_OK)
+    await coletar(
+      servico(sem).call(
+        { provider: 'anthropic', prompt: PROMPT, contextPackId: PACK },
+        { userId: USUARIO, workspace: 'jarvis' }
+      )
+    )
+    expect(sem.recebido).not.toHaveProperty('opcoesLocais')
+  })
+
   it('nenhum evento do stream carrega a credencial', async () => {
     const eventos = await coletar(
       servico(adapterFalso(ROTEIRO_OK)).call(

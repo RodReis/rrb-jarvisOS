@@ -425,6 +425,7 @@ export class AiCallService {
         // diagnóstico que não gera documento.
         ...(request.console === undefined ? {} : { fase: faseDaEtapa(request.console.etapa) }),
         ...(request.jsonSchema === undefined ? {} : { jsonSchema: request.jsonSchema }),
+        ...(request.opcoesLocais === undefined ? {} : { opcoesLocais: request.opcoesLocais }),
         maxTokens,
         ...(credencial === undefined ? {} : { apiKey: credencial.value }),
         timeoutMs: TIMEOUT_PADRAO_MS,
