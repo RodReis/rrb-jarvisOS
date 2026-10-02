@@ -84,6 +84,8 @@ export type OrigemDaCamada =
       readonly provider: AiProvider
       readonly modelo: string
       readonly validador?: 'e1'
+      /** Janela de contexto pedida ao Ollama; vai ao snapshot. Só vale para `ollama`. */
+      readonly numCtx?: number
     }
 
 export interface CapacidadeNoPerfil {
@@ -199,7 +201,11 @@ const CHAVES_DO_PERFIL = [
   'limites'
 ] as const
 const CHAVES_DA_ORIGEM_FASE = ['origem'] as const
-const CHAVES_DA_ORIGEM_MODELO = ['origem', 'provider', 'modelo', 'validador'] as const
+const CHAVES_DA_ORIGEM_MODELO = ['origem', 'provider', 'modelo', 'validador', 'numCtx'] as const
+
+/** Faixa de `num_ctx` que o produto aceita: abaixo o plano não cabe; acima a VRAM do PI não segura. */
+export const MIN_NUM_CTX = 2_048
+export const MAX_NUM_CTX = 131_072
 const CHAVES_DA_CAPACIDADE = ['id', 'obrigatoria', 'camadas'] as const
 const CHAVES_DO_ACESSO = ['escrita', 'git', 'github'] as const
 const CHAVES_DA_CAMADA_DO_PAPEL = ['camada'] as const
@@ -223,6 +229,9 @@ type Problemas = ProblemaDoPerfil[]
 
 const ehObjeto = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v)
+
+const ehInteiroEntre = (v: unknown, min: number, max: number): v is number =>
+  typeof v === 'number' && Number.isSafeInteger(v) && v >= min && v <= max
 
 const ehInteiroAte = (v: unknown, teto: number): v is number =>
   typeof v === 'number' && Number.isSafeInteger(v) && v > 0 && v <= teto
@@ -275,7 +284,18 @@ function validarOrigem(
   }
   exigirSoChaves(origem, CHAVES_DA_ORIGEM_MODELO, caminho, problemas)
 
-  const { validador } = origem
+  const { validador, numCtx } = origem
+  if (
+    numCtx !== undefined &&
+    (origem.provider !== 'ollama' || !ehInteiroEntre(numCtx, MIN_NUM_CTX, MAX_NUM_CTX))
+  ) {
+    registrar(
+      problemas,
+      'SCHEMA',
+      `${caminho}.numCtx`,
+      `só para ollama, inteiro entre ${MIN_NUM_CTX} e ${MAX_NUM_CTX}`
+    )
+  }
   if (validador !== undefined && validador !== 'e1') {
     registrar(problemas, 'SCHEMA', `${caminho}.validador`, 'só o validador e1 existe')
   }
@@ -577,7 +597,8 @@ function montarPerfil(b: Record<string, unknown>): PerfilDeSquad {
           origem: 'modelo',
           provider: o.provider as AiProvider,
           modelo: o.modelo as string,
-          ...(o.validador === 'e1' ? { validador: 'e1' as const } : {})
+          ...(o.validador === 'e1' ? { validador: 'e1' as const } : {}),
+          ...(typeof o.numCtx === 'number' ? { numCtx: o.numCtx } : {})
         }
 
   return congelar({

@@ -3,6 +3,7 @@ import type { PerfilDeSquad, ResultadoDaValidacao } from './squad-perfil'
 import { CAPACIDADES, REGISTRO_DE_CAPACIDADES } from './squad-capacidades'
 import {
   ACOES_COM_APROVACAO,
+  MAX_NUM_CTX,
   PERFIL_PADRAO,
   TETO_DE_MINUTOS_POR_TAREFA,
   TETO_DE_TAREFAS,
@@ -291,6 +292,35 @@ describe('validarPerfil — chave desconhecida é recusada (fail closed)', () =>
       maxMinutosPorTarefa: TETO_DE_MINUTOS_POR_TAREFA
     }
     expect(validarPerfil(perfil({ limites })).ok).toBe(true)
+  })
+})
+
+describe('validarPerfil — num_ctx do orquestrador local', () => {
+  const comNumCtx = (numCtx: unknown, provider = 'ollama'): unknown =>
+    perfil({
+      camadas: {
+        ...PERFIL_PADRAO.camadas,
+        orquestrador: { origem: 'modelo', provider, modelo: 'qwen3:8b', validador: 'e1', numCtx }
+      }
+    })
+
+  it('aceita a janela dentro da faixa e a guarda no perfil', () => {
+    const r = validarPerfil(comNumCtx(8192))
+    expect(r.ok && r.perfil.camadas.orquestrador).toMatchObject({ numCtx: 8192 })
+  })
+
+  it.each([0, 1024, 4096.5, MAX_NUM_CTX + 1, '8192', Number.NaN])('recusa num_ctx %s', (v) => {
+    expect(validarPerfil(comNumCtx(v)).ok).toBe(false)
+  })
+
+  it('num_ctx só vale para o ollama', () => {
+    expect(validarPerfil(comNumCtx(8192, 'claude-code')).ok).toBe(false)
+  })
+
+  it('a janela entra na revisão do perfil — mudar num_ctx é outro perfil', async () => {
+    const a = validarPerfil(comNumCtx(8192))
+    const b = validarPerfil(comNumCtx(16384))
+    expect(JSON.stringify(a)).not.toBe(JSON.stringify(b))
   })
 })
 

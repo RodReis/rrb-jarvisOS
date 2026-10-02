@@ -40,7 +40,7 @@ export interface SnapshotDoSquad {
 }
 
 /** JSON com as chaves ordenadas: a mesma árvore dá os mesmos bytes, qualquer que seja a ordem. */
-function canonico(valor: unknown): string {
+export function canonico(valor: unknown): string {
   if (Array.isArray(valor)) return `[${valor.map(canonico).join(',')}]`
   if (typeof valor === 'object' && valor !== null) {
     const registro = valor as Record<string, unknown>
