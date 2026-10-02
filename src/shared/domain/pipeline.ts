@@ -143,6 +143,11 @@ export const TRANSICAO_REASONS = [
   'sem-aprovacao-vigente',
   /** Aquisição do slot de WIP recusada: outro run o detém (critério 2). */
   'wip-ocupado',
+  /**
+   * O run detém um slot do pool e quem pediu a transição não apresentou o fencing token vigente
+   * (SPEC-Scheduler-01, critério 4): é o dono antigo tentando confirmar progresso.
+   */
+  'fencing-invalido',
   /** Dependência do run ainda não concluída (invariante 5 da CONVENTION §4). */
   'dependencia-aberta'
 ] as const

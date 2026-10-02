@@ -140,6 +140,11 @@ export class PoolService {
     })()
   }
 
+  /** O run já foi adquirido pelo pool alguma vez? Quem nunca foi não tem token a apresentar. */
+  adquiriu(runId: string): boolean {
+    return this.deps.pool.buscarItem(runId)?.estado === 'adquirido'
+  }
+
   /** O slot que o run detém, se detém. */
   slotDoRun(runId: string): Lease | undefined {
     return this.deps.leases.buscarSlotDoRun(this.deps.userId(), runId)
@@ -261,6 +266,28 @@ export class PoolService {
   }
 
   /**
+   * O run **terminou** (a máquina de estados já o autorizou): solta o slot dele, sem exigir o token.
+   * Não é roubo — o dono morreu por um caminho legítimo, e segurar o slot até a próxima
+   * reconciliação (que só roda no boot) travaria a fila. Só o slot do próprio run é solto.
+   */
+  encerrar(runId: string): boolean {
+    const lease = this.slotDoRun(runId)
+    if (lease === undefined) return false
+
+    const agora = this.agora()
+    return this.deps.db.transaction((): boolean => {
+      if (!this.deps.leases.removerReconciliado(lease.user_id, lease.recurso)) return false
+      this.deps.pool.registrarDecisao(
+        lease.user_id,
+        { runId, projectId: lease.projectId ?? '', decisao: 'liberado' },
+        agora
+      )
+      this.auditarLease('liberado', lease)
+      return true
+    })()
+  }
+
+  /**
    * Quem apresenta este token ainda é o dono do slot? (critério 4.) O dono antigo — o que perdeu o
    * lease, mesmo que o mesmo run o tenha readquirido — apresenta um token que já não é o vigente.
    */
@@ -282,7 +309,7 @@ export class PoolService {
    * métricas (critério 5). **Só leitura** — nada aqui adquire, renova nem libera, e o token não
    * sai daqui.
    */
-  vista(): VistaDoPool {
+  vista(workspace: WorkspaceId = this.deps.workspaceId()): VistaDoPool {
     const userId = this.deps.userId()
     const agora = this.agora()
     const { pool, leases } = this.deps
@@ -317,18 +344,31 @@ export class PoolService {
         esperandoHaMs: Math.max(0, agora - i.enfileiradoEm)
       }
     }
-    const aAdquirir = decisao.adquirir.map((runId, k) =>
-      naVista(runId, k + 1, { tipo: 'pronto-para-adquirir' })
-    )
-    const aEsperar = decisao.espera.map((e) =>
-      naVista(e.runId, e.posicao + decisao.adquirir.length, e.motivo)
-    )
+    const doWorkspace = (runId: string): boolean => porRun.get(runId)?.workspaceId === workspace
+    const aAdquirir = decisao.adquirir
+      .map((runId, k) => ({
+        runId,
+        posicao: k + 1,
+        motivo: { tipo: 'pronto-para-adquirir' } as const
+      }))
+      .filter((x) => doWorkspace(x.runId))
+    const aEsperar = decisao.espera
+      .map((e) => ({
+        runId: e.runId,
+        posicao: e.posicao + decisao.adquirir.length,
+        motivo: e.motivo
+      }))
+      .filter((x) => doWorkspace(x.runId))
 
     return {
       config,
       capacidadeEfetiva: capacidadeEfetiva(config),
-      ocupados: slots.map((l) => this.comoSlotNaVista(l, agora)),
-      fila: [...aAdquirir, ...aEsperar],
+      // Só os slots dos runs deste workspace: o pool é um por usuário, mas quem olha o NOA não
+      // enxerga o run do JARVIS OS. O lease sem item (V1 em voo) não tem dono conhecido e fica fora.
+      ocupados: slots
+        .filter((l) => this.deps.pool.buscarItem(l.proprietario)?.workspaceId === workspace)
+        .map((l) => this.comoSlotNaVista(l, agora)),
+      fila: [...aAdquirir, ...aEsperar].map((x) => naVista(x.runId, x.posicao, x.motivo)),
       metricas: {
         ocupacao: { ocupados: slots.length, capacidade: capacidadeEfetiva(config) },
         ...pool.metricas(userId, agora - JANELA_DAS_METRICAS_MS, agora)
@@ -372,10 +412,15 @@ export class PoolService {
     }
   }
 
+  /** O workspace do run na fila; o do ciclo só quando o lease não tem item (V1 em voo). */
+  private workspaceDoRun(runId: string): WorkspaceId {
+    return this.deps.pool.buscarItem(runId)?.workspaceId ?? this.deps.workspaceId()
+  }
+
   private auditarLease(acao: 'adquirido' | 'liberado', lease: Lease): void {
     this.deps.audit.append({
       user_id: lease.user_id,
-      workspace_id: this.deps.workspaceId(),
+      workspace_id: this.workspaceDoRun(lease.proprietario),
       type: 'pipeline-lease',
       // O token não entra: é a credencial do dono, e a auditoria não é lugar de credencial.
       payload: {

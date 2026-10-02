@@ -19,6 +19,7 @@
 import type { Database } from 'better-sqlite3'
 import type { ConfigDoPool, MotivoDeEspera } from '@shared/domain/pool'
 import type { PoolMetricas } from '@shared/domain/pool-vista'
+import type { WorkspaceId } from '@shared/domain/entities'
 import { CONFIG_PADRAO, validarConfig } from '@shared/domain/pool'
 
 export type EstadoDaFila = 'esperando' | 'adquirido' | 'cancelado'
@@ -26,6 +27,8 @@ export type EstadoDaFila = 'esperando' | 'adquirido' | 'cancelado'
 export interface ItemPersistido {
   readonly runId: string
   readonly userId: string
+  /** O workspace do run: a vista, a ativação e a auditoria seguem o dele, não o do ciclo. */
+  readonly workspaceId: WorkspaceId
   readonly projectId: string
   readonly sliceId: string
   readonly prioridade: number
@@ -38,6 +41,7 @@ export interface ItemPersistido {
 
 export interface NovoItem {
   readonly runId: string
+  readonly workspaceId: WorkspaceId
   readonly projectId: string
   readonly sliceId: string
   readonly prioridade: number
@@ -50,6 +54,7 @@ export type TipoDeDecisao = 'adquirido' | 'liberado' | 'reconciliado' | 'cancela
 interface FilaRow {
   readonly run_id: string
   readonly user_id: string
+  readonly workspace_id: WorkspaceId
   readonly project_id: string
   readonly slice_id: string
   readonly prioridade: number
@@ -75,6 +80,7 @@ function toItem(row: FilaRow): ItemPersistido {
   return {
     runId: row.run_id,
     userId: row.user_id,
+    workspaceId: row.workspace_id,
     projectId: row.project_id,
     sliceId: row.slice_id,
     prioridade: row.prioridade,
@@ -129,13 +135,14 @@ export class PoolRepository {
     this.db
       .prepare(
         `INSERT OR IGNORE INTO pool_fila
-           (run_id, user_id, project_id, slice_id, prioridade, enfileirado_em, executor, classe,
-            estado, motivo, atualizado_em)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'esperando', NULL, ?)`
+           (run_id, user_id, workspace_id, project_id, slice_id, prioridade, enfileirado_em,
+            executor, classe, estado, motivo, atualizado_em)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'esperando', NULL, ?)`
       )
       .run(
         item.runId,
         userId,
+        item.workspaceId,
         item.projectId,
         item.sliceId,
         item.prioridade,
@@ -145,7 +152,10 @@ export class PoolRepository {
         agora
       )
 
-    return this.buscarItem(item.runId) as ItemPersistido
+    const existente = this.buscarItem(item.runId) as ItemPersistido
+    // `run_id` é a chave: um id que já é de outro usuário não vira dele, e a linha alheia não volta.
+    if (existente.userId !== userId) throw new Error('Run já pertence a outro usuário na fila.')
+    return existente
   }
 
   buscarItem(runId: string): ItemPersistido | undefined {

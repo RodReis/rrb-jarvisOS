@@ -975,3 +975,26 @@ describe('contradições do PRD (emenda E1) — a fronteira valida forma, o serv
     )
   })
 })
+
+describe('pool de execução (SPEC-Scheduler-01) — só leitura', () => {
+  const VISTA = { capacidadeEfetiva: 1, ocupados: [], fila: [] }
+
+  it('responde com a vista do pool, sem argumento do renderer', async () => {
+    const vista = vi.fn().mockReturnValue(VISTA)
+    registerIpcHandlers({ ...deps, pool: { vista } } as unknown as IpcDependencies)
+    const fn = handle.mock.calls.find(([c]) => c === IPC_CHANNELS.poolVista)?.[1] as (
+      evento: unknown,
+      ...rest: unknown[]
+    ) => unknown
+
+    // Um argumento que o renderer inventasse é ignorado: a vista não tem parâmetro.
+    expect(fn({}, 'qualquer-coisa')).toBe(VISTA)
+    expect(vista).toHaveBeenCalledWith()
+  })
+
+  it('nenhum canal do contrato move o pool', () => {
+    const canais = Object.values(IPC_CHANNELS).filter((c) => c.startsWith('pool:'))
+
+    expect(canais).toEqual(['pool:vista'])
+  })
+})

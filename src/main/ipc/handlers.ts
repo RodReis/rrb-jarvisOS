@@ -126,6 +126,7 @@ import { NATUREZAS, isGate } from '@shared/domain/aprovacoes'
 import type { PublicacaoService } from '../projects/publicacao-service'
 import type { MergePolicyService } from '../pipeline/merge-policy-service'
 import type { FilaService } from '../pipeline/fila-service'
+import type { PoolService } from '../pipeline/pool-service'
 import type { VistaDeMarcos } from '@shared/domain/marcos'
 import type { MarcosService } from '../projects/marcos-service'
 import type { RoadmapService } from '../projects/roadmap-service'
@@ -408,6 +409,8 @@ export interface IpcDependencies {
   readonly mergePolicy: MergePolicyService
   /** A fila de execução (SPEC-Entrega-02). Exposta só para leitura. */
   readonly fila: FilaService
+  /** O pool de execução (SPEC-Scheduler-01). Exposto só para leitura. */
+  readonly pool: PoolService
   readonly preflight: PreflightService
   /** A prova dos runs e as pendências de limpeza (SPEC-Entrega-06). Leitura apenas. */
   readonly executionLedger: ExecutionLedgerRepository
@@ -2298,6 +2301,9 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       return deps.fila.vista(projectId, workspace)
     }
   )
+
+  // Só leitura: a vista sai do banco, sem o fencing token, e nenhum canal mexe no pool.
+  ipcMain.handle(IPC_CHANNELS.poolVista, () => deps.pool.vista())
 
   /**
    * O estado do sandbox (SPEC-Entrega-03). Só leitura: responde "a máquina está pronta?" sem

@@ -28,7 +28,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Approval, RevisaoAprovada } from '@shared/domain/aprovacoes'
 import type { BloqueioExterno } from '@shared/domain/pacote-estrutural'
 import type { Mvp, Slice } from '@shared/domain/roadmap'
-import { RECURSO_WIP_GLOBAL, VALIDADE_DO_LEASE_MS } from '@shared/domain/lease'
+import { VALIDADE_DO_LEASE_MS } from '@shared/domain/lease'
+import { recursoDoSlot } from '@shared/domain/pool'
 
 const logCat = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 vi.mock('../logging/logger', () => ({
@@ -42,6 +43,8 @@ const { PipelineRepository } = await import('./pipeline-repository')
 const { LeaseRepository } = await import('./lease-repository')
 const { EffectJournalRepository } = await import('./effect-journal-repository')
 const { FilaService } = await import('./fila-service')
+const { PoolRepository } = await import('./pool-repository')
+const { PoolService } = await import('./pool-service')
 const { ReconciliacaoService } = await import('./reconciliacao-service')
 const { MergePolicyRepository } = await import('./merge-policy-repository')
 const { MergePolicyService } = await import('./merge-policy-service')
@@ -51,6 +54,8 @@ const WS = 'jarvis' as const
 const PROJETO_A = 'p-a'
 const PROJETO_B = 'p-b'
 const AGORA = 1_700_000_000_000
+/** O único slot enquanto o paralelismo está desligado (padrão até a M12-F03). */
+const SLOT = recursoDoSlot(1)
 
 const origem: Mvp['origem'] = { tipo: 'decisao', decisaoId: 'd-1', perguntaId: 'p-1' }
 
@@ -133,10 +138,24 @@ beforeEach(() => {
   runs = new PipelineRepository(db)
   leases = new LeaseRepository(db)
 
+  const audit = new AuditRepository(db, 'chave-de-teste')
+  const pool = new PoolService({
+    db,
+    pool: new PoolRepository(db),
+    leases,
+    audit,
+    userId: () => USER,
+    workspaceId: () => WS,
+    gates: (item) => fila.gatesDoItem(item),
+    ativar: (item) => fila.ativarRun(item),
+    agora: () => relogio
+  })
+
   fila = new FilaService({
     runs,
-    leases,
-    audit: new AuditRepository(db, 'chave-de-teste'),
+    pool,
+    workspaceId: () => WS,
+    audit,
     roadmap: () => ({ mvps: MVPS, slices: SLICES }),
     aprovacoes: () => aprovacoes,
     revisoesDoGate: () => REVISOES,
@@ -158,6 +177,13 @@ function runPronto(projectId = PROJETO_A, sliceId = 'f1'): string {
   fila.transicionar(projectId, WS, run.id, 'AWAITING_PI')
   fila.transicionar(projectId, WS, run.id, 'READY')
   return run.id
+}
+
+/** Adquire o slot do run e devolve o fencing token — a credencial que as transições passam a exigir. */
+function adquirir(projectId: string, runId: string): number {
+  const r = fila.adquirirSlot(projectId, WS, runId)
+  expect(r.reason).toBe('adquirido')
+  return r.lease?.fencingToken as number
 }
 
 describe('máquina de estados contra o banco', () => {
@@ -267,7 +293,7 @@ describe('gate SLICE_ENTRY (critério 7)', () => {
   })
 })
 
-describe('slot global de WIP (critério 2)', () => {
+describe('slot de execução, com o paralelismo desligado (critério 2)', () => {
   it('deixa um run adquirir e o leva a RUNNING', () => {
     const runId = runPronto()
 
@@ -293,8 +319,8 @@ describe('slot global de WIP (critério 2)', () => {
 
   it('libera o slot e deixa o próximo run entrar', () => {
     const primeiro = runPronto(PROJETO_A, 'f1')
-    fila.adquirirSlot(PROJETO_A, WS, primeiro)
-    fila.liberarSlot(PROJETO_A, WS, primeiro)
+    const token = adquirir(PROJETO_A, primeiro)
+    fila.liberarSlot(PROJETO_A, WS, primeiro, token)
 
     expect(leaseNoBanco()).toBe(0)
 
@@ -306,8 +332,8 @@ describe('slot global de WIP (critério 2)', () => {
     const dono = runPronto()
     fila.adquirirSlot(PROJETO_A, WS, dono)
 
-    expect(fila.renovarSlot('run-intruso')).toBe(false)
-    expect(leases.buscar(USER, RECURSO_WIP_GLOBAL)?.proprietario).toBe(dono)
+    expect(fila.renovarSlot('run-intruso', 1)).toBe(false)
+    expect(leases.buscar(USER, SLOT)?.proprietario).toBe(dono)
   })
 })
 
@@ -323,20 +349,20 @@ describe('lease expirado (critério 3)', () => {
 
     expect(recusa.reason).toBe('expirado-requer-reconciliacao')
     expect(leaseNoBanco()).toBe(1)
-    expect(leases.buscar(USER, RECURSO_WIP_GLOBAL)?.proprietario).toBe(dono)
+    expect(leases.buscar(USER, SLOT)?.proprietario).toBe(dono)
     expect(estadoNoBanco(ladrao)).toBe('READY')
   })
 
   it('deixa o heartbeat do dono empurrar a expiração e manter o slot', () => {
     const dono = runPronto()
-    fila.adquirirSlot(PROJETO_A, WS, dono)
+    const token = adquirir(PROJETO_A, dono)
 
     relogio = AGORA + VALIDADE_DO_LEASE_MS - 1
-    expect(fila.renovarSlot(dono)).toBe(true)
+    expect(fila.renovarSlot(dono, token)).toBe(true)
 
     // Depois da renovação, o instante que teria expirado o lease original já não expira.
     relogio = AGORA + VALIDADE_DO_LEASE_MS + 1
-    expect(leases.buscar(USER, RECURSO_WIP_GLOBAL)?.expiraEm).toBeGreaterThan(relogio)
+    expect(leases.buscar(USER, SLOT)?.expiraEm).toBeGreaterThan(relogio)
   })
 })
 
@@ -351,15 +377,15 @@ describe('convergência depois de crash (critério 4)', () => {
     // Converge para o mesmo resultado da primeira chamada, sem duplicar nem perder o lease.
     expect(segunda.reason).toBe('adquirido')
     expect(leaseNoBanco()).toBe(1)
-    expect(leases.buscar(USER, RECURSO_WIP_GLOBAL)?.proprietario).toBe(runId)
+    expect(leases.buscar(USER, SLOT)?.proprietario).toBe(runId)
     expect(estadoNoBanco(runId)).toBe('RUNNING')
   })
 
   it('reconciliação roda duas vezes e converge para o mesmo resultado', async () => {
     const runId = runPronto()
-    fila.adquirirSlot(PROJETO_A, WS, runId)
+    const token = adquirir(PROJETO_A, runId)
     // O run morreu: some do processo, mas a linha e o lease ficam.
-    fila.transicionar(PROJETO_A, WS, runId, 'BLOCKED', BLOQUEIO)
+    fila.transicionar(PROJETO_A, WS, runId, 'BLOCKED', BLOQUEIO, token)
     relogio = AGORA + VALIDADE_DO_LEASE_MS + 1
 
     const reconciliacao = new ReconciliacaoService({
@@ -398,14 +424,14 @@ describe('convergência depois de crash (critério 4)', () => {
 
     const achados = await reconciliacao.reconcileAll()
 
-    expect(achados.find((a) => a.recurso === RECURSO_WIP_GLOBAL)?.decisao).toBe('bloqueado')
+    expect(achados.find((a) => a.recurso === SLOT)?.decisao).toBe('bloqueado')
     expect(leaseNoBanco()).toBe(1)
   })
 
   it('respeita o verificador da M9-F03: recurso em uso não é liberado', async () => {
     const runId = runPronto()
-    fila.adquirirSlot(PROJETO_A, WS, runId)
-    fila.transicionar(PROJETO_A, WS, runId, 'BLOCKED', BLOQUEIO)
+    const token = adquirir(PROJETO_A, runId)
+    fila.transicionar(PROJETO_A, WS, runId, 'BLOCKED', BLOQUEIO, token)
     relogio = AGORA + VALIDADE_DO_LEASE_MS + 1
 
     const reconciliacao = new ReconciliacaoService({
@@ -420,7 +446,7 @@ describe('convergência depois de crash (critério 4)', () => {
 
     const achados = await reconciliacao.reconcileAll()
 
-    expect(achados.find((a) => a.recurso === RECURSO_WIP_GLOBAL)?.decisao).toBe('bloqueado')
+    expect(achados.find((a) => a.recurso === SLOT)?.decisao).toBe('bloqueado')
     expect(leaseNoBanco()).toBe(1)
   })
 
@@ -501,11 +527,14 @@ describe('convergência depois de crash (critério 4)', () => {
 })
 
 describe('kill-switch do merge (critério 7)', () => {
+  /** O token do run mais recente, para `concluir` — que libera o slot com ele. */
+  let tokenDoRun = 0
+
   function ateOPrCi(): string {
     const runId = runPronto()
-    fila.adquirirSlot(PROJETO_A, WS, runId)
-    fila.transicionar(PROJETO_A, WS, runId, 'VALIDATING')
-    fila.transicionar(PROJETO_A, WS, runId, 'PR_CI')
+    tokenDoRun = adquirir(PROJETO_A, runId)
+    fila.transicionar(PROJETO_A, WS, runId, 'VALIDATING', undefined, tokenDoRun)
+    fila.transicionar(PROJETO_A, WS, runId, 'PR_CI', undefined, tokenDoRun)
     return runId
   }
 
@@ -513,7 +542,7 @@ describe('kill-switch do merge (critério 7)', () => {
     mergeLigado = true
     const runId = ateOPrCi()
 
-    expect(fila.concluir(PROJETO_A, WS, runId).reason).toBe('transicionado')
+    expect(fila.concluir(PROJETO_A, WS, runId, tokenDoRun).reason).toBe('transicionado')
     expect(estadoNoBanco(runId)).toBe('MERGED')
   })
 
@@ -521,7 +550,7 @@ describe('kill-switch do merge (critério 7)', () => {
     mergeLigado = false
     const runId = ateOPrCi()
 
-    fila.concluir(PROJETO_A, WS, runId)
+    fila.concluir(PROJETO_A, WS, runId, tokenDoRun)
 
     expect(estadoNoBanco(runId)).toBe('AWAITING_MERGE')
     expect(estadoNoBanco(runId)).not.toBe('BLOCKED')
@@ -530,7 +559,7 @@ describe('kill-switch do merge (critério 7)', () => {
   it('libera o slot nos dois desfechos: terminal não segura a fila', () => {
     mergeLigado = false
     const runId = ateOPrCi()
-    fila.concluir(PROJETO_A, WS, runId)
+    fila.concluir(PROJETO_A, WS, runId, tokenDoRun)
 
     expect(leaseNoBanco()).toBe(0)
   })
@@ -539,7 +568,7 @@ describe('kill-switch do merge (critério 7)', () => {
     // O PR está verde, mas não mergeou: a fatia seguinte construiria sobre base inexistente.
     mergeLigado = false
     const runId = ateOPrCi()
-    fila.concluir(PROJETO_A, WS, runId)
+    fila.concluir(PROJETO_A, WS, runId, tokenDoRun)
 
     const concluidas = runs.fatiasConcluidas({
       userId: USER,

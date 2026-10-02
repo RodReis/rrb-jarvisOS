@@ -27,13 +27,7 @@
 import { aprovacaoVigente, type Approval, type RevisaoAprovada } from '@shared/domain/aprovacoes'
 import type { WorkspaceId } from '@shared/domain/entities'
 import { dependenciasAbertas, type DependenciaAberta } from '@shared/domain/fila'
-import {
-  RECURSO_WIP_GLOBAL,
-  estadoDoLease,
-  podeAdquirir,
-  type Lease,
-  type LeaseOutcome
-} from '@shared/domain/lease'
+import type { LeaseOutcome } from '@shared/domain/lease'
 import type { BloqueioExterno } from '@shared/domain/pacote-estrutural'
 import {
   ehTerminal,
@@ -47,7 +41,8 @@ import type { Mvp, Slice } from '@shared/domain/roadmap'
 import { log } from '../logging/logger'
 import type { AuditRepository } from '../storage/audit-repository'
 import type { EscopoDoRun, PipelineRepository } from './pipeline-repository'
-import type { LeaseRepository } from './lease-repository'
+import type { Aquisicao, PoolService } from './pool-service'
+import type { ItemPersistido } from './pool-repository'
 
 /** O roadmap de um projeto, como a fila precisa dele. */
 export interface RoadmapDaFila {
@@ -57,7 +52,11 @@ export interface RoadmapDaFila {
 
 export interface FilaDeps {
   readonly runs: PipelineRepository
-  readonly leases: LeaseRepository
+  /**
+   * O pool de execução (SPEC-Scheduler-01). Substitui o slot global único da V1: quem detém o slot,
+   * com que token e quem espera é do pool; a fila só decide *se* um run pode entrar nele.
+   */
+  readonly pool: PoolService
   readonly audit: AuditRepository
   /** O roadmap do projeto. Vem do `RoadmapRepository`, injetado para o serviço não conhecê-lo. */
   readonly roadmap: (escopo: EscopoDoRun) => RoadmapDaFila
@@ -66,6 +65,14 @@ export interface FilaDeps {
   /** As revisões atuais do gate, para comparar hashes — a mesma fonte que a M8-F06 usa. */
   readonly revisoesDoGate: (escopo: EscopoDoRun) => readonly RevisaoAprovada[]
   readonly userId: () => string
+  /** O espaço atual: o pool ativa runs por dentro do ciclo, sem o espaço de quem chamou. */
+  readonly workspaceId: () => WorkspaceId
+  /**
+   * Avisa quem executa que um run **adquiriu** o slot (e já está em `RUNNING`). Um run que espera
+   * é ativado quando outro libera, e ninguém o chamou na hora: sem este aviso ele seguraria um
+   * slot sem trabalhar até o lease expirar.
+   */
+  readonly aoAdquirir?: (aquisicao: Aquisicao) => void
   /**
    * O kill-switch do merge autônomo do projeto (M9-F05, decisão do PI de 2026-08-30).
    *
@@ -77,6 +84,12 @@ export interface FilaDeps {
   /** Relógio injetado: lease e expiração precisam ser determinísticos no teste. */
   readonly agora?: () => number
 }
+
+/** Os estados em que o run **executa**: só avança com o token de um lease vivo. */
+const ESTADOS_EM_EXECUCAO: readonly EstadoDoRun[] = ['RUNNING', 'VALIDATING', 'PR_CI']
+
+/** Os terminais em que o trabalho acabou: o slot não tem mais o que proteger. */
+const DESFECHOS_CONCLUIDOS: readonly EstadoDoRun[] = ['MERGED', 'AWAITING_MERGE']
 
 export class FilaService {
   private readonly agora: () => number
@@ -124,7 +137,8 @@ export class FilaService {
     workspaceId: WorkspaceId,
     runId: string,
     para: EstadoDoRun,
-    bloqueio?: BloqueioExterno
+    bloqueio?: BloqueioExterno,
+    fencingToken?: number
   ): TransicaoOutcome {
     const escopo = this.escopo(projectId, workspaceId)
     const run = this.deps.runs.buscar(runId)
@@ -180,102 +194,164 @@ export class FilaService {
       }
     }
 
-    const gravou = this.deps.runs.transicionar(
-      runId,
-      run.estado,
-      para,
-      new Date(this.agora()),
-      para === 'BLOCKED' ? bloqueio : undefined
-    )
-
-    // O compare-and-set falhou: outro processo transicionou este run entre a leitura e a escrita.
-    if (!gravou) {
+    // **Quem executa o run só o avança com o token de um lease vivo** (critério 4). Vale para o run
+    // que detém um slot *e* para o que está em execução sem lease nenhum: este último é o dono
+    // antigo — perdeu o lease, outro pode ter o slot —, e tratá-lo como "run sem slot" o deixaria
+    // confirmar progresso sem fiscalização. Cancelar é ato do PI e dispensa o token. A conferência
+    // é o próprio `UPDATE`: entre "o token confere?" e "grava" não há janela para o lease mudar.
+    //
+    // **Só de quem passou pelo pool.** O construtor ainda leva o run por `RUNNING → PR_CI` direto
+    // pelo repositório, sem slot nem token, e o `EntregaService` o conclui por aqui: exigir token de
+    // quem nunca recebeu um travaria a entrega em `PR_CI`. Migrar esse caminho é da M12-F03.
+    const passouPeloPool =
+      this.deps.pool.adquiriu(runId) || this.deps.pool.slotDoRun(runId) !== undefined
+    const exigeToken =
+      para !== 'CANCELLED' && ESTADOS_EM_EXECUCAO.includes(run.estado) && passouPeloPool
+    if (exigeToken && fencingToken === undefined) {
       return {
-        reason: 'transicao-invalida',
-        mensagem: 'O run mudou de estado enquanto esta transição era decidida.'
+        reason: 'fencing-invalido',
+        mensagem: 'Este run está em execução: a transição exige o fencing token vigente.'
       }
+    }
+
+    const gravou =
+      exigeToken && fencingToken !== undefined
+        ? this.deps.runs.transicionarComFencing(
+            runId,
+            run.estado,
+            para,
+            new Date(this.agora()),
+            fencingToken,
+            para === 'BLOCKED' ? bloqueio : undefined
+          )
+        : this.deps.runs.transicionar(
+            runId,
+            run.estado,
+            para,
+            new Date(this.agora()),
+            para === 'BLOCKED' ? bloqueio : undefined
+          )
+
+    // O compare-and-set falhou: outro processo transicionou este run entre a leitura e a escrita —
+    // ou o token apresentado já não era o vigente (o dono antigo que perdeu o lease).
+    if (!gravou) {
+      return exigeToken
+        ? {
+            reason: 'fencing-invalido',
+            mensagem: 'O token apresentado não é o vigente: este dono perdeu o slot.'
+          }
+        : {
+            reason: 'transicao-invalida',
+            mensagem: 'O run mudou de estado enquanto esta transição era decidida.'
+          }
     }
 
     const atualizado = this.deps.runs.buscar(runId) as PipelineRun
     this.auditarTransicao(escopo, atualizado, run.estado, para, bloqueio)
 
+    // O run terminou: sai da fila, se esperava. O slot só é solto aqui nos desfechos **concluídos**
+    // — `terminal não segura a fila` —; em `BLOCKED` e `CANCELLED` o lease fica até a reconciliação
+    // verificar se container e porta ainda estão em uso (a regra que a V1 já tinha). Liberar o slot
+    // no cancelamento, com a limpeza dos recursos, é da M12-F05.
+    if (ehTerminal(para)) {
+      this.deps.pool.cancelar(runId)
+      if (DESFECHOS_CONCLUIDOS.includes(para) && this.deps.pool.encerrar(runId)) this.despachar()
+    }
+
     return { reason: 'transicionado', run: atualizado, mensagem: `Run em ${para}.` }
   }
 
   /**
-   * Adquire o slot global de WIP para um run em `READY`, e o leva a `RUNNING` (critério 2).
+   * Pede um slot do pool para um run em `READY`, e o leva a `RUNNING` (critério 2).
+   *
+   * O run entra na fila e o scheduler decide: com capacidade, ele adquire e avança no mesmo ciclo;
+   * sem, continua esperando — e o motivo (limite global, do projeto, gate, prova de independência)
+   * fica gravado na fila e na vista. **Quem tem a vez nem sempre é quem pediu**: a justiça entre
+   * projetos pode dar o slot a outro run que já esperava, e este espera a próxima liberação.
    *
    * As duas coisas juntas de propósito: um slot adquirido sem o run avançar seria um recurso
    * preso a um run que não está trabalhando, e a reconciliação teria de adivinhar se aquilo é
-   * progresso ou lixo.
+   * progresso ou lixo. Por isso a ativação do run roda **dentro** do ciclo do pool.
    */
   adquirirSlot(projectId: string, workspaceId: WorkspaceId, runId: string): LeaseOutcome {
     const escopo = this.escopo(projectId, workspaceId)
-    const agora = this.agora()
-    const existente = this.deps.leases.buscar(escopo.userId, RECURSO_WIP_GLOBAL)
+    const run = this.deps.runs.buscar(runId)
 
-    if (!podeAdquirir(existente, runId, agora)) {
-      // Critério 3: expirado **não** é o mesmo que livre. A reconciliação decide, porque a
-      // expiração pode significar máquina lenta, não processo morto.
-      const estado = estadoDoLease(existente, agora)
-      return estado === 'expirado'
-        ? {
-            reason: 'expirado-requer-reconciliacao',
-            ...(existente === undefined ? {} : { lease: existente }),
-            mensagem:
-              'O slot de WIP tem lease expirado. A reconciliação precisa confirmar o estado antes de reatribuí-lo.'
-          }
-        : {
-            reason: 'ocupado',
-            ...(existente === undefined ? {} : { lease: existente }),
-            mensagem: 'Outro run detém o slot de execução. WIP=1 é global (uma fatia por máquina).'
-          }
+    if (run === undefined || run.user_id !== escopo.userId) {
+      return { reason: 'lease-inexistente', mensagem: 'Run não encontrado.' }
     }
 
-    // **Retry depois de crash: o slot já é dele e o run já avançou** (critério 4).
-    //
-    // O crash entre `adquirir` e a confirmação deixa exatamente este estado — lease do run,
-    // run em `RUNNING`. Repetir a chamada tem de devolver o mesmo resultado, e não tentar a
-    // transição de novo: `RUNNING → RUNNING` é inválida por construção, e tratar essa recusa
-    // como "o run não podia avançar" liberaria o slot de um run que está trabalhando.
-    const jaEstavaRodando = this.deps.runs.buscar(runId)?.estado === 'RUNNING'
-    if (existente?.proprietario === runId && jaEstavaRodando) {
-      return {
-        reason: 'adquirido',
-        lease: existente,
-        mensagem: 'O slot já pertencia a este run, que já estava em execução.'
-      }
-    }
+    // **Retry depois de crash converge**: `enfileirar` devolve a linha que já existe e o ciclo não
+    // readquire o que já está adquirido — repetir a chamada devolve o mesmo slot, sem tentar a
+    // transição `RUNNING → RUNNING` (inválida por construção) nem liberar o slot de quem trabalha.
+    this.deps.pool.enfileirar({
+      runId,
+      workspaceId,
+      projectId,
+      sliceId: run.sliceId,
+      prioridade: this.prioridadeDaFatia(escopo, run.sliceId)
+    })
+    this.despachar()
 
-    // Readquirir o próprio lease vigente é idempotente: o retry depois de um crash entre gravar e
-    // confirmar não pode ficar travado no próprio lease (critério 4).
-    const lease =
-      existente?.proprietario === runId
-        ? existente
-        : this.deps.leases.adquirir(
-            escopo.userId,
-            { proprietario: runId, recurso: RECURSO_WIP_GLOBAL, projectId },
-            agora
-          )
+    const lease = this.deps.pool.slotDoRun(runId)
+    if (lease === undefined) return this.esperaDe(runId)
 
-    if (lease === undefined) {
-      // O `UNIQUE` recusou: outro processo adquiriu entre a checagem e o INSERT. A janela que a
-      // checagem em memória deixa aberta é fechada aqui, no banco.
-      return {
-        reason: 'ocupado',
-        mensagem: 'Outro run adquiriu o slot de execução neste instante.'
-      }
-    }
-
-    const transicao = this.transicionar(projectId, workspaceId, runId, 'RUNNING')
-    if (transicao.reason !== 'transicionado') {
-      // O run não podia avançar: devolvo o slot em vez de deixá-lo preso a um run parado.
-      this.deps.leases.liberar(escopo.userId, RECURSO_WIP_GLOBAL, runId)
-      return { reason: 'ocupado', mensagem: transicao.mensagem }
-    }
-
-    this.auditarLease(escopo, 'adquirido', lease)
     return { reason: 'adquirido', lease, mensagem: 'Slot de execução adquirido.' }
+  }
+
+  /**
+   * Roda um ciclo do scheduler: quem cabe adquire, é ativado e é anunciado a `aoAdquirir`. É o que
+   * se chama quando algo muda — slot liberado, gate fechado, configuração alterada — para a fila
+   * andar sem esperar o próximo pedido.
+   */
+  despachar(): readonly Aquisicao[] {
+    const { adquiridos } = this.deps.pool.ciclo()
+    for (const a of adquiridos) this.deps.aoAdquirir?.(a)
+    return adquiridos
+  }
+
+  /** Por que o run ainda não tem slot, no formato que `adquirirSlot` devolve. */
+  private esperaDe(runId: string): LeaseOutcome {
+    const motivo = this.deps.pool.vista().fila.find((i) => i.runId === runId)?.motivo
+    if (motivo?.tipo === 'aguardando-reconciliacao') {
+      return {
+        reason: 'expirado-requer-reconciliacao',
+        mensagem:
+          'Há um slot com lease expirado. A reconciliação precisa confirmar o estado antes de reatribuí-lo.'
+      }
+    }
+    return { reason: 'ocupado', mensagem: mensagemDeEspera(motivo) }
+  }
+
+  /**
+   * A precedência do run na fila: a do roadmap (MVP e fatia, na ordem em que o PI os numerou).
+   * Fatia que não está no roadmap vai para o fim — nunca à frente de quem tem lugar nele.
+   */
+  private prioridadeDaFatia(escopo: EscopoDoRun, sliceId: string): number {
+    const { mvps, slices } = this.deps.roadmap(escopo)
+    const slice = slices.find((s) => s.id === sliceId)
+    const mvp = mvps.find((m) => m.id === slice?.mvpId)
+    return slice === undefined || mvp === undefined ? 1_000_000 : mvp.numero * 1_000 + slice.numero
+  }
+
+  /**
+   * Os gates que ainda seguram um item da fila: o run precisa estar `READY` (a aprovação do PI e as
+   * dependências da fatia já passaram). Vazio = elegível. Capacidade livre não torna ninguém
+   * elegível (regra 1 da SPEC-Scheduler-01).
+   */
+  gatesDoItem(item: ItemPersistido): readonly string[] {
+    const run = this.deps.runs.buscar(item.runId)
+    // `READY` já exige as dependências concluídas (a transição confere), e concluído não regride:
+    // o que segura um item é o run ainda não estar pronto.
+    return run === undefined || run.estado !== 'READY' ? ['run-nao-pronto'] : []
+  }
+
+  /** A ativação do run pelo pool: `READY → RUNNING`, sem token (o lease acabou de nascer). */
+  ativarRun(item: ItemPersistido): boolean {
+    return (
+      this.transicionar(item.projectId, item.workspaceId, item.runId, 'RUNNING').reason ===
+      'transicionado'
+    )
   }
 
   /**
@@ -289,31 +365,35 @@ export class FilaService {
    * O merge em si é da M9-F05; esta função só decide **qual terminal** o run merece. Quem chama
    * já confirmou os checks no `head SHA` esperado — a fila não valida CI.
    */
-  concluir(projectId: string, workspaceId: WorkspaceId, runId: string): TransicaoOutcome {
+  concluir(
+    projectId: string,
+    workspaceId: WorkspaceId,
+    runId: string,
+    fencingToken?: number
+  ): TransicaoOutcome {
     const terminal = this.deps.mergeAutonomoLigado(projectId) ? 'MERGED' : 'AWAITING_MERGE'
-    const resultado = this.transicionar(projectId, workspaceId, runId, terminal)
-
-    // O slot é da máquina: segurá-lo depois do terminal travaria a fila inteira até o próximo
-    // boot. Libero em qualquer dos dois desfechos — `AWAITING_MERGE` também terminou.
-    if (resultado.reason === 'transicionado') {
-      this.liberarSlot(projectId, workspaceId, runId)
-    }
-
-    return resultado
+    // O terminal já solta o slot e passa a vez (ver `transicionarCom`): `AWAITING_MERGE` também
+    // terminou, e segurar o slot travaria a fila até o próximo boot.
+    return this.transicionar(projectId, workspaceId, runId, terminal, undefined, fencingToken)
   }
 
-  /** Renova o heartbeat do slot. Só o próprio dono renova (o `WHERE` do repositório garante). */
-  renovarSlot(runId: string): boolean {
-    return this.deps.leases.renovar(this.deps.userId(), RECURSO_WIP_GLOBAL, runId, this.agora())
+  /** Renova o heartbeat do slot. Só o dono com o token vigente renova. */
+  renovarSlot(runId: string, fencingToken: number): boolean {
+    return this.deps.pool.renovar(runId, fencingToken)
   }
 
-  /** Libera o slot ao fim do run. */
-  liberarSlot(projectId: string, workspaceId: WorkspaceId, runId: string): boolean {
-    const escopo = this.escopo(projectId, workspaceId)
-    const lease = this.deps.leases.buscar(escopo.userId, RECURSO_WIP_GLOBAL)
-    const liberou = this.deps.leases.liberar(escopo.userId, RECURSO_WIP_GLOBAL, runId)
-
-    if (liberou && lease !== undefined) this.auditarLease(escopo, 'liberado', lease)
+  /**
+   * Libera o slot ao fim do run — só com o token vigente — e já roda um ciclo, para a fila andar:
+   * o próximo run que espera adquire na hora, e não no próximo pedido de alguém.
+   */
+  liberarSlot(
+    _projectId: string,
+    _workspaceId: WorkspaceId,
+    runId: string,
+    fencingToken: number
+  ): boolean {
+    const liberou = this.deps.pool.liberar(runId, fencingToken)
+    if (liberou) this.despachar()
     return liberou
   }
 
@@ -387,18 +467,28 @@ export class FilaService {
 
     log.agent.info('Run da pipeline mudou de estado', { runId: run.id, de: de ?? null, para })
   }
+}
 
-  private auditarLease(escopo: EscopoDoRun, acao: 'adquirido' | 'liberado', lease: Lease): void {
-    this.deps.audit.append({
-      user_id: escopo.userId,
-      workspace_id: escopo.workspaceId,
-      type: 'pipeline-lease',
-      payload: {
-        acao,
-        recurso: lease.recurso,
-        proprietario: lease.proprietario,
-        projectId: escopo.projectId
-      }
-    })
+/** O motivo de espera em texto, para quem chama a API do slot; a vista traz o motivo estruturado. */
+function mensagemDeEspera(motivo: { readonly tipo: string } | undefined): string {
+  switch (motivo?.tipo) {
+    case 'paralelismo-desligado':
+      return 'Outro run detém o slot de execução. O paralelismo está desligado: um run por máquina.'
+    case 'limite-global':
+      return 'Todos os slots de execução estão ocupados.'
+    case 'limite-do-projeto':
+      return 'O projeto já tem o máximo de runs em execução.'
+    case 'limite-do-executor':
+      return 'O executor deste run já está no limite de execuções simultâneas.'
+    case 'limite-da-classe':
+      return 'A classe de recurso deste run já está no limite de execuções simultâneas.'
+    case 'sem-prova-de-independencia':
+      return 'Outro run do mesmo projeto está em execução e não há prova de independência entre os dois.'
+    case 'precedencia':
+      return 'Há um run anterior do mesmo projeto esperando na frente deste.'
+    case 'gate':
+      return 'O run ainda tem um gate aberto (aprovação ou dependência).'
+    default:
+      return 'O run aguarda a vez na fila de execução.'
   }
 }

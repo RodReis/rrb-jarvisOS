@@ -47,6 +47,36 @@ Substituir o slot global único da V1 por um pool durável de capacidade, com do
 - crash antes/depois da aquisição;
 - métricas e auditoria das decisões.
 
+## Decisões de implementação (PI, 2026-10-02)
+
+Tomadas na implementação da F01, depois de o Code achar duas lacunas que a SPEC não resolvia. Registradas aqui porque a opção recusada também é decisão.
+
+1. **Paralelismo desligado por padrão.** A SPEC fixa "dois slots globais" como padrão V2, mas o ADR-006 mantém multi-escritor desligado até o MVP-028. **Decidido:** o pool nasce com **2 slots** e `paralelismo` **desligado**; a capacidade efetiva é **1** até a M12-F03 (isolamento concorrente) ligá-lo. O comportamento de hoje (um run por vez) não muda. *Recusada:* ligar os dois slots já na F01 — mais próximo da letra da SPEC, mas dois runs escrevendo no mesmo repositório antes do isolamento da F03.
+2. **Critério 5 por API, sem tela.** **Decidido:** serviço (`PoolService.vista()`) + canal IPC tipado só de leitura (`pool:vista`). Não há UI: o quadro é do MVP-028. *Recusada:* um painel provisório na F01, que a F28 jogaria fora.
+
+## Contrato com as próximas fatias
+
+- **O token nunca sai do main.** A vista (`VistaDoPool`), a auditoria e as mensagens de erro não o carregam; só o dono do slot o recebe, em `adquirirSlot`.
+- **Run em execução só avança com o token vigente** (`RUNNING`/`VALIDATING`/`PR_CI`), inclusive o dono antigo que já perdeu o lease. `CANCELLED` é ato do PI e dispensa o token.
+- **O slot solta quando o run termina por `MERGED` ou `AWAITING_MERGE`.** Cancelamento e bloqueio **não** soltam o slot nesta fatia: a liberação deles é da **M12-F05** (recuperação), junto com a reconciliação de lease expirado — que também só roda no boot.
+- **Lease V1 em voo** (`wip:global`) atravessa a atualização: não é slot do pool, e a reconciliação do boot o resolve como resolvia antes.
+- **`ConstrutorService` ainda transiciona pelo repositório**, sem passar o token. O caminho do pool (FilaService) o exige; migrar o construtor para ele é da F03, quando houver mais de um escritor.
+- **O pool é um por usuário; a vista é por workspace.** A capacidade é do pool inteiro (um escritor no NOA ocupa o slot do JARVIS OS), mas `pool_fila` guarda o `workspace_id` do run, e a vista, a ativação e a auditoria seguem o dele. A vista mostra só os runs do workspace atual, e `ocupacao` conta o pool todo.
+- **Quem executa precisa ser ligado na F03.** Nenhum chamador de produção usa `adquirirSlot`, `renovarSlot` nem `aoAdquirir`: quando a F03 ligar o executor, ele deve receber o token de `adquirirSlot` e de `aoAdquirir` (hoje opcional) e renovar o heartbeat. Sem isso, um run que o `despachar()` ativa depois de uma liberação ficaria com slot e sem worker.
+- **`ativar` recusado cancela o item.** Hoje a pré-condição é só `READY`, validada nos gates; se a ativação ganhar outras, o item cancelado não volta pelo mesmo run.
+- **Independência é porta, não regra.** `ProvaDeIndependencia` entra no `decidirPool` com padrão `SEM_PROVA` (nada é independente de nada); a F02 injeta a prova real.
+
+## Limites declarados
+
+Achados das revisões independentes que ficam fora da F01, sem chamador em produção que os exponha hoje:
+
+- **Terminal e liberação do slot são dois commits** (`UPDATE` do run, depois `pool.encerrar`). Um crash entre os dois deixa lease vigente de run encerrado até o lease expirar e o próximo boot reconciliar. Janela de duas instruções síncronas; fechar com uma transação única é da M12-F05.
+- **A `posicao` exibida** é calculada sem contar o projeto que acabou de adquirir na mesma decisão, e pode divergir da ordem do ciclo seguinte. A justiça real não é afetada; só o número mostrado.
+- **Fila e `pool_decisao` sem teto nem retenção.** As métricas só olham 24 h, e a vista refaz a decisão a cada chamada. Teto de itens por usuário e purga do histórico entram com o quadro (MVP-028), que é quem consulta a vista de forma contínua.
+- **O token é sequencial, não segredo.** Serve de fencing (monotônico, nunca reaproveitado), não de credencial entre processos: se um dia atravessar IPC, precisa de componente aleatório. Tentativa recusada por `fencing-invalido` não gera `AuditEvent`.
+- **`transicionarComFencing` aceita lease expirado** se o token confere: coerente com "expirado ocupa o slot até a reconciliação".
+
+
 ## Perguntas abertas ao PI
 
 Nenhuma. Revisão exata aprovada pelo PI em 2026-08-29.

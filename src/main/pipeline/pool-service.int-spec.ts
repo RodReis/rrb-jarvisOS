@@ -72,6 +72,7 @@ afterEach(() => {
 
 const run = (runId: string, projectId = 'p-a', prioridade = 1) => ({
   runId,
+  workspaceId: 'jarvis' as const,
   projectId,
   sliceId: `s-${runId}`,
   prioridade
@@ -492,6 +493,50 @@ describe('vista — critério 5', () => {
   })
 })
 
+describe('escopo de workspace e de usuário', () => {
+  const noa = (runId: string, projectId = 'p-noa') => ({
+    ...run(runId, projectId),
+    workspaceId: 'noa' as const
+  })
+
+  it('a vista mostra só o workspace de quem olha, mas a capacidade continua sendo uma só', () => {
+    servico.configurar(PARALELO)
+    servico.enfileirar(run('j1', 'p-j')) // jarvis
+    servico.enfileirar(noa('n1'))
+    servico.enfileirar(noa('n2', 'p-noa2'))
+    servico.ciclo() // j1 e n1 adquirem; n2 espera
+    servico.enfileirar(noa('n3', 'p-noa3'))
+
+    const jarvis = servico.vista('jarvis')
+    expect(jarvis.ocupados.map((s) => s.runId)).toEqual(['j1'])
+    expect(jarvis.fila).toEqual([])
+
+    const doNoa = servico.vista('noa')
+    expect(doNoa.ocupados.map((s) => s.runId)).toEqual(['n1'])
+    expect(doNoa.fila.map((i) => i.runId).sort()).toEqual(['n2', 'n3'])
+    // O número de slots em uso é do pool inteiro: um por usuário, não um por espaço.
+    expect(doNoa.metricas.ocupacao.ocupados).toBe(2)
+    // Sem argumento, vale o workspace do serviço — o que o canal IPC usa.
+    expect(servico.vista().ocupados.map((s) => s.runId)).toEqual(['j1'])
+  })
+
+  it('a auditoria do lease leva o workspace do run, não o do ciclo', () => {
+    servico.enfileirar(noa('n1'))
+    servico.ciclo() // o serviço roda como `jarvis`, o run é do `noa`
+
+    const evento = audit.list(USER).find((e) => e.type === 'pipeline-lease')
+    expect(evento?.workspace_id).toBe('noa')
+  })
+
+  it('o run que já é de outro usuário não volta a quem tenta enfileirá-lo', () => {
+    servico.enfileirar(run('r1'))
+    const intruso = montar('u-outro')
+
+    expect(() => intruso.enfileirar(run('r1'))).toThrow(/outro usuário/)
+    expect(pool.esperando('u-outro')).toEqual([])
+  })
+})
+
 describe('cancelar e liberar', () => {
   it('cancelar tira da fila, registra a decisão e não cancela quem já adquiriu', () => {
     servico.enfileirar(run('a1', 'p-a'))
@@ -517,6 +562,23 @@ describe('cancelar e liberar', () => {
     const a = servico.ciclo().adquiridos[0]
     servico.liberar(a.runId, a.fencingToken)
     expect(servico.ciclo().adquiridos.map((x) => x.runId)).toEqual(['b1'])
+  })
+
+  it('encerrar solta o slot do run que terminou, sem token, e só o dele', () => {
+    servico.configurar(PARALELO)
+    servico.enfileirar(run('a1', 'p-a'))
+    servico.enfileirar(run('b1', 'p-b'))
+    servico.ciclo()
+
+    expect(servico.encerrar('a1')).toBe(true)
+    expect(servico.encerrar('a1')).toBe(false)
+    expect(servico.encerrar('nunca-teve')).toBe(false)
+
+    expect(servico.slotDoRun('a1')).toBeUndefined()
+    expect(servico.slotDoRun('b1')).toBeDefined()
+    expect(servico.vista().metricas.decisoes.liberado).toBe(1)
+    const eventos = audit.list(USER).filter((e) => e.type === 'pipeline-lease')
+    expect(eventos.map((e) => e.payload.acao)).toEqual(['adquirido', 'adquirido', 'liberado'])
   })
 
   it('registrar a reconciliação conta a decisão', () => {

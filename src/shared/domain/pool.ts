@@ -383,6 +383,15 @@ function ocupar(
   ativosPorProjeto.set(p, [...(ativosPorProjeto.get(p) ?? []), item.runId])
 }
 
+/** Os runs que já ocupam slot, agrupados por projeto — a base da regra de precedência. */
+function ativosDosOcupados(ocupados: readonly SlotOcupado[]): Map<string, string[]> {
+  const porProjeto = new Map<string, string[]>()
+  for (const o of ocupados) {
+    porProjeto.set(o.projectId, [...(porProjeto.get(o.projectId) ?? []), o.runId])
+  }
+  return porProjeto
+}
+
 /**
  * Decide quem adquire agora e por que os demais esperam. Pura e determinística: a ordem de
  * `itens` e de `ocupados` não muda o resultado.
@@ -400,10 +409,7 @@ export function decidirPool(
     .filter((o) => o.estado === 'expirado')
     .map((o) => o.runId)
     .sort()
-  const ativosPorProjeto = new Map<string, string[]>()
-  for (const o of estado.ocupados) {
-    ativosPorProjeto.set(o.projectId, [...(ativosPorProjeto.get(o.projectId) ?? []), o.runId])
-  }
+  const ativosPorProjeto = ativosDosOcupados(estado.ocupados)
 
   const adquirir: string[] = []
   const servidos = new Set<string>()

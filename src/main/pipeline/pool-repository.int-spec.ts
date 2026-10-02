@@ -41,6 +41,7 @@ afterEach(() => {
 
 const item = (runId: string, projectId = 'p-a') => ({
   runId,
+  workspaceId: 'jarvis' as const,
   projectId,
   sliceId: `s-${runId}`,
   prioridade: 1

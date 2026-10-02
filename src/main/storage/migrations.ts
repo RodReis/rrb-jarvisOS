@@ -1771,6 +1771,7 @@ const MIGRATIONS: readonly string[] = [
   CREATE TABLE pool_fila (
     run_id         TEXT PRIMARY KEY,
     user_id        TEXT NOT NULL,
+    workspace_id   TEXT NOT NULL,
     project_id     TEXT NOT NULL,
     slice_id       TEXT NOT NULL,
     prioridade     INTEGER NOT NULL,

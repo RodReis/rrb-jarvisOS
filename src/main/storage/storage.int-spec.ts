@@ -133,6 +133,17 @@ describe('migrations', () => {
     antigo.exec('ALTER TABLE user_profile DROP COLUMN voz_saida_id')
     antigo.exec('ALTER TABLE user_profile DROP COLUMN voz_entrada_rotulo')
     antigo.exec('ALTER TABLE user_profile DROP COLUMN voz_saida_rotulo')
+    // A 48 cria o pool de execução (SPEC-Scheduler-01). A coluna `fencing_token` que ela dá ao
+    // `lease` some junto com a tabela, derrubada acima.
+    for (const tabela of [
+      'pool_config',
+      'pool_fila',
+      'pool_vez',
+      'pool_sequencia',
+      'pool_decisao'
+    ]) {
+      antigo.exec(`DROP TABLE ${tabela}`)
+    }
     antigo.pragma('user_version = 1')
     antigo.close()
 
