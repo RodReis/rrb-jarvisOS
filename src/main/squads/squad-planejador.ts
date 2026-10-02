@@ -25,6 +25,7 @@
 
 import { createHash } from 'node:crypto'
 import type { ModeloEscolhido } from '@shared/domain/modelo-da-fase'
+import { isRotaUnmetered } from '@shared/domain/ai'
 import type { ContextoDeValidacao, Decisao, Rejeicao, SquadPlan } from '@shared/domain/squad-plano'
 import { proximaTentativaPermitida } from '@shared/domain/attempt'
 import { ESQUEMA_DO_PLANO_JSON } from '@shared/domain/squad-plano-esquema'
@@ -105,32 +106,86 @@ export type ResultadoDoPlanejamento =
     }
   | {
       readonly ok: false
-      readonly motivo: 'PLANO_REJEITADO' | 'GERADOR_INDISPONIVEL' | 'PERFIL_INELEGIVEL'
+      readonly motivo:
+        | 'PLANO_REJEITADO'
+        | 'GERADOR_INDISPONIVEL'
+        | 'PERFIL_INELEGIVEL'
+        | 'GERADORES_FORA_DO_SNAPSHOT'
       readonly historico: readonly TentativaDePlano[]
     }
 
 const sha256 = (texto: string): string => createHash('sha256').update(texto).digest('hex')
 
-/**
- * Tira o JSON da resposta: direto, dentro de cerca de código ou entre o primeiro `{` e o último
- * `}`. Modelo local de 8B embrulha a saída com frequência, e isso não é motivo para perder a
- * proposta — o esquema estrito em `lerPlano` é quem barra o que vier errado.
- */
-export function extrairJson(texto: string): unknown {
-  const candidatos = [texto.trim()]
-  const cerca = /```(?:json)?\s*([\s\S]*?)```/i.exec(texto)
-  if (cerca?.[1] !== undefined) candidatos.push(cerca[1].trim())
-  const [ini, fim] = [texto.indexOf('{'), texto.lastIndexOf('}')]
-  if (ini >= 0 && fim > ini) candidatos.push(texto.slice(ini, fim + 1))
+/** Quantos pontos de partida (`{`) a varredura tenta: texto adversarial cheio de chaves não trava. */
+const MAX_PONTOS_DE_PARTIDA = 200
 
-  for (const c of candidatos) {
+/** Onde fecha o objeto que abre em `ini`, respeitando string e escape; `-1` se não fecha. */
+function fimDoObjeto(texto: string, ini: number): number {
+  let profundidade = 0
+  let emString = false
+  let escapado = false
+  for (let i = ini; i < texto.length; i++) {
+    const c = texto[i]
+    if (emString) {
+      if (escapado) escapado = false
+      else if (c === '\\') escapado = true
+      else if (c === '"') emString = false
+      continue
+    }
+    if (c === '"') emString = true
+    else if (c === '{') profundidade++
+    else if (c === '}' && --profundidade === 0) return i
+  }
+  return -1
+}
+
+/** Os objetos de topo balanceados de um texto: o que sobra quando se tira a prosa em volta. */
+function objetosBalanceados(texto: string): string[] {
+  const achados: string[] = []
+  let de = 0
+  for (let tentativa = 0; tentativa < MAX_PONTOS_DE_PARTIDA; tentativa++) {
+    const ini = texto.indexOf('{', de)
+    if (ini < 0) break
+    const fim = fimDoObjeto(texto, ini)
+    if (fim < 0) {
+      de = ini + 1
+      continue
+    }
+    achados.push(texto.slice(ini, fim + 1))
+    de = fim + 1
+  }
+  return achados
+}
+
+const ehObjeto = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v)
+
+/**
+ * Tira o JSON da resposta: o texto inteiro e cada objeto de topo balanceado dentro dele. Modelo
+ * local de 8B embrulha a saída com frequência — com prosa, com cerca de código, com chaves soltas
+ * e às vezes com mais de um bloco —, e isso não é motivo para perder a proposta. A cerca de código
+ * não precisa de tratamento próprio: o objeto dentro dela é um objeto de topo como outro qualquer.
+ *
+ * `aceita` escolhe, entre os objetos legíveis, o que o chamador quer (o que `lerPlano` entende);
+ * se nenhum serve, devolve o primeiro legível, para o validador dizer por que ele não serve. O
+ * esquema estrito em `lerPlano` continua sendo a barreira.
+ */
+export function extrairJson(
+  texto: string,
+  aceita: (valor: Record<string, unknown>) => boolean = () => true
+): Record<string, unknown> | undefined {
+  const candidatos = [texto.trim(), ...objetosBalanceados(texto)]
+
+  const lidos: Record<string, unknown>[] = []
+  for (const candidato of candidatos) {
     try {
-      return JSON.parse(c) as unknown
+      const valor = JSON.parse(candidato) as unknown
+      if (ehObjeto(valor)) lidos.push(valor)
     } catch {
       continue
     }
   }
-  return undefined
+  return lidos.find(aceita) ?? lidos[0]
 }
 
 /** O hash do plano aceito, ligado ao run, à revisão da SPEC e à revisão do perfil. */
@@ -141,15 +196,22 @@ export function hashDoPlanoAceito(
   return sha256(canonico({ plano, ...vinculos }))
 }
 
+/**
+ * O contexto de validação, **copiado e congelado**. Os arrays que o chamador passou continuam
+ * sendo dele: se mudassem no meio do ciclo, a tentativa seguinte seria julgada por limites
+ * diferentes — exatamente o que o replanejamento não pode fazer (critério 3).
+ */
 function contextoDe(entrada: EntradaDoPlanejamento): ContextoDeValidacao {
   const { snapshot, spec, base } = entrada
+  const congelada = <T>(lista: readonly T[]): readonly T[] => Object.freeze([...lista])
   return Object.freeze({
-    criteriosDaSpec: spec.criterios.map((c) => c.numero),
+    criteriosDaSpec: congelada(spec.criterios.map((c) => c.numero)),
+    riscosDaSpec: congelada(spec.riscos ?? []),
     perfil: snapshot.perfil,
     resolucao: snapshot.resolucao,
-    pathsPermitidos: base.pathsPermitidos,
-    fontesPermitidas: base.fontesPermitidas,
-    arquivosDaBase: base.arquivosDaBase,
+    pathsPermitidos: congelada(base.pathsPermitidos),
+    fontesPermitidas: congelada(base.fontesPermitidas),
+    arquivosDaBase: congelada(base.arquivosDaBase),
     orcamentoUsd: base.orcamentoUsd
   })
 }
@@ -258,7 +320,7 @@ async function rodarGerador(
     }
 
     const hashDaProposta = sha256(resposta.texto)
-    const bruto = extrairJson(resposta.texto)
+    const bruto = extrairJson(resposta.texto, (v) => lerPlano(v).plano !== undefined)
     const decisao = validarPlano(bruto ?? 'JSON ilegível', ctx)
 
     if (decisao.aceito) {
@@ -306,13 +368,54 @@ function ordemDosGeradores(
   return [deps.geradorFase]
 }
 
+const mesmoModelo = (a: ModeloEscolhido, b: ModeloEscolhido): boolean =>
+  a.provider === b.provider && a.modelo === b.modelo
+
+/**
+ * Os geradores são os que o snapshot resolveu? O comentário do módulo promete que o fallback é o
+ * modelo da fase pela rota de assinatura, e a promessa só vale se for conferida: um chamador que
+ * monte `geradorFase` com um modelo `anthropic` chamaria a rota paga sem que nada reclamasse.
+ *
+ *  - o gerador da fase usa exatamente o `modeloDaFase` do snapshot;
+ *  - o gerador local, quando o perfil o quer, usa exatamente o modelo que a resolução aprovou;
+ *  - a reserva (a fase) não é rota paga sem o opt-in do projeto — é o caso que a resolução não
+ *    enxerga quando o orquestrador é o local: ele está configurado, e a fase só entra depois.
+ */
+function geradoresConferem(deps: DependenciasDoPlanejador, snapshot: SnapshotDoSquad): boolean {
+  const { optInApiPaga } = snapshot.ambiente
+  const permitido = (g: GeradorDePlano): boolean =>
+    isRotaUnmetered(g.modelo.provider) || optInApiPaga
+
+  if (
+    !mesmoModelo(deps.geradorFase.modelo, snapshot.modeloDaFase) ||
+    !permitido(deps.geradorFase)
+  ) {
+    return false
+  }
+  const orquestrador = snapshot.resolucao.camadas.orquestrador
+  const querLocal = snapshot.perfil.camadas.orquestrador.origem === 'modelo'
+  if (!querLocal || deps.geradorLocal === undefined || orquestrador.estado !== 'configurado') {
+    return true
+  }
+  return (
+    orquestrador.modelo !== undefined && mesmoModelo(deps.geradorLocal.modelo, orquestrador.modelo)
+  )
+}
+
 export async function planejarSquad(
   deps: DependenciasDoPlanejador,
   entrada: EntradaDoPlanejamento
 ): Promise<ResultadoDoPlanejamento> {
   const historico: TentativaDePlano[] = []
-  if (!entrada.snapshot.resolucao.elegivel)
+  // Elegibilidade já inclui o orquestrador (squad-resolucao); a checagem direta da camada fica
+  // como defesa em profundidade para um snapshot que chegue adulterado como elegível.
+  const { resolucao } = entrada.snapshot
+  if (!resolucao.elegivel || resolucao.camadas.orquestrador.estado === 'indisponivel') {
     return { ok: false, motivo: 'PERFIL_INELEGIVEL', historico }
+  }
+  if (!geradoresConferem(deps, entrada.snapshot)) {
+    return { ok: false, motivo: 'GERADORES_FORA_DO_SNAPSHOT', historico }
+  }
 
   const auditar: Auditar = (type, payload) => {
     deps.auditoria.append({

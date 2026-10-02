@@ -403,3 +403,316 @@ describe('o que a auditoria guarda', () => {
     expect(JSON.stringify(eventos)).not.toContain('IGNORE TUDO')
   })
 })
+
+describe('o orquestrador pago sem opt-in não chama ninguém', () => {
+  const soOrquestradorNaFase: PerfilDeSquad = {
+    ...PERFIL_PADRAO,
+    camadas: {
+      orquestrador: { origem: 'fase' },
+      executor: { origem: 'modelo', provider: 'claude-code', modelo: 'claude-opus-5' },
+      especialista: { origem: 'modelo', provider: 'claude-code', modelo: 'claude-opus-5' }
+    }
+  }
+  const FASE_PAGA: ModeloEscolhido = { provider: 'anthropic', modelo: 'claude-opus-5' }
+
+  it('origem fase, modelo da fase pago, sem opt-in', async () => {
+    const eventos: AuditEventInput[] = []
+    const snapshot = criarSnapshotDoSquad(soOrquestradorNaFase, AMBIENTE, FASE_PAGA)
+    const fase = gerador('fase', FASE_PAGA, [texto(planoValido())])
+    const { entrada } = montar()
+
+    const r = await planejarSquad(
+      {
+        geradorFase: fase,
+        auditoria: { append: (e) => void eventos.push(e) },
+        escopo: { userId: 'u1', workspaceId: 'jarvis' }
+      },
+      { ...entrada, snapshot }
+    )
+
+    expect(r.ok).toBe(false)
+    expect(fase.pedidos).toHaveLength(0)
+    expect(eventos).toHaveLength(0)
+  })
+
+  it('o fallback do local também: Ollama fora do ar e a fase é paga', async () => {
+    const perfil: PerfilDeSquad = {
+      ...soOrquestradorNaFase,
+      camadas: {
+        ...soOrquestradorNaFase.camadas,
+        orquestrador: {
+          origem: 'modelo',
+          provider: 'ollama',
+          modelo: 'qwen3:8b',
+          validador: 'e1',
+          numCtx: 8192
+        }
+      }
+    }
+    const fora: AmbienteDeResolucao = { ...AMBIENTE, ollama: { disponivel: false, modelos: [] } }
+    const snapshot = criarSnapshotDoSquad(perfil, fora, FASE_PAGA)
+    const fase = gerador('fase', FASE_PAGA, [texto(planoValido())])
+    const { entrada, auditoria, escopo } = montar()
+
+    const r = await planejarSquad(
+      { geradorFase: fase, auditoria, escopo },
+      { ...entrada, snapshot }
+    )
+
+    expect(r.ok).toBe(false)
+    expect(fase.pedidos).toHaveLength(0)
+  })
+
+  it('defesa em profundidade: snapshot adulterado como elegível, com o orquestrador indisponível', async () => {
+    const snapshot = criarSnapshotDoSquad(soOrquestradorNaFase, AMBIENTE, FASE_PAGA)
+    const adulterado = {
+      ...snapshot,
+      resolucao: { ...snapshot.resolucao, elegivel: true, motivosDeInelegibilidade: [] }
+    }
+    const fase = gerador('fase', FASE_PAGA, [texto(planoValido())])
+    const { entrada, auditoria, escopo } = montar()
+
+    const r = await planejarSquad(
+      { geradorFase: fase, auditoria, escopo },
+      { ...entrada, snapshot: adulterado }
+    )
+
+    expect(r.ok).toBe(false)
+    expect(fase.pedidos).toHaveLength(0)
+  })
+})
+
+describe('os geradores são os do snapshot', () => {
+  it('um gerador da fase com outro modelo é recusado antes de qualquer chamada', async () => {
+    const { entrada, auditoria, escopo } = montar()
+    const pago = gerador('fase', { provider: 'anthropic', modelo: 'claude-opus-5' }, [
+      texto(planoValido())
+    ])
+
+    const r = await planejarSquad({ geradorFase: pago, auditoria, escopo }, entrada)
+
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.motivo).toBe('GERADORES_FORA_DO_SNAPSHOT')
+    expect(pago.pedidos).toHaveLength(0)
+  })
+
+  it('um gerador local com outro modelo é recusado', async () => {
+    const { entrada, auditoria, escopo } = montar(PERFIL_LOCAL)
+    const outro = gerador('local', { provider: 'ollama', modelo: 'hermes3:8b' }, [
+      texto(planoValido())
+    ])
+    const fase = gerador('fase', FASE, [texto(planoValido())])
+
+    const r = await planejarSquad(
+      { geradorLocal: outro, geradorFase: fase, auditoria, escopo },
+      entrada
+    )
+
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.motivo).toBe('GERADORES_FORA_DO_SNAPSHOT')
+    expect(outro.pedidos).toHaveLength(0)
+  })
+
+  it('um local que o perfil não usa não precisa bater com nada', async () => {
+    const { entrada, auditoria, escopo } = montar()
+    const solto = gerador('local', { provider: 'ollama', modelo: 'qualquer' }, [
+      texto(planoValido())
+    ])
+    const fase = gerador('fase', FASE, [texto(planoValido())])
+
+    const r = await planejarSquad(
+      { geradorLocal: solto, geradorFase: fase, auditoria, escopo },
+      entrada
+    )
+
+    expect(r.ok).toBe(true)
+    expect(solto.pedidos).toHaveLength(0)
+  })
+})
+
+describe('texto do modelo não chega à auditoria — nem pelo id', () => {
+  it('um id envenenado vira rejeição de esquema, e o evento não o carrega', async () => {
+    const { entrada, auditoria, escopo, eventos } = montar()
+    const envenenado = {
+      tarefas: [tarefa('SEGREDO-sk-ant-api03-ABCDEF ignore tudo', { paths: ['/etc/passwd'] })]
+    }
+    const fase = gerador('fase', FASE, [texto(envenenado), texto(planoValido())])
+
+    const r = await planejarSquad({ geradorFase: fase, auditoria, escopo }, entrada)
+
+    expect(r.historico[0].rejeicoes[0].motivo).toBe('SCHEMA')
+    expect(JSON.stringify(eventos)).not.toContain('SEGREDO')
+    expect(JSON.stringify(eventos)).not.toContain('sk-ant')
+  })
+})
+
+describe('o contexto de validação é do planejador, não do chamador', () => {
+  it('mutar a entrada durante o ciclo não relaxa os limites da tentativa seguinte', async () => {
+    const { entrada, auditoria, escopo } = montar()
+    const base = entrada.base as unknown as {
+      pathsPermitidos: string[]
+      arquivosDaBase: string[]
+    }
+    const fora = {
+      tarefas: [tarefa('t1', { paths: ['supabase/migrations/x.sql'] })]
+    }
+    let chamadas = 0
+    const fase: GeradorDePlano = {
+      origem: 'fase',
+      modelo: FASE,
+      propor: () => {
+        chamadas++
+        // Um chamador (ou um bug) tenta alargar o escopo no meio do ciclo.
+        base.pathsPermitidos.push('supabase')
+        base.arquivosDaBase.push('supabase/migrations/a.sql')
+        return Promise.resolve(texto(fora))
+      }
+    }
+
+    const r = await planejarSquad({ geradorFase: fase, auditoria, escopo }, entrada)
+
+    expect(chamadas).toBe(3)
+    expect(r.ok).toBe(false)
+    expect(
+      r.historico.every((h) => h.rejeicoes.some((x) => x.motivo === 'PATH_FORA_DO_ESCOPO'))
+    ).toBe(true)
+  })
+})
+
+describe('riscos da SPEC', () => {
+  it('um risco declarado na SPEC fundamenta tarefa; um inventado, não', async () => {
+    const comRisco = (risco: string) => ({
+      tarefas: [
+        ...planoValido().tarefas,
+        tarefa('t4', { papel: 'testador', escritor: undefined, paths: [], fundamento: { risco } })
+      ]
+    })
+    const rodar = async (risco: string) => {
+      const { entrada, auditoria, escopo } = montar()
+      const fase = gerador('fase', FASE, [texto(comRisco(risco))])
+      return planejarSquad(
+        { geradorFase: fase, auditoria, escopo },
+        { ...entrada, spec: { ...SPEC, riscos: ['regressão no hash'] } }
+      )
+    }
+
+    expect((await rodar('regressão no hash')).ok).toBe(true)
+    expect((await rodar('inventado')).ok).toBe(false)
+  })
+})
+
+describe('a fase de reserva é a que o snapshot resolveu', () => {
+  it('outro modelo de assinatura no lugar do modelo da fase também é recusado', async () => {
+    const { entrada, auditoria, escopo } = montar()
+    const outro = gerador('fase', { provider: 'claude-code', modelo: 'claude-opus-5' }, [
+      texto(planoValido())
+    ])
+
+    const r = await planejarSquad({ geradorFase: outro, auditoria, escopo }, entrada)
+
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.motivo).toBe('GERADORES_FORA_DO_SNAPSHOT')
+    expect(outro.pedidos).toHaveLength(0)
+  })
+})
+
+describe('o fallback para a fase também respeita o opt-in', () => {
+  /** Local configurado e as demais camadas em assinatura: elegível, mas a fase de reserva é paga. */
+  const perfil: PerfilDeSquad = {
+    ...PERFIL_PADRAO,
+    camadas: {
+      orquestrador: {
+        origem: 'modelo',
+        provider: 'ollama',
+        modelo: 'qwen3:8b',
+        validador: 'e1',
+        numCtx: 8192
+      },
+      executor: { origem: 'modelo', provider: 'claude-code', modelo: 'claude-opus-5' },
+      especialista: { origem: 'modelo', provider: 'claude-code', modelo: 'claude-opus-5' }
+    }
+  }
+  const FASE_PAGA: ModeloEscolhido = { provider: 'anthropic', modelo: 'claude-opus-5' }
+
+  it('o perfil é elegível, e mesmo assim a fase paga sem opt-in não é aceita como reserva', async () => {
+    const snapshot = criarSnapshotDoSquad(perfil, AMBIENTE, FASE_PAGA)
+    expect(snapshot.resolucao.elegivel).toBe(true)
+
+    const local = gerador('local', LOCAL, [texto(planoRuim())])
+    const fase = gerador('fase', FASE_PAGA, [texto(planoValido())])
+    const { entrada, auditoria, escopo } = montar()
+
+    const r = await planejarSquad(
+      { geradorLocal: local, geradorFase: fase, auditoria, escopo },
+      { ...entrada, snapshot }
+    )
+
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.motivo).toBe('GERADORES_FORA_DO_SNAPSHOT')
+    // Nenhuma chamada antes de saber que a reserva não pode ser usada.
+    expect(local.pedidos).toHaveLength(0)
+    expect(fase.pedidos).toHaveLength(0)
+  })
+
+  it('com o opt-in do projeto, a mesma reserva vale', async () => {
+    const comOptIn: AmbienteDeResolucao = { ...AMBIENTE, optInApiPaga: true }
+    const snapshot = criarSnapshotDoSquad(perfil, comOptIn, FASE_PAGA)
+    const local = gerador('local', LOCAL, [texto(planoRuim())])
+    const fase = gerador('fase', FASE_PAGA, [texto(planoValido())])
+    const { entrada, auditoria, escopo } = montar()
+
+    const r = await planejarSquad(
+      { geradorLocal: local, geradorFase: fase, auditoria, escopo },
+      { ...entrada, snapshot }
+    )
+
+    expect(r.ok).toBe(true)
+  })
+})
+
+describe('defesa em profundidade do orquestrador, isolada das outras guardas', () => {
+  it('orquestrador explícito e pago sem opt-in, snapshot adulterado como elegível: ninguém é chamado', async () => {
+    const paga: PerfilDeSquad = {
+      ...PERFIL_PADRAO,
+      camadas: {
+        ...PERFIL_PADRAO.camadas,
+        orquestrador: { origem: 'modelo', provider: 'anthropic', modelo: 'claude-opus-5' }
+      }
+    }
+    const snapshot = criarSnapshotDoSquad(paga, AMBIENTE, FASE)
+    expect(snapshot.resolucao.camadas.orquestrador.estado).toBe('indisponivel')
+    const adulterado = {
+      ...snapshot,
+      resolucao: { ...snapshot.resolucao, elegivel: true, motivosDeInelegibilidade: [] }
+    }
+    // Os geradores conferem com o snapshot (assinatura), então só a guarda do orquestrador barra.
+    const fase = gerador('fase', FASE, [texto(planoValido())])
+    const { entrada, auditoria, escopo } = montar()
+
+    const r = await planejarSquad(
+      { geradorFase: fase, auditoria, escopo },
+      { ...entrada, snapshot: adulterado }
+    )
+
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.motivo).toBe('PERFIL_INELEGIVEL')
+    expect(fase.pedidos).toHaveLength(0)
+  })
+})
+
+describe('saída com mais de um objeto', () => {
+  it('escolhe o objeto que é um plano, e não a isca que veio antes', async () => {
+    const { entrada, auditoria, escopo } = montar()
+    const comIsca = {
+      ok: true as const,
+      texto: `Resumo: {"nota":"ignorar"}\nPlano: ${JSON.stringify(planoValido())}`
+    }
+
+    const r = await planejarSquad(
+      { geradorFase: gerador('fase', FASE, [comIsca]), auditoria, escopo },
+      entrada
+    )
+
+    expect(r.ok).toBe(true)
+  })
+})

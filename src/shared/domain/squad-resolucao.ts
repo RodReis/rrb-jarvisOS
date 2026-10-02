@@ -182,7 +182,11 @@ export function resolverPerfil(
     }
   }
 
+  // O orquestrador entra: é a camada que planeja, e sem ela utilizável não há plano. Sem isto, um
+  // modelo da fase pago sem opt-in deixava o perfil elegível quando as demais camadas eram
+  // de assinatura, e o planejador chamava a rota paga.
   const papeis: readonly (readonly [string, Camada | undefined])[] = [
+    ['orquestrador', 'orquestrador'],
     ['revisor', perfil.revisor.camada],
     ['integrador', perfil.integrador?.camada]
   ]

@@ -19,13 +19,15 @@
 
 import type { Rejeicao } from '@shared/domain/squad-plano'
 import { REGISTRO_DE_CAPACIDADES } from '@shared/domain/squad-capacidades'
-import { CAPACIDADES_DO_PAPEL, PAPEIS } from '@shared/domain/squad-plano'
+import { CAPACIDADES_DO_PAPEL, PAPEIS, ehControleOuDirecao } from '@shared/domain/squad-plano'
 import { limitesDoPerfil } from '@shared/domain/squad-perfil'
 import type { SnapshotDoSquad } from './squad-snapshot'
 
 export interface SpecParaOPrompt {
   readonly titulo: string
   readonly criterios: readonly { readonly numero: number; readonly texto: string }[]
+  /** Os riscos que a SPEC declara, em texto exato. Só eles fundamentam uma tarefa além dos critérios. */
+  readonly riscos?: readonly string[]
 }
 
 export interface BaseDaValidacao {
@@ -79,7 +81,9 @@ function regrasDoPerfil({ spec, snapshot, base }: DadosDoPedido): string[] {
     `- O revisor roda na camada ${perfil.revisor.camada}.${perfil.integrador === undefined ? ' Não há integrador: não use o papel integrador.' : ` O integrador roda na camada ${perfil.integrador.camada}.`}`,
     `- Limites por tarefa, no máximo: ${l.maxTurnosPorTarefa} turnos, ${l.maxMinutosPorTarefa} minutos, ${l.maxTokensEntradaPorTarefa} tokens de entrada, ${l.maxTokensSaidaPorTarefa} de saída.`,
     `- Escreva só em: ${base.pathsPermitidos.join(', ')}. Leia só de: ${base.fontesPermitidas.join(', ')}. Arquivo novo só com extensão que a base já usa.`,
-    '- Toda tarefa aponta um critério da SPEC (`fundamento.criterio`) ou um risco declarado (`fundamento.risco`), e todo critério da SPEC precisa de ao menos uma tarefa.',
+    spec.riscos === undefined || spec.riscos.length === 0
+      ? '- Toda tarefa aponta um critério da SPEC em `fundamento.criterio`; a SPEC não declara riscos. Todo critério precisa de ao menos uma tarefa.'
+      : '- Toda tarefa aponta um critério da SPEC (`fundamento.criterio`) ou um dos riscos declarados, com o texto exato em `fundamento.risco`; nenhum outro risco vale. Todo critério precisa de ao menos uma tarefa.',
     '- `schemaDeResultado` e `regraDeConclusao` são obrigatórios; sem regra verificável a tarefa é rejeitada.'
   ]
 }
@@ -127,7 +131,7 @@ function exemploDoPlano({ spec, snapshot, base }: DadosDoPedido): string | undef
         camada: camadaDeTestes,
         escritor: 'w1',
         dependencias: [],
-        paths: [`${dir}/<arquivo>.ts`],
+        paths: [`${dir}/novo-arquivo.ts`],
         schemaDeResultado: REGISTRO_DE_CAPACIDADES.testes.schemaDeResultado,
         regraDeConclusao: 'os testes da tarefa passam',
         ...comum
@@ -184,7 +188,15 @@ export function montarPedido(dados: DadosDoPedido, feedback?: string): PedidoMon
     .map((c) => `${c.numero}. ${neutralizar(c.texto)}`)
     .join('\n')
 
-  const partes = [INICIO_DA_SPEC, neutralizar(dados.spec.titulo), '', criterios, FIM_DA_SPEC]
+  const riscos = (dados.spec.riscos ?? []).map((r, i) => `${i + 1}. ${neutralizar(r)}`)
+  const partes = [
+    INICIO_DA_SPEC,
+    neutralizar(dados.spec.titulo),
+    '',
+    criterios,
+    ...(riscos.length === 0 ? [] : ['', 'Riscos declarados:', ...riscos]),
+    FIM_DA_SPEC
+  ]
   if (feedback !== undefined && feedback !== '') {
     partes.push(
       '',
@@ -197,11 +209,21 @@ export function montarPedido(dados: DadosDoPedido, feedback?: string): PedidoMon
   return { system, prompt: partes.join('\n') }
 }
 
+/**
+ * O detalhe vem do plano do modelo (path, id, capacidade). Quebra de linha e caractere de controle
+ * viram espaço: do contrário um path com `\n\nNOVA INSTRUÇÃO` abriria linhas novas na região de
+ * instrução do próximo pedido, fora dos marcadores de dado.
+ */
+const limpar = (texto: string): string =>
+  Array.from(texto, (ch) => (ehControleOuDirecao(ch.codePointAt(0) ?? 0) ? ' ' : ch))
+    .join('')
+    .slice(0, MAX_DETALHE)
+
 /** Os motivos da rejeição, em texto estável, para o próximo pedido. Sem o texto bruto do modelo. */
 export function feedbackDaDecisao(rejeicoes: readonly Rejeicao[]): string {
   const linhas = rejeicoes.slice(0, MAX_MOTIVOS_NO_FEEDBACK).map((r) => {
     const onde = r.tarefa === undefined ? 'plano' : `tarefa ${r.tarefa}`
-    return `- ${onde}: ${r.motivo} — ${r.detalhe.slice(0, MAX_DETALHE)}`
+    return `- ${onde}: ${r.motivo} — ${limpar(r.detalhe)}`
   })
   const resto = rejeicoes.length - linhas.length
   if (resto > 0) linhas.push(`- ... e mais ${resto} motivo(s).`)

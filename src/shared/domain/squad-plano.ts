@@ -79,6 +79,12 @@ export interface SquadPlan {
 /** O que o kernel sabe antes de o modelo falar. */
 export interface ContextoDeValidacao {
   readonly criteriosDaSpec: readonly number[]
+  /**
+   * Os riscos que a SPEC declara, em texto exato. `fundamento.risco` só vale se for um deles:
+   * texto livre deixaria um documento envenenado criar tarefa extra com um "risco" inventado.
+   * Vazio = nenhum risco vale, e o fundamento passa a ser só o critério.
+   */
+  readonly riscosDaSpec: readonly string[]
   readonly perfil: PerfilDeSquad
   readonly resolucao: ResolucaoDoPerfil
   /** Diretórios em que uma tarefa pode escrever. */
@@ -114,6 +120,7 @@ export type MotivoDeRejeicao =
   | 'PATH_INEXISTENTE'
   | 'SEM_FUNDAMENTO'
   | 'CRITERIO_INEXISTENTE'
+  | 'RISCO_INEXISTENTE'
   | 'NAO_COMPROVAVEL'
   | 'REDUNDANTE'
   | 'COBERTURA_INCOMPLETA'
@@ -171,24 +178,51 @@ type Registro = Record<string, unknown>
 const ehRegistro = (v: unknown): v is Registro =>
   typeof v === 'object' && v !== null && !Array.isArray(v)
 const ehTexto = (v: unknown): v is string => typeof v === 'string' && v.trim() !== ''
-const ehListaDeTexto = (v: unknown): v is readonly string[] =>
-  Array.isArray(v) && Array.from(v as unknown[]).every((x) => typeof x === 'string')
-
 const chavesExtras = (o: Registro, permitidas: readonly string[]): string[] =>
   Object.keys(o).filter((k) => !permitidas.includes(k))
 
+/**
+ * Forma e tamanho dos campos que o modelo escreve. `id` e `escritor` viram nome de worktree, de
+ * branch e linha de auditoria nas fatias seguintes; um id com espaço, barra ou 100 mil caracteres
+ * seria texto de modelo chegando a lugares que não o esperam. O formato restrito resolve a
+ * auditoria (o `id` que chega lá é sempre curto) e protege o consumidor futuro.
+ */
+const IDENTIFICADOR_SEGURO = /^[A-Za-z0-9_-]{1,32}$/
+const MAX_TEXTO_CURTO = 64
+const MAX_REGRA_DE_CONCLUSAO = 500
+const MAX_RISCO = 300
+const MAX_TAMANHO_DE_PATH = 300
+const MAX_ITENS_POR_LISTA = 50
+
+const ehIdentificador = (v: unknown): v is string =>
+  typeof v === 'string' && IDENTIFICADOR_SEGURO.test(v)
+const ehTextoAte = (v: unknown, max: number): v is string =>
+  typeof v === 'string' && v.trim() !== '' && v.length <= max
+const ehListaDe = (v: unknown, max: number, valido: (x: unknown) => boolean): boolean =>
+  Array.isArray(v) && v.length <= max && Array.from(v as unknown[]).every(valido)
+
 /** Por que este campo não é o que o esquema pede, ou `undefined` se é. */
 function problemaDoCampo(t: Registro): string | undefined {
-  if (!ehTexto(t.id)) return 'id'
+  if (!ehIdentificador(t.id)) return 'id'
   if (!(PAPEIS as readonly unknown[]).includes(t.papel)) return 'papel'
-  if (!ehTexto(t.capacidade)) return 'capacidade'
-  if (!ehTexto(t.camada)) return 'camada'
-  if (t.escritor !== undefined && t.escritor !== null && !ehTexto(t.escritor)) return 'escritor'
-  for (const campo of ['entradas', 'dependencias', 'paths'] as const) {
-    if (!ehListaDeTexto(t[campo])) return campo
+  if (!ehTextoAte(t.capacidade, MAX_TEXTO_CURTO)) return 'capacidade'
+  if (!ehTextoAte(t.camada, MAX_TEXTO_CURTO)) return 'camada'
+  if (t.escritor !== undefined && t.escritor !== null && !ehIdentificador(t.escritor)) {
+    return 'escritor'
   }
-  if (typeof t.schemaDeResultado !== 'string') return 'schemaDeResultado'
-  if (typeof t.regraDeConclusao !== 'string') return 'regraDeConclusao'
+  const caminho = (x: unknown): boolean => typeof x === 'string' && x.length <= MAX_TAMANHO_DE_PATH
+  if (!ehListaDe(t.entradas, MAX_ITENS_POR_LISTA, caminho)) return 'entradas'
+  if (!ehListaDe(t.paths, MAX_ITENS_POR_LISTA, caminho)) return 'paths'
+  if (!ehListaDe(t.dependencias, MAX_ITENS_POR_LISTA, ehIdentificador)) return 'dependencias'
+  if (typeof t.schemaDeResultado !== 'string' || t.schemaDeResultado.length > MAX_TEXTO_CURTO) {
+    return 'schemaDeResultado'
+  }
+  if (
+    typeof t.regraDeConclusao !== 'string' ||
+    t.regraDeConclusao.length > MAX_REGRA_DE_CONCLUSAO
+  ) {
+    return 'regraDeConclusao'
+  }
   return undefined
 }
 
@@ -201,7 +235,12 @@ function problemaDosAninhados(t: Registro): string | undefined {
   }
   if (fundamento.criterio !== undefined && !Number.isInteger(fundamento.criterio))
     return 'fundamento'
-  if (fundamento.risco !== undefined && typeof fundamento.risco !== 'string') return 'fundamento'
+  if (
+    fundamento.risco !== undefined &&
+    !(typeof fundamento.risco === 'string' && fundamento.risco.length <= MAX_RISCO)
+  ) {
+    return 'fundamento'
+  }
   return undefined
 }
 
@@ -255,12 +294,46 @@ export function lerPlano(bruto: unknown): { plano?: SquadPlan; erro?: string } {
 
 type Coletor = (motivo: MotivoDeRejeicao, detalhe: string, tarefa?: string) => void
 
-/** Normaliza `a\b/./c` e recusa o que sai da raiz: absoluto, `~` e `..`. `undefined` = inválido. */
+/**
+ * Caracteres que um path vindo de modelo não pode ter: controle (inclui NUL e quebra de linha),
+ * override de direção (RLO/LRO) e os reservados do Windows — `:` abre stream alternativo no NTFS.
+ */
+/** Controle (inclui NUL e quebra de linha) e override de direção (RLO/LRO e isolados): nada disso é nome de arquivo. */
+export function ehControleOuDirecao(codePoint: number): boolean {
+  const controle = codePoint <= 0x1f || codePoint === 0x7f
+  const direcao =
+    (codePoint >= 0x202a && codePoint <= 0x202e) || (codePoint >= 0x2066 && codePoint <= 0x2069)
+  return controle || direcao
+}
+
+/** Reservados do Windows: `:` abre stream alternativo no NTFS. */
+const RESERVADOS_DO_WINDOWS = ':*?"<>|'
+
+function temCaractereProibido(texto: string): boolean {
+  return Array.from(texto).some(
+    (ch) => ehControleOuDirecao(ch.codePointAt(0) ?? 0) || RESERVADOS_DO_WINDOWS.includes(ch)
+  )
+}
+/** Dispositivos do Windows: `CON.ts` abre o console, não um arquivo. */
+const NOME_RESERVADO = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i
+/** O que nenhum plano deve escrever nem ler, mesmo que o arquivo exista na base. */
+const NOME_DE_SEGREDO =
+  /^(\.env(\..*)?|\.git|\.ssh|\.aws|\.npmrc|id_(rsa|dsa|ecdsa|ed25519)(\.pub)?|.*\.(pem|key|p12|pfx))$/i
+
+/**
+ * Normaliza `a\b/./c` e recusa o que sai da raiz (absoluto, `~`, `..`) ou não é um caminho de
+ * arquivo comum (controle, reservado do Windows, segredo). `undefined` = inválido.
+ */
 function normalizar(caminho: string): string | undefined {
+  if (temCaractereProibido(caminho)) return undefined
   const limpo = caminho.replace(/\\/g, '/')
   if (limpo.startsWith('/') || limpo.startsWith('~') || /^[A-Za-z]:/.test(limpo)) return undefined
   const partes = limpo.split('/').filter((p) => p !== '' && p !== '.')
-  return partes.includes('..') || partes.length === 0 ? undefined : partes.join('/')
+  if (partes.length === 0 || partes.includes('..')) return undefined
+  // Segmento que termina em ponto ou espaço: o Windows o descarta, e `x.` vira `x` em silêncio.
+  if (partes.some((p) => p.endsWith('.') || p.endsWith(' '))) return undefined
+  if (partes.some((p) => NOME_RESERVADO.test(p) || NOME_DE_SEGREDO.test(p))) return undefined
+  return partes.join('/')
 }
 
 function dentroDoEscopo(caminho: string, permitidos: readonly string[]): boolean {
@@ -278,16 +351,37 @@ const extensaoDe = (caminho: string): string => {
   return ponto > 0 ? nome.slice(ponto) : ''
 }
 
+/** A base indexada uma vez: com milhares de paths no plano, varrê-la a cada um é quadrático. */
+interface IndiceDaBase {
+  readonly arquivos: ReadonlySet<string>
+  readonly diretorios: ReadonlySet<string>
+  readonly extensoes: ReadonlySet<string>
+}
+
+function indiceDaBase(base: readonly string[]): IndiceDaBase {
+  const arquivos = new Set<string>()
+  const diretorios = new Set<string>()
+  const extensoes = new Set<string>()
+  for (const arquivo of base) {
+    arquivos.add(arquivo)
+    const ext = extensaoDe(arquivo)
+    if (ext !== '') extensoes.add(ext)
+    const partes = arquivo.split('/')
+    for (let i = 1; i < partes.length; i++) diretorios.add(partes.slice(0, i).join('/'))
+  }
+  return { arquivos, diretorios, extensoes }
+}
+
 /**
  * O path existe na base, ou é arquivo novo com extensão que a base já tem (Emenda E1). Path
  * inventado — extensão de outra stack, sem extensão — não passa.
  */
-function pathPlausivel(caminho: string, base: readonly string[]): boolean {
+function pathPlausivel(caminho: string, indice: IndiceDaBase): boolean {
   const alvo = normalizar(caminho)
   if (alvo === undefined) return false
-  if (base.some((f) => f === alvo || f.startsWith(`${alvo}/`))) return true
+  if (indice.arquivos.has(alvo) || indice.diretorios.has(alvo)) return true
   const ext = extensaoDe(alvo)
-  return ext !== '' && base.some((f) => extensaoDe(f) === ext)
+  return ext !== '' && indice.extensoes.has(ext)
 }
 
 function achaCiclo(tarefas: readonly TarefaDoPlano[]): string | undefined {
@@ -368,10 +462,15 @@ function validarPapel(t: TarefaDoPlano, perfil: PerfilDeSquad, rejeita: Coletor)
   }
 }
 
-function validarEscopo(t: TarefaDoPlano, ctx: ContextoDeValidacao, rejeita: Coletor): void {
+function validarEscopo(
+  t: TarefaDoPlano,
+  ctx: ContextoDeValidacao,
+  indice: IndiceDaBase,
+  rejeita: Coletor
+): void {
   for (const p of t.paths) {
     if (!dentroDoEscopo(p, ctx.pathsPermitidos)) rejeita('PATH_FORA_DO_ESCOPO', p, t.id)
-    else if (!pathPlausivel(p, ctx.arquivosDaBase)) rejeita('PATH_INEXISTENTE', p, t.id)
+    else if (!pathPlausivel(p, indice)) rejeita('PATH_INEXISTENTE', p, t.id)
   }
   for (const e of t.entradas) {
     if (!dentroDoEscopo(e, ctx.fontesPermitidas)) rejeita('FONTE_FORA_DO_ESCOPO', e, t.id)
@@ -380,10 +479,16 @@ function validarEscopo(t: TarefaDoPlano, ctx: ContextoDeValidacao, rejeita: Cole
 
 function validarFundamento(t: TarefaDoPlano, ctx: ContextoDeValidacao, rejeita: Coletor): void {
   const { criterio, risco } = t.fundamento
-  if (criterio === undefined && !ehTexto(risco))
+  if (criterio === undefined && !ehTexto(risco)) {
     rejeita('SEM_FUNDAMENTO', 'sem critério nem risco', t.id)
-  else if (criterio !== undefined && !ctx.criteriosDaSpec.includes(criterio)) {
-    rejeita('CRITERIO_INEXISTENTE', `critério ${criterio} não existe na SPEC`, t.id)
+  } else {
+    if (criterio !== undefined && !ctx.criteriosDaSpec.includes(criterio)) {
+      rejeita('CRITERIO_INEXISTENTE', `critério ${criterio} não existe na SPEC`, t.id)
+    }
+    // Conferido mesmo ao lado de um critério: o risco que a SPEC não declara é escopo extra.
+    if (risco !== undefined && !ctx.riscosDaSpec.includes(risco)) {
+      rejeita('RISCO_INEXISTENTE', 'o risco não é um dos que a SPEC declara', t.id)
+    }
   }
   if (!ehTexto(t.regraDeConclusao)) rejeita('NAO_COMPROVAVEL', 'sem regra de conclusão', t.id)
 }
@@ -420,20 +525,26 @@ function validarEscritores(
       `${escritores.size} escritores; o perfil permite ${perfil.escritores}`
     )
   }
-  // Dois donos no mesmo path é o conflito que o integrador existe para resolver; o planejador
-  // não pode produzi-lo de propósito.
-  const dono = new Map<string, string>()
+  // Dois donos no mesmo arquivo é o conflito que o integrador existe para resolver; o
+  // planejador não pode produzi-lo de propósito. A chave é o path **normalizado e em minúsculas**
+  // (Windows), e a sobreposição inclui diretório: `./x.ts`, `x.ts/`, `X.TS` e o diretório pai
+  // são o mesmo território.
+  const donos: { chave: string; escritor: string }[] = []
   for (const t of tarefas) {
     if (t.escritor === undefined) continue
     for (const p of t.paths) {
-      const atual = dono.get(p)
-      if (atual !== undefined && atual !== t.escritor) {
-        rejeita('ESCRITORES_COLIDEM', `${p} é de ${atual} e de ${t.escritor}`, t.id)
+      const chave = (normalizar(p) ?? p).toLowerCase()
+      const outro = donos.find((d) => d.escritor !== t.escritor && sobrepoem(d.chave, chave))
+      if (outro !== undefined) {
+        rejeita('ESCRITORES_COLIDEM', `${p} é de ${outro.escritor} e de ${t.escritor}`, t.id)
       }
-      dono.set(p, t.escritor)
+      donos.push({ chave, escritor: t.escritor })
     }
   }
 }
+
+const sobrepoem = (a: string, b: string): boolean =>
+  a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`)
 
 function validarGrafo(tarefas: readonly TarefaDoPlano[], rejeita: Coletor): void {
   const ids = new Set<string>()
@@ -458,7 +569,13 @@ function validarCoberturaERedundancia(
   const vistas = new Set<string>()
   for (const t of tarefas) {
     if (t.fundamento.criterio === undefined) continue
-    const chave = `${t.papel}|${t.fundamento.criterio}|${[...t.paths].sort().join(',')}`
+    const chave = [
+      t.papel,
+      t.capacidade,
+      t.fundamento.criterio,
+      [...t.paths].sort().join(','),
+      [...t.entradas].sort().join(',')
+    ].join('|')
     if (vistas.has(chave)) rejeita('REDUNDANTE', `repete ${chave}`, t.id)
     vistas.add(chave)
   }
@@ -475,10 +592,6 @@ function validarOrcamento(
   ctx: ContextoDeValidacao,
   rejeita: Coletor
 ): void {
-  const { maxTarefas } = limitesDoPerfil(ctx.perfil, ctx.criteriosDaSpec.length)
-  if (tarefas.length > maxTarefas) {
-    rejeita('ORCAMENTO_EXCEDIDO', `${tarefas.length} tarefas; o teto é ${maxTarefas}`)
-  }
   const total = tarefas.reduce((soma, t) => {
     const modelo = isCamada(t.camada) ? ctx.resolucao.camadas[t.camada].modelo : undefined
     if (modelo === undefined || isRotaUnmetered(modelo.provider)) return soma
@@ -507,6 +620,7 @@ const CLASSE_DO_MOTIVO: Partial<Record<MotivoDeRejeicao, ClassificacaoDaTarefa>>
   CAMADA_FORA_DO_PERFIL: 'fora-de-escopo',
   CAPACIDADE_FORA_DO_PAPEL: 'fora-de-escopo',
   CRITERIO_INEXISTENTE: 'fora-de-escopo',
+  RISCO_INEXISTENTE: 'fora-de-escopo',
   INTEGRADOR_FORA_DO_PERFIL: 'fora-de-escopo',
   REVISOR_FORA_DA_CAMADA: 'fora-de-escopo',
   SEM_FUNDAMENTO: 'nao-comprovavel',
@@ -549,16 +663,35 @@ export function validarPlano(bruto: unknown, ctx: ContextoDeValidacao): Decisao 
   }
 
   const { tarefas } = lido.plano
+
+  // O teto vem **antes** do grafo, dos paths e da classificação: o custo deles cresce com o número
+  // de tarefas (DFS recursiva, varredura da base), e uma saída de modelo com milhares de tarefas
+  // não pode ser o que os faz explodir. Plano acima do teto já está rejeitado.
+  const { maxTarefas } = limitesDoPerfil(ctx.perfil, ctx.criteriosDaSpec.length)
+  if (tarefas.length > maxTarefas) {
+    return {
+      aceito: false,
+      rejeicoes: [
+        {
+          motivo: 'ORCAMENTO_EXCEDIDO',
+          detalhe: `${tarefas.length} tarefas; o teto é ${maxTarefas}`
+        }
+      ],
+      tarefas: []
+    }
+  }
+
   const rejeicoes: Rejeicao[] = []
   const rejeita: Coletor = (motivo, detalhe, tarefa) => {
     rejeicoes.push({ motivo, detalhe, ...(tarefa === undefined ? {} : { tarefa }) })
   }
 
+  const indice = indiceDaBase(ctx.arquivosDaBase)
   validarGrafo(tarefas, rejeita)
   for (const t of tarefas) {
     validarCapacidadeECamada(t, ctx, rejeita)
     validarPapel(t, ctx.perfil, rejeita)
-    validarEscopo(t, ctx, rejeita)
+    validarEscopo(t, ctx, indice, rejeita)
     validarFundamento(t, ctx, rejeita)
     validarLimites(t, ctx.perfil, rejeita)
   }
