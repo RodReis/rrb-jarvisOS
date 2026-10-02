@@ -155,18 +155,80 @@ interface Rodada {
   readonly resultado?: Extract<ResultadoDoPlanejamento, { ok: true }>
 }
 
+interface Contexto {
+  readonly entrada: EntradaDoPlanejamento
+  readonly historico: TentativaDePlano[]
+  readonly auditar: Auditar
+}
+
+/** Registra e audita o plano aceito, com o hash ligado ao run, à SPEC e ao perfil. */
+function registrarAceite(
+  c: Contexto,
+  gerador: GeradorDePlano,
+  tentativa: number,
+  hashDaProposta: string,
+  plano: SquadPlan
+): Extract<ResultadoDoPlanejamento, { ok: true }> {
+  const { entrada, historico } = c
+  const planoHash = hashDoPlanoAceito(plano, {
+    runId: entrada.runId,
+    specRevisao: entrada.specRevisao,
+    perfilRevisao: entrada.snapshot.revisao
+  })
+  historico.push({
+    gerador: gerador.origem,
+    tentativa,
+    resultado: 'aceita',
+    hashDaProposta,
+    rejeicoes: []
+  })
+  c.auditar('squad-plan-aceito', {
+    runId: entrada.runId,
+    specRevisao: entrada.specRevisao,
+    perfilRevisao: entrada.snapshot.revisao,
+    planoHash,
+    gerador: gerador.origem,
+    modelo: gerador.modelo,
+    tentativas: historico.length
+  })
+  return { ok: true, plano, planoHash, gerador: gerador.origem, historico }
+}
+
+/** Registra e audita a proposta rejeitada — por hash e motivos, nunca pelo texto. */
+function registrarRejeicao(
+  c: Contexto,
+  origem: OrigemDoGerador,
+  tentativa: number,
+  hashDaProposta: string,
+  decisao: Decisao
+): void {
+  c.historico.push({
+    gerador: origem,
+    tentativa,
+    resultado: 'rejeitada',
+    hashDaProposta,
+    rejeicoes: decisao.rejeicoes
+  })
+  c.auditar('squad-plan-rejeitado', {
+    runId: c.entrada.runId,
+    tentativa,
+    gerador: origem,
+    hashDaProposta,
+    motivos: decisao.rejeicoes.map((r) => ({ motivo: r.motivo, tarefa: r.tarefa })),
+    classificacoes: decisao.tarefas.map((t) => ({ id: t.id, classificacao: t.classificacao }))
+  })
+}
+
 async function rodarGerador(
   gerador: GeradorDePlano,
-  entrada: EntradaDoPlanejamento,
-  ctx: ContextoDeValidacao,
-  historico: TentativaDePlano[],
-  auditar: Auditar
+  c: Contexto,
+  ctx: ContextoDeValidacao
 ): Promise<Rodada> {
-  const numCtx = gerador.origem === 'local' ? numCtxDoPerfil(entrada.snapshot) : undefined
+  const numCtx = gerador.origem === 'local' ? numCtxDoPerfil(c.entrada.snapshot) : undefined
   let feedback: string | undefined
 
   for (let tentativa = 1; ; tentativa++) {
-    const pedido = montarPedido(entrada, feedback)
+    const pedido = montarPedido(c.entrada, feedback)
     const resposta = await gerador.propor({
       ...pedido,
       jsonSchema: ESQUEMA_DO_PLANO_JSON,
@@ -175,7 +237,7 @@ async function rodarGerador(
     })
 
     if (!resposta.ok) {
-      historico.push({
+      c.historico.push({
         gerador: gerador.origem,
         tentativa,
         resultado: 'indisponivel',
@@ -186,53 +248,17 @@ async function rodarGerador(
 
     const hashDaProposta = sha256(resposta.texto)
     const bruto = extrairJson(resposta.texto)
-    const decisao: Decisao = validarPlano(bruto ?? 'JSON ilegível', ctx)
+    const decisao = validarPlano(bruto ?? 'JSON ilegível', ctx)
 
     if (decisao.aceito) {
       const plano = lerPlano(bruto).plano as SquadPlan
-      const planoHash = hashDoPlanoAceito(plano, {
-        runId: entrada.runId,
-        specRevisao: entrada.specRevisao,
-        perfilRevisao: entrada.snapshot.revisao
-      })
-      historico.push({
-        gerador: gerador.origem,
-        tentativa,
-        resultado: 'aceita',
-        hashDaProposta,
-        rejeicoes: []
-      })
-      auditar('squad-plan-aceito', {
-        runId: entrada.runId,
-        specRevisao: entrada.specRevisao,
-        perfilRevisao: entrada.snapshot.revisao,
-        planoHash,
-        gerador: gerador.origem,
-        modelo: gerador.modelo,
-        tentativas: historico.length
-      })
       return {
         desfecho: 'aceito',
-        resultado: { ok: true, plano, planoHash, gerador: gerador.origem, historico }
+        resultado: registrarAceite(c, gerador, tentativa, hashDaProposta, plano)
       }
     }
 
-    historico.push({
-      gerador: gerador.origem,
-      tentativa,
-      resultado: 'rejeitada',
-      hashDaProposta,
-      rejeicoes: decisao.rejeicoes
-    })
-    auditar('squad-plan-rejeitado', {
-      runId: entrada.runId,
-      tentativa,
-      gerador: gerador.origem,
-      hashDaProposta,
-      motivos: decisao.rejeicoes.map((r) => ({ motivo: r.motivo, tarefa: r.tarefa })),
-      classificacoes: decisao.tarefas.map((t) => ({ id: t.id, classificacao: t.classificacao }))
-    })
-
+    registrarRejeicao(c, gerador.origem, tentativa, hashDaProposta, decisao)
     if (!proximaTentativaPermitida(tentativa)) return { desfecho: 'esgotado' }
     feedback = feedbackDaDecisao(decisao.rejeicoes)
   }
@@ -290,7 +316,7 @@ export async function planejarSquad(
 
   let ultimo: Rodada['desfecho'] = 'esgotado'
   for (const [i, gerador] of geradores.entries()) {
-    const rodada = await rodarGerador(gerador, entrada, ctx, historico, auditar)
+    const rodada = await rodarGerador(gerador, { entrada, historico, auditar }, ctx)
     if (rodada.resultado !== undefined) return rodada.resultado
     ultimo = rodada.desfecho
 
