@@ -25,7 +25,11 @@ export interface ItemNaVista {
   readonly sliceId: string
   /** A ordem em que o pool atenderia, a partir de 1. */
   readonly posicao: number
-  readonly motivo: MotivoDeEspera
+  /**
+   * Por que o item espera — ou `pronto-para-adquirir`: cabe agora e só falta o próximo ciclo do
+   * scheduler. Nunca um motivo vazio: quem olha sempre sabe o que o segura.
+   */
+  readonly motivo: MotivoDeEspera | { readonly tipo: 'pronto-para-adquirir' }
   readonly enfileiradoEm: number
   readonly esperandoHaMs: number
 }
