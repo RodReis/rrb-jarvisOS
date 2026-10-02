@@ -550,7 +550,11 @@ export const AUDIT_EVENT_TYPES = [
   // Registrar a hotkey global é mudança observável **fora** do app: o atalho passa a interceptar
   // a tecla no sistema inteiro. A recusa também entra — silêncio esconderia um atalho que nunca
   // funcionou porque outro app já o tinha, e o usuário leria como microfone quebrado.
-  'voz.hotkey.registro'
+  'voz.hotkey.registro',
+  // SPEC-Squads-01: o perfil e a resolução que um Squad usou, pela revisão (hash) do perfil. Tipo
+  // próprio, e não `policy-decision`: aquele classifica uma ação, e a pergunta aqui é "com qual
+  // perfil e em que ambiente este Squad foi montado?" — a resposta que sobra quando o perfil muda.
+  'squad-snapshot'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]
