@@ -3,9 +3,12 @@ import type { PerfilDeSquad, ResultadoDaValidacao } from './squad-perfil'
 import { CAPACIDADES, REGISTRO_DE_CAPACIDADES } from './squad-capacidades'
 import {
   ACOES_COM_APROVACAO,
+  MAX_NUM_CTX,
   PERFIL_PADRAO,
+  TETO_DE_MINUTOS_POR_TAREFA,
   TETO_DE_TAREFAS,
   TETO_DE_TOKENS_POR_TAREFA,
+  TETO_DE_TURNOS_POR_TAREFA,
   limitesDoPerfil,
   validarPerfil
 } from './squad-perfil'
@@ -271,7 +274,10 @@ describe('validarPerfil — chave desconhecida é recusada (fail closed)', () =>
       { maxTokensEntradaPorTarefa: TETO_DE_TOKENS_POR_TAREFA + 1 }
     ],
     ['tokens de saída acima do teto', { maxTokensSaidaPorTarefa: TETO_DE_TOKENS_POR_TAREFA + 1 }],
-    ['piso de tarefas acima do teto', { maxTarefasMinimo: TETO_DE_TAREFAS + 1 }]
+    ['piso de tarefas acima do teto', { maxTarefasMinimo: TETO_DE_TAREFAS + 1 }],
+    ['turnos acima do teto', { maxTurnosPorTarefa: TETO_DE_TURNOS_POR_TAREFA + 1 }],
+    ['minutos acima do teto', { maxMinutosPorTarefa: TETO_DE_MINUTOS_POR_TAREFA + 1 }],
+    ['turnos ausentes', { maxTurnosPorTarefa: undefined }]
   ])('limite absurdo é recusado: %s', (_nome, troca) => {
     const limites = { ...PERFIL_PADRAO.limites, ...troca }
     expect(codigos(validarPerfil(perfil({ limites })))).toContain('LIMITE_INVALIDO')
@@ -281,9 +287,40 @@ describe('validarPerfil — chave desconhecida é recusada (fail closed)', () =>
     const limites = {
       maxTarefasMinimo: TETO_DE_TAREFAS,
       maxTokensEntradaPorTarefa: TETO_DE_TOKENS_POR_TAREFA,
-      maxTokensSaidaPorTarefa: TETO_DE_TOKENS_POR_TAREFA
+      maxTokensSaidaPorTarefa: TETO_DE_TOKENS_POR_TAREFA,
+      maxTurnosPorTarefa: TETO_DE_TURNOS_POR_TAREFA,
+      maxMinutosPorTarefa: TETO_DE_MINUTOS_POR_TAREFA
     }
     expect(validarPerfil(perfil({ limites })).ok).toBe(true)
+  })
+})
+
+describe('validarPerfil — num_ctx do orquestrador local', () => {
+  const comNumCtx = (numCtx: unknown, provider = 'ollama'): unknown =>
+    perfil({
+      camadas: {
+        ...PERFIL_PADRAO.camadas,
+        orquestrador: { origem: 'modelo', provider, modelo: 'qwen3:8b', validador: 'e1', numCtx }
+      }
+    })
+
+  it('aceita a janela dentro da faixa e a guarda no perfil', () => {
+    const r = validarPerfil(comNumCtx(8192))
+    expect(r.ok && r.perfil.camadas.orquestrador).toMatchObject({ numCtx: 8192 })
+  })
+
+  it.each([0, 1024, 4096.5, MAX_NUM_CTX + 1, '8192', Number.NaN])('recusa num_ctx %s', (v) => {
+    expect(validarPerfil(comNumCtx(v)).ok).toBe(false)
+  })
+
+  it('num_ctx só vale para o ollama', () => {
+    expect(validarPerfil(comNumCtx(8192, 'claude-code')).ok).toBe(false)
+  })
+
+  it('a janela entra na revisão do perfil — mudar num_ctx é outro perfil', async () => {
+    const a = validarPerfil(comNumCtx(8192))
+    const b = validarPerfil(comNumCtx(16384))
+    expect(JSON.stringify(a)).not.toBe(JSON.stringify(b))
   })
 })
 

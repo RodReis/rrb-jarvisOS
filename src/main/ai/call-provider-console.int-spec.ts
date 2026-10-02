@@ -439,6 +439,30 @@ describe('a ponte com o adapter', () => {
     expect(semConsole.recebido?.onEvento).toBeUndefined()
   })
 
+  it('com console, a fase vem da etapa — uma fase declarada no pedido não a sobrescreve', async () => {
+    const espiao = consoleFalso()
+    let recebida: string | undefined
+    const adapter: AiAdapter = {
+      nome: 'claude-code',
+      generateStream(request: AdapterRequest): AsyncIterable<AdapterChunk> {
+        recebida = request.fase
+        return (async function* (): AsyncIterable<AdapterChunk> {
+          yield { tipo: 'fim', usage: USAGE }
+        })()
+      }
+    }
+
+    // `refinamento` é Planejamento; o pedido tenta declarar Construção (com ferramentas).
+    await coletar(
+      servico(adapter, espiao).call(
+        { ...PEDIDO_COM_CONSOLE, fase: 'construcao' as const },
+        { userId: USUARIO, workspace: 'jarvis' }
+      )
+    )
+
+    expect(recebida).toBe('planejamento')
+  })
+
   it('o evento que o adapter emite chega ao coletor', async () => {
     const espiao = consoleFalso()
     // O adapter real chama `onEvento` durante o parsing das linhas; aqui o dublê faz o mesmo

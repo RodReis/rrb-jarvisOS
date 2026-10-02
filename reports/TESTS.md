@@ -12,8 +12,8 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 1932 | 1932 | 0 | 79.3 | — | — |
-| — | — | — | Banco | 1291 | 1277 | 0 | 86.9 | — | — |
+| — | — | — | Regras de Negócio | 2118 | 2118 | 0 | 81.0 | — | — |
+| — | — | — | Banco | 1298 | 1282 | 0 | 80.3 | — | — |
 | — | — | — | Tela | 735 | 734 | 0 | 76.5 | — | — |
 
 ## Histórico por entrega
@@ -406,3 +406,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-10-02 | #122 | spec-squads-01-capacidades-perfis | Regras de Negócio | 1932 | 1932 | 0 | 79.3 | #375 | [#375](https://github.com/RodReis/rrb-jarvisOS/pull/375) |
 | 2026-10-02 | #122 | spec-squads-01-capacidades-perfis | Banco | 1291 | 1277 | 0 | 86.9 | #375 | [#375](https://github.com/RodReis/rrb-jarvisOS/pull/375) |
 | 2026-10-02 | #122 | spec-squads-01-capacidades-perfis | Tela | 735 | 734 | 0 | 76.5 | #375 | [#375](https://github.com/RodReis/rrb-jarvisOS/pull/375) |
+| 2026-10-02 | #123 | spec-squads-02-planejador-validador | Regras de Negócio | 2118 | 2118 | 0 | 81.0 | #376 | [#376](https://github.com/RodReis/rrb-jarvisOS/pull/376) |
+| 2026-10-02 | #123 | spec-squads-02-planejador-validador | Banco | 1298 | 1282 | 0 | 80.3 | #376 | [#376](https://github.com/RodReis/rrb-jarvisOS/pull/376) |
+| 2026-10-02 | #123 | spec-squads-02-planejador-validador | Tela | 735 | 734 | 0 | 76.5 | #376 | [#376](https://github.com/RodReis/rrb-jarvisOS/pull/376) |

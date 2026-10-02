@@ -325,3 +325,33 @@ describe('determinismo', () => {
     expect(JSON.stringify(a)).toBe(JSON.stringify(b))
   })
 })
+
+describe('o orquestrador também precisa de camada utilizável', () => {
+  /** Executor e especialista em assinatura; só o orquestrador sai do modelo da fase — que é pago. */
+  const soOrquestradorNaFase: PerfilDeSquad = {
+    ...PERFIL_PADRAO,
+    camadas: {
+      orquestrador: { origem: 'fase' },
+      executor: { origem: 'modelo', provider: 'claude-code', modelo: 'claude-opus-5' },
+      especialista: { origem: 'modelo', provider: 'claude-code', modelo: 'claude-opus-5' }
+    }
+  }
+  const FASE_PAGA: ModeloEscolhido = { provider: 'anthropic', modelo: 'claude-opus-5' }
+
+  it('fase paga sem opt-in torna o plano inelegível, mesmo com as outras camadas em assinatura', () => {
+    const r = resolverPerfil(soOrquestradorNaFase, AMBIENTE_COMPLETO, FASE_PAGA)
+    expect(r.camadas.orquestrador).toMatchObject({ estado: 'indisponivel' })
+    expect(r.camadas.executor.estado).toBe('configurado')
+    expect(r.elegivel).toBe(false)
+    expect(r.motivosDeInelegibilidade.join(' ')).toContain('orquestrador')
+  })
+
+  it('com opt-in, o mesmo perfil é elegível', () => {
+    const r = resolverPerfil(
+      soOrquestradorNaFase,
+      { ...AMBIENTE_COMPLETO, optInApiPaga: true },
+      FASE_PAGA
+    )
+    expect(r.elegivel).toBe(true)
+  })
+})

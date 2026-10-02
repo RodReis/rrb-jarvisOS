@@ -554,7 +554,14 @@ export const AUDIT_EVENT_TYPES = [
   // SPEC-Squads-01: o perfil e a resolução que um Squad usou, pela revisão (hash) do perfil. Tipo
   // próprio, e não `policy-decision`: aquele classifica uma ação, e a pergunta aqui é "com qual
   // perfil e em que ambiente este Squad foi montado?" — a resposta que sobra quando o perfil muda.
-  'squad-snapshot'
+  'squad-snapshot',
+  // SPEC-Squads-02: o ciclo do planejamento do Squad. Três tipos próprios, e não um só com `acao`,
+  // porque a pergunta de quem audita é diferente em cada um: *o que foi proposto e por que caiu*
+  // (`rejeitado`, por hash — o texto do modelo nunca entra), *por que o gerador trocou*
+  // (`fallback`) e *qual plano valeu, ligado a qual run, SPEC e perfil* (`aceito`).
+  'squad-plan-rejeitado',
+  'squad-plan-fallback',
+  'squad-plan-aceito'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]

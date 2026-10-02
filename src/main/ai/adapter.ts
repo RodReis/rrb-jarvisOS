@@ -11,7 +11,7 @@
  * coisa que só a Anthropic tem, esse teste não compilaria.
  */
 
-import type { AiUsage } from '@shared/domain/ai'
+import type { AiUsage, OpcoesLocais } from '@shared/domain/ai'
 import type { GenerationEvent } from '@shared/domain/geracao'
 import type { Fase } from '@shared/domain/fase'
 
@@ -77,6 +77,12 @@ export interface AdapterRequest {
    * adapter seria trabalho para chegar ao mesmo lugar.
    */
   readonly jsonSchema?: string
+  /**
+   * Janela de contexto e formato que o servidor local deve impor (SPEC-Squads-02). Só o
+   * `OllamaAdapter` o consome; os demais o ignoram. Separado de `jsonSchema` de propósito: o
+   * Ollama sempre ignorou aquele, e honrá-lo mudaria as gerações de documento que já saem por ele.
+   */
+  readonly opcoesLocais?: OpcoesLocais
 }
 
 /**

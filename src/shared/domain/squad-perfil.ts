@@ -84,6 +84,8 @@ export type OrigemDaCamada =
       readonly provider: AiProvider
       readonly modelo: string
       readonly validador?: 'e1'
+      /** Janela de contexto pedida ao Ollama; vai ao snapshot. Só vale para `ollama`. */
+      readonly numCtx?: number
     }
 
 export interface CapacidadeNoPerfil {
@@ -108,6 +110,10 @@ export interface LimitesDoPerfil {
   readonly maxTarefasMinimo: number
   readonly maxTokensEntradaPorTarefa: number
   readonly maxTokensSaidaPorTarefa: number
+  /** Turnos (idas e vindas com o modelo) que uma tarefa pode gastar — SPEC-Squads-02. */
+  readonly maxTurnosPorTarefa: number
+  /** Tempo de parede que uma tarefa pode gastar, em minutos — SPEC-Squads-02. */
+  readonly maxMinutosPorTarefa: number
 }
 
 export interface PerfilDeSquad {
@@ -173,6 +179,8 @@ const TIPO_DE_FATIA = /^[a-z0-9]+(-[a-z0-9]+)*$/
  */
 export const TETO_DE_TAREFAS = 1_000
 export const TETO_DE_TOKENS_POR_TAREFA = 1_000_000
+export const TETO_DE_TURNOS_POR_TAREFA = 200
+export const TETO_DE_MINUTOS_POR_TAREFA = 240
 
 /**
  * As chaves que o schema conhece, **nível a nível**. O validador recusa o resto em vez de copiar:
@@ -193,20 +201,37 @@ const CHAVES_DO_PERFIL = [
   'limites'
 ] as const
 const CHAVES_DA_ORIGEM_FASE = ['origem'] as const
-const CHAVES_DA_ORIGEM_MODELO = ['origem', 'provider', 'modelo', 'validador'] as const
+const CHAVES_DA_ORIGEM_MODELO = ['origem', 'provider', 'modelo', 'validador', 'numCtx'] as const
+
+/** Faixa de `num_ctx` que o produto aceita: abaixo o plano não cabe; acima a VRAM do PI não segura. */
+export const MIN_NUM_CTX = 2_048
+export const MAX_NUM_CTX = 131_072
 const CHAVES_DA_CAPACIDADE = ['id', 'obrigatoria', 'camadas'] as const
 const CHAVES_DO_ACESSO = ['escrita', 'git', 'github'] as const
 const CHAVES_DA_CAMADA_DO_PAPEL = ['camada'] as const
 const CHAVES_DOS_LIMITES = [
   'maxTarefasMinimo',
   'maxTokensEntradaPorTarefa',
-  'maxTokensSaidaPorTarefa'
+  'maxTokensSaidaPorTarefa',
+  'maxTurnosPorTarefa',
+  'maxMinutosPorTarefa'
 ] as const
+
+const TETO_DO_LIMITE: Readonly<Record<(typeof CHAVES_DOS_LIMITES)[number], number>> = {
+  maxTarefasMinimo: TETO_DE_TAREFAS,
+  maxTokensEntradaPorTarefa: TETO_DE_TOKENS_POR_TAREFA,
+  maxTokensSaidaPorTarefa: TETO_DE_TOKENS_POR_TAREFA,
+  maxTurnosPorTarefa: TETO_DE_TURNOS_POR_TAREFA,
+  maxMinutosPorTarefa: TETO_DE_MINUTOS_POR_TAREFA
+}
 
 type Problemas = ProblemaDoPerfil[]
 
 const ehObjeto = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v)
+
+const ehInteiroEntre = (v: unknown, min: number, max: number): v is number =>
+  typeof v === 'number' && Number.isSafeInteger(v) && v >= min && v <= max
 
 const ehInteiroAte = (v: unknown, teto: number): v is number =>
   typeof v === 'number' && Number.isSafeInteger(v) && v > 0 && v <= teto
@@ -259,7 +284,18 @@ function validarOrigem(
   }
   exigirSoChaves(origem, CHAVES_DA_ORIGEM_MODELO, caminho, problemas)
 
-  const { validador } = origem
+  const { validador, numCtx } = origem
+  if (
+    numCtx !== undefined &&
+    (origem.provider !== 'ollama' || !ehInteiroEntre(numCtx, MIN_NUM_CTX, MAX_NUM_CTX))
+  ) {
+    registrar(
+      problemas,
+      'SCHEMA',
+      `${caminho}.numCtx`,
+      `só para ollama, inteiro entre ${MIN_NUM_CTX} e ${MAX_NUM_CTX}`
+    )
+  }
   if (validador !== undefined && validador !== 'e1') {
     registrar(problemas, 'SCHEMA', `${caminho}.validador`, 'só o validador e1 existe')
   }
@@ -521,7 +557,7 @@ function validarLimites(bruto: unknown, problemas: Problemas): void {
   }
   exigirSoChaves(bruto, CHAVES_DOS_LIMITES, 'limites', problemas)
   for (const campo of CHAVES_DOS_LIMITES) {
-    const teto = campo === 'maxTarefasMinimo' ? TETO_DE_TAREFAS : TETO_DE_TOKENS_POR_TAREFA
+    const teto = TETO_DO_LIMITE[campo]
     if (!ehInteiroAte(bruto[campo], teto)) {
       registrar(problemas, 'LIMITE_INVALIDO', `limites.${campo}`, `inteiro entre 1 e ${teto}`)
     }
@@ -561,7 +597,8 @@ function montarPerfil(b: Record<string, unknown>): PerfilDeSquad {
           origem: 'modelo',
           provider: o.provider as AiProvider,
           modelo: o.modelo as string,
-          ...(o.validador === 'e1' ? { validador: 'e1' as const } : {})
+          ...(o.validador === 'e1' ? { validador: 'e1' as const } : {}),
+          ...(typeof o.numCtx === 'number' ? { numCtx: o.numCtx } : {})
         }
 
   return congelar({
@@ -591,7 +628,9 @@ function montarPerfil(b: Record<string, unknown>): PerfilDeSquad {
     limites: {
       maxTarefasMinimo: limites.maxTarefasMinimo,
       maxTokensEntradaPorTarefa: limites.maxTokensEntradaPorTarefa,
-      maxTokensSaidaPorTarefa: limites.maxTokensSaidaPorTarefa
+      maxTokensSaidaPorTarefa: limites.maxTokensSaidaPorTarefa,
+      maxTurnosPorTarefa: limites.maxTurnosPorTarefa,
+      maxMinutosPorTarefa: limites.maxMinutosPorTarefa
     }
   })
 }
@@ -682,6 +721,8 @@ export const PERFIL_PADRAO: PerfilDeSquad = congelar({
   limites: {
     maxTarefasMinimo: 12,
     maxTokensEntradaPorTarefa: 16_000,
-    maxTokensSaidaPorTarefa: 8_000
+    maxTokensSaidaPorTarefa: 8_000,
+    maxTurnosPorTarefa: 30,
+    maxMinutosPorTarefa: 45
   }
 })

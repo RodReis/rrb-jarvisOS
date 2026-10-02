@@ -16,6 +16,7 @@ import type { WorkspaceId } from './entities'
 import type { CredentialKey } from './credentials'
 import type { TaskType } from './routing'
 import type { Etapa } from './jornada'
+import type { Fase } from './fase'
 
 /**
  * Os providers que o app conhece — **dado, não lógica**, como `CREDENTIAL_KEYS`.
@@ -344,6 +345,34 @@ export interface AiRequest {
    * de por decisão.
    */
   readonly diagnostico?: boolean
+  /**
+   * Opções que só o servidor local (Ollama) entende (SPEC-Squads-02): a janela de contexto e o
+   * formato imposto à saída. Ausentes, a chamada é a de sempre.
+   *
+   * Campo próprio e **não** o `jsonSchema`: o Ollama ignora `jsonSchema` por desenho (ver acima),
+   * e passar a honrá-lo mudaria silenciosamente toda geração de documento que hoje sai pelo
+   * provider local. Quem quer o formato imposto o pede aqui, de propósito.
+   */
+  readonly opcoesLocais?: OpcoesLocais
+  /**
+   * A fase de isolamento do CLI, **quando não há `console`** (SPEC-Squads-02).
+   *
+   * O `ClaudeCodeAdapter` só isola — sem ferramentas, sem settings do ambiente, com o esquema
+   * imposto — quando recebe uma fase de geração de documento. A fase normalmente vem da etapa do
+   * `console`; o orquestrador do Squad não pertence a etapa nenhuma e, sem este campo, rodaria o
+   * CLI **com ferramentas** sobre texto de SPEC e de repositório. `console` presente vence: a
+   * fase continua sendo derivada num lugar só.
+   */
+  readonly fase?: Fase
+}
+
+/** O que o orquestrador local pede ao servidor: `num_ctx` e o JSON Schema (serializado) de `format`. */
+export interface OpcoesLocais {
+  readonly numCtx: number
+  readonly formato?: string
+  /** Reprodutibilidade do orquestrador: a mesma configuração que a M11-F00 mediu. */
+  readonly temperatura?: number
+  readonly semente?: number
 }
 
 /**
