@@ -77,6 +77,8 @@ import { RoadmapRepository } from './projects/roadmap-repository'
 import { ExternalRefRepository } from './projects/external-ref-repository'
 import { PublicacaoService } from './projects/publicacao-service'
 import { FilaService } from './pipeline/fila-service'
+import { PoolRepository } from './pipeline/pool-repository'
+import { PoolService } from './pipeline/pool-service'
 import { EffectJournalRepository } from './pipeline/effect-journal-repository'
 import { LeaseRepository } from './pipeline/lease-repository'
 import { MergePolicyRepository } from './pipeline/merge-policy-repository'
@@ -1327,9 +1329,24 @@ if (!app.requestSingleInstanceLock()) {
       userId: userIdAtual,
       identidade: () => auth?.usuarioAtual()?.id
     })
-    const fila = new FilaService({
-      runs: pipelineRepository,
+    // O pool de execução (SPEC-Scheduler-01) substitui o slot global único. Pool e fila se
+    // conhecem: o pool pergunta à fila quais gates seguram cada run e pede a ela que ative o run
+    // **dentro** do ciclo; a fila pede ao pool que decida. A referência cruzada é resolvida por
+    // closure — nenhum dos dois é chamado antes de ambos existirem.
+    const pool = new PoolService({
+      db: storage.db,
+      pool: new PoolRepository(storage.db),
       leases: leaseRepository,
+      audit: storage.audit,
+      userId: userIdAtual,
+      workspaceId: () => workspaces.atual(),
+      gates: (item) => fila.gatesDoItem(item),
+      ativar: (item) => fila.ativarRun(item)
+    })
+    const fila: FilaService = new FilaService({
+      runs: pipelineRepository,
+      pool,
+      workspaceId: () => workspaces.atual(),
       audit: storage.audit,
       roadmap: (escopo) => roadmapRepository.carregar(escopo),
       aprovacoes: (escopo) => roadmapRepository.listarAprovacoes(escopo),
@@ -1480,6 +1497,12 @@ if (!app.requestSingleInstanceLock()) {
       effectJournal,
       userId: userIdAtual,
       workspaceId: () => workspaces.atual(),
+      // A reconciliação liberou um slot: o pool registra a decisão dela e a fila anda — o slot
+      // pode ser de quem espera.
+      aoLiberarSlot: (lease) => {
+        pool.registrarReconciliado(lease)
+        fila.despachar()
+      },
       // O ponto de extensão que a M9-F02 deixou pronto, agora preenchido: container e porta
       // passam a ser consultados antes de um lease expirado cair (critério 4).
       verificadores: [
@@ -1862,6 +1885,7 @@ if (!app.requestSingleInstanceLock()) {
       publicacao,
       mergePolicy,
       fila,
+      pool,
       preflight,
       executionLedger,
       credentials,

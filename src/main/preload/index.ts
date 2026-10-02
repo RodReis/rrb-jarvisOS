@@ -26,6 +26,7 @@ import type {
 import type { DesfechoDaFala, ProntidaoDoTts } from '@shared/domain/visemes'
 import type { PendenciaDeLimpeza } from '@shared/domain/limpeza'
 import type { MergePolicyOutcome, PoliticaDeMerge, VistaDaFila } from '@shared/domain/pipeline'
+import type { VistaDoPool } from '@shared/domain/pool-vista'
 import type { ContextPack, ContextPackOutcome, FalhaRegistrada } from '@shared/domain/context-pack'
 import type { CapacidadeResolvida } from '@shared/domain/skills'
 import type { CodexBillingMode, CodexProfileState } from '@shared/domain/codex-profile'
@@ -684,6 +685,7 @@ const bridge: JarvisBridge = {
     ipcRenderer.invoke(IPC_CHANNELS.publicacaoPublicar, projectId, alvo, workspace),
   vistaDaFila: (projectId: string, workspace: WorkspaceId): Promise<VistaDaFila> =>
     ipcRenderer.invoke(IPC_CHANNELS.filaVista, projectId, workspace),
+  vistaDoPool: (): Promise<VistaDoPool> => ipcRenderer.invoke(IPC_CHANNELS.poolVista),
   estadoDoSandbox: (): Promise<{
     readonly dockerNoAr: boolean
     readonly proxyNoAr: boolean

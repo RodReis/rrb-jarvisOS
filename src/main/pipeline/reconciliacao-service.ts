@@ -40,7 +40,8 @@
  */
 
 import type { WorkspaceId } from '@shared/domain/entities'
-import { estadoDoLease, RECURSO_WIP_GLOBAL, type Lease } from '@shared/domain/lease'
+import { estadoDoLease, type Lease } from '@shared/domain/lease'
+import { ehRecursoDeSlot } from '@shared/domain/pool'
 import { ehTerminal, type PipelineRun } from '@shared/domain/pipeline'
 import { log } from '../logging/logger'
 import type { AuditRepository } from '../storage/audit-repository'
@@ -87,6 +88,11 @@ export interface ReconciliacaoDeps {
   readonly workspaceId: () => WorkspaceId
   /** Verificadores de recurso externo. A M9-F03 registra os dela aqui. */
   readonly verificadores?: readonly VerificadorDeRecurso[]
+  /**
+   * Avisa que a reconciliação liberou um slot do pool (SPEC-Scheduler-01). A decisão foi dela, e o
+   * pool só a registra — e roda um ciclo, porque o slot liberado pode ser de quem espera.
+   */
+  readonly aoLiberarSlot?: (lease: Lease) => void
   readonly agora?: () => number
 }
 
@@ -206,6 +212,8 @@ export class ReconciliacaoService {
       }
     })
 
+    if (ehRecursoDeSlot(lease.recurso)) this.deps.aoLiberarSlot?.(lease)
+
     return {
       recurso: lease.recurso,
       decisao: 'liberado',
@@ -216,9 +224,11 @@ export class ReconciliacaoService {
     }
   }
 
-  /** O slot global está livre depois da reconciliação? Para a tela mostrar a fila. */
+  /**
+   * Todos os slots do pool estão livres depois da reconciliação? Para a tela mostrar a fila. Um
+   * slot com lease expirado **não** está livre: ele só cai quando a reconciliação decide.
+   */
   slotLivre(): boolean {
-    const lease = this.deps.leases.buscar(this.deps.userId(), RECURSO_WIP_GLOBAL)
-    return estadoDoLease(lease, this.agora()) === 'livre'
+    return this.deps.leases.listarSlots(this.deps.userId()).length === 0
   }
 }

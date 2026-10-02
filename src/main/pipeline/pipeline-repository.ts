@@ -145,6 +145,46 @@ export class PipelineRepository {
     return resultado.changes === 1
   }
 
+  /**
+   * A transição de um run que **detém um slot do pool**, condicionada ao fencing token no próprio
+   * `UPDATE` (SPEC-Scheduler-01, critério 4). Confirmar progresso e conferir a posse são um passo
+   * só, no banco: entre "o token confere?" e "grava" não existe janela em que o lease possa mudar
+   * de dono. Um dono antigo — o que perdeu o lease e voltou — carrega um token que já não é o
+   * vigente, e a transição simplesmente não acontece.
+   */
+  transicionarComFencing(
+    runId: string,
+    de: EstadoDoRun,
+    para: EstadoDoRun,
+    agora: Date,
+    fencingToken: number,
+    bloqueio?: BloqueioExterno
+  ): boolean {
+    const resultado = this.db
+      .prepare(
+        `UPDATE pipeline_run
+            SET estado = ?, bloqueio = ?, updated_at = ?
+          WHERE id = ? AND estado = ?
+            AND EXISTS (
+              SELECT 1 FROM lease
+               WHERE lease.user_id = pipeline_run.user_id
+                 AND lease.proprietario = pipeline_run.id
+                 AND lease.recurso LIKE 'wip:slot:%'
+                 AND lease.fencing_token = ?
+            )`
+      )
+      .run(
+        para,
+        bloqueio === undefined ? null : JSON.stringify(bloqueio),
+        agora.toISOString(),
+        runId,
+        de,
+        fencingToken
+      )
+
+    return resultado.changes === 1
+  }
+
   buscar(runId: string): PipelineRun | undefined {
     const row = this.db.prepare('SELECT * FROM pipeline_run WHERE id = ?').get(runId) as
       RunRow | undefined

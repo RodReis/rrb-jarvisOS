@@ -56,6 +56,12 @@ export interface Lease {
   readonly heartbeatEm: number
   /** Epoch ms em que o lease expira se o heartbeat não renovar. */
   readonly expiraEm: number
+  /**
+   * O fencing token do slot do pool (SPEC-Scheduler-01): monotônico por usuário e nunca reutilizado.
+   * Ausente nos leases que não são de slot. Só o token vigente confirma progresso: quem perdeu o
+   * lease e voltou carrega um token que já não vale.
+   */
+  readonly fencingToken?: number
   readonly created_at: string
 }
 

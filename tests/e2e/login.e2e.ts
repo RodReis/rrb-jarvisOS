@@ -274,7 +274,8 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'updateWorkflow',
     'validarPrototipos',
     'verifyAuditChain',
-    'vistaDaFila'
+    'vistaDaFila',
+    'vistaDoPool'
   ])
 
   // Nenhum método entrega credencial — a superfície fechada é o critério 4 em runtime.

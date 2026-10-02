@@ -205,7 +205,8 @@ describe('ponte do preload', () => {
       'updateWorkflow',
       'validarPrototipos',
       'verifyAuditChain',
-      'vistaDaFila'
+      'vistaDaFila',
+      'vistaDoPool'
     ])
   })
 
@@ -223,6 +224,18 @@ describe('ponte do preload', () => {
 
     await (bridge.switchWorkspace as (w: string) => Promise<unknown>)('noa')
     expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.workspaceSwitch, 'noa')
+  })
+
+  it('o pool é só leitura: um método, sem argumentos, e nenhum que o mova', async () => {
+    const bridge = await carregarPonte()
+
+    await (bridge.vistaDoPool as () => Promise<unknown>)()
+    expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.poolVista)
+
+    // O renderer olha o pool; quem o move é o main. Nenhum nome de ato sobre slot/fila.
+    expect(Object.keys(bridge).filter((k) => /pool|slot|fencing|enfileirar/i.test(k))).toEqual([
+      'vistaDoPool'
+    ])
   })
 
   it('não expõe ipcRenderer nem primitivas de canal arbitrário', async () => {

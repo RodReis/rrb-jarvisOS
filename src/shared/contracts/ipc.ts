@@ -82,6 +82,7 @@ import type { AlvoDaPublicacao, PublicacaoOutcome } from '../domain/publicacao'
 import type { ExecutionLedger } from '../domain/execution-ledger'
 import type { PendenciaDeLimpeza } from '../domain/limpeza'
 import type { MergePolicyOutcome, PoliticaDeMerge, VistaDaFila } from '../domain/pipeline'
+import type { VistaDoPool } from '../domain/pool-vista'
 import type { Roadmap } from '../domain/roadmap'
 import type { MvpGerado, RoadmapGeradoOutcome, RoadmapRegistrado } from '../domain/roadmap-gerado'
 import type { EstadoDaJornada, TransicaoOutcome } from '../domain/jornada'
@@ -604,6 +605,14 @@ export const IPC_CHANNELS = {
   mergePolicyDefinir: 'merge-policy:definir',
   /** SPEC-Entrega-02: o estado da fila — runs ativos, concluídas e o que está travado. */
   filaVista: 'fila:vista',
+  /**
+   * SPEC-Scheduler-01: o pool de execução — slots, fila, motivo de espera e métricas. **Só leitura.**
+   *
+   * Não existe canal que enfileire, adquira, renove, libere ou configure: quem move o pool é o
+   * main, a partir do que o PI aprovou. A vista também **não carrega o fencing token** — ele é a
+   * credencial do dono do slot, e a tela nunca a tem.
+   */
+  poolVista: 'pool:vista',
   /**
    * O estado do sandbox do executor (SPEC-Entrega-03). **Só leitura**, como os canais da
    * M9-F02: nada aqui prepara nem derruba container — quem prepara é o preflight, chamado pela
@@ -1469,6 +1478,8 @@ export interface JarvisBridge {
   ): Promise<PublicacaoOutcome>
   /** O estado da fila de execução (SPEC-Entrega-02). Só leitura: o renderer não move a pipeline. */
   vistaDaFila(projectId: string, workspace: WorkspaceId): Promise<VistaDaFila>
+  /** O pool de execução (SPEC-Scheduler-01). Só leitura, sem o token de nenhum slot. */
+  vistaDoPool(): Promise<VistaDoPool>
   /**
    * O estado do sandbox do executor (SPEC-Entrega-03). Só leitura — a preparação é da pipeline.
    */
