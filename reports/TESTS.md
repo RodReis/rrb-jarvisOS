@@ -12,7 +12,7 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 1851 | 1851 | 0 | 78.8 | — | — |
+| — | — | — | Regras de Negócio | 1932 | 1932 | 0 | 79.3 | — | — |
 | — | — | — | Banco | 1291 | 1277 | 0 | 86.9 | — | — |
 | — | — | — | Tela | 735 | 734 | 0 | 76.5 | — | — |
 
@@ -403,3 +403,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-10-02 | #369 | — | Regras de Negócio | 1851 | 1851 | 0 | 78.8 | #372 | [#372](https://github.com/RodReis/rrb-jarvisOS/pull/372) |
 | 2026-10-02 | #369 | — | Banco | 1291 | 1277 | 0 | 86.9 | #372 | [#372](https://github.com/RodReis/rrb-jarvisOS/pull/372) |
 | 2026-10-02 | #369 | — | Tela | 735 | 734 | 0 | 76.5 | #372 | [#372](https://github.com/RodReis/rrb-jarvisOS/pull/372) |
+| 2026-10-02 | #122 | spec-squads-01-capacidades-perfis | Regras de Negócio | 1932 | 1932 | 0 | 79.3 | #375 | [#375](https://github.com/RodReis/rrb-jarvisOS/pull/375) |
+| 2026-10-02 | #122 | spec-squads-01-capacidades-perfis | Banco | 1291 | 1277 | 0 | 86.9 | #375 | [#375](https://github.com/RodReis/rrb-jarvisOS/pull/375) |
+| 2026-10-02 | #122 | spec-squads-01-capacidades-perfis | Tela | 735 | 734 | 0 | 76.5 | #375 | [#375](https://github.com/RodReis/rrb-jarvisOS/pull/375) |
