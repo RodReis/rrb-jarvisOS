@@ -132,6 +132,8 @@ A mesma fatia pode ser construída por Claude ou Codex sem alterar o kernel; qua
 
 ## 7. MVP-011 — Squads limitados pela SPEC
 
+> **Emenda proposta em 2026-10-02 — [ADR-006](../../adr/adr-006-squads-orquestrados-modelo-local.md).** Orquestrador local via Ollama (propõe; o kernel valida), até 2 escritores em worktrees isolados com agente integrador (revoga a Decisão 5 no escopo do MVP-011), quadro de execução com play e PR/MERGE. A Decisão 3 permanece. O texto abaixo descreve a revisão de 2026-08-29 e vale até o PI aprovar a ADR-006; depois disso, a fonte é `docs/mvp/mvp-011-squads-limitados.md`.
+
 ### Tese
 
 Criar Squads temporários para uma fatia aprovada, preservando um único escritor e autoridade determinística.

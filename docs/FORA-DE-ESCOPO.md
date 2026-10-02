@@ -23,7 +23,12 @@
 Requisito `transferido` é obrigação com endereço: sai do MVP de origem e entra no MVP nomeado.
 Aparecer nesta seção **não** afrouxa a entrega.
 
-_(vazio — inventário ainda em classificação; ver `RASTREABILIDADE.md` §6)_
+| ID | Requisito | De | Para | Motivo | Decisor / data |
+|---|---|---|---|---|---|
+| RF-014.2 | Specialist Teams — acionamento por automação | MVP-011 | MVP-013 | O play do PI cobre o acionamento manual; a automação é a drenagem contínua do MVP-013 | PI, 2026-10-02 |
+| RF-014.3 | Specialist Teams — visão de performance por equipe | MVP-011 | MVP-015 | Performance é observabilidade operacional (MVP-015) | PI, 2026-10-02 |
+
+_Inventário ainda em classificação; ver `RASTREABILIDADE.md` §6._
 
 ## Adiados — sem compromisso, com gatilho
 

@@ -1,49 +1,53 @@
-# SPEC-Squads-02 — Planejador e validador determinístico
+# SPEC-Squads-02 — Orquestrador local e validador determinístico
 
 - MVP: `docs/mvp/mvp-011-squads-limitados.md` (Fatia 02).
 - Issue: [#123](https://github.com/RodReis/rrb-jarvisOS/issues/123); épico [#121](https://github.com/RodReis/rrb-jarvisOS/issues/121).
-- Status: **aprovada-pi** (2026-08-29) — entra no backlog na ordem do MVP; implementação depende da fila.
-- Depende de: F01 aprovada e entregue.
+- Status: **planejado** — reescrita em 2026-10-02 pela ADR-006.
+- Depende de: M11-F01.
 
 ## Objetivo
 
-Permitir que um planejador proponha tarefas internas, mas fazer o kernel decidir deterministicamente se cada tarefa cabe na SPEC, nas dependências e no orçamento.
+O modelo local propõe o grafo de tarefas da issue e o kernel decide deterministicamente se cada tarefa cabe na SPEC, nas dependências, no perfil e no orçamento.
 
 ## Dentro
 
-- `SquadPlan` como DAG interno com função, capacidade, entradas mínimas, dependências, schema, limites e regra de conclusão.
-- Validador de cobertura da SPEC, paths/fontes permitidos, ferramentas, orçamento, número de workers, turnos e tempo.
-- Classificação de proposta válida, redundante, fora de escopo ou não comprovável.
-- Correção/replanejamento limitado sem ampliar autoridade.
+- Orquestrador chamado pelo adapter Ollama, com o modelo do perfil, saída estruturada e `num_ctx` declarado no snapshot.
+- `SquadPlan` como DAG com, por tarefa: papel, capacidade, **camada de modelo**, **escritor dono** (quando escreve), entradas mínimas, dependências, schema, limites e regra de conclusão.
+- Validador de cobertura da SPEC, paths e fontes permitidos, ferramentas, camadas permitidas, número de escritores, orçamento, turnos e tempo.
+- Classificação de cada proposta: válida, redundante, fora de escopo ou não comprovável.
+- Replanejamento limitado e, esgotado o limite ou com o Ollama indisponível, **fallback para o modelo da fase** pela assinatura, com a troca registrada.
 - Hash do plano aceito ligado ao run e à revisão da SPEC.
 
 ## Fora
 
-- Planejador aprovando sua própria expansão de escopo.
-- Alteração automática de arquitetura, requisitos ou prioridade.
+- Orquestrador aprovando sua própria expansão de escopo.
+- Alteração automática de arquitetura, requisitos, prioridade ou fila.
 - Tarefa sem resultado verificável ou sem consumidor definido.
+- Memória do orquestrador entre runs.
 
 ## Regras
 
 1. Texto do agente nunca substitui validação estrutural.
-2. Toda tarefa deve mapear para critério, risco ou evidência da SPEC.
-3. Achado fora do escopo vira relatório/pergunta, não nova tarefa executável.
-4. DAG cíclico, worker sem capacidade ou orçamento excedido é rejeitado antes do dispatch.
+2. Toda tarefa mapeia para critério, risco ou evidência da SPEC.
+3. Achado fora do escopo vira relatório ou pergunta, nunca nova tarefa executável.
+4. DAG cíclico, worker sem capacidade, camada não permitida, escritor além do teto ou orçamento excedido são rejeitados antes do dispatch.
+5. O fallback nunca usa API paga sem opt-in e nunca troca de assinatura em silêncio.
 
 ## Critérios de aceite
 
-1. Validador aceita plano mínimo válido e rejeita ciclo, escopo extra e segundo writer.
+1. O validador aceita plano mínimo válido e rejeita ciclo, escopo extra, terceiro escritor e camada fora do perfil.
 2. Cada tarefa aceita aponta para fundamento explícito da SPEC.
-3. Replanejamento preserva limites e mantém histórico das propostas rejeitadas.
-4. Mesmo snapshot produz a mesma decisão de validação.
-5. Prompt injection em documento/repositório não cria tarefa ou permissão nova.
+3. O replanejamento preserva limites e mantém o histórico das propostas rejeitadas.
+4. O mesmo snapshot produz a mesma decisão de validação.
+5. Prompt injection em documento ou repositório não cria tarefa, permissão ou escritor novo.
+6. Ollama fora do ar e plano rejeitado até o limite caem no modelo da fase, com evento auditado.
 
 ## Testes e evidência
 
-- property tests do DAG interno;
-- fixtures de expansão de escopo e prompt injection;
-- trilha de propostas, rejeições e plano final.
+- fixtures de planos válidos e inválidos (incluindo saída malformada do modelo local);
+- teste de determinismo do validador;
+- teste de fallback com Ollama ausente.
 
 ## Perguntas abertas ao PI
 
-Nenhuma. Revisão exata aprovada pelo PI em 2026-08-29.
+1. Limite de replanejamentos antes do fallback: reusar o limite de tentativas da M9-F04 ou definir um próprio?

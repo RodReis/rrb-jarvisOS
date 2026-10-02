@@ -14,7 +14,7 @@ Executar até duas fatias independentes em paralelo, com isolamento e prova expl
 
 | Ordem | Fatia | SPEC | Dependência |
 |---:|---|---|---|
-| 1 | Pool global e fila justa | `spec-scheduler-01-pool-fila.md` | MVP-011 |
+| 1 | Pool global e fila justa | `spec-scheduler-01-pool-fila.md` | M11-F02 — entra antes da M11-F03 (ADR-006, decisão 13; proposta, aguarda aprovação do PI) |
 | 2 | Independência e locks | `spec-scheduler-02-independencia-locks.md` | F01 |
 | 3 | Isolamento concorrente | `spec-scheduler-03-isolamento-concorrente.md` | F02 |
 | 4 | Merge serializado | `spec-scheduler-04-merge-serializado.md` | F03 |

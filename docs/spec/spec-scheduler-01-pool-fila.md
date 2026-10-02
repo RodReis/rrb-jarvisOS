@@ -3,7 +3,7 @@
 - MVP: `docs/mvp/mvp-012-scheduler-concorrente.md` (Fatia 01).
 - Issue: [#128](https://github.com/RodReis/rrb-jarvisOS/issues/128); épico [#127](https://github.com/RodReis/rrb-jarvisOS/issues/127).
 - Status: **aprovada-pi** (2026-08-29) — entra no backlog na ordem do MVP; implementação depende da fila.
-- Depende de: MVP-011 concluído.
+- Depende de: MVP-011 concluído. **Proposta da ADR-006 (2026-10-02), pendente de aprovação do PI:** passa a depender da M11-F02 e entra antes da M11-F03; o conteúdo desta SPEC não muda nesta rodada.
 
 ## Objetivo
 

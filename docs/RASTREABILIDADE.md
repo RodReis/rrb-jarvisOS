@@ -158,7 +158,10 @@ Origem de todas as linhas: `docs/iniciais/requisitos-agent-os.md`, seção `### 
 | RF-011 | Providers de IA | a-classificar | MVP-005 (proposta) | — | — | — | — | — |
 | RF-012 | Mission Control | a-classificar | — | — | — | — | — | — |
 | RF-013 | Harnesses e agentes executores | a-classificar | MVP-010 (proposta) | — | — | — | — | — |
-| RF-014 | Specialist Teams | a-classificar | MVP-011 (proposta) | — | — | — | — | — |
+| RF-014 | Specialist Teams | absorvido | MVP-011 | RF-014.1, RF-014.2, RF-014.3 | — | Dividido em três partes com destinos diferentes (ADR-006) | PI, 2026-10-02 | — (prova nas filhas) |
+| RF-014.1 | Specialist Teams — equipe com agentes, papéis, objetivo, workflow padrão, limites de custo; acionamento manual | mantido | MVP-011 (M11-F01, M11-F05) | — | — | — | PI, 2026-10-02 | — |
+| RF-014.2 | Specialist Teams — acionamento por automação | transferido | MVP-011 | MVP-013 | — | O play do PI cobre o acionamento manual; a automação é a drenagem contínua do MVP-013 | PI, 2026-10-02 | — |
+| RF-014.3 | Specialist Teams — visão de performance por equipe | transferido | MVP-011 | MVP-015 | — | Performance é observabilidade operacional (MVP-015) | PI, 2026-10-02 | — |
 | RF-015 | Agent Memory | a-classificar | MVP-007 (proposta) | — | — | — | — | — |
 | RF-015.1 | Notebook | a-classificar | — | — | — | — | — | — |
 | RF-016 | Operator Central | a-classificar | — | — | — | — | — | — |
