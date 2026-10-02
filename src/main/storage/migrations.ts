@@ -1742,6 +1742,71 @@ const MIGRATIONS: readonly string[] = [
     updated_at         TEXT NOT NULL,
     PRIMARY KEY (user_id, workspace_id, project_id)
   );
+  `,
+
+  // 48 - o pool de execucao (SPEC-Scheduler-01).
+  //
+  // O slot global unico da V1 (`wip:global`) vira um pool: cada slot e um lease em
+  // `wip:slot:<n>`, entao o `UNIQUE(user_id, recurso)` continua sendo a garantia de "nunca mais
+  // escritores que o limite" — nao existe recurso `wip:slot:9` para ser adquirido.
+  //
+  // `fencing_token` e **monotonico por usuario e nunca reutilizado** (`pool_sequencia` sobrevive
+  // a liberacao e a reconciliacao): e o que faz um dono antigo, que perdeu o lease e voltou, nao
+  // conseguir confirmar progresso — o token que ele guarda ja nao e o do lease vigente. Nulo nos
+  // leases que nao sao de slot (worktree, container): fencing e do pool.
+  //
+  // A fila e persistida porque a posicao e o motivo de espera precisam sobreviver ao reinicio sem
+  // duplicar run (`run_id` e a chave). `pool_vez` guarda quando cada projeto foi servido, que e o
+  // que alterna entre projetos. `pool_decisao` e o historico das decisoes — a fonte das metricas
+  // de ocupacao, espera e decisoes do scheduler.
+  `
+  ALTER TABLE lease ADD COLUMN fencing_token INTEGER;
+
+  CREATE TABLE pool_config (
+    user_id    TEXT PRIMARY KEY,
+    config     TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE pool_fila (
+    run_id         TEXT PRIMARY KEY,
+    user_id        TEXT NOT NULL,
+    project_id     TEXT NOT NULL,
+    slice_id       TEXT NOT NULL,
+    prioridade     INTEGER NOT NULL,
+    enfileirado_em INTEGER NOT NULL,
+    executor       TEXT,
+    classe         TEXT,
+    estado         TEXT NOT NULL CHECK (estado IN ('esperando', 'adquirido', 'cancelado')),
+    -- JSON do MotivoDeEspera atual. NULL quando nao esta esperando.
+    motivo         TEXT,
+    atualizado_em  INTEGER NOT NULL
+  );
+  CREATE INDEX idx_pool_fila_espera ON pool_fila(user_id, estado, enfileirado_em);
+
+  CREATE TABLE pool_vez (
+    user_id    TEXT NOT NULL,
+    project_id TEXT NOT NULL,
+    servido_em INTEGER NOT NULL,
+    PRIMARY KEY (user_id, project_id)
+  );
+
+  CREATE TABLE pool_sequencia (
+    user_id TEXT PRIMARY KEY,
+    ultimo  INTEGER NOT NULL
+  );
+
+  CREATE TABLE pool_decisao (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    TEXT NOT NULL,
+    run_id     TEXT NOT NULL,
+    project_id TEXT NOT NULL,
+    decisao    TEXT NOT NULL CHECK (decisao IN ('adquirido', 'liberado', 'reconciliado', 'cancelado')),
+    -- So em 'adquirido': quanto o run esperou na fila, em ms.
+    espera_ms  INTEGER,
+    em         INTEGER NOT NULL
+  );
+  CREATE INDEX idx_pool_decisao_em ON pool_decisao(user_id, em);
   `
 ]
 

@@ -24,6 +24,7 @@ interface LeaseRow {
   readonly project_id: string | null
   readonly heartbeat_em: number
   readonly expira_em: number
+  readonly fencing_token: number | null
   readonly created_at: string
 }
 
@@ -36,6 +37,7 @@ function toLease(row: LeaseRow): Lease {
     ...(row.project_id === null ? {} : { projectId: row.project_id }),
     heartbeatEm: row.heartbeat_em,
     expiraEm: row.expira_em,
+    ...(row.fencing_token === null ? {} : { fencingToken: row.fencing_token }),
     created_at: row.created_at
   }
 }
@@ -63,6 +65,8 @@ export class LeaseRepository {
       readonly proprietario: string
       readonly recurso: string
       readonly projectId?: string
+      /** Só os slots do pool têm token (SPEC-Scheduler-01). */
+      readonly fencingToken?: number
     },
     agora: number
   ): Lease | undefined {
@@ -74,8 +78,9 @@ export class LeaseRepository {
       this.db
         .prepare(
           `INSERT INTO lease
-             (id, user_id, proprietario, recurso, project_id, heartbeat_em, expira_em, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+             (id, user_id, proprietario, recurso, project_id, heartbeat_em, expira_em,
+              fencing_token, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .run(
           id,
@@ -85,6 +90,7 @@ export class LeaseRepository {
           dados.projectId ?? null,
           agora,
           expiraEm,
+          dados.fencingToken ?? null,
           criadoEm
         )
     } catch {
@@ -100,6 +106,7 @@ export class LeaseRepository {
       ...(dados.projectId === undefined ? {} : { projectId: dados.projectId }),
       heartbeatEm: agora,
       expiraEm,
+      ...(dados.fencingToken === undefined ? {} : { fencingToken: dados.fencingToken }),
       created_at: criadoEm
     }
   }
@@ -148,6 +155,67 @@ export class LeaseRepository {
     const resultado = this.db
       .prepare('DELETE FROM lease WHERE user_id = ? AND recurso = ?')
       .run(userId, recurso)
+
+    return resultado.changes === 1
+  }
+
+  /** Os leases dos slots do pool (`wip:slot:*`), do mais antigo ao mais novo. */
+  listarSlots(userId: string): readonly Lease[] {
+    const rows = this.db
+      .prepare(
+        "SELECT * FROM lease WHERE user_id = ? AND recurso LIKE 'wip:slot:%' ORDER BY created_at ASC, recurso ASC"
+      )
+      .all(userId) as LeaseRow[]
+
+    return rows.map(toLease)
+  }
+
+  /** O slot que um run detém, se detém. */
+  buscarSlotDoRun(userId: string, runId: string): Lease | undefined {
+    const row = this.db
+      .prepare(
+        "SELECT * FROM lease WHERE user_id = ? AND proprietario = ? AND recurso LIKE 'wip:slot:%'"
+      )
+      .get(userId, runId) as LeaseRow | undefined
+
+    return row === undefined ? undefined : toLease(row)
+  }
+
+  /**
+   * Renova o slot **só se o token confere**. O `WHERE` leva o token porque um dono antigo que
+   * voltou depois de perder o lease não pode renová-lo — mesmo que o recurso tenha sido adquirido
+   * de novo pelo mesmo run: o token novo é outro.
+   */
+  renovarSlot(
+    userId: string,
+    recurso: string,
+    proprietario: string,
+    fencingToken: number,
+    agora: number
+  ): boolean {
+    const resultado = this.db
+      .prepare(
+        `UPDATE lease
+            SET heartbeat_em = ?, expira_em = ?
+          WHERE user_id = ? AND recurso = ? AND proprietario = ? AND fencing_token = ?`
+      )
+      .run(agora, proximaExpiracao(agora), userId, recurso, proprietario, fencingToken)
+
+    return resultado.changes === 1
+  }
+
+  /** Libera o slot **só se o token confere**: um dono antigo não derruba o lease do novo. */
+  liberarSlot(
+    userId: string,
+    recurso: string,
+    proprietario: string,
+    fencingToken: number
+  ): boolean {
+    const resultado = this.db
+      .prepare(
+        'DELETE FROM lease WHERE user_id = ? AND recurso = ? AND proprietario = ? AND fencing_token = ?'
+      )
+      .run(userId, recurso, proprietario, fencingToken)
 
     return resultado.changes === 1
   }
