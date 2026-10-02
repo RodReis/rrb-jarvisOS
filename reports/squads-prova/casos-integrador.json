@@ -1,0 +1,163 @@
+{
+  "casos": [
+    {
+      "tipo": "sintetico",
+      "id": "S-M9-F01",
+      "fatia": "M9-F01",
+      "base": "295f00aa765a6943ba237c41a4c1e3526a31e96b",
+      "w1": "6e2605eaa8eefd7e24cf1369c0592ac7a69cdf0f",
+      "w2": "61e871c95959d83b557f07b57a6f20ed6141d7b4",
+      "verdade": "7a70e7664f03d0e5f77ca42c6999d2e41068dd9b",
+      "alvo": "src/main/execution/terminal-engine.ts",
+      "hunksNoAlvo": 4,
+      "conflitos": [
+        "src/main/execution/terminal-engine.ts"
+      ]
+    },
+    {
+      "tipo": "sintetico",
+      "id": "S-M9-F03",
+      "fatia": "M9-F03",
+      "base": "2e8151f83736f7a16167c903c3838b0a79d64e96",
+      "w1": "8290b313b7b5aa44a511d7fd8bf385d1cf2ebc53",
+      "w2": "73280fb33f26c2a8797b4116c69cda7459234a3e",
+      "verdade": "cae53205abebc6346b4cc0cf0975e77393d1a5cf",
+      "alvo": "src/main/ai/call-provider.ts",
+      "hunksNoAlvo": 5,
+      "conflitos": [
+        "src/main/ai/call-provider.ts"
+      ]
+    },
+    {
+      "tipo": "sintetico",
+      "id": "S-M9-F04",
+      "fatia": "M9-F04",
+      "base": "786ca98660cb0b061be5b4dbd2879b5138615ceb",
+      "w1": "1cb30662c6b6b83cfb873223e1c6f0f4a0d5caa0",
+      "w2": "e1ad45f325be1a574e94ec1fdfc43fee2178488f",
+      "verdade": "9005423aa3f7421c4f63099f439f5a5d18791d2c",
+      "alvo": "src/shared/domain/preflight.ts",
+      "hunksNoAlvo": 2,
+      "conflitos": [
+        "src/shared/domain/preflight.ts"
+      ]
+    },
+    {
+      "tipo": "sintetico",
+      "id": "S-M26-F01",
+      "fatia": "M26-F01",
+      "base": "e29f69e590dd12e2673260075c4474b3a92416a4",
+      "w1": "cdec3be4ff26d37e380f262d93126c766241a688",
+      "w2": "41dd8dabac27d31e9f4e6d25bea823eb3ec7668e",
+      "verdade": "4b52668191109fb5adc9f03deacc2fd265505103",
+      "alvo": "src/main/index.ts",
+      "hunksNoAlvo": 3,
+      "conflitos": [
+        "src/main/index.ts"
+      ]
+    },
+    {
+      "tipo": "sintetico",
+      "id": "S-M26-F02",
+      "fatia": "M26-F02",
+      "base": "b2ccc8063520832c31c14af2ed043a4eac0741fd",
+      "w1": "ff725ddb9404300a3f029632294bfc80e7fcce9c",
+      "w2": "a5ec6b94cd268b21e48988731baa6a8f4e9ab923",
+      "verdade": "ca637516bbbc1e9b32aa88e2755aaef13da5849d",
+      "alvo": "src/renderer/src/app/ProjetosLocais.tsx",
+      "hunksNoAlvo": 3,
+      "conflitos": [
+        "src/renderer/src/app/ProjetosLocais.tsx"
+      ]
+    },
+    {
+      "tipo": "sintetico",
+      "id": "S-M26-F06",
+      "fatia": "M26-F06",
+      "base": "ae2039d6207cd338d5e5fd1e1c0a08d9f835223a",
+      "w1": "119656e56db76658c9e473ef1cb0052bf09362d5",
+      "w2": "279cbb71b029a876974c12cc35beeb97ba9428bd",
+      "verdade": "1067f65949a7729bd80d8328e2555bc75fd6d912",
+      "alvo": "src/shared/domain/rota-de-geracao.ts",
+      "hunksNoAlvo": 8,
+      "conflitos": [
+        "src/shared/domain/rota-de-geracao.ts"
+      ]
+    },
+    {
+      "tipo": "historico",
+      "id": "H-d37e0b4a",
+      "base": "2e8151f83736f7a16167c903c3838b0a79d64e96",
+      "w1": "6d1eb89882da12b8e1215d2767d89a47489d9637",
+      "w2": "cae53205abebc6346b4cc0cf0975e77393d1a5cf",
+      "verdade": "d37e0b4a6eadd3e49b029349b87207b3b3f4194e",
+      "conflitos": [
+        "docs/STATUS.md"
+      ],
+      "assunto": "docs: reconcilia main após PR211 e preserva histórico gerado (refs #189)"
+    },
+    {
+      "tipo": "historico",
+      "id": "H-9f2a3c41",
+      "base": "0799c8af58d2af5168f869185f060cdf5e1d8f6d",
+      "w1": "e6262cf0d36938ea85bf4a5e945f4ee7516001fb",
+      "w2": "2e8151f83736f7a16167c903c3838b0a79d64e96",
+      "verdade": "9f2a3c418dea02f6c3e7d49bcc11b19c1dd76a37",
+      "conflitos": [
+        "docs/DECISIONS.md",
+        "docs/STATUS.md"
+      ],
+      "assunto": "docs: integra decisões posteriores e Shell sem colisão de MVP (refs #189)"
+    },
+    {
+      "tipo": "historico",
+      "id": "H-e6262cf0",
+      "base": "deed97b79bb7360e6a2fdca4f5cec4bc5673abe3",
+      "w1": "5d3a4ed6e730cf9cf4c5678ed1defc0330346a5e",
+      "w2": "0799c8af58d2af5168f869185f060cdf5e1d8f6d",
+      "verdade": "e6262cf0d36938ea85bf4a5e945f4ee7516001fb",
+      "conflitos": [
+        "docs/DECISIONS.md",
+        "docs/STATUS.md",
+        "docs/mvp/mvp-009-entrega-autonoma.md",
+        "docs/spec/spec-entrega-02-dag-fila-reconciliacao.md",
+        "docs/spec/spec-entrega-03-worktree-preflight-docker.md",
+        "docs/spec/spec-entrega-04-construcao-recuperacao.md",
+        "docs/spec/spec-entrega-05-revisao-ci-merge.md"
+      ],
+      "assunto": "docs: reconcilia main e decisões do PI preservando aprovações (refs #189)"
+    },
+    {
+      "tipo": "historico",
+      "id": "H-26b301f5",
+      "base": "328ac2675c695b6851542bdde3b8c2bc0f56ddbd",
+      "w1": "eff4aeb313644cbc62c8022255141dc801f4070e",
+      "w2": "e5a0def08d87b9c5dcfc603a15287e0fc6356116",
+      "verdade": "26b301f57c28a0f0cfd778bf913dd5f6bce210fe",
+      "conflitos": [
+        "docs/STATUS.md"
+      ],
+      "assunto": "Merge remote-tracking branch 'origin/main' into feat/design-system-foundations"
+    }
+  ],
+  "descartados": {
+    "pares": {
+      "o patch do segundo escritor não aplica na base": 88,
+      "sem arquivo de código em comum": 45,
+      "o merge dos dois lados é limpo": 3
+    },
+    "sinteticos": {
+      "M9-F02": "sem arquivo de código com 2+ hunks e linha mutável",
+      "M9-F05": "sem arquivo de código com 2+ hunks e linha mutável",
+      "M9-F06": "sem arquivo de código com 2+ hunks e linha mutável",
+      "M10-F01": "sem arquivo de código com 2+ hunks e linha mutável",
+      "M10-F02": "sem arquivo de código com 2+ hunks e linha mutável",
+      "M10-F03": "sem arquivo de código com 2+ hunks e linha mutável",
+      "M10-F04": "sem arquivo de código com 2+ hunks e linha mutável",
+      "M10-F05": "sem arquivo de código com 2+ hunks e linha mutável",
+      "M26-F03": "sem arquivo de código com 2+ hunks e linha mutável",
+      "M26-F04": "sem arquivo de código com 2+ hunks e linha mutável",
+      "M26-F05": "sem arquivo de código com 2+ hunks e linha mutável"
+    }
+  }
+}

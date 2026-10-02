@@ -1,0 +1,407 @@
+{
+  "modelo": "hermes3:8b",
+  "executadoEm": "2026-10-02T18:17:28.280Z",
+  "snapshotValidador": "ddfef988c2ce338d36773505dd222b45529ecfc115c05da15acac9564872b78d",
+  "versaoDoTeto": "v2-max(12,criterios)",
+  "numCtxPedido": 8192,
+  "semente": 42,
+  "aceitos": 9,
+  "total": 17,
+  "taxa": 0.5294117647058824,
+  "resultados": [
+    {
+      "fatia": "M9-F01",
+      "texto": "{\n  \"tarefas\": [\n    {\n      \"id\": \"t1\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"docs/revision.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 1\n      },\n      \"regraDeConclusao\": \"A revisão local está atualizada e aprovada.\"\n    },\n    {\n      \"id\": \"t2\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"src/main/execution/execution.go\",\n        \"src/main/storage/storage.go\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 3\n      },\n      \"regraDeConclusao\": \"Issues apontam para a execução e armazenamento corretos.\"\n    },\n    {\n      \"id\": \"t3\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"src/main/connectors/github.go\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 4\n      },\n      \"regraDeConclusao\": \"A dependência do GitHub está confirmada.\"\n    },\n    {\n      \"id\": \"t4\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"src/main/projects/project.go\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 5\n      },\n      \"regraDeConclusao\": \"As dependências estão registradas como limitações explícitas.\"\n    },\n    {\n      \"id\": \"t5\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"src/main/preload/preload.go\",\n        \"src/main/ipc/ipc.go\",\n        \"src/main/storage/storage.go\",\n        \"src/main/connectors/github.go\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 6\n      },\n      \"regraDeConclusao\": \"Reinício após efeito remoto reconcilia antes de repetir.\"\n    },\n    {\n      \"id\": \"t6\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"src/main/execution/execution.go\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 2\n      },\n      \"regraDeConclusao\": \"Commits locais aprovados correspondem à branch remota publicada.\"\n    },\n    {\n      \"id\": \"t7\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"src/main/execution/execution.go\",\n        \"src/main/storage/storage.go\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 3\n      },\n      \"regraDeConclusao\": \"Issues apontam para a execução e armazenamento corretos.\"\n    },\n    {\n      \"id\": \"t8\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"src/main/connectors/github.go\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 4\n      },\n      \"regraDeConclusao\": \"A dependência do GitHub está confirmada.\"\n    },\n    {\n      \"id\": \"t9\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"src/main/projects/project.go\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 5\n      },\n      \"regraDeConclusao\": \"As dependências estão registradas como limitações explícitas.\"\n    },\n    {\n      \"id\": \"t10\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"src/main/preload/preload.go\",\n        \"src/main/ipc/ipc.go\",\n        \"src/main/storage/storage.go\",\n        \"src/main/connectors/github.go\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 6\n      },\n      \"regraDeConclusao\": \"Reinício após efeito remoto reconcilia antes de repetir.\"\n    },\n    {\n      \"id\": \"t11\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"src/main/execution/execution.go\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 2\n      },\n      \"regraDeConclusao\": \"Commits locais aprovados correspondem à branch remota publicada.\"\n    },\n    {\n      \"id\": \"t12\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"src/main/execution/execution.go\",\n        \"src/main/storage/storage.go\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 3\n      },\n      \"regraDeConclusao\": \"Issues apontam para a execução e armazenamento corretos.\"\n    }\n  ]\n}",
+      "latenciaMs": 17981,
+      "promptTokens": 745,
+      "saidaTokens": 1372,
+      "numCtxEfetivo": 8192,
+      "vramBytes": 5553258495,
+      "truncado": false,
+      "decisao": {
+        "aceito": false,
+        "rejeicoes": [
+          {
+            "motivo": "REDUNDANTE",
+            "detalhe": "repete revisor|3|src/main/execution/execution.go,src/main/storage/storage.go",
+            "tarefa": "t7"
+          },
+          {
+            "motivo": "REDUNDANTE",
+            "detalhe": "repete revisor|4|src/main/connectors/github.go",
+            "tarefa": "t8"
+          },
+          {
+            "motivo": "REDUNDANTE",
+            "detalhe": "repete revisor|5|src/main/projects/project.go",
+            "tarefa": "t9"
+          },
+          {
+            "motivo": "REDUNDANTE",
+            "detalhe": "repete revisor|6|src/main/connectors/github.go,src/main/ipc/ipc.go,src/main/preload/preload.go,src/main/storage/storage.go",
+            "tarefa": "t10"
+          },
+          {
+            "motivo": "REDUNDANTE",
+            "detalhe": "repete revisor|2|src/main/execution/execution.go",
+            "tarefa": "t11"
+          },
+          {
+            "motivo": "REDUNDANTE",
+            "detalhe": "repete revisor|3|src/main/execution/execution.go,src/main/storage/storage.go",
+            "tarefa": "t12"
+          }
+        ]
+      }
+    },
+    {
+      "fatia": "M9-F02",
+      "texto": "{\n  \"tarefas\": [\n    {\n      \"id\": \"t1\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"docs/revision_process.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 7\n      },\n      \"regraDeConclusao\": \"A revisão está aprovada e o run termina em AWAITING_MERGE\"\n    },\n    {\n      \"id\": \"t2\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"src/main/storage\",\n        \"src/main/pipeline\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 1\n      },\n      \"regraDeConclusao\": \"O DAG rejeita ciclos e dependências ausentes\"\n    },\n    {\n      \"id\": \"t3\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t2\"],\n      \"paths\": [\n        \"src/main/ipc\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 2\n      },\n      \"regraDeConclusao\": \"WIP=1 global impede duas fatias simultâneas\"\n    },\n    {\n      \"id\": \"t4\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t3\"],\n      \"paths\": [\n        \"src/main/preload\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 3\n      },\n      \"regraDeConclusao\": \"Lease expirado não autoriza roubo antes da reconciliação\"\n    },\n    {\n      \"id\": \"t5\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t4\"],\n      \"paths\": [\n        \"src/main/queue\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 4\n      },\n      \"regraDeConclusao\": \"Crash antes/depois de efeito converge para um único resultado\"\n    },\n    {\n      \"id\": \"t6\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t5\"],\n      \"paths\": [\n        \"src/main/storage\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 5\n      },\n      \"regraDeConclusao\": \"Run não pula diretamente para MERGED\"\n    },\n    {\n      \"id\": \"t7\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t6\"],\n      \"paths\": [\n        \"src/main/pipeline\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 6\n      },\n      \"regraDeConclusao\": \"Bloqueio registra causa, evidência, tentativas, risco e ação\"\n    },\n    {\n      \"id\": \"t8\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"fase\",\n      \"dependencias\": [\"t7\"],\n      \"paths\": [\n        \"src/shared/domain\",\n        \"src/shared/contracts\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 7\n      },\n      \"regraDeConclusao\": \"Nenhuma transição sai de AWAITING_PI sem Approval do gate SLICE_ENTRY para a revisão vigente da SPEC; com kill-switch desligado o run termina em AWAITING_MERGE, nunca em BLOCKED\"\n    }\n  ]\n}",
+      "latenciaMs": 12001,
+      "promptTokens": 737,
+      "saidaTokens": 926,
+      "numCtxEfetivo": 8192,
+      "vramBytes": 5553258495,
+      "truncado": false,
+      "decisao": {
+        "aceito": true,
+        "rejeicoes": []
+      }
+    },
+    {
+      "fatia": "M9-F03",
+      "texto": "{\n  \"tarefas\": [\n    {\n      \"id\": \"t1\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 1\n      },\n      \"regraDeConclusao\": \"Verificar se o executor nunca recebe o checkout ativo como cwd.\"\n    },\n    {\n      \"id\": \"t2\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 2\n      },\n      \"regraDeConclusao\": \"Verificar se o branch nasce do SHA registrado.\"\n    },\n    {\n      \"id\": \"t3\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\", \"t2\"],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 3\n      },\n      \"regraDeConclusao\": \"Verificar se a porta ocupada é detectada antes de subir recurso.\"\n    },\n    {\n      \"id\": \"t4\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\", \"t2\", \"t3\"],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 4\n      },\n      \"regraDeConclusao\": \"Verificar se o container/porta possui lease reconciliável.\"\n    },\n    {\n      \"id\": \"t5\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\", \"t2\", \"t3\", \"t4\"],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 5\n      },\n      \"regraDeConclusao\": \"Verificar se o preflight falho não inicia o executor.\"\n    },\n    {\n      \"id\": \"t6\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\", \"t2\", \"t3\", \"t4\", \"t5\"],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 6\n      },\n      \"regraDeConclusao\": \"Verificar se a mudança fora do allowlist é detectada antes do commit.\"\n    },\n    {\n      \"id\": \"t7\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\", \"t2\", \"t3\", \"t4\", \"t5\", \"t6\"],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 7\n      },\n      \"regraDeConclusao\": \"Verificar se a limpeza não alcança path ou recurso não pertencente ao run.\"\n    },\n    {\n      \"id\": \"t8\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\", \"t2\", \"t3\", \"t4\", \"t5\", \"t6\", \"t7\"],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 8\n      },\n      \"regraDeConclusao\": \"Verificar se o executor só recebe cwd dentro do container, com o worktree montado; e se a tentativa de executar no host é impedida. Teste comprova que não existe caminho de execução no host.\"\n    },\n    {\n      \"id\": \"t9\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\", \"t2\", \"t3\", \"t4\", \"t5\", \"t6\", \"t7\", \"t8\"],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 9\n      },\n      \"regraDeConclusao\": \"Verificar se nenhum segredo entra no container. Teste inspeciona ambiente e montagens do container e não encontra token, chave ou credencial.\"\n    },\n    {\n      \"id\": \"t10\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\", \"t2\", \"t3\", \"t4\", \"t5\", \"t6\", \"t7\", \"t8\", \"t9\"],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 10\n      },\n      \"regraDeConclusao\": \"Verificar se Docker indisponível bloqueia o preflight com `BLOCKED_EXTERNAL` e ação. Teste.\"\n    },\n    {\n      \"id\": \"t11\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\", \"t2\", \"t3\", \"t4\", \"t5\", \"t6\", \"t7\", \"t8\", \"t9\", \"t10\"],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 11\n      },\n      \"regraDeConclusao\": \"Verificar se o proxy é o único caminho até o modelo. Teste comprova que o container não tem credencial de provider e que a chamada do executor chega ao `AiCallService` do host com `CostEvent`/`AuditEvent` atribuídos ao run e à tentativa. Sem o proxy no ar, o preflight falha.\"\n    },\n    {\n      \"id\": \"t12\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\", \"t2\", \"t3\", \"t4\", \"t5\", \"t6\", \"t7\", \"t8\", \"t9\", \"t10\", \"t11\"],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 12\n      },\n      \"regraDeConclusao\": \"Verificar se egress restrito. Teste comprova que, de dentro do container, `api.github.com` é inalcançável e o proxy do host é alcançável.\"\n    },\n    {\n      \"id\": \"t13\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\", \"t2\", \"t3\", \"t4\", \"t5\", \"t6\", \"t7\", \"t8\", \"t9\", \"t10\", \"t11\", \"t12\"],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 13\n      },\n      \"regraDeConclusao\": \"Verificar se a lista de paths permitidos existe antes de o executor iniciar, registrada no `ContextPack` com a origem (`spec` ou `derivada`); sem lista, o preflight falha.\"\n    }\n  ]\n}",
+      "latenciaMs": 22782,
+      "promptTokens": 1198,
+      "saidaTokens": 1716,
+      "numCtxEfetivo": 8192,
+      "vramBytes": 5553258495,
+      "truncado": false,
+      "decisao": {
+        "aceito": true,
+        "rejeicoes": []
+      }
+    },
+    {
+      "fatia": "M9-F04",
+      "texto": "{\n  \"tarefas\": [\n    {\n      \"id\": \"t1\",\n      \"papel\": \"integrador\",\n      \"capacidade\": \"rodar-testes\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"reports/execution\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 8\n      },\n      \"regraDeConclusao\": \"Todos os testes de execução rodam dentro do container e passam\"\n    },\n    {\n      \"id\": \"t2\",\n      \"papel\": \"integrador\",\n      \"capacidade\": \"rodar-testes\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"reports/integration\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 3\n      },\n      \"regraDeConclusao\": \"Todas as integrações passam e não repetem testes resolvidos\"\n    },\n    {\n      \"id\": \"t3\",\n      \"papel\": \"integrador\",\n      \"capacidade\": \"rodar-testes\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t2\"],\n      \"paths\": [\n        \"reports/integration\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 3\n      },\n      \"regraDeConclusao\": \"Todas as integrações passam e não repetem testes resolvidos\"\n    },\n    {\n      \"id\": \"t4\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\", \"t2\", \"t3\"],\n      \"paths\": [\n        \"docs/adr-04-execution.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 4\n      },\n      \"regraDeConclusao\": \"O ADR de execução é atualizado e não bloqueia o PR após o gate\"\n    },\n    {\n      \"id\": \"t5\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t2\", \"t3\"],\n      \"paths\": [\n        \"docs/adr-05-subscription.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 12\n      },\n      \"regraDeConclusao\": \"O ADR de assinatura é atualizado com o estado de quota e não bloqueia o PR após o gate\"\n    },\n    {\n      \"id\": \"t6\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"src/main/ai/ExecutionAdapter.java\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 1\n      },\n      \"regraDeConclusao\": \"O adapter de execução controla o comando e o cwd dentro do container\"\n    },\n    {\n      \"id\": \"t7\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t6\"],\n      \"paths\": [\n        \"src/main/ai/SubscriptionProxy.java\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 10\n      },\n      \"regraDeConclusao\": \"O proxy de assinatura registra as chamadas sem valor monetário\"\n    },\n    {\n      \"id\": \"t8\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t6\"],\n      \"paths\": [\n        \"src/main/ai/ExecutionAdapter.java\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 8\n      },\n      \"regraDeConclusao\": \"A execução é containerizada e o adapter só inicia o executor com o container pronto e o worktree montado\"\n    },\n    {\n      \"id\": \"t9\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t6\"],\n      \"paths\": [\n        \"src/main/ai/ExecutionAdapter.java\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 9\n      },\n      \"regraDeConclusao\": \"O uso da rota de assinatura é registrado sem valor monetário\"\n    },\n    {\n      \"id\": \"t10\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t6\"],\n      \"paths\": [\n        \"src/main/ai/ExecutionAdapter.java\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 10\n      },\n      \"regraDeConclusao\": \"Toda chamada ao modelo feita pelo executor passa pelo proxy do host\"\n    },\n    {\n      \"id\": \"t11\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t6\"],\n      \"paths\": [\n        \"src/main/ai/ExecutionAdapter.java\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 12\n      },\n      \"regraDeConclusao\": \"A rota de assinatura é `subscription_limited` e quota desconhecida não vira saldo infinito\"\n    },\n    {\n      \"id\": \"t12\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t6\"],\n      \"paths\": [\n        \"src/main/ai/ExecutionAdapter.java\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 12\n      },\n      \"regraDeConclusao\": \"O ledger registra chamadas, tokens, tempo e estado de quota e reset\"\n    }\n  ]\n}",
+      "latenciaMs": 18764,
+      "promptTokens": 1294,
+      "saidaTokens": 1400,
+      "numCtxEfetivo": 8192,
+      "vramBytes": 5553258495,
+      "truncado": false,
+      "decisao": {
+        "aceito": false,
+        "rejeicoes": [
+          {
+            "motivo": "REDUNDANTE",
+            "detalhe": "repete integrador|3|reports/integration",
+            "tarefa": "t3"
+          },
+          {
+            "motivo": "REDUNDANTE",
+            "detalhe": "repete desenvolvedor|12|src/main/ai/ExecutionAdapter.java",
+            "tarefa": "t12"
+          },
+          {
+            "motivo": "COBERTURA_INCOMPLETA",
+            "detalhe": "critérios sem tarefa: 2, 5, 6, 7, 11"
+          }
+        ]
+      }
+    },
+    {
+      "fatia": "M9-F05",
+      "texto": "{\n  \"tarefas\": [\n    {\n      \"id\": \"t1\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"docs/STATUS.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 13\n      },\n      \"regraDeConclusao\": \"O arquivo 'docs/STATUS.md' deve estar presente no PR e não haver commit separado na branch-base após o merge\"\n    },\n    {\n      \"id\": \"t2\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"docs/STATUS-ARQUIVO.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 13\n      },\n      \"regraDeConclusao\": \"O arquivo 'docs/STATUS-ARQUIVO.md' deve estar presente no PR e não haver commit separado na branch-base após o merge\"\n    },\n    {\n      \"id\": \"t3\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"src/main/storage/ExecutionLedger.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 13\n      },\n      \"regraDeConclusao\": \"O arquivo 'src/main/storage/ExecutionLedger.md' deve estar presente no PR e não haver commit separado na branch-base após o merge\"\n    },\n    {\n      \"id\": \"t4\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"reports/STATUS.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 13\n      },\n      \"regraDeConclusao\": \"O arquivo 'reports/STATUS.md' deve estar presente no PR e não haver commit separado na branch-base após o merge\"\n    },\n    {\n      \"id\": \"t5\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"src/main/storage/STATUS.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 13\n      },\n      \"regraDeConclusao\": \"O arquivo 'src/main/storage/STATUS.md' deve estar presente no PR e não haver commit separado na branch-base após o merge\"\n    },\n    {\n      \"id\": \"t6\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"src/main/storage/STATUS-ARQUIVO.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 13\n      },\n      \"regraDeConclusao\": \"O arquivo 'src/main/storage/STATUS-ARQUIVO.md' deve estar presente no PR e não haver commit separado na branch-base após o merge\"\n    },\n    {\n      \"id\": \"t7\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"src/main/storage/STATUS-ARQUIVO.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 13\n      },\n      \"regraDeConclusao\": \"O arquivo 'src/main/storage/STATUS-ARQUIVO.md' deve estar presente no PR e não haver commit separado na branch-base após o merge\"\n    },\n    {\n      \"id\": \"t8\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"src/main/storage/STATUS-ARQUIVO.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 13\n      },\n      \"regraDeConclusao\": \"O arquivo 'src/main/storage/STATUS-ARQUIVO.md' deve estar presente no PR e não haver commit separado na branch-base após o merge\"\n    },\n    {\n      \"id\": \"t9\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"src/main/storage/STATUS-ARQUIVO.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 13\n      },\n      \"regraDeConclusao\": \"O arquivo 'src/main/storage/STATUS-ARQUIVO.md' deve estar presente no PR e não haver commit separado na branch-base após o merge\"\n    },\n    {\n      \"id\": \"t10\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"src/main/storage/STATUS-ARQUIVO.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 13\n      },\n      \"regraDeConclusao\": \"O arquivo 'src/main/storage/STATUS-ARQUIVO.md' deve estar presente no PR e não haver commit separado na branch-base após o merge\"\n    },\n    {\n      \"id\": \"t11\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"src/main/storage/STATUS-ARQUIVO.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 13\n      },\n      \"regraDeConclusao\": \"O arquivo 'src/main/storage/STATUS-ARQUIVO.md' deve estar presente no PR e não haver commit separado na branch-base após o merge\"\n    },\n    {\n      \"id\": \"t12\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"src/main/storage/STATUS-ARQUIVO.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 13\n      },\n      \"regraDeConclusao\": \"O arquivo 'src/main/storage/STATUS-ARQUIVO.md' deve estar presente no PR e não haver commit separado na branch-base após o merge\"\n    },\n    {\n      \"id\": \"t13\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"src/main/storage/STATUS-ARQUIVO.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 13\n      },\n      \"regraDeConclusao\": \"O arquivo 'src/main/storage/STATUS-ARQUIVO.md' deve estar presente no PR e não haver commit separado na branch-base após o merge\"\n    }\n  ]\n}",
+      "latenciaMs": 21428,
+      "promptTokens": 970,
+      "saidaTokens": 1626,
+      "numCtxEfetivo": 8192,
+      "vramBytes": 5553258495,
+      "truncado": false,
+      "decisao": {
+        "aceito": false,
+        "rejeicoes": [
+          {
+            "motivo": "REDUNDANTE",
+            "detalhe": "repete revisor|13|src/main/storage/STATUS-ARQUIVO.md",
+            "tarefa": "t7"
+          },
+          {
+            "motivo": "REDUNDANTE",
+            "detalhe": "repete revisor|13|src/main/storage/STATUS-ARQUIVO.md",
+            "tarefa": "t8"
+          },
+          {
+            "motivo": "REDUNDANTE",
+            "detalhe": "repete revisor|13|src/main/storage/STATUS-ARQUIVO.md",
+            "tarefa": "t9"
+          },
+          {
+            "motivo": "REDUNDANTE",
+            "detalhe": "repete revisor|13|src/main/storage/STATUS-ARQUIVO.md",
+            "tarefa": "t10"
+          },
+          {
+            "motivo": "REDUNDANTE",
+            "detalhe": "repete revisor|13|src/main/storage/STATUS-ARQUIVO.md",
+            "tarefa": "t11"
+          },
+          {
+            "motivo": "REDUNDANTE",
+            "detalhe": "repete revisor|13|src/main/storage/STATUS-ARQUIVO.md",
+            "tarefa": "t12"
+          },
+          {
+            "motivo": "REDUNDANTE",
+            "detalhe": "repete revisor|13|src/main/storage/STATUS-ARQUIVO.md",
+            "tarefa": "t13"
+          },
+          {
+            "motivo": "COBERTURA_INCOMPLETA",
+            "detalhe": "critérios sem tarefa: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12"
+          }
+        ]
+      }
+    },
+    {
+      "fatia": "M9-F06",
+      "texto": "{\n  \"tarefas\": [\n    {\n      \"id\": \"t1\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"docs/superpowers/plans/plan.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 1\n      },\n      \"regraDeConclusao\": \"Verificar que o head SHA, checks e merge SHA estão coerentes no MERGED\"\n    },\n    {\n      \"id\": \"t2\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"docs/superpowers/plans/plan.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 3\n      },\n      \"regraDeConclusao\": \"Verificar que o relatório humano referencia artefatos extensos por hash\"\n    },\n    {\n      \"id\": \"t3\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"docs/superpowers/plans/plan.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 4\n      },\n      \"regraDeConclusao\": \"Verificar que o documento sem mudança material não recebe edição cosmética\"\n    },\n    {\n      \"id\": \"t4\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"docs/superpowers/plans/plan.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 5\n      },\n      \"regraDeConclusao\": \"Verificar que o reinício pós-merge não cria novo PR ou merge\"\n    },\n    {\n      \"id\": \"t5\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"docs/superpowers/plans/plan.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 8\n      },\n      \"regraDeConclusao\": \"Verificar que o coletor de retenção respeita idade, cota, fixação e proteção de run não resolvido, e nunca deixa referência versionada apontando para conteúdo que ele afirma estar presente\"\n    },\n    {\n      \"id\": \"t6\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"docs/superpowers/plans/plan.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 9\n      },\n      \"regraDeConclusao\": \"Verificar que o cancelamento depois do push preserva PR/branch e permite retomada vinculada somente após reconciliar o head SHA; cancelar depois do merge não muda o resultado\"\n    },\n    {\n      \"id\": \"t7\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"docs/superpowers/plans/plan.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 7\n      },\n      \"regraDeConclusao\": \"Verificar que a próxima fatia exige sua própria revisão aprovada\"\n    },\n    {\n      \"id\": \"t8\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"docs/superpowers/plans/plan.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 2\n      },\n      \"regraDeConclusao\": \"Verificar que o estado terminal é compreensível sem ler logs técnicos\"\n    }\n  ]\n}",
+      "latenciaMs": 12848,
+      "promptTokens": 790,
+      "saidaTokens": 974,
+      "numCtxEfetivo": 8192,
+      "vramBytes": 5553258495,
+      "truncado": false,
+      "decisao": {
+        "aceito": false,
+        "rejeicoes": [
+          {
+            "motivo": "COBERTURA_INCOMPLETA",
+            "detalhe": "critérios sem tarefa: 6"
+          }
+        ]
+      }
+    },
+    {
+      "fatia": "M10-F01",
+      "texto": "{\n  \"tarefas\": [\n    {\n      \"id\": \"t1\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"src/main/executors/CodingExecutorRuntime.java\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 1\n      },\n      \"regraDeConclusao\": \"O adapter fake deve percorrer sucesso, falha, timeout, cancelamento e retomada no mesmo contract test.\"\n    },\n    {\n      \"id\": \"t2\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"src/main/executors/ContextPack.java\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 1\n      },\n      \"regraDeConclusao\": \"O adapter deve receber e processar o ContextPack corretamente.\"\n    },\n    {\n      \"id\": \"t3\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"src/main/executors/Request.java\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 1\n      },\n      \"regraDeConclusao\": \"O adapter deve processar corretamente o request normalizado com IDs do run/attempt, executor/modelo/modo de cobrança, revisões aprovadas, ContextPack, worktree/container, paths, validações, limites, schema de saída e referência opaca de autenticação.\"\n    },\n    {\n      \"id\": \"t4\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"src/main/executors/Events.java\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 1\n      },\n      \"regraDeConclusao\": \"O adapter deve emitir eventos normalizados corretamente: started, progress, tool_used, path_changed, usage e terminais.\"\n    },\n    {\n      \"id\": \"t5\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"src/main/executors/Results.java\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 1\n      },\n      \"regraDeConclusao\": \"O adapter deve gerar resultados estruturados corretamente com status, resumo, paths alterados, validações, evidências, uso, sessão retomável e assinatura de falha.\"\n    },\n    {\n      \"id\": \"t6\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"src/main/executors/Machine.java\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 1\n      },\n      \"regraDeConclusao\": \"O adapter deve implementar corretamente a máquina de estados durável, cancelamento idempotente, timeout e health por executor.\"\n    },\n    {\n      \"id\": \"t7\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-testes\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"src/test/java/org/example/executors/CodingExecutorRuntimeTest.java\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 1\n      },\n      \"regraDeConclusao\": \"O contract test reutilizável deve cobrir corretamente todos os caminhos e cenários do adapter.\"\n    },\n    {\n      \"id\": \"t8\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"src/main/executors/Events.java\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 2\n      },\n      \"regraDeConclusao\": \"O adapter deve rejeitar corretamente eventos duplicados, fora de ordem e após terminal que corrompem o estado.\"\n    },\n    {\n      \"id\": \"t9\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"src/main/executors/Events.java\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 2\n      },\n      \"regraDeConclusao\": \"O adapter deve cancelar corretamente duas vezes produzindo um único efeito e terminando a árvore do processo.\"\n    },\n    {\n      \"id\": \"t10\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"src/main/executors/Request.java\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 2\n      },\n      \"regraDeConclusao\": \"O adapter deve rejeitar corretamente o modo de cobrança, revisão ou schema incompatível antes de iniciar o CLI.\"\n    },\n    {\n      \"id\": \"t11\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"src/main/executors/Request.java\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 2\n      },\n      \"regraDeConclusao\": \"O adapter deve rejeitar corretamente credenciais GitHub/Vault/projeto e não expor autenticação ao renderer.\"\n    },\n    {\n      \"id\": \"t12\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"src/main/executors/Results.java\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 2\n      },\n      \"regraDeConclusao\": \"O adapter deve permitir auditoria correta de uso e falhas sem depender do formato interno do fornecedor.\"\n    }\n  ]\n}",
+      "latenciaMs": 20579,
+      "promptTokens": 1023,
+      "saidaTokens": 1546,
+      "numCtxEfetivo": 8192,
+      "vramBytes": 5553258495,
+      "truncado": false,
+      "decisao": {
+        "aceito": false,
+        "rejeicoes": [
+          {
+            "motivo": "PATH_FORA_DO_ESCOPO",
+            "detalhe": "src/test/java/org/example/executors/CodingExecutorRuntimeTest.java",
+            "tarefa": "t7"
+          },
+          {
+            "motivo": "REDUNDANTE",
+            "detalhe": "repete desenvolvedor|2|src/main/executors/Events.java",
+            "tarefa": "t9"
+          },
+          {
+            "motivo": "REDUNDANTE",
+            "detalhe": "repete desenvolvedor|2|src/main/executors/Request.java",
+            "tarefa": "t11"
+          },
+          {
+            "motivo": "COBERTURA_INCOMPLETA",
+            "detalhe": "critérios sem tarefa: 3, 4, 5, 6"
+          }
+        ]
+      }
+    },
+    {
+      "fatia": "M10-F02",
+      "texto": "{\n  \"tarefas\": [\n    {\n      \"id\": \"t1\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"docs/README.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 1\n      },\n      \"regraDeConclusao\": \"Verificar se a autenticação do PI é feita sem o app receber segredo em formulário, IPC ou log.\"\n    },\n    {\n      \"id\": \"t2\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"docs/health.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 2\n      },\n      \"regraDeConclusao\": \"Confirmar se o container com sessão autorizada acessa somente o perfil indicado.\"\n    },\n    {\n      \"id\": \"t3\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"docs/security.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 3\n      },\n      \"regraDeConclusao\": \"Verificar se o scanner não encontra token/cookie/credencial em worktree, imagem, log ou artefatos.\"\n    },\n    {\n      \"id\": \"t4\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"docs/limits.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 4\n      },\n      \"regraDeConclusao\": \"Confirmar se `subscription_credits` desabilitado nunca é selecionado após quota de assinatura.\"\n    },\n    {\n      \"id\": \"t5\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"docs/budget.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 5\n      },\n      \"regraDeConclusao\": \"Verificar se o teto de créditos excedido bloqueia antes da execução monetária.\"\n    },\n    {\n      \"id\": \"t6\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"docs/health-contracts.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 6\n      },\n      \"regraDeConclusao\": \"Confirmar se os estados de health e quota aparecem por contrato tipado e sobrevivem a reinício.\"\n    },\n    {\n      \"id\": \"t7\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"docs/README.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 1\n      },\n      \"regraDeConclusao\": \"Verificar se a autenticação do PI é feita sem o app receber segredo em formulário, IPC ou log.\"\n    },\n    {\n      \"id\": \"t8\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t2\"],\n      \"paths\": [\n        \"docs/health.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 2\n      },\n      \"regraDeConclusao\": \"Confirmar se o container com sessão autorizada acessa somente o perfil indicado.\"\n    },\n    {\n      \"id\": \"t9\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t3\"],\n      \"paths\": [\n        \"docs/security.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 3\n      },\n      \"regraDeConclusao\": \"Verificar se o scanner não encontra token/cookie/credencial em worktree, imagem, log ou artefatos.\"\n    },\n    {\n      \"id\": \"t10\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t4\"],\n      \"paths\": [\n        \"docs/limits.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 4\n      },\n      \"regraDeConclusao\": \"Confirmar se `subscription_credits` desabilitado nunca é selecionado após quota de assinatura.\"\n    },\n    {\n      \"id\": \"t11\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t5\"],\n      \"paths\": [\n        \"docs/budget.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 5\n      },\n      \"regraDeConclusao\": \"Verificar se o teto de créditos excedido bloqueia antes da execução monetária.\"\n    },\n    {\n      \"id\": \"t12\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t6\"],\n      \"paths\": [\n        \"docs/health-contracts.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 6\n      },\n      \"regraDeConclusao\": \"Confirmar se os estados de health e quota aparecem por contrato tipado e sobrevivem a reinício.\"\n    }\n  ]\n}",
+      "latenciaMs": 18230,
+      "promptTokens": 1026,
+      "saidaTokens": 1379,
+      "numCtxEfetivo": 8192,
+      "vramBytes": 5553258495,
+      "truncado": false,
+      "decisao": {
+        "aceito": false,
+        "rejeicoes": [
+          {
+            "motivo": "REDUNDANTE",
+            "detalhe": "repete revisor|1|docs/README.md",
+            "tarefa": "t7"
+          },
+          {
+            "motivo": "REDUNDANTE",
+            "detalhe": "repete revisor|2|docs/health.md",
+            "tarefa": "t8"
+          },
+          {
+            "motivo": "REDUNDANTE",
+            "detalhe": "repete revisor|3|docs/security.md",
+            "tarefa": "t9"
+          },
+          {
+            "motivo": "REDUNDANTE",
+            "detalhe": "repete revisor|4|docs/limits.md",
+            "tarefa": "t10"
+          },
+          {
+            "motivo": "REDUNDANTE",
+            "detalhe": "repete revisor|5|docs/budget.md",
+            "tarefa": "t11"
+          },
+          {
+            "motivo": "REDUNDANTE",
+            "detalhe": "repete revisor|6|docs/health-contracts.md",
+            "tarefa": "t12"
+          }
+        ]
+      }
+    },
+    {
+      "fatia": "M10-F03",
+      "texto": "{\n  \"tarefas\": [\n    {\n      \"id\": \"t1\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"src/main/executors/CodexExecExecutorAdapter.java\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 1\n      },\n      \"regraDeConclusao\": \"O adapter passa integralmente pelo contract test da F01\"\n    },\n    {\n      \"id\": \"t2\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"src/main/executors/CodexExecExecutorAdapter.java\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 2\n      },\n      \"regraDeConclusao\": \"Fixtures cobrem JSONL parcial, evento desconhecido, saída inválida, timeout, kill e retomada\"\n    },\n    {\n      \"id\": \"t3\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"src/main/executors/CodexExecExecutorAdapter.java\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 3\n      },\n      \"regraDeConclusao\": \"O processo não usa shell e rejeita argumento/cwd fora do request validado\"\n    },\n    {\n      \"id\": \"t4\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"src/main/executors/CodexExecExecutorAdapter.java\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 4\n      },\n      \"regraDeConclusao\": \"Falha após alteração retorna paths/evidência suficientes para preservar e diagnosticar o delta\"\n    },\n    {\n      \"id\": \"t5\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"src/main/executors/CodexExecExecutorAdapter.java\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 5\n      },\n      \"regraDeConclusao\": \"Nenhum segredo aparece em argv, stdout persistido ou resultado estruturado\"\n    },\n    {\n      \"id\": \"t6\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"src/main/executors/CodexExecExecutorAdapter.java\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 6\n      },\n      \"regraDeConclusao\": \"Teste de compatibilidade detecta versão do CLI sem assumir recurso inexistente\"\n    }\n  ]\n}",
+      "latenciaMs": 9652,
+      "promptTokens": 958,
+      "saidaTokens": 738,
+      "numCtxEfetivo": 8192,
+      "vramBytes": 5553258495,
+      "truncado": false,
+      "decisao": {
+        "aceito": true,
+        "rejeicoes": []
+      }
+    },
+    {
+      "fatia": "M10-F04",
+      "texto": "{\n  \"tarefas\": [\n    {\n      \"id\": \"t1\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"docs/audits/revisor_audit.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 6\n      },\n      \"regraDeConclusao\": \"O revisor_audit.md deve conter uma análise detalhada dos achados revisados, incluindo assinatura, severidade, evidência e status de resolução.\"\n    },\n    {\n      \"id\": \"t2\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"fase\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"reports/revise/revise_01.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 5\n      },\n      \"regraDeConclusao\": \"O revise_01.md deve conter uma revisão detalhada do delta do writer, sem incluir o repositório inteiro.\"\n    },\n    {\n      \"id\": \"t3\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"fase\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"reports/revise/revise_02.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 5\n      },\n      \"regraDeConclusao\": \"O revise_02.md deve conter uma revisão detalhada do delta do writer, sem incluir o repositório inteiro.\"\n    },\n    {\n      \"id\": \"t4\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"fase\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"reports/revise/revise_03.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 5\n      },\n      \"regraDeConclusao\": \"O revise_03.md deve conter uma revisão detalhada do delta do writer, sem incluir o repositório inteiro.\"\n    },\n    {\n      \"id\": \"t5\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"fase\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"reports/revise/revise_04.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 5\n      },\n      \"regraDeConclusao\": \"O revise_04.md deve conter uma revisão detalhada do delta do writer, sem incluir o repositório inteiro.\"\n    },\n    {\n      \"id\": \"t6\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"fase\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"reports/revise/revise_05.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 5\n      },\n      \"regraDeConclusao\": \"O revise_05.md deve conter uma revisão detalhada do delta do writer, sem incluir o repositório inteiro.\"\n    },\n    {\n      \"id\": \"t7\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"fase\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"reports/revise/revise_06.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 5\n      },\n      \"regraDeConclusao\": \"O revise_06.md deve conter uma revisão detalhada do delta do writer, sem incluir o repositório inteiro.\"\n    },\n    {\n      \"id\": \"t8\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"fase\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"reports/revise/revise_07.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 5\n      },\n      \"regraDeConclusao\": \"O revise_07.md deve conter uma revisão detalhada do delta do writer, sem incluir o repositório inteiro.\"\n    },\n    {\n      \"id\": \"t9\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"fase\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"reports/revise/revise_08.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 5\n      },\n      \"regraDeConclusao\": \"O revise_08.md deve conter uma revisão detalhada do delta do writer, sem incluir o repositório inteiro.\"\n    },\n    {\n      \"id\": \"t10\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"fase\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"reports/revise/revise_09.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 5\n      },\n      \"regraDeConclusao\": \"O revise_09.md deve conter uma revisão detalhada do delta do writer, sem incluir o repositório inteiro.\"\n    },\n    {\n      \"id\": \"t11\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"fase\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"reports/revise/revise_10.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 5\n      },\n      \"regraDeConclusao\": \"O revise_10.md deve conter uma revisão detalhada do delta do writer, sem incluir o repositório inteiro.\"\n    },\n    {\n      \"id\": \"t12\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"fase\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"reports/revise/revise_11.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 5\n      },\n      \"regraDeConclusao\": \"O revise_11.md deve conter uma revisão detalhada do delta do writer, sem incluir o repositório inteiro.\"\n    },\n    {\n      \"id\": \"t13\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"fase\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"reports/revise/revise_12.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 5\n      },\n      \"regraDeConclusao\": \"O revise_12.md deve conter uma revisão detalhada do delta do writer, sem incluir o repositório inteiro.\"\n    }\n  ]\n}",
+      "latenciaMs": 20965,
+      "promptTokens": 968,
+      "saidaTokens": 1654,
+      "numCtxEfetivo": 8192,
+      "vramBytes": 5553258495,
+      "truncado": false,
+      "decisao": {
+        "aceito": false,
+        "rejeicoes": [
+          {
+            "motivo": "ORCAMENTO_EXCEDIDO",
+            "detalhe": "13 tarefas; o teto é 12"
+          },
+          {
+            "motivo": "COBERTURA_INCOMPLETA",
+            "detalhe": "critérios sem tarefa: 1, 2, 3, 4"
+          }
+        ]
+      }
+    },
+    {
+      "fatia": "M10-F05",
+      "texto": "{\n  \"tarefas\": [\n    {\n      \"id\": \"t1\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"src/main/executors\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 1\n      },\n      \"regraDeConclusao\": \"O executor pode ser configurado com preferência e o PI pode ver por que está elegível ou não.\"\n    },\n    {\n      \"id\": \"t2\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"src/main/storage\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 2\n      },\n      \"regraDeConclusao\": \"Habilitar créditos sem teto é impossível; desabilitado nunca é usado.\"\n    },\n    {\n      \"id\": \"t3\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"src/main/preload\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 3\n      },\n      \"regraDeConclusao\": \"Nenhum segredo alcança renderer, screenshot ou relatório.\"\n    },\n    {\n      \"id\": \"t4\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\", \"t2\", \"t3\"],\n      \"paths\": [\n        \"src/renderer/src/app\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 4\n      },\n      \"regraDeConclusao\": \"A jornada E2E produz delta por um executor e revisão identificada pelo outro.\"\n    },\n    {\n      \"id\": \"t5\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t4\"],\n      \"paths\": [\n        \"src/shared/domain\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 5\n      },\n      \"regraDeConclusao\": \"Git e GitHub são executados pelo app, não pelo adapter.\"\n    },\n    {\n      \"id\": \"t6\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"rodar-testes\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t4\"],\n      \"paths\": [\n        \"tests/e2e\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 6\n      },\n      \"regraDeConclusao\": \"Smoke ao vivo, testes de componentes, integração e acessibilidade passam.\"\n    },\n    {\n      \"id\": \"t7\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"atualizar-docs\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t6\"],\n      \"paths\": [\n        \"docs\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 7\n      },\n      \"regraDeConclusao\": \"Evidência registra revisões, executor, modo, head SHA, checks e resultado sem dados voláteis falsos.\"\n    }\n  ]\n}",
+      "latenciaMs": 10148,
+      "promptTokens": 988,
+      "saidaTokens": 800,
+      "numCtxEfetivo": 8192,
+      "vramBytes": 5553258495,
+      "truncado": false,
+      "decisao": {
+        "aceito": true,
+        "rejeicoes": []
+      }
+    },
+    {
+      "fatia": "M26-F01",
+      "texto": "{\n  \"tarefas\": [\n    {\n      \"id\": \"t1\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"fase\",\n      \"dependencias\": [],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 1\n      },\n      \"regraDeConclusao\": \"Verificar se a fase do projeto está coerente com a etapa derivada.\"\n    },\n    {\n      \"id\": \"t2\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"fase\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 2\n      },\n      \"regraDeConclusao\": \"Garantir que o card do projeto exiba fase e etapa coerentes com a etapa derivada.\"\n    },\n    {\n      \"id\": \"t3\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"fase\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 3\n      },\n      \"regraDeConclusao\": \"Verificar se o contador de gates aceites está correto e atualizado.\"\n    },\n    {\n      \"id\": \"t4\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"fase\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 4\n      },\n      \"regraDeConclusao\": \"Assegurar que a rota e o modelo do card sejam os mesmos que o selo mostra ao abrir o projeto.\"\n    },\n    {\n      \"id\": \"t5\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"fase\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 5\n      },\n      \"regraDeConclusao\": \"Verificar se o projeto bloqueado exibe o motivo e ação corretos.\"\n    },\n    {\n      \"id\": \"t6\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"fase\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 6\n      },\n      \"regraDeConclusao\": \"Garantir que a trilha esteja agrupada por fase, com a fase atual expandida e as demais condensadas.\"\n    },\n    {\n      \"id\": \"t7\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"fase\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 7\n      },\n      \"regraDeConclusao\": \"Verificar se existe uma única leitura IPC por card, sem nenhum fato recalculado no renderer.\"\n    }\n  ]\n}",
+      "latenciaMs": 9408,
+      "promptTokens": 773,
+      "saidaTokens": 744,
+      "numCtxEfetivo": 8192,
+      "vramBytes": 5553258495,
+      "truncado": false,
+      "decisao": {
+        "aceito": true,
+        "rejeicoes": []
+      }
+    },
+    {
+      "fatia": "M26-F02",
+      "texto": "{\n  \"tarefas\": [\n    {\n      \"id\": \"t1\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 1\n      },\n      \"regraDeConclusao\": \"Verificar se claude-fable-5-1 está no combo da rota de assinatura e não está no da rota paga\"\n    },\n    {\n      \"id\": \"t2\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 2\n      },\n      \"regraDeConclusao\": \"Teste de cada serviço da jornada com política editada para verificar se o modelo chamado é o da fase\"\n    },\n    {\n      \"id\": \"t3\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 3\n      },\n      \"regraDeConclusao\": \"Verificar se o override do projeto vence o workspace e se removê-lo volta ao workspace\"\n    },\n    {\n      \"id\": \"t4\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 4\n      },\n      \"regraDeConclusao\": \"Verificar se modelo fora do catálogo do provider é recusado na fronteira IPC e se nenhuma chamada sai\"\n    },\n    {\n      \"id\": \"t5\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 5\n      },\n      \"regraDeConclusao\": \"Verificar se troca no workspace e no projeto gera AuditEvent encadeado e se verifyChain passa\"\n    },\n    {\n      \"id\": \"t6\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 6\n      },\n      \"regraDeConclusao\": \"Verificar se com rota bloqueado o combo do projeto fica desabilitado com o motivo e se escolher modelo não destrava rota\"\n    },\n    {\n      \"id\": \"t7\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 7\n      },\n      \"regraDeConclusao\": \"Verificar se editor de Roteamento por tipo de tarefa continua funcional e testado, sob Avançado\"\n    },\n    {\n      \"id\": \"t8\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 8\n      },\n      \"regraDeConclusao\": \"Verificar se MODELO_PADRAO e a troca de modelo por provider (F04) continuam existindo para chamadas fora da jornada e se a jornada não os lê mais\"\n    }\n  ]\n}",
+      "latenciaMs": 11040,
+      "promptTokens": 836,
+      "saidaTokens": 872,
+      "numCtxEfetivo": 8192,
+      "vramBytes": 5553258495,
+      "truncado": false,
+      "decisao": {
+        "aceito": true,
+        "rejeicoes": []
+      }
+    },
+    {
+      "fatia": "M26-F03",
+      "texto": "{\n  \"tarefas\": [\n    {\n      \"id\": \"t1\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"src/renderer/src/app/Console.jsx\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 1\n      },\n      \"regraDeConclusao\": \"O componente Console renderiza corretamente os eventos de texto, ferramenta e uso no painel.\"\n    },\n    {\n      \"id\": \"t2\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [\n        \"src/renderer/src/app/ConsolePanel.jsx\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 6\n      },\n      \"regraDeConclusao\": \"O componente ConsolePanel abre, mostra ao vivo e reabre o histórico com o mesmo conteúdo.\"\n    },\n    {\n      \"id\": \"t3\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"src/renderer/src/app/TraceEntry.jsx\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 2\n      },\n      \"regraDeConclusao\": \"O componente TraceEntry exibe corretamente o trace com o 'ledgerEntryId'.\"\n    },\n    {\n      \"id\": \"t4\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t3\"],\n      \"paths\": [\n        \"src/renderer/src/app/TraceList.jsx\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 6\n      },\n      \"regraDeConclusao\": \"O componente TraceList exibe corretamente o histórico de traces.\"\n    },\n    {\n      \"id\": \"t5\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"src/renderer/src/app/TextEditor.jsx\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 3\n      },\n      \"regraDeConclusao\": \"O componente TextEditor permite a edição do argumento e resultado.\"\n    },\n    {\n      \"id\": \"t6\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t5\"],\n      \"paths\": [\n        \"src/renderer/src/app/TextEditorValidation.jsx\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 4\n      },\n      \"regraDeConclusao\": \"O componente TextEditorValidation valida o argumento e resultado, e aplica a redação com base no fixture com segredo.\"\n    },\n    {\n      \"id\": \"t7\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"src/renderer/src/app/ResultTruncation.jsx\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 5\n      },\n      \"regraDeConclusao\": \"O componente ResultTruncation aplica a truncagem quando o resultado é maior que 2KB, e verifica que 'tamanhoOriginal' bate.\"\n    },\n    {\n      \"id\": \"t8\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"src/renderer/src/app/ParserError.jsx\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 5\n      },\n      \"regraDeConclusao\": \"O componente ParserError exibe o erro de parser e permite a continuidade com o texto correto.\"\n    },\n    {\n      \"id\": \"t9\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"src/renderer/src/app/AdapterTrace.jsx\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 8\n      },\n      \"regraDeConclusao\": \"O componente AdapterTrace exibe trace válido para adapters sem ferramentas, com apenas 'texto' e 'uso'.\"\n    },\n    {\n      \"id\": \"t10\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t9\"],\n      \"paths\": [\n        \"src/renderer/src/app/SignalCancellation.jsx\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 8\n      },\n      \"regraDeConclusao\": \"O componente SignalCancellation verifica que a escrita em lote não perde evento em cancelamento, e que o trace termina com 'status: cancelado' e exibe os eventos até o cancelamento.\"\n    }\n  ]\n}",
+      "latenciaMs": 15315,
+      "promptTokens": 794,
+      "saidaTokens": 1216,
+      "numCtxEfetivo": 8192,
+      "vramBytes": 5553258495,
+      "truncado": false,
+      "decisao": {
+        "aceito": false,
+        "rejeicoes": [
+          {
+            "motivo": "COBERTURA_INCOMPLETA",
+            "detalhe": "critérios sem tarefa: 7"
+          }
+        ]
+      }
+    },
+    {
+      "fatia": "M26-F04",
+      "texto": "{\n  \"tarefas\": [\n    {\n      \"id\": \"t1\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"docs/verificaMarcos.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 4\n      },\n      \"regraDeConclusao\": \"Verificar se o script verifica corretamente a presença de marcos e bloqueia o SLICE_ENTRY em cada uma das três condições, com ação por item.\"\n    },\n    {\n      \"id\": \"t2\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\n        \"t1\"\n      ],\n      \"paths\": [\n        \"docs/verificaMarcos.md\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 6\n      },\n      \"regraDeConclusao\": \"Verificar se o script registra corretamente a auditoria de comandos do Git.\"\n    },\n    {\n      \"id\": \"t3\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"src/main/preload/verificaMarcos.js\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 1\n      },\n      \"regraDeConclusao\": \"Verificar se o script de verificação de marcos lista corretamente cada documento com estado, hash e coerência blob↔revisão.\"\n    },\n    {\n      \"id\": \"t4\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"src/main/preload/verificaMarcos.js\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 2\n      },\n      \"regraDeConclusao\": \"Verificar se o script de verificação de marcos mostra corretamente o worktree sujo e o remoto não publicado com os arquivos e estado, sem expor conteúdo.\"\n    },\n    {\n      \"id\": \"t5\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"src/main/preload/verificaMarcos.js\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 3\n      },\n      \"regraDeConclusao\": \"Verificar se o script 'Commitar marco' usa corretamente a retomada da M8-F01 e o teste prova que não existe segundo caminho de commit.\"\n    },\n    {\n      \"id\": \"t6\",\n      \"papel\": \"desenvolvedor\",\n      \"capacidade\": \"escrever-codigo\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [\n        \"src/main/preload/verificaMarcos.js\"\n      ],\n      \"fundamento\": {\n        \"criterio\": 5\n      },\n      \"regraDeConclusao\": \"Verificar se a mudança de HEAD entre a verificação e o aceite força uma nova verificação.\"\n    }\n  ]\n}",
+      "latenciaMs": 10139,
+      "promptTokens": 749,
+      "saidaTokens": 776,
+      "numCtxEfetivo": 8192,
+      "vramBytes": 5553258495,
+      "truncado": false,
+      "decisao": {
+        "aceito": true,
+        "rejeicoes": []
+      }
+    },
+    {
+      "fatia": "M26-F05",
+      "texto": "{\n  \"tarefas\": [\n    {\n      \"id\": \"t1\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 1\n      },\n      \"regraDeConclusao\": \"Verificar se o run é iniciado com o executor e o modelo da fase Construção, usando o docker-runner com os args capturados.\"\n    },\n    {\n      \"id\": \"t2\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 3\n      },\n      \"regraDeConclusao\": \"Verificar se o workspace é usado no run sem override do projeto.\"\n    },\n    {\n      \"id\": \"t3\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 5\n      },\n      \"regraDeConclusao\": \"Verificar se o ExecutionLedger e o painel do estado terminal registram o provider e o modelo por tentativa.\"\n    },\n    {\n      \"id\": \"t4\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 6\n      },\n      \"regraDeConclusao\": \"Verificar se não há chamada de rota paga sem opt-in do projeto.\"\n    },\n    {\n      \"id\": \"t5\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 2\n      },\n      \"regraDeConclusao\": \"Verificar se a mudança de política durante o run não afeta a tentativa em andamento.\"\n    },\n    {\n      \"id\": \"t6\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t2\"],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 4\n      },\n      \"regraDeConclusao\": \"Verificar se o preflight recusa modelo fora do catálogo antes de criar container, com ação.\"\n    }\n  ]\n}",
+      "latenciaMs": 8417,
+      "promptTokens": 1134,
+      "saidaTokens": 623,
+      "numCtxEfetivo": 8192,
+      "vramBytes": 5553258495,
+      "truncado": false,
+      "decisao": {
+        "aceito": true,
+        "rejeicoes": []
+      }
+    },
+    {
+      "fatia": "M26-F06",
+      "texto": "{\n  \"tarefas\": [\n    {\n      \"id\": \"t1\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 1\n      },\n      \"regraDeConclusao\": \"Verifique se o CodexAdapter seleciona o gpt-5.6-sol para geração de brief/perguntas/PRD e se o ledger registra codex com valor zero na assinatura.\"\n    },\n    {\n      \"id\": \"t2\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 2\n      },\n      \"regraDeConclusao\": \"Confirme que a saída passa pelo mesmo validador de origem por afirmação e pela invariante 9 (SPEC-Jornada-02), e que a fixture de saída do Codex reprova afirmação sem origem.\"\n    },\n    {\n      \"id\": \"t3\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 3\n      },\n      \"regraDeConclusao\": \"Verifique se o console mostra texto, ferramentas e uso a partir de codex exec --json, e se a fixture gravada está correta.\"\n    },\n    {\n      \"id\": \"t4\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 4\n      },\n      \"regraDeConclusao\": \"Confirme que a assinatura do Codex é bloqueada com Sol escolhida, mas nenhum caminho de chamada é feito ao Claude nem à API.\"\n    },\n    {\n      \"id\": \"t5\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 5\n      },\n      \"regraDeConclusao\": \"Verifique se o modo API do Codex é chamado apenas com opt-in do projeto e com preço na tabela quando o PI o habilitar.\"\n    },\n    {\n      \"id\": \"t6\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 6\n      },\n      \"regraDeConclusao\": \"Confirme que o Codex aparece como offline na tela de providers, e que auth_required leva ao fluxo de login da M10-F02 sem o app receber segredo.\"\n    },\n    {\n      \"id\": \"t7\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 7\n      },\n      \"regraDeConclusao\": \"Verifique se o gpt-5.5 aparece desabilitado na Construção com o motivo até a M10-F03/F04.\"\n    },\n    {\n      \"id\": \"t8\",\n      \"papel\": \"revisor\",\n      \"capacidade\": \"revisar\",\n      \"camada\": \"local\",\n      \"dependencias\": [\"t1\"],\n      \"paths\": [],\n      \"fundamento\": {\n        \"criterio\": 8\n      },\n      \"regraDeConclusao\": \"Confirme que nenhum caminho de chamada é feito fora do ponto único (call-provider), e que o teste de contrato dos adapters inclui o codex.\"\n    }\n  ]\n}",
+      "latenciaMs": 13145,
+      "promptTokens": 1565,
+      "saidaTokens": 969,
+      "numCtxEfetivo": 8192,
+      "vramBytes": 5553258495,
+      "truncado": false,
+      "decisao": {
+        "aceito": true,
+        "rejeicoes": []
+      }
+    }
+  ]
+}
