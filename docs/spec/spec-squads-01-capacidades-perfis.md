@@ -3,7 +3,7 @@
 - MVP: `docs/mvp/mvp-011-squads-limitados.md` (Fatia 01).
 - Issue: [#122](https://github.com/RodReis/rrb-jarvisOS/issues/122); épico [#121](https://github.com/RodReis/rrb-jarvisOS/issues/121).
 - Status: **aprovada-pi** (2026-10-02) — revisão exata do PR #367 aprovada pelo PI; reescrita em 2026-10-02 pela ADR-006; substitui a revisão aprovada em 2026-08-29.
-- Depende de: M11-F00 aprovada pelo critério.
+- Depende de: M11-F00 concluída como checkpoint — **reprovada no critério, padrão do orquestrador = modelo da fase** (PI, 2026-10-02; [SPEC-Squads-00 § Emenda E1](spec-squads-00-prova-orquestrador-integrador.md)).
 
 ## Objetivo
 
@@ -12,7 +12,7 @@ Descrever Squads por capacidades verificáveis e por camadas de modelo, e não p
 ## Dentro
 
 - Registro versionado de capacidades: análise, arquitetura, testes, revisão de código, revisão de design, pesquisa documental.
-- **Camadas de modelo**: orquestrador local, executor e especialista, cada uma resolvida por provider e modelo das rotas existentes (MVP-005 e MVP-026).
+- **Camadas de modelo**: orquestrador, executor e especialista, cada uma resolvida por provider e modelo das rotas existentes (MVP-005 e MVP-026).
 - Perfil por tipo de fatia com:
   - capacidades obrigatórias e opcionais, cada uma com as camadas permitidas;
   - número de escritores (1 ou 2) e camada do integrador, que precisa ser diferente da do revisor;
@@ -36,6 +36,7 @@ Descrever Squads por capacidades verificáveis e por camadas de modelo, e não p
 4. Mudança de perfil durante um run não altera seu snapshot.
 5. **Até o MVP-028 entregue, o perfil aceita 1 escritor por padrão**; 2 escritores só em E2E de teste (ADR-006, decisão 16).
 6. Fable só resolve pela rota de assinatura; nenhuma camada cai em API paga sem o opt-in do projeto (MVP-026).
+7. **Orquestrador (PI, 2026-10-02):** o padrão do perfil é o **modelo da fase**. O modelo local via Ollama é opção do perfil e só pode ser escolhido com o validador endurecido da SPEC-Squads-02 § Emenda E1; vira padrão somente se a M11-F00b ([#373](https://github.com/RodReis/rrb-jarvisOS/issues/373)) atingir ≥ 80%.
 
 ## Critérios de aceite
 

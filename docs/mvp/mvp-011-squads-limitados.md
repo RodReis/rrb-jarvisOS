@@ -1,7 +1,7 @@
 # MVP-011 — Squads orquestrados pela SPEC
 
 - Status: **reescrito em 2026-10-02 pelas decisões do PI ([ADR-006](../adr/adr-006-squads-orquestrados-modelo-local.md)); revisão aprovada pelo PI em 2026-10-02 (PR #367).** Substitui a versão de 2026-08-29 (escritor único, cinco fatias). **Partido em dois MVPs** (ADR-006, decisão 14): este é o núcleo; quadro de execução e governança são o [MVP-028](mvp-028-quadro-execucao-squads.md).
-- GitHub: épico [#121](https://github.com/RodReis/rrb-jarvisOS/issues/121); fatias #122–#125 em Backlog com as SPECs reescritas; M11-F00 em [#369](https://github.com/RodReis/rrb-jarvisOS/issues/369); #126 passou ao MVP-028 ([#368](https://github.com/RodReis/rrb-jarvisOS/issues/368)).
+- GitHub: épico [#121](https://github.com/RodReis/rrb-jarvisOS/issues/121); fatias #122–#125 em Backlog com as SPECs reescritas; M11-F00 em [#369](https://github.com/RodReis/rrb-jarvisOS/issues/369) e M11-F00b em [#373](https://github.com/RodReis/rrb-jarvisOS/issues/373); #126 passou ao MVP-028 ([#368](https://github.com/RodReis/rrb-jarvisOS/issues/368)).
 - Depende de: MVP-010 concluído. **M12-F01 (pool global) entra antes da M11-F03** (ADR-006, decisão 13).
 - Dono do aceite: PI.
 - Design: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v2-design.md` §7, emendado pela ADR-006.
@@ -12,7 +12,7 @@ R-crítico (9 pts: irrev. 1, segurança 3, alcance 3, incerteza 2)
 Conta por fatia: F00 = 1 + prova nova; F01 = 1 + ADR + migração + sensível; F02 = 1 + sensível; F03 = 1 + migração + sensível; F04 = 1 + prova nova + migração. As migrações de F03 e F04 só contam se o estado de escritor e de achados não couber no `ExecutionLedger` atual; a confirmação é do Code na F01.
 
 - R-crítico obriga ADR e prova antes da primeira fatia: ADR-006 e a M11-F00, com os critérios numéricos fixados pelo PI.
-- T-grande pede ordem explícita e checkpoint intermediário: o checkpoint é o resultado da F00 (aprovado ou reprovado pelo critério) antes da F01.
+- T-grande pede ordem explícita e checkpoint intermediário: o checkpoint é o resultado da F00 (aprovado ou reprovado pelo critério) antes da F01. **Resultado (PI, 2026-10-02):** reprovada no critério, orquestrador padrão = modelo da fase, F01 liberada; a prova do integrador e a F00-bis do local foram reabertas na M11-F00b ([#373](https://github.com/RodReis/rrb-jarvisOS/issues/373)), que precisa terminar antes da F03.
 
 ## Tese
 
@@ -23,9 +23,10 @@ Um orquestrador local e barato quebra cada issue em tarefas e escolhe a camada d
 | Ordem | Fatia | SPEC | Dependência | Issue |
 |---:|---|---|---|---|
 | 0 | Prova do orquestrador local e do integrador | `spec-squads-00-prova-orquestrador-integrador.md` | MVP-010 | #369 |
-| 1 | Capacidades, perfis e camadas de modelo | `spec-squads-01-capacidades-perfis.md` | F00 aprovada pelo critério | #122 |
+| 0b | Reprova do integrador (instrumento corrigido) e F00-bis do orquestrador local | `spec-squads-00-prova-orquestrador-integrador.md` § Emenda E1 | F00 | #373 |
+| 1 | Capacidades, perfis e camadas de modelo | `spec-squads-01-capacidades-perfis.md` | F00 concluída (checkpoint, PI 2026-10-02) | #122 |
 | 2 | Orquestrador local e validador determinístico | `spec-squads-02-planejador-validador.md` | F01 | #123 |
-| 3 | Workers somente-leitura e escritores isolados | `spec-squads-03-workers-isolados.md` | F02 + **M12-F01** | #124 |
+| 3 | Workers somente-leitura e escritores isolados | `spec-squads-03-workers-isolados.md` | F02 + **M12-F01** + **F00b** | #124 |
 | 4 | Integrador, TESTE → REVIEWER e retrabalho | `spec-squads-04-revisao-independente.md` | F03 | #125 |
 
 ## Dentro
