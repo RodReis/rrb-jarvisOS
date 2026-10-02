@@ -2,7 +2,7 @@
 
 - MVP: `docs/mvp/mvp-011-squads-limitados.md` (Fatia 00).
 - Issue: criada pelo Cowork quando esta SPEC for aprovada; épico [#121](https://github.com/RodReis/rrb-jarvisOS/issues/121).
-- Status: **planejado** — redigida em 2026-10-02 (ADR-006, decisão 12); aguarda o PI fixar os critérios numéricos.
+- Status: **planejado** — redigida em 2026-10-02 (ADR-006, decisão 12); critérios fixados pelo PI em 2026-10-02.
 - Depende de: MVP-010 concluído.
 
 ## Objetivo
@@ -24,6 +24,11 @@ Provar com medição, antes da primeira fatia de produto, as duas incertezas que
 - Escolher o modelo padrão sem atingir o critério.
 - Ajustar o validador para fazer um modelo passar.
 - Qualquer efeito remoto (PR, push, issue).
+
+## Critérios numéricos (PI, 2026-10-02)
+
+- **Orquestrador local:** vira padrão somente com **≥ 80%** de planos aceitos pelo validador no conjunto de referência.
+- **Integrador:** **zero** hunk perdido sem registro **e 100%** de suítes verdes após a integração no conjunto de merges com conflito.
 
 ## Regras
 
@@ -47,6 +52,4 @@ Provar com medição, antes da primeira fatia de produto, as duas incertezas que
 
 ## Perguntas abertas ao PI
 
-1. **Critério do orquestrador:** qual % mínima de planos aceitos pelo validador, em quantas fatias de referência?
-2. **Critério do integrador:** além de zero hunk perdido sem registro (regra 3), qual % mínima de suítes verdes após a integração?
-3. **Conjunto de referência:** quais fatias entram? A proposta é usar fatias do MVP-009, do MVP-010 e do MVP-026 já mergeadas, mas a escolha é sua.
+1. **Conjunto de referência:** quais fatias entram? A proposta é usar fatias do MVP-009, do MVP-010 e do MVP-026 já mergeadas, mas a escolha é sua.

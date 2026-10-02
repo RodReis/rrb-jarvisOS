@@ -34,10 +34,12 @@ O plano antigo não acomoda (2) nem (3), e trata o planejador como caixa-preta.
 11. **Aprovação do PI antes de executar:** alteração estrutural de banco e comando destrutivo. O card fica na coluna atual com o **selo "Aguardando PI"** e o motivo. **Deploy em produção** fica registrado como ação sujeita à mesma aprovação quando entrar no escopo (hoje está fora da V2).
 12. **Prova antes da primeira fatia (R-crítico):** a fatia **M11-F00** mede o orquestrador local em fatias já entregues e o integrador em merges históricos com conflito. O critério de aprovação é numérico e definido pelo PI na SPEC-Squads-00.
 13. **Ordem:** a **M12-F01 (pool global)** passa a entrar **antes da M11-F03**. O restante do MVP-012 segue depois do MVP-011.
+14. **Partição (T-enorme, 20 pts):** o MVP-011 fica com o núcleo (F00–F04, T-grande) e o quadro de execução e a governança (play, PR/MERGE, selo, tetos agregados, cancelamento em cascata, E2E) vão para o **MVP-028** (T-médio, R-alto), que depende do MVP-011.
+15. **Critérios da M11-F00:** orquestrador local vira padrão com **≥ 80%** de planos aceitos; integrador exige **zero hunk perdido sem registro e 100% de suítes verdes**. Replanejamento limitado ao **limite da M9-F04**; consulta de checks a cada **60 s**.
 
 ## Consequências
 
-- O MVP-011 é reescrito (sete fatias, F00–F06) e suas SPECs voltam a rascunho até o "aprovado" do PI. As issues #122–#126 voltam a `proplan:planejado` quando o PI aprovar esta ADR.
+- O MVP-011 é reescrito (F00–F04) e nasce o MVP-028 (F01–F02); as SPECs ficam em planejado até o "aprovado" do PI. As issues #122–#125 voltam a `proplan:planejado` quando o PI aprovar esta ADR; #126 passa ao MVP-028.
 - O §3 da V2 continua excluindo "vários agentes no **mesmo** worktree" e "duas implementações concorrentes da mesma fatia". Multi-escritor aqui é divisão de trabalho em worktrees distintos.
 - **Pendências para a próxima rodada** (não decididas aqui): emendas ao MVP-012 (slots por escritor, fairness com multi-escritor, independência entre issues do mesmo MVP no play) e ao MVP-013 (relação entre o play do PI e a drenagem contínua; RF-014.2).
 - RF-014 dividido na matriz: RF-014.1 mantido no MVP-011; RF-014.2 transferido ao MVP-013; RF-014.3 transferido ao MVP-015.

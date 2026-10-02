@@ -1,9 +1,9 @@
-# SPEC-Squads-05 — Quadro de execução, play e PR/MERGE
+# SPEC-Execucao-01 — Quadro de execução, play e PR/MERGE
 
-- MVP: `docs/mvp/mvp-011-squads-limitados.md` (Fatia 05).
-- Issue: criada pelo Cowork quando esta SPEC for aprovada; épico [#121](https://github.com/RodReis/rrb-jarvisOS/issues/121).
-- Status: **planejado** — redigida em 2026-10-02 pela ADR-006 (decisões 8, 9 e 11).
-- Depende de: M11-F04.
+- MVP: `docs/mvp/mvp-028-quadro-execucao-squads.md` (Fatia 01).
+- Issue: criada pelo Cowork quando esta SPEC for aprovada; épico do MVP-028 (criado pelo Cowork na aprovação).
+- Status: **planejado** — redigida em 2026-10-02 pela ADR-006 (decisões 8, 9, 11 e 14); era a M11-F05 antes da partição do MVP-011.
+- Depende de: MVP-011 concluído.
 
 ## Objetivo
 
@@ -14,7 +14,7 @@ Dar ao PI um quadro de execução do projeto em que ele escolhe o que roda (play
 - **Quadro local do projeto**, como projeção do run, com as colunas **A fazer → DEVELOPER → TESTE → REVIEWER → PR/MERGE → DONE → Finalizado (PI)**.
 - **Play** em uma issue ou em várias selecionadas **do mesmo MVP** em "A fazer". Cada issue ganha seu worktree e segue o fluxo.
 - Issue com dependência não satisfeita ou sem prova de independência espera em "A fazer" com o motivo visível; não há salto.
-- Coluna **PR/MERGE** alimentada pelo estado real dos checks e do merge, consultado pelo kernel a cada transição e periodicamente. O card mostra o check pendente, o tempo de espera e a última consulta.
+- Coluna **PR/MERGE** alimentada pelo estado real dos checks e do merge, consultado pelo kernel a cada transição e **a cada 60 s** (decisão do PI, 2026-10-02). O card mostra o check pendente, o tempo de espera e a última consulta.
 - **Selo "Aguardando PI"** no card, que fica na coluna atual com o motivo, para alteração estrutural de banco e comando destrutivo. Aprovar ou recusar no próprio card, com `AuditEvent`.
 - Card com camada de modelo e escritores ativos, tentativas usadas, achados abertos e link do console da geração (MVP-026).
 - RF-014.1: a equipe da issue (agentes, papéis, objetivo, workflow padrão, limite de custo) visível e acionada pelo play.
@@ -51,4 +51,4 @@ Dar ao PI um quadro de execução do projeto em que ele escolhe o que roda (play
 
 ## Perguntas abertas ao PI
 
-1. Intervalo da consulta periódica dos checks em PR/MERGE (a proposta é 60 s; a decisão é sua).
+Nenhuma. Intervalo de 60 s decidido pelo PI em 2026-10-02.
