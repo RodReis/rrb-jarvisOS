@@ -13,7 +13,7 @@ Totais da última execução (regenerado, não acumulado):
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
 | — | — | — | Regras de Negócio | 1851 | 1851 | 0 | 78.8 | — | — |
-| — | — | — | Banco | 1291 | 1270 | 0 | 86.9 | — | — |
+| — | — | — | Banco | 1291 | 1277 | 0 | 86.9 | — | — |
 | — | — | — | Tela | 735 | 734 | 0 | 76.5 | — | — |
 
 ## Histórico por entrega
@@ -401,5 +401,5 @@ Append-only — linhas de entregas passadas são imutáveis.
 | — | #120 | spec-multi-executor-05-ui-prova-operacional | Banco | 1291 | 1277 | 0 | 86.9 | — | — |
 | — | #120 | spec-multi-executor-05-ui-prova-operacional | Tela | 735 | 734 | 0 | 76.5 | — | — |
 | 2026-10-02 | 369 | spec-squads-00-prova-orquestrador-integrador | Regras de Negócio | 1851 | 1851 | 0 | 78.8 | — | — |
-| 2026-10-02 | 369 | spec-squads-00-prova-orquestrador-integrador | Banco | 1291 | 1270 | 0 | 86.9 | — | — |
+| 2026-10-02 | 369 | spec-squads-00-prova-orquestrador-integrador | Banco | 1291 | 1277 | 0 | 86.9 | — | — |
 | 2026-10-02 | 369 | spec-squads-00-prova-orquestrador-integrador | Tela | 735 | 734 | 0 | 76.5 | — | — |
