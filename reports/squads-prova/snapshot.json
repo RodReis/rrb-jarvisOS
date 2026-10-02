@@ -1,0 +1,1007 @@
+{
+  "criadoEm": "2026-10-02T17:58:07.312Z",
+  "hardware": {
+    "gpu": "NVIDIA GeForce RTX 5060, 8151 MiB, 616.92",
+    "node": "v24.15.0",
+    "so": "win32 x64"
+  },
+  "perfil": {
+    "capacidadesPermitidas": [
+      "ler-repositorio",
+      "escrever-codigo",
+      "escrever-testes",
+      "rodar-testes",
+      "atualizar-docs",
+      "revisar"
+    ],
+    "camadasPermitidas": [
+      "local",
+      "fase"
+    ],
+    "maxEscritores": 2,
+    "maxTarefas": 12
+  },
+  "validadorSha256": "ddfef988c2ce338d36773505dd222b45529ecfc115c05da15acac9564872b78d",
+  "manifestoSha256": "c0dda637a4072c2b2439a9741b0c72ee3023b36990bf797bdda26ffaf8a8e890",
+  "fatias": [
+    {
+      "id": "M9-F01",
+      "mvp": 9,
+      "fatia": "F01",
+      "issue": 101,
+      "pr": 190,
+      "spec": "spec-entrega-01-publicacao-github.md",
+      "merge": "7a70e7664f03d0e5f77ca42c6999d2e41068dd9b",
+      "specPath": "docs/spec/spec-entrega-01-publicacao-github.md",
+      "specSha256": "2839250dc2e9aaf4857acf3f2d03656ce9b483233b069eef6fb1dad2a50d5919",
+      "criterios": [
+        {
+          "n": 1,
+          "texto": "Repetir a operação não duplica repositório ou issue."
+        },
+        {
+          "n": 2,
+          "texto": "Commits locais aprovados correspondem à branch remota publicada."
+        },
+        {
+          "n": 3,
+          "texto": "Issues apontam para MVP, Fatia e SPEC corretos."
+        },
+        {
+          "n": 4,
+          "texto": "Dependências são confirmadas ou registradas como limitação explícita."
+        },
+        {
+          "n": 5,
+          "texto": "Falta de instalação/permissão gera bloqueio retomável."
+        },
+        {
+          "n": 6,
+          "texto": "Reinício após efeito remoto reconcilia antes de repetir."
+        }
+      ],
+      "arquivosAlterados": 28,
+      "pathsPermitidos": [
+        "docs",
+        "reports",
+        "src/main",
+        "src/main/connectors/github",
+        "src/main/execution",
+        "src/main/ipc",
+        "src/main/preload",
+        "src/main/projects",
+        "src/main/storage",
+        "src/shared/contracts",
+        "src/shared/domain",
+        "tests/e2e"
+      ]
+    },
+    {
+      "id": "M9-F02",
+      "mvp": 9,
+      "fatia": "F02",
+      "issue": 102,
+      "pr": 208,
+      "spec": "spec-entrega-02-dag-fila-reconciliacao.md",
+      "merge": "905e9e42fb4e4da5051077d888960e0b1a1309e5",
+      "specPath": "docs/spec/spec-entrega-02-dag-fila-reconciliacao.md",
+      "specSha256": "c5ab39d3c723c61ec7bff711f2a207340ad9bb6ccf9cefd746c09ed9f715b7b4",
+      "criterios": [
+        {
+          "n": 1,
+          "texto": "DAG rejeita ciclos e dependências ausentes."
+        },
+        {
+          "n": 2,
+          "texto": "WIP=1 **global** impede duas fatias simultâneas, inclusive de projetos diferentes; o slot participa de `reconcileAll`."
+        },
+        {
+          "n": 3,
+          "texto": "Lease expirado não autoriza roubo antes da reconciliação."
+        },
+        {
+          "n": 4,
+          "texto": "Crash antes/depois de efeito converge para um único resultado."
+        },
+        {
+          "n": 5,
+          "texto": "Run não pula diretamente para `MERGED`."
+        },
+        {
+          "n": 6,
+          "texto": "Bloqueio registra causa, evidência, tentativas, risco e ação."
+        },
+        {
+          "n": 7,
+          "texto": "Nenhuma transição sai de `AWAITING_PI` sem `Approval` do gate `SLICE_ENTRY` para a revisão vigente da SPEC; com kill-switch desligado o run termina em `AWAITING_MERGE`, nunca em `BLOCKED`. Teste dos dois caminhos."
+        }
+      ],
+      "arquivosAlterados": 25,
+      "pathsPermitidos": [
+        "docs",
+        "reports",
+        "src/main",
+        "src/main/ipc",
+        "src/main/pipeline",
+        "src/main/preload",
+        "src/main/storage",
+        "src/shared/contracts",
+        "src/shared/domain",
+        "tests/e2e"
+      ]
+    },
+    {
+      "id": "M9-F03",
+      "mvp": 9,
+      "fatia": "F03",
+      "issue": 103,
+      "pr": 211,
+      "spec": "spec-entrega-03-worktree-preflight-docker.md",
+      "merge": "cae53205abebc6346b4cc0cf0975e77393d1a5cf",
+      "specPath": "docs/spec/spec-entrega-03-worktree-preflight-docker.md",
+      "specSha256": "7bbfc7b15e6833ca289673e42c6160cdf1a8b76080b28b022c60d27ec226390f",
+      "criterios": [
+        {
+          "n": 1,
+          "texto": "Executor nunca recebe o checkout ativo como cwd."
+        },
+        {
+          "n": 2,
+          "texto": "Branch nasce do SHA registrado."
+        },
+        {
+          "n": 3,
+          "texto": "Porta ocupada é detectada antes de subir recurso."
+        },
+        {
+          "n": 4,
+          "texto": "Container/porta possuem lease reconciliável."
+        },
+        {
+          "n": 5,
+          "texto": "Preflight falho não inicia o executor."
+        },
+        {
+          "n": 6,
+          "texto": "Mudança fora do allowlist é detectada antes do commit."
+        },
+        {
+          "n": 7,
+          "texto": "Limpeza não alcança path ou recurso não pertencente ao run."
+        },
+        {
+          "n": 8,
+          "texto": "**O executor só recebe cwd dentro do container**, com o worktree montado; tentativa de executar no host é impedida. Teste comprova que não existe caminho de execução no host."
+        },
+        {
+          "n": 9,
+          "texto": "**Nenhum segredo entra no container.** Teste inspeciona ambiente e montagens do container e não encontra token, chave ou credencial."
+        },
+        {
+          "n": 10,
+          "texto": "**Docker indisponível bloqueia o preflight** com `BLOCKED_EXTERNAL` e ação; nenhum executor inicia. Teste."
+        },
+        {
+          "n": 11,
+          "texto": "**Proxy é o único caminho até o modelo:** teste comprova que o container não tem credencial de provider e que a chamada do executor chega ao `AiCallService` do host com `CostEvent`/`AuditEvent` atribuídos ao run e à tentativa. Sem o proxy no ar, o preflight falha."
+        },
+        {
+          "n": 12,
+          "texto": "**Egress restrito:** teste comprova que, de dentro do container, `api.github.com` é inalcançável e o proxy do host é alcançável."
+        },
+        {
+          "n": 13,
+          "texto": "**Lista de paths permitidos existe antes de o executor iniciar**, registrada no `ContextPack` com a origem (`spec` ou `derivada`); sem lista, o preflight falha."
+        }
+      ],
+      "arquivosAlterados": 29,
+      "pathsPermitidos": [
+        "docs",
+        "docs/spec",
+        "reports",
+        "scripts",
+        "src/main",
+        "src/main/ai",
+        "src/main/budget",
+        "src/main/context",
+        "src/main/ipc",
+        "src/main/pipeline",
+        "src/main/preload",
+        "src/main/storage",
+        "src/shared/contracts",
+        "src/shared/domain",
+        "tests/e2e"
+      ]
+    },
+    {
+      "id": "M9-F04",
+      "mvp": 9,
+      "fatia": "F04",
+      "issue": 104,
+      "pr": 231,
+      "spec": "spec-entrega-04-construcao-recuperacao.md",
+      "merge": "9005423aa3f7421c4f63099f439f5a5d18791d2c",
+      "specPath": "docs/spec/spec-entrega-04-construcao-recuperacao.md",
+      "specSha256": "2aff466902f8de741e7b6094657b844ff540c1cc4d36f58a66c21907b08fb862",
+      "criterios": [
+        {
+          "n": 1,
+          "texto": "Comando e cwd são controlados pelo adapter, **dentro do container**; não existe caminho de execução no host."
+        },
+        {
+          "n": 2,
+          "texto": "Tentativa excedente é impedida."
+        },
+        {
+          "n": 3,
+          "texto": "Recuperação não repete descoberta resolvida."
+        },
+        {
+          "n": 4,
+          "texto": "Alteração fora do escopo bloqueia commit e traz diff."
+        },
+        {
+          "n": 5,
+          "texto": "Cancelamento não deixa subprocesso órfão."
+        },
+        {
+          "n": 6,
+          "texto": "Custo/tokens são atribuídos por tentativa."
+        },
+        {
+          "n": 7,
+          "texto": "Falha terminal contém ação mínima de retomada."
+        },
+        {
+          "n": 8,
+          "texto": "**Execução é containerizada:** o adapter só inicia o executor com o container pronto e o worktree montado. Teste comprova que sem container não há execução."
+        },
+        {
+          "n": 9,
+          "texto": "**Uso da rota de assinatura é registrado sem valor monetário** (emenda da SPEC-Providers-03); atribuição por tentativa continua obrigatória. Teste."
+        },
+        {
+          "n": 10,
+          "texto": "**Toda chamada ao modelo feita pelo executor passa pelo proxy do host** e chega ao `AiCallService` com `runId`/`attemptId`; o gate de orçamento do MVP-005 barra a tentativa que estouraria **antes** de ela sair. Teste com servidor que conta requisições."
+        },
+        {
+          "n": 11,
+          "texto": "**`test/lint/type/build` disparados pelo app rodam no container**, nunca no host. Teste comprova que o adapter não tem caminho de execução de validação no host."
+        },
+        {
+          "n": 12,
+          "texto": "**Rota de assinatura é `subscription_limited`** (emenda aprovada pelo PI em 2026-08-30): quota desconhecida **não** vira saldo infinito. O ledger registra chamadas, tokens, tempo e — quando a origem os expõe — estado de quota e reset. Rate limit tenta somente fallback já autorizado ou termina em espera/bloqueio explicável, nunca em tentativa cega. Teste."
+        }
+      ],
+      "arquivosAlterados": 25,
+      "pathsPermitidos": [
+        "docs",
+        "docs/superpowers/plans",
+        "reports",
+        "src/main",
+        "src/main/ai",
+        "src/main/pipeline",
+        "src/main/storage",
+        "src/shared/domain"
+      ]
+    },
+    {
+      "id": "M9-F05",
+      "mvp": 9,
+      "fatia": "F05",
+      "issue": 105,
+      "pr": 235,
+      "spec": "spec-entrega-05-revisao-ci-merge.md",
+      "merge": "6bade77498c910d01a9d5e56c5f2d36286cda4f3",
+      "specPath": "docs/spec/spec-entrega-05-revisao-ci-merge.md",
+      "specSha256": "ac3c744b3d5f3ea30360e9eeda21af949d2d1d05b8adb800f9d1894fd9ff8713",
+      "criterios": [
+        {
+          "n": 1,
+          "texto": "Diff fora da SPEC não chega ao push."
+        },
+        {
+          "n": 2,
+          "texto": "P0/P1 aberto impede merge."
+        },
+        {
+          "n": 3,
+          "texto": "CI verde pertence ao `head SHA` esperado."
+        },
+        {
+          "n": 4,
+          "texto": "Stale SHA impede merge e força reconciliação."
+        },
+        {
+          "n": 5,
+          "texto": "Falha corrigível mantém o mesmo PR."
+        },
+        {
+          "n": 6,
+          "texto": "`mergeSha` é confirmado na origem."
+        },
+        {
+          "n": 7,
+          "texto": "Código do comando zero, sozinho, não prova sucesso."
+        },
+        {
+          "n": 8,
+          "texto": "**Kill-switch respeitado:** com merge autônomo desligado, o run para em `AWAITING_MERGE` (M9-F02) sem mergear e sem marcar falha; com ligado, mergeia e confirma na origem. Teste dos dois caminhos."
+        },
+        {
+          "n": 9,
+          "texto": "**Projeto sem CI recebe o workflow gerado no primeiro PR**, e o run seguinte o encontra e não o reescreve. Teste."
+        },
+        {
+          "n": 10,
+          "texto": "**Sem check configurado não há merge:** lista vazia de checks termina em bloqueio explicável, nunca em `MERGED`. Teste."
+        },
+        {
+          "n": 11,
+          "texto": "**Ruleset em movimento:** mudança de ruleset/check obrigatório durante o run força novo snapshot e reconciliação; check `neutral`/`skipped` só passa quando a própria regra da origem o considerar satisfatório. Teste."
+        },
+        {
+          "n": 12,
+          "texto": "**Merge queue:** repositório que a exige termina com PR verde em `AWAITING_MERGE` e bloqueio externo explicável; a pipeline **não** tenta contorná-la. Teste."
+        },
+        {
+          "n": 13,
+          "texto": "**`STATUS.md`, `STATUS-ARQUIVO.md` e o relatório de testes do projeto-alvo entram no mesmo PR, antes do merge** — nunca em commit direto na branch-base depois dele (invariante 10 da CONVENTION §4; Convention do próprio projeto-alvo). A M9-F06 só grava o `ExecutionLedger` local."
+        }
+      ],
+      "arquivosAlterados": 28,
+      "pathsPermitidos": [
+        "docs",
+        "docs/superpowers/plans",
+        "reports",
+        "src/main",
+        "src/main/connectors/github",
+        "src/main/pipeline",
+        "src/main/storage",
+        "src/shared/domain",
+        "tests/e2e"
+      ]
+    },
+    {
+      "id": "M9-F06",
+      "mvp": 9,
+      "fatia": "F06",
+      "issue": 106,
+      "pr": 236,
+      "spec": "spec-entrega-06-evidencia-limpeza-continuidade.md",
+      "merge": "2ac721d8f58def260b97d855efff8df7c4ab26a5",
+      "specPath": "docs/spec/spec-entrega-06-evidencia-limpeza-continuidade.md",
+      "specSha256": "1d05b4b37a67712aa8c6254f258736ef99d9774b997c9f280aed7d8766277c65",
+      "criterios": [
+        {
+          "n": 1,
+          "texto": "`MERGED` possui head SHA, checks e merge SHA coerentes."
+        },
+        {
+          "n": 2,
+          "texto": "Relatório humano referencia artefatos extensos por hash."
+        },
+        {
+          "n": 3,
+          "texto": "Documento sem mudança material não recebe edição cosmética."
+        },
+        {
+          "n": 4,
+          "texto": "Reinício pós-merge não cria novo PR ou merge."
+        },
+        {
+          "n": 5,
+          "texto": "Worktree, **container do executor** e demais recursos temporários são removidos ou ficam com pendência explícita reconciliável."
+        },
+        {
+          "n": 6,
+          "texto": "Próxima fatia exige sua própria revisão aprovada."
+        },
+        {
+          "n": 7,
+          "texto": "Estado terminal é compreensível sem ler logs técnicos."
+        },
+        {
+          "n": 8,
+          "texto": "**Cancelar depois do push preserva PR/branch** e permite retomada vinculada somente após reconciliar o `head SHA`; cancelar depois do merge não muda o resultado. Teste das duas fases."
+        },
+        {
+          "n": 9,
+          "texto": "**O coletor de retenção respeita idade, cota, fixação e proteção de run não resolvido**, e nunca deixa referência versionada apontando para conteúdo que ela afirme estar presente. Teste."
+        }
+      ],
+      "arquivosAlterados": 31,
+      "pathsPermitidos": [
+        "docs",
+        "docs/superpowers/plans",
+        "reports",
+        "src/main",
+        "src/main/budget",
+        "src/main/ipc",
+        "src/main/pipeline",
+        "src/main/preload",
+        "src/main/storage",
+        "src/renderer/src/app",
+        "src/shared/contracts",
+        "src/shared/domain",
+        "tests/e2e"
+      ]
+    },
+    {
+      "id": "M10-F01",
+      "mvp": 10,
+      "fatia": "F01",
+      "issue": 116,
+      "pr": 360,
+      "spec": "spec-multi-executor-01-runtime.md",
+      "merge": "254c64cf22f9eef106e722fcfef1abddfd9c0903",
+      "specPath": "docs/spec/spec-multi-executor-01-runtime.md",
+      "specSha256": "e16a569817fcc619aeb677a3e67c7b52263d92c123db653cc27255015a33c9b1",
+      "criterios": [
+        {
+          "n": 1,
+          "texto": "Adapter fake percorre sucesso, falha, timeout, cancelamento e retomada no mesmo contract test."
+        },
+        {
+          "n": 2,
+          "texto": "Eventos duplicados, fora de ordem e após terminal não corrompem o estado."
+        },
+        {
+          "n": 3,
+          "texto": "Cancelar duas vezes produz um único efeito e termina a árvore do processo."
+        },
+        {
+          "n": 4,
+          "texto": "O runtime rejeita modo de cobrança, revisão ou schema incompatível antes de iniciar o CLI."
+        },
+        {
+          "n": 5,
+          "texto": "O adapter não recebe credencial GitHub/Vault/projeto e não expõe autenticação ao renderer."
+        },
+        {
+          "n": 6,
+          "texto": "Uso e falhas são auditáveis sem depender do formato interno do fornecedor."
+        }
+      ],
+      "arquivosAlterados": 14,
+      "pathsPermitidos": [
+        "docs",
+        "docs/superpowers/plans",
+        "reports",
+        "src/main/executors"
+      ]
+    },
+    {
+      "id": "M10-F02",
+      "mvp": 10,
+      "fatia": "F02",
+      "issue": 117,
+      "pr": 267,
+      "spec": "spec-multi-executor-02-autenticacao-codex.md",
+      "merge": "45d069cadd44d84d3cb96775162c13365e11d725",
+      "specPath": "docs/spec/spec-multi-executor-02-autenticacao-codex.md",
+      "specSha256": "07a176cb8083ae14745ba3b9fc21472de97f26a7d317c889b24b6b2fad5eb519",
+      "criterios": [
+        {
+          "n": 1,
+          "texto": "O PI autentica o perfil sem o app receber segredo em formulário, IPC ou log."
+        },
+        {
+          "n": 2,
+          "texto": "Container sem mount não acessa a sessão; container autorizado acessa somente o perfil indicado."
+        },
+        {
+          "n": 3,
+          "texto": "Scanner não encontra token/cookie/credencial em worktree, imagem, log ou artefatos."
+        },
+        {
+          "n": 4,
+          "texto": "`subscription_credits` desabilitado nunca é selecionado após quota de assinatura."
+        },
+        {
+          "n": 5,
+          "texto": "Teto de créditos excedido bloqueia antes da execução monetária."
+        },
+        {
+          "n": 6,
+          "texto": "Estados de health e quota aparecem por contrato tipado e sobrevivem a reinício."
+        }
+      ],
+      "arquivosAlterados": 19,
+      "pathsPermitidos": [
+        "docs",
+        "reports",
+        "src/main",
+        "src/main/ai",
+        "src/main/ipc",
+        "src/main/preload",
+        "src/renderer/src/app",
+        "src/shared/contracts",
+        "src/shared/domain",
+        "tests/e2e"
+      ]
+    },
+    {
+      "id": "M10-F03",
+      "mvp": 10,
+      "fatia": "F03",
+      "issue": 118,
+      "pr": 363,
+      "spec": "spec-multi-executor-03-codex-exec-adapter.md",
+      "merge": "70ac871a0ea72115480c36f96dc16d9b1ca055cf",
+      "specPath": "docs/spec/spec-multi-executor-03-codex-exec-adapter.md",
+      "specSha256": "68b5ae5923bf06c632aaea116cedc05d6bd41b2566f2bd035846f19ed8b3035b",
+      "criterios": [
+        {
+          "n": 1,
+          "texto": "O adapter passa integralmente pelo contract test da F01."
+        },
+        {
+          "n": 2,
+          "texto": "Fixtures cobrem JSONL parcial, evento desconhecido, saída inválida, timeout, kill e retomada."
+        },
+        {
+          "n": 3,
+          "texto": "Processo não usa shell e rejeita argumento/cwd fora do request validado."
+        },
+        {
+          "n": 4,
+          "texto": "Falha após alteração retorna paths/evidência suficientes para preservar e diagnosticar o delta."
+        },
+        {
+          "n": 5,
+          "texto": "Nenhum segredo aparece em argv, stdout persistido ou resultado estruturado."
+        },
+        {
+          "n": 6,
+          "texto": "Teste de compatibilidade detecta versão do CLI sem assumir recurso inexistente."
+        }
+      ],
+      "arquivosAlterados": 9,
+      "pathsPermitidos": [
+        ".",
+        "docs",
+        "reports",
+        "src/main/executors"
+      ]
+    },
+    {
+      "id": "M10-F04",
+      "mvp": 10,
+      "fatia": "F04",
+      "issue": 119,
+      "pr": 365,
+      "spec": "spec-multi-executor-04-roteamento-revisao-cruzada.md",
+      "merge": "eba4b5a5bb260502b337d65835ac99f823f6f53d",
+      "specPath": "docs/spec/spec-multi-executor-04-roteamento-revisao-cruzada.md",
+      "specSha256": "7875bc6e5ba24385b7c665fa30b34ba2ddb35ec1a0494325734d108ee4d1dab6",
+      "criterios": [
+        {
+          "n": 1,
+          "texto": "Mesma fatia executa por Claude ou Codex sem mudança no kernel."
+        },
+        {
+          "n": 2,
+          "texto": "Indisponibilidade do preferido escolhe apenas rota elegível e registra o motivo."
+        },
+        {
+          "n": 3,
+          "texto": "Crédito/API desautorizado produz espera ou bloqueio, nunca cobrança."
+        },
+        {
+          "n": 4,
+          "texto": "Troca após falha não repete efeito `confirmed` nem cria writer concorrente."
+        },
+        {
+          "n": 5,
+          "texto": "Quando ambos estão disponíveis, executor diferente revisa o delta do writer."
+        },
+        {
+          "n": 6,
+          "texto": "Revisão usa o head/revisão exatos e deduplica histórico de falhas."
+        }
+      ],
+      "arquivosAlterados": 6,
+      "pathsPermitidos": [
+        "docs",
+        "reports",
+        "src/main/executors"
+      ]
+    },
+    {
+      "id": "M10-F05",
+      "mvp": 10,
+      "fatia": "F05",
+      "issue": 120,
+      "pr": 366,
+      "spec": "spec-multi-executor-05-ui-prova-operacional.md",
+      "merge": "e7427af97b6a14f7468e4e1d219349945aeece5c",
+      "specPath": "docs/spec/spec-multi-executor-05-ui-prova-operacional.md",
+      "specSha256": "ca87bd0a640fa6cf35ec22d016d39bfaf106b236ba41e61858d82a12c3ce7dbf",
+      "criterios": [
+        {
+          "n": 1,
+          "texto": "PI configura preferência e vê por que cada executor está ou não elegível."
+        },
+        {
+          "n": 2,
+          "texto": "Habilitar créditos sem teto é impossível; desabilitado nunca é usado."
+        },
+        {
+          "n": 3,
+          "texto": "Nenhum segredo alcança renderer, screenshot ou relatório."
+        },
+        {
+          "n": 4,
+          "texto": "Jornada E2E produz delta por um executor e revisão identificada pelo outro."
+        },
+        {
+          "n": 5,
+          "texto": "Git e GitHub são executados pelo app, não pelo adapter."
+        },
+        {
+          "n": 6,
+          "texto": "Smoke ao vivo, testes de componentes, integração e acessibilidade passam."
+        },
+        {
+          "n": 7,
+          "texto": "Evidência registra revisões, executor, modo, head SHA, checks e resultado sem dados voláteis falsos."
+        }
+      ],
+      "arquivosAlterados": 21,
+      "pathsPermitidos": [
+        ".",
+        "docs",
+        "reports",
+        "src/main",
+        "src/main/executors",
+        "src/main/ipc",
+        "src/main/preload",
+        "src/main/storage",
+        "src/renderer/src/app",
+        "src/renderer/src/lib",
+        "src/shared/contracts",
+        "src/shared/domain",
+        "tests/e2e"
+      ]
+    },
+    {
+      "id": "M26-F01",
+      "mvp": 26,
+      "fatia": "F01",
+      "issue": 251,
+      "pr": 258,
+      "spec": "spec-fases-01-fase-e-card-do-projeto.md",
+      "merge": "4b52668191109fb5adc9f03deacc2fd265505103",
+      "specPath": "docs/spec/spec-fases-01-fase-e-card-do-projeto.md",
+      "specSha256": "d116018725e2426ad0323b48b4da2f8e5385d54dea7f347614a5d62ab3710510",
+      "criterios": [
+        {
+          "n": 1,
+          "texto": "`FASE_DA_ETAPA` cobre todas as `ETAPAS`; teste quebra quando uma etapa nova nasce sem fase."
+        },
+        {
+          "n": 2,
+          "texto": "O card mostra fase e etapa coerentes com a etapa derivada — teste com projeto em cada fase."
+        },
+        {
+          "n": 3,
+          "texto": "`gates aceitos` conta exatamente as aprovações das cinco etapas de aceite; data = último evento de transição."
+        },
+        {
+          "n": 4,
+          "texto": "Rota e modelo do card são os mesmos que o selo mostra ao abrir o projeto (uma fonte)."
+        },
+        {
+          "n": 5,
+          "texto": "Projeto bloqueado mostra motivo e ação; projeto sem bloqueio não mostra o bloco."
+        },
+        {
+          "n": 6,
+          "texto": "Trilha agrupada por fase; a fase atual expandida, as demais condensadas; navegação por teclado preservada."
+        },
+        {
+          "n": 7,
+          "texto": "Uma leitura IPC por card; nenhum fato recalculado no renderer."
+        }
+      ],
+      "arquivosAlterados": 29,
+      "pathsPermitidos": [
+        "docs",
+        "reports",
+        "src/main",
+        "src/main/ipc",
+        "src/main/preload",
+        "src/main/projects",
+        "src/renderer/src/app",
+        "src/renderer/src/i18n",
+        "src/renderer/src/prova",
+        "src/shared/contracts",
+        "src/shared/domain",
+        "tests/e2e",
+        "tests/prova"
+      ]
+    },
+    {
+      "id": "M26-F02",
+      "mvp": 26,
+      "fatia": "F02",
+      "issue": 252,
+      "pr": 262,
+      "spec": "spec-fases-02-catalogo-e-modelo-por-fase.md",
+      "merge": "ca637516bbbc1e9b32aa88e2755aaef13da5849d",
+      "specPath": "docs/spec/spec-fases-02-catalogo-e-modelo-por-fase.md",
+      "specSha256": "5b6b96932c34dcdb1422af3325f3e23cde85b728770d5a835dcfb86994dc6d07",
+      "criterios": [
+        {
+          "n": 1,
+          "texto": "`claude-fable-5-1` aparece no combo da rota de assinatura e **não aparece** no da rota paga; `qwen3:8b` aparece em Ollama."
+        },
+        {
+          "n": 2,
+          "texto": "Geração de cada fase usa `modeloDaFase`; teste de cada serviço da jornada com política editada prova que o modelo chamado é o da fase."
+        },
+        {
+          "n": 3,
+          "texto": "Override do projeto vence o workspace; removê-lo volta ao workspace."
+        },
+        {
+          "n": 4,
+          "texto": "Modelo fora do catálogo do provider é recusado na fronteira IPC; nenhuma chamada sai."
+        },
+        {
+          "n": 5,
+          "texto": "Troca no workspace e no projeto gera `AuditEvent` encadeado; `verifyChain` passa."
+        },
+        {
+          "n": 6,
+          "texto": "Com rota `bloqueado`, o combo do projeto fica desabilitado com o motivo — escolher modelo não destrava rota."
+        },
+        {
+          "n": 7,
+          "texto": "Editor de \"Roteamento por tipo de tarefa\" continua funcional e testado, sob \"Avançado\"."
+        },
+        {
+          "n": 8,
+          "texto": "`MODELO_PADRAO` e a troca de modelo por provider (F04) continuam existindo para chamadas fora da jornada; a jornada não os lê mais."
+        }
+      ],
+      "arquivosAlterados": 30,
+      "pathsPermitidos": [
+        "docs",
+        "reports",
+        "src/main",
+        "src/main/ai",
+        "src/main/ipc",
+        "src/main/preload",
+        "src/main/projects",
+        "src/main/storage",
+        "src/renderer/src/app",
+        "src/renderer/src/i18n",
+        "src/shared/contracts",
+        "src/shared/domain",
+        "tests/e2e"
+      ]
+    },
+    {
+      "id": "M26-F03",
+      "mvp": 26,
+      "fatia": "F03",
+      "issue": 253,
+      "pr": 263,
+      "spec": "spec-fases-03-console-da-geracao.md",
+      "merge": "c330c47a20a9a35d434c325dea8aa677304409d0",
+      "specPath": "docs/spec/spec-fases-03-console-da-geracao.md",
+      "specSha256": "b0136a95d97a778f8dc5beba3b362d236e50e04f8fcdb371e3c535a85a4531d2",
+      "criterios": [
+        {
+          "n": 1,
+          "texto": "Geração pelo Claude Code CLI produz eventos `texto`, `ferramenta-inicio/fim` e `uso` no painel, na ordem em que o CLI os emitiu — fixture de `stream-json` gravado."
+        },
+        {
+          "n": 2,
+          "texto": "Todo trace tem `ledgerEntryId`; teste recusa trace órfão."
+        },
+        {
+          "n": 3,
+          "texto": "Argumento e resultado persistidos passam pelo redator; fixture com segredo prova a redação."
+        },
+        {
+          "n": 4,
+          "texto": "Resultado acima de 2 KB é truncado e `tamanhoOriginal` bate."
+        },
+        {
+          "n": 5,
+          "texto": "Linha inválida do CLI gera `erro` de parser e a geração termina com o texto correto."
+        },
+        {
+          "n": 6,
+          "texto": "Painel abre ao iniciar, mostra ao vivo e reabre do histórico com o mesmo conteúdo."
+        },
+        {
+          "n": 7,
+          "texto": "Adapters sem ferramentas produzem trace válido só com `texto` e `uso`."
+        },
+        {
+          "n": 8,
+          "texto": "Escrita em lote não perde evento em cancelamento (`signal`): o trace termina com `status: cancelado` e os eventos até ali."
+        }
+      ],
+      "arquivosAlterados": 40,
+      "pathsPermitidos": [
+        "docs",
+        "reports",
+        "scripts",
+        "src/design/ui",
+        "src/main",
+        "src/main/ai",
+        "src/main/ipc",
+        "src/main/pipeline",
+        "src/main/preload",
+        "src/main/storage",
+        "src/renderer/src/app",
+        "src/renderer/src/prova",
+        "src/shared/contracts",
+        "src/shared/domain",
+        "tests/e2e",
+        "tests/prova"
+      ]
+    },
+    {
+      "id": "M26-F04",
+      "mvp": 26,
+      "fatia": "F04",
+      "issue": 254,
+      "pr": 264,
+      "spec": "spec-fases-04-marcos-git-e-gate-da-construcao.md",
+      "merge": "aaf75748b69e5f310feb8637c5121bb2b0dc795b",
+      "specPath": "docs/spec/spec-fases-04-marcos-git-e-gate-da-construcao.md",
+      "specSha256": "01a2546f72dfe384de321beb440806266b0a88406af2138504de73debf76f26a",
+      "criterios": [
+        {
+          "n": 1,
+          "texto": "Painel lista cada documento com estado, hash e coerência blob↔revisão; fixture de repositório com marco faltando mostra `revisão sem commit`."
+        },
+        {
+          "n": 2,
+          "texto": "Worktree sujo e remoto não publicado aparecem com os arquivos/o estado, sem expor conteúdo."
+        },
+        {
+          "n": 3,
+          "texto": "\"Commitar marco\" usa a retomada da M8-F01; teste prova que não existe segundo caminho de commit."
+        },
+        {
+          "n": 4,
+          "texto": "`verificarMarcos` bloqueia o `SLICE_ENTRY` em cada uma das três condições, com ação por item; com tudo `ok`, o aceite segue como hoje."
+        },
+        {
+          "n": 5,
+          "texto": "Verificação e resultado auditados; mudança de HEAD entre verificação e aceite força nova verificação."
+        },
+        {
+          "n": 6,
+          "texto": "Leitura do Git passa pelo `GitRunner` e aparece na auditoria de comandos."
+        }
+      ],
+      "arquivosAlterados": 28,
+      "pathsPermitidos": [
+        "docs",
+        "reports",
+        "src/main",
+        "src/main/execution",
+        "src/main/ipc",
+        "src/main/preload",
+        "src/main/projects",
+        "src/renderer/src/app",
+        "src/renderer/src/prova",
+        "src/shared/contracts",
+        "src/shared/domain",
+        "tests/e2e",
+        "tests/prova"
+      ]
+    },
+    {
+      "id": "M26-F05",
+      "mvp": 26,
+      "fatia": "F05",
+      "issue": 255,
+      "pr": 265,
+      "spec": "spec-fases-05-modelo-da-fase-no-run.md",
+      "merge": "ace36e438ff9c6ad0333e82f0ed53947c9ffd640",
+      "specPath": "docs/spec/spec-fases-05-modelo-da-fase-no-run.md",
+      "specSha256": "2da2631829886c125c3b65997950b582a4d9732b15c513f3ad1e2d7f0e61de0e",
+      "criterios": [
+        {
+          "n": 1,
+          "texto": "Run iniciado com política editada chama o executor com `--model` igual ao modelo da fase Construção — teste do `docker-runner` com args capturados."
+        },
+        {
+          "n": 2,
+          "texto": "Override do projeto vence o workspace no run; sem override, usa o workspace."
+        },
+        {
+          "n": 3,
+          "texto": "Snapshot da tentativa carrega `{ provider, modelo }`; mudar a política durante o run não altera a tentativa corrente."
+        },
+        {
+          "n": 4,
+          "texto": "Preflight recusa modelo fora do catálogo antes de criar container, com ação."
+        },
+        {
+          "n": 5,
+          "texto": "`ExecutionLedger` mostra provider e modelo por tentativa; painel terminal os exibe."
+        },
+        {
+          "n": 6,
+          "texto": "Nenhuma chamada sai por rota paga sem opt-in do projeto (teste existente da M9-F04 continua passando com o modelo injetado)."
+        }
+      ],
+      "arquivosAlterados": 18,
+      "pathsPermitidos": [
+        "docs",
+        "reports",
+        "src/main",
+        "src/main/pipeline",
+        "src/main/storage",
+        "src/renderer/src/app",
+        "src/shared/domain"
+      ]
+    },
+    {
+      "id": "M26-F06",
+      "mvp": 26,
+      "fatia": "F06",
+      "issue": 256,
+      "pr": 269,
+      "spec": "spec-fases-06-codex-no-ponto-unico.md",
+      "merge": "1067f65949a7729bd80d8328e2555bc75fd6d912",
+      "specPath": "docs/spec/spec-fases-06-codex-no-ponto-unico.md",
+      "specSha256": "883f5f44397dc1f88f34f603a1173b5377a895dbc8a139058b8b2f443e45ee3b",
+      "criterios": [
+        {
+          "n": 1,
+          "texto": "`gpt-5.6-sol` selecionado para Planejamento gera brief/perguntas/PRD pelo `CodexAdapter`; ledger registra `codex` com valor zero na assinatura."
+        },
+        {
+          "n": 2,
+          "texto": "Saída passa pelo mesmo validador de origem por afirmação e pela invariante 9 (SPEC-Jornada-02) — fixture de saída do Codex reprova afirmação sem origem."
+        },
+        {
+          "n": 3,
+          "texto": "Console mostra texto, ferramentas e uso a partir de `codex exec --json`; fixture gravada."
+        },
+        {
+          "n": 4,
+          "texto": "Assinatura do Codex indisponível com Sol escolhido → bloqueio com ação; nenhuma chamada ao Claude nem à API."
+        },
+        {
+          "n": 5,
+          "texto": "Modo `api` do Codex sem opt-in do projeto nunca é chamado — teste espelhando o da rota paga da Anthropic."
+        },
+        {
+          "n": 6,
+          "texto": "Health do Codex aparece na tela de providers; `auth_required` leva ao fluxo de login da M10-F02 sem o app receber segredo."
+        },
+        {
+          "n": 7,
+          "texto": "`gpt-5.5` aparece desabilitado na Construção com o motivo até a M10-F03/F04."
+        },
+        {
+          "n": 8,
+          "texto": "Nenhum caminho de chamada fora do ponto único (`call-provider`) — teste de contrato dos adapters inclui o `codex`."
+        }
+      ],
+      "arquivosAlterados": 27,
+      "pathsPermitidos": [
+        "docs",
+        "reports",
+        "src/main",
+        "src/main/ai",
+        "src/main/projects",
+        "src/renderer/src/app",
+        "src/shared/domain",
+        "tests/e2e"
+      ]
+    }
+  ]
+}
