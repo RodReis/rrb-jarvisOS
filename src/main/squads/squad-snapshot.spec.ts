@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import type { AuditEventInput } from '../../shared/domain/entities'
-import type { PerfilDeSquad } from '../../shared/domain/squad-perfil'
-import type { AmbienteDeResolucao } from '../../shared/domain/squad-resolucao'
-import { PERFIL_PADRAO } from '../../shared/domain/squad-perfil'
-import { resolverPerfil } from '../../shared/domain/squad-resolucao'
+import type { AuditEventInput } from '@shared/domain/entities'
+import type { PerfilDeSquad } from '@shared/domain/squad-perfil'
+import type { AmbienteDeResolucao } from '@shared/domain/squad-resolucao'
+import { PERFIL_PADRAO } from '@shared/domain/squad-perfil'
+import { resolverPerfil } from '@shared/domain/squad-resolucao'
 import {
   auditarSnapshotDoSquad,
   criarSnapshotDoSquad,
   reproduzirSnapshot,
-  revisaoDoPerfil
+  revisaoDoPerfil,
+  verificarSnapshot
 } from './squad-snapshot'
 
 const FASE = { provider: 'claude-code', modelo: 'claude-fable-5-1' } as const
@@ -119,5 +120,73 @@ describe('auditoria do snapshot usado', () => {
     expect(eventos[0].payload).toMatchObject({
       fallbacks: [{ camada: 'orquestrador', motivo: 'OLLAMA_FORA_DO_AR' }]
     })
+  })
+})
+
+describe('snapshot só nasce de perfil válido', () => {
+  it('recusa perfil com permissão de Git — não vira snapshot elegível', () => {
+    const ruim = structuredClone(PERFIL_PADRAO) as unknown as {
+      acessoPorFuncao: { leitura: { git: boolean } }
+    }
+    ruim.acessoPorFuncao.leitura.git = true
+    expect(() => criarSnapshotDoSquad(ruim as unknown as PerfilDeSquad, AMBIENTE, FASE)).toThrow(
+      /PERMISSAO_GIT_GITHUB/
+    )
+  })
+
+  it('recusa dois escritores sem o multi-escritor ligado, e aceita com ele (E2E de teste)', () => {
+    const dois: PerfilDeSquad = {
+      ...PERFIL_PADRAO,
+      escritores: 2,
+      integrador: { camada: 'executor' }
+    }
+    expect(() => criarSnapshotDoSquad(dois, AMBIENTE, FASE)).toThrow(/MULTI_ESCRITOR_DESLIGADO/)
+    const snap = criarSnapshotDoSquad(dois, AMBIENTE, FASE, { multiEscritor: true })
+    expect(snap.perfil.escritores).toBe(2)
+  })
+})
+
+describe('verificarSnapshot — a revisão registrada confere com o perfil', () => {
+  it('aceita o snapshot íntegro', () => {
+    expect(verificarSnapshot(criarSnapshotDoSquad(PERFIL_PADRAO, AMBIENTE, FASE))).toBe(true)
+  })
+
+  it('recusa snapshot lido de fora com perfil adulterado depois da revisão', () => {
+    const snap = criarSnapshotDoSquad(PERFIL_PADRAO, AMBIENTE, FASE)
+    const adulterado = { ...snap, perfil: { ...snap.perfil, versao: 2 } }
+    expect(verificarSnapshot(adulterado)).toBe(false)
+  })
+
+  it('recusa snapshot cuja resolução registrada não se reproduz', () => {
+    const snap = criarSnapshotDoSquad(PERFIL_PADRAO, AMBIENTE, FASE)
+    const adulterado = { ...snap, resolucao: { ...snap.resolucao, elegivel: false } }
+    expect(verificarSnapshot(adulterado)).toBe(false)
+  })
+})
+
+describe('auditoria registra o fallback por capacidade', () => {
+  const auditar = (skills: readonly string[]): readonly Record<string, unknown>[] => {
+    const eventos: AuditEventInput[] = []
+    const snap = criarSnapshotDoSquad(PERFIL_PADRAO, { ...AMBIENTE, skills }, FASE)
+    auditarSnapshotDoSquad(
+      { append: (e) => void eventos.push(e) },
+      { userId: 'u1', workspaceId: 'jarvis' },
+      snap
+    )
+    return eventos[0].payload?.capacidades as readonly Record<string, unknown>[]
+  }
+
+  it('skill ausente vira prompt, e isso aparece no evento', () => {
+    expect(auditar([])).toContainEqual({
+      capacidade: 'revisao-de-codigo',
+      camada: 'especialista',
+      estado: 'fallback',
+      via: 'prompt:revisao-de-codigo-disciplinada@1',
+      motivo: 'IMPLEMENTACAO_AUSENTE'
+    })
+  })
+
+  it('o que resolveu por implementação não polui o evento', () => {
+    expect(auditar(['code-review']).some((c) => c.capacidade === 'revisao-de-codigo')).toBe(false)
   })
 })

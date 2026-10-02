@@ -11,11 +11,12 @@
  *  - **Pura e sem consulta.** O ambiente (skills instaladas, ferramentas, estado do Ollama,
  *    opt-in) e o modelo da fase entram por parâmetro. Quem os mede é o chamador; aqui só se
  *    decide. É o que torna o snapshot reproduzível: mesmo perfil, mesmo ambiente, mesma resolução.
- *  - **Ollama fora do ar cai no modelo da fase** — que já vem resolvido pela rota que o projeto
- *    escolheu (MVP-026). Esta função nunca escolhe rota, então não tem como cair numa API paga
- *    por conta própria (SPEC-Squads-02, regra 5).
- *  - **Pedir API paga sem opt-in não vira fallback: vira indisponível.** O perfil *pediu* aquela
- *    camada; entregar outra, mesmo barata, seria a troca silenciosa que a regra 6 proíbe.
+ *  - **Ollama fora do ar cai no modelo da fase** — que vem resolvido pela rota que o projeto
+ *    escolheu (MVP-026). Esta função nunca escolhe rota.
+ *  - **API paga sem opt-in não vira fallback: vira indisponível**, e a conferência vale para o
+ *    modelo efetivo da camada — pedido pelo perfil, modelo da fase ou fallback do Ollama. Não se
+ *    confia em que `escolherRota` já barrou: a regra 6 é desta camada também (SPEC-Squads-02,
+ *    regra 5). Entregar outra rota, mesmo barata, seria a troca silenciosa que ela proíbe.
  */
 
 import type { ModeloEscolhido } from './modelo-da-fase'
@@ -71,7 +72,15 @@ export interface ResolucaoDoPerfil {
   readonly motivosDeInelegibilidade: readonly string[]
 }
 
-function resolverCamada(
+/**
+ * O `ollama list` costuma devolver `llama3.1:latest` para quem baixou sem tag, e o produto
+ * escreve `llama3.1`. São o mesmo modelo; comparar por igualdade exata reportaria "ausente" para
+ * quem o tem.
+ */
+const semTagLatest = (tag: string): string => (tag.endsWith(':latest') ? tag.slice(0, -7) : tag)
+
+/** A camada como o perfil a pede, sem olhar o opt-in — quem checa o preço é `resolverCamada`. */
+function candidataDaCamada(
   camada: Camada,
   perfil: PerfilDeSquad,
   ambiente: AmbienteDeResolucao,
@@ -81,21 +90,36 @@ function resolverCamada(
   if (origem.origem === 'fase') return { camada, estado: 'configurado', modelo: modeloDaFase }
 
   const modelo: ModeloEscolhido = { provider: origem.provider, modelo: origem.modelo }
+  if (origem.provider !== 'ollama') return { camada, estado: 'configurado', modelo }
 
-  if (origem.provider === 'ollama') {
-    if (!ambiente.ollama.disponivel) {
-      return { camada, estado: 'fallback', modelo: modeloDaFase, motivo: 'OLLAMA_FORA_DO_AR' }
-    }
-    if (!ambiente.ollama.modelos.includes(origem.modelo)) {
-      return { camada, estado: 'fallback', modelo: modeloDaFase, motivo: 'MODELO_LOCAL_AUSENTE' }
-    }
-    return { camada, estado: 'configurado', modelo }
+  if (!ambiente.ollama.disponivel) {
+    return { camada, estado: 'fallback', modelo: modeloDaFase, motivo: 'OLLAMA_FORA_DO_AR' }
   }
-
-  if (!isRotaUnmetered(origem.provider) && !ambiente.optInApiPaga) {
-    return { camada, estado: 'indisponivel', motivo: 'API_PAGA_SEM_OPT_IN' }
+  const instalados = ambiente.ollama.modelos.map(semTagLatest)
+  if (!instalados.includes(semTagLatest(origem.modelo))) {
+    return { camada, estado: 'fallback', modelo: modeloDaFase, motivo: 'MODELO_LOCAL_AUSENTE' }
   }
   return { camada, estado: 'configurado', modelo }
+}
+
+/**
+ * Resolve uma camada e **depois** confere o preço do modelo efetivo, qualquer que seja a origem:
+ * o pedido do perfil, o modelo da fase ou o fallback do Ollama. Conferir só o pedido explícito
+ * deixaria a rota paga entrar por onde o perfil nunca a nomeou — a regra 6 vale para a camada, não
+ * para o ramo que a produziu. Sem opt-in a camada fica indisponível, e não troca de rota.
+ */
+function resolverCamada(
+  camada: Camada,
+  perfil: PerfilDeSquad,
+  ambiente: AmbienteDeResolucao,
+  modeloDaFase: ModeloEscolhido
+): CamadaResolvida {
+  const candidata = candidataDaCamada(camada, perfil, ambiente, modeloDaFase)
+  const { modelo } = candidata
+  if (modelo !== undefined && !isRotaUnmetered(modelo.provider) && !ambiente.optInApiPaga) {
+    return { camada, estado: 'indisponivel', motivo: 'API_PAGA_SEM_OPT_IN' }
+  }
+  return candidata
 }
 
 function resolverImplementacao(

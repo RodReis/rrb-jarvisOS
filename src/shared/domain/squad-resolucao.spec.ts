@@ -227,6 +227,55 @@ describe('resolução de camadas — API paga só com opt-in (regra 6)', () => {
   })
 })
 
+describe('modelo da fase pago também respeita o opt-in (regra 6)', () => {
+  const FASE_PAGA: ModeloEscolhido = { provider: 'anthropic', modelo: 'claude-opus-5' }
+
+  it('fase paga sem opt-in deixa a camada indisponível e o plano inelegível', () => {
+    const r = resolverPerfil(PERFIL_PADRAO, AMBIENTE_COMPLETO, FASE_PAGA)
+    expect(r.camadas.especialista).toEqual({
+      camada: 'especialista',
+      estado: 'indisponivel',
+      motivo: 'API_PAGA_SEM_OPT_IN'
+    })
+    expect(r.elegivel).toBe(false)
+  })
+
+  it('fase paga com opt-in resolve', () => {
+    const r = resolverPerfil(PERFIL_PADRAO, { ...AMBIENTE_COMPLETO, optInApiPaga: true }, FASE_PAGA)
+    expect(r.camadas.especialista.estado).toBe('configurado')
+  })
+
+  it('o fallback do Ollama para uma fase paga sem opt-in também é recusado', () => {
+    const r = resolverPerfil(
+      comLocal(),
+      { ...AMBIENTE_COMPLETO, ollama: { disponivel: false, modelos: [] } },
+      FASE_PAGA
+    )
+    expect(r.camadas.orquestrador).toEqual({
+      camada: 'orquestrador',
+      estado: 'indisponivel',
+      motivo: 'API_PAGA_SEM_OPT_IN'
+    })
+  })
+})
+
+describe('tag do Ollama', () => {
+  it('llama3.1 e llama3.1:latest são o mesmo modelo', () => {
+    const perfilLocal = comLocal({
+      camadas: {
+        ...PERFIL_PADRAO.camadas,
+        orquestrador: { origem: 'modelo', provider: 'ollama', modelo: 'llama3.1', validador: 'e1' }
+      }
+    })
+    const r = resolverPerfil(
+      perfilLocal,
+      { ...AMBIENTE_COMPLETO, ollama: { disponivel: true, modelos: ['llama3.1:latest'] } },
+      FASE
+    )
+    expect(r.camadas.orquestrador.estado).toBe('configurado')
+  })
+})
+
 describe('custo e limites antes de instanciar — critério 4', () => {
   it('rota de assinatura e Ollama não têm custo em USD, e o relatório diz isso', () => {
     const r = resolverPerfil(PERFIL_PADRAO, AMBIENTE_COMPLETO, FASE)

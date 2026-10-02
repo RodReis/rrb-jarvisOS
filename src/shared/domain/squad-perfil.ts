@@ -146,6 +146,8 @@ export type CodigoDeProblema =
   | 'ACESSO_SUPERIOR_A_FUNCAO'
   | 'APROVACAO_AUSENTE'
   | 'LIMITE_INVALIDO'
+  | 'CHAVE_DESCONHECIDA'
+  | 'APROVACAO_DESCONHECIDA'
 
 export interface ProblemaDoPerfil {
   readonly codigo: CodigoDeProblema
@@ -165,11 +167,49 @@ export interface OpcoesDeValidacao {
 
 const TIPO_DE_FATIA = /^[a-z0-9]+(-[a-z0-9]+)*$/
 
+/**
+ * Tetos de sanidade dos limites. Um `maxTokensEntradaPorTarefa` de `1e300` é inteiro e passaria
+ * por "positivo", mas é lixo: alimentaria a cota de custo com um número que não significa nada.
+ */
+export const TETO_DE_TAREFAS = 1_000
+export const TETO_DE_TOKENS_POR_TAREFA = 1_000_000
+
+/**
+ * As chaves que o schema conhece, **nível a nível**. O validador recusa o resto em vez de copiar:
+ * um perfil com `acessoPorFuncao.admin = { git: true }` tem a forma certa nas chaves que o
+ * validador olha e uma permissão que ele nunca viu — exatamente o que o critério 3 proíbe.
+ */
+const CHAVES_DO_PERFIL = [
+  'schema',
+  'tipoDeFatia',
+  'versao',
+  'camadas',
+  'capacidades',
+  'escritores',
+  'integrador',
+  'revisor',
+  'acessoPorFuncao',
+  'aprovacoes',
+  'limites'
+] as const
+const CHAVES_DA_ORIGEM_FASE = ['origem'] as const
+const CHAVES_DA_ORIGEM_MODELO = ['origem', 'provider', 'modelo', 'validador'] as const
+const CHAVES_DA_CAPACIDADE = ['id', 'obrigatoria', 'camadas'] as const
+const CHAVES_DO_ACESSO = ['escrita', 'git', 'github'] as const
+const CHAVES_DA_CAMADA_DO_PAPEL = ['camada'] as const
+const CHAVES_DOS_LIMITES = [
+  'maxTarefasMinimo',
+  'maxTokensEntradaPorTarefa',
+  'maxTokensSaidaPorTarefa'
+] as const
+
+type Problemas = ProblemaDoPerfil[]
+
 const ehObjeto = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v)
 
-const ehInteiroPositivo = (v: unknown): v is number =>
-  typeof v === 'number' && Number.isInteger(v) && v > 0
+const ehInteiroAte = (v: unknown, teto: number): v is number =>
+  typeof v === 'number' && Number.isSafeInteger(v) && v > 0 && v <= teto
 
 /** Congela em profundidade. O perfil é contrato: ninguém o altera depois de validado. */
 export function congelar<T>(valor: T): T {
@@ -180,206 +220,380 @@ export function congelar<T>(valor: T): T {
   return valor
 }
 
-function validarCamadas(bruto: unknown, problemas: ProblemaDoPerfil[]): void {
-  const problema = (codigo: CodigoDeProblema, caminho: string, detalhe: string): void => {
-    problemas.push({ codigo, caminho, detalhe })
-  }
+function registrar(
+  problemas: Problemas,
+  codigo: CodigoDeProblema,
+  caminho: string,
+  detalhe: string
+): void {
+  problemas.push({ codigo, caminho, detalhe })
+}
 
-  if (!ehObjeto(bruto)) {
-    problema('SCHEMA', 'camadas', 'as camadas não são um objeto')
+/** Recusa toda chave própria fora da lista — inclusive a `__proto__` que o `JSON.parse` cria. */
+function exigirSoChaves(
+  objeto: Record<string, unknown>,
+  permitidas: readonly string[],
+  caminho: string,
+  problemas: Problemas
+): void {
+  for (const chave of Object.keys(objeto)) {
+    if (permitidas.includes(chave)) continue
+    const onde = caminho === '' ? chave : `${caminho}.${chave}`
+    registrar(problemas, 'CHAVE_DESCONHECIDA', onde, `a chave ${chave} não existe no schema`)
+  }
+}
+
+function validarOrigem(
+  camada: Camada,
+  origem: Record<string, unknown>,
+  problemas: Problemas
+): void {
+  const caminho = `camadas.${camada}`
+  if (origem.origem === 'fase') {
+    exigirSoChaves(origem, CHAVES_DA_ORIGEM_FASE, caminho, problemas)
     return
   }
+  if (origem.origem !== 'modelo') {
+    registrar(problemas, 'SCHEMA', caminho, `origem ${String(origem.origem)} desconhecida`)
+    return
+  }
+  exigirSoChaves(origem, CHAVES_DA_ORIGEM_MODELO, caminho, problemas)
 
+  const { validador } = origem
+  if (validador !== undefined && validador !== 'e1') {
+    registrar(problemas, 'SCHEMA', `${caminho}.validador`, 'só o validador e1 existe')
+  }
+  validarProviderEModelo(camada, origem, problemas)
+}
+
+/** O par pedido existe? E o orquestrador local declara o validador que a Emenda E1 exige? */
+function validarProviderEModelo(
+  camada: Camada,
+  origem: Record<string, unknown>,
+  problemas: Problemas
+): void {
+  const caminho = `camadas.${camada}`
+  const { provider, modelo, validador } = origem
+  if (typeof provider !== 'string' || !(AI_PROVIDERS as readonly string[]).includes(provider)) {
+    registrar(
+      problemas,
+      'MODELO_FORA_DO_CATALOGO',
+      caminho,
+      `provider ${String(provider)} desconhecido`
+    )
+    return
+  }
+  if (typeof modelo !== 'string' || modelo.trim() === '') {
+    registrar(problemas, 'MODELO_FORA_DO_CATALOGO', caminho, 'modelo em branco')
+    return
+  }
+  // A tag do Ollama é a da máquina do usuário: o produto não a cataloga, e a disponibilidade é
+  // pergunta da resolução. Para os demais providers, o catálogo manda — é ele que proíbe Fable
+  // pela API paga.
+  if (provider !== 'ollama' && !modeloExisteNoCatalogo(provider as AiProvider, modelo)) {
+    registrar(
+      problemas,
+      'MODELO_FORA_DO_CATALOGO',
+      caminho,
+      `${provider} não tem o modelo ${modelo}`
+    )
+  }
+  if (camada === 'orquestrador' && provider === 'ollama' && validador !== 'e1') {
+    registrar(
+      problemas,
+      'LOCAL_SEM_VALIDADOR_E1',
+      caminho,
+      'o orquestrador local só entra com o validador endurecido (SPEC-Squads-02, Emenda E1)'
+    )
+  }
+}
+
+function validarCamadas(bruto: unknown, problemas: Problemas): void {
+  if (!ehObjeto(bruto)) {
+    registrar(problemas, 'SCHEMA', 'camadas', 'as camadas não são um objeto')
+    return
+  }
+  exigirSoChaves(bruto, CAMADAS, 'camadas', problemas)
   for (const camada of CAMADAS) {
     const origem = bruto[camada]
-    const caminho = `camadas.${camada}`
+    if (ehObjeto(origem)) validarOrigem(camada, origem, problemas)
+    else registrar(problemas, 'SCHEMA', `camadas.${camada}`, 'camada sem origem declarada')
+  }
+}
 
-    if (!ehObjeto(origem)) {
-      problema('SCHEMA', caminho, 'camada sem origem declarada')
-      continue
-    }
-    if (origem.origem === 'fase') continue
-    if (origem.origem !== 'modelo') {
-      problema('SCHEMA', caminho, `origem ${String(origem.origem)} desconhecida`)
-      continue
-    }
+function validarCapacidade(
+  item: unknown,
+  i: number,
+  vistas: Set<unknown>,
+  problemas: Problemas
+): void {
+  const caminho = `capacidades[${i}]`
+  if (!ehObjeto(item)) {
+    registrar(problemas, 'SCHEMA', caminho, 'a capacidade não é um objeto')
+    return
+  }
+  exigirSoChaves(item, CHAVES_DA_CAPACIDADE, caminho, problemas)
 
-    const { provider, modelo } = origem
-    if (typeof provider !== 'string' || !(AI_PROVIDERS as readonly string[]).includes(provider)) {
-      problema('MODELO_FORA_DO_CATALOGO', caminho, `provider ${String(provider)} desconhecido`)
+  if (!isCapacidadeId(item.id)) {
+    registrar(
+      problemas,
+      'CAPACIDADE_DESCONHECIDA',
+      `${caminho}.id`,
+      `capacidade ${String(item.id)} não está no registro`
+    )
+  } else if (vistas.has(item.id)) {
+    registrar(
+      problemas,
+      'CAPACIDADE_DUPLICADA',
+      `${caminho}.id`,
+      `${item.id} aparece mais de uma vez`
+    )
+  }
+  vistas.add(item.id)
+
+  if (typeof item.obrigatoria !== 'boolean') {
+    registrar(problemas, 'SCHEMA', `${caminho}.obrigatoria`, 'obrigatoria precisa ser booleano')
+  }
+  // `Array.from` e não `.every` direto: `every` pula os buracos de um array esparso.
+  const camadas = Array.isArray(item.camadas) ? Array.from(item.camadas as unknown[]) : []
+  if (camadas.length === 0 || !camadas.every(isCamada)) {
+    registrar(
+      problemas,
+      'CAMADA_INVALIDA',
+      `${caminho}.camadas`,
+      'ao menos uma camada válida (orquestrador, executor ou especialista)'
+    )
+  }
+}
+
+function validarCapacidades(bruto: unknown, problemas: Problemas): void {
+  if (!Array.isArray(bruto) || bruto.length === 0) {
+    registrar(problemas, 'SCHEMA', 'capacidades', 'sem capacidades')
+    return
+  }
+  const vistas = new Set<unknown>()
+  for (const [i, item] of Array.from(bruto as unknown[]).entries()) {
+    validarCapacidade(item, i, vistas, problemas)
+  }
+}
+
+function validarAcesso(bruto: unknown, problemas: Problemas): void {
+  if (!ehObjeto(bruto)) {
+    registrar(problemas, 'SCHEMA', 'acessoPorFuncao', 'não é um objeto')
+    return
+  }
+  exigirSoChaves(bruto, FUNCOES, 'acessoPorFuncao', problemas)
+
+  for (const funcao of FUNCOES) {
+    const acesso = bruto[funcao]
+    const caminho = `acessoPorFuncao.${funcao}`
+    if (!ehObjeto(acesso)) {
+      registrar(problemas, 'SCHEMA', caminho, 'escrita, git e github obrigatórios')
       continue
     }
-    if (typeof modelo !== 'string' || modelo.trim() === '') {
-      problema('MODELO_FORA_DO_CATALOGO', caminho, 'modelo em branco')
+    exigirSoChaves(acesso, CHAVES_DO_ACESSO, caminho, problemas)
+    if (CHAVES_DO_ACESSO.some((c) => typeof acesso[c] !== 'boolean')) {
+      registrar(problemas, 'SCHEMA', caminho, 'escrita, git e github obrigatórios')
       continue
     }
-    // A tag do Ollama é a da máquina do usuário: o produto não a cataloga, e a disponibilidade
-    // é pergunta da resolução. Para os demais providers, o catálogo manda — é ele que proíbe
-    // Fable pela API paga.
-    if (provider !== 'ollama' && !modeloExisteNoCatalogo(provider as AiProvider, modelo)) {
-      problema('MODELO_FORA_DO_CATALOGO', caminho, `${provider} não tem o modelo ${modelo}`)
-    }
-    if (camada === 'orquestrador' && provider === 'ollama' && origem.validador !== 'e1') {
-      problema(
-        'LOCAL_SEM_VALIDADOR_E1',
+    if (acesso.git === true || acesso.github === true) {
+      registrar(
+        problemas,
+        'PERMISSAO_GIT_GITHUB',
         caminho,
-        'o orquestrador local só entra com o validador endurecido (SPEC-Squads-02, Emenda E1)'
+        'nenhum agente tem Git ou GitHub; quem commita e integra é o kernel'
+      )
+    }
+    if (acesso.escrita === true && !FUNCOES_QUE_ESCREVEM.includes(funcao)) {
+      registrar(
+        problemas,
+        'ACESSO_SUPERIOR_A_FUNCAO',
+        caminho,
+        `a função ${funcao} só lê; escrita é de escritor e integrador`
       )
     }
   }
 }
 
-function validarCapacidades(bruto: unknown, problemas: ProblemaDoPerfil[]): void {
-  if (!Array.isArray(bruto) || bruto.length === 0) {
-    problemas.push({ codigo: 'SCHEMA', caminho: 'capacidades', detalhe: 'sem capacidades' })
-    return
+function camadaDoPapel(papel: unknown, caminho: string, problemas: Problemas): Camada | undefined {
+  if (!ehObjeto(papel)) {
+    registrar(problemas, 'CAMADA_INVALIDA', `${caminho}.camada`, 'obrigatória')
+    return undefined
   }
-
-  const vistas = new Set<unknown>()
-  for (const [i, item] of bruto.entries()) {
-    const caminho = `capacidades[${i}]`
-    if (!ehObjeto(item)) {
-      problemas.push({ codigo: 'SCHEMA', caminho, detalhe: 'a capacidade não é um objeto' })
-      continue
-    }
-    if (!isCapacidadeId(item.id)) {
-      problemas.push({
-        codigo: 'CAPACIDADE_DESCONHECIDA',
-        caminho: `${caminho}.id`,
-        detalhe: `capacidade ${String(item.id)} não está no registro`
-      })
-    } else if (vistas.has(item.id)) {
-      problemas.push({
-        codigo: 'CAPACIDADE_DUPLICADA',
-        caminho: `${caminho}.id`,
-        detalhe: `${item.id} aparece mais de uma vez`
-      })
-    }
-    vistas.add(item.id)
-
-    if (typeof item.obrigatoria !== 'boolean') {
-      problemas.push({
-        codigo: 'SCHEMA',
-        caminho: `${caminho}.obrigatoria`,
-        detalhe: 'obrigatoria precisa ser booleano'
-      })
-    }
-    const camadas = item.camadas
-    if (!Array.isArray(camadas) || camadas.length === 0 || !camadas.every(isCamada)) {
-      problemas.push({
-        codigo: 'CAMADA_INVALIDA',
-        caminho: `${caminho}.camadas`,
-        detalhe: 'ao menos uma camada válida (orquestrador, executor ou especialista)'
-      })
-    }
-  }
+  exigirSoChaves(papel, CHAVES_DA_CAMADA_DO_PAPEL, caminho, problemas)
+  if (isCamada(papel.camada)) return papel.camada
+  registrar(problemas, 'CAMADA_INVALIDA', `${caminho}.camada`, 'inválida')
+  return undefined
 }
 
-function validarAcesso(bruto: unknown, problemas: ProblemaDoPerfil[]): void {
-  if (!ehObjeto(bruto)) {
-    problemas.push({ codigo: 'SCHEMA', caminho: 'acessoPorFuncao', detalhe: 'não é um objeto' })
-    return
+function validarContagemDeEscritores(
+  escritores: unknown,
+  opcoes: OpcoesDeValidacao,
+  problemas: Problemas
+): number | undefined {
+  if (!ehInteiroAte(escritores, Number.MAX_SAFE_INTEGER)) {
+    registrar(problemas, 'SCHEMA', 'escritores', 'inteiro ≥ 1')
+    return undefined
   }
-
-  for (const funcao of FUNCOES) {
-    const acesso = bruto[funcao]
-    const caminho = `acessoPorFuncao.${funcao}`
-    if (
-      !ehObjeto(acesso) ||
-      typeof acesso.escrita !== 'boolean' ||
-      typeof acesso.git !== 'boolean' ||
-      typeof acesso.github !== 'boolean'
-    ) {
-      problemas.push({ codigo: 'SCHEMA', caminho, detalhe: 'escrita, git e github obrigatórios' })
-      continue
-    }
-    if (acesso.git || acesso.github) {
-      problemas.push({
-        codigo: 'PERMISSAO_GIT_GITHUB',
-        caminho,
-        detalhe: 'nenhum agente tem Git ou GitHub; quem commita e integra é o kernel'
-      })
-    }
-    if (acesso.escrita && !FUNCOES_QUE_ESCREVEM.includes(funcao)) {
-      problemas.push({
-        codigo: 'ACESSO_SUPERIOR_A_FUNCAO',
-        caminho,
-        detalhe: `a função ${funcao} só lê; escrita é de escritor e integrador`
-      })
-    }
+  if (escritores > MAX_ESCRITORES) {
+    registrar(
+      problemas,
+      'ESCRITORES_EXCEDIDOS',
+      'escritores',
+      `${escritores} escritores; o teto é ${MAX_ESCRITORES}`
+    )
+  } else if (escritores === 2 && opcoes.multiEscritor !== true) {
+    registrar(
+      problemas,
+      'MULTI_ESCRITOR_DESLIGADO',
+      'escritores',
+      'dois escritores ficam desligados até o MVP-028 (ADR-006, decisão 16)'
+    )
   }
+  return escritores
 }
 
 function validarEscritores(
   bruto: Record<string, unknown>,
   opcoes: OpcoesDeValidacao,
-  problemas: ProblemaDoPerfil[]
+  problemas: Problemas
 ): void {
-  const { escritores, integrador, revisor } = bruto
+  const escritores = validarContagemDeEscritores(bruto.escritores, opcoes, problemas)
+  const camadaDoRevisor = camadaDoPapel(bruto.revisor, 'revisor', problemas)
+  if (escritores === undefined) return
 
-  if (!ehInteiroPositivo(escritores)) {
-    problemas.push({ codigo: 'SCHEMA', caminho: 'escritores', detalhe: 'inteiro ≥ 1' })
+  const { integrador } = bruto
+  if (escritores >= 2 && integrador === undefined) {
+    registrar(
+      problemas,
+      'INTEGRADOR_AUSENTE',
+      'integrador',
+      'com mais de um escritor, alguém precisa integrar'
+    )
     return
   }
-  if (escritores > MAX_ESCRITORES) {
-    problemas.push({
-      codigo: 'ESCRITORES_EXCEDIDOS',
-      caminho: 'escritores',
-      detalhe: `${escritores} escritores; o teto é ${MAX_ESCRITORES}`
-    })
-  } else if (escritores === 2 && opcoes.multiEscritor !== true) {
-    problemas.push({
-      codigo: 'MULTI_ESCRITOR_DESLIGADO',
-      caminho: 'escritores',
-      detalhe: 'dois escritores ficam desligados até o MVP-028 (ADR-006, decisão 16)'
-    })
-  }
+  if (integrador === undefined) return
 
-  const camadaDoRevisor = ehObjeto(revisor) && isCamada(revisor.camada) ? revisor.camada : undefined
-  if (camadaDoRevisor === undefined) {
-    problemas.push({ codigo: 'CAMADA_INVALIDA', caminho: 'revisor.camada', detalhe: 'obrigatória' })
+  if (escritores === 1) {
+    registrar(
+      problemas,
+      'INTEGRADOR_SEM_SEGUNDO_ESCRITOR',
+      'integrador',
+      'integrador só existe com dois escritores'
+    )
   }
-
-  const camadaDoIntegrador =
-    ehObjeto(integrador) && isCamada(integrador.camada) ? integrador.camada : undefined
-
-  if (escritores >= 2 && integrador === undefined) {
-    problemas.push({
-      codigo: 'INTEGRADOR_AUSENTE',
-      caminho: 'integrador',
-      detalhe: 'com mais de um escritor, alguém precisa integrar'
-    })
-  }
-  if (escritores === 1 && integrador !== undefined) {
-    problemas.push({
-      codigo: 'INTEGRADOR_SEM_SEGUNDO_ESCRITOR',
-      caminho: 'integrador',
-      detalhe: 'integrador só existe com dois escritores'
-    })
-  }
-  if (integrador !== undefined && camadaDoIntegrador === undefined) {
-    problemas.push({ codigo: 'CAMADA_INVALIDA', caminho: 'integrador.camada', detalhe: 'inválida' })
-  }
+  const camadaDoIntegrador = camadaDoPapel(integrador, 'integrador', problemas)
   if (camadaDoIntegrador !== undefined && camadaDoIntegrador === camadaDoRevisor) {
-    problemas.push({
-      codigo: 'INTEGRADOR_NA_CAMADA_DO_REVISOR',
-      caminho: 'integrador.camada',
-      detalhe: `quem integra não revisa o próprio resultado; ambos em ${camadaDoIntegrador}`
-    })
+    registrar(
+      problemas,
+      'INTEGRADOR_NA_CAMADA_DO_REVISOR',
+      'integrador.camada',
+      `quem integra não revisa o próprio resultado; ambos em ${camadaDoIntegrador}`
+    )
   }
 }
 
-function validarLimites(bruto: unknown, problemas: ProblemaDoPerfil[]): void {
-  const campos = ['maxTarefasMinimo', 'maxTokensEntradaPorTarefa', 'maxTokensSaidaPorTarefa']
-  for (const campo of campos) {
-    if (!ehObjeto(bruto) || !ehInteiroPositivo(bruto[campo])) {
-      problemas.push({
-        codigo: 'LIMITE_INVALIDO',
-        caminho: `limites.${campo}`,
-        detalhe: 'inteiro positivo obrigatório'
-      })
+function validarAprovacoes(bruto: unknown, problemas: Problemas): void {
+  const lista: readonly unknown[] = Array.isArray(bruto) ? Array.from(bruto as unknown[]) : []
+  if (!Array.isArray(bruto)) registrar(problemas, 'SCHEMA', 'aprovacoes', 'precisa ser uma lista')
+
+  for (const acao of lista) {
+    if (!(ACOES_COM_APROVACAO as readonly unknown[]).includes(acao)) {
+      registrar(
+        problemas,
+        'APROVACAO_DESCONHECIDA',
+        'aprovacoes',
+        `a ação ${String(acao)} não existe`
+      )
     }
   }
+  for (const acao of ACOES_COM_APROVACAO) {
+    if (!lista.includes(acao)) {
+      registrar(problemas, 'APROVACAO_AUSENTE', 'aprovacoes', `a ação ${acao} precisa esperar o PI`)
+    }
+  }
+}
+
+function validarLimites(bruto: unknown, problemas: Problemas): void {
+  if (!ehObjeto(bruto)) {
+    registrar(problemas, 'LIMITE_INVALIDO', 'limites', 'não é um objeto')
+    return
+  }
+  exigirSoChaves(bruto, CHAVES_DOS_LIMITES, 'limites', problemas)
+  for (const campo of CHAVES_DOS_LIMITES) {
+    const teto = campo === 'maxTarefasMinimo' ? TETO_DE_TAREFAS : TETO_DE_TOKENS_POR_TAREFA
+    if (!ehInteiroAte(bruto[campo], teto)) {
+      registrar(problemas, 'LIMITE_INVALIDO', `limites.${campo}`, `inteiro entre 1 e ${teto}`)
+    }
+  }
+}
+
+function validarCabecalho(bruto: Record<string, unknown>, problemas: Problemas): void {
+  if (bruto.schema !== VERSAO_DO_SCHEMA_DO_PERFIL) {
+    registrar(
+      problemas,
+      'VERSAO_DE_SCHEMA_DESCONHECIDA',
+      'schema',
+      `esperado ${VERSAO_DO_SCHEMA_DO_PERFIL}, veio ${String(bruto.schema)}`
+    )
+  }
+  if (typeof bruto.tipoDeFatia !== 'string' || !TIPO_DE_FATIA.test(bruto.tipoDeFatia)) {
+    registrar(problemas, 'TIPO_INVALIDO', 'tipoDeFatia', 'kebab-case não vazio')
+  }
+  if (!ehInteiroAte(bruto.versao, Number.MAX_SAFE_INTEGER)) {
+    registrar(problemas, 'VERSAO_INVALIDA', 'versao', 'inteiro ≥ 1')
+  }
+}
+
+/**
+ * Monta o perfil **só com o que foi validado**. Não clona a entrada: chave que o schema não
+ * conhece já foi recusada, mas copiar campo a campo é o que garante que nada além do contrato
+ * chega ao consumidor — e que um valor sem clone (função, símbolo) não derruba a validação.
+ */
+function montarPerfil(b: Record<string, unknown>): PerfilDeSquad {
+  const camadas = b.camadas as Record<Camada, Record<string, unknown>>
+  const acesso = b.acessoPorFuncao as Record<Funcao, AcessoDaFuncao>
+  const limites = b.limites as Record<(typeof CHAVES_DOS_LIMITES)[number], number>
+  const origemDe = (o: Record<string, unknown>): OrigemDaCamada =>
+    o.origem === 'fase'
+      ? { origem: 'fase' }
+      : {
+          origem: 'modelo',
+          provider: o.provider as AiProvider,
+          modelo: o.modelo as string,
+          ...(o.validador === 'e1' ? { validador: 'e1' as const } : {})
+        }
+
+  return congelar({
+    schema: VERSAO_DO_SCHEMA_DO_PERFIL,
+    tipoDeFatia: b.tipoDeFatia as string,
+    versao: b.versao as number,
+    camadas: {
+      orquestrador: origemDe(camadas.orquestrador),
+      executor: origemDe(camadas.executor),
+      especialista: origemDe(camadas.especialista)
+    },
+    capacidades: (b.capacidades as Record<string, unknown>[]).map((c) => ({
+      id: c.id as CapacidadeId,
+      obrigatoria: c.obrigatoria as boolean,
+      camadas: Array.from(c.camadas as Camada[])
+    })),
+    escritores: b.escritores as 1 | 2,
+    ...(ehObjeto(b.integrador) ? { integrador: { camada: b.integrador.camada as Camada } } : {}),
+    revisor: { camada: (b.revisor as { camada: Camada }).camada },
+    acessoPorFuncao: Object.fromEntries(
+      FUNCOES.map((f) => [
+        f,
+        { escrita: acesso[f].escrita, git: acesso[f].git, github: acesso[f].github }
+      ])
+    ) as Record<Funcao, AcessoDaFuncao>,
+    aprovacoes: Array.from(b.aprovacoes as AcaoComAprovacao[]),
+    limites: {
+      maxTarefasMinimo: limites.maxTarefasMinimo,
+      maxTokensEntradaPorTarefa: limites.maxTokensEntradaPorTarefa,
+      maxTokensSaidaPorTarefa: limites.maxTokensSaidaPorTarefa
+    }
+  })
 }
 
 /**
@@ -397,46 +611,18 @@ export function validarPerfil(
     }
   }
 
-  const problemas: ProblemaDoPerfil[] = []
-
-  if (bruto.schema !== VERSAO_DO_SCHEMA_DO_PERFIL) {
-    problemas.push({
-      codigo: 'VERSAO_DE_SCHEMA_DESCONHECIDA',
-      caminho: 'schema',
-      detalhe: `esperado ${VERSAO_DO_SCHEMA_DO_PERFIL}, veio ${String(bruto.schema)}`
-    })
-  }
-  if (typeof bruto.tipoDeFatia !== 'string' || !TIPO_DE_FATIA.test(bruto.tipoDeFatia)) {
-    problemas.push({
-      codigo: 'TIPO_INVALIDO',
-      caminho: 'tipoDeFatia',
-      detalhe: 'kebab-case não vazio'
-    })
-  }
-  if (!ehInteiroPositivo(bruto.versao)) {
-    problemas.push({ codigo: 'VERSAO_INVALIDA', caminho: 'versao', detalhe: 'inteiro ≥ 1' })
-  }
-
+  const problemas: Problemas = []
+  exigirSoChaves(bruto, CHAVES_DO_PERFIL, '', problemas)
+  validarCabecalho(bruto, problemas)
   validarCamadas(bruto.camadas, problemas)
   validarCapacidades(bruto.capacidades, problemas)
   validarEscritores(bruto, opcoes, problemas)
   validarAcesso(bruto.acessoPorFuncao, problemas)
-
-  const aprovacoes = Array.isArray(bruto.aprovacoes) ? bruto.aprovacoes : []
-  for (const acao of ACOES_COM_APROVACAO) {
-    if (!aprovacoes.includes(acao)) {
-      problemas.push({
-        codigo: 'APROVACAO_AUSENTE',
-        caminho: 'aprovacoes',
-        detalhe: `a ação ${acao} precisa esperar o PI`
-      })
-    }
-  }
-
+  validarAprovacoes(bruto.aprovacoes, problemas)
   validarLimites(bruto.limites, problemas)
 
   if (problemas.length > 0) return { ok: false, problemas }
-  return { ok: true, perfil: congelar(structuredClone(bruto) as unknown as PerfilDeSquad) }
+  return { ok: true, perfil: montarPerfil(bruto) }
 }
 
 export interface LimitesCalculados {
@@ -445,8 +631,16 @@ export interface LimitesCalculados {
   readonly maxTarefas: number
 }
 
-/** Os limites que valem **antes** de instanciar o Squad (critério 4). */
+/**
+ * Os limites que valem **antes** de instanciar o Squad (critério 4).
+ *
+ * `criteriosDaSpec` inválido **lança**: `Math.max(piso, NaN)` devolve `NaN`, e um gate que compara
+ * `usd > limite` com `NaN` dá `false` — deixaria passar exatamente a conta que não existe.
+ */
 export function limitesDoPerfil(perfil: PerfilDeSquad, criteriosDaSpec: number): LimitesCalculados {
+  if (!Number.isSafeInteger(criteriosDaSpec) || criteriosDaSpec < 0) {
+    throw new RangeError(`número de critérios inválido: ${String(criteriosDaSpec)}`)
+  }
   return {
     slots: perfil.escritores,
     maxTarefas: Math.max(perfil.limites.maxTarefasMinimo, criteriosDaSpec)
