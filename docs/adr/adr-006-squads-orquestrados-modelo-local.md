@@ -1,6 +1,6 @@
 # ADR-006: Squads orquestrados por modelo local, com multi-escritor e quadro de execução
 
-- Status: **proposto** — aguarda o "aprovado" do PI a esta revisão.
+- Status: **aceito** — aprovado pelo PI em 2 de outubro de 2026 (revisão do PR #367).
 - Data: 2 de outubro de 2026.
 - Decisor: PI (todas as decisões abaixo, tomadas em sessão de planejamento de 2026-10-02); redação pelo Cowork.
 - Relacionado: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v2-design.md` (Decisões 3 e 5, §7); MVP-009 (decisão 6, WIP=1; M9-F04 tentativas; M9-F05 merge); MVP-012 (M12-F01 pool); MVP-013; MVP-016; MVP-026 (modelo por fase; Fable só por assinatura); `DIMENSIONAMENTO.md`; RF-014.
@@ -35,11 +35,12 @@ O plano antigo não acomoda (2) nem (3), e trata o planejador como caixa-preta.
 12. **Prova antes da primeira fatia (R-crítico):** a fatia **M11-F00** mede o orquestrador local em fatias já entregues e o integrador em merges históricos com conflito. O critério de aprovação é numérico e definido pelo PI na SPEC-Squads-00.
 13. **Ordem:** a **M12-F01 (pool global)** passa a entrar **antes da M11-F03**. O restante do MVP-012 segue depois do MVP-011.
 14. **Partição (T-enorme, 20 pts):** o MVP-011 fica com o núcleo (F00–F04, T-grande) e o quadro de execução e a governança (play, PR/MERGE, selo, tetos agregados, cancelamento em cascata, E2E) vão para o **MVP-028** (T-médio, R-alto), que depende do MVP-011.
-15. **Critérios da M11-F00:** orquestrador local vira padrão com **≥ 80%** de planos aceitos; integrador exige **zero hunk perdido sem registro e 100% de suítes verdes**. Replanejamento limitado ao **limite da M9-F04**; consulta de checks a cada **60 s**.
+15. **Critérios da M11-F00:** orquestrador local vira padrão com **≥ 80%** de planos aceitos; integrador exige **zero hunk perdido sem registro e 100% de suítes verdes**. Replanejamento limitado ao **limite da M9-F04**; consulta de checks a cada **60 s**. Conjunto de referência: fatias mergeadas do MVP-009, do MVP-010 e do MVP-026.
+16. **Multi-escritor desligado por padrão entre a entrega do MVP-011 e a do MVP-028**: até lá, o perfil aceita 1 escritor; 2 escritores só em E2E de teste. Liga quando tetos agregados, selo de aprovação e cancelamento em cascata existirem.
 
 ## Consequências
 
-- O MVP-011 é reescrito (F00–F04) e nasce o MVP-028 (F01–F02); as SPECs ficam em planejado até o "aprovado" do PI. As issues #122–#125 voltam a `proplan:planejado` quando o PI aprovar esta ADR; #126 passa ao MVP-028.
+- O MVP-011 é reescrito (F00–F04) e nasce o MVP-028 (F01–F02); as SPECs ficam em planejado até o "aprovado" do PI. As issues #122–#125 seguem em Backlog com as SPECs reescritas; #126 passa ao MVP-028; M11-F00 = #369, MVP-028 = #368, M28-F01 = #370.
 - O §3 da V2 continua excluindo "vários agentes no **mesmo** worktree" e "duas implementações concorrentes da mesma fatia". Multi-escritor aqui é divisão de trabalho em worktrees distintos.
 - **Pendências para a próxima rodada** (não decididas aqui): emendas ao MVP-012 (slots por escritor, fairness com multi-escritor, independência entre issues do mesmo MVP no play) e ao MVP-013 (relação entre o play do PI e a drenagem contínua; RF-014.2).
 - RF-014 dividido na matriz: RF-014.1 mantido no MVP-011; RF-014.2 transferido ao MVP-013; RF-014.3 transferido ao MVP-015.

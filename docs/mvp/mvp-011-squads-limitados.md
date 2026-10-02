@@ -1,7 +1,7 @@
 # MVP-011 — Squads orquestrados pela SPEC
 
-- Status: **reescrito em 2026-10-02 pelas decisões do PI ([ADR-006](../adr/adr-006-squads-orquestrados-modelo-local.md)); aguarda o "aprovado" do PI.** A versão aprovada em 2026-08-29 (escritor único, cinco fatias) fica substituída quando o PI aprovar esta revisão. **Partido em dois MVPs** (ADR-006, decisão 14): este é o núcleo; quadro de execução e governança são o [MVP-028](mvp-028-quadro-execucao-squads.md).
-- GitHub: épico [#121](https://github.com/RodReis/rrb-jarvisOS/issues/121); fatias #122–#125 (voltam a `proplan:planejado` na aprovação da ADR-006); F00 ganha issue nova na aprovação da sua SPEC; #126 passa ao MVP-028.
+- Status: **reescrito em 2026-10-02 pelas decisões do PI ([ADR-006](../adr/adr-006-squads-orquestrados-modelo-local.md)); revisão aprovada pelo PI em 2026-10-02 (PR #367).** Substitui a versão de 2026-08-29 (escritor único, cinco fatias). **Partido em dois MVPs** (ADR-006, decisão 14): este é o núcleo; quadro de execução e governança são o [MVP-028](mvp-028-quadro-execucao-squads.md).
+- GitHub: épico [#121](https://github.com/RodReis/rrb-jarvisOS/issues/121); fatias #122–#125 em Backlog com as SPECs reescritas; M11-F00 em [#369](https://github.com/RodReis/rrb-jarvisOS/issues/369); #126 passou ao MVP-028 ([#368](https://github.com/RodReis/rrb-jarvisOS/issues/368)).
 - Depende de: MVP-010 concluído. **M12-F01 (pool global) entra antes da M11-F03** (ADR-006, decisão 13).
 - Dono do aceite: PI.
 - Design: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v2-design.md` §7, emendado pela ADR-006.
@@ -22,7 +22,7 @@ Um orquestrador local e barato quebra cada issue em tarefas e escolhe a camada d
 
 | Ordem | Fatia | SPEC | Dependência | Issue |
 |---:|---|---|---|---|
-| 0 | Prova do orquestrador local e do integrador | `spec-squads-00-prova-orquestrador-integrador.md` | MVP-010 | nova |
+| 0 | Prova do orquestrador local e do integrador | `spec-squads-00-prova-orquestrador-integrador.md` | MVP-010 | #369 |
 | 1 | Capacidades, perfis e camadas de modelo | `spec-squads-01-capacidades-perfis.md` | F00 aprovada pelo critério | #122 |
 | 2 | Orquestrador local e validador determinístico | `spec-squads-02-planejador-validador.md` | F01 | #123 |
 | 3 | Workers somente-leitura e escritores isolados | `spec-squads-03-workers-isolados.md` | F02 + **M12-F01** | #124 |
@@ -57,5 +57,4 @@ Um orquestrador local e barato quebra cada issue em tarefas e escolhe a camada d
 
 ## Perguntas abertas ao PI
 
-1. Conjunto de referência da M11-F00 (SPEC-Squads-00).
-2. Entre a entrega deste MVP e a do MVP-028 (sem tetos agregados nem selo de aprovação), o multi-escritor fica ligado ou desligado por padrão?
+Nenhuma. Conjunto de referência da F00 e multi-escritor desligado por padrão até o MVP-028 decididos pelo PI em 2026-10-02 (ADR-006, decisões 15 e 16).

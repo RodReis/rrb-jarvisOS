@@ -1,8 +1,8 @@
 # SPEC-Squads-00 — Prova do orquestrador local e do integrador
 
 - MVP: `docs/mvp/mvp-011-squads-limitados.md` (Fatia 00).
-- Issue: criada pelo Cowork quando esta SPEC for aprovada; épico [#121](https://github.com/RodReis/rrb-jarvisOS/issues/121).
-- Status: **planejado** — redigida em 2026-10-02 (ADR-006, decisão 12); critérios fixados pelo PI em 2026-10-02.
+- Issue: [#369](https://github.com/RodReis/rrb-jarvisOS/issues/369); épico [#121](https://github.com/RodReis/rrb-jarvisOS/issues/121).
+- Status: **aprovada-pi** (2026-10-02) — revisão exata do PR #367 aprovada pelo PI; redigida em 2026-10-02 (ADR-006, decisão 12); critérios fixados pelo PI em 2026-10-02.
 - Depende de: MVP-010 concluído.
 
 ## Objetivo
@@ -50,6 +50,10 @@ Provar com medição, antes da primeira fatia de produto, as duas incertezas que
 - teste negativo do manifesto (hunk removido de propósito);
 - relatório bruto em `reports/` conforme `TESTING.md`.
 
+## Conjunto de referência (PI, 2026-10-02)
+
+Fatias **mergeadas do MVP-009, do MVP-010 e do MVP-026**. A lista exata (issue, SHA do merge, SPEC) é fixada no snapshot da medição antes de rodar.
+
 ## Perguntas abertas ao PI
 
-1. **Conjunto de referência:** quais fatias entram? A proposta é usar fatias do MVP-009, do MVP-010 e do MVP-026 já mergeadas, mas a escolha é sua.
+Nenhuma. Revisão exata aprovada pelo PI em 2026-10-02.

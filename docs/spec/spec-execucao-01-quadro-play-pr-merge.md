@@ -1,8 +1,8 @@
 # SPEC-Execucao-01 — Quadro de execução, play e PR/MERGE
 
 - MVP: `docs/mvp/mvp-028-quadro-execucao-squads.md` (Fatia 01).
-- Issue: criada pelo Cowork quando esta SPEC for aprovada; épico do MVP-028 (criado pelo Cowork na aprovação).
-- Status: **planejado** — redigida em 2026-10-02 pela ADR-006 (decisões 8, 9, 11 e 14); era a M11-F05 antes da partição do MVP-011.
+- Issue: [#370](https://github.com/RodReis/rrb-jarvisOS/issues/370); épico [#368](https://github.com/RodReis/rrb-jarvisOS/issues/368).
+- Status: **aprovada-pi** (2026-10-02) — revisão exata do PR #367 aprovada pelo PI; redigida em 2026-10-02 pela ADR-006 (decisões 8, 9, 11 e 14); era a M11-F05 antes da partição do MVP-011.
 - Depende de: MVP-011 concluído.
 
 ## Objetivo

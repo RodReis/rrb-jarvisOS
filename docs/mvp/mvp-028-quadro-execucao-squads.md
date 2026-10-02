@@ -1,7 +1,7 @@
 # MVP-028 — Quadro de execução e governança dos Squads
 
-- Status: **criado em 2026-10-02 pela partição do MVP-011 ([ADR-006](../adr/adr-006-squads-orquestrados-modelo-local.md), decisão 14); aguarda o "aprovado" do PI.**
-- GitHub: épico criado pelo Cowork na aprovação; F01 ganha issue nova; F02 reaproveita [#126](https://github.com/RodReis/rrb-jarvisOS/issues/126) (retitulada).
+- Status: **criado em 2026-10-02 pela partição do MVP-011 ([ADR-006](../adr/adr-006-squads-orquestrados-modelo-local.md), decisão 14); revisão aprovada pelo PI em 2026-10-02 (PR #367).**
+- GitHub: épico [#368](https://github.com/RodReis/rrb-jarvisOS/issues/368); F01 [#370](https://github.com/RodReis/rrb-jarvisOS/issues/370); F02 [#126](https://github.com/RodReis/rrb-jarvisOS/issues/126) (retitulada).
 - Depende de: MVP-011 concluído.
 - Dono do aceite: PI.
 
@@ -18,7 +18,7 @@ O PI escolhe o que roda e vê o estágio real de cada issue, inclusive a espera 
 
 | Ordem | Fatia | SPEC | Dependência | Issue |
 |---:|---|---|---|---|
-| 1 | Quadro de execução, play e PR/MERGE | `spec-execucao-01-quadro-play-pr-merge.md` | MVP-011 | nova |
+| 1 | Quadro de execução, play e PR/MERGE | `spec-execucao-01-quadro-play-pr-merge.md` | MVP-011 | #370 |
 | 2 | Tetos, aprovações do PI, cancelamento e E2E | `spec-execucao-02-tetos-aprovacoes-cancelamento-e2e.md` | F01 | #126 |
 
 ## Dentro
@@ -28,6 +28,7 @@ O PI escolhe o que roda e vê o estágio real de cada issue, inclusive a espera 
 - PR/MERGE pelo estado real dos checks (consulta a cada transição e a cada 60 s);
 - selo "Aguardando PI" para alteração estrutural de banco e comando destrutivo; deploy registrado;
 - tetos agregados, cancelamento em cascata, limpeza e E2E;
+- ligar o multi-escritor por padrão ao fim da F02 (ADR-006, decisão 16);
 - RF-014.1 (parte de acionamento manual pelo play).
 
 ## Fora
@@ -44,4 +45,4 @@ O PI escolhe o que roda e vê o estágio real de cada issue, inclusive a espera 
 
 ## Perguntas abertas ao PI
 
-Nenhuma além da aprovação desta revisão.
+Nenhuma.

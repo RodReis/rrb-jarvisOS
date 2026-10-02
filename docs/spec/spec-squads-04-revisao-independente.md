@@ -2,7 +2,7 @@
 
 - MVP: `docs/mvp/mvp-011-squads-limitados.md` (Fatia 04).
 - Issue: [#125](https://github.com/RodReis/rrb-jarvisOS/issues/125); épico [#121](https://github.com/RodReis/rrb-jarvisOS/issues/121).
-- Status: **planejado** — reescrita em 2026-10-02 pela ADR-006 (decisões 6 e 10).
+- Status: **aprovada-pi** (2026-10-02) — revisão exata do PR #367 aprovada pelo PI; reescrita em 2026-10-02 pela ADR-006 (decisões 6 e 10).
 - Depende de: M11-F03.
 
 ## Objetivo
@@ -51,4 +51,4 @@ Juntar o trabalho dos escritores com prova de que nada se perdeu, testar antes d
 
 ## Perguntas abertas ao PI
 
-Nenhuma além da aprovação desta revisão.
+Nenhuma. Revisão exata aprovada pelo PI em 2026-10-02.

@@ -1,8 +1,8 @@
 # SPEC-Execucao-02 — Tetos, aprovações do PI, cancelamento e E2E
 
 - MVP: `docs/mvp/mvp-028-quadro-execucao-squads.md` (Fatia 02).
-- Issue: [#126](https://github.com/RodReis/rrb-jarvisOS/issues/126) (antes M11-F05 "Orçamento, cancelamento e E2E"; retitulada e religada ao épico do MVP-028 na aprovação).
-- Status: **planejado** — reescrita em 2026-10-02 pela ADR-006; substitui `spec-squads-05-orcamento-cancelamento-e2e.md`; era a M11-F06 antes da partição.
+- Issue: [#126](https://github.com/RodReis/rrb-jarvisOS/issues/126) (antes M11-F05 "Orçamento, cancelamento e E2E"; retitulada e religada ao épico [#368](https://github.com/RodReis/rrb-jarvisOS/issues/368) em 2026-10-02).
+- Status: **aprovada-pi** (2026-10-02) — revisão exata do PR #367 aprovada pelo PI; reescrita em 2026-10-02 pela ADR-006; substitui `spec-squads-05-orcamento-cancelamento-e2e.md`; era a M11-F06 antes da partição.
 - Depende de: M28-F01.
 
 ## Objetivo
@@ -53,4 +53,4 @@ Fechar a governança operacional dos Squads orquestrados e provar, numa issue re
 
 ## Perguntas abertas ao PI
 
-Nenhuma além da aprovação desta revisão.
+Nenhuma. Revisão exata aprovada pelo PI em 2026-10-02.

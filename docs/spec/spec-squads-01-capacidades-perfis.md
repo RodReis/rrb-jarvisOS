@@ -2,7 +2,7 @@
 
 - MVP: `docs/mvp/mvp-011-squads-limitados.md` (Fatia 01).
 - Issue: [#122](https://github.com/RodReis/rrb-jarvisOS/issues/122); épico [#121](https://github.com/RodReis/rrb-jarvisOS/issues/121).
-- Status: **planejado** — reescrita em 2026-10-02 pela ADR-006; substitui a revisão aprovada em 2026-08-29 quando o PI aprovar.
+- Status: **aprovada-pi** (2026-10-02) — revisão exata do PR #367 aprovada pelo PI; reescrita em 2026-10-02 pela ADR-006; substitui a revisão aprovada em 2026-08-29.
 - Depende de: M11-F00 aprovada pelo critério.
 
 ## Objetivo
@@ -34,7 +34,8 @@ Descrever Squads por capacidades verificáveis e por camadas de modelo, e não p
 2. Capacidade obrigatória sem implementação ou fallback torna o plano inelegível.
 3. Perfil não concede acesso superior ao exigido pela função.
 4. Mudança de perfil durante um run não altera seu snapshot.
-5. Fable só resolve pela rota de assinatura; nenhuma camada cai em API paga sem o opt-in do projeto (MVP-026).
+5. **Até o MVP-028 entregue, o perfil aceita 1 escritor por padrão**; 2 escritores só em E2E de teste (ADR-006, decisão 16).
+6. Fable só resolve pela rota de assinatura; nenhuma camada cai em API paga sem o opt-in do projeto (MVP-026).
 
 ## Critérios de aceite
 
@@ -52,4 +53,4 @@ Descrever Squads por capacidades verificáveis e por camadas de modelo, e não p
 
 ## Perguntas abertas ao PI
 
-Nenhuma além da aprovação desta revisão.
+Nenhuma. Revisão exata aprovada pelo PI em 2026-10-02.

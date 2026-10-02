@@ -2,7 +2,7 @@
 
 - MVP: `docs/mvp/mvp-011-squads-limitados.md` (Fatia 03).
 - Issue: [#124](https://github.com/RodReis/rrb-jarvisOS/issues/124); épico [#121](https://github.com/RodReis/rrb-jarvisOS/issues/121).
-- Status: **planejado** — reescrita em 2026-10-02 pela ADR-006 (decisão 5 revoga o escritor único no escopo do MVP-011).
+- Status: **aprovada-pi** (2026-10-02) — revisão exata do PR #367 aprovada pelo PI; reescrita em 2026-10-02 pela ADR-006 (decisão 5 revoga o escritor único no escopo do MVP-011).
 - Depende de: M11-F02 e **M12-F01** (pool global de slots).
 
 ## Objetivo
@@ -52,4 +52,4 @@ Executar tarefas em paralelo com contexto mínimo e acesso compatível com a fun
 
 ## Perguntas abertas ao PI
 
-Nenhuma além da aprovação desta revisão.
+Nenhuma. Revisão exata aprovada pelo PI em 2026-10-02.
