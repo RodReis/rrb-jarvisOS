@@ -45,3 +45,7 @@ O plano antigo não acomoda (2) nem (3), e trata o planejador como caixa-preta.
 - **Pendências para a próxima rodada** (não decididas aqui): emendas ao MVP-012 (slots por escritor, fairness com multi-escritor, independência entre issues do mesmo MVP no play) e ao MVP-013 (relação entre o play do PI e a drenagem contínua; RF-014.2).
 - RF-014 dividido na matriz: RF-014.1 mantido no MVP-011; RF-014.2 transferido ao MVP-013; RF-014.3 transferido ao MVP-015.
 - Risco aceito pelo PI: um LLM integrador pode perder trabalho de forma silenciosa. A mitigação é o manifesto de hunks com parada do run, não a confiança no modelo.
+
+## Nota pós-M11-F00 (PI, 2026-10-02)
+
+A prova da M11-F00 (PR [#372](https://github.com/RodReis/rrb-jarvisOS/pull/372)) reprovou o orquestrador local no critério de 80%. Pela regra 2 da SPEC-Squads-00, prevista nesta ADR (decisões 12 e 15), a **decisão 1 passa a valer assim até nova prova**: o orquestrador padrão é o **modelo da fase**, pela assinatura; o modelo local via adapter Ollama é opção do perfil, atrás do validador endurecido da SPEC-Squads-02 § Emenda E1. A F00-bis e a nova medição do integrador estão na M11-F00b ([#373](https://github.com/RodReis/rrb-jarvisOS/issues/373)); se o local atingir o critério, volta a ser o padrão. As demais decisões não mudam.

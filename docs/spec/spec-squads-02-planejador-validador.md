@@ -11,7 +11,7 @@ O modelo local propõe o grafo de tarefas da issue e o kernel decide determinist
 
 ## Dentro
 
-- Orquestrador chamado pelo adapter Ollama, com o modelo do perfil, saída estruturada e `num_ctx` declarado no snapshot.
+- Orquestrador chamado com o modelo do perfil — **padrão: modelo da fase; local via adapter Ollama como opção** (Emenda E1) —, saída estruturada e `num_ctx` declarado no snapshot.
 - `SquadPlan` como DAG com, por tarefa: papel, capacidade, **camada de modelo**, **escritor dono** (quando escreve), entradas mínimas, dependências, schema, limites e regra de conclusão.
 - Validador de cobertura da SPEC, paths e fontes permitidos, ferramentas, camadas permitidas, número de escritores, orçamento, turnos e tempo.
 - Classificação de cada proposta: válida, redundante, fora de escopo ou não comprovável.
@@ -48,6 +48,20 @@ O modelo local propõe o grafo de tarefas da issue e o kernel decide determinist
 - teste de determinismo do validador;
 - teste de fallback com Ollama ausente.
 
+## Emenda E1 — validador endurecido (PI, 2026-10-02)
+
+Origem: a M11-F00 aceitou planos locais sem nenhum escritor e com caminhos de outra stack ([SPEC-Squads-00 § Emenda E1](spec-squads-00-prova-orquestrador-integrador.md)). O validador passa a rejeitar também:
+
+1. **Plano sem escritor:** nenhuma tarefa com escritor dono.
+2. **Path inexistente:** path que não existe na base e não é arquivo novo dentro de um diretório permitido, com extensão já presente na base.
+3. **Tarefa de escritor sem path** (já era regra; passa a ter teste próprio).
+
+O orquestrador local só pode ser escolhido no perfil com este validador; a rejeição volta ao orquestrador como feedback, até o limite da M9-F04, e depois cai no modelo da fase.
+
+Critérios de aceite adicionais:
+
+7. O validador rejeita plano sem escritor, path inexistente fora das condições acima e escritor sem path, com fixtures tiradas da M11-F00.
+
 ## Perguntas abertas ao PI
 
-Nenhuma. Limite de replanejamento = limite da M9-F04 (PI, 2026-10-02).
+Nenhuma. Limite de replanejamento = limite da M9-F04; Emenda E1 decidida pelo PI em 2026-10-02.
