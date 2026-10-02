@@ -1,0 +1,32 @@
+{
+  "S-M9-F01": {
+    "aplicavel": true,
+    "ok": true,
+    "ms": 2286
+  },
+  "S-M9-F03": {
+    "aplicavel": true,
+    "ok": true,
+    "ms": 657
+  },
+  "S-M9-F04": {
+    "aplicavel": true,
+    "ok": true,
+    "ms": 1185
+  },
+  "S-M26-F01": {
+    "aplicavel": true,
+    "ok": true,
+    "ms": 19109
+  },
+  "S-M26-F02": {
+    "aplicavel": true,
+    "ok": true,
+    "ms": 18875
+  },
+  "S-M26-F06": {
+    "aplicavel": true,
+    "ok": true,
+    "ms": 7542
+  }
+}

@@ -23,3 +23,6 @@ graphify-out
 # Artefatos do Playwright (E2E).
 test-results
 playwright-report
+
+# Evidência bruta da prova M11-F00 (gerada por scripts/prova-squads): o byte é a evidência.
+reports/squads-prova
