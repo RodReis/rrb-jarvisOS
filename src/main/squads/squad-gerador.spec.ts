@@ -46,7 +46,7 @@ describe('gerador local pelo ponto único', () => {
     const ia = chamador([chunk('{"tarefas":'), chunk('[]}'), fim('concluido')])
     const g = new GeradorViaPontoUnico('local', LOCAL, ia, CTX, VINCULOS)
 
-    const r = await g.propor({ ...PEDIDO, numCtx: 8192 })
+    const r = await g.propor({ ...PEDIDO, numCtx: 8192, temperatura: 0, semente: 42 })
 
     expect(r).toEqual({ ok: true, texto: '{"tarefas":[]}' })
     expect(ia.pedidos[0]).toMatchObject({
@@ -58,7 +58,7 @@ describe('gerador local pelo ponto único', () => {
       runId: 'run-1',
       tentativa: 2,
       maxTokens: MAX_TOKENS_DO_PLANO,
-      opcoesLocais: { numCtx: 8192, formato: '{"type":"object"}' }
+      opcoesLocais: { numCtx: 8192, formato: '{"type":"object"}', temperatura: 0, semente: 42 }
     })
   })
 
@@ -114,6 +114,26 @@ describe('gerador da fase pelo ponto único', () => {
       detalhe: 'sessão expirada'
     })
   })
+})
+
+describe('isolamento — o orquestrador não tem ferramenta', () => {
+  it.each([
+    ['local', LOCAL],
+    ['fase', FASE]
+  ] as const)(
+    'o gerador %s declara a fase de geração de documento (sem ferramentas)',
+    async (origem, modelo) => {
+      const ia = chamador([chunk('{}'), fim('concluido')])
+      await new GeradorViaPontoUnico(origem, modelo, ia, CTX, VINCULOS).propor({
+        ...PEDIDO,
+        numCtx: 8192
+      })
+      // Sem `fase` o `ClaudeCodeAdapter` devolve os args base: sem `--tools ""`, sem
+      // `--setting-sources ""` e sem `--json-schema`. O orquestrador leria SPEC e repositório —
+      // o vetor de prompt injection — com ferramentas.
+      expect(ia.pedidos[0].fase).toBe('planejamento')
+    }
+  )
 })
 
 describe('o que nunca acontece', () => {

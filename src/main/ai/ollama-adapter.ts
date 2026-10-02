@@ -95,7 +95,9 @@ function corpoDaRequisicao(request: AdapterRequest): Record<string, unknown> {
     ...(formato === undefined ? {} : { format: formato, think: false }),
     options: {
       num_predict: request.maxTokens,
-      ...(local === undefined ? {} : { num_ctx: local.numCtx })
+      ...(local === undefined ? {} : { num_ctx: local.numCtx }),
+      ...(local?.temperatura === undefined ? {} : { temperature: local.temperatura }),
+      ...(local?.semente === undefined ? {} : { seed: local.semente })
     }
   }
 }

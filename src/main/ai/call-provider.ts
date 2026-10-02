@@ -423,7 +423,11 @@ export class AiCallService {
         // Ausente sem `console`: é a chamada que não pertence a etapa nenhuma (o painel de teste
         // do Settings), e impor a ela a política de uma geração de documento restringiria um
         // diagnóstico que não gera documento.
-        ...(request.console === undefined ? {} : { fase: faseDaEtapa(request.console.etapa) }),
+        ...(request.console !== undefined
+          ? { fase: faseDaEtapa(request.console.etapa) }
+          : request.fase === undefined
+            ? {}
+            : { fase: request.fase }),
         ...(request.jsonSchema === undefined ? {} : { jsonSchema: request.jsonSchema }),
         ...(request.opcoesLocais === undefined ? {} : { opcoesLocais: request.opcoesLocais }),
         maxTokens,

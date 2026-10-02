@@ -261,7 +261,7 @@ describe('Ollama — NDJSON, sem credencial (critério 1)', () => {
       adapter.generateStream({
         ...base,
         jsonSchema: '{"type":"string"}',
-        opcoesLocais: { numCtx: 8192, formato: '{"type":"object"}' }
+        opcoesLocais: { numCtx: 8192, formato: '{"type":"object"}', temperatura: 0, semente: 42 }
       })
     )
     await coletar(adapter.generateStream(base))
@@ -272,7 +272,7 @@ describe('Ollama — NDJSON, sem credencial (critério 1)', () => {
     expect(corpos[0]).toMatchObject({
       format: { type: 'object' },
       think: false,
-      options: { num_ctx: 8192, num_predict: 10 }
+      options: { num_ctx: 8192, num_predict: 10, temperature: 0, seed: 42 }
     })
     for (const corpo of corpos.slice(1)) {
       expect(corpo).not.toHaveProperty('format')

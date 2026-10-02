@@ -68,8 +68,18 @@ export class GeradorViaPontoUnico implements GeradorDePlano {
       contextPackId: this.vinculos.contextPackId,
       runId: this.vinculos.runId,
       tentativa: pedido.tentativa,
+      // Geração de documento: sem ferramentas, sem settings do ambiente, esquema imposto. O
+      // orquestrador lê texto de SPEC e de repositório; ferramenta ali é o vetor de prompt injection.
+      fase: 'planejamento',
       ...(this.origem === 'local'
-        ? { opcoesLocais: { numCtx: pedido.numCtx as number, formato: pedido.jsonSchema } }
+        ? {
+            opcoesLocais: {
+              numCtx: pedido.numCtx as number,
+              formato: pedido.jsonSchema,
+              ...(pedido.temperatura === undefined ? {} : { temperatura: pedido.temperatura }),
+              ...(pedido.semente === undefined ? {} : { semente: pedido.semente })
+            }
+          }
         : { jsonSchema: pedido.jsonSchema })
     }
 

@@ -255,6 +255,27 @@ describe('streaming ao chamador (critério 2)', () => {
     expect(adapter.recebido?.apiKey).toBe(SEGREDO)
   })
 
+  it('entrega a fase declarada ao adapter quando não há console — o isolamento do CLI depende dela', async () => {
+    const adapter = adapterFalso(ROTEIRO_OK)
+    await coletar(
+      servico(adapter).call(
+        { provider: 'anthropic', prompt: PROMPT, contextPackId: PACK, fase: 'planejamento' },
+        { userId: USUARIO, workspace: 'jarvis' }
+      )
+    )
+    expect(adapter.recebido?.fase).toBe('planejamento')
+
+    const sem = adapterFalso(ROTEIRO_OK)
+    await coletar(
+      servico(sem).call(
+        { provider: 'anthropic', prompt: PROMPT, contextPackId: PACK },
+        { userId: USUARIO, workspace: 'jarvis' }
+      )
+    )
+    // Sem fase e sem console o adapter não isola: é a chamada avulsa do painel de teste.
+    expect(sem.recebido).not.toHaveProperty('fase')
+  })
+
   it('entrega as opções do modelo local ao adapter quando o pedido as traz — e só então', async () => {
     const com = adapterFalso(ROTEIRO_OK)
     await coletar(

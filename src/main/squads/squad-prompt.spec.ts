@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { Rejeicao } from '@shared/domain/squad-plano'
 import type { AmbienteDeResolucao } from '@shared/domain/squad-resolucao'
 import { ESQUEMA_DO_PLANO, ESQUEMA_DO_PLANO_JSON } from '@shared/domain/squad-plano-esquema'
-import { CAPACIDADES } from '@shared/domain/squad-capacidades'
-import { PAPEIS, lerPlano } from '@shared/domain/squad-plano'
+import { CAPACIDADES, REGISTRO_DE_CAPACIDADES } from '@shared/domain/squad-capacidades'
+import { PAPEIS, lerPlano, validarPlano } from '@shared/domain/squad-plano'
 import { PERFIL_PADRAO } from '@shared/domain/squad-perfil'
 import { extrairJson } from './squad-planejador'
 import { feedbackDaDecisao, montarPedido } from './squad-prompt'
@@ -79,6 +79,43 @@ describe('montarPedido', () => {
   it('não leva o ambiente nem credencial ao modelo', () => {
     const { system, prompt } = montarPedido(dados())
     expect(system + prompt).not.toMatch(/optInApiPaga|apiKey|skills/)
+  })
+})
+
+describe('o que o smoke real mostrou faltar ao modelo', () => {
+  it('diz o schemaDeResultado de cada capacidade, tirado do registro', () => {
+    const { system } = montarPedido(dados())
+    for (const [id, def] of Object.entries(REGISTRO_DE_CAPACIDADES)) {
+      expect(system).toContain(`${id}=${def.schemaDeResultado}`)
+    }
+  })
+
+  it('diz que só desenvolvedor e integrador têm escritor, e que nos demais o campo é omitido', () => {
+    expect(montarPedido(dados()).system).toContain('OMITA o campo escritor')
+  })
+
+  it('traz um exemplo que o próprio validador aceita', () => {
+    const d = dados()
+    const { system } = montarPedido(d)
+    const json = /Exemplo de plano válido:\n(\{.*\})\n/.exec(system)?.[1]
+    expect(json).toBeDefined()
+
+    const decisao = validarPlano(JSON.parse(json as string), {
+      criteriosDaSpec: d.spec.criterios.map((c) => c.numero),
+      perfil: d.snapshot.perfil,
+      resolucao: d.snapshot.resolucao,
+      pathsPermitidos: d.base.pathsPermitidos,
+      fontesPermitidas: d.base.fontesPermitidas,
+      arquivosDaBase: ['src/shared/domain/ai.ts'],
+      orcamentoUsd: 1
+    })
+    expect(decisao.rejeicoes).toEqual([])
+  })
+
+  it('o exemplo usa critérios que a SPEC tem, e não inventa o que o perfil não permite', () => {
+    const { system } = montarPedido(dados())
+    expect(system).not.toContain('"criterio":99')
+    expect(system).toContain('"criterio":1')
   })
 })
 

@@ -350,7 +350,10 @@ describe('fallback para o modelo da fase — critério 6', () => {
     await planejarSquad({ geradorLocal: local, geradorFase: fase, auditoria, escopo }, entrada)
 
     expect(local.pedidos[0].numCtx).toBe(8192)
+    expect(local.pedidos[0]).toMatchObject({ temperatura: 0, semente: 42 })
     expect(fase.pedidos[0].numCtx).toBeUndefined()
+    expect(fase.pedidos[0].temperatura).toBeUndefined()
+    expect(fase.pedidos[0].semente).toBeUndefined()
   })
 
   it('sem gerador disponível em nenhum dos dois, o run para com motivo', async () => {

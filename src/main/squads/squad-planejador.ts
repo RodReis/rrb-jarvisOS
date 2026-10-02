@@ -37,6 +37,13 @@ import { canonico } from './squad-snapshot'
 /** `num_ctx` quando o perfil não declara um: o que a M11-F00 mediu no hardware do PI. */
 export const NUM_CTX_PADRAO = 8_192
 
+/**
+ * Temperatura e semente do orquestrador local: as da M11-F00 (`temperatura 0`, `semente 42`). O que
+ * se mediu lá precisa ser o que roda aqui — um 58,8% medido em uma configuração não descreve outra.
+ */
+export const TEMPERATURA_DO_PLANO = 0
+export const SEMENTE_DO_PLANO = 42
+
 export type OrigemDoGerador = 'local' | 'fase'
 
 export interface PedidoAoGerador {
@@ -46,6 +53,8 @@ export interface PedidoAoGerador {
   readonly jsonSchema: string
   /** Só o gerador local recebe; a fase não tem janela a declarar. */
   readonly numCtx?: number
+  readonly temperatura?: number
+  readonly semente?: number
   /** A tentativa dentro deste gerador, a partir de 1. */
   readonly tentativa: number
 }
@@ -232,7 +241,9 @@ async function rodarGerador(
     const resposta = await gerador.propor({
       ...pedido,
       jsonSchema: ESQUEMA_DO_PLANO_JSON,
-      ...(numCtx === undefined ? {} : { numCtx }),
+      ...(numCtx === undefined
+        ? {}
+        : { numCtx, temperatura: TEMPERATURA_DO_PLANO, semente: SEMENTE_DO_PLANO }),
       tentativa
     })
 
