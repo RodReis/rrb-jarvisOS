@@ -108,6 +108,10 @@ export interface LimitesDoPerfil {
   readonly maxTarefasMinimo: number
   readonly maxTokensEntradaPorTarefa: number
   readonly maxTokensSaidaPorTarefa: number
+  /** Turnos (idas e vindas com o modelo) que uma tarefa pode gastar — SPEC-Squads-02. */
+  readonly maxTurnosPorTarefa: number
+  /** Tempo de parede que uma tarefa pode gastar, em minutos — SPEC-Squads-02. */
+  readonly maxMinutosPorTarefa: number
 }
 
 export interface PerfilDeSquad {
@@ -173,6 +177,8 @@ const TIPO_DE_FATIA = /^[a-z0-9]+(-[a-z0-9]+)*$/
  */
 export const TETO_DE_TAREFAS = 1_000
 export const TETO_DE_TOKENS_POR_TAREFA = 1_000_000
+export const TETO_DE_TURNOS_POR_TAREFA = 200
+export const TETO_DE_MINUTOS_POR_TAREFA = 240
 
 /**
  * As chaves que o schema conhece, **nível a nível**. O validador recusa o resto em vez de copiar:
@@ -200,8 +206,18 @@ const CHAVES_DA_CAMADA_DO_PAPEL = ['camada'] as const
 const CHAVES_DOS_LIMITES = [
   'maxTarefasMinimo',
   'maxTokensEntradaPorTarefa',
-  'maxTokensSaidaPorTarefa'
+  'maxTokensSaidaPorTarefa',
+  'maxTurnosPorTarefa',
+  'maxMinutosPorTarefa'
 ] as const
+
+const TETO_DO_LIMITE: Readonly<Record<(typeof CHAVES_DOS_LIMITES)[number], number>> = {
+  maxTarefasMinimo: TETO_DE_TAREFAS,
+  maxTokensEntradaPorTarefa: TETO_DE_TOKENS_POR_TAREFA,
+  maxTokensSaidaPorTarefa: TETO_DE_TOKENS_POR_TAREFA,
+  maxTurnosPorTarefa: TETO_DE_TURNOS_POR_TAREFA,
+  maxMinutosPorTarefa: TETO_DE_MINUTOS_POR_TAREFA
+}
 
 type Problemas = ProblemaDoPerfil[]
 
@@ -521,7 +537,7 @@ function validarLimites(bruto: unknown, problemas: Problemas): void {
   }
   exigirSoChaves(bruto, CHAVES_DOS_LIMITES, 'limites', problemas)
   for (const campo of CHAVES_DOS_LIMITES) {
-    const teto = campo === 'maxTarefasMinimo' ? TETO_DE_TAREFAS : TETO_DE_TOKENS_POR_TAREFA
+    const teto = TETO_DO_LIMITE[campo]
     if (!ehInteiroAte(bruto[campo], teto)) {
       registrar(problemas, 'LIMITE_INVALIDO', `limites.${campo}`, `inteiro entre 1 e ${teto}`)
     }
@@ -591,7 +607,9 @@ function montarPerfil(b: Record<string, unknown>): PerfilDeSquad {
     limites: {
       maxTarefasMinimo: limites.maxTarefasMinimo,
       maxTokensEntradaPorTarefa: limites.maxTokensEntradaPorTarefa,
-      maxTokensSaidaPorTarefa: limites.maxTokensSaidaPorTarefa
+      maxTokensSaidaPorTarefa: limites.maxTokensSaidaPorTarefa,
+      maxTurnosPorTarefa: limites.maxTurnosPorTarefa,
+      maxMinutosPorTarefa: limites.maxMinutosPorTarefa
     }
   })
 }
@@ -682,6 +700,8 @@ export const PERFIL_PADRAO: PerfilDeSquad = congelar({
   limites: {
     maxTarefasMinimo: 12,
     maxTokensEntradaPorTarefa: 16_000,
-    maxTokensSaidaPorTarefa: 8_000
+    maxTokensSaidaPorTarefa: 8_000,
+    maxTurnosPorTarefa: 30,
+    maxMinutosPorTarefa: 45
   }
 })

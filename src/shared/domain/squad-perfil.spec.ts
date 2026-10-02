@@ -4,8 +4,10 @@ import { CAPACIDADES, REGISTRO_DE_CAPACIDADES } from './squad-capacidades'
 import {
   ACOES_COM_APROVACAO,
   PERFIL_PADRAO,
+  TETO_DE_MINUTOS_POR_TAREFA,
   TETO_DE_TAREFAS,
   TETO_DE_TOKENS_POR_TAREFA,
+  TETO_DE_TURNOS_POR_TAREFA,
   limitesDoPerfil,
   validarPerfil
 } from './squad-perfil'
@@ -271,7 +273,10 @@ describe('validarPerfil — chave desconhecida é recusada (fail closed)', () =>
       { maxTokensEntradaPorTarefa: TETO_DE_TOKENS_POR_TAREFA + 1 }
     ],
     ['tokens de saída acima do teto', { maxTokensSaidaPorTarefa: TETO_DE_TOKENS_POR_TAREFA + 1 }],
-    ['piso de tarefas acima do teto', { maxTarefasMinimo: TETO_DE_TAREFAS + 1 }]
+    ['piso de tarefas acima do teto', { maxTarefasMinimo: TETO_DE_TAREFAS + 1 }],
+    ['turnos acima do teto', { maxTurnosPorTarefa: TETO_DE_TURNOS_POR_TAREFA + 1 }],
+    ['minutos acima do teto', { maxMinutosPorTarefa: TETO_DE_MINUTOS_POR_TAREFA + 1 }],
+    ['turnos ausentes', { maxTurnosPorTarefa: undefined }]
   ])('limite absurdo é recusado: %s', (_nome, troca) => {
     const limites = { ...PERFIL_PADRAO.limites, ...troca }
     expect(codigos(validarPerfil(perfil({ limites })))).toContain('LIMITE_INVALIDO')
@@ -281,7 +286,9 @@ describe('validarPerfil — chave desconhecida é recusada (fail closed)', () =>
     const limites = {
       maxTarefasMinimo: TETO_DE_TAREFAS,
       maxTokensEntradaPorTarefa: TETO_DE_TOKENS_POR_TAREFA,
-      maxTokensSaidaPorTarefa: TETO_DE_TOKENS_POR_TAREFA
+      maxTokensSaidaPorTarefa: TETO_DE_TOKENS_POR_TAREFA,
+      maxTurnosPorTarefa: TETO_DE_TURNOS_POR_TAREFA,
+      maxMinutosPorTarefa: TETO_DE_MINUTOS_POR_TAREFA
     }
     expect(validarPerfil(perfil({ limites })).ok).toBe(true)
   })
