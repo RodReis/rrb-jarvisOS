@@ -155,11 +155,18 @@ if (casos) {
     ''
   )
 }
+const pisoDe = (id) => casos?.casos.find((c) => c.id === id)?.perdidosNaVerdade ?? '—'
+
+p(
+  '**Como ler os "perdidos sem registro".** O manifesto lista todo hunk que os dois escritores produziram e conta como perdido o que não está no resultado e não tem motivo registrado. O **piso** é o mesmo cálculo sobre a resposta de verdade (o PR real, ou o merge humano): ele não é zero. Nos sintéticos, o hunk mutado (`// w2`) só pode entrar se o integrador escolher um lado e **registrar** o descarte do outro; nos merges de docs, o humano também descartou linhas superadas sem registro. Um integrador no piso fez o que a verdade fez; acima do piso, perdeu algo a mais.',
+  ''
+)
+
 for (const i of integradores) {
   p(`### Camada \`${i.camada}\` — ${i.aprovado ? 'APROVADA' : 'REPROVADA'}`, '')
   p(
-    '| Caso | Tipo | Blocos | Hunks | Preservados | Descartados c/ motivo | **Perdidos sem registro** | Suíte | Falhas |',
-    '|---|---|---:|---:|---:|---:|---:|---|---|'
+    '| Caso | Tipo | Blocos | Hunks | Preservados | Descartados c/ motivo | **Perdidos sem registro** | Piso (perdidos na verdade) | Suíte | Falhas |',
+    '|---|---|---:|---:|---:|---:|---:|---:|---|---|'
   )
   for (const r of i.resultados) {
     const suite = r.suite.aplicavel
@@ -170,7 +177,7 @@ for (const i of integradores) {
         ? 'ambiente inválido'
         : 'n/a (docs)'
     p(
-      `| ${r.caso} | ${r.tipo} | ${r.blocos} | ${r.hunks} | ${r.preservados} | ${r.descartadosComMotivo} | ${r.perdidosSemRegistro.length} | ${suite} | ${r.falhas.length === 0 ? '—' : r.falhas.join('; ').slice(0, 80)} |`
+      `| ${r.caso} | ${r.tipo} | ${r.blocos} | ${r.hunks} | ${r.preservados} | ${r.descartadosComMotivo} | ${r.perdidosSemRegistro.length} | ${pisoDe(r.caso)} | ${suite} | ${r.falhas.length === 0 ? '—' : r.falhas.join('; ').slice(0, 80)} |`
     )
   }
   p('')
@@ -204,6 +211,9 @@ p(
   '- **Conflitos do integrador são fabricados** nos casos sintéticos (código e verdade reais, conflito injetado); os históricos reais são só de docs, sem suíte. O "zero hunk perdido" vale para essa amostra pequena e não generaliza.',
   '- **O integrador é o `git merge-tree` + a camada por bloco em conflito.** O que o merge faz sozinho entra no manifesto como preservado por construção.',
   '- **Suíte = specs que o PR tocou + vizinhos do arquivo em conflito** (categoria Regras/Tela); `int-spec` fica fora. Caso cuja árvore da verdade já não passa neste ambiente é marcado "ambiente inválido" e sai do critério.',
+  '- **Camada local não integra conflito grande.** Blocos acima de ~18 mil caracteres (`num_ctx` 8192) ficam com os marcadores de conflito (`falhas: fora_do_contexto`), e o manifesto os conta como preservados porque as duas versões estão no arquivo — quem pega o arquivo quebrado é a suíte, que nos merges de docs não existe. Os merges de docs não provam o integrador local.',
+  '- **O manifesto tem piso, não zero.** A verdade também "perde" hunks (coluna Piso), então o critério literal do PI (zero perdido sem registro) reprova até o resultado humano; o relatório mostra os dois números e o veredito segue o critério literal.',
+  '- **A suíte de cada caso sintético é parcial** (specs do PR + vizinhos), não a suíte inteira do projeto.',
   '- **Baseline por assinatura** (CLI do Claude, isolamento do adapter de produção), sem API paga.',
   ''
 )

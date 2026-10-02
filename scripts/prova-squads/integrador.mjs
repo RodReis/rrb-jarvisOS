@@ -225,7 +225,12 @@ function rodarSuite(arvore, specs) {
       )
       return { aplicavel: true, ok: true, ms: Date.now() - inicio }
     } catch (e) {
-      const saida = `${e.stdout ?? ''}${e.stderr ?? ''}`.split('\n').slice(-12).join('\n')
+      // O erro de verdade mora no começo; o rodapé do vitest é só a moldura do stack.
+      const saida = `${e.stdout ?? ''}${e.stderr ?? ''}`
+        .split('\n')
+        .filter((l) => /error|failed|cannot|unexpected|expected/i.test(l) && !/^\s*❯/.test(l))
+        .slice(0, 8)
+        .join('\n')
       return { aplicavel: true, ok: false, ms: Date.now() - inicio, saida }
     }
   } finally {

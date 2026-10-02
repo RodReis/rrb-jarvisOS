@@ -25,10 +25,14 @@ const COMENTARIO = ' // w2'
 /** Separa um diff unificado em arquivos e hunks; só arquivos de texto modificados. */
 export function parsearDiff(diff) {
   const arquivos = []
+  const inteiros = []
   for (const bloco of diff.split(/^(?=diff --git )/m)) {
     if (!bloco.startsWith('diff --git ')) continue
     const corte = bloco.search(/^@@/m)
-    if (corte === -1 || /^(new|deleted) file mode|^rename from|^Binary files/m.test(bloco)) continue
+    if (corte === -1 || /^(new|deleted) file mode|^rename from|^Binary files/m.test(bloco)) {
+      inteiros.push(bloco)
+      continue
+    }
     const cabecalho = bloco.slice(0, corte)
     const hunks = bloco
       .slice(corte)
@@ -37,7 +41,7 @@ export function parsearDiff(diff) {
     const caminho = /^\+\+\+ b\/(.+)$/m.exec(cabecalho)?.[1]
     if (caminho) arquivos.push({ caminho, cabecalho, hunks })
   }
-  return arquivos
+  return { arquivos, inteiros }
 }
 
 const montar = (arquivo, hunks) => `${arquivo.cabecalho}${hunks.join('')}`
@@ -59,8 +63,8 @@ function mutar(hunk) {
 
 /** Escolhe o arquivo-alvo e monta os dois patches; `undefined` se a fatia não serve de caso. */
 export function planejarCaso(fatia) {
-  const diff = git(['diff', `${fatia.merge}^`, fatia.merge, '--', ...CODIGO])
-  const arquivos = parsearDiff(diff)
+  const diff = git(['diff', '--binary', `${fatia.merge}^`, fatia.merge, '--', ...CODIGO])
+  const { arquivos, inteiros } = parsearDiff(diff)
   const candidatos = arquivos
     .filter((a) => !ehTeste(a.caminho) && a.hunks.length >= 2)
     .map((a) => ({ a, mutado: mutar(a.hunks[0]) }))
@@ -71,9 +75,12 @@ export function planejarCaso(fatia) {
 
   const { a: alvo, mutado } = escolhido
   const ultimo = alvo.hunks.at(-1)
-  const patchW1 = arquivos
-    .map((f) => (f === alvo ? montar(f, f.hunks.slice(0, -1)) : montar(f, f.hunks)))
-    .join('')
+  // Arquivo novo, apagado ou renomeado vai inteiro no W1: os hunks de outros arquivos importam
+  // dele, e sem ele a árvore integrada nem compila — defeito do caso, não do integrador.
+  const patchW1 =
+    arquivos
+      .map((f) => (f === alvo ? montar(f, f.hunks.slice(0, -1)) : montar(f, f.hunks)))
+      .join('') + inteiros.join('')
   const patchW2 = montar(alvo, [mutado, ultimo])
   return { alvo: alvo.caminho, hunksNoAlvo: alvo.hunks.length, patchW1, patchW2 }
 }
