@@ -146,6 +146,24 @@ export const RECURSOS = {
           falhou: 'A conversa falhou. Tentar de novo.'
         }
       },
+      escuta: {
+        grupo: 'Escuta contínua do microfone',
+        rotulo: 'Escuta',
+        ligada: 'Escuta ligada',
+        ligando: 'Abrindo o microfone…',
+        desligada: 'Escuta desligada',
+        indisponivel: 'Escuta indisponível',
+        semMicrofone: 'Microfone não abriu',
+        dicaAlternar: 'Liga ou desliga a escuta da palavra de ativação',
+        dicaIndisponivel: 'O modelo da palavra de ativação ainda não está neste computador.',
+        dicaSemMicrofone:
+          'O microfone foi negado ou não está disponível. Confira a permissão e o dispositivo em Voz.',
+        recusaModelo:
+          'Não foi possível ligar a escuta: o modelo da palavra de ativação não está neste computador.',
+        recusaEntrada: 'Não foi possível alterar a escuta. Tente de novo.',
+        naoPronta:
+          'A palavra de ativação foi ouvida, mas a voz ainda não está pronta. Baixe o que falta nesta tela.'
+      },
       janela: {
         minimizar: 'Minimizar para a bandeja'
       },
@@ -1001,6 +1019,23 @@ export const RECURSOS = {
           indisponivel: 'The conversation is unavailable',
           falhou: 'The conversation failed. Try again.'
         }
+      },
+      escuta: {
+        grupo: 'Continuous microphone listening',
+        rotulo: 'Listening',
+        ligada: 'Listening on',
+        ligando: 'Opening the microphone…',
+        desligada: 'Listening off',
+        indisponivel: 'Listening unavailable',
+        semMicrofone: 'Microphone did not open',
+        dicaAlternar: 'Turns wake word listening on or off',
+        dicaIndisponivel: 'The wake word model is not on this computer yet.',
+        dicaSemMicrofone:
+          'The microphone was denied or is unavailable. Check the permission and the device in Voice.',
+        recusaModelo: 'Could not turn listening on: the wake word model is not on this computer.',
+        recusaEntrada: 'Could not change listening. Try again.',
+        naoPronta:
+          'The wake word was heard, but voice is not ready yet. Download what is missing on this screen.'
       },
       janela: {
         minimizar: 'Minimize to tray'

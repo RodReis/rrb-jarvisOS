@@ -2,7 +2,7 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspaceId } from '@shared/domain/entities'
-import { entrarPelaChoice } from './test-utils'
+import { entrarPelaChoice, pontaDaEscuta } from './test-utils'
 
 /**
  * A sidebar como projeção do registro (SPEC-Shell-01, critérios 1 a 5).
@@ -35,6 +35,7 @@ beforeEach(() => {
 
   vi.stubGlobal('jarvis', {
     getAppInfo: vi.fn(),
+    ...pontaDaEscuta(),
     sendLog: vi.fn(),
     minimizeToTray: vi.fn(),
     switchWorkspace,

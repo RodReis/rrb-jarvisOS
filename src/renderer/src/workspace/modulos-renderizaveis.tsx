@@ -19,7 +19,7 @@ const TELAS: Readonly<Record<string, NonNullable<ModuloRegistrado['renderizar']>
       nomeDoEspaco={nomeDoEspaco}
     />
   ),
-  voz: ({ workspace, preferencias, salvar }) => (
+  voz: ({ workspace, preferencias, salvar, disparo, aoTratarDisparo }) => (
     <Microfone
       workspace={workspace}
       vozDaFala={preferencias.vozDaFala}
@@ -27,6 +27,8 @@ const TELAS: Readonly<Record<string, NonNullable<ModuloRegistrado['renderizar']>
       entradaRotulo={preferencias.vozEntradaRotulo}
       saidaId={preferencias.vozSaidaId}
       onSalvarDispositivo={salvar}
+      disparo={disparo}
+      aoTratarDisparo={aoTratarDisparo}
     />
   ),
   operator: ({ workspace }) => <AprovacoesPendentes workspace={workspace} />

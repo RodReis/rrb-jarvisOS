@@ -2,7 +2,7 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspaceId } from '@shared/domain/entities'
-import { entrarPelaChoice } from './test-utils'
+import { entrarPelaChoice, pontaDaEscuta } from './test-utils'
 
 /**
  * AppShell re-plataformado: navegação e resiliência (SPEC-DesignSystem-04a, critérios 1, 3 e 4).
@@ -35,6 +35,7 @@ function mockarPonte(): void {
   Object.defineProperty(window, 'jarvis', {
     value: {
       getAppInfo: vi.fn(),
+      ...pontaDaEscuta(),
       sendLog: vi.fn(),
       minimizeToTray,
       switchWorkspace,
