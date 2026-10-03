@@ -3,6 +3,9 @@ import {
   avaliarResultado,
   EVIDENCIA_EXIGIDA,
   escritoresColidemPorNome,
+  faixasDaBusca,
+  recortarLinhas,
+  totalDeLinhas,
   ehEstadoTerminal,
   ehItemDeEscritor,
   idDoEscritor,
@@ -397,5 +400,68 @@ describe('assinatura do resultado', () => {
     expect(textoDaAssinatura({ ...r, confianca: 'baixa', lacunas: ['talvez'] })).toBe(
       textoDaAssinatura(r)
     )
+  })
+})
+
+describe('faixas de uma busca', () => {
+  it('cada ocorrência vira uma faixa com o contexto ao redor', () => {
+    expect(faixasDaBusca([10], 100, 2)).toEqual([{ de: 8, ate: 12 }])
+  })
+
+  it('o contexto não passa do começo nem do fim do arquivo', () => {
+    expect(faixasDaBusca([1], 5, 3)).toEqual([{ de: 1, ate: 4 }])
+    expect(faixasDaBusca([5], 5, 3)).toEqual([{ de: 2, ate: 5 }])
+  })
+
+  it('faixas que se tocam ou se cobrem viram uma só', () => {
+    expect(faixasDaBusca([10, 12], 100, 2)).toEqual([{ de: 8, ate: 14 }])
+    // Adjacentes (sem linha livre entre elas) também se juntam.
+    expect(faixasDaBusca([10, 15], 100, 2)).toEqual([{ de: 8, ate: 17 }])
+  })
+
+  it('faixas separadas por uma linha livre continuam separadas', () => {
+    expect(faixasDaBusca([10, 16], 100, 2)).toEqual([
+      { de: 8, ate: 12 },
+      { de: 14, ate: 18 }
+    ])
+  })
+
+  it('não depende da ordem nem da repetição', () => {
+    expect(faixasDaBusca([20, 5, 20, 5], 100, 1)).toEqual([
+      { de: 4, ate: 6 },
+      { de: 19, ate: 21 }
+    ])
+  })
+
+  it('ocorrência fora do arquivo é ignorada; sem ocorrência não há faixa', () => {
+    expect(faixasDaBusca([], 100, 2)).toEqual([])
+    expect(faixasDaBusca([0, 101], 100, 2)).toEqual([])
+  })
+})
+
+describe('recorte de linhas', () => {
+  const texto = 'a\nb\nc\nd\n'
+
+  it('devolve as linhas da faixa, com o fim de linha', () => {
+    expect(recortarLinhas(texto, { de: 2, ate: 3 })).toBe('b\nc\n')
+    expect(recortarLinhas(texto, { de: 1, ate: 4 })).toBe(texto)
+  })
+
+  it('a faixa é limitada pelo tamanho do arquivo', () => {
+    expect(recortarLinhas(texto, { de: 3, ate: 99 })).toBe('c\nd\n')
+  })
+
+  it('arquivo sem quebra no fim não ganha uma', () => {
+    expect(recortarLinhas('a\nb', { de: 1, ate: 2 })).toBe('a\nb')
+  })
+
+  it('o fim de linha CRLF é preservado', () => {
+    expect(recortarLinhas('a\r\nb\r\nc\r\n', { de: 2, ate: 2 })).toBe('b\r\n')
+  })
+
+  it('o total de linhas do arquivo conta a última sem quebra, e não a vazia depois dela', () => {
+    expect(totalDeLinhas('a\nb\n')).toBe(2)
+    expect(totalDeLinhas('a\nb')).toBe(2)
+    expect(totalDeLinhas('')).toBe(0)
   })
 })

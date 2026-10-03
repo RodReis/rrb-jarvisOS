@@ -342,3 +342,49 @@ export function textoDaAssinatura(resultado: ResultadoDaTarefa): string {
   ].sort()
   return JSON.stringify([resultado.schema, normalizar(resultado.conclusao), evidencias])
 }
+
+// ─── Trechos de uma busca ───────────────────────────────────────────────────────────────────────
+
+export interface FaixaDeLinhas {
+  readonly de: number
+  readonly ate: number
+}
+
+/** O contexto de cada lado de uma ocorrência: o bastante para entender o trecho, sem trazer o arquivo. */
+export const LINHAS_DE_CONTEXTO_DA_BUSCA = 5
+
+/** As linhas do texto, cada uma com o seu fim de linha. O resto sem quebra no fim também é linha. */
+function linhasDoTexto(texto: string): string[] {
+  return texto.match(/[^\n]*\n|[^\n]+$/g) ?? []
+}
+
+export const totalDeLinhas = (texto: string): number => linhasDoTexto(texto).length
+
+/**
+ * As faixas que cobrem as ocorrências, cada uma com `contexto` linhas de cada lado. Faixas que se
+ * tocam viram uma só: duas ocorrências a três linhas uma da outra são um trecho, não dois com
+ * linhas repetidas. Ocorrência fora do arquivo é ignorada.
+ */
+export function faixasDaBusca(
+  linhas: readonly number[],
+  total: number,
+  contexto: number = LINHAS_DE_CONTEXTO_DA_BUSCA
+): readonly FaixaDeLinhas[] {
+  const ordenadas = linhas.filter((l) => l >= 1 && l <= total).sort((a, b) => a - b)
+  const faixas: { de: number; ate: number }[] = []
+  for (const linha of ordenadas) {
+    const de = Math.max(1, linha - contexto)
+    const ate = Math.min(total, linha + contexto)
+    const anterior = faixas[faixas.length - 1]
+    if (anterior !== undefined && de <= anterior.ate + 1) anterior.ate = ate
+    else faixas.push({ de, ate })
+  }
+  return faixas
+}
+
+/** O texto da faixa, com o fim de linha original. A faixa é limitada pelo tamanho do texto. */
+export function recortarLinhas(texto: string, faixa: FaixaDeLinhas): string {
+  return linhasDoTexto(texto)
+    .slice(faixa.de - 1, faixa.ate)
+    .join('')
+}
