@@ -562,6 +562,11 @@ export const AUDIT_EVENT_TYPES = [
   'squad-plan-rejeitado',
   'squad-plan-fallback',
   'squad-plan-aceito',
+  // SPEC-Squads-03: a execução de uma tarefa do Squad. Um tipo só, com `marco` (`inicio`/`fim`),
+  // porque a pergunta de quem audita é uma: *o que aconteceu com esta tarefa, e como terminou*.
+  // O estado terminal (`concluida`, `incompleta`, `invalida`, `timeout`, `cancelada`, `falhou`,
+  // `recusada`) fica no payload. **Nunca o texto do agente**: só ids, hashes, contagens e o motivo.
+  'squad-tarefa',
   // SPEC-Scheduler-01: a configuração do pool (capacidade, limites, paralelismo). Tipo próprio: é
   // uma decisão do PI sobre quanto da máquina a pipeline pode usar — e ligar o paralelismo é a que
   // mais importa registrar.

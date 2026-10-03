@@ -2352,7 +2352,7 @@ Status: **em andamento** — issue [#124](https://github.com/RodReis/rrb-jarvisO
 - [x] **2. Git por intenção** (`src/main/squads/squad-git.ts`): worktree por escritor, commit do kernel sem hook, diff e status por worktree, remoção sem `--force`; provado com Git real e com o `TerminalEngine` real.
 - [x] **3. Slot por escritor**: item `<runId>:<escritor>` no pool, irmãos sem prova entre si, o primeiro escritor leva o run a `RUNNING`, token por escritor.
 - [x] **4. ContextPack por tarefa**: raiz parametrizável (worktree), `realpath`, fontes justificadas com hash e revisão, busca estrutural/grep controlada.
-- [ ] **5. Workers sem ferramentas**: execução pelo ponto único de IA com isolamento, saída por schema, limites de tempo e cancelamento.
+- [x] **5. Workers sem ferramentas**: execução pelo ponto único de IA com isolamento, saída por schema, limites de tempo e cancelamento.
 - [ ] **6. Escritor no container**: unidade de sandbox por escritor sobre o Preflight, agente sem Bash, diff por worktree, commit do kernel, heartbeat e fencing.
 - [ ] **7. Orquestrador do Squad**: DAG de tarefas, N workers, dois escritores com pool cheio, sessão e segredo por unidade, estados terminais auditados.
 - [ ] **8. Revisões independentes, relatório, PR.**
