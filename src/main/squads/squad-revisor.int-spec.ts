@@ -33,6 +33,7 @@ let chamadas: AiRequest[]
 let responder: (request: AiRequest) => unknown
 let fontesDoPack: Fontes
 let contextoRecusa: string | undefined
+let packComItens: readonly { caminho: string }[] | undefined
 
 const ia = {
   call(request: AiRequest): AsyncIterable<AiStreamEvent> {
@@ -53,7 +54,13 @@ const contexto = {
   montarDaTarefa: vi.fn((pedido: { fontes: Fontes }) => {
     fontesDoPack = pedido.fontes
     return contextoRecusa === undefined
-      ? { pack: { id: 'pack-1', hash: 'h', itens: [] } }
+      ? {
+          pack: {
+            id: 'pack-1',
+            hash: 'h',
+            itens: packComItens ?? pedido.fontes.map((f) => ({ caminho: f.caminho }))
+          }
+        }
       : { reason: contextoRecusa, mensagem: 'recusado' }
   })
 }
@@ -64,6 +71,7 @@ beforeEach(() => {
   chamadas = []
   fontesDoPack = []
   contextoRecusa = undefined
+  packComItens = undefined
   responder = () => new Error('nenhuma resposta combinada')
 })
 
@@ -84,7 +92,7 @@ function servico() {
 }
 
 const REVISORES = [
-  { id: 'rev-1', modelo: { provider: 'codex', modelo: 'rev-1' } },
+  { id: 'rev-1', modelo: { provider: 'anthropic', modelo: 'rev-1' } },
   { id: 'rev-2', modelo: { provider: 'gemini', modelo: 'rev-2' } }
 ] as const
 
@@ -180,7 +188,8 @@ comGit('revisão com achados', () => {
   })
 
   it('achado cujo trecho não está no arquivo é observação: não é defeito confirmado', async () => {
-    responder = () => parecer([achado({ trecho: 'linha que não existe' })])
+    responder = () =>
+      parecer([achado({ trecho: 'linha que não existe no arquivo' })], { parecer: 'PASS' })
 
     const r = await servico().revisar(pedido(resultado(COM_BUG)))
 
@@ -190,10 +199,13 @@ comGit('revisão com achados', () => {
 
   it('P2 e P3 são registrados e não bloqueiam; fora da SPEC não bloqueia nem volta ao escritor', async () => {
     responder = () =>
-      parecer([
-        achado({ severidade: 'P2' }),
-        achado({ severidade: 'P1', foraDaSpec: true, trecho: 'export const f' })
-      ])
+      parecer(
+        [
+          achado({ severidade: 'P2' }),
+          achado({ severidade: 'P1', foraDaSpec: true, trecho: 'export const f' })
+        ],
+        { parecer: 'PASS' }
+      )
 
     const r = await servico().revisar(pedido(resultado(COM_BUG)))
 
@@ -316,14 +328,14 @@ comGit('revisão sem parecer', () => {
     expect(repo.listar(USUARIO_DE_TESTE, 'run-1')[0]?.estado).toBe('accepted')
   })
 
-  it('um revisor inválido e outro válido: a revisão segue com o que tem parecer', async () => {
+  it('um revisor inválido e outro válido: sem quórum o run para, em vez de o outro aprovar sozinho', async () => {
     responder = (req) => (req.model === 'rev-1' ? { lixo: true } : parecer())
 
     const r = await servico().revisar(pedido(resultado(COM_BUG), { revisores: [...REVISORES] }))
 
     expect(r).toMatchObject({
       estado: 'revisada',
-      veredito: { resultado: 'PASS' },
+      veredito: { resultado: 'BLOCKED', motivo: 'revisao-sem-parecer' },
       revisores: [
         { id: 'rev-1', estado: 'invalido' },
         { id: 'rev-2', estado: 'parecer' }
@@ -467,5 +479,87 @@ comGit('auditoria', () => {
 
     expect(amb.git(['rev-parse', 'main'])).toBe(amb.baseSha)
     expect(amb.git(['status', '--porcelain'])).toBe('')
+  })
+})
+
+comGit('o que o revisor e o conteúdo não podem fazer (revisão de segurança e de código)', () => {
+  it('H2 (segurança): revisor em provider com ferramenta (codex) não revisa', async () => {
+    const r = await servico().revisar(
+      pedido(resultado(COM_BUG), {
+        revisores: [{ id: 'rev-cli', modelo: { provider: 'codex', modelo: 'gpt' } }]
+      })
+    )
+
+    expect(r).toEqual({ estado: 'parada', motivo: 'provider-com-ferramenta', detalhe: 'rev-cli' })
+    expect(chamadas).toHaveLength(0)
+  })
+
+  it('H3: o segundo revisor rebaixa o P0 do primeiro com uma justificativa: a severidade fica e o run para', async () => {
+    responder = () => parecer([achado({ severidade: 'P0' })])
+    await servico().revisar(pedido(resultado(COM_BUG, 'r1')))
+    responder = () =>
+      parecer([achado({ severidade: 'P3', justificativaDeSeveridade: 'ok' })], {
+        parecer: 'PASS'
+      })
+
+    const r = await servico().revisar(pedido(resultado(COM_BUG, 'r2'), { rodada: 2 }))
+
+    expect(r).toMatchObject({
+      estado: 'revisada',
+      veredito: { resultado: 'BLOCKED', motivo: 'conflito-entre-revisores' }
+    })
+    expect(repo.listar(USUARIO_DE_TESTE, 'run-1')[0]?.severidade).toBe('P0')
+  })
+
+  it('M4: FIX_REQUIRED sem nenhum achado que o kernel confira não vira PASS: vai ao PI', async () => {
+    responder = () => parecer([achado({ trecho: 'linha que o revisor parafraseou errado' })])
+
+    const r = await servico().revisar(pedido(resultado(COM_BUG)))
+
+    expect(r).toMatchObject({
+      estado: 'revisada',
+      veredito: { resultado: 'BLOCKED', motivo: 'parecer-sem-evidencia' },
+      achados: []
+    })
+  })
+
+  it('M4: achado em arquivo que não é do delta é observação, mesmo com o trecho existindo lá', async () => {
+    responder = () => parecer([achado({ arquivo: 'README.md', trecho: '# projeto de teste' })])
+    const sha = amb.commitarComo(amb.worktree('r'), COM_BUG)
+
+    const r = await servico().revisar(pedido(sha))
+
+    expect(r).toMatchObject({ estado: 'revisada', achados: [] })
+  })
+
+  it('M2: fonte que o contexto descartou como inválida não segue ao modelo', async () => {
+    packComItens = []
+    responder = () => parecer()
+
+    const r = await servico().revisar(pedido(resultado(COM_BUG)))
+
+    expect(r).toMatchObject({
+      estado: 'parada',
+      motivo: 'contexto-recusado',
+      detalhe: 'fonte-invalida'
+    })
+    expect(chamadas).toHaveLength(0)
+  })
+
+  it('o diff de um rename e o de um caminho não ASCII chegam ao revisor com o caminho certo', async () => {
+    const w = amb.worktree('r')
+    amb.git(['mv', 'src/a.ts', 'src/café.ts'], w.worktree)
+    amb.git(
+      ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 'renomeia'],
+      w.worktree
+    )
+    const sha = amb.git(['rev-parse', 'HEAD'], w.worktree)
+    responder = () => parecer()
+
+    await servico().revisar(pedido(sha))
+
+    const caminhos = fontesDoPack.map((f) => f.caminho)
+    expect(caminhos).toContain('revisao/diff/src/café.ts.patch')
+    expect(caminhos).toContain('src/café.ts')
   })
 })

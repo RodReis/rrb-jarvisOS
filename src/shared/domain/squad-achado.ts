@@ -22,6 +22,7 @@ export const SEVERIDADES = ['P0', 'P1', 'P2', 'P3'] as const
 export type Severidade = (typeof SEVERIDADES)[number]
 
 const BLOQUEIAM: readonly Severidade[] = ['P0', 'P1']
+const ORDEM_DA_SEVERIDADE: Readonly<Record<Severidade, number>> = { P0: 0, P1: 1, P2: 2, P3: 3 }
 export const bloqueia = (s: Severidade): boolean => BLOQUEIAM.includes(s)
 
 /** A ordem de revisão do `REVIEW.md`, uma categoria por item. */
@@ -115,6 +116,8 @@ const MAX_TRECHO = 1000
 const MAX_TEXTO = 1000
 const MAX_ASSINATURA = 100
 const MAX_MOTIVO_DA_RECUSA = 160
+/** Caracteres, sem espaço, que um trecho precisa ter para ancorar um achado no arquivo. */
+const MIN_TRECHO = 10
 
 const ehPertencente = <T extends string>(lista: readonly T[], v: unknown): v is T =>
   typeof v === 'string' && (lista as readonly string[]).includes(v)
@@ -122,7 +125,7 @@ const ehPertencente = <T extends string>(lista: readonly T[], v: unknown): v is 
 function lerAchado(bruto: unknown, i: number): { achado?: AchadoDeclarado; erro?: string } {
   if (!ehRegistro(bruto)) return { erro: `achado ${i} não é um objeto` }
   const extras = chavesExtras(bruto, CHAVES_DO_ACHADO)
-  if (extras.length > 0) return { erro: `achado ${i}: chave ${extras[0]} não existe no esquema` }
+  if (extras.length > 0) return { erro: `achado ${i}: chave desconhecida no esquema` }
   if (!ehPertencente(CATEGORIAS_DE_ACHADO, bruto.categoria)) {
     return { erro: `achado ${i}: categoria inválida` }
   }
@@ -196,7 +199,7 @@ const recusa = (motivo: string): LeituraDoParecer => ({
 export function lerParecer(bruto: unknown): LeituraDoParecer {
   if (!ehRegistro(bruto)) return recusa('o parecer não é um objeto')
   const extras = chavesExtras(bruto, CHAVES_DO_PARECER)
-  if (extras.length > 0) return recusa(`chave ${extras[0]} não existe no esquema do parecer`)
+  if (extras.length > 0) return recusa('chave desconhecida no esquema do parecer')
   if (bruto.schema !== PARECER_DE_REVISAO) return recusa('schema do parecer inválido')
   if (!ehPertencente(PARECERES, bruto.parecer)) return recusa('parecer fora do vocabulário')
   if (!Array.isArray(bruto.achados) || bruto.achados.length > MAX_ACHADOS) {
@@ -249,8 +252,11 @@ export function conferirEvidencia(
   achado: Pick<AchadoDeclarado, 'arquivo' | 'trecho'>,
   lerArquivo: (arquivo: string) => string | undefined
 ): boolean {
+  const trecho = compacto(achado.trecho)
+  // Um `}` ou um `a` está em qualquer arquivo: trecho curto não ancora nada, e forjaria um achado.
+  if (trecho.length < MIN_TRECHO) return false
   const conteudo = lerArquivo(achado.arquivo)
-  return conteudo !== undefined && compacto(conteudo).includes(compacto(achado.trecho))
+  return conteudo !== undefined && compacto(conteudo).includes(trecho)
 }
 
 // ─── Ciclo de vida ──────────────────────────────────────────────────────────────────────────────
@@ -325,12 +331,19 @@ function atualizarVisto(
         motivoDoEstado: undefined
       })
     : existente
-  const comJustificativa =
-    achado.justificativaDeSeveridade !== undefined && achado.severidade !== base.severidade
+  // Elevar a severidade com justificativa é livre. **Rebaixar um bloqueante não é**: uma
+  // justificativa de uma palavra dissolveria o bloqueio sem passar pelo critério 6. O rebaixamento
+  // vira contestação — a severidade fica, o achado é marcado como contestado e o veredito para o
+  // run para o PI.
+  const subiu = ORDEM_DA_SEVERIDADE[achado.severidade] < ORDEM_DA_SEVERIDADE[base.severidade]
+  const baixou = ORDEM_DA_SEVERIDADE[achado.severidade] > ORDEM_DA_SEVERIDADE[base.severidade]
+  const rebaixaBloqueante = baixou && bloqueia(base.severidade)
   return {
     ...base,
-    severidade: comJustificativa ? achado.severidade : base.severidade,
+    severidade:
+      subiu && achado.justificativaDeSeveridade !== undefined ? achado.severidade : base.severidade,
     vistoPor: semRepetir(base.vistoPor, revisor),
+    contestadoPor: rebaixaBloqueante ? semRepetir(base.contestadoPor, revisor) : base.contestadoPor,
     deltaDaUltimaVista: delta
   }
 }
@@ -430,27 +443,45 @@ export type VereditoDaRevisao =
   | { readonly resultado: 'PASS' | 'FIX_REQUIRED' }
   | {
       readonly resultado: 'BLOCKED'
-      readonly motivo: 'conflito-entre-revisores' | 'revisao-sem-parecer' | 'revisor-bloqueou'
+      readonly motivo:
+        | 'conflito-entre-revisores'
+        | 'revisao-sem-parecer'
+        | 'revisor-bloqueou'
+        | 'parecer-sem-evidencia'
     }
+
+export interface OpcoesDoVeredito {
+  /** Algum revisor declarou `BLOCKED`: ele diz que não consegue revisar. */
+  readonly algumRevisorBloqueou?: boolean
+  /** Algum revisor declarou `FIX_REQUIRED` sem nenhum achado bloqueante que o kernel conferisse. */
+  readonly parecerSemEvidencia?: boolean
+}
 
 /**
  * O veredito é do kernel, derivado dos achados — não do `parecer` que o agente declarou. Sem
  * parecer válido o run para (regra 1); conflito de bloqueante aberto também (critério 6). Um
- * revisor que declara `BLOCKED` para o run: ele diz que não consegue revisar, e passar por cima
- * disso seria aceitar a integração sem a prova.
+ * revisor que declara `BLOCKED` para o run: passar por cima seria aceitar a integração sem a prova.
+ * Um revisor que reprova **sem evidência que o kernel confira** também não vira `PASS` em silêncio:
+ * um P0 real mal citado desapareceria como observação. Se há bloqueante conferido, a correção
+ * volta ao escritor; se não há, quem decide é o PI.
  */
 export function veredito(
   achados: readonly AchadoRegistrado[],
   houveParecer: boolean,
-  algumRevisorBloqueou = false
+  opcoes: OpcoesDoVeredito = {}
 ): VereditoDaRevisao {
   if (!houveParecer) return { resultado: 'BLOCKED', motivo: 'revisao-sem-parecer' }
-  if (algumRevisorBloqueou) return { resultado: 'BLOCKED', motivo: 'revisor-bloqueou' }
+  if (opcoes.algumRevisorBloqueou === true)
+    return { resultado: 'BLOCKED', motivo: 'revisor-bloqueou' }
   const bloqueantes = achados.filter((a) => aberto(a) && bloqueia(a.severidade) && !a.foraDaSpec)
   if (bloqueantes.some((a) => a.contestadoPor.length > 0)) {
     return { resultado: 'BLOCKED', motivo: 'conflito-entre-revisores' }
   }
-  return { resultado: bloqueantes.length > 0 ? 'FIX_REQUIRED' : 'PASS' }
+  if (bloqueantes.length > 0) return { resultado: 'FIX_REQUIRED' }
+  if (opcoes.parecerSemEvidencia === true) {
+    return { resultado: 'BLOCKED', motivo: 'parecer-sem-evidencia' }
+  }
+  return { resultado: 'PASS' }
 }
 
 /**

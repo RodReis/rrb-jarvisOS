@@ -50,9 +50,15 @@ const ia = {
 }
 
 const contexto = {
-  montarDaTarefa: vi.fn(() =>
+  montarDaTarefa: vi.fn((pedido: { fontes: readonly { caminho: string }[] }) =>
     contextoRecusa === undefined
-      ? { pack: { id: 'pack-1', hash: 'h', itens: [] } }
+      ? {
+          pack: {
+            id: 'pack-1',
+            hash: 'h',
+            itens: pedido.fontes.map((f) => ({ caminho: f.caminho }))
+          }
+        }
       : { reason: contextoRecusa, mensagem: 'recusado' }
   )
 }
@@ -456,5 +462,159 @@ comGit('auditoria e isolamento', () => {
 
     expect(readFileSync(join(amb.repo, 'src', 'a.ts'), 'utf8')).toBe('export const a = 1\n')
     expect(amb.git(['rev-parse', 'main'])).toBe(amb.baseSha)
+  })
+})
+
+comGit('o que o conteúdo do escritor não pode fazer (revisão de segurança e de código)', () => {
+  it('H1: linha ">>>>>>>" dentro de um lado não forja a estrutura: o run para, sem chamar o agente', async () => {
+    const pedido = escritores(
+      { 'src/a.ts': 'export const a = 1\nx\n>>>>>>> quote\ny\n' },
+      { 'src/a.ts': 'export const a = 1\nz\n' }
+    )
+    responder = () => ({ resolucao: 'RESOLVIDO', descartes: [] })
+
+    const r = await servico().integrar(pedido)
+
+    expect(r).toMatchObject({ estado: 'parado', motivo: 'conflito-nao-suportado' })
+    expect(chamadas).toHaveLength(0)
+  })
+
+  it('H2 (segurança): provider com ferramenta (codex) não integra', async () => {
+    const r = await servico().integrar({
+      ...escritores({ 'src/a.ts': 'x\n' }, { 'src/b.ts': 'y\n' }),
+      modelo: { provider: 'codex', modelo: 'gpt' }
+    })
+
+    expect(r).toMatchObject({ estado: 'parado', motivo: 'provider-com-ferramenta' })
+    expect(chamadas).toHaveLength(0)
+  })
+
+  it('M5: arquivo com mais blocos que o teto para antes de gastar uma chamada', async () => {
+    const base = ['uno', 'm1', 'dois', 'tres', 'quatro', 'cinco', 'seis', 'sete', 'm2', 'oito', '']
+    amb.limpar()
+    amb = montarAmbienteDeGit({ 'src/a.ts': base.join('\n') })
+    const com = (m1: string, m2: string): string =>
+      base.map((l) => (l === 'm1' ? m1 : l === 'm2' ? m2 : l)).join('\n')
+    const pedido = escritores({ 'src/a.ts': com('A1', 'A2') }, { 'src/a.ts': com('B1', 'B2') })
+
+    const r = await servico().integrar({ ...pedido, maxBlocos: 1 })
+
+    expect(r).toMatchObject({ estado: 'parado', motivo: 'blocos-demais' })
+    expect(chamadas).toHaveLength(0)
+  })
+
+  it('L2: commit que não descende da base não é integrado', async () => {
+    const pedido = escritores({ 'src/a.ts': 'x\n' }, { 'src/b.ts': 'y\n' })
+    amb.git(['checkout', '-q', '--orphan', 'solto'])
+    amb.git([
+      '-c',
+      'user.name=t',
+      '-c',
+      'user.email=t@t',
+      'commit',
+      '-q',
+      '--allow-empty',
+      '-m',
+      's'
+    ])
+    const orfao = amb.git(['rev-parse', 'HEAD'])
+    amb.git(['checkout', '-q', 'main'])
+
+    const r = await servico().integrar({
+      ...pedido,
+      escritores: [pedido.escritores[0], { escritor: 'b', commitSha: orfao }] as never
+    })
+
+    expect(r).toMatchObject({ estado: 'parado', motivo: 'escritores-invalidos' })
+  })
+
+  it.each(['.gitattributes', 'sub/.gitmodules', '.lfsconfig'])(
+    'L2: escritor que toca %s para o run',
+    async (arquivo) => {
+      const pedido = escritores({ [arquivo]: '* filter=x\n' }, { 'src/b.ts': 'y\n' })
+
+      const r = await servico().integrar(pedido)
+
+      expect(r).toMatchObject({ estado: 'parado', motivo: 'arquivo-de-configuracao-do-git' })
+    }
+  )
+
+  it('M3: o descarte só vale para o que está no bloco — citar texto de fora dele não salva', async () => {
+    responder = () => ({
+      resolucao: 'export const x = 10',
+      descartes: [
+        { trecho: 'export const y = 20 // e mais coisa que não está no bloco', motivo: 'inventado' }
+      ]
+    })
+
+    const r = await servico().integrar(escritores(INSERCOES.a, INSERCOES.b))
+
+    expect(r).toMatchObject({ estado: 'parado', motivo: 'hunk-perdido-sem-registro' })
+  })
+
+  it('o resultado traz as linhas novas da resolução e o manifesto em texto, com cada descarte', async () => {
+    responder = () => ({
+      resolucao: 'export const a = 10 + 20',
+      descartes: [
+        { trecho: 'export const a = 10', motivo: 'combinado em a = 10 + 20' },
+        { trecho: 'export const a = 20', motivo: 'combinado em a = 10 + 20' }
+      ]
+    })
+
+    const r = await servico().integrar(escritores(MESMA_LINHA.a, MESMA_LINHA.b))
+
+    expect(r.estado).toBe('integrado')
+    if (r.estado !== 'integrado') return
+    expect(r.linhasNovas).toBe(1)
+    expect(r.manifestoTexto).toContain('2 descartados')
+    expect(r.manifestoTexto).toContain('combinado em a = 10 + 20')
+  })
+})
+
+comGit('merge limpo que o auditor não pode reprovar (revisão de código, H1 e H2)', () => {
+  it('H1: a linha removida existe também noutro ponto do arquivo: a integração segue', async () => {
+    amb.limpar()
+    amb = montarAmbienteDeGit({
+      'src/f.ts': 'function a() {\n  return false\n}\nfunction b() {\n  return false\n}\n'
+    })
+    const pedido = escritores(
+      { 'src/f.ts': 'function a() {\n  return true\n}\nfunction b() {\n  return false\n}\n' },
+      { 'src/novo.ts': 'export const novo = 1\n' }
+    )
+
+    const r = await servico().integrar(pedido)
+
+    expect(r).toMatchObject({ estado: 'integrado', manifesto: { aprovada: true } })
+    expect(chamadas).toHaveLength(0)
+  })
+
+  it('H2: A renomeia o arquivo e B edita o original: o merge limpo é aceito', async () => {
+    amb.limpar()
+    amb = montarAmbienteDeGit({
+      'src/f.ts': 'um\ndois\ntres\nquatro\ncinco\nseis\nsete\noito\nnove\ndez\n'
+    })
+    const wa = amb.worktree('a')
+    amb.git(['mv', 'src/f.ts', 'src/g.ts'], wa.worktree)
+    amb.git(
+      ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 'renomeia'],
+      wa.worktree
+    )
+    const commitA = amb.git(['rev-parse', 'HEAD'], wa.worktree)
+    const commitB = amb.commitarComo(amb.worktree('b'), {
+      'src/f.ts': 'um\nDOIS\ntres\nquatro\ncinco\nseis\nsete\noito\nnove\ndez\n'
+    })
+
+    const r = await servico().integrar(pedidoDe(commitA, commitB))
+
+    expect(r).toMatchObject({ estado: 'integrado', manifesto: { aprovada: true } })
+    expect(naBranch('src/g.ts')).toContain('DOIS')
+  })
+
+  it('caminho não ASCII não derruba o auditor', async () => {
+    const pedido = escritores({ 'src/café.ts': 'export const c = 1\n' }, { 'src/b.ts': 'y\n' })
+
+    const r = await servico().integrar(pedido)
+
+    expect(r).toMatchObject({ estado: 'integrado', manifesto: { aprovada: true } })
   })
 })

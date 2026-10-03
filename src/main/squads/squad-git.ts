@@ -17,7 +17,15 @@
  * timeout valem aqui como em qualquer outro lugar.
  */
 
-import { lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync
+} from 'node:fs'
 import { dirname, isAbsolute, join, resolve, sep } from 'node:path'
 import type { WorkspaceId } from '@shared/domain/entities'
 import { ehControleOuDirecao } from '@shared/domain/squad-plano'
@@ -329,8 +337,14 @@ export class SquadGit {
       const info = lstatSync(alvo)
       if (!info.isFile()) return recusa('não é arquivo regular')
       if (info.size > MAX_BYTES_DO_ARQUIVO_EM_CONFLITO) return recusa('arquivo grande demais')
-      const texto = readFileSync(alvo, 'utf8')
-      return texto.includes('\0') ? recusa('arquivo-binario') : { ok: true, valor: texto }
+      const bytes = readFileSync(alvo)
+      const texto = bytes.toString('utf8')
+      if (texto.includes('\0')) return recusa('arquivo-binario')
+      // Latin-1 e afins: decodificar como UTF-8 troca byte inválido por U+FFFD, e regravar o
+      // arquivo o corromperia sem ninguém ver. Sem ida e volta exata, não é texto que se resolve.
+      return Buffer.from(texto, 'utf8').equals(bytes)
+        ? { ok: true, valor: texto }
+        : recusa('arquivo-nao-utf8')
     } catch {
       return recusa('arquivo ilegível')
     }
@@ -389,9 +403,13 @@ export class SquadGit {
     if (!isAbsolute(repositorio)) return recusa('o repositório precisa ser um caminho absoluto')
     const r = this.executar(
       [
+        // Caminho não ASCII sai como está, e não entre aspas com escape octal.
+        '-c',
+        'core.quotePath=false',
         'diff',
         '--no-color',
-        '--no-renames',
+        // Rename seguido: o manifesto casa os hunks pelo caminho da base.
+        '-M',
         '--no-ext-diff',
         '--no-textconv',
         '-U0',
@@ -403,6 +421,19 @@ export class SquadGit {
       true
     )
     return r.ok ? { ok: true, valor: r.bruto } : recusa(r.motivo)
+  }
+
+  /**
+   * `ancestral` é ancestral de `commit`? Os dois escritores têm de ter partido da base declarada:
+   * um commit que não descende dela traria história e arquivos que o diff da base não mostra.
+   */
+  ehDescendente(repositorio: string, ancestral: string, commit: string): ResultadoGit<boolean> {
+    if (!SHA.test(ancestral) || !SHA.test(commit)) return recusa('revisão inválida')
+    if (!isAbsolute(repositorio)) return recusa('o repositório precisa ser um caminho absoluto')
+    const r = this.executar(['merge-base', '--is-ancestor', ancestral, commit], repositorio, true)
+    if (r.ok) return { ok: true, valor: true }
+    // Sair com 1 é "não é ancestral"; qualquer outro código é erro do Git.
+    return r.codigo === 1 ? { ok: true, valor: false } : recusa(r.motivo)
   }
 
   private mergeEmAndamento(w: WorktreeDeEscritor): boolean {
@@ -418,7 +449,20 @@ export class SquadGit {
   private caminhoNoWorktree(w: WorktreeDeEscritor, caminho: string): string | ResultadoGit<never> {
     if (!caminhoRelativoSeguro(caminho)) return recusa('caminho inválido')
     const alvo = resolve(w.worktree, caminho)
-    return alvo.startsWith(resolve(w.worktree) + sep) ? alvo : recusa('caminho fora do worktree')
+    if (!alvo.startsWith(resolve(w.worktree) + sep)) return recusa('caminho fora do worktree')
+    // O `lstat` da folha não vê um **diretório** que seja link simbólico no meio do caminho: o
+    // ancestral existente mais próximo, resolvido, tem de continuar dentro do worktree real.
+    let ancestral = dirname(alvo)
+    while (!existsSync(ancestral) && dirname(ancestral) !== ancestral)
+      ancestral = dirname(ancestral)
+    try {
+      const real = realpathSync(ancestral)
+      const raiz = realpathSync(w.worktree)
+      if (real !== raiz && !real.startsWith(raiz + sep)) return recusa('caminho passa por um link')
+    } catch {
+      return recusa('caminho ilegível')
+    }
+    return alvo
   }
 
   private commitarComIdentidade(w: WorktreeDeEscritor, mensagem: string): ResultadoGit<string> {

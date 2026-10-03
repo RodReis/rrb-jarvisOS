@@ -33,6 +33,24 @@ export type EscolhaDeRevisores =
 
 export const MAX_REVISORES_PADRAO = 2
 
+/**
+ * Os providers que **não têm como** executar comando nem ler fora do material do pedido na fase de
+ * planejamento: o `claude` roda com `--tools ""`, e a API e o modelo local não têm ferramenta. O
+ * `codex exec` não desliga as ferramentas — só restringe o que elas alcançam (`--sandbox
+ * read-only`) —, então um revisor ou integrador nele poderia rodar `git log` ou ler fora do
+ * worktree. Critério 4 da SPEC-Squads-04: sem Git nem por prompt; quem não prova isso por
+ * construção não revisa nem integra.
+ */
+export const PROVIDERS_SEM_FERRAMENTA: readonly string[] = [
+  'claude-code',
+  'anthropic',
+  'gemini',
+  'ollama'
+]
+
+export const providerSemFerramenta = (provider: string): boolean =>
+  PROVIDERS_SEM_FERRAMENTA.includes(provider)
+
 export function escolherRevisores(
   candidatos: readonly RevisorCandidato[],
   participantes: readonly ParticipanteDoTrabalho[],
@@ -42,6 +60,7 @@ export function escolherRevisores(
   const providers = new Set(participantes.map((p) => p.modelo.provider))
   const vistos = new Set<string>()
   const elegiveis = candidatos.filter((c) => {
+    if (!providerSemFerramenta(c.modelo.provider)) return false
     if (ids.has(c.id) || vistos.has(c.id)) return false
     vistos.add(c.id)
     return true

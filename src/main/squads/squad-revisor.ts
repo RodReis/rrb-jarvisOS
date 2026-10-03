@@ -20,6 +20,7 @@ import type { AiProvider, AiRequest } from '@shared/domain/ai'
 import type { WorkspaceId } from '@shared/domain/entities'
 import {
   PARECER_DE_REVISAO,
+  bloqueia,
   conferirEvidencia,
   contestar,
   decidirTriagem,
@@ -33,12 +34,13 @@ import {
   type ParecerDoRevisor,
   type VereditoDaRevisao
 } from '@shared/domain/squad-achado'
-import type { RevisorCandidato } from '@shared/domain/squad-revisores'
+import { providerSemFerramenta, type RevisorCandidato } from '@shared/domain/squad-revisores'
 import type { ContextService, FonteDaTarefa } from '../context/context-service'
 import type { AuditRepository } from '../storage/audit-repository'
 import type { AchadoRepository } from './achado-repository'
 import { MS_POR_MINUTO, chamarModelo } from './squad-chamada'
 import { MAX_FONTES_DA_TAREFA } from './squad-contexto'
+import { dividirPorArquivo } from './squad-diff'
 import type { ChamadorDeIa } from './squad-gerador'
 import type { SquadGit } from './squad-git'
 import { extrairJsonFinal } from './squad-planejador'
@@ -87,6 +89,7 @@ export type MotivoDaRevisaoParada =
   | 'contexto-recusado'
   | 'contexto-acima-do-limite'
   | 'modelo-local-sem-janela'
+  | 'provider-com-ferramenta'
 
 export type ResultadoDaRevisao =
   | {
@@ -126,17 +129,6 @@ const parada = (motivo: MotivoDaRevisaoParada, detalhe?: string): Parada => ({
 const sha256 = (texto: string): string => createHash('sha256').update(texto, 'utf8').digest('hex')
 const bytes = (texto: string): number => Buffer.byteLength(texto, 'utf8')
 
-/** Os diffs por arquivo: `diff --git a/x b/x` abre cada um. */
-function dividirDiff(diff: string): readonly { arquivo: string; texto: string }[] {
-  return diff
-    .split(/^(?=diff --git )/m)
-    .filter((parte) => parte.startsWith('diff --git '))
-    .map((texto) => {
-      const cabecalho = texto.split('\n', 1)[0] ?? ''
-      return { arquivo: cabecalho.slice(cabecalho.lastIndexOf(' b/') + 3), texto }
-    })
-}
-
 interface RodadaDoRevisor {
   readonly id: string
   readonly estado: EstadoDoRevisor
@@ -170,6 +162,9 @@ export class RevisorService {
 
   private async executar(pedido: PedidoDeRevisao): Promise<ResultadoDaRevisao> {
     if (pedido.revisores.length === 0) return parada('sem-revisor')
+    // Critério 4: sem Git nem por prompt. Só revisa quem prova a ausência de ferramenta por construção.
+    const comFerramenta = pedido.revisores.find((r) => !providerSemFerramenta(r.modelo.provider))
+    if (comFerramenta !== undefined) return parada('provider-com-ferramenta', comFerramenta.id)
     const localSemJanela = pedido.revisores.find(
       (r) => r.modelo.provider === 'ollama' && (r.numCtx ?? 0) <= 0
     )
@@ -185,8 +180,9 @@ export class RevisorService {
     }
 
     const existentes = this.deps.achados.listar(this.deps.userId(), pedido.runId)
-    const fontes = this.montarFontes(pedido, lerArquivo, existentes)
-    if ('estado' in fontes) return fontes
+    const montadas = this.montarFontes(pedido, lerArquivo, existentes)
+    if ('estado' in montadas) return montadas
+    const { fontes, arquivosDoDelta } = montadas
 
     const todas = await Promise.all(pedido.revisores.map((r) => this.rodar(pedido, r, fontes)))
     const impedida = todas.find((r): r is RodadaImpedida => 'parada' in r)
@@ -196,18 +192,25 @@ export class RevisorService {
       r.parecer === undefined ? [] : [{ id: r.id, p: r.parecer }]
     )
 
-    const { lista, novos, observacoes } = this.consolidar(pedido, existentes, pareceres, lerArquivo)
+    const { lista, novos, observacoes, parecerSemEvidencia } = this.consolidar(
+      pedido,
+      existentes,
+      pareceres,
+      lerArquivo,
+      arquivosDoDelta
+    )
     this.deps.achados.salvar(
       { userId: this.deps.userId(), workspaceId: this.deps.workspaceId(), runId: pedido.runId },
       lista
     )
     return {
       estado: 'revisada',
-      veredito: veredito(
-        lista,
-        pareceres.length > 0,
-        pareceres.some((x) => x.p.parecer === 'BLOCKED')
-      ),
+      // Quórum: **todo** revisor escolhido tem de ter devolvido parecer. Um revisor cruzado que deu
+      // timeout não pode sumir em silêncio deixando o outro aprovar sozinho.
+      veredito: veredito(lista, pareceres.length === rodadas.length, {
+        algumRevisorBloqueou: pareceres.some((x) => x.p.parecer === 'BLOCKED'),
+        parecerSemEvidencia
+      }),
       achados: lista,
       observacoes,
       revisores: rodadas.map((r) => ({ id: r.id, estado: r.estado })),
@@ -225,18 +228,33 @@ export class RevisorService {
     pedido: PedidoDeRevisao,
     existentes: readonly AchadoRegistrado[],
     pareceres: readonly { id: string; p: ParecerDoRevisor }[],
-    lerArquivo: (arquivo: string) => string | undefined
-  ): { lista: readonly AchadoRegistrado[]; novos: number; observacoes: readonly string[] } {
+    lerArquivo: (arquivo: string) => string | undefined,
+    arquivosDoDelta: ReadonlySet<string>
+  ): {
+    lista: readonly AchadoRegistrado[]
+    novos: number
+    observacoes: readonly string[]
+    parecerSemEvidencia: boolean
+  } {
     const observacoes: string[] = []
     const verificados: AchadoDoRevisor[] = []
+    let parecerSemEvidencia = false
     for (const { id, p } of pareceres) {
+      let bloqueantesDoRevisor = 0
       for (const achado of p.achados) {
-        if (conferirEvidencia(achado, lerArquivo)) verificados.push({ revisor: id, achado })
-        else {
+        // Só vale achado em arquivo **do delta** e com trecho que o kernel reencontra: sem isso o
+        // revisor forjaria um P0 em qualquer arquivo da árvore, com `correcao` escrita por ele.
+        if (arquivosDoDelta.has(achado.arquivo) && conferirEvidencia(achado, lerArquivo)) {
+          verificados.push({ revisor: id, achado })
+          if (bloqueia(achado.severidade) && !achado.foraDaSpec) bloqueantesDoRevisor += 1
+        } else {
           observacoes.push(`sem localização verificável: ${achado.arquivo} — ${achado.titulo}`)
         }
       }
       observacoes.push(...p.observacoes)
+      // Reprovou e o kernel não achou nada que confira: um P0 real mal citado sumiria como
+      // observação. Não vira `PASS` em silêncio.
+      if (p.parecer === 'FIX_REQUIRED' && bloqueantesDoRevisor === 0) parecerSemEvidencia = true
     }
 
     const revalidados = revalidar(existentes, lerArquivo, pedido.resultadoSha)
@@ -249,7 +267,8 @@ export class RevisorService {
     return {
       lista,
       novos: lista.filter((a) => !conhecidos.has(a.assinatura)).length,
-      observacoes: observacoes.map((o) => o.slice(0, MAX_OBSERVACAO)).slice(0, MAX_OBSERVACOES)
+      observacoes: observacoes.map((o) => o.slice(0, MAX_OBSERVACAO)).slice(0, MAX_OBSERVACOES),
+      parecerSemEvidencia
     }
   }
 
@@ -262,7 +281,7 @@ export class RevisorService {
     pedido: PedidoDeRevisao,
     lerArquivo: (arquivo: string) => string | undefined,
     existentes: readonly AchadoRegistrado[]
-  ): readonly FonteDaTarefa[] | Parada {
+  ): { fontes: readonly FonteDaTarefa[]; arquivosDoDelta: ReadonlySet<string> } | Parada {
     const diff = this.deps.git.diffEntre(pedido.repositorio, pedido.baseSha, pedido.resultadoSha)
     if (!diff.ok) return parada('diff-recusado', diff.motivo)
 
@@ -291,7 +310,7 @@ export class RevisorService {
       fonte('revisao/achados-abertos.json', JSON.stringify(abertos, null, 2), 'achados registrados')
     ]
 
-    const porArquivo = dividirDiff(diff.valor)
+    const porArquivo = dividirPorArquivo(diff.valor)
     for (const { arquivo, texto } of porArquivo) {
       fontes.push(fonte(`revisao/diff/${arquivo}.patch`, texto, 'diff contra a base'))
     }
@@ -301,9 +320,10 @@ export class RevisorService {
     }
     const grande = fontes.find((f) => bytes(f.texto) > TETO_POR_FONTE_BYTES)
     if (grande !== undefined) return parada('delta-grande-demais', grande.caminho)
-    return fontes.length > MAX_FONTES_DA_TAREFA
-      ? parada('delta-grande-demais', `${fontes.length} fontes`)
-      : fontes
+    if (fontes.length > MAX_FONTES_DA_TAREFA) {
+      return parada('delta-grande-demais', `${fontes.length} fontes`)
+    }
+    return { fontes, arquivosDoDelta: new Set(porArquivo.map((p) => p.arquivo)) }
   }
 
   /** Um revisor: monta o pack, chama o modelo sem ferramenta e lê o parecer de modo estrito. */
@@ -335,6 +355,11 @@ export class RevisorService {
     )
     if (montado.pack === undefined) {
       return { id: revisor.id, parada: parada('contexto-recusado', montado.reason) }
+    }
+    // Fonte que o contexto descartou como inválida **não passou pelo scan de segredo** e iria ao
+    // modelo mesmo assim: o pack tem de ter exatamente as fontes que o prompt carrega.
+    if (montado.pack.itens.length !== fontes.length) {
+      return { id: revisor.id, parada: parada('contexto-recusado', 'fonte-invalida') }
     }
 
     const esquema = JSON.stringify(esquemaDoParecer())

@@ -145,7 +145,7 @@ const pedido = (extra: Partial<Pedido> = {}): Pedido => ({
     repositorio: '/repo',
     baseSha: 'b'.repeat(40),
     rota: 'claude-code',
-    revisores: [{ id: 'rev-1', modelo: { provider: 'codex', modelo: 'x' } }],
+    revisores: [{ id: 'rev-1', modelo: { provider: 'anthropic', modelo: 'x' } }],
     spec: { caminho: 'docs/spec/x.md', texto: 'SPEC' },
     contratoDeRevisao: 'REVIEW'
   },
@@ -278,6 +278,22 @@ describe('retrabalho depois do REVIEWER', () => {
       .list(USER)
       .filter((e) => e.type === 'squad-retrabalho')
     expect(eventos).toHaveLength(3)
+  })
+
+  it('a suíte quebra na volta que corrigia um achado: a correção aceita continua pendente para o escritor', async () => {
+    revisoes = [fix(achado()), pass]
+    suites = [verde, vermelha, verde]
+    producoes = [pronto(1), pronto(2), pronto(3)]
+
+    const r = await ciclo().executar(pedido())
+
+    expect(r).toMatchObject({ estado: 'aprovado', tentativas: 3 })
+    const terceira = produzir.mock.calls[2]?.[0] as {
+      correcoes: { assinatura: string }[]
+      falhaDeTeste?: { passo: string }
+    }
+    expect(terceira.correcoes.map((c) => c.assinatura)).toEqual(['sig-1'])
+    expect(terceira.falhaDeTeste).toMatchObject({ passo: 'test' })
   })
 
   it('o limite é por run: suíte vermelha e reprovação da revisão dividem as mesmas três tentativas', async () => {

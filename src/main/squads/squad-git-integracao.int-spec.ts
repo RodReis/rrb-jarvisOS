@@ -256,3 +256,94 @@ comGit('diffEntre', () => {
     expect(amb.squadGit.diffEntre(amb.repo, 'HEAD', amb.baseSha).ok).toBe(false)
   })
 })
+
+comGit('diffEntre: rename e caminho não ASCII', () => {
+  it('segue o rename e traz o caminho não ASCII sem aspas nem octal', () => {
+    const w = amb.worktree('r')
+    amb.git(['mv', 'src/a.ts', 'src/café.ts'], w.worktree)
+    amb.git(
+      ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 'renomeia'],
+      w.worktree
+    )
+    const commit = amb.git(['rev-parse', 'HEAD'], w.worktree)
+
+    const r = amb.squadGit.diffEntre(amb.repo, amb.baseSha, commit)
+
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.valor).toContain('rename from src/a.ts')
+    expect(r.valor).toContain('rename to src/café.ts')
+    expect(r.valor).not.toContain(String.raw`\303`)
+  })
+})
+
+comGit('ehDescendente', () => {
+  it('o commit do escritor descende da base; a base não descende dele', () => {
+    const { commitA } = doisEscritores({ 'src/a.ts': 'x\n' }, { 'src/b.ts': 'y\n' })
+
+    expect(amb.squadGit.ehDescendente(amb.repo, amb.baseSha, commitA)).toEqual({
+      ok: true,
+      valor: true
+    })
+    expect(amb.squadGit.ehDescendente(amb.repo, commitA, amb.baseSha)).toEqual({
+      ok: true,
+      valor: false
+    })
+  })
+
+  it('commit órfão, sem a base na história, não descende dela', () => {
+    amb.git(['checkout', '-q', '--orphan', 'solto'])
+    amb.git([
+      '-c',
+      'user.name=t',
+      '-c',
+      'user.email=t@t',
+      'commit',
+      '-q',
+      '--allow-empty',
+      '-m',
+      'solto'
+    ])
+    const orfao = amb.git(['rev-parse', 'HEAD'])
+    amb.git(['checkout', '-q', 'main'])
+
+    expect(amb.squadGit.ehDescendente(amb.repo, amb.baseSha, orfao)).toEqual({
+      ok: true,
+      valor: false
+    })
+  })
+
+  it('revisão que não é SHA é recusada', () => {
+    expect(amb.squadGit.ehDescendente(amb.repo, '--all', amb.baseSha).ok).toBe(false)
+  })
+})
+
+comGit('leitura e escrita no worktree de integração: o que o caminho atravessa', () => {
+  it('arquivo que não é UTF-8 (latin-1) não é lido: regravá-lo o corromperia', () => {
+    const { commitA } = doisEscritores({ 'src/a.ts': 'x\n' }, { 'src/b.ts': 'y\n' })
+    const w = integracaoEm(commitA)
+    writeFileSync(join(w.worktree, 'src', 'latin.txt'), Buffer.from([0x63, 0x61, 0x66, 0xe9, 0x0a]))
+
+    expect(amb.squadGit.lerArquivoDoWorktree(w, 'src/latin.txt')).toEqual({
+      ok: false,
+      motivo: 'arquivo-nao-utf8'
+    })
+  })
+
+  it('diretório que é link simbólico no meio do caminho não é atravessado, nem para ler nem para gravar', () => {
+    const { commitA } = doisEscritores({ 'src/a.ts': 'x\n' }, { 'src/b.ts': 'y\n' })
+    const w = integracaoEm(commitA)
+    const fora = join(amb.dir, 'fora')
+    mkdirSync(fora)
+    writeFileSync(join(fora, 'segredo.txt'), 'não leia')
+    try {
+      symlinkSync(fora, join(w.worktree, 'src', 'elo'), 'junction')
+    } catch {
+      return // sem permissão de link nesta máquina: nada a provar
+    }
+
+    expect(amb.squadGit.lerArquivoDoWorktree(w, 'src/elo/segredo.txt').ok).toBe(false)
+    expect(amb.squadGit.resolverArquivo(w, 'src/elo/novo.txt', 'x').ok).toBe(false)
+    expect(existsSync(join(fora, 'novo.txt'))).toBe(false)
+  })
+})

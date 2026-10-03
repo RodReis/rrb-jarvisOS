@@ -42,7 +42,13 @@ const FASE = { provider: 'claude-code', modelo: MODELO_DO_SMOKE } as const
 const TIMEOUT = 600_000
 
 const contexto = {
-  montarDaTarefa: () => ({ pack: { id: 'pack-smoke', hash: 'h', itens: [] } })
+  montarDaTarefa: (pedido: { fontes: readonly { caminho: string }[] }) => ({
+    pack: {
+      id: 'pack-smoke',
+      hash: 'h',
+      itens: pedido.fontes.map((f) => ({ caminho: f.caminho }))
+    }
+  })
 }
 
 let amb: ReturnType<typeof montarAmbienteDeGit>

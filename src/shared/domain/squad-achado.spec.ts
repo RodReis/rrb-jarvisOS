@@ -63,7 +63,7 @@ describe('lerParecer', () => {
   it('recusa chave que o esquema não tem', () => {
     const lido = lerParecer(parecerBruto({ assinatura: 'forjada' }))
 
-    expect(lido).toEqual({ ok: false, motivo: expect.stringContaining('assinatura') })
+    expect(lido).toEqual({ ok: false, motivo: expect.stringContaining('chave desconhecida') })
   })
 
   it('recusa o achado que traz chave extra: a assinatura é do kernel', () => {
@@ -371,7 +371,10 @@ describe('contestar e veredito', () => {
   })
 
   it('revisor que declarou BLOCKED para o run: o kernel não passa por cima', () => {
-    expect(veredito([], true, true)).toEqual({ resultado: 'BLOCKED', motivo: 'revisor-bloqueou' })
+    expect(veredito([], true, { algumRevisorBloqueou: true })).toEqual({
+      resultado: 'BLOCKED',
+      motivo: 'revisor-bloqueou'
+    })
   })
 })
 
@@ -394,5 +397,100 @@ describe('esquemaDoParecer', () => {
 
   it('um parecer que cumpre o esquema passa em lerParecer', () => {
     expect(lerParecer(parecerBruto()).ok).toBe(true)
+  })
+})
+
+describe('rebaixar a severidade de um bloqueante é contestação, não escrita livre (H3)', () => {
+  it('outro revisor reporta o P0 como P3 com justificativa: a severidade fica, e vira conflito', () => {
+    const lista = incorporarAchados(
+      [registrado({ severidade: 'P0' })],
+      [
+        {
+          revisor: 'rev-2',
+          achado: declarado({ severidade: 'P3', justificativaDeSeveridade: 'ok' })
+        }
+      ],
+      'd1',
+      assinar
+    )
+
+    expect(lista[0]?.severidade).toBe('P0')
+    expect(lista[0]?.contestadoPor).toEqual(['rev-2'])
+    expect(veredito(lista, true)).toEqual({
+      resultado: 'BLOCKED',
+      motivo: 'conflito-entre-revisores'
+    })
+  })
+
+  it('rebaixar sem justificativa também não muda nada, e também contesta', () => {
+    const lista = incorporarAchados(
+      [registrado({ severidade: 'P1' })],
+      [{ revisor: 'rev-2', achado: declarado({ severidade: 'P2' }) }],
+      'd1',
+      assinar
+    )
+
+    expect(lista[0]?.severidade).toBe('P1')
+    expect(lista[0]?.contestadoPor).toEqual(['rev-2'])
+  })
+
+  it('rebaixar um achado que já não bloqueia não contesta nada', () => {
+    const lista = incorporarAchados(
+      [registrado({ severidade: 'P2' })],
+      [{ revisor: 'rev-2', achado: declarado({ severidade: 'P3' }) }],
+      'd1',
+      assinar
+    )
+
+    expect(lista[0]?.contestadoPor).toEqual([])
+  })
+
+  it('elevar com justificativa continua livre', () => {
+    const lista = incorporarAchados(
+      [registrado({ severidade: 'P3' })],
+      [
+        {
+          revisor: 'rev-2',
+          achado: declarado({ severidade: 'P0', justificativaDeSeveridade: 'corrompe o banco' })
+        }
+      ],
+      'd1',
+      assinar
+    )
+
+    expect(lista[0]?.severidade).toBe('P0')
+    expect(lista[0]?.contestadoPor).toEqual([])
+  })
+})
+
+describe('evidência mínima (revisão, M4)', () => {
+  const ARQUIVO = 'function f() { x = 1; return a }\n);\nreturn items.slice(0, -1)\n'
+
+  it.each(['}', 'a', 'x = 1', ');'])(
+    'o trecho curto %j não é evidência, mesmo presente no arquivo',
+    (trecho) => {
+      expect(conferirEvidencia(declarado({ trecho }), () => ARQUIVO)).toBe(false)
+    }
+  )
+
+  it('o trecho de uma linha de código de verdade é evidência', () => {
+    expect(
+      conferirEvidencia(declarado({ trecho: 'return items.slice(0, -1)' }), () => ARQUIVO)
+    ).toBe(true)
+  })
+})
+
+describe('parecer FIX_REQUIRED sem achado verificado (M4)', () => {
+  it('sem bloqueante registrado, vira BLOCKED para o PI em vez de PASS', () => {
+    expect(veredito([], true, { parecerSemEvidencia: true })).toEqual({
+      resultado: 'BLOCKED',
+      motivo: 'parecer-sem-evidencia'
+    })
+  })
+
+  it('com bloqueante verificado, o veredito é FIX_REQUIRED, e o escritor tem o que corrigir', () => {
+    expect(veredito([registrado()], true, { parecerSemEvidencia: true })).toEqual({
+      resultado: 'FIX_REQUIRED'
+    })
   })
 })

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { escolherRevisores, type RevisorCandidato } from './squad-revisores'
+import { escolherRevisores, providerSemFerramenta, type RevisorCandidato } from './squad-revisores'
 
 const claude = { provider: 'claude-code', modelo: 'claude-fable-5-1' } as const
-const codex = { provider: 'codex', modelo: 'gpt' } as const
+const codex = { provider: 'gemini', modelo: 'gemini-pro' } as const
+const codexCli = { provider: 'codex', modelo: 'gpt' } as const
 const ollama = { provider: 'ollama', modelo: 'qwen3:8b' } as const
 
 const candidato = (id: string, modelo: RevisorCandidato['modelo']): RevisorCandidato => ({
@@ -72,5 +73,27 @@ describe('escolherRevisores', () => {
       ok: false,
       motivo: 'sem-revisor-elegivel'
     })
+  })
+})
+
+describe('providers sem ferramenta (critério 4)', () => {
+  it.each(['claude-code', 'anthropic', 'gemini', 'ollama'])('%s é elegível', (provider) => {
+    expect(providerSemFerramenta(provider)).toBe(true)
+  })
+
+  it('o codex não é: o `codex exec` não desliga as ferramentas, só restringe o alcance', () => {
+    expect(providerSemFerramenta('codex')).toBe(false)
+  })
+
+  it('o escolhedor nunca devolve um revisor em provider com ferramenta', () => {
+    const r = escolherRevisores(
+      [candidato('rev-cli', codexCli), candidato('rev-ok', claude)],
+      [{ id: 'esc', modelo: claude }]
+    )
+
+    expect(r).toMatchObject({ ok: true, revisores: [{ id: 'rev-ok' }] })
+    expect(
+      escolherRevisores([candidato('so-codex', codexCli)], [{ id: 'esc', modelo: claude }])
+    ).toEqual({ ok: false, motivo: 'sem-revisor-elegivel' })
   })
 })

@@ -13,6 +13,10 @@
  * DEVELOPER que está sendo revista).
  *
  * Cada volta fica registrada (critério 5), inclusive a que parou. Nunca lança.
+ *
+ * **O ciclo não é retomável**: ele sempre começa na tentativa 1, e uma segunda execução do mesmo run
+ * esbarra no registro das voltas (`erro-interno`). Retomar depois de reiniciar o app é decisão
+ * futura (MVP-028), e o registro no banco já guarda o que ela precisaria.
  */
 
 import type { ComandosDeValidacao } from '@shared/domain/ci-workflow'
@@ -75,6 +79,7 @@ export type MotivoDoCiclo =
   | 'conflito-entre-revisores'
   | 'revisao-sem-parecer'
   | 'revisor-bloqueou'
+  | 'parecer-sem-evidencia'
   | 'cancelada'
   | 'erro-interno'
 
@@ -172,7 +177,8 @@ export class CicloDeRevisao {
         this.registrar(pedido, tentativa, 'teste', decisao, [])
         if (decisao.tipo === 'parar') return parado(decisao.motivo)
         tentativa = decisao.proximaTentativa
-        correcoes = []
+        // As correções aceitas que ainda estão pendentes **seguem**: se a suíte quebrou na volta
+        // que corrigia o achado X, o escritor continua precisando saber que X segue aceito.
         falhaDeTeste = { passo: suite.passo, evidencia: suite.evidencia }
         continue
       }
