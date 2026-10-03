@@ -49,6 +49,15 @@ Juntar o trabalho dos escritores com prova de que nada se perdeu, testar antes d
 - ciclo TESTE → REVIEWER → DEVELOPER até o limite;
 - deduplicação por assinatura.
 
+## Decisões de implementação (PI, 2026-10-03)
+
+Tomadas ao puxar a F04, depois de o Code mapear o código da F03 e achar quatro pontos que a SPEC não fixava. Registradas aqui porque a opção recusada também é decisão.
+
+1. **Como o integrador produz o resultado.** **Decidido:** o kernel faz o merge determinístico (`git merge-tree --write-tree`); o agente integrador, na camada da fase (nota pós-F00b da ADR-006), devolve JSON só para os **blocos em conflito**; o kernel monta a árvore, materializa o worktree de integração e commita. O agente não tem ferramenta nem Git. É o fluxo medido na F00b (6/6, zero hunk perdido). *Recusadas:* agente com Edit/Write livre no worktree de integração (superfície maior, fluxo sem prova real); os dois fluxos atrás de opção do perfil (dobra a superfície de teste sem medição que justifique).
+2. **Contagem do retrabalho.** **Decidido:** **por run**, inicial mais duas voltas, pela fonte única `proximaTentativaPermitida` (M9-F04, SPEC-Entrega-04). Revisão não consome tentativa; só a correção que ela dispara. *Recusada:* três tentativas por tarefa DEVELOPER (teto do run passaria de seis voltas e fugiria da M9-F04 literal).
+3. **Persistência dos achados.** **Decidido:** tabela nova (migração 49) com repositório próprio e `UNIQUE(run, assinatura)`; o `ExecutionLedger` é resumo do run e não comporta o ciclo de vida. *Recusada:* achados em memória no run com só o resumo no `AuditEvent` (perde o ciclo se o app reiniciar no meio).
+4. **Escopo da entrega.** **Decidido:** serviços (integrador, revisor, etapa TESTE, retrabalho, achados) provados com Git e SQLite reais, **ligação do `GerenteDeSlots` ao `FilaService` real** (`aoAdquirir` e `aoCancelarEspera`, pendência da F03) **e smoke opt-in com `claude` e Docker reais** (a F03 empurrou essa prova para cá). Sem IPC nem tela (MVP-028). Sem credencial ou Docker o smoke registra `not_run`, nunca `pass`.
+
 ## Perguntas abertas ao PI
 
-Nenhuma. Revisão exata aprovada pelo PI em 2026-10-02.
+Nenhuma. Revisão exata aprovada pelo PI em 2026-10-02; decisões de implementação em 2026-10-03.
