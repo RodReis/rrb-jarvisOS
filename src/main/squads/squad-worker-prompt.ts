@@ -46,7 +46,7 @@ const ROTULO_DO_PAPEL: Readonly<Record<string, string>> = {
 }
 
 /** Controle e override de direção saem do cabeçalho de cada fonte: o caminho é uma linha só. */
-function caminhoLimpo(caminho: string): string {
+export function caminhoLimpo(caminho: string): string {
   return Array.from(caminho)
     .filter((ch) => {
       const cp = ch.codePointAt(0) ?? 0
@@ -115,7 +115,7 @@ function umaLinha(texto: string): string {
     .trim()
 }
 
-function blocosDasFontes(fontes: readonly FonteDaTarefa[], marcador: string): string[] {
+export function blocosDasFontes(fontes: readonly FonteDaTarefa[], marcador: string): string[] {
   return fontes.map((f) => {
     const faixa = f.linhas === undefined ? '' : ` (linhas ${f.linhas.de}-${f.linhas.ate})`
     return [marcador, `caminho: ${caminhoLimpo(f.caminho)}${faixa}`, f.texto, marcador].join('\n')

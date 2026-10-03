@@ -196,11 +196,11 @@ const MAX_LACUNAS = 20
 const MAX_MOTIVO_DA_RECUSA = 160
 const MAX_LACUNA = 500
 
-type Registro = Record<string, unknown>
+export type Registro = Record<string, unknown>
 
-const ehRegistro = (v: unknown): v is Registro =>
+export const ehRegistro = (v: unknown): v is Registro =>
   typeof v === 'object' && v !== null && !Array.isArray(v)
-const chavesExtras = (o: Registro, permitidas: readonly string[]): string[] =>
+export const chavesExtras = (o: Registro, permitidas: readonly string[]): string[] =>
   Object.keys(o).filter((k) => !permitidas.includes(k))
 
 const TABULACAO = 0x09
@@ -217,7 +217,7 @@ function temCaractereProibido(texto: string, permiteQuebra: boolean): boolean {
   })
 }
 
-function textoAte(v: unknown, max: number, permiteQuebra: boolean): string | undefined {
+export function textoAte(v: unknown, max: number, permiteQuebra: boolean): string | undefined {
   if (typeof v !== 'string' || v.trim() === '' || v.length > max) return undefined
   return temCaractereProibido(v, permiteQuebra) ? undefined : v
 }
