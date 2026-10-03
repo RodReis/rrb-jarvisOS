@@ -17,8 +17,8 @@
  * timeout valem aqui como em qualquer outro lugar.
  */
 
-import { lstatSync, rmSync } from 'node:fs'
-import { isAbsolute, join, resolve, sep } from 'node:path'
+import { lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { dirname, isAbsolute, join, resolve, sep } from 'node:path'
 import type { WorkspaceId } from '@shared/domain/entities'
 import { ehControleOuDirecao } from '@shared/domain/squad-plano'
 import { GitRunner } from '../projects/git-runner'
@@ -50,6 +50,13 @@ export interface ArquivoNaRevisao {
   readonly caminho: string
   readonly oid: string
   readonly bytes: number
+}
+
+export interface ResultadoDoMerge {
+  /** Os arquivos que o Git não conseguiu juntar sozinho: o integrador decide cada um. */
+  readonly conflitos: readonly string[]
+  /** `false` quando o outro lado já estava contido: não há merge a commitar. */
+  readonly emAndamento: boolean
 }
 
 export interface OcorrenciaDeBusca {
@@ -86,6 +93,8 @@ const MAX_TERMO_DE_BUSCA = 200
 /** O teto de ocorrências devolvidas: uma busca que casa tudo não vira contexto. */
 export const MAX_OCORRENCIAS_DA_BUSCA = 500
 const MAX_MENSAGEM = 200
+/** O teto de leitura de um arquivo em conflito: acima disso o arquivo não é texto de código. */
+const MAX_BYTES_DO_ARQUIVO_EM_CONFLITO = 1024 * 1024
 
 /** Onde um hook do repositório deixaria de existir: o caminho nulo do sistema. */
 const SEM_HOOKS = process.platform === 'win32' ? 'NUL' : '/dev/null'
@@ -262,6 +271,147 @@ export class SquadGit {
     if (!preparados.ok) return recusa(preparados.motivo)
     if (partir(preparados.bruto).length === 0) return recusa('sem-alteracoes')
 
+    return this.commitarComIdentidade(w, mensagem)
+  }
+
+  /**
+   * Remove o worktree **sem `--force`**. O `--force` casa o padrão destrutivo do `TerminalEngine` e
+   * viraria pedido de aprovação — e o kernel não tem como pedir aprovação no meio de uma
+   * limpeza. Sem ele o Git recusa o worktree com arquivo não commitado, que é o certo: a limpeza
+   * não destrói trabalho que o kernel não registrou.
+   */
+  remover(w: WorktreeDeEscritor): ResultadoGit<void> {
+    // O que o sandbox deixou no worktree antes de o agente rodar não é trabalho a salvar: sem
+    // descartá-lo o Git recusaria todo worktree, até o que o escritor commitou inteiro.
+    for (const artefato of ARTEFATOS_DO_SANDBOX) {
+      rmSync(join(w.worktree, artefato), { recursive: true, force: true })
+    }
+    const r = this.executar(['worktree', 'remove', w.worktree], w.repositorio)
+    if (r.ok) return { ok: true, valor: undefined }
+    return recusa(/modified or untracked/i.test(r.motivo) ? 'worktree-sujo' : r.motivo)
+  }
+
+  // ─── integração de dois escritores ────────────────────────────────────────────────────────────
+  //
+  // O worktree de integração é do kernel: nasce no commit de um escritor, recebe o merge do outro e
+  // é onde o kernel grava a resolução que o integrador devolveu. **O agente integrador não toca
+  // nele** (decisão do PI de 2026-10-03): ele devolve texto de bloco, e quem escreve, adiciona e
+  // commita é o kernel — por isso nada aqui precisa defender o worktree de um agente.
+
+  /**
+   * Junta o commit do outro escritor ao worktree de integração, **sem commitar**. O Git faz o que é
+   * determinístico; o que sobra em `conflitos` vai ao integrador, com a base (estilo diff3).
+   */
+  mesclar(w: WorktreeDeEscritor, commit: string): ResultadoGit<ResultadoDoMerge> {
+    if (!SHA.test(commit)) return recusa('commit inválido')
+    const r = this.noWorktree(w, [
+      '-c',
+      'merge.conflictStyle=diff3',
+      'merge',
+      '--no-commit',
+      '--no-ff',
+      '--no-edit',
+      commit
+    ])
+    // Sair com 1 é conflito; qualquer outro erro é o merge que não aconteceu.
+    if (!r.ok && r.codigo !== 1) return recusa(r.motivo)
+
+    const abertos = this.conflitosAbertos(w)
+    if (!abertos.ok) return abertos
+    return { ok: true, valor: { conflitos: abertos.valor, emAndamento: this.mergeEmAndamento(w) } }
+  }
+
+  /** O texto de um arquivo do worktree de integração: regular, pequeno, sem link nem binário. */
+  lerArquivoDoWorktree(w: WorktreeDeEscritor, caminho: string): ResultadoGit<string> {
+    const alvo = this.caminhoNoWorktree(w, caminho)
+    if (typeof alvo !== 'string') return alvo
+    try {
+      const info = lstatSync(alvo)
+      if (!info.isFile()) return recusa('não é arquivo regular')
+      if (info.size > MAX_BYTES_DO_ARQUIVO_EM_CONFLITO) return recusa('arquivo grande demais')
+      const texto = readFileSync(alvo, 'utf8')
+      return texto.includes('\0') ? recusa('arquivo-binario') : { ok: true, valor: texto }
+    } catch {
+      return recusa('arquivo ilegível')
+    }
+  }
+
+  /** Grava a resolução de um arquivo em conflito e o marca como resolvido. */
+  resolverArquivo(w: WorktreeDeEscritor, caminho: string, texto: string): ResultadoGit<void> {
+    const alvo = this.caminhoNoWorktree(w, caminho)
+    if (typeof alvo !== 'string') return alvo
+    try {
+      // Nunca escreve por cima de um link: o destino pode estar fora do worktree.
+      if (lstatSync(alvo, { throwIfNoEntry: false })?.isSymbolicLink() === true) {
+        return recusa('o arquivo é um link simbólico')
+      }
+      mkdirSync(dirname(alvo), { recursive: true })
+      writeFileSync(alvo, texto, 'utf8')
+    } catch {
+      return recusa('arquivo não gravável')
+    }
+    const adicionado = this.noWorktree(w, ['--literal-pathspecs', 'add', '--', caminho])
+    return adicionado.ok ? { ok: true, valor: undefined } : recusa(adicionado.motivo)
+  }
+
+  /**
+   * Commita o merge em andamento. Com conflito aberto **não commita**: integração sem todas as
+   * resoluções não existe (regra 1). O commit leva os dois pais e a identidade fixa do kernel.
+   */
+  commitarIntegracao(w: WorktreeDeEscritor, mensagem: string): ResultadoGit<string> {
+    if (mensagem.trim() === '' || mensagem.length > MAX_MENSAGEM || /[\r\n]/.test(mensagem)) {
+      return recusa('mensagem de commit inválida')
+    }
+    if (!this.mergeEmAndamento(w)) return recusa('sem-merge-em-andamento')
+    const abertos = this.conflitosAbertos(w)
+    if (!abertos.ok) return abertos
+    if (abertos.valor.length > 0) return recusa('conflitos-abertos')
+    return this.commitarComIdentidade(w, mensagem)
+  }
+
+  /**
+   * O diff textual entre dois commits, sem contexto (`-U0`): cada hunk é só o que mudou, que é o
+   * que o manifesto identifica por conteúdo. Sem driver externo nem conversão de texto — nada do
+   * repositório faz o `git` rodar um programa.
+   */
+  diffEntre(repositorio: string, de: string, para: string): ResultadoGit<string> {
+    if (!SHA.test(de) || !SHA.test(para)) return recusa('revisão inválida')
+    if (!isAbsolute(repositorio)) return recusa('o repositório precisa ser um caminho absoluto')
+    const r = this.executar(
+      [
+        'diff',
+        '--no-color',
+        '--no-renames',
+        '--no-ext-diff',
+        '--no-textconv',
+        '-U0',
+        de,
+        para,
+        '--'
+      ],
+      repositorio,
+      true
+    )
+    return r.ok ? { ok: true, valor: r.bruto } : recusa(r.motivo)
+  }
+
+  private mergeEmAndamento(w: WorktreeDeEscritor): boolean {
+    return this.noWorktree(w, ['rev-parse', '--verify', '--quiet', 'MERGE_HEAD']).ok
+  }
+
+  private conflitosAbertos(w: WorktreeDeEscritor): ResultadoGit<readonly string[]> {
+    const r = this.noWorktree(w, ['diff', '--name-only', '--diff-filter=U', '-z'])
+    return r.ok ? { ok: true, valor: partir(r.bruto).sort() } : recusa(r.motivo)
+  }
+
+  /** O caminho absoluto dentro do worktree, ou a recusa. */
+  private caminhoNoWorktree(w: WorktreeDeEscritor, caminho: string): string | ResultadoGit<never> {
+    if (!caminhoRelativoSeguro(caminho)) return recusa('caminho inválido')
+    const alvo = resolve(w.worktree, caminho)
+    return alvo.startsWith(resolve(w.worktree) + sep) ? alvo : recusa('caminho fora do worktree')
+  }
+
+  private commitarComIdentidade(w: WorktreeDeEscritor, mensagem: string): ResultadoGit<string> {
     const commit = this.noWorktree(w, [
       '-c',
       `user.name=${IDENTIDADE_DO_KERNEL.nome}`,
@@ -281,23 +431,6 @@ export class SquadGit {
 
     const sha = this.noWorktree(w, ['rev-parse', 'HEAD'])
     return sha.ok ? { ok: true, valor: sha.saida } : recusa(sha.motivo)
-  }
-
-  /**
-   * Remove o worktree **sem `--force`**. O `--force` casa o padrão destrutivo do `TerminalEngine` e
-   * viraria pedido de aprovação — e o kernel não tem como pedir aprovação no meio de uma
-   * limpeza. Sem ele o Git recusa o worktree com arquivo não commitado, que é o certo: a limpeza
-   * não destrói trabalho que o kernel não registrou.
-   */
-  remover(w: WorktreeDeEscritor): ResultadoGit<void> {
-    // O que o sandbox deixou no worktree antes de o agente rodar não é trabalho a salvar: sem
-    // descartá-lo o Git recusaria todo worktree, até o que o escritor commitou inteiro.
-    for (const artefato of ARTEFATOS_DO_SANDBOX) {
-      rmSync(join(w.worktree, artefato), { recursive: true, force: true })
-    }
-    const r = this.executar(['worktree', 'remove', w.worktree], w.repositorio)
-    if (r.ok) return { ok: true, valor: undefined }
-    return recusa(/modified or untracked/i.test(r.motivo) ? 'worktree-sujo' : r.motivo)
   }
 
   // ─── leitura de uma revisão ───────────────────────────────────────────────────────────────────
