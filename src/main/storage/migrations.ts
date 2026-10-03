@@ -1808,6 +1808,60 @@ const MIGRATIONS: readonly string[] = [
     em         INTEGER NOT NULL
   );
   CREATE INDEX idx_pool_decisao_em ON pool_decisao(user_id, em);
+  `,
+
+  // 49 - os achados da revisao independente e as voltas do retrabalho (SPEC-Squads-04).
+  //
+  // O `ExecutionLedger` e o resumo do run e nao comporta o ciclo de vida de um achado (decisao do
+  // PI de 2026-10-03). `UNIQUE(run_id, assinatura)` e a garantia de "o mesmo problema e uma
+  // assinatura so": e o indice, nao um `if` do servico, que impede dois registros do mesmo achado.
+  // A assinatura e calculada pelo kernel — nunca vem do agente.
+  //
+  // `squad_retrabalho` registra **cada volta** ao DEVELOPER (criterio 5): quem reprovou, por que e
+  // quais assinaturas voltaram. E append-only na pratica: a chave inclui a tentativa.
+  `
+  CREATE TABLE squad_achado (
+    run_id                  TEXT NOT NULL,
+    assinatura              TEXT NOT NULL,
+    user_id                 TEXT NOT NULL,
+    workspace_id            TEXT NOT NULL,
+    estado                  TEXT NOT NULL
+      CHECK (estado IN ('open', 'accepted', 'fixed', 'dismissed', 'superseded')),
+    severidade              TEXT NOT NULL CHECK (severidade IN ('P0', 'P1', 'P2', 'P3')),
+    categoria               TEXT NOT NULL,
+    titulo                  TEXT NOT NULL,
+    arquivo                 TEXT NOT NULL,
+    trecho                  TEXT NOT NULL,
+    impacto                 TEXT NOT NULL,
+    correcao                TEXT NOT NULL,
+    fora_da_spec            INTEGER NOT NULL CHECK (fora_da_spec IN (0, 1)),
+    justificativa_severidade TEXT,
+    -- JSON: string[]
+    visto_por               TEXT NOT NULL,
+    contestado_por          TEXT NOT NULL,
+    delta_primeira_vista    TEXT NOT NULL,
+    delta_ultima_vista      TEXT NOT NULL,
+    delta_fechamento        TEXT,
+    motivo_estado           TEXT,
+    reaberturas             INTEGER NOT NULL DEFAULT 0,
+    atualizado_em           TEXT NOT NULL,
+    PRIMARY KEY (run_id, assinatura)
+  );
+  CREATE INDEX idx_squad_achado_estado ON squad_achado(user_id, run_id, estado);
+
+  CREATE TABLE squad_retrabalho (
+    run_id       TEXT NOT NULL,
+    tentativa    INTEGER NOT NULL CHECK (tentativa >= 1),
+    user_id      TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    origem       TEXT NOT NULL CHECK (origem IN ('teste', 'revisao')),
+    decisao      TEXT NOT NULL CHECK (decisao IN ('voltar', 'parar')),
+    motivo       TEXT,
+    -- JSON: string[] das assinaturas que voltaram ao escritor
+    assinaturas  TEXT NOT NULL,
+    em           TEXT NOT NULL,
+    PRIMARY KEY (run_id, tentativa, origem)
+  );
   `
 ]
 
