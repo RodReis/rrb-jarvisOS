@@ -37,7 +37,7 @@ import { normalizar, type TarefaDoPlano } from '@shared/domain/squad-plano'
 import { ehSchemaDeResultado } from '@shared/domain/squad-resultado-esquema'
 import type { FonteDaTarefa } from '../context/context-service'
 import type { AuditRepository } from '../storage/audit-repository'
-import { extrairJson } from './squad-planejador'
+import { extrairJsonFinal } from './squad-planejador'
 import { recusaDaTentativa, recusaDoContexto, recusaDosLimites } from './squad-recusas'
 import type { SquadGit, WorktreeDeEscritor } from './squad-git'
 import type { GerenteDeSlots } from './squad-slots'
@@ -443,7 +443,7 @@ export class ExecutorDeEscritor {
     base: { descartadas: string[]; worktree: string }
   ): Desfecho {
     const schema = pedido.tarefa.schemaDeResultado as SchemaDeResultado
-    const bruto = extrairJson(texto, (v) => 'conclusao' in v && 'schema' in v)
+    const bruto = extrairJsonFinal(texto, (v) => 'conclusao' in v && 'schema' in v)
     if (bruto === undefined) {
       return { ...base, estado: 'invalida', motivo: 'saida-sem-json', arquivos }
     }

@@ -33,7 +33,7 @@ import type { AiCallContext } from '../ai/call-provider'
 import type { FonteDaTarefa } from '../context/context-service'
 import type { AuditRepository } from '../storage/audit-repository'
 import type { ChamadorDeIa } from './squad-gerador'
-import { extrairJson } from './squad-planejador'
+import { extrairJsonFinal } from './squad-planejador'
 import { recusaDaTentativa, recusaDoContexto, recusaDosLimites } from './squad-recusas'
 import { montarPromptDoWorker } from './squad-worker-prompt'
 
@@ -281,7 +281,7 @@ export class ExecutorDeWorker {
     schema: SchemaDeResultado,
     fontes: readonly FonteDaTarefa[]
   ): Desfecho {
-    const bruto = extrairJson(texto, (v) => 'conclusao' in v && 'schema' in v)
+    const bruto = extrairJsonFinal(texto, (v) => 'conclusao' in v && 'schema' in v)
     if (bruto === undefined) {
       return { estado: 'invalida', motivo: 'saida-sem-json', descartadas: [] }
     }
