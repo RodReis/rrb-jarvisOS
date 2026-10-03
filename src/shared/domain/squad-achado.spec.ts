@@ -3,10 +3,12 @@ import {
   conferirEvidencia,
   contestar,
   decidirTriagem,
+  esquemaDoParecer,
   incorporarAchados,
   lerParecer,
   revalidar,
   textoDaAssinaturaDoAchado,
+  transicaoDoAchadoAlcancavel,
   transicaoDoAchadoPermitida,
   veredito,
   type AchadoDeclarado,
@@ -286,6 +288,19 @@ describe('ciclo de vida', () => {
   })
 })
 
+describe('transicaoDoAchadoAlcancavel', () => {
+  it.each([
+    ['fixed', 'accepted', true],
+    ['dismissed', 'accepted', true],
+    ['open', 'fixed', true],
+    ['fixed', 'dismissed', true],
+    ['superseded', 'open', false],
+    ['superseded', 'accepted', false]
+  ] as const)('%s → %s: %s', (de, para, esperado) => {
+    expect(transicaoDoAchadoAlcancavel(de, para)).toBe(esperado)
+  })
+})
+
 describe('decidirTriagem', () => {
   it('aceita o bloqueante, dentro da SPEC, com evidência conferida', () => {
     const lista = decidirTriagem([registrado()], () => 'items.slice(0, -1)')
@@ -353,5 +368,31 @@ describe('contestar e veredito', () => {
 
   it('sem parecer do revisor, BLOCKED', () => {
     expect(veredito([], false)).toEqual({ resultado: 'BLOCKED', motivo: 'revisao-sem-parecer' })
+  })
+
+  it('revisor que declarou BLOCKED para o run: o kernel não passa por cima', () => {
+    expect(veredito([], true, true)).toEqual({ resultado: 'BLOCKED', motivo: 'revisor-bloqueou' })
+  })
+})
+
+describe('esquemaDoParecer', () => {
+  it('é estrito, pede o que lerParecer exige e não tem assinatura', () => {
+    const e = esquemaDoParecer() as {
+      additionalProperties: boolean
+      required: string[]
+      properties: Record<string, unknown>
+    }
+
+    expect(e.additionalProperties).toBe(false)
+    expect(e.required).toEqual(['schema', 'parecer', 'achados', 'observacoes', 'contestacoes'])
+    const itemDoAchado = (e.properties.achados as { items: { properties: object } }).items
+    expect(Object.keys(e.properties)).not.toContain('assinatura')
+    // A assinatura é do kernel: o achado não a declara. (A contestação cita a de um achado já
+    // registrado, e por isso tem o campo.)
+    expect(Object.keys(itemDoAchado.properties)).not.toContain('assinatura')
+  })
+
+  it('um parecer que cumpre o esquema passa em lerParecer', () => {
+    expect(lerParecer(parecerBruto()).ok).toBe(true)
   })
 })

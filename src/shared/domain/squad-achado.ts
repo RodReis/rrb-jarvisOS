@@ -267,6 +267,26 @@ const TRANSICOES: Readonly<Record<EstadoDoAchado, readonly EstadoDoAchado[]>> = 
 export const transicaoDoAchadoPermitida = (de: EstadoDoAchado, para: EstadoDoAchado): boolean =>
   TRANSICOES[de].includes(para)
 
+/**
+ * O estado final é alcançável por transições permitidas, em um ou mais passos. Uma rodada de
+ * revisão pode reabrir **e** aceitar o mesmo achado (`fixed → open → accepted`); quem grava confere
+ * o resultado líquido, e `superseded` segue sem saída.
+ */
+export function transicaoDoAchadoAlcancavel(de: EstadoDoAchado, para: EstadoDoAchado): boolean {
+  const vistos = new Set<EstadoDoAchado>([de])
+  const fila: EstadoDoAchado[] = [de]
+  for (let estado = fila.shift(); estado !== undefined; estado = fila.shift()) {
+    for (const proximo of TRANSICOES[estado]) {
+      if (proximo === para) return true
+      if (!vistos.has(proximo)) {
+        vistos.add(proximo)
+        fila.push(proximo)
+      }
+    }
+  }
+  return false
+}
+
 const aberto = (a: AchadoRegistrado): boolean => a.estado === 'open' || a.estado === 'accepted'
 
 function mudarEstado(
@@ -410,21 +430,80 @@ export type VereditoDaRevisao =
   | { readonly resultado: 'PASS' | 'FIX_REQUIRED' }
   | {
       readonly resultado: 'BLOCKED'
-      readonly motivo: 'conflito-entre-revisores' | 'revisao-sem-parecer'
+      readonly motivo: 'conflito-entre-revisores' | 'revisao-sem-parecer' | 'revisor-bloqueou'
     }
 
 /**
  * O veredito é do kernel, derivado dos achados — não do `parecer` que o agente declarou. Sem
- * parecer válido o run para (regra 1); conflito de bloqueante aberto também (critério 6).
+ * parecer válido o run para (regra 1); conflito de bloqueante aberto também (critério 6). Um
+ * revisor que declara `BLOCKED` para o run: ele diz que não consegue revisar, e passar por cima
+ * disso seria aceitar a integração sem a prova.
  */
 export function veredito(
   achados: readonly AchadoRegistrado[],
-  houveParecer: boolean
+  houveParecer: boolean,
+  algumRevisorBloqueou = false
 ): VereditoDaRevisao {
   if (!houveParecer) return { resultado: 'BLOCKED', motivo: 'revisao-sem-parecer' }
+  if (algumRevisorBloqueou) return { resultado: 'BLOCKED', motivo: 'revisor-bloqueou' }
   const bloqueantes = achados.filter((a) => aberto(a) && bloqueia(a.severidade) && !a.foraDaSpec)
   if (bloqueantes.some((a) => a.contestadoPor.length > 0)) {
     return { resultado: 'BLOCKED', motivo: 'conflito-entre-revisores' }
   }
   return { resultado: bloqueantes.length > 0 ? 'FIX_REQUIRED' : 'PASS' }
+}
+
+/**
+ * O JSON Schema que o revisor recebe para o parecer. Uma **ajuda**, não a barreira: o CLI o aplica
+ * como `--json-schema` e o Ollama como `format`, e quem decide é `lerParecer`. Sem `assinatura`.
+ */
+export function esquemaDoParecer(): Record<string, unknown> {
+  const texto = { type: 'string' }
+  return {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      schema: { enum: [PARECER_DE_REVISAO] },
+      parecer: { enum: [...PARECERES] },
+      achados: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            categoria: { enum: [...CATEGORIAS_DE_ACHADO] },
+            severidade: { enum: [...SEVERIDADES] },
+            titulo: texto,
+            arquivo: texto,
+            trecho: texto,
+            impacto: texto,
+            correcao: texto,
+            foraDaSpec: { type: 'boolean' },
+            justificativaDeSeveridade: texto
+          },
+          required: [
+            'categoria',
+            'severidade',
+            'titulo',
+            'arquivo',
+            'trecho',
+            'impacto',
+            'correcao',
+            'foraDaSpec'
+          ]
+        }
+      },
+      observacoes: { type: 'array', items: texto },
+      contestacoes: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: { assinatura: texto, motivo: texto },
+          required: ['assinatura', 'motivo']
+        }
+      }
+    },
+    required: ['schema', 'parecer', 'achados', 'observacoes', 'contestacoes']
+  }
 }

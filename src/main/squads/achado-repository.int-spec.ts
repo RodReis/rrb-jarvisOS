@@ -101,6 +101,14 @@ describe('salvar e listar', () => {
     expect(repo.listar('u-1', 'run-1')).toHaveLength(1)
   })
 
+  it('aceita o resultado líquido de reabrir e aceitar na mesma rodada (fixed → accepted)', () => {
+    repo.salvar(ESCOPO, [achado({ estado: 'fixed', deltaDoFechamento: 'd1' })])
+
+    repo.salvar(ESCOPO, [achado({ estado: 'accepted', reaberturas: 1, deltaDaUltimaVista: 'd2' })])
+
+    expect(repo.listar('u-1', 'run-1')[0]).toMatchObject({ estado: 'accepted', reaberturas: 1 })
+  })
+
   it('o achado de um usuário não vaza para outro, nem é sobrescrito por ele', () => {
     repo.salvar(ESCOPO, [achado()])
     repo.salvar({ ...ESCOPO, userId: 'u-2' }, [achado({ severidade: 'P3' })])

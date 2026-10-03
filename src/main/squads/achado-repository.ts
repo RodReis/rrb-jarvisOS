@@ -8,7 +8,7 @@
 
 import type { Database } from 'better-sqlite3'
 import {
-  transicaoDoAchadoPermitida,
+  transicaoDoAchadoAlcancavel,
   type AchadoRegistrado,
   type CategoriaDeAchado,
   type EstadoDoAchado,
@@ -106,7 +106,7 @@ export class AchadoRepository {
       if (
         atual !== undefined &&
         atual.estado !== achado.estado &&
-        !transicaoDoAchadoPermitida(atual.estado, achado.estado)
+        !transicaoDoAchadoAlcancavel(atual.estado, achado.estado)
       ) {
         throw new Error(`Transição de achado não permitida: ${atual.estado} → ${achado.estado}.`)
       }

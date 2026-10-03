@@ -115,7 +115,7 @@ function umaLinha(texto: string): string {
     .trim()
 }
 
-function blocosDasFontes(fontes: readonly FonteDaTarefa[], marcador: string): string[] {
+export function blocosDasFontes(fontes: readonly FonteDaTarefa[], marcador: string): string[] {
   return fontes.map((f) => {
     const faixa = f.linhas === undefined ? '' : ` (linhas ${f.linhas.de}-${f.linhas.ate})`
     return [marcador, `caminho: ${caminhoLimpo(f.caminho)}${faixa}`, f.texto, marcador].join('\n')
