@@ -152,6 +152,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'createWorkflow',
     'definirEscutaAtiva',
     'definirGatilhosDaEscuta',
+    'definirHotkeyDaEscuta',
     'definirModoDeTesteDaEscuta',
     'definirPoliticaDeMerge',
     'definirSensibilidadeDaEscuta',

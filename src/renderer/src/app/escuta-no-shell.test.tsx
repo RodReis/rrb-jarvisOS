@@ -15,7 +15,9 @@ const LIGADA: EstadoDaEscuta = {
   disponivel: true,
   frase: true,
   palmas: true,
-  sensibilidade: 0.5
+  sensibilidade: 0.5,
+  hotkey: 'Control+Alt+M',
+  hotkeyRegistrada: true
 }
 
 const PERFIL = {

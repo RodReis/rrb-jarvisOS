@@ -15,6 +15,7 @@ const DETECCAO: EventoWakeWordDetectado = { confianca: 0.91, fimDaFraseMs: 1234 
 function engineFalso(resposta: EventoWakeWordDetectado | null = null) {
   const alimentados: Int16Array[] = []
   const limiares: number[] = []
+  const encerramentos = { total: 0 }
   let limiar = 0.5
   const engine: WakeWordEngine = {
     alimentar: async (pcm) => {
@@ -27,9 +28,11 @@ function engineFalso(resposta: EventoWakeWordDetectado | null = null) {
       limiares.push(v)
     },
     obterLimiar: () => limiar,
-    encerrar: async () => undefined
+    encerrar: async () => {
+      encerramentos.total += 1
+    }
   }
-  return { engine, alimentados, limiares }
+  return { engine, alimentados, limiares, encerramentos }
 }
 
 function montar(
@@ -41,13 +44,17 @@ function montar(
     turnoAtivo?: boolean
     modeloPronto?: boolean
     tetoDoTurnoMs?: number
+    hotkeyOcupada?: boolean
   } = {}
 ) {
-  const { engine, alimentados, limiares } = engineFalso(sobrescrever.resposta ?? null)
+  const { engine, alimentados, limiares, encerramentos } = engineFalso(
+    sobrescrever.resposta ?? null
+  )
   const auditados: { type: string; payload: Record<string, unknown> }[] = []
   const capturas: boolean[] = []
   const disparos: EventoDeEscuta[] = []
   const testes: DisparoDeTeste[] = []
+  const registradas: string[] = []
   const gravados: EstadoPersistidoDaEscuta[] = []
   let palmasAlimentadas = 0
   let persistido = sobrescrever.persistido
@@ -78,6 +85,10 @@ function montar(
     aoMudarCaptura: (aberta) => void capturas.push(aberta),
     aoDisparar: (e) => void disparos.push(e),
     aoTestar: (e) => void testes.push(e),
+    registrarHotkey: (h) => {
+      registradas.push(h)
+      return !sobrescrever.hotkeyOcupada
+    },
     tetoDoTurnoMs: sobrescrever.tetoDoTurnoMs,
     agendar: (acao, ms) => {
       const a = { acao, ms, cancelado: false }
@@ -94,9 +105,11 @@ function montar(
     capturas,
     disparos,
     testes,
+    registradas,
     gravados,
     alimentados,
     limiares,
+    encerramentos,
     palmasAlimentadas: () => palmasAlimentadas,
     agendados,
     estourarTeto: () => agendados.filter((a) => !a.cancelado).forEach((a) => a.acao()),
@@ -115,7 +128,13 @@ describe('EscutaService — restauração (SPEC-Escuta-01, critérios 8 e 10)', 
 
   it('o kill switch salvo como desligado prevalece sobre o padrão', async () => {
     const m = montar({
-      persistido: { ativa: false, frase: true, palmas: true, sensibilidade: 0.5 }
+      persistido: {
+        ativa: false,
+        frase: true,
+        palmas: true,
+        sensibilidade: 0.5,
+        hotkey: 'Control+Alt+M'
+      }
     })
     await m.servico.restaurar()
     expect(m.servico.estado().ativa).toBe(false)
@@ -204,7 +223,13 @@ describe('EscutaService — hotkey de mute (critério 11)', () => {
 describe('EscutaService — áudio e gatilhos (critérios 2, 7 e 12)', () => {
   it('escuta desligada não alimenta engine nem detector de palmas', async () => {
     const m = montar({
-      persistido: { ativa: false, frase: true, palmas: true, sensibilidade: 0.5 }
+      persistido: {
+        ativa: false,
+        frase: true,
+        palmas: true,
+        sensibilidade: 0.5,
+        hotkey: 'Control+Alt+M'
+      }
     })
     await m.servico.restaurar()
     await m.servico.receberPcm(PCM)
@@ -228,7 +253,13 @@ describe('EscutaService — áudio e gatilhos (critérios 2, 7 e 12)', () => {
 
   it('cada gatilho liga e desliga separadamente', async () => {
     const m = montar({
-      persistido: { ativa: true, frase: false, palmas: true, sensibilidade: 0.5 },
+      persistido: {
+        ativa: true,
+        frase: false,
+        palmas: true,
+        sensibilidade: 0.5,
+        hotkey: 'Control+Alt+M'
+      },
       resposta: DETECCAO,
       palmas: true
     })
@@ -417,5 +448,96 @@ describe('EscutaService — modo de teste ao vivo (critério 12)', () => {
     await m.servico.receberPcm(PCM)
 
     expect(m.disparos).toHaveLength(1)
+  })
+})
+
+describe('EscutaService — o kill switch descarta o que ouviu (critérios 3 e 8)', () => {
+  it('desligar encerra o engine: o pré-roll em memória e o processo do detector somem', async () => {
+    const m = montar({ persistido: undefined })
+    await m.servico.restaurar()
+    expect(m.encerramentos.total).toBe(0)
+
+    await m.servico.desligar('interface')
+
+    // O engine guarda 1,5 s de áudio num buffer circular e mantém um sidecar vivo. Com o
+    // microfone fechado, nada disso pode continuar de pé.
+    expect(m.encerramentos.total).toBe(1)
+  })
+
+  it('desligar duas vezes não encerra duas vezes', async () => {
+    const m = montar({ persistido: undefined })
+    await m.servico.restaurar()
+
+    await m.servico.desligar('hotkey')
+    await m.servico.desligar('hotkey')
+
+    expect(m.encerramentos.total).toBe(1)
+  })
+
+  it('religar depois de desligar volta a alimentar o engine', async () => {
+    const m = montar({ persistido: undefined, resposta: DETECCAO })
+    await m.servico.restaurar()
+    await m.servico.desligar('interface')
+    await m.servico.ligar('interface')
+
+    await m.servico.receberPcm(PCM)
+
+    expect(m.disparos).toHaveLength(1)
+  })
+})
+
+describe('EscutaService — hotkey de mute configurável (critério 11)', () => {
+  it('restaurar registra a hotkey padrão e diz que o SO a aceitou', async () => {
+    const m = montar({ persistido: undefined })
+    await m.servico.restaurar()
+
+    expect(m.registradas).toEqual(['Control+Alt+M'])
+    expect(m.servico.estado()).toMatchObject({ hotkey: 'Control+Alt+M', hotkeyRegistrada: true })
+  })
+
+  it('a hotkey escolhida em Settings é a que vale no reinício', async () => {
+    const m = montar({
+      persistido: {
+        ativa: false,
+        frase: true,
+        palmas: true,
+        sensibilidade: 0.5,
+        hotkey: 'Control+Shift+K'
+      }
+    })
+    await m.servico.restaurar()
+
+    expect(m.registradas).toEqual(['Control+Shift+K'])
+  })
+
+  it('trocar a hotkey registra a nova, persiste e fica no estado', async () => {
+    const m = montar({ persistido: undefined })
+    await m.servico.restaurar()
+
+    await m.servico.definirHotkey('Control+Shift+M')
+
+    expect(m.registradas.at(-1)).toBe('Control+Shift+M')
+    expect(m.servico.estado().hotkey).toBe('Control+Shift+M')
+    expect(m.gravados.at(-1)?.hotkey).toBe('Control+Shift+M')
+  })
+
+  it('combinação fora da lista é recusada: o renderer não sequestra qualquer atalho global', async () => {
+    const m = montar({ persistido: undefined })
+    await m.servico.restaurar()
+    m.registradas.length = 0
+
+    await m.servico.definirHotkey('Control+C')
+    await m.servico.definirHotkey('Control+Alt+Space')
+
+    expect(m.registradas).toEqual([])
+    expect(m.servico.estado().hotkey).toBe('Control+Alt+M')
+  })
+
+  it('atalho ocupado por outro app aparece como não registrado, sem derrubar a escuta', async () => {
+    const m = montar({ persistido: undefined, hotkeyOcupada: true })
+    await m.servico.restaurar()
+
+    // A escuta segue valendo pelo interruptor da tela; o estado só avisa que o atalho não pegou.
+    expect(m.servico.estado()).toMatchObject({ ativa: true, hotkeyRegistrada: false })
   })
 })

@@ -12,6 +12,7 @@
 
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
+import { HOTKEY_DE_MUTE_PADRAO, isHotkeyDeMuteDaEscuta } from '@shared/domain/voz'
 import { LIMIAR_PADRAO_WAKE_WORD } from './wake-word-engine'
 import type { EstadoPersistidoDaEscuta } from './escuta-service'
 
@@ -19,19 +20,30 @@ const FALHA_FECHADO: EstadoPersistidoDaEscuta = {
   ativa: false,
   frase: true,
   palmas: true,
-  sensibilidade: LIMIAR_PADRAO_WAKE_WORD
+  sensibilidade: LIMIAR_PADRAO_WAKE_WORD,
+  hotkey: HOTKEY_DE_MUTE_PADRAO
 }
 
-function forma(valor: unknown): valor is EstadoPersistidoDaEscuta {
-  if (typeof valor !== 'object' || valor === null) return false
+/** Lê o estado; a hotkey é a única parte tolerante, porque arquivo antigo não a tinha. */
+function forma(valor: unknown): EstadoPersistidoDaEscuta | undefined {
+  if (typeof valor !== 'object' || valor === null) return undefined
   const v = valor as Record<string, unknown>
-  return (
-    typeof v.ativa === 'boolean' &&
-    typeof v.frase === 'boolean' &&
-    typeof v.palmas === 'boolean' &&
-    typeof v.sensibilidade === 'number' &&
-    Number.isFinite(v.sensibilidade)
-  )
+  if (
+    typeof v.ativa !== 'boolean' ||
+    typeof v.frase !== 'boolean' ||
+    typeof v.palmas !== 'boolean' ||
+    typeof v.sensibilidade !== 'number' ||
+    !Number.isFinite(v.sensibilidade)
+  ) {
+    return undefined
+  }
+  return {
+    ativa: v.ativa,
+    frase: v.frase,
+    palmas: v.palmas,
+    sensibilidade: v.sensibilidade,
+    hotkey: isHotkeyDeMuteDaEscuta(v.hotkey) ? v.hotkey : HOTKEY_DE_MUTE_PADRAO
+  }
 }
 
 export function criarEstadoDaEscutaEmDisco(caminho: string): {
@@ -49,7 +61,7 @@ export function criarEstadoDaEscutaEmDisco(caminho: string): {
       }
       try {
         const lido: unknown = JSON.parse(texto)
-        return forma(lido) ? lido : FALHA_FECHADO
+        return forma(lido) ?? FALHA_FECHADO
       } catch {
         return FALHA_FECHADO
       }

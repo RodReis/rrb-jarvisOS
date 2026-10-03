@@ -15,7 +15,9 @@ const BASE: EstadoDaEscuta = {
   disponivel: true,
   frase: true,
   palmas: true,
-  sensibilidade: 0.5
+  sensibilidade: 0.5,
+  hotkey: 'Control+Alt+M',
+  hotkeyRegistrada: true
 }
 
 let estado: EstadoDaEscuta
@@ -24,6 +26,7 @@ let avisarTeste: ((d: DisparoDeTesteDaEscuta) => void) | undefined
 const definirGatilhosDaEscuta = vi.fn()
 const definirSensibilidadeDaEscuta = vi.fn()
 const definirModoDeTesteDaEscuta = vi.fn()
+const definirHotkeyDaEscuta = vi.fn()
 
 beforeEach(() => {
   estado = BASE
@@ -36,11 +39,15 @@ beforeEach(() => {
     .mockReset()
     .mockImplementation(async (s) => (estado = { ...estado, sensibilidade: s }))
   definirModoDeTesteDaEscuta.mockReset().mockImplementation(async () => estado)
+  definirHotkeyDaEscuta
+    .mockReset()
+    .mockImplementation(async (h) => (estado = { ...estado, hotkey: h }))
   vi.stubGlobal('jarvis', {
     estadoDaEscuta: vi.fn(async () => estado),
     definirGatilhosDaEscuta,
     definirSensibilidadeDaEscuta,
     definirModoDeTesteDaEscuta,
+    definirHotkeyDaEscuta,
     onEscutaMudou: (l: (e: EstadoDaEscuta) => void) => {
       avisarEstado = l
       return () => {
@@ -168,5 +175,37 @@ describe('teste ao vivo (critério 12)', () => {
 
     expect(await screen.findByRole('button', { name: /testar ao vivo/i })).toBeDisabled()
     expect(screen.queryByText(/não abre conversa/i)).not.toBeInTheDocument()
+  })
+})
+
+describe('hotkey de mute (critério 11)', () => {
+  it('mostra a combinação atual como está escrita na tecla, não como a API a chama', async () => {
+    await montar()
+
+    expect(screen.getByRole('combobox', { name: /atalho de mute/i })).toHaveTextContent(
+      'Ctrl + Alt + M'
+    )
+  })
+
+  it('trocar o atalho manda só a combinação escolhida', async () => {
+    await montar()
+
+    await userEvent.click(screen.getByRole('combobox', { name: /atalho de mute/i }))
+    await userEvent.click(await screen.findByRole('option', { name: 'Ctrl + Shift + K' }))
+
+    expect(definirHotkeyDaEscuta).toHaveBeenCalledWith('Control+Shift+K')
+  })
+
+  it('atalho ocupado por outro app diz o que fazer, e o interruptor da tela segue valendo', async () => {
+    estado = { ...BASE, hotkeyRegistrada: false }
+    await montar()
+
+    expect(await screen.findByText(/outro app já usa esse atalho/i)).toBeInTheDocument()
+  })
+
+  it('com o atalho registrado não mostra aviso nenhum', async () => {
+    await montar()
+
+    expect(screen.queryByText(/outro app já usa/i)).not.toBeInTheDocument()
   })
 })

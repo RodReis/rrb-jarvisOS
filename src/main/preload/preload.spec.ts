@@ -83,6 +83,7 @@ describe('ponte do preload', () => {
       'createWorkflow',
       'definirEscutaAtiva',
       'definirGatilhosDaEscuta',
+      'definirHotkeyDaEscuta',
       'definirModoDeTesteDaEscuta',
       'definirPoliticaDeMerge',
       'definirSensibilidadeDaEscuta',
@@ -504,6 +505,14 @@ describe('ponte do preload', () => {
       expect(canal).toBe(IPC_EVENT_CHANNELS.escutaMudou)
       expect(ouvinte).toHaveBeenCalledWith(estado)
       expect(removeListener).toHaveBeenCalledWith(IPC_EVENT_CHANNELS.escutaMudou, envolvido)
+    })
+
+    it('a hotkey de mute leva só a combinação pelo canal nomeado', async () => {
+      const bridge = await carregarPonte()
+
+      await (bridge.definirHotkeyDaEscuta as (h: string) => Promise<unknown>)('Control+Alt+K')
+
+      expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.escutaDefinirHotkey, 'Control+Alt+K')
     })
 
     it('o modo de teste leva só o booleano, e o ouvinte do teste assina o canal do teste', async () => {

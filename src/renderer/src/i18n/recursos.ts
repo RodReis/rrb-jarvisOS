@@ -769,6 +769,11 @@ export const RECURSOS = {
           ultimoGatilho:
             'Pelo menos um gatilho precisa ficar ligado. Para parar de ouvir, use o interruptor Escuta na barra superior.',
           limiar: 'Limiar de disparo',
+          hotkey: 'Atalho de mute',
+          hotkeyDescricao:
+            'Atalho global que liga e desliga a escuta, mesmo com a janela minimizada. Cada troca fica registrada na auditoria.',
+          hotkeyOcupada:
+            'Outro app já usa esse atalho. Escolha outra combinação — o interruptor Escuta na barra superior continua valendo.',
           limiarDescricao:
             'Maior exige mais certeza para disparar (menos disparos por engano); menor dispara mais fácil. Vale na hora.',
           testar: 'Testar ao vivo',
@@ -1593,6 +1598,11 @@ export const RECURSOS = {
           ultimoGatilho:
             'At least one trigger must stay on. To stop listening, use the Listening switch in the top bar.',
           limiar: 'Trigger threshold',
+          hotkey: 'Mute shortcut',
+          hotkeyDescricao:
+            'Global shortcut that turns listening on and off, even with the window minimized. Each change is recorded in the audit log.',
+          hotkeyOcupada:
+            'Another app already uses this shortcut. Pick another combination — the Listening switch in the top bar still works.',
           limiarDescricao:
             'Higher needs more certainty to trigger (fewer false triggers); lower triggers more easily. Applies immediately.',
           testar: 'Test live',

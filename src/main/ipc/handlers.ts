@@ -856,6 +856,11 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     return deps.escuta.estado()
   })
 
+  ipcMain.handle(IPC_CHANNELS.escutaDefinirHotkey, async (_event, hotkey: unknown) => {
+    if (typeof hotkey === 'string') await deps.escuta.definirHotkey(hotkey)
+    return deps.escuta.estado()
+  })
+
   ipcMain.handle(IPC_CHANNELS.escutaModoDeTeste, (_event, ativo: unknown) => {
     if (typeof ativo === 'boolean') deps.escuta.definirModoDeTeste(ativo)
     return deps.escuta.estado()

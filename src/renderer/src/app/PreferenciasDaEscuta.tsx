@@ -1,8 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Alternador, Button, Field, Slider } from '@design/ui'
-import type { DisparoDeTesteDaEscuta, EstadoDaEscuta } from '@shared/domain/voz'
+import { Alternador, Button, Field, Select, Slider } from '@design/ui'
+import type {
+  DisparoDeTesteDaEscuta,
+  EstadoDaEscuta,
+  HotkeyDeMuteDaEscuta
+} from '@shared/domain/voz'
 import {
+  HOTKEYS_DE_MUTE_DA_ESCUTA,
   SENSIBILIDADE_MAXIMA_WAKE_WORD,
   SENSIBILIDADE_MINIMA_WAKE_WORD,
   WAKE_WORD_OFICIAL
@@ -23,6 +28,17 @@ import {
  *    modo é encerrado ao sair da seção; o main ainda o expira, mas deixá-lo ligado sem querer
  *    faria a escuta parar de abrir turnos sem ninguém ver.
  */
+
+/**
+ * O acelerador do Electron para o que está escrito na tecla — o mesmo critério do push-to-talk:
+ * `Control+Alt+M` é o que a API entende, `Ctrl + Alt + M` é o que o teclado mostra.
+ */
+const ROTULO_DA_HOTKEY: Readonly<Record<HotkeyDeMuteDaEscuta, string>> = {
+  'Control+Alt+M': 'Ctrl + Alt + M',
+  'Control+Shift+M': 'Ctrl + Shift + M',
+  'Control+Alt+K': 'Ctrl + Alt + K',
+  'Control+Shift+K': 'Ctrl + Shift + K'
+}
 
 /** Quantos disparos do teste a lista guarda. */
 const MAXIMO_DE_DISPAROS = 8
@@ -118,6 +134,24 @@ export function PreferenciasDaEscuta(): React.JSX.Element | null {
             onMudar={(valor) =>
               void window.jarvis.definirSensibilidadeDaEscuta(valor).then(setEstado)
             }
+          />
+        )}
+      </Field>
+
+      <Field
+        rotulo={t('settings.escuta.hotkey')}
+        descricao={t('settings.escuta.hotkeyDescricao')}
+        erro={estado.hotkeyRegistrada ? undefined : t('settings.escuta.hotkeyOcupada')}
+      >
+        {(atributos) => (
+          <Select
+            {...atributos}
+            valor={estado.hotkey}
+            onMudar={(valor) => void window.jarvis.definirHotkeyDaEscuta(valor).then(setEstado)}
+            opcoes={HOTKEYS_DE_MUTE_DA_ESCUTA.map((hotkey) => ({
+              valor: hotkey,
+              rotulo: ROTULO_DA_HOTKEY[hotkey]
+            }))}
           />
         )}
       </Field>

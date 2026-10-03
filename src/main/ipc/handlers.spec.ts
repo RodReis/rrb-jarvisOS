@@ -1005,7 +1005,9 @@ describe('escuta contínua (SPEC-Escuta-01) — a ponte do kill switch', () => {
     disponivel: true,
     frase: true,
     palmas: true,
-    sensibilidade: 0.5
+    sensibilidade: 0.5,
+    hotkey: 'Control+Alt+M',
+    hotkeyRegistrada: true
   }
 
   function montarEscuta() {
@@ -1017,7 +1019,8 @@ describe('escuta contínua (SPEC-Escuta-01) — a ponte do kill switch', () => {
       definirSensibilidade: vi.fn(async () => undefined),
       receberPcm: vi.fn(async () => undefined),
       definirTurno: vi.fn(),
-      definirModoDeTeste: vi.fn()
+      definirModoDeTeste: vi.fn(),
+      definirHotkey: vi.fn(async () => undefined)
     }
     registerIpcHandlers({ ...deps, escuta } as unknown as IpcDependencies)
     const chamar = (canal: string, ...args: unknown[]): Promise<unknown> => {
@@ -1107,6 +1110,18 @@ describe('escuta contínua (SPEC-Escuta-01) — a ponte do kill switch', () => {
     enviar(IPC_SEND_CHANNELS.escutaPcm, pcm)
 
     expect(escuta.receberPcm).toHaveBeenCalledWith(pcm)
+  })
+
+  it('a hotkey só passa se for texto: a lista fechada é imposta pelo serviço', async () => {
+    const { escuta, chamar } = montarEscuta()
+
+    await chamar(IPC_CHANNELS.escutaDefinirHotkey, 'Control+Shift+K')
+    await chamar(IPC_CHANNELS.escutaDefinirHotkey, { acelerador: 'Control+C' })
+    await chamar(IPC_CHANNELS.escutaDefinirHotkey, undefined)
+
+    // O handler só garante o tipo; recusar combinação fora da lista é do serviço (e é lá testado),
+    // para que nenhum outro caminho até ele possa registrar um atalho global qualquer.
+    expect(escuta.definirHotkey.mock.calls).toEqual([['Control+Shift+K']])
   })
 
   it('o modo de teste liga e desliga só com booleano, e devolve o estado', async () => {

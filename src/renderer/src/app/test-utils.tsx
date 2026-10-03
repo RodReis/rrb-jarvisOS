@@ -31,12 +31,15 @@ export function pontaDaEscuta(): Record<string, ReturnType<typeof vi.fn>> {
       disponivel: false,
       frase: true,
       palmas: true,
-      sensibilidade: 0.5
+      sensibilidade: 0.5,
+      hotkey: 'Control+Alt+M',
+      hotkeyRegistrada: true
     })),
     definirEscutaAtiva: vi.fn(async () => ({ ok: true })),
     definirGatilhosDaEscuta: vi.fn(),
     definirSensibilidadeDaEscuta: vi.fn(),
     definirModoDeTesteDaEscuta: vi.fn(),
+    definirHotkeyDaEscuta: vi.fn(),
     enviarPcmDaEscuta: vi.fn(),
     informarTurnoDaEscuta: vi.fn(),
     onEscutaMudou: vi.fn(() => () => undefined),

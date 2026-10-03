@@ -229,6 +229,11 @@ export const IPC_CHANNELS = {
    * abre turno. Expira no main, porque um teste esquecido deixaria a escuta sem abrir turno.
    */
   escutaModoDeTeste: 'escuta:modo-de-teste',
+  /**
+   * Troca a hotkey global de mute. O que atravessa é só o texto da combinação; a lista fechada é
+   * imposta no main, e o registro (e sua auditoria) também — a tela não registra atalho nenhum.
+   */
+  escutaDefinirHotkey: 'escuta:definir-hotkey',
   /*
    * Fala (SPEC-Voz-02). Dois canais: sintetizar um texto e perguntar quais vozes existem.
    *
@@ -956,6 +961,7 @@ export interface JarvisBridge {
   }): Promise<EstadoDaEscuta>
   definirSensibilidadeDaEscuta(sensibilidade: number): Promise<EstadoDaEscuta>
   definirModoDeTesteDaEscuta(ativo: boolean): Promise<EstadoDaEscuta>
+  definirHotkeyDaEscuta(hotkey: string): Promise<EstadoDaEscuta>
   enviarPcmDaEscuta(pcm: Int16Array): void
   /** Avisa o main que um turno de conversa começou (`true`) ou terminou (`false`). */
   informarTurnoDaEscuta(ativo: boolean): void

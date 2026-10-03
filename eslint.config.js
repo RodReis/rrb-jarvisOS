@@ -114,6 +114,10 @@ export default tseslint.config(
       'src/main/ai/*.int-spec.ts',
       // A implementação do engine de STT é quem pode importar o runtime dele.
       'src/main/voz/faster-whisper-engine.ts',
+      // O mesmo para a wake word (SPEC-Escuta-01, critério 1): a implementação, o spec dela e a
+      // composição (`src/main/index.ts`, já liberada acima) são os únicos que a importam.
+      'src/main/voz/engine-openwakeword.ts',
+      'src/main/voz/engine-openwakeword.spec.ts',
       'src/main/voz/*.int-spec.ts'
     ],
     rules: {
@@ -153,6 +157,14 @@ export default tseslint.config(
               group: ['faster-whisper*', 'whisper*', 'onnxruntime*'],
               message:
                 'Critério 1 (SPEC-Voz-01): só a implementação do engine conhece o runtime de STT. O resto do app fala com a interface `SttEngine`.'
+            },
+            {
+              // SPEC-Escuta-01, critério 1: a escuta fala com `WakeWordEngine`. O módulo do
+              // openWakeWord é guardado por caminho — o runtime dele é Python, no sidecar, e não
+              // há pacote npm a bloquear —, e o pacote entra na lista só por precaução.
+              group: ['**/engine-openwakeword', '**/engine-openwakeword.*', 'openwakeword*'],
+              message:
+                'Critério 1 (SPEC-Escuta-01): só a implementação e a composição conhecem o engine do openWakeWord. O resto do app fala com a interface `WakeWordEngine`.'
             }
           ]
         }

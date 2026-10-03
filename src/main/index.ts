@@ -16,7 +16,7 @@ import { criarAoDispararDaEscuta } from './voz/disparo-da-escuta'
 import { prepararRuntime, runtimeUsavel } from './voz/preparo-do-runtime'
 import { ConversaService } from './voz/conversa-service'
 import { MODELO_PADRAO } from '@shared/domain/ai'
-import { HOTKEY_DE_MUTE_DA_ESCUTA, MODELO_PADRAO_DA_CONVERSA } from '@shared/domain/voz'
+import { MODELO_PADRAO_DA_CONVERSA, type HotkeyDeMuteDaEscuta } from '@shared/domain/voz'
 import { criarRotaLocal } from './voz/rota-local'
 import { montarSnapshot } from './voz/snapshot-do-app'
 import { PersonaRepository } from './voz/persona-repository'
@@ -1808,8 +1808,40 @@ if (!app.requestSingleInstanceLock()) {
     powerMonitor.on('lock-screen', () => (sessaoBloqueada = true))
     powerMonitor.on('unlock-screen', () => (sessaoBloqueada = false))
 
+    /*
+     * A hotkey de mute é o próprio kill switch por outro caminho: corta a captura com a janela
+     * minimizada e fica persistida e auditada como qualquer desligamento. Registrar é mudança
+     * observável fora do app, então a combinação e o aceite do SO vão para a auditoria — a recusa
+     * também, porque silêncio esconderia um atalho que nunca funcionou.
+     *
+     * Libera a anterior **antes** de pedir a nova: dois aceleradores ativos fariam o antigo seguir
+     * cortando o microfone depois de o PI tê-lo trocado, e a mudança pareceria não ter pegado.
+     */
+    let muteAtual: HotkeyDeMuteDaEscuta | undefined
+    const registrarHotkeyDeMute = (acelerador: HotkeyDeMuteDaEscuta): boolean => {
+      if (muteAtual !== undefined) globalShortcut.unregister(muteAtual)
+      muteAtual = undefined
+      const registrado = globalShortcut.register(acelerador, () => {
+        void escuta.alternarPorHotkey()
+      })
+      if (registrado) muteAtual = acelerador
+      storage.audit.append({
+        user_id: userIdAtual(),
+        type: 'voz.hotkey.registro',
+        payload: { acelerador, registrado, funcao: 'mute' }
+      })
+      if (!registrado) {
+        log.sistema.warn(
+          'A hotkey de mute da escuta não pôde ser registrada; o botão da tela segue valendo',
+          { acelerador }
+        )
+      }
+      return registrado
+    }
+
     const escuta = new EscutaService({
       engine: engineDaEscuta,
+      registrarHotkey: registrarHotkeyDeMute,
       palmas: new DetectorDeDuasPalmas(),
       estado: criarEstadoDaEscutaEmDisco(diretorioDaVoz('escuta.json')),
       // Sem o runtime usável e os três arquivos do detector, a escuta não abre o microfone.
@@ -1832,28 +1864,6 @@ if (!app.requestSingleInstanceLock()) {
     })
 
     /*
-     * A hotkey de mute é o próprio kill switch por outro caminho: corta a captura com a janela
-     * minimizada e fica persistida e auditada como qualquer desligamento. Registrar é mudança
-     * observável fora do app, então a combinação e o aceite do SO vão para a auditoria.
-     */
-    const muteRegistrado = globalShortcut.register(HOTKEY_DE_MUTE_DA_ESCUTA, () => {
-      void escuta.alternarPorHotkey()
-    })
-    storage.audit.append({
-      user_id: userIdAtual(),
-      type: 'voz.hotkey.registro',
-      payload: { acelerador: HOTKEY_DE_MUTE_DA_ESCUTA, registrado: muteRegistrado, funcao: 'mute' }
-    })
-    if (!muteRegistrado) {
-      log.sistema.warn(
-        'A hotkey de mute da escuta não pôde ser registrada; o botão da tela segue valendo',
-        {
-          acelerador: HOTKEY_DE_MUTE_DA_ESCUTA
-        }
-      )
-    }
-
-    /*
      * O sidecar morre com o app (critério 2), e o atalho global é liberado junto.
      *
      * Sem liberar, o acelerador continuaria registrado no SO depois de o app sair — a próxima
@@ -1861,7 +1871,7 @@ if (!app.requestSingleInstanceLock()) {
      */
     app.on('will-quit', () => {
       hotkeyDaVoz.liberar()
-      globalShortcut.unregister(HOTKEY_DE_MUTE_DA_ESCUTA)
+      if (muteAtual !== undefined) globalShortcut.unregister(muteAtual)
       void engineDaEscuta.encerrar()
       void engineDaVoz.encerrar()
       // O segundo sidecar morre junto: são processos separados por isolamento de crash, não

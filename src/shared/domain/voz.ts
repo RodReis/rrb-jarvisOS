@@ -162,6 +162,10 @@ export interface EstadoDaEscuta {
   /** Gatilhos ligáveis separadamente (decisão do PI de 2026-10-03): a frase e as duas palmas. */
   readonly frase: boolean
   readonly palmas: boolean
+  /** A hotkey global de mute escolhida (critério 11). */
+  readonly hotkey: HotkeyDeMuteDaEscuta
+  /** Se o SO aceitou registrá-la; `false` quando outro app já tem o atalho. */
+  readonly hotkeyRegistrada: boolean
 }
 
 /**
@@ -194,11 +198,29 @@ export interface DisparoDeTesteDaEscuta {
 }
 
 /**
- * A hotkey global de mute da escuta (SPEC-Escuta-01, critério 11). Fora das quatro combinações do
- * push-to-talk de propósito: as duas funções convivem e o atalho de uma não pode ser o da outra.
- * Configurável em Settings é o passo seguinte; até lá este é o atalho, e o registro é auditado.
+ * As hotkeys globais de mute da escuta (SPEC-Escuta-01, critério 11).
+ *
+ * Lista fechada, como a do push-to-talk: registrar atalho global intercepta a tecla no sistema
+ * inteiro, e campo livre deixaria o renderer sequestrar qualquer combinação. Disjunta de
+ * `HOTKEYS_DE_VOZ` de propósito — as duas funções convivem, e o atalho de uma não pode ser o da
+ * outra.
  */
-export const HOTKEY_DE_MUTE_DA_ESCUTA = 'Control+Alt+M'
+export const HOTKEYS_DE_MUTE_DA_ESCUTA = [
+  'Control+Alt+M',
+  'Control+Shift+M',
+  'Control+Alt+K',
+  'Control+Shift+K'
+] as const
+
+export type HotkeyDeMuteDaEscuta = (typeof HOTKEYS_DE_MUTE_DA_ESCUTA)[number]
+
+export const HOTKEY_DE_MUTE_PADRAO: HotkeyDeMuteDaEscuta = 'Control+Alt+M'
+
+export function isHotkeyDeMuteDaEscuta(valor: unknown): valor is HotkeyDeMuteDaEscuta {
+  return (
+    typeof valor === 'string' && (HOTKEYS_DE_MUTE_DA_ESCUTA as readonly string[]).includes(valor)
+  )
+}
 
 /** Palavra de ativação oficial do sistema. */
 export const WAKE_WORD_OFICIAL = 'Ei, amigo'

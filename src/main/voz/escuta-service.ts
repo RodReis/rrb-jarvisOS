@@ -23,6 +23,8 @@
  * diz quem disparou e se a sessão estava bloqueada; quem abre o turno decide o resto.
  */
 
+import type { HotkeyDeMuteDaEscuta } from '@shared/domain/voz'
+import { HOTKEY_DE_MUTE_PADRAO, isHotkeyDeMuteDaEscuta } from '@shared/domain/voz'
 import type { WakeWordEngine } from './wake-word-engine'
 import { LIMIAR_PADRAO_WAKE_WORD, validarLimiar } from './wake-word-engine'
 
@@ -34,6 +36,7 @@ export interface EstadoPersistidoDaEscuta {
   readonly frase: boolean
   readonly palmas: boolean
   readonly sensibilidade: number
+  readonly hotkey: HotkeyDeMuteDaEscuta
 }
 
 export interface EventoDeEscuta {
@@ -54,6 +57,8 @@ export interface DisparoDeTeste {
 export interface EstadoDaEscutaNoMain extends EstadoPersistidoDaEscuta {
   /** Se o modelo da wake word está pronto no disco. */
   readonly disponivel: boolean
+  /** Se o SO aceitou registrar a hotkey de mute. */
+  readonly hotkeyRegistrada: boolean
 }
 
 export type DesfechoDeLigar =
@@ -84,6 +89,12 @@ export interface DepsDaEscuta {
   readonly aoDisparar: (evento: EventoDeEscuta) => void
   /** Onde o disparo cai no modo de teste, no lugar de `aoDisparar`. */
   readonly aoTestar?: (disparo: DisparoDeTeste) => void
+  /**
+   * Registra a hotkey global de mute no SO, liberando a anterior, e diz se foi aceita. É da
+   * composição porque `globalShortcut` é API do Electron — e porque a auditoria do registro mora
+   * lá, ao lado da do push-to-talk.
+   */
+  readonly registrarHotkey?: (hotkey: HotkeyDeMuteDaEscuta) => boolean
   /** Teto do turno aberto pela escuta; passado dele a escuta volta a ouvir. */
   readonly tetoDoTurnoMs?: number
   readonly agendar?: (acao: () => void, ms: number) => ReturnType<typeof setTimeout>
@@ -103,13 +114,15 @@ const PADRAO: EstadoPersistidoDaEscuta = {
   ativa: true,
   frase: true,
   palmas: true,
-  sensibilidade: LIMIAR_PADRAO_WAKE_WORD
+  sensibilidade: LIMIAR_PADRAO_WAKE_WORD,
+  hotkey: HOTKEY_DE_MUTE_PADRAO
 }
 
 export class EscutaService {
   private persistido: EstadoPersistidoDaEscuta = PADRAO
   private ativa = false
   private disponivel = false
+  private hotkeyRegistrada = false
   private turno = false
   private relogioDoTurno: ReturnType<typeof setTimeout> | undefined
   private teste = false
@@ -118,7 +131,12 @@ export class EscutaService {
   constructor(private readonly deps: DepsDaEscuta) {}
 
   estado(): EstadoDaEscutaNoMain {
-    return { ...this.persistido, ativa: this.ativa, disponivel: this.disponivel }
+    return {
+      ...this.persistido,
+      ativa: this.ativa,
+      disponivel: this.disponivel,
+      hotkeyRegistrada: this.hotkeyRegistrada
+    }
   }
 
   /**
@@ -133,6 +151,7 @@ export class EscutaService {
       sensibilidade: validarLimiar(this.persistido.sensibilidade)
     }
     this.deps.engine.definirLimiar(this.persistido.sensibilidade)
+    this.hotkeyRegistrada = this.deps.registrarHotkey?.(this.persistido.hotkey) ?? false
     this.disponivel = await this.deps.modeloPronto()
 
     if (this.persistido.ativa && this.disponivel) await this.ligar('restauracao')
@@ -161,6 +180,9 @@ export class EscutaService {
     this.deps.palmas.limpar()
     this.deps.aoMudarCaptura(false)
     this.deps.auditar({ type: 'voz.escuta.desligada', payload: { via } })
+    // Com o microfone fechado, o pré-roll (1,5 s de áudio) e o processo do detector não ficam de
+    // pé. A falha em encerrar é do engine, e o microfone já está fechado: não desfaz o desligamento.
+    await this.deps.engine.encerrar().catch(() => undefined)
   }
 
   /** A hotkey global de mute: o mesmo kill switch, por outro caminho. */
@@ -174,6 +196,17 @@ export class EscutaService {
     readonly palmas: boolean
   }): Promise<void> {
     this.persistir(gatilhos)
+  }
+
+  /**
+   * Troca a hotkey de mute (critério 11). Só vale combinação da lista fechada: o renderer não
+   * escolhe um atalho global qualquer. Atalho ocupado por outro app não é erro — o estado
+   * `hotkeyRegistrada` diz que não pegou, e a escuta segue valendo pelo interruptor da tela.
+   */
+  async definirHotkey(hotkey: unknown): Promise<void> {
+    if (!isHotkeyDeMuteDaEscuta(hotkey)) return
+    this.hotkeyRegistrada = this.deps.registrarHotkey?.(hotkey) ?? false
+    this.persistir({ hotkey })
   }
 
   /** Vale na detecção seguinte, sem restart (critério 12). Fora da faixa é limitado, não aceito. */

@@ -230,6 +230,8 @@ const bridge: JarvisBridge = {
   }): Promise<EstadoDaEscuta> => ipcRenderer.invoke(IPC_CHANNELS.escutaDefinirGatilhos, gatilhos),
   definirSensibilidadeDaEscuta: (sensibilidade: number): Promise<EstadoDaEscuta> =>
     ipcRenderer.invoke(IPC_CHANNELS.escutaDefinirSensibilidade, sensibilidade),
+  definirHotkeyDaEscuta: (hotkey: string): Promise<EstadoDaEscuta> =>
+    ipcRenderer.invoke(IPC_CHANNELS.escutaDefinirHotkey, hotkey),
   definirModoDeTesteDaEscuta: (ativo: boolean): Promise<EstadoDaEscuta> =>
     ipcRenderer.invoke(IPC_CHANNELS.escutaModoDeTeste, ativo),
   enviarPcmDaEscuta: (pcm: Int16Array): void => ipcRenderer.send(IPC_SEND_CHANNELS.escutaPcm, pcm),
