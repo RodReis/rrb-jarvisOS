@@ -117,6 +117,38 @@ export interface PedidoDeContexto {
   readonly pathsPermitidos?: PathsPermitidos
 }
 
+/**
+ * Uma fonte do contexto de uma tarefa do Squad (SPEC-Squads-03): o texto **já lido pelo kernel**
+ * de uma revisão do Git, e não um caminho a resolver no disco. O pack descreve o que foi enviado;
+ * quem o monta já provou que o caminho existe na revisão e é um arquivo regular.
+ */
+export interface FonteDaTarefa {
+  /** Relativo à raiz do projeto, como na revisão. */
+  readonly caminho: string
+  /** O texto exato que entra no prompt: é dele que sai o hash do item. */
+  readonly texto: string
+  /** Só estas duas: leitura ampla é exceção do PI, e o estado do app não é arquivo. */
+  readonly origem: 'explicito' | 'busca-estrutural'
+  readonly motivo: string
+  /** Faixa de linhas, quando só um trecho entrou (resultado de uma busca). */
+  readonly linhas?: { readonly de: number; readonly ate: number }
+}
+
+/** O pedido de montagem do pack de uma tarefa do Squad. */
+export interface PedidoDeContextoDaTarefa {
+  readonly projectId: string
+  /** O rótulo da tarefa — run, tarefa e revisão do código. Entra no hash do pack. */
+  readonly tarefa: string
+  readonly etapa: string
+  readonly fontes: readonly FonteDaTarefa[]
+  readonly regras?: readonly string[]
+  readonly rota: AiProvider
+  readonly tetoDeTokens?: number
+  readonly motivoDaExpansao?: string
+}
+
+const ORIGENS_DA_TAREFA: readonly OrigemDeContexto[] = ['explicito', 'busca-estrutural']
+
 interface ContextServiceDeps {
   readonly repository: ContextRepository
   readonly projects: ProjectRepository
@@ -216,6 +248,19 @@ export function fingerprintDaFalha(etapa: string, mensagem: string): string {
     .trim()
 
   return createHash('sha256').update(`${etapa}\n${normalizada}`, 'utf8').digest('hex').slice(0, 32)
+}
+
+/**
+ * A fonte da tarefa é utilizável? Origem permitida, caminho **relativo** e dentro do projeto, e
+ * texto dentro do teto por arquivo. Truncar não vale aqui: o manifesto descreve o que foi enviado,
+ * e um arquivo cortado ao meio entraria no prompt como se fosse inteiro.
+ */
+function fonteDaTarefaValida(fonte: FonteDaTarefa): boolean {
+  if (!ORIGENS_DA_TAREFA.includes(fonte.origem)) return false
+  const caminho = fonte.caminho
+  if (caminho === '' || isAbsolute(caminho) || /^[A-Za-z]:/.test(caminho)) return false
+  if (caminho.split(/[\\/]/).includes('..')) return false
+  return Buffer.byteLength(fonte.texto, 'utf8') <= TETO_POR_ARQUIVO_BYTES
 }
 
 export class ContextService {
@@ -703,6 +748,145 @@ export class ContextService {
     })
 
     return pack
+  }
+
+  /**
+   * Monta o pack de **uma tarefa do Squad** (SPEC-Squads-03, critério 3).
+   *
+   * É método próprio, como `montarDoApp`, porque a fonte não é o disco do projeto: o kernel já leu
+   * os textos de uma revisão do Git — por oid, sem link simbólico e sem janela entre existir e
+   * ler — e o pack só registra o que foi enviado. As guardas que sobram são as do pack: segredo
+   * recusa o pack inteiro, teto de tokens recusa, e hash, dedupe, persistência e auditoria são
+   * os mesmos do contexto documental.
+   *
+   * **A recusa de segredo é do pack inteiro**, como em `montar`: uma tarefa montada sem a fonte
+   * acusada receberia um contexto silenciosamente diferente do que o plano pediu.
+   */
+  montarDaTarefa(pedido: PedidoDeContextoDaTarefa, workspaceId: WorkspaceId): ContextPackOutcome {
+    const userId = this.userId()
+    // O formato que `recusar` e `orcamentoDaEtapa` esperam; sem candidatos: as fontes já vêm lidas.
+    const base: PedidoDeContexto = {
+      projectId: pedido.projectId,
+      tarefa: pedido.tarefa,
+      etapa: pedido.etapa,
+      candidatos: [],
+      rota: pedido.rota,
+      ...(pedido.tetoDeTokens === undefined ? {} : { tetoDeTokens: pedido.tetoDeTokens }),
+      ...(pedido.motivoDaExpansao === undefined
+        ? {}
+        : { motivoDaExpansao: pedido.motivoDaExpansao })
+    }
+    const project = this.projects.findById(userId, pedido.projectId)
+    if (project === undefined || project.workspace_id !== workspaceId) {
+      return this.recusar(userId, workspaceId, 'projeto-desconhecido', base, {
+        mensagem: 'Projeto não encontrado neste espaço.'
+      })
+    }
+
+    const itens: ContextItem[] = []
+    const comSegredo: string[] = []
+    for (const fonte of pedido.fontes) {
+      if (!fonteDaTarefaValida(fonte)) {
+        log.agent.warn('Fonte de contexto da tarefa inválida foi ignorada', {
+          projectId: project.id,
+          caminho: fonte.caminho
+        })
+        continue
+      }
+      if (detectarSegredo(fonte.caminho, fonte.texto) !== undefined) {
+        comSegredo.push(fonte.caminho)
+        continue
+      }
+      itens.push({
+        caminho: fonte.caminho,
+        hash: createHash('sha256').update(fonte.texto, 'utf8').digest('hex'),
+        origem: fonte.origem,
+        bytes: Buffer.byteLength(fonte.texto, 'utf8'),
+        ...(fonte.linhas === undefined ? {} : { linhas: fonte.linhas }),
+        motivo: fonte.motivo
+      })
+    }
+
+    if (comSegredo.length > 0) {
+      return this.recusar(userId, workspaceId, 'segredo-no-contexto', base, {
+        mensagem: `${comSegredo.length} fonte(s) da tarefa parecem conter credencial e não entram no contexto.`,
+        caminhosComSegredo: comSegredo,
+        detalhe: { caminhosComSegredo: comSegredo }
+      })
+    }
+    if (itens.length === 0) {
+      return this.recusar(userId, workspaceId, 'contexto-vazio', base, {
+        mensagem: 'A tarefa não tem nenhuma fonte de contexto utilizável.'
+      })
+    }
+
+    const orcamento = this.orcamentoDaEtapa(base, itens)
+    if (orcamento.tokensEstimados > orcamento.tetoDeTokens) {
+      return this.recusar(userId, workspaceId, 'teto-de-tokens-excedido', base, {
+        mensagem: `O contexto da tarefa estima ${orcamento.tokensEstimados} tokens e o teto é ${orcamento.tetoDeTokens}.`,
+        detalhe: {
+          tokensEstimados: orcamento.tokensEstimados,
+          tetoDeTokens: orcamento.tetoDeTokens
+        }
+      })
+    }
+
+    const semHash: Omit<ContextPack, 'id' | 'hash' | 'created_at'> = {
+      user_id: userId,
+      workspace_id: workspaceId,
+      projectId: project.id,
+      tarefa: pedido.tarefa,
+      itens,
+      regras: pedido.regras ?? [],
+      falhasAbertas: falhasParaOContexto(this.repository.listFalhas(userId, project.id)),
+      orcamento,
+      rota: pedido.rota
+    }
+    const hash = hashDoPack(semHash)
+
+    const existente = this.repository.findByHash(userId, hash)
+    if (existente !== undefined) {
+      return {
+        reason: 'montado',
+        pack: existente,
+        mensagem: 'Contexto da tarefa idêntico ao anterior.'
+      }
+    }
+
+    const pack: ContextPack = {
+      id: randomUUID(),
+      ...semHash,
+      hash,
+      created_at: new Date().toISOString()
+    }
+    this.repository.save(pack)
+
+    this.audit.append({
+      user_id: userId,
+      workspace_id: workspaceId,
+      type: 'context-pack',
+      // Hashes e contagens, **nunca o texto**: a auditoria responde "o que foi enviado?" sem
+      // repetir o que foi enviado (ADR-004).
+      payload: {
+        reason: 'montado',
+        packId: pack.id,
+        projectId: project.id,
+        origem: 'squad-tarefa',
+        tarefa: pedido.tarefa,
+        hash: pack.hash,
+        itens: itens.length,
+        tokensEstimados: orcamento.tokensEstimados,
+        tetoDeTokens: orcamento.tetoDeTokens,
+        unmetered: orcamento.unmetered,
+        rota: pack.rota
+      }
+    })
+
+    return {
+      reason: 'montado',
+      pack,
+      mensagem: `Contexto da tarefa montado com ${itens.length} fonte(s) e ${orcamento.tokensEstimados} tokens estimados.`
+    }
   }
 
   /** Recusa auditada. **Toda** recusa audita — a tentativa barrada é o fato interessante. */
