@@ -1,6 +1,6 @@
 {
-  "criadoEm": "2026-10-03T04:41:23.820Z",
-  "instrumentoSha256": "a63d0d03348111d181ee1717786333143381d609725fbc04a9fca7df8e59daf8",
+  "criadoEm": "2026-10-03T04:52:49.685Z",
+  "instrumentoSha256": "ffced56e089c2f320bded1c3e321e6e9d4a72c7f27e04d5a762dd3ce5f67cdaa",
   "casos": [
     {
       "tipo": "sintetico-e1",
@@ -23,22 +23,22 @@
         "base": {
           "aplicavel": true,
           "ok": true,
-          "ms": 1455
+          "ms": 2405
         },
         "lado1": {
           "aplicavel": true,
           "ok": true,
-          "ms": 952
+          "ms": 584
         },
         "lado2": {
           "aplicavel": true,
           "ok": true,
-          "ms": 639
+          "ms": 571
         },
         "verdade": {
           "aplicavel": true,
           "ok": true,
-          "ms": 592
+          "ms": 556
         }
       }
     },
@@ -63,22 +63,22 @@
         "base": {
           "aplicavel": true,
           "ok": true,
-          "ms": 581
+          "ms": 576
         },
         "lado1": {
           "aplicavel": true,
           "ok": true,
-          "ms": 556
+          "ms": 578
         },
         "lado2": {
           "aplicavel": true,
           "ok": true,
-          "ms": 569
+          "ms": 584
         },
         "verdade": {
           "aplicavel": true,
           "ok": true,
-          "ms": 654
+          "ms": 558
         }
       }
     },
@@ -103,22 +103,22 @@
         "base": {
           "aplicavel": true,
           "ok": true,
-          "ms": 538
+          "ms": 566
         },
         "lado1": {
           "aplicavel": true,
           "ok": true,
-          "ms": 570
+          "ms": 560
         },
         "lado2": {
           "aplicavel": true,
           "ok": true,
-          "ms": 556
+          "ms": 562
         },
         "verdade": {
           "aplicavel": true,
           "ok": true,
-          "ms": 540
+          "ms": 565
         }
       }
     },
@@ -143,22 +143,22 @@
         "base": {
           "aplicavel": true,
           "ok": true,
-          "ms": 571
+          "ms": 606
         },
         "lado1": {
           "aplicavel": true,
           "ok": true,
-          "ms": 627
+          "ms": 649
         },
         "lado2": {
           "aplicavel": true,
           "ok": true,
-          "ms": 1410
+          "ms": 589
         },
         "verdade": {
           "aplicavel": true,
           "ok": true,
-          "ms": 554
+          "ms": 589
         }
       }
     },
@@ -183,22 +183,22 @@
         "base": {
           "aplicavel": true,
           "ok": true,
-          "ms": 575
+          "ms": 619
         },
         "lado1": {
           "aplicavel": true,
           "ok": true,
-          "ms": 623
+          "ms": 600
         },
         "lado2": {
           "aplicavel": true,
           "ok": true,
-          "ms": 566
+          "ms": 558
         },
         "verdade": {
           "aplicavel": true,
           "ok": true,
-          "ms": 621
+          "ms": 617
         }
       }
     },
@@ -223,22 +223,22 @@
         "base": {
           "aplicavel": true,
           "ok": true,
-          "ms": 550
+          "ms": 712
         },
         "lado1": {
           "aplicavel": true,
           "ok": true,
-          "ms": 553
+          "ms": 575
         },
         "lado2": {
           "aplicavel": true,
           "ok": true,
-          "ms": 557
+          "ms": 560
         },
         "verdade": {
           "aplicavel": true,
           "ok": true,
-          "ms": 552
+          "ms": 592
         }
       }
     }

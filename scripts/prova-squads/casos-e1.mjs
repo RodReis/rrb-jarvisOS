@@ -4,10 +4,12 @@
  *
  * Em cada um, dois escritores partem do módulo como a fatia o entregou e acrescentam, **no mesmo
  * ponto**, um comportamento diferente com teste próprio — a forma está em
- * `src/main/squads/prova/caso-sintetico.ts`. O alvo mudou de arquivo nos casos em que o da primeira
- * medição não tinha como ser testado (`src/main/index.ts` importa o Electron; `ProjetosLocais.tsx`
- * é tela): todo alvo aqui é um módulo puro de `src/shared/domain` com spec vizinho, tocado pela
- * fatia, para que "cada lado coberto por teste próprio" seja verdade e não intenção.
+ * `src/main/squads/prova/caso-sintetico.ts`. O alvo mudou de arquivo em quatro fatias (M9-F01,
+ * M9-F03, M26-F01 e M26-F02), porque o da primeira medição não tinha como ser testado por spec
+ * puro (`terminal-engine.ts` e `index.ts` dependem do Node/Electron, `call-provider.ts` do banco,
+ * `ProjetosLocais.tsx` é tela): todo alvo aqui é um módulo puro de `src/shared/domain` com spec
+ * vizinho, tocado pela fatia, para que "cada lado coberto por teste próprio" seja verdade e não
+ * intenção. M9-F04 e M26-F06 mantêm o alvo.
  *
  * Os comportamentos são pequenos de propósito. O que a prova mede é se o integrador preserva os
  * dois lados quando o `git` conflita, não se ele sabe programar o comportamento.

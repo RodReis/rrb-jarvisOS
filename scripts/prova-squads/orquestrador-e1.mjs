@@ -68,7 +68,13 @@ function gerador(origem, modeloEscolhido, chamar, bloco, registro) {
         { role: 'system', content: `${pedido.system}\n\n${bloco}` },
         { role: 'user', content: pedido.prompt }
       ]
-      const r = await chamar(mensagens, JSON.parse(pedido.jsonSchema))
+      // Como o gerador de produção: nunca lança. Uma chamada que estoura o tempo (geração em laço,
+      // servidor caído) é falha de execução desta tentativa, não o fim da medição.
+      const inicio = performance.now()
+      const r = await chamar(mensagens, JSON.parse(pedido.jsonSchema)).catch((e) => ({
+        erro: `${e.message}${e.cause ? ` (${e.cause.code ?? e.cause.message})` : ''}`,
+        latenciaMs: Math.round(performance.now() - inicio)
+      }))
       registro.push({
         tentativa: pedido.tentativa,
         latenciaMs: r.latenciaMs,
