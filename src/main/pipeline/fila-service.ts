@@ -75,6 +75,11 @@ export interface FilaDeps {
    */
   readonly aoAdquirir?: (aquisicao: Aquisicao) => void
   /**
+   * Avisa quem executa que estes itens **saíram da fila** porque o run terminou. Sem o aviso, um
+   * escritor que esperava a vez e não tinha sinal de cancelamento ficaria pendente para sempre.
+   */
+  readonly aoCancelarEspera?: (runIds: readonly string[]) => void
+  /**
    * O kill-switch do merge autônomo do projeto (M9-F05, decisão do PI de 2026-08-30).
    *
    * Injetado como função, e não como o `MergePolicyService` inteiro: a fila só precisa da
@@ -255,7 +260,8 @@ export class FilaService {
     // verificar se container e porta ainda estão em uso (a regra que a V1 já tinha). Liberar o slot
     // no cancelamento, com a limpeza dos recursos, é da M12-F05.
     if (ehTerminal(para)) {
-      this.deps.pool.cancelarDoRun(runId)
+      const saidos = this.deps.pool.cancelarDoRun(runId)
+      if (saidos.length > 0) this.deps.aoCancelarEspera?.(saidos)
       if (DESFECHOS_CONCLUIDOS.includes(para) && this.deps.pool.encerrarDoRun(runId)) {
         this.despachar()
       }

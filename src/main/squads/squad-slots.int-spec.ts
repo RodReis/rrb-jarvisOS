@@ -91,6 +91,7 @@ beforeEach(() => {
     mergeAutonomoLigado: () => true,
     // A ligação de produção: o pool anuncia, o gerente acorda quem esperava.
     aoAdquirir: (a) => gerente.anunciar(a),
+    aoCancelarEspera: (ids) => ids.forEach((id) => gerente.cancelarEspera(id)),
     agora: () => relogio
   })
   gerente = new GerenteDeSlots(fila)
@@ -275,6 +276,35 @@ describe('cancelar a espera', () => {
     expect(pool.vista().fila).toHaveLength(1)
     gerente.liberar('p-a', WS, a.unidade, a.fencingToken)
     expect(await firme).toMatchObject({ ok: true, unidade: idDoEscritor(run, 'ui') })
+  })
+
+  it('o run que termina enquanto o escritor espera o cancela, mesmo sem sinal', async () => {
+    const run = pronto()
+    const a = await pedir(run, 'api')
+    if (!a.ok) throw new Error('sem slot')
+    const espera = pedir(run, 'ui')
+    expect(await estado(espera)).toBe('pendente')
+
+    fila.transicionar('p-a', WS, run, 'CANCELLED')
+
+    expect(await espera).toEqual({ ok: false, motivo: 'cancelada' })
+    expect(pool.vista().fila).toEqual([])
+  })
+
+  it('o run que termina cancela as duas chamadas da mesma unidade e solta o ouvinte do sinal', async () => {
+    const run = pronto()
+    await pedir(run, 'api')
+    const controle = new AbortController()
+    const p1 = pedir(run, 'ui', controle.signal)
+    const p2 = pedir(run, 'ui')
+
+    fila.transicionar('p-a', WS, run, 'CANCELLED')
+
+    expect(await Promise.all([p1, p2])).toEqual([
+      { ok: false, motivo: 'cancelada' },
+      { ok: false, motivo: 'cancelada' }
+    ])
+    expect(getEventListeners(controle.signal, 'abort')).toHaveLength(0)
   })
 
   it('o sinal abortado depois de adquirir não desfaz o slot', async () => {

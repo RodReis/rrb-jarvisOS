@@ -159,11 +159,12 @@ export class PoolService {
 
   /**
    * Cancela o que o run ainda tem na fila: o item dele e o dos escritores que esperavam. Quem já
-   * tem slot não é tocado — a liberação de cancelamento e bloqueio é da M12-F05.
+   * tem slot não é tocado — a liberação de cancelamento e bloqueio é da M12-F05. Devolve os ids
+   * dos itens que saíram da fila, para quem executa acordar quem esperava por eles.
    */
-  cancelarDoRun(runId: string): boolean {
+  cancelarDoRun(runId: string): string[] {
     const itens = this.deps.pool.itensDoGrupo(this.deps.userId(), runId).map((i) => i.runId)
-    return [runId, ...itens].map((id) => this.cancelar(id)).some(Boolean)
+    return [runId, ...itens].filter((id) => this.cancelar(id))
   }
 
   /** Solta o slot do run e o dos escritores que sobraram: o run terminou e não há quem os use. */

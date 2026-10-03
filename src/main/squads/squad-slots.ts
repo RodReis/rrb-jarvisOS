@@ -34,9 +34,14 @@ export interface PedidoDeSlot {
   readonly signal?: AbortSignal
 }
 
+interface Espera {
+  readonly acordar: (fencingToken: number) => void
+  readonly cancelar: () => void
+}
+
 export class GerenteDeSlots {
   /** Quem espera cada unidade. Lista, porque duas chamadas à mesma unidade esperam a mesma vez. */
-  private readonly espera = new Map<string, ((fencingToken: number) => void)[]>()
+  private readonly espera = new Map<string, Espera[]>()
 
   constructor(private readonly fila: FilaParaOEscritor) {}
 
@@ -71,14 +76,17 @@ export class GerenteDeSlots {
         pedido.signal?.removeEventListener('abort', aoCancelar)
         resolver(resultado)
       }
-      const aoAdquirir = (fencingToken: number): void => fim({ ok: true, unidade, fencingToken })
+      const aguardo: Espera = {
+        acordar: (fencingToken) => fim({ ok: true, unidade, fencingToken }),
+        cancelar: () => fim({ ok: false, motivo: 'cancelada' })
+      }
       const aoCancelar = (): void => {
-        this.sair(unidade, aoAdquirir)
+        this.sair(unidade, aguardo)
         // O item da fila é um só por unidade: só desiste da vaga quem era o último a esperá-la.
         if (!this.espera.has(unidade)) this.fila.desistirDoSlot(unidade)
-        fim({ ok: false, motivo: 'cancelada' })
+        aguardo.cancelar()
       }
-      this.entrar(unidade, aoAdquirir)
+      this.entrar(unidade, aguardo)
       pedido.signal?.addEventListener('abort', aoCancelar)
     })
   }
@@ -88,7 +96,18 @@ export class GerenteDeSlots {
     const esperando = this.espera.get(aquisicao.runId)
     if (esperando === undefined) return
     this.espera.delete(aquisicao.runId)
-    for (const acordar of esperando) acordar(aquisicao.fencingToken)
+    for (const e of esperando) e.acordar(aquisicao.fencingToken)
+  }
+
+  /**
+   * O run terminou e o pool tirou a unidade da fila: quem a esperava não vai ser atendido. O item já
+   * saiu da fila, então aqui só se acorda quem esperava — não há vaga a devolver.
+   */
+  cancelarEspera(unidade: string): void {
+    const esperando = this.espera.get(unidade)
+    if (esperando === undefined) return
+    this.espera.delete(unidade)
+    for (const e of esperando) e.cancelar()
   }
 
   renovar(unidade: string, fencingToken: number): boolean {
@@ -108,12 +127,12 @@ export class GerenteDeSlots {
     return this.fila.liberarSlot(projectId, workspaceId, unidade, fencingToken)
   }
 
-  private entrar(unidade: string, acordar: (fencingToken: number) => void): void {
-    this.espera.set(unidade, [...(this.espera.get(unidade) ?? []), acordar])
+  private entrar(unidade: string, aguardo: Espera): void {
+    this.espera.set(unidade, [...(this.espera.get(unidade) ?? []), aguardo])
   }
 
-  private sair(unidade: string, acordar: (fencingToken: number) => void): void {
-    const resto = (this.espera.get(unidade) ?? []).filter((a) => a !== acordar)
+  private sair(unidade: string, aguardo: Espera): void {
+    const resto = (this.espera.get(unidade) ?? []).filter((a) => a !== aguardo)
     if (resto.length === 0) this.espera.delete(unidade)
     else this.espera.set(unidade, resto)
   }
