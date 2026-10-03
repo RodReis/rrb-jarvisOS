@@ -17,7 +17,7 @@
  * timeout valem aqui como em qualquer outro lugar.
  */
 
-import { lstatSync } from 'node:fs'
+import { lstatSync, rmSync } from 'node:fs'
 import { isAbsolute, join, resolve, sep } from 'node:path'
 import type { WorkspaceId } from '@shared/domain/entities'
 import { ehControleOuDirecao } from '@shared/domain/squad-plano'
@@ -56,6 +56,12 @@ export interface OcorrenciaDeBusca {
   readonly caminho: string
   /** A linha, a partir de 1. */
   readonly linha: number
+}
+
+export interface ResultadoDaBusca {
+  readonly ocorrencias: readonly OcorrenciaDeBusca[]
+  /** Havia mais ocorrências que o teto: o que veio é um recorte. */
+  readonly truncada: boolean
 }
 
 export interface DependenciasDoSquadGit {
@@ -103,6 +109,20 @@ const CONFIG_DO_KERNEL = [
 type SaidaDoGit =
   | { readonly ok: true; readonly saida: string; readonly bruto: string }
   | { readonly ok: false; readonly motivo: string; readonly codigo: number | null }
+
+/**
+ * Os diretórios que o **sandbox** (o Preflight) cria dentro do worktree antes de o agente rodar —
+ * hoje o `.gitmeta`, a cópia do gitdir que o container enxerga (ARCHITECTURE, M9-F03). Não são
+ * trabalho do escritor: sem esta exclusão, todo escritor real terminaria em `escopo-violado`.
+ *
+ * É seguro ignorá-los porque o kernel nunca lê o Git por eles (usa `--git-dir` explícito) e só
+ * commita os caminhos que provou dentro do write set. O container os monta somente-leitura; um
+ * agente que os alterasse mesmo assim não teria efeito algum no host nem no commit.
+ */
+const ARTEFATOS_DO_SANDBOX = ['.gitmeta'] as const
+
+const ehArtefatoDoSandbox = (caminho: string): boolean =>
+  ARTEFATOS_DO_SANDBOX.some((a) => caminho.startsWith(`${a}/`))
 
 const recusa = (motivo: string): { ok: false; motivo: string } => ({ ok: false, motivo })
 
@@ -206,10 +226,14 @@ export class SquadGit {
       '--'
     ])
     if (!versionados.ok) return recusa(versionados.motivo)
-    const novos = this.noWorktree(w, ['ls-files', '--others', '--exclude-standard', '-z'])
+    // Sem `--exclude-standard`: o `.gitignore` do worktree é do agente, e um `*` num diretório
+    // esconderia a si mesmo e tudo o que ele escreveu ali. O que o escritor criou fora do write set
+    // é fuga, ignorado pelo Git ou não.
+    const novos = this.noWorktree(w, ['ls-files', '--others', '-z'])
     if (!novos.ok) return recusa(novos.motivo)
 
-    const caminhos = [...new Set([...partir(versionados.bruto), ...partir(novos.bruto)])].sort()
+    const todos = [...partir(versionados.bruto), ...partir(novos.bruto)]
+    const caminhos = [...new Set(todos.filter((c) => !ehArtefatoDoSandbox(c)))].sort()
     return { ok: true, valor: { caminhos, simbolicos: caminhos.filter((c) => ehSimbolico(w, c)) } }
   }
 
@@ -266,6 +290,11 @@ export class SquadGit {
    * não destrói trabalho que o kernel não registrou.
    */
   remover(w: WorktreeDeEscritor): ResultadoGit<void> {
+    // O que o sandbox deixou no worktree antes de o agente rodar não é trabalho a salvar: sem
+    // descartá-lo o Git recusaria todo worktree, até o que o escritor commitou inteiro.
+    for (const artefato of ARTEFATOS_DO_SANDBOX) {
+      rmSync(join(w.worktree, artefato), { recursive: true, force: true })
+    }
     const r = this.executar(['worktree', 'remove', w.worktree], w.repositorio)
     if (r.ok) return { ok: true, valor: undefined }
     return recusa(/modified or untracked/i.test(r.motivo) ? 'worktree-sujo' : r.motivo)
@@ -324,7 +353,7 @@ export class SquadGit {
     revisao: string,
     termo: string,
     caminhos: readonly string[]
-  ): ResultadoGit<readonly OcorrenciaDeBusca[]> {
+  ): ResultadoGit<ResultadoDaBusca> {
     if (!SHA.test(revisao)) return recusa('revisão inválida')
     if (!isAbsolute(repositorio)) return recusa('o repositório precisa ser um caminho absoluto')
     if (termo.trim() === '' || termo.length > MAX_TERMO_DE_BUSCA || temControle(termo)) {
@@ -339,20 +368,26 @@ export class SquadGit {
       true
     )
     if (!r.ok) {
-      return r.codigo === 1 ? { ok: true, valor: [] } : recusa(r.motivo)
+      return r.codigo === 1
+        ? { ok: true, valor: { ocorrencias: [], truncada: false } }
+        : recusa(r.motivo)
     }
 
     const prefixo = `${revisao}:`
-    const ocorrencias: OcorrenciaDeBusca[] = []
+    const todas: OcorrenciaDeBusca[] = []
     for (const registro of r.bruto.split('\n')) {
       const [origem, linha] = registro.split('\0')
       if (origem === undefined || linha === undefined || !origem.startsWith(prefixo)) continue
       const numero = Number(linha)
       if (!Number.isInteger(numero) || numero < 1) continue
-      ocorrencias.push({ caminho: origem.slice(prefixo.length), linha: numero })
-      if (ocorrencias.length >= MAX_OCORRENCIAS_DA_BUSCA) break
+      todas.push({ caminho: origem.slice(prefixo.length), linha: numero })
     }
-    return { ok: true, valor: ocorrencias }
+    // Cortar em silêncio faria o contexto diferir do pedido sem ninguém saber: `truncada` avisa.
+    const truncada = todas.length > MAX_OCORRENCIAS_DA_BUSCA
+    return {
+      ok: true,
+      valor: { ocorrencias: todas.slice(0, MAX_OCORRENCIAS_DA_BUSCA), truncada }
+    }
   }
 
   // ─── execução ─────────────────────────────────────────────────────────────────────────────────

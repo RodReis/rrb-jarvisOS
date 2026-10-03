@@ -44,6 +44,7 @@ export type MotivoDeDescarte =
   | 'binario'
   | 'repetido'
   | 'limite-de-fontes'
+  | 'busca-truncada'
 
 export interface FonteDescartada {
   readonly caminho: string
@@ -207,9 +208,12 @@ export class ContextoDaTarefa {
       escopo as string[]
     )
     if (!achadas.ok) return achadas.motivo
+    if (achadas.valor.truncada) {
+      descartadas.push({ caminho: `busca:${busca.termo}`, motivo: 'busca-truncada' })
+    }
 
     const porArquivo = new Map<string, number[]>()
-    for (const o of achadas.valor) {
+    for (const o of achadas.valor.ocorrencias) {
       if (inteiros.has(o.caminho)) continue
       porArquivo.set(o.caminho, [...(porArquivo.get(o.caminho) ?? []), o.linha])
     }

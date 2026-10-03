@@ -207,6 +207,64 @@ comGit('criar o worktree', () => {
   })
 })
 
+comGit('o .gitmeta que o Preflight deixa dentro do worktree não é trabalho do escritor', () => {
+  /** O que o Preflight faz antes de o agente rodar: copia o gitdir para `<worktree>/.gitmeta`. */
+  async function comGitMeta(nome: string) {
+    const { prepararGitMeta } = await import('../pipeline/docker-runner')
+    const w = criar(nome)
+    expect(prepararGitMeta(w.gitDir, w.worktree)).toBeDefined()
+    expect(existsSync(join(w.worktree, '.gitmeta', 'HEAD'))).toBe(true)
+    return w
+  }
+
+  it('o diff não o lista: sem alteração do escritor, a lista é vazia', async () => {
+    const w = await comGitMeta('a')
+
+    expect(squadGit.alteracoes(w)).toEqual({ ok: true, valor: { caminhos: [], simbolicos: [] } })
+  })
+
+  it('o que o escritor altera continua aparecendo, e só isso', async () => {
+    const w = await comGitMeta('a')
+    writeFileSync(join(w.worktree, 'src', 'a.ts'), 'mudou\n')
+
+    expect(squadGit.alteracoes(w)).toEqual({
+      ok: true,
+      valor: { caminhos: ['src/a.ts'], simbolicos: [] }
+    })
+  })
+
+  it('só o diretório exato é artefato do sandbox: nome parecido continua sendo do escritor', async () => {
+    const w = await comGitMeta('a')
+    mkdirSync(join(w.worktree, '.gitmeta2'))
+    writeFileSync(join(w.worktree, '.gitmeta2', 'x'), 'x\n')
+    writeFileSync(join(w.worktree, '.gitmeta-extra'), 'x\n')
+    writeFileSync(join(w.worktree, 'src', '.gitmeta'), 'x\n')
+
+    const r = squadGit.alteracoes(w)
+
+    expect(r.ok && r.valor.caminhos).toEqual(['.gitmeta-extra', '.gitmeta2/x', 'src/.gitmeta'])
+  })
+
+  it('o worktree commitado é removido mesmo com o .gitmeta dentro, e o commit fica na branch', async () => {
+    const w = await comGitMeta('a')
+    writeFileSync(join(w.worktree, 'src', 'a.ts'), 'mudou\n')
+    expect(squadGit.commitar(w, 'tarefa t1', ['src/a.ts']).ok).toBe(true)
+
+    expect(squadGit.remover(w)).toEqual({ ok: true, valor: undefined })
+
+    expect(existsSync(w.worktree)).toBe(false)
+    expect(git(['log', '-1', '--format=%s', 'feat/a'])).toBe('tarefa t1')
+  })
+
+  it('o arquivo não commitado ainda segura a remoção: só o .gitmeta é descartado', async () => {
+    const w = await comGitMeta('a')
+    writeFileSync(join(w.worktree, 'src', 'novo.ts'), 'x\n')
+
+    expect(squadGit.remover(w)).toEqual({ ok: false, motivo: 'worktree-sujo' })
+    expect(existsSync(join(w.worktree, 'src', 'novo.ts'))).toBe(true)
+  })
+})
+
 comGit('adotar o worktree que o Preflight criou', () => {
   /** Cria o worktree como o Preflight cria: pelo Git direto, com o `autocrlf` desligado. */
   function criarPorFora(nome: string, branch = `feat/${nome}`): string {
@@ -299,7 +357,7 @@ comGit('diff por worktree — a prova de escopo (critério 2)', () => {
     expect(existsSync(join(repo, 'src', 'novo.ts'))).toBe(false)
   })
 
-  it('lista o modificado, o criado e o removido; ignora o que o .gitignore cobre', () => {
+  it('lista o modificado, o criado e o removido — e o que o .gitignore cobre também', () => {
     const w = criar('a')
     writeFileSync(join(w.worktree, 'src', 'a.ts'), 'mudou\n')
     writeFileSync(join(w.worktree, 'src', 'novo.ts'), 'novo\n')
@@ -311,8 +369,22 @@ comGit('diff por worktree — a prova de escopo (critério 2)', () => {
 
     expect(r).toEqual({
       ok: true,
-      valor: { caminhos: ['src/a.ts', 'src/b.ts', 'src/novo.ts'], simbolicos: [] }
+      valor: {
+        caminhos: ['dist/saida.js', 'src/a.ts', 'src/b.ts', 'src/novo.ts'],
+        simbolicos: []
+      }
     })
+  })
+
+  it('o .gitignore do worktree é do agente: ele não esconde a si mesmo nem o que escreveu', () => {
+    const w = criar('a')
+    mkdirSync(join(w.worktree, 'docs', 'x'), { recursive: true })
+    writeFileSync(join(w.worktree, 'docs', 'x', '.gitignore'), '*\n')
+    writeFileSync(join(w.worktree, 'docs', 'x', 'escondido.sh'), 'echo x\n')
+
+    const r = squadGit.alteracoes(w)
+
+    expect(r.ok && r.valor.caminhos).toEqual(['docs/x/.gitignore', 'docs/x/escondido.sh'])
   })
 
   it('espaço, acento e maiúscula chegam inteiros, sem aspas', () => {
@@ -696,10 +768,13 @@ comGit('ler uma revisão — o contexto da tarefa sai do Git, não do disco', ()
 
       expect(r).toEqual({
         ok: true,
-        valor: [
-          { caminho: 'src/c.ts', linha: 2 },
-          { caminho: 'src/c.ts', linha: 4 }
-        ]
+        valor: {
+          ocorrencias: [
+            { caminho: 'src/c.ts', linha: 2 },
+            { caminho: 'src/c.ts', linha: 4 }
+          ],
+          truncada: false
+        }
       })
     })
 
@@ -708,18 +783,18 @@ comGit('ler uma revisão — o contexto da tarefa sai do Git, não do disco', ()
 
       expect(squadGit.buscarNaRevisao(repo, sha, 'a.b', ['src'])).toEqual({
         ok: true,
-        valor: [{ caminho: 'src/c.ts', linha: 1 }]
+        valor: { ocorrencias: [{ caminho: 'src/c.ts', linha: 1 }], truncada: false }
       })
       expect(squadGit.buscarNaRevisao(repo, sha, 'a*b', ['src'])).toEqual({
         ok: true,
-        valor: [{ caminho: 'src/c.ts', linha: 3 }]
+        valor: { ocorrencias: [{ caminho: 'src/c.ts', linha: 3 }], truncada: false }
       })
     })
 
     it('sem ocorrência é lista vazia, não erro', () => {
       expect(squadGit.buscarNaRevisao(repo, baseSha, 'nao-existe-xyz', ['src'])).toEqual({
         ok: true,
-        valor: []
+        valor: { ocorrencias: [], truncada: false }
       })
     })
 
@@ -730,7 +805,7 @@ comGit('ler uma revisão — o contexto da tarefa sai do Git, não do disco', ()
 
       const r = squadGit.buscarNaRevisao(repo, git(['rev-parse', 'HEAD']), 'alvo', ['src'])
 
-      expect(r).toEqual({ ok: true, valor: [] })
+      expect(r).toEqual({ ok: true, valor: { ocorrencias: [], truncada: false } })
     })
 
     it('o escopo é caminho literal: um glob não amplia a busca', () => {
@@ -738,7 +813,7 @@ comGit('ler uma revisão — o contexto da tarefa sai do Git, não do disco', ()
 
       const r = squadGit.buscarNaRevisao(repo, sha, 'alvo', ['*'])
 
-      expect(r).toEqual({ ok: true, valor: [] })
+      expect(r).toEqual({ ok: true, valor: { ocorrencias: [], truncada: false } })
     })
 
     it('recusa termo, escopo e revisão inválidos antes de rodar Git', () => {
@@ -759,12 +834,22 @@ comGit('ler uma revisão — o contexto da tarefa sai do Git, não do disco', ()
       expect(squadGit.buscarNaRevisao('relativo', baseSha, 'alvo', ['src']).ok).toBe(false)
     })
 
+    it('no limite exato não há truncamento: truncada só vale quando sobrou ocorrência', () => {
+      const sha = commitar({ 'src/exato.ts': 'alvo\n'.repeat(MAX_OCORRENCIAS_DA_BUSCA) })
+
+      const r = squadGit.buscarNaRevisao(repo, sha, 'alvo', ['src/exato.ts'])
+
+      expect(r.ok && r.valor.ocorrencias.length).toBe(MAX_OCORRENCIAS_DA_BUSCA)
+      expect(r.ok && r.valor.truncada).toBe(false)
+    })
+
     it('uma busca que casa tudo é cortada no teto', () => {
       const sha = commitar({ 'src/muito.ts': 'alvo\n'.repeat(MAX_OCORRENCIAS_DA_BUSCA + 50) })
 
       const r = squadGit.buscarNaRevisao(repo, sha, 'alvo', ['src/muito.ts'])
 
-      expect(r.ok && r.valor.length).toBe(MAX_OCORRENCIAS_DA_BUSCA)
+      expect(r.ok && r.valor.ocorrencias.length).toBe(MAX_OCORRENCIAS_DA_BUSCA)
+      expect(r.ok && r.valor.truncada).toBe(true)
     })
   })
 })
@@ -836,7 +921,10 @@ describe('o parser da busca não confia na saída do Git', () => {
 
     const r = comSaida(saida).buscarNaRevisao(repo, sha, 'alvo', ['src'])
 
-    expect(r).toEqual({ ok: true, valor: [{ caminho: 'src/ok.ts', linha: 7 }] })
+    expect(r).toEqual({
+      ok: true,
+      valor: { ocorrencias: [{ caminho: 'src/ok.ts', linha: 7 }], truncada: false }
+    })
   })
 })
 
