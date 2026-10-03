@@ -71,6 +71,11 @@ export interface PedidoDePreflight {
    */
   readonly portasDeServico?: readonly number[]
   readonly proxyUrl: string
+  /**
+   * Dá branch própria ao **escritor** de um Squad: ele passa `<escritor>-t<tentativa>`, e dois
+   * escritores do mesmo run não dividem a branch. Ausente no run comum (SPEC-Squads-03).
+   */
+  readonly sufixoDaBranch?: string
 }
 
 export interface PreflightDeps {
@@ -260,7 +265,7 @@ export class PreflightService {
     }
 
     // 9. A branch nasce do SHA fixado (critério 2), num worktree fora do checkout ativo.
-    const branch = nomeDaBranch(pedido.sliceId, pedido.runId)
+    const branch = nomeDaBranch(pedido.sliceId, pedido.runId, pedido.sufixoDaBranch)
     // `core.autocrlf=false` no ato do checkout, e isto **não é preferência de estilo**: no
     // Windows o padrão grava CRLF no disco, e o Git de dentro do container (Linux) lê cada
     // arquivo como modificado. O executor veria a árvore inteira suja e o critério 6 acusaria
