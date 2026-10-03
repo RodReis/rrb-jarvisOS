@@ -17,6 +17,7 @@ import { GaleriaDeMarcos, type CenaDeMarcos } from './GaleriaDeMarcos'
 import { GaleriaDaArquitetura, type CenaDaArquitetura } from './GaleriaDaArquitetura'
 import { GaleriaDoMascote } from './GaleriaDoMascote'
 import { GaleriaDoCommandCenter } from './GaleriaDoCommandCenter'
+import { GaleriaDaEscuta, prepararPonteDaEscuta, type CenaDaEscuta } from './GaleriaDaEscuta'
 import { initI18n } from '@renderer/i18n'
 import type { ModoUi, Modulo } from '@design/tokens/semantic'
 import type { CorAcento } from '@design/tokens/acento'
@@ -72,7 +73,9 @@ const CENAS_POR_GALERIA: Readonly<Record<string, readonly string[]>> = {
   // O painel de marcos (M26-F04): em dia, bloqueando a Construção, e sem Git disponível.
   marcos: ['em-dia', 'pendente', 'sem-git'],
   // O pacote de arquitetura (#333): o tamanho que um projeto pequeno produz, e um enxuto ao lado.
-  arquitetura: ['pacote-cheio', 'pacote-magro', 'gerando', 'gerando-falhou']
+  arquitetura: ['pacote-cheio', 'pacote-magro', 'gerando', 'gerando-falhou'],
+  // A escuta contínua (M18-F01): os quatro estados da barra e a seção de Settings.
+  escuta: ['ligada', 'desligada', 'indisponivel', 'sem-microfone', 'settings']
 }
 
 const cenaBruta = params.get('cena')
@@ -146,6 +149,11 @@ const GALERIAS = {
   ),
   mascote: () => <GaleriaDoMascote modo={modo} acento={acento ?? undefined} />,
   'command-center': () => <GaleriaDoCommandCenter modo={modo} />,
+  escuta: () => {
+    const cena = (cenaBruta ?? 'ligada') as CenaDaEscuta
+    prepararPonteDaEscuta(cena)
+    return <GaleriaDaEscuta modo={modo} cena={cena} />
+  },
   planejamento: () => (
     <GaleriaDaJornadaDePlanejamento
       modo={modo}
@@ -194,7 +202,8 @@ const TRADUZ_POR_I18N: readonly string[] = [
   'brief',
   'projetos',
   'arquitetura',
-  'command-center'
+  'command-center',
+  'escuta'
 ]
 if (TRADUZ_POR_I18N.includes(qual)) await initI18n('pt-BR')
 

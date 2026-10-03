@@ -164,7 +164,7 @@ export function EscutaDaVoz({
       <span
         role="status"
         title={DICA[visao]}
-        className={`inline-flex items-center gap-1.5 text-[length:var(--jos-texto-micro)] ${
+        className={`inline-flex items-center gap-1.5 text-[length:var(--jos-texto-mini)] ${
           problema ? 'text-[var(--jos-cor-err-leitura)]' : 'text-[var(--jos-cor-texto-suave)]'
         }`}
       >
