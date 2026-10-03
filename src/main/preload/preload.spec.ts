@@ -81,11 +81,16 @@ describe('ponte do preload', () => {
       'createAutomation',
       'createProject',
       'createWorkflow',
+      'definirEscutaAtiva',
+      'definirGatilhosDaEscuta',
       'definirPoliticaDeMerge',
+      'definirSensibilidadeDaEscuta',
       'descartarAjusteDaArquitetura',
       'entrarNoCodex',
+      'enviarPcmDaEscuta',
       'escolherAnexo',
       'escolherMvpDoRoadmap',
+      'estadoDaEscuta',
       'estadoDaJornada',
       'estadoDoCodex',
       'estadoDoRefinamento',
@@ -118,6 +123,7 @@ describe('ponte do preload', () => {
       'historicoDaConversa',
       'historicoDoRefinamento',
       'importProject',
+      'informarTurnoDaEscuta',
       'jornadaDeVarios',
       'ledgerDoRun',
       'lerPersona',
@@ -149,6 +155,8 @@ describe('ponte do preload', () => {
       'mvpsElegiveis',
       'onAiStreamEvent',
       'onAuthChanged',
+      'onEscutaDisparo',
+      'onEscutaMudou',
       'onGenerationEvent',
       'onVozHotkey',
       'pendenciasDeLimpeza',
@@ -449,6 +457,64 @@ describe('ponte do preload', () => {
     await (bridge.transcreverAudio as (p: Int16Array, w: string) => Promise<unknown>)(pcm, 'jarvis')
 
     expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.vozTranscrever, pcm, 'jarvis')
+  })
+
+  describe('escuta contínua (SPEC-Escuta-01)', () => {
+    it('ligar e desligar levam só o booleano: a via da auditoria não atravessa a ponte', async () => {
+      const bridge = await carregarPonte()
+
+      await (bridge.definirEscutaAtiva as (a: boolean, via?: string) => Promise<unknown>)(
+        false,
+        'hotkey'
+      )
+
+      // Se a ponte repassasse um segundo argumento, a tela poderia afirmar quem fechou o
+      // microfone; a auditoria deixaria de ser prova.
+      expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.escutaDefinirAtiva, false)
+    })
+
+    it('o PCM sai pelo canal só de ida, sem esperar resposta', async () => {
+      const bridge = await carregarPonte()
+      const pcm = new Int16Array(1280)
+
+      ;(bridge.enviarPcmDaEscuta as (p: Int16Array) => void)(pcm)
+
+      expect(send).toHaveBeenCalledWith(IPC_SEND_CHANNELS.escutaPcm, pcm)
+      expect(invoke).not.toHaveBeenCalledWith(IPC_SEND_CHANNELS.escutaPcm, pcm)
+    })
+
+    it('o ouvinte do estado recebe só o estado, sem o evento do Electron, e cancela a assinatura', async () => {
+      const bridge = await carregarPonte()
+      const ouvinte = vi.fn()
+      const estado = {
+        ativa: false,
+        disponivel: true,
+        frase: true,
+        palmas: true,
+        sensibilidade: 0.5
+      }
+
+      const cancelar = (bridge.onEscutaMudou as (l: (e: unknown) => void) => () => void)(ouvinte)
+      const [canal, envolvido] = on.mock.calls.at(-1) as [string, (e: unknown, p: unknown) => void]
+      envolvido({ sender: 'objeto-do-electron' }, estado)
+      cancelar()
+
+      expect(canal).toBe(IPC_EVENT_CHANNELS.escutaMudou)
+      expect(ouvinte).toHaveBeenCalledWith(estado)
+      expect(removeListener).toHaveBeenCalledWith(IPC_EVENT_CHANNELS.escutaMudou, envolvido)
+    })
+
+    it('o ouvinte do disparo assina o canal do disparo', async () => {
+      const bridge = await carregarPonte()
+      const ouvinte = vi.fn()
+
+      ;(bridge.onEscutaDisparo as (l: (d: unknown) => void) => () => void)(ouvinte)
+      const [canal, envolvido] = on.mock.calls.at(-1) as [string, (e: unknown, p: unknown) => void]
+      envolvido({}, { gatilho: 'palmas', sessaoBloqueada: true })
+
+      expect(canal).toBe(IPC_EVENT_CHANNELS.escutaDisparo)
+      expect(ouvinte).toHaveBeenCalledWith({ gatilho: 'palmas', sessaoBloqueada: true })
+    })
   })
 
   it('recusa expor a ponte quando contextIsolation está desligado', async () => {

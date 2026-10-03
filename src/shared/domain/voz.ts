@@ -159,8 +159,26 @@ export interface EstadoDaEscuta {
   readonly disponivel: boolean
   /** Sensibilidade calibrada [0.1, 0.95]. */
   readonly sensibilidade: number
-  /** Se a captura está mutada temporariamente pela hotkey global de mute. */
-  readonly mutada: boolean
+  /** Gatilhos ligáveis separadamente (decisão do PI de 2026-10-03): a frase e as duas palmas. */
+  readonly frase: boolean
+  readonly palmas: boolean
+}
+
+/**
+ * O desfecho de pedir a escuta ligada. Desligar não falha, então só ligar tem desfecho: sem
+ * modelo pronto a escuta não abre o microfone, e `ENTRADA_INVALIDA` é a chamada malformada.
+ */
+export type DesfechoDeLigarEscuta =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly motivo: 'MODELO_AUSENTE' | 'ENTRADA_INVALIDA' }
+
+/**
+ * O que a tela sabe de um disparo: **quem** disparou e se a sessão estava bloqueada. Nem áudio,
+ * nem confiança, nem caminho de modelo atravessam a ponte.
+ */
+export interface DisparoDaEscuta {
+  readonly gatilho: 'frase' | 'palmas'
+  readonly sessaoBloqueada: boolean
 }
 
 /** Resultado de um teste ao vivo de wake word em Settings (critério 12). */
@@ -169,6 +187,13 @@ export interface DesfechoDoTesteWakeWord {
   readonly limiar: number
   readonly disparou: boolean
 }
+
+/**
+ * A hotkey global de mute da escuta (SPEC-Escuta-01, critério 11). Fora das quatro combinações do
+ * push-to-talk de propósito: as duas funções convivem e o atalho de uma não pode ser o da outra.
+ * Configurável em Settings é o passo seguinte; até lá este é o atalho, e o registro é auditado.
+ */
+export const HOTKEY_DE_MUTE_DA_ESCUTA = 'Control+Alt+M'
 
 /** Palavra de ativação oficial do sistema. */
 export const WAKE_WORD_OFICIAL = 'Ei, amigo'

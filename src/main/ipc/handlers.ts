@@ -1,6 +1,7 @@
 import type { VozService } from '../voz/voz-service'
 import type { TtsService } from '../voz/tts-service'
 import type { ConversaService } from '../voz/conversa-service'
+import type { EscutaService } from '../voz/escuta-service'
 import type { PersonaRepository } from '../voz/persona-repository'
 import {
   BLOCO_FIXO_DA_PERSONA,
@@ -429,6 +430,8 @@ export interface IpcDependencies {
   /** A persona por escopo (SPEC-Voz-03, critério 5). */
   readonly personas: PersonaRepository
   readonly baixarArtefatoDeVoz: (id: string) => Promise<DesfechoDoDownload>
+  /** A escuta contínua (SPEC-Escuta-01). Injetada como o resto — o IPC não conhece o engine. */
+  readonly escuta: EscutaService
   /** Ausente quando as credenciais não estão configuradas — o app roda sem login. */
   readonly auth?: AuthService
   /** Ponto único de chamada de IA (SPEC-Providers-02): classifica, estima, audita, mede. */
@@ -468,6 +471,9 @@ export interface IpcDependencies {
  * A regra "todo método loga" (CONVENTION §3) vale aqui: cada canal emite `info` no fluxo
  * normal e `error` na falha, com `direction` marcando a entrada e a saída da chamada.
  */
+/** Janela mínima entre dois avisos da mesma falha da escuta no log. */
+const JANELA_DO_LOG_DA_ESCUTA_MS = 30_000
+
 export function registerIpcHandlers(deps: IpcDependencies): void {
   ipcMain.handle(IPC_CHANNELS.appInfo, () => {
     log.ipc.info('Metadados do app solicitados', { canal: IPC_CHANNELS.appInfo, direction: 'in' })
@@ -821,6 +827,38 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       return { estado: 'falhou' as const, motivo: 'Artefato não identificado.' }
     }
     return deps.baixarArtefatoDeVoz(id)
+  })
+
+  /*
+   * A escuta contínua (SPEC-Escuta-01). Entrada malformada é ignorada e devolve o estado atual:
+   * a tela nunca recebe uma exceção opaca, e nada muda no microfone por causa de um valor que
+   * não era o que o contrato promete.
+   */
+  ipcMain.handle(IPC_CHANNELS.escutaEstado, () => deps.escuta.estado())
+
+  ipcMain.handle(IPC_CHANNELS.escutaDefinirAtiva, async (_event, ativa: unknown) => {
+    if (typeof ativa !== 'boolean') {
+      return { ok: false as const, motivo: 'ENTRADA_INVALIDA' as const }
+    }
+    // A via é fixa: o argumento extra, se vier, não é lido. Ver o comentário do canal.
+    if (!ativa) {
+      await deps.escuta.desligar('interface')
+      return { ok: true as const }
+    }
+    return deps.escuta.ligar('interface')
+  })
+
+  ipcMain.handle(IPC_CHANNELS.escutaDefinirGatilhos, async (_event, gatilhos: unknown) => {
+    const { frase, palmas } = (gatilhos ?? {}) as { frase?: unknown; palmas?: unknown }
+    if (typeof frase === 'boolean' && typeof palmas === 'boolean') {
+      await deps.escuta.definirGatilhos({ frase, palmas })
+    }
+    return deps.escuta.estado()
+  })
+
+  ipcMain.handle(IPC_CHANNELS.escutaDefinirSensibilidade, async (_event, valor: unknown) => {
+    if (typeof valor === 'number') await deps.escuta.definirSensibilidade(valor)
+    return deps.escuta.estado()
   })
 
   /*
@@ -2571,6 +2609,27 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     }
 
     writeLog({ ...input, source: 'renderer' })
+  })
+
+  // O PCM da escuta: só `Int16Array` é áudio. O resto some, e a captura segue — um bloco ruim não
+  // pode derrubar a escuta. Falha do engine vai ao log, no máximo uma vez por janela: são ~12
+  // blocos por segundo, e um sidecar morto escreveria centenas de linhas iguais por minuto.
+  let ultimaFalhaDaEscuta = Number.NEGATIVE_INFINITY
+  ipcMain.on(IPC_SEND_CHANNELS.escutaPcm, (_event, pcm: unknown) => {
+    if (!(pcm instanceof Int16Array)) return
+    deps.escuta.receberPcm(pcm).catch((erro: unknown) => {
+      const agora = Date.now()
+      if (agora - ultimaFalhaDaEscuta < JANELA_DO_LOG_DA_ESCUTA_MS) return
+      ultimaFalhaDaEscuta = agora
+      log.ipc.warn('A escuta contínua falhou ao processar o áudio', {
+        canal: IPC_SEND_CHANNELS.escutaPcm,
+        motivo: erro instanceof Error ? erro.message : 'desconhecido'
+      })
+    })
+  })
+
+  ipcMain.on(IPC_SEND_CHANNELS.escutaTurno, (_event, ativo: unknown) => {
+    if (typeof ativo === 'boolean') deps.escuta.definirTurno(ativo)
   })
 
   ipcMain.on(IPC_SEND_CHANNELS.windowMinimizeToTray, () => {

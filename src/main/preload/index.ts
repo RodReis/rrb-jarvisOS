@@ -18,7 +18,10 @@ import type { ExecutionLedger } from '@shared/domain/execution-ledger'
 import type {
   DesfechoDaConversa,
   DesfechoDaTranscricao,
+  DesfechoDeLigarEscuta,
   DesfechoDoDownload,
+  DisparoDaEscuta,
+  EstadoDaEscuta,
   PersonaEditavel,
   ProntidaoDaVoz,
   TrocaDaConversa
@@ -212,6 +215,37 @@ const bridge: JarvisBridge = {
   prontidaoDaVoz: (): Promise<ProntidaoDaVoz> => ipcRenderer.invoke(IPC_CHANNELS.vozProntidao),
   baixarArtefatoDeVoz: (id: string): Promise<DesfechoDoDownload> =>
     ipcRenderer.invoke(IPC_CHANNELS.vozBaixarArtefato, id),
+
+  /*
+   * A escuta contínua (SPEC-Escuta-01). A tela captura e manda o PCM; o main decide. Nenhum método
+   * aceita a "via" da auditoria — ela é fixada do lado de lá.
+   */
+  estadoDaEscuta: (): Promise<EstadoDaEscuta> => ipcRenderer.invoke(IPC_CHANNELS.escutaEstado),
+  definirEscutaAtiva: (ativa: boolean): Promise<DesfechoDeLigarEscuta> =>
+    ipcRenderer.invoke(IPC_CHANNELS.escutaDefinirAtiva, ativa),
+  definirGatilhosDaEscuta: (gatilhos: {
+    readonly frase: boolean
+    readonly palmas: boolean
+  }): Promise<EstadoDaEscuta> => ipcRenderer.invoke(IPC_CHANNELS.escutaDefinirGatilhos, gatilhos),
+  definirSensibilidadeDaEscuta: (sensibilidade: number): Promise<EstadoDaEscuta> =>
+    ipcRenderer.invoke(IPC_CHANNELS.escutaDefinirSensibilidade, sensibilidade),
+  enviarPcmDaEscuta: (pcm: Int16Array): void => ipcRenderer.send(IPC_SEND_CHANNELS.escutaPcm, pcm),
+  informarTurnoDaEscuta: (ativo: boolean): void =>
+    ipcRenderer.send(IPC_SEND_CHANNELS.escutaTurno, ativo),
+  onEscutaMudou: (listener: (estado: EstadoDaEscuta) => void): (() => void) => {
+    const wrapped = (_event: unknown, estado: EstadoDaEscuta): void => listener(estado)
+
+    ipcRenderer.on(IPC_EVENT_CHANNELS.escutaMudou, wrapped)
+
+    return () => ipcRenderer.removeListener(IPC_EVENT_CHANNELS.escutaMudou, wrapped)
+  },
+  onEscutaDisparo: (listener: (disparo: DisparoDaEscuta) => void): (() => void) => {
+    const wrapped = (_event: unknown, disparo: DisparoDaEscuta): void => listener(disparo)
+
+    ipcRenderer.on(IPC_EVENT_CHANNELS.escutaDisparo, wrapped)
+
+    return () => ipcRenderer.removeListener(IPC_EVENT_CHANNELS.escutaDisparo, wrapped)
+  },
 
   /*
    * Fala (SPEC-Voz-02, critério 6). O PCM sintetizado volta por aqui e quem toca é o renderer,

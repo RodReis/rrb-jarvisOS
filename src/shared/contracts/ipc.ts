@@ -112,7 +112,10 @@ import type { CapacidadeResolvida } from '../domain/skills'
 import type {
   DesfechoDaConversa,
   DesfechoDaTranscricao,
+  DesfechoDeLigarEscuta,
   DesfechoDoDownload,
+  DisparoDaEscuta,
+  EstadoDaEscuta,
   PersonaEditavel,
   ProntidaoDaVoz,
   TrocaDaConversa
@@ -208,6 +211,18 @@ export const IPC_CHANNELS = {
   vozTranscrever: 'voz:transcrever',
   vozProntidao: 'voz:prontidao',
   vozBaixarArtefato: 'voz:baixar-artefato',
+  /*
+   * A escuta contínua (SPEC-Escuta-01). Quatro canais de pedido: ler o estado, ligar/desligar,
+   * escolher os gatilhos e a sensibilidade.
+   *
+   * **A tela não escolhe a via.** Quem liga ou desliga por aqui é sempre `interface`; `hotkey` e
+   * `restauracao` são do main. A auditoria existe para provar quem fechou o microfone, e um
+   * argumento vindo do renderer a tornaria autodeclarada.
+   */
+  escutaEstado: 'escuta:estado',
+  escutaDefinirAtiva: 'escuta:definir-ativa',
+  escutaDefinirGatilhos: 'escuta:definir-gatilhos',
+  escutaDefinirSensibilidade: 'escuta:definir-sensibilidade',
   /*
    * Fala (SPEC-Voz-02). Dois canais: sintetizar um texto e perguntar quais vozes existem.
    *
@@ -667,7 +682,19 @@ export const IPC_SEND_CHANNELS = {
    */
   log: 'log:record',
   /** Minimiza para o tray. Ação de janela vive no main; o renderer só pede (SPEC-02). */
-  windowMinimizeToTray: 'window:minimizar-tray'
+  windowMinimizeToTray: 'window:minimizar-tray',
+  /**
+   * O PCM da escuta contínua (SPEC-Escuta-01). Só de ida e sem resposta: são ~12 blocos por
+   * segundo e esperar confirmação de cada um tornaria a captura refém do main. O renderer captura
+   * com `getUserMedia`; quem decide o que o áudio significa é o main.
+   */
+  escutaPcm: 'escuta:pcm',
+  /**
+   * A tela avisa que um turno de conversa começou ou terminou (SPEC-Escuta-01: gatilhos são
+   * ignorados enquanto um turno está ativo). Booleano e nada mais; o main ainda impõe um teto,
+   * porque uma tela que esquece de avisar o fim não pode deixar a escuta surda.
+   */
+  escutaTurno: 'escuta:turno'
 } as const
 
 /**
@@ -711,7 +738,20 @@ export const IPC_EVENT_CHANNELS = {
    *
    * O payload é só `gravando`: o main sabe **se** a gravação deve estar aberta, não o áudio.
    */
-  vozHotkey: 'voz:hotkey'
+  vozHotkey: 'voz:hotkey',
+  /**
+   * O estado da escuta contínua (SPEC-Escuta-01, critérios 8 e 9), empurrado a cada mudança.
+   *
+   * É o canal que fecha o microfone: com `ativa: false` a tela encerra o stream do
+   * `getUserMedia`. Push e não consulta porque quem muda o estado nem sempre é a tela — a hotkey
+   * global de mute corta a escuta com a janela minimizada, e a tela só fica sabendo por aqui.
+   */
+  escutaMudou: 'escuta:mudou',
+  /**
+   * Um gatilho disparou (frase ou duas palmas). O payload é só `DisparoDaEscuta`: quem abre o
+   * turno de conversa é o renderer, e o main não manda áudio nem confiança.
+   */
+  escutaDisparo: 'escuta:disparo'
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]
@@ -894,6 +934,25 @@ export interface JarvisBridge {
   transcreverAudio(pcm: Int16Array, workspace: WorkspaceId): Promise<DesfechoDaTranscricao>
   prontidaoDaVoz(): Promise<ProntidaoDaVoz>
   baixarArtefatoDeVoz(id: string): Promise<DesfechoDoDownload>
+
+  /*
+   * A escuta contínua (SPEC-Escuta-01). O renderer captura o microfone e manda o PCM por
+   * `enviarPcmDaEscuta`; as decisões — ligar, gatilho, bloqueio de sessão — são do main, e o que
+   * volta é estado ou desfecho nomeado.
+   */
+  estadoDaEscuta(): Promise<EstadoDaEscuta>
+  definirEscutaAtiva(ativa: boolean): Promise<DesfechoDeLigarEscuta>
+  definirGatilhosDaEscuta(gatilhos: {
+    readonly frase: boolean
+    readonly palmas: boolean
+  }): Promise<EstadoDaEscuta>
+  definirSensibilidadeDaEscuta(sensibilidade: number): Promise<EstadoDaEscuta>
+  enviarPcmDaEscuta(pcm: Int16Array): void
+  /** Avisa o main que um turno de conversa começou (`true`) ou terminou (`false`). */
+  informarTurnoDaEscuta(ativo: boolean): void
+  /** Avisa a tela de toda mudança de estado — inclusive a feita pela hotkey de mute. */
+  onEscutaMudou(listener: (estado: EstadoDaEscuta) => void): () => void
+  onEscutaDisparo(listener: (disparo: DisparoDaEscuta) => void): () => void
 
   /*
    * Fala (SPEC-Voz-02, critério 6). O que volta é PCM mais a timeline de bocas; quem toca é o

@@ -74,7 +74,17 @@ export interface DepsDaEscuta {
   /** Avisa a tela que abra (`true`) ou **encerre** (`false`) o stream do microfone. */
   readonly aoMudarCaptura: (aberta: boolean) => void
   readonly aoDisparar: (evento: EventoDeEscuta) => void
+  /** Teto do turno aberto pela escuta; passado dele a escuta volta a ouvir. */
+  readonly tetoDoTurnoMs?: number
+  readonly agendar?: (acao: () => void, ms: number) => ReturnType<typeof setTimeout>
+  readonly cancelar?: (relogio: ReturnType<typeof setTimeout>) => void
 }
+
+/**
+ * Sem teto, um turno que a tela esquece de encerrar (janela recarregada, erro no meio da resposta)
+ * deixaria a escuta surda até o próximo boot — e o indicador diria que está ouvindo.
+ */
+export const TETO_DO_TURNO_PADRAO_MS = 120_000
 
 const PADRAO: EstadoPersistidoDaEscuta = {
   ativa: true,
@@ -87,6 +97,8 @@ export class EscutaService {
   private persistido: EstadoPersistidoDaEscuta = PADRAO
   private ativa = false
   private disponivel = false
+  private turno = false
+  private relogioDoTurno: ReturnType<typeof setTimeout> | undefined
 
   constructor(private readonly deps: DepsDaEscuta) {}
 
@@ -129,6 +141,7 @@ export class EscutaService {
 
     this.ativa = false
     this.persistir({ ativa: false })
+    this.definirTurno(false)
     this.deps.palmas.limpar()
     this.deps.aoMudarCaptura(false)
     this.deps.auditar({ type: 'voz.escuta.desligada', payload: { via } })
@@ -154,9 +167,34 @@ export class EscutaService {
     this.persistir({ sensibilidade })
   }
 
+  /**
+   * A tela avisa que um turno de conversa começou ou terminou — qualquer turno, inclusive o do
+   * push-to-talk. O turno que o próprio disparo abre já nasce marcado aqui, de forma síncrona: o
+   * PCM que ainda está a caminho não pode abrir um segundo.
+   */
+  definirTurno(ativo: boolean): void {
+    const cancelar = this.deps.cancelar ?? clearTimeout
+    if (this.relogioDoTurno !== undefined) {
+      cancelar(this.relogioDoTurno)
+      this.relogioDoTurno = undefined
+    }
+    this.turno = ativo
+    if (!ativo) return
+
+    const agendar = this.deps.agendar ?? setTimeout
+    this.relogioDoTurno = agendar(() => {
+      this.relogioDoTurno = undefined
+      this.turno = false
+    }, this.deps.tetoDoTurnoMs ?? TETO_DO_TURNO_PADRAO_MS)
+  }
+
+  private emTurno(): boolean {
+    return this.turno || this.deps.turnoAtivo()
+  }
+
   /** Um bloco de PCM 16 kHz mono vindo da captura. Desligada, ou em turno, não faz nada. */
   async receberPcm(pcm: Int16Array): Promise<void> {
-    if (!this.ativa || this.deps.turnoAtivo()) return
+    if (!this.ativa || this.emTurno()) return
 
     if (this.persistido.palmas && this.deps.palmas.alimentar(pcm)) {
       this.disparar({ gatilho: 'palmas' })
@@ -166,12 +204,13 @@ export class EscutaService {
 
     const deteccao = await this.deps.engine.alimentar(pcm)
     // O turno pode ter começado enquanto o engine pensava: o disparo tardio seria um segundo turno.
-    if (deteccao !== null && !this.deps.turnoAtivo()) {
+    if (deteccao !== null && !this.emTurno()) {
       this.disparar({ gatilho: 'frase', confianca: deteccao.confianca })
     }
   }
 
   private disparar(evento: Omit<EventoDeEscuta, 'sessaoBloqueada'>): void {
+    this.definirTurno(true)
     this.deps.aoDisparar({ ...evento, sessaoBloqueada: this.deps.sessaoBloqueada() })
   }
 

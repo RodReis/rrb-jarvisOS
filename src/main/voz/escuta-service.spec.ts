@@ -35,6 +35,7 @@ function montar(
     bloqueada?: boolean
     turnoAtivo?: boolean
     modeloPronto?: boolean
+    tetoDoTurnoMs?: number
   } = {}
 ) {
   const { engine, alimentados, limiares } = engineFalso(sobrescrever.resposta ?? null)
@@ -46,6 +47,7 @@ function montar(
   let persistido = sobrescrever.persistido
   let bloqueada = sobrescrever.bloqueada ?? false
   let turnoAtivo = sobrescrever.turnoAtivo ?? false
+  const agendados: { acao: () => void; ms: number; cancelado: boolean }[] = []
 
   const deps: DepsDaEscuta = {
     engine,
@@ -68,7 +70,16 @@ function montar(
     sessaoBloqueada: () => bloqueada,
     turnoAtivo: () => turnoAtivo,
     aoMudarCaptura: (aberta) => void capturas.push(aberta),
-    aoDisparar: (e) => void disparos.push(e)
+    aoDisparar: (e) => void disparos.push(e),
+    tetoDoTurnoMs: sobrescrever.tetoDoTurnoMs,
+    agendar: (acao, ms) => {
+      const a = { acao, ms, cancelado: false }
+      agendados.push(a)
+      return a as unknown as ReturnType<typeof setTimeout>
+    },
+    cancelar: (r) => {
+      ;(r as unknown as { cancelado: boolean }).cancelado = true
+    }
   }
   return {
     servico: new EscutaService(deps),
@@ -79,6 +90,8 @@ function montar(
     alimentados,
     limiares,
     palmasAlimentadas: () => palmasAlimentadas,
+    agendados,
+    estourarTeto: () => agendados.filter((a) => !a.cancelado).forEach((a) => a.acao()),
     bloquear: (v: boolean) => (bloqueada = v),
     ocuparTurno: (v: boolean) => (turnoAtivo = v)
   }
@@ -216,6 +229,7 @@ describe('EscutaService — áudio e gatilhos (critérios 2, 7 e 12)', () => {
     expect(m.alimentados).toHaveLength(0)
     expect(m.disparos.map((d) => d.gatilho)).toEqual(['palmas'])
 
+    m.servico.definirTurno(false)
     await m.servico.definirGatilhos({ frase: true, palmas: false })
     await m.servico.receberPcm(PCM)
     expect(m.disparos.map((d) => d.gatilho)).toEqual(['palmas', 'frase'])
@@ -241,6 +255,7 @@ describe('EscutaService — áudio e gatilhos (critérios 2, 7 e 12)', () => {
     await m.servico.restaurar()
     m.bloquear(true)
     await m.servico.receberPcm(PCM)
+    m.servico.definirTurno(false)
     m.bloquear(false)
     await m.servico.receberPcm(PCM)
     expect(m.disparos.map((d) => d.sessaoBloqueada)).toEqual([true, false])
@@ -262,5 +277,55 @@ describe('EscutaService — áudio e gatilhos (critérios 2, 7 e 12)', () => {
     expect(m.servico.estado().sensibilidade).toBe(0.95)
     await m.servico.definirSensibilidade(Number.NaN)
     expect(m.servico.estado().sensibilidade).toBe(0.5)
+  })
+})
+
+describe('EscutaService — o turno aberto pelo disparo', () => {
+  it('um disparo abre o turno: o áudio seguinte não dispara de novo até o turno encerrar', async () => {
+    const m = montar({ persistido: undefined, resposta: DETECCAO })
+    await m.servico.restaurar()
+
+    await m.servico.receberPcm(PCM)
+    await m.servico.receberPcm(PCM)
+    expect(m.disparos).toHaveLength(1)
+
+    m.servico.definirTurno(false)
+    await m.servico.receberPcm(PCM)
+    expect(m.disparos).toHaveLength(2)
+  })
+
+  it('o turno aberto pela tela (push-to-talk) também silencia a escuta', async () => {
+    const m = montar({ persistido: undefined, resposta: DETECCAO })
+    await m.servico.restaurar()
+
+    m.servico.definirTurno(true)
+    await m.servico.receberPcm(PCM)
+
+    expect(m.disparos).toEqual([])
+    expect(m.alimentados).toHaveLength(0)
+  })
+
+  it('o turno que ninguém encerra expira sozinho, para a escuta não ficar surda', async () => {
+    const m = montar({ persistido: undefined, resposta: DETECCAO, tetoDoTurnoMs: 90_000 })
+    await m.servico.restaurar()
+    await m.servico.receberPcm(PCM)
+    expect(m.agendados.at(-1)?.ms).toBe(90_000)
+
+    m.estourarTeto()
+    await m.servico.receberPcm(PCM)
+
+    expect(m.disparos).toHaveLength(2)
+  })
+
+  it('encerrar o turno cancela o teto, e desligar a escuta também encerra o turno', async () => {
+    const m = montar({ persistido: undefined, resposta: DETECCAO })
+    await m.servico.restaurar()
+    await m.servico.receberPcm(PCM)
+
+    expect(m.agendados.length).toBeGreaterThan(0)
+
+    await m.servico.desligar('hotkey')
+
+    expect(m.agendados.every((a) => a.cancelado)).toBe(true)
   })
 })
