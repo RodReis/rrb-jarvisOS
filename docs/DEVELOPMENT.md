@@ -2381,7 +2381,7 @@ Status: **PR aberto, CI em execução** ([PR #380](https://github.com/RodReis/rr
 
 ### Fatia 04 — Integrador, TESTE → REVIEWER e retrabalho (`docs/spec/spec-squads-04-revisao-independente.md`)
 
-Status: **em implementação, PR a abrir** — issue [#125](https://github.com/RodReis/rrb-jarvisOS/issues/125), puxada pelo PI em 2026-10-03 com a #356 em `next`. Decisões do PI (merge do kernel com o agente só nos conflitos, retrabalho por run, achados em tabela nova, escopo com smoke real) e as escolhas do Code a confirmar, na SPEC.
+Status: **PR aberto, CI em execução** ([PR #384](https://github.com/RodReis/rrb-jarvisOS/pull/384)) — issue [#125](https://github.com/RodReis/rrb-jarvisOS/issues/125), puxada pelo PI em 2026-10-03 com a #356 em `next`. Decisões do PI (merge do kernel com o agente só nos conflitos, retrabalho por run, achados em tabela nova, escopo com smoke real) e as escolhas do Code a confirmar, na SPEC.
 
 - [x] **1. Domínio dos achados e do retrabalho** (`squad-achado.ts`, `squad-retrabalho.ts`, `squad-revisores.ts`): parecer estruturado, assinatura do kernel (categoria + arquivo + trecho), ciclo de vida `open/accepted/fixed/dismissed/superseded`, deduplicação, revalidação objetiva, contestação sem voto, veredito derivado dos achados, limite da M9-F04 por run.
 - [x] **2. Migração 49 e repositório** (`achado-repository.ts`): `UNIQUE(run, assinatura)`, transições validadas por alcance, uma linha por volta do retrabalho.
@@ -2394,7 +2394,7 @@ Status: **em implementação, PR a abrir** — issue [#125](https://github.com/R
 - [x] **9. Smoke real** (`squad-revisao.smoke.int-spec.ts`, `JARVIS_SMOKE_FASE=1`): integrador e revisor com o `claude` CLI; **Docker real da etapa TESTE `not_run`** (engine em erro 500 nesta máquina).
 - [x] **10. Duas revisões independentes (código e segurança), corrigidas com teste vermelho antes:** texto do escritor forjando a estrutura do conflito; auditor que reprovava merge limpo (rename, linha repetida) e aprovava hunk apagado; revisor em provider com ferramenta (`codex`); severidade rebaixada com uma justificativa de uma palavra; quórum de um revisor; leitura de arquivo não UTF-8; fonte descartada pelo contexto indo ao modelo sem o scan de segredo.
 - [x] **11. Suíte completa:** 255 arquivos passando, **5044 testes** (+343 contra os 4701 da F03), 0 falhas de código; o único arquivo vermelho é `docker-egress.int-spec.ts`, por timeout do `docker info` (Docker Desktop em erro 500 nesta máquina), ambiente e não regressão.
-- [ ] **12. Relatório, PR e CI** — pendente.
+- [x] **12. Relatório e PR** ([PR #384](https://github.com/RodReis/rrb-jarvisOS/pull/384)): relatório carimbado a partir dos artefatos do CI (o Docker local está fora; ver a nota de relatório sujo) — Regras 2517, Banco 1819, Tela 735, 0 falhas. Os jobs `test-regras`, `test-banco`, `test-tela`, `e2e`, `quality` e `visual` passaram na primeira rodada; só o agregador `test` caiu, pela ausência do carimbo.
 
 ## Registro de entregas
 
