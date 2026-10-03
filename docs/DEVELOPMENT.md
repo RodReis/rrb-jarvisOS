@@ -2381,7 +2381,7 @@ Status: **PR aberto, CI em execução** ([PR #380](https://github.com/RodReis/rr
 
 ### Fatia 04 — Integrador, TESTE → REVIEWER e retrabalho (`docs/spec/spec-squads-04-revisao-independente.md`)
 
-Status: **PR aberto, CI em execução** ([PR #384](https://github.com/RodReis/rrb-jarvisOS/pull/384)) — issue [#125](https://github.com/RodReis/rrb-jarvisOS/issues/125), puxada pelo PI em 2026-10-03 com a #356 em `next`. Decisões do PI (merge do kernel com o agente só nos conflitos, retrabalho por run, achados em tabela nova, escopo com smoke real) e as escolhas do Code a confirmar, na SPEC.
+Status: **entregue no [PR #384](https://github.com/RodReis/rrb-jarvisOS/pull/384)**, mergeado na `main` em 2026-10-03 (`8ed2dde`), CI verde; `proplan:done`, aguardando o aceite do PI — issue [#125](https://github.com/RodReis/rrb-jarvisOS/issues/125), puxada pelo PI em 2026-10-03 com a #356 em `next`. Decisões do PI (merge do kernel com o agente só nos conflitos, retrabalho por run, achados em tabela nova, escopo com smoke real) e as escolhas do Code a confirmar, na SPEC.
 
 - [x] **1. Domínio dos achados e do retrabalho** (`squad-achado.ts`, `squad-retrabalho.ts`, `squad-revisores.ts`): parecer estruturado, assinatura do kernel (categoria + arquivo + trecho), ciclo de vida `open/accepted/fixed/dismissed/superseded`, deduplicação, revalidação objetiva, contestação sem voto, veredito derivado dos achados, limite da M9-F04 por run.
 - [x] **2. Migração 49 e repositório** (`achado-repository.ts`): `UNIQUE(run, assinatura)`, transições validadas por alcance, uma linha por volta do retrabalho.
