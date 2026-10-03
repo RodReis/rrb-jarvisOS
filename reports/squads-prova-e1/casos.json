@@ -1,0 +1,246 @@
+{
+  "criadoEm": "2026-10-03T04:52:49.685Z",
+  "instrumentoSha256": "ffced56e089c2f320bded1c3e321e6e9d4a72c7f27e04d5a762dd3ce5f67cdaa",
+  "casos": [
+    {
+      "tipo": "sintetico-e1",
+      "id": "E1-M9-F01",
+      "fatia": "M9-F01",
+      "base": "7a70e7664f03d0e5f77ca42c6999d2e41068dd9b",
+      "w1": "228757ab4ba64e9ecbde824f40a87480ce1b46bf",
+      "w2": "d71270e9bb28571987b2d9c6e5f9f0839eec6b9a",
+      "verdade": "60af5b3f33a97674d619b878d636578bb6f16650",
+      "alvo": "src/shared/domain/publicacao.ts",
+      "specs": [
+        "src/shared/domain/publicacao.spec.ts"
+      ],
+      "conflitos": [
+        "src/shared/domain/publicacao.spec.ts",
+        "src/shared/domain/publicacao.ts"
+      ],
+      "hunks": 6,
+      "controle": {
+        "base": {
+          "aplicavel": true,
+          "ok": true,
+          "ms": 2405
+        },
+        "lado1": {
+          "aplicavel": true,
+          "ok": true,
+          "ms": 584
+        },
+        "lado2": {
+          "aplicavel": true,
+          "ok": true,
+          "ms": 571
+        },
+        "verdade": {
+          "aplicavel": true,
+          "ok": true,
+          "ms": 556
+        }
+      }
+    },
+    {
+      "tipo": "sintetico-e1",
+      "id": "E1-M9-F03",
+      "fatia": "M9-F03",
+      "base": "cae53205abebc6346b4cc0cf0975e77393d1a5cf",
+      "w1": "0f05ccc944e8740539b5309642d57ce51c89e3c8",
+      "w2": "a622aefab51548255c71bd9282ae45617595ad1f",
+      "verdade": "431aaeab118e33f5f12ad2f9edf609a74bfb4c5e",
+      "alvo": "src/shared/domain/context-pack.ts",
+      "specs": [
+        "src/shared/domain/context-pack.spec.ts"
+      ],
+      "conflitos": [
+        "src/shared/domain/context-pack.spec.ts",
+        "src/shared/domain/context-pack.ts"
+      ],
+      "hunks": 6,
+      "controle": {
+        "base": {
+          "aplicavel": true,
+          "ok": true,
+          "ms": 576
+        },
+        "lado1": {
+          "aplicavel": true,
+          "ok": true,
+          "ms": 578
+        },
+        "lado2": {
+          "aplicavel": true,
+          "ok": true,
+          "ms": 584
+        },
+        "verdade": {
+          "aplicavel": true,
+          "ok": true,
+          "ms": 558
+        }
+      }
+    },
+    {
+      "tipo": "sintetico-e1",
+      "id": "E1-M9-F04",
+      "fatia": "M9-F04",
+      "base": "9005423aa3f7421c4f63099f439f5a5d18791d2c",
+      "w1": "1051e25dbbc0718dfdeecdfe685333c7e27d1444",
+      "w2": "e7d5aa9a3f55f0c5dada14afde5fa3b933a85ee4",
+      "verdade": "abec68c1ab830ec23666d38da94e2e7e02c7f7d4",
+      "alvo": "src/shared/domain/preflight.ts",
+      "specs": [
+        "src/shared/domain/preflight.spec.ts"
+      ],
+      "conflitos": [
+        "src/shared/domain/preflight.spec.ts",
+        "src/shared/domain/preflight.ts"
+      ],
+      "hunks": 6,
+      "controle": {
+        "base": {
+          "aplicavel": true,
+          "ok": true,
+          "ms": 566
+        },
+        "lado1": {
+          "aplicavel": true,
+          "ok": true,
+          "ms": 560
+        },
+        "lado2": {
+          "aplicavel": true,
+          "ok": true,
+          "ms": 562
+        },
+        "verdade": {
+          "aplicavel": true,
+          "ok": true,
+          "ms": 565
+        }
+      }
+    },
+    {
+      "tipo": "sintetico-e1",
+      "id": "E1-M26-F01",
+      "fatia": "M26-F01",
+      "base": "4b52668191109fb5adc9f03deacc2fd265505103",
+      "w1": "864b462582432533947480d666fc5127ff11e2c5",
+      "w2": "8a94755be3281ea58e922df465a8c17c078715e8",
+      "verdade": "7483e85dd7472a2dc81c1e6bada3cebcec6d412e",
+      "alvo": "src/shared/domain/fase.ts",
+      "specs": [
+        "src/shared/domain/fase.spec.ts"
+      ],
+      "conflitos": [
+        "src/shared/domain/fase.spec.ts",
+        "src/shared/domain/fase.ts"
+      ],
+      "hunks": 6,
+      "controle": {
+        "base": {
+          "aplicavel": true,
+          "ok": true,
+          "ms": 606
+        },
+        "lado1": {
+          "aplicavel": true,
+          "ok": true,
+          "ms": 649
+        },
+        "lado2": {
+          "aplicavel": true,
+          "ok": true,
+          "ms": 589
+        },
+        "verdade": {
+          "aplicavel": true,
+          "ok": true,
+          "ms": 589
+        }
+      }
+    },
+    {
+      "tipo": "sintetico-e1",
+      "id": "E1-M26-F02",
+      "fatia": "M26-F02",
+      "base": "ca637516bbbc1e9b32aa88e2755aaef13da5849d",
+      "w1": "0d68d77bf9dce7469a4711507a9efec81e6f2973",
+      "w2": "a4a08d47e65cd7dbe6e964ded515bbc6cdb0d2ed",
+      "verdade": "71eff4ed9d8b458a57732de65443dcf3b7518d3c",
+      "alvo": "src/shared/domain/modelo-da-fase.ts",
+      "specs": [
+        "src/shared/domain/modelo-da-fase.spec.ts"
+      ],
+      "conflitos": [
+        "src/shared/domain/modelo-da-fase.spec.ts",
+        "src/shared/domain/modelo-da-fase.ts"
+      ],
+      "hunks": 6,
+      "controle": {
+        "base": {
+          "aplicavel": true,
+          "ok": true,
+          "ms": 619
+        },
+        "lado1": {
+          "aplicavel": true,
+          "ok": true,
+          "ms": 600
+        },
+        "lado2": {
+          "aplicavel": true,
+          "ok": true,
+          "ms": 558
+        },
+        "verdade": {
+          "aplicavel": true,
+          "ok": true,
+          "ms": 617
+        }
+      }
+    },
+    {
+      "tipo": "sintetico-e1",
+      "id": "E1-M26-F06",
+      "fatia": "M26-F06",
+      "base": "1067f65949a7729bd80d8328e2555bc75fd6d912",
+      "w1": "52dae54993159f88b11df0976dabbbc677e0186c",
+      "w2": "8fd8cacf4116d1e6cf5fb61eed0e415b599a7944",
+      "verdade": "7921783f0ae5c4e02fdcf4d4a8014db6d175eb2f",
+      "alvo": "src/shared/domain/rota-de-geracao.ts",
+      "specs": [
+        "src/shared/domain/rota-de-geracao.spec.ts"
+      ],
+      "conflitos": [
+        "src/shared/domain/rota-de-geracao.spec.ts",
+        "src/shared/domain/rota-de-geracao.ts"
+      ],
+      "hunks": 6,
+      "controle": {
+        "base": {
+          "aplicavel": true,
+          "ok": true,
+          "ms": 712
+        },
+        "lado1": {
+          "aplicavel": true,
+          "ok": true,
+          "ms": 575
+        },
+        "lado2": {
+          "aplicavel": true,
+          "ok": true,
+          "ms": 560
+        },
+        "verdade": {
+          "aplicavel": true,
+          "ok": true,
+          "ms": 592
+        }
+      }
+    }
+  ]
+}

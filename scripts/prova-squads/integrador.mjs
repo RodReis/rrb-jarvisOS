@@ -181,7 +181,7 @@ async function integrarArquivo(camada, texto) {
 }
 
 /** Árvore final = a do merge com os arquivos resolvidos trocados. */
-function arvoreFinal(arvoreDoMerge, resolvidos) {
+export function arvoreFinal(arvoreDoMerge, resolvidos) {
   const pasta = mkdtempSync(join(tmpdir(), 'integ-'))
   try {
     const env = { GIT_INDEX_FILE: join(pasta, 'index') }
@@ -197,7 +197,7 @@ function arvoreFinal(arvoreDoMerge, resolvidos) {
 }
 
 /** Roda os specs da fatia na árvore integrada, em worktree descartável com node_modules ligado. */
-function rodarSuite(arvore, specs) {
+export function rodarSuite(arvore, specs) {
   if (specs.length === 0) return { aplicavel: false }
   const commit = git(['commit-tree', arvore, '-m', 'integrado'], {
     env: {
@@ -329,7 +329,7 @@ export async function integrarCaso(camada, caso) {
   const suite =
     controle.aplicavel && !controle.ok
       ? { aplicavel: false, ambienteInvalido: true, saida: controle.saida }
-      : rodarSuite(arvore, specsDoCaso(caso))
+      : rodarSuite(arvore, caso.specs ?? specsDoCaso(caso))
 
   return {
     caso: caso.id,
@@ -341,6 +341,11 @@ export async function integrarCaso(camada, caso) {
     preservados: auditoria.preservados.length,
     descartadosComMotivo: auditoria.descartadosComMotivo.length,
     perdidosSemRegistro: auditoria.perdidosSemRegistro.map((h) => ({
+      id: h.id,
+      arquivo: h.arquivo,
+      adicionadas: h.adicionadas.slice(0, 3)
+    })),
+    naoResolvidos: auditoria.naoResolvidos.map((h) => ({
       id: h.id,
       arquivo: h.arquivo,
       adicionadas: h.adicionadas.slice(0, 3)

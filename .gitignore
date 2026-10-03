@@ -35,3 +35,7 @@ playwright-report
 
 # Estado local de skills de terceiros — não é fonte do projeto.
 .superpowers/
+
+# Diagnóstico e progresso das medições da prova (locais, descartáveis)
+reports/squads-prova-e1/.*
+reports/squads-prova/.*

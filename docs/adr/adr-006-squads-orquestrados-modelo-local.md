@@ -49,3 +49,7 @@ O plano antigo não acomoda (2) nem (3), e trata o planejador como caixa-preta.
 ## Nota pós-M11-F00 (PI, 2026-10-02)
 
 A prova da M11-F00 (PR [#372](https://github.com/RodReis/rrb-jarvisOS/pull/372)) reprovou o orquestrador local no critério de 80%. Pela regra 2 da SPEC-Squads-00, prevista nesta ADR (decisões 12 e 15), a **decisão 1 passa a valer assim até nova prova**: o orquestrador padrão é o **modelo da fase**, pela assinatura; o modelo local via adapter Ollama é opção do perfil, atrás do validador endurecido da SPEC-Squads-02 § Emenda E1. A F00-bis e a nova medição do integrador estão na M11-F00b ([#373](https://github.com/RodReis/rrb-jarvisOS/issues/373)); se o local atingir o critério, volta a ser o padrão. As demais decisões não mudam.
+
+## Nota pós-M11-F00b (Code registra em 2026-10-03; aceite do PI pendente)
+
+A reprova da M11-F00b (PR [#381](https://github.com/RodReis/rrb-jarvisOS/pull/381)), com instrumento corrigido e validador endurecido, **confirmou** a nota anterior: `hermes3:8b` 0/17 e `qwen3:8b` 3/17 dentro do limite de três tentativas, contra 17/17 do modelo da fase. A decisão 1 segue como está — o orquestrador padrão é o modelo da fase, e o local é opção. O mesmo vale para o integrador: a camada da fase passou os seis casos de código (zero hunk perdido, suíte verde); as camadas locais reprovaram (0/6 e 1/6). Para a M11-F04, o integrador roda na camada da fase.
