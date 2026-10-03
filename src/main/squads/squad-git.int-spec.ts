@@ -207,6 +207,81 @@ comGit('criar o worktree', () => {
   })
 })
 
+comGit('adotar o worktree que o Preflight criou', () => {
+  /** Cria o worktree como o Preflight cria: pelo Git direto, com o `autocrlf` desligado. */
+  function criarPorFora(nome: string, branch = `feat/${nome}`): string {
+    const caminho = join(appDir, `wt-${nome}`)
+    git(['-c', 'core.autocrlf=false', 'worktree', 'add', '-b', branch, caminho, baseSha])
+    return caminho
+  }
+
+  it('fixa o gitdir do host, e o worktree adotado funciona como o criado pelo kernel', () => {
+    const worktree = criarPorFora('a')
+
+    const r = squadGit.adotarWorktree({ repositorio: repo, worktree, branch: 'feat/a', baseSha })
+
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.valor.gitDir.replace(/\\/g, '/')).toContain('/.git/worktrees/')
+    writeFileSync(join(worktree, 'src', 'a.ts'), 'mudou\n')
+    expect(squadGit.alteracoes(r.valor)).toMatchObject({
+      ok: true,
+      valor: { caminhos: ['src/a.ts'] }
+    })
+    expect(squadGit.commitar(r.valor, 'tarefa t1', ['src/a.ts']).ok).toBe(true)
+  })
+
+  it('recusa o worktree que não está na base declarada', () => {
+    const worktree = criarPorFora('a')
+    writeFileSync(join(worktree, 'novo.ts'), 'x\n')
+    git(['add', '-A'], worktree)
+    git(['commit', '-m', 'adiantado'], worktree)
+
+    const r = squadGit.adotarWorktree({ repositorio: repo, worktree, branch: 'feat/a', baseSha })
+
+    expect(r).toEqual({ ok: false, motivo: 'o worktree não está na base declarada' })
+  })
+
+  it('recusa o worktree que está em outra branch', () => {
+    const worktree = criarPorFora('a')
+
+    const r = squadGit.adotarWorktree({
+      repositorio: repo,
+      worktree,
+      branch: 'feat/outra',
+      baseSha
+    })
+
+    expect(r).toEqual({ ok: false, motivo: 'o worktree não está na branch declarada' })
+  })
+
+  it('recusa o diretório que não é worktree deste repositório', () => {
+    const outro = join(appDir, 'outro-repo')
+    mkdirSync(outro, { recursive: true })
+    git(['init', '--initial-branch=main'], outro)
+
+    const r = squadGit.adotarWorktree({
+      repositorio: repo,
+      worktree: outro,
+      branch: 'main',
+      baseSha
+    })
+
+    expect(r.ok).toBe(false)
+  })
+
+  it('recusa entrada malformada antes de rodar Git', () => {
+    for (const ruim of [
+      { repositorio: repo, worktree: 'relativo', branch: 'feat/a', baseSha },
+      { repositorio: 'relativo', worktree: join(appDir, 'wt-x'), branch: 'feat/a', baseSha },
+      { repositorio: repo, worktree: join(appDir, 'wt-x'), branch: '-D', baseSha },
+      { repositorio: repo, worktree: join(appDir, 'wt-x'), branch: 'feat/a', baseSha: 'HEAD' }
+    ]) {
+      expect(squadGit.adotarWorktree(ruim).ok).toBe(false)
+    }
+  })
+})
+
 comGit('diff por worktree — a prova de escopo (critério 2)', () => {
   it('cada escritor só vê o que fez no seu worktree', () => {
     const a = criar('a')
@@ -719,6 +794,15 @@ describe('a leitura recusa a entrada inválida sem chegar a rodar Git', () => {
     expect(isolado.listarNaRevisao(repo, 'HEAD').ok).toBe(false)
     expect(isolado.buscarNaRevisao('relativo', baseSha, 'alvo', ['src']).ok).toBe(false)
     expect(isolado.buscarNaRevisao(repo, 'HEAD', 'alvo', ['src']).ok).toBe(false)
+    const worktree = join(appDir, 'wt-x')
+    for (const ruim of [
+      { repositorio: repo, worktree: 'relativo', branch: 'feat/a', baseSha },
+      { repositorio: 'relativo', worktree, branch: 'feat/a', baseSha },
+      { repositorio: repo, worktree, branch: '-D', baseSha },
+      { repositorio: repo, worktree, branch: 'feat/a', baseSha: 'HEAD' }
+    ]) {
+      expect(isolado.adotarWorktree(ruim).ok).toBe(false)
+    }
 
     expect(chamadas).toBe(0)
   })

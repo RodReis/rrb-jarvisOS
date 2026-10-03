@@ -137,6 +137,44 @@ export class SquadGit {
     )
     if (!criado.ok) return recusa(criado.motivo)
 
+    return this.fixarGitDir(pedido)
+  }
+
+  /**
+   * Adota um worktree que **outro** criou — o `PreflightService`, que prepara o sandbox do
+   * escritor — e fixa o gitdir do host. Tem de rodar **antes** de o agente executar: é só nesse
+   * instante que o `.git` do worktree ainda é de confiança. O worktree adotado precisa estar na
+   * base e na branch que o chamador diz, e sob o `.git` do repositório dele.
+   */
+  adotarWorktree(pedido: {
+    readonly repositorio: string
+    readonly worktree: string
+    readonly branch: string
+    readonly baseSha: string
+  }): ResultadoGit<WorktreeDeEscritor> {
+    const invalido = this.validarCriacao(pedido)
+    if (invalido !== undefined) return recusa(invalido)
+
+    const adotado = this.fixarGitDir(pedido)
+    if (!adotado.ok) return adotado
+
+    const cabeca = this.noWorktree(adotado.valor, ['rev-parse', 'HEAD'])
+    if (!cabeca.ok) return recusa(cabeca.motivo)
+    if (cabeca.saida !== pedido.baseSha) return recusa('o worktree não está na base declarada')
+
+    const ramo = this.noWorktree(adotado.valor, ['rev-parse', '--abbrev-ref', 'HEAD'])
+    if (!ramo.ok) return recusa(ramo.motivo)
+    if (ramo.saida !== pedido.branch) return recusa('o worktree não está na branch declarada')
+    return adotado
+  }
+
+  /** Lê o gitdir do worktree e confirma que ele mora sob o `.git` do repositório. */
+  private fixarGitDir(pedido: {
+    readonly repositorio: string
+    readonly worktree: string
+    readonly branch: string
+    readonly baseSha: string
+  }): ResultadoGit<WorktreeDeEscritor> {
     // Lido agora, antes de o agente rodar: depois disso o `.git` do worktree não é de confiança.
     const gitDir = this.executar(['rev-parse', '--absolute-git-dir'], pedido.worktree)
     if (!gitDir.ok) return recusa(gitDir.motivo)
