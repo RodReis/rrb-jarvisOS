@@ -2349,7 +2349,7 @@ Terceira e última das entregas verticais planejadas para esta fatia. Na `main` 
 Status: **em andamento** — issue [#124](https://github.com/RodReis/rrb-jarvisOS/issues/124), puxada pelo PI em 2026-10-02 com a F00b ([#373](https://github.com/RodReis/rrb-jarvisOS/issues/373)) ainda aberta. Decisões do PI (slot por escritor, agente com ferramentas no container, workers só com ContextPack) registradas na SPEC.
 
 - [x] **1. Núcleo puro da execução** (`src/shared/domain/squad-execucao.ts`): ids e nomes injetivos por escritor, estados terminais, leitor estrito do resultado (conclusão, evidência, confiança, lacunas, assinatura) com "incompleto" quando falta evidência.
-- [ ] **2. Git por intenção** (`src/main/squads/squad-git.ts`): worktree por escritor, commit do kernel sem hook, diff e status por worktree, remoção sem `--force`; provado com Git real e com o `TerminalEngine` real.
+- [x] **2. Git por intenção** (`src/main/squads/squad-git.ts`): worktree por escritor, commit do kernel sem hook, diff e status por worktree, remoção sem `--force`; provado com Git real e com o `TerminalEngine` real.
 - [ ] **3. Slot por escritor**: item `<runId>:<escritor>` no pool, irmãos sem prova entre si, o primeiro escritor leva o run a `RUNNING`, token por escritor.
 - [ ] **4. ContextPack por tarefa**: raiz parametrizável (worktree), `realpath`, fontes justificadas com hash e revisão, busca estrutural/grep controlada.
 - [ ] **5. Workers sem ferramentas**: execução pelo ponto único de IA com isolamento, saída por schema, limites de tempo e cancelamento.
