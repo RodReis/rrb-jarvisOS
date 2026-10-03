@@ -83,40 +83,48 @@ export class SandboxDoEscritorReal implements SandboxDoEscritor {
       tentativa: pedido.tentativa,
       contextPackId: pedido.contextPackId
     })
-    const preflight = this.deps.preflight.preparar({
-      runId: unidade,
-      projectId: pedido.projectId,
-      sliceId: pedido.sliceId,
-      raizOperacional: this.deps.raizOperacional(),
-      repositorio: pedido.repositorio,
-      base: pedido.baseSha,
-      pathsDaSpec: pedido.pathsPermitidos,
-      proxyUrl: this.deps.proxyUrl(),
-      sufixoDaBranch: sufixoDoSandbox(pedido),
-      caminhoDoProxy: rota.caminho
-    })
-    const sandbox = preflight.sandbox
-    if (preflight.reason !== 'liberado' || sandbox === undefined) {
-      this.deps.proxy.liberarUnidade(rota.chave)
-      return { ok: false, motivo: `${preflight.reason}: ${preflight.mensagem}` }
-    }
+    let sandbox: SandboxPreparado | undefined
+    try {
+      const preflight = this.deps.preflight.preparar({
+        runId: unidade,
+        projectId: pedido.projectId,
+        sliceId: pedido.sliceId,
+        raizOperacional: this.deps.raizOperacional(),
+        repositorio: pedido.repositorio,
+        base: pedido.baseSha,
+        pathsDaSpec: pedido.pathsPermitidos,
+        proxyUrl: this.deps.proxyUrl(),
+        sufixoDaBranch: sufixoDoSandbox(pedido),
+        caminhoDoProxy: rota.caminho
+      })
+      sandbox = preflight.sandbox
+      if (preflight.reason !== 'liberado' || sandbox === undefined) {
+        this.deps.proxy.liberarUnidade(rota.chave)
+        return { ok: false, motivo: `${preflight.reason}: ${preflight.mensagem}` }
+      }
 
-    const adotado = this.deps.git.adotarWorktree({
-      repositorio: pedido.repositorio,
-      worktree: sandbox.worktreeNoHost,
-      branch: sandbox.branch,
-      baseSha: sandbox.baseSha
-    })
-    if (!adotado.ok) {
-      // O container já subiu: sem adotar o worktree o escritor não roda, e o container não fica.
-      this.parar(sandbox)
-      this.deps.proxy.liberarUnidade(rota.chave)
-      return { ok: false, motivo: `worktree-nao-adotado: ${adotado.motivo}` }
-    }
+      const adotado = this.deps.git.adotarWorktree({
+        repositorio: pedido.repositorio,
+        worktree: sandbox.worktreeNoHost,
+        branch: sandbox.branch,
+        baseSha: sandbox.baseSha
+      })
+      if (!adotado.ok) {
+        // O container já subiu: sem adotar o worktree o escritor não roda, e o container não fica.
+        this.parar(sandbox)
+        this.deps.proxy.liberarUnidade(rota.chave)
+        return { ok: false, motivo: `worktree-nao-adotado: ${adotado.motivo}` }
+      }
 
-    this.porUnidade.set(unidade, { sandbox, chave: rota.chave })
-    this.porWorktree.set(sandbox.worktreeNoHost, sandbox)
-    return { ok: true, worktree: adotado.valor }
+      this.porUnidade.set(unidade, { sandbox, chave: rota.chave })
+      this.porWorktree.set(sandbox.worktreeNoHost, sandbox)
+      return { ok: true, worktree: adotado.valor }
+    } catch (erro) {
+      // Quem não entrou em `porUnidade` não passa pelo `encerrar`: a chave e o container sobrariam.
+      if (sandbox !== undefined) this.parar(sandbox)
+      this.deps.proxy.liberarUnidade(rota.chave)
+      return { ok: false, motivo: `erro-no-sandbox: ${erro instanceof Error ? erro.name : 'erro'}` }
+    }
   }
 
   /** O container que atende o worktree do escritor, ou `undefined` se ele não é de um sandbox vivo. */

@@ -208,6 +208,36 @@ describe('preparar', () => {
   })
 })
 
+describe('preparar que lança', () => {
+  it('o Preflight lançar devolve ok:false e libera a chave do proxy — a unidade não vaza', async () => {
+    const { sandbox, liberadas } = montar({
+      preflight: () => {
+        throw new TypeError('docker sumiu')
+      }
+    })
+
+    const r = await sandbox.preparar(PEDIDO)
+
+    expect(r).toEqual({ ok: false, motivo: 'erro-no-sandbox: TypeError' })
+    expect(liberadas).toEqual(['chave-1'])
+  })
+
+  it('adotar lançar com o container já no ar para o container e libera a chave', async () => {
+    const { sandbox, liberadas, parados } = montar({
+      adotar: vi.fn(() => {
+        throw new Error('git caiu')
+      })
+    })
+
+    const r = await sandbox.preparar(PEDIDO)
+
+    expect(r).toEqual({ ok: false, motivo: 'erro-no-sandbox: Error' })
+    expect(liberadas).toEqual(['chave-1'])
+    expect(parados).toEqual([['jarvisos-run-run-1-api-tar-1-t1', '/raiz']])
+    expect(sandbox.containerDe('/raiz/jarvisos-run-run-1-api-tar-1-t1')).toBeUndefined()
+  })
+})
+
 describe('a unidade no proxy (SPEC-Squads-03, critério 5)', () => {
   it('registra o run, a tentativa e o pack da unidade antes de subir o container', async () => {
     const { sandbox, registrados, preparados } = montar()
