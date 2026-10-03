@@ -2342,6 +2342,21 @@ Terceira e última das entregas verticais planejadas para esta fatia. Na `main` 
 
 **Instabilidade observada, e não é regressão.** Com cobertura ligada e a máquina carregada, `github-automacao.int-spec.ts` apareceu com 32 e depois 50 testes em `pending` — o arquivo sobe um servidor HTTP em porta efêmera. Isolado passa; três execuções seguintes da categoria deram 1208 aprovados e zero pendentes, de forma idêntica. Os números do relatório são os da execução limpa.
 
+## MVP-011 — Squads orquestrados
+
+### Fatia 03 — Workers somente-leitura e escritores isolados (`docs/spec/spec-squads-03-workers-isolados.md`)
+
+Status: **em andamento** — issue [#124](https://github.com/RodReis/rrb-jarvisOS/issues/124), puxada pelo PI em 2026-10-02 com a F00b ([#373](https://github.com/RodReis/rrb-jarvisOS/issues/373)) ainda aberta. Decisões do PI (slot por escritor, agente com ferramentas no container, workers só com ContextPack) registradas na SPEC.
+
+- [ ] **1. Núcleo puro da execução** (`src/shared/domain/squad-execucao.ts`): ids e nomes injetivos por escritor, estados terminais, leitor estrito do resultado (conclusão, evidência, confiança, lacunas, assinatura) com "incompleto" quando falta evidência.
+- [ ] **2. Git por intenção** (`src/main/squads/squad-git.ts`): worktree por escritor, commit do kernel sem hook, diff e status por worktree, remoção sem `--force`; provado com Git real e com o `TerminalEngine` real.
+- [ ] **3. Slot por escritor**: item `<runId>:<escritor>` no pool, irmãos sem prova entre si, o primeiro escritor leva o run a `RUNNING`, token por escritor.
+- [ ] **4. ContextPack por tarefa**: raiz parametrizável (worktree), `realpath`, fontes justificadas com hash e revisão, busca estrutural/grep controlada.
+- [ ] **5. Workers sem ferramentas**: execução pelo ponto único de IA com isolamento, saída por schema, limites de tempo e cancelamento.
+- [ ] **6. Escritor no container**: unidade de sandbox por escritor sobre o Preflight, agente sem Bash, diff por worktree, commit do kernel, heartbeat e fencing.
+- [ ] **7. Orquestrador do Squad**: DAG de tarefas, N workers, dois escritores com pool cheio, sessão e segredo por unidade, estados terminais auditados.
+- [ ] **8. Revisões independentes, relatório, PR.**
+
 ## Registro de entregas
 
 | Data | Fatia | PR | Observação |
