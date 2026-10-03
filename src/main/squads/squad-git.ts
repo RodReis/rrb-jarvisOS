@@ -20,6 +20,7 @@
 import { lstatSync } from 'node:fs'
 import { isAbsolute, join, resolve, sep } from 'node:path'
 import type { WorkspaceId } from '@shared/domain/entities'
+import { ehControleOuDirecao } from '@shared/domain/squad-plano'
 import { GitRunner } from '../projects/git-runner'
 
 export interface WorktreeDeEscritor {
@@ -44,6 +45,19 @@ export interface AlteracoesDoWorktree {
   readonly simbolicos: readonly string[]
 }
 
+/** Um arquivo regular da árvore de uma revisão: o oid identifica o conteúdo, e é por ele que se lê. */
+export interface ArquivoNaRevisao {
+  readonly caminho: string
+  readonly oid: string
+  readonly bytes: number
+}
+
+export interface OcorrenciaDeBusca {
+  readonly caminho: string
+  /** A linha, a partir de 1. */
+  readonly linha: number
+}
+
 export interface DependenciasDoSquadGit {
   readonly git: Pick<GitRunner, 'run'>
   readonly workspaceId: () => WorkspaceId
@@ -56,8 +70,15 @@ export const IDENTIDADE_DO_KERNEL = {
 } as const
 
 const SHA = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/
+/** `<modo> <tipo> <oid> <tamanho>\t<caminho>`: a saída de `ls-tree -l -z`. */
+const LINHA_DA_ARVORE = /^(\d{6}) (\w+) ([0-9a-f]{40,64}) +(\d+|-)\t([\s\S]+)$/
+/** Arquivo comum: não é link simbólico (120000) nem submódulo (160000). */
+const MODOS_DE_ARQUIVO_COMUM = ['100644', '100755']
 const BRANCH = /^[A-Za-z0-9][A-Za-z0-9._/-]{0,99}$/
 const COMMIT_POR_LOTE = 100
+const MAX_TERMO_DE_BUSCA = 200
+/** O teto de ocorrências devolvidas: uma busca que casa tudo não vira contexto. */
+export const MAX_OCORRENCIAS_DA_BUSCA = 500
 const MAX_MENSAGEM = 200
 
 /** Onde um hook do repositório deixaria de existir: o caminho nulo do sistema. */
@@ -79,7 +100,16 @@ const CONFIG_DO_KERNEL = [
   'core.autocrlf=false'
 ] as const
 
+type SaidaDoGit =
+  | { readonly ok: true; readonly saida: string; readonly bruto: string }
+  | { readonly ok: false; readonly motivo: string; readonly codigo: number | null }
+
 const recusa = (motivo: string): { ok: false; motivo: string } => ({ ok: false, motivo })
+
+/** Controle e override de direção: nada disso é texto de busca legítimo. */
+function temControle(texto: string): boolean {
+  return Array.from(texto).some((ch) => ehControleOuDirecao(ch.codePointAt(0) ?? 0))
+}
 
 function caminhoRelativoSeguro(caminho: string): boolean {
   if (caminho === '' || isAbsolute(caminho) || caminho.startsWith('-')) return false
@@ -203,6 +233,90 @@ export class SquadGit {
     return recusa(/modified or untracked/i.test(r.motivo) ? 'worktree-sujo' : r.motivo)
   }
 
+  // ─── leitura de uma revisão ───────────────────────────────────────────────────────────────────
+  //
+  // O contexto da tarefa sai **de uma revisão do Git**, não do disco. O SHA é imutável, e o conteúdo
+  // é lido pelo oid do blob — não há caminho para o agente trocar por um link simbólico, nem janela
+  // entre "o arquivo existe" e "li o arquivo". Roda no repositório do projeto (confiável), nunca no
+  // worktree do agente.
+
+  /**
+   * Os arquivos regulares da árvore da revisão, por caminho. Link simbólico e submódulo ficam de
+   * fora: ler o blob de um link devolveria o texto do destino, não um arquivo.
+   */
+  listarNaRevisao(
+    repositorio: string,
+    revisao: string
+  ): ResultadoGit<ReadonlyMap<string, ArquivoNaRevisao>> {
+    if (!SHA.test(revisao)) return recusa('revisão inválida')
+    if (!isAbsolute(repositorio)) return recusa('o repositório precisa ser um caminho absoluto')
+
+    const r = this.executar(['ls-tree', '-r', '-z', '-l', revisao], repositorio, true)
+    if (!r.ok) return recusa(r.motivo)
+
+    const arquivos = new Map<string, ArquivoNaRevisao>()
+    for (const registro of partir(r.bruto)) {
+      const lido = LINHA_DA_ARVORE.exec(registro)
+      if (lido === null) continue
+      const [, modo, , oid, tamanho, caminho] = lido
+      if (!MODOS_DE_ARQUIVO_COMUM.includes(modo)) continue
+      arquivos.set(caminho, { caminho, oid, bytes: Number(tamanho) })
+    }
+    return { ok: true, valor: arquivos }
+  }
+
+  /** O texto do arquivo, lido pelo oid. Binário é recusa: contexto é texto. */
+  lerNaRevisao(repositorio: string, arquivo: ArquivoNaRevisao): ResultadoGit<string> {
+    if (!SHA.test(arquivo.oid)) return recusa('oid inválido')
+    if (!isAbsolute(repositorio)) return recusa('o repositório precisa ser um caminho absoluto')
+
+    const r = this.executar(['cat-file', 'blob', arquivo.oid], repositorio, true)
+    if (!r.ok) return recusa(r.motivo)
+    if (r.bruto.includes('\0')) return recusa('arquivo-binario')
+    return { ok: true, valor: r.bruto }
+  }
+
+  /**
+   * Busca literal na revisão, **só dentro dos caminhos dados** — sem escopo a busca varreria o
+   * repositório inteiro, e leitura ampla é decisão do PI, não do kernel (ContextPack). Sem
+   * ocorrência é lista vazia, não erro: o `git grep` sai com 1 e sem mensagem.
+   */
+  buscarNaRevisao(
+    repositorio: string,
+    revisao: string,
+    termo: string,
+    caminhos: readonly string[]
+  ): ResultadoGit<readonly OcorrenciaDeBusca[]> {
+    if (!SHA.test(revisao)) return recusa('revisão inválida')
+    if (!isAbsolute(repositorio)) return recusa('o repositório precisa ser um caminho absoluto')
+    if (termo.trim() === '' || termo.length > MAX_TERMO_DE_BUSCA || temControle(termo)) {
+      return recusa('termo de busca inválido')
+    }
+    if (caminhos.length === 0) return recusa('a busca precisa de um escopo de caminhos')
+    if (!caminhos.every(caminhoRelativoSeguro)) return recusa('caminho inválido no escopo da busca')
+
+    const r = this.executar(
+      ['--literal-pathspecs', 'grep', '-n', '-F', '-z', '-e', termo, revisao, '--', ...caminhos],
+      repositorio,
+      true
+    )
+    if (!r.ok) {
+      return r.codigo === 1 ? { ok: true, valor: [] } : recusa(r.motivo)
+    }
+
+    const prefixo = `${revisao}:`
+    const ocorrencias: OcorrenciaDeBusca[] = []
+    for (const registro of r.bruto.split('\n')) {
+      const [origem, linha] = registro.split('\0')
+      if (origem === undefined || linha === undefined || !origem.startsWith(prefixo)) continue
+      const numero = Number(linha)
+      if (!Number.isInteger(numero) || numero < 1) continue
+      ocorrencias.push({ caminho: origem.slice(prefixo.length), linha: numero })
+      if (ocorrencias.length >= MAX_OCORRENCIAS_DA_BUSCA) break
+    }
+    return { ok: true, valor: ocorrencias }
+  }
+
   // ─── execução ─────────────────────────────────────────────────────────────────────────────────
 
   private validarCriacao(p: {
@@ -222,10 +336,7 @@ export class SquadGit {
   }
 
   /** Um comando no worktree, com o gitdir do host e a configuração do kernel. */
-  private noWorktree(
-    w: WorktreeDeEscritor,
-    args: readonly string[]
-  ): { ok: true; saida: string; bruto: string } | { ok: false; motivo: string } {
+  private noWorktree(w: WorktreeDeEscritor, args: readonly string[]): SaidaDoGit {
     return this.executar(
       ['--git-dir', w.gitDir, '--work-tree', w.worktree, ...args],
       w.worktree,
@@ -233,16 +344,18 @@ export class SquadGit {
     )
   }
 
-  private executar(
-    args: readonly string[],
-    cwd: string,
-    semAuditarSaida = false
-  ): { ok: true; saida: string; bruto: string } | { ok: false; motivo: string } {
+  private executar(args: readonly string[], cwd: string, semAuditarSaida = false): SaidaDoGit {
     const r = this.deps.git.run([...CONFIG_DO_KERNEL, ...args], cwd, this.deps.workspaceId(), {
       // A lista de arquivos é conteúdo do projeto: não vai para a trilha de auditoria.
       saidaEhConteudo: semAuditarSaida
     })
-    if (!r.ok) return { ok: false, motivo: GitRunner.explicarFalha(r.execucao) }
+    if (!r.ok) {
+      return {
+        ok: false,
+        motivo: GitRunner.explicarFalha(r.execucao),
+        codigo: r.execucao.exitCode
+      }
+    }
     return { ok: true, saida: r.saida, bruto: r.execucao.stdout }
   }
 }

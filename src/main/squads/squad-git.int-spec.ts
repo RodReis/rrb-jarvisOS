@@ -37,7 +37,7 @@ const { ExecutionRepository } = await import('../execution/execution-repository'
 const { ApprovalRepository } = await import('../execution/approval-repository')
 const { TerminalEngine } = await import('../execution/terminal-engine')
 const { GitRunner } = await import('../projects/git-runner')
-const { SquadGit, IDENTIDADE_DO_KERNEL } = await import('./squad-git')
+const { SquadGit, IDENTIDADE_DO_KERNEL, MAX_OCORRENCIAS_DA_BUSCA } = await import('./squad-git')
 
 const USER = 'u-1'
 
@@ -506,6 +506,253 @@ comGit('remover — sem --force', () => {
     expect(r.ok).toBe(false)
     expect(r.execucao.state).not.toBe('concluido')
     expect(existsSync(w.worktree)).toBe(true)
+  })
+})
+
+comGit('ler uma revisão — o contexto da tarefa sai do Git, não do disco', () => {
+  /** Commita no repositório principal e devolve o SHA. */
+  function commitar(arquivos: Record<string, string>): string {
+    for (const [caminho, conteudo] of Object.entries(arquivos)) {
+      mkdirSync(join(repo, caminho, '..'), { recursive: true })
+      writeFileSync(join(repo, caminho), conteudo)
+    }
+    git(['add', '-A'])
+    git(['commit', '-m', 'mais arquivos'])
+    return git(['rev-parse', 'HEAD'])
+  }
+
+  it('lista os arquivos regulares com oid e tamanho, e deixa link e submódulo de fora', () => {
+    const oidDoLink = execFileSync('git', ['hash-object', '-w', '--stdin'], {
+      cwd: repo,
+      input: 'src/a.ts',
+      encoding: 'utf8'
+    }).trim()
+    git(['update-index', '--add', '--cacheinfo', `120000,${oidDoLink},atalho.ts`])
+    git(['update-index', '--add', '--cacheinfo', `160000,${baseSha},submodulo`])
+    git(['commit', '-m', 'link e submódulo'])
+    const sha = git(['rev-parse', 'HEAD'])
+
+    const r = squadGit.listarNaRevisao(repo, sha)
+
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect([...r.valor.keys()].sort()).toEqual(['.gitignore', 'README.md', 'src/a.ts', 'src/b.ts'])
+    const a = r.valor.get('src/a.ts')
+    expect(a?.bytes).toBe('export const a = 1\n'.length)
+    expect(a?.oid).toBe(git(['rev-parse', `${sha}:src/a.ts`]))
+  })
+
+  it('espaço e acento no nome chegam inteiros', () => {
+    const sha = commitar({ 'docs/Relatório final.md': 'x\n' })
+
+    const r = squadGit.listarNaRevisao(repo, sha)
+
+    expect(r.ok && r.valor.has('docs/Relatório final.md')).toBe(true)
+  })
+
+  it('o arquivo executável também é regular', () => {
+    mkdirSync(join(repo, 'bin'), { recursive: true })
+    writeFileSync(join(repo, 'bin', 'run.sh'), '#!/bin/sh\n')
+    git(['add', '-A'])
+    git(['update-index', '--chmod=+x', 'bin/run.sh'])
+    git(['commit', '-m', 'exec'])
+
+    const r = squadGit.listarNaRevisao(repo, git(['rev-parse', 'HEAD']))
+
+    expect(r.ok && r.valor.has('bin/run.sh')).toBe(true)
+  })
+
+  it('recusa revisão e repositório malformados antes de rodar Git', () => {
+    for (const ruim of ['HEAD', 'main', baseSha.slice(0, 7), '', `${baseSha}; rm -rf`]) {
+      expect(squadGit.listarNaRevisao(repo, ruim).ok).toBe(false)
+    }
+    expect(squadGit.listarNaRevisao('relativo', baseSha).ok).toBe(false)
+  })
+
+  it('lê o texto pelo oid: o que mudou no disco depois não entra', () => {
+    const arquivo = squadGit.listarNaRevisao(repo, baseSha)
+    if (!arquivo.ok) throw new Error('listagem falhou')
+    const a = arquivo.valor.get('src/a.ts')
+    if (a === undefined) throw new Error('src/a.ts ausente')
+    writeFileSync(join(repo, 'src', 'a.ts'), 'ADULTERADO\n')
+
+    const r = squadGit.lerNaRevisao(repo, a)
+
+    expect(r).toEqual({ ok: true, valor: 'export const a = 1\n' })
+  })
+
+  it('arquivo binário é recusa, e oid malformado também', () => {
+    writeFileSync(join(repo, 'bin.dat'), Buffer.from([0x62, 0x69, 0x6e, 0x00, 0x66]))
+    git(['add', '-A'])
+    git(['commit', '-m', 'binario'])
+    const listado = squadGit.listarNaRevisao(repo, git(['rev-parse', 'HEAD']))
+    if (!listado.ok) throw new Error('listagem falhou')
+    const bin = listado.valor.get('bin.dat')
+    if (bin === undefined) throw new Error('bin.dat ausente')
+
+    expect(squadGit.lerNaRevisao(repo, bin)).toEqual({ ok: false, motivo: 'arquivo-binario' })
+    expect(squadGit.lerNaRevisao(repo, { ...bin, oid: 'xyz' }).ok).toBe(false)
+    expect(squadGit.lerNaRevisao('relativo', bin).ok).toBe(false)
+  })
+
+  it('o conteúdo lido não vai para a trilha de auditoria', () => {
+    const sha = commitar({ 'src/segredinho.ts': 'conteudo-unico-abc123\n' })
+    const listado = squadGit.listarNaRevisao(repo, sha)
+    if (!listado.ok) throw new Error('listagem falhou')
+    const arquivo = listado.valor.get('src/segredinho.ts')
+    if (arquivo === undefined) throw new Error('arquivo ausente')
+
+    expect(squadGit.lerNaRevisao(repo, arquivo).ok).toBe(true)
+
+    const linhas = db
+      .prepare("SELECT payload FROM audit_event WHERE type = 'terminal-command'")
+      .all() as { payload: string }[]
+    expect(linhas.some((l) => l.payload.includes('conteudo-unico-abc123'))).toBe(false)
+  })
+
+  describe('busca literal', () => {
+    it('acha as ocorrências, com caminho e linha, só no escopo pedido', () => {
+      const sha = commitar({
+        'src/c.ts': 'um\nalvo aqui\ntres\nalvo de novo\n',
+        'docs/d.md': 'alvo fora do escopo\n'
+      })
+
+      const r = squadGit.buscarNaRevisao(repo, sha, 'alvo', ['src'])
+
+      expect(r).toEqual({
+        ok: true,
+        valor: [
+          { caminho: 'src/c.ts', linha: 2 },
+          { caminho: 'src/c.ts', linha: 4 }
+        ]
+      })
+    })
+
+    it('é literal: o ponto e o asterisco não são regex', () => {
+      const sha = commitar({ 'src/c.ts': 'a.b\naxb\na*b\n' })
+
+      expect(squadGit.buscarNaRevisao(repo, sha, 'a.b', ['src'])).toEqual({
+        ok: true,
+        valor: [{ caminho: 'src/c.ts', linha: 1 }]
+      })
+      expect(squadGit.buscarNaRevisao(repo, sha, 'a*b', ['src'])).toEqual({
+        ok: true,
+        valor: [{ caminho: 'src/c.ts', linha: 3 }]
+      })
+    })
+
+    it('sem ocorrência é lista vazia, não erro', () => {
+      expect(squadGit.buscarNaRevisao(repo, baseSha, 'nao-existe-xyz', ['src'])).toEqual({
+        ok: true,
+        valor: []
+      })
+    })
+
+    it('ignora arquivo binário', () => {
+      writeFileSync(join(repo, 'src', 'bin.dat'), Buffer.from('alvo\0binario'))
+      git(['add', '-A'])
+      git(['commit', '-m', 'binario'])
+
+      const r = squadGit.buscarNaRevisao(repo, git(['rev-parse', 'HEAD']), 'alvo', ['src'])
+
+      expect(r).toEqual({ ok: true, valor: [] })
+    })
+
+    it('o escopo é caminho literal: um glob não amplia a busca', () => {
+      const sha = commitar({ 'src/c.ts': 'alvo\n', 'docs/d.md': 'alvo\n' })
+
+      const r = squadGit.buscarNaRevisao(repo, sha, 'alvo', ['*'])
+
+      expect(r).toEqual({ ok: true, valor: [] })
+    })
+
+    it('recusa termo, escopo e revisão inválidos antes de rodar Git', () => {
+      const nul = String.fromCharCode(0)
+      for (const [termo, caminhos] of [
+        ['', ['src']],
+        ['  ', ['src']],
+        ['x'.repeat(201), ['src']],
+        [`a${nul}b`, ['src']],
+        ['alvo', []],
+        ['alvo', ['../fora']],
+        ['alvo', ['/abs']],
+        ['alvo', ['-f']]
+      ] as const) {
+        expect(squadGit.buscarNaRevisao(repo, baseSha, termo, caminhos).ok).toBe(false)
+      }
+      expect(squadGit.buscarNaRevisao(repo, 'HEAD', 'alvo', ['src']).ok).toBe(false)
+      expect(squadGit.buscarNaRevisao('relativo', baseSha, 'alvo', ['src']).ok).toBe(false)
+    })
+
+    it('uma busca que casa tudo é cortada no teto', () => {
+      const sha = commitar({ 'src/muito.ts': 'alvo\n'.repeat(MAX_OCORRENCIAS_DA_BUSCA + 50) })
+
+      const r = squadGit.buscarNaRevisao(repo, sha, 'alvo', ['src/muito.ts'])
+
+      expect(r.ok && r.valor.length).toBe(MAX_OCORRENCIAS_DA_BUSCA)
+    })
+  })
+})
+
+describe('a leitura recusa a entrada inválida sem chegar a rodar Git', () => {
+  it('nenhuma chamada ao Git acontece para o que o kernel já sabe ser inválido', () => {
+    let chamadas = 0
+    const git = {
+      run: () => {
+        chamadas += 1
+        return {
+          ok: true,
+          saida: '',
+          execucao: { state: 'concluido', stdout: '', stderr: '' } as never
+        }
+      }
+    }
+    const isolado = new SquadGit({ git, workspaceId: () => 'jarvis' })
+    const arquivo = { caminho: 'x', oid: baseSha, bytes: 1 }
+
+    for (const caminhos of [[], ['../fora'], ['/abs'], ['-f'], ['src', '..']]) {
+      expect(isolado.buscarNaRevisao(repo, baseSha, 'alvo', caminhos).ok).toBe(false)
+    }
+    expect(isolado.lerNaRevisao(repo, { ...arquivo, oid: 'xyz' }).ok).toBe(false)
+    expect(isolado.lerNaRevisao('relativo', arquivo).ok).toBe(false)
+    expect(isolado.listarNaRevisao('relativo', baseSha).ok).toBe(false)
+    expect(isolado.listarNaRevisao(repo, 'HEAD').ok).toBe(false)
+    expect(isolado.buscarNaRevisao('relativo', baseSha, 'alvo', ['src']).ok).toBe(false)
+    expect(isolado.buscarNaRevisao(repo, 'HEAD', 'alvo', ['src']).ok).toBe(false)
+
+    expect(chamadas).toBe(0)
+  })
+})
+
+describe('o parser da busca não confia na saída do Git', () => {
+  /** Um Git de mentira que devolve a saída pronta — para o que o Git real nunca produziria. */
+  function comSaida(stdout: string) {
+    const git = {
+      run: () => ({
+        ok: true,
+        saida: stdout,
+        execucao: { state: 'concluido', stdout, stderr: '' } as never
+      })
+    }
+    return new SquadGit({ git, workspaceId: () => 'jarvis' })
+  }
+
+  it('pula o registro sem o prefixo da revisão e o de número de linha inválido', () => {
+    const sha = baseSha
+    const saida = [
+      `${sha}:src/ok.ts\0 7\0texto`,
+      'lixo sem separador',
+      `${'0'.repeat(40)}:src/outra-revisao.ts\0 3\0texto`,
+      `${sha}:src/zero.ts\0 0\0texto`,
+      `${sha}:src/negativa.ts\0-2\0texto`,
+      `${sha}:src/decimal.ts\0 1.5\0texto`,
+      `${sha}:src/letra.ts\0x\0texto`,
+      `${sha}:src/sem-linha.ts`
+    ].join('\n')
+
+    const r = comSaida(saida).buscarNaRevisao(repo, sha, 'alvo', ['src'])
+
+    expect(r).toEqual({ ok: true, valor: [{ caminho: 'src/ok.ts', linha: 7 }] })
   })
 })
 
