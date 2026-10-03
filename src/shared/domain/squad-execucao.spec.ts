@@ -315,13 +315,13 @@ describe('resultado da tarefa — conteúdo do agente é dado não confiável', 
   it('cada schema exige o seu tipo de evidência', () => {
     expect(EVIDENCIA_EXIGIDA['achados@1']).toEqual(['arquivo', 'trecho'])
     expect(EVIDENCIA_EXIGIDA['parecer@1']).toEqual(['arquivo', 'trecho', 'documento'])
-    expect(EVIDENCIA_EXIGIDA['resultado-de-testes@1']).toEqual(['teste', 'arquivo', 'trecho'])
+    expect(EVIDENCIA_EXIGIDA['resultado-de-testes@1']).toEqual(['arquivo', 'trecho'])
 
     const parecer = avaliarResultado(
       {
         ...valido(),
         schema: 'parecer@1',
-        evidencia: [{ tipo: 'documento', referencia: 'https://doc/x' }]
+        evidencia: [{ tipo: 'documento', referencia: 'src/a.ts' }]
       },
       { schemaEsperado: 'parecer@1', fontesDoPack: FONTES }
     )
@@ -331,11 +331,29 @@ describe('resultado da tarefa — conteúdo do agente é dado não confiável', 
       {
         ...valido(),
         schema: 'resultado-de-testes@1',
-        evidencia: [{ tipo: 'teste', referencia: 'a.spec.ts > faz x' }]
+        evidencia: [{ tipo: 'trecho', referencia: 'src/b.ts' }]
       },
       { schemaEsperado: 'resultado-de-testes@1', fontesDoPack: FONTES }
     )
     expect(testes.estado).toBe('concluida')
+  })
+
+  // O texto livre que o agente escreve (URL, "arquivo > teste") não é verificável pelo kernel:
+  // aceitá-lo deixaria qualquer resposta passar por concluída.
+  it.each([
+    ['documento fora do pacote', 'parecer@1', { tipo: 'documento', referencia: 'https://doc/x' }],
+    [
+      'teste num resultado de testes',
+      'resultado-de-testes@1',
+      { tipo: 'teste', referencia: 'a.spec.ts > faz x' }
+    ]
+  ])('evidência inventada não conclui: %s', (_nome, schema, evidencia) => {
+    const r = avaliarResultado(
+      { ...valido(), schema, evidencia: [evidencia] },
+      { schemaEsperado: schema, fontesDoPack: FONTES }
+    )
+
+    expect(r.estado).toBe('incompleta')
   })
 
   it('o schema esperado que o kernel não conhece é recusa, não passe livre', () => {

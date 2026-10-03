@@ -140,7 +140,7 @@ export type Confianca = (typeof CONFIANCAS)[number]
 export const EVIDENCIA_EXIGIDA = {
   'achados@1': ['arquivo', 'trecho'],
   'parecer@1': ['arquivo', 'trecho', 'documento'],
-  'resultado-de-testes@1': ['teste', 'arquivo', 'trecho']
+  'resultado-de-testes@1': ['arquivo', 'trecho']
 } as const satisfies Readonly<Record<string, readonly TipoDeEvidencia[]>>
 
 export type SchemaDeResultado = keyof typeof EVIDENCIA_EXIGIDA
@@ -293,8 +293,12 @@ function lerCampos(
   }
 }
 
-/** Arquivo e trecho citam um caminho: só vale o que está no `ContextPack` da tarefa. */
-const CITA_CAMINHO: readonly TipoDeEvidencia[] = ['arquivo', 'trecho']
+/**
+ * Arquivo, trecho e documento citam um caminho: só vale o que está no `ContextPack` da tarefa.
+ * `teste` e `documento` fora do pacote seriam texto livre do agente, que o kernel não consegue
+ * conferir — evidência que qualquer resposta forja não é evidência.
+ */
+const CITA_CAMINHO: readonly TipoDeEvidencia[] = ['arquivo', 'trecho', 'documento']
 
 /**
  * Avalia o que o agente devolveu. `invalida` quando a forma está errada; `incompleta` quando a
