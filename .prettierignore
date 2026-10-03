@@ -26,3 +26,6 @@ playwright-report
 
 # Evidência bruta da prova M11-F00 (gerada por scripts/prova-squads): o byte é a evidência.
 reports/squads-prova
+
+# Evidência bruta da F00b (scripts/prova-squads/*-e1): idem.
+reports/squads-prova-e1

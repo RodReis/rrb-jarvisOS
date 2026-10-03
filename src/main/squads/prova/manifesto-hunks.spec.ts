@@ -97,3 +97,47 @@ describe('auditarIntegracao', () => {
     expect(auditoria.perdidosSemRegistro).toHaveLength(1)
   })
 })
+
+describe('auditarIntegracao — bloco não resolvido (SPEC-Squads-00 § E1)', () => {
+  // As duas versões ficam no arquivo entre marcadores: o texto do hunk "está lá", e é exatamente
+  // por isso que a primeira medição o contou como preservado.
+  const comMarcadores = (corpo: string): string =>
+    `export const b = 1\n<<<<<<< sem resolução\n${corpo}=======\nexport const d = 3\n>>>>>>>\n`
+
+  it('NEGATIVO: hunk que só existe dentro do bloco em conflito é falha, não preservado', () => {
+    const final = { ...arquivosIntegrados, 'src/b.ts': comMarcadores('export const c = 2\n') }
+    const auditoria = auditarIntegracao(manifesto, (a) => final[a], [])
+    expect(auditoria.naoResolvidos.map((h) => h.arquivo)).toEqual(['src/b.ts'])
+    expect(auditoria.preservados.map((h) => h.arquivo)).not.toContain('src/b.ts')
+    expect(auditoria.perdidosSemRegistro).toHaveLength(0)
+  })
+
+  it('o resolvido do mesmo arquivo segue preservado quando está fora do conflito', () => {
+    const final = {
+      ...arquivosIntegrados,
+      'src/b.ts': `export const c = 2\n${comMarcadores('export const e = 5\n')}`
+    }
+    const auditoria = auditarIntegracao(manifesto, (a) => final[a], [])
+    expect(auditoria.preservados.map((h) => h.arquivo)).toContain('src/b.ts')
+    expect(auditoria.naoResolvidos).toHaveLength(0)
+  })
+
+  it('motivo registrado não redime bloco não resolvido', () => {
+    const final = { ...arquivosIntegrados, 'src/b.ts': comMarcadores('export const c = 2\n') }
+    const auditoria = auditarIntegracao(manifesto, (a) => final[a], [
+      { hunk: manifesto[2]!.id, motivo: 'redundante' }
+    ])
+    expect(auditoria.naoResolvidos).toHaveLength(1)
+    expect(auditoria.descartadosComMotivo).toHaveLength(0)
+  })
+
+  it('`=======` fora de um bloco aberto não é marcador', () => {
+    const final = {
+      ...arquivosIntegrados,
+      'src/b.ts': 'export const b = 1\n=======\nexport const c = 2\n'
+    }
+    const auditoria = auditarIntegracao(manifesto, (a) => final[a], [])
+    expect(auditoria.naoResolvidos).toHaveLength(0)
+    expect(auditoria.preservados).toHaveLength(3)
+  })
+})
