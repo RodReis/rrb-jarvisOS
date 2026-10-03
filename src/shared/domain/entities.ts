@@ -575,6 +575,9 @@ export const AUDIT_EVENT_TYPES = [
   'squad-integracao',
   'squad-revisao',
   'squad-retrabalho',
+  // A suíte do projeto sobre o resultado integrado (etapa TESTE): estado, passo e classe da falha,
+  // nunca a saída do projeto.
+  'squad-teste',
   // SPEC-Scheduler-01: a configuração do pool (capacidade, limites, paralelismo). Tipo próprio: é
   // uma decisão do PI sobre quanto da máquina a pipeline pode usar — e ligar o paralelismo é a que
   // mais importa registrar.
