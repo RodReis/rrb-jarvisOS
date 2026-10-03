@@ -38,6 +38,7 @@ import {
   type VistaDaFila
 } from '@shared/domain/pipeline'
 import type { Mvp, Slice } from '@shared/domain/roadmap'
+import { idDoEscritor, lerIdDoEscritor } from '@shared/domain/squad-execucao'
 import { log } from '../logging/logger'
 import type { AuditRepository } from '../storage/audit-repository'
 import type { EscopoDoRun, PipelineRepository } from './pipeline-repository'
@@ -254,8 +255,10 @@ export class FilaService {
     // verificar se container e porta ainda estão em uso (a regra que a V1 já tinha). Liberar o slot
     // no cancelamento, com a limpeza dos recursos, é da M12-F05.
     if (ehTerminal(para)) {
-      this.deps.pool.cancelar(runId)
-      if (DESFECHOS_CONCLUIDOS.includes(para) && this.deps.pool.encerrar(runId)) this.despachar()
+      this.deps.pool.cancelarDoRun(runId)
+      if (DESFECHOS_CONCLUIDOS.includes(para) && this.deps.pool.encerrarDoRun(runId)) {
+        this.despachar()
+      }
     }
 
     return { reason: 'transicionado', run: atualizado, mensagem: `Run em ${para}.` }
@@ -274,6 +277,39 @@ export class FilaService {
    * progresso ou lixo. Por isso a ativação do run roda **dentro** do ciclo do pool.
    */
   adquirirSlot(projectId: string, workspaceId: WorkspaceId, runId: string): LeaseOutcome {
+    return this.adquirirItem(projectId, workspaceId, runId, runId)
+  }
+
+  /**
+   * Pede um slot para **um escritor** do run (SPEC-Squads-03, decisão 1 do PI): o item do pool é
+   * `<runId>:<escritor>`, com lease e fencing token próprios. O run não segura slot enquanto o
+   * Squad executa — quem ocupa é o escritor. O primeiro escritor adquirido leva o run de `READY`
+   * a `RUNNING`; os seguintes encontram o run já em execução.
+   *
+   * Com a capacidade efetiva em 1 (paralelismo desligado) o segundo escritor espera o primeiro
+   * liberar — o plano de dois escritores roda em sequência, sem erro (critério 6).
+   */
+  adquirirSlotDoEscritor(
+    projectId: string,
+    workspaceId: WorkspaceId,
+    runId: string,
+    escritor: string
+  ): LeaseOutcome {
+    const unidade = idDoEscritor(runId, escritor)
+    const lido = lerIdDoEscritor(unidade)
+    if (lido === undefined || lido.escritor !== escritor) {
+      return { reason: 'lease-inexistente', mensagem: 'Escritor inválido.' }
+    }
+    return this.adquirirItem(projectId, workspaceId, runId, unidade)
+  }
+
+  /** O que `adquirirSlot` e `adquirirSlotDoEscritor` têm em comum: enfileirar, despachar, responder. */
+  private adquirirItem(
+    projectId: string,
+    workspaceId: WorkspaceId,
+    runId: string,
+    itemId: string
+  ): LeaseOutcome {
     const escopo = this.escopo(projectId, workspaceId)
     const run = this.deps.runs.buscar(runId)
 
@@ -285,7 +321,7 @@ export class FilaService {
     // readquire o que já está adquirido — repetir a chamada devolve o mesmo slot, sem tentar a
     // transição `RUNNING → RUNNING` (inválida por construção) nem liberar o slot de quem trabalha.
     this.deps.pool.enfileirar({
-      runId,
+      runId: itemId,
       workspaceId,
       projectId,
       sliceId: run.sliceId,
@@ -293,8 +329,8 @@ export class FilaService {
     })
     this.despachar()
 
-    const lease = this.deps.pool.slotDoRun(runId)
-    if (lease === undefined) return this.esperaDe(runId)
+    const lease = this.deps.pool.slotDoRun(itemId)
+    if (lease === undefined) return this.esperaDe(itemId)
 
     return { reason: 'adquirido', lease, mensagem: 'Slot de execução adquirido.' }
   }
@@ -340,16 +376,24 @@ export class FilaService {
    * elegível (regra 1 da SPEC-Scheduler-01).
    */
   gatesDoItem(item: ItemPersistido): readonly string[] {
-    const run = this.deps.runs.buscar(item.runId)
+    const escritor = lerIdDoEscritor(item.runId)
+    const run = this.deps.runs.buscar(escritor?.runId ?? item.runId)
     // `READY` já exige as dependências concluídas (a transição confere), e concluído não regride:
-    // o que segura um item é o run ainda não estar pronto.
-    return run === undefined || run.estado !== 'READY' ? ['run-nao-pronto'] : []
+    // o que segura um item é o run ainda não estar pronto. O escritor também entra com o run já
+    // em execução — o primeiro escritor o levou até lá.
+    const aceitos: readonly string[] = escritor === undefined ? ['READY'] : ['READY', 'RUNNING']
+    return run === undefined || !aceitos.includes(run.estado) ? ['run-nao-pronto'] : []
   }
 
-  /** A ativação do run pelo pool: `READY → RUNNING`, sem token (o lease acabou de nascer). */
+  /**
+   * A ativação pelo pool: `READY → RUNNING`, sem token (o lease acabou de nascer). Para o escritor
+   * é o run que avança, e só uma vez: o segundo escritor encontra o run já em `RUNNING`.
+   */
   ativarRun(item: ItemPersistido): boolean {
+    const runId = lerIdDoEscritor(item.runId)?.runId ?? item.runId
+    if (runId !== item.runId && this.deps.runs.buscar(runId)?.estado === 'RUNNING') return true
     return (
-      this.transicionar(item.projectId, item.workspaceId, item.runId, 'RUNNING').reason ===
+      this.transicionar(item.projectId, item.workspaceId, runId, 'RUNNING').reason ===
       'transicionado'
     )
   }

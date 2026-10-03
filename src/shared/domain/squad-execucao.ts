@@ -34,6 +34,18 @@ export function lerIdDoEscritor(id: string): { runId: string; escritor: string }
 export const ehItemDeEscritor = (id: string): boolean => lerIdDoEscritor(id) !== undefined
 
 /**
+ * Os escritores do mesmo run são irmãos: dividem uma issue, não competem por ela. A prova de
+ * independência do pool existe para dois **runs** do mesmo projeto; entre irmãos ela não faz
+ * sentido — mas só vale quando **todos** os ativos do projeto são irmãos do item, porque um run
+ * de fora, ativo no mesmo projeto, continua pedindo a prova.
+ */
+export function irmaosNoPool(itemId: string, ativosDoProjeto: readonly string[]): boolean {
+  const meu = lerIdDoEscritor(itemId)
+  if (meu === undefined) return false
+  return ativosDoProjeto.every((a) => lerIdDoEscritor(a)?.runId === meu.runId)
+}
+
+/**
  * Os pares de escritores cujo nome, depois de sanitizado, é o mesmo — ou que a sanitização
  * esvazia. `a_b` e `a-b` são ids válidos e distintos para o validador do plano, mas viram o mesmo
  * nome de container e de branch; sem esta checagem o segundo escritor reusaria o ambiente do

@@ -21,6 +21,7 @@ import type { ConfigDoPool, MotivoDeEspera } from '@shared/domain/pool'
 import type { PoolMetricas } from '@shared/domain/pool-vista'
 import type { WorkspaceId } from '@shared/domain/entities'
 import { CONFIG_PADRAO, validarConfig } from '@shared/domain/pool'
+import { lerIdDoEscritor, SEPARADOR_DO_ESCRITOR } from '@shared/domain/squad-execucao'
 
 export type EstadoDaFila = 'esperando' | 'adquirido' | 'cancelado'
 
@@ -162,6 +163,18 @@ export class PoolRepository {
     const row = this.db.prepare('SELECT * FROM pool_fila WHERE run_id = ?').get(runId) as
       FilaRow | undefined
     return row === undefined ? undefined : toItem(row)
+  }
+
+  /**
+   * Os itens dos escritores de um run (`<runId>:<escritor>`). O prefixo seleciona; o filtro
+   * confirma, porque um run cujo id tem `:` não pode se confundir com o escritor de outro.
+   */
+  itensDoGrupo(userId: string, runId: string): readonly ItemPersistido[] {
+    const prefixo = `${runId}${SEPARADOR_DO_ESCRITOR}`
+    const rows = this.db
+      .prepare('SELECT * FROM pool_fila WHERE user_id = ? AND substr(run_id, 1, ?) = ?')
+      .all(userId, prefixo.length, prefixo) as FilaRow[]
+    return rows.map(toItem).filter((i) => lerIdDoEscritor(i.runId)?.runId === runId)
   }
 
   /** Quem espera, na ordem de chegada (a ordem justa é decidida pelo núcleo, não pelo SQL). */

@@ -47,6 +47,7 @@ import {
   tokenConfere,
   validarConfig
 } from '@shared/domain/pool'
+import { irmaosNoPool } from '@shared/domain/squad-execucao'
 import type { AuditRepository } from '../storage/audit-repository'
 import type { LeaseRepository } from './lease-repository'
 import type { ItemPersistido, NovoItem, PoolRepository } from './pool-repository'
@@ -90,9 +91,13 @@ export interface PoolDeps {
 
 export class PoolService {
   private readonly agora: () => number
+  /** A prova que o pool usa: a de quem injetou, mais a dos irmãos (escritores do mesmo run). */
+  private readonly prova: ProvaDeIndependencia
 
   constructor(private readonly deps: PoolDeps) {
     this.agora = deps.agora ?? ((): number => Date.now())
+    const injetada = deps.prova ?? SEM_PROVA
+    this.prova = (item, ativos) => irmaosNoPool(item.runId, ativos) || injetada(item, ativos)
   }
 
   configuracao(): ConfigDoPool {
@@ -140,6 +145,21 @@ export class PoolService {
     })()
   }
 
+  /**
+   * Cancela o que o run ainda tem na fila: o item dele e o dos escritores que esperavam. Quem já
+   * tem slot não é tocado — a liberação de cancelamento e bloqueio é da M12-F05.
+   */
+  cancelarDoRun(runId: string): boolean {
+    const itens = this.deps.pool.itensDoGrupo(this.deps.userId(), runId).map((i) => i.runId)
+    return [runId, ...itens].map((id) => this.cancelar(id)).some(Boolean)
+  }
+
+  /** Solta o slot do run e o dos escritores que sobraram: o run terminou e não há quem os use. */
+  encerrarDoRun(runId: string): boolean {
+    const itens = this.deps.pool.itensDoGrupo(this.deps.userId(), runId).map((i) => i.runId)
+    return [runId, ...itens].map((id) => this.encerrar(id)).some(Boolean)
+  }
+
   /** O run já foi adquirido pelo pool alguma vez? Quem nunca foi não tem token a apresentar. */
   adquiriu(runId: string): boolean {
     return this.deps.pool.buscarItem(runId)?.estado === 'adquirido'
@@ -172,7 +192,7 @@ export class PoolService {
         ocupados: slots.map((l) => this.comoOcupado(l, agora)),
         ultimoServidoEm: pool.vezes(userId)
       },
-      this.deps.prova ?? SEM_PROVA
+      this.prova
     )
 
     const emUso = new Set(slots.map((l) => l.recurso))
@@ -324,7 +344,7 @@ export class PoolService {
         ocupados: slots.map((l) => this.comoOcupado(l, agora)),
         ultimoServidoEm: pool.vezes(userId)
       },
-      this.deps.prova ?? SEM_PROVA
+      this.prova
     )
 
     const porRun = new Map(esperando.map((i) => [i.runId, i]))

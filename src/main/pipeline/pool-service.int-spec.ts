@@ -160,6 +160,32 @@ describe('gates — capacidade livre não torna ninguém elegível (regra 1)', (
   })
 })
 
+describe('a prova de independência injetada continua valendo para runs comuns', () => {
+  const comProva = (prova: () => boolean) =>
+    new PoolService({
+      db,
+      pool,
+      leases,
+      audit,
+      userId: () => USER,
+      workspaceId: () => 'jarvis',
+      prova,
+      agora: () => relogio
+    })
+
+  it('sem prova, o segundo run do projeto espera; com a prova, entra', () => {
+    comProva(() => false).configurar(PARALELO)
+    const sem = comProva(() => false)
+    sem.enfileirar(run('a1'))
+    sem.enfileirar(run('a2'))
+    expect(sem.ciclo().adquiridos.map((a) => a.runId)).toEqual(['a1'])
+    expect(pool.buscarItem('a2')?.motivo).toEqual({ tipo: 'sem-prova-de-independencia' })
+
+    const com = comProva(() => true)
+    expect(com.ciclo().adquiridos.map((a) => a.runId)).toEqual(['a2'])
+  })
+})
+
 describe('justiça entre projetos — critério 2', () => {
   it('dois projetos continuamente elegíveis alternam a cada slot liberado', () => {
     const servidos: string[] = []

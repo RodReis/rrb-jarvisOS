@@ -6,6 +6,7 @@ import {
   ehEstadoTerminal,
   ehItemDeEscritor,
   idDoEscritor,
+  irmaosNoPool,
   lerIdDoEscritor,
   textoDaAssinatura,
   transicaoDaTarefaPermitida,
@@ -48,6 +49,30 @@ describe('id do escritor no pool', () => {
   it('distingue o item de escritor do item de run', () => {
     expect(ehItemDeEscritor('run-1:a')).toBe(true)
     expect(ehItemDeEscritor('run-1')).toBe(false)
+  })
+})
+
+describe('irmãos no pool', () => {
+  it('o escritor é irmão de quem divide o run com ele', () => {
+    expect(irmaosNoPool('run-1:ui', ['run-1:api'])).toBe(true)
+    expect(irmaosNoPool('run-1:ui', ['run-1:api', 'run-1:db'])).toBe(true)
+  })
+
+  it('basta um ativo de fora para pedir a prova: a regra vale para todos os ativos do projeto', () => {
+    expect(irmaosNoPool('run-1:ui', ['run-1:api', 'run-2:api'])).toBe(false)
+    expect(irmaosNoPool('run-1:ui', ['run-2'])).toBe(false)
+    expect(irmaosNoPool('run-1:ui', ['run-1'])).toBe(false)
+  })
+
+  it('quem não é escritor nunca é irmão de ninguém', () => {
+    expect(irmaosNoPool('run-1', ['run-1:api'])).toBe(false)
+    expect(irmaosNoPool('run-1', [])).toBe(false)
+  })
+
+  it('o run cujo id tem ":" não se confunde com o escritor de outro run', () => {
+    // `x:y:esc` é o escritor `esc` do run `x:y`, e não o escritor `y` do run `x`.
+    expect(irmaosNoPool('x:esc', ['x:y:esc'])).toBe(false)
+    expect(irmaosNoPool('x:y:esc', ['x:y:outro'])).toBe(true)
   })
 })
 

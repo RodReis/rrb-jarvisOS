@@ -172,6 +172,43 @@ describe('fila persistida — critério 3', () => {
   })
 })
 
+describe('itens dos escritores de um run', () => {
+  it('lista os escritores do run, e só deles', () => {
+    pool.enfileirar(USER, item('r1'), AGORA)
+    pool.enfileirar(USER, item('r1:api'), AGORA)
+    pool.enfileirar(USER, item('r1:ui'), AGORA)
+    pool.enfileirar(USER, item('r2:api'), AGORA)
+
+    expect(
+      pool
+        .itensDoGrupo(USER, 'r1')
+        .map((i) => i.runId)
+        .sort()
+    ).toEqual(['r1:api', 'r1:ui'])
+  })
+
+  it('o run cujo id tem ":" não puxa o escritor de outro run', () => {
+    pool.enfileirar(USER, item('x:y:esc'), AGORA)
+    pool.enfileirar(USER, item('x:esc'), AGORA)
+
+    expect(pool.itensDoGrupo(USER, 'x').map((i) => i.runId)).toEqual(['x:esc'])
+    expect(pool.itensDoGrupo(USER, 'x:y').map((i) => i.runId)).toEqual(['x:y:esc'])
+  })
+
+  it('não vaza o item de outro usuário', () => {
+    pool.enfileirar(USER, item('r1:api'), AGORA)
+
+    expect(pool.itensDoGrupo('u-outro', 'r1')).toEqual([])
+  })
+
+  it('o prefixo é literal: % e _ no id do run não casam outros', () => {
+    pool.enfileirar(USER, item('r_1:api'), AGORA)
+    pool.enfileirar(USER, item('rx1:api'), AGORA)
+
+    expect(pool.itensDoGrupo(USER, 'r_1').map((i) => i.runId)).toEqual(['r_1:api'])
+  })
+})
+
 describe('a vez de cada projeto', () => {
   it('registrar atualiza, não duplica, e é por usuário', () => {
     pool.registrarVez(USER, 'p-a', AGORA)
