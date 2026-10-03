@@ -267,7 +267,7 @@ export function recursoDaPorta(porta: number): string {
  * Sanitizar em vez de validar é deliberado: o `runId` é um UUID nosso, não entrada do usuário,
  * e recusar aqui transformaria um detalhe de formatação em falha de execução.
  */
-function sanitizar(valor: string): string {
+export function sanitizar(valor: string): string {
   return valor
     .toLowerCase()
     .replace(/[^a-z0-9-]+/g, '-')
