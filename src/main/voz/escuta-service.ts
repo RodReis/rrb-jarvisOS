@@ -43,6 +43,14 @@ export interface EventoDeEscuta {
   readonly sessaoBloqueada: boolean
 }
 
+/** Um disparo visto no modo de teste de Settings: a confiança medida e o limiar que valia. */
+export interface DisparoDeTeste {
+  readonly gatilho: 'frase' | 'palmas'
+  /** Só a frase tem confiança medida. */
+  readonly confianca?: number
+  readonly limiar: number
+}
+
 export interface EstadoDaEscutaNoMain extends EstadoPersistidoDaEscuta {
   /** Se o modelo da wake word está pronto no disco. */
   readonly disponivel: boolean
@@ -74,6 +82,8 @@ export interface DepsDaEscuta {
   /** Avisa a tela que abra (`true`) ou **encerre** (`false`) o stream do microfone. */
   readonly aoMudarCaptura: (aberta: boolean) => void
   readonly aoDisparar: (evento: EventoDeEscuta) => void
+  /** Onde o disparo cai no modo de teste, no lugar de `aoDisparar`. */
+  readonly aoTestar?: (disparo: DisparoDeTeste) => void
   /** Teto do turno aberto pela escuta; passado dele a escuta volta a ouvir. */
   readonly tetoDoTurnoMs?: number
   readonly agendar?: (acao: () => void, ms: number) => ReturnType<typeof setTimeout>
@@ -85,6 +95,9 @@ export interface DepsDaEscuta {
  * deixaria a escuta surda até o próximo boot — e o indicador diria que está ouvindo.
  */
 export const TETO_DO_TURNO_PADRAO_MS = 120_000
+
+/** O modo de teste esquecido ligado deixaria a escuta sem abrir turno nenhum, em silêncio. */
+export const TETO_DO_TESTE_PADRAO_MS = 120_000
 
 const PADRAO: EstadoPersistidoDaEscuta = {
   ativa: true,
@@ -99,6 +112,8 @@ export class EscutaService {
   private disponivel = false
   private turno = false
   private relogioDoTurno: ReturnType<typeof setTimeout> | undefined
+  private teste = false
+  private relogioDoTeste: ReturnType<typeof setTimeout> | undefined
 
   constructor(private readonly deps: DepsDaEscuta) {}
 
@@ -142,6 +157,7 @@ export class EscutaService {
     this.ativa = false
     this.persistir({ ativa: false })
     this.definirTurno(false)
+    this.definirModoDeTeste(false)
     this.deps.palmas.limpar()
     this.deps.aoMudarCaptura(false)
     this.deps.auditar({ type: 'voz.escuta.desligada', payload: { via } })
@@ -188,6 +204,27 @@ export class EscutaService {
     }, this.deps.tetoDoTurnoMs ?? TETO_DO_TURNO_PADRAO_MS)
   }
 
+  /**
+   * Settings pede para ver cada disparo com a confiança medida (critério 12). No modo de teste o
+   * disparo **não** abre turno nem sobe a janela: quem ajusta a sensibilidade não quer começar
+   * uma conversa a cada tentativa. Expira sozinho, e desligar a escuta também o encerra.
+   */
+  definirModoDeTeste(ativo: boolean): void {
+    const cancelar = this.deps.cancelar ?? clearTimeout
+    if (this.relogioDoTeste !== undefined) {
+      cancelar(this.relogioDoTeste)
+      this.relogioDoTeste = undefined
+    }
+    this.teste = ativo
+    if (!ativo) return
+
+    const agendar = this.deps.agendar ?? setTimeout
+    this.relogioDoTeste = agendar(() => {
+      this.relogioDoTeste = undefined
+      this.teste = false
+    }, TETO_DO_TESTE_PADRAO_MS)
+  }
+
   private emTurno(): boolean {
     return this.turno || this.deps.turnoAtivo()
   }
@@ -210,6 +247,10 @@ export class EscutaService {
   }
 
   private disparar(evento: Omit<EventoDeEscuta, 'sessaoBloqueada'>): void {
+    if (this.teste) {
+      this.deps.aoTestar?.({ ...evento, limiar: this.deps.engine.obterLimiar() })
+      return
+    }
     this.definirTurno(true)
     this.deps.aoDisparar({ ...evento, sessaoBloqueada: this.deps.sessaoBloqueada() })
   }

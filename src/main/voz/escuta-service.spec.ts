@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { EventoWakeWordDetectado, WakeWordEngine } from './wake-word-engine'
-import type { DepsDaEscuta, EstadoPersistidoDaEscuta, EventoDeEscuta } from './escuta-service'
+import type {
+  DepsDaEscuta,
+  DisparoDeTeste,
+  EstadoPersistidoDaEscuta,
+  EventoDeEscuta
+} from './escuta-service'
 import { EscutaService } from './escuta-service'
 
 const PCM = new Int16Array(1280)
@@ -42,6 +47,7 @@ function montar(
   const auditados: { type: string; payload: Record<string, unknown> }[] = []
   const capturas: boolean[] = []
   const disparos: EventoDeEscuta[] = []
+  const testes: DisparoDeTeste[] = []
   const gravados: EstadoPersistidoDaEscuta[] = []
   let palmasAlimentadas = 0
   let persistido = sobrescrever.persistido
@@ -71,6 +77,7 @@ function montar(
     turnoAtivo: () => turnoAtivo,
     aoMudarCaptura: (aberta) => void capturas.push(aberta),
     aoDisparar: (e) => void disparos.push(e),
+    aoTestar: (e) => void testes.push(e),
     tetoDoTurnoMs: sobrescrever.tetoDoTurnoMs,
     agendar: (acao, ms) => {
       const a = { acao, ms, cancelado: false }
@@ -86,6 +93,7 @@ function montar(
     auditados,
     capturas,
     disparos,
+    testes,
     gravados,
     alimentados,
     limiares,
@@ -327,5 +335,87 @@ describe('EscutaService — o turno aberto pelo disparo', () => {
     await m.servico.desligar('hotkey')
 
     expect(m.agendados.every((a) => a.cancelado)).toBe(true)
+  })
+})
+
+describe('EscutaService — modo de teste ao vivo (critério 12)', () => {
+  it('em teste, o disparo mostra a confiança medida e o limiar, e não abre turno', async () => {
+    const m = montar({ persistido: undefined, resposta: DETECCAO })
+    await m.servico.restaurar()
+    m.servico.definirModoDeTeste(true)
+
+    await m.servico.receberPcm(PCM)
+
+    expect(m.testes).toEqual([{ gatilho: 'frase', confianca: 0.91, limiar: 0.5 }])
+    // Testar sensibilidade não pode começar uma conversa nem subir a janela.
+    expect(m.disparos).toEqual([])
+  })
+
+  it('o teste não consome o turno: a próxima detecção continua sendo testada', async () => {
+    const m = montar({ persistido: undefined, resposta: DETECCAO })
+    await m.servico.restaurar()
+    m.servico.definirModoDeTeste(true)
+
+    await m.servico.receberPcm(PCM)
+    await m.servico.receberPcm(PCM)
+
+    expect(m.testes).toHaveLength(2)
+  })
+
+  it('as palmas também aparecem no teste, sem confiança (o detector não a mede)', async () => {
+    const m = montar({ persistido: undefined, palmas: true })
+    await m.servico.restaurar()
+    m.servico.definirModoDeTeste(true)
+
+    await m.servico.receberPcm(PCM)
+
+    expect(m.testes).toEqual([{ gatilho: 'palmas', limiar: 0.5 }])
+  })
+
+  it('o limiar do teste é o que Settings acabou de definir, sem restart', async () => {
+    const m = montar({ persistido: undefined, resposta: DETECCAO })
+    await m.servico.restaurar()
+    m.servico.definirModoDeTeste(true)
+    await m.servico.definirSensibilidade(0.8)
+
+    await m.servico.receberPcm(PCM)
+
+    expect(m.testes[0]?.limiar).toBe(0.8)
+  })
+
+  it('sair do modo de teste devolve o disparo ao turno de verdade', async () => {
+    const m = montar({ persistido: undefined, resposta: DETECCAO })
+    await m.servico.restaurar()
+    m.servico.definirModoDeTeste(true)
+    m.servico.definirModoDeTeste(false)
+
+    await m.servico.receberPcm(PCM)
+
+    expect(m.disparos).toHaveLength(1)
+    expect(m.testes).toEqual([])
+  })
+
+  it('o modo de teste esquecido expira sozinho, para a escuta não ficar sem abrir turno', async () => {
+    const m = montar({ persistido: undefined, resposta: DETECCAO })
+    await m.servico.restaurar()
+    m.servico.definirModoDeTeste(true)
+    expect(m.agendados.at(-1)?.ms).toBe(120_000)
+
+    m.estourarTeto()
+    await m.servico.receberPcm(PCM)
+
+    expect(m.disparos).toHaveLength(1)
+  })
+
+  it('desligar a escuta também encerra o modo de teste', async () => {
+    const m = montar({ persistido: undefined, resposta: DETECCAO })
+    await m.servico.restaurar()
+    m.servico.definirModoDeTeste(true)
+
+    await m.servico.desligar('interface')
+    await m.servico.ligar('interface')
+    await m.servico.receberPcm(PCM)
+
+    expect(m.disparos).toHaveLength(1)
   })
 })

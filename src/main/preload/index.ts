@@ -21,6 +21,7 @@ import type {
   DesfechoDeLigarEscuta,
   DesfechoDoDownload,
   DisparoDaEscuta,
+  DisparoDeTesteDaEscuta,
   EstadoDaEscuta,
   PersonaEditavel,
   ProntidaoDaVoz,
@@ -229,6 +230,8 @@ const bridge: JarvisBridge = {
   }): Promise<EstadoDaEscuta> => ipcRenderer.invoke(IPC_CHANNELS.escutaDefinirGatilhos, gatilhos),
   definirSensibilidadeDaEscuta: (sensibilidade: number): Promise<EstadoDaEscuta> =>
     ipcRenderer.invoke(IPC_CHANNELS.escutaDefinirSensibilidade, sensibilidade),
+  definirModoDeTesteDaEscuta: (ativo: boolean): Promise<EstadoDaEscuta> =>
+    ipcRenderer.invoke(IPC_CHANNELS.escutaModoDeTeste, ativo),
   enviarPcmDaEscuta: (pcm: Int16Array): void => ipcRenderer.send(IPC_SEND_CHANNELS.escutaPcm, pcm),
   informarTurnoDaEscuta: (ativo: boolean): void =>
     ipcRenderer.send(IPC_SEND_CHANNELS.escutaTurno, ativo),
@@ -238,6 +241,13 @@ const bridge: JarvisBridge = {
     ipcRenderer.on(IPC_EVENT_CHANNELS.escutaMudou, wrapped)
 
     return () => ipcRenderer.removeListener(IPC_EVENT_CHANNELS.escutaMudou, wrapped)
+  },
+  onEscutaTeste: (listener: (disparo: DisparoDeTesteDaEscuta) => void): (() => void) => {
+    const wrapped = (_event: unknown, disparo: DisparoDeTesteDaEscuta): void => listener(disparo)
+
+    ipcRenderer.on(IPC_EVENT_CHANNELS.escutaTeste, wrapped)
+
+    return () => ipcRenderer.removeListener(IPC_EVENT_CHANNELS.escutaTeste, wrapped)
   },
   onEscutaDisparo: (listener: (disparo: DisparoDaEscuta) => void): (() => void) => {
     const wrapped = (_event: unknown, disparo: DisparoDaEscuta): void => listener(disparo)

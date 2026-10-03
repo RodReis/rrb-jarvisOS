@@ -758,6 +758,27 @@ export const RECURSOS = {
         erroInesperado: 'Não foi possível montar o contexto. Tente novamente.'
       },
       settings: {
+        escuta: {
+          titulo: 'Escuta contínua',
+          descricao:
+            'O app ouve o microfone neste computador e só começa a gravar a conversa depois de um gatilho. O áudio da escuta não sai da máquina nem é guardado.',
+          frase: 'Frase “{{frase}}”',
+          fraseDescricao: 'Dizer a palavra de ativação abre a conversa.',
+          palmas: 'Duas palmas',
+          palmasDescricao: 'Duas palmas seguidas abrem a conversa.',
+          ultimoGatilho:
+            'Pelo menos um gatilho precisa ficar ligado. Para parar de ouvir, use o interruptor Escuta na barra superior.',
+          limiar: 'Limiar de disparo',
+          limiarDescricao:
+            'Maior exige mais certeza para disparar (menos disparos por engano); menor dispara mais fácil. Vale na hora.',
+          testar: 'Testar ao vivo',
+          pararTeste: 'Parar o teste',
+          testeExigeEscuta: 'Ligue a escuta na barra superior para testar.',
+          testeSemConversa: 'Durante o teste, o disparo só aparece aqui e não abre conversa.',
+          disparosDoTeste: 'Disparos do teste',
+          disparoFrase: '“{{frase}}” · confiança {{confianca}} · limiar {{limiar}}',
+          disparoPalmas: 'Duas palmas · limiar {{limiar}}'
+        },
         titulo: 'Configurações',
         // As cinco abas (decisão do PI, 2026-08-30). Nomes curtos: são régua, não frase.
         abaGeral: 'Geral',
@@ -1561,6 +1582,28 @@ export const RECURSOS = {
         erroInesperado: 'Could not build the context. Try again.'
       },
       settings: {
+        escuta: {
+          titulo: 'Continuous listening',
+          descricao:
+            'The app listens to the microphone on this computer and only starts recording the conversation after a trigger. Listening audio never leaves the machine and is not stored.',
+          frase: 'Phrase “{{frase}}”',
+          fraseDescricao: 'Saying the wake phrase opens the conversation.',
+          palmas: 'Two claps',
+          palmasDescricao: 'Two claps in a row open the conversation.',
+          ultimoGatilho:
+            'At least one trigger must stay on. To stop listening, use the Listening switch in the top bar.',
+          limiar: 'Trigger threshold',
+          limiarDescricao:
+            'Higher needs more certainty to trigger (fewer false triggers); lower triggers more easily. Applies immediately.',
+          testar: 'Test live',
+          pararTeste: 'Stop the test',
+          testeExigeEscuta: 'Turn listening on in the top bar to test.',
+          testeSemConversa:
+            'During the test, a trigger only shows up here and does not open a conversation.',
+          disparosDoTeste: 'Test triggers',
+          disparoFrase: '“{{frase}}” · confidence {{confianca}} · threshold {{limiar}}',
+          disparoPalmas: 'Two claps · threshold {{limiar}}'
+        },
         titulo: 'Settings',
         abaGeral: 'General',
         abaPermissoes: 'Permissions',

@@ -856,6 +856,11 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     return deps.escuta.estado()
   })
 
+  ipcMain.handle(IPC_CHANNELS.escutaModoDeTeste, (_event, ativo: unknown) => {
+    if (typeof ativo === 'boolean') deps.escuta.definirModoDeTeste(ativo)
+    return deps.escuta.estado()
+  })
+
   ipcMain.handle(IPC_CHANNELS.escutaDefinirSensibilidade, async (_event, valor: unknown) => {
     if (typeof valor === 'number') await deps.escuta.definirSensibilidade(valor)
     return deps.escuta.estado()

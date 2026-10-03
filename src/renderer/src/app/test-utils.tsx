@@ -20,7 +20,7 @@ import { App } from './App'
  * Os métodos da escuta contínua (SPEC-Escuta-01) para dublês da ponte.
  *
  * O `AppShell` monta o controle da escuta em toda tela e consulta o estado ao montar, então todo
- * teste que monta o shell precisa destes seis — sem eles o primeiro efeito estoura antes de o
+ * teste que monta o shell (e o Settings) precisa destes — sem eles o primeiro efeito estoura antes de o
  * teste chegar ao que mede. O estado devolvido é "desligada e indisponível": não abre captura
  * nenhuma, que é o que um teste que não é sobre a escuta quer.
  */
@@ -34,10 +34,14 @@ export function pontaDaEscuta(): Record<string, ReturnType<typeof vi.fn>> {
       sensibilidade: 0.5
     })),
     definirEscutaAtiva: vi.fn(async () => ({ ok: true })),
+    definirGatilhosDaEscuta: vi.fn(),
+    definirSensibilidadeDaEscuta: vi.fn(),
+    definirModoDeTesteDaEscuta: vi.fn(),
     enviarPcmDaEscuta: vi.fn(),
     informarTurnoDaEscuta: vi.fn(),
     onEscutaMudou: vi.fn(() => () => undefined),
-    onEscutaDisparo: vi.fn(() => () => undefined)
+    onEscutaDisparo: vi.fn(() => () => undefined),
+    onEscutaTeste: vi.fn(() => () => undefined)
   }
 }
 

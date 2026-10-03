@@ -83,6 +83,7 @@ describe('ponte do preload', () => {
       'createWorkflow',
       'definirEscutaAtiva',
       'definirGatilhosDaEscuta',
+      'definirModoDeTesteDaEscuta',
       'definirPoliticaDeMerge',
       'definirSensibilidadeDaEscuta',
       'descartarAjusteDaArquitetura',
@@ -157,6 +158,7 @@ describe('ponte do preload', () => {
       'onAuthChanged',
       'onEscutaDisparo',
       'onEscutaMudou',
+      'onEscutaTeste',
       'onGenerationEvent',
       'onVozHotkey',
       'pendenciasDeLimpeza',
@@ -502,6 +504,21 @@ describe('ponte do preload', () => {
       expect(canal).toBe(IPC_EVENT_CHANNELS.escutaMudou)
       expect(ouvinte).toHaveBeenCalledWith(estado)
       expect(removeListener).toHaveBeenCalledWith(IPC_EVENT_CHANNELS.escutaMudou, envolvido)
+    })
+
+    it('o modo de teste leva só o booleano, e o ouvinte do teste assina o canal do teste', async () => {
+      const bridge = await carregarPonte()
+      const ouvinte = vi.fn()
+
+      await (bridge.definirModoDeTesteDaEscuta as (a: boolean) => Promise<unknown>)(true)
+      expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.escutaModoDeTeste, true)
+
+      ;(bridge.onEscutaTeste as (l: (d: unknown) => void) => () => void)(ouvinte)
+      const [canal, envolvido] = on.mock.calls.at(-1) as [string, (e: unknown, p: unknown) => void]
+      envolvido({ sender: 'x' }, { gatilho: 'frase', confianca: 0.7, limiar: 0.5 })
+
+      expect(canal).toBe(IPC_EVENT_CHANNELS.escutaTeste)
+      expect(ouvinte).toHaveBeenCalledWith({ gatilho: 'frase', confianca: 0.7, limiar: 0.5 })
     })
 
     it('o ouvinte do disparo assina o canal do disparo', async () => {

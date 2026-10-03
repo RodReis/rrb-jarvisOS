@@ -115,6 +115,7 @@ import type {
   DesfechoDeLigarEscuta,
   DesfechoDoDownload,
   DisparoDaEscuta,
+  DisparoDeTesteDaEscuta,
   EstadoDaEscuta,
   PersonaEditavel,
   ProntidaoDaVoz,
@@ -223,6 +224,11 @@ export const IPC_CHANNELS = {
   escutaDefinirAtiva: 'escuta:definir-ativa',
   escutaDefinirGatilhos: 'escuta:definir-gatilhos',
   escutaDefinirSensibilidade: 'escuta:definir-sensibilidade',
+  /**
+   * Liga ou desliga o modo de teste de Settings: o disparo aparece com a confiança medida e **não**
+   * abre turno. Expira no main, porque um teste esquecido deixaria a escuta sem abrir turno.
+   */
+  escutaModoDeTeste: 'escuta:modo-de-teste',
   /*
    * Fala (SPEC-Voz-02). Dois canais: sintetizar um texto e perguntar quais vozes existem.
    *
@@ -751,7 +757,9 @@ export const IPC_EVENT_CHANNELS = {
    * Um gatilho disparou (frase ou duas palmas). O payload é só `DisparoDaEscuta`: quem abre o
    * turno de conversa é o renderer, e o main não manda áudio nem confiança.
    */
-  escutaDisparo: 'escuta:disparo'
+  escutaDisparo: 'escuta:disparo',
+  /** Um disparo visto no modo de teste, com a confiança medida (SPEC-Escuta-01, critério 12). */
+  escutaTeste: 'escuta:teste'
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]
@@ -947,12 +955,14 @@ export interface JarvisBridge {
     readonly palmas: boolean
   }): Promise<EstadoDaEscuta>
   definirSensibilidadeDaEscuta(sensibilidade: number): Promise<EstadoDaEscuta>
+  definirModoDeTesteDaEscuta(ativo: boolean): Promise<EstadoDaEscuta>
   enviarPcmDaEscuta(pcm: Int16Array): void
   /** Avisa o main que um turno de conversa começou (`true`) ou terminou (`false`). */
   informarTurnoDaEscuta(ativo: boolean): void
   /** Avisa a tela de toda mudança de estado — inclusive a feita pela hotkey de mute. */
   onEscutaMudou(listener: (estado: EstadoDaEscuta) => void): () => void
   onEscutaDisparo(listener: (disparo: DisparoDaEscuta) => void): () => void
+  onEscutaTeste(listener: (disparo: DisparoDeTesteDaEscuta) => void): () => void
 
   /*
    * Fala (SPEC-Voz-02, critério 6). O que volta é PCM mais a timeline de bocas; quem toca é o

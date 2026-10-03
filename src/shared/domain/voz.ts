@@ -181,11 +181,16 @@ export interface DisparoDaEscuta {
   readonly sessaoBloqueada: boolean
 }
 
-/** Resultado de um teste ao vivo de wake word em Settings (critério 12). */
-export interface DesfechoDoTesteWakeWord {
-  readonly confianca: number
+/**
+ * Um disparo visto no modo de teste de Settings (critério 12): a confiança medida e o limiar que
+ * valia. É o **único** caminho em que a confiança do detector atravessa a ponte — no disparo
+ * normal ela fica no main.
+ */
+export interface DisparoDeTesteDaEscuta {
+  readonly gatilho: 'frase' | 'palmas'
+  /** Só a frase tem confiança medida. */
+  readonly confianca?: number
   readonly limiar: number
-  readonly disparou: boolean
 }
 
 /**

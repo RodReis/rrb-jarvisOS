@@ -1016,7 +1016,8 @@ describe('escuta contínua (SPEC-Escuta-01) — a ponte do kill switch', () => {
       definirGatilhos: vi.fn(async () => undefined),
       definirSensibilidade: vi.fn(async () => undefined),
       receberPcm: vi.fn(async () => undefined),
-      definirTurno: vi.fn()
+      definirTurno: vi.fn(),
+      definirModoDeTeste: vi.fn()
     }
     registerIpcHandlers({ ...deps, escuta } as unknown as IpcDependencies)
     const chamar = (canal: string, ...args: unknown[]): Promise<unknown> => {
@@ -1106,6 +1107,16 @@ describe('escuta contínua (SPEC-Escuta-01) — a ponte do kill switch', () => {
     enviar(IPC_SEND_CHANNELS.escutaPcm, pcm)
 
     expect(escuta.receberPcm).toHaveBeenCalledWith(pcm)
+  })
+
+  it('o modo de teste liga e desliga só com booleano, e devolve o estado', async () => {
+    const { escuta, chamar } = montarEscuta()
+
+    await chamar(IPC_CHANNELS.escutaModoDeTeste, true)
+    await chamar(IPC_CHANNELS.escutaModoDeTeste, false)
+    await chamar(IPC_CHANNELS.escutaModoDeTeste, 'sim')
+
+    expect(escuta.definirModoDeTeste.mock.calls).toEqual([[true], [false]])
   })
 
   it('o aviso de turno chega ao serviço só como booleano', () => {

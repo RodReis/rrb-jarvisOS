@@ -4,6 +4,7 @@ import { Button, Field, Select } from '@design/ui'
 import type { PreferencesSnapshot } from '@shared/contracts/ipc'
 import type { ProntidaoDoTts } from '@shared/domain/visemes'
 import { criarReprodutor } from './reproducao-de-fala'
+import { PreferenciasDaEscuta } from './PreferenciasDaEscuta'
 import {
   HOTKEYS_DE_VOZ,
   IDIOMAS_DE_VOZ,
@@ -134,6 +135,8 @@ export function PreferenciasDeVoz({
       </Field>
 
       <VozDaFala preferencias={preferencias} onSalvar={onSalvar} />
+
+      <PreferenciasDaEscuta />
     </div>
   )
 }
