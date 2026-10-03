@@ -3,7 +3,7 @@
 - MVP: `docs/mvp/mvp-028-quadro-execucao-squads.md` (Fatia 02).
 - Issue: [#126](https://github.com/RodReis/rrb-jarvisOS/issues/126) (antes M11-F05 "Orçamento, cancelamento e E2E"; retitulada e religada ao épico [#368](https://github.com/RodReis/rrb-jarvisOS/issues/368) em 2026-10-02).
 - Status: **aprovada-pi** (2026-10-02) — revisão exata do PR #367 aprovada pelo PI; reescrita em 2026-10-02 pela ADR-006; substitui `spec-squads-05-orcamento-cancelamento-e2e.md`; era a M11-F06 antes da partição.
-- Depende de: M28-F01.
+- Depende de: M28-F01 e, pela ordem do PI de 2026-10-02, M28-F03 ([#378](https://github.com/RodReis/rrb-jarvisOS/issues/378)).
 
 ## Objetivo
 
