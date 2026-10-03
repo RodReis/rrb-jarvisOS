@@ -2379,6 +2379,23 @@ Status: **PR aberto, CI em execução** ([PR #380](https://github.com/RodReis/rr
 - [x] **7. Orquestrador do Squad**: DAG de tarefas, N workers, dois escritores com pool cheio, sessão e segredo por unidade, estados terminais auditados.
 - [x] **8. Revisões independentes, relatório, PR** ([PR #380](https://github.com/RodReis/rrb-jarvisOS/pull/380)): duas revisões (código e segurança) corrigidas com teste vermelho antes; suíte completa 241 arquivos / 4701 testes; relatório carimbado.
 
+### Fatia 04 — Integrador, TESTE → REVIEWER e retrabalho (`docs/spec/spec-squads-04-revisao-independente.md`)
+
+Status: **em implementação, PR a abrir** — issue [#125](https://github.com/RodReis/rrb-jarvisOS/issues/125), puxada pelo PI em 2026-10-03 com a #356 em `next`. Decisões do PI (merge do kernel com o agente só nos conflitos, retrabalho por run, achados em tabela nova, escopo com smoke real) e as escolhas do Code a confirmar, na SPEC.
+
+- [x] **1. Domínio dos achados e do retrabalho** (`squad-achado.ts`, `squad-retrabalho.ts`, `squad-revisores.ts`): parecer estruturado, assinatura do kernel (categoria + arquivo + trecho), ciclo de vida `open/accepted/fixed/dismissed/superseded`, deduplicação, revalidação objetiva, contestação sem voto, veredito derivado dos achados, limite da M9-F04 por run.
+- [x] **2. Migração 49 e repositório** (`achado-repository.ts`): `UNIQUE(run, assinatura)`, transições validadas por alcance, uma linha por volta do retrabalho.
+- [x] **3. Git de integração do kernel** (`squad-git.ts`): merge sem commit em worktree de integração, resolução e commit de merge sem hook e com identidade fixa, diff com rename, ancestralidade da base, leitura que não atravessa link nem arquivo não UTF-8.
+- [x] **4. Integrador** (`squad-integrador.ts`, `squad-conflito.ts`, `squad-diff.ts`, `squad-manifesto.ts`): um bloco por chamada, sem ferramenta; estrutura ambígua, mais de 50 blocos e arquivo de configuração do Git param antes do modelo; manifesto de hunks contra o diff da base ao commit, por ocorrência e com rename; descarte só explica o que está no bloco daquele arquivo.
+- [x] **5. Revisor independente** (`squad-revisor.ts`): achado só vale em arquivo do delta e com trecho que o kernel reencontra no commit; `FIX_REQUIRED` sem evidência e rebaixamento de bloqueante não passam em silêncio; quórum de todos os revisores; só providers sem ferramenta.
+- [x] **6. Etapa TESTE** (`squad-teste.ts`): suíte sobre o commit integrado, em sandbox; `nao-rodou` nunca é verde; falha externa não gasta tentativa.
+- [x] **7. Ciclo TESTE → REVIEWER → DEVELOPER** (`squad-ciclo.ts`): ordem fixa, três tentativas por run, cada volta registrada no banco e na auditoria, correção só para o escritor.
+- [x] **8. Ligação dos slots**: `ganchosDosSlots` liga o `GerenteDeSlots` ao `FilaService` de produção (`aoAdquirir` e `aoCancelarEspera`, pendência da F03).
+- [x] **9. Smoke real** (`squad-revisao.smoke.int-spec.ts`, `JARVIS_SMOKE_FASE=1`): integrador e revisor com o `claude` CLI; **Docker real da etapa TESTE `not_run`** (engine em erro 500 nesta máquina).
+- [x] **10. Duas revisões independentes (código e segurança), corrigidas com teste vermelho antes:** texto do escritor forjando a estrutura do conflito; auditor que reprovava merge limpo (rename, linha repetida) e aprovava hunk apagado; revisor em provider com ferramenta (`codex`); severidade rebaixada com uma justificativa de uma palavra; quórum de um revisor; leitura de arquivo não UTF-8; fonte descartada pelo contexto indo ao modelo sem o scan de segredo.
+- [x] **11. Suíte completa:** 255 arquivos passando, **5044 testes** (+343 contra os 4701 da F03), 0 falhas de código; o único arquivo vermelho é `docker-egress.int-spec.ts`, por timeout do `docker info` (Docker Desktop em erro 500 nesta máquina), ambiente e não regressão.
+- [ ] **12. Relatório, PR e CI** — pendente.
+
 ## Registro de entregas
 
 | Data | Fatia | PR | Observação |
