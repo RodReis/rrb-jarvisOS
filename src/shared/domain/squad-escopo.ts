@@ -33,13 +33,23 @@ export interface VeredictoDoEscopo {
 }
 
 /**
+ * `.gitattributes` e `.gitmodules` mudam como o próprio Git lê o repositório (filtros, submódulos):
+ * não são trabalho do escritor, em pasta nenhuma.
+ */
+const ARQUIVOS_QUE_CONFIGURAM_O_GIT = /(^|\/)\.git(attributes|modules)$/i
+
+/**
  * O nome que o kernel aceita é o que o validador do plano aceitaria: `normalizar` devolve o
  * mesmo caminho. Qualquer diferença — barra no fim, `.env`, `NUL.ts`, segmento terminado em ponto —
  * é nome que não entra no repositório por esta via. O `-` inicial casaria o gate destrutivo do
  * terminal, e o `commitar` do kernel o recusa de qualquer modo.
  */
 function nomeInvalido(caminho: string): boolean {
-  return caminho.startsWith('-') || normalizar(caminho) !== caminho
+  return (
+    caminho.startsWith('-') ||
+    normalizar(caminho) !== caminho ||
+    ARQUIVOS_QUE_CONFIGURAM_O_GIT.test(caminho)
+  )
 }
 
 export function avaliarEscopoDoEscritor(

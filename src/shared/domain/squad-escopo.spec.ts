@@ -73,6 +73,17 @@ describe('prova de escopo do escritor', () => {
     expect(v.dentro).toEqual(['src/api/ok.ts'])
   })
 
+  it('arquivo que reconfigura o Git (.gitattributes, .gitmodules) em qualquer pasta reprova, mesmo dentro do escopo', () => {
+    const v = avaliarEscopoDoEscritor(
+      alt(['src/api/.gitattributes', '.gitmodules', 'src/api/ok.ts']),
+      escopo('src/api', '.gitmodules')
+    )
+
+    expect(v.ok).toBe(false)
+    expect(v.invalidos).toEqual(['src/api/.gitattributes', '.gitmodules'])
+    expect(v.dentro).toEqual(['src/api/ok.ts'])
+  })
+
   it('cada caminho conta uma vez, na primeira categoria que o pega', () => {
     const v = avaliarEscopoDoEscritor(
       alt(['fora/atalho', '.env', 'fora/x.ts'], ['fora/atalho']),

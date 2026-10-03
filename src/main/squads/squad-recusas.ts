@@ -18,14 +18,18 @@ export function recusaDaTentativa(tentativa: number): MotivoDeRecusaComum | unde
   return proximaTentativaPermitida(tentativa - 1) ? undefined : 'tentativas-esgotadas'
 }
 
-/** Prazo, entrada e saída precisam ser números positivos e finitos. */
+/**
+ * Prazo, entrada e saída precisam ser números positivos e finitos; os turnos, que viram o
+ * `--max-turns` do CLI, inteiros positivos.
+ */
 export function recusaDosLimites(
-  limites: Pick<TarefaDoPlano['limites'], 'maxMinutos' | 'maxTokensEntrada' | 'maxTokensSaida'>
+  limites: TarefaDoPlano['limites']
 ): MotivoDeRecusaComum | undefined {
-  const { maxMinutos, maxTokensEntrada, maxTokensSaida } = limites
-  const validos = [maxMinutos, maxTokensEntrada, maxTokensSaida].every(
-    (n) => Number.isFinite(n) && n > 0
-  )
+  const { maxTurnos, maxMinutos, maxTokensEntrada, maxTokensSaida } = limites
+  const validos =
+    Number.isInteger(maxTurnos) &&
+    maxTurnos > 0 &&
+    [maxMinutos, maxTokensEntrada, maxTokensSaida].every((n) => Number.isFinite(n) && n > 0)
   return validos ? undefined : 'limite-invalido'
 }
 

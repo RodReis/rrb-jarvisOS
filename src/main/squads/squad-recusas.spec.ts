@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { recusaDaTentativa, recusaDoContexto, recusaDosLimites } from './squad-recusas'
 
-const LIMITES = { maxMinutos: 5, maxTokensEntrada: 1000, maxTokensSaida: 500 }
+const LIMITES = { maxTurnos: 3, maxMinutos: 5, maxTokensEntrada: 1000, maxTokensSaida: 500 }
 
 describe('tentativa (limite da M9-F04)', () => {
   it('as três primeiras são permitidas; a quarta, não', () => {
@@ -29,6 +29,13 @@ describe('limites', () => {
         expect(recusaDosLimites({ ...LIMITES, [campo]: valor })).toBe('limite-invalido')
       }
     }
+  })
+
+  it('os turnos vão para --max-turns do CLI: só inteiro positivo passa', () => {
+    for (const valor of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(recusaDosLimites({ ...LIMITES, maxTurnos: valor })).toBe('limite-invalido')
+    }
+    expect(recusaDosLimites({ ...LIMITES, maxTurnos: 1 })).toBeUndefined()
   })
 })
 
