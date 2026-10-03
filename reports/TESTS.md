@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 2347 | 2347 | 0 | 80.8 | — | — |
-| — | — | — | Banco | 1667 | 1651 | 0 | 82.9 | — | — |
-| — | — | — | Tela | 735 | 734 | 0 | 76.5 | — | — |
+| — | — | — | Regras de Negócio | 2444 | 2444 | 0 | 81.5 | — | — |
+| — | — | — | Banco | 1681 | 1665 | 0 | 82.5 | — | — |
+| — | — | — | Tela | 772 | 771 | 0 | 77.3 | — | — |
 
 ## Histórico por entrega
 
@@ -418,3 +418,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-10-03 | #373 | spec-squads-00-prova-orquestrador-integrador | Regras de Negócio | 2347 | 2347 | 0 | 80.8 | #381 | [#381](https://github.com/RodReis/rrb-jarvisOS/pull/381) |
 | 2026-10-03 | #373 | spec-squads-00-prova-orquestrador-integrador | Banco | 1667 | 1651 | 0 | 82.9 | #381 | [#381](https://github.com/RodReis/rrb-jarvisOS/pull/381) |
 | 2026-10-03 | #373 | spec-squads-00-prova-orquestrador-integrador | Tela | 735 | 734 | 0 | 76.5 | #381 | [#381](https://github.com/RodReis/rrb-jarvisOS/pull/381) |
+| 2026-10-03 | #356 | spec-escuta-01-wake-word | Regras de Negócio | 2444 | 2444 | 0 | 81.5 | #383 | [#383](https://github.com/RodReis/rrb-jarvisOS/pull/383) |
+| 2026-10-03 | #356 | spec-escuta-01-wake-word | Banco | 1681 | 1665 | 0 | 82.5 | #383 | [#383](https://github.com/RodReis/rrb-jarvisOS/pull/383) |
+| 2026-10-03 | #356 | spec-escuta-01-wake-word | Tela | 772 | 771 | 0 | 77.3 | #383 | [#383](https://github.com/RodReis/rrb-jarvisOS/pull/383) |
