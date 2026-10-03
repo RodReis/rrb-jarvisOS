@@ -145,3 +145,35 @@ export const MODELO_PADRAO_DA_CONVERSA = 'qwen3:8b'
  * Zero está na lista porque é escolha legítima: perguntas independentes, sem follow-up.
  */
 export const JANELAS_DA_CONVERSA = [0, 5, 10, 20, 50] as const
+
+/**
+ * O estado da escuta contínua de wake word (SPEC-Escuta-01, critérios 8, 9, 11 e 12).
+ *
+ * Moram em `shared` porque renderer e main precisam do mesmo contrato.
+ * A tela usa para desenhar o indicador permanente, o kill switch e a sensibilidade.
+ */
+export interface EstadoDaEscuta {
+  /** Se a escuta contínua está ligada (kill switch). */
+  readonly ativa: boolean
+  /** Se o interpretador e o modelo da wake word estão prontos no disco. */
+  readonly disponivel: boolean
+  /** Sensibilidade calibrada [0.1, 0.95]. */
+  readonly sensibilidade: number
+  /** Se a captura está mutada temporariamente pela hotkey global de mute. */
+  readonly mutada: boolean
+}
+
+/** Resultado de um teste ao vivo de wake word em Settings (critério 12). */
+export interface DesfechoDoTesteWakeWord {
+  readonly confianca: number
+  readonly limiar: number
+  readonly disparou: boolean
+}
+
+/** Palavra de ativação oficial do sistema. */
+export const WAKE_WORD_OFICIAL = 'Ei, amigo'
+
+/** Limiares padrão de sensibilidade para UI e validação. */
+export const SENSIBILIDADE_PADRAO_WAKE_WORD = 0.5
+export const SENSIBILIDADE_MINIMA_WAKE_WORD = 0.1
+export const SENSIBILIDADE_MAXIMA_WAKE_WORD = 0.95

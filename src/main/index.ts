@@ -1608,7 +1608,10 @@ if (!app.requestSingleInstanceLock()) {
       })
 
     const faltandoNoDisco = (): readonly string[] => {
-      const doStt = ARTEFATOS_DA_VOZ.filter((a) => grupoDoArtefato(a.id) !== 'vozes')
+      const doStt = ARTEFATOS_DA_VOZ.filter((a) => {
+        const grupo = grupoDoArtefato(a.id)
+        return grupo !== 'vozes' && grupo !== 'wake'
+      })
 
       /*
        * O modelo é medido por presença; runtime e wheels, por **usabilidade**.

@@ -70,6 +70,17 @@ Trocar o gatilho da conversa. Hoje o loop de voz do MVP-017 começa com um ato e
 8. **Sensibilidade:** ajustável em Settings, com teste ao vivo. — decidido.
 9. **Controle do microfone aberto:** kill switch alcançável, indicador permanente, `AuditEvent` ao ligar/desligar e hotkey global de mute — os quatro dentro desta fatia. — decidido.
 
+## Revisão de escopo decidida pelo PI (2026-10-03, issue #356)
+
+- **Dois gatilhos configuráveis em Settings:** frase "Ei, amigo" e duas palmas seguidas.
+  Cada gatilho pode ser ligado ou desligado separadamente; ambos iniciam o mesmo loop de
+  conversa e são ignorados enquanto um turno já está ativo.
+- **Estado inicial:** após instalar e verificar o modelo local, a escuta contínua começa
+  ligada. O kill switch persistido prevalece sobre esse padrão quando o PI a desliga.
+- O detector de palmas precisa de contrafactuais para palma isolada, ruído sustentado e
+  fala comum, além de teste físico. O controle visual, a hotkey e a auditoria cobrem a
+  captura compartilhada, independentemente de qual gatilho esteja habilitado.
+
 ## Decisões cravadas pelo Cowork (coerentes com as anteriores; o PI pode vetar)
 
 - **Sidecar próprio para a escuta**, sobre o mesmo runtime Python já baixado pela M17-F01. Os ciclos de vida diferem — a escuta vive enquanto estiver ligada, o STT nasce sob demanda — e um crash na transcrição não pode derrubar a escuta.
