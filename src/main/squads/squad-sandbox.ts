@@ -26,6 +26,15 @@ export interface PreflightParaOEscritor {
   preparar(pedido: PedidoDePreflight): PreflightOutcome
 }
 
+/** O proxy do executor, que roteia cada unidade para o run e o pack dela (critério 5). */
+export interface ProxyParaOEscritor {
+  registrarUnidade(contexto: { runId: string; tentativa: number; contextPackId: string }): {
+    chave: string
+    caminho: string
+  }
+  liberarUnidade(chave: string): void
+}
+
 export interface DockerParaOEscritor {
   parar(nome: string, cwd: string): boolean
 }
@@ -34,6 +43,7 @@ export interface DependenciasDoSandboxDoEscritor {
   readonly preflight: PreflightParaOEscritor
   readonly git: Pick<SquadGit, 'adotarWorktree'>
   readonly docker: DockerParaOEscritor
+  readonly proxy: ProxyParaOEscritor
   /** A raiz operacional validada: onde os worktrees podem nascer. Nunca o checkout ativo. */
   readonly raizOperacional: () => string
   /** A URL do proxy do host que o sidecar encaminha. */
@@ -48,14 +58,20 @@ export const unidadeDeSandbox = (
 ): string => `${p.runId}-${p.escritor}-t${p.tentativa}`
 
 export class SandboxDoEscritorReal implements SandboxDoEscritor {
-  /** O sandbox de cada unidade em uso, para o agente achar o container e o `encerrar` pará-lo. */
-  private readonly porUnidade = new Map<string, SandboxPreparado>()
+  /** O sandbox e a chave de proxy de cada unidade em uso: o `encerrar` para um e libera a outra. */
+  private readonly porUnidade = new Map<string, { sandbox: SandboxPreparado; chave: string }>()
   private readonly porWorktree = new Map<string, SandboxPreparado>()
 
   constructor(private readonly deps: DependenciasDoSandboxDoEscritor) {}
 
   async preparar(pedido: PedidoDeSandbox): ReturnType<SandboxDoEscritor['preparar']> {
     const unidade = unidadeDeSandbox(pedido)
+    // A chave nasce antes do container: a URL que ele recebe já carrega o caminho da unidade.
+    const rota = this.deps.proxy.registrarUnidade({
+      runId: pedido.runId,
+      tentativa: pedido.tentativa,
+      contextPackId: pedido.contextPackId
+    })
     const preflight = this.deps.preflight.preparar({
       runId: unidade,
       projectId: pedido.projectId,
@@ -65,10 +81,12 @@ export class SandboxDoEscritorReal implements SandboxDoEscritor {
       base: pedido.baseSha,
       pathsDaSpec: pedido.pathsPermitidos,
       proxyUrl: this.deps.proxyUrl(),
-      sufixoDaBranch: `${pedido.escritor}-t${pedido.tentativa}`
+      sufixoDaBranch: `${pedido.escritor}-t${pedido.tentativa}`,
+      caminhoDoProxy: rota.caminho
     })
     const sandbox = preflight.sandbox
     if (preflight.reason !== 'liberado' || sandbox === undefined) {
+      this.deps.proxy.liberarUnidade(rota.chave)
       return { ok: false, motivo: `${preflight.reason}: ${preflight.mensagem}` }
     }
 
@@ -81,10 +99,11 @@ export class SandboxDoEscritorReal implements SandboxDoEscritor {
     if (!adotado.ok) {
       // O container já subiu: sem adotar o worktree o escritor não roda, e o container não fica.
       this.parar(sandbox)
+      this.deps.proxy.liberarUnidade(rota.chave)
       return { ok: false, motivo: `worktree-nao-adotado: ${adotado.motivo}` }
     }
 
-    this.porUnidade.set(unidade, sandbox)
+    this.porUnidade.set(unidade, { sandbox, chave: rota.chave })
     this.porWorktree.set(sandbox.worktreeNoHost, sandbox)
     return { ok: true, worktree: adotado.valor }
   }
@@ -97,10 +116,12 @@ export class SandboxDoEscritorReal implements SandboxDoEscritor {
 
   async encerrar(pedido: PedidoDeSandbox): Promise<void> {
     const unidade = unidadeDeSandbox(pedido)
-    const sandbox = this.porUnidade.get(unidade)
-    if (sandbox === undefined) return
+    const emUso = this.porUnidade.get(unidade)
+    if (emUso === undefined) return
+    const { sandbox, chave } = emUso
     this.porUnidade.delete(unidade)
     this.porWorktree.delete(sandbox.worktreeNoHost)
+    this.deps.proxy.liberarUnidade(chave)
     this.parar(sandbox)
   }
 

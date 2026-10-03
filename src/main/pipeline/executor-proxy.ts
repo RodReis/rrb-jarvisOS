@@ -31,6 +31,7 @@
  * e no `execution_run`. Sem segredo para vazar, não há vazamento.
  */
 
+import { randomBytes } from 'node:crypto'
 import { createServer, type Server } from 'node:http'
 import type { AiProvider, AiRequest } from '@shared/domain/ai'
 import type { WorkspaceId } from '@shared/domain/entities'
@@ -55,9 +56,21 @@ export interface ProxyDeps {
   readonly contextPackId: () => string | undefined
 }
 
+/** O contexto de **uma unidade** (um escritor de um Squad): o run, a tentativa e o pack dela. */
+export interface ContextoDaUnidade {
+  readonly runId: string
+  readonly tentativa: number
+  readonly contextPackId: string
+}
+
+/** O prefixo de caminho que identifica uma unidade: `/u/<chave>`. */
+const PREFIXO_DA_UNIDADE = /^\/u\/([^/]*)/
+
 export class ExecutorProxy {
   private servidor?: Server
   private porta?: number
+  /** As unidades registradas, por chave. A chave é a única credencial de roteamento: aleatória. */
+  private readonly unidades = new Map<string, ContextoDaUnidade>()
 
   constructor(private readonly deps: ProxyDeps) {}
 
@@ -88,6 +101,33 @@ export class ExecutorProxy {
     return this.url()
   }
 
+  /**
+   * Registra o contexto de uma unidade e devolve o caminho que o container dela usa na
+   * `ANTHROPIC_BASE_URL` (SPEC-Squads-03, critério 5).
+   *
+   * O proxy é um só, e o contexto de `deps` é global — serve a um run por vez. Dois escritores
+   * rodando juntos precisam que cada chamada chegue ao ponto único com **o run, a tentativa e o
+   * pack da própria unidade**; senão o custo e o manifesto de um seriam atribuídos ao outro. A
+   * chave é **aleatória** (16 bytes): um container que adivinhasse a de outro usaria o pack e o
+   * orçamento dele, e uma chave previsível (`run-escritor-t1`) seria exatamente isso.
+   *
+   * A chave não é credencial de modelo — nenhuma credencial atravessa a fronteira —, é só a de
+   * roteamento. Ela viaja no argumento do `docker run`, e por isso é por unidade e descartável.
+   */
+  registrarUnidade(contexto: ContextoDaUnidade): {
+    readonly chave: string
+    readonly caminho: string
+  } {
+    const chave = randomBytes(16).toString('hex')
+    this.unidades.set(chave, contexto)
+    return { chave, caminho: `/u/${chave}` }
+  }
+
+  /** A unidade terminou: a chave deixa de valer. Liberar o que não existe não faz nada. */
+  liberarUnidade(chave: string): void {
+    this.unidades.delete(chave)
+  }
+
   /** O proxy está no ar? É o que o preflight pergunta antes de liberar o run (critério 11). */
   noAr(): boolean {
     return this.servidor !== undefined && this.servidor.listening
@@ -113,7 +153,7 @@ export class ExecutorProxy {
   }
 
   private async atender(
-    req: NodeJS.ReadableStream & { readonly method?: string },
+    req: NodeJS.ReadableStream & { readonly method?: string; readonly url?: string },
     res: NodeJS.WritableStream & {
       writeHead: (status: number, headers?: Record<string, string>) => void
       end: (chunk?: string) => void
@@ -135,8 +175,17 @@ export class ExecutorProxy {
       return
     }
 
-    const contexto = this.deps.contexto()
-    const packId = this.deps.contextPackId()
+    // Com o prefixo `/u/<chave>`, o contexto é o da unidade; sem ele, o global de antes. Uma chave
+    // que ninguém registrou é recusa — e nada chega ao ponto único.
+    const prefixo = PREFIXO_DA_UNIDADE.exec(req.url ?? '')
+    const unidade = prefixo === null ? undefined : this.unidades.get(prefixo[1])
+    if (prefixo !== null && unidade === undefined) {
+      res.writeHead(403, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ error: 'Unidade desconhecida.' }))
+      return
+    }
+    const contexto = unidade ?? this.deps.contexto()
+    const packId = unidade?.contextPackId ?? this.deps.contextPackId()
 
     const pedido: AiRequest = {
       provider: this.deps.rota(),

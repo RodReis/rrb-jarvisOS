@@ -12,7 +12,8 @@ const PEDIDO: PedidoDeSandbox = {
   tentativa: 1,
   repositorio: '/repo',
   baseSha: 'a'.repeat(40),
-  pathsPermitidos: { origem: 'derivada', paths: ['src/api'], justificativa: 'write set' }
+  pathsPermitidos: { origem: 'derivada', paths: ['src/api'], justificativa: 'write set' },
+  contextPackId: 'pack-1'
 }
 
 const sandboxPreparado = (unidade: string): SandboxPreparado =>
@@ -36,6 +37,8 @@ function montar(
 ) {
   const preparados: PedidoDePreflight[] = []
   const parados: [string, string][] = []
+  const registrados: { runId: string; tentativa: number; contextPackId: string }[] = []
+  const liberadas: string[] = []
   const adotar =
     opcoes.adotar ??
     vi.fn((p: { worktree: string }) => ({
@@ -68,11 +71,19 @@ function montar(
         return true
       }
     },
+    proxy: {
+      registrarUnidade: (c) => {
+        registrados.push(c)
+        const chave = `chave-${registrados.length}`
+        return { chave, caminho: `/u/${chave}` }
+      },
+      liberarUnidade: (chave) => void liberadas.push(chave)
+    },
     raizOperacional: () => '/raiz',
     proxyUrl: () => 'http://proxy',
     cwdDoDocker: () => '/raiz'
   })
-  return { sandbox, preparados, parados, adotar }
+  return { sandbox, preparados, parados, adotar, registrados, liberadas }
 }
 
 describe('unidade de sandbox', () => {
@@ -102,7 +113,8 @@ describe('preparar', () => {
         base: 'a'.repeat(40),
         pathsDaSpec: PEDIDO.pathsPermitidos,
         proxyUrl: 'http://proxy',
-        sufixoDaBranch: 'api-t1'
+        sufixoDaBranch: 'api-t1',
+        caminhoDoProxy: '/u/chave-1'
       }
     ])
   })
@@ -187,6 +199,60 @@ describe('preparar', () => {
     expect(r).toEqual({ ok: false, motivo: 'worktree-nao-adotado: fora do .git do repositório' })
     expect(parados).toEqual([['jarvisos-run-run-1-api-t1', '/raiz']])
     expect(sandbox.containerDe('/raiz/jarvisos-run-run-1-api-t1')).toBeUndefined()
+  })
+})
+
+describe('a unidade no proxy (SPEC-Squads-03, critério 5)', () => {
+  it('registra o run, a tentativa e o pack da unidade antes de subir o container', async () => {
+    const { sandbox, registrados, preparados } = montar()
+
+    await sandbox.preparar({ ...PEDIDO, tentativa: 2 })
+
+    expect(registrados).toEqual([{ runId: 'run-1', tentativa: 2, contextPackId: 'pack-1' }])
+    expect(preparados[0].caminhoDoProxy).toBe('/u/chave-1')
+  })
+
+  it('cada escritor e cada tentativa ganham a sua chave', async () => {
+    const { sandbox, preparados } = montar()
+
+    await sandbox.preparar(PEDIDO)
+    await sandbox.preparar({ ...PEDIDO, escritor: 'ui' })
+    await sandbox.preparar({ ...PEDIDO, tentativa: 2 })
+
+    expect(preparados.map((p) => p.caminhoDoProxy)).toEqual([
+      '/u/chave-1',
+      '/u/chave-2',
+      '/u/chave-3'
+    ])
+  })
+
+  it('a chave é liberada se o Preflight recusa, e se o worktree não é adotado', async () => {
+    const recusa = montar({ preflight: () => ({ reason: 'docker-indisponivel', mensagem: 'x' }) })
+    await recusa.sandbox.preparar(PEDIDO)
+    expect(recusa.liberadas).toEqual(['chave-1'])
+
+    const semAdocao = montar({ adotar: vi.fn(() => ({ ok: false, motivo: 'x' })) })
+    await semAdocao.sandbox.preparar(PEDIDO)
+    expect(semAdocao.liberadas).toEqual(['chave-1'])
+  })
+
+  it('a chave continua valendo enquanto o escritor trabalha, e sai quando o sandbox encerra', async () => {
+    const { sandbox, liberadas } = montar()
+    await sandbox.preparar(PEDIDO)
+    await sandbox.preparar({ ...PEDIDO, escritor: 'ui' })
+    expect(liberadas).toEqual([])
+
+    await sandbox.encerrar(PEDIDO)
+
+    expect(liberadas).toEqual(['chave-1'])
+  })
+
+  it('encerrar o que nunca subiu não libera chave nenhuma', async () => {
+    const { sandbox, liberadas } = montar()
+
+    await sandbox.encerrar(PEDIDO)
+
+    expect(liberadas).toEqual([])
   })
 })
 

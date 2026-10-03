@@ -13,6 +13,7 @@
  *  - o proxy escuta só em loopback, e `noAr()` responde o que o preflight pergunta.
  */
 
+import { request } from 'node:http'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AiRequest, AiStreamEvent } from '@shared/domain/ai'
 import type { WorkspaceId } from '@shared/domain/entities'
@@ -217,5 +218,129 @@ describe('ExecutorProxy — chamada do container passa pelo gate de orçamento a
     }
 
     expect(chamadasAoGate).toEqual([3])
+  })
+})
+
+describe('ExecutorProxy — contexto por unidade (SPEC-Squads-03, critério 5)', () => {
+  const pedidoHttp = (caminho: string): Promise<Response> =>
+    fetch(`${urlLocal()}${caminho}`, {
+      method: 'POST',
+      body: JSON.stringify({ messages: [{ role: 'user', content: 'edite' }] })
+    })
+
+  it('cada unidade chega ao ponto único com o run, a tentativa e o pack dela — não os globais', async () => {
+    const a = proxy.registrarUnidade({ runId: 'run-A', tentativa: 1, contextPackId: 'pack-A' })
+    const b = proxy.registrarUnidade({ runId: 'run-B', tentativa: 3, contextPackId: 'pack-B' })
+
+    await (await pedidoHttp(`${a.caminho}/v1/messages`)).text()
+    await (await pedidoHttp(`${b.caminho}/v1/messages`)).text()
+
+    expect(recebidos.map((r) => [r.runId, r.tentativa, r.contextPackId])).toEqual([
+      ['run-A', 1, 'pack-A'],
+      ['run-B', 3, 'pack-B']
+    ])
+  })
+
+  it('duas unidades em paralelo não misturam contexto', async () => {
+    const a = proxy.registrarUnidade({ runId: 'run-A', tentativa: 1, contextPackId: 'pack-A' })
+    const b = proxy.registrarUnidade({ runId: 'run-B', tentativa: 1, contextPackId: 'pack-B' })
+
+    await Promise.all([
+      pedidoHttp(`${a.caminho}/v1/messages`).then((r) => r.text()),
+      pedidoHttp(`${b.caminho}/v1/messages`).then((r) => r.text())
+    ])
+
+    expect(recebidos.map((r) => r.contextPackId).sort()).toEqual(['pack-A', 'pack-B'])
+    expect(new Set(recebidos.map((r) => r.runId)).size).toBe(2)
+  })
+
+  it('a chave é aleatória e longa, e cada registro tem a sua', () => {
+    const a = proxy.registrarUnidade({ runId: 'r', tentativa: 1, contextPackId: 'p' })
+    const b = proxy.registrarUnidade({ runId: 'r', tentativa: 1, contextPackId: 'p' })
+
+    expect(a.chave).toMatch(/^[0-9a-f]{32}$/)
+    expect(a.chave).not.toBe(b.chave)
+    expect(a.caminho).toBe(`/u/${a.chave}`)
+  })
+
+  it('uma chave que ninguém registrou é recusada, e nada chega ao ponto único', async () => {
+    const r = await pedidoHttp(`/u/${'0'.repeat(32)}/v1/messages`)
+
+    expect(r.status).toBe(403)
+    expect(recebidos).toHaveLength(0)
+  })
+
+  it('uma unidade não usa a chave de outra: sem a chave exata, 403', async () => {
+    const a = proxy.registrarUnidade({ runId: 'run-A', tentativa: 1, contextPackId: 'pack-A' })
+
+    for (const ruim of [
+      `/u/${a.chave.slice(1)}/v1/messages`,
+      `/u/${a.chave}x/v1/messages`,
+      `/u/${a.chave.toUpperCase()}/v1/messages`,
+      `/u//v1/messages`
+    ]) {
+      const r = await pedidoHttp(ruim)
+      expect(r.status).toBe(403)
+    }
+    expect(recebidos).toHaveLength(0)
+  })
+
+  it('o caminho com ".." cru, que o fetch normalizaria, também é 403', async () => {
+    const porta = Number(new URL(urlLocal()).port)
+
+    const status = await new Promise<number>((resolve, reject) => {
+      const req = request(
+        { host: '127.0.0.1', port: porta, path: '/u/../v1/messages', method: 'POST' },
+        (res) => {
+          res.resume()
+          resolve(res.statusCode ?? 0)
+        }
+      )
+      req.on('error', reject)
+      req.end(JSON.stringify({ messages: [{ role: 'user', content: 'x' }] }))
+    })
+
+    expect(status).toBe(403)
+    expect(recebidos).toHaveLength(0)
+  })
+
+  it('o prefixo só vale no começo do caminho: a chave no meio dele não troca o contexto', async () => {
+    const a = proxy.registrarUnidade({ runId: 'run-A', tentativa: 1, contextPackId: 'pack-A' })
+
+    await (await pedidoHttp(`/v1${a.caminho}/messages`)).text()
+
+    expect(recebidos[0]).toMatchObject({ runId: 'run-7', contextPackId: 'pack-9' })
+  })
+
+  it('liberada a unidade, a chave deixa de valer', async () => {
+    const a = proxy.registrarUnidade({ runId: 'run-A', tentativa: 1, contextPackId: 'pack-A' })
+    proxy.liberarUnidade(a.chave)
+
+    const r = await pedidoHttp(`${a.caminho}/v1/messages`)
+
+    expect(r.status).toBe(403)
+    expect(recebidos).toHaveLength(0)
+  })
+
+  it('liberar uma chave que não existe não faz nada', () => {
+    expect(() => proxy.liberarUnidade('nao-existe')).not.toThrow()
+  })
+
+  it('sem o prefixo de unidade, o contexto global de antes continua valendo', async () => {
+    await (await pedidoHttp('/v1/messages')).text()
+
+    expect(recebidos[0]).toMatchObject({ runId: 'run-7', tentativa: 2, contextPackId: 'pack-9' })
+  })
+
+  it('a unidade usa a rota do proxy, e a exceção do ponto único não vaza para o container', async () => {
+    const a = proxy.registrarUnidade({ runId: 'run-A', tentativa: 1, contextPackId: 'pack-A' })
+    responder = () => {
+      throw new Error('segredo-do-provider')
+    }
+
+    const texto = await (await pedidoHttp(`${a.caminho}/v1/messages`)).text()
+
+    expect(recebidos[0].provider).toBe('claude-code')
+    expect(texto).not.toContain('segredo-do-provider')
   })
 })

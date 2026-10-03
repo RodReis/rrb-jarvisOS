@@ -59,6 +59,8 @@ export interface PedidoDeSandbox {
   readonly repositorio: string
   readonly baseSha: string
   readonly pathsPermitidos: PathsPermitidos
+  /** O pack que autoriza as chamadas de modelo desta unidade: o proxy a roteia por ele. */
+  readonly contextPackId: string
 }
 
 /** O ambiente isolado do escritor: um worktree próprio e, em produção, o container dele. */
@@ -272,7 +274,8 @@ export class ExecutorDeEscritor {
       tentativa: pedido.tentativa,
       repositorio: pedido.repositorio,
       baseSha: pedido.baseSha,
-      pathsPermitidos: escopo
+      pathsPermitidos: escopo,
+      contextPackId: pedido.contexto.pack.id
     }
     try {
       return await this.trabalhar(pedido, escopo, sandbox, slot.unidade, slot.fencingToken)

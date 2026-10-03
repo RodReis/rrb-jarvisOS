@@ -448,6 +448,40 @@ describe('preflight — liberação', () => {
     expect(outcome.sandbox?.cwd).not.toContain(dir)
   })
 
+  it('o caminho do proxy da unidade entra na URL do container, e só ele (SPEC-Squads-03)', () => {
+    const chamadas: ChamadaDocker[] = []
+    const chave = 'a'.repeat(32)
+
+    const outcome = montarServico({ chamadas }).preparar(pedido({ caminhoDoProxy: `/u/${chave}` }))
+
+    expect(outcome.reason).toBe('liberado')
+    expect(chamadas[0]?.montagem?.proxyUrl).toBe(`http://192.168.16.2:8080/u/${chave}`)
+    expect(outcome.sandbox?.proxyUrl).toBe(`http://192.168.16.2:8080/u/${chave}`)
+  })
+
+  it('o caminho que não tem a forma de uma unidade é ignorado, não concatenado', () => {
+    const ruins = [
+      '/x/' + 'a'.repeat(32),
+      '/x/u/' + 'a'.repeat(32),
+      '/u/' + 'a'.repeat(31),
+      '/u/' + 'a'.repeat(33),
+      '/u/' + 'g'.repeat(32),
+      '/u/' + 'A'.repeat(32),
+      '/u/curta',
+      `/u/${'a'.repeat(32)}/mais`,
+      'u/abc',
+      '//evil.com/x'
+    ]
+    for (const [i, ruim] of ruins.entries()) {
+      const chamadas: ChamadaDocker[] = []
+
+      // Um run por caminho: o worktree e a branch de um não podem colidir com os do seguinte.
+      montarServico({ chamadas }).preparar(pedido({ caminhoDoProxy: ruim, runId: `${RUN}-${i}` }))
+
+      expect(chamadas[0]?.montagem?.proxyUrl).toBe('http://192.168.16.2:8080')
+    }
+  })
+
   /**
    * Critério 9: nenhum segredo entra no container. Medido nos **argumentos reais** do
    * `docker run` que o serviço montou — inspecionar o retorno não provaria nada.
