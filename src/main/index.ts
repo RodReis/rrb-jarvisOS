@@ -8,17 +8,22 @@ import { Sidecar } from './voz/sidecar'
 import { criarEngineFasterWhisper } from './voz/engine-faster-whisper'
 import { criarEnginePiper } from './voz/engine-piper'
 import { HotkeyDaVoz } from './voz/hotkey-da-voz'
+import { criarEngineOpenWakeWord } from './voz/engine-openwakeword'
+import { DetectorDeDuasPalmas } from './voz/detector-de-palmas'
+import { EscutaService } from './voz/escuta-service'
+import { criarEstadoDaEscutaEmDisco } from './voz/estado-da-escuta-em-disco'
+import { criarAoDispararDaEscuta } from './voz/disparo-da-escuta'
 import { prepararRuntime, runtimeUsavel } from './voz/preparo-do-runtime'
 import { ConversaService } from './voz/conversa-service'
 import { MODELO_PADRAO } from '@shared/domain/ai'
-import { MODELO_PADRAO_DA_CONVERSA } from '@shared/domain/voz'
+import { MODELO_PADRAO_DA_CONVERSA, type HotkeyDeMuteDaEscuta } from '@shared/domain/voz'
 import { criarRotaLocal } from './voz/rota-local'
 import { montarSnapshot } from './voz/snapshot-do-app'
 import { PersonaRepository } from './voz/persona-repository'
 import type { ModoDeCompute } from '@shared/domain/voz'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { execFile, spawn } from 'node:child_process'
-import { app, BrowserWindow, globalShortcut, nativeTheme, shell } from 'electron'
+import { app, BrowserWindow, globalShortcut, nativeTheme, powerMonitor, shell } from 'electron'
 import { IPC_EVENT_CHANNELS } from '@shared/contracts/ipc'
 import { AuthService } from './auth/auth-service'
 import { createSupabaseClient, readSupabaseConfig } from './auth/supabase-client'
@@ -1608,7 +1613,10 @@ if (!app.requestSingleInstanceLock()) {
       })
 
     const faltandoNoDisco = (): readonly string[] => {
-      const doStt = ARTEFATOS_DA_VOZ.filter((a) => grupoDoArtefato(a.id) !== 'vozes')
+      const doStt = ARTEFATOS_DA_VOZ.filter((a) => {
+        const grupo = grupoDoArtefato(a.id)
+        return grupo !== 'vozes' && grupo !== 'wake'
+      })
 
       /*
        * O modelo é medido por presença; runtime e wheels, por **usabilidade**.
@@ -1769,6 +1777,93 @@ if (!app.requestSingleInstanceLock()) {
     aplicarHotkeyDaVoz()
 
     /*
+     * A escuta contínua (SPEC-Escuta-01). Serviço do main, global aos dois espaços: o renderer só
+     * captura o microfone e manda o PCM; as decisões (ligar, gatilho, bloqueio) moram aqui.
+     *
+     * Sidecar próprio sobre o mesmo runtime Python: o ciclo de vida difere (a escuta vive enquanto
+     * estiver ligada) e um crash na transcrição não pode derrubar a escuta.
+     */
+    const pastaDoWake = join(app.getPath('userData'), 'models', 'wake')
+    const engineDaEscuta = criarEngineOpenWakeWord({
+      sidecar: new Sidecar({
+        spawn: (comando, args) => spawn(comando, [...args], { stdio: 'pipe' }),
+        comando: diretorioDaVoz('runtime', 'python', 'python.exe'),
+        args: [join(__dirname, 'sidecar-wake.py')],
+        timeoutMs: 30_000
+      }),
+      configuracao: () => ({
+        modelo: join(pastaDoWake, 'ei_amigo.onnx'),
+        melspec: join(pastaDoWake, 'melspectrogram.onnx'),
+        embedding: join(pastaDoWake, 'embedding_model.onnx')
+      })
+    })
+
+    const avisarTela = (canal: string, payload: unknown): void => {
+      // `isDestroyed` pela mesma razão da hotkey: o gatilho chega com a janela fechando.
+      if (janela !== undefined && !janela.isDestroyed()) janela.webContents.send(canal, payload)
+    }
+
+    // Bloqueio lido do `powerMonitor`, e não de heurística de foco (decisão da SPEC).
+    let sessaoBloqueada = false
+    powerMonitor.on('lock-screen', () => (sessaoBloqueada = true))
+    powerMonitor.on('unlock-screen', () => (sessaoBloqueada = false))
+
+    /*
+     * A hotkey de mute é o próprio kill switch por outro caminho: corta a captura com a janela
+     * minimizada e fica persistida e auditada como qualquer desligamento. Registrar é mudança
+     * observável fora do app, então a combinação e o aceite do SO vão para a auditoria — a recusa
+     * também, porque silêncio esconderia um atalho que nunca funcionou.
+     *
+     * Libera a anterior **antes** de pedir a nova: dois aceleradores ativos fariam o antigo seguir
+     * cortando o microfone depois de o PI tê-lo trocado, e a mudança pareceria não ter pegado.
+     */
+    let muteAtual: HotkeyDeMuteDaEscuta | undefined
+    const registrarHotkeyDeMute = (acelerador: HotkeyDeMuteDaEscuta): boolean => {
+      if (muteAtual !== undefined) globalShortcut.unregister(muteAtual)
+      muteAtual = undefined
+      const registrado = globalShortcut.register(acelerador, () => {
+        void escuta.alternarPorHotkey()
+      })
+      if (registrado) muteAtual = acelerador
+      storage.audit.append({
+        user_id: userIdAtual(),
+        type: 'voz.hotkey.registro',
+        payload: { acelerador, registrado, funcao: 'mute' }
+      })
+      if (!registrado) {
+        log.sistema.warn(
+          'A hotkey de mute da escuta não pôde ser registrada; o botão da tela segue valendo',
+          { acelerador }
+        )
+      }
+      return registrado
+    }
+
+    const escuta = new EscutaService({
+      engine: engineDaEscuta,
+      registrarHotkey: registrarHotkeyDeMute,
+      palmas: new DetectorDeDuasPalmas(),
+      estado: criarEstadoDaEscutaEmDisco(diretorioDaVoz('escuta.json')),
+      // Sem o runtime usável e os três arquivos do detector, a escuta não abre o microfone.
+      modeloPronto: async () =>
+        runtimeUsavel({ diretorioDaVoz, existe: existsSync }) && engineDaEscuta.disponivel(),
+      auditar: ({ type, payload }) =>
+        storage.audit.append({ user_id: userIdAtual(), type, payload }),
+      sessaoBloqueada: () => sessaoBloqueada,
+      // O push-to-talk por hotkey também é um turno: a escuta não abre um segundo por cima.
+      turnoAtivo: () => hotkeyDaVoz.estaGravando,
+      // É este aviso que fecha o `getUserMedia` na tela (critério 8): o estado vai inteiro.
+      aoMudarCaptura: () => avisarTela(IPC_EVENT_CHANNELS.escutaMudou, escuta.estado()),
+      aoTestar: (disparo) => avisarTela(IPC_EVENT_CHANNELS.escutaTeste, disparo),
+      aoDisparar: criarAoDispararDaEscuta({
+        revelarJanela: () => {
+          if (janela !== undefined && !janela.isDestroyed()) revelarJanela(janela)
+        },
+        avisarTela: (disparo) => avisarTela(IPC_EVENT_CHANNELS.escutaDisparo, disparo)
+      })
+    })
+
+    /*
      * O sidecar morre com o app (critério 2), e o atalho global é liberado junto.
      *
      * Sem liberar, o acelerador continuaria registrado no SO depois de o app sair — a próxima
@@ -1776,6 +1871,8 @@ if (!app.requestSingleInstanceLock()) {
      */
     app.on('will-quit', () => {
       hotkeyDaVoz.liberar()
+      if (muteAtual !== undefined) globalShortcut.unregister(muteAtual)
+      void engineDaEscuta.encerrar()
       void engineDaVoz.encerrar()
       // O segundo sidecar morre junto: são processos separados por isolamento de crash, não
       // porque um deles deva sobreviver ao app.
@@ -1784,6 +1881,7 @@ if (!app.requestSingleInstanceLock()) {
 
     registerIpcHandlers({
       voz,
+      escuta,
       tts,
       conversa,
       personas,
@@ -1910,6 +2008,13 @@ if (!app.requestSingleInstanceLock()) {
 
     janela = createMainWindow()
     createTray(janela)
+
+    // Depois da janela existir: ligar a escuta avisa a tela, e sem janela o aviso cairia no vazio.
+    escuta.restaurar().catch((erro: unknown) => {
+      log.sistema.warn('A escuta contínua não pôde ser restaurada na abertura', {
+        motivo: erro instanceof Error ? erro.message : 'desconhecido'
+      })
+    })
 
     /*
      * A coleta roda **uma vez, na abertura** (SPEC-Fases-03 § Persistência).

@@ -11,6 +11,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AuthSnapshot } from '@shared/contracts/auth'
 import { App } from '../app/App'
+import { pontaDaEscuta } from '../app/test-utils'
 
 const getAuth = vi.fn()
 const login = vi.fn()
@@ -39,6 +40,7 @@ function mockarPonte(): void {
   Object.defineProperty(window, 'jarvis', {
     value: {
       getAppInfo: vi.fn(),
+      ...pontaDaEscuta(),
       sendLog: vi.fn(),
       minimizeToTray: vi.fn(),
       switchWorkspace: vi.fn().mockResolvedValue({ workspace: 'jarvis', auditSeq: 1 }),

@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspaceId } from '@shared/domain/entities'
 import { App } from './App'
-import { entrarPelaChoice } from './test-utils'
+import { entrarPelaChoice, pontaDaEscuta } from './test-utils'
 import { ROTEAMENTO_PADRAO } from '@shared/domain/routing'
 
 const sendLog = vi.fn()
@@ -75,6 +75,7 @@ function mockarPonte(): void {
   Object.defineProperty(window, 'jarvis', {
     value: {
       getAppInfo: vi.fn(),
+      ...pontaDaEscuta(),
       sendLog,
       minimizeToTray,
       switchWorkspace,

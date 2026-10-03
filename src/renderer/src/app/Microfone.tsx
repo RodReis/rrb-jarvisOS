@@ -15,6 +15,8 @@ import type { DesfechoDaTranscricao, ProntidaoDaVoz } from '@shared/domain/voz'
 import { capturarPcm, type CapturaDeAudio } from './captura-de-audio'
 import { criarReprodutor } from './reproducao-de-fala'
 import { criarMedidorDeEntrada, type MedidorDeEntrada } from './medidor-de-audio'
+import { criarDetectorDeFimDaFala } from './fim-da-fala'
+import type { DisparoRecebido } from './EscutaDaVoz'
 import { log } from '../lib/log'
 import type { TrocaDaConversa } from '@shared/domain/voz'
 
@@ -61,9 +63,18 @@ export function Microfone({
   onSalvarDispositivo,
   capturar = capturarPcm,
   criarFala = criarReprodutor,
-  criarMedidor = criarMedidorDeEntrada
+  criarMedidor = criarMedidorDeEntrada,
+  disparo,
+  aoTratarDisparo
 }: {
   readonly workspace: WorkspaceId
+  /**
+   * Um gatilho da escuta (frase ou palmas) pediu um turno (SPEC-Escuta-01). A tela grava sem
+   * botão e decide o fim pelo silêncio. É **consumido uma vez** por `aoTratarDisparo`: um
+   * disparo que ficasse guardado abriria o microfone sozinho na próxima vez que a tela montasse.
+   */
+  readonly disparo?: DisparoRecebido
+  readonly aoTratarDisparo?: (id: number) => void
   /**
    * A voz com que a resposta é falada (SPEC-Voz-02). Vem do AppShell, que já tem as
    * preferências resolvidas — consultá-las aqui daria à tela um segundo dono do mesmo valor.
@@ -122,6 +133,17 @@ export function Microfone({
    */
   const estadoAtual = useRef<EstadoDoMicrofone>('ocioso')
   const soltouCedo = useRef(false)
+  /** O relógio que decide o fim do turno aberto pela escuta; nunca existe no push-to-talk. */
+  const monitorDoTurno = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
+  const ultimoDisparoTratado = useRef<number | undefined>(undefined)
+  /** O último valor avisado ao main; `undefined` até a primeira transição real. */
+  const turnoRelatado = useRef<boolean | undefined>(undefined)
+
+  function pararMonitorDoTurno(): void {
+    if (monitorDoTurno.current === undefined) return
+    clearInterval(monitorDoTurno.current)
+    monitorDoTurno.current = undefined
+  }
 
   /*
    * O reprodutor vive num ref, e não em estado: trocá-lo não redesenha nada, e recriá-lo a cada
@@ -262,7 +284,7 @@ export function Microfone({
     await consultar()
   }
 
-  async function comecar(): Promise<void> {
+  async function comecar(porEscuta = false): Promise<void> {
     if (estadoAtual.current !== 'ocioso') return
     setErro(undefined)
     setAviso(undefined)
@@ -274,9 +296,11 @@ export function Microfone({
       const medidorAtual = medidor.current
       medidor.current = undefined
       await medidorAtual?.parar()
+      nivelEntrada.current = 0
       encerrarCaptura.current = await capturar(entradaEfetivaId || undefined, (valor) => {
         nivelEntrada.current = valor
       })
+      if (porEscuta) armarMonitorDoTurno()
     } catch {
       // Microfone negado ou ausente. Não é falha do runtime — a próxima ação é do sistema
       // operacional, não do app.
@@ -295,7 +319,34 @@ export function Microfone({
     if (soltouCedo.current) await terminar()
   }
 
+  /**
+   * O turno aberto pela escuta não tem botão para soltar: o silêncio decide (critério 13).
+   * `cancelar` descarta a gravação **sem transcrever** — é isso que garante que disparo sem fala
+   * não custa uma chamada de IA.
+   */
+  function armarMonitorDoTurno(): void {
+    pararMonitorDoTurno()
+    const detector = criarDetectorDeFimDaFala()
+    const inicio = Date.now()
+    monitorDoTurno.current = setInterval(() => {
+      const veredito = detector.alimentar(nivelEntrada.current, Date.now() - inicio)
+      if (veredito === 'continua') return
+      pararMonitorDoTurno()
+      void (veredito === 'fim' ? acoes.current.terminar() : acoes.current.cancelarTurno())
+    }, 100)
+  }
+
+  async function cancelarTurno(): Promise<void> {
+    if (estadoAtual.current !== 'gravando') return
+    const parar = encerrarCaptura.current
+    encerrarCaptura.current = undefined
+    // Fecha o microfone e joga o áudio fora: ninguém falou, não há o que transcrever.
+    await parar?.()
+    marcar('ocioso')
+  }
+
   async function terminar(): Promise<void> {
+    pararMonitorDoTurno()
     if (estadoAtual.current !== 'gravando') return
 
     // A captura ainda não abriu: registra a intenção e deixa `comecar` encerrar quando puder.
@@ -460,7 +511,7 @@ export function Microfone({
    * cada render (fecham sobre `estado`), e listá-las reassinaria o canal a cada tecla — a
    * assinatura sairia e voltaria no meio da própria gravação que ela conduz.
    */
-  const acoes = useRef({ comecar, terminar })
+  const acoes = useRef({ comecar, terminar, cancelarTurno })
 
   /*
    * A ref é atualizada **em efeito**, não durante o render: escrever nela no corpo é o
@@ -469,8 +520,47 @@ export function Microfone({
    * as duas funções recém-criadas precisam entrar.
    */
   useEffect(() => {
-    acoes.current = { comecar, terminar }
+    acoes.current = { comecar, terminar, cancelarTurno }
   })
+
+  /*
+   * Um disparo da escuta começa o turno. Só age com a prontidão conhecida: antes dela a tela nem
+   * sabe se há como transcrever. Sem runtime pronto o turno não pode correr, e o main precisa
+   * saber — senão ficaria ignorando gatilhos até o teto.
+   */
+  useEffect(() => {
+    if (disparo === undefined || prontidao === undefined) return
+    if (ultimoDisparoTratado.current === disparo.id) return
+    ultimoDisparoTratado.current = disparo.id
+    aoTratarDisparo?.(disparo.id)
+
+    if (!prontidao.pronta) {
+      // Dentro da promessa, e não no corpo do efeito: `setState` síncrono ali cascateia render.
+      void Promise.resolve().then(() => setAviso(t('escuta.naoPronta')))
+      window.jarvis.informarTurnoDaEscuta(false)
+      return
+    }
+    void acoes.current.comecar(true)
+  }, [disparo, prontidao, aoTratarDisparo, t])
+
+  // O main só impede um segundo turno se souber que este começou e quando terminou. Só transições
+  // contam: montar em `ocioso` não é o fim de turno nenhum, e avisá-lo liberaria o que o disparo
+  // acabou de abrir.
+  useEffect(() => {
+    const emTurno = estado !== 'ocioso'
+    if (turnoRelatado.current === undefined && !emTurno) return
+    if (turnoRelatado.current === emTurno) return
+    turnoRelatado.current = emTurno
+    window.jarvis.informarTurnoDaEscuta(emTurno)
+  }, [estado])
+
+  useEffect(
+    () => () => {
+      pararMonitorDoTurno()
+      if (turnoRelatado.current === true) window.jarvis.informarTurnoDaEscuta(false)
+    },
+    []
+  )
 
   useEffect(() => {
     return window.jarvis.onVozHotkey((gravando) => {

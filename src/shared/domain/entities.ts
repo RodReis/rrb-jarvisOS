@@ -551,6 +551,11 @@ export const AUDIT_EVENT_TYPES = [
   // a tecla no sistema inteiro. A recusa também entra — silêncio esconderia um atalho que nunca
   // funcionou porque outro app já o tinha, e o usuário leria como microfone quebrado.
   'voz.hotkey.registro',
+  // SPEC-Escuta-01, critério 10: ligar e desligar a escuta contínua é abrir e fechar o microfone,
+  // por qualquer caminho. O `via` (interface, hotkey, restauracao) vai no payload: a pergunta de
+  // quem audita é *quem fechou o microfone*, e o hash-chain só prova isso se o caminho constar.
+  'voz.escuta.ligada',
+  'voz.escuta.desligada',
   // SPEC-Squads-01: o perfil e a resolução que um Squad usou, pela revisão (hash) do perfil. Tipo
   // próprio, e não `policy-decision`: aquele classifica uma ação, e a pergunta aqui é "com qual
   // perfil e em que ambiente este Squad foi montado?" — a resposta que sobra quando o perfil muda.

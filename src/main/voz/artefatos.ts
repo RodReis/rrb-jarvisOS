@@ -133,24 +133,33 @@ export const ARTEFATOS_DA_VOZ: readonly Artefato[] = [
     url: w.url,
     sha256: w.sha256,
     destino: `voz/wheels/${w.arquivo}`
-  }))
+  })),
+
+  {
+    id: 'modelo-wake/ei_amigo.onnx',
+    url: 'https://raw.githubusercontent.com/RodReis/rrb-jarvisOS/main/docs/spec/models/ei_amigo.onnx',
+    sha256: '22ffd34393b4cbf7a9124f6878a817d6b9dbca3735a278c0ccf7df27d700d0a9',
+    destino: 'models/wake/ei_amigo.onnx'
+  }
 ]
 
 /**
  * Os grupos, na ordem em que a tela os apresenta.
  *
  * A lista crua tem dezenas de itens, e mostrá-la ao usuário seria uma barra de progresso com nomes
- * de pacote Python. O que ele precisa saber é que faltam **runtime**, **modelo**, **vozes** ou
- * **bibliotecas** — e o download de cada item continua individual, com hash próprio.
+ * de pacote Python. O que ele precisa saber é que faltam **runtime**, **modelo**, **vozes**,
+ * **bibliotecas** ou **wake** — e o download de cada item continua individual, com hash próprio.
  *
  * `vozes` é grupo próprio porque a ação do usuário é diferente: o modelo do STT é obrigatório para
  * ouvir, e a voz é escolha — ele pode querer uma e não a outra (critério 5).
+ * `wake` é o modelo de wake word (SPEC-Escuta-01, critério 5).
  */
-export type GrupoDeArtefato = 'runtime' | 'modelo' | 'vozes' | 'wheels'
+export type GrupoDeArtefato = 'runtime' | 'modelo' | 'vozes' | 'wheels' | 'wake'
 
 export function grupoDoArtefato(id: string): GrupoDeArtefato {
   if (id.startsWith('wheel/')) return 'wheels'
   if (id.startsWith('voz-piper/')) return 'vozes'
+  if (id.startsWith('modelo-wake/')) return 'wake'
   if (id.startsWith('modelo-')) return 'modelo'
   return 'runtime'
 }

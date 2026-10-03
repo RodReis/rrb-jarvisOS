@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Microfone } from './Microfone'
@@ -53,12 +53,15 @@ beforeEach(() => {
     historicoDaConversa,
     falar,
     onVozHotkey,
+    informarTurnoDaEscuta: vi.fn(),
     // O helper de log do renderer chama isto; sem o dublê, o primeiro log derrubaria o teste.
     sendLog: vi.fn()
   })
 })
 
 afterEach(() => {
+  // Desmonta antes de tirar a ponte: o desmonte avisa o main de que o turno acabou.
+  cleanup()
   vi.unstubAllGlobals()
 })
 
