@@ -104,6 +104,17 @@ function regrasComuns(
   ]
 }
 
+/**
+ * Texto do plano que entra numa seção do pedido vai numa linha só: quebra de linha, controle e
+ * direção viram espaço, e uma regra não consegue abrir uma seção falsa (`MATERIAL DE ANÁLISE`).
+ */
+function umaLinha(texto: string): string {
+  return texto
+    .replace(/[\p{Cc}\u202a-\u202e\u2066-\u2069]+/gu, ' ')
+    .replace(/ {2,}/g, ' ')
+    .trim()
+}
+
 function blocosDasFontes(fontes: readonly FonteDaTarefa[], marcador: string): string[] {
   return fontes.map((f) => {
     const faixa = f.linhas === undefined ? '' : ` (linhas ${f.linhas.de}-${f.linhas.ate})`
@@ -120,7 +131,7 @@ function corpoDoPedido(dados: DadosDoPromptDoWorker, marcador: string): string {
     dados.objetivo,
     '',
     'REGRA DE CONCLUSÃO',
-    tarefa.regraDeConclusao,
+    umaLinha(tarefa.regraDeConclusao),
     '',
     `SCHEMA DO RESULTADO: ${tarefa.schemaDeResultado}`,
     '',
