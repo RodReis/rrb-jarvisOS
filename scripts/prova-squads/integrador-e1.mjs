@@ -17,7 +17,7 @@
  */
 
 import { createHash } from 'node:crypto'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -162,6 +162,11 @@ function controlarSuites(caso) {
 const suiteOk = (r) => r?.aplicavel === true && r.ok === true
 
 async function congelar() {
+  if (existsSync(ARQUIVO_DOS_CASOS) && !process.argv.includes('--refazer'))
+    throw new Error(
+      'Os casos já estão congelados. Congelar de novo invalida as medições anteriores: ' +
+        'só com --refazer, e por decisão do PI.'
+    )
   const { fatias } = JSON.parse(readFileSync(join(PASTA_V1, 'snapshot.json'), 'utf8'))
   const casos = []
   for (const definicao of CASOS_E1) {
@@ -217,6 +222,9 @@ const carregarHistoricos = () =>
 
 /** Caso de código aprovado: nada perdido, nada em conflito, nenhum bloco sem resolução, suíte verde. */
 export const casoAprovado = (r) =>
+  // A verdade contém os dois lados: descartar qualquer coisa, com ou sem motivo, é perder
+  // comportamento — e um único `trecho` longo cobriria vários hunks no casamento por conteúdo.
+  r.descartadosComMotivo === 0 &&
   r.perdidosSemRegistro.length === 0 &&
   r.naoResolvidos.length === 0 &&
   r.falhas.length === 0 &&

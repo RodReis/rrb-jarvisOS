@@ -35,6 +35,22 @@ const integradores = arquivos
   .sort((a, b) => a.camada.localeCompare(b.camada))
 const locais = (lista, chave) => lista.filter((x) => !ehFase(x[chave]))
 
+// Um resultado medido com outro instrumento não pode entrar neste relatório.
+for (const i of integradores)
+  if (i.instrumentoSha256 !== casos.instrumentoSha256)
+    throw new Error(`integrador-${i.camada}.json foi medido com outro instrumento`)
+
+/** Perdas dos casos de código por camada local, e quantas são só de `import`. */
+const ehImport = (h) => h.adicionadas.every((l) => /^\s*import\b/.test(l) || l.trim() === '')
+const locaisDeCodigo = locais(integradores, 'camada').map((i) => {
+  const perdidos = i.resultados.filter((r) => !r.informativo).flatMap((r) => r.perdidosSemRegistro)
+  return {
+    camada: i.camada,
+    perdas: perdidos.length,
+    perdasDeImport: perdidos.filter(ehImport).length
+  }
+})
+
 const modelosOllama = (() => {
   try {
     return execFileSync('ollama', ['list'], { encoding: 'utf8' })
@@ -274,7 +290,14 @@ p(
   '- **A árvore mostra os arquivos diretos de cada diretório permitido**, mais as subpastas (o validador aceita escrita nelas). A base de cada fatia é o pai do commit de merge.',
   '- **Os casos de código mudaram de arquivo-alvo** em quatro fatias (M9-F01, M9-F03, M26-F01, M26-F02), porque o alvo da primeira medição (`terminal-engine.ts`, `call-provider.ts`, `index.ts`, `ProjetosLocais.tsx`) não tem como ser testado por spec puro. As seis fatias são as mesmas; todo alvo agora é um módulo de `src/shared/domain` com spec vizinho. M9-F04 e M26-F06 mantêm o alvo.',
   '- **O conflito é "os dois acrescentam no mesmo ponto"** (fim do módulo, depois do último `import` do spec, fim do spec). Não cobre conflito semântico em lógica existente, em que a resolução exige reescrever uma função.',
-  '- **O manifesto identifica o hunk pela linha.** Fundir dois `import` numa linha é equivalente e conta como perda sem registro: foram as duas perdas de cada caso do `qwen3:8b` e duas das perdas do `hermes3:8b`. O instrumento **não foi mudado depois de ver o resultado** (a SPEC proíbe ajustar o que se mede até um modelo passar); a leitura alternativa está em cada camada, o veredito não depende dela, e aceitar import fundido no manifesto fica como proposta ao PI para uma próxima medição.',
+  `- **O manifesto identifica o hunk pela linha.** Fundir dois \`import\` numa linha é equivalente e conta como perda sem registro: ${locaisDeCodigo
+    .map((i) => `${i.perdasDeImport} das ${i.perdas} perdas do \`${i.camada}\``)
+    .join(
+      ' e '
+    )} são só de import. O instrumento **não foi mudado depois de ver o resultado** (a SPEC proíbe ajustar o que se mede até um modelo passar); a leitura alternativa está em cada camada, o veredito não depende dela, e aceitar import fundido no manifesto fica como proposta ao PI para uma próxima medição.`,
+  '- **O congelamento por hash cobre o que decide a aceitação e o texto do pedido** (validador, esquema, perfil, capacidades, limite de tentativas, `montarPedido`, `planejarSquad`, bloco da base; para o integrador, os casos, o manifesto e a forma do caso). **Não cobre os scripts do harness** (`integrador.mjs`, `integrador-e1.mjs`, `orquestrador.mjs`, `orquestrador-e1.mjs`): neles moram o prompt do integrador, o timeout do cliente e o cálculo de aprovado. O `orquestrador-e1.mjs` ganhou o `.catch` em volta da chamada ao modelo depois do primeiro commit, e por isso o `qwen3:8b` foi rerodado inteiro com ele; o `hermes3:8b` rodou antes dele e não teve erro de execução. Incluir os scripts no hash fica como proposta para a próxima medição. O relatório confere que cada JSON do integrador carrega o mesmo hash dos casos.',
+  '- **O critério dos casos de código exige também zero descarte registrado**, porque a verdade contém os dois lados e qualquer descarte é perda de comportamento (o casamento do descarte é por conteúdo e um único trecho longo cobriria vários hunks). Nenhum caso de código de nenhuma camada tinha descarte; o veredito é o mesmo com ou sem a regra.',
+  '- **Diretório `.` em `pathsPermitidos`** (M10-F03 e M10-F05) aparece na árvore como "não existe na base"; o validador não aceita escrita nele de qualquer forma, então a aceitação não muda, mas o texto que o modelo recebeu nessas duas fatias é impreciso.',
   '- **Três fatias do `qwen3:8b` terminaram por timeout do cliente** (5 min, geração longa), tratado como indisponibilidade como no produto; o limite superior sem elas está na tabela do modelo.',
   '- **Amostra de seis casos de código**, com comportamentos pequenos de propósito: mede se o integrador preserva os dois lados, não se ele sabe programar.',
   '- **A suíte de cada caso é o spec do módulo** (testes antigos mais os dois novos), não a suíte inteira do projeto.',
