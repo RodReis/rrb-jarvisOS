@@ -152,8 +152,8 @@ describe('resultado da tarefa — conteúdo do agente é dado não confiável', 
 
   it('recusa campo faltando ou do tipo errado', () => {
     for (const campo of ['schema', 'conclusao', 'evidencia', 'confianca', 'lacunas']) {
-      const { [campo]: _omitido, ...resto } = valido() as Record<string, unknown>
-      expect(avaliarResultado(resto, ctx).estado).toBe('invalida')
+      const semOCampo = Object.fromEntries(Object.entries(valido()).filter(([k]) => k !== campo))
+      expect(avaliarResultado(semOCampo, ctx).estado).toBe('invalida')
     }
     expect(avaliarResultado({ ...valido(), conclusao: '   ' }, ctx).estado).toBe('invalida')
     expect(avaliarResultado({ ...valido(), conclusao: 7 }, ctx).estado).toBe('invalida')
