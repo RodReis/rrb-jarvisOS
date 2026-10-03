@@ -2361,6 +2361,8 @@ Status: **PR aberto, CI em execução** ([PR #381](https://github.com/RodReis/rr
 
 **Dois defeitos meus achados no caminho:** o gerador do harness não capturava exceção (o gerador de produção captura), então um timeout derrubou a medição inteira do `qwen3:8b` e ela foi refeita; e uma regex gerada por heredoc perdeu `s` e `` em silêncio — o relatório saiu sem a coluna certa, sem erro.
 
+**Relatório de testes:** Regras 2347 (+24: manifesto 4, caso sintético 10, bloco da base 10), Banco 1667/1651 e Tela 735/734, sem alteração. Os três números vêm dos artefatos `test-report-*` do run limpo do CI (`--no-run` e depois `--check --no-run --require-entry`), e não de execução local: o Docker Desktop da máquina ficou degradado (`docker info` em ~60 s com erro 500), o que derrubou o worker do `docker-egress.int-spec.ts` e pulou o RLS em três execuções seguidas do relatório — duas sujas (1 falha de timeout do ESLint e 50 testes a menos; 10 testes a menos) e uma que travou na etapa Banco. O Banco isolado, sem cobertura, tinha fechado limpo (1644 + 23 pulados). Nenhuma dessas execuções foi carimbada.
+
 ### Fatia 03 — Workers somente-leitura e escritores isolados (`docs/spec/spec-squads-03-workers-isolados.md`)
 
 Status: **PR aberto, CI em execução** ([PR #380](https://github.com/RodReis/rrb-jarvisOS/pull/380)) — issue [#124](https://github.com/RodReis/rrb-jarvisOS/issues/124), puxada pelo PI em 2026-10-02 com a F00b ([#373](https://github.com/RodReis/rrb-jarvisOS/issues/373)) ainda aberta. Decisões do PI (slot por escritor, agente com ferramentas no container, workers só com ContextPack) registradas na SPEC.
