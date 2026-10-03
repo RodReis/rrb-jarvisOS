@@ -2379,6 +2379,31 @@ Status: **PR aberto, CI em execução** ([PR #380](https://github.com/RodReis/rr
 - [x] **7. Orquestrador do Squad**: DAG de tarefas, N workers, dois escritores com pool cheio, sessão e segredo por unidade, estados terminais auditados.
 - [x] **8. Revisões independentes, relatório, PR** ([PR #380](https://github.com/RodReis/rrb-jarvisOS/pull/380)): duas revisões (código e segurança) corrigidas com teste vermelho antes; suíte completa 241 arquivos / 4701 testes; relatório carimbado.
 
+## MVP-018 — Escuta contínua e Modo Boas-Vindas
+
+### Fatia 01 — Engine de wake word local, global nos dois espaços (`docs/spec/spec-escuta-01-wake-word.md`)
+
+Status: **em andamento** ([PR #383](https://github.com/RodReis/rrb-jarvisOS/pull/383) em rascunho) — issue [#356](https://github.com/RodReis/rrb-jarvisOS/issues/356), branch `feat/m18-f01-wake-word-local`. Retomada de um worktree sem commit, parado em `FIX_REQUIRED` (`reports/revisao-issue-356.md`); o trabalho foi preservado, rebaseado na `main` e continuado.
+
+- [x] **1. Serviço da escuta** (`escuta-service.ts`): kill switch persistido que vence o padrão; auditoria de ligar/desligar com a via; gatilhos separados; limiar sem restart; turno aberto pelo disparo (síncrono, com teto de 2 min); modo de teste; hotkey de mute; desligar encerra o engine (descarta o pré-roll).
+- [x] **2. Estado em disco com falha fechado** (`estado-da-escuta-em-disco.ts`): ausente = padrão; ilegível ou de forma errada = desligada; campo novo ausente não desliga.
+- [x] **3. Ponte IPC tipada**: invoke (estado, ligar/desligar, gatilhos, limiar, hotkey, teste), só de ida (PCM, turno), push (estado, disparo, teste). A via da auditoria é fixa em `interface` no main.
+- [x] **4. Captura contínua** (`captura-continua.ts`): blocos de 1280 amostras; `parar()` encerra as trilhas e nada sai depois.
+- [x] **5. Indicador e kill switch na barra** (`EscutaDaVoz.tsx`), nos dois espaços; "ligada" só com o stream aberto.
+- [x] **6. Disparo** (`disparo-da-escuta.ts`): sessão bloqueada não sobe a janela; o turno grava sem botão e decide o fim por silêncio (`fim-da-fala.ts`); 3 s sem fala cancela sem chamar a IA.
+- [x] **7. Settings** (`PreferenciasDaEscuta.tsx`): gatilhos, limiar de disparo, atalho de mute, teste ao vivo.
+- [x] **8. Guardas**: lint do engine concreto; zero rede e zero áudio em disco (`sem-audio-na-escuta.int-spec.ts`).
+- [x] **9. Prova visual** (`escuta.prova.ts`, 31 medições nos dois temas).
+- [ ] **10. Modelo "Ei, amigo" aceito** — bloqueado: o candidato dá 0,53 para a frase e 0,49 para "ei você". Depende de mais treino sintético ou de decisão do PI sobre a margem.
+- [ ] **11. Catálogo**: SHA pinado para `melspectrogram.onnx` e `embedding_model.onnx`, mais o `ei_amigo.onnx` publicável (critério 5).
+- [ ] **12. Teste físico do PI** e medição de CPU e memória em uso (critérios 6, 7 e 14).
+- [ ] **13. Pré-roll no turno.**
+- [ ] **14. Relatório de testes** (`reports/TESTS.md`) regenerado a partir dos artefatos do CI.
+
+**Decisões técnicas desta fatia** (nenhuma altera escopo; a confirmar pelo PI estão no corpo da PR): a hotkey de mute é o próprio kill switch por outro caminho; o disparo vindo do NOA passa para o JARVIS pela troca auditada, porque o Command Center só existe lá; o estado vive em arquivo local e não em coluna de preferências (sem migração); a tela diz "limiar de disparo" porque maior exige mais certeza.
+
+**Limites declarados:** limiar de fala (1200 de RMS) e silêncio de fim (1,5 s) sem calibração com voz real; o `.onnx` não é publicado; sem o modelo a escuta fica indisponível.
+
 ## Registro de entregas
 
 | Data | Fatia | PR | Observação |
