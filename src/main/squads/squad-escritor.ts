@@ -349,7 +349,13 @@ export class ExecutorDeEscritor {
     )
     const batida = setInterval(() => {
       // Perder o lease é perder o direito de escrever: o agente é abortado, e nada é commitado.
-      if (!this.deps.slots.renovar(unidade, fencingToken)) parar('lease-perdido')
+      // Não conseguir nem perguntar (banco indisponível) vale o mesmo: um `throw` dentro do
+      // intervalo seria exceção não tratada no processo principal, e o agente seguiria sem dono.
+      try {
+        if (!this.deps.slots.renovar(unidade, fencingToken)) parar('lease-perdido')
+      } catch {
+        parar('lease-perdido')
+      }
     }, this.intervaloMs)
     const aoCancelar = (): void => parar('cancelada')
     if (pedido.signal?.aborted === true) aoCancelar()

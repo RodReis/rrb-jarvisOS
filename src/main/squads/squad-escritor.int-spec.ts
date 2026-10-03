@@ -711,6 +711,23 @@ comGit('falha, prazo, cancelamento e lease têm estado terminal próprio (crité
     expect(depois).toBeGreaterThan(antes)
   })
 
+  it('o heartbeat que lança é lease perdido: o agente é abortado e nada é commitado', async () => {
+    intervaloDoHeartbeatMs = 10
+    remontar()
+    vi.spyOn(fila, 'renovarSlot').mockImplementation(() => {
+      throw new Error('banco indisponível')
+    })
+    agente = async (p) => {
+      escrever(p, 'src/api/a.ts')
+      return pendurado(p)
+    }
+
+    const r = await executor.executar(pedido())
+
+    expect(r).toMatchObject({ estado: 'falhou', motivo: 'lease-perdido' })
+    expect(git(['rev-parse', 'feat/api-t1'])).toBe(baseSha)
+  })
+
   it('o sandbox que não sobe é falha, e o slot é solto', async () => {
     sandboxFalha = 'docker parado'
 
