@@ -255,6 +255,58 @@ describe('com o paralelismo ligado, os dois escritores do mesmo run rodam juntos
   })
 })
 
+describe('a nova tentativa do escritor volta à fila (M9-F04)', () => {
+  it('depois de liberar, o mesmo escritor pede de novo e recebe slot e token novos', () => {
+    const run = pronto('p-a')
+    const a = fila.adquirirSlotDoEscritor('p-a', WS, run, 'api')
+    fila.liberarSlot('p-a', WS, idDoEscritor(run, 'api'), token(a.lease))
+
+    const b = fila.adquirirSlotDoEscritor('p-a', WS, run, 'api')
+
+    expect(b.reason).toBe('adquirido')
+    expect(token(b.lease)).toBeGreaterThan(token(a.lease))
+  })
+
+  it('depois de cancelar a espera, o mesmo escritor pede de novo e volta à fila', () => {
+    const run = pronto('p-a')
+    fila.adquirirSlotDoEscritor('p-a', WS, run, 'api')
+    expect(fila.adquirirSlotDoEscritor('p-a', WS, run, 'ui').reason).toBe('ocupado')
+    fila.desistirDoSlot(idDoEscritor(run, 'ui'))
+    expect(pool.vista().fila).toEqual([])
+
+    expect(fila.adquirirSlotDoEscritor('p-a', WS, run, 'ui').reason).toBe('ocupado')
+
+    expect(pool.vista().fila.map((i) => i.runId)).toEqual([idDoEscritor(run, 'ui')])
+  })
+
+  it('o pedido repetido de quem tem slot segue convergindo no mesmo slot', () => {
+    const run = pronto('p-a')
+    const a = fila.adquirirSlotDoEscritor('p-a', WS, run, 'api')
+
+    const de_novo = fila.adquirirSlotDoEscritor('p-a', WS, run, 'api')
+
+    expect(token(de_novo.lease)).toBe(token(a.lease))
+  })
+
+  it('o run comum cancelado da fila não volta ao pedir de novo: o ciclo único da M12-F01 vale', () => {
+    const run = pronto('p-a')
+    fila.adquirirSlot('p-b', WS, pronto('p-b')) // ocupa o único slot
+    expect(fila.adquirirSlot('p-a', WS, run).reason).toBe('ocupado')
+    pool.cancelar(run)
+
+    expect(fila.adquirirSlot('p-a', WS, run).reason).toBe('ocupado')
+    expect(pool.vista().fila).toEqual([])
+  })
+
+  it('o run comum é de ciclo único: liberado, não volta sozinho para a fila', () => {
+    const run = pronto('p-a')
+    const a = fila.adquirirSlot('p-a', WS, run)
+    fila.liberarSlot('p-a', WS, run, token(a.lease))
+
+    expect(fila.adquirirSlot('p-a', WS, run).reason).toBe('ocupado')
+  })
+})
+
 describe('o gate do escritor é o estado do run', () => {
   it('run que não está pronto nem rodando mantém o escritor na fila', () => {
     const run = fila.criarRun('p-a', WS, 'f1').id
@@ -334,6 +386,35 @@ describe('o token é do escritor, não do run', () => {
     expect(pool.slotDoRun(idA)).toBeDefined()
     fila.liberarSlot('p-a', WS, idA, token(a.lease))
     expect(pool.slotDoRun(idA)).toBeUndefined()
+  })
+
+  it('confirmar o slot exige o token vigente: o dono antigo não confirma', () => {
+    const run = pronto('p-a')
+    const a = fila.adquirirSlotDoEscritor('p-a', WS, run, 'api')
+    const idA = idDoEscritor(run, 'api')
+
+    expect(fila.confirmarSlot(idA, token(a.lease))).toBe(true)
+    expect(fila.confirmarSlot(idA, token(a.lease) + 1)).toBe(false)
+    expect(fila.confirmarSlot(idA, token(a.lease) - 1)).toBe(false)
+
+    fila.liberarSlot('p-a', WS, idA, token(a.lease))
+    expect(fila.confirmarSlot(idA, token(a.lease))).toBe(false)
+    expect(fila.confirmarSlot('nao-existe', 1)).toBe(false)
+  })
+
+  it('desistir da vaga tira da fila quem esperava, e não toca em quem já tem slot', () => {
+    const run = pronto('p-a')
+    fila.adquirirSlotDoEscritor('p-a', WS, run, 'api')
+    fila.adquirirSlotDoEscritor('p-a', WS, run, 'ui')
+    const idUi = idDoEscritor(run, 'ui')
+    expect(pool.vista().fila).toHaveLength(1)
+
+    expect(fila.desistirDoSlot(idUi)).toBe(true)
+    expect(pool.vista().fila).toEqual([])
+    expect(fila.desistirDoSlot(idUi)).toBe(false)
+
+    expect(fila.desistirDoSlot(idDoEscritor(run, 'api'))).toBe(false)
+    expect(pool.slotDoRun(idDoEscritor(run, 'api'))).toBeDefined()
   })
 
   it('o run do Squad segue sem fencing nas transições: o escritor é quem carrega o token', () => {

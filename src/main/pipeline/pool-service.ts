@@ -128,6 +128,18 @@ export class PoolService {
     return this.deps.pool.enfileirar(this.deps.userId(), item, this.agora())
   }
 
+  /**
+   * Um novo pedido do mesmo item, depois de ele ter terminado o ciclo sem slot — é a **nova
+   * tentativa** de um escritor (M9-F04). Só reabre quem não detém slot: um item com lease vigente
+   * ou expirado segue com ele, e é a reconciliação que o resolve.
+   */
+  reabrir(runId: string): boolean {
+    const item = this.deps.pool.buscarItem(runId)
+    if (item === undefined || item.userId !== this.deps.userId()) return false
+    if (this.slotDoRun(runId) !== undefined) return false
+    return this.deps.pool.reabrir(runId, this.agora())
+  }
+
   /** O run deixa a fila sem ter adquirido. Quem já adquiriu não é cancelado aqui: libera. */
   cancelar(runId: string): boolean {
     const item = this.deps.pool.buscarItem(runId)

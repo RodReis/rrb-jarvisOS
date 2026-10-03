@@ -563,6 +563,40 @@ describe('escopo de workspace e de usuário', () => {
   })
 })
 
+describe('reabrir o item que terminou sem slot', () => {
+  it('reabre o item liberado, e ele volta a ser atendido com um token novo', () => {
+    servico.enfileirar(run('r1:api'))
+    const a = servico.ciclo().adquiridos[0]
+    servico.liberar('r1:api', a.fencingToken)
+    expect(servico.slotDoRun('r1:api')).toBeUndefined()
+
+    expect(servico.reabrir('r1:api')).toBe(true)
+
+    const b = servico.ciclo().adquiridos[0]
+    expect(b.runId).toBe('r1:api')
+    expect(b.fencingToken).toBeGreaterThan(a.fencingToken)
+  })
+
+  it('não reabre quem detém slot, vigente ou expirado: é a reconciliação que o resolve', () => {
+    servico.enfileirar(run('r1:api'))
+    servico.ciclo()
+    expect(servico.reabrir('r1:api')).toBe(false)
+
+    relogio += VALIDADE_DO_LEASE_MS + 1
+    expect(servico.reabrir('r1:api')).toBe(false)
+    expect(servico.slotDoRun('r1:api')).toBeDefined()
+  })
+
+  it('não reabre o que não existe nem o item de outro usuário', () => {
+    servico.enfileirar(run('r1:api'))
+    servico.cancelar('r1:api')
+
+    expect(servico.reabrir('nao-existe')).toBe(false)
+    expect(montar('u-outro').reabrir('r1:api')).toBe(false)
+    expect(pool.buscarItem('r1:api')?.estado).toBe('cancelado')
+  })
+})
+
 describe('cancelar e liberar', () => {
   it('cancelar tira da fila, registra a decisão e não cancela quem já adquiriu', () => {
     servico.enfileirar(run('a1', 'p-a'))

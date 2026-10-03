@@ -317,6 +317,10 @@ export class FilaService {
       return { reason: 'lease-inexistente', mensagem: 'Run não encontrado.' }
     }
 
+    // O escritor tem até três tentativas (M9-F04), e cada uma é um pedido novo: o item que já
+    // terminou o ciclo sem slot volta a esperar. O run comum é de ciclo único e não passa por aqui.
+    if (itemId !== runId) this.deps.pool.reabrir(itemId)
+
     // **Retry depois de crash converge**: `enfileirar` devolve a linha que já existe e o ciclo não
     // readquire o que já está adquirido — repetir a chamada devolve o mesmo slot, sem tentar a
     // transição `RUNNING → RUNNING` (inválida por construção) nem liberar o slot de quem trabalha.
@@ -424,6 +428,23 @@ export class FilaService {
   /** Renova o heartbeat do slot. Só o dono com o token vigente renova. */
   renovarSlot(runId: string, fencingToken: number): boolean {
     return this.deps.pool.renovar(runId, fencingToken)
+  }
+
+  /**
+   * O dono ainda é o dono? Quem vai **confirmar progresso** — o escritor, antes de o kernel
+   * commitar o trabalho dele — apresenta o token: o dono antigo, que perdeu o lease, não passa
+   * (critério 4 da SPEC-Scheduler-01).
+   */
+  confirmarSlot(unidade: string, fencingToken: number): boolean {
+    return this.deps.pool.confirmarProgresso(unidade, fencingToken)
+  }
+
+  /**
+   * Desiste da vaga de quem ainda **espera** o slot (cancelado antes de ser atendido). Quem já tem
+   * slot não é tocado: esse libera com o token.
+   */
+  desistirDoSlot(unidade: string): boolean {
+    return this.deps.pool.cancelar(unidade)
   }
 
   /**

@@ -197,6 +197,21 @@ export class PoolRepository {
     )
   }
 
+  /**
+   * Põe de volta na fila um item que já terminou o ciclo — adquirido e depois liberado, ou
+   * cancelado. A idade recomeça: é um pedido novo, e herdar a antiga furaria a fila de quem
+   * esperava. Quem ainda espera não é tocado.
+   */
+  reabrir(runId: string, agora: number): boolean {
+    return (
+      this.db
+        .prepare(
+          "UPDATE pool_fila SET estado = 'esperando', enfileirado_em = ?, atualizado_em = ? WHERE run_id = ? AND estado IN ('adquirido', 'cancelado')"
+        )
+        .run(agora, agora, runId).changes === 1
+    )
+  }
+
   cancelar(runId: string, agora: number): boolean {
     return (
       this.db
