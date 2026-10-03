@@ -193,6 +193,7 @@ const MAX_EVIDENCIAS = 50
 const MAX_REFERENCIA = 300
 const MAX_DETALHE = 500
 const MAX_LACUNAS = 20
+const MAX_MOTIVO_DA_RECUSA = 160
 const MAX_LACUNA = 500
 
 type Registro = Record<string, unknown>
@@ -307,7 +308,10 @@ const CITA_CAMINHO: readonly TipoDeEvidencia[] = ['arquivo', 'trecho', 'document
  */
 export function avaliarResultado(bruto: unknown, ctx: ContextoDeLeitura): AvaliacaoDoResultado {
   const lido = lerCampos(bruto, ctx)
-  if (lido.resultado === undefined) return { estado: 'invalida', motivo: lido.erro ?? 'inválido' }
+  if (lido.resultado === undefined) {
+    // o motivo cita chave e schema escolhidos pelo agente: vai para auditoria e log, então tem teto
+    return { estado: 'invalida', motivo: (lido.erro ?? 'inválido').slice(0, MAX_MOTIVO_DA_RECUSA) }
+  }
 
   const aceitos = EVIDENCIA_EXIGIDA[lido.resultado.schema as SchemaDeResultado] as readonly string[]
   const validas: EvidenciaDoResultado[] = []

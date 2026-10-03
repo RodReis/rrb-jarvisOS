@@ -171,6 +171,17 @@ describe('resultado da tarefa — conteúdo do agente é dado não confiável', 
     expect((r as { motivo: string }).motivo).toContain('assinatura')
   })
 
+  it('o motivo da recusa não carrega texto do agente além do teto', () => {
+    const longo = 'x'.repeat(5000)
+    const porChave = avaliarResultado({ ...valido(), [longo]: 1 }, ctx)
+    const porSchema = avaliarResultado({ ...valido(), schema: longo }, ctx)
+
+    for (const r of [porChave, porSchema]) {
+      expect(r.estado).toBe('invalida')
+      expect((r as { motivo: string }).motivo.length).toBeLessThanOrEqual(160)
+    }
+  })
+
   it('recusa o schema que não é o da tarefa', () => {
     const r = avaliarResultado({ ...valido(), schema: 'parecer@1' }, ctx)
 
