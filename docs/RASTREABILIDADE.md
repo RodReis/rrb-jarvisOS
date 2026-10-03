@@ -148,7 +148,9 @@ Origem de todas as linhas: `docs/iniciais/requisitos-agent-os.md`, seção `### 
 | RF-002 | Command Center | a-classificar | MVP-017 (proposta) | — | — | — | — | — |
 | RF-003 | Persona JARVIS OS por voz | a-classificar | MVP-017 (proposta) | — | — | — | — | — |
 | RF-004 | Navegação principal | a-classificar | MVP-022 (proposta) | — | — | — | — | — |
-| RF-005 | Kanban operacional | a-classificar | — | — | — | — | — | — |
+| RF-005 | Kanban operacional | absorvido | MVP-028 | RF-005.1, RF-005.2 | — | Dividido: o critério de abrir a tarefa vai para o painel da M28-F03; o resto segue para classificação | PI, 2026-10-02 | — (prova nas filhas) |
+| RF-005.1 | Kanban operacional — tarefa pode ser aberta para ver logs, artefatos e decisões | mantido | MVP-028 (M28-F03, [#378](https://github.com/RodReis/rrb-jarvisOS/issues/378)) | — | — | — | PI, 2026-10-02 | — |
+| RF-005.2 | Kanban operacional — estados Triage/To Do/Ready/Running, prompt decomposto pelo orquestrador, card com agente/prioridade/custo/harness, input rápido | a-classificar | — | — | — | — | — | — |
 | RF-006 | Workflows | a-classificar | — | — | — | — | — | — |
 | RF-007 | Automations | a-classificar | — | — | — | — | — | — |
 | RF-008 | Skill Creator | a-classificar | — | — | — | — | — | — |
