@@ -2346,7 +2346,7 @@ Terceira e última das entregas verticais planejadas para esta fatia. Na `main` 
 
 ### Fatia 00b — Reprova do integrador e F00-bis do orquestrador local (`docs/spec/spec-squads-00-prova-orquestrador-integrador.md` § Emenda E1)
 
-Status: **PR aberto, CI em execução** ([PR #381](https://github.com/RodReis/rrb-jarvisOS/pull/381)) — issue [#373](https://github.com/RodReis/rrb-jarvisOS/issues/373), puxada pelo PI em 2026-10-03. Critérios numéricos da F00 inalterados; muda o instrumento. Relatório: `reports/squads-prova-m11-f00b.md`.
+Status: **entregue** ([PR #381](https://github.com/RodReis/rrb-jarvisOS/pull/381), mergeado em 2026-10-03, `6235e7e`; aguardando o aceite do PI) — issue [#373](https://github.com/RodReis/rrb-jarvisOS/issues/373), puxada pelo PI em 2026-10-03. Critérios numéricos da F00 inalterados; muda o instrumento. Relatório: `reports/squads-prova-m11-f00b.md`.
 
 - [x] **1. Manifesto sem bloco aberto** (`manifesto-hunks.ts`): hunk que só existe dentro de `<<<<<<<`…`>>>>>>>` vira `naoResolvidos` (falha do caso), nunca preservado; `=======` fora de bloco aberto é texto. Teste negativo em `manifesto-hunks.spec.ts`, visto vermelho antes.
 - [x] **2. Caso sintético real** (`caso-sintetico.ts`, `casos-e1.mjs`): dois lados com comportamentos diferentes no mesmo ponto do módulo e do spec, cada um com teste; conflito provado no `git`, verdade com os dois lados (piso zero), suíte do spec verde na base, em cada lado e na verdade antes de medir; commits com data e autor fixos, reconstruídos com os mesmos SHAs. Contrafactual: sem o código de um lado, a suíte da verdade reprova 2 de 19.
