@@ -77,6 +77,7 @@ import { RoadmapRepository } from './projects/roadmap-repository'
 import { ExternalRefRepository } from './projects/external-ref-repository'
 import { PublicacaoService } from './projects/publicacao-service'
 import { FilaService } from './pipeline/fila-service'
+import { GerenteDeSlots, ganchosDosSlots } from './squads/squad-slots'
 import { PoolRepository } from './pipeline/pool-repository'
 import { PoolService } from './pipeline/pool-service'
 import { EffectJournalRepository } from './pipeline/effect-journal-repository'
@@ -1343,7 +1344,12 @@ if (!app.requestSingleInstanceLock()) {
       gates: (item) => fila.gatesDoItem(item),
       ativar: (item) => fila.ativarRun(item)
     })
+    // Os slots dos escritores dos Squads (SPEC-Squads-03/04): o pool anuncia a aquisição e o run que
+    // termina cancela a espera pelos ganchos da fila. O gerente nasce **depois** da fila, que
+    // precisa dele — por isso os ganchos o leem por função.
+    let slotsDosSquads: GerenteDeSlots | undefined
     const fila: FilaService = new FilaService({
+      ...ganchosDosSlots(() => slotsDosSquads),
       runs: pipelineRepository,
       pool,
       workspaceId: () => workspaces.atual(),
@@ -1355,6 +1361,7 @@ if (!app.requestSingleInstanceLock()) {
       userId: userIdAtual,
       mergeAutonomoLigado: (projectId) => mergePolicy.autonomoLigado(projectId)
     })
+    slotsDosSquads = new GerenteDeSlots(fila)
     // Sandbox do executor, proxy e preflight (SPEC-Entrega-03).
     //
     // O `TerminalEngine` do Docker é **outra instância**, com prazo maior: o do usuário tem 30 s,
