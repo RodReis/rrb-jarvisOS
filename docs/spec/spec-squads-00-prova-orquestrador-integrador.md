@@ -5,6 +5,7 @@
 - Status: **aprovada-pi** (2026-10-02) — revisão exata do PR #367 aprovada pelo PI; redigida em 2026-10-02 (ADR-006, decisão 12); critérios fixados pelo PI em 2026-10-02.
 - Depende de: MVP-010 concluído.
 - **Resultado (2026-10-02, PR [#372](https://github.com/RodReis/rrb-jarvisOS/pull/372)):** orquestrador local **reprovado**; integrador **inconclusivo** por defeito do instrumento. Checkpoint aceito pelo PI; prova reaberta na [Emenda E1](#emenda-e1--reabertura-da-prova-pi-2026-10-02), issue [#373](https://github.com/RodReis/rrb-jarvisOS/issues/373).
+- **Resultado da E1 (2026-10-03, PR [#381](https://github.com/RodReis/rrb-jarvisOS/pull/381)):** orquestrador local **reprovado** (`hermes3:8b` 0/17, `qwen3:8b` 3/17); integrador da fase **aprovado** (6/6), locais reprovados. [Detalhe](#resultado-da-emenda-e1-2026-10-03-pr-381).
 
 ## Objetivo
 
@@ -93,6 +94,22 @@ Fatia **M11-F00b**, issue [#373](https://github.com/RodReis/rrb-jarvisOS/issues/
 1. O relatório traz, por modelo e por fatia, primeira tentativa e resultado dentro do limite.
 2. Teste negativo do manifesto: bloco não resolvido cai em falha.
 3. Teste do caso sintético: a verdade preserva os dois comportamentos e a suíte dela passa.
+
+## Resultado da Emenda E1 (2026-10-03, PR [#381](https://github.com/RodReis/rrb-jarvisOS/pull/381))
+
+Relatório: [`reports/squads-prova-m11-f00b.md`](../../reports/squads-prova-m11-f00b.md). Critérios numéricos inalterados; instrumento corrigido e congelado por hash antes de rodar.
+
+| Critério | Resultado |
+|---|---|
+| Orquestrador `hermes3:8b`, ≥ 80% dentro do limite de 3 tentativas | **reprovado**, 0/17 |
+| Orquestrador `qwen3:8b` | **reprovado**, 3/17 (17,6%); 6/17 no melhor caso, se as 3 fatias terminadas por timeout contassem como aceitas |
+| Controle, modelo da fase | 17/17 no limite (15/17 na primeira tentativa) |
+| Integrador da fase, nos 6 casos de código | **aprovado**, 6/6 |
+| Integrador `hermes3:8b` e `qwen3:8b` | **reprovados**, 0/6 e 1/6 |
+
+Consequências, pela regra 2: o orquestrador padrão segue sendo o **modelo da fase** e o local fica como opção; o integrador da F04 roda na **camada da fase**, e o integrador local não é opção até nova prova. O controle da fase mostra que o validador endurecido é satisfazível, então a reprova do local é do modelo e não do instrumento.
+
+**Limites declarados** (detalhe no relatório): o prompt de produção (`montarPedido`) não leva o bloco da base — a medição o acrescentou em `src/main/squads/prova/base-do-prompt.ts`; perfil medido = `PERFIL_PADRAO` com um escritor; quatro fatias tiveram o arquivo-alvo trocado por módulo puro com spec vizinho; o conflito é "os dois acrescentam no mesmo ponto". Todas as perdas do `qwen3:8b` são `import` fundidos numa linha, resolução equivalente que o manifesto (identidade por linha) não reconhece; o instrumento **não** foi mudado depois do resultado, e o veredito não depende disso (2/6 passariam na leitura alternativa). Aceitar import fundido no manifesto é proposta ao PI para uma próxima medição.
 
 ## Perguntas abertas ao PI
 

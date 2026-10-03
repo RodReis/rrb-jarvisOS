@@ -12,7 +12,7 @@ R-crítico (9 pts: irrev. 1, segurança 3, alcance 3, incerteza 2)
 Conta por fatia: F00 = 1 + prova nova; F01 = 1 + ADR + migração + sensível; F02 = 1 + sensível; F03 = 1 + migração + sensível; F04 = 1 + prova nova + migração. As migrações de F03 e F04 só contam se o estado de escritor e de achados não couber no `ExecutionLedger` atual; a confirmação é do Code na F01.
 
 - R-crítico obriga ADR e prova antes da primeira fatia: ADR-006 e a M11-F00, com os critérios numéricos fixados pelo PI.
-- T-grande pede ordem explícita e checkpoint intermediário: o checkpoint é o resultado da F00 (aprovado ou reprovado pelo critério) antes da F01. **Resultado (PI, 2026-10-02):** reprovada no critério, orquestrador padrão = modelo da fase, F01 liberada; a prova do integrador e a F00-bis do local foram reabertas na M11-F00b ([#373](https://github.com/RodReis/rrb-jarvisOS/issues/373)), que precisa terminar antes da F03.
+- T-grande pede ordem explícita e checkpoint intermediário: o checkpoint é o resultado da F00 (aprovado ou reprovado pelo critério) antes da F01. **Resultado (PI, 2026-10-02):** reprovada no critério, orquestrador padrão = modelo da fase, F01 liberada; a prova do integrador e a F00-bis do local foram reabertas na M11-F00b ([#373](https://github.com/RodReis/rrb-jarvisOS/issues/373)), que precisa terminar antes da F03. **Resultado da F00b (2026-10-03, PR [#381](https://github.com/RodReis/rrb-jarvisOS/pull/381)):** o local reprovou de novo (`hermes3:8b` 0/17, `qwen3:8b` 3/17), o modelo da fase passou (17/17) e o integrador da fase aprovou os 6 casos de código; o padrão do orquestrador e o integrador da F04 ficam na camada da fase.
 
 ## Tese
 

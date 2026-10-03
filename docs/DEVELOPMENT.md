@@ -2344,6 +2344,23 @@ Terceira e última das entregas verticais planejadas para esta fatia. Na `main` 
 
 ## MVP-011 — Squads orquestrados
 
+### Fatia 00b — Reprova do integrador e F00-bis do orquestrador local (`docs/spec/spec-squads-00-prova-orquestrador-integrador.md` § Emenda E1)
+
+Status: **PR aberto, CI em execução** ([PR #381](https://github.com/RodReis/rrb-jarvisOS/pull/381)) — issue [#373](https://github.com/RodReis/rrb-jarvisOS/issues/373), puxada pelo PI em 2026-10-03. Critérios numéricos da F00 inalterados; muda o instrumento. Relatório: `reports/squads-prova-m11-f00b.md`.
+
+- [x] **1. Manifesto sem bloco aberto** (`manifesto-hunks.ts`): hunk que só existe dentro de `<<<<<<<`…`>>>>>>>` vira `naoResolvidos` (falha do caso), nunca preservado; `=======` fora de bloco aberto é texto. Teste negativo em `manifesto-hunks.spec.ts`, visto vermelho antes.
+- [x] **2. Caso sintético real** (`caso-sintetico.ts`, `casos-e1.mjs`): dois lados com comportamentos diferentes no mesmo ponto do módulo e do spec, cada um com teste; conflito provado no `git`, verdade com os dois lados (piso zero), suíte do spec verde na base, em cada lado e na verdade antes de medir; commits com data e autor fixos, reconstruídos com os mesmos SHAs. Contrafactual: sem o código de um lado, a suíte da verdade reprova 2 de 19.
+- [x] **3. Bloco da base no prompt** (`base-do-prompt.ts`): árvore de arquivos diretos por diretório permitido (mais subpastas) e stack do `package.json`, com corte declarado.
+- [x] **4. F00-bis pelo produto**: as 17 fatias passam pelo `planejarSquad` de produção (validador endurecido, feedback, três tentativas); o harness só acrescenta o bloco da base e registra latência, tokens e VRAM. Arquivos do validador, do pedido e do laço congelados por hash.
+- [x] **5. Medição e relatório**: `hermes3:8b`, `qwen3:8b` e o modelo da fase como controle, no hardware do PI.
+- [x] **6. Docs**: SPEC-Squads-00 (resultado), ADR-006 (nota), MVP-011, STATUS.
+
+**Resultado:** `hermes3:8b` 0/17 e `qwen3:8b` 3/17 dentro do limite (80% exigido); modelo da fase 17/17. Integrador: fase 6/6, `hermes3:8b` 0/6, `qwen3:8b` 1/6. O padrão do orquestrador segue sendo o modelo da fase, e o integrador da F04 roda na camada da fase.
+
+**Limites declarados:** (1) `montarPedido` de produção não leva o bloco da base — se o PI adotar o local, é preciso portá-lo. (2) Perfil medido = `PERFIL_PADRAO` com um escritor. (3) Quatro fatias trocaram o arquivo-alvo por módulo puro com spec vizinho. (4) Todas as perdas do `qwen3:8b` são `import` fundidos numa linha, que o manifesto (identidade por linha) não reconhece; **o instrumento não foi mudado depois de ver o resultado** e o veredito não depende disso. (5) Três fatias do `qwen3:8b` terminaram por timeout de 5 min do cliente, tratadas como indisponibilidade como no produto.
+
+**Dois defeitos meus achados no caminho:** o gerador do harness não capturava exceção (o gerador de produção captura), então um timeout derrubou a medição inteira do `qwen3:8b` e ela foi refeita; e uma regex gerada por heredoc perdeu `s` e `` em silêncio — o relatório saiu sem a coluna certa, sem erro.
+
 ### Fatia 03 — Workers somente-leitura e escritores isolados (`docs/spec/spec-squads-03-workers-isolados.md`)
 
 Status: **PR aberto, CI em execução** ([PR #380](https://github.com/RodReis/rrb-jarvisOS/pull/380)) — issue [#124](https://github.com/RodReis/rrb-jarvisOS/issues/124), puxada pelo PI em 2026-10-02 com a F00b ([#373](https://github.com/RodReis/rrb-jarvisOS/issues/373)) ainda aberta. Decisões do PI (slot por escritor, agente com ferramentas no container, workers só com ContextPack) registradas na SPEC.
