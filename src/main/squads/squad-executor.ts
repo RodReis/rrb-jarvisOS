@@ -110,47 +110,68 @@ export class ExecutorDoSquad {
     ): void => {
       resultados.set(t.id, { tarefaId: t.id, papel: t.papel, ...r })
     }
-    this.recusarNomesQueColidem(pedido, terminar)
+    let falha: unknown
+    try {
+      this.recusarNomesQueColidem(pedido, terminar)
 
-    for (;;) {
-      this.cancelarOQueNaoPodeRodar(pedido, resultados, terminar)
+      for (;;) {
+        this.cancelarOQueNaoPodeRodar(pedido, resultados, terminar)
 
-      for (const tarefa of pedido.plano.tarefas) {
-        if (resultados.has(tarefa.id) || emAndamento.has(tarefa.id)) continue
-        if (!this.dependenciasConcluidas(tarefa, resultados)) continue
-        const escreve = PAPEIS_QUE_ESCREVEM.includes(tarefa.papel)
-        const escritor = tarefa.escritor as string
-        if (!escreve && workersRodando >= this.maxWorkers) continue
-        if (escreve && escritoresOcupados.has(escritor)) continue
+        for (const tarefa of pedido.plano.tarefas) {
+          if (resultados.has(tarefa.id) || emAndamento.has(tarefa.id)) continue
+          if (!this.dependenciasConcluidas(tarefa, resultados)) continue
+          const escreve = PAPEIS_QUE_ESCREVEM.includes(tarefa.papel)
+          const escritor = tarefa.escritor as string
+          if (!escreve && workersRodando >= this.maxWorkers) continue
+          if (escreve && escritoresOcupados.has(escritor)) continue
 
-        if (escreve) escritoresOcupados.add(escritor)
-        else workersRodando += 1
-        const base = escreve ? (baseDoEscritor.get(escritor) ?? pedido.baseSha) : pedido.baseSha
-        const rodando = this.rodar(pedido, tarefa, base)
-          .then((r) => {
-            terminar(tarefa, r)
-            const commit = (r.execucao as ResultadoDoEscritor | undefined)?.commitSha
-            if (escreve && r.estado === 'concluida' && commit !== undefined) {
-              baseDoEscritor.set(escritor, commit)
-            }
-          })
-          .finally(() => {
-            emAndamento.delete(tarefa.id)
-            if (escreve) escritoresOcupados.delete(escritor)
-            else workersRodando -= 1
-          })
-        emAndamento.set(tarefa.id, rodando)
+          if (escreve) escritoresOcupados.add(escritor)
+          else workersRodando += 1
+          const base = escreve ? (baseDoEscritor.get(escritor) ?? pedido.baseSha) : pedido.baseSha
+          const rodando = this.rodar(pedido, tarefa, base)
+            .then((r) => {
+              terminar(tarefa, r)
+              const commit = (r.execucao as ResultadoDoEscritor | undefined)?.commitSha
+              if (escreve && r.estado === 'concluida' && commit !== undefined) {
+                baseDoEscritor.set(escritor, commit)
+              }
+            })
+            .finally(() => {
+              emAndamento.delete(tarefa.id)
+              if (escreve) escritoresOcupados.delete(escritor)
+              else workersRodando -= 1
+            })
+          emAndamento.set(tarefa.id, rodando)
+        }
+
+        if (emAndamento.size === 0) break
+        await Promise.race(emAndamento.values())
       }
 
-      if (emAndamento.size === 0) break
-      await Promise.race(emAndamento.values())
+      // O que sobrou sem rodar e sem motivo já registrado: dependência que não existe, ou ciclo.
+      for (const tarefa of pedido.plano.tarefas) {
+        if (!resultados.has(tarefa.id)) {
+          this.registrar(pedido, tarefa, 'cancelada', 'dependencias-nao-resolvidas')
+          terminar(tarefa, { estado: 'cancelada', motivo: 'dependencias-nao-resolvidas' })
+        }
+      }
+    } catch (erro) {
+      falha = erro
     }
 
-    // O que sobrou sem rodar e sem motivo já registrado: dependência que não existe, ou ciclo.
-    for (const tarefa of pedido.plano.tarefas) {
-      if (!resultados.has(tarefa.id)) {
-        this.registrar(pedido, tarefa, 'cancelada', 'dependencias-nao-resolvidas')
-        terminar(tarefa, { estado: 'cancelada', motivo: 'dependencias-nao-resolvidas' })
+    // Quem já rodava (um escritor com slot, por exemplo) termina antes de o plano devolver: o
+    // executor nunca rejeita e nunca larga uma tarefa viva para trás.
+    await Promise.allSettled(emAndamento.values())
+    if (falha !== undefined) {
+      const motivo = `erro inesperado: ${falha instanceof Error ? falha.name : 'desconhecido'}`
+      for (const tarefa of pedido.plano.tarefas) {
+        if (resultados.has(tarefa.id)) continue
+        try {
+          this.registrar(pedido, tarefa, 'falhou', motivo)
+        } catch {
+          // a auditoria pode ser a própria causa: a tarefa ainda recebe o estado terminal
+        }
+        terminar(tarefa, { estado: 'falhou', motivo })
       }
     }
 
@@ -311,6 +332,7 @@ function estadoDoSquad(
   pedido: PedidoDoSquad,
   tarefas: readonly ResultadoDaTarefaDoSquad[]
 ): EstadoDoSquad {
-  if (pedido.signal?.aborted === true) return 'cancelado'
-  return tarefas.every((t) => t.estado === 'concluida') ? 'concluido' : 'parcial'
+  // Tudo entregue é entregue: o sinal que chega no último instante não desfaz o trabalho.
+  if (tarefas.every((t) => t.estado === 'concluida')) return 'concluido'
+  return pedido.signal?.aborted === true ? 'cancelado' : 'parcial'
 }

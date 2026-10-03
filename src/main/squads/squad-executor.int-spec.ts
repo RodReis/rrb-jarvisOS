@@ -624,6 +624,31 @@ describe('o que o executor recusa antes de rodar', () => {
   })
 })
 
+describe('o executor nunca rejeita', () => {
+  it('a auditoria que falha no meio do plano vira falha da tarefa; quem já rodava termina e o plano devolve resultado', async () => {
+    manual = true
+    vi.spyOn(audit, 'append').mockImplementation(() => {
+      throw new Error('auditoria fora do ar')
+    })
+    const executor = montar()
+    const execucao = executor.executar(
+      pedido([
+        tarefa('a'),
+        tarefa('b', { dependencias: ['a'] }),
+        tarefa('c', { dependencias: ['inexistente'] })
+      ])
+    )
+    await controladas.get('a')?.iniciada
+    controladas.get('a')?.liberar('falhou', 'x')
+
+    const r = await execucao
+
+    expect(r.estado).toBe('parcial')
+    expect(r.tarefas.map((t) => t.tarefaId)).toEqual(['a', 'b', 'c'])
+    expect(r.tarefas.every((t) => t.estado !== 'concluida')).toBe(true)
+  })
+})
+
 describe('cancelamento', () => {
   it('o sinal chega aos executores, e o plano termina cancelado', async () => {
     manual = true
@@ -649,6 +674,27 @@ describe('cancelamento', () => {
     const controle = new AbortController()
     const r = await montar().executar(pedido([tarefa('a')], { signal: controle.signal }))
     controle.abort()
+
+    expect(r.estado).toBe('concluido')
+  })
+
+  it('o sinal abortado no instante em que a última tarefa conclui não apaga o que foi entregue', async () => {
+    const controle = new AbortController()
+    const executor = new ExecutorDoSquad({
+      contexto: { montar: () => ({ ok: true, pack: PACK, fontes: FONTES, descartadas: [] }) },
+      worker: {
+        executar: async () => {
+          controle.abort()
+          return { estado: 'concluida' } as never
+        }
+      },
+      escritor: { executar: async () => ({ estado: 'concluida' }) as never },
+      audit,
+      userId: () => USER,
+      workspaceId: () => 'jarvis'
+    })
+
+    const r = await executor.executar(pedido([tarefa('a')], { signal: controle.signal }))
 
     expect(r.estado).toBe('concluido')
   })
