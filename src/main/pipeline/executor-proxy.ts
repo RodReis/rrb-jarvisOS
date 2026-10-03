@@ -56,8 +56,13 @@ export interface ProxyDeps {
   readonly contextPackId: () => string | undefined
 }
 
-/** O contexto de **uma unidade** (um escritor de um Squad): o run, a tentativa e o pack dela. */
+/**
+ * O contexto de **uma unidade** (um escritor de um Squad): o workspace, o run, a tentativa e o
+ * pack dela. O workspace é o da unidade, não o global: a chamada é auditada e tem custo no
+ * espaço em que o trabalho nasceu, mesmo que o ativo tenha mudado enquanto o escritor rodava.
+ */
 export interface ContextoDaUnidade {
+  readonly workspaceId: WorkspaceId
   readonly runId: string
   readonly tentativa: number
   readonly contextPackId: string
@@ -65,6 +70,9 @@ export interface ContextoDaUnidade {
 
 /** O prefixo de caminho que identifica uma unidade: `/u/<chave>`. */
 const PREFIXO_DA_UNIDADE = /^\/u\/([^/]*)/
+
+/** Mais corpo que isto não é uma conversa do agente: é abuso, e não se acumula em memória. */
+const MAX_CORPO_BYTES = 8 * 1024 * 1024
 
 export class ExecutorProxy {
   private servidor?: Server
@@ -153,7 +161,11 @@ export class ExecutorProxy {
   }
 
   private async atender(
-    req: NodeJS.ReadableStream & { readonly method?: string; readonly url?: string },
+    req: NodeJS.ReadableStream & {
+      readonly method?: string
+      readonly url?: string
+      readonly headers?: Readonly<Record<string, string | string[] | undefined>>
+    },
     res: NodeJS.WritableStream & {
       writeHead: (status: number, headers?: Record<string, string>) => void
       end: (chunk?: string) => void
@@ -165,18 +177,16 @@ export class ExecutorProxy {
       return
     }
 
-    let corpo = ''
-    for await (const pedaco of req) corpo += String(pedaco)
-
-    const prompt = extrairPrompt(corpo)
-    if (prompt === undefined) {
-      res.writeHead(400, { 'content-type': 'application/json' })
-      res.end(JSON.stringify({ error: 'Pedido sem conteúdo.' }))
+    // O agente do container não é um navegador: um pedido com `Origin` é uma página que alguém
+    // abriu no host tentando falar com o loopback, e não é atendido.
+    if (req.headers?.origin !== undefined) {
+      res.writeHead(403, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ error: 'Origem não permitida.' }))
       return
     }
 
     // Com o prefixo `/u/<chave>`, o contexto é o da unidade; sem ele, o global de antes. Uma chave
-    // que ninguém registrou é recusa — e nada chega ao ponto único.
+    // que ninguém registrou é recusa — e isso se decide **antes** de ler o corpo.
     const prefixo = PREFIXO_DA_UNIDADE.exec(req.url ?? '')
     const unidade = prefixo === null ? undefined : this.unidades.get(prefixo[1])
     if (prefixo !== null && unidade === undefined) {
@@ -184,6 +194,20 @@ export class ExecutorProxy {
       res.end(JSON.stringify({ error: 'Unidade desconhecida.' }))
       return
     }
+
+    const corpo = await lerCorpo(req)
+    if (corpo === undefined) {
+      res.writeHead(413, { 'content-type': 'application/json', connection: 'close' })
+      res.end(JSON.stringify({ error: 'Pedido grande demais.' }))
+      return
+    }
+    const prompt = extrairPrompt(corpo)
+    if (prompt === undefined) {
+      res.writeHead(400, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ error: 'Pedido sem conteúdo.' }))
+      return
+    }
+
     const contexto = unidade ?? this.deps.contexto()
     const packId = unidade?.contextPackId ?? this.deps.contextPackId()
 
@@ -203,7 +227,7 @@ export class ExecutorProxy {
     try {
       for await (const evento of this.deps.ai.call(pedido, {
         userId: this.deps.userId(),
-        workspace: this.deps.workspaceId()
+        workspace: unidade?.workspaceId ?? this.deps.workspaceId()
       })) {
         if (evento.tipo === 'chunk') {
           res.write(`data: ${JSON.stringify({ type: 'chunk', text: evento.texto })}\n\n`)
@@ -222,6 +246,19 @@ export class ExecutorProxy {
       res.end()
     }
   }
+}
+
+/** O corpo do pedido, ou `undefined` se passou do teto — e então para de acumular. */
+async function lerCorpo(req: NodeJS.ReadableStream): Promise<string | undefined> {
+  const pedacos: Buffer[] = []
+  let total = 0
+  for await (const pedaco of req) {
+    const buffer = Buffer.isBuffer(pedaco) ? pedaco : Buffer.from(String(pedaco))
+    total += buffer.length
+    if (total > MAX_CORPO_BYTES) return undefined
+    pedacos.push(buffer)
+  }
+  return Buffer.concat(pedacos).toString('utf8')
 }
 
 /**

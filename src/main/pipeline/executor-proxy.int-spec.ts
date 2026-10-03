@@ -30,6 +30,7 @@ const WS: WorkspaceId = 'jarvis'
 
 let proxy: InstanceType<typeof ExecutorProxy>
 let recebidos: AiRequest[]
+let workspacesRecebidos: string[]
 let responder: () => AsyncIterable<AiStreamEvent>
 
 /** A URL real para o teste falar: `host.docker.internal` só resolve dentro do container. */
@@ -44,11 +45,13 @@ async function* streamOk(): AsyncIterable<AiStreamEvent> {
 
 beforeEach(async () => {
   recebidos = []
+  workspacesRecebidos = []
   responder = streamOk
 
   const ai = {
-    call: (pedido: AiRequest): AsyncIterable<AiStreamEvent> => {
+    call: (pedido: AiRequest, ctx: { workspace: string }): AsyncIterable<AiStreamEvent> => {
       recebidos.push(pedido)
+      workspacesRecebidos.push(ctx.workspace)
       return responder()
     }
   }
@@ -229,8 +232,18 @@ describe('ExecutorProxy — contexto por unidade (SPEC-Squads-03, critério 5)',
     })
 
   it('cada unidade chega ao ponto único com o run, a tentativa e o pack dela — não os globais', async () => {
-    const a = proxy.registrarUnidade({ runId: 'run-A', tentativa: 1, contextPackId: 'pack-A' })
-    const b = proxy.registrarUnidade({ runId: 'run-B', tentativa: 3, contextPackId: 'pack-B' })
+    const a = proxy.registrarUnidade({
+      workspaceId: WS,
+      runId: 'run-A',
+      tentativa: 1,
+      contextPackId: 'pack-A'
+    })
+    const b = proxy.registrarUnidade({
+      workspaceId: WS,
+      runId: 'run-B',
+      tentativa: 3,
+      contextPackId: 'pack-B'
+    })
 
     await (await pedidoHttp(`${a.caminho}/v1/messages`)).text()
     await (await pedidoHttp(`${b.caminho}/v1/messages`)).text()
@@ -242,8 +255,18 @@ describe('ExecutorProxy — contexto por unidade (SPEC-Squads-03, critério 5)',
   })
 
   it('duas unidades em paralelo não misturam contexto', async () => {
-    const a = proxy.registrarUnidade({ runId: 'run-A', tentativa: 1, contextPackId: 'pack-A' })
-    const b = proxy.registrarUnidade({ runId: 'run-B', tentativa: 1, contextPackId: 'pack-B' })
+    const a = proxy.registrarUnidade({
+      workspaceId: WS,
+      runId: 'run-A',
+      tentativa: 1,
+      contextPackId: 'pack-A'
+    })
+    const b = proxy.registrarUnidade({
+      workspaceId: WS,
+      runId: 'run-B',
+      tentativa: 1,
+      contextPackId: 'pack-B'
+    })
 
     await Promise.all([
       pedidoHttp(`${a.caminho}/v1/messages`).then((r) => r.text()),
@@ -255,8 +278,18 @@ describe('ExecutorProxy — contexto por unidade (SPEC-Squads-03, critério 5)',
   })
 
   it('a chave é aleatória e longa, e cada registro tem a sua', () => {
-    const a = proxy.registrarUnidade({ runId: 'r', tentativa: 1, contextPackId: 'p' })
-    const b = proxy.registrarUnidade({ runId: 'r', tentativa: 1, contextPackId: 'p' })
+    const a = proxy.registrarUnidade({
+      workspaceId: WS,
+      runId: 'r',
+      tentativa: 1,
+      contextPackId: 'p'
+    })
+    const b = proxy.registrarUnidade({
+      workspaceId: WS,
+      runId: 'r',
+      tentativa: 1,
+      contextPackId: 'p'
+    })
 
     expect(a.chave).toMatch(/^[0-9a-f]{32}$/)
     expect(a.chave).not.toBe(b.chave)
@@ -271,7 +304,12 @@ describe('ExecutorProxy — contexto por unidade (SPEC-Squads-03, critério 5)',
   })
 
   it('uma unidade não usa a chave de outra: sem a chave exata, 403', async () => {
-    const a = proxy.registrarUnidade({ runId: 'run-A', tentativa: 1, contextPackId: 'pack-A' })
+    const a = proxy.registrarUnidade({
+      workspaceId: WS,
+      runId: 'run-A',
+      tentativa: 1,
+      contextPackId: 'pack-A'
+    })
 
     for (const ruim of [
       `/u/${a.chave.slice(1)}/v1/messages`,
@@ -305,15 +343,86 @@ describe('ExecutorProxy — contexto por unidade (SPEC-Squads-03, critério 5)',
   })
 
   it('o prefixo só vale no começo do caminho: a chave no meio dele não troca o contexto', async () => {
-    const a = proxy.registrarUnidade({ runId: 'run-A', tentativa: 1, contextPackId: 'pack-A' })
+    const a = proxy.registrarUnidade({
+      workspaceId: WS,
+      runId: 'run-A',
+      tentativa: 1,
+      contextPackId: 'pack-A'
+    })
 
     await (await pedidoHttp(`/v1${a.caminho}/messages`)).text()
 
     expect(recebidos[0]).toMatchObject({ runId: 'run-7', contextPackId: 'pack-9' })
   })
 
+  it('o workspace da unidade vai ao ponto único, não o ativo do momento', async () => {
+    const outro: WorkspaceId = 'noa'
+    const a = proxy.registrarUnidade({
+      workspaceId: outro,
+      runId: 'run-A',
+      tentativa: 1,
+      contextPackId: 'pack-A'
+    })
+
+    await (await pedidoHttp(`${a.caminho}/v1/messages`)).text()
+    await (await pedidoHttp('/v1/messages')).text()
+
+    expect(workspacesRecebidos).toEqual([outro, WS])
+  })
+
+  it('a chave desconhecida é recusada antes de ler o corpo: corpo inválido não vira 400', async () => {
+    const r = await fetch(`${urlLocal()}/u/${'0'.repeat(32)}/v1/messages`, {
+      method: 'POST',
+      body: 'isto não é json'
+    })
+
+    expect(r.status).toBe(403)
+  })
+
+  it('um pedido com Origin (página de navegador) é recusado, mesmo com chave válida', async () => {
+    const a = proxy.registrarUnidade({
+      workspaceId: WS,
+      runId: 'run-A',
+      tentativa: 1,
+      contextPackId: 'pack-A'
+    })
+
+    const r = await fetch(`${urlLocal()}${a.caminho}/v1/messages`, {
+      method: 'POST',
+      headers: { origin: 'http://pagina.exemplo' },
+      body: JSON.stringify({ messages: [{ role: 'user', content: 'x' }] })
+    })
+
+    expect(r.status).toBe(403)
+    expect(recebidos).toHaveLength(0)
+  })
+
+  it('um corpo acima do teto é recusado, e nada chega ao ponto único', async () => {
+    const a = proxy.registrarUnidade({
+      workspaceId: WS,
+      runId: 'run-A',
+      tentativa: 1,
+      contextPackId: 'pack-A'
+    })
+
+    const r = await fetch(`${urlLocal()}${a.caminho}/v1/messages`, {
+      method: 'POST',
+      body: 'x'.repeat(9 * 1024 * 1024)
+    }).catch(() => undefined)
+
+    // O servidor pode fechar a conexão antes de o cliente terminar de enviar: sem resposta também
+    // é recusa. O que não pode haver é chamada ao ponto único.
+    if (r !== undefined) expect(r.status).toBe(413)
+    expect(recebidos).toHaveLength(0)
+  })
+
   it('liberada a unidade, a chave deixa de valer', async () => {
-    const a = proxy.registrarUnidade({ runId: 'run-A', tentativa: 1, contextPackId: 'pack-A' })
+    const a = proxy.registrarUnidade({
+      workspaceId: WS,
+      runId: 'run-A',
+      tentativa: 1,
+      contextPackId: 'pack-A'
+    })
     proxy.liberarUnidade(a.chave)
 
     const r = await pedidoHttp(`${a.caminho}/v1/messages`)
@@ -333,7 +442,12 @@ describe('ExecutorProxy — contexto por unidade (SPEC-Squads-03, critério 5)',
   })
 
   it('a unidade usa a rota do proxy, e a exceção do ponto único não vaza para o container', async () => {
-    const a = proxy.registrarUnidade({ runId: 'run-A', tentativa: 1, contextPackId: 'pack-A' })
+    const a = proxy.registrarUnidade({
+      workspaceId: WS,
+      runId: 'run-A',
+      tentativa: 1,
+      contextPackId: 'pack-A'
+    })
     responder = () => {
       throw new Error('segredo-do-provider')
     }

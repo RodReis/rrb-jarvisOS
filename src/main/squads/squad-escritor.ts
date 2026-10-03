@@ -53,6 +53,7 @@ const MAX_MOTIVO_AUDITADO = 160
 export interface PedidoDeSandbox {
   readonly runId: string
   readonly projectId: string
+  readonly workspaceId: WorkspaceId
   readonly sliceId: string
   readonly escritor: string
   /** A tarefa que o sandbox atende: um escritor com duas tarefas tem dois ambientes, não um. */
@@ -271,6 +272,7 @@ export class ExecutorDeEscritor {
     const sandbox: PedidoDeSandbox = {
       runId: pedido.runId,
       projectId: pedido.projectId,
+      workspaceId: pedido.workspaceId,
       sliceId: pedido.sliceId,
       escritor: pedido.escritor,
       tarefaId: pedido.tarefa.id,

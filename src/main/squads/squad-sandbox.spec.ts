@@ -7,6 +7,7 @@ import { SandboxDoEscritorReal, unidadeDeSandbox } from './squad-sandbox'
 const PEDIDO: PedidoDeSandbox = {
   runId: 'run-1',
   projectId: 'p-1',
+  workspaceId: 'jarvis',
   sliceId: 'f03',
   escritor: 'api',
   tarefaId: 'tar-1',
@@ -213,7 +214,9 @@ describe('a unidade no proxy (SPEC-Squads-03, critério 5)', () => {
 
     await sandbox.preparar({ ...PEDIDO, tentativa: 2 })
 
-    expect(registrados).toEqual([{ runId: 'run-1', tentativa: 2, contextPackId: 'pack-1' }])
+    expect(registrados).toEqual([
+      { runId: 'run-1', tentativa: 2, contextPackId: 'pack-1', workspaceId: 'jarvis' }
+    ])
     expect(preparados[0].caminhoDoProxy).toBe('/u/chave-1')
   })
 

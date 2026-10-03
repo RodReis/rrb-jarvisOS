@@ -16,6 +16,7 @@
  * rodar, porque depois disso o `.git` do worktree é território do agente.
  */
 
+import type { WorkspaceId } from '@shared/domain/entities'
 import type { PedidoDePreflight } from '../pipeline/preflight-service'
 import type { PreflightOutcome } from '@shared/domain/preflight'
 import type { SandboxPreparado } from '@shared/domain/preflight'
@@ -28,7 +29,12 @@ export interface PreflightParaOEscritor {
 
 /** O proxy do executor, que roteia cada unidade para o run e o pack dela (critério 5). */
 export interface ProxyParaOEscritor {
-  registrarUnidade(contexto: { runId: string; tentativa: number; contextPackId: string }): {
+  registrarUnidade(contexto: {
+    workspaceId: WorkspaceId
+    runId: string
+    tentativa: number
+    contextPackId: string
+  }): {
     chave: string
     caminho: string
   }
@@ -72,6 +78,7 @@ export class SandboxDoEscritorReal implements SandboxDoEscritor {
     const unidade = unidadeDeSandbox(pedido)
     // A chave nasce antes do container: a URL que ele recebe já carrega o caminho da unidade.
     const rota = this.deps.proxy.registrarUnidade({
+      workspaceId: pedido.workspaceId,
       runId: pedido.runId,
       tentativa: pedido.tentativa,
       contextPackId: pedido.contextPackId
