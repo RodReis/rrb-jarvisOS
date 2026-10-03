@@ -180,6 +180,28 @@ comGit('resolver e commitar a integração', () => {
   })
 })
 
+comGit('abortarMerge', () => {
+  it('desfaz o merge em conflito e o worktree sai sem --force', () => {
+    const { commitA, commitB } = doisEscritores(
+      { 'src/a.ts': 'export const a = 10\n' },
+      { 'src/a.ts': 'export const a = 20\n' }
+    )
+    const w = integracaoEm(commitA)
+    amb.squadGit.mesclar(w, commitB)
+
+    expect(amb.squadGit.abortarMerge(w)).toEqual({ ok: true, valor: undefined })
+    expect(readFileSync(join(w.worktree, 'src', 'a.ts'), 'utf8')).toBe('export const a = 10\n')
+    expect(amb.squadGit.remover(w)).toEqual({ ok: true, valor: undefined })
+  })
+
+  it('sem merge em andamento não há o que abortar, e não é erro', () => {
+    const { commitA } = doisEscritores({ 'src/a.ts': 'x\n' }, { 'src/b.ts': 'y\n' })
+    const w = integracaoEm(commitA)
+
+    expect(amb.squadGit.abortarMerge(w)).toEqual({ ok: true, valor: undefined })
+  })
+})
+
 comGit('lerArquivoDoWorktree', () => {
   it('lê o arquivo regular do worktree', () => {
     const { commitA } = doisEscritores({ 'src/a.ts': 'x\n' }, { 'src/b.ts': 'y\n' })

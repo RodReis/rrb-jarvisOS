@@ -370,6 +370,16 @@ export class SquadGit {
   }
 
   /**
+   * Desfaz o merge em andamento, para o worktree de integração poder ser removido sem `--force`.
+   * `merge --abort` não casa o padrão destrutivo do `TerminalEngine`; `reset --hard` casaria.
+   */
+  abortarMerge(w: WorktreeDeEscritor): ResultadoGit<void> {
+    if (!this.mergeEmAndamento(w)) return { ok: true, valor: undefined }
+    const r = this.noWorktree(w, ['merge', '--abort'])
+    return r.ok ? { ok: true, valor: undefined } : recusa(r.motivo)
+  }
+
+  /**
    * O diff textual entre dois commits, sem contexto (`-U0`): cada hunk é só o que mudou, que é o
    * que o manifesto identifica por conteúdo. Sem driver externo nem conversão de texto — nada do
    * repositório faz o `git` rodar um programa.

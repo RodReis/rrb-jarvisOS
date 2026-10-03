@@ -567,6 +567,14 @@ export const AUDIT_EVENT_TYPES = [
   // O estado terminal (`concluida`, `incompleta`, `invalida`, `timeout`, `cancelada`, `falhou`,
   // `recusada`) fica no payload. **Nunca o texto do agente**: só ids, hashes, contagens e o motivo.
   'squad-tarefa',
+  // SPEC-Squads-04: a integração dos escritores, a revisão independente e cada volta do retrabalho.
+  // Três tipos próprios, com `marco` quando há início e fim, porque a pergunta é diferente em cada
+  // um: *a integração perdeu trabalho?* (manifesto de hunks), *quem revisou e com que veredito* e
+  // *quantas vezes o trabalho voltou ao DEVELOPER, e por quê*. **Nunca o texto do código nem o do
+  // agente**: só ids, hashes, contagens, estados e o motivo.
+  'squad-integracao',
+  'squad-revisao',
+  'squad-retrabalho',
   // SPEC-Scheduler-01: a configuração do pool (capacidade, limites, paralelismo). Tipo próprio: é
   // uma decisão do PI sobre quanto da máquina a pipeline pode usar — e ligar o paralelismo é a que
   // mais importa registrar.

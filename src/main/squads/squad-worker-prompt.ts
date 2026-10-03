@@ -46,7 +46,7 @@ const ROTULO_DO_PAPEL: Readonly<Record<string, string>> = {
 }
 
 /** Controle e override de direção saem do cabeçalho de cada fonte: o caminho é uma linha só. */
-function caminhoLimpo(caminho: string): string {
+export function caminhoLimpo(caminho: string): string {
   return Array.from(caminho)
     .filter((ch) => {
       const cp = ch.codePointAt(0) ?? 0

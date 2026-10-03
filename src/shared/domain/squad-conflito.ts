@@ -175,3 +175,27 @@ export function lerResolucao(bruto: unknown): LeituraDaResolucao {
   }
   return { ok: true, valor: { resolucao, descartes } }
 }
+
+/**
+ * O JSON Schema que o integrador recebe para a resolução de um bloco. Uma **ajuda**, não a barreira:
+ * o CLI o aplica como `--json-schema` e o Ollama como `format`, e quem decide é `lerResolucao`.
+ */
+export function esquemaDaResolucao(): Record<string, unknown> {
+  return {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      resolucao: { type: 'string' },
+      descartes: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: { trecho: { type: 'string' }, motivo: { type: 'string' } },
+          required: ['trecho', 'motivo']
+        }
+      }
+    },
+    required: ['resolucao', 'descartes']
+  }
+}
