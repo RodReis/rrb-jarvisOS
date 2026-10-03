@@ -33,7 +33,7 @@ let audit: InstanceType<typeof AuditRepository>
 
 /** A tarefa que o teste controla: roda até `liberar()` ser chamado, e termina no estado dado. */
 interface Controlada {
-  readonly liberar: (estado?: string, motivo?: string) => void
+  readonly liberar: (estado?: string, motivo?: string, commitSha?: string) => void
   readonly iniciada: Promise<void>
 }
 let controladas: Map<string, Controlada>
@@ -44,7 +44,7 @@ let pedidosAoWorker: Record<string, unknown>[]
 let pedidosAoEscritor: Record<string, unknown>[]
 let pedidosAoContexto: Record<string, unknown>[]
 let contextoFalha: Map<string, string>
-let resposta: (id: string) => { estado: string; motivo?: string }
+let resposta: (id: string) => { estado: string; motivo?: string; commitSha?: string }
 /** Quando `true`, a tarefa só termina com `liberar()`; senão termina na hora. */
 let manual: boolean
 
@@ -104,7 +104,7 @@ function pedido(tarefas: TarefaDoPlano[], extra: Partial<PedidoDoSquad> = {}): P
 function executarTarefa(
   id: string,
   ehWorker: boolean
-): Promise<{ estado: string; motivo?: string }> {
+): Promise<{ estado: string; motivo?: string; commitSha?: string }> {
   ordemDeInicio.push(id)
   emParalelo += 1
   if (ehWorker) picoDeWorkers = Math.max(picoDeWorkers, emParalelo)
@@ -112,13 +112,17 @@ function executarTarefa(
     emParalelo -= 1
     return Promise.resolve(resposta(id))
   }
-  let liberarFn: (estado?: string, motivo?: string) => void = () => undefined
+  let liberarFn: (estado?: string, motivo?: string, commitSha?: string) => void = () => undefined
   let iniciadaFn: () => void = () => undefined
   const iniciada = new Promise<void>((r) => (iniciadaFn = r))
-  const fim = new Promise<{ estado: string; motivo?: string }>((resolve) => {
-    liberarFn = (estado = 'concluida', motivo) => {
+  const fim = new Promise<{ estado: string; motivo?: string; commitSha?: string }>((resolve) => {
+    liberarFn = (estado = 'concluida', motivo, commitSha) => {
       emParalelo -= 1
-      resolve({ estado, ...(motivo === undefined ? {} : { motivo }) })
+      resolve({
+        estado,
+        ...(motivo === undefined ? {} : { motivo }),
+        ...(commitSha === undefined ? {} : { commitSha })
+      })
     }
   })
   controladas.set(id, { liberar: liberarFn, iniciada })
@@ -385,6 +389,91 @@ describe('paralelismo: workers até o teto, escritores até o pool', () => {
     expect(ordemDeInicio).toContain('w2')
     for (const id of ['w2', 'e1']) controladas.get(id)?.liberar()
     await execucao
+  })
+})
+
+describe('um escritor com várias tarefas', () => {
+  const COMMIT = 'c'.repeat(40)
+
+  it('as tarefas do mesmo escritor rodam em sequência; escritores diferentes seguem juntos', async () => {
+    manual = true
+    const execucao = montar().executar(
+      pedido([escritora('a1', 'api'), escritora('a2', 'api'), escritora('u1', 'ui')])
+    )
+    await espera(30)
+
+    expect(ordemDeInicio.sort()).toEqual(['a1', 'u1'])
+    controladas.get('a1')?.liberar()
+    await espera(30)
+    expect(ordemDeInicio).toContain('a2')
+    for (const id of ['a2', 'u1']) controladas.get(id)?.liberar()
+    await execucao
+  })
+
+  it('a segunda tarefa parte do commit da primeira, no contexto e no escritor', async () => {
+    manual = true
+    const execucao = montar().executar(pedido([escritora('a1', 'api'), escritora('a2', 'api')]))
+    await espera(30)
+    controladas.get('a1')?.liberar('concluida', undefined, COMMIT)
+    await espera(30)
+    controladas.get('a2')?.liberar()
+    await execucao
+
+    expect(pedidosAoEscritor.map((p) => p.baseSha)).toEqual(['a'.repeat(40), COMMIT])
+    expect(pedidosAoContexto.map((p) => p.revisao)).toEqual(['a'.repeat(40), COMMIT])
+  })
+
+  it('a base de um escritor não vaza para outro', async () => {
+    resposta = (id) =>
+      id === 'a1' ? { estado: 'concluida', commitSha: COMMIT } : { estado: 'concluida' }
+
+    await montar().executar(pedido([escritora('a1', 'api'), escritora('u1', 'ui')]))
+
+    const porTarefa = new Map(
+      pedidosAoEscritor.map((p) => [(p.tarefa as { id: string }).id, p.baseSha])
+    )
+    expect(porTarefa.get('u1')).toBe('a'.repeat(40))
+  })
+
+  it('se a primeira não concluiu, a seguinte parte da base original: não há commit a herdar', async () => {
+    resposta = (id) =>
+      id === 'a1' ? { estado: 'falhou', commitSha: COMMIT } : { estado: 'concluida' }
+
+    await montar().executar(pedido([escritora('a1', 'api'), escritora('a2', 'api')]))
+
+    expect(pedidosAoEscritor.map((p) => p.baseSha)).toEqual(['a'.repeat(40), 'a'.repeat(40)])
+  })
+
+  it('a tarefa de escrita não herda a base de um worker: só o commit do escritor conta', async () => {
+    resposta = () => ({ estado: 'concluida', commitSha: COMMIT })
+
+    await montar().executar(pedido([tarefa('w1'), escritora('a1', 'api')]))
+
+    expect(pedidosAoEscritor[0].baseSha).toBe('a'.repeat(40))
+    expect(pedidosAoContexto.find((p) => (p.tarefa as { id: string }).id === 'w1')?.revisao).toBe(
+      'a'.repeat(40)
+    )
+  })
+
+  it('duas tarefas cujo escritor-tarefa vira o mesmo nome: a segunda é recusada e auditada', async () => {
+    // `a_b` + `c` e `a` + `b_c` viram `a-b-c`: o mesmo container e a mesma branch.
+    const r = await montar().executar(
+      pedido([
+        escritora('c', 'a_b'),
+        escritora('b_c', 'a'),
+        tarefa('depois', { dependencias: ['b_c'] })
+      ])
+    )
+
+    expect(r.tarefas.map((t) => [t.tarefaId, t.estado])).toEqual([
+      ['c', 'concluida'],
+      ['b_c', 'recusada'],
+      ['depois', 'cancelada']
+    ])
+    expect(pedidosAoEscritor).toHaveLength(1)
+    expect(eventos()).toContainEqual(
+      expect.objectContaining({ tarefaId: 'b_c', estado: 'recusada', motivo: 'nome-colide' })
+    )
   })
 })
 

@@ -52,10 +52,14 @@ export interface DependenciasDoSandboxDoEscritor {
   readonly cwdDoDocker: () => string
 }
 
-/** A unidade de sandbox: única por run, escritor e tentativa. */
+/** O que distingue a unidade da vizinha no mesmo run: o escritor, a tarefa e a tentativa. */
+const sufixoDoSandbox = (p: Pick<PedidoDeSandbox, 'escritor' | 'tarefaId' | 'tentativa'>): string =>
+  `${p.escritor}-${p.tarefaId}-t${p.tentativa}`
+
+/** A unidade de sandbox: única por run, escritor, tarefa e tentativa. */
 export const unidadeDeSandbox = (
-  p: Pick<PedidoDeSandbox, 'runId' | 'escritor' | 'tentativa'>
-): string => `${p.runId}-${p.escritor}-t${p.tentativa}`
+  p: Pick<PedidoDeSandbox, 'runId' | 'escritor' | 'tarefaId' | 'tentativa'>
+): string => `${p.runId}-${sufixoDoSandbox(p)}`
 
 export class SandboxDoEscritorReal implements SandboxDoEscritor {
   /** O sandbox e a chave de proxy de cada unidade em uso: o `encerrar` para um e libera a outra. */
@@ -81,7 +85,7 @@ export class SandboxDoEscritorReal implements SandboxDoEscritor {
       base: pedido.baseSha,
       pathsDaSpec: pedido.pathsPermitidos,
       proxyUrl: this.deps.proxyUrl(),
-      sufixoDaBranch: `${pedido.escritor}-t${pedido.tentativa}`,
+      sufixoDaBranch: sufixoDoSandbox(pedido),
       caminhoDoProxy: rota.caminho
     })
     const sandbox = preflight.sandbox

@@ -10,6 +10,9 @@
  *    todos despachados, e quem os contém é o **pool** — um slot por escritor, regra 5.
  *  - **O contexto é montado aqui, pelo kernel**, a partir das `entradas` do plano; o que não monta
  *    recusa a tarefa (`recusada`, com a razão), e nada roda sem contexto autorizado.
+ *  - **As tarefas de um mesmo escritor rodam em sequência**, cada uma a partir do commit da
+ *    anterior que concluiu: um escritor tem um slot, e duas tarefas dele ao mesmo tempo disputariam
+ *    o mesmo ambiente. O que a primeira commitou é o ponto de partida da segunda.
  *  - **Uma tentativa por tarefa.** A repetição — dentro do limite da M9-F04 — é de quem decide o
  *    retrabalho (F04, MVP-028): este executor roda o plano uma vez e devolve o que cada tarefa foi.
  *
@@ -20,7 +23,7 @@
 import type { AiProvider } from '@shared/domain/ai'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { ModeloEscolhido } from '@shared/domain/modelo-da-fase'
-import type { EstadoDaTarefa } from '@shared/domain/squad-execucao'
+import { escritoresColidemPorNome, type EstadoDaTarefa } from '@shared/domain/squad-execucao'
 import { PAPEIS_QUE_ESCREVEM, type SquadPlan, type TarefaDoPlano } from '@shared/domain/squad-plano'
 import type { AuditRepository } from '../storage/audit-repository'
 import type { ContextoDaTarefa, BuscaDaTarefa } from './squad-contexto'
@@ -97,6 +100,9 @@ export class ExecutorDoSquad {
     const resultados = new Map<string, ResultadoDaTarefaDoSquad>()
     const emAndamento = new Map<string, Promise<void>>()
     let workersRodando = 0
+    // Um escritor por vez, e cada tarefa dele parte do commit da anterior que concluiu.
+    const escritoresOcupados = new Set<string>()
+    const baseDoEscritor = new Map<string, string>()
 
     const terminar = (
       t: TarefaDoPlano,
@@ -104,6 +110,7 @@ export class ExecutorDoSquad {
     ): void => {
       resultados.set(t.id, { tarefaId: t.id, papel: t.papel, ...r })
     }
+    this.recusarNomesQueColidem(pedido, terminar)
 
     for (;;) {
       this.cancelarOQueNaoPodeRodar(pedido, resultados, terminar)
@@ -112,14 +119,25 @@ export class ExecutorDoSquad {
         if (resultados.has(tarefa.id) || emAndamento.has(tarefa.id)) continue
         if (!this.dependenciasConcluidas(tarefa, resultados)) continue
         const escreve = PAPEIS_QUE_ESCREVEM.includes(tarefa.papel)
+        const escritor = tarefa.escritor as string
         if (!escreve && workersRodando >= this.maxWorkers) continue
+        if (escreve && escritoresOcupados.has(escritor)) continue
 
-        if (!escreve) workersRodando += 1
-        const rodando = this.rodar(pedido, tarefa)
-          .then((r) => terminar(tarefa, r))
+        if (escreve) escritoresOcupados.add(escritor)
+        else workersRodando += 1
+        const base = escreve ? (baseDoEscritor.get(escritor) ?? pedido.baseSha) : pedido.baseSha
+        const rodando = this.rodar(pedido, tarefa, base)
+          .then((r) => {
+            terminar(tarefa, r)
+            const commit = (r.execucao as ResultadoDoEscritor | undefined)?.commitSha
+            if (escreve && r.estado === 'concluida' && commit !== undefined) {
+              baseDoEscritor.set(escritor, commit)
+            }
+          })
           .finally(() => {
             emAndamento.delete(tarefa.id)
-            if (!escreve) workersRodando -= 1
+            if (escreve) escritoresOcupados.delete(escritor)
+            else workersRodando -= 1
           })
         emAndamento.set(tarefa.id, rodando)
       }
@@ -140,6 +158,24 @@ export class ExecutorDoSquad {
       (t) => resultados.get(t.id) as ResultadoDaTarefaDoSquad
     )
     return { estado: estadoDoSquad(pedido, tarefas), tarefas }
+  }
+
+  /**
+   * Duas tarefas de escrita cujo `escritor-tarefa`, depois de sanitizado, dá o mesmo nome (`a_b` e
+   * `a-b`) reusariam o container e a branch uma da outra: a segunda não roda.
+   */
+  private recusarNomesQueColidem(
+    pedido: PedidoDoSquad,
+    terminar: (t: TarefaDoPlano, r: Omit<ResultadoDaTarefaDoSquad, 'tarefaId' | 'papel'>) => void
+  ): void {
+    const escrevem = pedido.plano.tarefas.filter((t) => PAPEIS_QUE_ESCREVEM.includes(t.papel))
+    const nomeDe = (t: TarefaDoPlano): string => `${t.escritor as string}-${t.id}`
+    for (const [, repetido] of escritoresColidemPorNome(escrevem.map(nomeDe))) {
+      const tarefa = escrevem.find((t) => nomeDe(t) === repetido)
+      if (tarefa === undefined) continue
+      this.registrar(pedido, tarefa, 'recusada', 'nome-colide')
+      terminar(tarefa, { estado: 'recusada', motivo: 'nome-colide' })
+    }
   }
 
   private dependenciasConcluidas(
@@ -176,14 +212,15 @@ export class ExecutorDoSquad {
   /** Monta o contexto e despacha ao executor do papel. Nunca lança. */
   private async rodar(
     pedido: PedidoDoSquad,
-    tarefa: TarefaDoPlano
+    tarefa: TarefaDoPlano,
+    revisao: string
   ): Promise<Omit<ResultadoDaTarefaDoSquad, 'tarefaId' | 'papel'>> {
     try {
       const contexto = this.deps.contexto.montar({
         projectId: pedido.projectId,
         workspaceId: pedido.workspaceId,
         repositorio: pedido.repositorio,
-        revisao: pedido.baseSha,
+        revisao,
         runId: pedido.runId,
         tarefa: { id: tarefa.id, entradas: tarefa.entradas },
         rota: pedido.rota,
@@ -216,7 +253,7 @@ export class ExecutorDoSquad {
           sliceId: pedido.sliceId,
           escritor: tarefa.escritor as string,
           repositorio: pedido.repositorio,
-          baseSha: pedido.baseSha
+          baseSha: revisao
         })
         return {
           estado: execucao.estado,

@@ -55,6 +55,8 @@ export interface PedidoDeSandbox {
   readonly projectId: string
   readonly sliceId: string
   readonly escritor: string
+  /** A tarefa que o sandbox atende: um escritor com duas tarefas tem dois ambientes, não um. */
+  readonly tarefaId: string
   readonly tentativa: number
   readonly repositorio: string
   readonly baseSha: string
@@ -271,6 +273,7 @@ export class ExecutorDeEscritor {
       projectId: pedido.projectId,
       sliceId: pedido.sliceId,
       escritor: pedido.escritor,
+      tarefaId: pedido.tarefa.id,
       tentativa: pedido.tentativa,
       repositorio: pedido.repositorio,
       baseSha: pedido.baseSha,

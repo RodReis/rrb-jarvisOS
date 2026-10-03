@@ -9,6 +9,7 @@ const PEDIDO: PedidoDeSandbox = {
   projectId: 'p-1',
   sliceId: 'f03',
   escritor: 'api',
+  tarefaId: 'tar-1',
   tentativa: 1,
   repositorio: '/repo',
   baseSha: 'a'.repeat(40),
@@ -87,11 +88,12 @@ function montar(
 }
 
 describe('unidade de sandbox', () => {
-  it('é única por run, escritor e tentativa', () => {
-    const base = { runId: 'run-1', escritor: 'api', tentativa: 1 }
+  it('é única por run, escritor, tarefa e tentativa', () => {
+    const base = { runId: 'run-1', escritor: 'api', tarefaId: 'tar-1', tentativa: 1 }
 
-    expect(unidadeDeSandbox(base)).toBe('run-1-api-t1')
+    expect(unidadeDeSandbox(base)).toBe('run-1-api-tar-1-t1')
     expect(unidadeDeSandbox({ ...base, escritor: 'ui' })).not.toBe(unidadeDeSandbox(base))
+    expect(unidadeDeSandbox({ ...base, tarefaId: 'tar-2' })).not.toBe(unidadeDeSandbox(base))
     expect(unidadeDeSandbox({ ...base, tentativa: 2 })).not.toBe(unidadeDeSandbox(base))
     expect(unidadeDeSandbox({ ...base, runId: 'run-2' })).not.toBe(unidadeDeSandbox(base))
   })
@@ -105,7 +107,7 @@ describe('preparar', () => {
 
     expect(preparados).toEqual([
       {
-        runId: 'run-1-api-t1',
+        runId: 'run-1-api-tar-1-t1',
         projectId: 'p-1',
         sliceId: 'f03',
         raizOperacional: '/raiz',
@@ -113,7 +115,7 @@ describe('preparar', () => {
         base: 'a'.repeat(40),
         pathsDaSpec: PEDIDO.pathsPermitidos,
         proxyUrl: 'http://proxy',
-        sufixoDaBranch: 'api-t1',
+        sufixoDaBranch: 'api-tar-1-t1',
         caminhoDoProxy: '/u/chave-1'
       }
     ])
@@ -126,11 +128,14 @@ describe('preparar', () => {
 
     expect(adotar).toHaveBeenCalledWith({
       repositorio: '/repo',
-      worktree: '/raiz/jarvisos-run-run-1-api-t1',
-      branch: 'feat/f03-run-1-run-1-api-t1',
+      worktree: '/raiz/jarvisos-run-run-1-api-tar-1-t1',
+      branch: 'feat/f03-run-1-run-1-api-tar-1-t1',
       baseSha: 'a'.repeat(40)
     })
-    expect(r).toMatchObject({ ok: true, worktree: { worktree: '/raiz/jarvisos-run-run-1-api-t1' } })
+    expect(r).toMatchObject({
+      ok: true,
+      worktree: { worktree: '/raiz/jarvisos-run-run-1-api-tar-1-t1' }
+    })
   })
 
   it('dois escritores do mesmo run recebem unidades, e portanto ambientes, distintos', async () => {
@@ -139,8 +144,8 @@ describe('preparar', () => {
     await sandbox.preparar(PEDIDO)
     await sandbox.preparar({ ...PEDIDO, escritor: 'ui' })
 
-    expect(preparados.map((p) => p.runId)).toEqual(['run-1-api-t1', 'run-1-ui-t1'])
-    expect(preparados.map((p) => p.sufixoDaBranch)).toEqual(['api-t1', 'ui-t1'])
+    expect(preparados.map((p) => p.runId)).toEqual(['run-1-api-tar-1-t1', 'run-1-ui-tar-1-t1'])
+    expect(preparados.map((p) => p.sufixoDaBranch)).toEqual(['api-tar-1-t1', 'ui-tar-1-t1'])
   })
 
   it('cada motivo de recusa do Preflight vira recusa do sandbox, com o motivo e a mensagem', async () => {
@@ -167,7 +172,7 @@ describe('preparar', () => {
 
     expect(await sandbox.preparar(PEDIDO)).toEqual({ ok: false, motivo: 'arvore-suja: sujo' })
     expect(adotar).not.toHaveBeenCalled()
-    expect(sandbox.containerDe('/raiz/jarvisos-run-run-1-api-t1')).toBeUndefined()
+    expect(sandbox.containerDe('/raiz/jarvisos-run-run-1-api-tar-1-t1')).toBeUndefined()
   })
 
   it('adota na base que o Preflight resolveu, não na que o pedido trouxe', async () => {
@@ -197,8 +202,8 @@ describe('preparar', () => {
     const r = await sandbox.preparar(PEDIDO)
 
     expect(r).toEqual({ ok: false, motivo: 'worktree-nao-adotado: fora do .git do repositório' })
-    expect(parados).toEqual([['jarvisos-run-run-1-api-t1', '/raiz']])
-    expect(sandbox.containerDe('/raiz/jarvisos-run-run-1-api-t1')).toBeUndefined()
+    expect(parados).toEqual([['jarvisos-run-run-1-api-tar-1-t1', '/raiz']])
+    expect(sandbox.containerDe('/raiz/jarvisos-run-run-1-api-tar-1-t1')).toBeUndefined()
   })
 })
 
@@ -262,11 +267,11 @@ describe('container e encerramento', () => {
     await sandbox.preparar(PEDIDO)
     await sandbox.preparar({ ...PEDIDO, escritor: 'ui' })
 
-    expect(sandbox.containerDe('/raiz/jarvisos-run-run-1-api-t1')).toEqual({
-      container: 'jarvisos-run-run-1-api-t1'
+    expect(sandbox.containerDe('/raiz/jarvisos-run-run-1-api-tar-1-t1')).toEqual({
+      container: 'jarvisos-run-run-1-api-tar-1-t1'
     })
-    expect(sandbox.containerDe('/raiz/jarvisos-run-run-1-ui-t1')).toEqual({
-      container: 'jarvisos-run-run-1-ui-t1'
+    expect(sandbox.containerDe('/raiz/jarvisos-run-run-1-ui-tar-1-t1')).toEqual({
+      container: 'jarvisos-run-run-1-ui-tar-1-t1'
     })
     expect(sandbox.containerDe('/outro/lugar')).toBeUndefined()
   })
@@ -278,9 +283,9 @@ describe('container e encerramento', () => {
 
     await sandbox.encerrar(PEDIDO)
 
-    expect(parados).toEqual([['jarvisos-run-run-1-api-t1', '/raiz']])
-    expect(sandbox.containerDe('/raiz/jarvisos-run-run-1-api-t1')).toBeUndefined()
-    expect(sandbox.containerDe('/raiz/jarvisos-run-run-1-ui-t1')).toBeDefined()
+    expect(parados).toEqual([['jarvisos-run-run-1-api-tar-1-t1', '/raiz']])
+    expect(sandbox.containerDe('/raiz/jarvisos-run-run-1-api-tar-1-t1')).toBeUndefined()
+    expect(sandbox.containerDe('/raiz/jarvisos-run-run-1-ui-tar-1-t1')).toBeDefined()
   })
 
   it('encerrar o que nunca subiu, ou já foi encerrado, não faz nada', async () => {

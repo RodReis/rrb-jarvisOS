@@ -812,6 +812,12 @@ comGit('a nova tentativa do escritor (M9-F04)', () => {
     expect(preparados.map((p) => p.tentativa)).toEqual([1, 2])
   })
 
+  it('o sandbox sabe de que tarefa é: duas tarefas do mesmo escritor não dividem ambiente', async () => {
+    await executor.executar(pedido())
+
+    expect(preparados.map((p) => p.tarefaId)).toEqual(['t1'])
+  })
+
   it('a quarta tentativa é recusada, sem tomar slot', async () => {
     const r = await executor.executar(pedido({ tentativa: 4 }))
 
