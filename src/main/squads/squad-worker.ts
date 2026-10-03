@@ -17,7 +17,6 @@
 
 import { createHash } from 'node:crypto'
 import { TIMEOUT_PADRAO_MS, type AiRequest, type CostEvent } from '@shared/domain/ai'
-import { proximaTentativaPermitida } from '@shared/domain/attempt'
 import type { ContextPack } from '@shared/domain/context-pack'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { ModeloEscolhido } from '@shared/domain/modelo-da-fase'
@@ -35,6 +34,7 @@ import type { FonteDaTarefa } from '../context/context-service'
 import type { AuditRepository } from '../storage/audit-repository'
 import type { ChamadorDeIa } from './squad-gerador'
 import { extrairJson } from './squad-planejador'
+import { recusaDaTentativa, recusaDoContexto, recusaDosLimites } from './squad-recusas'
 import { montarPromptDoWorker } from './squad-worker-prompt'
 
 /** Mais que isto de saída é um modelo fora de controle, não um resultado: corta e marca inválida. */
@@ -163,16 +163,11 @@ export class ExecutorDeWorker {
     const { tarefa, contexto, modelo } = pedido
     if (PAPEIS_QUE_ESCREVEM.includes(tarefa.papel)) return 'papel-de-escrita'
     if (!ehSchemaDeResultado(tarefa.schemaDeResultado)) return 'schema-desconhecido'
-    if (!Number.isInteger(pedido.tentativa) || pedido.tentativa < 1) return 'tentativa-invalida'
-    // A terceira tentativa é a última: o limite é o da M9-F04, e vale por tarefa.
-    if (!proximaTentativaPermitida(pedido.tentativa - 1)) {
-      return 'tentativas-esgotadas'
-    }
-    const { maxMinutos, maxTokensEntrada, maxTokensSaida } = tarefa.limites
-    if (![maxMinutos, maxTokensEntrada, maxTokensSaida].every((n) => Number.isFinite(n) && n > 0)) {
-      return 'limite-invalido'
-    }
-    if (contexto.fontes.length === 0 || contexto.pack.itens.length === 0) return 'sem-contexto'
+    const comum =
+      recusaDaTentativa(pedido.tentativa) ??
+      recusaDosLimites(tarefa.limites) ??
+      recusaDoContexto(contexto.fontes.length, contexto.pack.itens.length)
+    if (comum !== undefined) return comum
     if (modelo.provider === 'ollama' && (pedido.numCtx === undefined || pedido.numCtx <= 0)) {
       return 'modelo-local-sem-janela'
     }
@@ -183,7 +178,9 @@ export class ExecutorDeWorker {
       fontes: contexto.fontes
     })
     const tokensDeEntrada = Math.ceil(Buffer.byteLength(system + prompt, 'utf8') / 4)
-    return tokensDeEntrada > maxTokensEntrada ? 'contexto-acima-do-limite' : undefined
+    return tokensDeEntrada > tarefa.limites.maxTokensEntrada
+      ? 'contexto-acima-do-limite'
+      : undefined
   }
 
   private async rodar(pedido: PedidoDoWorker): Promise<{ desfecho: Desfecho; custo?: CostEvent }> {
