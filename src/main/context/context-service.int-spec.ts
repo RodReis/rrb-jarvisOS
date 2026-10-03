@@ -17,7 +17,12 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import type { Database as Db } from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { CandidatoDeContexto, PedidoDeContexto } from './context-service'
+import type {
+  CandidatoDeContexto,
+  FonteDaTarefa,
+  PedidoDeContexto,
+  PedidoDeContextoDaTarefa
+} from './context-service'
 
 const logCat = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 vi.mock('../logging/logger', () => ({
@@ -762,5 +767,243 @@ describe('o caminho documental não afrouxou (contrafactual do critério 10)', (
      */
     expect(hashDoPack({ ...entrada, projectId: undefined })).toBe(HASH_SEM_PROJETO)
     expect(HASH_SEM_PROJETO).not.toBe(HASH_CANONICO_DE_REFERENCIA)
+  })
+})
+
+describe('contexto da tarefa do Squad (SPEC-Squads-03, critério 3)', () => {
+  const sha = (texto: string): string => createHash('sha256').update(texto, 'utf8').digest('hex')
+
+  const fonte = (parcial: Partial<FonteDaTarefa> = {}): FonteDaTarefa => ({
+    caminho: 'src/a.ts',
+    texto: 'export const a = 1\n',
+    origem: 'explicito',
+    motivo: 'entrada da tarefa t1',
+    ...parcial
+  })
+
+  const pedidoDaTarefa = (
+    parcial: Partial<PedidoDeContextoDaTarefa> = {}
+  ): PedidoDeContextoDaTarefa => ({
+    projectId: PROJETO,
+    tarefa: 'squad:run-1/t1@abc123def456',
+    etapa: 'squad-tarefa',
+    fontes: [fonte()],
+    rota: 'anthropic',
+    ...parcial
+  })
+
+  it('registra o hash do texto exato enviado, o motivo e a origem de cada fonte', () => {
+    const r = service.montarDaTarefa(
+      pedidoDaTarefa({
+        fontes: [
+          fonte(),
+          fonte({
+            caminho: 'src/b.ts',
+            texto: 'trecho\n',
+            origem: 'busca-estrutural',
+            motivo: 'busca por "alvo"',
+            linhas: { de: 3, ate: 9 }
+          })
+        ]
+      }),
+      'jarvis'
+    )
+
+    expect(r.reason).toBe('montado')
+    expect(r.pack?.itens).toEqual([
+      {
+        caminho: 'src/a.ts',
+        hash: sha('export const a = 1\n'),
+        origem: 'explicito',
+        bytes: Buffer.byteLength('export const a = 1\n'),
+        motivo: 'entrada da tarefa t1'
+      },
+      {
+        caminho: 'src/b.ts',
+        hash: sha('trecho\n'),
+        origem: 'busca-estrutural',
+        bytes: Buffer.byteLength('trecho\n'),
+        linhas: { de: 3, ate: 9 },
+        motivo: 'busca por "alvo"'
+      }
+    ])
+    expect(r.pack?.tarefa).toBe('squad:run-1/t1@abc123def456')
+    expect(r.pack?.rota).toBe('anthropic')
+  })
+
+  it('o pack fica gravado, e o serviço o devolve pelo id — é o que o gate da IA consulta', () => {
+    const r = service.montarDaTarefa(pedidoDaTarefa(), 'jarvis')
+
+    expect(packsNoBanco()).toBe(1)
+    expect(itensNoBanco()).toBe(1)
+    expect(service.buscar(r.pack?.id as string)?.hash).toBe(r.pack?.hash)
+  })
+
+  it('mesmo conteúdo e mesma tarefa reaproveitam o pack; outra tarefa ou outro texto não', () => {
+    const a = service.montarDaTarefa(pedidoDaTarefa(), 'jarvis')
+    const igual = service.montarDaTarefa(pedidoDaTarefa(), 'jarvis')
+    const outraTarefa = service.montarDaTarefa(
+      pedidoDaTarefa({ tarefa: 'squad:run-1/t2@abc123def456' }),
+      'jarvis'
+    )
+    const outraRevisao = service.montarDaTarefa(
+      pedidoDaTarefa({ tarefa: 'squad:run-1/t1@999999999999' }),
+      'jarvis'
+    )
+    const outroTexto = service.montarDaTarefa(
+      pedidoDaTarefa({ fontes: [fonte({ texto: 'mudou\n' })] }),
+      'jarvis'
+    )
+
+    expect(igual.pack?.id).toBe(a.pack?.id)
+    expect(new Set([a, outraTarefa, outraRevisao, outroTexto].map((x) => x.pack?.hash)).size).toBe(
+      4
+    )
+    expect(packsNoBanco()).toBe(4)
+  })
+
+  it('segredo em qualquer fonte recusa o pack inteiro, sem gravar linha nem guardar o trecho', () => {
+    const segredo = 'anotei aqui: ghp_abcdefghijklmnopqrstuvwxyz0123456789'
+
+    const r = service.montarDaTarefa(
+      pedidoDaTarefa({ fontes: [fonte(), fonte({ caminho: 'src/c.ts', texto: segredo })] }),
+      'jarvis'
+    )
+
+    expect(r.reason).toBe('segredo-no-contexto')
+    expect(r.pack).toBeUndefined()
+    expect(r.caminhosComSegredo).toEqual(['src/c.ts'])
+    expect(packsNoBanco()).toBe(0)
+    expect(JSON.stringify(audit.list(USER))).not.toContain('ghp_abcdefghij')
+  })
+
+  it('o nome de arquivo proibido recusa, mesmo com conteúdo inocente', () => {
+    const r = service.montarDaTarefa(
+      pedidoDaTarefa({ fontes: [fonte({ caminho: '.env', texto: 'X=1\n' })] }),
+      'jarvis'
+    )
+
+    expect(r.reason).toBe('segredo-no-contexto')
+    expect(packsNoBanco()).toBe(0)
+  })
+
+  it('projeto desconhecido ou de outro espaço é recusa', () => {
+    expect(
+      service.montarDaTarefa(pedidoDaTarefa({ projectId: 'nao-existe' }), 'jarvis').reason
+    ).toBe('projeto-desconhecido')
+    expect(service.montarDaTarefa(pedidoDaTarefa(), 'noa').reason).toBe('projeto-desconhecido')
+    expect(packsNoBanco()).toBe(0)
+  })
+
+  it('sem fonte utilizável é contexto vazio', () => {
+    expect(service.montarDaTarefa(pedidoDaTarefa({ fontes: [] }), 'jarvis').reason).toBe(
+      'contexto-vazio'
+    )
+  })
+
+  it('caminho absoluto, com ".." ou origem desconhecida não entra no manifesto', () => {
+    const r = service.montarDaTarefa(
+      pedidoDaTarefa({
+        fontes: [
+          fonte({ caminho: '/etc/passwd' }),
+          fonte({ caminho: '../fora.ts' }),
+          fonte({ caminho: String.raw`src\..\fora.ts` }),
+          fonte({ caminho: 'C:/x.ts' }),
+          fonte({ caminho: 'src/ampla.ts', origem: 'leitura-ampla' as never }),
+          fonte({ caminho: 'src/app.ts', origem: 'estado-do-app' as never }),
+          fonte({ caminho: 'src/valido.ts' })
+        ]
+      }),
+      'jarvis'
+    )
+
+    expect(r.pack?.itens.map((i) => i.caminho)).toEqual(['src/valido.ts'])
+  })
+
+  it('o caminho vazio não entra no manifesto', () => {
+    const r = service.montarDaTarefa(
+      pedidoDaTarefa({ fontes: [fonte({ caminho: '' }), fonte()] }),
+      'jarvis'
+    )
+
+    expect(r.pack?.itens.map((i) => i.caminho)).toEqual(['src/a.ts'])
+  })
+
+  it('as regras de domínio da tarefa entram no pack', () => {
+    const r = service.montarDaTarefa(
+      pedidoDaTarefa({ regras: ['Policy Engine é fail closed'] }),
+      'jarvis'
+    )
+
+    expect(r.pack?.regras).toEqual(['Policy Engine é fail closed'])
+  })
+
+  it('fonte maior que o teto por arquivo não entra: o manifesto descreve o que foi enviado', () => {
+    const grande = 'x'.repeat(256 * 1024 + 1)
+
+    const r = service.montarDaTarefa(
+      pedidoDaTarefa({ fontes: [fonte({ caminho: 'src/grande.ts', texto: grande }), fonte()] }),
+      'jarvis'
+    )
+
+    expect(r.pack?.itens.map((i) => i.caminho)).toEqual(['src/a.ts'])
+  })
+
+  it('passou do teto de tokens é recusa, e a expansão só vale com motivo', () => {
+    const muito = 'x'.repeat(200 * 1024)
+    const fontes = [
+      fonte({ caminho: 'src/1.ts', texto: muito }),
+      fonte({ caminho: 'src/2.ts', texto: muito })
+    ]
+
+    expect(service.montarDaTarefa(pedidoDaTarefa({ fontes }), 'jarvis').reason).toBe(
+      'teto-de-tokens-excedido'
+    )
+    expect(
+      service.montarDaTarefa(pedidoDaTarefa({ fontes, tetoDeTokens: 200_000 }), 'jarvis').reason
+    ).toBe('teto-de-tokens-excedido')
+    expect(
+      service.montarDaTarefa(
+        pedidoDaTarefa({
+          fontes,
+          tetoDeTokens: 200_000,
+          motivoDaExpansao: 'a tarefa precisa dos dois módulos'
+        }),
+        'jarvis'
+      ).reason
+    ).toBe('montado')
+  })
+
+  it('a auditoria leva hashes e contagens — nunca o texto', () => {
+    service.montarDaTarefa(
+      pedidoDaTarefa({ fontes: [fonte({ texto: 'texto-unico-xyz987\n' })] }),
+      'jarvis'
+    )
+
+    const eventos = audit.list(USER).filter((e) => e.type === 'context-pack')
+    expect(eventos).toHaveLength(1)
+    expect(eventos[0]?.payload).toMatchObject({
+      reason: 'montado',
+      itens: 1,
+      origem: 'squad-tarefa'
+    })
+    expect(JSON.stringify(eventos)).not.toContain('texto-unico-xyz987')
+  })
+
+  it('o caminho documental não mudou: montar continua exigindo arquivo no disco', () => {
+    const r = service.montar(
+      pedido({ candidatos: [candidato({ caminho: 'nao/existe.md' })] }),
+      'jarvis'
+    )
+
+    expect(r.reason).toBe('contexto-vazio')
+  })
+
+  it('as falhas abertas do projeto entram no pack, como no contexto documental', () => {
+    service.registrarFalha(PROJETO, 'jarvis', 'squad-tarefa', 'o worker devolveu saída inválida')
+
+    const r = service.montarDaTarefa(pedidoDaTarefa(), 'jarvis')
+
+    expect(r.pack?.falhasAbertas).toHaveLength(1)
   })
 })

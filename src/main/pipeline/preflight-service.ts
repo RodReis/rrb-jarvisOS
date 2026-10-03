@@ -71,6 +71,25 @@ export interface PedidoDePreflight {
    */
   readonly portasDeServico?: readonly number[]
   readonly proxyUrl: string
+  /**
+   * Dá branch própria ao **escritor** de um Squad: ele passa `<escritor>-t<tentativa>`, e dois
+   * escritores do mesmo run não dividem a branch. Ausente no run comum (SPEC-Squads-03).
+   */
+  readonly sufixoDaBranch?: string
+  /**
+   * O caminho da **unidade** no proxy (`/u/<chave>`), que o container recebe como parte da
+   * `ANTHROPIC_BASE_URL` (SPEC-Squads-03, critério 5). O sidecar encaminha TCP 1:1, então o caminho
+   * chega intacto ao proxy do host, que o resolve para o run e o pack daquela unidade. Só a forma
+   * exata de uma unidade é aceita — qualquer outra é descartada, nunca concatenada.
+   */
+  readonly caminhoDoProxy?: string
+}
+
+const CAMINHO_DE_UNIDADE = /^\/u\/[0-9a-f]{32}$/
+
+/** O caminho da unidade, se tem a forma exata; vazio caso contrário. */
+function caminhoDaUnidade(caminho: string | undefined): string {
+  return caminho !== undefined && CAMINHO_DE_UNIDADE.test(caminho) ? caminho : ''
 }
 
 export interface PreflightDeps {
@@ -260,7 +279,7 @@ export class PreflightService {
     }
 
     // 9. A branch nasce do SHA fixado (critério 2), num worktree fora do checkout ativo.
-    const branch = nomeDaBranch(pedido.sliceId, pedido.runId)
+    const branch = nomeDaBranch(pedido.sliceId, pedido.runId, pedido.sufixoDaBranch)
     // `core.autocrlf=false` no ato do checkout, e isto **não é preferência de estilo**: no
     // Windows o padrão grava CRLF no disco, e o Git de dentro do container (Linux) lê cada
     // arquivo como modificado. O executor veria a árvore inteira suja e o critério 6 acusaria
@@ -345,7 +364,7 @@ export class PreflightService {
         'Conferir o Docker Desktop e retomar a fatia.'
       )
     }
-    const proxyUrlDoExecutor = `http://${ipDoProxy}:${PORTA_DO_PROXY_DE_EGRESS}`
+    const proxyUrlDoExecutor = `http://${ipDoProxy}:${PORTA_DO_PROXY_DE_EGRESS}${caminhoDaUnidade(pedido.caminhoDoProxy)}`
 
     // 11. O sandbox sobe com o worktree montado e nenhum segredo (critérios 8 e 9).
     //

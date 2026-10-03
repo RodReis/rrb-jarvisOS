@@ -324,7 +324,7 @@ const NOME_DE_SEGREDO =
  * Normaliza `a\b/./c` e recusa o que sai da raiz (absoluto, `~`, `..`) ou não é um caminho de
  * arquivo comum (controle, reservado do Windows, segredo). `undefined` = inválido.
  */
-function normalizar(caminho: string): string | undefined {
+export function normalizar(caminho: string): string | undefined {
   if (temCaractereProibido(caminho)) return undefined
   const limpo = caminho.replace(/\\/g, '/')
   if (limpo.startsWith('/') || limpo.startsWith('~') || /^[A-Za-z]:/.test(limpo)) return undefined

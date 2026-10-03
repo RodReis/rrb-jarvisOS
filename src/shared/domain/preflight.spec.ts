@@ -122,6 +122,21 @@ describe('nomes derivados do run', () => {
     expect(nomeDaBranch('m9-f03', 'run-A')).not.toBe(nomeDaBranch('m9-f03', 'run-B'))
   })
 
+  it('o sufixo dá branch própria a cada escritor de um mesmo run, sem mudar a do run comum', () => {
+    const run = 'abcdef0123456789'
+
+    expect(nomeDaBranch('f03', run)).toBe('feat/f03-abcdef01')
+    expect(nomeDaBranch('f03', run, 'api-t1')).toBe('feat/f03-abcdef01-api-t1')
+    expect(nomeDaBranch('f03', run, 'api-t1')).not.toBe(nomeDaBranch('f03', run, 'ui-t1'))
+    expect(nomeDaBranch('f03', run, 'api-t1')).not.toBe(nomeDaBranch('f03', run, 'api-t2'))
+  })
+
+  it('o sufixo é sanitizado como o resto do nome, e vazio não deixa traço pendurado', () => {
+    expect(nomeDaBranch('f03', 'abcdef0123', 'API_T1')).toBe('feat/f03-abcdef01-api-t1')
+    expect(nomeDaBranch('f03', 'abcdef0123', '')).toBe('feat/f03-abcdef01')
+    expect(nomeDaBranch('f03', 'abcdef0123', '___')).toBe('feat/f03-abcdef01')
+  })
+
   it('produz nome de container válido para o Docker (minúsculas, sem caractere estranho)', () => {
     expect(nomeDoContainer('Run_42:xyz')).toBe('jarvisos-run-run-42-xyz')
     expect(nomeDoContainer('Run_42:xyz')).toMatch(/^[a-z0-9][a-z0-9-]*$/)

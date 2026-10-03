@@ -174,10 +174,25 @@ export function extrairJson(
   texto: string,
   aceita: (valor: Record<string, unknown>) => boolean = () => true
 ): Record<string, unknown> | undefined {
-  const candidatos = [texto.trim(), ...objetosBalanceados(texto)]
+  const lidos = objetosLegiveis(texto)
+  return lidos.find(aceita) ?? lidos[0]
+}
 
+/**
+ * Como `extrairJson`, mas a resposta do agente é o **último** objeto: o prompt dele traz um exemplo
+ * com a forma do resultado, e um eco do exemplo antes da resposta não pode vencer a resposta.
+ */
+export function extrairJsonFinal(
+  texto: string,
+  aceita: (valor: Record<string, unknown>) => boolean = () => true
+): Record<string, unknown> | undefined {
+  const lidos = objetosLegiveis(texto)
+  return lidos.findLast(aceita) ?? lidos.at(-1)
+}
+
+function objetosLegiveis(texto: string): Record<string, unknown>[] {
   const lidos: Record<string, unknown>[] = []
-  for (const candidato of candidatos) {
+  for (const candidato of [texto.trim(), ...objetosBalanceados(texto)]) {
     try {
       const valor = JSON.parse(candidato) as unknown
       if (ehObjeto(valor)) lidos.push(valor)
@@ -185,7 +200,7 @@ export function extrairJson(
       continue
     }
   }
-  return lidos.find(aceita) ?? lidos[0]
+  return lidos
 }
 
 /** O hash do plano aceito, ligado ao run, à revisão da SPEC e à revisão do perfil. */

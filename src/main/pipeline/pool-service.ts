@@ -47,6 +47,7 @@ import {
   tokenConfere,
   validarConfig
 } from '@shared/domain/pool'
+import { irmaosNoPool } from '@shared/domain/squad-execucao'
 import type { AuditRepository } from '../storage/audit-repository'
 import type { LeaseRepository } from './lease-repository'
 import type { ItemPersistido, NovoItem, PoolRepository } from './pool-repository'
@@ -90,9 +91,13 @@ export interface PoolDeps {
 
 export class PoolService {
   private readonly agora: () => number
+  /** A prova que o pool usa: a de quem injetou, mais a dos irmãos (escritores do mesmo run). */
+  private readonly prova: ProvaDeIndependencia
 
   constructor(private readonly deps: PoolDeps) {
     this.agora = deps.agora ?? ((): number => Date.now())
+    const injetada = deps.prova ?? SEM_PROVA
+    this.prova = (item, ativos) => irmaosNoPool(item.runId, ativos) || injetada(item, ativos)
   }
 
   configuracao(): ConfigDoPool {
@@ -123,6 +128,18 @@ export class PoolService {
     return this.deps.pool.enfileirar(this.deps.userId(), item, this.agora())
   }
 
+  /**
+   * Um novo pedido do mesmo item, depois de ele ter terminado o ciclo sem slot — é a **nova
+   * tentativa** de um escritor (M9-F04). Só reabre quem não detém slot: um item com lease vigente
+   * ou expirado segue com ele, e é a reconciliação que o resolve.
+   */
+  reabrir(runId: string): boolean {
+    const item = this.deps.pool.buscarItem(runId)
+    if (item === undefined || item.userId !== this.deps.userId()) return false
+    if (this.slotDoRun(runId) !== undefined) return false
+    return this.deps.pool.reabrir(runId, this.agora())
+  }
+
   /** O run deixa a fila sem ter adquirido. Quem já adquiriu não é cancelado aqui: libera. */
   cancelar(runId: string): boolean {
     const item = this.deps.pool.buscarItem(runId)
@@ -138,6 +155,22 @@ export class PoolService {
       )
       return true
     })()
+  }
+
+  /**
+   * Cancela o que o run ainda tem na fila: o item dele e o dos escritores que esperavam. Quem já
+   * tem slot não é tocado — a liberação de cancelamento e bloqueio é da M12-F05. Devolve os ids
+   * dos itens que saíram da fila, para quem executa acordar quem esperava por eles.
+   */
+  cancelarDoRun(runId: string): string[] {
+    const itens = this.deps.pool.itensDoGrupo(this.deps.userId(), runId).map((i) => i.runId)
+    return [runId, ...itens].filter((id) => this.cancelar(id))
+  }
+
+  /** Solta o slot do run e o dos escritores que sobraram: o run terminou e não há quem os use. */
+  encerrarDoRun(runId: string): boolean {
+    const itens = this.deps.pool.itensDoGrupo(this.deps.userId(), runId).map((i) => i.runId)
+    return [runId, ...itens].map((id) => this.encerrar(id)).some(Boolean)
   }
 
   /** O run já foi adquirido pelo pool alguma vez? Quem nunca foi não tem token a apresentar. */
@@ -172,7 +205,7 @@ export class PoolService {
         ocupados: slots.map((l) => this.comoOcupado(l, agora)),
         ultimoServidoEm: pool.vezes(userId)
       },
-      this.deps.prova ?? SEM_PROVA
+      this.prova
     )
 
     const emUso = new Set(slots.map((l) => l.recurso))
@@ -324,7 +357,7 @@ export class PoolService {
         ocupados: slots.map((l) => this.comoOcupado(l, agora)),
         ultimoServidoEm: pool.vezes(userId)
       },
-      this.deps.prova ?? SEM_PROVA
+      this.prova
     )
 
     const porRun = new Map(esperando.map((i) => [i.runId, i]))

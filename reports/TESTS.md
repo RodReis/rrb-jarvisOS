@@ -12,8 +12,8 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 2175 | 2175 | 0 | 81.5 | — | — |
-| — | — | — | Banco | 1388 | 1372 | 0 | 80.8 | — | — |
+| — | — | — | Regras de Negócio | 2323 | 2323 | 0 | 80.5 | — | — |
+| — | — | — | Banco | 1667 | 1651 | 0 | 82.9 | — | — |
 | — | — | — | Tela | 735 | 734 | 0 | 76.5 | — | — |
 
 ## Histórico por entrega
@@ -412,3 +412,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-10-02 | #128 | spec-scheduler-01-pool-fila | Regras de Negócio | 2175 | 2175 | 0 | 81.5 | #377 | [#377](https://github.com/RodReis/rrb-jarvisOS/pull/377) |
 | 2026-10-02 | #128 | spec-scheduler-01-pool-fila | Banco | 1388 | 1372 | 0 | 80.8 | #377 | [#377](https://github.com/RodReis/rrb-jarvisOS/pull/377) |
 | 2026-10-02 | #128 | spec-scheduler-01-pool-fila | Tela | 735 | 734 | 0 | 76.5 | #377 | [#377](https://github.com/RodReis/rrb-jarvisOS/pull/377) |
+| 2026-10-03 | #124 | spec-squads-03-workers-isolados | Regras de Negócio | 2323 | 2323 | 0 | 80.5 | #380 | [#380](https://github.com/RodReis/rrb-jarvisOS/pull/380) |
+| 2026-10-03 | #124 | spec-squads-03-workers-isolados | Banco | 1667 | 1651 | 0 | 82.9 | #380 | [#380](https://github.com/RodReis/rrb-jarvisOS/pull/380) |
+| 2026-10-03 | #124 | spec-squads-03-workers-isolados | Tela | 735 | 734 | 0 | 76.5 | #380 | [#380](https://github.com/RodReis/rrb-jarvisOS/pull/380) |

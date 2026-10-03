@@ -13,6 +13,7 @@
  * que só a Anthropic tem, este arquivo não compilaria.
  */
 
+import { getEventListeners } from 'node:events'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -23,6 +24,7 @@ import { BudgetRepository } from '../budget/budget-repository'
 import type { BudgetLimitsInput } from '@shared/domain/budget'
 import { RoutingService } from '../ai/routing-service'
 import { RoutingRepository } from '../ai/routing-repository'
+import { TIMEOUT_PADRAO_MS } from '@shared/domain/ai'
 
 const logCat = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 vi.mock('../logging/logger', () => ({
@@ -579,6 +581,102 @@ describe('resiliência (critério 7)', () => {
     const fim = eventos.at(-1)
     expect(fim?.tipo === 'fim' ? fim.erro : '').not.toContain(SEGREDO)
     expect(fim?.tipo === 'fim' ? fim.erro : '').toBe('Falha inesperada ao chamar o provider.')
+  })
+})
+
+describe('cancelamento e prazo por chamada (SPEC-Squads-03, critério 4)', () => {
+  const CTX = { userId: USUARIO, workspace: 'jarvis' } as const
+  const PEDIDO = { provider: 'anthropic', prompt: PROMPT, contextPackId: PACK } as const
+
+  /** Um adapter que só termina quando o sinal que o ponto único lhe entregou é abortado. */
+  function adapterPendurado(): AiAdapter & { recebido?: AdapterRequest } {
+    const adapter: AiAdapter & { recebido?: AdapterRequest } = adapterFalso(() =>
+      (async function* (): AsyncIterable<AdapterChunk> {
+        const sinal = adapter.recebido?.signal as AbortSignal
+        await new Promise<void>((resolve) => {
+          if (sinal.aborted) resolve()
+          else sinal.addEventListener('abort', () => resolve(), { once: true })
+        })
+        throw new AdapterError('A chamada foi interrompida.', new Error('abort'))
+        yield { tipo: 'fim', usage: USAGE }
+      })()
+    )
+    return adapter
+  }
+
+  it('o sinal do contexto aborta a chamada em andamento', async () => {
+    const adapter = adapterPendurado()
+    const controle = new AbortController()
+    setTimeout(() => controle.abort(), 30)
+
+    const eventos = await coletar(
+      servico(adapter).call(PEDIDO, { ...CTX, signal: controle.signal })
+    )
+
+    expect(eventos.at(-1)).toMatchObject({ tipo: 'fim', estado: 'falhou' })
+    expect(adapter.recebido?.signal?.aborted).toBe(true)
+    expect(eventosDeIa().at(-1)?.payload).toMatchObject({ fase: 'conclusao', estado: 'falhou' })
+  })
+
+  it('o sinal já abortado impede a chamada de esperar', async () => {
+    const adapter = adapterPendurado()
+    const controle = new AbortController()
+    controle.abort()
+
+    const eventos = await coletar(
+      servico(adapter).call(PEDIDO, { ...CTX, signal: controle.signal })
+    )
+
+    expect(eventos.at(-1)).toMatchObject({ tipo: 'fim', estado: 'falhou' })
+  })
+
+  it('o ouvinte do sinal sai quando a chamada termina: um sinal de vida longa não acumula', async () => {
+    const controle = new AbortController()
+
+    await coletar(
+      servico(adapterFalso(ROTEIRO_OK)).call(PEDIDO, { ...CTX, signal: controle.signal })
+    )
+
+    expect(getEventListeners(controle.signal, 'abort')).toHaveLength(0)
+  })
+
+  it('um prazo menor que o padrão é entregue ao adapter e encerra a chamada', async () => {
+    const adapter = adapterPendurado()
+
+    const inicio = Date.now()
+    const eventos = await coletar(servico(adapter).call(PEDIDO, { ...CTX, timeoutMs: 40 }))
+
+    expect(Date.now() - inicio).toBeLessThan(5_000)
+    expect(adapter.recebido?.timeoutMs).toBe(40)
+    expect(eventos.at(-1)).toMatchObject({ tipo: 'fim', estado: 'falhou' })
+  })
+
+  it('um prazo maior que o padrão não o estende: o teto do ponto único vale', async () => {
+    const adapter = adapterFalso(ROTEIRO_OK)
+
+    await coletar(servico(adapter).call(PEDIDO, { ...CTX, timeoutMs: 10 * 60 * 60 * 1000 }))
+
+    expect(adapter.recebido?.timeoutMs).toBe(TIMEOUT_PADRAO_MS)
+  })
+
+  it('sem sinal nem prazo no contexto, nada muda', async () => {
+    const adapter = adapterFalso(ROTEIRO_OK)
+
+    const eventos = await coletar(servico(adapter).call(PEDIDO, CTX))
+
+    expect(eventos.at(-1)).toMatchObject({ tipo: 'fim', estado: 'concluido' })
+    expect(adapter.recebido?.timeoutMs).toBe(TIMEOUT_PADRAO_MS)
+  })
+
+  it('prazo inválido (zero, negativo, NaN) cai no padrão em vez de abortar na hora', async () => {
+    for (const timeoutMs of [0, -5, Number.NaN]) {
+      const adapter = adapterFalso(ROTEIRO_OK)
+
+      const eventos = await coletar(servico(adapter).call(PEDIDO, { ...CTX, timeoutMs }))
+
+      expect(eventos.at(-1)).toMatchObject({ tipo: 'fim', estado: 'concluido' })
+      expect(adapter.recebido?.timeoutMs).toBe(TIMEOUT_PADRAO_MS)
+    }
   })
 })
 

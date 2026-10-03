@@ -31,6 +31,7 @@
  * e no `execution_run`. Sem segredo para vazar, não há vazamento.
  */
 
+import { randomBytes } from 'node:crypto'
 import { createServer, type Server } from 'node:http'
 import type { AiProvider, AiRequest } from '@shared/domain/ai'
 import type { WorkspaceId } from '@shared/domain/entities'
@@ -55,9 +56,29 @@ export interface ProxyDeps {
   readonly contextPackId: () => string | undefined
 }
 
+/**
+ * O contexto de **uma unidade** (um escritor de um Squad): o workspace, o run, a tentativa e o
+ * pack dela. O workspace é o da unidade, não o global: a chamada é auditada e tem custo no
+ * espaço em que o trabalho nasceu, mesmo que o ativo tenha mudado enquanto o escritor rodava.
+ */
+export interface ContextoDaUnidade {
+  readonly workspaceId: WorkspaceId
+  readonly runId: string
+  readonly tentativa: number
+  readonly contextPackId: string
+}
+
+/** O prefixo de caminho que identifica uma unidade: `/u/<chave>`. */
+const PREFIXO_DA_UNIDADE = /^\/u\/([^/]*)/
+
+/** Mais corpo que isto não é uma conversa do agente: é abuso, e não se acumula em memória. */
+const MAX_CORPO_BYTES = 8 * 1024 * 1024
+
 export class ExecutorProxy {
   private servidor?: Server
   private porta?: number
+  /** As unidades registradas, por chave. A chave é a única credencial de roteamento: aleatória. */
+  private readonly unidades = new Map<string, ContextoDaUnidade>()
 
   constructor(private readonly deps: ProxyDeps) {}
 
@@ -88,6 +109,33 @@ export class ExecutorProxy {
     return this.url()
   }
 
+  /**
+   * Registra o contexto de uma unidade e devolve o caminho que o container dela usa na
+   * `ANTHROPIC_BASE_URL` (SPEC-Squads-03, critério 5).
+   *
+   * O proxy é um só, e o contexto de `deps` é global — serve a um run por vez. Dois escritores
+   * rodando juntos precisam que cada chamada chegue ao ponto único com **o run, a tentativa e o
+   * pack da própria unidade**; senão o custo e o manifesto de um seriam atribuídos ao outro. A
+   * chave é **aleatória** (16 bytes): um container que adivinhasse a de outro usaria o pack e o
+   * orçamento dele, e uma chave previsível (`run-escritor-t1`) seria exatamente isso.
+   *
+   * A chave não é credencial de modelo — nenhuma credencial atravessa a fronteira —, é só a de
+   * roteamento. Ela viaja no argumento do `docker run`, e por isso é por unidade e descartável.
+   */
+  registrarUnidade(contexto: ContextoDaUnidade): {
+    readonly chave: string
+    readonly caminho: string
+  } {
+    const chave = randomBytes(16).toString('hex')
+    this.unidades.set(chave, contexto)
+    return { chave, caminho: `/u/${chave}` }
+  }
+
+  /** A unidade terminou: a chave deixa de valer. Liberar o que não existe não faz nada. */
+  liberarUnidade(chave: string): void {
+    this.unidades.delete(chave)
+  }
+
   /** O proxy está no ar? É o que o preflight pergunta antes de liberar o run (critério 11). */
   noAr(): boolean {
     return this.servidor !== undefined && this.servidor.listening
@@ -113,7 +161,11 @@ export class ExecutorProxy {
   }
 
   private async atender(
-    req: NodeJS.ReadableStream & { readonly method?: string },
+    req: NodeJS.ReadableStream & {
+      readonly method?: string
+      readonly url?: string
+      readonly headers?: Readonly<Record<string, string | string[] | undefined>>
+    },
     res: NodeJS.WritableStream & {
       writeHead: (status: number, headers?: Record<string, string>) => void
       end: (chunk?: string) => void
@@ -125,9 +177,30 @@ export class ExecutorProxy {
       return
     }
 
-    let corpo = ''
-    for await (const pedaco of req) corpo += String(pedaco)
+    // O agente do container não é um navegador: um pedido com `Origin` é uma página que alguém
+    // abriu no host tentando falar com o loopback, e não é atendido.
+    if (req.headers?.origin !== undefined) {
+      res.writeHead(403, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ error: 'Origem não permitida.' }))
+      return
+    }
 
+    // Com o prefixo `/u/<chave>`, o contexto é o da unidade; sem ele, o global de antes. Uma chave
+    // que ninguém registrou é recusa — e isso se decide **antes** de ler o corpo.
+    const prefixo = PREFIXO_DA_UNIDADE.exec(req.url ?? '')
+    const unidade = prefixo === null ? undefined : this.unidades.get(prefixo[1])
+    if (prefixo !== null && unidade === undefined) {
+      res.writeHead(403, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ error: 'Unidade desconhecida.' }))
+      return
+    }
+
+    const corpo = await lerCorpo(req)
+    if (corpo === undefined) {
+      res.writeHead(413, { 'content-type': 'application/json', connection: 'close' })
+      res.end(JSON.stringify({ error: 'Pedido grande demais.' }))
+      return
+    }
     const prompt = extrairPrompt(corpo)
     if (prompt === undefined) {
       res.writeHead(400, { 'content-type': 'application/json' })
@@ -135,8 +208,8 @@ export class ExecutorProxy {
       return
     }
 
-    const contexto = this.deps.contexto()
-    const packId = this.deps.contextPackId()
+    const contexto = unidade ?? this.deps.contexto()
+    const packId = unidade?.contextPackId ?? this.deps.contextPackId()
 
     const pedido: AiRequest = {
       provider: this.deps.rota(),
@@ -154,7 +227,7 @@ export class ExecutorProxy {
     try {
       for await (const evento of this.deps.ai.call(pedido, {
         userId: this.deps.userId(),
-        workspace: this.deps.workspaceId()
+        workspace: unidade?.workspaceId ?? this.deps.workspaceId()
       })) {
         if (evento.tipo === 'chunk') {
           res.write(`data: ${JSON.stringify({ type: 'chunk', text: evento.texto })}\n\n`)
@@ -173,6 +246,19 @@ export class ExecutorProxy {
       res.end()
     }
   }
+}
+
+/** O corpo do pedido, ou `undefined` se passou do teto — e então para de acumular. */
+async function lerCorpo(req: NodeJS.ReadableStream): Promise<string | undefined> {
+  const pedacos: Buffer[] = []
+  let total = 0
+  for await (const pedaco of req) {
+    const buffer = Buffer.isBuffer(pedaco) ? pedaco : Buffer.from(String(pedaco))
+    total += buffer.length
+    if (total > MAX_CORPO_BYTES) return undefined
+    pedacos.push(buffer)
+  }
+  return Buffer.concat(pedacos).toString('utf8')
 }
 
 /**

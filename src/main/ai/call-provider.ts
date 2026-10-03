@@ -60,6 +60,18 @@ import type { ColetorDaGeracao } from './generation-trace-service'
 export interface AiCallContext {
   readonly userId: string
   readonly workspace: WorkspaceId
+  /**
+   * Cancela a chamada de fora (SPEC-Squads-03, critério 4: cancelamento com estado terminal
+   * auditável). Vive no contexto, e não no `AiRequest`, porque o contexto é montado no main — o
+   * renderer não o preenche, e um `AbortSignal` não atravessa o IPC.
+   */
+  readonly signal?: AbortSignal
+  /**
+   * O prazo desta chamada. **Só reduz** o teto do ponto único: um valor maior, zero, negativo ou
+   * `NaN` cai no `TIMEOUT_PADRAO_MS` — quem chama não estende o prazo, e um prazo inválido não
+   * aborta a chamada na hora.
+   */
+  readonly timeoutMs?: number
 }
 
 /**
@@ -103,6 +115,12 @@ export interface AberturaDoConsole {
     readonly provider: string
     readonly modelo: string
   }): ColetorDaGeracao
+}
+
+/** O prazo efetivo: o pedido, quando é um número positivo e menor que o teto; senão, o teto. */
+function prazoDaChamada(pedido: number | undefined): number {
+  if (pedido === undefined || !Number.isFinite(pedido) || pedido <= 0) return TIMEOUT_PADRAO_MS
+  return Math.min(pedido, TIMEOUT_PADRAO_MS)
 }
 
 export class AiCallService {
@@ -363,6 +381,12 @@ export class AiCallService {
     let latenciaPrimeiroChunkMs: number | undefined
     const controle = new AbortController()
     this.emVoo.set(id, controle)
+    // O sinal de quem chamou aborta o mesmo controle que `cancel` e o prazo abortam: um só ponto de
+    // parada, e o adapter recebe um só sinal.
+    const abortar = (): void => controle.abort()
+    if (ctx.signal?.aborted === true) abortar()
+    else ctx.signal?.addEventListener('abort', abortar)
+    const prazo = prazoDaChamada(ctx.timeoutMs)
 
     // O console (SPEC-Fases-03). Aberto **depois** dos gates: um trace de chamada que não saiu
     // registraria uma geração que não houve, e o `ledgerEntryId` apontaria para uma linha de
@@ -389,7 +413,7 @@ export class AiCallService {
     // O timeout arma **antes** do primeiro chunk e desarma no fim. O que ele protege não é a
     // resposta longa (streaming é lento por natureza) e sim o stream pendurado, que sem isto
     // seguraria a chamada — e o evento de conclusão — para sempre.
-    const relogio = setTimeout(() => controle.abort(), TIMEOUT_PADRAO_MS)
+    const relogio = setTimeout(() => controle.abort(), prazo)
 
     // O desfecho do console. Começa em `falhou` porque é o que um trace vale enquanto ninguém
     // provou o contrário: uma geração que morre no meio é falha que o painel deve mostrar, e um
@@ -432,7 +456,7 @@ export class AiCallService {
         ...(request.opcoesLocais === undefined ? {} : { opcoesLocais: request.opcoesLocais }),
         maxTokens,
         ...(credencial === undefined ? {} : { apiKey: credencial.value }),
-        timeoutMs: TIMEOUT_PADRAO_MS,
+        timeoutMs: prazo,
         signal: controle.signal,
         ...(coletor === undefined
           ? {}
@@ -510,6 +534,7 @@ export class AiCallService {
       })
     } finally {
       clearTimeout(relogio)
+      ctx.signal?.removeEventListener('abort', abortar)
       this.emVoo.delete(id)
 
       // Fecha o console **sempre** — inclusive quando o consumidor abandona o `for await` no

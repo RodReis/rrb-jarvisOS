@@ -160,6 +160,32 @@ describe('gates — capacidade livre não torna ninguém elegível (regra 1)', (
   })
 })
 
+describe('a prova de independência injetada continua valendo para runs comuns', () => {
+  const comProva = (prova: () => boolean) =>
+    new PoolService({
+      db,
+      pool,
+      leases,
+      audit,
+      userId: () => USER,
+      workspaceId: () => 'jarvis',
+      prova,
+      agora: () => relogio
+    })
+
+  it('sem prova, o segundo run do projeto espera; com a prova, entra', () => {
+    comProva(() => false).configurar(PARALELO)
+    const sem = comProva(() => false)
+    sem.enfileirar(run('a1'))
+    sem.enfileirar(run('a2'))
+    expect(sem.ciclo().adquiridos.map((a) => a.runId)).toEqual(['a1'])
+    expect(pool.buscarItem('a2')?.motivo).toEqual({ tipo: 'sem-prova-de-independencia' })
+
+    const com = comProva(() => true)
+    expect(com.ciclo().adquiridos.map((a) => a.runId)).toEqual(['a2'])
+  })
+})
+
 describe('justiça entre projetos — critério 2', () => {
   it('dois projetos continuamente elegíveis alternam a cada slot liberado', () => {
     const servidos: string[] = []
@@ -534,6 +560,40 @@ describe('escopo de workspace e de usuário', () => {
 
     expect(() => intruso.enfileirar(run('r1'))).toThrow(/outro usuário/)
     expect(pool.esperando('u-outro')).toEqual([])
+  })
+})
+
+describe('reabrir o item que terminou sem slot', () => {
+  it('reabre o item liberado, e ele volta a ser atendido com um token novo', () => {
+    servico.enfileirar(run('r1:api'))
+    const a = servico.ciclo().adquiridos[0]
+    servico.liberar('r1:api', a.fencingToken)
+    expect(servico.slotDoRun('r1:api')).toBeUndefined()
+
+    expect(servico.reabrir('r1:api')).toBe(true)
+
+    const b = servico.ciclo().adquiridos[0]
+    expect(b.runId).toBe('r1:api')
+    expect(b.fencingToken).toBeGreaterThan(a.fencingToken)
+  })
+
+  it('não reabre quem detém slot, vigente ou expirado: é a reconciliação que o resolve', () => {
+    servico.enfileirar(run('r1:api'))
+    servico.ciclo()
+    expect(servico.reabrir('r1:api')).toBe(false)
+
+    relogio += VALIDADE_DO_LEASE_MS + 1
+    expect(servico.reabrir('r1:api')).toBe(false)
+    expect(servico.slotDoRun('r1:api')).toBeDefined()
+  })
+
+  it('não reabre o que não existe nem o item de outro usuário', () => {
+    servico.enfileirar(run('r1:api'))
+    servico.cancelar('r1:api')
+
+    expect(servico.reabrir('nao-existe')).toBe(false)
+    expect(montar('u-outro').reabrir('r1:api')).toBe(false)
+    expect(pool.buscarItem('r1:api')?.estado).toBe('cancelado')
   })
 })
 

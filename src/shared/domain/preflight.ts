@@ -245,8 +245,15 @@ export function nomeDoProxyDeEgress(runId: string): string {
 /** A porta que o sidecar escuta, do lado da rede de egress. Fixa: o sidecar só encaminha 1:1. */
 export const PORTA_DO_PROXY_DE_EGRESS = 8080
 
-export function nomeDaBranch(sliceId: string, runId: string): string {
-  return `feat/${sanitizar(sliceId)}-${sanitizar(runId).slice(0, 8)}`
+/**
+ * A branch do run. O `sufixo` existe para o **escritor** (SPEC-Squads-03): dois escritores do mesmo
+ * run e da mesma fatia dividiriam os oito primeiros caracteres do run, e a mesma branch — o
+ * segundo `worktree add` falharia. Sem sufixo (o run comum) o nome é o de sempre.
+ */
+export function nomeDaBranch(sliceId: string, runId: string, sufixo?: string): string {
+  const base = `feat/${sanitizar(sliceId)}-${sanitizar(runId).slice(0, 8)}`
+  const extra = sufixo === undefined ? '' : sanitizar(sufixo)
+  return extra === '' ? base : `${base}-${extra}`
 }
 
 export function recursoDoWorktree(runId: string): string {
@@ -267,7 +274,7 @@ export function recursoDaPorta(porta: number): string {
  * Sanitizar em vez de validar é deliberado: o `runId` é um UUID nosso, não entrada do usuário,
  * e recusar aqui transformaria um detalhe de formatação em falha de execução.
  */
-function sanitizar(valor: string): string {
+export function sanitizar(valor: string): string {
   return valor
     .toLowerCase()
     .replace(/[^a-z0-9-]+/g, '-')

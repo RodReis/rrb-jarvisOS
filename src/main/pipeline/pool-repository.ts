@@ -21,6 +21,7 @@ import type { ConfigDoPool, MotivoDeEspera } from '@shared/domain/pool'
 import type { PoolMetricas } from '@shared/domain/pool-vista'
 import type { WorkspaceId } from '@shared/domain/entities'
 import { CONFIG_PADRAO, validarConfig } from '@shared/domain/pool'
+import { lerIdDoEscritor, SEPARADOR_DO_ESCRITOR } from '@shared/domain/squad-execucao'
 
 export type EstadoDaFila = 'esperando' | 'adquirido' | 'cancelado'
 
@@ -164,6 +165,18 @@ export class PoolRepository {
     return row === undefined ? undefined : toItem(row)
   }
 
+  /**
+   * Os itens dos escritores de um run (`<runId>:<escritor>`). O prefixo seleciona; o filtro
+   * confirma, porque um run cujo id tem `:` não pode se confundir com o escritor de outro.
+   */
+  itensDoGrupo(userId: string, runId: string): readonly ItemPersistido[] {
+    const prefixo = `${runId}${SEPARADOR_DO_ESCRITOR}`
+    const rows = this.db
+      .prepare('SELECT * FROM pool_fila WHERE user_id = ? AND substr(run_id, 1, ?) = ?')
+      .all(userId, prefixo.length, prefixo) as FilaRow[]
+    return rows.map(toItem).filter((i) => lerIdDoEscritor(i.runId)?.runId === runId)
+  }
+
   /** Quem espera, na ordem de chegada (a ordem justa é decidida pelo núcleo, não pelo SQL). */
   esperando(userId: string): readonly ItemPersistido[] {
     const rows = this.db
@@ -181,6 +194,21 @@ export class PoolRepository {
           "UPDATE pool_fila SET estado = 'adquirido', motivo = NULL, atualizado_em = ? WHERE run_id = ? AND estado = 'esperando'"
         )
         .run(agora, runId).changes === 1
+    )
+  }
+
+  /**
+   * Põe de volta na fila um item que já terminou o ciclo — adquirido e depois liberado, ou
+   * cancelado. A idade recomeça: é um pedido novo, e herdar a antiga furaria a fila de quem
+   * esperava. Quem ainda espera não é tocado.
+   */
+  reabrir(runId: string, agora: number): boolean {
+    return (
+      this.db
+        .prepare(
+          "UPDATE pool_fila SET estado = 'esperando', enfileirado_em = ?, atualizado_em = ? WHERE run_id = ? AND estado IN ('adquirido', 'cancelado')"
+        )
+        .run(agora, agora, runId).changes === 1
     )
   }
 
