@@ -1,5 +1,11 @@
 # SPEC-Voz-05 — Tela do Command Center e seletor de dispositivos
 
+> Revisão do PI em 2026-10-04, durante a prova física da #356: os seletores de entrada e
+> saída, com o medidor de nível ao lado da entrada, passam para Settings > Voz. A escolha
+> continua obrigatória antes de liberar o primeiro turno e persistida como preferência do app.
+> As referências abaixo ao local original dos controles registram a entrega da F05; esta
+> revisão altera somente a localização, sem mudar o contrato de captura e reprodução.
+
 - MVP: `docs/mvp/mvp-017-command-center-voz.md` (Fatia 05) — fecha o MVP-017. Épico [#193](https://github.com/RodReis/rrb-jarvisOS/issues/193).
 - Status: **aprovada-pi** (2026-09-09) — quatro perguntas resolvidas pelo PI nesta data (comandos rápidos, câmera, primeira execução e, na F04, a forma da boca); as demais estão cravadas em § Decisões. A issue-fatia nasce quando esta spec chegar à `main`.
 - Dependências: **M17-F01 (#200)** — a captura passa a receber dispositivo; **M17-F02 (#202)** — a reprodução passa a receber saída; **M17-F03 (#204)** — transcript e histórico existem em forma mínima; **M17-F04** — o mascote e o `posicaoMs()` do relógio de áudio nascem lá e são consumidos aqui; **M22-F01 (#206)** — o menu é projeção do registro de módulos, então o Command Center entra como módulo registrado.

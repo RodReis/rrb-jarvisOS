@@ -110,6 +110,7 @@ export const RECURSOS = {
         microfoneIndisponivel:
           'O microfone nao esta disponivel. Verifique a permissao do sistema e o dispositivo padrao.',
         escolherMicrofone: 'Permitir e escolher microfone',
+        escolhaEmSettings: 'Escolha o microfone em Settings > Voz para começar.',
         entrada: 'Microfone',
         saida: 'Alto-falantes',
         selecione: 'Selecione um dispositivo',
@@ -145,6 +146,25 @@ export const RECURSOS = {
           indisponivel: 'A conversa nao esta disponivel',
           falhou: 'A conversa falhou. Tentar de novo.'
         }
+      },
+      escuta: {
+        grupo: 'Escuta contínua do microfone',
+        rotulo: 'Escuta',
+        ligada: 'Escuta ligada',
+        ligando: 'Abrindo o microfone…',
+        desligada: 'Escuta desligada',
+        indisponivel: 'Escuta indisponível',
+        semMicrofone: 'Microfone não abriu',
+        dicaAlternar: 'Liga ou desliga a escuta da palavra de ativação',
+        dicaIndisponivel: 'O modelo da palavra de ativação ainda não está neste computador.',
+        dicaSemMicrofone: 'O microfone foi negado ou mudou. Selecione a entrada em Settings > Voz.',
+        recusaModelo:
+          'Não foi possível ligar a escuta: o modelo da palavra de ativação não está neste computador.',
+        recusaEntrada: 'Não foi possível alterar a escuta. Tente de novo.',
+        semPerguntaAposGatilho:
+          'Gatilho detectado, mas não ouvi uma pergunta. Fale logo após “Ei, amigo” ou as duas palmas.',
+        naoPronta:
+          'A palavra de ativação foi ouvida, mas a voz ainda não está pronta. Baixe o que falta nesta tela.'
       },
       janela: {
         minimizar: 'Minimizar para a bandeja'
@@ -740,6 +760,38 @@ export const RECURSOS = {
         erroInesperado: 'Não foi possível montar o contexto. Tente novamente.'
       },
       settings: {
+        escuta: {
+          titulo: 'Escuta contínua',
+          descricao:
+            'O app ouve o microfone neste computador e só começa a gravar a conversa depois de um gatilho. O áudio da escuta não sai da máquina nem é guardado.',
+          frase: 'Frase “{{frase}}”',
+          fraseDescricao: 'Dizer a palavra de ativação abre a conversa.',
+          palmas: 'Duas palmas',
+          palmasDescricao: 'Duas palmas seguidas abrem a conversa.',
+          modeloAusente: 'Instale o modelo local para ativar a escuta contínua.',
+          instalarModelo: 'Instalar modelo de ativação',
+          instalando: 'Instalando modelo…',
+          instalacaoFalhou:
+            'Não foi possível instalar o modelo. Confira a conexão e tente novamente.',
+          prepararVoz: 'Modelo instalado. Prepare o runtime em Voz para ligar a escuta.',
+          ultimoGatilho:
+            'Pelo menos um gatilho precisa ficar ligado. Para parar de ouvir, use o interruptor Escuta na barra superior.',
+          limiar: 'Limiar de disparo',
+          hotkey: 'Atalho de mute',
+          hotkeyDescricao:
+            'Atalho global que liga e desliga a escuta, mesmo com a janela minimizada. Cada troca fica registrada na auditoria.',
+          hotkeyOcupada:
+            'Outro app já usa esse atalho. Escolha outra combinação — o interruptor Escuta na barra superior continua valendo.',
+          limiarDescricao:
+            'Maior exige mais certeza para disparar (menos disparos por engano); menor dispara mais fácil. Vale na hora.',
+          testar: 'Testar ao vivo',
+          pararTeste: 'Parar o teste',
+          testeExigeEscuta: 'Ligue a escuta na barra superior para testar.',
+          testeSemConversa: 'Durante o teste, o disparo só aparece aqui e não abre conversa.',
+          disparosDoTeste: 'Disparos do teste',
+          disparoFrase: '“{{frase}}” · confiança {{confianca}} · limiar {{limiar}}',
+          disparoPalmas: 'Duas palmas · limiar {{limiar}}'
+        },
         titulo: 'Configurações',
         // As cinco abas (decisão do PI, 2026-08-30). Nomes curtos: são régua, não frase.
         abaGeral: 'Geral',
@@ -972,6 +1024,7 @@ export const RECURSOS = {
         microfoneIndisponivel:
           'The microphone is unavailable. Check system permission and the default device.',
         escolherMicrofone: 'Allow and choose microphone',
+        escolhaEmSettings: 'Choose a microphone in Settings > Voice to begin.',
         entrada: 'Microphone',
         saida: 'Speakers',
         selecione: 'Select a device',
@@ -1001,6 +1054,25 @@ export const RECURSOS = {
           indisponivel: 'The conversation is unavailable',
           falhou: 'The conversation failed. Try again.'
         }
+      },
+      escuta: {
+        grupo: 'Continuous microphone listening',
+        rotulo: 'Listening',
+        ligada: 'Listening on',
+        ligando: 'Opening the microphone…',
+        desligada: 'Listening off',
+        indisponivel: 'Listening unavailable',
+        semMicrofone: 'Microphone did not open',
+        dicaAlternar: 'Turns wake word listening on or off',
+        dicaIndisponivel: 'The wake word model is not on this computer yet.',
+        dicaSemMicrofone:
+          'The microphone was denied or changed. Select the input in Settings > Voice.',
+        recusaModelo: 'Could not turn listening on: the wake word model is not on this computer.',
+        recusaEntrada: 'Could not change listening. Try again.',
+        semPerguntaAposGatilho:
+          'Wake trigger detected, but I did not hear a question. Speak right after “Ei, amigo” or two claps.',
+        naoPronta:
+          'The wake word was heard, but voice is not ready yet. Download what is missing on this screen.'
       },
       janela: {
         minimizar: 'Minimize to tray'
@@ -1526,6 +1598,38 @@ export const RECURSOS = {
         erroInesperado: 'Could not build the context. Try again.'
       },
       settings: {
+        escuta: {
+          titulo: 'Continuous listening',
+          descricao:
+            'The app listens to the microphone on this computer and only starts recording the conversation after a trigger. Listening audio never leaves the machine and is not stored.',
+          frase: 'Phrase “{{frase}}”',
+          fraseDescricao: 'Saying the wake phrase opens the conversation.',
+          palmas: 'Two claps',
+          palmasDescricao: 'Two claps in a row open the conversation.',
+          modeloAusente: 'Install the local model to enable continuous listening.',
+          instalarModelo: 'Install activation model',
+          instalando: 'Installing model…',
+          instalacaoFalhou: 'Could not install the model. Check your connection and try again.',
+          prepararVoz: 'Model installed. Prepare the runtime in Voice to turn on listening.',
+          ultimoGatilho:
+            'At least one trigger must stay on. To stop listening, use the Listening switch in the top bar.',
+          limiar: 'Trigger threshold',
+          hotkey: 'Mute shortcut',
+          hotkeyDescricao:
+            'Global shortcut that turns listening on and off, even with the window minimized. Each change is recorded in the audit log.',
+          hotkeyOcupada:
+            'Another app already uses this shortcut. Pick another combination — the Listening switch in the top bar still works.',
+          limiarDescricao:
+            'Higher needs more certainty to trigger (fewer false triggers); lower triggers more easily. Applies immediately.',
+          testar: 'Test live',
+          pararTeste: 'Stop the test',
+          testeExigeEscuta: 'Turn listening on in the top bar to test.',
+          testeSemConversa:
+            'During the test, a trigger only shows up here and does not open a conversation.',
+          disparosDoTeste: 'Test triggers',
+          disparoFrase: '“{{frase}}” · confidence {{confianca}} · threshold {{limiar}}',
+          disparoPalmas: 'Two claps · threshold {{limiar}}'
+        },
         titulo: 'Settings',
         abaGeral: 'General',
         abaPermissoes: 'Permissions',

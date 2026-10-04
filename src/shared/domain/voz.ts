@@ -145,3 +145,89 @@ export const MODELO_PADRAO_DA_CONVERSA = 'qwen3:8b'
  * Zero está na lista porque é escolha legítima: perguntas independentes, sem follow-up.
  */
 export const JANELAS_DA_CONVERSA = [0, 5, 10, 20, 50] as const
+
+/**
+ * O estado da escuta contínua de wake word (SPEC-Escuta-01, critérios 8, 9, 11 e 12).
+ *
+ * Moram em `shared` porque renderer e main precisam do mesmo contrato.
+ * A tela usa para desenhar o indicador permanente, o kill switch e a sensibilidade.
+ */
+export interface EstadoDaEscuta {
+  /** Se a escuta contínua está ligada (kill switch). */
+  readonly ativa: boolean
+  /** Se o interpretador e o modelo da wake word estão prontos no disco. */
+  readonly disponivel: boolean
+  /** Sensibilidade calibrada [0.1, 0.95]. */
+  readonly sensibilidade: number
+  /** Gatilhos ligáveis separadamente (decisão do PI de 2026-10-03): a frase e as duas palmas. */
+  readonly frase: boolean
+  readonly palmas: boolean
+  /** A hotkey global de mute escolhida (critério 11). */
+  readonly hotkey: HotkeyDeMuteDaEscuta
+  /** Se o SO aceitou registrá-la; `false` quando outro app já tem o atalho. */
+  readonly hotkeyRegistrada: boolean
+}
+
+/**
+ * O desfecho de pedir a escuta ligada. Desligar não falha, então só ligar tem desfecho: sem
+ * modelo pronto a escuta não abre o microfone, e `ENTRADA_INVALIDA` é a chamada malformada.
+ */
+export type DesfechoDeLigarEscuta =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly motivo: 'MODELO_AUSENTE' | 'ENTRADA_INVALIDA' }
+
+/**
+ * O que a tela sabe de um disparo: **quem** disparou e se a sessão estava bloqueada. Nem áudio,
+ * nem confiança, nem caminho de modelo atravessam a ponte. O relógio local permite medir
+ * a latência até a reserva do turno sem carregar áudio.
+ */
+export interface DisparoDaEscuta {
+  readonly gatilho: 'frase' | 'palmas'
+  readonly sessaoBloqueada: boolean
+  readonly fimDoGatilhoMs?: number
+}
+
+/**
+ * Um disparo visto no modo de teste de Settings (critério 12): a confiança medida e o limiar que
+ * valia. É o **único** caminho em que a confiança do detector atravessa a ponte — no disparo
+ * normal ela fica no main.
+ */
+export interface DisparoDeTesteDaEscuta {
+  readonly gatilho: 'frase' | 'palmas'
+  /** Só a frase tem confiança medida. */
+  readonly confianca?: number
+  readonly limiar: number
+}
+
+/**
+ * As hotkeys globais de mute da escuta (SPEC-Escuta-01, critério 11).
+ *
+ * Lista fechada, como a do push-to-talk: registrar atalho global intercepta a tecla no sistema
+ * inteiro, e campo livre deixaria o renderer sequestrar qualquer combinação. Disjunta de
+ * `HOTKEYS_DE_VOZ` de propósito — as duas funções convivem, e o atalho de uma não pode ser o da
+ * outra.
+ */
+export const HOTKEYS_DE_MUTE_DA_ESCUTA = [
+  'Control+Alt+M',
+  'Control+Shift+M',
+  'Control+Alt+K',
+  'Control+Shift+K'
+] as const
+
+export type HotkeyDeMuteDaEscuta = (typeof HOTKEYS_DE_MUTE_DA_ESCUTA)[number]
+
+export const HOTKEY_DE_MUTE_PADRAO: HotkeyDeMuteDaEscuta = 'Control+Alt+M'
+
+export function isHotkeyDeMuteDaEscuta(valor: unknown): valor is HotkeyDeMuteDaEscuta {
+  return (
+    typeof valor === 'string' && (HOTKEYS_DE_MUTE_DA_ESCUTA as readonly string[]).includes(valor)
+  )
+}
+
+/** Palavra de ativação oficial do sistema. */
+export const WAKE_WORD_OFICIAL = 'Ei, amigo'
+
+/** Limiares padrão de sensibilidade para UI e validação. */
+export const SENSIBILIDADE_PADRAO_WAKE_WORD = 0.95
+export const SENSIBILIDADE_MINIMA_WAKE_WORD = 0.1
+export const SENSIBILIDADE_MAXIMA_WAKE_WORD = 0.95

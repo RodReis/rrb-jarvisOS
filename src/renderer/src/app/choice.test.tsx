@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspaceId } from '@shared/domain/entities'
 import { App } from './App'
+import { pontaDaEscuta } from './test-utils'
 
 /**
  * Tela CHOICE — porta de entrada de cada sessão (SPEC-CHOICE-01).
@@ -31,6 +32,7 @@ function mockarPonte(): void {
   Object.defineProperty(window, 'jarvis', {
     value: {
       getAppInfo: vi.fn(),
+      ...pontaDaEscuta(),
       sendLog,
       minimizeToTray: vi.fn(),
       switchWorkspace,

@@ -998,3 +998,182 @@ describe('pool de execução (SPEC-Scheduler-01) — só leitura', () => {
     expect(canais).toEqual(['pool:vista'])
   })
 })
+
+describe('escuta contínua (SPEC-Escuta-01) — a ponte do kill switch', () => {
+  const ESTADO = {
+    ativa: true,
+    disponivel: true,
+    frase: true,
+    palmas: true,
+    sensibilidade: 0.5,
+    hotkey: 'Control+Alt+M',
+    hotkeyRegistrada: true
+  }
+
+  function montarEscuta() {
+    const escuta = {
+      estado: vi.fn(() => ESTADO),
+      ligar: vi.fn(async () => ({ ok: true as const })),
+      desligar: vi.fn(async () => undefined),
+      definirGatilhos: vi.fn(async () => undefined),
+      definirSensibilidade: vi.fn(async () => undefined),
+      receberPcm: vi.fn(async () => undefined),
+      definirTurno: vi.fn(),
+      definirModoDeTeste: vi.fn(),
+      definirHotkey: vi.fn(async () => undefined)
+    }
+    registerIpcHandlers({ ...deps, escuta } as unknown as IpcDependencies)
+    const chamar = (canal: string, ...args: unknown[]): Promise<unknown> => {
+      const fn = handle.mock.calls.find(([c]) => c === canal)?.[1] as (
+        evento: unknown,
+        ...rest: unknown[]
+      ) => Promise<unknown>
+      return Promise.resolve(fn({}, ...args))
+    }
+    const enviar = (canal: string, payload?: unknown): void => {
+      const fn = on.mock.calls.find(([c]) => c === canal)?.[1] as (e: unknown, p: unknown) => void
+      fn({}, payload)
+    }
+    return { escuta, chamar, enviar }
+  }
+
+  it('o estado volta como o main o conhece, sem argumento do renderer', async () => {
+    const { chamar } = montarEscuta()
+    expect(await chamar(IPC_CHANNELS.escutaEstado, 'qualquer-coisa')).toEqual(ESTADO)
+  })
+
+  it('ligar e desligar pela tela chegam ao serviço com a via "interface"', async () => {
+    const { escuta, chamar } = montarEscuta()
+
+    await chamar(IPC_CHANNELS.escutaDefinirAtiva, false)
+    await chamar(IPC_CHANNELS.escutaDefinirAtiva, true)
+
+    expect(escuta.desligar).toHaveBeenCalledWith('interface')
+    expect(escuta.ligar).toHaveBeenCalledWith('interface')
+  })
+
+  it('o renderer não escolhe a via: um terceiro argumento é ignorado', async () => {
+    const { escuta, chamar } = montarEscuta()
+
+    // A auditoria diz quem fechou o microfone. Se a tela pudesse mandar "hotkey", o registro
+    // deixaria de provar o caminho de quem desligou.
+    await chamar(IPC_CHANNELS.escutaDefinirAtiva, false, 'hotkey')
+
+    expect(escuta.desligar).toHaveBeenCalledWith('interface')
+  })
+
+  it('valor que não é booleano não liga nem desliga nada', async () => {
+    const { escuta, chamar } = montarEscuta()
+
+    expect(await chamar(IPC_CHANNELS.escutaDefinirAtiva, 'sim')).toEqual({
+      ok: false,
+      motivo: 'ENTRADA_INVALIDA'
+    })
+    expect(escuta.ligar).not.toHaveBeenCalled()
+    expect(escuta.desligar).not.toHaveBeenCalled()
+  })
+
+  it('ligar sem modelo devolve o desfecho nomeado do serviço', async () => {
+    const { escuta, chamar } = montarEscuta()
+    escuta.ligar.mockResolvedValueOnce({ ok: false as never })
+
+    expect(await chamar(IPC_CHANNELS.escutaDefinirAtiva, true)).toEqual({ ok: false })
+  })
+
+  it('os gatilhos só passam como par de booleanos', async () => {
+    const { escuta, chamar } = montarEscuta()
+
+    await chamar(IPC_CHANNELS.escutaDefinirGatilhos, { frase: false, palmas: true })
+    expect(escuta.definirGatilhos).toHaveBeenCalledWith({ frase: false, palmas: true })
+
+    escuta.definirGatilhos.mockClear()
+    await chamar(IPC_CHANNELS.escutaDefinirGatilhos, { frase: 'sim', palmas: true })
+    await chamar(IPC_CHANNELS.escutaDefinirGatilhos, null)
+    expect(escuta.definirGatilhos).not.toHaveBeenCalled()
+  })
+
+  it('a sensibilidade só passa se for número; o serviço limita a faixa', async () => {
+    const { escuta, chamar } = montarEscuta()
+
+    await chamar(IPC_CHANNELS.escutaDefinirSensibilidade, 0.7)
+    expect(escuta.definirSensibilidade).toHaveBeenCalledWith(0.7)
+
+    escuta.definirSensibilidade.mockClear()
+    await chamar(IPC_CHANNELS.escutaDefinirSensibilidade, '0.7')
+    expect(escuta.definirSensibilidade).not.toHaveBeenCalled()
+  })
+
+  it('o PCM da captura chega ao serviço quando é Int16Array', () => {
+    const { escuta, enviar } = montarEscuta()
+    const pcm = new Int16Array(1280)
+
+    enviar(IPC_SEND_CHANNELS.escutaPcm, pcm)
+
+    expect(escuta.receberPcm).toHaveBeenCalledWith(pcm)
+  })
+
+  it('a hotkey só passa se for texto: a lista fechada é imposta pelo serviço', async () => {
+    const { escuta, chamar } = montarEscuta()
+
+    await chamar(IPC_CHANNELS.escutaDefinirHotkey, 'Control+Shift+K')
+    await chamar(IPC_CHANNELS.escutaDefinirHotkey, { acelerador: 'Control+C' })
+    await chamar(IPC_CHANNELS.escutaDefinirHotkey, undefined)
+
+    // O handler só garante o tipo; recusar combinação fora da lista é do serviço (e é lá testado),
+    // para que nenhum outro caminho até ele possa registrar um atalho global qualquer.
+    expect(escuta.definirHotkey.mock.calls).toEqual([['Control+Shift+K']])
+  })
+
+  it('o modo de teste liga e desliga só com booleano, e devolve o estado', async () => {
+    const { escuta, chamar } = montarEscuta()
+
+    await chamar(IPC_CHANNELS.escutaModoDeTeste, true)
+    await chamar(IPC_CHANNELS.escutaModoDeTeste, false)
+    await chamar(IPC_CHANNELS.escutaModoDeTeste, 'sim')
+
+    expect(escuta.definirModoDeTeste.mock.calls).toEqual([[true], [false]])
+  })
+
+  it('o aviso de turno chega ao serviço só como booleano', () => {
+    const { escuta, enviar } = montarEscuta()
+
+    enviar(IPC_SEND_CHANNELS.escutaTurno, true)
+    enviar(IPC_SEND_CHANNELS.escutaTurno, false)
+    enviar(IPC_SEND_CHANNELS.escutaTurno, 'sim')
+
+    expect(escuta.definirTurno.mock.calls).toEqual([[true], [false]])
+  })
+
+  it('falha do engine no PCM vai ao log e não vira rejeição não tratada', async () => {
+    const { escuta, enviar } = montarEscuta()
+    logIpc.warn.mockClear()
+    escuta.receberPcm.mockRejectedValue(new Error('sidecar caiu'))
+
+    enviar(IPC_SEND_CHANNELS.escutaPcm, new Int16Array(1280))
+    await new Promise((r) => setTimeout(r, 0))
+
+    expect(logIpc.warn).toHaveBeenCalledTimes(1)
+  })
+
+  it('a mesma falha repetida a cada bloco não inunda o log', async () => {
+    const { escuta, enviar } = montarEscuta()
+    logIpc.warn.mockClear()
+    escuta.receberPcm.mockRejectedValue(new Error('sidecar caiu'))
+
+    // ~12 blocos por segundo: sem teto, um sidecar morto escreveria ~700 linhas por minuto.
+    for (let i = 0; i < 20; i++) enviar(IPC_SEND_CHANNELS.escutaPcm, new Int16Array(1280))
+    await new Promise((r) => setTimeout(r, 0))
+
+    expect(logIpc.warn).toHaveBeenCalledTimes(1)
+  })
+
+  it('qualquer outra coisa no canal do PCM é descartada sem derrubar a captura', () => {
+    const { escuta, enviar } = montarEscuta()
+
+    enviar(IPC_SEND_CHANNELS.escutaPcm, new Float32Array(4))
+    enviar(IPC_SEND_CHANNELS.escutaPcm, 'áudio')
+    enviar(IPC_SEND_CHANNELS.escutaPcm, undefined)
+
+    expect(escuta.receberPcm).not.toHaveBeenCalled()
+  })
+})

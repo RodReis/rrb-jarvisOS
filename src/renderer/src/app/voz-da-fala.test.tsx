@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PreferenciasDeVoz } from './PreferenciasDeVoz'
+import { pontaDaEscuta } from './test-utils'
 import type { PreferencesSnapshot } from '@shared/contracts/ipc'
 import type { DesfechoDaFala, ProntidaoDoTts } from '@shared/domain/visemes'
 
@@ -94,7 +95,8 @@ function dublarWebAudio(): void {
 beforeEach(() => {
   falar.mockReset().mockResolvedValue(falaOk())
   prontidaoDoTts.mockReset().mockResolvedValue(prontidao())
-  vi.stubGlobal('jarvis', { falar, prontidaoDoTts, sendLog: vi.fn() })
+  // A seção da escuta mora nas preferências de voz e consulta a ponte ao montar.
+  vi.stubGlobal('jarvis', { falar, prontidaoDoTts, sendLog: vi.fn(), ...pontaDaEscuta() })
   dublarWebAudio()
 })
 

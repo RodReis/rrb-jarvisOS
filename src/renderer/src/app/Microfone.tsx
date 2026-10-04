@@ -1,20 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  Button,
-  Card,
-  Field,
-  InlineAlert,
-  Select,
-  VoiceMascot,
-  type EstadoDoMascote
-} from '@design/ui'
+import { Button, Card, InlineAlert, VoiceMascot, type EstadoDoMascote } from '@design/ui'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { VisemeEvent } from '@shared/domain/visemes'
 import type { DesfechoDaTranscricao, ProntidaoDaVoz } from '@shared/domain/voz'
 import { capturarPcm, type CapturaDeAudio } from './captura-de-audio'
+import type { CapturaDoTurno } from './captura-continua'
 import { criarReprodutor } from './reproducao-de-fala'
 import { criarMedidorDeEntrada, type MedidorDeEntrada } from './medidor-de-audio'
+import { criarDetectorDeFimDaFala } from './fim-da-fala'
+import type { DisparoRecebido } from './EscutaDaVoz'
 import { log } from '../lib/log'
 import type { TrocaDaConversa } from '@shared/domain/voz'
 
@@ -58,12 +53,20 @@ export function Microfone({
   entradaId,
   entradaRotulo,
   saidaId,
-  onSalvarDispositivo,
   capturar = capturarPcm,
   criarFala = criarReprodutor,
-  criarMedidor = criarMedidorDeEntrada
+  criarMedidor = criarMedidorDeEntrada,
+  disparo,
+  aoTratarDisparo
 }: {
   readonly workspace: WorkspaceId
+  /**
+   * Um gatilho da escuta (frase ou palmas) pediu um turno (SPEC-Escuta-01). A tela grava sem
+   * botão e decide o fim pelo silêncio. É **consumido uma vez** por `aoTratarDisparo`: um
+   * disparo que ficasse guardado abriria o microfone sozinho na próxima vez que a tela montasse.
+   */
+  readonly disparo?: DisparoRecebido
+  readonly aoTratarDisparo?: (id: number) => void
   /**
    * A voz com que a resposta é falada (SPEC-Voz-02). Vem do AppShell, que já tem as
    * preferências resolvidas — consultá-las aqui daria à tela um segundo dono do mesmo valor.
@@ -72,12 +75,6 @@ export function Microfone({
   readonly entradaId?: string | null
   readonly entradaRotulo?: string | null
   readonly saidaId?: string | null
-  readonly onSalvarDispositivo?: (mudanca: {
-    readonly vozEntradaId?: string
-    readonly vozSaidaId?: string
-    readonly vozEntradaRotulo?: string
-    readonly vozSaidaRotulo?: string
-  }) => Promise<void>
   /** Injetada para teste: `getUserMedia` não existe em jsdom, e dublar aqui mede a lógica. */
   readonly capturar?: CapturaDeAudio
   /** Injetado pela mesma razão: Web Audio também não existe em jsdom. */
@@ -100,10 +97,8 @@ export function Microfone({
   const [falaAtual, setFalaAtual] =
     useState<ReturnType<ReturnType<typeof criarReprodutor>['tocar']>>()
   const [visemesDaFala, setVisemesDaFala] = useState<readonly VisemeEvent[]>([])
-  const [dispositivos, setDispositivos] = useState<readonly MediaDeviceInfo[]>([])
   const [permissaoConcedida, setPermissaoConcedida] = useState(Boolean(entradaId))
   const [entradaEfetivaId, setEntradaEfetivaId] = useState(entradaId ?? '')
-  const [saidaEfetivaId, setSaidaEfetivaId] = useState(saidaId ?? '')
   const encerrarCaptura = useRef<(() => Promise<Int16Array>) | undefined>(undefined)
   const medidor = useRef<MedidorDeEntrada | undefined>(undefined)
   const nivelEntrada = useRef(0)
@@ -122,6 +117,17 @@ export function Microfone({
    */
   const estadoAtual = useRef<EstadoDoMicrofone>('ocioso')
   const soltouCedo = useRef(false)
+  /** O relógio que decide o fim do turno aberto pela escuta; nunca existe no push-to-talk. */
+  const monitorDoTurno = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
+  const ultimoDisparoTratado = useRef<number | undefined>(undefined)
+  /** O último valor avisado ao main; `undefined` até a primeira transição real. */
+  const turnoRelatado = useRef<boolean | undefined>(undefined)
+
+  function pararMonitorDoTurno(): void {
+    if (monitorDoTurno.current === undefined) return
+    clearInterval(monitorDoTurno.current)
+    monitorDoTurno.current = undefined
+  }
 
   /*
    * O reprodutor vive num ref, e não em estado: trocá-lo não redesenha nada, e recriá-lo a cada
@@ -148,7 +154,6 @@ export function Microfone({
 
   const listarDispositivos = useCallback(async (): Promise<void> => {
     const lista = await navigator.mediaDevices.enumerateDevices()
-    setDispositivos(lista.filter((d) => d.kind === 'audioinput' || d.kind === 'audiooutput'))
     const entradasDisponiveis = lista.filter((d) => d.kind === 'audioinput')
     if (entradaId && !entradasDisponiveis.some((d) => d.deviceId === entradaId)) {
       const fallback = entradasDisponiveis[0]
@@ -262,8 +267,11 @@ export function Microfone({
     await consultar()
   }
 
-  async function comecar(): Promise<void> {
-    if (estadoAtual.current !== 'ocioso') return
+  async function comecar(porEscuta = false, capturaDoTurno?: CapturaDoTurno): Promise<void> {
+    if (estadoAtual.current !== 'ocioso') {
+      capturaDoTurno?.cancelar()
+      return
+    }
     setErro(undefined)
     setAviso(undefined)
     setTexto(undefined)
@@ -274,13 +282,23 @@ export function Microfone({
       const medidorAtual = medidor.current
       medidor.current = undefined
       await medidorAtual?.parar()
-      encerrarCaptura.current = await capturar(entradaEfetivaId || undefined, (valor) => {
-        nivelEntrada.current = valor
-      })
+      nivelEntrada.current = 0
+      if (porEscuta && capturaDoTurno === undefined) {
+        throw new Error('Captura contínua indisponível para o turno da escuta.')
+      }
+      encerrarCaptura.current = await (capturaDoTurno?.capturar ?? capturar)(
+        entradaEfetivaId || undefined,
+        (valor) => {
+          nivelEntrada.current = valor
+        }
+      )
+      if (porEscuta) armarMonitorDoTurno()
     } catch {
       // Microfone negado ou ausente. Não é falha do runtime — a próxima ação é do sistema
       // operacional, não do app.
       marcar('ocioso')
+      capturaDoTurno?.cancelar()
+      if (porEscuta) window.jarvis.informarTurnoDaEscuta(false)
       setErro(t('voz.microfoneIndisponivel'))
       return
     }
@@ -295,7 +313,35 @@ export function Microfone({
     if (soltouCedo.current) await terminar()
   }
 
+  /**
+   * O turno aberto pela escuta não tem botão para soltar: o silêncio decide (critério 13).
+   * `cancelar` descarta a gravação **sem transcrever** — é isso que garante que disparo sem fala
+   * não custa uma chamada de IA.
+   */
+  function armarMonitorDoTurno(): void {
+    pararMonitorDoTurno()
+    const detector = criarDetectorDeFimDaFala()
+    const inicio = Date.now()
+    monitorDoTurno.current = setInterval(() => {
+      const veredito = detector.alimentar(nivelEntrada.current, Date.now() - inicio)
+      if (veredito === 'continua') return
+      pararMonitorDoTurno()
+      void (veredito === 'fim' ? acoes.current.terminar() : acoes.current.cancelarTurno())
+    }, 100)
+  }
+
+  async function cancelarTurno(): Promise<void> {
+    if (estadoAtual.current !== 'gravando') return
+    const parar = encerrarCaptura.current
+    encerrarCaptura.current = undefined
+    // Fecha o microfone e joga o áudio fora: ninguém falou, não há o que transcrever.
+    await parar?.()
+    marcar('ocioso')
+    setAviso(t('escuta.semPerguntaAposGatilho'))
+  }
+
   async function terminar(): Promise<void> {
+    pararMonitorDoTurno()
     if (estadoAtual.current !== 'gravando') return
 
     // A captura ainda não abriu: registra a intenção e deixa `comecar` encerrar quando puder.
@@ -429,7 +475,7 @@ export function Microfone({
     const fala = await window.jarvis.falar(texto, vozDaFala)
     if (fala.estado !== 'ok') return
 
-    const emCurso = reprodutor.current?.tocar(fala.fala, saidaEfetivaId || undefined)
+    const emCurso = reprodutor.current?.tocar(fala.fala, saidaId || undefined)
     if (emCurso === undefined) return
     void emCurso.saidaAplicada.then((aplicada) => {
       if (!aplicada) setAviso(t('voz.saidaSemSuporte'))
@@ -460,7 +506,7 @@ export function Microfone({
    * cada render (fecham sobre `estado`), e listá-las reassinaria o canal a cada tecla — a
    * assinatura sairia e voltaria no meio da própria gravação que ela conduz.
    */
-  const acoes = useRef({ comecar, terminar })
+  const acoes = useRef({ comecar, terminar, cancelarTurno })
 
   /*
    * A ref é atualizada **em efeito**, não durante o render: escrever nela no corpo é o
@@ -469,8 +515,48 @@ export function Microfone({
    * as duas funções recém-criadas precisam entrar.
    */
   useEffect(() => {
-    acoes.current = { comecar, terminar }
+    acoes.current = { comecar, terminar, cancelarTurno }
   })
+
+  /*
+   * Um disparo da escuta começa o turno. Só age com a prontidão conhecida: antes dela a tela nem
+   * sabe se há como transcrever. Sem runtime pronto o turno não pode correr, e o main precisa
+   * saber — senão ficaria ignorando gatilhos até o teto.
+   */
+  useEffect(() => {
+    if (disparo === undefined || prontidao === undefined) return
+    if (ultimoDisparoTratado.current === disparo.id) return
+    ultimoDisparoTratado.current = disparo.id
+    aoTratarDisparo?.(disparo.id)
+
+    if (!prontidao.pronta) {
+      disparo.capturaDoTurno.cancelar()
+      // Dentro da promessa, e não no corpo do efeito: `setState` síncrono ali cascateia render.
+      void Promise.resolve().then(() => setAviso(t('escuta.naoPronta')))
+      window.jarvis.informarTurnoDaEscuta(false)
+      return
+    }
+    void acoes.current.comecar(true, disparo.capturaDoTurno)
+  }, [disparo, prontidao, aoTratarDisparo, t])
+
+  // O main só impede um segundo turno se souber que este começou e quando terminou. Só transições
+  // contam: montar em `ocioso` não é o fim de turno nenhum, e avisá-lo liberaria o que o disparo
+  // acabou de abrir.
+  useEffect(() => {
+    const emTurno = estado !== 'ocioso'
+    if (turnoRelatado.current === undefined && !emTurno) return
+    if (turnoRelatado.current === emTurno) return
+    turnoRelatado.current = emTurno
+    window.jarvis.informarTurnoDaEscuta(emTurno)
+  }, [estado])
+
+  useEffect(
+    () => () => {
+      pararMonitorDoTurno()
+      if (turnoRelatado.current === true) window.jarvis.informarTurnoDaEscuta(false)
+    },
+    []
+  )
 
   useEffect(() => {
     return window.jarvis.onVozHotkey((gravando) => {
@@ -502,8 +588,6 @@ export function Microfone({
   // Segurar para falar só vale de `ocioso`: durante transcrição, resposta ou fala, um novo
   // aperto abriria uma segunda conversa por cima da primeira.
   const ocupado = estado !== 'ocioso' && estado !== 'gravando'
-  const entradas = dispositivos.filter((d) => d.kind === 'audioinput')
-  const saidas = dispositivos.filter((d) => d.kind === 'audiooutput')
   const escolhaPendente = !entradaEfetivaId
 
   return (
@@ -619,60 +703,29 @@ export function Microfone({
           </div>
         )}
 
+        {prontidao.pronta && permissaoConcedida && escolhaPendente && (
+          <p
+            role="status"
+            className="text-[length:var(--jos-texto-mini)] text-[var(--jos-cor-texto-suave)]"
+          >
+            {t('voz.escolhaEmSettings')}
+          </p>
+        )}
+
         {permissaoConcedida && (
-          <div className="grid w-full gap-4 md:grid-cols-2">
-            <div className="flex flex-col gap-2">
-              <Field rotulo={t('voz.entrada')}>
-                {(campo) => (
-                  <Select
-                    {...campo}
-                    valor={entradaEfetivaId}
-                    placeholder={t('voz.selecione')}
-                    opcoes={entradas.map((d) => ({ valor: d.deviceId, rotulo: d.label }))}
-                    onMudar={(valor) => {
-                      setEntradaEfetivaId(valor)
-                      const rotulo = entradas.find((d) => d.deviceId === valor)?.label
-                      void onSalvarDispositivo?.({
-                        vozEntradaId: valor,
-                        vozEntradaRotulo: rotulo
-                      })
-                    }}
-                  />
-                )}
-              </Field>
-              <div
-                role="meter"
-                aria-label={t('voz.nivelEntrada')}
-                aria-valuemin={0}
-                aria-valuemax={32767}
-                aria-valuenow={0}
-                className="h-2 w-full overflow-hidden bg-[rgba(var(--jos-borda-rgb),0.12)]"
-              >
-                <span
-                  ref={barraDoMedidor}
-                  className="block h-full bg-[var(--jos-cor-acento)]"
-                  style={{ width: '0%' }}
-                />
-              </div>
-            </div>
-            <Field rotulo={t('voz.saida')}>
-              {(campo) => (
-                <Select
-                  {...campo}
-                  valor={saidaEfetivaId}
-                  placeholder={t('voz.selecione')}
-                  opcoes={saidas.map((d) => ({ valor: d.deviceId, rotulo: d.label }))}
-                  onMudar={(valor) => {
-                    setSaidaEfetivaId(valor)
-                    const rotulo = saidas.find((d) => d.deviceId === valor)?.label
-                    void onSalvarDispositivo?.({
-                      vozSaidaId: valor,
-                      vozSaidaRotulo: rotulo
-                    })
-                  }}
-                />
-              )}
-            </Field>
+          <div
+            role="meter"
+            aria-label={t('voz.nivelEntrada')}
+            aria-valuemin={0}
+            aria-valuemax={32767}
+            aria-valuenow={0}
+            className="h-2 w-full max-w-sm overflow-hidden bg-[rgba(var(--jos-borda-rgb),0.12)]"
+          >
+            <span
+              ref={barraDoMedidor}
+              className="block h-full bg-[var(--jos-cor-acento)]"
+              style={{ width: '0%' }}
+            />
           </div>
         )}
 

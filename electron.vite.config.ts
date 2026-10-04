@@ -15,10 +15,17 @@ import tailwindcss from '@tailwindcss/vite'
  * copiá-los, `out/main/` sai sem os arquivos e a voz falha em produção com "arquivo não
  * encontrado", enquanto passa em desenvolvimento, onde o caminho ainda alcança `src/`.
  *
- * São dois porque os processos são separados (SPEC-Voz-02, decisão 3 do PI): transcrever e falar
- * não podem se derrubar, e o Whisper quer a GPU enquanto o Piper roda em CPU.
+ * São três processos separados: transcrever e falar não podem se derrubar (SPEC-Voz-02,
+ * decisão 3 do PI), o Whisper quer a GPU enquanto o Piper roda em CPU, e a escuta contínua vive
+ * enquanto estiver ligada — um crash na transcrição não pode derrubá-la (SPEC-Escuta-01).
+ * O quarto arquivo é o extrator de características importado pelo sidecar da escuta.
  */
-const SIDECARES_DE_VOZ = ['sidecar-stt.py', 'sidecar-tts.py'] as const
+const SIDECARES_DE_VOZ = [
+  'sidecar-stt.py',
+  'sidecar-tts.py',
+  'sidecar-wake.py',
+  'features_wake.py'
+] as const
 
 function copiarSidecarDeVoz(): Plugin {
   return {

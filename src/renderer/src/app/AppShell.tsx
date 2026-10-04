@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Grid3x3, LogOut, Minimize2, Target } from 'lucide-react'
 import type { UserProfile, WorkspaceId } from '@shared/domain/entities'
@@ -13,6 +13,9 @@ import {
   type ItemDoRail
 } from '@design/patterns'
 import { VoiceMascot } from '@design/ui'
+import type { DisparoDaEscuta } from '@shared/domain/voz'
+import { EscutaDaVoz, type DisparoRecebido } from './EscutaDaVoz'
+import type { CapturaDoTurno } from './captura-continua'
 import { ACENTO_PADRAO } from '@design/tokens'
 import { log } from '../lib/log'
 import { usePreferences } from '../preferences/usePreferences'
@@ -47,6 +50,9 @@ import { gruposVisiveis } from '../workspace/registro-de-modulos'
 /** Os espaços oferecidos. `Desenvolvimento` **nunca** entra (SPEC-Fundacao-02, critério 5). */
 const ESPACOS: readonly WorkspaceId[] = ['noa', 'jarvis']
 
+/** A rota do Command Center (a tela de voz), onde o turno aberto pela escuta acontece. */
+const ROTA_DO_COMMAND_CENTER = 'voz'
+
 interface AppShellProps {
   /** Usuário da sessão. Opcional só para o app seguir montável sem login configurado. */
   readonly perfil?: UserProfile
@@ -68,6 +74,9 @@ export function AppShell({ perfil, onSair }: AppShellProps = {}): React.JSX.Elem
    */
   const [navegacao, setNavegacao] = useState<RotasPorWorkspace>(NAVEGACAO_INICIAL)
   const [erro, setErro] = useState<string | null>(null)
+  /** O disparo da escuta ainda não tratado pelo Command Center; consumido uma vez. */
+  const [disparo, setDisparo] = useState<DisparoRecebido | undefined>(undefined)
+  const contadorDeDisparos = useRef(0)
 
   useEffect(() => {
     window.jarvis
@@ -79,8 +88,9 @@ export function AppShell({ perfil, onSair }: AppShellProps = {}): React.JSX.Elem
       })
   }, [])
 
-  async function trocarWorkspace(destino: WorkspaceId): Promise<void> {
-    if (destino === workspace) return
+  /** Devolve se o espaço ativo é `destino` ao fim: já era, ou a troca deu certo. */
+  async function trocarWorkspace(destino: WorkspaceId): Promise<boolean> {
+    if (destino === workspace) return true
 
     try {
       // O main audita a troca antes de confirmá-la; a UI só reflete o que ele devolveu.
@@ -90,10 +100,31 @@ export function AppShell({ perfil, onSair }: AppShellProps = {}): React.JSX.Elem
         para: resultado.workspace,
         auditSeq: resultado.auditSeq
       })
+      return true
     } catch (error) {
       setErro('erro.trocaEspaco')
       log.ui.error('Falha ao alternar espaço de trabalho', { destino, error })
+      return false
     }
+  }
+
+  /**
+   * Um gatilho da escuta disparou. O Command Center é a tela do turno e só existe no JARVIS, então
+   * um disparo vindo do NOA passa para ele — pela mesma troca auditada do seletor. Se a troca
+   * falhar não há quem conduza o turno, e o main é avisado: sem isso ele ignoraria gatilhos até o
+   * teto do turno.
+   */
+  async function aoDispararDaEscuta(
+    recebido: DisparoDaEscuta,
+    capturaDoTurno: CapturaDoTurno
+  ): Promise<void> {
+    if (!(await trocarWorkspace('jarvis'))) {
+      capturaDoTurno.cancelar()
+      window.jarvis.informarTurnoDaEscuta(false)
+      return
+    }
+    setNavegacao((atual) => navegar(atual, 'jarvis', ROTA_DO_COMMAND_CENTER))
+    setDisparo({ ...recebido, capturaDoTurno, id: ++contadorDeDisparos.current })
   }
 
   /**
@@ -140,7 +171,9 @@ export function AppShell({ perfil, onSair }: AppShellProps = {}): React.JSX.Elem
       erroPreferencias,
       salvar,
       uiTheme,
-      nomeDoEspaco: nomeEspaco
+      nomeDoEspaco: nomeEspaco,
+      disparo,
+      aoTratarDisparo: (id) => setDisparo((atual) => (atual?.id === id ? undefined : atual))
     }) ?? null
   const outroEspaco: WorkspaceId = workspace === 'jarvis' ? 'noa' : 'jarvis'
 
@@ -284,6 +317,12 @@ export function AppShell({ perfil, onSair }: AppShellProps = {}): React.JSX.Elem
               </p>
             </div>
           )}
+          {/* Sempre à mão e fora das rotas: a escuta é global aos dois espaços (SPEC-Escuta-01). */}
+          <EscutaDaVoz
+            entradaId={preferencias.vozEntradaId}
+            entradaRotulo={preferencias.vozEntradaRotulo}
+            aoDisparar={(d, capturaDoTurno) => void aoDispararDaEscuta(d, capturaDoTurno)}
+          />
           <button
             type="button"
             onClick={() => window.jarvis.minimizeToTray()}

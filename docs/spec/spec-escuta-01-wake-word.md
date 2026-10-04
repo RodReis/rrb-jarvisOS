@@ -1,7 +1,7 @@
 # SPEC-Escuta-01 — Engine de wake word local, global nos dois espaços
 
 - MVP/Fatia: MVP-018 · M18-F01 — abre o MVP-018. Épico [#194](https://github.com/RodReis/rrb-jarvisOS/issues/194).
-- Status: **aprovada-pi** (2026-09-10) — nove perguntas resolvidas pelo PI nesta data, nenhuma em aberto. A issue-fatia nasce quando esta SPEC chegar à `main`.
+- Status: **aprovada-pi** (2026-09-10; revisão de gatilhos e engine aprovada pelo PI em 2026-10-03). Issue-fatia [#356](https://github.com/RodReis/rrb-jarvisOS/issues/356).
 - Fila: **não altera `next`.** A redação foi aberta em paralelo por decisão do PI de 2026-09-10; a construção corrente é a M10-F01 ([#116](https://github.com/RodReis/rrb-jarvisOS/issues/116)). Aprovar esta SPEC habilita o Backlog, nada mais.
 - Depende de: **MVP-017 (fechado em 2026-09-10)** — M17-F01 (sidecar Python gerenciado, caminho de download auditado, `globalShortcut`), M17-F02 (Piper, usado aqui para gerar o dataset de treino), M17-F05 (preferência de dispositivo com `deviceId: { exact }` e medidor de nível), M22-F01 (registro de módulos). MVP-001 (`AuditEvent`/hash-chain) e MVP-003 (design system).
 - Decisões que sustentam esta SPEC: decisões do PI de 2026-08-30 (épico #194) e de 2026-09-10 (§ Perguntas resolvidas); regras invioláveis do `CLAUDE.md`; ARCHITECTURE (local é fonte de verdade operacional).
@@ -14,8 +14,8 @@ Trocar o gatilho da conversa. Hoje o loop de voz do MVP-017 começa com um ato e
 
 ### Dentro
 
-- **Interface `WakeWordEngine`** no main — contrato mínimo `start(fonte) / stop()` e evento `detectado({ confianca, fimDaFraseMs })` — com openWakeWord como primeira implementação, **injetada**: trocar de engine é configuração, não refatoração. Nenhum import do engine concreto fora da implementação (guarda de lint, como a `SttEngine` da M17-F01).
-- **Modelo próprio, treinado fora do app.** O openWakeWord é Apache 2.0 no código, mas seus modelos pré-treinados são **CC BY-NC-SA 4.0 (não comercial)** — nenhum deles entra aqui. O modelo de "Ei, amigo" é treinado com áudio sintético gerado pelo **Piper que o app já embarca desde a M17-F02**, mais dataset de fundo, e o `.onnx` resultante é artefato do projeto, sem restrição de licença.
+- **Interface `WakeWordEngine`** no main — entrada de PCM, disponibilidade, limiar e encerramento — com detector próprio como primeira implementação, **injetada**. Nenhum import do engine concreto fora da composição e dos testes autorizados (guarda de lint, como a `SttEngine` da M17-F01).
+- **Modelo e extração de características próprios, treinados fora do app.** O classificador de "Ei, amigo" usa log-mel calculado por código do projeto e áudio sintético gerado pelo **Piper que o app já embarca desde a M17-F02**, com ruído de fundo e variações de voz. Não incorpora pesos nem modelos auxiliares do openWakeWord. O `.onnx` resultante é artefato do projeto, com procedência e atribuições das vozes de treino registradas junto dele.
 - **Dataset negativo dirigido, obrigatório.** "Amigo" é palavra corrente em pt-BR: o treino inclui negativos com **"amigo" isolado**, **frases contendo "amigo" sem "ei"** e **"ei" sem "amigo"**. Sem esses negativos, o modelo não é aceito.
 - **Distribuição do modelo:** artefato versionado, **baixado no 1º uso com SHA-256 pinado**, `AuditEvent` antes e depois, allowlist de URL — exatamente o caminho já provado pela M17-F01 para o runtime Python e o modelo Whisper. Artefatos em `userData/models/wake/`. Hash divergente rejeita, apaga e informa.
 - **Captura contínua no renderer** via `getUserMedia` com o `deviceId: { exact: … }` da preferência persistida pela M17-F05, 16 kHz mono PCM, enviada ao main por IPC tipado. A fronteira renderer/Node permanece intacta.
@@ -42,7 +42,7 @@ Trocar o gatilho da conversa. Hoje o loop de voz do MVP-017 começa com um ato e
 
 ## Critérios de aceite
 
-1. `WakeWordEngine` é interface injetada no main; a tela e o fluxo não conhecem o engine concreto (teste com dublê); nenhum import de openWakeWord fora da implementação (guarda de lint).
+1. `WakeWordEngine` é interface injetada no main; a tela e o fluxo não conhecem o engine concreto (teste com dublê); nenhum import do detector próprio fora da composição e dos testes autorizados (guarda de lint).
 2. **"Ei, amigo" dispara** — teste afirma o evento a partir de áudio de referência. **Contrafactual obrigatório:** áudio de "amigo" isolado e de frase contendo "amigo" sem "ei" **não** disparam no limiar default; se disparassem, o teste reprova.
 3. **Nenhum áudio sai antes do disparo:** com a escuta ativa e nenhuma wake word falada, a rede interceptada conta **zero** requisição; o buffer circular é descartado e não cresce.
 4. **Nenhum áudio em disco:** após uma sessão de escuta, a varredura de `userData` não encontra arquivo de áudio.
@@ -60,7 +60,7 @@ Trocar o gatilho da conversa. Hoje o loop de voz do MVP-017 começa com um ato e
 
 ## Perguntas resolvidas pelo PI (2026-09-10)
 
-1. **Engine:** openWakeWord. O Porcupine foi descartado por fato externo — a Picovoice encerrou o free tier em **2026-06-30** e o SDK não opera sem AccessKey válida, validada contra a nuvem, o que contraria o invariante "100% local". — decidido.
+1. **Engine (decisão original, substituída em 2026-10-03):** openWakeWord. O Porcupine foi descartado porque exige AccessKey e contraria o funcionamento local. A revisão abaixo escolhe detector próprio.
 2. **Modelo:** próprio, treinado com áudio sintético do Piper, em vez dos pré-treinados CC BY-NC-SA. — decidido.
 3. **Palavra de ativação:** **"Ei, amigo"**. — decidido.
 4. **Quando escuta:** sempre que o app estiver rodando, inclusive minimizado, em segundo plano e com a máquina bloqueada. — decidido.
@@ -69,6 +69,32 @@ Trocar o gatilho da conversa. Hoje o loop de voz do MVP-017 começa com um ato e
 7. **Distribuição do modelo:** artefato baixado no 1º uso, SHA-256 pinado, pelo mesmo caminho auditado do Whisper e do Piper. — decidido.
 8. **Sensibilidade:** ajustável em Settings, com teste ao vivo. — decidido.
 9. **Controle do microfone aberto:** kill switch alcançável, indicador permanente, `AuditEvent` ao ligar/desligar e hotkey global de mute — os quatro dentro desta fatia. — decidido.
+
+## Revisão de escopo decidida pelo PI (2026-10-03, issue #356)
+
+- **Engine:** detector próprio, incluindo extração de log-mel e classificador treinado do zero.
+  A licença dos modelos auxiliares necessários para a opção openWakeWord não foi confirmada;
+  nenhum deles integra a entrega.
+- **Gravações de referência:** o PI autorizou usar os três M4A enviados para ajustar o
+  classificador que será publicado na PR. Os arquivos ficam fora do repositório; somente
+  características temporárias e o modelo resultante participam da produção do artefato.
+  Como esses áudios entram no treino, acertá-los é regressão, não validação independente;
+  a prova física exige frases novas do PI no aplicativo.
+
+- **Dois gatilhos configuráveis em Settings:** frase "Ei, amigo" e duas palmas seguidas.
+  Cada gatilho pode ser ligado ou desligado separadamente; ambos iniciam o mesmo loop de
+  conversa e são ignorados enquanto um turno já está ativo.
+- **Estado inicial:** após instalar e verificar o modelo local, a escuta contínua começa
+  ligada. O kill switch persistido prevalece sobre esse padrão quando o PI a desliga.
+- O detector de palmas precisa de contrafactuais para palma isolada, ruído sustentado e
+  fala comum, além de teste físico. O controle visual, a hotkey e a auditoria cobrem a
+  captura compartilhada, independentemente de qual gatilho esteja habilitado.
+- **Retorno do teste físico (2026-10-04):** a escolha do microfone e do alto-falante fica em
+  Settings > Voz. Quando a frase ou as duas palmas abrem um turno sem pergunta, o Command
+  Center informa que o gatilho foi detectado e pede a pergunta logo em seguida. A conversa
+  local solicita iniciar o Ollama instalado na máquina ao subir o app, preservando um serviço
+  que já estivesse ativo. A verificação real com pergunta nova e sessão bloqueada continua
+  necessária para o aceite.
 
 ## Decisões cravadas pelo Cowork (coerentes com as anteriores; o PI pode vetar)
 

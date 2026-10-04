@@ -23,6 +23,7 @@ import type { SubModuloJarvis } from './navegacao'
 import type { ReactNode } from 'react'
 import type { PreferencesSnapshot } from '@shared/contracts/ipc'
 import type { UserPreferences, WorkspaceId } from '@shared/domain/entities'
+import type { DisparoRecebido } from '../app/EscutaDaVoz'
 
 export interface ContextoDoModulo {
   readonly workspace: WorkspaceId
@@ -31,6 +32,9 @@ export interface ContextoDoModulo {
   readonly salvar: (mudanca: UserPreferences) => Promise<void>
   readonly uiTheme: 'light' | 'dark'
   readonly nomeDoEspaco: string
+  /** Um disparo da escuta ainda não tratado (SPEC-Escuta-01); só o Command Center o consome. */
+  readonly disparo?: DisparoRecebido
+  readonly aoTratarDisparo?: (id: number) => void
 }
 
 /** Os grupos do protótipo (JARVISOS §2). Identificadores em inglês/ASCII; rótulo vem do i18n. */

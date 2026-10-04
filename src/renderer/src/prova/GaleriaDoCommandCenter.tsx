@@ -13,6 +13,7 @@ const ponteDaProva = {
   ],
   falar: async () => ({ estado: 'indisponivel' as const }),
   onVozHotkey: () => () => {},
+  informarTurnoDaEscuta: () => {},
   sendLog: () => {}
 } as unknown as JarvisBridge
 
