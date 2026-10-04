@@ -47,8 +47,8 @@ Estado: **FIX_REQUIRED**. Esta revisão cobre o branch
   próprios. O bundle copia o extrator junto do sidecar; o áudio de treino sintético e o áudio
   real do PI não são gravados no repositório.
 - O sidecar carrega apenas o classificador ONNX próprio. O candidato final foi
-  colocado em `docs/spec/models/ei_amigo.onnx`; o catálogo ainda precisa da
-  revisão imutável do commit que publicar esse arquivo.
+  colocado em `docs/spec/models/ei_amigo.onnx`; o catálogo foi atualizado com a
+  revisão imutável do commit `c63d46ac2afc6c4c19deef849e3c8152d957fa8e` e o SHA exato do arquivo.
 - O pré-roll de 1,5 s agora fica no stream contínuo do renderer: ao disparar, ele é
   reservado antes da navegação e entregue junto à fala seguinte pelo mesmo microfone.
   O turno não abre segundo `getUserMedia`; falha de navegação ou STT indisponível descarta
@@ -93,6 +93,15 @@ acionamentos por hora nem a taxa de perda com novas vozes e microfones.
 
 Estado posterior: a captura, controle, IPC, UI, pré-roll, modelo candidato e
 prova visual estão no worktree da PR #383. A SPEC revisada registra a decisão
-dos dois gatilhos e o detector próprio. Restam o catálogo com URL imutável, a
+dos dois gatilhos e o detector próprio. Restam a
 prova física do PI no app (incluindo sessão bloqueada), CPU/memória/latência,
 o relatório do SHA final, novo CI e merge. O candidato não é aceite físico.
+
+Na execução local de 2026-10-04, `npm run lint` e `npm run typecheck`
+passaram. Os testes dirigidos do catálogo, serviço, adapter e pré-roll passaram.
+`npm test -- --maxWorkers 2` terminou com 4.815 testes aprovados, 24 pulados,
+um teste de infraestrutura com timeout de 5 s (`tests/design/fronteira.int-spec.ts`)
+e dois workers encerrados inesperadamente; a execução completa **não passou**.
+O Docker local não estava disponível, e `npx supabase status` tentou obter o
+pacote na rede restrita. A PR precisa de CI limpo no SHA final; esses resultados
+locais não substituem o gate.

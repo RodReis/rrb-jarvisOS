@@ -2395,7 +2395,7 @@ Status: **em andamento** ([PR #383](https://github.com/RodReis/rrb-jarvisOS/pull
 - [x] **8. Guardas**: lint do engine concreto; zero rede e zero áudio em disco (`sem-audio-na-escuta.int-spec.ts`).
 - [x] **9. Prova visual** (`escuta.prova.ts`, 31 medições nos dois temas).
 - [x] **10. Candidato de modelo "Ei, amigo"** — classificador próprio treinado com vozes sintéticas e gravações autorizadas, hash e proveniência em `docs/spec/models/README.md`; validação independente no teste físico do PI ainda pendente.
-- [ ] **11. Catálogo**: SHA e URL de revisão imutável para o `ei_amigo.onnx` próprio validado (critério 5). O PI retirou a dependência dos modelos auxiliares do openWakeWord.
+- [x] **11. Catálogo**: SHA e URL de revisão imutável para o `ei_amigo.onnx` próprio validado (critério 5). O PI retirou a dependência dos modelos auxiliares do openWakeWord.
 - [ ] **12. Teste físico do PI** e medição de CPU e memória em uso (critérios 6, 7 e 14).
 - [x] **13. Pré-roll no turno.** A captura contínua guarda 1,5 s em memória e entrega esse
   trecho com a fala seguinte pelo mesmo stream. O disparo reserva o buffer antes da navegação;

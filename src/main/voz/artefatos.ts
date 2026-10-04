@@ -137,8 +137,8 @@ export const ARTEFATOS_DA_VOZ: readonly Artefato[] = [
 
   {
     id: 'modelo-wake/ei_amigo.onnx',
-    url: 'https://raw.githubusercontent.com/RodReis/rrb-jarvisOS/main/docs/spec/models/ei_amigo.onnx',
-    sha256: '22ffd34393b4cbf7a9124f6878a817d6b9dbca3735a278c0ccf7df27d700d0a9',
+    url: 'https://raw.githubusercontent.com/RodReis/rrb-jarvisOS/c63d46ac2afc6c4c19deef849e3c8152d957fa8e/docs/spec/models/ei_amigo.onnx',
+    sha256: '28b6ad9a7e4e747697fa6a315882211f530697235bc5b767fe53efd0e512a6f3',
     destino: 'models/wake/ei_amigo.onnx'
   }
 ]
