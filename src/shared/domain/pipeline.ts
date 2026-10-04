@@ -149,7 +149,12 @@ export const TRANSICAO_REASONS = [
    */
   'fencing-invalido',
   /** Dependência do run ainda não concluída (invariante 5 da CONVENTION §4). */
-  'dependencia-aberta'
+  'dependencia-aberta',
+  /**
+   * O run tem merge no ar, ou confirmado na origem e ainda não registrado: cancelar agora deixaria
+   * o run `CANCELLED` com o PR já mergeado (SPEC-Scheduler-04, critério 5).
+   */
+  'merge-em-curso'
 ] as const
 
 export type TransicaoReason = (typeof TRANSICAO_REASONS)[number]
