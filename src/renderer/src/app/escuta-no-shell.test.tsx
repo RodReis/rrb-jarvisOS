@@ -58,7 +58,12 @@ function mockarPonte(espaco: WorkspaceId): void {
   )
   vi.stubGlobal('navigator', {
     ...navigator,
-    mediaDevices: { getUserMedia, enumerateDevices: vi.fn().mockResolvedValue([]) }
+    mediaDevices: {
+      getUserMedia,
+      enumerateDevices: vi
+        .fn()
+        .mockResolvedValue([{ kind: 'audioinput', deviceId: 'headset-2', label: 'Headset' }])
+    }
   })
   vi.stubGlobal('jarvis', {
     getAppInfo: vi.fn(),
@@ -128,7 +133,8 @@ describe('um disparo leva ao Command Center', () => {
     await screen.findByText(/escuta ligada/i)
     const capturasDeTurno = (): number =>
       getUserMedia.mock.calls.filter(
-        ([pedido]) => pedido?.audio?.channelCount === 1 && pedido?.audio?.sampleRate === 16_000
+        ([pedido]) =>
+          pedido?.audio?.deviceId?.exact === 'headset-2' && pedido?.audio?.echoCancellation === true
       ).length
     const abertasAntes = capturasDeTurno()
 

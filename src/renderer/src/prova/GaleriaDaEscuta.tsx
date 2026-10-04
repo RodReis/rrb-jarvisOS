@@ -110,11 +110,7 @@ export function GaleriaDaEscuta({
               onAlternarTema={() => {}}
               rotuloTema="Alternar tema"
             >
-              <EscutaDaVoz
-                entradaId="headset-prova"
-                aoDisparar={() => {}}
-                abrirCaptura={abrirCaptura}
-              />
+              <EscutaDaVoz aoDisparar={() => {}} abrirCaptura={abrirCaptura} />
             </TopBar>
           )}
         </main>
