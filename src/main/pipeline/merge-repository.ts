@@ -11,6 +11,7 @@
  */
 
 import type { Database } from 'better-sqlite3'
+import type { WorkspaceId } from '@shared/domain/entities'
 import { ESTADOS_DO_RUN, ehTerminal } from '@shared/domain/pipeline'
 import type { EstadoDaTentativa } from '@shared/domain/merge-serializado'
 
@@ -18,6 +19,7 @@ export interface TentativaDeMerge {
   readonly id: number
   readonly userId: string
   readonly runId: string
+  readonly workspaceId: WorkspaceId
   readonly projectId: string
   readonly recurso: string
   readonly pullRequest: number
@@ -31,6 +33,7 @@ export interface TentativaDeMerge {
 
 export interface NovaTentativa {
   readonly runId: string
+  readonly workspaceId: WorkspaceId
   readonly projectId: string
   readonly recurso: string
   readonly pullRequest: number
@@ -58,6 +61,7 @@ interface TentativaRow {
   id: number
   user_id: string
   run_id: string
+  workspace_id: string
   project_id: string
   recurso: string
   pull_request: number
@@ -74,6 +78,7 @@ function toTentativa(row: TentativaRow): TentativaDeMerge {
     id: row.id,
     userId: row.user_id,
     runId: row.run_id,
+    workspaceId: row.workspace_id as WorkspaceId,
     projectId: row.project_id,
     recurso: row.recurso,
     pullRequest: row.pull_request,
@@ -119,13 +124,14 @@ export class MergeRepository {
         const info = this.db
           .prepare(
             `INSERT INTO merge_tentativa
-               (user_id, run_id, project_id, recurso, pull_request, head_sha, fencing_token,
-                estado, iniciada_em)
-             VALUES (?, ?, ?, ?, ?, ?, ?, 'iniciada', ?)`
+               (user_id, run_id, workspace_id, project_id, recurso, pull_request, head_sha,
+                fencing_token, estado, iniciada_em)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'iniciada', ?)`
           )
           .run(
             userId,
             dados.runId,
+            dados.workspaceId,
             dados.projectId,
             dados.recurso,
             dados.pullRequest,

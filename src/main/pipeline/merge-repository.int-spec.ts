@@ -67,6 +67,7 @@ function lease(runId: string, token: number, recurso = RECURSO): void {
 
 const dados = (runId: string, token: number, pullRequest = 7, headSha = HEAD) => ({
   runId,
+  workspaceId: WS,
   projectId: 'p',
   recurso: RECURSO,
   pullRequest,

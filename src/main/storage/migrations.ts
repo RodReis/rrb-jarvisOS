@@ -2002,6 +2002,7 @@ const MIGRATIONS: readonly string[] = [
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id       TEXT NOT NULL,
     run_id        TEXT NOT NULL,
+    workspace_id  TEXT NOT NULL,
     project_id    TEXT NOT NULL,
     recurso       TEXT NOT NULL,
     pull_request  INTEGER NOT NULL,
