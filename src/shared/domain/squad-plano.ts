@@ -298,12 +298,23 @@ type Coletor = (motivo: MotivoDeRejeicao, detalhe: string, tarefa?: string) => v
  * Caracteres que um path vindo de modelo não pode ter: controle (inclui NUL e quebra de linha),
  * override de direção (RLO/LRO) e os reservados do Windows — `:` abre stream alternativo no NTFS.
  */
-/** Controle (inclui NUL e quebra de linha) e override de direção (RLO/LRO e isolados): nada disso é nome de arquivo. */
+/**
+ * Controle (inclui NUL e quebra de linha, e os de C1), override de direção (RLO/LRO e isolados) e os
+ * invisíveis de formatação — marca de direção, espaço de largura zero, separador de linha e
+ * parágrafo, BOM: nada disso é nome de arquivo, e todos escondem texto de quem lê o caminho.
+ */
 export function ehControleOuDirecao(codePoint: number): boolean {
-  const controle = codePoint <= 0x1f || codePoint === 0x7f
+  const controle = codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f)
   const direcao =
     (codePoint >= 0x202a && codePoint <= 0x202e) || (codePoint >= 0x2066 && codePoint <= 0x2069)
-  return controle || direcao
+  const invisivel =
+    codePoint === 0x061c ||
+    (codePoint >= 0x200b && codePoint <= 0x200f) ||
+    codePoint === 0x2028 ||
+    codePoint === 0x2029 ||
+    (codePoint >= 0x2060 && codePoint <= 0x2064) ||
+    codePoint === 0xfeff
+  return controle || direcao || invisivel
 }
 
 /** Reservados do Windows: `:` abre stream alternativo no NTFS. */

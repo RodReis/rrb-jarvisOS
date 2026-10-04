@@ -137,3 +137,24 @@ export class GerenteDeSlots {
     else this.espera.set(unidade, resto)
   }
 }
+
+/**
+ * Os ganchos que ligam o `FilaService` ao gerente — a ligação de produção que a F03 deixou para a
+ * F04 (SPEC-Squads-03, "Contrato com a F04"): o pool anuncia a aquisição e o gerente acorda quem
+ * esperava; o run que termina tira os escritores da fila e o gerente cancela a espera deles.
+ *
+ * O gerente é lido **por função**: fila e gerente se conhecem, e a fila nasce primeiro. Os ganchos
+ * só rodam depois de os dois existirem, e antes disso (ou sem gerente) não fazem nada.
+ */
+export function ganchosDosSlots(gerente: () => GerenteDeSlots | undefined): {
+  readonly aoAdquirir: (aquisicao: Aquisicao) => void
+  readonly aoCancelarEspera: (unidades: readonly string[]) => void
+} {
+  return {
+    aoAdquirir: (aquisicao) => gerente()?.anunciar(aquisicao),
+    aoCancelarEspera: (unidades) => {
+      const g = gerente()
+      for (const unidade of unidades) g?.cancelarEspera(unidade)
+    }
+  }
+}

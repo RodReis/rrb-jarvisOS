@@ -144,6 +144,9 @@ describe('migrations', () => {
     ]) {
       antigo.exec(`DROP TABLE ${tabela}`)
     }
+    // A 49 cria os achados da revisão e as voltas do retrabalho (SPEC-Squads-04).
+    antigo.exec('DROP TABLE squad_achado')
+    antigo.exec('DROP TABLE squad_retrabalho')
     antigo.pragma('user_version = 1')
     antigo.close()
 

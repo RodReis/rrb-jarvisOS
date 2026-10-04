@@ -16,7 +16,7 @@
  */
 
 import { createHash } from 'node:crypto'
-import { TIMEOUT_PADRAO_MS, type AiRequest, type CostEvent } from '@shared/domain/ai'
+import type { AiRequest, CostEvent } from '@shared/domain/ai'
 import type { ContextPack } from '@shared/domain/context-pack'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { ModeloEscolhido } from '@shared/domain/modelo-da-fase'
@@ -29,21 +29,13 @@ import {
 } from '@shared/domain/squad-execucao'
 import { PAPEIS_QUE_ESCREVEM, type TarefaDoPlano } from '@shared/domain/squad-plano'
 import { ehSchemaDeResultado, esquemaDoResultado } from '@shared/domain/squad-resultado-esquema'
-import type { AiCallContext } from '../ai/call-provider'
 import type { FonteDaTarefa } from '../context/context-service'
 import type { AuditRepository } from '../storage/audit-repository'
+import { MS_POR_MINUTO, chamarModelo } from './squad-chamada'
 import type { ChamadorDeIa } from './squad-gerador'
 import { extrairJsonFinal } from './squad-planejador'
 import { recusaDaTentativa, recusaDoContexto, recusaDosLimites } from './squad-recusas'
 import { montarPromptDoWorker } from './squad-worker-prompt'
-
-/** Mais que isto de saída é um modelo fora de controle, não um resultado: corta e marca inválida. */
-const MAX_BYTES_DA_SAIDA = 256 * 1024
-const MS_POR_MINUTO = 60_000
-/** Margem para o relógio do executor disparar antes do relógio do ponto único. */
-const MARGEM_DO_PRAZO_MS = 2_000
-/** O que do erro do provider vai para a auditoria: o bastante para diagnosticar, nada de corpo cru. */
-const MAX_MOTIVO_AUDITADO = 160
 
 export interface PedidoDoWorker {
   readonly runId: string
@@ -193,28 +185,6 @@ export class ExecutorDeWorker {
     })
     const esquema = JSON.stringify(esquemaDoResultado(schema))
 
-    // O prazo efetivo é o menor entre o do plano e o teto do ponto único. O relógio do executor
-    // dispara primeiro, para o estado ser `timeout` e não uma falha anônima.
-    const prazoMs = Math.min(tarefa.limites.maxMinutos * MS_POR_MINUTO, TIMEOUT_PADRAO_MS)
-    const controle = new AbortController()
-    let causa: 'timeout' | 'cancelada' | undefined
-    const estourar = setTimeout(() => {
-      causa ??= 'timeout'
-      controle.abort()
-    }, prazoMs)
-    const cancelar = (): void => {
-      causa ??= 'cancelada'
-      controle.abort()
-    }
-    if (pedido.signal?.aborted === true) cancelar()
-    else pedido.signal?.addEventListener('abort', cancelar)
-
-    const ctx: AiCallContext = {
-      userId: this.deps.userId(),
-      workspace: this.deps.workspaceId(),
-      signal: controle.signal,
-      timeoutMs: prazoMs + MARGEM_DO_PRAZO_MS
-    }
     const request: AiRequest = {
       provider: modelo.provider,
       model: modelo.modelo,
@@ -232,48 +202,24 @@ export class ExecutorDeWorker {
         : { jsonSchema: esquema })
     }
 
-    try {
-      let texto = ''
-      let custo: CostEvent | undefined
-      for await (const evento of this.deps.ia.call(request, ctx)) {
-        if (evento.tipo === 'chunk') {
-          texto += evento.texto
-          if (Buffer.byteLength(texto, 'utf8') > MAX_BYTES_DA_SAIDA) {
-            controle.abort()
-            return {
-              desfecho: { estado: 'invalida', motivo: 'saida-grande-demais', descartadas: [] }
-            }
-          }
-          continue
-        }
-        custo = evento.custo
-        // Prazo ou cancelamento que disparou antes do fim vale mais que o resultado que chegou junto:
-        // cancelada não vira concluída por uma corrida entre o sinal e o último evento.
-        if (causa !== undefined) return { desfecho: this.falha(causa), ...(custo ? { custo } : {}) }
-        if (evento.estado === 'falhou') {
-          return { desfecho: this.falha(causa, evento.erro), ...(custo ? { custo } : {}) }
-        }
-        return {
-          desfecho: this.avaliar(texto, schema, contexto.fontes),
-          ...(custo ? { custo } : {})
-        }
+    // O prazo efetivo é o menor entre o do plano e o teto do ponto único; o relógio do executor
+    // dispara primeiro, para o estado ser `timeout` e não uma falha anônima.
+    const chamada = await chamarModelo({
+      ia: this.deps.ia,
+      request,
+      userId: this.deps.userId(),
+      workspace: this.deps.workspaceId(),
+      prazoMs: tarefa.limites.maxMinutos * MS_POR_MINUTO,
+      ...(pedido.signal === undefined ? {} : { signal: pedido.signal })
+    })
+    const custo = chamada.custo === undefined ? {} : { custo: chamada.custo }
+    if (!chamada.ok) {
+      return {
+        desfecho: { estado: chamada.estado, motivo: chamada.motivo, descartadas: [] },
+        ...custo
       }
-      return { desfecho: this.falha(causa, 'o stream terminou sem desfecho') }
-    } finally {
-      clearTimeout(estourar)
-      pedido.signal?.removeEventListener('abort', cancelar)
     }
-  }
-
-  /** A falha da chamada, classificada pelo que a causou: prazo e cancelamento têm estado próprio. */
-  private falha(causa: 'timeout' | 'cancelada' | undefined, erro?: string): Desfecho {
-    if (causa === 'timeout') return { estado: 'timeout', motivo: 'prazo-do-plano', descartadas: [] }
-    if (causa === 'cancelada') return { estado: 'cancelada', motivo: 'cancelada', descartadas: [] }
-    return {
-      estado: 'falhou',
-      motivo: (erro ?? 'a chamada falhou').slice(0, MAX_MOTIVO_AUDITADO),
-      descartadas: []
-    }
+    return { desfecho: this.avaliar(chamada.texto, schema, contexto.fontes), ...custo }
   }
 
   private avaliar(

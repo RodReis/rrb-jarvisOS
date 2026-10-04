@@ -27,7 +27,7 @@ const { LeaseRepository } = await import('../pipeline/lease-repository')
 const { FilaService } = await import('../pipeline/fila-service')
 const { PoolRepository } = await import('../pipeline/pool-repository')
 const { PoolService } = await import('../pipeline/pool-service')
-const { GerenteDeSlots } = await import('./squad-slots')
+const { GerenteDeSlots, ganchosDosSlots } = await import('./squad-slots')
 
 const USER = 'u-1'
 const WS = 'jarvis' as const
@@ -89,9 +89,8 @@ beforeEach(() => {
     revisoesDoGate: () => REVISOES,
     userId: () => USER,
     mergeAutonomoLigado: () => true,
-    // A ligação de produção: o pool anuncia, o gerente acorda quem esperava.
-    aoAdquirir: (a) => gerente.anunciar(a),
-    aoCancelarEspera: (ids) => ids.forEach((id) => gerente.cancelarEspera(id)),
+    // A ligação de produção (`ganchosDosSlots`): o pool anuncia, o gerente acorda quem esperava.
+    ...ganchosDosSlots(() => gerente),
     agora: () => relogio
   })
   gerente = new GerenteDeSlots(fila)
@@ -391,5 +390,33 @@ describe('o resto do contrato com o pool', () => {
         lease: {} as never
       })
     ).not.toThrow()
+  })
+})
+
+describe('ganchosDosSlots', () => {
+  it('antes de o gerente existir, e sem ele, os ganchos não fazem nada e não lançam', () => {
+    const ganchos = ganchosDosSlots(() => undefined)
+
+    expect(() => ganchos.aoAdquirir({ runId: 'x', fencingToken: 1 } as never)).not.toThrow()
+    expect(() => ganchos.aoCancelarEspera(['x', 'y'])).not.toThrow()
+  })
+
+  it('aoCancelarEspera cancela a espera de cada unidade que saiu da fila', () => {
+    const cancelarEspera = vi.fn()
+    const ganchos = ganchosDosSlots(() => ({ cancelarEspera }) as never)
+
+    ganchos.aoCancelarEspera(['run-1:a', 'run-1:b'])
+
+    expect(cancelarEspera.mock.calls).toEqual([['run-1:a'], ['run-1:b']])
+  })
+
+  it('aoAdquirir anuncia a aquisição ao gerente', () => {
+    const anunciar = vi.fn()
+    const ganchos = ganchosDosSlots(() => ({ anunciar }) as never)
+    const aquisicao = { runId: 'run-1:a', fencingToken: 3 } as never
+
+    ganchos.aoAdquirir(aquisicao)
+
+    expect(anunciar).toHaveBeenCalledWith(aquisicao)
   })
 })
