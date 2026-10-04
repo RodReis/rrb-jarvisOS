@@ -35,6 +35,14 @@ beforeEach(() => {
   estadoDaEscuta.mockReset().mockImplementation(async () => estado)
   definirEscutaAtiva.mockReset().mockResolvedValue({ ok: true })
   enviarPcmDaEscuta.mockReset()
+  vi.stubGlobal('navigator', {
+    ...navigator,
+    mediaDevices: {
+      enumerateDevices: vi.fn(async () => [
+        { kind: 'audioinput', deviceId: 'headset-2', label: 'Headset' }
+      ])
+    }
+  })
   vi.stubGlobal('jarvis', {
     estadoDaEscuta,
     definirEscutaAtiva,
@@ -121,6 +129,29 @@ describe('indicador permanente (critério 9)', () => {
 })
 
 describe('captura e kill switch (critério 8)', () => {
+  it('usa o novo ID do mesmo microfone depois que o Windows troca o identificador', async () => {
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      mediaDevices: {
+        enumerateDevices: vi.fn(async () => [
+          { kind: 'audioinput', deviceId: 'headset-novo', label: 'Headset' }
+        ])
+      }
+    })
+    const captura = capturaFalsa()
+    render(
+      <EscutaDaVoz
+        entradaId="headset-2"
+        entradaRotulo="Headset"
+        aoDisparar={vi.fn()}
+        abrirCaptura={captura.abrir}
+      />
+    )
+
+    await screen.findByText(/escuta ligada/i)
+    expect(captura.abrir).toHaveBeenCalledWith('headset-novo', expect.any(Function))
+  })
+
   it('abre o dispositivo escolhido e manda os blocos de áudio ao main', async () => {
     const captura = capturaFalsa()
     montar(captura)

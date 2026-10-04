@@ -157,7 +157,7 @@ export const RECURSOS = {
         dicaAlternar: 'Liga ou desliga a escuta da palavra de ativação',
         dicaIndisponivel: 'O modelo da palavra de ativação ainda não está neste computador.',
         dicaSemMicrofone:
-          'O microfone foi negado ou não está disponível. Confira a permissão e o dispositivo em Voz.',
+          'O microfone foi negado ou mudou. Selecione a entrada em JARVIS OS > Command Center > Voz.',
         recusaModelo:
           'Não foi possível ligar a escuta: o modelo da palavra de ativação não está neste computador.',
         recusaEntrada: 'Não foi possível alterar a escuta. Tente de novo.',
@@ -1063,7 +1063,7 @@ export const RECURSOS = {
         dicaAlternar: 'Turns wake word listening on or off',
         dicaIndisponivel: 'The wake word model is not on this computer yet.',
         dicaSemMicrofone:
-          'The microphone was denied or is unavailable. Check the permission and the device in Voice.',
+          'The microphone was denied or changed. Select the input in JARVIS OS > Command Center > Voice.',
         recusaModelo: 'Could not turn listening on: the wake word model is not on this computer.',
         recusaEntrada: 'Could not change listening. Try again.',
         naoPronta:

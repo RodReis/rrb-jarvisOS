@@ -2,7 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Mic, MicOff } from 'lucide-react'
 import type { DisparoDaEscuta, EstadoDaEscuta } from '@shared/domain/voz'
-import { abrirCapturaContinua, type CapturaContinua, type CapturaDoTurno } from './captura-continua'
+import {
+  abrirCapturaContinua,
+  resolverEntradaSelecionada,
+  type CapturaContinua,
+  type CapturaDoTurno
+} from './captura-continua'
 import { log } from '../lib/log'
 
 /**
@@ -35,11 +40,13 @@ type Visao = 'ligada' | 'ligando' | 'desligada' | 'indisponivel' | 'sem-microfon
 
 export function EscutaDaVoz({
   entradaId,
+  entradaRotulo,
   aoDisparar,
   abrirCaptura = abrirCapturaContinua
 }: {
   /** O dispositivo escolhido na F05; sem ele, o padrão do sistema. */
   readonly entradaId?: string | null
+  readonly entradaRotulo?: string | null
   /** Quem conduz o turno de conversa quando um gatilho dispara. */
   readonly aoDisparar: (disparo: DisparoDaEscuta, capturaDoTurno: CapturaDoTurno) => void
   /** Injetada para teste: `getUserMedia` não existe em jsdom. */
@@ -92,7 +99,8 @@ export function EscutaDaVoz({
     let cancelado = false
     let captura: CapturaContinua | undefined
 
-    abrirCaptura(entradaId ?? undefined, (bloco) => window.jarvis.enviarPcmDaEscuta(bloco))
+    resolverEntradaSelecionada(entradaId ?? undefined, entradaRotulo ?? undefined)
+      .then((id) => abrirCaptura(id, (bloco) => window.jarvis.enviarPcmDaEscuta(bloco)))
       .then((aberta) => {
         // O stream que chega depois de o estado ter mudado nasce condenado: sem este `parar`, a
         // permissão demorada deixaria o microfone aberto sem ninguém para fechá-lo.
@@ -109,7 +117,9 @@ export function EscutaDaVoz({
         if (cancelado) return
         setFalhouAoAbrir(true)
         log.ui.warn('A escuta não conseguiu abrir o microfone', {
-          motivo: erro instanceof Error ? erro.name : 'desconhecido'
+          motivo: erro instanceof Error ? erro.name : 'desconhecido',
+          restricao:
+            erro && typeof erro === 'object' && 'constraint' in erro ? erro.constraint : undefined
         })
       })
 
@@ -119,7 +129,7 @@ export function EscutaDaVoz({
       setCapturando(false)
       void captura?.parar()
     }
-  }, [ativa, entradaId, abrirCaptura])
+  }, [ativa, entradaId, entradaRotulo, abrirCaptura])
 
   if (estado === undefined) return null
 

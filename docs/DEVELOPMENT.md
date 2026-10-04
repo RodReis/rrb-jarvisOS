@@ -2414,6 +2414,13 @@ Status: **em andamento** ([PR #383](https://github.com/RodReis/rrb-jarvisOS/pull
 - [x] **10. Candidato de modelo "Ei, amigo"** — classificador próprio treinado com vozes sintéticas e gravações autorizadas, hash e proveniência em `docs/spec/models/README.md`; validação independente no teste físico do PI ainda pendente.
 - [x] **11. Catálogo**: SHA e URL de revisão imutável para o `ei_amigo.onnx` próprio validado (critério 5). O PI retirou a dependência dos modelos auxiliares do openWakeWord.
 - [ ] **12. Teste físico do PI** e medição de CPU e memória em uso (critérios 6, 7 e 14).
+  Primeira tentativa em 2026-10-04: fala e palmas não dispararam porque o `deviceId` salvo
+  deixou de existir (`OverconstrainedError`, restrição `deviceId`); o perfil não guardava
+  `vozEntradaRotulo`. A correção verifica o ID atual e recupera pelo nome apenas quando a
+  correspondência é única. Sem nome ou correspondência, indica microfone indisponível e pede
+  nova seleção em Command Center > Voz. O PI ainda precisa repetir os testes após selecionar
+  a entrada atual; o print do Gerenciador de Tarefas (Python 231,5 MB, Electron 187,5 MB,
+  ambos 0% naquele instante) não mede o custo da escuta em funcionamento.
 - [x] **13. Pré-roll no turno.** A captura contínua guarda 1,5 s em memória e entrega esse
   trecho com a fala seguinte pelo mesmo stream. O disparo reserva o buffer antes da navegação;
   se a troca de espaço falha ou o STT não está pronto, ele é descartado. Teste de regressão

@@ -1,5 +1,43 @@
 import { describe, expect, it, vi } from 'vitest'
-import { TAMANHO_DO_BLOCO, abrirCapturaContinua, criarEmpacotador } from './captura-continua'
+import {
+  TAMANHO_DO_BLOCO,
+  abrirCapturaContinua,
+  criarEmpacotador,
+  resolverEntradaSelecionada
+} from './captura-continua'
+
+describe('dispositivo da escuta após mudança de ID', () => {
+  const entrada = (deviceId: string, label: string) =>
+    ({ kind: 'audioinput', deviceId, label }) as MediaDeviceInfo
+
+  it('mantém o ID salvo quando ainda existe', async () => {
+    expect(
+      await resolverEntradaSelecionada('antigo', 'Headset', async () => [
+        entrada('antigo', 'Headset')
+      ])
+    ).toBe('antigo')
+  })
+
+  it('encontra o mesmo microfone pelo nome quando o ID mudou', async () => {
+    expect(
+      await resolverEntradaSelecionada('antigo', 'Headset', async () => [
+        entrada('novo', 'Headset')
+      ])
+    ).toBe('novo')
+  })
+
+  it('não escolhe outro microfone silenciosamente', async () => {
+    await expect(
+      resolverEntradaSelecionada('antigo', 'Headset', async () => [entrada('outro', 'Placa-mãe')])
+    ).rejects.toMatchObject({ name: 'NotFoundError' })
+  })
+
+  it('pede nova escolha quando o ID mudou e a preferência antiga não tem nome', async () => {
+    await expect(
+      resolverEntradaSelecionada('antigo', undefined, async () => [entrada('novo', 'Headset')])
+    ).rejects.toMatchObject({ name: 'NotFoundError' })
+  })
+})
 
 describe('empacotador de blocos (SPEC-Escuta-01: 16 kHz mono, quadros de 1280)', () => {
   it('entrega blocos de 1280 amostras Int16 e guarda o resto para o próximo pedaço', () => {

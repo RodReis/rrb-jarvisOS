@@ -39,6 +39,20 @@ export interface DepsDaCapturaContinua {
   readonly criarContexto: () => AudioContext
 }
 
+/** IDs do Chromium podem mudar entre sessões; só recupera a escolha quando o nome é único. */
+export async function resolverEntradaSelecionada(
+  deviceId: string | undefined,
+  rotulo: string | undefined,
+  listar = () => navigator.mediaDevices.enumerateDevices()
+): Promise<string | undefined> {
+  if (!deviceId) return undefined
+  const entradas = (await listar()).filter((dispositivo) => dispositivo.kind === 'audioinput')
+  if (entradas.some((dispositivo) => dispositivo.deviceId === deviceId)) return deviceId
+  const mesmoNome = rotulo ? entradas.filter((dispositivo) => dispositivo.label === rotulo) : []
+  if (mesmoNome.length === 1) return mesmoNome[0].deviceId
+  throw new DOMException('O microfone escolhido não está disponível.', 'NotFoundError')
+}
+
 /** Junta pedaços de Float32 em blocos Int16 de `TAMANHO_DO_BLOCO`, guardando só o resto. */
 export function criarEmpacotador(
   aoBloco: (bloco: Int16Array) => void
@@ -63,9 +77,9 @@ const DEPS_REAIS: DepsDaCapturaContinua = {
   abrirStream: (deviceId) =>
     navigator.mediaDevices.getUserMedia({
       audio: {
-        channelCount: 1,
-        sampleRate: TAXA,
         echoCancellation: true,
+        // A placa decide a taxa e os canais da captura. O AudioContext abaixo converte para
+        // 16 kHz mono; exigir isso também do dispositivo pode impedir sua abertura no Windows.
         // O dispositivo escolhido na F05 é exigido: sem o `exact`, o navegador cai no padrão do
         // Windows, que é a placa-mãe e não o headset.
         ...(deviceId ? { deviceId: { exact: deviceId } } : {})

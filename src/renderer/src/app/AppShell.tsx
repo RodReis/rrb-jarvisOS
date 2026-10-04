@@ -320,6 +320,7 @@ export function AppShell({ perfil, onSair }: AppShellProps = {}): React.JSX.Elem
           {/* Sempre à mão e fora das rotas: a escuta é global aos dois espaços (SPEC-Escuta-01). */}
           <EscutaDaVoz
             entradaId={preferencias.vozEntradaId}
+            entradaRotulo={preferencias.vozEntradaRotulo}
             aoDisparar={(d, capturaDoTurno) => void aoDispararDaEscuta(d, capturaDoTurno)}
           />
           <button
