@@ -148,6 +148,40 @@ describe('EscutaService — restauração (SPEC-Escuta-01, critérios 8 e 10)', 
     expect(m.capturas).toEqual([])
   })
 
+  it('liga após instalar o modelo quando não havia escolha salva', async () => {
+    const opcoes = { modeloPronto: false }
+    const m = montar(opcoes)
+    await m.servico.restaurar()
+    opcoes.modeloPronto = true
+
+    await m.servico.atualizarDisponibilidade()
+
+    expect(m.servico.estado()).toMatchObject({ ativa: true, disponivel: true })
+    expect(m.capturas).toEqual([true])
+    expect(m.auditados.at(-1)?.payload.via).toBe('restauracao')
+  })
+
+  it('instalar o modelo não reverte um kill switch salvo', async () => {
+    const opcoes = {
+      modeloPronto: false,
+      persistido: {
+        ativa: false,
+        frase: true,
+        palmas: true,
+        sensibilidade: 0.95,
+        hotkey: 'Control+Alt+M' as const
+      }
+    }
+    const m = montar(opcoes)
+    await m.servico.restaurar()
+    opcoes.modeloPronto = true
+
+    await m.servico.atualizarDisponibilidade()
+
+    expect(m.servico.estado()).toMatchObject({ ativa: false, disponivel: true })
+    expect(m.capturas).toEqual([])
+  })
+
   it('a restauração que liga é auditada com a via "restauracao"', async () => {
     const m = montar({ persistido: undefined })
     await m.servico.restaurar()

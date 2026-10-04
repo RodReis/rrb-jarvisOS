@@ -157,6 +157,12 @@ export class EscutaService {
     if (this.persistido.ativa && this.disponivel) await this.ligar('restauracao')
   }
 
+  /** Reavalia o modelo depois de um download; um kill switch salvo continua prevalecendo. */
+  async atualizarDisponibilidade(): Promise<void> {
+    this.disponivel = await this.deps.modeloPronto()
+    if (this.persistido.ativa && this.disponivel && !this.ativa) await this.ligar('restauracao')
+  }
+
   async ligar(via: ViaDaEscuta): Promise<DesfechoDeLigar> {
     this.disponivel = await this.deps.modeloPronto()
     if (!this.disponivel) return { ok: false, motivo: 'MODELO_AUSENTE' }

@@ -1947,6 +1947,12 @@ if (!app.requestSingleInstanceLock()) {
           if (preparo.estado === 'falhou') {
             log.sistema.error('O preparo do runtime da voz falhou', { motivo: preparo.motivo })
           }
+
+          const disponivelAntes = escuta.estado().disponivel
+          await escuta.atualizarDisponibilidade()
+          if (disponivelAntes !== escuta.estado().disponivel) {
+            avisarTela(IPC_EVENT_CHANNELS.escutaMudou, escuta.estado())
+          }
         }
 
         return desfecho

@@ -2408,7 +2408,7 @@ Status: **em andamento** ([PR #383](https://github.com/RodReis/rrb-jarvisOS/pull
 - [x] **4. Captura contínua** (`captura-continua.ts`): blocos de 1280 amostras; `parar()` encerra as trilhas e nada sai depois.
 - [x] **5. Indicador e kill switch na barra** (`EscutaDaVoz.tsx`), nos dois espaços; "ligada" só com o stream aberto.
 - [x] **6. Disparo** (`disparo-da-escuta.ts`): sessão bloqueada não sobe a janela; o turno grava sem botão e decide o fim por silêncio (`fim-da-fala.ts`); 3 s sem fala cancela sem chamar a IA.
-- [x] **7. Settings** (`PreferenciasDaEscuta.tsx`): gatilhos, limiar de disparo, atalho de mute, teste ao vivo.
+- [x] **7. Settings** (`PreferenciasDaEscuta.tsx`): instalação do modelo pelo catálogo com hash, gatilhos, limiar de disparo, atalho de mute e teste ao vivo. Depois do download válido, a escuta liga se não houver kill switch salvo.
 - [x] **8. Guardas**: lint do engine concreto; zero rede e zero áudio em disco (`sem-audio-na-escuta.int-spec.ts`).
 - [x] **9. Prova visual** (`escuta.prova.ts`, 31 medições nos dois temas).
 - [x] **10. Candidato de modelo "Ei, amigo"** — classificador próprio treinado com vozes sintéticas e gravações autorizadas, hash e proveniência em `docs/spec/models/README.md`; validação independente no teste físico do PI ainda pendente.

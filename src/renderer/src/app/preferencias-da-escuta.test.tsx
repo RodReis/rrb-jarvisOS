@@ -27,6 +27,7 @@ const definirGatilhosDaEscuta = vi.fn()
 const definirSensibilidadeDaEscuta = vi.fn()
 const definirModoDeTesteDaEscuta = vi.fn()
 const definirHotkeyDaEscuta = vi.fn()
+const baixarArtefatoDeVoz = vi.fn()
 
 beforeEach(() => {
   estado = BASE
@@ -42,12 +43,17 @@ beforeEach(() => {
   definirHotkeyDaEscuta
     .mockReset()
     .mockImplementation(async (h) => (estado = { ...estado, hotkey: h }))
+  baixarArtefatoDeVoz.mockReset().mockImplementation(async () => {
+    estado = { ...estado, disponivel: true, ativa: true }
+    return { estado: 'ok' }
+  })
   vi.stubGlobal('jarvis', {
     estadoDaEscuta: vi.fn(async () => estado),
     definirGatilhosDaEscuta,
     definirSensibilidadeDaEscuta,
     definirModoDeTesteDaEscuta,
     definirHotkeyDaEscuta,
+    baixarArtefatoDeVoz,
     onEscutaMudou: (l: (e: EstadoDaEscuta) => void) => {
       avisarEstado = l
       return () => {
@@ -61,6 +67,30 @@ beforeEach(() => {
       }
     },
     sendLog: vi.fn()
+  })
+})
+
+describe('instalação do modelo local', () => {
+  it('oferece a instalação quando indisponível e atualiza o estado após o download', async () => {
+    estado = { ...BASE, ativa: false, disponivel: false }
+    await montar()
+
+    await userEvent.click(screen.getByRole('button', { name: /instalar modelo de ativação/i }))
+
+    expect(baixarArtefatoDeVoz).toHaveBeenCalledWith('modelo-wake/ei_amigo.onnx')
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /instalar modelo de ativação/i })).toBeNull()
+    )
+  })
+
+  it('mostra erro quando o download não valida', async () => {
+    estado = { ...BASE, ativa: false, disponivel: false }
+    baixarArtefatoDeVoz.mockResolvedValue({ estado: 'hash-divergente' })
+    await montar()
+
+    await userEvent.click(screen.getByRole('button', { name: /instalar modelo de ativação/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/não foi possível instalar/i)
   })
 })
 

@@ -105,3 +105,9 @@ e dois workers encerrados inesperadamente; a execução completa **não passou**
 O Docker local não estava disponível, e `npx supabase status` tentou obter o
 pacote na rede restrita. A PR precisa de CI limpo no SHA final; esses resultados
 locais não substituem o gate.
+
+A revisão do fluxo de primeira instalação achou uma lacuna: o catálogo oferecia o
+modelo por IPC, mas Settings não dava acesso ao download. A seção ganhou o
+botão de instalação; depois do hash válido, o serviço reavalia a disponibilidade
+e liga a escuta quando o padrão é ativo, preservando um kill switch salvo.
+Dois testes de regressão cobrem o download e a precedência do kill switch.

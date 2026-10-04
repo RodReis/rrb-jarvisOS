@@ -766,6 +766,12 @@ export const RECURSOS = {
           fraseDescricao: 'Dizer a palavra de ativação abre a conversa.',
           palmas: 'Duas palmas',
           palmasDescricao: 'Duas palmas seguidas abrem a conversa.',
+          modeloAusente: 'Instale o modelo local para ativar a escuta contínua.',
+          instalarModelo: 'Instalar modelo de ativação',
+          instalando: 'Instalando modelo…',
+          instalacaoFalhou:
+            'Não foi possível instalar o modelo. Confira a conexão e tente novamente.',
+          prepararVoz: 'Modelo instalado. Prepare o runtime em Voz para ligar a escuta.',
           ultimoGatilho:
             'Pelo menos um gatilho precisa ficar ligado. Para parar de ouvir, use o interruptor Escuta na barra superior.',
           limiar: 'Limiar de disparo',
@@ -1595,6 +1601,11 @@ export const RECURSOS = {
           fraseDescricao: 'Saying the wake phrase opens the conversation.',
           palmas: 'Two claps',
           palmasDescricao: 'Two claps in a row open the conversation.',
+          modeloAusente: 'Install the local model to enable continuous listening.',
+          instalarModelo: 'Install activation model',
+          instalando: 'Installing model…',
+          instalacaoFalhou: 'Could not install the model. Check your connection and try again.',
+          prepararVoz: 'Model installed. Prepare the runtime in Voice to turn on listening.',
           ultimoGatilho:
             'At least one trigger must stay on. To stop listening, use the Listening switch in the top bar.',
           limiar: 'Trigger threshold',

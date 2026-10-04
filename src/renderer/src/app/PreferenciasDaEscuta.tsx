@@ -48,6 +48,8 @@ export function PreferenciasDaEscuta(): React.JSX.Element | null {
   const [estado, setEstado] = useState<EstadoDaEscuta | undefined>(undefined)
   const [testando, setTestando] = useState(false)
   const [disparos, setDisparos] = useState<readonly DisparoDeTesteDaEscuta[]>([])
+  const [instalando, setInstalando] = useState(false)
+  const [erroInstalacao, setErroInstalacao] = useState<string | undefined>()
   const testandoAgora = useRef(false)
 
   useEffect(() => {
@@ -93,6 +95,25 @@ export function PreferenciasDaEscuta(): React.JSX.Element | null {
     await window.jarvis.definirModoDeTesteDaEscuta(proximo)
   }
 
+  async function instalarModelo(): Promise<void> {
+    setInstalando(true)
+    setErroInstalacao(undefined)
+    try {
+      const resultado = await window.jarvis.baixarArtefatoDeVoz('modelo-wake/ei_amigo.onnx')
+      if (resultado.estado !== 'ok') {
+        setErroInstalacao(t('settings.escuta.instalacaoFalhou'))
+        return
+      }
+      const atualizado = await window.jarvis.estadoDaEscuta()
+      setEstado(atualizado)
+      if (!atualizado.disponivel) setErroInstalacao(t('settings.escuta.prepararVoz'))
+    } catch {
+      setErroInstalacao(t('settings.escuta.instalacaoFalhou'))
+    } finally {
+      setInstalando(false)
+    }
+  }
+
   // O último gatilho ligado fica fixo: ver o comentário do componente.
   const soUmLigado = estado.frase !== estado.palmas
 
@@ -104,6 +125,24 @@ export function PreferenciasDaEscuta(): React.JSX.Element | null {
         </h3>
         <p className="mt-1 text-xs opacity-70">{t('settings.escuta.descricao')}</p>
       </div>
+
+      {!estado.disponivel && (
+        <div className="flex flex-col items-start gap-2">
+          <p className="text-xs opacity-70">{t('settings.escuta.modeloAusente')}</p>
+          <Button
+            variante="secundaria"
+            desabilitado={instalando}
+            onClick={() => void instalarModelo()}
+          >
+            {instalando ? t('settings.escuta.instalando') : t('settings.escuta.instalarModelo')}
+          </Button>
+          {erroInstalacao && (
+            <p role="alert" className="text-xs text-[var(--jos-cor-err-leitura)]">
+              {erroInstalacao}
+            </p>
+          )}
+        </div>
+      )}
 
       <GatilhoLigavel
         rotulo={t('settings.escuta.frase', { frase: WAKE_WORD_OFICIAL })}
