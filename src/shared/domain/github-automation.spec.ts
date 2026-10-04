@@ -14,10 +14,12 @@ import {
   GITHUB_API_ORIGIN,
   GITHUB_CAPABILITIES,
   GITHUB_OPERATIONS,
+  MENSAGEM_DE_CONFLITO_NA_ATUALIZACAO,
   checkSatisfazGate,
   checksAprovam,
   corpoComChaveExterna,
   corpoTemChaveExterna,
+  erroDeConflitoNaAtualizacao,
   erroDeHeadDivergente,
   marcadorDeChaveExterna,
   origemDaApi,
@@ -61,7 +63,8 @@ describe('capacidades declaradas', () => {
       'pr.squash-merge',
       'repo.set-default-branch',
       'branch.ensure-protection',
-      'label.ensure'
+      'label.ensure',
+      'pr.update-branch'
     ])
     // `commit.sha-for-ref` fica de fora de propósito: ler o commit da origem não muda nada, e
     // marcá-lo como mutação obrigaria a publicação a inventar chave de idempotência para conferir
@@ -75,6 +78,13 @@ describe('capacidades declaradas', () => {
     const cap = GITHUB_CAPABILITIES.find((c) => c.operation === GITHUB_OPERATIONS.getRequiredChecks)
     expect(cap).toBeDefined()
     expect(cap?.effect).toBe('leitura')
+  })
+
+  it('ler as regras da branch é leitura, e atualizar o branch é mutação', () => {
+    const efeito = (operation: string) =>
+      GITHUB_CAPABILITIES.find((c) => c.operation === operation)?.effect
+    expect(efeito(GITHUB_OPERATIONS.getRulesForBranch)).toBe('leitura')
+    expect(efeito(GITHUB_OPERATIONS.updateBranch)).toBe('mutacao')
   })
 
   it('toda capacidade é do conector github e tem descrição', () => {
@@ -376,6 +386,53 @@ describe('validarEntrada', () => {
     })
   })
 
+  describe('pr.update-branch', () => {
+    it('aceita com expectedHeadSha', () => {
+      expect(
+        validarEntrada(GITHUB_OPERATIONS.updateBranch, {
+          ...REPO,
+          pullRequest: 146,
+          expectedHeadSha: SHA
+        })
+      ).toBeUndefined()
+    })
+
+    it('RECUSA sem expectedHeadSha ou com nome de branch no lugar dele', () => {
+      expect(validarEntrada(GITHUB_OPERATIONS.updateBranch, { ...REPO, pullRequest: 146 })).toMatch(
+        /expectedHeadSha/
+      )
+      expect(
+        validarEntrada(GITHUB_OPERATIONS.updateBranch, {
+          ...REPO,
+          pullRequest: 146,
+          expectedHeadSha: 'main'
+        })
+      ).toMatch(/expectedHeadSha/)
+    })
+
+    it('recusa número de PR ausente ou zero', () => {
+      expect(
+        validarEntrada(GITHUB_OPERATIONS.updateBranch, { ...REPO, expectedHeadSha: SHA })
+      ).toMatch(/pullRequest/)
+      expect(
+        validarEntrada(GITHUB_OPERATIONS.updateBranch, {
+          ...REPO,
+          pullRequest: 0,
+          expectedHeadSha: SHA
+        })
+      ).toMatch(/pullRequest/)
+    })
+  })
+
+  describe('rulesets.for-branch', () => {
+    it('exige a branch cujas regras serão lidas', () => {
+      expect(validarEntrada(GITHUB_OPERATIONS.getRulesForBranch, { ...REPO })).toMatch(/branch/)
+      expect(
+        validarEntrada(GITHUB_OPERATIONS.getRulesForBranch, { ...REPO, branch: 'main' })
+      ).toBeUndefined()
+    })
+  })
+
   describe('leituras por commit', () => {
     it.each([GITHUB_OPERATIONS.getChecksForHead, GITHUB_OPERATIONS.getWorkflowRunsForHead])(
       '%s exige SHA',
@@ -396,6 +453,25 @@ describe('validarEntrada', () => {
         validarEntrada(GITHUB_OPERATIONS.getRequiredChecks, { ...REPO, branch: 'main' })
       ).toBeUndefined()
     })
+  })
+})
+
+describe('erroDeConflitoNaAtualizacao', () => {
+  it('é reconhecível pelo prefixo estável e não é retentável', () => {
+    const erro = erroDeConflitoNaAtualizacao(
+      '2026-08-29T12:00:00.000Z',
+      GITHUB_OPERATIONS.updateBranch
+    )
+
+    expect(erro.code).toBe('validacao-invalida')
+    expect(erro.retryable).toBe(false)
+    expect(erro.acao).toBe('corrigir-entrada')
+    expect(erro.mensagem.startsWith(MENSAGEM_DE_CONFLITO_NA_ATUALIZACAO)).toBe(true)
+  })
+
+  it('não se confunde com o erro de head divergente', () => {
+    const divergente = erroDeHeadDivergente(SHA, '2026-08-29T12:00:00.000Z', 'x')
+    expect(divergente.mensagem.startsWith(MENSAGEM_DE_CONFLITO_NA_ATUALIZACAO)).toBe(false)
   })
 })
 

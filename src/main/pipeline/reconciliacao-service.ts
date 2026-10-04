@@ -87,6 +87,14 @@ export interface ReconciliadorDeIsolamento {
   readonly reconciliar: () => Promise<readonly AchadoDaReconciliacao[]>
 }
 
+/**
+ * O merge serializado visto pela reconciliação (SPEC-Scheduler-04): resolve, consultando o GitHub,
+ * as tentativas de merge que um crash deixou, e solta os MergeLeases sem tentativa em aberto.
+ */
+export interface ReconciliadorDeMerge {
+  readonly reconciliar: () => Promise<readonly AchadoDaReconciliacao[]>
+}
+
 export interface ReconciliacaoDeps {
   readonly runs: PipelineRepository
   readonly leases: LeaseRepository
@@ -104,6 +112,8 @@ export interface ReconciliacaoDeps {
   readonly aoLiberarSlot?: (lease: Lease) => void
   /** O isolamento por run. Opcional: sem ele a reconciliação só enxerga leases. */
   readonly isolamento?: ReconciliadorDeIsolamento
+  /** O merge serializado. Opcional: sem ele a reconciliação não enxerga tentativas de merge. */
+  readonly merge?: ReconciliadorDeMerge
   readonly agora?: () => number
 }
 
@@ -141,6 +151,10 @@ export class ReconciliacaoService {
     // caiu com ele, e o que sobra para `reconciliarLease` é só o que o inventário não conhece.
     achados.push(...(await this.reconciliarIsolamento()))
 
+    // O merge antes dos leases: o MergeLease de uma tentativa que a origem mostrou resolvida já
+    // caiu com ela, e o que sobra para `reconciliarLease` é só o que o merge não conhece.
+    achados.push(...(await this.reconciliarMerge()))
+
     for (const lease of this.deps.leases.listar(userId)) {
       achados.push(await this.reconciliarLease(lease))
     }
@@ -176,6 +190,26 @@ export class ReconciliacaoService {
           recurso: 'isolamento',
           decisao: 'bloqueado',
           motivo: `A reconciliação do isolamento falhou (${motivo}). Os recursos dos runs não foram verificados.`
+        }
+      ]
+    }
+  }
+
+  /**
+   * O merge que **não pôde** reconciliar é um achado bloqueado, nunca uma lista vazia: falha de
+   * detecção não é ausência de tentativa. O boot segue, e o achado fica para o PI ver.
+   */
+  private async reconciliarMerge(): Promise<readonly AchadoDaReconciliacao[]> {
+    if (this.deps.merge === undefined) return []
+    try {
+      return await this.deps.merge.reconciliar()
+    } catch (erro) {
+      const motivo = erro instanceof Error ? erro.message : 'erro desconhecido'
+      return [
+        {
+          recurso: 'merge',
+          decisao: 'bloqueado',
+          motivo: `A reconciliação do merge falhou (${motivo}). As tentativas de merge não foram verificadas.`
         }
       ]
     }

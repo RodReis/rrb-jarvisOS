@@ -32,11 +32,17 @@ vi.mock('../logging/logger', () => ({
 }))
 
 const { CAMINHO_DO_WORKFLOW, NOME_DO_JOB_DE_CI } = await import('@shared/domain/ci-workflow')
-const { GITHUB_OPERATIONS } = await import('@shared/domain/github-automation')
+const { GITHUB_OPERATIONS, MENSAGEM_DE_CONFLITO_NA_ATUALIZACAO } =
+  await import('@shared/domain/github-automation')
 const { perfilNodeEmWindows, perfilPythonEmWindows } =
   await import('@shared/domain/ci-profile-perfis')
-const { EntregaService } = await import('./entrega-service')
+const { EntregaService, MAXIMO_DE_REVALIDACOES } = await import('./entrega-service')
 const { RulesetRepository } = await import('./ruleset-repository')
+const { MergeService } = await import('./merge-service')
+const { MergeRepository } = await import('./merge-repository')
+const { LeaseRepository } = await import('./lease-repository')
+const { PoolRepository } = await import('./pool-repository')
+const { AuditRepository } = await import('../storage/audit-repository')
 const { ExecutionLedgerRepository } = await import('./execution-ledger-repository')
 const { BudgetRepository } = await import('../budget/budget-repository')
 const { ledgerCompleto } = await import('@shared/domain/execution-ledger')
@@ -52,6 +58,8 @@ const REPO = 'projeto-alvo'
 const PR = 7
 const SHA_HEAD = 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0'
 const SHA_MERGE = 'f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3f2e1'
+/** O head do PR depois de a base ser atualizada nele (SPEC-Scheduler-04). */
+const SHA_HEAD_ATUALIZADO = '9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b'
 /**
  * O commit da branch-base, **distinto** do head da fatia.
  *
@@ -91,6 +99,10 @@ interface EstadoDaOrigem {
   merged: boolean
   /** O merge respondeu 200 mas a origem não confirma? É o cenário do critério 7. */
   mergeSemConfirmacao: boolean
+  /** O CI do head novo (depois de atualizar a branch) fecha verde? */
+  ciDoHeadNovoVerde: boolean
+  /** A atualização da branch esbarra em conflito com a base? (SPEC-Scheduler-04, regra 4) */
+  conflitoNaAtualizacao: boolean
 }
 
 let chamadas: { operation: string; input: Record<string, unknown> }[]
@@ -190,6 +202,34 @@ function connectorFalso(): { call: (r: ConnectorRequest) => Promise<ConnectorOut
           if (!origem.mergeSemConfirmacao) origem.merged = true
           return ok({ mergeSha: SHA_MERGE, merged: !origem.mergeSemConfirmacao })
 
+        // A base entra na branch da fatia: o head **muda**, e o CI do commit novo é outro CI. O
+        // dublê o deixa verde, como o CI real ficaria, para o fluxo poder terminar.
+        case GITHUB_OPERATIONS.updateBranch: {
+          if (origem.conflitoNaAtualizacao) {
+            return {
+              ok: false,
+              code: 'validacao-invalida',
+              mensagem: `${MENSAGEM_DE_CONFLITO_NA_ATUALIZACAO} detalhe`,
+              retryable: false,
+              acao: 'corrigir-entrada',
+              provenance: { connector: 'github', operation: request.operation, obtidoEm: 'agora' }
+            } as ConnectorOutcome
+          }
+          origem.headSha = SHA_HEAD_ATUALIZADO
+          if (origem.ciDoHeadNovoVerde) {
+            origem.checks.push({
+              nome: NOME_DO_JOB_DE_CI,
+              headSha: SHA_HEAD_ATUALIZADO,
+              status: 'completed',
+              conclusao: 'success'
+            })
+          }
+          return ok({ aceito: true })
+        }
+
+        case GITHUB_OPERATIONS.getRulesForBranch:
+          return ok({ contextsExigidos: [], mergeQueue: false, exigePullRequest: false, tipos: [] })
+
         case GITHUB_OPERATIONS.getMergeState:
           return ok({
             numero: PR,
@@ -227,7 +267,14 @@ function limpezaFalsa(): never {
   } as never
 }
 
-function montar(): EntregaServiceType {
+function montar(
+  opcoes: {
+    revisar?: (
+      pedido: unknown,
+      delta?: { headAnterior: string; headNovo: string }
+    ) => Promise<unknown[]>
+  } = {}
+): EntregaServiceType {
   const gitFalso = {
     run: vi.fn(() => ({ ok: true })),
     push: vi.fn((_origem: string, branch: string) => {
@@ -243,8 +290,9 @@ function montar(): EntregaServiceType {
   return new EntregaService({
     construtor: { construir: vi.fn(async () => construcao) } as never,
     connectors: connectorFalso() as never,
+    merge: mergeDoTeste(),
     git: gitFalso as never,
-    fila: { concluir: concluirDaFila } as never,
+    fila: { concluir: concluirDaFila, transicionar: transicionarDaFila } as never,
     mergePolicy: { autonomoLigado: vi.fn(() => autonomo) } as never,
     ruleset,
     ledger: ledgerRepo,
@@ -252,7 +300,7 @@ function montar(): EntregaServiceType {
     budget: budgetRepo,
     audit: { append: vi.fn() } as never,
     userId: () => USER,
-    revisar: async () => achados,
+    revisar: (opcoes.revisar ?? (async () => achados)) as never,
     token: async () => undefined,
     // Sem espera real, mas o relógio **anda**: `dormir` avança o tempo simulado pelo mesmo
     // intervalo que o serviço pediu. Um `dormir` que não avança deixaria o teto inalcançável e o
@@ -268,8 +316,28 @@ function montar(): EntregaServiceType {
 let relogio: number
 /** A fila dublada: o que a entrega diz a ela é o que decide o terminal do run (#393). */
 let concluirDaFila: ReturnType<typeof vi.fn>
+/** As transições que a entrega pede à fila fora o terminal (bloquear o run, por exemplo). */
+let transicionarDaFila: ReturnType<typeof vi.fn>
 /** `mergeConfirmado` da última conclusão pedida à fila. */
 const confirmouMerge = (): unknown => concluirDaFila.mock.calls.at(-1)?.[4]
+
+/**
+ * O `MergeService` **de verdade**, sobre o mesmo GitHub falso. A entrega agora só mergeia através
+ * dele, e um dublê do serviço concordaria com qualquer sequência — inclusive a que o lease existe
+ * para impedir. O banco é o real: o run `run-1` nasce em `PR_CI`, que é o que a tentativa confere.
+ */
+function mergeDoTeste(): InstanceType<typeof MergeService> {
+  const pool = new PoolRepository(db)
+  return new MergeService({
+    connectors: connectorFalso() as never,
+    leases: new LeaseRepository(db),
+    merges: new MergeRepository(db),
+    audit: new AuditRepository(db, 'chave-de-teste'),
+    userId: () => USER,
+    proximoToken: () => pool.proximoToken(USER),
+    agora: () => relogio
+  })
+}
 
 function sandboxDe(): SandboxPreparado {
   return {
@@ -306,12 +374,17 @@ beforeEach(() => {
   execFileSync('git', ['init', '-q'], { cwd: worktree })
 
   db = openDatabase(join(dir, 'jarvis.db'))
+  db.prepare(
+    `INSERT INTO pipeline_run (id, user_id, workspace_id, project_id, slice_id, estado, created_at, updated_at)
+     VALUES ('run-1', ?, ?, 'p-1', 's-1', 'PR_CI', 'agora', 'agora')`
+  ).run(USER, WS)
   ruleset = new RulesetRepository(db)
   ledgerRepo = new ExecutionLedgerRepository(db)
   budgetRepo = new BudgetRepository(db)
   limpezas = []
 
   concluirDaFila = vi.fn(() => ({ reason: 'transicionado' }))
+  transicionarDaFila = vi.fn(() => ({ reason: 'transicionado' }))
   chamadas = []
   chamadaExtra = undefined
   pushes = []
@@ -330,7 +403,9 @@ beforeEach(() => {
     baseSha: SHA_BASE,
     prsPorHead: new Map<string, number>(),
     merged: false,
-    mergeSemConfirmacao: false
+    mergeSemConfirmacao: false,
+    ciDoHeadNovoVerde: true,
+    conflitoNaAtualizacao: false
   }
 })
 
@@ -568,6 +643,7 @@ describe('EntregaService — docs do projeto-alvo no mesmo PR (critério 13)', (
     const service = new EntregaService({
       construtor: { construir: vi.fn(async () => construcao) } as never,
       connectors: connectorFalso() as never,
+      merge: mergeDoTeste(),
       git: {
         run: vi.fn((args: string[]) => {
           comandosGit.push(args)
@@ -580,7 +656,10 @@ describe('EntregaService — docs do projeto-alvo no mesmo PR (critério 13)', (
         }),
         pushComToken: vi.fn(() => ({ ok: true }))
       } as never,
-      fila: { concluir: vi.fn(() => ({ reason: 'transicionado' })) } as never,
+      fila: {
+        concluir: vi.fn(() => ({ reason: 'transicionado' })),
+        transicionar: transicionarDaFila
+      } as never,
       mergePolicy: { autonomoLigado: vi.fn(() => true) } as never,
       ruleset,
       ledger: ledgerRepo,
@@ -612,6 +691,7 @@ describe('EntregaService — docs do projeto-alvo no mesmo PR (critério 13)', (
     const service = new EntregaService({
       construtor: { construir: vi.fn(async () => construcao) } as never,
       connectors: connectorFalso() as never,
+      merge: mergeDoTeste(),
       git: {
         run: vi.fn((args: string[]) => {
           comandosGit.push(args)
@@ -623,7 +703,10 @@ describe('EntregaService — docs do projeto-alvo no mesmo PR (critério 13)', (
         }),
         pushComToken: vi.fn(() => ({ ok: true }))
       } as never,
-      fila: { concluir: vi.fn(() => ({ reason: 'transicionado' })) } as never,
+      fila: {
+        concluir: vi.fn(() => ({ reason: 'transicionado' })),
+        transicionar: transicionarDaFila
+      } as never,
       mergePolicy: { autonomoLigado: vi.fn(() => true) } as never,
       ruleset,
       ledger: ledgerRepo,
@@ -686,12 +769,16 @@ describe('EntregaService — correlação do run (pendência da M9-F04)', () => 
         })
       } as never,
       connectors: connectorFalso() as never,
+      merge: mergeDoTeste(),
       git: {
         run: vi.fn(() => ({ ok: true })),
         push: vi.fn(() => ({ ok: true })),
         pushComToken: vi.fn(() => ({ ok: true }))
       } as never,
-      fila: { concluir: vi.fn(() => ({ reason: 'transicionado' })) } as never,
+      fila: {
+        concluir: vi.fn(() => ({ reason: 'transicionado' })),
+        transicionar: transicionarDaFila
+      } as never,
       mergePolicy: { autonomoLigado: vi.fn(() => true) } as never,
       ruleset,
       ledger: ledgerRepo,
@@ -724,12 +811,16 @@ describe('EntregaService — correlação do run (pendência da M9-F04)', () => 
         })
       } as never,
       connectors: connectorFalso() as never,
+      merge: mergeDoTeste(),
       git: {
         run: vi.fn(() => ({ ok: true })),
         push: vi.fn(() => ({ ok: true })),
         pushComToken: vi.fn(() => ({ ok: true }))
       } as never,
-      fila: { concluir: vi.fn(() => ({ reason: 'transicionado' })) } as never,
+      fila: {
+        concluir: vi.fn(() => ({ reason: 'transicionado' })),
+        transicionar: transicionarDaFila
+      } as never,
       mergePolicy: { autonomoLigado: vi.fn(() => true) } as never,
       ruleset,
       ledger: ledgerRepo,
@@ -768,12 +859,16 @@ describe('EntregaService — correlação do run (pendência da M9-F04)', () => 
     const service = new EntregaService({
       construtor: { construir: vi.fn(async () => construcao) } as never,
       connectors: connectorFalso() as never,
+      merge: mergeDoTeste(),
       git: {
         run: vi.fn(() => ({ ok: true })),
         push: vi.fn(() => ({ ok: true })),
         pushComToken: vi.fn(() => ({ ok: true }))
       } as never,
-      fila: { concluir: vi.fn(() => ({ reason: 'transicionado' })) } as never,
+      fila: {
+        concluir: vi.fn(() => ({ reason: 'transicionado' })),
+        transicionar: transicionarDaFila
+      } as never,
       mergePolicy: { autonomoLigado: vi.fn(() => true) } as never,
       ruleset,
       ledger: ledgerRepo,
@@ -866,8 +961,9 @@ describe('encerramento do run (SPEC-Entrega-06)', () => {
         })
       } as never,
       connectors: connectorFalso() as never,
+      merge: mergeDoTeste(),
       git: { run: vi.fn(() => ({ ok: true })), push: vi.fn(() => ({ ok: true })) } as never,
-      fila: { concluir: vi.fn() } as never,
+      fila: { concluir: vi.fn(), transicionar: transicionarDaFila } as never,
       mergePolicy: { autonomoLigado: vi.fn(() => true) } as never,
       ruleset,
       ledger: ledgerRepo,
@@ -1014,12 +1110,12 @@ describe('EntregaService — workflow a partir do perfil (SPEC-Pipeline-01, crit
 })
 
 describe('EntregaService — a base avançou entre a avaliação e o merge (critério 12)', () => {
-  it('base que avança depois da avaliação bloqueia em vez de mergear', async () => {
+  it('base que avança depois da avaliação atualiza a branch e revalida: nunca mergeia com a base velha', async () => {
     // O head do PR **não se move** quando alguém mergeia outro PR na base: o CI continua verde
     // descrevendo o código contra uma base que já não existe. Sem `strict` na proteção, ninguém
-    // recusa, e esta reconferência é a única que existe.
+    // recusa, e a reconferência sob o lease é a única que existe. A SPEC-Scheduler-04 troca o
+    // bloqueio por atualização + revalidação: a fatia remanescente segue, contra a base nova.
     let leiturasDaBase = 0
-    const original = origem.baseSha
     chamadaExtra = (operation, input) => {
       if (operation === GITHUB_OPERATIONS.getCommitSha && input.ref === 'main') {
         leiturasDaBase += 1
@@ -1030,13 +1126,104 @@ describe('EntregaService — a base avançou entre a avaliação e o merge (crit
 
     const r = await montar().entregar(pedido())
 
-    expect(r.estadoFinal).toBe('BLOCKED')
-    expect(r.bloqueio?.causa).toBe('base-avancou')
-    expect(r.bloqueio?.mensagem).toContain(original.slice(0, 12))
-    // A fila não pode registrar `MERGED` para um PR que não foi mergeado (#393).
-    expect(confirmouMerge()).not.toBe(true)
-    // O ponto: nada foi mergeado.
+    // A branch foi atualizada, e SÓ DEPOIS veio o merge — com o head novo, nunca o antigo.
+    const operacoes = chamadas.map((c) => c.operation)
+    expect(chamadasDe(GITHUB_OPERATIONS.updateBranch)).toHaveLength(1)
+    expect(chamadasDe(GITHUB_OPERATIONS.squashMerge)).toHaveLength(1)
+    expect(operacoes.indexOf(GITHUB_OPERATIONS.updateBranch)).toBeLessThan(
+      operacoes.indexOf(GITHUB_OPERATIONS.squashMerge)
+    )
+    expect(chamadasDe(GITHUB_OPERATIONS.squashMerge)[0]?.input.expectedHeadSha).toBe(
+      SHA_HEAD_ATUALIZADO
+    )
+    expect(r.estadoFinal).toBe('MERGED')
+    expect(r.headSha).toBe(SHA_HEAD_ATUALIZADO)
+  })
+
+  it('os checks do head anterior não valem para o head novo: o merge espera o CI do commit novo', async () => {
+    let leiturasDaBase = 0
+    chamadaExtra = (operation, input) => {
+      if (operation === GITHUB_OPERATIONS.getCommitSha && input.ref === 'main') {
+        leiturasDaBase += 1
+        if (leiturasDaBase >= 2) origem.baseSha = SHA_MERGE
+      }
+    }
+    // O CI do commit novo **não** fecha verde. Os checks do SHA anterior continuam verdes na origem
+    // — e é exatamente o que não pode bastar.
+    origem.ciDoHeadNovoVerde = false
+
+    const r = await montar().entregar(pedido())
+
     expect(chamadasDe(GITHUB_OPERATIONS.squashMerge)).toHaveLength(0)
+    // O gate exige o check obrigatório **no head verificado**: sem ele, o run bloqueia por causa
+    // externa em vez de herdar o verde do commit anterior.
+    expect(r.estadoFinal).toBe('BLOCKED')
+    expect(r.bloqueio?.mensagem).toContain('Checks obrigatórios sem sucesso no head verificado')
+  })
+
+  it('a revisão do delta roda de novo quando o head muda, e P1 novo impede o merge', async () => {
+    let leiturasDaBase = 0
+    chamadaExtra = (operation, input) => {
+      if (operation === GITHUB_OPERATIONS.getCommitSha && input.ref === 'main') {
+        leiturasDaBase += 1
+        if (leiturasDaBase >= 2) origem.baseSha = SHA_MERGE
+      }
+    }
+    const revisar = vi.fn(
+      async (_p: unknown, delta?: { headAnterior: string; headNovo: string }) =>
+        delta === undefined ? [] : [{ severidade: 'P1' as const, titulo: 'regressão no delta' }]
+    )
+
+    const r = await montar({ revisar }).entregar(pedido())
+
+    // A segunda chamada recebeu o delta: o que mudou entre os dois heads.
+    expect(revisar).toHaveBeenLastCalledWith(expect.anything(), {
+      headAnterior: SHA_HEAD,
+      headNovo: SHA_HEAD_ATUALIZADO
+    })
+    // O P1 achado no delta barra o merge, mesmo com o CI do commit novo verde.
+    expect(chamadasDe(GITHUB_OPERATIONS.squashMerge)).toHaveLength(0)
+    expect(r.estadoFinal).not.toBe('MERGED')
+  })
+
+  it('conflito ao atualizar a base bloqueia o run em estado seguro, sem mergear', async () => {
+    let leiturasDaBase = 0
+    chamadaExtra = (operation, input) => {
+      if (operation === GITHUB_OPERATIONS.getCommitSha && input.ref === 'main') {
+        leiturasDaBase += 1
+        if (leiturasDaBase >= 2) origem.baseSha = SHA_MERGE
+      }
+    }
+    origem.conflitoNaAtualizacao = true
+
+    const r = await montar().entregar(pedido())
+
+    expect(r.estadoFinal).toBe('BLOCKED')
+    expect(r.bloqueio?.causa).toBe('conflito-na-atualizacao')
+    expect(chamadasDe(GITHUB_OPERATIONS.squashMerge)).toHaveLength(0)
+    // O run foi devolvido a BLOCKED com a ação de retomada, pela fila (única que escreve estado).
+    const bloqueio = transicionarDaFila.mock.calls.find((c) => c[3] === 'BLOCKED')?.[4]
+    expect(bloqueio).toMatchObject({ causa: 'conflito-na-atualizacao' })
+    expect(bloqueio?.retomada).toContain('conflito')
+  })
+
+  it('base que não para de avançar estoura o teto de revalidações e bloqueia', async () => {
+    // Cada atualização da branch coincide com outro merge na base: a base nunca estabiliza.
+    let n = 0
+    chamadaExtra = (operation, input) => {
+      if (operation === GITHUB_OPERATIONS.getCommitSha && input.ref === 'main') {
+        n += 1
+        if (n % 2 === 0) origem.baseSha = `base-${n}`.padEnd(40, '0')
+      }
+    }
+
+    const r = await montar().entregar(pedido())
+
+    expect(r.estadoFinal).toBe('BLOCKED')
+    expect(r.bloqueio?.causa).toBe('base-instavel')
+    expect(chamadasDe(GITHUB_OPERATIONS.updateBranch).length).toBeLessThanOrEqual(
+      MAXIMO_DE_REVALIDACOES + 1
+    )
   })
 
   it('base estável mergeia normalmente', async () => {

@@ -80,7 +80,9 @@ export const GITHUB_OPERATIONS = {
   ensureBranchProtection: 'branch.ensure-protection',
   getCommitSha: 'commit.sha-for-ref',
   ensureLabel: 'label.ensure',
-  getRequiredChecks: 'checks.required-for-branch'
+  getRequiredChecks: 'checks.required-for-branch',
+  updateBranch: 'pr.update-branch',
+  getRulesForBranch: 'rulesets.for-branch'
 } as const
 
 export type GithubOperation = (typeof GITHUB_OPERATIONS)[keyof typeof GITHUB_OPERATIONS]
@@ -182,6 +184,19 @@ export const GITHUB_CAPABILITIES: readonly ConnectorCapability[] = [
     operation: GITHUB_OPERATIONS.getRequiredChecks,
     effect: 'leitura',
     descricao: 'Lê da origem quais checks a proteção da branch exige antes de permitir o merge.'
+  },
+  {
+    connector: 'github',
+    operation: GITHUB_OPERATIONS.updateBranch,
+    effect: 'mutacao',
+    descricao:
+      'Atualiza o branch do pull request com a base, pelo GitHub, exigindo que o head seja o esperado.'
+  },
+  {
+    connector: 'github',
+    operation: GITHUB_OPERATIONS.getRulesForBranch,
+    effect: 'leitura',
+    descricao: 'Lê da origem as regras ativas que valem para a branch, inclusive as de rulesets.'
   }
 ]
 
@@ -241,6 +256,72 @@ export interface SquashMergeInput extends RepoAlvo {
    * cuidado do `expectedHeadSha` que a M9-F05 já previa.
    */
   readonly expectedHeadSha: string
+}
+
+/**
+ * Entrada de `pr.update-branch`.
+ *
+ * Mesmo contrato do merge, e pelo mesmo motivo: sem `expectedHeadSha` o GitHub atualiza o que estiver
+ * no head, e um push que chegou depois da verificação receberia a base sem que ninguém o tivesse
+ * visto. O GitHub aceita omitir o campo; este contrato não.
+ */
+export interface UpdateBranchInput extends RepoAlvo {
+  readonly pullRequest: number
+  readonly expectedHeadSha: string
+}
+
+/** Entrada de `rulesets.for-branch`: a branch cujas regras efetivas se quer ler. */
+export interface RulesForBranchInput extends RepoAlvo {
+  readonly branch: string
+}
+
+/**
+ * As regras ativas de uma branch, normalizadas e **determinísticas** (listas ordenadas, sem
+ * duplicata) — o chamador compara o resultado entre leituras sem se preocupar com a ordem em que o
+ * GitHub devolveu.
+ *
+ * Ausência de regra é `tipos: []`, e não erro: uma branch sem regra é o estado normal de repositório
+ * novo, e quem decide o que fazer com ela é o gate.
+ */
+export interface RulesForBranchNormalizado {
+  /** Os *contexts* das regras `required_status_checks`, de todos os rulesets que valem. */
+  readonly contextsExigidos: readonly string[]
+  /** Alguma regra `merge_queue` vale para a branch? */
+  readonly mergeQueue: boolean
+  /** Alguma regra `pull_request` vale para a branch (merge só por PR)? */
+  readonly exigePullRequest: boolean
+  /** Todos os tipos de regra distintos que valem para a branch. */
+  readonly tipos: readonly string[]
+}
+
+/**
+ * O prefixo estável da mensagem de "a base conflita com o branch do PR".
+ *
+ * Existe porque o vocabulário de erros da F01 é enum fechado e não tem código de conflito; acrescentar
+ * um tocaria todo consumidor por causa de uma operação. O chamador reconhece o caso por
+ * `mensagem.startsWith(MENSAGEM_DE_CONFLITO_NA_ATUALIZACAO)` — e a constante, em vez de uma string
+ * solta de cada lado, é o que impede os dois lados de divergirem.
+ */
+export const MENSAGEM_DE_CONFLITO_NA_ATUALIZACAO =
+  'Conflito ao atualizar o branch do pull request com a base.'
+
+/**
+ * O erro de "atualizar o branch da base gerou conflito" (422 do `update-branch`).
+ *
+ * `validacao-invalida` + `corrigir-entrada` e não retentável: repetir produz o mesmo conflito. Quem
+ * resolve é quem escreveu o código do branch, não a automação.
+ */
+export function erroDeConflitoNaAtualizacao(obtidoEm: string, operation: string): ConnectorError {
+  return {
+    ok: false,
+    code: 'validacao-invalida',
+    mensagem:
+      `${MENSAGEM_DE_CONFLITO_NA_ATUALIZACAO} ` +
+      'A base e o branch alteram as mesmas linhas: resolva o conflito antes de tentar de novo.',
+    retryable: false,
+    acao: 'corrigir-entrada',
+    provenance: { connector: 'github', operation, obtidoEm }
+  }
 }
 
 /**
@@ -614,6 +695,17 @@ export function validarEntrada(operation: string, input: unknown): string | unde
       return ehSha('expectedHeadSha', v)
         ? undefined
         : 'Informe `expectedHeadSha` — merge sem SHA esperado mergeia o que estiver no head.'
+
+    case GITHUB_OPERATIONS.updateBranch:
+      if (!inteiroPositivo('pullRequest')) return 'Informe `pullRequest` como número.'
+      // Mesma exigência do merge: sem o SHA esperado, a atualização acontece sobre o que estiver
+      // no head, inclusive um push que ninguém verificou.
+      return ehSha('expectedHeadSha', v)
+        ? undefined
+        : 'Informe `expectedHeadSha` — atualizar sem SHA esperado age sobre o que estiver no head.'
+
+    case GITHUB_OPERATIONS.getRulesForBranch:
+      return texto('branch') ? undefined : 'Informe `branch`.'
 
     case GITHUB_OPERATIONS.getMergeState:
       return inteiroPositivo('pullRequest') ? undefined : 'Informe `pullRequest` como número.'

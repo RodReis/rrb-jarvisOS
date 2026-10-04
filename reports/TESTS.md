@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 2746 | 2746 | 0 | 82.8 | — | — |
-| — | — | — | Banco | 2044 | 2026 | 0 | 84.3 | — | — |
-| — | — | — | Tela | 776 | 775 | 0 | 77.6 | — | — |
+| — | — | — | Regras de Negócio | 2776 | 2776 | 0 | 82.5 | — | — |
+| — | — | — | Banco | 2141 | 2123 | 0 | 84.6 | — | — |
+| — | — | — | Tela | 776 | 775 | 0 | 77.5 | — | — |
 
 ## Histórico por entrega
 
@@ -436,3 +436,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-10-04 | #393 | spec-entrega-05-revisao-ci-merge | Regras de Negócio | 2746 | 2746 | 0 | 82.8 | 394 | [394](https://github.com/RodReis/rrb-jarvisOS/pull/394) |
 | 2026-10-04 | #393 | spec-entrega-05-revisao-ci-merge | Banco | 2044 | 2026 | 0 | 84.3 | 394 | [394](https://github.com/RodReis/rrb-jarvisOS/pull/394) |
 | 2026-10-04 | #393 | spec-entrega-05-revisao-ci-merge | Tela | 776 | 775 | 0 | 77.6 | 394 | [394](https://github.com/RodReis/rrb-jarvisOS/pull/394) |
+| 2026-10-04 | #131 | spec-scheduler-04-merge-serializado | Regras de Negócio | 2776 | 2776 | 0 | 82.5 | 395 | [395](https://github.com/RodReis/rrb-jarvisOS/pull/395) |
+| 2026-10-04 | #131 | spec-scheduler-04-merge-serializado | Banco | 2141 | 2123 | 0 | 84.6 | 395 | [395](https://github.com/RodReis/rrb-jarvisOS/pull/395) |
+| 2026-10-04 | #131 | spec-scheduler-04-merge-serializado | Tela | 776 | 775 | 0 | 77.5 | 395 | [395](https://github.com/RodReis/rrb-jarvisOS/pull/395) |

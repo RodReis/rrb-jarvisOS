@@ -32,8 +32,11 @@ import {
   type PullRequestInput,
   type RequiredChecksInput,
   type RequiredChecksNormalizado,
+  type RulesForBranchInput,
+  type RulesForBranchNormalizado,
   type SetDefaultBranchInput,
   type SquashMergeInput,
+  type UpdateBranchInput,
   type WorkflowRunNormalizado
 } from '@shared/domain/github-automation'
 import { log } from '../../logging/logger'
@@ -720,6 +723,99 @@ export async function getRequiredChecksForBranch(
       protegida: true,
       mergeQueueExigida:
         corpo?.required_merge_queue !== undefined && corpo.required_merge_queue !== null
+    },
+    externalRef: referencia,
+    criado: false
+  }
+}
+
+/**
+ * `pr.update-branch` — pede ao GitHub que traga a base para dentro do branch do PR (SPEC-Scheduler-04).
+ *
+ * É o merge da base no head **feito pela origem**: sem git local e sem force-push, que é o que
+ * mantém a operação dentro do que o conector já pode fazer. `expected_head_sha` vai no corpo pelo
+ * mesmo motivo do `sha` do merge — a atualização só acontece se o head ainda for o verificado.
+ *
+ * **202 significa "aceito", não "feito"**: o GitHub enfileira o merge e responde na hora. Por isso a
+ * saída é só `{ aceito: true }` e o novo head **não** é inventado aqui — o chamador o relê por
+ * `pr.merge-state`. Devolver um SHA calculado por nós seria afirmar um commit que a origem ainda
+ * pode não ter criado.
+ *
+ * Falhas sobem como `FalhaRest`; o adapter distingue head divergente de conflito de merge, que o
+ * GitHub responde ambos com 422 e só diferencia pela mensagem.
+ */
+export async function updatePullRequestBranch(
+  rest: GithubRest,
+  input: UpdateBranchInput
+): Promise<ResultadoDeOperacao<{ readonly aceito: true }>> {
+  exigirOk(
+    await rest.request(
+      'PUT',
+      `/repos/${input.owner}/${input.repo}/pulls/${input.pullRequest}/update-branch`,
+      { expected_head_sha: input.expectedHeadSha }
+    )
+  )
+
+  return {
+    data: { aceito: true },
+    externalRef: { id: `${input.owner}/${input.repo}/pulls/${input.pullRequest}` },
+    criado: false
+  }
+}
+
+/**
+ * `rulesets.for-branch` — as regras ativas **efetivas** de uma branch, lidas da origem.
+ *
+ * Complementa `checks.required-for-branch`: aquela lê só a proteção clássica, e este endpoint
+ * enxerga também o que vem de rulesets (inclusive `merge_queue`, que a proteção clássica não
+ * expressa). O gate precisa dos dois, porque uma exigência pode morar em qualquer um.
+ *
+ * **404 e lista vazia são "sem regra"**, não erro — branch sem regra é o estado normal de
+ * repositório novo. **403 não**: sem permissão para ler, "sem regra" seria uma afirmação que não
+ * dá para fazer, e verde por falta de visibilidade é o que o critério 10 proíbe. O 403 sobe como
+ * falha e o adapter o traduz.
+ *
+ * A saída é ordenada e sem duplicata: dois rulesets exigindo o mesmo check não devem produzir
+ * leituras diferentes conforme a ordem em que o GitHub os devolveu.
+ */
+export async function getRulesForBranch(
+  rest: GithubRest,
+  input: RulesForBranchInput
+): Promise<ResultadoDeOperacao<RulesForBranchNormalizado>> {
+  const resposta = await rest.request(
+    'GET',
+    `/repos/${input.owner}/${input.repo}/rules/branches/${input.branch}?per_page=100`
+  )
+
+  const referencia = {
+    id: `${input.owner}/${input.repo}/rules/${input.branch}`,
+    url: `https://github.com/${input.owner}/${input.repo}/rules`
+  }
+
+  const regras = resposta.status === 404 ? [] : lista(exigirOk(resposta).corpo)
+  const tipos = new Set<string>()
+  const contexts = new Set<string>()
+
+  for (const regra of regras) {
+    const tipo = texto(regra, 'type')
+    if (tipo === undefined) continue
+    tipos.add(tipo)
+
+    if (tipo === 'required_status_checks') {
+      const parametros = (regra as { parameters?: unknown }).parameters
+      for (const check of lista(parametros, 'required_status_checks')) {
+        const contexto = texto(check, 'context')
+        if (contexto !== undefined) contexts.add(contexto)
+      }
+    }
+  }
+
+  return {
+    data: {
+      contextsExigidos: [...contexts].sort(),
+      mergeQueue: tipos.has('merge_queue'),
+      exigePullRequest: tipos.has('pull_request'),
+      tipos: [...tipos].sort()
     },
     externalRef: referencia,
     criado: false

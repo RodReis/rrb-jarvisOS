@@ -26,6 +26,7 @@ import {
   GITHUB_API_VERSION,
   GITHUB_CAPABILITIES,
   GITHUB_OPERATIONS,
+  erroDeConflitoNaAtualizacao,
   erroDeHeadDivergente,
   origemDaApi,
   significadoDo404,
@@ -41,8 +42,10 @@ import {
   type HeadShaInput,
   type PullRequestInput,
   type RequiredChecksInput,
+  type RulesForBranchInput,
   type SetDefaultBranchInput,
-  type SquashMergeInput
+  type SquashMergeInput,
+  type UpdateBranchInput
 } from '@shared/domain/github-automation'
 import type { ConnectorAdapter, ConnectorExecution } from '../adapter'
 import {
@@ -57,13 +60,15 @@ import {
   getCommitSha,
   getMergeState,
   getRequiredChecksForBranch,
+  getRulesForBranch,
   getWorkflowRunsForHead,
   setDefaultBranch,
   squashMerge,
+  updatePullRequestBranch,
   FalhaRest,
   type ResultadoDeOperacao
 } from './github-operations'
-import { GithubRest, type BuscadorHttp } from './github-rest'
+import { GithubRest, texto, type BuscadorHttp } from './github-rest'
 
 /**
  * O slug público da GitHub App, usado só para montar a URL de instalação.
@@ -226,6 +231,12 @@ export class GithubAdapter implements ConnectorAdapter {
       case GITHUB_OPERATIONS.getRequiredChecks:
         return await getRequiredChecksForBranch(rest, input as RequiredChecksInput)
 
+      case GITHUB_OPERATIONS.updateBranch:
+        return await updatePullRequestBranch(rest, input as UpdateBranchInput)
+
+      case GITHUB_OPERATIONS.getRulesForBranch:
+        return await getRulesForBranch(rest, input as RulesForBranchInput)
+
       default:
         // Inalcançável pelo caminho normal (o registro filtra antes), mas o `default` mantém a
         // função total: uma capacidade nova declarada e não roteada falha aqui, alto e claro, em
@@ -359,6 +370,11 @@ export class GithubAdapter implements ConnectorAdapter {
       return erroDeHeadDivergente(esperado ?? '', provenance.obtidoEm, execution.request.operation)
     }
 
+    if (execution.request.operation === GITHUB_OPERATIONS.updateBranch) {
+      const erro = this.traduzirFalhaDoUpdateBranch(falha, execution, provenance.obtidoEm)
+      if (erro !== undefined) return erro
+    }
+
     if (status === 409 || status === 422) {
       return {
         ok: false,
@@ -393,6 +409,36 @@ export class GithubAdapter implements ConnectorAdapter {
       provenance,
       evidencia: `HTTP ${status}`
     }
+  }
+
+  /**
+   * O `update-branch` responde **422 para duas causas opostas** — head que não é mais o esperado e
+   * conflito entre a base e o branch — e só a mensagem as distingue. Sem separar, o chamador
+   * receberia o mesmo erro genérico e não saberia se deve reler o head ou escalar o conflito.
+   *
+   * `undefined` quando a mensagem não é de nenhuma das duas: cai no 422 genérico, em vez de
+   * adivinhar uma causa. O conflito é testado primeiro porque a mensagem de head divergente nunca
+   * o menciona, e o contrário não vale.
+   */
+  private traduzirFalhaDoUpdateBranch(
+    falha: FalhaRest,
+    execution: ConnectorExecution,
+    obtidoEm: string
+  ): ConnectorError | undefined {
+    const { status, corpo } = falha.resposta
+    const operation = execution.request.operation
+    const mensagem = texto(corpo, 'message') ?? ''
+
+    if (status === 422 && /conflict/i.test(mensagem)) {
+      return erroDeConflitoNaAtualizacao(obtidoEm, operation)
+    }
+
+    if (status === 409 || (status === 422 && /head|sha/i.test(mensagem))) {
+      const esperado = (execution.request.input as UpdateBranchInput | undefined)?.expectedHeadSha
+      return erroDeHeadDivergente(esperado ?? '', obtidoEm, operation)
+    }
+
+    return undefined
   }
 
   private provenance(execution: ConnectorExecution): ConnectorResult['provenance'] {

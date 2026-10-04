@@ -88,6 +88,12 @@ export interface FilaDeps {
    * assunto, com outro tipo de evento.
    */
   readonly mergeAutonomoLigado: (projectId: string) => boolean
+  /**
+   * O run tem merge no ar, ou confirmado e ainda não registrado? (SPEC-Scheduler-04, critério 5.)
+   * Quando sim, o cancelamento não vence: o merge confirmado na origem não se desfaz, e um run
+   * `CANCELLED` com o PR mergeado seria a mentira que a fila existe para impedir.
+   */
+  readonly mergeEmCurso?: (runId: string) => boolean
   /** Relógio injetado: lease e expiração precisam ser determinísticos no teste. */
   readonly agora?: () => number
 }
@@ -158,6 +164,17 @@ export class FilaService {
       return {
         reason: 'run-terminal',
         mensagem: `O run já terminou em ${run.estado}. Retomar exige uma continuação vinculada.`
+      }
+    }
+
+    // O cancelamento não passa por cima de um merge que já saiu. A tentativa é gravada na mesma
+    // transação que confere `PR_CI`, então uma das duas — cancelar ou iniciar o merge — vence.
+    if (para === 'CANCELLED' && this.deps.mergeEmCurso?.(runId) === true) {
+      return {
+        reason: 'merge-em-curso',
+        mensagem:
+          'O merge deste run já saiu ou está sendo confirmado; cancelar não o desfaz. ' +
+          'Aguarde a confirmação na origem.'
       }
     }
 

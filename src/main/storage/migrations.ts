@@ -1974,6 +1974,51 @@ const MIGRATIONS: readonly string[] = [
   CREATE UNIQUE INDEX idx_recurso_run_ident
     ON recurso_run(user_id, tipo, identificador) WHERE estado <> 'removido';
   CREATE INDEX idx_recurso_run_run ON recurso_run(user_id, run_id);
+  `,
+
+  // 52 - tentativas de merge sob o MergeLease (SPEC-Scheduler-04).
+  //
+  // Uma linha por tentativa de mergear um PR, gravada **antes** de a chamada sair (`iniciada`) e
+  // confirmada depois (`confirmada`, com o commit de merge). E o que torna verificaveis os dois
+  // criterios que o lease sozinho nao cobre: o crash entre a chamada e a confirmacao deixa
+  // `iniciada`, e a reconciliacao consulta o GitHub antes de repetir; e o cancelamento tardio nao
+  // desfaz um merge confirmado, porque o cancelamento olha esta tabela antes de vencer.
+  //
+  // O lease em si **nao tem tabela propria**: e uma linha de `lease` com recurso `merge:<repo>:<base>`
+  // e fencing token, como os slots do pool. Esta tabela guarda o que o lease nao guarda — qual PR,
+  // qual head e o que aconteceu.
+  //
+  // Dois UNIQUE parciais fazem a serializacao valer no banco, nao so no codigo:
+  //  - `idx_merge_tentativa_exclusiva`: no maximo UMA tentativa `iniciada` por repositorio e base.
+  //    Um crash deixa a linha de pe, e enquanto a reconciliacao nao a resolver ninguem mais mergeia
+  //    naquela base — nao se sabe se o merge aconteceu, e mergear em cima do desconhecido e o que
+  //    o criterio 4 proibe;
+  //  - `idx_merge_tentativa_efeito`: uma tentativa viva por run, PR e head. `abandonada` sai do
+  //    indice, entao um head que nao mergeou pode ser tentado de novo.
+  //
+  // `fencing_token` e o do lease no momento da tentativa; so quem o apresenta confirma.
+  `
+  CREATE TABLE merge_tentativa (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id       TEXT NOT NULL,
+    run_id        TEXT NOT NULL,
+    workspace_id  TEXT NOT NULL,
+    project_id    TEXT NOT NULL,
+    recurso       TEXT NOT NULL,
+    pull_request  INTEGER NOT NULL,
+    head_sha      TEXT NOT NULL,
+    fencing_token INTEGER NOT NULL,
+    estado        TEXT NOT NULL CHECK (estado IN ('iniciada', 'confirmada', 'abandonada')),
+    -- O commit de merge na origem. NULL ate a confirmacao.
+    merge_sha     TEXT,
+    iniciada_em   INTEGER NOT NULL,
+    concluida_em  INTEGER
+  );
+  CREATE UNIQUE INDEX idx_merge_tentativa_exclusiva
+    ON merge_tentativa(user_id, recurso) WHERE estado = 'iniciada';
+  CREATE UNIQUE INDEX idx_merge_tentativa_efeito
+    ON merge_tentativa(user_id, run_id, pull_request, head_sha) WHERE estado <> 'abandonada';
+  CREATE INDEX idx_merge_tentativa_run ON merge_tentativa(user_id, run_id);
   `
 ]
 

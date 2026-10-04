@@ -12,6 +12,7 @@ import { join } from 'node:path'
 import type { Database as Db } from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { openDatabase } from '../storage/database'
+import { LeaseRepository } from './lease-repository'
 import { EffectJournalRepository, type NovaIntencao } from './effect-journal-repository'
 
 const USER = 'u-1'
@@ -117,6 +118,87 @@ describe('concluir', () => {
 
     expect(repo.buscarPorChave(USER, 'chave-1')?.estado).toBe('failed')
     expect(repo.listarPendentes(USER)).toEqual([])
+  })
+})
+
+describe('concluirComFencing — só o dono atual do lease confirma o efeito (SPEC-Scheduler-04, regra 2)', () => {
+  const RECURSO = 'merge:o/r:main'
+  const AGORA = 1_700_000_000_000
+
+  function pendente(): string {
+    const registrada = repo.registrarIntencao(intencao())
+    if (registrada.tipo !== 'registrada') throw new Error('esperava registrada')
+    return registrada.entrada.id
+  }
+
+  function lease(token: number): void {
+    new LeaseRepository(db).adquirir(
+      USER,
+      { proprietario: 'run-1', recurso: RECURSO, fencingToken: token },
+      AGORA
+    )
+  }
+
+  it('o dono com o token vigente confirma', () => {
+    const id = pendente()
+    lease(3)
+
+    const gravou = repo.concluirComFencing(USER, id, 'confirmed', 'ref-7', {
+      recurso: RECURSO,
+      fencingToken: 3
+    })
+
+    expect(gravou).toBe(true)
+    expect(repo.buscarPorChave(USER, 'chave-1')).toMatchObject({
+      estado: 'confirmed',
+      externalRefId: 'ref-7'
+    })
+  })
+
+  it('token que não é o vigente NÃO confirma: a entrada segue pendente para a reconciliação', () => {
+    const id = pendente()
+    lease(4)
+
+    const gravou = repo.concluirComFencing(USER, id, 'confirmed', 'ref-7', {
+      recurso: RECURSO,
+      fencingToken: 3
+    })
+
+    expect(gravou).toBe(false)
+    expect(repo.buscarPorChave(USER, 'chave-1')?.estado).toBe('pendente')
+    expect(repo.listarPendentes(USER)).toHaveLength(1)
+  })
+
+  it('sem lease nenhum também não confirma', () => {
+    const id = pendente()
+
+    expect(
+      repo.concluirComFencing(USER, id, 'failed', undefined, { recurso: RECURSO, fencingToken: 1 })
+    ).toBe(false)
+  })
+
+  it('lease de outro recurso não vale', () => {
+    const id = pendente()
+    lease(3)
+
+    expect(
+      repo.concluirComFencing(USER, id, 'confirmed', undefined, {
+        recurso: 'merge:o/r:release',
+        fencingToken: 3
+      })
+    ).toBe(false)
+  })
+
+  it('não toca a entrada de outro usuário', () => {
+    const id = pendente()
+    lease(3)
+
+    expect(
+      repo.concluirComFencing('u-2', id, 'confirmed', undefined, {
+        recurso: RECURSO,
+        fencingToken: 3
+      })
+    ).toBe(false)
   })
 })
 

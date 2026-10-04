@@ -68,6 +68,12 @@ import type { CreditService } from './credit-service'
 export interface ConnectorCallContext {
   readonly userId: string
   readonly workspace: WorkspaceId
+  /**
+   * O lease que dá direito de **confirmar** o efeito (SPEC-Scheduler-04, regra 2). Com ele, a
+   * entrada do diário só é concluída se o token ainda for o vigente; sem ele, quem chama é dono
+   * do próprio efeito, como sempre foi.
+   */
+  readonly efeito?: { readonly recurso: string; readonly fencingToken: number }
 }
 
 /**
@@ -343,16 +349,36 @@ export class ConnectorService {
     // da issue). Qualquer outro erro é `failed`: ou nunca chegou a sair (validação, circuito,
     // crédito, credencial — já recusados antes deste ponto), ou saiu e foi recusado de forma
     // definitiva pelo serviço.
-    this.effectJournal.concluir(
-      registro.entrada.id,
-      desfecho.ok
-        ? 'confirmed'
-        : capability.effect === 'mutacao' &&
-            (desfecho.code === 'indisponivel' || desfecho.code === 'timeout')
-          ? 'ambiguous'
-          : 'failed',
-      desfecho.ok ? desfecho.externalRef?.id : undefined
-    )
+    const estadoDoEfeito = desfecho.ok
+      ? 'confirmed'
+      : capability.effect === 'mutacao' &&
+          (desfecho.code === 'indisponivel' || desfecho.code === 'timeout')
+        ? 'ambiguous'
+        : 'failed'
+    const externalRefId = desfecho.ok ? desfecho.externalRef?.id : undefined
+
+    if (ctx.efeito === undefined) {
+      this.effectJournal.concluir(registro.entrada.id, estadoDoEfeito, externalRefId)
+    } else if (
+      !this.effectJournal.concluirComFencing(
+        ctx.userId,
+        registro.entrada.id,
+        estadoDoEfeito,
+        externalRefId,
+        ctx.efeito
+      )
+    ) {
+      // O lease mudou de dono durante a chamada. O efeito pode ter saído, mas quem o chamou já não
+      // pode declará-lo confirmado: a entrada fica `pendente` e a reconciliação consulta a origem.
+      log.ai.warn(
+        'Lease perdido durante a chamada; a entrada do diário fica para a reconciliação',
+        {
+          correlationId: request.correlationId,
+          connector: request.connector,
+          operation: request.operation
+        }
+      )
+    }
 
     this.audit.append({
       user_id: ctx.userId,

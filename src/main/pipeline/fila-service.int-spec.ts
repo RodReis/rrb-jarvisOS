@@ -41,6 +41,7 @@ const { openDatabase } = await import('../storage/database')
 const { AuditRepository } = await import('../storage/audit-repository')
 const { PipelineRepository } = await import('./pipeline-repository')
 const { LeaseRepository } = await import('./lease-repository')
+const { MergeRepository } = await import('./merge-repository')
 const { EffectJournalRepository } = await import('./effect-journal-repository')
 const { FilaService } = await import('./fila-service')
 const { PoolRepository } = await import('./pool-repository')
@@ -115,6 +116,7 @@ let relogio: number
 let aprovacoes: Approval[]
 let runs: InstanceType<typeof PipelineRepository>
 let leases: InstanceType<typeof LeaseRepository>
+let merges: InstanceType<typeof MergeRepository>
 let fila: InstanceType<typeof FilaService>
 let mergeLigado: boolean
 
@@ -137,6 +139,7 @@ beforeEach(() => {
 
   runs = new PipelineRepository(db)
   leases = new LeaseRepository(db)
+  merges = new MergeRepository(db)
 
   const audit = new AuditRepository(db, 'chave-de-teste')
   const pool = new PoolService({
@@ -161,6 +164,7 @@ beforeEach(() => {
     revisoesDoGate: () => REVISOES,
     userId: () => USER,
     mergeAutonomoLigado: () => mergeLigado,
+    mergeEmCurso: (runId) => merges.emCursoDoRun(USER, runId),
     agora: () => relogio
   })
 })
@@ -597,6 +601,89 @@ describe('kill-switch do merge (critério 7)', () => {
     })
 
     expect(concluidas).toHaveLength(0)
+  })
+})
+
+describe('cancelamento tardio não desfaz merge (SPEC-Scheduler-04, critério 5)', () => {
+  const RECURSO_DO_MERGE = 'merge:o/r:main'
+  let tokenDoRun = 0
+
+  function ateOPrCi(): string {
+    const runId = runPronto()
+    tokenDoRun = adquirir(PROJETO_A, runId)
+    fila.transicionar(PROJETO_A, WS, runId, 'VALIDATING', undefined, tokenDoRun)
+    fila.transicionar(PROJETO_A, WS, runId, 'PR_CI', undefined, tokenDoRun)
+    return runId
+  }
+
+  /** O run entra na seção crítica: detém o MergeLease e grava a tentativa antes da chamada. */
+  function iniciarMerge(runId: string): number {
+    leases.adquirir(
+      USER,
+      { proprietario: runId, recurso: RECURSO_DO_MERGE, fencingToken: 77 },
+      relogio
+    )
+    const r = merges.iniciar(
+      USER,
+      {
+        runId,
+        workspaceId: WS,
+        projectId: PROJETO_A,
+        recurso: RECURSO_DO_MERGE,
+        pullRequest: 7,
+        headSha: 'a'.repeat(40),
+        fencingToken: 77
+      },
+      relogio
+    )
+    if (r.tipo !== 'iniciada') throw new Error('esperava iniciada')
+    return r.tentativa.id
+  }
+
+  it('sem merge em curso, o cancelamento vence como sempre', () => {
+    const runId = ateOPrCi()
+
+    expect(fila.transicionar(PROJETO_A, WS, runId, 'CANCELLED').reason).toBe('transicionado')
+    expect(estadoNoBanco(runId)).toBe('CANCELLED')
+  })
+
+  it('com o merge no ar, o cancelamento é recusado e o run segue em PR_CI', () => {
+    const runId = ateOPrCi()
+    iniciarMerge(runId)
+
+    const r = fila.transicionar(PROJETO_A, WS, runId, 'CANCELLED')
+
+    expect(r.reason).toBe('merge-em-curso')
+    expect(estadoNoBanco(runId)).toBe('PR_CI')
+  })
+
+  it('confirmado na origem e ainda não registrado no run: continua recusando, e o MERGED vence', () => {
+    const runId = ateOPrCi()
+    const tentativa = iniciarMerge(runId)
+    merges.confirmar(USER, tentativa, 'm'.repeat(40), relogio)
+
+    expect(fila.transicionar(PROJETO_A, WS, runId, 'CANCELLED').reason).toBe('merge-em-curso')
+    expect(fila.concluir(PROJETO_A, WS, runId, tokenDoRun, true).reason).toBe('transicionado')
+
+    expect(estadoNoBanco(runId)).toBe('MERGED')
+    // O cancelamento tardio não reabre nem desfaz: o terminal responde por si.
+    expect(fila.transicionar(PROJETO_A, WS, runId, 'CANCELLED').reason).toBe('run-terminal')
+    expect(estadoNoBanco(runId)).toBe('MERGED')
+  })
+
+  it('tentativa abandonada não segura o cancelamento: o merge não aconteceu', () => {
+    const runId = ateOPrCi()
+    merges.abandonar(USER, iniciarMerge(runId), relogio)
+
+    expect(fila.transicionar(PROJETO_A, WS, runId, 'CANCELLED').reason).toBe('transicionado')
+  })
+
+  it('o merge em curso de um run não segura o cancelamento de outro', () => {
+    const emMerge = ateOPrCi()
+    iniciarMerge(emMerge)
+    const outro = runPronto(PROJETO_A, 'f2')
+
+    expect(fila.transicionar(PROJETO_A, WS, outro, 'CANCELLED').reason).toBe('transicionado')
   })
 })
 

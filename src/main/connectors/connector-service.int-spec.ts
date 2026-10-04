@@ -35,6 +35,7 @@ import { ConnectorService, type ConnectorSecretSource } from './connector-servic
 import { CreditService } from './credit-service'
 import { CreditRepository } from './credit-repository'
 import { EffectJournalRepository } from '../pipeline/effect-journal-repository'
+import { LeaseRepository } from '../pipeline/lease-repository'
 import type { ConnectorAdapter, ConnectorExecution } from './adapter'
 
 const USUARIO = 'user-teste'
@@ -531,6 +532,53 @@ describe('diário de efeitos — intenção antes do I/O, confirmação depois (
     expect(entrada?.estado).toBe('confirmed')
     expect(entrada?.externalRefId).toBe('issue-7')
     expect(effectJournal.listarPendentes(USUARIO)).toEqual([])
+  })
+
+  it('com efeito fenciado, só o dono atual do lease confirma a entrada (SPEC-Scheduler-04, regra 2)', async () => {
+    const github = new AdapterFake(
+      'github',
+      [capacidade('github', 'issues.create', 'mutacao')],
+      () => ({
+        ok: true,
+        data: { numero: 7 },
+        provenance: {
+          connector: 'github',
+          operation: 'issues.create',
+          obtidoEm: '2026-08-29T00:00:00Z'
+        },
+        usage: { creditos: 0, latenciaMs: 5 },
+        externalRef: { id: 'issue-7' }
+      })
+    )
+    registry.register(github)
+    const leases = new LeaseRepository(db)
+    leases.adquirir(
+      USUARIO,
+      { proprietario: 'run-1', recurso: 'merge:o/r:main', fencingToken: 5 },
+      1_700_000_000_000
+    )
+
+    // O token apresentado é o de um dono antigo: o efeito saiu, mas a confirmação não é dele.
+    await service.call(
+      pedido({ connector: 'github', operation: 'issues.create', idempotencyKey: 'idem-1' }),
+      {
+        userId: USUARIO,
+        workspace: 'jarvis',
+        efeito: { recurso: 'merge:o/r:main', fencingToken: 4 }
+      }
+    )
+    expect(effectJournal.buscarPorChave(USUARIO, 'idem-1')?.estado).toBe('pendente')
+
+    // O dono atual confirma.
+    await service.call(
+      pedido({ connector: 'github', operation: 'issues.create', idempotencyKey: 'idem-1' }),
+      {
+        userId: USUARIO,
+        workspace: 'jarvis',
+        efeito: { recurso: 'merge:o/r:main', fencingToken: 5 }
+      }
+    )
+    expect(effectJournal.buscarPorChave(USUARIO, 'idem-1')?.estado).toBe('confirmed')
   })
 
   it('chave igual com payload diferente falha antes do I/O — nenhuma requisição sai (critério 3)', async () => {

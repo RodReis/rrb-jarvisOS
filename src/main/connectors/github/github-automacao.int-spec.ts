@@ -24,7 +24,8 @@ vi.mock('../../logging/logger', () => ({
 }))
 
 const { GithubAdapter } = await import('./github-adapter')
-const { GITHUB_OPERATIONS } = await import('@shared/domain/github-automation')
+const { GITHUB_OPERATIONS, MENSAGEM_DE_CONFLITO_NA_ATUALIZACAO } =
+  await import('@shared/domain/github-automation')
 
 import type { ConnectorError, ConnectorRequest, ConnectorResult } from '@shared/domain/connectors'
 
@@ -57,6 +58,8 @@ interface EstadoFake {
   rotulos: Map<string, Record<string, unknown>>
   /** O commit para onde cada ref aponta na origem, para `commit.sha-for-ref`. */
   commits: Map<string, string>
+  /** As regras ativas efetivas por branch, como `GET /rules/branches/{branch}` as devolve. */
+  regras: Map<string, unknown[]>
 }
 
 let estado: EstadoFake
@@ -88,7 +91,8 @@ function estadoInicial(): EstadoFake {
     workflowRuns: [],
     protecoes: new Map(),
     commits: new Map(),
-    rotulos: new Map()
+    rotulos: new Map(),
+    regras: new Map()
   }
 }
 
@@ -265,6 +269,29 @@ function responder(
     pr.state = 'closed'
     pr.merge_commit_sha = 'merged00sha00000000000000000000000000000'
     return { status: 200, corpo: { sha: pr.merge_commit_sha, merged: true } }
+  }
+
+  // PUT /repos/{o}/{r}/pulls/{n}/update-branch
+  const update = /\/pulls\/(\d+)\/update-branch$/.exec(semQuery)
+  if (metodo === 'PUT' && update) {
+    const pr = estado.pulls.find((p) => p.number === Number(update[1]))
+    if (!pr) return { status: 404, corpo: { message: 'Not Found' } }
+    // 422 só quando o `expected_head_sha` foi enviado e não casa, como a API real: sem ele, o
+    // GitHub atualiza o que estiver no head, e um fake que recusasse a ausência esconderia um
+    // código que a omitisse.
+    if (corpoObj.expected_head_sha !== undefined && corpoObj.expected_head_sha !== pr.head.sha) {
+      return {
+        status: 422,
+        corpo: { message: "Expected head sha didn't match current head ref." }
+      }
+    }
+    return { status: 202, corpo: { message: 'Updating pull request branch.', url: 'x' } }
+  }
+
+  // GET /repos/{o}/{r}/rules/branches/{branch} — lista vazia quando nenhuma regra vale
+  const regrasMatch = /\/rules\/branches\/([^/]+)$/.exec(semQuery)
+  if (metodo === 'GET' && regrasMatch) {
+    return { status: 200, corpo: estado.regras.get(regrasMatch[1] ?? '') ?? [] }
   }
 
   // GET /repos/{o}/{r}/commits/{sha}/check-runs
@@ -1178,6 +1205,189 @@ describe('label.ensure — emenda 4 da M9-F01', () => {
 
     expect(r.ok).toBe(false)
     expect(r.code).toBe('validacao-invalida')
+  })
+})
+
+describe('pr.update-branch — SPEC-Scheduler-04', () => {
+  const CAMINHO = `PUT /repos/${OWNER}/${REPO}/pulls/1/update-branch`
+
+  beforeEach(async () => {
+    await executar(GITHUB_OPERATIONS.ensurePullRequest, {
+      owner: OWNER,
+      repo: REPO,
+      head: 'feat/x',
+      base: 'main',
+      title: 'T',
+      body: ''
+    })
+  })
+
+  it('202 vira { aceito: true } e o SHA esperado vai no corpo', async () => {
+    const r = (await executar(GITHUB_OPERATIONS.updateBranch, {
+      owner: OWNER,
+      repo: REPO,
+      pullRequest: 1,
+      expectedHeadSha: SHA
+    })) as ConnectorResult
+
+    expect(r.ok).toBe(true)
+    expect(r.data).toEqual({ aceito: true })
+    const chamada = requisicoes.find((q) => q.metodo === 'PUT')
+    expect(chamada?.corpo).toEqual({ expected_head_sha: SHA })
+  })
+
+  it('head divergente (422 do GitHub) vira erro de head divergente', async () => {
+    const r = (await executar(GITHUB_OPERATIONS.updateBranch, {
+      owner: OWNER,
+      repo: REPO,
+      pullRequest: 1,
+      expectedHeadSha: OUTRO_SHA
+    })) as ConnectorError
+
+    expect(r.ok).toBe(false)
+    expect(r.code).toBe('validacao-invalida')
+    expect(r.retryable).toBe(false)
+    expect(r.mensagem).toMatch(/releia os checks/i)
+    expect(r.mensagem.startsWith(MENSAGEM_DE_CONFLITO_NA_ATUALIZACAO)).toBe(false)
+  })
+
+  it('409 também é head divergente', async () => {
+    forcadas.set(CAMINHO, { status: 409, corpo: { message: 'Head branch was modified.' } })
+
+    const r = (await executar(GITHUB_OPERATIONS.updateBranch, {
+      owner: OWNER,
+      repo: REPO,
+      pullRequest: 1,
+      expectedHeadSha: SHA
+    })) as ConnectorError
+
+    expect(r.mensagem).toMatch(/releia os checks/i)
+  })
+
+  it('conflito entre base e branch é reconhecível pelo prefixo estável', async () => {
+    forcadas.set(CAMINHO, {
+      status: 422,
+      corpo: { message: 'merge conflict between base and head' }
+    })
+
+    const r = (await executar(GITHUB_OPERATIONS.updateBranch, {
+      owner: OWNER,
+      repo: REPO,
+      pullRequest: 1,
+      expectedHeadSha: SHA
+    })) as ConnectorError
+
+    expect(r.ok).toBe(false)
+    expect(r.code).toBe('validacao-invalida')
+    expect(r.retryable).toBe(false)
+    expect(r.mensagem.startsWith(MENSAGEM_DE_CONFLITO_NA_ATUALIZACAO)).toBe(true)
+  })
+
+  it('422 de causa desconhecida não é adivinhado: cai no erro genérico', async () => {
+    forcadas.set(CAMINHO, { status: 422, corpo: { message: 'Validation Failed' } })
+
+    const r = (await executar(GITHUB_OPERATIONS.updateBranch, {
+      owner: OWNER,
+      repo: REPO,
+      pullRequest: 1,
+      expectedHeadSha: SHA
+    })) as ConnectorError
+
+    expect(r.code).toBe('validacao-invalida')
+    expect(r.evidencia).toBe('HTTP 422')
+  })
+
+  it('sem expectedHeadSha, a chamada nem sai do app', async () => {
+    const r = (await executar(GITHUB_OPERATIONS.updateBranch, {
+      owner: OWNER,
+      repo: REPO,
+      pullRequest: 1
+    })) as ConnectorError
+
+    expect(r.code).toBe('validacao-invalida')
+    expect(contar('PUT', /update-branch/)).toBe(0)
+  })
+})
+
+describe('rulesets.for-branch — SPEC-Scheduler-04', () => {
+  const entrada = { owner: OWNER, repo: REPO, branch: 'main' }
+
+  it('normaliza checks, merge queue e pull request de rulesets, ordenado e sem duplicata', async () => {
+    estado.regras.set('main', [
+      {
+        type: 'required_status_checks',
+        parameters: {
+          required_status_checks: [{ context: 'validacao' }, { context: 'build' }]
+        }
+      },
+      { type: 'merge_queue', parameters: {} },
+      { type: 'pull_request', parameters: {} },
+      {
+        type: 'required_status_checks',
+        parameters: { required_status_checks: [{ context: 'build' }, { context: 'e2e' }] }
+      }
+    ])
+
+    const r = (await executar(GITHUB_OPERATIONS.getRulesForBranch, entrada)) as ConnectorResult
+
+    expect(r.ok).toBe(true)
+    expect(r.data).toEqual({
+      contextsExigidos: ['build', 'e2e', 'validacao'],
+      mergeQueue: true,
+      exigePullRequest: true,
+      tipos: ['merge_queue', 'pull_request', 'required_status_checks']
+    })
+  })
+
+  it('lista vazia significa sem regra, não erro', async () => {
+    const r = (await executar(GITHUB_OPERATIONS.getRulesForBranch, entrada)) as ConnectorResult
+
+    expect(r.ok).toBe(true)
+    expect(r.data).toEqual({
+      contextsExigidos: [],
+      mergeQueue: false,
+      exigePullRequest: false,
+      tipos: []
+    })
+  })
+
+  it('404 também significa sem regra', async () => {
+    forcadas.set(`GET /repos/${OWNER}/${REPO}/rules/branches/main`, {
+      status: 404,
+      corpo: { message: 'Not Found' }
+    })
+
+    const r = (await executar(GITHUB_OPERATIONS.getRulesForBranch, entrada)) as ConnectorResult
+
+    expect(r.ok).toBe(true)
+    expect(r.data).toMatchObject({ mergeQueue: false, tipos: [] })
+  })
+
+  it('403 NÃO vira "sem regra": sobe como erro de permissão', async () => {
+    // Sem permissão para ler, afirmar "sem regra" seria verde por falta de visibilidade.
+    forcadas.set(`GET /repos/${OWNER}/${REPO}/rules/branches/main`, {
+      status: 403,
+      corpo: { message: 'Resource not accessible by integration' }
+    })
+
+    const r = (await executar(GITHUB_OPERATIONS.getRulesForBranch, entrada)) as ConnectorError
+
+    expect(r.ok).toBe(false)
+    expect(r.code).toBe('permissao-negada')
+  })
+
+  it('ignora regra sem tipo e check sem contexto em vez de quebrar', async () => {
+    estado.regras.set('main', [
+      { parameters: {} },
+      {
+        type: 'required_status_checks',
+        parameters: { required_status_checks: [{}, { context: 'a' }] }
+      }
+    ])
+
+    const r = (await executar(GITHUB_OPERATIONS.getRulesForBranch, entrada)) as ConnectorResult
+
+    expect(r.data).toMatchObject({ contextsExigidos: ['a'], tipos: ['required_status_checks'] })
   })
 })
 

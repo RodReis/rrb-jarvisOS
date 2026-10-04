@@ -91,7 +91,9 @@ describe('capacidades', () => {
       'branch.ensure-protection',
       'commit.sha-for-ref',
       'label.ensure',
-      'checks.required-for-branch'
+      'checks.required-for-branch',
+      'pr.update-branch',
+      'rulesets.for-branch'
     ])
     expect(caps[0]).toMatchObject({ connector: 'github', effect: 'leitura' })
   })
