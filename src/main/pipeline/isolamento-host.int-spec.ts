@@ -84,17 +84,35 @@ describe('perfil do run', () => {
     expect(() => removerPerfil(alvo)).toThrow()
     expect(existsSync(alvo)).toBe(true)
   })
+
+  it('recusa um diretório que só termina em -perfil, e o caminho relativo', () => {
+    const parecido = join(dir, 'meu-perfil')
+    mkdirSync(parecido)
+
+    expect(() => removerPerfil(parecido)).toThrow()
+    expect(() => removerPerfil('jarvisos-run-a-perfil')).toThrow()
+    expect(existsSync(parecido)).toBe(true)
+  })
 })
 
 describe('descartarArtefatosDoSandbox', () => {
   it('descarta o .gitmeta e nada mais', () => {
+    const worktree = join(dir, 'jarvisos-run-x')
+    mkdirSync(join(worktree, '.gitmeta'), { recursive: true })
+    writeFileSync(join(worktree, '.gitmeta', 'HEAD'), 'ref')
+    writeFileSync(join(worktree, 'trabalho.ts'), 'x')
+
+    descartarArtefatosDoSandbox(worktree)
+
+    expect(existsSync(join(worktree, '.gitmeta'))).toBe(false)
+    expect(existsSync(join(worktree, 'trabalho.ts'))).toBe(true)
+  })
+
+  it('recusa o diretório que não tem a forma de um worktree de run, e o caminho relativo', () => {
     mkdirSync(join(dir, '.gitmeta'))
-    writeFileSync(join(dir, '.gitmeta', 'HEAD'), 'ref')
-    writeFileSync(join(dir, 'trabalho.ts'), 'x')
 
-    descartarArtefatosDoSandbox(dir)
-
-    expect(existsSync(join(dir, '.gitmeta'))).toBe(false)
-    expect(existsSync(join(dir, 'trabalho.ts'))).toBe(true)
+    expect(() => descartarArtefatosDoSandbox(dir)).toThrow()
+    expect(() => descartarArtefatosDoSandbox('jarvisos-run-x')).toThrow()
+    expect(existsSync(join(dir, '.gitmeta'))).toBe(true)
   })
 })

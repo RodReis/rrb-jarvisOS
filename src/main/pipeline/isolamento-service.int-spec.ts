@@ -32,24 +32,50 @@ class MundoDocker {
   redes = new Map<string, { runId?: string }>()
   inspecoes = new Map<string, EntradaDoScanner | undefined>()
   caiu = false
+  /** Depois de parar, o Docker cai (a listagem de confirmação falha). */
+  cairAposParar = false
+  /** Container que ainda aparece por N consultas depois do stop (`--rm` em remoção). */
+  demoraParaSumir = new Map<string, number>()
+  fantasmas = new Map<string, { runId?: string; restantes: number }>()
+  consultasDePortas = 0
   pararFalha = new Set<string>()
   redeFalha = new Set<string>()
   chamadas: string[] = []
 
-  portasEmUso = (): ReadonlySet<number> | undefined =>
-    this.caiu ? undefined : new Set([...this.containers.values()].flatMap((c) => c.portas))
-  listarGeridos = (): { containers: unknown[]; redes: unknown[] } | undefined =>
-    this.caiu
-      ? undefined
-      : {
-          containers: [...this.containers].map(([nome, c]) => ({ nome, runId: c.runId })),
-          redes: [...this.redes].map(([nome, r]) => ({ nome, runId: r.runId }))
-        }
+  portasEmUso = (): ReadonlySet<number> | undefined => {
+    this.consultasDePortas += 1
+    return this.caiu ? undefined : new Set([...this.containers.values()].flatMap((c) => c.portas))
+  }
+  listarGeridos = (): { containers: unknown[]; redes: unknown[] } | undefined => {
+    if (this.caiu) return undefined
+    const ainda: { nome: string; runId: string | undefined }[] = []
+    for (const [nome, f] of this.fantasmas) {
+      if (f.restantes > 0) {
+        f.restantes -= 1
+        ainda.push({ nome, runId: f.runId })
+      } else {
+        this.fantasmas.delete(nome)
+      }
+    }
+    return {
+      containers: [
+        ...[...this.containers].map(([nome, c]) => ({ nome, runId: c.runId })),
+        ...ainda
+      ],
+      redes: [...this.redes].map(([nome, r]) => ({ nome, runId: r.runId }))
+    }
+  }
   inspecionarSandbox = (nome: string): EntradaDoScanner | undefined => this.inspecoes.get(nome)
   parar = (nome: string): boolean => {
     this.chamadas.push(`parar:${nome}`)
     if (this.pararFalha.has(nome)) return false
+    const c = this.containers.get(nome)
     this.containers.delete(nome)
+    const demora = this.demoraParaSumir.get(nome)
+    if (demora !== undefined && c !== undefined) {
+      this.fantasmas.set(nome, { runId: c.runId, restantes: demora })
+    }
+    if (this.cairAposParar) this.caiu = true
     return true
   }
   removerRede = (nome: string): boolean => {
@@ -82,7 +108,7 @@ function montar(): InstanceType<typeof IsolamentoService> {
       run: (args: readonly string[]) => {
         gitChamadas.push([...args])
         if (gitFalha) return { ok: false, saida: '' }
-        if (args[0] === 'worktree' && args[1] === 'remove') worktrees.delete(String(args[2]))
+        if (args[0] === 'worktree' && args[1] === 'remove') worktrees.delete(String(args.at(-1)))
         return { ok: true, saida: '' }
       }
     },
@@ -95,10 +121,12 @@ function montar(): InstanceType<typeof IsolamentoService> {
     runAtivo: (runId) => ativos.has(runId),
     worktreeExiste: (caminho) => worktrees.has(caminho),
     descartarArtefatos: vi.fn(),
+    prepararPerfil: () => true,
     removerDiretorio: (caminho) => {
       diretoriosRemovidos.push(caminho)
     },
     portaLivreNoHost: (porta) => !hostOcupado.has(porta),
+    aguardar: () => undefined,
     cwd: () => CWD,
     agora: () => AGORA
   })
@@ -297,8 +325,10 @@ function depsDe(
     runAtivo: (runId) => ativos.has(runId),
     worktreeExiste: (caminho) => worktrees.has(caminho),
     descartarArtefatos: vi.fn(),
+    prepararPerfil: () => true,
     removerDiretorio: vi.fn(),
     portaLivreNoHost: (porta) => !hostOcupado.has(porta),
+    aguardar: () => undefined,
     cwd: () => CWD,
     agora
   }
@@ -360,7 +390,7 @@ describe('liberarRun', () => {
     servico.liberarRun('a')
 
     const remove = gitChamadas.find((a) => a[0] === 'worktree' && a[1] === 'remove') ?? []
-    expect(remove).toEqual(['worktree', 'remove', '/raiz/jarvisos-run-a'])
+    expect(remove).toEqual(['worktree', 'remove', '--', '/raiz/jarvisos-run-a'])
     expect(remove).not.toContain('--force')
   })
 
@@ -554,5 +584,103 @@ describe('reconciliar (crash)', () => {
     expect(docker.redes.size).toBe(0)
     expect(worktrees.size).toBe(0)
     expect(leases.listar(USER)).toEqual([])
+  })
+})
+
+describe('falha de detecção não é ausência (revisão da F03)', () => {
+  it('container planejado com o Docker caído continua inventariado e vira pendência', () => {
+    servico.planejar(identidade('a'), 'container', 'jarvisos-run-a')
+    docker.caiu = true
+
+    const r = servico.liberarRun('a')
+
+    expect(r.pendencias.map((p) => p.recurso)).toEqual(['container'])
+    expect(inventario.listarDoRun(USER, 'a').map((x) => x.estado)).toEqual(['planejado'])
+  })
+
+  it('o Docker cai logo depois do stop: sem confirmar a parada o container não é dado como removido', () => {
+    criarRun('a', { portas: [20010] })
+    docker.cairAposParar = true
+
+    const r = servico.liberarRun('a')
+
+    expect(r.pendencias.map((p) => p.recurso)).toContain('container')
+    expect(estados('a')['container:jarvisos-run-a']).not.toBe('removido')
+    expect(leases.buscar(USER, recursoDaPorta(20010))?.proprietario).toBe('a')
+  })
+
+  it('container que ainda aparece por um instante depois do stop é reconsultado e concluído', () => {
+    criarRun('a')
+    docker.demoraParaSumir.set('jarvisos-run-a', 2)
+
+    const r = servico.liberarRun('a')
+
+    expect(r.pendencias).toEqual([])
+    expect(estados('a')['container:jarvisos-run-a']).toBe('removido')
+  })
+
+  it('container que não some depois de várias consultas vira pendência', () => {
+    criarRun('a')
+    docker.demoraParaSumir.set('jarvisos-run-a', 99)
+
+    expect(servico.liberarRun('a').pendencias.map((p) => p.recurso)).toContain('container')
+  })
+})
+
+describe('ordem e posse na devolução (revisão da F03)', () => {
+  it('sidecar ausente não solta o lease do container se o executor não parar', () => {
+    criarRun('a')
+    docker.containers.delete('jarvisos-proxy-a')
+    docker.pararFalha.add('jarvisos-run-a')
+
+    servico.liberarRun('a')
+
+    expect(leases.buscar(USER, recursoDoContainer('a'))?.proprietario).toBe('a')
+  })
+
+  it('com o container pendente, worktree e perfil não são removidos de baixo dele', () => {
+    criarRun('a')
+    docker.pararFalha.add('jarvisos-run-a')
+
+    servico.liberarRun('a')
+
+    expect(gitChamadas.some((a) => a[0] === 'worktree' && a[1] === 'remove')).toBe(false)
+    expect(diretoriosRemovidos).toEqual([])
+    expect(estados('a')['worktree:/raiz/jarvisos-run-a']).toBe('criado')
+    expect(estados('a')['perfil:/raiz/jarvisos-run-a-perfil']).toBe('criado')
+  })
+
+  it('pode preservar o worktree e a branch: o escritor acabou, mas o kernel ainda os usa', () => {
+    criarRun('a', { portas: [20010] })
+
+    const r = servico.liberarRun('a', { preservarWorktree: true })
+
+    expect(r.pendencias).toEqual([])
+    expect(docker.containers.size).toBe(0)
+    expect(docker.redes.size).toBe(0)
+    expect(diretoriosRemovidos).toEqual(['/raiz/jarvisos-run-a-perfil'])
+    expect(worktrees.has('/raiz/jarvisos-run-a')).toBe(true)
+    expect(estados('a')['worktree:/raiz/jarvisos-run-a']).toBe('criado')
+    expect(estados('a')['branch:feat/f03-a']).toBe('criado')
+    expect(estados('a')['porta:20010']).toBe('removido')
+  })
+})
+
+describe('porta: indisponível não é o mesmo que não verificada (revisão da F03)', () => {
+  it('porta tomada diz indisponivel; Docker mudo diz sem-verificacao', () => {
+    docker.containers.set('x', { portas: [20003] })
+    const tomada = servico.reservarPorta(identidade('a'), 20003)
+    docker.caiu = true
+    const muda = servico.reservarPorta(identidade('a'), 20004)
+
+    expect(tomada).toMatchObject({ ok: false, causa: 'indisponivel' })
+    expect(muda).toMatchObject({ ok: false, causa: 'sem-verificacao' })
+  })
+
+  it('alocarPorta consulta o Docker uma vez só, não uma por candidata', () => {
+    for (let i = 20000; i < 20010; i += 1) docker.containers.set(`c${i}`, { portas: [i] })
+
+    expect(servico.alocarPorta(identidade('a'))).toEqual({ ok: true, porta: 20010 })
+    expect(docker.consultasDePortas).toBe(1)
   })
 })

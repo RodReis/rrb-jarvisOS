@@ -100,10 +100,13 @@ const pedido = (extra: Partial<Pedido> = {}): Pedido => ({
   ...extra
 })
 
+const liberados: [string, unknown][] = []
+
 const suite = () =>
   new SuiteNoSandbox({
     preflight,
     docker,
+    isolamento: { liberarRun: (runId, opcoes) => void liberados.push([runId, opcoes]) },
     raizOperacional: () => '/raiz',
     proxyUrl: () => 'http://proxy',
     cwdDoDocker: () => '/docker-cwd'
@@ -284,5 +287,17 @@ describe('resumoDaSuite', () => {
         passos: []
       })
     ).toBe('suíte vermelha no passo test (corrigivel):\n1 falhou')
+  })
+})
+
+describe('SuiteNoSandbox: isolamento por run (SPEC-Scheduler-03)', () => {
+  it('ao terminar devolve o que montou, preservando o worktree do commit integrado', async () => {
+    liberados.length = 0
+
+    await suite().rodar(pedido({ tentativa: 3 }))
+
+    // O preflight dublê devolve sempre o mesmo sandbox: o que importa é que a suíte devolve o que o
+    // **sandbox** diz ser o run dele.
+    expect(liberados).toEqual([[liberado.sandbox?.runId, { preservarWorktree: true }]])
   })
 })

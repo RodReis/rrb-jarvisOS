@@ -8,11 +8,16 @@
 
 import { spawnSync } from 'node:child_process'
 import { mkdirSync, rmSync } from 'node:fs'
-import { join } from 'node:path'
+import { isAbsolute, join } from 'node:path'
 import { ARTEFATOS_DO_SANDBOX } from '../squads/squad-git'
 
-/** O sufixo que marca a raiz do perfil de um run: é o único diretório que `removerPerfil` apaga. */
-const SUFIXO_DO_PERFIL = '-perfil'
+/**
+ * A forma dos diretórios que o isolamento cria e, por isso, os únicos que apaga: absolutos, com o
+ * nome `jarvisos-run-<run>` (o worktree) ou `jarvisos-run-<run>-perfil`. O caminho vem do banco; um
+ * valor adulterado não pode virar `rm -rf` de outro lugar.
+ */
+const FORMA_DA_RAIZ_DO_PERFIL = /[\\/]jarvisos-run-[a-z0-9-]+-perfil$/
+const FORMA_DO_WORKTREE = /[\\/]jarvisos-run-[a-z0-9-]+$/
 
 /**
  * As interfaces onde a sonda tenta o bind. **As três importam**, e foi medido: no Windows um
@@ -66,11 +71,10 @@ export function prepararPerfil(raiz: string): boolean {
 
 /**
  * Remove a raiz do perfil. O caminho vem do inventário (banco), não de quem chama, então só se
- * apaga o que **tem a forma** de um perfil de run — um valor adulterado não vira `rm -rf` de outro
- * diretório.
+ * apaga o que **tem a forma** de um perfil de run (`FORMA_DA_RAIZ_DO_PERFIL`).
  */
 export function removerPerfil(raiz: string): void {
-  if (!raiz.endsWith(SUFIXO_DO_PERFIL)) {
+  if (!isAbsolute(raiz) || !FORMA_DA_RAIZ_DO_PERFIL.test(raiz)) {
     throw new Error(`Recusado: ${raiz} não é a raiz do perfil de um run.`)
   }
   rmSync(raiz, { recursive: true, force: true })
@@ -82,6 +86,9 @@ export function removerPerfil(raiz: string): void {
  * commitado inteiro.
  */
 export function descartarArtefatosDoSandbox(worktree: string): void {
+  if (!isAbsolute(worktree) || !FORMA_DO_WORKTREE.test(worktree)) {
+    throw new Error(`Recusado: ${worktree} não é o worktree de um run.`)
+  }
   for (const artefato of ARTEFATOS_DO_SANDBOX) {
     rmSync(join(worktree, artefato), { recursive: true, force: true })
   }

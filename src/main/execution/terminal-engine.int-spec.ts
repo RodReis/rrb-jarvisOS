@@ -347,6 +347,22 @@ describe('exceção da limpeza do inventário (ADR-007)', () => {
     expect(existsSync(alvo)).toBe(false)
   })
 
+  it('autorizador que lança mantém o gate: erro na consulta é "não liberado", nunca "liberado"', () => {
+    comandos.add('u-1', 'jarvis', 'node')
+    const alvo = join(permitido, 'lancou.txt')
+    const engineDocker = engineComAutorizador(() => {
+      throw new Error('banco indisponível')
+    })
+
+    const execucao = engineDocker.run(
+      { binary: 'node', args: destrutivo(alvo), cwd: permitido },
+      'jarvis'
+    )
+
+    expect(execucao.state).toBe('aguardando-aprovacao')
+    expect(existsSync(alvo)).toBe(false)
+  })
+
   it('o engine comum, sem autorizador, segue pausando o mesmo comando', () => {
     comandos.add('u-1', 'jarvis', 'node')
     const alvo = join(permitido, 'comum.txt')
@@ -358,6 +374,63 @@ describe('exceção da limpeza do inventário (ADR-007)', () => {
 
     expect(execucao.state).toBe('aguardando-aprovacao')
     expect(existsSync(alvo)).toBe(false)
+  })
+})
+
+describe('saída sensível (revisão de segurança da F03)', () => {
+  /** O texto só existe na **saída**: em base64 nos argumentos, para a auditoria dos args não o ter. */
+  const imprime = (texto: string): readonly string[] => [
+    '-e',
+    `process.stdout.write(Buffer.from(${JSON.stringify(Buffer.from(texto).toString('base64'))}, 'base64').toString())`
+  ]
+  const SEGREDO = 'ghp_abcdefghijklmnopqrstuvwxyz0123456789'
+  const URL_COM_CREDENCIAL = `https://x-access-token:${SEGREDO}@github.com/o/r.git`
+
+  it('devolve ao chamador a saída crua, sem a redação que mascararia o que ele precisa ler', () => {
+    comandos.add('u-1', 'jarvis', 'node')
+
+    const execucao = engine.run(
+      {
+        binary: 'node',
+        args: imprime(`GH_TOKEN=${SEGREDO} ${URL_COM_CREDENCIAL}`),
+        cwd: permitido,
+        saidaEhSensivel: true
+      },
+      'jarvis'
+    )
+
+    expect(execucao.stdout).toContain(SEGREDO)
+    expect(execucao.stdout).toContain(URL_COM_CREDENCIAL)
+  })
+
+  it('não grava a saída na auditoria: fica só o marcador, e o rastro do comando continua', () => {
+    comandos.add('u-1', 'jarvis', 'node')
+
+    engine.run(
+      {
+        binary: 'node',
+        args: imprime(`GH_TOKEN=${SEGREDO}`),
+        cwd: permitido,
+        saidaEhSensivel: true
+      },
+      'jarvis'
+    )
+
+    const eventos = audit.list('u-1').filter((e) => e.type === 'terminal-command')
+    expect(JSON.stringify(eventos)).not.toContain(SEGREDO)
+    expect(eventos.map((e) => e.payload['marco'])).toEqual(['antes', 'depois'])
+    expect(eventos[1]?.payload['stdout']).toBe('[conteúdo de arquivo omitido da evidência]')
+  })
+
+  it('sem a marca, a saída segue redigida e auditada como sempre', () => {
+    comandos.add('u-1', 'jarvis', 'node')
+
+    const execucao = engine.run(
+      { binary: 'node', args: imprime(URL_COM_CREDENCIAL), cwd: permitido },
+      'jarvis'
+    )
+
+    expect(execucao.stdout).not.toContain(SEGREDO)
   })
 })
 

@@ -14,7 +14,7 @@
 
 import { randomUUID } from 'node:crypto'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer, type Server } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -133,6 +133,8 @@ function subirRun(run: string): { container: string; rede: string; perfil: strin
   const gitCommon = join(dir, `gc-${run}`)
   const perfil = join(dir, `perfil-${run}`, 'claude')
   for (const d of [worktree, gitMeta, gitCommon, perfil]) mkdirSync(d, { recursive: true })
+  // O `.git` de um repositório de verdade sempre tem `config`; o scanner o lê em /gitcommon.
+  writeFileSync(join(gitCommon, 'config'), '[core]\n\tbare = false\n')
 
   criados.redes.add(rede)
   criados.containers.add(container)
@@ -296,6 +298,23 @@ describe('scanner com o Docker real', () => {
     expect(JSON.stringify(achados)).not.toContain('ghp_nao_vaza_este_valor')
   }, 120_000)
 
+  it('acha o token que o config do Git do usuário carrega num remote', async ({ skip }) => {
+    skip(!dockerNoAr, 'Docker fora do ar')
+    const a = subirRun('remoto')
+    const gitCommon = join(dir, 'gc-remoto')
+    const segredo = `ghp_${'a'.repeat(36)}`
+    writeFileSync(
+      join(gitCommon, 'config'),
+      `[remote "origin"]\n\turl = https://x-access-token:${segredo}@github.com/o/r.git\n`
+    )
+
+    const entrada = runner.inspecionarSandbox(a.container, dir)
+    const achados = entrada === undefined ? [] : escanearSandbox(entrada)
+
+    expect(achados.map((x) => `${x.origem}:${x.referencia}`)).toContain('arquivo:/gitcommon/config')
+    expect(JSON.stringify(achados)).not.toContain(segredo)
+  }, 120_000)
+
   it('container inexistente é indeterminado, não limpo', async ({ skip }) => {
     skip(!dockerNoAr, 'Docker fora do ar')
 
@@ -318,6 +337,7 @@ function montarServico(
     runAtivo,
     worktreeExiste: () => false,
     descartarArtefatos: () => undefined,
+    prepararPerfil: () => true,
     removerDiretorio: () => undefined,
     portaLivreNoHost,
     cwd: () => dir,

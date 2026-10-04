@@ -84,8 +84,7 @@ import { IndependenciaService } from './pipeline/independencia-service'
 import { LockRepository } from './pipeline/lock-repository'
 import { EffectJournalRepository } from './pipeline/effect-journal-repository'
 import { LeaseRepository } from './pipeline/lease-repository'
-import { comandoDeLimpezaDoInventario } from '@shared/domain/isolamento'
-import { ehTerminal } from '@shared/domain/pipeline'
+import { comandoDeLimpezaDoInventario, runOuUnidadeAtiva } from '@shared/domain/isolamento'
 import { MergePolicyRepository } from './pipeline/merge-policy-repository'
 import { MergePolicyService } from './pipeline/merge-policy-service'
 import { PipelineRepository } from './pipeline/pipeline-repository'
@@ -1450,12 +1449,16 @@ if (!app.requestSingleInstanceLock()) {
       audit: storage.audit,
       userId: userIdAtual,
       workspaceId: () => workspaces.atual(),
-      runAtivo: (runId) => {
-        const run = pipelineRepository.buscar(runId)
-        return run !== undefined && !ehTerminal(run.estado)
-      },
+      // O inventário registra também a **unidade** de sandbox de um Squad (`<run>-<escritor>-…`):
+      // procurá-la entre os runs ativos a daria por morta e devolveria o sandbox de um run vivo.
+      runAtivo: (runId) =>
+        runOuUnidadeAtiva(
+          runId,
+          pipelineRepository.listarAtivos(userIdAtual()).map((run) => run.id)
+        ),
       worktreeExiste: existsSync,
       descartarArtefatos: descartarArtefatosDoSandbox,
+      prepararPerfil,
       removerDiretorio: removerPerfil,
       portaLivreNoHost,
       cwd: () => app.getAppPath()
@@ -1574,8 +1577,7 @@ if (!app.requestSingleInstanceLock()) {
           projectId
         ),
       prepararGitMeta,
-      isolamento,
-      prepararPerfil
+      isolamento
     })
 
     const reconciliacao = new ReconciliacaoService({

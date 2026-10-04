@@ -161,6 +161,7 @@ function montarIsolamento(
     runAtivo,
     worktreeExiste: existsSync,
     descartarArtefatos: descartarArtefatosDoSandbox,
+    prepararPerfil,
     removerDiretorio: removerPerfil,
     portaLivreNoHost,
     cwd: () => raiz,
@@ -181,7 +182,6 @@ function montarPreflight(isolamento = montarIsolamento()): InstanceType<typeof P
     modeloDaConstrucao: () => ({ provider: 'claude-code', modelo: 'claude-opus-5' }),
     prepararGitMeta,
     isolamento,
-    prepararPerfil,
     imagemDoSandbox: IMAGEM
   })
 }

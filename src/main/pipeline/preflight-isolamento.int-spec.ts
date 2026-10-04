@@ -114,7 +114,7 @@ function montar(): InstanceType<typeof PreflightService> {
       gitCalls.push([...args])
       if (args[0] === 'rev-parse') return { ok: true, saida: 'a'.repeat(40) }
       if (args[2] === 'worktree' && args[3] === 'add') worktrees.add(String(args[6]))
-      if (args[0] === 'worktree' && args[1] === 'remove') worktrees.delete(String(args[2]))
+      if (args[0] === 'worktree' && args[1] === 'remove') worktrees.delete(String(args.at(-1)))
       return { ok: true, saida: '' }
     }
   }
@@ -130,6 +130,11 @@ function montar(): InstanceType<typeof PreflightService> {
     runAtivo: () => false,
     worktreeExiste: (caminho) => worktrees.has(caminho),
     descartarArtefatos: vi.fn(),
+    prepararPerfil: (caminho: string) => {
+      perfis.push(caminho)
+      return true
+    },
+    aguardar: () => undefined,
     removerDiretorio: (caminho) => {
       perfis.splice(perfis.indexOf(caminho), 1)
     },
@@ -148,10 +153,6 @@ function montar(): InstanceType<typeof PreflightService> {
     derivarPaths: () => undefined,
     modeloDaConstrucao: () => ({ provider: 'claude-code', modelo: 'claude-opus-5' }),
     prepararGitMeta: () => '/gitmeta',
-    prepararPerfil: (caminho: string) => {
-      perfis.push(caminho)
-      return true
-    },
     isolamento,
     agora: () => AGORA
   })
@@ -368,5 +369,57 @@ describe('scanner de credenciais', () => {
 
     expect(r.reason).toBe('credencial-no-sandbox')
     expect(docker.containers.size).toBe(0)
+  })
+})
+
+describe('guardas do preflight (revisão da F03)', () => {
+  it('um segundo preflight do mesmo run, com o primeiro vivo, recusa sem tocar nos recursos dele', () => {
+    expect(preflight.preparar(pedido('run-a', { portasDeServico: [20070] })).reason).toBe(
+      'liberado'
+    )
+    const antes = doRun('run-a')
+
+    const segundo = preflight.preparar(pedido('run-a', { portasDeServico: [20070] }))
+
+    expect(segundo.reason).toBe('recurso-ocupado')
+    expect(doRun('run-a')).toEqual(antes)
+    expect(docker.containers.has('jarvisos-run-run-a')).toBe(true)
+    expect(docker.chamadas).toEqual([])
+  })
+
+  it('lease do worktree que já tem dono: o run devolve a porta que acabou de reservar', () => {
+    leases.adquirir(
+      USER,
+      { proprietario: 'outro', recurso: 'worktree:run-a', projectId: 'p' },
+      AGORA
+    )
+
+    const r = preflight.preparar(pedido('run-a', { portasDeServico: [20071] }))
+
+    expect(r.reason).toBe('recurso-ocupado')
+    expect(leases.buscar(USER, 'porta:20071')).toBeUndefined()
+    expect(inventario.listarDoRun(USER, 'run-a')).toEqual([])
+  })
+
+  it('rede que outro run já registrou recusa antes de criar qualquer coisa', () => {
+    inventario.planejar(
+      USER,
+      {
+        runId: 'outro',
+        projectId: 'p',
+        tipo: 'rede',
+        identificador: 'jarvisos-egress-run-a',
+        labels: {}
+      },
+      AGORA
+    )
+
+    const r = preflight.preparar(pedido('run-a'))
+
+    expect(r.reason).toBe('recurso-ocupado')
+    expect(docker.redesCriadas).toEqual([])
+    expect(docker.containers.size).toBe(0)
+    expect(inventario.listarDoRun(USER, 'run-a')).toEqual([])
+    expect(worktrees.size).toBe(0)
   })
 })

@@ -68,6 +68,10 @@ export interface IsolamentoParaOPreflight {
     detalhes?: Readonly<Record<string, string>>
   ) => RecursoDoRun | undefined
   readonly confirmar: (id: number) => boolean
+  /** O inventário já tem recurso vivo deste run? Preparar de novo por cima seria destruí-lo. */
+  readonly inventariado: (runId: string) => boolean
+  /** Cria a raiz do perfil do run, com o diretório `claude` dentro. */
+  readonly prepararPerfil: (raiz: string) => boolean
   readonly reservarPorta: (identidade: IdentidadeDoRun, porta: number) => ResultadoDaReserva
   readonly escanear: (container: string) => ResultadoDoScanner
   readonly liberarRun: (runId: string) => unknown
@@ -162,12 +166,11 @@ export interface PreflightDeps {
    */
   readonly prepararGitMeta: (origem: string, worktree: string) => string | undefined
   /**
-   * O isolamento por run: inventário, portas e scanner. **Opcional**: sem ele o preflight é o de
-   * antes da SPEC-Scheduler-03 (sem labels, sem inventário, sem perfil por run).
+   * O isolamento por run: inventário, portas, perfil e scanner. **Opcional**: sem ele o preflight
+   * é o de antes da SPEC-Scheduler-03 — sem inventário, sem reserva de porta, sem perfil por run e
+   * sem scanner (as labels vão sempre, e só acrescentam `--label` aos comandos).
    */
   readonly isolamento?: IsolamentoParaOPreflight
-  /** Cria a raiz do perfil do run (com o diretório `claude` dentro). Obrigatório com `isolamento`. */
-  readonly prepararPerfil?: (caminho: string) => boolean
   /**
    * A imagem do sandbox. Ausente = `IMAGEM_PADRAO`, que é o que produção usa. Existe para o teste
    * com Docker real rodar numa imagem de poucos MB em vez de puxar a do executor.
@@ -264,6 +267,16 @@ export class PreflightService {
       ...(pedido.tentativa === undefined ? {} : { tentativa: pedido.tentativa })
     }
     const iso = this.deps.isolamento
+    // Um run que já tem recurso vivo no inventário não prepara de novo: o segundo preflight só
+    // chegaria a destruir (`desfazer`) o que o primeiro montou. Recusa **sem tocar em nada**.
+    if (iso?.inventariado(pedido.runId) === true) {
+      return this.recusar(
+        pedido,
+        'recurso-ocupado',
+        'Este run já tem recursos inventariados: o sandbox dele está montado ou aguarda reconciliação.',
+        'Aguardar o run terminar, ou reconciliar os recursos no próximo boot.'
+      )
+    }
     if (iso === undefined) {
       const ocupada = (pedido.portasDeServico ?? []).find((porta) =>
         this.deps.docker.portaOcupadaPorContainer(porta, pedido.raizOperacional)
@@ -295,7 +308,7 @@ export class PreflightService {
     //    tem de nascer de um ponto conhecido, não de "o que a base for quando eu olhar".
     const baseSha = this.resolverBase(pedido)
     if (baseSha === undefined) {
-      this.desfazer(userId, pedido.runId)
+      this.liberarReservas(pedido.runId)
       return this.recusar(
         pedido,
         'base-nao-resolvida',
@@ -316,6 +329,7 @@ export class PreflightService {
       this.agora()
     )
     if (leaseWorktree === undefined) {
+      this.liberarReservas(pedido.runId)
       return this.recusar(
         pedido,
         'recurso-ocupado',
@@ -336,6 +350,7 @@ export class PreflightService {
     )
     if (leaseContainer === undefined) {
       this.deps.leases.liberar(userId, recursoDoWorktree(pedido.runId), pedido.runId)
+      this.liberarReservas(pedido.runId)
       return this.recusar(
         pedido,
         'recurso-ocupado',
@@ -404,6 +419,8 @@ export class PreflightService {
     const labels = labelsDoRecurso(identidade)
     const redeDeEgress = nomeDaRedeDeEgress(pedido.runId)
     const registroDaRede = this.registrar(identidade, 'rede', redeDeEgress)
+    if (registroDaRede === undefined)
+      return this.recusarRegistro(pedido, userId, 'a rede', redeDeEgress)
     const redeCriada = this.deps.docker.criarRedeDeEgress(
       redeDeEgress,
       pedido.raizOperacional,
@@ -422,6 +439,9 @@ export class PreflightService {
 
     const nomeProxy = nomeDoProxyDeEgress(pedido.runId)
     const registroDoSidecar = this.registrar(identidade, 'sidecar', nomeProxy)
+    if (registroDoSidecar === undefined) {
+      return this.recusarRegistro(pedido, userId, 'o sidecar', nomeProxy)
+    }
     const proxySubiu = this.deps.docker.subirProxyDeEgress(
       {
         nome: nomeProxy,
@@ -498,6 +518,9 @@ export class PreflightService {
     }
 
     const registroDoContainer = this.registrar(identidade, 'container', nomeContainer)
+    if (registroDoContainer === undefined) {
+      return this.recusarRegistro(pedido, userId, 'o container', nomeContainer)
+    }
     const montou = this.deps.docker.subir(
       {
         worktreeNoHost: worktree,
@@ -660,6 +683,31 @@ export class PreflightService {
     this.liberarRecursos(userId, runId)
   }
 
+  /**
+   * Devolve só as reservas **desta chamada** (as portas), para falhas que ocorrem antes de qualquer
+   * recurso nascer. Não usa `desfazer`: se um segundo preflight do mesmo run chegasse até aqui, ele
+   * não poderia derrubar o que o primeiro montou.
+   */
+  private liberarReservas(runId: string): void {
+    this.deps.isolamento?.liberarRun(runId)
+  }
+
+  /** O nome do recurso já pertence a outro run no inventário: nada foi criado, e o que foi, sai. */
+  private recusarRegistro(
+    pedido: PedidoDePreflight,
+    userId: string,
+    recurso: string,
+    nome: string
+  ): PreflightOutcome {
+    this.desfazer(userId, pedido.runId)
+    return this.recusar(
+      pedido,
+      'recurso-ocupado',
+      `${recurso.charAt(0).toUpperCase()}${recurso.slice(1)} ${nome} já pertence a outro run.`,
+      'Aguardar o outro run terminar, ou reconciliar os recursos no próximo boot.'
+    )
+  }
+
   /** Registra a intenção no inventário. `null` sem isolamento; `undefined` se o nome é de outro run. */
   private registrar(
     identidade: IdentidadeDoRun,
@@ -688,7 +736,7 @@ export class PreflightService {
     // Sem ponto na frente de propósito: `.claude` é o diretório que o scanner proíbe montar.
     const raiz = `${pedido.raizOperacional}/${nomeContainer}-perfil`
     const registro = this.registrar(identidade, 'perfil', raiz)
-    if (registro === undefined || this.deps.prepararPerfil?.(raiz) !== true) return null
+    if (registro === undefined || this.deps.isolamento.prepararPerfil(raiz) !== true) return null
     this.confirmar(registro)
     return `${raiz}/claude`
   }

@@ -14,24 +14,29 @@ interface Resposta {
 function terminalDuble(responder: (args: readonly string[]) => Resposta = () => ({})): {
   terminal: TerminalEngine
   chamadas: string[][]
+  submissoes: { readonly args: readonly string[]; readonly saidaEhSensivel?: boolean }[]
 } {
   const chamadas: string[][] = []
+  const submissoes: { readonly args: readonly string[]; readonly saidaEhSensivel?: boolean }[] = []
   const terminal = {
-    run: vi.fn((submission: { readonly args: readonly string[] }) => {
-      chamadas.push([...submission.args])
-      const r = responder(submission.args)
-      return {
-        id: 'x',
-        state: r.state ?? 'concluido',
-        reason: r.reason ?? 'executado',
-        stdout: r.stdout ?? '',
-        stderr: '',
-        exitCode: r.exitCode ?? 0,
-        durationMs: 1
+    run: vi.fn(
+      (submission: { readonly args: readonly string[]; readonly saidaEhSensivel?: boolean }) => {
+        submissoes.push(submission)
+        chamadas.push([...submission.args])
+        const r = responder(submission.args)
+        return {
+          id: 'x',
+          state: r.state ?? 'concluido',
+          reason: r.reason ?? 'executado',
+          stdout: r.stdout ?? '',
+          stderr: '',
+          exitCode: r.exitCode ?? 0,
+          durationMs: 1
+        }
       }
-    })
+    )
   } as unknown as TerminalEngine
-  return { terminal, chamadas }
+  return { terminal, chamadas, submissoes }
 }
 
 const runner = (t: TerminalEngine): DockerRunner => new DockerRunner(t, () => 'ws1' as never)
@@ -229,8 +234,61 @@ describe('inspecionarSandbox', () => {
         { origem: '/r/.git', destino: '/gitcommon', somenteLeitura: true }
       ],
       comando: ['sleep', 'infinity'],
-      arquivos: ['/root/.npmrc', '/tmp/x']
+      arquivos: ['/root/.npmrc', '/tmp/x'],
+      // O `cat` do config do Git cai no mesmo dublê de `exec` deste teste.
+      configDoGit: '/root/.npmrc\n/tmp/x\n'
     })
+  })
+
+  it('o inspect e o cat do config do Git pedem saída sensível: crua para o scanner, fora da auditoria', () => {
+    const { terminal, submissoes } = terminalDuble((args) =>
+      args[0] === 'inspect' ? { stdout: inspecao } : { stdout: '[core]\n' }
+    )
+    runner(terminal).inspecionarSandbox('c1', '/cwd')
+
+    const inspect = submissoes.find((s) => s.args[0] === 'inspect')
+    const cat = submissoes.find((s) => s.args.includes('cat'))
+    const find = submissoes.find((s) => s.args.includes('find'))
+    expect(inspect?.saidaEhSensivel).toBe(true)
+    expect(cat?.saidaEhSensivel).toBe(true)
+    expect(cat?.args).toContain('/gitcommon/config')
+    // O `find` só lista caminhos: segue o caminho comum, redigido e auditado.
+    expect(find?.saidaEhSensivel).not.toBe(true)
+  })
+
+  it('sem montagem em /gitcommon não há config a ler', () => {
+    const semGit = JSON.stringify({
+      Config: { Env: [], Cmd: ['x'], Entrypoint: null },
+      Mounts: [{ Source: '/raiz/c1', Destination: '/work', RW: true }]
+    })
+    const { terminal, chamadas } = terminalDuble((args) =>
+      args[0] === 'inspect' ? { stdout: semGit } : { stdout: '' }
+    )
+
+    const entrada = runner(terminal).inspecionarSandbox('c1', '/cwd')
+
+    expect(chamadas.some((a) => a.includes('cat'))).toBe(false)
+    expect(entrada?.configDoGit).toBeUndefined()
+  })
+
+  it('não conseguir ler o config do Git é indeterminado', () => {
+    const { terminal } = terminalDuble((args) => {
+      if (args[0] === 'inspect') return { stdout: inspecao }
+      if (args.includes('cat')) return { state: 'falhou', exitCode: 1 }
+      return { stdout: '' }
+    })
+
+    expect(runner(terminal).inspecionarSandbox('c1', '/cwd')).toBeUndefined()
+  })
+
+  it('config do Git truncado é indeterminado: o remote pode estar depois do corte', () => {
+    const { terminal } = terminalDuble((args) => {
+      if (args[0] === 'inspect') return { stdout: inspecao }
+      if (args.includes('cat')) return { stdout: '[core]\n[saída truncada em 65536 bytes]' }
+      return { stdout: '' }
+    })
+
+    expect(runner(terminal).inspecionarSandbox('c1', '/cwd')).toBeUndefined()
   })
 
   it('procura arquivo só fora do worktree, onde o repositório do usuário não confunde', () => {
@@ -250,6 +308,18 @@ describe('inspecionarSandbox', () => {
 
     expect(runner(falha.terminal).inspecionarSandbox('c1', '/cwd')).toBeUndefined()
     expect(runner(lixo.terminal).inspecionarSandbox('c1', '/cwd')).toBeUndefined()
+  })
+
+  it('saída do find truncada pelo terminal é indeterminada: o que veio depois do corte não foi visto', () => {
+    // Só o `find` vem truncado; o `cat` do config do Git responde normalmente — senão o teste
+    // passaria pelo motivo errado (o `cat` truncado também derrubaria o resultado).
+    const { terminal } = terminalDuble((args) => {
+      if (args[0] === 'inspect') return { stdout: inspecao }
+      if (args.includes('cat')) return { stdout: '[core]\n' }
+      return { stdout: '/root/a\n/root/b\n\n[saída truncada em 65536 bytes]' }
+    })
+
+    expect(runner(terminal).inspecionarSandbox('c1', '/cwd')).toBeUndefined()
   })
 
   it('devolve undefined quando o find não roda: sem olhar o disco não há "limpo"', () => {

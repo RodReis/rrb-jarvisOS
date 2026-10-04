@@ -33,6 +33,7 @@ import {
   portasDaSaidaDoDocker,
   type EntradaDoScanner
 } from '@shared/domain/isolamento'
+import { MARCADOR_DE_TRUNCAMENTO } from '../execution/terminal-engine'
 import { log } from '../logging/logger'
 import { cpSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -592,8 +593,16 @@ export class DockerRunner {
    * `undefined` quando não deu para olhar: sem ver o container, "nenhum achado" seria mentira.
    */
   inspecionarSandbox(container: string, cwd: string): EntradaDoScanner | undefined {
+    // `saidaEhSensivel`: o `Config.Env` é exatamente o que o scanner procura. Sem a marca a
+    // redação do terminal mascararia `https://usuario:token@host` antes de o scanner ler, e o valor
+    // iria em claro para a auditoria encadeada por hash, de onde não se remove.
     const inspecao = this.terminal.run(
-      { binary: BINARIO_DOCKER, args: ['inspect', '--format', '{{json .}}', container], cwd },
+      {
+        binary: BINARIO_DOCKER,
+        args: ['inspect', '--format', '{{json .}}', container],
+        cwd,
+        saidaEhSensivel: true
+      },
       this.workspaceId()
     )
     if (inspecao.state !== 'concluido') return undefined
@@ -608,12 +617,43 @@ export class DockerRunner {
       ['find', ...raizes, '-xdev', '-maxdepth', '6', '-type', 'f'],
       cwd
     )
-    if (!arquivos.ok) return undefined
+    // A saída do terminal é cortada em 64 KB: lista truncada é só o começo da lista, e o arquivo
+    // de credencial pode estar depois do corte. Sem ver tudo, não há "limpo".
+    if (!arquivos.ok || arquivos.stdout.includes(MARCADOR_DE_TRUNCAMENTO)) return undefined
+
+    const configDoGit = this.lerConfigDoGit(container, lido.montagens, cwd)
+    if (configDoGit === null) return undefined
 
     return {
       ...lido,
-      arquivos: arquivos.stdout.split('\n').filter((linha) => linha.trim() !== '')
+      arquivos: arquivos.stdout.split('\n').filter((linha) => linha.trim() !== ''),
+      ...(configDoGit === undefined ? {} : { configDoGit })
     }
+  }
+
+  /**
+   * O `config` do `.git` principal que o container enxerga em `/gitcommon`. `undefined` quando a
+   * montagem não existe (nada a ler); `null` quando existe e não deu para lê-lo por inteiro.
+   */
+  private lerConfigDoGit(
+    container: string,
+    montagens: readonly { readonly destino: string }[],
+    cwd: string
+  ): string | null | undefined {
+    if (!montagens.some((m) => m.destino === GITCOMMON_NO_CONTAINER)) return undefined
+    const leitura = this.terminal.run(
+      {
+        binary: BINARIO_DOCKER,
+        args: ['exec', container, 'cat', `${GITCOMMON_NO_CONTAINER}/config`],
+        cwd,
+        saidaEhSensivel: true
+      },
+      this.workspaceId()
+    )
+    if (leitura.state !== 'concluido' || leitura.stdout.includes(MARCADOR_DE_TRUNCAMENTO)) {
+      return null
+    }
+    return leitura.stdout
   }
 }
 

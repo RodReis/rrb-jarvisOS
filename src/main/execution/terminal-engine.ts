@@ -166,7 +166,7 @@ export const SAIDA_OMITIDA = '[conteúdo de arquivo omitido da evidência]'
  * do arquivo do usuário (ADR-004), não o rastro de que o comando rodou.
  */
 function semConteudo(execucao: CommandExecution, submission: CommandSubmission): CommandExecution {
-  if (submission.saidaEhConteudo !== true) return execucao
+  if (submission.saidaEhConteudo !== true && submission.saidaEhSensivel !== true) return execucao
   return { ...execucao, stdout: SAIDA_OMITIDA }
 }
 
@@ -177,13 +177,20 @@ function semConteudo(execucao: CommandExecution, submission: CommandSubmission):
  * ao meio e deixar o pedaço passar pela redação, que casa padrões inteiros — o segredo
  * vazaria justamente por ter sido cortado.
  */
+/**
+ * O que a saída ganha no fim quando passa do limite. Exportado porque quem **decide** a partir da
+ * saída (o scanner de credenciais) precisa reconhecer que viu só o começo: lista cortada não é
+ * lista completa.
+ */
+export const MARCADOR_DE_TRUNCAMENTO = '[saída truncada em'
+
 function saidaSegura(raw: string, limite: number = LIMITE_SAIDA_BYTES): string {
   const redigido = redact(raw)
   const texto = typeof redigido === 'string' ? redigido : String(redigido)
 
   if (Buffer.byteLength(texto, 'utf8') <= limite) return texto
 
-  return `${texto.slice(0, limite)}\n[saída truncada em ${limite} bytes]`
+  return `${texto.slice(0, limite)}\n${MARCADOR_DE_TRUNCAMENTO} ${limite} bytes]`
 }
 
 /**
@@ -195,7 +202,21 @@ function saidaSegura(raw: string, limite: number = LIMITE_SAIDA_BYTES): string {
  * auditoria.
  */
 function limiteDaSaida(submission: CommandSubmission): number {
-  return submission.saidaEhConteudo === true ? LIMITE_CONTEUDO_BYTES : LIMITE_SAIDA_BYTES
+  return submission.saidaEhConteudo === true || submission.saidaEhSensivel === true
+    ? LIMITE_CONTEUDO_BYTES
+    : LIMITE_SAIDA_BYTES
+}
+
+/**
+ * O `stdout` como o chamador o recebe. A saída **sensível** não passa pela redação (ver
+ * `CommandSubmission.saidaEhSensivel`) e só é truncada; as demais seguem por `saidaSegura`.
+ */
+function stdoutDoChamador(raw: string, submission: CommandSubmission): string {
+  const limite = limiteDaSaida(submission)
+  if (submission.saidaEhSensivel !== true) return saidaSegura(raw, limite)
+  return Buffer.byteLength(raw, 'utf8') <= limite
+    ? raw
+    : `${raw.slice(0, limite)}\n${MARCADOR_DE_TRUNCAMENTO} ${limite} bytes]`
 }
 
 /** O payload da operação guardado na `ApprovalRequest`, para retomar depois da decisão. */
@@ -292,7 +313,7 @@ export class TerminalEngine {
     // A exceção do ADR-007 só tira o gate de quem casou um padrão destrutivo **e** o autorizador
     // reconhece. O padrão que casou continua registrado: a liberação é rastreável.
     const liberadoPeloInventario =
-      casado !== undefined && this.autorizadorDeLimpeza?.(binarioCanonico, submission.args) === true
+      casado !== undefined && this.liberaPelaLimpeza(binarioCanonico, submission.args)
     const destrutivo = liberadoPeloInventario ? undefined : casado
     const action = destrutivo ? 'terminal.run-destructive' : 'terminal.run-allowlisted'
 
@@ -439,6 +460,22 @@ export class TerminalEngine {
   }
 
   /**
+   * O autorizador da limpeza (ADR-007) libera este comando? **Erro na consulta é "não liberado"**:
+   * o autorizador lê o inventário no banco, e um banco que falha não pode abrir o gate — cai no
+   * pedido de aprovação, que é o desfecho seguro.
+   */
+  private liberaPelaLimpeza(binario: string, args: readonly string[]): boolean {
+    try {
+      return this.autorizadorDeLimpeza?.(binario, args) === true
+    } catch (erro) {
+      log.agent.warn('Autorizador da limpeza falhou: o gate destrutivo foi mantido', {
+        erro: erro instanceof Error ? erro.message : 'erro desconhecido'
+      })
+      return false
+    }
+  }
+
+  /**
    * Executa o processo de verdade. Só se chega aqui depois de as duas barreiras e a política
    * terem passado — este método não decide nada, só faz.
    */
@@ -502,7 +539,7 @@ export class TerminalEngine {
     })
 
     const durationMs = Date.now() - ctx.started
-    const stdout = saidaSegura(resultado.stdout ?? '', limiteDaSaida(ctx.submission))
+    const stdout = stdoutDoChamador(resultado.stdout ?? '', ctx.submission)
     const stderrBruto = resultado.stderr ?? ''
 
     // Estourou o timeout: o Node marca `error.code === 'ETIMEDOUT'` (ou devolve o sinal com

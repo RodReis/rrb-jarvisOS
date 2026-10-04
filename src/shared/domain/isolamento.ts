@@ -116,12 +116,21 @@ export function escolherPorta(
  * próximo `docker start`.
  */
 export function portasDaSaidaDoDocker(saida: string): number[] {
-  const publicadas = [...saida.matchAll(/:(\d+)->/g)].map((m) => Number(m[1]))
-  const configuradas = saida
-    .split(/\s+/)
-    .filter((token) => /^\d+$/.test(token))
-    .map(Number)
-  return [...new Set([...publicadas, ...configuradas])]
+  const portas = new Set<number>()
+  const somar = (de: string, ate: string | undefined): void => {
+    const inicio = Number(de)
+    const fim = ate === undefined ? inicio : Number(ate)
+    // Faixa invertida ou fora de 1–65535 não é porta: nada a somar.
+    if (inicio < 1 || fim > 65_535 || fim < inicio) return
+    for (let porta = inicio; porta <= fim; porta += 1) portas.add(porta)
+  }
+  // `0.0.0.0:8000-8002->80-82/tcp`: a faixa do host é a que vem **antes** da seta.
+  for (const m of saida.matchAll(/:(\d+)(?:-(\d+))?->/g)) somar(m[1] ?? '', m[2])
+  for (const token of saida.split(/\s+/)) {
+    const m = /^(\d+)(?:-(\d+))?$/.exec(token)
+    if (m !== null) somar(m[1] ?? '', m[2])
+  }
+  return [...portas]
 }
 
 // ─── o scanner de credenciais proibidas ──────────────────────────────────────────────────────────
@@ -151,18 +160,59 @@ export interface EntradaDoScanner {
   readonly comando: readonly string[]
   /** Caminhos de arquivo vistos dentro do container (`find`). */
   readonly arquivos: readonly string[]
+  /**
+   * O conteúdo do `config` do `.git` principal, montado em `/gitcommon`. Um remote com
+   * `https://usuario:token@host` ali fica legível ao agente, e nenhum outro lugar do scanner o vê.
+   */
+  readonly configDoGit?: string
 }
 
-/** Nomes que, por si, indicam credencial. `ANTHROPIC_BASE_URL` não casa: é só um endereço. */
-const NOME_DE_CREDENCIAL = /(token|secret|passw|senha|api[_-]?key|credential|private[_-]?key)/i
+/**
+ * Nomes que, por si, indicam credencial. `ANTHROPIC_BASE_URL` e `GIT_AUTHOR_NAME` não casam: o
+ * primeiro é só um endereço, e `auth` só conta como palavra inteira (`AUTH`, `MY_AUTH_HEADER`).
+ */
+const NOME_DE_CREDENCIAL =
+  /(token|secret|passw|senha|api[_-]?key|credential|private[_-]?key|access[_-]?key|bearer|cookie|(^|_)auth(_|$))/i
+
+/**
+ * Formatos de valor que o `segredos.ts` (feito para o contexto de IA) não cobre e o sandbox precisa:
+ * Stripe, Slack, JWT e, sobretudo, **URL com usuário e senha** (`postgres://u:p@host/db`,
+ * `https://x-access-token:...@github.com`) — o formato que a redação do terminal mascara e que o
+ * scanner, por isso, recebe a saída crua (`saidaEhSensivel`).
+ */
+const VALORES_EXTRAS: readonly RegExp[] = [
+  /\bsk_(live|test)_[A-Za-z0-9]{16,}/,
+  /\bxox[abprs]-[A-Za-z0-9-]{10,}/,
+  /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/,
+  /[a-z][a-z0-9+.-]*:\/\/[^/\s:@]+:[^/\s@]+@/i
+]
+
+const temSegredo = (texto: string): boolean =>
+  conteudoTemSegredo(texto) || VALORES_EXTRAS.some((padrao) => padrao.test(texto))
+
+/** Arquivos de credencial que o `NOMES_PROIBIDOS` do contexto não pega (ponto na frente, sem extensão). */
+const ARQUIVOS_EXTRAS: readonly RegExp[] = [
+  /(^|\/)\.credentials\.json$/,
+  /(^|\/)\.git-credentials$/,
+  /(^|\/)\.pgpass$/,
+  /(^|\/)\.aws\/credentials$/,
+  /(^|\/)\.docker\/config\.json$/,
+  /(^|\/)\.kube\/config$/
+]
 
 /** O que do host jamais pode ser montado dentro de um sandbox. */
 const MONTAGENS_PROIBIDAS: readonly RegExp[] = [
-  /(^|\/)\.(claude|codex|ssh|aws|gnupg|kube|docker)(\/|$)/,
-  /(^|\/)\.config\/gh(\/|$)/,
+  /(^|\/)\.(claude|codex|ssh|aws|gnupg|kube|docker|azure)(\/|$)/,
+  /(^|\/)\.config\/(gh|gcloud)(\/|$)/,
+  /(^|\/)\.git-credentials/,
+  // Socket do Docker no Linux e named pipe no Windows (`//./pipe/docker_engine`).
   /docker\.sock$/,
+  /(^|\/)pipe\/docker/,
   /(^|\/)vault(\/|$)/
 ]
+
+const arquivoDeCredencial = (caminho: string): boolean =>
+  nomeProibido(caminho) || ARQUIVOS_EXTRAS.some((padrao) => padrao.test(normalizar(caminho)))
 
 const normalizar = (caminho: string): string => caminho.replace(/\\/g, '/').toLowerCase()
 
@@ -187,14 +237,14 @@ export function escanearSandbox(entrada: EntradaDoScanner): AchadoDoScanner[] {
         referencia: nome,
         motivo: 'Nome de variável indica credencial.'
       })
-    } else if (conteudoTemSegredo(valor)) {
+    } else if (temSegredo(valor)) {
       achados.push({ origem: 'env', referencia: nome, motivo: 'Valor tem formato de segredo.' })
     }
   }
 
   for (const montagem of entrada.montagens) {
     const origem = normalizar(montagem.origem)
-    if (MONTAGENS_PROIBIDAS.some((padrao) => padrao.test(origem)) || nomeProibido(origem)) {
+    if (MONTAGENS_PROIBIDAS.some((padrao) => padrao.test(origem)) || arquivoDeCredencial(origem)) {
       achados.push({
         origem: 'montagem',
         referencia: montagem.origem,
@@ -204,7 +254,7 @@ export function escanearSandbox(entrada: EntradaDoScanner): AchadoDoScanner[] {
   }
 
   for (const arquivo of entrada.arquivos) {
-    if (nomeProibido(arquivo)) {
+    if (arquivoDeCredencial(arquivo)) {
       achados.push({
         origem: 'arquivo',
         referencia: arquivo,
@@ -213,7 +263,15 @@ export function escanearSandbox(entrada: EntradaDoScanner): AchadoDoScanner[] {
     }
   }
 
-  if (entrada.comando.some((argumento) => conteudoTemSegredo(argumento))) {
+  if (entrada.configDoGit !== undefined && temSegredo(entrada.configDoGit)) {
+    achados.push({
+      origem: 'arquivo',
+      referencia: '/gitcommon/config',
+      motivo: 'O config do Git montado no sandbox traz credencial num remote.'
+    })
+  }
+
+  if (entrada.comando.some((argumento) => temSegredo(argumento))) {
     achados.push({
       origem: 'comando',
       referencia: 'comando',
@@ -247,4 +305,16 @@ export function comandoDeLimpezaDoInventario(
   if (binario !== 'docker' || args.length !== 3) return false
   const [grupo, verbo, alvo] = args
   return grupo === 'network' && verbo === 'rm' && alvo !== undefined && inventario.redes.has(alvo)
+}
+
+/**
+ * O run — ou a **unidade de sandbox** de um run — está ativo?
+ *
+ * O Squad e a suíte passam ao preflight uma unidade (`<run>-<escritor>-<tarefa>-t<n>`,
+ * `<run>-teste-t<n>`) no lugar do `runId`, e é ela que o inventário registra. Procurar a unidade
+ * entre os runs ativos a daria por morta e a reconciliação devolveria o sandbox de um run que
+ * segue em execução. Prefixo **por segmento** (`<run>-`): `run-10` não é unidade de `run-1`.
+ */
+export function runOuUnidadeAtiva(id: string, runsAtivos: readonly string[]): boolean {
+  return runsAtivos.some((run) => id === run || id.startsWith(`${run}-`))
 }

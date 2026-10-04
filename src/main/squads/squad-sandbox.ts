@@ -45,10 +45,21 @@ export interface DockerParaOEscritor {
   parar(nome: string, cwd: string): boolean
 }
 
+/**
+ * O isolamento por run, visto pelo escritor (SPEC-Scheduler-03). Ao encerrar, devolve rede, sidecar,
+ * perfil e portas da unidade — **preservando o worktree e a branch**, que o kernel ainda commita,
+ * integra e remove pelo `SquadGit`.
+ */
+export interface IsolamentoParaOEscritor {
+  liberarRun(runId: string, opcoes: { readonly preservarWorktree: true }): unknown
+}
+
 export interface DependenciasDoSandboxDoEscritor {
   readonly preflight: PreflightParaOEscritor
   readonly git: Pick<SquadGit, 'adotarWorktree'>
   readonly docker: DockerParaOEscritor
+  /** Opcional: sem ele só o container é parado, como antes da SPEC-Scheduler-03. */
+  readonly isolamento?: IsolamentoParaOEscritor
   readonly proxy: ProxyParaOEscritor
   /** A raiz operacional validada: onde os worktrees podem nascer. Nunca o checkout ativo. */
   readonly raizOperacional: () => string
@@ -146,5 +157,7 @@ export class SandboxDoEscritorReal implements SandboxDoEscritor {
 
   private parar(sandbox: SandboxPreparado): void {
     this.deps.docker.parar(sandbox.containerNome, this.deps.cwdDoDocker())
+    // `sandbox.runId` é a unidade: foi ela que o preflight registrou no inventário.
+    this.deps.isolamento?.liberarRun(sandbox.runId, { preservarWorktree: true })
   }
 }
