@@ -89,6 +89,12 @@ Trocar o gatilho da conversa. Hoje o loop de voz do MVP-017 começa com um ato e
 - O detector de palmas precisa de contrafactuais para palma isolada, ruído sustentado e
   fala comum, além de teste físico. O controle visual, a hotkey e a auditoria cobrem a
   captura compartilhada, independentemente de qual gatilho esteja habilitado.
+- **Retorno do teste físico (2026-10-04):** a escolha do microfone e do alto-falante fica em
+  Settings > Voz. Quando a frase ou as duas palmas abrem um turno sem pergunta, o Command
+  Center informa que o gatilho foi detectado e pede a pergunta logo em seguida. A conversa
+  local solicita iniciar o Ollama instalado na máquina ao subir o app, preservando um serviço
+  que já estivesse ativo. A verificação real com pergunta nova e sessão bloqueada continua
+  necessária para o aceite.
 
 ## Decisões cravadas pelo Cowork (coerentes com as anteriores; o PI pode vetar)
 

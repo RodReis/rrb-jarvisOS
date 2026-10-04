@@ -33,6 +33,7 @@ import { AiCallService } from './ai/call-provider'
 import { AnthropicAdapter } from './ai/anthropic-adapter'
 import { GeminiAdapter } from './ai/gemini-adapter'
 import { OllamaAdapter } from './ai/ollama-adapter'
+import { iniciarOllamaLocal } from './ai/ollama-runtime'
 import { ClaudeCodeAdapter } from './ai/claude-code-adapter'
 import { RoutingService, SondaDeAdapters } from './ai/routing-service'
 import { RoutingRepository } from './ai/routing-repository'
@@ -396,6 +397,11 @@ if (!app.requestSingleInstanceLock()) {
     })
 
     const ollamaAdapter = new OllamaAdapter()
+    // A conversa de voz depende do servidor local. O boot segue sem bloquear a janela; uma
+    // instalação ausente continua no caminho de recusa explícita da SPEC-Voz-03.
+    void iniciarOllamaLocal(ollamaAdapter).then((encerrar) => {
+      if (encerrar) app.on('will-quit', encerrar)
+    })
     /**
      * O cwd neutro dos dois CLIs (emenda E1 à SPEC-Fases-03).
      *

@@ -1,14 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  Button,
-  Card,
-  Field,
-  InlineAlert,
-  Select,
-  VoiceMascot,
-  type EstadoDoMascote
-} from '@design/ui'
+import { Button, Card, InlineAlert, VoiceMascot, type EstadoDoMascote } from '@design/ui'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { VisemeEvent } from '@shared/domain/visemes'
 import type { DesfechoDaTranscricao, ProntidaoDaVoz } from '@shared/domain/voz'
@@ -61,7 +53,6 @@ export function Microfone({
   entradaId,
   entradaRotulo,
   saidaId,
-  onSalvarDispositivo,
   capturar = capturarPcm,
   criarFala = criarReprodutor,
   criarMedidor = criarMedidorDeEntrada,
@@ -84,12 +75,6 @@ export function Microfone({
   readonly entradaId?: string | null
   readonly entradaRotulo?: string | null
   readonly saidaId?: string | null
-  readonly onSalvarDispositivo?: (mudanca: {
-    readonly vozEntradaId?: string
-    readonly vozSaidaId?: string
-    readonly vozEntradaRotulo?: string
-    readonly vozSaidaRotulo?: string
-  }) => Promise<void>
   /** Injetada para teste: `getUserMedia` não existe em jsdom, e dublar aqui mede a lógica. */
   readonly capturar?: CapturaDeAudio
   /** Injetado pela mesma razão: Web Audio também não existe em jsdom. */
@@ -112,10 +97,8 @@ export function Microfone({
   const [falaAtual, setFalaAtual] =
     useState<ReturnType<ReturnType<typeof criarReprodutor>['tocar']>>()
   const [visemesDaFala, setVisemesDaFala] = useState<readonly VisemeEvent[]>([])
-  const [dispositivos, setDispositivos] = useState<readonly MediaDeviceInfo[]>([])
   const [permissaoConcedida, setPermissaoConcedida] = useState(Boolean(entradaId))
   const [entradaEfetivaId, setEntradaEfetivaId] = useState(entradaId ?? '')
-  const [saidaEfetivaId, setSaidaEfetivaId] = useState(saidaId ?? '')
   const encerrarCaptura = useRef<(() => Promise<Int16Array>) | undefined>(undefined)
   const medidor = useRef<MedidorDeEntrada | undefined>(undefined)
   const nivelEntrada = useRef(0)
@@ -171,7 +154,6 @@ export function Microfone({
 
   const listarDispositivos = useCallback(async (): Promise<void> => {
     const lista = await navigator.mediaDevices.enumerateDevices()
-    setDispositivos(lista.filter((d) => d.kind === 'audioinput' || d.kind === 'audiooutput'))
     const entradasDisponiveis = lista.filter((d) => d.kind === 'audioinput')
     if (entradaId && !entradasDisponiveis.some((d) => d.deviceId === entradaId)) {
       const fallback = entradasDisponiveis[0]
@@ -355,6 +337,7 @@ export function Microfone({
     // Fecha o microfone e joga o áudio fora: ninguém falou, não há o que transcrever.
     await parar?.()
     marcar('ocioso')
+    setAviso(t('escuta.semPerguntaAposGatilho'))
   }
 
   async function terminar(): Promise<void> {
@@ -492,7 +475,7 @@ export function Microfone({
     const fala = await window.jarvis.falar(texto, vozDaFala)
     if (fala.estado !== 'ok') return
 
-    const emCurso = reprodutor.current?.tocar(fala.fala, saidaEfetivaId || undefined)
+    const emCurso = reprodutor.current?.tocar(fala.fala, saidaId || undefined)
     if (emCurso === undefined) return
     void emCurso.saidaAplicada.then((aplicada) => {
       if (!aplicada) setAviso(t('voz.saidaSemSuporte'))
@@ -605,8 +588,6 @@ export function Microfone({
   // Segurar para falar só vale de `ocioso`: durante transcrição, resposta ou fala, um novo
   // aperto abriria uma segunda conversa por cima da primeira.
   const ocupado = estado !== 'ocioso' && estado !== 'gravando'
-  const entradas = dispositivos.filter((d) => d.kind === 'audioinput')
-  const saidas = dispositivos.filter((d) => d.kind === 'audiooutput')
   const escolhaPendente = !entradaEfetivaId
 
   return (
@@ -722,60 +703,29 @@ export function Microfone({
           </div>
         )}
 
+        {prontidao.pronta && permissaoConcedida && escolhaPendente && (
+          <p
+            role="status"
+            className="text-[length:var(--jos-texto-mini)] text-[var(--jos-cor-texto-suave)]"
+          >
+            {t('voz.escolhaEmSettings')}
+          </p>
+        )}
+
         {permissaoConcedida && (
-          <div className="grid w-full gap-4 md:grid-cols-2">
-            <div className="flex flex-col gap-2">
-              <Field rotulo={t('voz.entrada')}>
-                {(campo) => (
-                  <Select
-                    {...campo}
-                    valor={entradaEfetivaId}
-                    placeholder={t('voz.selecione')}
-                    opcoes={entradas.map((d) => ({ valor: d.deviceId, rotulo: d.label }))}
-                    onMudar={(valor) => {
-                      setEntradaEfetivaId(valor)
-                      const rotulo = entradas.find((d) => d.deviceId === valor)?.label
-                      void onSalvarDispositivo?.({
-                        vozEntradaId: valor,
-                        vozEntradaRotulo: rotulo
-                      })
-                    }}
-                  />
-                )}
-              </Field>
-              <div
-                role="meter"
-                aria-label={t('voz.nivelEntrada')}
-                aria-valuemin={0}
-                aria-valuemax={32767}
-                aria-valuenow={0}
-                className="h-2 w-full overflow-hidden bg-[rgba(var(--jos-borda-rgb),0.12)]"
-              >
-                <span
-                  ref={barraDoMedidor}
-                  className="block h-full bg-[var(--jos-cor-acento)]"
-                  style={{ width: '0%' }}
-                />
-              </div>
-            </div>
-            <Field rotulo={t('voz.saida')}>
-              {(campo) => (
-                <Select
-                  {...campo}
-                  valor={saidaEfetivaId}
-                  placeholder={t('voz.selecione')}
-                  opcoes={saidas.map((d) => ({ valor: d.deviceId, rotulo: d.label }))}
-                  onMudar={(valor) => {
-                    setSaidaEfetivaId(valor)
-                    const rotulo = saidas.find((d) => d.deviceId === valor)?.label
-                    void onSalvarDispositivo?.({
-                      vozSaidaId: valor,
-                      vozSaidaRotulo: rotulo
-                    })
-                  }}
-                />
-              )}
-            </Field>
+          <div
+            role="meter"
+            aria-label={t('voz.nivelEntrada')}
+            aria-valuemin={0}
+            aria-valuemax={32767}
+            aria-valuenow={0}
+            className="h-2 w-full max-w-sm overflow-hidden bg-[rgba(var(--jos-borda-rgb),0.12)]"
+          >
+            <span
+              ref={barraDoMedidor}
+              className="block h-full bg-[var(--jos-cor-acento)]"
+              style={{ width: '0%' }}
+            />
           </div>
         )}
 

@@ -121,7 +121,7 @@ function montar(capturar = capturaFalsa()): ReturnType<typeof render> {
 }
 
 describe('primeiro uso escolhe dispositivo (SPEC-Voz-05)', () => {
-  it('pede permissão e mantém falar bloqueado até escolher microfone', async () => {
+  it('pede permissão e mantém falar bloqueado até escolher microfone em Settings', async () => {
     const getUserMedia = vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] })
     const enumerateDevices = vi.fn().mockResolvedValue([
       { kind: 'audioinput', deviceId: 'headset', label: 'Headset USB', groupId: '' },
@@ -146,8 +146,8 @@ describe('primeiro uso escolhe dispositivo (SPEC-Voz-05)', () => {
 
     expect(await screen.findByRole('meter', { name: /nivel do microfone/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /segure para falar/i })).toBeDisabled()
-    await userEvent.click(screen.getAllByRole('combobox')[0])
-    expect(await screen.findByText('Headset USB')).toBeInTheDocument()
+    expect(screen.getByText(/escolha o microfone em settings > voz/i)).toBeInTheDocument()
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
   })
 })
 
@@ -186,7 +186,7 @@ describe('dispositivo salvo ausente (SPEC-Voz-05, critério 4)', () => {
       { kind: 'audioinput', deviceId: 'microfone-antigo', label: 'Headset antigo', groupId: '' }
     ])
 
-    await screen.findAllByRole('combobox')
+    await screen.findByRole('button', { name: /segure para falar/i })
     expect(screen.queryByText(/sumiu/i)).not.toBeInTheDocument()
   })
 })

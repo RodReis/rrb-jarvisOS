@@ -5,6 +5,7 @@ import type { PreferencesSnapshot } from '@shared/contracts/ipc'
 import type { ProntidaoDoTts } from '@shared/domain/visemes'
 import { criarReprodutor } from './reproducao-de-fala'
 import { PreferenciasDaEscuta } from './PreferenciasDaEscuta'
+import { DispositivosDeVoz } from './DispositivosDeVoz'
 import {
   HOTKEYS_DE_VOZ,
   IDIOMAS_DE_VOZ,
@@ -77,6 +78,8 @@ export function PreferenciasDeVoz({
   return (
     <div className="flex max-w-md flex-col gap-8">
       <p className="text-xs opacity-70">{t('settings.vozDescricao')}</p>
+
+      <DispositivosDeVoz preferencias={preferencias} onSalvar={onSalvar} />
 
       <Field rotulo={t('settings.vozModelo')} descricao={t('settings.vozModeloDescricao')}>
         {(atributos) => (

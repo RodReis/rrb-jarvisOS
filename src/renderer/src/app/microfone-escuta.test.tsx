@@ -134,7 +134,7 @@ describe('o disparo começa o turno sem botão', () => {
     const captura = capturaConduzida()
     montar(captura, DISPARO)
     await screen.findByRole('button', { name: /ouvindo/i })
-    expect(informarTurnoDaEscuta).toHaveBeenLastCalledWith(true)
+    await waitFor(() => expect(informarTurnoDaEscuta).toHaveBeenLastCalledWith(true))
 
     await passar(1_000, () => captura.nivel(3_000))
     await passar(2_000, () => captura.nivel(100))
@@ -153,6 +153,7 @@ describe('silêncio após o disparo (critério 13)', () => {
     await passar(3_500, () => captura.nivel(100))
 
     await screen.findByRole('button', { name: /segure para falar/i })
+    expect(screen.getByText(/gatilho detectado, mas não ouvi uma pergunta/i)).toBeInTheDocument()
     // A captura é encerrada (o microfone fecha), e nada vai ao STT nem ao ponto único de IA.
     expect(captura.encerrar).toHaveBeenCalledTimes(1)
     expect(transcreverAudio).not.toHaveBeenCalled()

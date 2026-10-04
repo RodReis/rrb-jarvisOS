@@ -110,6 +110,7 @@ export const RECURSOS = {
         microfoneIndisponivel:
           'O microfone nao esta disponivel. Verifique a permissao do sistema e o dispositivo padrao.',
         escolherMicrofone: 'Permitir e escolher microfone',
+        escolhaEmSettings: 'Escolha o microfone em Settings > Voz para começar.',
         entrada: 'Microfone',
         saida: 'Alto-falantes',
         selecione: 'Selecione um dispositivo',
@@ -156,11 +157,12 @@ export const RECURSOS = {
         semMicrofone: 'Microfone não abriu',
         dicaAlternar: 'Liga ou desliga a escuta da palavra de ativação',
         dicaIndisponivel: 'O modelo da palavra de ativação ainda não está neste computador.',
-        dicaSemMicrofone:
-          'O microfone foi negado ou mudou. Selecione a entrada em JARVIS OS > Command Center > Voz.',
+        dicaSemMicrofone: 'O microfone foi negado ou mudou. Selecione a entrada em Settings > Voz.',
         recusaModelo:
           'Não foi possível ligar a escuta: o modelo da palavra de ativação não está neste computador.',
         recusaEntrada: 'Não foi possível alterar a escuta. Tente de novo.',
+        semPerguntaAposGatilho:
+          'Gatilho detectado, mas não ouvi uma pergunta. Fale logo após “Ei, amigo” ou as duas palmas.',
         naoPronta:
           'A palavra de ativação foi ouvida, mas a voz ainda não está pronta. Baixe o que falta nesta tela.'
       },
@@ -1022,6 +1024,7 @@ export const RECURSOS = {
         microfoneIndisponivel:
           'The microphone is unavailable. Check system permission and the default device.',
         escolherMicrofone: 'Allow and choose microphone',
+        escolhaEmSettings: 'Choose a microphone in Settings > Voice to begin.',
         entrada: 'Microphone',
         saida: 'Speakers',
         selecione: 'Select a device',
@@ -1063,9 +1066,11 @@ export const RECURSOS = {
         dicaAlternar: 'Turns wake word listening on or off',
         dicaIndisponivel: 'The wake word model is not on this computer yet.',
         dicaSemMicrofone:
-          'The microphone was denied or changed. Select the input in JARVIS OS > Command Center > Voice.',
+          'The microphone was denied or changed. Select the input in Settings > Voice.',
         recusaModelo: 'Could not turn listening on: the wake word model is not on this computer.',
         recusaEntrada: 'Could not change listening. Try again.',
+        semPerguntaAposGatilho:
+          'Wake trigger detected, but I did not hear a question. Speak right after “Ei, amigo” or two claps.',
         naoPronta:
           'The wake word was heard, but voice is not ready yet. Download what is missing on this screen.'
       },
