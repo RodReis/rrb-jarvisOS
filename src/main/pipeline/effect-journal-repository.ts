@@ -147,6 +147,46 @@ export class EffectJournalRepository {
       .run(estado, externalRefId ?? null, agora(), id)
   }
 
+  /**
+   * Conclui a entrada **só se o lease do recurso ainda é de quem apresenta o token**
+   * (SPEC-Scheduler-04, regra 2: só o dono atual confirma o efeito).
+   *
+   * O token está no `EXISTS`, na mesma instrução do `UPDATE`: entre "o token confere?" e "grava"
+   * não há janela para o lease mudar de dono. Devolve `false` quando não gravou — a entrada segue
+   * `pendente`, e é a reconciliação, consultando a origem, que a resolve. Um dono que perdeu o
+   * lease no meio da chamada sabe que o efeito pode ter saído, mas não tem mais o direito de o
+   * declarar confirmado.
+   */
+  concluirComFencing(
+    userId: string,
+    id: string,
+    estado: Exclude<EstadoDoEfeito, 'pendente'>,
+    externalRefId: string | undefined,
+    efeito: { readonly recurso: string; readonly fencingToken: number },
+    agora: () => string = () => new Date().toISOString()
+  ): boolean {
+    const resultado = this.db
+      .prepare(
+        `UPDATE effect_journal
+            SET estado = ?, external_ref_id = ?, updated_at = ?
+          WHERE id = ? AND user_id = ?
+            AND EXISTS (SELECT 1 FROM lease
+                         WHERE user_id = ? AND recurso = ? AND fencing_token = ?)`
+      )
+      .run(
+        estado,
+        externalRefId ?? null,
+        agora(),
+        id,
+        userId,
+        userId,
+        efeito.recurso,
+        efeito.fencingToken
+      )
+
+    return resultado.changes === 1
+  }
+
   buscarPorChave(userId: string, chaveIdempotente: string): EntradaDoDiario | undefined {
     const row = this.db
       .prepare('SELECT * FROM effect_journal WHERE user_id = ? AND chave_idempotente = ?')
