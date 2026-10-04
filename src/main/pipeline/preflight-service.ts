@@ -168,6 +168,11 @@ export interface PreflightDeps {
   readonly isolamento?: IsolamentoParaOPreflight
   /** Cria a raiz do perfil do run (com o diretório `claude` dentro). Obrigatório com `isolamento`. */
   readonly prepararPerfil?: (caminho: string) => boolean
+  /**
+   * A imagem do sandbox. Ausente = `IMAGEM_PADRAO`, que é o que produção usa. Existe para o teste
+   * com Docker real rodar numa imagem de poucos MB em vez de puxar a do executor.
+   */
+  readonly imagemDoSandbox?: string
   readonly agora?: () => number
 }
 
@@ -502,7 +507,8 @@ export class PreflightService {
         redeDeEgress,
         proxyUrl: proxyUrlDoExecutor,
         labels,
-        ...(perfilClaudeNoHost === undefined ? {} : { perfilClaudeNoHost })
+        ...(perfilClaudeNoHost === undefined ? {} : { perfilClaudeNoHost }),
+        ...(this.deps.imagemDoSandbox === undefined ? {} : { imagem: this.deps.imagemDoSandbox })
       },
       pedido.raizOperacional
     )
