@@ -84,6 +84,8 @@ import { IndependenciaService } from './pipeline/independencia-service'
 import { LockRepository } from './pipeline/lock-repository'
 import { EffectJournalRepository } from './pipeline/effect-journal-repository'
 import { LeaseRepository } from './pipeline/lease-repository'
+import { comandoDeLimpezaDoInventario } from '@shared/domain/isolamento'
+import { ehTerminal } from '@shared/domain/pipeline'
 import { MergePolicyRepository } from './pipeline/merge-policy-repository'
 import { MergePolicyService } from './pipeline/merge-policy-service'
 import { PipelineRepository } from './pipeline/pipeline-repository'
@@ -153,6 +155,14 @@ import { ConstrutorService } from './pipeline/construtor-service'
 import { EntregaService } from './pipeline/entrega-service'
 import { ExecutionLedgerRepository } from './pipeline/execution-ledger-repository'
 import { LimpezaService } from './pipeline/limpeza-service'
+import { InventarioRepository } from './pipeline/inventario-repository'
+import { IsolamentoService } from './pipeline/isolamento-service'
+import {
+  descartarArtefatosDoSandbox,
+  portaLivreNoHost,
+  prepararPerfil,
+  removerPerfil
+} from './pipeline/isolamento-host'
 import { RetencaoService } from './pipeline/retencao-service'
 import { ExecutorProxy } from './pipeline/executor-proxy'
 import { RulesetRepository } from './pipeline/ruleset-repository'
@@ -1403,6 +1413,9 @@ if (!app.requestSingleInstanceLock()) {
     // O `TerminalEngine` do Docker é **outra instância**, com prazo maior: o do usuário tem 30 s,
     // e `docker run` de imagem ainda não baixada leva minutos. É a única diferença entre as
     // duas — a mesma política, a mesma auditoria, a mesma allowlist governam ambas.
+    // O inventário de recursos por run (SPEC-Scheduler-03) vive antes do terminal do Docker porque
+    // é ele quem diz qual rede pode ser removida sem pedir aprovação.
+    const inventario = new InventarioRepository(storage.db)
     const terminalDocker = new TerminalEngine(
       policy,
       commandAllowlist,
@@ -1411,13 +1424,42 @@ if (!app.requestSingleInstanceLock()) {
       approvals,
       storage.audit,
       userIdAtual,
-      TIMEOUT_DOCKER_MS
+      TIMEOUT_DOCKER_MS,
+      // A exceção do ADR-007, **só neste engine**: `docker network rm <rede>` de uma rede que o
+      // inventário lista, e nenhuma outra forma do comando. O resto segue pedindo aprovação.
+      (binario, args) =>
+        comandoDeLimpezaDoInventario(binario, args, {
+          redes: inventario.redesAtivas(userIdAtual())
+        })
     )
     const docker = new DockerRunner(terminalDocker, () => workspaces.atual())
 
     // A prova e a limpeza de cada run (SPEC-Entrega-06). O mesmo repositório serve aos dois: o
     // ledger grava o desfecho, e a limpeza registra nele a pendência do que não pôde ser removido.
     const executionLedger = new ExecutionLedgerRepository(storage.db)
+
+    // O isolamento por run (SPEC-Scheduler-03): inventário durável, portas inéditas, scanner de
+    // credenciais e devolução dos recursos pela posse provada (label). Run em andamento nunca é
+    // tocado pela reconciliação.
+    const isolamento = new IsolamentoService({
+      docker,
+      git: gitRunner,
+      inventario,
+      leases: leaseRepository,
+      ledger: executionLedger,
+      audit: storage.audit,
+      userId: userIdAtual,
+      workspaceId: () => workspaces.atual(),
+      runAtivo: (runId) => {
+        const run = pipelineRepository.buscar(runId)
+        return run !== undefined && !ehTerminal(run.estado)
+      },
+      worktreeExiste: existsSync,
+      descartarArtefatos: descartarArtefatosDoSandbox,
+      removerDiretorio: removerPerfil,
+      portaLivreNoHost,
+      cwd: () => app.getAppPath()
+    })
 
     /*
      * O coletor de retenção, **instanciado** (SPEC-Fases-03 § Persistência).
@@ -1465,6 +1507,7 @@ if (!app.requestSingleInstanceLock()) {
         git: gitRunner,
         leases: leaseRepository,
         ledger: executionLedger,
+        isolamento,
         workspaceId: () => workspaces.atual()
       }),
       budget: budgetRepository,
@@ -1530,7 +1573,9 @@ if (!app.requestSingleInstanceLock()) {
           'assinatura',
           projectId
         ),
-      prepararGitMeta
+      prepararGitMeta,
+      isolamento,
+      prepararPerfil
     })
 
     const reconciliacao = new ReconciliacaoService({
@@ -1551,7 +1596,10 @@ if (!app.requestSingleInstanceLock()) {
       verificadores: [
         verificadorDeContainer(docker, () => app.getAppPath()),
         verificadorDePorta(docker, () => app.getAppPath())
-      ]
+      ],
+      // O inventário de recursos por run: encontra container, rede e sidecar que nenhum lease
+      // cobria (SPEC-Scheduler-03).
+      isolamento
     })
 
     // **`reconcileAll` é bloqueante** (decisão cravada da spec): nenhum trabalho novo é adquirido

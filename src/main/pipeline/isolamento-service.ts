@@ -137,6 +137,11 @@ export class IsolamentoService {
     return this.deps.inventario.mudarEstado(this.deps.userId(), id, 'criado', this.agora())
   }
 
+  /** O inventário conhece recurso vivo deste run? Run anterior à SPEC-Scheduler-03 não tem. */
+  inventariado(runId: string): boolean {
+    return this.deps.inventario.listarDoRun(this.deps.userId(), runId).length > 0
+  }
+
   // ─── portas ────────────────────────────────────────────────────────────────────────────────────
 
   /**

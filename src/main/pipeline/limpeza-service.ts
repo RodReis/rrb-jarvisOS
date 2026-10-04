@@ -28,13 +28,14 @@ import type {
   FaseDeCancelamento,
   RecursoLimpavel
 } from '@shared/domain/limpeza'
-import { planoDeLimpeza } from '@shared/domain/limpeza'
+import { planoDeLimpeza, RECURSOS_LIMPAVEIS } from '@shared/domain/limpeza'
 import type { EstadoDoRun } from '@shared/domain/pipeline'
 import type { SandboxPreparado } from '@shared/domain/preflight'
 import { RECURSO_PORTA, recursoDoContainer, recursoDoWorktree } from '@shared/domain/preflight'
 import type { WorkspaceId } from '@shared/domain/entities'
 import { log } from '../logging/logger'
 import type { ExecutionLedgerRepository } from './execution-ledger-repository'
+import type { ResultadoDaLiberacao } from './isolamento-service'
 import type { LeaseRepository } from './lease-repository'
 
 /**
@@ -58,11 +59,26 @@ export interface GitDaLimpeza {
   ) => { readonly ok: boolean }
 }
 
+/**
+ * O que a limpeza pede ao isolamento por run (SPEC-Scheduler-03): devolver o que o inventário diz
+ * que o run criou — container, sidecar, rede, worktree, perfil e portas —, conferido pela label e
+ * sem `--force`. Interface mínima, pela mesma razão do `DockerDaLimpeza`.
+ */
+export interface IsolamentoDaLimpeza {
+  readonly inventariado: (runId: string) => boolean
+  readonly liberarRun: (runId: string) => ResultadoDaLiberacao
+}
+
 export interface LimpezaDeps {
   readonly docker: DockerDaLimpeza
   readonly git: GitDaLimpeza
   readonly leases: LeaseRepository
   readonly ledger: ExecutionLedgerRepository
+  /**
+   * O isolamento por run. Opcional: o run que o inventário não conhece (anterior à SPEC-Scheduler-03)
+   * segue o caminho antigo, por lease.
+   */
+  readonly isolamento?: IsolamentoDaLimpeza
   readonly workspaceId: () => WorkspaceId
   readonly agora?: () => number
 }
@@ -108,6 +124,17 @@ export class LimpezaService {
     // Fase que preserva o snapshot ainda tem trabalho no worktree e container: interromper não é
     // encerrar, e remover aqui obrigaria o preflight inteiro de novo na retomada.
     if (!plano.removeRecursos) {
+      return { removidos, pendencias }
+    }
+
+    // O run que o inventário conhece é devolvido por ele: posse provada pela label, worktree sem
+    // `--force` (que casa a política de destrutivos e travaria a limpeza num gate humano), rede e
+    // sidecar incluídos. A branch nunca sai — ela é o trabalho entregue.
+    const isolamento = this.deps.isolamento
+    if (isolamento?.inventariado(pedido.runId) === true) {
+      const devolvido = isolamento.liberarRun(pedido.runId)
+      removidos.push(...devolvido.removidos.filter(ehLimpavel))
+      pendencias.push(...devolvido.pendencias)
       return { removidos, pendencias }
     }
 
@@ -253,3 +280,6 @@ export class LimpezaService {
     pendencias.push(pendencia)
   }
 }
+
+const ehLimpavel = (tipo: string): tipo is RecursoLimpavel =>
+  (RECURSOS_LIMPAVEIS as readonly string[]).includes(tipo)

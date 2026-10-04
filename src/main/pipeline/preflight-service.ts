@@ -26,6 +26,11 @@
  */
 
 import type { WorkspaceId } from '@shared/domain/entities'
+import {
+  labelsDoRecurso,
+  type IdentidadeDoRun,
+  type TipoDeRecurso
+} from '@shared/domain/isolamento'
 import type { ModeloEscolhido } from '@shared/domain/modelo-da-fase'
 import { modeloExisteNoCatalogo } from '@shared/domain/modelo-da-fase'
 import type { BloqueioExterno } from '@shared/domain/pacote-estrutural'
@@ -47,7 +52,26 @@ import { log } from '../logging/logger'
 import type { GitRunner } from '../projects/git-runner'
 import type { AuditRepository } from '../storage/audit-repository'
 import { RAIZ_NO_CONTAINER, type DockerRunner } from './docker-runner'
+import type { RecursoDoRun } from './inventario-repository'
+import type { ResultadoDaReserva, ResultadoDoScanner } from './isolamento-service'
 import type { LeaseRepository } from './lease-repository'
+
+/**
+ * O que o preflight pede ao isolamento por run (SPEC-Scheduler-03). Interface mínima: o tipo é a
+ * fronteira que impede o preflight de alcançar a limpeza ou a reconciliação por outro caminho.
+ */
+export interface IsolamentoParaOPreflight {
+  readonly planejar: (
+    identidade: IdentidadeDoRun,
+    tipo: TipoDeRecurso,
+    identificador: string,
+    detalhes?: Readonly<Record<string, string>>
+  ) => RecursoDoRun | undefined
+  readonly confirmar: (id: number) => boolean
+  readonly reservarPorta: (identidade: IdentidadeDoRun, porta: number) => ResultadoDaReserva
+  readonly escanear: (container: string) => ResultadoDoScanner
+  readonly liberarRun: (runId: string) => unknown
+}
 
 export interface PedidoDePreflight {
   readonly runId: string
@@ -76,6 +100,11 @@ export interface PedidoDePreflight {
    * escritores do mesmo run não dividem a branch. Ausente no run comum (SPEC-Squads-03).
    */
   readonly sufixoDaBranch?: string
+  /**
+   * A tentativa do run (M9-F04). Quando declarada e sem `sufixoDaBranch`, a branch ganha `-t<n>`:
+   * duas tentativas da mesma fatia não dividem branch (SPEC-Scheduler-03). Também vira label.
+   */
+  readonly tentativa?: number
   /**
    * O caminho da **unidade** no proxy (`/u/<chave>`), que o container recebe como parte da
    * `ANTHROPIC_BASE_URL` (SPEC-Squads-03, critério 5). O sidecar encaminha TCP 1:1, então o caminho
@@ -132,6 +161,13 @@ export interface PreflightDeps {
    * escrever arquivo. Ver a nota no ponto de uso: a cópia existe para não quebrar o host.
    */
   readonly prepararGitMeta: (origem: string, worktree: string) => string | undefined
+  /**
+   * O isolamento por run: inventário, portas e scanner. **Opcional**: sem ele o preflight é o de
+   * antes da SPEC-Scheduler-03 (sem labels, sem inventário, sem perfil por run).
+   */
+  readonly isolamento?: IsolamentoParaOPreflight
+  /** Cria a raiz do perfil do run (com o diretório `claude` dentro). Obrigatório com `isolamento`. */
+  readonly prepararPerfil?: (caminho: string) => boolean
   readonly agora?: () => number
 }
 
@@ -213,23 +249,48 @@ export class PreflightService {
     }
 
     // 6. Porta ocupada é detectada **antes** de subir recurso (critério 3). Descobrir a colisão
-    //    pelo erro do `docker run` deixaria worktree e leases já criados para trás.
-    const ocupada = (pedido.portasDeServico ?? []).find((porta) =>
-      this.deps.docker.portaOcupadaPorContainer(porta, pedido.raizOperacional)
-    )
-    if (ocupada !== undefined) {
-      return this.recusar(
-        pedido,
-        'recurso-ocupado',
-        `A porta ${ocupada}, declarada pelos serviços do projeto, já está publicada por outro container.`,
-        `Encerrar o container que ocupa a porta ${ocupada}, ou declarar outra porta no projeto.`
+    //    pelo erro do `docker run` deixaria worktree e leases já criados para trás. Com o
+    //    isolamento por run a porta é **reservada** (lease + inventário), e vale também a porta
+    //    configurada em container parado e a ocupada pelo host.
+    const identidade: IdentidadeDoRun = {
+      runId: pedido.runId,
+      sliceId: pedido.sliceId,
+      projectId: pedido.projectId,
+      ...(pedido.tentativa === undefined ? {} : { tentativa: pedido.tentativa })
+    }
+    const iso = this.deps.isolamento
+    if (iso === undefined) {
+      const ocupada = (pedido.portasDeServico ?? []).find((porta) =>
+        this.deps.docker.portaOcupadaPorContainer(porta, pedido.raizOperacional)
       )
+      if (ocupada !== undefined) {
+        return this.recusar(
+          pedido,
+          'recurso-ocupado',
+          `A porta ${ocupada}, declarada pelos serviços do projeto, já está publicada por outro container.`,
+          `Encerrar o container que ocupa a porta ${ocupada}, ou declarar outra porta no projeto.`
+        )
+      }
+    } else {
+      for (const porta of pedido.portasDeServico ?? []) {
+        const reserva = iso.reservarPorta(identidade, porta)
+        if (!reserva.ok) {
+          iso.liberarRun(pedido.runId)
+          return this.recusar(
+            pedido,
+            'recurso-ocupado',
+            reserva.motivo,
+            `Encerrar quem ocupa a porta ${porta}, ou declarar outra porta no projeto.`
+          )
+        }
+      }
     }
 
     // 7. A base resolve? O SHA é fixado **antes** de qualquer escrita (critério 2): a branch
     //    tem de nascer de um ponto conhecido, não de "o que a base for quando eu olhar".
     const baseSha = this.resolverBase(pedido)
     if (baseSha === undefined) {
+      this.desfazer(userId, pedido.runId)
       return this.recusar(
         pedido,
         'base-nao-resolvida',
@@ -279,7 +340,26 @@ export class PreflightService {
     }
 
     // 9. A branch nasce do SHA fixado (critério 2), num worktree fora do checkout ativo.
-    const branch = nomeDaBranch(pedido.sliceId, pedido.runId, pedido.sufixoDaBranch)
+    const sufixoDaBranch =
+      pedido.sufixoDaBranch ?? (pedido.tentativa === undefined ? undefined : `t${pedido.tentativa}`)
+    const branch = nomeDaBranch(pedido.sliceId, pedido.runId, sufixoDaBranch)
+
+    // A intenção entra no inventário **antes** de o recurso existir. Identificador que outro run
+    // já registrou (a mesma branch de dois runs que dividem o prefixo, o mesmo worktree) é
+    // recusado aqui, antes de criar qualquer coisa.
+    const registroDaBranch = this.registrar(identidade, 'branch', branch)
+    const registroDoWorktree = this.registrar(identidade, 'worktree', worktree, {
+      repositorio: pedido.repositorio
+    })
+    if (registroDaBranch === undefined || registroDoWorktree === undefined) {
+      this.desfazer(userId, pedido.runId)
+      return this.recusar(
+        pedido,
+        'recurso-ocupado',
+        `A branch ${branch} ou o worktree ${worktree} já pertence a outro run.`,
+        'Aguardar o outro run terminar, ou reconciliar os recursos no próximo boot.'
+      )
+    }
     // `core.autocrlf=false` no ato do checkout, e isto **não é preferência de estilo**: no
     // Windows o padrão grava CRLF no disco, e o Git de dentro do container (Linux) lê cada
     // arquivo como modificado. O executor veria a árvore inteira suja e o critério 6 acusaria
@@ -290,7 +370,7 @@ export class PreflightService {
       this.deps.workspaceId()
     )
     if (!criou.ok) {
-      this.liberarRecursos(userId, pedido.runId)
+      this.desfazer(userId, pedido.runId)
       return this.recusar(
         pedido,
         'base-nao-resolvida',
@@ -302,8 +382,10 @@ export class PreflightService {
     // 10. A árvore é limpa? Modificação não commitada não é lixo — é trabalho de alguém, e
     //    apagá-la seria a destruição que o critério 7 proíbe. Só olhamos a **nossa** árvore.
     const sujo = this.deps.git.run(['status', '--porcelain'], worktree, this.deps.workspaceId())
+    this.confirmar(registroDaBranch)
+    this.confirmar(registroDoWorktree)
     if (sujo.ok && sujo.saida !== '') {
-      this.liberarRecursos(userId, pedido.runId)
+      this.desfazer(userId, pedido.runId)
       return this.recusar(
         pedido,
         'arvore-suja',
@@ -314,10 +396,17 @@ export class PreflightService {
 
     // 10. A rede de egress e o sidecar (critério 12). Antes do container do executor: ele nasce
     //     já preso à rede `--internal`, nunca com uma janela de rede aberta enquanto se prepara.
+    const labels = labelsDoRecurso(identidade)
     const redeDeEgress = nomeDaRedeDeEgress(pedido.runId)
-    const redeCriada = this.deps.docker.criarRedeDeEgress(redeDeEgress, pedido.raizOperacional)
+    const registroDaRede = this.registrar(identidade, 'rede', redeDeEgress)
+    const redeCriada = this.deps.docker.criarRedeDeEgress(
+      redeDeEgress,
+      pedido.raizOperacional,
+      labels
+    )
+    if (redeCriada) this.confirmar(registroDaRede)
     if (!redeCriada) {
-      this.liberarRecursos(userId, pedido.runId)
+      this.desfazer(userId, pedido.runId)
       return this.recusar(
         pedido,
         'docker-indisponivel',
@@ -327,17 +416,22 @@ export class PreflightService {
     }
 
     const nomeProxy = nomeDoProxyDeEgress(pedido.runId)
+    const registroDoSidecar = this.registrar(identidade, 'sidecar', nomeProxy)
     const proxySubiu = this.deps.docker.subirProxyDeEgress(
       {
         nome: nomeProxy,
         redeDeEgress,
         porta: PORTA_DO_PROXY_DE_EGRESS,
-        proxyDoHost: pedido.proxyUrl
+        proxyDoHost: pedido.proxyUrl,
+        labels
       },
       pedido.raizOperacional
     )
+    // O sidecar pode existir mesmo quando a ligação à `bridge` falhou: o registro fica
+    // `planejado` e a limpeza o encontra pela label.
+    if (proxySubiu) this.confirmar(registroDoSidecar)
     if (!proxySubiu) {
-      this.liberarRecursos(userId, pedido.runId)
+      this.desfazer(userId, pedido.runId)
       return this.recusar(
         pedido,
         'proxy-indisponivel',
@@ -356,7 +450,7 @@ export class PreflightService {
       pedido.raizOperacional
     )
     if (ipDoProxy === undefined) {
-      this.liberarRecursos(userId, pedido.runId)
+      this.desfazer(userId, pedido.runId)
       return this.recusar(
         pedido,
         'proxy-indisponivel',
@@ -376,7 +470,7 @@ export class PreflightService {
       worktree
     )
     if (gitMeta === undefined) {
-      this.liberarRecursos(userId, pedido.runId)
+      this.desfazer(userId, pedido.runId)
       return this.recusar(
         pedido,
         'base-nao-resolvida',
@@ -385,6 +479,20 @@ export class PreflightService {
       )
     }
 
+    // O perfil do Claude é um diretório **só deste run**: dois runs nunca dividem diretório
+    // gravável (SPEC-Scheduler-03). Só existe com o isolamento por run.
+    const perfilClaudeNoHost = this.prepararPerfilDoRun(identidade, nomeContainer, pedido)
+    if (perfilClaudeNoHost === null) {
+      this.desfazer(userId, pedido.runId)
+      return this.recusar(
+        pedido,
+        'recurso-ocupado',
+        'Não foi possível preparar o perfil exclusivo do run.',
+        'Conferir permissões de escrita na raiz operacional.'
+      )
+    }
+
+    const registroDoContainer = this.registrar(identidade, 'container', nomeContainer)
     const montou = this.deps.docker.subir(
       {
         worktreeNoHost: worktree,
@@ -392,17 +500,36 @@ export class PreflightService {
         gitCommonNoHost: `${pedido.repositorio}/.git`,
         containerNome: nomeContainer,
         redeDeEgress,
-        proxyUrl: proxyUrlDoExecutor
+        proxyUrl: proxyUrlDoExecutor,
+        labels,
+        ...(perfilClaudeNoHost === undefined ? {} : { perfilClaudeNoHost })
       },
       pedido.raizOperacional
     )
+    if (montou) this.confirmar(registroDoContainer)
     if (!montou) {
-      this.liberarRecursos(userId, pedido.runId)
+      this.desfazer(userId, pedido.runId)
       return this.recusar(
         pedido,
         'docker-indisponivel',
         `O container ${nomeContainer} não subiu.`,
         'Conferir o Docker Desktop e retomar a fatia.'
+      )
+    }
+
+    // O scanner roda com o container de pé e **antes** de o executor receber o sandbox: achado, ou
+    // não conseguir inspecionar, recusa e devolve os recursos (SPEC-Scheduler-03, critério 4).
+    const varredura = iso?.escanear(nomeContainer)
+    if (varredura !== undefined && varredura.estado !== 'limpo') {
+      this.desfazer(userId, pedido.runId)
+      const referencias = varredura.achados.map((a) => `${a.origem}:${a.referencia}`).join(', ')
+      return this.recusar(
+        pedido,
+        'credencial-no-sandbox',
+        varredura.estado === 'achados'
+          ? `O sandbox carrega credencial proibida (${referencias}).`
+          : 'O sandbox não pôde ser inspecionado: sem ver o container não há como afirmar que está limpo.',
+        'Remover a credencial da configuração do sandbox e retomar a fatia.'
       )
     }
 
@@ -415,7 +542,8 @@ export class PreflightService {
       worktreeNoHost: worktree,
       pathsPermitidos: paths,
       proxyUrl: proxyUrlDoExecutor,
-      modeloDaConstrucao
+      modeloDaConstrucao,
+      ...(perfilClaudeNoHost === undefined ? {} : { perfilClaudeNoHost })
     }
 
     this.deps.audit.append({
@@ -514,6 +642,49 @@ export class PreflightService {
     })
     log.agent.warn('Preflight recusado', { runId: pedido.runId, causa: reason })
     return { reason, mensagem, retomada }
+  }
+
+  /**
+   * Desfaz uma preparação que falhou no meio. Com o isolamento por run, devolve **o que o
+   * inventário diz que o run criou** (posse provada pela label): antes, o recurso Docker órfão só
+   * era encontrado pela reconciliação do boot. Os leases saem de qualquer forma.
+   */
+  private desfazer(userId: string, runId: string): void {
+    this.deps.isolamento?.liberarRun(runId)
+    this.liberarRecursos(userId, runId)
+  }
+
+  /** Registra a intenção no inventário. `null` sem isolamento; `undefined` se o nome é de outro run. */
+  private registrar(
+    identidade: IdentidadeDoRun,
+    tipo: TipoDeRecurso,
+    identificador: string,
+    detalhes?: Readonly<Record<string, string>>
+  ): RecursoDoRun | null | undefined {
+    if (this.deps.isolamento === undefined) return null
+    return this.deps.isolamento.planejar(identidade, tipo, identificador, detalhes)
+  }
+
+  private confirmar(registro: RecursoDoRun | null | undefined): void {
+    if (registro) this.deps.isolamento?.confirmar(registro.id)
+  }
+
+  /**
+   * O perfil do Claude do run. `undefined` quando não há isolamento por run, `null` quando a
+   * preparação falhou, e o caminho quando deu certo.
+   */
+  private prepararPerfilDoRun(
+    identidade: IdentidadeDoRun,
+    nomeContainer: string,
+    pedido: PedidoDePreflight
+  ): string | null | undefined {
+    if (this.deps.isolamento === undefined) return undefined
+    // Sem ponto na frente de propósito: `.claude` é o diretório que o scanner proíbe montar.
+    const raiz = `${pedido.raizOperacional}/${nomeContainer}-perfil`
+    const registro = this.registrar(identidade, 'perfil', raiz)
+    if (registro === undefined || this.deps.prepararPerfil?.(raiz) !== true) return null
+    this.confirmar(registro)
+    return `${raiz}/claude`
   }
 
   /**

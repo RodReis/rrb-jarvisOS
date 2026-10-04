@@ -235,7 +235,15 @@ export class TerminalEngine {
     private readonly audit: AuditRepository,
     private readonly userId: () => string,
     /** Injetável só para o teste de timeout não precisar esperar 30 segundos de verdade. */
-    private readonly timeoutMs: number = TIMEOUT_PADRAO_MS
+    private readonly timeoutMs: number = TIMEOUT_PADRAO_MS,
+    /**
+     * A exceção do ADR-007: o comando destrutivo que o autorizador libera executa sem pausar.
+     *
+     * **Só o engine do Docker a recebe**, e o autorizador que ele recebe reconhece um único formato
+     * exato (`docker network rm <rede do inventário>`). Ausente, nada muda: o gate destrutivo é o
+     * de sempre. Não afrouxa a allowlist de binário nem a de diretório — só o passo 4.
+     */
+    private readonly autorizadorDeLimpeza?: (binario: string, args: readonly string[]) => boolean
   ) {}
 
   /**
@@ -280,7 +288,12 @@ export class TerminalEngine {
     }
 
     // Passo 4 — 2ª barreira: este *uso* do binário permitido é destrutivo?
-    const destrutivo = matchDestructivePattern(binarioCanonico, submission.args)
+    const casado = matchDestructivePattern(binarioCanonico, submission.args)
+    // A exceção do ADR-007 só tira o gate de quem casou um padrão destrutivo **e** o autorizador
+    // reconhece. O padrão que casou continua registrado: a liberação é rastreável.
+    const liberadoPeloInventario =
+      casado !== undefined && this.autorizadorDeLimpeza?.(binarioCanonico, submission.args) === true
+    const destrutivo = liberadoPeloInventario ? undefined : casado
     const action = destrutivo ? 'terminal.run-destructive' : 'terminal.run-allowlisted'
 
     const classificada = this.policy.classify(action, {
@@ -290,7 +303,8 @@ export class TerminalEngine {
         binary: binarioCanonico,
         args: submission.args,
         cwd: cwdCanonico,
-        ...(destrutivo ? { padraoDestrutivo: destrutivo.id } : {})
+        ...(casado ? { padraoDestrutivo: casado.id } : {}),
+        ...(liberadoPeloInventario ? { liberadoPeloInventario: true } : {})
       }
     })
 
@@ -327,7 +341,12 @@ export class TerminalEngine {
       return this.pausarParaAprovacao(contexto, action, decision.reason, destrutivo?.descricao)
     }
 
-    return this.executar({ ...contexto, cwdCanonico, action })
+    return this.executar({
+      ...contexto,
+      cwdCanonico,
+      action,
+      ...(liberadoPeloInventario && casado ? { liberadoPeloInventario: casado.id } : {})
+    })
   }
 
   /**
@@ -432,6 +451,8 @@ export class TerminalEngine {
     readonly cwdCanonico: string
     readonly action: string
     readonly approvedBy?: string
+    /** O padrão destrutivo que o autorizador do inventário liberou (ADR-007), quando houve. */
+    readonly liberadoPeloInventario?: string
   }): CommandExecution {
     const parcial = this.montar(ctx, {
       state: 'concluido',
@@ -454,7 +475,10 @@ export class TerminalEngine {
         args: argsSeguros(ctx.submission.args),
         cwd: ctx.cwdCanonico,
         correlationId: ctx.correlationId,
-        approvedBy: ctx.approvedBy ?? null
+        approvedBy: ctx.approvedBy ?? null,
+        ...(ctx.liberadoPeloInventario === undefined
+          ? {}
+          : { liberadoPeloInventario: ctx.liberadoPeloInventario })
       }
     })
 

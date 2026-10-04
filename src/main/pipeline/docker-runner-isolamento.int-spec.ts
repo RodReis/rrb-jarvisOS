@@ -193,7 +193,10 @@ describe('removerRede', () => {
   })
 
   it('devolve false quando o terminal recusa (política ou Docker)', () => {
-    const { terminal } = terminalDuble(() => ({ state: 'bloqueado', reason: 'aprovacao-pendente' }))
+    const { terminal } = terminalDuble(() => ({
+      state: 'bloqueado',
+      reason: 'aguardando-aprovacao-destrutivo'
+    }))
 
     expect(runner(terminal).removerRede('r', '/cwd')).toBe(false)
   })

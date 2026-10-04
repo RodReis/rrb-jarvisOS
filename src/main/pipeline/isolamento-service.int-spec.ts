@@ -143,7 +143,7 @@ function criarRun(runId: string, opcoes: { portas?: number[] } = {}): void {
     ['container', `jarvisos-run-${runId}`],
     ['sidecar', `jarvisos-proxy-${runId}`],
     ['rede', `jarvisos-egress-${runId}`],
-    ['perfil', `/raiz/jarvisos-run-${runId}-perfil/claude`]
+    ['perfil', `/raiz/jarvisos-run-${runId}-perfil`]
   ]
   for (const [tipo, identificador, detalhes] of itens) {
     const r = servico.planejar(id, tipo, identificador, detalhes)
@@ -351,7 +351,7 @@ describe('liberarRun', () => {
     expect(worktrees.size).toBe(0)
     expect(inventario.listarDoRun(USER, 'a')).toEqual([])
     expect(leases.listar(USER)).toEqual([])
-    expect(diretoriosRemovidos).toEqual(['/raiz/jarvisos-run-a-perfil/claude'])
+    expect(diretoriosRemovidos).toEqual(['/raiz/jarvisos-run-a-perfil'])
   })
 
   it('remove o worktree sem --force: trabalho não registrado não se destrói', () => {
