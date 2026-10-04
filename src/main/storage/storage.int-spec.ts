@@ -153,6 +153,8 @@ describe('migrations', () => {
     }
     // A 51 cria o inventário durável de recursos por run (SPEC-Scheduler-03).
     antigo.exec('DROP TABLE recurso_run')
+    // A 52 cria as tentativas de merge sob o MergeLease (SPEC-Scheduler-04).
+    antigo.exec('DROP TABLE merge_tentativa')
     antigo.pragma('user_version = 1')
     antigo.close()
 
