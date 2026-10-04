@@ -69,9 +69,16 @@ export interface DockerParaASuite {
   parar(nome: string, cwd: string): boolean
 }
 
+/** Ver `IsolamentoParaOEscritor`: a suíte também devolve o que montou, e preserva o worktree. */
+export interface IsolamentoParaASuite {
+  liberarRun(runId: string, opcoes: { readonly preservarWorktree: true }): unknown
+}
+
 export interface DependenciasDaSuiteNoSandbox {
   readonly preflight: PreflightParaASuite
   readonly docker: DockerParaASuite
+  /** Opcional: sem ele só o container é parado, como antes da SPEC-Scheduler-03. */
+  readonly isolamento?: IsolamentoParaASuite
   /** A raiz operacional validada: onde os worktrees podem nascer. Nunca o checkout ativo. */
   readonly raizOperacional: () => string
   /** A URL do proxy do host que o sidecar encaminha: o sandbox exige uma, mesmo sem agente. */
@@ -116,6 +123,7 @@ export class SuiteNoSandbox implements ExecutorDeSuite {
       return this.passos(sandbox, pedido)
     } finally {
       this.deps.docker.parar(sandbox.containerNome, this.deps.cwdDoDocker())
+      this.deps.isolamento?.liberarRun(sandbox.runId, { preservarWorktree: true })
     }
   }
 

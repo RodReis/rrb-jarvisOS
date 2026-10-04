@@ -86,8 +86,11 @@ import { FilaService } from './pipeline/fila-service'
 import { GerenteDeSlots, ganchosDosSlots } from './squads/squad-slots'
 import { PoolRepository } from './pipeline/pool-repository'
 import { PoolService } from './pipeline/pool-service'
+import { IndependenciaService } from './pipeline/independencia-service'
+import { LockRepository } from './pipeline/lock-repository'
 import { EffectJournalRepository } from './pipeline/effect-journal-repository'
 import { LeaseRepository } from './pipeline/lease-repository'
+import { comandoDeLimpezaDoInventario, runOuUnidadeAtiva } from '@shared/domain/isolamento'
 import { MergePolicyRepository } from './pipeline/merge-policy-repository'
 import { MergePolicyService } from './pipeline/merge-policy-service'
 import { PipelineRepository } from './pipeline/pipeline-repository'
@@ -142,6 +145,8 @@ import {
   promptDoRoadmap
 } from '@shared/domain/roadmap-schema'
 import { ordemDaEtapa } from '@shared/domain/jornada'
+import { fechoDeDependencias } from '@shared/domain/independencia'
+import { lerIdDoEscritor } from '@shared/domain/squad-execucao'
 import type { Etapa } from '@shared/domain/jornada'
 import { faseDaEtapa, type Fase } from '@shared/domain/fase'
 import type { RotaComModelo } from '@shared/domain/modelo-da-fase'
@@ -155,6 +160,14 @@ import { ConstrutorService } from './pipeline/construtor-service'
 import { EntregaService } from './pipeline/entrega-service'
 import { ExecutionLedgerRepository } from './pipeline/execution-ledger-repository'
 import { LimpezaService } from './pipeline/limpeza-service'
+import { InventarioRepository } from './pipeline/inventario-repository'
+import { IsolamentoService } from './pipeline/isolamento-service'
+import {
+  descartarArtefatosDoSandbox,
+  portaLivreNoHost,
+  prepararPerfil,
+  removerPerfil
+} from './pipeline/isolamento-host'
 import { RetencaoService } from './pipeline/retencao-service'
 import { ExecutorProxy } from './pipeline/executor-proxy'
 import { RulesetRepository } from './pipeline/ruleset-repository'
@@ -1345,15 +1358,47 @@ if (!app.requestSingleInstanceLock()) {
     // conhecem: o pool pergunta à fila quais gates seguram cada run e pede a ela que ative o run
     // **dentro** do ciclo; a fila pede ao pool que decida. A referência cruzada é resolvida por
     // closure — nenhum dos dois é chamado antes de ambos existirem.
+    const poolRepository = new PoolRepository(storage.db)
+    // Independência e locks (SPEC-Scheduler-02). A **fonte do write set previsto** é a porta que a
+    // F03 liga (SPEC → derivada, o `PathsPermitidos` do preflight): hoje nada a responde, e fonte
+    // sem resposta é prova incompleta — o segundo run do projeto segue em sequência (regra 1).
+    const independencia = new IndependenciaService({
+      db: storage.db,
+      locks: new LockRepository(storage.db),
+      pool: poolRepository,
+      userId: userIdAtual,
+      fonte: () => undefined,
+      dependencias: (item) => {
+        const { mvps, slices } = roadmapRepository.carregar({
+          userId: item.userId,
+          workspaceId: item.workspaceId,
+          projectId: item.projectId
+        })
+        const fatia = slices.find((s) => s.id === item.sliceId)
+        return fatia === undefined ? undefined : fechoDeDependencias(fatia, mvps, slices)
+      }
+    })
     const pool = new PoolService({
       db: storage.db,
-      pool: new PoolRepository(storage.db),
+      pool: poolRepository,
       leases: leaseRepository,
       audit: storage.audit,
       userId: userIdAtual,
       workspaceId: () => workspaces.atual(),
       gates: (item) => fila.gatesDoItem(item),
-      ativar: (item) => fila.ativarRun(item)
+      ativar: (item) => fila.ativarRun(item),
+      independencia,
+      // Quem perdeu a disputa de lock vai a BLOCKED com o token vigente; para o escritor de um
+      // Squad é o run dele que bloqueia.
+      bloquear: (item, fencingToken, bloqueio) =>
+        fila.transicionar(
+          item.projectId,
+          item.workspaceId,
+          lerIdDoEscritor(item.runId)?.runId ?? item.runId,
+          'BLOCKED',
+          bloqueio,
+          fencingToken
+        ).reason === 'transicionado'
     })
     // Os slots dos escritores dos Squads (SPEC-Squads-03/04): o pool anuncia a aquisição e o run que
     // termina cancela a espera pelos ganchos da fila. O gerente nasce **depois** da fila, que
@@ -1378,6 +1423,9 @@ if (!app.requestSingleInstanceLock()) {
     // O `TerminalEngine` do Docker é **outra instância**, com prazo maior: o do usuário tem 30 s,
     // e `docker run` de imagem ainda não baixada leva minutos. É a única diferença entre as
     // duas — a mesma política, a mesma auditoria, a mesma allowlist governam ambas.
+    // O inventário de recursos por run (SPEC-Scheduler-03) vive antes do terminal do Docker porque
+    // é ele quem diz qual rede pode ser removida sem pedir aprovação.
+    const inventario = new InventarioRepository(storage.db)
     const terminalDocker = new TerminalEngine(
       policy,
       commandAllowlist,
@@ -1386,13 +1434,46 @@ if (!app.requestSingleInstanceLock()) {
       approvals,
       storage.audit,
       userIdAtual,
-      TIMEOUT_DOCKER_MS
+      TIMEOUT_DOCKER_MS,
+      // A exceção do ADR-007, **só neste engine**: `docker network rm <rede>` de uma rede que o
+      // inventário lista, e nenhuma outra forma do comando. O resto segue pedindo aprovação.
+      (binario, args) =>
+        comandoDeLimpezaDoInventario(binario, args, {
+          redes: inventario.redesAtivas(userIdAtual())
+        })
     )
     const docker = new DockerRunner(terminalDocker, () => workspaces.atual())
 
     // A prova e a limpeza de cada run (SPEC-Entrega-06). O mesmo repositório serve aos dois: o
     // ledger grava o desfecho, e a limpeza registra nele a pendência do que não pôde ser removido.
     const executionLedger = new ExecutionLedgerRepository(storage.db)
+
+    // O isolamento por run (SPEC-Scheduler-03): inventário durável, portas inéditas, scanner de
+    // credenciais e devolução dos recursos pela posse provada (label). Run em andamento nunca é
+    // tocado pela reconciliação.
+    const isolamento = new IsolamentoService({
+      docker,
+      git: gitRunner,
+      inventario,
+      leases: leaseRepository,
+      ledger: executionLedger,
+      audit: storage.audit,
+      userId: userIdAtual,
+      workspaceId: () => workspaces.atual(),
+      // O inventário registra também a **unidade** de sandbox de um Squad (`<run>-<escritor>-…`):
+      // procurá-la entre os runs ativos a daria por morta e devolveria o sandbox de um run vivo.
+      runAtivo: (runId) =>
+        runOuUnidadeAtiva(
+          runId,
+          pipelineRepository.listarAtivos(userIdAtual()).map((run) => run.id)
+        ),
+      worktreeExiste: existsSync,
+      descartarArtefatos: descartarArtefatosDoSandbox,
+      prepararPerfil,
+      removerDiretorio: removerPerfil,
+      portaLivreNoHost,
+      cwd: () => app.getAppPath()
+    })
 
     /*
      * O coletor de retenção, **instanciado** (SPEC-Fases-03 § Persistência).
@@ -1440,6 +1521,7 @@ if (!app.requestSingleInstanceLock()) {
         git: gitRunner,
         leases: leaseRepository,
         ledger: executionLedger,
+        isolamento,
         workspaceId: () => workspaces.atual()
       }),
       budget: budgetRepository,
@@ -1505,7 +1587,8 @@ if (!app.requestSingleInstanceLock()) {
           'assinatura',
           projectId
         ),
-      prepararGitMeta
+      prepararGitMeta,
+      isolamento
     })
 
     const reconciliacao = new ReconciliacaoService({
@@ -1526,7 +1609,10 @@ if (!app.requestSingleInstanceLock()) {
       verificadores: [
         verificadorDeContainer(docker, () => app.getAppPath()),
         verificadorDePorta(docker, () => app.getAppPath())
-      ]
+      ],
+      // O inventário de recursos por run: encontra container, rede e sidecar que nenhum lease
+      // cobria (SPEC-Scheduler-03).
+      isolamento
     })
 
     // **`reconcileAll` é bloqueante** (decisão cravada da spec): nenhum trabalho novo é adquirido

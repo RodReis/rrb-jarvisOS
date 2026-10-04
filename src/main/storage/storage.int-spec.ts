@@ -147,6 +147,12 @@ describe('migrations', () => {
     // A 49 cria os achados da revisão e as voltas do retrabalho (SPEC-Squads-04).
     antigo.exec('DROP TABLE squad_achado')
     antigo.exec('DROP TABLE squad_retrabalho')
+    // A 50 cria as travas, a prova de independência e as expansões (SPEC-Scheduler-02).
+    for (const tabela of ['pool_escopo', 'pool_lock', 'pool_prova', 'pool_expansao']) {
+      antigo.exec(`DROP TABLE ${tabela}`)
+    }
+    // A 51 cria o inventário durável de recursos por run (SPEC-Scheduler-03).
+    antigo.exec('DROP TABLE recurso_run')
     antigo.pragma('user_version = 1')
     antigo.close()
 

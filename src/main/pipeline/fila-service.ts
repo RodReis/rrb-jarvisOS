@@ -27,6 +27,7 @@
 import { aprovacaoVigente, type Approval, type RevisaoAprovada } from '@shared/domain/aprovacoes'
 import type { WorkspaceId } from '@shared/domain/entities'
 import { dependenciasAbertas, type DependenciaAberta } from '@shared/domain/fila'
+import { descreverRazao, type Razao } from '@shared/domain/independencia'
 import type { LeaseOutcome } from '@shared/domain/lease'
 import type { BloqueioExterno } from '@shared/domain/pacote-estrutural'
 import {
@@ -541,7 +542,9 @@ export class FilaService {
 }
 
 /** O motivo de espera em texto, para quem chama a API do slot; a vista traz o motivo estruturado. */
-function mensagemDeEspera(motivo: { readonly tipo: string } | undefined): string {
+function mensagemDeEspera(
+  motivo: { readonly tipo: string; readonly razoes?: readonly Razao[] } | undefined
+): string {
   switch (motivo?.tipo) {
     case 'paralelismo-desligado':
       return 'Outro run detém o slot de execução. O paralelismo está desligado: um run por máquina.'
@@ -553,8 +556,14 @@ function mensagemDeEspera(motivo: { readonly tipo: string } | undefined): string
       return 'O executor deste run já está no limite de execuções simultâneas.'
     case 'limite-da-classe':
       return 'A classe de recurso deste run já está no limite de execuções simultâneas.'
-    case 'sem-prova-de-independencia':
-      return 'Outro run do mesmo projeto está em execução e não há prova de independência entre os dois.'
+    case 'sem-prova-de-independencia': {
+      const base =
+        'Outro run do mesmo projeto está em execução e não há prova de independência entre os dois.'
+      const razoes = motivo.razoes ?? []
+      return razoes.length === 0
+        ? base
+        : `${base} Motivo: ${razoes.map(descreverRazao).join('; ')}.`
+    }
     case 'precedencia':
       return 'Há um run anterior do mesmo projeto esperando na frente deste.'
     case 'gate':

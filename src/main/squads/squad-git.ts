@@ -136,7 +136,7 @@ type SaidaDoGit =
  * commita os caminhos que provou dentro do write set. O container os monta somente-leitura; um
  * agente que os alterasse mesmo assim não teria efeito algum no host nem no commit.
  */
-const ARTEFATOS_DO_SANDBOX = ['.gitmeta'] as const
+export const ARTEFATOS_DO_SANDBOX = ['.gitmeta'] as const
 
 const ehArtefatoDoSandbox = (caminho: string): boolean =>
   ARTEFATOS_DO_SANDBOX.some((a) => caminho.startsWith(`${a}/`))

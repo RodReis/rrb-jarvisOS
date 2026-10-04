@@ -124,7 +124,14 @@ export function planoDeLimpeza(fase: FaseDeCancelamento): PlanoDeLimpeza {
  * pela limpeza automática, mesmo órfão — vira pendência para o usuário decidir. Deixá-lo fora do
  * tipo é o que impede um chamador futuro passá-lo por engano.
  */
-export const RECURSOS_LIMPAVEIS = ['worktree', 'container', 'rede', 'sidecar', 'porta'] as const
+export const RECURSOS_LIMPAVEIS = [
+  'worktree',
+  'container',
+  'rede',
+  'sidecar',
+  'porta',
+  'perfil'
+] as const
 
 export type RecursoLimpavel = (typeof RECURSOS_LIMPAVEIS)[number]
 

@@ -26,6 +26,14 @@
  */
 
 import type { WorkspaceId } from '@shared/domain/entities'
+import {
+  argsDeLabel,
+  LABEL_GERIDO,
+  LABEL_RUN,
+  portasDaSaidaDoDocker,
+  type EntradaDoScanner
+} from '@shared/domain/isolamento'
+import { MARCADOR_DE_TRUNCAMENTO } from '../execution/terminal-engine'
 import { log } from '../logging/logger'
 import { cpSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -58,6 +66,17 @@ export const RAIZ_NO_CONTAINER = '/work'
 /** Onde o `.git` do worktree e o `.git` principal aparecem dentro do container. */
 export const GITMETA_NO_CONTAINER = `${RAIZ_NO_CONTAINER}/.gitmeta`
 export const GITCOMMON_NO_CONTAINER = '/gitcommon'
+
+/**
+ * Onde o perfil do Claude **deste run** aparece no container (SPEC-Scheduler-03).
+ *
+ * Um diretório por run, no host, montado só nele: dois runs nunca compartilham diretório gravável.
+ * O nome no host não começa com ponto de propósito — `.claude` é o que o scanner proíbe montar.
+ */
+export const PERFIL_CLAUDE_NO_CONTAINER = '/perfil/claude'
+
+/** Onde o scanner procura arquivo de credencial dentro do container: fora do worktree do usuário. */
+const RAIZES_DO_SCANNER = ['/root', '/home', '/tmp'] as const
 
 /**
  * A imagem do sidecar de egress (critério 12).
@@ -102,6 +121,25 @@ export interface MontagemDoSandbox {
    */
   readonly proxyUrl: string
   readonly imagem?: string
+  /** As labels do run (`labelsDoRecurso`): é por elas que o recurso é achado e reconciliado. */
+  readonly labels?: Readonly<Record<string, string>>
+  /**
+   * O diretório do perfil do Claude exclusivo deste run. Montado em `PERFIL_CLAUDE_NO_CONTAINER`,
+   * com `CLAUDE_CONFIG_DIR` apontando para ele. Vazio de credencial: a autenticação segue sendo o
+   * proxy do host.
+   */
+  readonly perfilClaudeNoHost?: string
+}
+
+/** Um recurso Docker achado pela label de gerido, com o run que a label declara. */
+export interface RecursoNoDocker {
+  readonly nome: string
+  readonly runId: string | undefined
+}
+
+export interface RecursosGeridos {
+  readonly containers: readonly RecursoNoDocker[]
+  readonly redes: readonly RecursoNoDocker[]
 }
 
 /**
@@ -240,6 +278,15 @@ export class DockerRunner {
           `GIT_WORK_TREE=${RAIZ_NO_CONTAINER}`,
           '--env',
           `ANTHROPIC_BASE_URL=${montagem.proxyUrl}`,
+          ...(montagem.perfilClaudeNoHost === undefined
+            ? []
+            : [
+                '--volume',
+                `${montagem.perfilClaudeNoHost}:${PERFIL_CLAUDE_NO_CONTAINER}`,
+                '--env',
+                `CLAUDE_CONFIG_DIR=${PERFIL_CLAUDE_NO_CONTAINER}`
+              ]),
+          ...argsDeLabel(montagem.labels ?? {}),
           montagem.imagem ?? IMAGEM_PADRAO,
           'sleep',
           'infinity'
@@ -278,11 +325,19 @@ export class DockerRunner {
    * existe (o `docker network create` idempotente do lado do app): retomar um run cujo preflight
    * morreu depois de criar a rede não deve falhar por "já existe".
    */
-  criarRedeDeEgress(nome: string, cwd: string): boolean {
+  criarRedeDeEgress(
+    nome: string,
+    cwd: string,
+    labels: Readonly<Record<string, string>> = {}
+  ): boolean {
     if (this.redeDeEgressExiste(nome, cwd)) return true
 
     const execucao = this.terminal.run(
-      { binary: BINARIO_DOCKER, args: ['network', 'create', '--internal', nome], cwd },
+      {
+        binary: BINARIO_DOCKER,
+        args: ['network', 'create', '--internal', ...argsDeLabel(labels), nome],
+        cwd
+      },
       this.workspaceId()
     )
     if (execucao.state !== 'concluido') {
@@ -311,6 +366,7 @@ export class DockerRunner {
       readonly porta: number
       readonly proxyDoHost: string
       readonly imagem?: string
+      readonly labels?: Readonly<Record<string, string>>
     },
     cwd: string
   ): boolean {
@@ -327,6 +383,7 @@ export class DockerRunner {
           dados.nome,
           '--network',
           dados.redeDeEgress,
+          ...argsDeLabel(dados.labels ?? {}),
           // A imagem já tem `socat` como entrypoint (medido: repeti-lo aqui duplica o comando e
           // o container morre com "exactly 2 addresses required (there are 3)"). Os dois
           // argumentos seguintes são os endereços do `socat`, não um comando a executar.
@@ -437,5 +494,200 @@ export class DockerRunner {
       { binary: BINARIO_DOCKER, args: ['exec', container, 'pkill', '-u', 'root'], cwd },
       this.workspaceId()
     )
+  }
+
+  /**
+   * Todas as portas do host que algum container publica **ou tem configurada** (SPEC-Scheduler-03,
+   * critério 3). `docker ps` só vê o container que está de pé; o parado volta no próximo
+   * `docker start` com a porta que configurou, e reusá-la seria uma colisão adiada.
+   *
+   * `undefined` quando o Docker falha: a lista que não pôde ser lida não é uma lista vazia, e quem
+   * trata falha como "nenhuma porta ocupada" aloca em cima de uma porta tomada.
+   */
+  portasEmUso(cwd: string): ReadonlySet<number> | undefined {
+    const publicadas = this.terminal.run(
+      { binary: BINARIO_DOCKER, args: ['ps', '--format', '{{.Ports}}'], cwd },
+      this.workspaceId()
+    )
+    const ids = this.terminal.run(
+      { binary: BINARIO_DOCKER, args: ['ps', '--all', '--format', '{{.ID}}'], cwd },
+      this.workspaceId()
+    )
+    if (publicadas.state !== 'concluido' || ids.state !== 'concluido') return undefined
+
+    const portas = new Set(portasDaSaidaDoDocker(publicadas.stdout))
+    const lista = ids.stdout.split(/\s+/).filter((id) => id !== '')
+    if (lista.length === 0) return portas
+
+    const configuradas = this.terminal.run(
+      {
+        binary: BINARIO_DOCKER,
+        args: [
+          'inspect',
+          '--format',
+          '{{range $p, $b := .HostConfig.PortBindings}}{{range $b}}{{.HostPort}} {{end}}{{end}}',
+          ...lista
+        ],
+        cwd
+      },
+      this.workspaceId()
+    )
+    if (configuradas.state !== 'concluido') return undefined
+
+    for (const porta of portasDaSaidaDoDocker(configuradas.stdout)) portas.add(porta)
+    return portas
+  }
+
+  /**
+   * Os containers e redes que o app gerencia, achados **pela label** — nunca por glob de nome.
+   * Devolve o run que cada label declara; recurso gerido sem label de run vem com `runId`
+   * indefinido, e quem o achar não o destrói (é órfão a reportar, não a apagar).
+   *
+   * `undefined` se qualquer listagem falhar, pela mesma razão de `portasEmUso`.
+   */
+  listarGeridos(cwd: string): RecursosGeridos | undefined {
+    const filtro = `label=${LABEL_GERIDO}=true`
+    const formato = (campo: string): string => `{{.${campo}}}\t{{.Label "${LABEL_RUN}"}}`
+    const containers = this.terminal.run(
+      {
+        binary: BINARIO_DOCKER,
+        args: ['ps', '--all', '--filter', filtro, '--format', formato('Names')],
+        cwd
+      },
+      this.workspaceId()
+    )
+    const redes = this.terminal.run(
+      {
+        binary: BINARIO_DOCKER,
+        args: ['network', 'ls', '--filter', filtro, '--format', formato('Name')],
+        cwd
+      },
+      this.workspaceId()
+    )
+    if (containers.state !== 'concluido' || redes.state !== 'concluido') return undefined
+
+    return { containers: lerRecursos(containers.stdout), redes: lerRecursos(redes.stdout) }
+  }
+
+  /**
+   * Remove a rede do run. O comando casa a política de destrutivos (`rm`); quem o libera é a
+   * exceção do ADR-007, que só vale para rede que o inventário lista — este método não decide
+   * isso, e se o terminal recusar o desfecho é `false`.
+   */
+  removerRede(nome: string, cwd: string): boolean {
+    const execucao = this.terminal.run(
+      { binary: BINARIO_DOCKER, args: ['network', 'rm', nome], cwd },
+      this.workspaceId()
+    )
+    return execucao.state === 'concluido'
+  }
+
+  /**
+   * O que o container carrega, na forma que o scanner de credenciais lê: variáveis de ambiente,
+   * montagens, comando de entrada e arquivos fora do worktree (SPEC-Scheduler-03, critério 4).
+   *
+   * Os arquivos são procurados em `/root`, `/home`, `/tmp` e no perfil do run — **não** em
+   * `/work`, onde mora o repositório do usuário e um `.env.example` versionado acusaria falso
+   * positivo; o que o executor escreve ali é o `verificarEscopo` do construtor quem vigia.
+   *
+   * `undefined` quando não deu para olhar: sem ver o container, "nenhum achado" seria mentira.
+   */
+  inspecionarSandbox(container: string, cwd: string): EntradaDoScanner | undefined {
+    // `saidaEhSensivel`: o `Config.Env` é exatamente o que o scanner procura. Sem a marca a
+    // redação do terminal mascararia `https://usuario:token@host` antes de o scanner ler, e o valor
+    // iria em claro para a auditoria encadeada por hash, de onde não se remove.
+    const inspecao = this.terminal.run(
+      {
+        binary: BINARIO_DOCKER,
+        args: ['inspect', '--format', '{{json .}}', container],
+        cwd,
+        saidaEhSensivel: true
+      },
+      this.workspaceId()
+    )
+    if (inspecao.state !== 'concluido') return undefined
+    const lido = lerInspecao(inspecao.stdout)
+    if (lido === undefined) return undefined
+
+    const raizes = lido.montagens.some((m) => m.destino.startsWith('/perfil'))
+      ? [...RAIZES_DO_SCANNER, '/perfil']
+      : [...RAIZES_DO_SCANNER]
+    const arquivos = this.exec(
+      container,
+      ['find', ...raizes, '-xdev', '-maxdepth', '6', '-type', 'f'],
+      cwd
+    )
+    // A saída do terminal é cortada em 64 KB: lista truncada é só o começo da lista, e o arquivo
+    // de credencial pode estar depois do corte. Sem ver tudo, não há "limpo".
+    if (!arquivos.ok || arquivos.stdout.includes(MARCADOR_DE_TRUNCAMENTO)) return undefined
+
+    const configDoGit = this.lerConfigDoGit(container, lido.montagens, cwd)
+    if (configDoGit === null) return undefined
+
+    return {
+      ...lido,
+      arquivos: arquivos.stdout.split('\n').filter((linha) => linha.trim() !== ''),
+      ...(configDoGit === undefined ? {} : { configDoGit })
+    }
+  }
+
+  /**
+   * O `config` do `.git` principal que o container enxerga em `/gitcommon`. `undefined` quando a
+   * montagem não existe (nada a ler); `null` quando existe e não deu para lê-lo por inteiro.
+   */
+  private lerConfigDoGit(
+    container: string,
+    montagens: readonly { readonly destino: string }[],
+    cwd: string
+  ): string | null | undefined {
+    if (!montagens.some((m) => m.destino === GITCOMMON_NO_CONTAINER)) return undefined
+    const leitura = this.terminal.run(
+      {
+        binary: BINARIO_DOCKER,
+        args: ['exec', container, 'cat', `${GITCOMMON_NO_CONTAINER}/config`],
+        cwd,
+        saidaEhSensivel: true
+      },
+      this.workspaceId()
+    )
+    if (leitura.state !== 'concluido' || leitura.stdout.includes(MARCADOR_DE_TRUNCAMENTO)) {
+      return null
+    }
+    return leitura.stdout
+  }
+}
+
+function lerRecursos(saida: string): RecursoNoDocker[] {
+  return saida
+    .split('\n')
+    .filter((linha) => linha.trim() !== '')
+    .map((linha) => {
+      const [nome = '', run = ''] = linha.split('\t')
+      return { nome: nome.trim(), runId: run.trim() === '' ? undefined : run.trim() }
+    })
+}
+
+const ehTexto = (valor: unknown): valor is string => typeof valor === 'string'
+const textos = (valor: unknown): string[] => (Array.isArray(valor) ? valor.filter(ehTexto) : [])
+
+/** A saída do `docker inspect`, sem confiar na forma: o que não vier como esperado é `undefined`. */
+function lerInspecao(saida: string): Omit<EntradaDoScanner, 'arquivos'> | undefined {
+  try {
+    const bruto: unknown = JSON.parse(saida)
+    if (typeof bruto !== 'object' || bruto === null) return undefined
+    const { Config, Mounts } = bruto as { Config?: Record<string, unknown>; Mounts?: unknown }
+    const montagens = (Array.isArray(Mounts) ? Mounts : []).flatMap((m: unknown) => {
+      const { Source, Destination, RW } = (m ?? {}) as Record<string, unknown>
+      return ehTexto(Source) && ehTexto(Destination)
+        ? [{ origem: Source, destino: Destination, somenteLeitura: RW === false }]
+        : []
+    })
+    return {
+      env: textos(Config?.['Env']),
+      montagens,
+      comando: [...textos(Config?.['Entrypoint']), ...textos(Config?.['Cmd'])]
+    }
+  } catch {
+    return undefined
   }
 }

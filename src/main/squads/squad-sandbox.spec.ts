@@ -41,6 +41,7 @@ function montar(
   const parados: [string, string][] = []
   const registrados: { runId: string; tentativa: number; contextPackId: string }[] = []
   const liberadas: string[] = []
+  const isolamento: [string, unknown][] = []
   const adotar =
     opcoes.adotar ??
     vi.fn((p: { worktree: string }) => ({
@@ -73,6 +74,7 @@ function montar(
         return true
       }
     },
+    isolamento: { liberarRun: (runId, opcoes) => void isolamento.push([runId, opcoes]) },
     proxy: {
       registrarUnidade: (c) => {
         registrados.push(c)
@@ -85,7 +87,7 @@ function montar(
     proxyUrl: () => 'http://proxy',
     cwdDoDocker: () => '/raiz'
   })
-  return { sandbox, preparados, parados, adotar, registrados, liberadas }
+  return { sandbox, preparados, parados, adotar, registrados, liberadas, isolamento }
 }
 
 describe('unidade de sandbox', () => {
@@ -330,5 +332,34 @@ describe('container e encerramento', () => {
     await sandbox.encerrar(PEDIDO)
 
     expect(parados).toHaveLength(1)
+  })
+})
+
+describe('isolamento por run ao encerrar (SPEC-Scheduler-03)', () => {
+  it('devolve rede, sidecar, perfil e portas da unidade, e preserva o worktree do kernel', async () => {
+    const { sandbox, isolamento } = montar()
+    await sandbox.preparar(PEDIDO)
+
+    await sandbox.encerrar(PEDIDO)
+
+    expect(isolamento).toEqual([[unidadeDeSandbox(PEDIDO), { preservarWorktree: true }]])
+  })
+
+  it('o worktree que não foi adotado também devolve os recursos que o preflight criou', async () => {
+    const { sandbox, isolamento } = montar({
+      adotar: vi.fn(() => ({ ok: false, motivo: 'HEAD divergente' }))
+    })
+
+    await sandbox.preparar(PEDIDO)
+
+    expect(isolamento).toEqual([[unidadeDeSandbox(PEDIDO), { preservarWorktree: true }]])
+  })
+
+  it('encerrar o que nunca subiu não devolve nada', async () => {
+    const { sandbox, isolamento } = montar()
+
+    await sandbox.encerrar(PEDIDO)
+
+    expect(isolamento).toEqual([])
   })
 })

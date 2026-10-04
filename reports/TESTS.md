@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 2619 | 2619 | 0 | 82.5 | — | — |
-| — | — | — | Banco | 1833 | 1815 | 0 | 83.4 | — | — |
-| — | — | — | Tela | 774 | 773 | 0 | 77.6 | — | — |
+| — | — | — | Regras de Negócio | 2638 | 2638 | 0 | 82.2 | — | — |
+| — | — | — | Banco | 2025 | 2007 | 0 | 84.7 | — | — |
+| — | — | — | Tela | 735 | 734 | 0 | 76.5 | — | — |
 
 ## Histórico por entrega
 
@@ -418,12 +418,15 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-10-03 | #373 | spec-squads-00-prova-orquestrador-integrador | Regras de Negócio | 2347 | 2347 | 0 | 80.8 | #381 | [#381](https://github.com/RodReis/rrb-jarvisOS/pull/381) |
 | 2026-10-03 | #373 | spec-squads-00-prova-orquestrador-integrador | Banco | 1667 | 1651 | 0 | 82.9 | #381 | [#381](https://github.com/RodReis/rrb-jarvisOS/pull/381) |
 | 2026-10-03 | #373 | spec-squads-00-prova-orquestrador-integrador | Tela | 735 | 734 | 0 | 76.5 | #381 | [#381](https://github.com/RodReis/rrb-jarvisOS/pull/381) |
-| 2026-10-03 | #356 | spec-escuta-01-wake-word | Regras de Negócio | 2444 | 2444 | 0 | 81.5 | #383 | [#383](https://github.com/RodReis/rrb-jarvisOS/pull/383) |
-| 2026-10-03 | #356 | spec-escuta-01-wake-word | Banco | 1681 | 1665 | 0 | 82.5 | #383 | [#383](https://github.com/RodReis/rrb-jarvisOS/pull/383) |
-| 2026-10-03 | #356 | spec-escuta-01-wake-word | Tela | 772 | 771 | 0 | 77.3 | #383 | [#383](https://github.com/RodReis/rrb-jarvisOS/pull/383) |
 | 2026-10-03 | #125 | spec-squads-04-revisao-independente | Regras de Negócio | 2517 | 2517 | 0 | 81.8 | #384 | [#384](https://github.com/RodReis/rrb-jarvisOS/pull/384) |
 | 2026-10-03 | #125 | spec-squads-04-revisao-independente | Banco | 1819 | 1801 | 0 | 83.8 | #384 | [#384](https://github.com/RodReis/rrb-jarvisOS/pull/384) |
 | 2026-10-03 | #125 | spec-squads-04-revisao-independente | Tela | 735 | 734 | 0 | 76.5 | #384 | [#384](https://github.com/RodReis/rrb-jarvisOS/pull/384) |
-| 2026-10-04 | #356 | spec-escuta-01-wake-word | Regras de Negócio | 2619 | 2619 | 0 | 82.5 | #383 | [#383](https://github.com/RodReis/rrb-jarvisOS/pull/383) |
-| 2026-10-04 | #356 | spec-escuta-01-wake-word | Banco | 1833 | 1815 | 0 | 83.4 | #383 | [#383](https://github.com/RodReis/rrb-jarvisOS/pull/383) |
-| 2026-10-04 | #356 | spec-escuta-01-wake-word | Tela | 774 | 773 | 0 | 77.6 | #383 | [#383](https://github.com/RodReis/rrb-jarvisOS/pull/383) |
+| 2026-10-04 | #129 | spec-scheduler-02-independencia-locks | Regras de Negócio | 2578 | 2578 | 0 | 82.1 | #386 | [#386](https://github.com/RodReis/rrb-jarvisOS/pull/386) |
+| 2026-10-04 | #129 | spec-scheduler-02-independencia-locks | Banco | 1882 | 1864 | 0 | 84.0 | #386 | [#386](https://github.com/RodReis/rrb-jarvisOS/pull/386) |
+| 2026-10-04 | #129 | spec-scheduler-02-independencia-locks | Tela | 735 | 734 | 0 | 76.5 | #386 | [#386](https://github.com/RodReis/rrb-jarvisOS/pull/386) |
+| 2026-10-04 | #130 | spec-scheduler-03-isolamento-concorrente | Regras de Negócio | 2638 | 2638 | 0 | 82.2 | #389 | [#389](https://github.com/RodReis/rrb-jarvisOS/pull/389) |
+| 2026-10-04 | #130 | spec-scheduler-03-isolamento-concorrente | Banco | 2025 | 2000 | 0 | 84.7 | #389 | [#389](https://github.com/RodReis/rrb-jarvisOS/pull/389) |
+| 2026-10-04 | #130 | spec-scheduler-03-isolamento-concorrente | Tela | 735 | 734 | 0 | 76.5 | #389 | [#389](https://github.com/RodReis/rrb-jarvisOS/pull/389) |
+| 2026-10-04 | #130 | spec-scheduler-03-isolamento-concorrente | Regras de Negócio | 2638 | 2638 | 0 | 82.2 | #389 | [#389](https://github.com/RodReis/rrb-jarvisOS/pull/389) |
+| 2026-10-04 | #130 | spec-scheduler-03-isolamento-concorrente | Banco | 2025 | 2007 | 0 | 84.7 | #389 | [#389](https://github.com/RodReis/rrb-jarvisOS/pull/389) |
+| 2026-10-04 | #130 | spec-scheduler-03-isolamento-concorrente | Tela | 735 | 734 | 0 | 76.5 | #389 | [#389](https://github.com/RodReis/rrb-jarvisOS/pull/389) |

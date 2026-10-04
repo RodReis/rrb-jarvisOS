@@ -27,7 +27,9 @@
 
 import type { Database } from 'better-sqlite3'
 import type { WorkspaceId } from '@shared/domain/entities'
+import type { ConflitoDeTrava, TravasDoWriteSet } from '@shared/domain/independencia'
 import type { Lease } from '@shared/domain/lease'
+import type { BloqueioExterno } from '@shared/domain/pacote-estrutural'
 import type {
   ConfigDoPool,
   ItemDaFila,
@@ -49,6 +51,7 @@ import {
 } from '@shared/domain/pool'
 import { irmaosNoPool } from '@shared/domain/squad-execucao'
 import type { AuditRepository } from '../storage/audit-repository'
+import type { IndependenciaService } from './independencia-service'
 import type { LeaseRepository } from './lease-repository'
 import type { ItemPersistido, NovoItem, PoolRepository } from './pool-repository'
 
@@ -84,10 +87,39 @@ export interface PoolDeps {
    * aquisição. Sem ela, o serviço só reparte slots (é o que os testes do núcleo do serviço usam).
    */
   readonly ativar?: (item: ItemPersistido) => boolean
-  /** A prova de independência da M12-F02. Padrão: sem prova, o segundo run do projeto espera. */
+  /** A prova de independência. Padrão: sem prova, o segundo run do projeto espera. */
   readonly prova?: ProvaDeIndependencia
+  /**
+   * Independência e locks (SPEC-Scheduler-02). Quando presente, é a prova que o pool usa, e cada
+   * aquisição trava o write set do run — as travas saem junto com o slot. Sem ele, vale `prova`.
+   */
+  readonly independencia?: IndependenciaService
+  /**
+   * Leva ao `BLOCKED` o run que perdeu uma disputa de lock, **dentro da transação da expansão** e
+   * com o token vigente. `false` = não conseguiu (o run já terminou, por exemplo); o conflito segue
+   * registrado e a expansão segue negada.
+   */
+  readonly bloquear?: (
+    item: ItemPersistido,
+    fencingToken: number,
+    bloqueio: BloqueioExterno
+  ) => boolean
   readonly agora?: () => number
 }
+
+export type ResultadoDaExpansaoNoPool =
+  | { readonly ok: true; readonly travas: TravasDoWriteSet }
+  | {
+      readonly ok: false
+      readonly motivo: 'fencing-invalido' | 'caminho-invalido' | 'bloqueado' | 'limite-de-travas'
+    }
+  | {
+      readonly ok: false
+      readonly motivo: 'conflito'
+      readonly conflitos: readonly ConflitoDeTrava[]
+      /** O run perdedor foi levado a `BLOCKED`. */
+      readonly bloqueado: boolean
+    }
 
 export class PoolService {
   private readonly agora: () => number
@@ -96,8 +128,9 @@ export class PoolService {
 
   constructor(private readonly deps: PoolDeps) {
     this.agora = deps.agora ?? ((): number => Date.now())
-    const injetada = deps.prova ?? SEM_PROVA
-    this.prova = (item, ativos) => irmaosNoPool(item.runId, ativos) || injetada(item, ativos)
+    const injetada = deps.independencia?.prova ?? deps.prova ?? SEM_PROVA
+    this.prova = (item, ativos) =>
+      irmaosNoPool(item.runId, ativos) ? true : injetada(item, ativos)
   }
 
   configuracao(): ConfigDoPool {
@@ -196,28 +229,34 @@ export class PoolService {
     const agora = this.agora()
     const { pool, leases } = this.deps
 
+    // Trava de run sem slot é resto de um crash entre remover o lease e soltá-la (critério 5).
+    this.deps.independencia?.varrerOrfaos()
+
     const slots = leases.listarSlots(userId)
+    const ocupados = slots.map((l) => this.comoOcupado(l, agora))
     const esperando = pool.esperando(userId)
     const decisao = decidirPool(
       {
         config: pool.config(userId),
         itens: esperando.map((i) => this.comoItem(i)),
-        ocupados: slots.map((l) => this.comoOcupado(l, agora)),
+        ocupados,
         ultimoServidoEm: pool.vezes(userId)
       },
       this.prova
     )
 
     const emUso = new Set(slots.map((l) => l.recurso))
+    const ativos = ativosPorProjeto(ocupados)
     const adquiridos: Aquisicao[] = []
     for (const runId of decisao.adquirir) {
       const item = esperando.find((i) => i.runId === runId)
       const recurso = proximoSlotLivre(emUso)
       if (item === undefined || recurso === undefined) continue
 
-      const aquisicao = this.adquirir(item, recurso, agora)
+      const aquisicao = this.adquirir(item, recurso, ativos.get(item.projectId) ?? [], agora)
       if (aquisicao === undefined) continue
       emUso.add(recurso)
+      ativos.set(item.projectId, [...(ativos.get(item.projectId) ?? []), item.runId])
       adquiridos.push(aquisicao)
     }
 
@@ -226,9 +265,18 @@ export class PoolService {
     return { adquiridos, espera }
   }
 
-  /** Adquire o lease do slot para o item e ativa o run. `undefined` se não pôde, sem deixar rastro. */
-  private adquirir(item: ItemPersistido, recurso: string, agora: number): Aquisicao | undefined {
-    const { pool, leases } = this.deps
+  /**
+   * Adquire o lease do slot para o item, trava o write set e ativa o run. `undefined` se não pôde,
+   * sem deixar rastro. `ativos` são os runs do mesmo projeto que já ocupam slot — inclusive os
+   * adquiridos antes, neste mesmo ciclo.
+   */
+  private adquirir(
+    item: ItemPersistido,
+    recurso: string,
+    ativos: readonly string[],
+    agora: number
+  ): Aquisicao | undefined {
+    const { pool, leases, independencia } = this.deps
     const fencingToken = pool.proximoToken(item.userId)
     const lease = leases.adquirir(
       item.userId,
@@ -237,9 +285,28 @@ export class PoolService {
     )
     if (lease === undefined) return undefined
 
+    const admissao = independencia?.aoAdquirir(
+      item,
+      ativos,
+      { provar: !irmaosNoPool(item.runId, ativos) },
+      agora
+    )
+    if (admissao !== undefined && !admissao.ok) {
+      // O estado de agora não prova o que o `decidirPool` presumiu: o slot volta e o item
+      // continua esperando, com o motivo gravado — não é cancelamento, é sequencial.
+      leases.liberarSlot(item.userId, recurso, item.runId, fencingToken)
+      pool.atualizarMotivo(
+        item.runId,
+        { tipo: 'sem-prova-de-independencia', razoes: admissao.razoes },
+        agora
+      )
+      return undefined
+    }
+
     if (this.deps.ativar !== undefined && !this.deps.ativar(item)) {
       // O run não podia avançar: o slot volta, e o item sai da fila em vez de ficar tentando.
       leases.liberarSlot(item.userId, recurso, item.runId, fencingToken)
+      independencia?.soltar(item.runId)
       pool.cancelar(item.runId, agora)
       pool.registrarDecisao(
         item.userId,
@@ -288,6 +355,7 @@ export class PoolService {
       if (!this.deps.leases.liberarSlot(lease.user_id, lease.recurso, runId, fencingToken)) {
         return false
       }
+      this.deps.independencia?.soltar(runId)
       this.deps.pool.registrarDecisao(
         lease.user_id,
         { runId, projectId: lease.projectId ?? '', decisao: 'liberado' },
@@ -310,6 +378,7 @@ export class PoolService {
     const agora = this.agora()
     return this.deps.db.transaction((): boolean => {
       if (!this.deps.leases.removerReconciliado(lease.user_id, lease.recurso)) return false
+      this.deps.independencia?.soltar(runId)
       this.deps.pool.registrarDecisao(
         lease.user_id,
         { runId, projectId: lease.projectId ?? '', decisao: 'liberado' },
@@ -328,13 +397,92 @@ export class PoolService {
     return tokenConfere(this.slotDoRun(runId)?.fencingToken, fencingToken)
   }
 
-  /** A reconciliação liberou este slot: o pool só registra, a decisão foi dela. */
+  /**
+   * A reconciliação liberou este slot: o pool registra, a decisão foi dela — e as travas do dono
+   * saem agora, não antes (critério 5: lock só cai depois da reconciliação do owner).
+   */
   registrarReconciliado(lease: Lease): void {
-    this.deps.pool.registrarDecisao(
-      lease.user_id,
-      { runId: lease.proprietario, projectId: lease.projectId ?? '', decisao: 'reconciliado' },
-      this.agora()
-    )
+    this.deps.db.transaction((): void => {
+      this.deps.independencia?.soltar(lease.proprietario)
+      this.deps.pool.registrarDecisao(
+        lease.user_id,
+        { runId: lease.proprietario, projectId: lease.projectId ?? '', decisao: 'reconciliado' },
+        this.agora()
+      )
+    })()
+  }
+
+  /**
+   * O run que detém o slot quer escrever em mais lugares (critério 3). Só o dono com o token
+   * vigente pede. Livre → as travas são adquiridas e o chamador **só então** escreve no novo path.
+   * Conflito → nada é travado, o conflito é auditado e o run perdedor vai a `BLOCKED` na mesma
+   * transação: o slot e as travas antigas ficam (a liberação do bloqueio é da M12-F05).
+   */
+  expandirEscopo(
+    runId: string,
+    fencingToken: number,
+    caminhos: readonly string[]
+  ): ResultadoDaExpansaoNoPool {
+    const { independencia } = this.deps
+    const lease = this.slotDoRun(runId)
+    const item = this.deps.pool.buscarItem(runId)
+    if (
+      independencia === undefined ||
+      item === undefined ||
+      lease === undefined ||
+      !tokenConfere(lease.fencingToken, fencingToken)
+    ) {
+      return { ok: false, motivo: 'fencing-invalido' }
+    }
+
+    return this.deps.db.transaction((): ResultadoDaExpansaoNoPool => {
+      const r = independencia.expandir(item, caminhos, this.agora())
+      if (r.ok) {
+        this.auditarLock({ acao: 'expansao-adquirida', item, caminhos: r.travas.caminhos })
+        return r
+      }
+      if (r.motivo !== 'conflito') return r
+
+      this.auditarLock({
+        acao: 'expansao-conflito',
+        item,
+        caminhos,
+        conflitos: r.conflitos
+      })
+      const bloqueado =
+        this.deps.bloquear?.(item, fencingToken, bloqueioPorConflito(caminhos, r.conflitos)) ??
+        false
+      return { ...r, bloqueado }
+    })()
+  }
+
+  private auditarLock(dados: {
+    readonly acao: 'expansao-adquirida' | 'expansao-conflito'
+    readonly item: ItemPersistido
+    readonly caminhos: readonly string[]
+    readonly conflitos?: readonly ConflitoDeTrava[]
+  }): void {
+    this.deps.audit.append({
+      user_id: dados.item.userId,
+      workspace_id: dados.item.workspaceId,
+      type: 'pool-lock',
+      payload: {
+        acao: dados.acao,
+        runId: dados.item.runId,
+        projectId: dados.item.projectId,
+        caminhos: [...dados.caminhos],
+        ...(dados.conflitos === undefined
+          ? {}
+          : {
+              conflitos: dados.conflitos.map((c) => ({
+                tipo: c.tipo,
+                chave: c.chave,
+                comRunId: c.comRunId,
+                comChave: c.comChave
+              }))
+            })
+      }
+    })
   }
 
   /**
@@ -463,6 +611,33 @@ export class PoolService {
         projectId: lease.projectId ?? null
       }
     })
+  }
+}
+
+/** Os runs que ocupam slot, agrupados por projeto — a base da prova de independência. */
+function ativosPorProjeto(ocupados: readonly SlotOcupado[]): Map<string, string[]> {
+  const porProjeto = new Map<string, string[]>()
+  for (const o of ocupados) {
+    porProjeto.set(o.projectId, [...(porProjeto.get(o.projectId) ?? []), o.runId])
+  }
+  return porProjeto
+}
+
+/** O bloqueio de quem perdeu a disputa: os cinco campos da CONVENTION §4, sem inventar nada. */
+function bloqueioPorConflito(
+  caminhos: readonly string[],
+  conflitos: readonly ConflitoDeTrava[]
+): BloqueioExterno {
+  const quem = [...new Set(conflitos.map((c) => c.comRunId))].join(', ')
+  const detalhe = conflitos.map(
+    (c) => `${c.tipo} ${c.chave} (travado por ${c.comRunId}: ${c.comChave})`
+  )
+  return {
+    causa: 'conflito-de-write-set',
+    evidencia: `Expansão pedida: ${caminhos.join(', ')}. Conflitos: ${detalhe.join('; ')}.`,
+    tentativas: 0,
+    porQueNaoSeguir: `Escrever no novo caminho colidiria com o run ${quem}, que já o trava; os dois alterariam a mesma área.`,
+    retomada: `Esperar o run ${quem} liberar o slot e retomar a fatia numa continuação vinculada.`
   }
 }
 

@@ -144,7 +144,12 @@ export const PREFLIGHT_REASONS = [
    * embora o IPC também valide: a checagem custa uma comparação e cobre o dia em que a primeira
    * barreira deixar de ser a única porta.
    */
-  'modelo-fora-do-catalogo'
+  'modelo-fora-do-catalogo',
+  /**
+   * O scanner achou credencial proibida no container — ou não conseguiu inspecioná-lo
+   * (SPEC-Scheduler-03, critério 4). Os dois recusam: sem ver o sandbox não há "limpo".
+   */
+  'credencial-no-sandbox'
 ] as const
 
 export type PreflightReason = (typeof PREFLIGHT_REASONS)[number]
@@ -198,6 +203,11 @@ export interface SandboxPreparado {
    * 2026-09-04).
    */
   readonly modeloDaConstrucao: ModeloEscolhido
+  /**
+   * O diretório do perfil do Claude **exclusivo deste run** (SPEC-Scheduler-03). Ausente quando
+   * o preflight roda sem isolamento por run.
+   */
+  readonly perfilClaudeNoHost?: string
 }
 
 /** Prefixos de lease desta fatia. O `UNIQUE(user_id, recurso)` faz o resto. */
