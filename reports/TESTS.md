@@ -13,8 +13,8 @@ Totais da última execução (regenerado, não acumulado):
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
 | — | — | — | Regras de Negócio | 2746 | 2746 | 0 | 82.8 | — | — |
-| — | — | — | Banco | 2039 | 2021 | 0 | 84.3 | — | — |
-| — | — | — | Tela | 776 | 775 | 0 | 77.5 | — | — |
+| — | — | — | Banco | 2044 | 2026 | 0 | 84.3 | — | — |
+| — | — | — | Tela | 776 | 775 | 0 | 77.6 | — | — |
 
 ## Histórico por entrega
 
@@ -433,3 +433,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-10-04 | #356 | spec-escuta-01-wake-word | Regras de Negócio | 2746 | 2746 | 0 | 82.8 | #383 | [#383](https://github.com/RodReis/rrb-jarvisOS/pull/383) |
 | 2026-10-04 | #356 | spec-escuta-01-wake-word | Banco | 2039 | 2021 | 0 | 84.3 | #383 | [#383](https://github.com/RodReis/rrb-jarvisOS/pull/383) |
 | 2026-10-04 | #356 | spec-escuta-01-wake-word | Tela | 776 | 775 | 0 | 77.5 | #383 | [#383](https://github.com/RodReis/rrb-jarvisOS/pull/383) |
+| 2026-10-04 | #393 | spec-entrega-05-revisao-ci-merge | Regras de Negócio | 2746 | 2746 | 0 | 82.8 | 394 | [394](https://github.com/RodReis/rrb-jarvisOS/pull/394) |
+| 2026-10-04 | #393 | spec-entrega-05-revisao-ci-merge | Banco | 2044 | 2026 | 0 | 84.3 | 394 | [394](https://github.com/RodReis/rrb-jarvisOS/pull/394) |
+| 2026-10-04 | #393 | spec-entrega-05-revisao-ci-merge | Tela | 776 | 775 | 0 | 77.6 | 394 | [394](https://github.com/RodReis/rrb-jarvisOS/pull/394) |
