@@ -2413,21 +2413,23 @@ Status: **em andamento** ([PR #383](https://github.com/RodReis/rrb-jarvisOS/pull
 - [x] **9. Prova visual** (`escuta.prova.ts`, 31 medições nos dois temas).
 - [x] **10. Candidato de modelo "Ei, amigo"** — classificador próprio treinado com vozes sintéticas e gravações autorizadas, hash e proveniência em `docs/spec/models/README.md`; validação independente no teste físico do PI ainda pendente.
 - [x] **11. Catálogo**: SHA e URL de revisão imutável para o `ei_amigo.onnx` próprio validado (critério 5). O PI retirou a dependência dos modelos auxiliares do openWakeWord.
-- [ ] **12. Teste físico do PI** e medição de CPU e memória em uso (critérios 6, 7 e 14).
+- [x] **12. Teste físico do PI** e medição de CPU e memória em uso (critérios 6, 7 e 14).
   Primeira tentativa em 2026-10-04: fala e palmas não dispararam porque o `deviceId` salvo
   deixou de existir (`OverconstrainedError`, restrição `deviceId`); o perfil não guardava
   `vozEntradaRotulo`. A correção verifica o ID atual e recupera pelo nome apenas quando a
   correspondência é única. Sem nome ou correspondência, indica microfone indisponível e pede
   nova seleção em Settings > Voz. Após selecionar o G432, o log real registrou disparos
   tanto por frase quanto por palmas entre 14h16 e 14h31 de 2026-10-04, mas o PI não viu
-  reação útil. Turnos sem pergunta agora mostram aviso explícito; falta repetir a prova física
-  com uma pergunta logo após o gatilho. O print anterior do Gerenciador de Tarefas (Python
-  231,5 MB, Electron 187,5 MB, ambos 0% naquele instante) não mede o custo da escuta em uso.
+  reação útil. Turnos sem pergunta agora mostram aviso explícito. Na repetição, o PI confirmou
+  resposta e histórico com os dois gatilhos, inclusive após bloquear a sessão com Win+L.
+  O detector Python em escuta ativa consumiu 0,00 segundo de CPU numa janela de 15 segundos
+  e 64 MB de memória residente; a medida é do detector, não do Electron/Ollama. O print
+  anterior do Gerenciador de Tarefas não isolava o custo da escuta.
 - [x] **13. Pré-roll no turno.** A captura contínua guarda 1,5 s em memória e entrega esse
   trecho com a fala seguinte pelo mesmo stream. O disparo reserva o buffer antes da navegação;
   se a troca de espaço falha ou o STT não está pronto, ele é descartado. Teste de regressão
   verifica que o turno não abre outro `getUserMedia`.
-- [ ] **14. Relatório de testes** (`reports/TESTS.md`): a mudança de testes desta revisão causou anti-drift no CI; regenerar após a suíte final e conferir o gate do SHA final.
+- [x] **14. Relatório de testes** (`reports/TESTS.md`): regenerado com artefatos de Banco do CI; anti-drift e self-check locais passaram. Os nove jobs, inclusive `gate`, passaram no SHA `fab2bf8`; conferir novamente após o commit de evidência.
 - [x] **15. Retorno da prova física**: seleção de entrada e saída movida do Command Center para Settings > Voz; turno sem pergunta após gatilho agora tem aviso visível. O app solicita iniciar o Ollama instalado localmente quando não há servidor ativo. Nos três turnos medidos, a geração local levou 22,4 a 29,6 s; a transcrição levou cerca de 0,8 a 2,1 s. A redução de latência do modelo segue investigação separada.
 
 **Decisões técnicas desta fatia** (nenhuma altera escopo; a confirmar pelo PI estão no corpo da PR): a hotkey de mute é o próprio kill switch por outro caminho; o disparo vindo do NOA passa para o JARVIS pela troca auditada, porque o Command Center só existe lá; o estado vive em arquivo local e não em coluna de preferências (sem migração); a tela diz "limiar de disparo" porque maior exige mais certeza.

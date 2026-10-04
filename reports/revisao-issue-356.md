@@ -120,3 +120,24 @@ relatório: Regras 2619/2619, Banco 1815/1833 (18 pulados), Tela 773/774
 O código posterior adicionou apenas o registro da latência entre o fim do
 gatilho e a reserva do turno, sem testes novos. O valor real ainda depende da
 execução física do PI.
+
+## Validação física final — 2026-10-04
+
+O PI confirmou que “Ei, amigo” e duas palmas abriram turnos, responderam por
+voz e ficaram no histórico. Repetiu os dois gatilhos com o Windows bloqueado
+por Win+L; as respostas saíram por voz e os turnos apareceram após destravar.
+A captura do Command Center mostra transcrição e resposta. Esta é evidência
+de execução no computador do PI, sem transformar os áudios usados no treino
+em validação independente do classificador.
+
+Com o app aberto e a escuta ativa, o processo Python do detector (PID 23196)
+acumulou 0,00 s de CPU numa amostra de 15 s (0% de um núcleo), com 64 MB de
+memória residente no fim da amostra. A medida é específica do detector;
+Electron, STT, Piper e Ollama têm processos separados. Geração de uma resposta
+local levou 17,0 s, enquanto três chamadas anteriores levaram 22,4–29,6 s;
+a latência percebida é dominada pelo Ollama, não pela transcrição de 0,8–2,1 s.
+
+O teste revelou dois ajustes de produto separados da ativação: a resposta
+sobre a hora local foi incorreta e o tratamento “Operador” não corresponde à
+preferência do PI. Não são contabilizados como êxito da conversa; exigem
+correção rastreada fora desta fatia.
