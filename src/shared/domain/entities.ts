@@ -581,7 +581,12 @@ export const AUDIT_EVENT_TYPES = [
   // SPEC-Scheduler-01: a configuração do pool (capacidade, limites, paralelismo). Tipo próprio: é
   // uma decisão do PI sobre quanto da máquina a pipeline pode usar — e ligar o paralelismo é a que
   // mais importa registrar.
-  'pool-config'
+  'pool-config',
+  // SPEC-Scheduler-02: o write set de um run que detém slot ganhou (ou não) um caminho novo. Tipo
+  // próprio porque é a trilha do critério 3 — *o lock foi confirmado antes da escrita?* — e a do
+  // conflito que bloqueou o run perdedor. O payload leva run, projeto, caminhos e os runs que
+  // seguravam o lock; nunca o conteúdo do que está sendo escrito.
+  'pool-lock'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]

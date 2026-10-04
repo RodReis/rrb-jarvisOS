@@ -27,6 +27,8 @@
  * Mora em `src/shared/domain`: pura, sem disco, sem relógio, verificável sem o Electron.
  */
 
+import type { Razao } from './independencia'
+
 /** Slots do pool, por padrão (SPEC-Scheduler-01, "Padrão V2: dois slots globais"). */
 export const CAPACIDADE_GLOBAL_PADRAO = 2
 
@@ -200,7 +202,13 @@ export type MotivoDeEspera =
       readonly ocupados: number
       readonly limite: number
     }
-  | { readonly tipo: 'sem-prova-de-independencia' }
+  | {
+      readonly tipo: 'sem-prova-de-independencia'
+      /** Por que a prova não saiu (M12-F02). Ausente quando o veredito veio como booleano. */
+      readonly razoes?: readonly Razao[]
+      /** O hash da entrada da prova: o mesmo snapshot dá o mesmo fingerprint. */
+      readonly fingerprint?: string
+    }
   | { readonly tipo: 'precedencia'; readonly aposRunId: string }
   | { readonly tipo: 'aguardando-reconciliacao'; readonly runIds: readonly string[] }
 
@@ -221,12 +229,40 @@ export interface DecisaoDoPool {
 }
 
 /**
- * Pode este item rodar **ao lado** dos que o projeto já tem ativos? É a prova de independência da
- * M12-F02. Até ela existir, o padrão é "não": o segundo run do mesmo projeto espera.
+ * O que a prova de independência respondeu. O booleano é a forma curta (os testes do núcleo e o
+ * `SEM_PROVA`); o objeto carrega **por que não** — as razões e o fingerprint da entrada —, que o
+ * motivo de espera guarda para a vista explicar (critério da M12-F02: "motivo de fallback").
  */
-export type ProvaDeIndependencia = (item: ItemDaFila, ativosDoProjeto: readonly string[]) => boolean
+export type VeredictoDaProva =
+  | boolean
+  | {
+      readonly independente: boolean
+      readonly razoes?: readonly Razao[]
+      readonly fingerprint?: string
+    }
+
+/**
+ * Pode este item rodar **ao lado** dos que o projeto já tem ativos? É a prova de independência da
+ * M12-F02. O padrão é "não": o segundo run do mesmo projeto espera.
+ */
+export type ProvaDeIndependencia = (
+  item: ItemDaFila,
+  ativosDoProjeto: readonly string[]
+) => VeredictoDaProva
 
 export const SEM_PROVA: ProvaDeIndependencia = () => false
+
+const independente = (v: VeredictoDaProva): boolean => (typeof v === 'boolean' ? v : v.independente)
+
+/** O motivo de espera de uma prova negativa: com as razões, quando o veredito as trouxe. */
+function motivoSemProva(v: VeredictoDaProva): MotivoDeEspera {
+  if (typeof v === 'boolean') return { tipo: 'sem-prova-de-independencia' }
+  return {
+    tipo: 'sem-prova-de-independencia',
+    ...(v.razoes === undefined || v.razoes.length === 0 ? {} : { razoes: v.razoes }),
+    ...(v.fingerprint === undefined ? {} : { fingerprint: v.fingerprint })
+  }
+}
 
 const porPrecedencia = (a: ItemDaFila, b: ItemDaFila): number =>
   a.prioridade - b.prioridade ||
@@ -281,7 +317,10 @@ function bloqueio(
     return { tipo: 'limite-do-projeto', ocupados: doProjeto, limite: limiteDoProjeto }
   }
   // Um segundo run do mesmo projeto só entra com prova de independência (M12-F02).
-  if (doProjeto > 0 && !prova(item, ativosDoProjeto)) return { tipo: 'sem-prova-de-independencia' }
+  if (doProjeto > 0) {
+    const veredito = prova(item, ativosDoProjeto)
+    if (!independente(veredito)) return motivoSemProva(veredito)
+  }
 
   if (item.executor !== undefined) {
     const limite = config.porExecutor[item.executor]

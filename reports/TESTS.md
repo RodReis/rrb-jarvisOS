@@ -12,8 +12,8 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 2517 | 2517 | 0 | 81.8 | — | — |
-| — | — | — | Banco | 1819 | 1801 | 0 | 83.8 | — | — |
+| — | — | — | Regras de Negócio | 2578 | 2578 | 0 | 82.1 | — | — |
+| — | — | — | Banco | 1882 | 1864 | 0 | 84.0 | — | — |
 | — | — | — | Tela | 735 | 734 | 0 | 76.5 | — | — |
 
 ## Histórico por entrega
@@ -421,3 +421,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-10-03 | #125 | spec-squads-04-revisao-independente | Regras de Negócio | 2517 | 2517 | 0 | 81.8 | #384 | [#384](https://github.com/RodReis/rrb-jarvisOS/pull/384) |
 | 2026-10-03 | #125 | spec-squads-04-revisao-independente | Banco | 1819 | 1801 | 0 | 83.8 | #384 | [#384](https://github.com/RodReis/rrb-jarvisOS/pull/384) |
 | 2026-10-03 | #125 | spec-squads-04-revisao-independente | Tela | 735 | 734 | 0 | 76.5 | #384 | [#384](https://github.com/RodReis/rrb-jarvisOS/pull/384) |
+| 2026-10-04 | #129 | spec-scheduler-02-independencia-locks | Regras de Negócio | 2578 | 2578 | 0 | 82.1 | #386 | [#386](https://github.com/RodReis/rrb-jarvisOS/pull/386) |
+| 2026-10-04 | #129 | spec-scheduler-02-independencia-locks | Banco | 1882 | 1864 | 0 | 84.0 | #386 | [#386](https://github.com/RodReis/rrb-jarvisOS/pull/386) |
+| 2026-10-04 | #129 | spec-scheduler-02-independencia-locks | Tela | 735 | 734 | 0 | 76.5 | #386 | [#386](https://github.com/RodReis/rrb-jarvisOS/pull/386) |

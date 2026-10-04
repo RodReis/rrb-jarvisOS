@@ -80,6 +80,8 @@ import { FilaService } from './pipeline/fila-service'
 import { GerenteDeSlots, ganchosDosSlots } from './squads/squad-slots'
 import { PoolRepository } from './pipeline/pool-repository'
 import { PoolService } from './pipeline/pool-service'
+import { IndependenciaService } from './pipeline/independencia-service'
+import { LockRepository } from './pipeline/lock-repository'
 import { EffectJournalRepository } from './pipeline/effect-journal-repository'
 import { LeaseRepository } from './pipeline/lease-repository'
 import { MergePolicyRepository } from './pipeline/merge-policy-repository'
@@ -136,6 +138,8 @@ import {
   promptDoRoadmap
 } from '@shared/domain/roadmap-schema'
 import { ordemDaEtapa } from '@shared/domain/jornada'
+import { fechoDeDependencias } from '@shared/domain/independencia'
+import { lerIdDoEscritor } from '@shared/domain/squad-execucao'
 import type { Etapa } from '@shared/domain/jornada'
 import { faseDaEtapa, type Fase } from '@shared/domain/fase'
 import type { RotaComModelo } from '@shared/domain/modelo-da-fase'
@@ -1334,15 +1338,47 @@ if (!app.requestSingleInstanceLock()) {
     // conhecem: o pool pergunta à fila quais gates seguram cada run e pede a ela que ative o run
     // **dentro** do ciclo; a fila pede ao pool que decida. A referência cruzada é resolvida por
     // closure — nenhum dos dois é chamado antes de ambos existirem.
+    const poolRepository = new PoolRepository(storage.db)
+    // Independência e locks (SPEC-Scheduler-02). A **fonte do write set previsto** é a porta que a
+    // F03 liga (SPEC → derivada, o `PathsPermitidos` do preflight): hoje nada a responde, e fonte
+    // sem resposta é prova incompleta — o segundo run do projeto segue em sequência (regra 1).
+    const independencia = new IndependenciaService({
+      db: storage.db,
+      locks: new LockRepository(storage.db),
+      pool: poolRepository,
+      userId: userIdAtual,
+      fonte: () => undefined,
+      dependencias: (item) => {
+        const { mvps, slices } = roadmapRepository.carregar({
+          userId: item.userId,
+          workspaceId: item.workspaceId,
+          projectId: item.projectId
+        })
+        const fatia = slices.find((s) => s.id === item.sliceId)
+        return fatia === undefined ? undefined : fechoDeDependencias(fatia, mvps, slices)
+      }
+    })
     const pool = new PoolService({
       db: storage.db,
-      pool: new PoolRepository(storage.db),
+      pool: poolRepository,
       leases: leaseRepository,
       audit: storage.audit,
       userId: userIdAtual,
       workspaceId: () => workspaces.atual(),
       gates: (item) => fila.gatesDoItem(item),
-      ativar: (item) => fila.ativarRun(item)
+      ativar: (item) => fila.ativarRun(item),
+      independencia,
+      // Quem perdeu a disputa de lock vai a BLOCKED com o token vigente; para o escritor de um
+      // Squad é o run dele que bloqueia.
+      bloquear: (item, fencingToken, bloqueio) =>
+        fila.transicionar(
+          item.projectId,
+          item.workspaceId,
+          lerIdDoEscritor(item.runId)?.runId ?? item.runId,
+          'BLOCKED',
+          bloqueio,
+          fencingToken
+        ).reason === 'transicionado'
     })
     // Os slots dos escritores dos Squads (SPEC-Squads-03/04): o pool anuncia a aquisição e o run que
     // termina cancela a espera pelos ganchos da fila. O gerente nasce **depois** da fila, que

@@ -1862,6 +1862,81 @@ const MIGRATIONS: readonly string[] = [
     em           TEXT NOT NULL,
     PRIMARY KEY (run_id, tentativa, origem)
   );
+  `,
+
+  // 50 - independencia e locks do pool (SPEC-Scheduler-02).
+  //
+  // `pool_lock` e o write set **persistido** dos runs que detem slot: uma linha por caminho
+  // (prefixo por segmento) e por recurso logico (lockfile, migrations...). Vive enquanto o lease do
+  // slot do dono existir — a liberacao e a reconciliacao do dono sao quem a encerra, e um lease
+  // expirado continua segurando (critério 5: so apos a reconciliacao). O UNIQUE cobre a chave exata
+  // por projeto: a sobreposicao de prefixos e verificada no servico, dentro da transacao, e o UNIQUE
+  // e a segunda barreira do recurso exclusivo — dois runs nao seguram o mesmo lockfile nem por bug.
+  //
+  // `pool_escopo` diz se o write set do run era **conhecido** quando ele adquiriu o slot. Linha com
+  // `conhecido = 0` e o fail closed da regra 1: o run ocupa slot sem ter provado nada, e ninguem
+  // roda ao lado dele.
+  //
+  // `pool_prova` guarda a prova usada pelo scheduler (entrada hasheada, razoes, quem estava ativo) e
+  // `invalidada_em` marca a que perdeu validade por mudanca estrutural (regra 4) sem apagar o
+  // registro. `pool_expansao` e o historico de cada pedido de expansao do write set, aceito ou nao.
+  `
+  CREATE TABLE pool_escopo (
+    run_id          TEXT PRIMARY KEY,
+    user_id         TEXT NOT NULL,
+    project_id      TEXT NOT NULL,
+    conhecido       INTEGER NOT NULL CHECK (conhecido IN (0, 1)),
+    catalogo_versao INTEGER NOT NULL,
+    registrado_em   INTEGER NOT NULL
+  );
+  CREATE INDEX idx_pool_escopo_projeto ON pool_escopo(user_id, project_id);
+
+  CREATE TABLE pool_lock (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id      TEXT NOT NULL,
+    run_id       TEXT NOT NULL,
+    project_id   TEXT NOT NULL,
+    tipo         TEXT NOT NULL CHECK (tipo IN ('caminho', 'recurso')),
+    chave        TEXT NOT NULL,
+    adquirido_em INTEGER NOT NULL,
+    origem       TEXT NOT NULL CHECK (origem IN ('inicial', 'expansao'))
+  );
+  CREATE UNIQUE INDEX idx_pool_lock_chave ON pool_lock(user_id, project_id, tipo, chave);
+  CREATE INDEX idx_pool_lock_run ON pool_lock(user_id, run_id);
+
+  CREATE TABLE pool_prova (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id         TEXT NOT NULL,
+    run_id          TEXT NOT NULL,
+    project_id      TEXT NOT NULL,
+    independente    INTEGER NOT NULL CHECK (independente IN (0, 1)),
+    fingerprint     TEXT NOT NULL,
+    catalogo_versao INTEGER NOT NULL,
+    -- JSON: Razao[]
+    razoes          TEXT NOT NULL,
+    -- JSON: string[] dos runs ativos contra os quais a prova valeu
+    contra          TEXT NOT NULL,
+    em              INTEGER NOT NULL,
+    invalidada_em   INTEGER
+  );
+  CREATE INDEX idx_pool_prova_run ON pool_prova(user_id, run_id);
+
+  CREATE TABLE pool_expansao (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    TEXT NOT NULL,
+    run_id     TEXT NOT NULL,
+    project_id TEXT NOT NULL,
+    -- JSON: string[] dos caminhos pedidos
+    caminhos   TEXT NOT NULL,
+    resultado  TEXT NOT NULL CHECK (resultado IN ('adquirida', 'conflito')),
+    -- JSON: ConflitoDeTrava[]
+    conflitos  TEXT NOT NULL,
+    em         INTEGER NOT NULL,
+    -- Quando a aquisicao do slot acabou. O conflito so vale enquanto a aquisicao dura: o mesmo
+    -- run_id volta a ser adquirido na nova tentativa do escritor.
+    encerrada_em INTEGER
+  );
+  CREATE INDEX idx_pool_expansao_run ON pool_expansao(user_id, run_id);
   `
 ]
 

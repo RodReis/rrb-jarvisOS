@@ -229,6 +229,37 @@ describe('independência dentro do projeto', () => {
   it('o SEM_PROVA é o padrão', () => {
     expect(SEM_PROVA(item('x', 'X'), [])).toBe(false)
   })
+
+  it('o veredito estruturado autoriza quando independente, como o booleano', () => {
+    const d = decidirPool(estado({ config: PARALELO, itens: doisDoMesmo }), () => ({
+      independente: true
+    }))
+    expect(d.adquirir).toEqual(['a1', 'a2'])
+  })
+
+  it('o veredito negativo leva as razões e o fingerprint ao motivo de espera (M12-F02)', () => {
+    const razoes = [
+      { tipo: 'recurso-exclusivo', runId: 'a2', contraRunId: 'a1', recurso: 'lockfile' }
+    ] as const
+    const d = decidirPool(estado({ config: PARALELO, itens: doisDoMesmo }), () => ({
+      independente: false,
+      razoes,
+      fingerprint: 'abc123'
+    }))
+    expect(d.adquirir).toEqual(['a1'])
+    expect(motivoDe(d, 'a2')).toEqual({
+      tipo: 'sem-prova-de-independencia',
+      razoes,
+      fingerprint: 'abc123'
+    })
+  })
+
+  it('o veredito negativo sem detalhe mantém o motivo simples', () => {
+    const d = decidirPool(estado({ config: PARALELO, itens: doisDoMesmo }), () => ({
+      independente: false
+    }))
+    expect(motivoDe(d, 'a2')).toEqual({ tipo: 'sem-prova-de-independencia' })
+  })
 })
 
 describe('gates — capacidade livre não torna ninguém elegível (regra 1)', () => {
