@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 2517 | 2517 | 0 | 81.8 | — | — |
-| — | — | — | Banco | 1819 | 1801 | 0 | 83.8 | — | — |
-| — | — | — | Tela | 735 | 734 | 0 | 76.5 | — | — |
+| — | — | — | Regras de Negócio | 2619 | 2619 | 0 | 82.5 | — | — |
+| — | — | — | Banco | 1833 | 1815 | 0 | 83.4 | — | — |
+| — | — | — | Tela | 774 | 773 | 0 | 77.6 | — | — |
 
 ## Histórico por entrega
 
@@ -424,3 +424,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-10-03 | #125 | spec-squads-04-revisao-independente | Regras de Negócio | 2517 | 2517 | 0 | 81.8 | #384 | [#384](https://github.com/RodReis/rrb-jarvisOS/pull/384) |
 | 2026-10-03 | #125 | spec-squads-04-revisao-independente | Banco | 1819 | 1801 | 0 | 83.8 | #384 | [#384](https://github.com/RodReis/rrb-jarvisOS/pull/384) |
 | 2026-10-03 | #125 | spec-squads-04-revisao-independente | Tela | 735 | 734 | 0 | 76.5 | #384 | [#384](https://github.com/RodReis/rrb-jarvisOS/pull/384) |
+| 2026-10-04 | #356 | spec-escuta-01-wake-word | Regras de Negócio | 2619 | 2619 | 0 | 82.5 | #383 | [#383](https://github.com/RodReis/rrb-jarvisOS/pull/383) |
+| 2026-10-04 | #356 | spec-escuta-01-wake-word | Banco | 1833 | 1815 | 0 | 83.4 | #383 | [#383](https://github.com/RodReis/rrb-jarvisOS/pull/383) |
+| 2026-10-04 | #356 | spec-escuta-01-wake-word | Tela | 774 | 773 | 0 | 77.6 | #383 | [#383](https://github.com/RodReis/rrb-jarvisOS/pull/383) |

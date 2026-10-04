@@ -2418,7 +2418,7 @@ Status: **em andamento** ([PR #383](https://github.com/RodReis/rrb-jarvisOS/pull
   trecho com a fala seguinte pelo mesmo stream. O disparo reserva o buffer antes da navegação;
   se a troca de espaço falha ou o STT não está pronto, ele é descartado. Teste de regressão
   verifica que o turno não abre outro `getUserMedia`.
-- [ ] **14. Relatório de testes** (`reports/TESTS.md`) regenerado a partir dos artefatos do CI.
+- [x] **14. Relatório de testes** (`reports/TESTS.md`) regenerado a partir dos artefatos do CI da PR #383; anti-drift e self-check locais passaram. O gate do SHA final ainda precisa ser conferido.
 
 **Decisões técnicas desta fatia** (nenhuma altera escopo; a confirmar pelo PI estão no corpo da PR): a hotkey de mute é o próprio kill switch por outro caminho; o disparo vindo do NOA passa para o JARVIS pela troca auditada, porque o Command Center só existe lá; o estado vive em arquivo local e não em coluna de preferências (sem migração); a tela diz "limiar de disparo" porque maior exige mais certeza.
 

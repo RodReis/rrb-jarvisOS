@@ -111,3 +111,12 @@ modelo por IPC, mas Settings não dava acesso ao download. A seção ganhou o
 botão de instalação; depois do hash válido, o serviço reavalia a disponibilidade
 e liga a escuta quando o padrão é ativo, preservando um kill switch salvo.
 Dois testes de regressão cobrem o download e a precedência do kill switch.
+
+O CI do commit `7cdeccc` passou em quality, Regras, Banco, Tela, visual e E2E;
+o agregado `test` reprovou porque `reports/TESTS.md` ainda tinha números da base.
+Baixei os JSONs e as coberturas daquele run (#37215282527) e regenerei o
+relatório: Regras 2619/2619, Banco 1815/1833 (18 pulados), Tela 773/774
+(1 todo), zero falha; o anti-drift com `--require-entry` e o self-check passaram.
+O código posterior adicionou apenas o registro da latência entre o fim do
+gatilho e a reserva do turno, sem testes novos. O valor real ainda depende da
+execução física do PI.

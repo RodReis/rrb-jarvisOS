@@ -43,6 +43,8 @@ export interface EventoDeEscuta {
   readonly gatilho: 'frase' | 'palmas'
   /** Só a frase tem confiança medida. */
   readonly confianca?: number
+  /** Relógio local para medir a passagem do gatilho ao turno, sem transportar áudio. */
+  readonly fimDoGatilhoMs?: number
   readonly sessaoBloqueada: boolean
 }
 
@@ -273,7 +275,7 @@ export class EscutaService {
     if (!this.ativa || this.emTurno()) return
 
     if (this.persistido.palmas && this.deps.palmas.alimentar(pcm)) {
-      this.disparar({ gatilho: 'palmas' })
+      this.disparar({ gatilho: 'palmas', fimDoGatilhoMs: Date.now() })
       return
     }
     if (!this.persistido.frase) return
@@ -281,13 +283,21 @@ export class EscutaService {
     const deteccao = await this.deps.engine.alimentar(pcm)
     // O turno pode ter começado enquanto o engine pensava: o disparo tardio seria um segundo turno.
     if (deteccao !== null && !this.emTurno()) {
-      this.disparar({ gatilho: 'frase', confianca: deteccao.confianca })
+      this.disparar({
+        gatilho: 'frase',
+        confianca: deteccao.confianca,
+        fimDoGatilhoMs: deteccao.fimDaFraseMs
+      })
     }
   }
 
   private disparar(evento: Omit<EventoDeEscuta, 'sessaoBloqueada'>): void {
     if (this.teste) {
-      this.deps.aoTestar?.({ ...evento, limiar: this.deps.engine.obterLimiar() })
+      this.deps.aoTestar?.({
+        gatilho: evento.gatilho,
+        ...(evento.confianca === undefined ? {} : { confianca: evento.confianca }),
+        limiar: this.deps.engine.obterLimiar()
+      })
       return
     }
     this.definirTurno(true)

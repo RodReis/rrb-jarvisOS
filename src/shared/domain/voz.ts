@@ -178,11 +178,13 @@ export type DesfechoDeLigarEscuta =
 
 /**
  * O que a tela sabe de um disparo: **quem** disparou e se a sessão estava bloqueada. Nem áudio,
- * nem confiança, nem caminho de modelo atravessam a ponte.
+ * nem confiança, nem caminho de modelo atravessam a ponte. O relógio local permite medir
+ * a latência até a reserva do turno sem carregar áudio.
  */
 export interface DisparoDaEscuta {
   readonly gatilho: 'frase' | 'palmas'
   readonly sessaoBloqueada: boolean
+  readonly fimDoGatilhoMs?: number
 }
 
 /**
@@ -226,6 +228,6 @@ export function isHotkeyDeMuteDaEscuta(valor: unknown): valor is HotkeyDeMuteDaE
 export const WAKE_WORD_OFICIAL = 'Ei, amigo'
 
 /** Limiares padrão de sensibilidade para UI e validação. */
-export const SENSIBILIDADE_PADRAO_WAKE_WORD = 0.5
+export const SENSIBILIDADE_PADRAO_WAKE_WORD = 0.95
 export const SENSIBILIDADE_MINIMA_WAKE_WORD = 0.1
 export const SENSIBILIDADE_MAXIMA_WAKE_WORD = 0.95

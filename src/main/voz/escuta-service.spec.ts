@@ -275,14 +275,24 @@ describe('EscutaService — áudio e gatilhos (critérios 2, 7 e 12)', () => {
     const m = montar({ persistido: undefined, resposta: DETECCAO })
     await m.servico.restaurar()
     await m.servico.receberPcm(PCM)
-    expect(m.disparos).toEqual([{ gatilho: 'frase', confianca: 0.91, sessaoBloqueada: false }])
+    expect(m.disparos).toEqual([
+      expect.objectContaining({
+        gatilho: 'frase',
+        confianca: 0.91,
+        sessaoBloqueada: false,
+        fimDoGatilhoMs: 1234
+      })
+    ])
   })
 
   it('duas palmas abrem o mesmo turno, pelo gatilho "palmas"', async () => {
     const m = montar({ persistido: undefined, palmas: true })
     await m.servico.restaurar()
     await m.servico.receberPcm(PCM)
-    expect(m.disparos).toEqual([{ gatilho: 'palmas', sessaoBloqueada: false }])
+    expect(m.disparos).toEqual([
+      expect.objectContaining({ gatilho: 'palmas', sessaoBloqueada: false })
+    ])
+    expect(m.disparos[0].fimDoGatilhoMs).toEqual(expect.any(Number))
   })
 
   it('cada gatilho liga e desliga separadamente', async () => {

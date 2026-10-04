@@ -17,7 +17,7 @@ export interface DepsDoDisparo {
 }
 
 export function criarAoDispararDaEscuta(deps: DepsDoDisparo): (evento: EventoDeEscuta) => void {
-  return ({ gatilho, sessaoBloqueada }) => {
+  return ({ gatilho, sessaoBloqueada, fimDoGatilhoMs }) => {
     if (!sessaoBloqueada) {
       try {
         deps.revelarJanela()
@@ -26,7 +26,11 @@ export function criarAoDispararDaEscuta(deps: DepsDoDisparo): (evento: EventoDeE
         // pode depender de a janela ter subido.
       }
     }
-    // Só o gatilho e o bloqueio atravessam: a confiança do detector fica no main.
-    deps.avisarTela({ gatilho, sessaoBloqueada })
+    // A confiança do detector fica no main; o timestamp serve só à medição de latência.
+    deps.avisarTela({
+      gatilho,
+      sessaoBloqueada,
+      ...(fimDoGatilhoMs === undefined ? {} : { fimDoGatilhoMs })
+    })
   }
 }

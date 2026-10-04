@@ -70,7 +70,12 @@ export function EscutaDaVoz({
         window.jarvis.informarTurnoDaEscuta(false)
         return
       }
-      aoDispararAtual.current(d, captura.iniciarTurno())
+      const turno = captura.iniciarTurno()
+      log.ui.info('Turno da escuta reservado', {
+        gatilho: d.gatilho,
+        latenciaAteReservaMs: Math.max(0, Date.now() - (d.fimDoGatilhoMs ?? Date.now()))
+      })
+      aoDispararAtual.current(d, turno)
     })
     return () => {
       vivo = false
