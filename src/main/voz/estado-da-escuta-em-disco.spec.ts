@@ -86,7 +86,7 @@ describe('estado persistido da escuta (SPEC-Escuta-01, critério 8)', () => {
       ativa: false,
       frase: true,
       palmas: true,
-      sensibilidade: 0.5,
+      sensibilidade: 0.95,
       hotkey: 'Control+Alt+M'
     })
   })

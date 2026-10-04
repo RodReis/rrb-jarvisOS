@@ -28,11 +28,11 @@ function engineFalso(disparar = false, confianca = 0.85): WakeWordEngine {
 
 describe('WakeWordEngine — contrato e validações (SPEC-Escuta-01, critérios 1 e 12)', () => {
   it('dispara quando configurado e a confiança atinge o limiar', async () => {
-    const engine = engineFalso(true, 0.9)
+    const engine = engineFalso(true, 0.98)
     const evento = await engine.alimentar(new Int16Array(1280))
 
     expect(evento).not.toBeNull()
-    expect(evento?.confianca).toBe(0.9)
+    expect(evento?.confianca).toBe(0.98)
   })
 
   it('não dispara quando a confiança fica abaixo do limiar', async () => {
@@ -43,14 +43,16 @@ describe('WakeWordEngine — contrato e validações (SPEC-Escuta-01, critérios
   })
 
   it('limiar de sensibilidade é atualizado sem restart (critério 12)', async () => {
-    const engine = engineFalso(true, 0.6)
+    const engine = engineFalso(true, 0.9)
 
-    // Com limiar default (0.5), confiança 0.6 dispara
-    expect(await engine.alimentar(new Int16Array(1280))).not.toBeNull()
+    // Com limiar default (0.95), confiança 0.9 não dispara.
+    expect(await engine.alimentar(new Int16Array(1280))).toBeNull()
 
-    // Aumenta o limiar para 0.8: na chamada seguinte a mesma confiança não dispara mais
+    // Reduzir e depois restaurar o limiar vale na chamada seguinte, sem reiniciar.
     engine.definirLimiar(0.8)
-    expect(engine.obterLimiar()).toBe(0.8)
+    expect(await engine.alimentar(new Int16Array(1280))).not.toBeNull()
+    engine.definirLimiar(0.95)
+    expect(engine.obterLimiar()).toBe(0.95)
     expect(await engine.alimentar(new Int16Array(1280))).toBeNull()
   })
 

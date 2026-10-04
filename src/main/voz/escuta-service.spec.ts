@@ -315,7 +315,7 @@ describe('EscutaService — áudio e gatilhos (critérios 2, 7 e 12)', () => {
     await m.servico.definirSensibilidade(5)
     expect(m.servico.estado().sensibilidade).toBe(0.95)
     await m.servico.definirSensibilidade(Number.NaN)
-    expect(m.servico.estado().sensibilidade).toBe(0.5)
+    expect(m.servico.estado().sensibilidade).toBe(0.95)
   })
 })
 
@@ -377,7 +377,7 @@ describe('EscutaService — modo de teste ao vivo (critério 12)', () => {
 
     await m.servico.receberPcm(PCM)
 
-    expect(m.testes).toEqual([{ gatilho: 'frase', confianca: 0.91, limiar: 0.5 }])
+    expect(m.testes).toEqual([{ gatilho: 'frase', confianca: 0.91, limiar: 0.95 }])
     // Testar sensibilidade não pode começar uma conversa nem subir a janela.
     expect(m.disparos).toEqual([])
   })
@@ -400,7 +400,7 @@ describe('EscutaService — modo de teste ao vivo (critério 12)', () => {
 
     await m.servico.receberPcm(PCM)
 
-    expect(m.testes).toEqual([{ gatilho: 'palmas', limiar: 0.5 }])
+    expect(m.testes).toEqual([{ gatilho: 'palmas', limiar: 0.95 }])
   })
 
   it('o limiar do teste é o que Settings acabou de definir, sem restart', async () => {

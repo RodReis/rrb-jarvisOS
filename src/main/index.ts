@@ -8,7 +8,7 @@ import { Sidecar } from './voz/sidecar'
 import { criarEngineFasterWhisper } from './voz/engine-faster-whisper'
 import { criarEnginePiper } from './voz/engine-piper'
 import { HotkeyDaVoz } from './voz/hotkey-da-voz'
-import { criarEngineOpenWakeWord } from './voz/engine-openwakeword'
+import { criarEngineWakeLocal } from './voz/engine-wake-local'
 import { DetectorDeDuasPalmas } from './voz/detector-de-palmas'
 import { EscutaService } from './voz/escuta-service'
 import { criarEstadoDaEscutaEmDisco } from './voz/estado-da-escuta-em-disco'
@@ -1784,7 +1784,7 @@ if (!app.requestSingleInstanceLock()) {
      * estiver ligada) e um crash na transcrição não pode derrubar a escuta.
      */
     const pastaDoWake = join(app.getPath('userData'), 'models', 'wake')
-    const engineDaEscuta = criarEngineOpenWakeWord({
+    const engineDaEscuta = criarEngineWakeLocal({
       sidecar: new Sidecar({
         spawn: (comando, args) => spawn(comando, [...args], { stdio: 'pipe' }),
         comando: diretorioDaVoz('runtime', 'python', 'python.exe'),
@@ -1792,9 +1792,7 @@ if (!app.requestSingleInstanceLock()) {
         timeoutMs: 30_000
       }),
       configuracao: () => ({
-        modelo: join(pastaDoWake, 'ei_amigo.onnx'),
-        melspec: join(pastaDoWake, 'melspectrogram.onnx'),
-        embedding: join(pastaDoWake, 'embedding_model.onnx')
+        modelo: join(pastaDoWake, 'ei_amigo.onnx')
       })
     })
 
@@ -1844,7 +1842,7 @@ if (!app.requestSingleInstanceLock()) {
       registrarHotkey: registrarHotkeyDeMute,
       palmas: new DetectorDeDuasPalmas(),
       estado: criarEstadoDaEscutaEmDisco(diretorioDaVoz('escuta.json')),
-      // Sem o runtime usável e os três arquivos do detector, a escuta não abre o microfone.
+      // Sem o runtime usável e o modelo próprio, a escuta não abre o microfone.
       modeloPronto: async () =>
         runtimeUsavel({ diretorioDaVoz, existe: existsSync }) && engineDaEscuta.disponivel(),
       auditar: ({ type, payload }) =>

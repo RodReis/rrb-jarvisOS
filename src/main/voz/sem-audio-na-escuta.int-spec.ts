@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join, relative } from 'node:path'
 import net from 'node:net'
 import dns from 'node:dns'
-import { criarEngineOpenWakeWord } from './engine-openwakeword'
+import { criarEngineWakeLocal } from './engine-wake-local'
 import { DetectorDeDuasPalmas } from './detector-de-palmas'
 import { EscutaService } from './escuta-service'
 import { criarEstadoDaEscutaEmDisco } from './estado-da-escuta-em-disco'
@@ -66,12 +66,10 @@ afterEach(() => {
 
 function montarSessao() {
   const disparos: unknown[] = []
-  const engine = criarEngineOpenWakeWord({
+  const engine = criarEngineWakeLocal({
     sidecar: sidecarQueResponde(),
     configuracao: () => ({
       modelo: join(userData, 'm.onnx'),
-      melspec: join(userData, 'mel.onnx'),
-      embedding: join(userData, 'emb.onnx'),
       artefatosPresentes: () => true
     })
   })
@@ -180,7 +178,7 @@ describe('o sidecar não tem caminho de escrita nem de rede', () => {
 })
 
 describe('o lado TypeScript da escuta também não escreve nem sai para a rede', () => {
-  it.each(['engine-openwakeword.ts', 'escuta-service.ts', 'buffer-circular-audio.ts'])(
+  it.each(['engine-wake-local.ts', 'escuta-service.ts', 'buffer-circular-audio.ts'])(
     '%s não importa fs de escrita nem faz requisição',
     (arquivo) => {
       const fonte = readFileSync(join(__dirname, arquivo), 'utf8')

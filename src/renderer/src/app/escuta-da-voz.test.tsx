@@ -60,12 +60,16 @@ afterEach(() => vi.unstubAllGlobals())
 /** Uma captura que registra o que a tela pediu, e quando foi encerrada. */
 function capturaFalsa() {
   const parar = vi.fn(async () => undefined)
+  const iniciarTurno = vi.fn(() => ({
+    capturar: vi.fn(async () => async () => new Int16Array()),
+    cancelar: vi.fn()
+  }))
   let aoBloco: ((b: Int16Array) => void) | undefined
   const abrir = vi.fn(async (_id: string | undefined, receber: (b: Int16Array) => void) => {
     aoBloco = receber
-    return { parar }
+    return { parar, iniciarTurno }
   })
-  return { abrir, parar, bloco: (b: Int16Array) => aoBloco?.(b) }
+  return { abrir, parar, iniciarTurno, bloco: (b: Int16Array) => aoBloco?.(b) }
 }
 
 function montar(captura = capturaFalsa(), aoDisparar = vi.fn()) {
@@ -169,7 +173,8 @@ describe('captura e kill switch (critério 8)', () => {
     captura.abrir.mockImplementationOnce(
       () =>
         new Promise((resolver) => {
-          terminarDeAbrir = () => resolver({ parar: captura.parar })
+          terminarDeAbrir = () =>
+            resolver({ parar: captura.parar, iniciarTurno: captura.iniciarTurno })
         })
     )
     montar(captura)
@@ -202,6 +207,9 @@ describe('o disparo', () => {
 
     act(() => avisarDisparo?.({ gatilho: 'palmas', sessaoBloqueada: true }))
 
-    expect(aoDisparar).toHaveBeenCalledWith({ gatilho: 'palmas', sessaoBloqueada: true })
+    expect(aoDisparar).toHaveBeenCalledWith(
+      { gatilho: 'palmas', sessaoBloqueada: true },
+      expect.objectContaining({ capturar: expect.any(Function) })
+    )
   })
 })

@@ -70,6 +70,33 @@ function webAudioFalso() {
 }
 
 describe('captura contínua (SPEC-Escuta-01, critério 8)', () => {
+  it('passa o pré-roll e a fala imediata ao mesmo turno sem reabrir o microfone', async () => {
+    const w = webAudioFalso()
+    const captura = await abrirCapturaContinua('headset-2', vi.fn(), w.deps)
+    for (let i = 0; i < 8; i++) w.falarComOMicrofone(0.1)
+
+    const turno = captura.iniciarTurno()
+    const pararTurno = await turno.capturar()
+    w.falarComOMicrofone(0.8)
+    const pcm = await pararTurno()
+
+    expect(pcm.length).toBe(24_000 + 3 * TAMANHO_DO_BLOCO)
+    expect(pcm[0]).toBe(3277)
+    expect(pcm.at(-1)).toBe(26214)
+    expect(w.abrirStream).toHaveBeenCalledTimes(1)
+    await captura.parar()
+  })
+
+  it('descarta o turno sem guardar PCM quando a navegação falha', async () => {
+    const w = webAudioFalso()
+    const captura = await abrirCapturaContinua(undefined, vi.fn(), w.deps)
+    w.falarComOMicrofone(0.1)
+    const turno = captura.iniciarTurno()
+    turno.cancelar()
+    expect((await (await turno.capturar())()).length).toBe(0)
+    await captura.parar()
+  })
+
   it('abre o dispositivo escolhido e manda os blocos de áudio', async () => {
     const w = webAudioFalso()
     const blocos: Int16Array[] = []
@@ -102,6 +129,17 @@ describe('captura contínua (SPEC-Escuta-01, critério 8)', () => {
     w.falarComOMicrofone(0.5)
 
     expect(aoBloco).not.toHaveBeenCalled()
+  })
+
+  it('kill switch descarta também o áudio do turno que já estava em memória', async () => {
+    const w = webAudioFalso()
+    const captura = await abrirCapturaContinua(undefined, vi.fn(), w.deps)
+    w.falarComOMicrofone(0.5)
+    const encerrarTurno = await captura.iniciarTurno().capturar()
+
+    await captura.parar()
+
+    expect((await encerrarTurno()).length).toBe(0)
   })
 
   it('parar duas vezes não fecha o contexto duas vezes', async () => {

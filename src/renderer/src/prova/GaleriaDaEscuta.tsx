@@ -72,9 +72,21 @@ export function GaleriaDaEscuta({
   readonly cena: CenaDaEscuta
 }): React.JSX.Element {
   // A captura da prova abre sempre, exceto na cena em que o microfone é recusado.
-  const abrirCaptura = async (): Promise<{ parar: () => Promise<void> }> => {
+  const abrirCaptura = async (): Promise<{
+    parar: () => Promise<void>
+    iniciarTurno: () => {
+      capturar: () => Promise<() => Promise<Int16Array>>
+      cancelar: () => void
+    }
+  }> => {
     if (cena === 'sem-microfone') throw new DOMException('negado', 'NotAllowedError')
-    return { parar: async () => undefined }
+    return {
+      parar: async () => undefined,
+      iniciarTurno: () => ({
+        capturar: async () => async () => new Int16Array(),
+        cancelar: () => undefined
+      })
+    }
   }
 
   return (

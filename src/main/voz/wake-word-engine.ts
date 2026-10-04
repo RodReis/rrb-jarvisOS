@@ -1,9 +1,9 @@
 /**
  * O contrato do engine de wake word (SPEC-Escuta-01, critério 1).
  *
- * O app fala com `WakeWordEngine`, nunca diretamente com openWakeWord. Trocar de engine
+ * O app fala com `WakeWordEngine`, nunca diretamente com o detector concreto. Trocar de engine
  * é escrever outra implementação e injetá-la — não é refatoração de quem consome (invariante do épico #194).
- * Nenhum import de openWakeWord fora da implementação (guarda de lint).
+ * Nenhum import do detector concreto fora da composição (guarda de lint).
  *
  * ## Pré-roll e fluxo de áudio
  *
@@ -46,7 +46,9 @@ export interface WakeWordEngine {
 }
 
 /** Limiares e constantes da escuta (SPEC-Escuta-01). */
-export const LIMIAR_PADRAO_WAKE_WORD = 0.5
+// Calibrado com dois conjuntos separados de 500 negativos cada; falso disparo é o risco
+// dominante da escuta contínua. O PI pode reduzir este valor em Settings.
+export const LIMIAR_PADRAO_WAKE_WORD = 0.95
 export const LIMIAR_MINIMO_WAKE_WORD = 0.1
 export const LIMIAR_MAXIMO_WAKE_WORD = 0.95
 

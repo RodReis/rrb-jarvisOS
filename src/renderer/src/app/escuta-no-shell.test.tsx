@@ -39,7 +39,23 @@ function mockarPonte(espaco: WorkspaceId): void {
     .mockReset()
     .mockImplementation((w: WorkspaceId) => Promise.resolve({ workspace: w, auditSeq: 1 }))
   informarTurnoDaEscuta.mockReset()
-  getUserMedia.mockReset().mockRejectedValue(new DOMException('negado', 'NotAllowedError'))
+  getUserMedia.mockReset().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] })
+  vi.stubGlobal(
+    'AudioContext',
+    class {
+      destination = {}
+      createMediaStreamSource() {
+        return { connect: vi.fn(), disconnect: vi.fn() }
+      }
+      createScriptProcessor() {
+        return { onaudioprocess: null, connect: vi.fn(), disconnect: vi.fn() }
+      }
+      createAnalyser() {
+        return { fftSize: 1024, getFloatTimeDomainData: vi.fn() }
+      }
+      async close() {}
+    }
+  )
   vi.stubGlobal('navigator', {
     ...navigator,
     mediaDevices: { getUserMedia, enumerateDevices: vi.fn().mockResolvedValue([]) }
@@ -103,29 +119,31 @@ describe('o controle da escuta na barra', () => {
 describe('um disparo leva ao Command Center', () => {
   beforeEach(() => mockarPonte('jarvis'))
 
-  it('no JARVIS, mostra o Command Center e tenta gravar com o dispositivo escolhido', async () => {
+  it('no JARVIS, mostra o Command Center e reutiliza a captura contínua', async () => {
     await entrarPelaChoice('jarvis')
     await screen.findByTestId('command-center')
     // O disparo pode chegar com o app em qualquer rota; o que o torna útil é levar à tela do turno.
     await userEvent.click(screen.getByRole('button', { name: 'Projects Hub' }))
     await waitFor(() => expect(screen.queryByTestId('command-center')).not.toBeInTheDocument())
+    await screen.findByText(/escuta ligada/i)
+    const capturasDeTurno = (): number =>
+      getUserMedia.mock.calls.filter(
+        ([pedido]) => pedido?.audio?.channelCount === 1 && pedido?.audio?.sampleRate === 16_000
+      ).length
+    const abertasAntes = capturasDeTurno()
 
     act(() => disparar?.({ gatilho: 'frase', sessaoBloqueada: false }))
     await screen.findByTestId('command-center')
 
-    await waitFor(() =>
-      expect(getUserMedia).toHaveBeenCalledWith({
-        // `channelCount` só a gravação pede; o medidor de entrada abre o mesmo dispositivo sem
-        // ele, e sem esta marca o teste passaria sem que o disparo tivesse feito nada.
-        audio: expect.objectContaining({ channelCount: 1, deviceId: { exact: 'headset-2' } })
-      })
-    )
+    expect(abertasAntes).toBe(1)
+    expect(capturasDeTurno()).toBe(abertasAntes)
   })
 
   it('vindo do NOA, passa para o JARVIS — o Command Center não existe no NOA', async () => {
     mockarPonte('noa')
     await entrarPelaChoice('noa')
     await screen.findByRole('switch', { name: /escuta/i })
+    await screen.findByText(/escuta ligada/i)
     expect(screen.queryByTestId('command-center')).not.toBeInTheDocument()
 
     act(() => disparar?.({ gatilho: 'palmas', sessaoBloqueada: false }))
@@ -139,6 +157,7 @@ describe('um disparo leva ao Command Center', () => {
     switchWorkspace.mockRejectedValue(new Error('falhou'))
     await entrarPelaChoice('noa')
     await screen.findByRole('switch', { name: /escuta/i })
+    await screen.findByText(/escuta ligada/i)
 
     act(() => disparar?.({ gatilho: 'frase', sessaoBloqueada: false }))
 

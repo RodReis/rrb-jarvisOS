@@ -37,12 +37,11 @@ afterAll(() => {
 
 describe('o engine concreto da wake word (ESLint)', () => {
   const proibidos: ReadonlyArray<readonly [string, string]> = [
-    ['o módulo do engine', "import { criarEngineOpenWakeWord } from '../engine-openwakeword'"],
+    ['o módulo do engine', "import { criarEngineWakeLocal } from '../engine-wake-local'"],
     [
       'o módulo do engine, caminho irmão',
-      "import { criarEngineOpenWakeWord } from './engine-openwakeword'"
-    ],
-    ['o pacote openwakeword', "import wake from 'openwakeword'"]
+      "import { criarEngineWakeLocal } from './engine-wake-local'"
+    ]
   ]
 
   it.each(proibidos)(

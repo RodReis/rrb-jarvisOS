@@ -13,6 +13,7 @@ import type { WorkspaceId } from '@shared/domain/entities'
 import type { VisemeEvent } from '@shared/domain/visemes'
 import type { DesfechoDaTranscricao, ProntidaoDaVoz } from '@shared/domain/voz'
 import { capturarPcm, type CapturaDeAudio } from './captura-de-audio'
+import type { CapturaDoTurno } from './captura-continua'
 import { criarReprodutor } from './reproducao-de-fala'
 import { criarMedidorDeEntrada, type MedidorDeEntrada } from './medidor-de-audio'
 import { criarDetectorDeFimDaFala } from './fim-da-fala'
@@ -284,8 +285,11 @@ export function Microfone({
     await consultar()
   }
 
-  async function comecar(porEscuta = false): Promise<void> {
-    if (estadoAtual.current !== 'ocioso') return
+  async function comecar(porEscuta = false, capturaDoTurno?: CapturaDoTurno): Promise<void> {
+    if (estadoAtual.current !== 'ocioso') {
+      capturaDoTurno?.cancelar()
+      return
+    }
     setErro(undefined)
     setAviso(undefined)
     setTexto(undefined)
@@ -297,14 +301,22 @@ export function Microfone({
       medidor.current = undefined
       await medidorAtual?.parar()
       nivelEntrada.current = 0
-      encerrarCaptura.current = await capturar(entradaEfetivaId || undefined, (valor) => {
-        nivelEntrada.current = valor
-      })
+      if (porEscuta && capturaDoTurno === undefined) {
+        throw new Error('Captura contínua indisponível para o turno da escuta.')
+      }
+      encerrarCaptura.current = await (capturaDoTurno?.capturar ?? capturar)(
+        entradaEfetivaId || undefined,
+        (valor) => {
+          nivelEntrada.current = valor
+        }
+      )
       if (porEscuta) armarMonitorDoTurno()
     } catch {
       // Microfone negado ou ausente. Não é falha do runtime — a próxima ação é do sistema
       // operacional, não do app.
       marcar('ocioso')
+      capturaDoTurno?.cancelar()
+      if (porEscuta) window.jarvis.informarTurnoDaEscuta(false)
       setErro(t('voz.microfoneIndisponivel'))
       return
     }
@@ -535,12 +547,13 @@ export function Microfone({
     aoTratarDisparo?.(disparo.id)
 
     if (!prontidao.pronta) {
+      disparo.capturaDoTurno.cancelar()
       // Dentro da promessa, e não no corpo do efeito: `setState` síncrono ali cascateia render.
       void Promise.resolve().then(() => setAviso(t('escuta.naoPronta')))
       window.jarvis.informarTurnoDaEscuta(false)
       return
     }
-    void acoes.current.comecar(true)
+    void acoes.current.comecar(true, disparo.capturaDoTurno)
   }, [disparo, prontidao, aoTratarDisparo, t])
 
   // O main só impede um segundo turno se souber que este começou e quando terminou. Só transições

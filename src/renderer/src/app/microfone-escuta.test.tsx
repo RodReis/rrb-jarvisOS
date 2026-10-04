@@ -16,7 +16,11 @@ const perguntarAoJarvis = vi.fn()
 const informarTurnoDaEscuta = vi.fn()
 const falar = vi.fn()
 
-const DISPARO: DisparoRecebido = { id: 1, gatilho: 'frase', sessaoBloqueada: false }
+const DISPARO: Omit<DisparoRecebido, 'capturaDoTurno'> = {
+  id: 1,
+  gatilho: 'frase',
+  sessaoBloqueada: false
+}
 
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true })
@@ -69,21 +73,31 @@ const reprodutorFalso = () => ({
   cancelar: () => {}
 })
 
-function montar(captura: ReturnType<typeof capturaConduzida>, disparo?: DisparoRecebido) {
+function montar(
+  captura: ReturnType<typeof capturaConduzida>,
+  disparo?: Omit<DisparoRecebido, 'capturaDoTurno'>
+) {
   const aoTratarDisparo = vi.fn()
+  const capturarPushToTalk = vi.fn(async () => {
+    throw new Error('O turno da escuta não pode abrir um segundo microfone.')
+  })
   const resultado = render(
     <Microfone
       workspace="jarvis"
       vozDaFala="pt_BR-faber-medium"
       entradaId="microfone-teste"
-      capturar={captura.capturar}
+      capturar={capturarPushToTalk}
       criarFala={reprodutorFalso as never}
       criarMedidor={async () => ({ nivelRms: () => 0, parar: async () => {} })}
-      disparo={disparo}
+      disparo={
+        disparo
+          ? { ...disparo, capturaDoTurno: { capturar: captura.capturar, cancelar: vi.fn() } }
+          : undefined
+      }
       aoTratarDisparo={aoTratarDisparo}
     />
   )
-  return { ...resultado, aoTratarDisparo }
+  return { ...resultado, aoTratarDisparo, capturarPushToTalk }
 }
 
 /** Avança o relógio em passos de 250 ms, o ritmo com que a captura mede o nível. */
@@ -99,11 +113,12 @@ async function passar(ms: number, nivel: () => void = () => {}): Promise<void> {
 describe('o disparo começa o turno sem botão', () => {
   it('grava assim que o disparo chega, e o consome para não repetir', async () => {
     const captura = capturaConduzida()
-    const { aoTratarDisparo } = montar(captura, DISPARO)
+    const { aoTratarDisparo, capturarPushToTalk } = montar(captura, DISPARO)
 
     await screen.findByRole('button', { name: /ouvindo/i })
 
     expect(captura.capturar).toHaveBeenCalledTimes(1)
+    expect(capturarPushToTalk).not.toHaveBeenCalled()
     expect(aoTratarDisparo).toHaveBeenCalledWith(1)
   })
 

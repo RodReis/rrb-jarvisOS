@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Mic, MicOff } from 'lucide-react'
 import type { DisparoDaEscuta, EstadoDaEscuta } from '@shared/domain/voz'
-import { abrirCapturaContinua, type CapturaContinua } from './captura-continua'
+import { abrirCapturaContinua, type CapturaContinua, type CapturaDoTurno } from './captura-continua'
 import { log } from '../lib/log'
 
 /**
@@ -26,7 +26,10 @@ import { log } from '../lib/log'
  */
 
 /** Um disparo entregue ao shell, com identidade própria para ser tratado uma única vez. */
-export type DisparoRecebido = DisparoDaEscuta & { readonly id: number }
+export type DisparoRecebido = DisparoDaEscuta & {
+  readonly id: number
+  readonly capturaDoTurno: CapturaDoTurno
+}
 
 type Visao = 'ligada' | 'ligando' | 'desligada' | 'indisponivel' | 'sem-microfone'
 
@@ -38,7 +41,7 @@ export function EscutaDaVoz({
   /** O dispositivo escolhido na F05; sem ele, o padrão do sistema. */
   readonly entradaId?: string | null
   /** Quem conduz o turno de conversa quando um gatilho dispara. */
-  readonly aoDisparar: (disparo: DisparoDaEscuta) => void
+  readonly aoDisparar: (disparo: DisparoDaEscuta, capturaDoTurno: CapturaDoTurno) => void
   /** Injetada para teste: `getUserMedia` não existe em jsdom. */
   readonly abrirCaptura?: typeof abrirCapturaContinua
 }): React.JSX.Element | null {
@@ -47,6 +50,7 @@ export function EscutaDaVoz({
   const [capturando, setCapturando] = useState(false)
   const [falhouAoAbrir, setFalhouAoAbrir] = useState(false)
   const [motivoDaRecusa, setMotivoDaRecusa] = useState<string | undefined>(undefined)
+  const capturaAtual = useRef<CapturaContinua | undefined>(undefined)
 
   // O disparo chega por assinatura estável; quem conduz o turno muda a cada render do shell.
   const aoDispararAtual = useRef(aoDisparar)
@@ -60,7 +64,14 @@ export function EscutaDaVoz({
       if (vivo) setEstado(e)
     })
     const cancelarEstado = window.jarvis.onEscutaMudou(setEstado)
-    const cancelarDisparo = window.jarvis.onEscutaDisparo((d) => aoDispararAtual.current(d))
+    const cancelarDisparo = window.jarvis.onEscutaDisparo((d) => {
+      const captura = capturaAtual.current
+      if (!captura) {
+        window.jarvis.informarTurnoDaEscuta(false)
+        return
+      }
+      aoDispararAtual.current(d, captura.iniciarTurno())
+    })
     return () => {
       vivo = false
       cancelarEstado()
@@ -85,6 +96,7 @@ export function EscutaDaVoz({
           return
         }
         captura = aberta
+        capturaAtual.current = aberta
         setFalhouAoAbrir(false)
         setCapturando(true)
       })
@@ -98,6 +110,7 @@ export function EscutaDaVoz({
 
     return () => {
       cancelado = true
+      if (capturaAtual.current === captura) capturaAtual.current = undefined
       setCapturando(false)
       void captura?.parar()
     }

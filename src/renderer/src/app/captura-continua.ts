@@ -14,10 +14,24 @@
 export const TAMANHO_DO_BLOCO = 1280
 
 const TAXA = 16_000
+const AMOSTRAS_PRE_ROLL = 24_000
+const AMOSTRAS_MAXIMAS_DO_TURNO = TAXA * 120 + AMOSTRAS_PRE_ROLL
+
+export interface CapturaDoTurno {
+  /** Usa o stream já aberto; devolve o PCM acumulado ao encerrar. */
+  readonly capturar: (
+    deviceId?: string,
+    onNivelRms?: (nivel: number) => void
+  ) => Promise<() => Promise<Int16Array>>
+  /** Descarta o áudio se não houve quem conduzisse o turno. */
+  readonly cancelar: () => void
+}
 
 export interface CapturaContinua {
   /** Fecha as trilhas do stream, o contexto de áudio e para de entregar blocos. Idempotente. */
   readonly parar: () => Promise<void>
+  /** Reserva o pré-roll imediatamente ao disparar, antes da navegação para o Command Center. */
+  readonly iniciarTurno: () => CapturaDoTurno
 }
 
 export interface DepsDaCapturaContinua {
@@ -70,7 +84,36 @@ export async function abrirCapturaContinua(
   const fonte = contexto.createMediaStreamSource(stream)
   const processador = contexto.createScriptProcessor(4096, 1, 1)
   let parado = false
-  const empacotar = criarEmpacotador(aoBloco)
+  const historico = new Int16Array(AMOSTRAS_PRE_ROLL)
+  let posicao = 0
+  let preenchimento = 0
+  let turno:
+    | {
+        pedacos: Int16Array[]
+        tamanho: number
+        onNivelRms?: (nivel: number) => void
+      }
+    | undefined
+
+  const empacotar = criarEmpacotador((bloco) => {
+    for (const amostra of bloco) {
+      historico[posicao] = amostra
+      posicao = (posicao + 1) % AMOSTRAS_PRE_ROLL
+      preenchimento = Math.min(AMOSTRAS_PRE_ROLL, preenchimento + 1)
+    }
+    if (turno !== undefined) {
+      if (turno.tamanho + bloco.length <= AMOSTRAS_MAXIMAS_DO_TURNO) {
+        turno.pedacos.push(bloco)
+        turno.tamanho += bloco.length
+      }
+      if (turno.onNivelRms) {
+        let soma = 0
+        for (const amostra of bloco) soma += amostra * amostra
+        turno.onNivelRms(Math.round(Math.sqrt(soma / bloco.length)))
+      }
+    }
+    aoBloco(bloco)
+  })
 
   processador.onaudioprocess = (evento) => {
     // Depois de parar, o que ainda estiver em voo não pode sair: o kill switch vale na hora.
@@ -82,9 +125,51 @@ export async function abrirCapturaContinua(
   processador.connect(contexto.destination)
 
   return {
+    iniciarTurno: () => {
+      const anterior = new Int16Array(preenchimento)
+      const inicio = (posicao - preenchimento + AMOSTRAS_PRE_ROLL) % AMOSTRAS_PRE_ROLL
+      for (let i = 0; i < preenchimento; i++) {
+        anterior[i] = historico[(inicio + i) % AMOSTRAS_PRE_ROLL]
+      }
+      const atual = {
+        pedacos: [anterior],
+        tamanho: anterior.length,
+        onNivelRms: undefined as ((nivel: number) => void) | undefined
+      }
+      turno = atual
+      return {
+        capturar: async (_deviceId, onNivelRms) => {
+          atual.onNivelRms = onNivelRms
+          return async () => {
+            if (turno === atual) turno = undefined
+            const resultado = new Int16Array(atual.tamanho)
+            let indice = 0
+            for (const pedaco of atual.pedacos) {
+              resultado.set(pedaco, indice)
+              indice += pedaco.length
+            }
+            atual.pedacos = []
+            atual.tamanho = 0
+            return resultado
+          }
+        },
+        cancelar: () => {
+          if (turno === atual) turno = undefined
+          atual.pedacos = []
+          atual.tamanho = 0
+        }
+      }
+    },
     parar: async () => {
       if (parado) return
       parado = true
+      historico.fill(0)
+      preenchimento = 0
+      if (turno) {
+        turno.pedacos = []
+        turno.tamanho = 0
+        turno = undefined
+      }
       processador.disconnect()
       fonte.disconnect()
       for (const trilha of stream.getTracks()) trilha.stop()

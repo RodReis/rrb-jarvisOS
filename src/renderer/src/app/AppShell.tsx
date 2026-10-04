@@ -15,6 +15,7 @@ import {
 import { VoiceMascot } from '@design/ui'
 import type { DisparoDaEscuta } from '@shared/domain/voz'
 import { EscutaDaVoz, type DisparoRecebido } from './EscutaDaVoz'
+import type { CapturaDoTurno } from './captura-continua'
 import { ACENTO_PADRAO } from '@design/tokens'
 import { log } from '../lib/log'
 import { usePreferences } from '../preferences/usePreferences'
@@ -113,13 +114,17 @@ export function AppShell({ perfil, onSair }: AppShellProps = {}): React.JSX.Elem
    * falhar não há quem conduza o turno, e o main é avisado: sem isso ele ignoraria gatilhos até o
    * teto do turno.
    */
-  async function aoDispararDaEscuta(recebido: DisparoDaEscuta): Promise<void> {
+  async function aoDispararDaEscuta(
+    recebido: DisparoDaEscuta,
+    capturaDoTurno: CapturaDoTurno
+  ): Promise<void> {
     if (!(await trocarWorkspace('jarvis'))) {
+      capturaDoTurno.cancelar()
       window.jarvis.informarTurnoDaEscuta(false)
       return
     }
     setNavegacao((atual) => navegar(atual, 'jarvis', ROTA_DO_COMMAND_CENTER))
-    setDisparo({ ...recebido, id: ++contadorDeDisparos.current })
+    setDisparo({ ...recebido, capturaDoTurno, id: ++contadorDeDisparos.current })
   }
 
   /**
@@ -315,7 +320,7 @@ export function AppShell({ perfil, onSair }: AppShellProps = {}): React.JSX.Elem
           {/* Sempre à mão e fora das rotas: a escuta é global aos dois espaços (SPEC-Escuta-01). */}
           <EscutaDaVoz
             entradaId={preferencias.vozEntradaId}
-            aoDisparar={(d) => void aoDispararDaEscuta(d)}
+            aoDisparar={(d, capturaDoTurno) => void aoDispararDaEscuta(d, capturaDoTurno)}
           />
           <button
             type="button"
