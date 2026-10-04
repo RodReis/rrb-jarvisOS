@@ -202,6 +202,28 @@ export function caminhosSeSobrepoem(a: string, b: string): boolean {
   return true
 }
 
+/**
+ * O catálogo com os caminhos já normalizados. `recursosTocados` roda por caminho, por ciclo e por
+ * avaliação do `decidirPool`; renormalizar as entradas do catálogo a cada chamada era o custo
+ * dominante. O catálogo é imutável, então o cache por referência não envelhece.
+ */
+const catalogosNormalizados = new WeakMap<
+  CatalogoDeRecursos,
+  readonly { readonly id: string; readonly caminhos: readonly string[] }[]
+>()
+
+function normalizadoDe(catalogo: CatalogoDeRecursos) {
+  let n = catalogosNormalizados.get(catalogo)
+  if (n === undefined) {
+    n = catalogo.recursos.map((r) => ({
+      id: r.id,
+      caminhos: r.caminhos.map(normalizarCaminho).filter((c): c is string => c !== undefined)
+    }))
+    catalogosNormalizados.set(catalogo, n)
+  }
+  return n
+}
+
 /** Os ids dos recursos que este caminho toca — por ser parte deles ou por conter parte deles. */
 export function recursosTocados(
   caminho: string,
@@ -209,13 +231,8 @@ export function recursosTocados(
 ): readonly string[] {
   const normal = normalizarCaminho(caminho)
   if (normal === undefined) return []
-  return catalogo.recursos
-    .filter((r) =>
-      r.caminhos.some((c) => {
-        const alvo = normalizarCaminho(c)
-        return alvo !== undefined && caminhosSeSobrepoem(normal, alvo)
-      })
-    )
+  return normalizadoDe(catalogo)
+    .filter((r) => r.caminhos.some((alvo) => caminhosSeSobrepoem(normal, alvo)))
     .map((r) => r.id)
     .sort()
 }
