@@ -2400,7 +2400,7 @@ Status: **entregue no [PR #384](https://github.com/RodReis/rrb-jarvisOS/pull/384
 
 ### Fatia 01 — Engine de wake word local, global nos dois espaços (`docs/spec/spec-escuta-01-wake-word.md`)
 
-Status: **entregue** ([PR #383](https://github.com/RodReis/rrb-jarvisOS/pull/383) mergeada na `main` em 2026-10-04, `b7a27b6`, CI verde nos nove jobs) — issue [#356](https://github.com/RodReis/rrb-jarvisOS/issues/356) aberta para aceite do PI. Revisão crítica, correções e evidência física em `reports/revisao-issue-356.md`.
+Status: **finalizado** ([PR #383](https://github.com/RodReis/rrb-jarvisOS/pull/383) mergeada na `main` em 2026-10-04, `b7a27b6`, CI verde nos nove jobs) — issue [#356](https://github.com/RodReis/rrb-jarvisOS/issues/356) aceita pelo PI via ProPlan e fechada em 2026-10-04. Revisão crítica, correções e evidência física em `reports/revisao-issue-356.md`.
 
 - [x] **1. Serviço da escuta** (`escuta-service.ts`): kill switch persistido que vence o padrão; auditoria de ligar/desligar com a via; gatilhos separados; limiar sem restart; turno aberto pelo disparo (síncrono, com teto de 2 min); modo de teste; hotkey de mute; desligar encerra o engine (descarta o pré-roll).
 - [x] **2. Estado em disco com falha fechado** (`estado-da-escuta-em-disco.ts`): ausente = padrão; ilegível ou de forma errada = desligada; campo novo ausente não desliga.
