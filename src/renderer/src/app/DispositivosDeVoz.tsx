@@ -47,7 +47,10 @@ export function DispositivosDeVoz({
     let relogio: ReturnType<typeof setInterval> | undefined
     void criarMedidorDeEntrada(id)
       .then((medidor) => {
-        if (cancelado) return medidor.parar()
+        if (cancelado) {
+          void medidor.parar()
+          return
+        }
         parar = medidor.parar
         relogio = setInterval(() => {
           const nivel = medidor.nivelRms()
