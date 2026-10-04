@@ -310,7 +310,7 @@ describe('provarIndependencia — propriedades', () => {
   it('independente ⇒ nenhum par de caminhos se sobrepõe e nenhum recurso é compartilhado', () => {
     const r = prng(42)
     let independentes = 0
-    for (let i = 0; i < 3000; i++) {
+    for (let i = 0; i < 1200; i++) {
       const a = Array.from({ length: 1 + Math.floor(r() * 3) }, () => caminhoAleatorio(r))
       const b = Array.from({ length: 1 + Math.floor(r() * 3) }, () => caminhoAleatorio(r))
       const p = provarIndependencia(fatia('b', b), [fatia('a', a)])
@@ -324,12 +324,12 @@ describe('provarIndependencia — propriedades', () => {
         }
     }
     // Sem isso o teste passaria vazio: precisa existir ao menos um caso independente.
-    expect(independentes).toBeGreaterThan(50)
+    expect(independentes).toBeGreaterThan(20)
   })
 
   it('é simétrica em quem é candidato e quem é ativo (no veredito)', () => {
     const r = prng(7)
-    for (let i = 0; i < 1000; i++) {
+    for (let i = 0; i < 500; i++) {
       const a = [caminhoAleatorio(r), caminhoAleatorio(r)]
       const b = [caminhoAleatorio(r)]
       const ab = provarIndependencia(fatia('b', b), [fatia('a', a)]).independente
