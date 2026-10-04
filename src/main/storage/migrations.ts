@@ -1965,6 +1965,9 @@ const MIGRATIONS: readonly string[] = [
     estado        TEXT NOT NULL CHECK (estado IN ('planejado', 'criado', 'parado', 'removido')),
     -- JSON: Record<string, string>
     labels        TEXT NOT NULL,
+    -- JSON: Record<string, string> — o que a reconciliacao precisa para agir e que nao e label
+    -- Docker (ex.: o repositorio de um worktree, que e o cwd do git worktree remove)
+    detalhes      TEXT NOT NULL DEFAULT '{}',
     criado_em     INTEGER NOT NULL,
     atualizado_em INTEGER NOT NULL
   );

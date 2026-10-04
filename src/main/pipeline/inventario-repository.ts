@@ -26,6 +26,7 @@ export interface RecursoDoRun {
   readonly identificador: string
   readonly estado: EstadoDoRecurso
   readonly labels: Readonly<Record<string, string>>
+  readonly detalhes: Readonly<Record<string, string>>
   readonly criadoEm: number
   readonly atualizadoEm: number
 }
@@ -36,6 +37,8 @@ export interface PlanoDeRecurso {
   readonly tipo: TipoDeRecurso
   readonly identificador: string
   readonly labels: Readonly<Record<string, string>>
+  /** O que a reconciliação precisa para agir e não é label Docker (ex.: `repositorio`). */
+  readonly detalhes?: Readonly<Record<string, string>>
 }
 
 interface RecursoRow {
@@ -46,14 +49,15 @@ interface RecursoRow {
   readonly identificador: string
   readonly estado: EstadoDoRecurso
   readonly labels: string
+  readonly detalhes: string
   readonly criado_em: number
   readonly atualizado_em: number
 }
 
 const COLUNAS =
-  'id, run_id, project_id, tipo, identificador, estado, labels, criado_em, atualizado_em'
+  'id, run_id, project_id, tipo, identificador, estado, labels, detalhes, criado_em, atualizado_em'
 
-function lerLabels(texto: string): Readonly<Record<string, string>> {
+function lerMapa(texto: string): Readonly<Record<string, string>> {
   try {
     return JSON.parse(texto) as Record<string, string>
   } catch {
@@ -69,7 +73,8 @@ function toRecurso(row: RecursoRow): RecursoDoRun {
     tipo: row.tipo,
     identificador: row.identificador,
     estado: row.estado,
-    labels: lerLabels(row.labels),
+    labels: lerMapa(row.labels),
+    detalhes: lerMapa(row.detalhes),
     criadoEm: row.criado_em,
     atualizadoEm: row.atualizado_em
   }
@@ -94,8 +99,8 @@ export class InventarioRepository {
       const info = this.db
         .prepare(
           `INSERT INTO recurso_run
-             (user_id, run_id, project_id, tipo, identificador, estado, labels, criado_em, atualizado_em)
-           VALUES (?, ?, ?, ?, ?, 'planejado', ?, ?, ?)`
+             (user_id, run_id, project_id, tipo, identificador, estado, labels, detalhes, criado_em, atualizado_em)
+           VALUES (?, ?, ?, ?, ?, 'planejado', ?, ?, ?, ?)`
         )
         .run(
           userId,
@@ -104,6 +109,7 @@ export class InventarioRepository {
           plano.tipo,
           plano.identificador,
           JSON.stringify(plano.labels),
+          JSON.stringify(plano.detalhes ?? {}),
           agora,
           agora
         )
