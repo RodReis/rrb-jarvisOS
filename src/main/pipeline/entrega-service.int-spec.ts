@@ -244,7 +244,7 @@ function montar(): EntregaServiceType {
     construtor: { construir: vi.fn(async () => construcao) } as never,
     connectors: connectorFalso() as never,
     git: gitFalso as never,
-    fila: { concluir: vi.fn(() => ({ reason: 'transicionado' })) } as never,
+    fila: { concluir: concluirDaFila } as never,
     mergePolicy: { autonomoLigado: vi.fn(() => autonomo) } as never,
     ruleset,
     ledger: ledgerRepo,
@@ -266,6 +266,10 @@ function montar(): EntregaServiceType {
 }
 
 let relogio: number
+/** A fila dublada: o que a entrega diz a ela é o que decide o terminal do run (#393). */
+let concluirDaFila: ReturnType<typeof vi.fn>
+/** `mergeConfirmado` da última conclusão pedida à fila. */
+const confirmouMerge = (): unknown => concluirDaFila.mock.calls.at(-1)?.[4]
 
 function sandboxDe(): SandboxPreparado {
   return {
@@ -307,6 +311,7 @@ beforeEach(() => {
   budgetRepo = new BudgetRepository(db)
   limpezas = []
 
+  concluirDaFila = vi.fn(() => ({ reason: 'transicionado' }))
   chamadas = []
   chamadaExtra = undefined
   pushes = []
@@ -374,6 +379,34 @@ describe('EntregaService — código zero não prova sucesso (critério 7)', () 
 
     expect(r.estadoFinal).not.toBe('MERGED')
     expect(r.mergeSha).toBeUndefined()
+    // O terminal do run na fila também: sem confirmação, nunca `MERGED` (#393).
+    expect(confirmouMerge()).not.toBe(true)
+  })
+})
+
+describe('EntregaService — a fila só recebe MERGED com merge confirmado na origem (#393)', () => {
+  it('merge confirmado conclui o run como mergeado', async () => {
+    await montar().entregar(pedido())
+
+    expect(concluirDaFila).toHaveBeenCalledTimes(1)
+    expect(confirmouMerge()).toBe(true)
+  })
+
+  it('teto de espera estourado conclui sem afirmar merge', async () => {
+    origem.checks = []
+
+    const r = await montar().entregar(pedido())
+
+    expect(r.estadoFinal).not.toBe('MERGED')
+    expect(confirmouMerge()).not.toBe(true)
+  })
+
+  it('merge autônomo desligado conclui sem afirmar merge', async () => {
+    autonomo = false
+
+    await montar().entregar(pedido())
+
+    expect(confirmouMerge()).not.toBe(true)
   })
 })
 
@@ -1000,6 +1033,8 @@ describe('EntregaService — a base avançou entre a avaliação e o merge (crit
     expect(r.estadoFinal).toBe('BLOCKED')
     expect(r.bloqueio?.causa).toBe('base-avancou')
     expect(r.bloqueio?.mensagem).toContain(original.slice(0, 12))
+    // A fila não pode registrar `MERGED` para um PR que não foi mergeado (#393).
+    expect(confirmouMerge()).not.toBe(true)
     // O ponto: nada foi mergeado.
     expect(chamadasDe(GITHUB_OPERATIONS.squashMerge)).toHaveLength(0)
   })

@@ -410,7 +410,8 @@ export class FilaService {
   }
 
   /**
-   * Conclui um run em `PR_CI`, escolhendo o terminal pelo kill-switch do projeto (critério 7).
+   * Conclui um run em `PR_CI`: `MERGED` só com `mergeConfirmado` e o kill-switch do projeto ligado
+   * (critério 7); qualquer outro caso termina em `AWAITING_MERGE`.
    *
    * **`AWAITING_MERGE` não é bloqueio nem falha** (emenda 2 de 2026-08-30): é o desfecho legítimo
    * de um projeto que decidiu não deixar a pipeline entrar sozinha na branch-base. Terminar em
@@ -424,9 +425,15 @@ export class FilaService {
     projectId: string,
     workspaceId: WorkspaceId,
     runId: string,
-    fencingToken?: number
+    fencingToken?: number,
+    mergeConfirmado = false
   ): TransicaoOutcome {
-    const terminal = this.deps.mergeAutonomoLigado(projectId) ? 'MERGED' : 'AWAITING_MERGE'
+    // `MERGED` exige as duas coisas: o merge **confirmado na origem** (quem chama diz) e a política
+    // do projeto ligada. Base que avançou, teto de espera e merge sem `merged: true` também
+    // terminam o run aqui, e nenhum deles mergeou — tratá-los como `MERGED` liberaria a fatia
+    // seguinte sobre uma base que não contém a anterior (#393).
+    const terminal =
+      mergeConfirmado && this.deps.mergeAutonomoLigado(projectId) ? 'MERGED' : 'AWAITING_MERGE'
     // O terminal já solta o slot e passa a vez (ver `transicionarCom`): `AWAITING_MERGE` também
     // terminou, e segurar o slot travaria a fila até o próximo boot.
     return this.transicionar(projectId, workspaceId, runId, terminal, undefined, fencingToken)

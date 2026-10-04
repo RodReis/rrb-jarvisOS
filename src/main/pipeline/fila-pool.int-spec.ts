@@ -258,7 +258,7 @@ describe('a fila anda quando o slot é liberado', () => {
     fila.transicionar('p-a', WS, a, 'VALIDATING', undefined, ta)
     fila.transicionar('p-a', WS, a, 'PR_CI', undefined, ta)
 
-    fila.concluir('p-a', WS, a, ta)
+    fila.concluir('p-a', WS, a, ta, true)
 
     expect(estado(a)).toBe('MERGED')
     expect(estado(b)).toBe('RUNNING')

@@ -538,12 +538,32 @@ describe('kill-switch do merge (critério 7)', () => {
     return runId
   }
 
-  it('com merge autônomo LIGADO, o run termina em MERGED', () => {
+  it('com merge autônomo LIGADO e merge confirmado, o run termina em MERGED', () => {
     mergeLigado = true
     const runId = ateOPrCi()
 
-    expect(fila.concluir(PROJETO_A, WS, runId, tokenDoRun).reason).toBe('transicionado')
+    expect(fila.concluir(PROJETO_A, WS, runId, tokenDoRun, true).reason).toBe('transicionado')
     expect(estadoNoBanco(runId)).toBe('MERGED')
+  })
+
+  it('com merge autônomo LIGADO mas SEM merge confirmado, o run NÃO vira MERGED (#393)', () => {
+    // O terminal vem da confirmação na origem, não da configuração: base que avançou, teto de
+    // espera e merge sem `merged: true` também passam por aqui.
+    mergeLigado = true
+    const runId = ateOPrCi()
+
+    fila.concluir(PROJETO_A, WS, runId, tokenDoRun)
+
+    expect(estadoNoBanco(runId)).toBe('AWAITING_MERGE')
+  })
+
+  it('merge confirmado com autônomo DESLIGADO não vira MERGED: o kill-switch continua mandando', () => {
+    mergeLigado = false
+    const runId = ateOPrCi()
+
+    fila.concluir(PROJETO_A, WS, runId, tokenDoRun, true)
+
+    expect(estadoNoBanco(runId)).toBe('AWAITING_MERGE')
   })
 
   it('com merge autônomo DESLIGADO, o run termina em AWAITING_MERGE — nunca em BLOCKED', () => {
