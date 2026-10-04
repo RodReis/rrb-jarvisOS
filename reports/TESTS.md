@@ -13,7 +13,7 @@ Totais da última execução (regenerado, não acumulado):
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
 | — | — | — | Regras de Negócio | 2638 | 2638 | 0 | 82.2 | — | — |
-| — | — | — | Banco | 2025 | 2000 | 0 | 84.7 | — | — |
+| — | — | — | Banco | 2025 | 2007 | 0 | 84.7 | — | — |
 | — | — | — | Tela | 735 | 734 | 0 | 76.5 | — | — |
 
 ## Histórico por entrega
@@ -426,4 +426,7 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-10-04 | #129 | spec-scheduler-02-independencia-locks | Tela | 735 | 734 | 0 | 76.5 | #386 | [#386](https://github.com/RodReis/rrb-jarvisOS/pull/386) |
 | 2026-10-04 | #130 | spec-scheduler-03-isolamento-concorrente | Regras de Negócio | 2638 | 2638 | 0 | 82.2 | #389 | [#389](https://github.com/RodReis/rrb-jarvisOS/pull/389) |
 | 2026-10-04 | #130 | spec-scheduler-03-isolamento-concorrente | Banco | 2025 | 2000 | 0 | 84.7 | #389 | [#389](https://github.com/RodReis/rrb-jarvisOS/pull/389) |
+| 2026-10-04 | #130 | spec-scheduler-03-isolamento-concorrente | Tela | 735 | 734 | 0 | 76.5 | #389 | [#389](https://github.com/RodReis/rrb-jarvisOS/pull/389) |
+| 2026-10-04 | #130 | spec-scheduler-03-isolamento-concorrente | Regras de Negócio | 2638 | 2638 | 0 | 82.2 | #389 | [#389](https://github.com/RodReis/rrb-jarvisOS/pull/389) |
+| 2026-10-04 | #130 | spec-scheduler-03-isolamento-concorrente | Banco | 2025 | 2007 | 0 | 84.7 | #389 | [#389](https://github.com/RodReis/rrb-jarvisOS/pull/389) |
 | 2026-10-04 | #130 | spec-scheduler-03-isolamento-concorrente | Tela | 735 | 734 | 0 | 76.5 | #389 | [#389](https://github.com/RodReis/rrb-jarvisOS/pull/389) |
