@@ -788,7 +788,7 @@ export class EntregaService {
       return { estadoFinal: 'AWAITING_MERGE', pullRequest, headSha, checks }
     }
 
-    this.deps.fila.concluir(pedido.projectId, pedido.workspaceId, pedido.runId)
+    this.deps.fila.concluir(pedido.projectId, pedido.workspaceId, pedido.runId, undefined, true)
     this.deps.audit.append({
       user_id: this.deps.userId(),
       workspace_id: pedido.workspaceId,
