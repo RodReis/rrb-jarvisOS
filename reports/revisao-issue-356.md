@@ -1,7 +1,9 @@
 # Revisão da issue #356 — 2026-10-03
 
-Estado: **FIX_REQUIRED**. Esta revisão cobre o branch
-`feat/m18-f01-wake-word-local`; não equivale a aceite nem a evidência de CI do SHA final.
+Estado da revisão inicial: **FIX_REQUIRED**. As correções foram entregues na
+[PR #383](https://github.com/RodReis/rrb-jarvisOS/pull/383), mergeada em
+2026-10-04 (`b7a27b6`); os nove jobs do CI passaram no SHA final `3f226a2`.
+O aceite da issue permanece com o PI.
 
 ## Decisão do PI nesta revisão
 
