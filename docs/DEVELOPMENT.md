@@ -2400,7 +2400,7 @@ Status: **entregue no [PR #384](https://github.com/RodReis/rrb-jarvisOS/pull/384
 
 ### Fatia 01 — Engine de wake word local, global nos dois espaços (`docs/spec/spec-escuta-01-wake-word.md`)
 
-Status: **em andamento** ([PR #383](https://github.com/RodReis/rrb-jarvisOS/pull/383) aberta) — issue [#356](https://github.com/RodReis/rrb-jarvisOS/issues/356), branch `feat/m18-f01-wake-word-local`. Revisão crítica e correções em `reports/revisao-issue-356.md`.
+Status: **entregue** ([PR #383](https://github.com/RodReis/rrb-jarvisOS/pull/383) mergeada na `main` em 2026-10-04, `b7a27b6`, CI verde nos nove jobs) — issue [#356](https://github.com/RodReis/rrb-jarvisOS/issues/356) aberta para aceite do PI. Revisão crítica, correções e evidência física em `reports/revisao-issue-356.md`.
 
 - [x] **1. Serviço da escuta** (`escuta-service.ts`): kill switch persistido que vence o padrão; auditoria de ligar/desligar com a via; gatilhos separados; limiar sem restart; turno aberto pelo disparo (síncrono, com teto de 2 min); modo de teste; hotkey de mute; desligar encerra o engine (descarta o pré-roll).
 - [x] **2. Estado em disco com falha fechado** (`estado-da-escuta-em-disco.ts`): ausente = padrão; ilegível ou de forma errada = desligada; campo novo ausente não desliga.
@@ -2429,7 +2429,7 @@ Status: **em andamento** ([PR #383](https://github.com/RodReis/rrb-jarvisOS/pull
   trecho com a fala seguinte pelo mesmo stream. O disparo reserva o buffer antes da navegação;
   se a troca de espaço falha ou o STT não está pronto, ele é descartado. Teste de regressão
   verifica que o turno não abre outro `getUserMedia`.
-- [x] **14. Relatório de testes** (`reports/TESTS.md`): regenerado com artefatos de Banco do CI; anti-drift e self-check locais passaram. Os nove jobs, inclusive `gate`, passaram no SHA `fab2bf8`; conferir novamente após o commit de evidência.
+- [x] **14. Relatório de testes** (`reports/TESTS.md`): regenerado com artefatos de Banco do CI; anti-drift e self-check locais passaram. Os nove jobs, inclusive `gate`, passaram no SHA final `3f226a2` da PR #383.
 - [x] **15. Retorno da prova física**: seleção de entrada e saída movida do Command Center para Settings > Voz; turno sem pergunta após gatilho agora tem aviso visível. O app solicita iniciar o Ollama instalado localmente quando não há servidor ativo. Nos três turnos medidos, a geração local levou 22,4 a 29,6 s; a transcrição levou cerca de 0,8 a 2,1 s. A redução de latência do modelo segue investigação separada.
 
 **Decisões técnicas desta fatia** (nenhuma altera escopo; a confirmar pelo PI estão no corpo da PR): a hotkey de mute é o próprio kill switch por outro caminho; o disparo vindo do NOA passa para o JARVIS pela troca auditada, porque o Command Center só existe lá; o estado vive em arquivo local e não em coluna de preferências (sem migração); a tela diz "limiar de disparo" porque maior exige mais certeza.
