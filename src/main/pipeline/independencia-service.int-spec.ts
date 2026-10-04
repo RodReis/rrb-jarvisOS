@@ -246,6 +246,39 @@ describe('aoAdquirir — registra o escopo, as travas e a prova usada', () => {
   })
 })
 
+describe('aoMergear — o merge mudou a base (SPEC-Scheduler-04)', () => {
+  it('invalida a prova de quem contava com o run mergeado, sem apagá-la', () => {
+    const a = item('a')
+    const b = item('b')
+    writeSets.set('a', ['src/api'])
+    writeSets.set('b', ['docs/guia'])
+    servico.aoAdquirir(a, [], { provar: true }, AGORA)
+    servico.aoAdquirir(b, ['a'], { provar: true }, AGORA)
+    expect(locks.provasDoRun('b')[0]?.invalidadaEm).toBeUndefined()
+
+    const invalidadas = servico.aoMergear('a')
+
+    expect(invalidadas).toBe(1)
+    // A prova segue registrada: é a evidência de que ela existiu contra a base antiga.
+    expect(locks.provasDoRun('b')[0]?.invalidadaEm).toBe(AGORA)
+  })
+
+  it('não toca a prova de quem não contava com o run, e é idempotente', () => {
+    const a = item('a')
+    const b = item('b')
+    writeSets.set('a', ['src/api'])
+    writeSets.set('b', ['docs/guia'])
+    servico.aoAdquirir(a, [], { provar: true }, AGORA)
+    servico.aoAdquirir(b, ['a'], { provar: true }, AGORA)
+
+    expect(servico.aoMergear('outro')).toBe(0)
+    expect(locks.provasDoRun('b')[0]?.invalidadaEm).toBeUndefined()
+
+    servico.aoMergear('a')
+    expect(servico.aoMergear('a')).toBe(0)
+  })
+})
+
 describe('expandir — critério 3: o novo path só é escrito depois do lock confirmado', () => {
   it('path livre: adquire, registra a expansão e invalida as provas que contavam com o run', () => {
     const a = item('a')

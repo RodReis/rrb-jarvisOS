@@ -93,6 +93,8 @@ import { LeaseRepository } from './pipeline/lease-repository'
 import { comandoDeLimpezaDoInventario, runOuUnidadeAtiva } from '@shared/domain/isolamento'
 import { MergePolicyRepository } from './pipeline/merge-policy-repository'
 import { MergePolicyService } from './pipeline/merge-policy-service'
+import { MergeRepository } from './pipeline/merge-repository'
+import { MergeService } from './pipeline/merge-service'
 import { PipelineRepository } from './pipeline/pipeline-repository'
 import { ReconciliacaoService } from './pipeline/reconciliacao-service'
 import { MarcosService } from './projects/marcos-service'
@@ -1359,6 +1361,9 @@ if (!app.requestSingleInstanceLock()) {
     // **dentro** do ciclo; a fila pede ao pool que decida. A referência cruzada é resolvida por
     // closure — nenhum dos dois é chamado antes de ambos existirem.
     const poolRepository = new PoolRepository(storage.db)
+    // As tentativas de merge sob o MergeLease (SPEC-Scheduler-04). Nasce antes da fila: o
+    // cancelamento só vence se não houver merge no ar, e quem sabe é este repositório.
+    const mergeRepository = new MergeRepository(storage.db)
     // Independência e locks (SPEC-Scheduler-02). A **fonte do write set previsto** é a porta que a
     // F03 liga (SPEC → derivada, o `PathsPermitidos` do preflight): hoje nada a responde, e fonte
     // sem resposta é prova incompleta — o segundo run do projeto segue em sequência (regra 1).
@@ -1415,7 +1420,34 @@ if (!app.requestSingleInstanceLock()) {
       revisoesDoGate: (escopo) =>
         roadmap.revisoesDoGate(escopo.projectId, 'SLICE_ENTRY', escopo.workspaceId),
       userId: userIdAtual,
-      mergeAutonomoLigado: (projectId) => mergePolicy.autonomoLigado(projectId)
+      mergeAutonomoLigado: (projectId) => mergePolicy.autonomoLigado(projectId),
+      mergeEmCurso: (runId) => mergeRepository.emCursoDoRun(userIdAtual(), runId)
+    })
+    // A seção crítica do merge (SPEC-Scheduler-04): lease exclusivo por repositório e base,
+    // reconciliação com o GitHub antes de agir, atualização da base e tentativa gravada antes da
+    // chamada. Todo merge passa por aqui — o `EntregaService` não fala com a API de merge direto.
+    const mergeService = new MergeService({
+      connectors,
+      leases: leaseRepository,
+      merges: mergeRepository,
+      audit: storage.audit,
+      userId: userIdAtual,
+      // O mesmo contador monotônico do pool: um token de merge nunca colide com o de um slot.
+      proximoToken: () => poolRepository.proximoToken(userIdAtual()),
+      // O merge mudou a base: as provas de independência que contavam com este run deixam de valer.
+      aoMergear: (runId) => independencia.aoMergear(runId),
+      // Merge confirmado na origem, run ainda em PR_CI (crash entre os dois): conclui o run com o
+      // token do slot que ele ainda detém, se detém.
+      aoReconciliarMergeado: (tentativa) => {
+        const slot = leaseRepository.buscarSlotDoRun(userIdAtual(), tentativa.runId)
+        fila.concluir(
+          tentativa.projectId,
+          tentativa.workspaceId,
+          tentativa.runId,
+          slot?.fencingToken,
+          true
+        )
+      }
     })
     slotsDosSquads.gerente = new GerenteDeSlots(fila)
     // Sandbox do executor, proxy e preflight (SPEC-Entrega-03).
@@ -1513,6 +1545,7 @@ if (!app.requestSingleInstanceLock()) {
       connectors,
       git: gitRunner,
       fila,
+      merge: mergeService,
       mergePolicy,
       ruleset: new RulesetRepository(storage.db),
       ledger: executionLedger,
@@ -1612,7 +1645,10 @@ if (!app.requestSingleInstanceLock()) {
       ],
       // O inventário de recursos por run: encontra container, rede e sidecar que nenhum lease
       // cobria (SPEC-Scheduler-03).
-      isolamento
+      isolamento,
+      // As tentativas de merge que um crash deixou: resolvidas contra o GitHub antes de qualquer
+      // repetição (SPEC-Scheduler-04, critério 4).
+      merge: mergeService
     })
 
     // **`reconcileAll` é bloqueante** (decisão cravada da spec): nenhum trabalho novo é adquirido

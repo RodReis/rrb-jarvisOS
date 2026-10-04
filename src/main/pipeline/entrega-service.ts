@@ -54,7 +54,7 @@ import {
 import { GITHUB_OPERATIONS, type CheckNormalizado } from '@shared/domain/github-automation'
 import type { EstadoDoRun } from '@shared/domain/pipeline'
 import type { SandboxPreparado } from '@shared/domain/preflight'
-import { baseAvancou, rulesetMudou, type SnapshotDeRuleset } from '@shared/domain/ruleset'
+import { rulesetMudou, type SnapshotDeRuleset } from '@shared/domain/ruleset'
 import type { ConnectorService } from '../connectors/connector-service'
 import { log } from '../logging/logger'
 import type { AuditRepository } from '../storage/audit-repository'
@@ -62,6 +62,8 @@ import type { ConstrutorService } from './construtor-service'
 import type { FilaService } from './fila-service'
 import type { GitRunner } from '../projects/git-runner'
 import type { MergePolicyService } from './merge-policy-service'
+import type { MergeService } from './merge-service'
+import { lerRegraDaBase } from './regra-da-base'
 import type { BudgetRepository } from '../budget/budget-repository'
 import type { ExecutionLedgerRepository } from './execution-ledger-repository'
 import type { LimpezaService } from './limpeza-service'
@@ -77,6 +79,14 @@ export const TETO_DE_ESPERA_PADRAO_MS = 30 * 60 * 1000
 
 /** O intervalo entre consultas ao estado dos checks. */
 const INTERVALO_DE_CONSULTA_MS = 15_000
+
+/**
+ * Quantas vezes o PR pode voltar a esperar o CI porque a base, o head ou a regra mudou durante a
+ * entrega (SPEC-Scheduler-04). Sem teto, uma base que avança a cada merge faria o run revalidar
+ * para sempre: cada atualização da branch dispara um CI novo e a janela seguinte já está velha.
+ * Estourado o teto, o run para em `BLOCKED` com a ação de retomada, em vez de girar calado.
+ */
+export const MAXIMO_DE_REVALIDACOES = 3
 
 export interface AlvoDaEntrega {
   readonly owner: string
@@ -120,6 +130,27 @@ export interface PedidoDeEntrega {
   /** Documentos do projeto-alvo que entram no mesmo PR, antes do merge (critério 13). */
   readonly docsDoProjeto?: readonly string[]
   readonly signal?: AbortSignal
+  /**
+   * O fencing token do slot do run. Quem executa o run o passa para que as transições da entrega
+   * (concluir, bloquear) sejam aceitas pela fila: run que passou pelo pool só avança com o token
+   * vigente (SPEC-Scheduler-01, critério 4).
+   */
+  readonly fencingToken?: number
+}
+
+/** O que mudou no PR desde que a revisão anterior foi feita — a entrada da revisão do delta. */
+export interface DeltaDoPr {
+  readonly headAnterior: string
+  readonly headNovo: string
+}
+
+/**
+ * O que o `EntregaService` pede ao `MergeService` e o que volta: avançar, esperar, revalidar ou
+ * terminar. `{}` significa "continuar esperando".
+ */
+interface Avanco {
+  readonly final?: ResultadoDaEntrega
+  readonly revalidar?: { readonly motivo: string; readonly headSha?: string }
 }
 
 export interface ResultadoDaEntrega {
@@ -161,6 +192,8 @@ export interface EntregaDeps {
   readonly connectors: ConnectorService
   readonly git: GitRunner
   readonly fila: FilaService
+  /** A seção crítica do merge (SPEC-Scheduler-04): todo merge passa por aqui, nunca direto ao conector. */
+  readonly merge: Pick<MergeService, 'tentar'>
   readonly mergePolicy: MergePolicyService
   readonly ruleset: RulesetRepository
   /** Onde a prova do run é gravada ao encerrar (M9-F06, critério 1). */
@@ -177,7 +210,11 @@ export interface EntregaDeps {
    * O revisor é o próprio executor, em invocação separada no container (M9-F04 § Decisões). Entra
    * como função para que o serviço não decida *como* revisar — só o que fazer com o resultado.
    */
-  readonly revisar: (pedido: PedidoDeEntrega) => Promise<readonly AchadoDeRevisao[]>
+  readonly revisar: (
+    pedido: PedidoDeEntrega,
+    /** Presente na revisão **depois** de o PR ter mudado (SPEC-Scheduler-04): só o delta material. */
+    delta?: DeltaDoPr
+  ) => Promise<readonly AchadoDeRevisao[]>
   /** Resolve o token do push. O conector resolve o dele por dentro do `ConnectorService`. */
   readonly token: (userId: string, workspace: WorkspaceId) => Promise<string | undefined>
   readonly tetoDeEsperaMs?: number
@@ -594,9 +631,13 @@ export class EntregaService {
   private async aguardarEConcluir(
     pedido: PedidoDeEntrega,
     pullRequest: number,
-    achados: readonly AchadoDeRevisao[]
+    achadosIniciais: readonly AchadoDeRevisao[]
   ): Promise<ResultadoDaEntrega> {
-    const limite = this.agora() + this.tetoDeEsperaMs
+    let limite = this.agora() + this.tetoDeEsperaMs
+    // Os achados crescem com a revisão do delta: um commit novo pode trazer um P1 que a primeira
+    // revisão não viu, e o gate precisa enxergá-lo.
+    let achados = achadosIniciais
+    let revalidacoes = 0
 
     // O head que a pipeline **verificou**: o que estava na origem logo depois do nosso push. É
     // contra ele que o gate compara. Reler os dois lados a cada volta e compará-los entre si
@@ -617,7 +658,7 @@ export class EntregaService {
       const snapshot = await this.snapshotDoRuleset(pedido)
       const headShaNaOrigem = await this.headNaOrigem(pedido)
       const checks = await this.checksDoHead(pedido, headShaEsperado)
-      // A base **na avaliação**: é contra este valor que a reconferência antes do merge compara.
+      // A base **na avaliação**: é contra este valor que a reconferência sob o lease compara.
       // Lida na mesma volta em que o gate decide, senão comparar-se-ia com um instante diferente
       // daquele em que a decisão foi tomada.
       const baseNaAvaliacao = await this.shaDaBase(pedido)
@@ -641,22 +682,56 @@ export class EntregaService {
         inicioDaEspera
       )
 
-      const desfecho = await this.aplicarVeredicto(
+      const avanco = await this.aplicarVeredicto(
         pedido,
         pullRequest,
         veredicto,
         headShaEsperado,
         checks.map((check) => ({ nome: check.nome, conclusao: check.conclusao ?? 'pendente' })),
-        baseNaAvaliacao
+        baseNaAvaliacao,
+        snapshot
       )
-      if (desfecho !== undefined) return { ...desfecho, correlacaoDeCi }
+      if (avanco.final !== undefined) return { ...avanco.final, correlacaoDeCi }
+
+      if (avanco.revalidar !== undefined) {
+        revalidacoes += 1
+        if (revalidacoes > MAXIMO_DE_REVALIDACOES) {
+          return {
+            ...(await this.bloquear(
+              pedido,
+              'base-instavel',
+              'Retomar a entrega quando a base parar de avançar.',
+              `A base ${pedido.alvo.branchBase} mudou ${MAXIMO_DE_REVALIDACOES} vezes durante a ` +
+                'entrega. A pipeline parou de revalidar para não girar indefinidamente.'
+            )),
+            pullRequest,
+            headSha: headShaEsperado,
+            correlacaoDeCi
+          }
+        }
+
+        const headAnterior = headShaEsperado
+        const headNovo = avanco.revalidar.headSha
+        if (headNovo !== undefined && headNovo !== headAnterior) {
+          // O commit é outro: os checks do SHA anterior não valem, e o delta é revisado de novo.
+          headShaEsperado = headNovo
+          achados = [...achados, ...(await this.deps.revisar(pedido, { headAnterior, headNovo }))]
+        }
+        // O CI do commit novo começa agora: ele ganha uma janela própria, não o que sobrou da outra.
+        limite = this.agora() + this.tetoDeEsperaMs
+      }
 
       // Reconciliação do head: alguém publicou depois da nossa verificação. O run passa a
       // verificar o commit novo — nunca mergeia o antigo, que já não é o head.
       if (veredicto.reason === 'stale') headShaEsperado = headShaNaOrigem
 
       if (this.agora() >= limite) {
-        this.deps.fila.concluir(pedido.projectId, pedido.workspaceId, pedido.runId)
+        this.deps.fila.concluir(
+          pedido.projectId,
+          pedido.workspaceId,
+          pedido.runId,
+          pedido.fencingToken
+        )
         log.agent.warn('Teto de espera do CI estourado; run termina aguardando merge', {
           runId: pedido.runId,
           pullRequest
@@ -668,141 +743,188 @@ export class EntregaService {
     }
   }
 
-  /** O que fazer com o veredicto. `undefined` significa "continuar esperando". */
+  /** O que fazer com o veredicto. `{}` significa "continuar esperando". */
   private async aplicarVeredicto(
     pedido: PedidoDeEntrega,
     pullRequest: number,
     veredicto: VeredictoDoGate,
     headSha: string,
     checks: readonly CheckDoLedger[],
-    baseNaAvaliacao: string | undefined
-  ): Promise<ResultadoDaEntrega | undefined> {
-    if (veredicto.reason === 'aguardando') return undefined
+    baseNaAvaliacao: string | undefined,
+    snapshot: SnapshotDeRuleset
+  ): Promise<Avanco> {
+    if (veredicto.reason === 'aguardando') return {}
 
     if (veredicto.reason === 'stale') {
       // Head divergente: os checks aprovaram outro commit. Reconciliar é reler na volta seguinte,
       // não mergear com o que se tinha.
       log.agent.warn('Head do pull request divergiu; reconciliando', { runId: pedido.runId })
-      return undefined
+      return {}
     }
 
     if (veredicto.reason === 'bloqueado-externo') {
       // Merge queue é bloqueio externo que **não** é falha do run: o PR fica verde e o merge é da
       // queue (critério 12). Termina em `AWAITING_MERGE`, como o kill-switch desligado.
       if (veredicto.acao.includes('merge queue')) {
-        this.deps.fila.concluir(pedido.projectId, pedido.workspaceId, pedido.runId)
-        return { estadoFinal: 'AWAITING_MERGE', pullRequest, headSha, checks }
+        this.deps.fila.concluir(
+          pedido.projectId,
+          pedido.workspaceId,
+          pedido.runId,
+          pedido.fencingToken
+        )
+        return { final: { estadoFinal: 'AWAITING_MERGE', pullRequest, headSha, checks } }
       }
 
       return {
-        ...this.bloqueado('externo', veredicto.acao, veredicto.mensagem),
-        pullRequest,
-        headSha,
-        checks
+        final: {
+          ...this.bloqueado('externo', veredicto.acao, veredicto.mensagem),
+          pullRequest,
+          headSha,
+          checks
+        }
       }
     }
 
-    return await this.mergear(pedido, pullRequest, headSha, checks, baseNaAvaliacao)
+    return await this.mergear(pedido, pullRequest, headSha, checks, baseNaAvaliacao, snapshot)
   }
 
   /**
-   * Mergeia e **confirma na origem**.
+   * Mergeia **dentro da seção crítica** e confirma na origem.
    *
    * O kill-switch desligado para aqui sem mergear: o run termina em `AWAITING_MERGE` com o PR
    * verde, aguardando o PI (critério 8). Não é bloqueio nem falha.
+   *
+   * Tudo o que vem depois — o lease por repositório e base, a releitura do PR, da base e da regra,
+   * a atualização da branch quando a base avançou, a tentativa gravada antes da chamada e a
+   * confirmação na origem — é do `MergeService` (SPEC-Scheduler-04). Esta função só traduz o que
+   * ele devolveu em desfecho do run: o terminal `MERGED` é pedido à fila **somente** com o merge
+   * confirmado na origem (#393).
    */
   private async mergear(
     pedido: PedidoDeEntrega,
     pullRequest: number,
     headSha: string,
     checks: readonly CheckDoLedger[],
-    baseNaAvaliacao: string | undefined
-  ): Promise<ResultadoDaEntrega> {
+    baseNaAvaliacao: string | undefined,
+    snapshot: SnapshotDeRuleset
+  ): Promise<Avanco> {
     if (!this.deps.mergePolicy.autonomoLigado(pedido.projectId)) {
-      this.deps.fila.concluir(pedido.projectId, pedido.workspaceId, pedido.runId)
+      this.deps.fila.concluir(
+        pedido.projectId,
+        pedido.workspaceId,
+        pedido.runId,
+        pedido.fencingToken
+      )
       log.agent.info('Merge autônomo desligado; run termina no PR verde', {
         runId: pedido.runId,
         pullRequest
       })
-      return { estadoFinal: 'AWAITING_MERGE', pullRequest, headSha, checks }
+      return { final: { estadoFinal: 'AWAITING_MERGE', pullRequest, headSha, checks } }
     }
 
-    // **A base é reconferida imediatamente antes da mutação** (SPEC-Pipeline-01 §7 e critério 12).
-    // O gate já recusa head do PR divergente, mas o head do PR **não se move** quando alguém
-    // mergeia outro PR na base: o CI continua verde descrevendo o código contra uma base que já
-    // não existe. É o caso de dois PRs que passam sozinhos e quebram juntos. Sem `strict` na
-    // proteção, a origem não recusa por conta própria, e esta é a única verificação que existe.
-    // Não saber o SHA da base (leitura falhou, permissão ausente) **não** vira bloqueio: a §7
-    // manda preservar o PR e explicar a limitação, e as outras garantias seguem valendo. O que
-    // não pode é o desconhecido virar afirmação de que a base não mudou.
-    const baseAgora = await this.shaDaBase(pedido)
-    if (
-      baseNaAvaliacao !== undefined &&
-      baseAgora !== undefined &&
-      baseAvancou(baseNaAvaliacao, baseAgora)
-    ) {
-      this.deps.fila.concluir(pedido.projectId, pedido.workspaceId, pedido.runId)
-      log.agent.warn('A base avançou entre a avaliação e o merge; reconciliar antes de integrar', {
-        runId: pedido.runId,
-        pullRequest
-      })
-      return {
-        ...this.bloqueado(
-          'base-avancou',
-          'Atualizar o branch da fatia sobre a base nova e revalidar no mesmo pull request.',
-          `A branch ${pedido.alvo.branchBase} avançou de ${baseNaAvaliacao.slice(0, 12)} para ` +
-            `${baseAgora.slice(0, 12)} depois da avaliação. Os checks verdes descrevem o código ` +
-            'contra a base anterior, e uma leitura prévia não basta para afirmar integração segura.'
-        ),
-        pullRequest,
-        headSha,
-        checks
-      }
-    }
-
-    await this.chamar(GITHUB_OPERATIONS.squashMerge, pedido.workspaceId, {
-      owner: pedido.alvo.owner,
-      repo: pedido.alvo.repo,
+    const r = await this.deps.merge.tentar({
+      runId: pedido.runId,
+      projectId: pedido.projectId,
+      workspaceId: pedido.workspaceId,
+      alvo: {
+        owner: pedido.alvo.owner,
+        repo: pedido.alvo.repo,
+        branchBase: pedido.alvo.branchBase
+      },
       pullRequest,
-      expectedHeadSha: headSha
+      avaliacao: { headSha, baseSha: baseNaAvaliacao, snapshot }
     })
 
-    // **A confirmação é o que decide**, não o código de saída do merge (critério 7). Um 200 sem
-    // `merged: true` na origem não é entrega: o run termina aguardando, com a causa registrada.
-    const estado = await this.chamar(GITHUB_OPERATIONS.getMergeState, pedido.workspaceId, {
-      owner: pedido.alvo.owner,
-      repo: pedido.alvo.repo,
-      pullRequest
-    })
+    switch (r.tipo) {
+      case 'mergeado':
+        // **A confirmação é o que decide**, não o código de saída do merge (critério 7).
+        this.deps.fila.concluir(
+          pedido.projectId,
+          pedido.workspaceId,
+          pedido.runId,
+          pedido.fencingToken,
+          true
+        )
+        return {
+          final: { estadoFinal: 'MERGED', pullRequest, mergeSha: r.mergeSha, headSha, checks }
+        }
 
-    const confirmado = estado.ok
-      ? (estado.data as { readonly merged?: boolean; readonly mergeSha?: string } | undefined)
-      : undefined
+      case 'aguardar':
+        // Outro run na seção crítica, ou a origem não respondeu: volta à espera, sem mergear.
+        log.agent.info('Merge aguardando a vez ou a origem', {
+          runId: pedido.runId,
+          motivo: r.motivo
+        })
+        return {}
 
-    if (confirmado?.merged !== true || confirmado.mergeSha === undefined) {
-      this.deps.fila.concluir(pedido.projectId, pedido.workspaceId, pedido.runId)
-      log.agent.warn('Merge não confirmado na origem; run termina aguardando', {
-        runId: pedido.runId,
-        pullRequest
-      })
-      return { estadoFinal: 'AWAITING_MERGE', pullRequest, headSha, checks }
+      case 'revalidar':
+        // A base, o head ou a regra mudou: os checks verdes descreviam outro estado.
+        log.agent.warn('Merge pede revalidação; o PR volta a esperar o CI', {
+          runId: pedido.runId,
+          motivo: r.motivo
+        })
+        return {
+          revalidar: {
+            motivo: r.motivo,
+            ...(r.headSha === undefined ? {} : { headSha: r.headSha })
+          }
+        }
+
+      case 'sem-confirmacao':
+        this.deps.fila.concluir(
+          pedido.projectId,
+          pedido.workspaceId,
+          pedido.runId,
+          pedido.fencingToken
+        )
+        log.agent.warn('Merge não confirmado na origem; run termina aguardando', {
+          runId: pedido.runId,
+          pullRequest
+        })
+        return { final: { estadoFinal: 'AWAITING_MERGE', pullRequest, headSha, checks } }
+
+      case 'bloqueado':
+        return {
+          final: {
+            ...(await this.bloquear(pedido, r.causa, r.acao, r.mensagem)),
+            pullRequest,
+            headSha,
+            checks
+          }
+        }
     }
+  }
 
-    this.deps.fila.concluir(pedido.projectId, pedido.workspaceId, pedido.runId, undefined, true)
-    this.deps.audit.append({
-      user_id: this.deps.userId(),
-      workspace_id: pedido.workspaceId,
-      type: 'pipeline-merge',
-      payload: { runId: pedido.runId, pullRequest, mergeSha: confirmado.mergeSha }
-    })
+  /**
+   * Devolve o run a um **estado seguro**: `BLOCKED`, com os cinco campos da CONVENTION §4 e a ação
+   * de retomada. Nada de correção às cegas (regra 4 da SPEC-Scheduler-04).
+   *
+   * Run que já não está em `PR_CI` (cancelado ou encerrado antes do merge) não é bloqueado de
+   * novo: a fila recusa a transição e o terminal que ele já tem é o estado seguro.
+   */
+  private async bloquear(
+    pedido: PedidoDeEntrega,
+    causa: string,
+    acao: string,
+    mensagem: string
+  ): Promise<ResultadoDaEntrega> {
+    this.deps.fila.transicionar(
+      pedido.projectId,
+      pedido.workspaceId,
+      pedido.runId,
+      'BLOCKED',
+      {
+        causa,
+        evidencia: mensagem,
+        tentativas: 1,
+        porQueNaoSeguir: mensagem,
+        retomada: acao
+      },
+      pedido.fencingToken
+    )
+    log.agent.warn('Entrega bloqueada na seção crítica do merge', { runId: pedido.runId, causa })
 
-    return {
-      estadoFinal: 'MERGED',
-      pullRequest,
-      mergeSha: confirmado.mergeSha,
-      headSha,
-      checks
-    }
+    return this.bloqueado(causa, acao, mensagem)
   }
 
   /** Lê a regra da origem e registra o snapshot quando ela mudou (ou quando é o primeiro). */
@@ -847,31 +969,16 @@ export class EntregaService {
     readonly protegida: boolean
     readonly mergeQueueExigida: boolean
   }> {
-    const r = await this.chamar(GITHUB_OPERATIONS.getRequiredChecks, pedido.workspaceId, {
-      owner: pedido.alvo.owner,
-      repo: pedido.alvo.repo,
-      branch: pedido.alvo.branchBase
-    })
-
-    const dados = r.ok
-      ? (r.data as
-          | {
-              readonly contexts?: readonly string[]
-              readonly strict?: boolean
-              readonly protegida?: boolean
-              readonly mergeQueueExigida?: boolean
-            }
-          | undefined)
-      : undefined
+    // A mesma leitura que o `MergeService` faz sob o lease (proteção + rulesets): se cada um lesse
+    // à sua maneira, a regra pareceria mudar a cada comparação.
+    const regra = await lerRegraDaBase(
+      (operation, input) => this.chamar(operation, pedido.workspaceId, input),
+      pedido.alvo
+    )
 
     // Falha na leitura não vira "sem exigência": sem saber o que a origem exige, o gate barra por
     // ausência de regra — que é o desfecho seguro, e não um verde por omissão.
-    return {
-      contexts: dados?.contexts ?? [],
-      strict: dados?.strict ?? false,
-      protegida: dados?.protegida ?? false,
-      mergeQueueExigida: dados?.mergeQueueExigida ?? false
-    }
+    return regra ?? { contexts: [], strict: false, protegida: false, mergeQueueExigida: false }
   }
 
   private async headNaOrigem(pedido: PedidoDeEntrega): Promise<string> {

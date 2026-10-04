@@ -279,6 +279,15 @@ export class IndependenciaService {
     })()
   }
 
+  /**
+   * O run teve o merge confirmado na origem (SPEC-Scheduler-04): a base mudou, e as provas que
+   * contavam com ele deixam de valer. Não apaga — o registro é a evidência de que a prova existiu.
+   * Quem as recalcula é a próxima aquisição, que prova contra a base de agora.
+   */
+  aoMergear(runId: string): number {
+    return this.deps.locks.invalidarProvas(this.deps.userId(), runId, this.agora())
+  }
+
   /** O slot do run saiu (liberado, encerrado ou reconciliado): as travas saem com ele. */
   soltar(runId: string): number {
     return this.deps.locks.soltar(runId)

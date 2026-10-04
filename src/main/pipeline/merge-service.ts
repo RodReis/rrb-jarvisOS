@@ -120,6 +120,11 @@ export interface MergeServiceDeps {
 
 const TIMEOUT_DA_CHAMADA_MS = 30_000
 
+interface OpcoesDeChamada {
+  readonly idempotencyKey?: string
+  readonly efeito?: { readonly recurso: string; readonly fencingToken: number }
+}
+
 export class MergeService {
   private readonly agora: () => number
 
@@ -231,7 +236,7 @@ export class MergeService {
       this.lerEstadoDoPr(pedido),
       this.lerBase(pedido),
       lerRegraDaBase(
-        (operation, input) => this.chamar(operation, pedido.workspaceId, input),
+        (operation, input) => this.chamarSeguro(operation, pedido.workspaceId, input),
         pedido.alvo
       )
     ])
@@ -243,7 +248,7 @@ export class MergeService {
   private async lerEstadoDoPr(
     pedido: PedidoDeMerge
   ): Promise<Pick<ObservacaoDoMerge, 'estado' | 'headSha' | 'mergeSha'> | undefined> {
-    const r = await this.chamar(GITHUB_OPERATIONS.getMergeState, pedido.workspaceId, {
+    const r = await this.chamarSeguro(GITHUB_OPERATIONS.getMergeState, pedido.workspaceId, {
       owner: pedido.alvo.owner,
       repo: pedido.alvo.repo,
       pullRequest: pedido.pullRequest
@@ -266,7 +271,7 @@ export class MergeService {
   }
 
   private async lerBase(pedido: PedidoDeMerge): Promise<string | undefined> {
-    const r = await this.chamar(GITHUB_OPERATIONS.getCommitSha, pedido.workspaceId, {
+    const r = await this.chamarSeguro(GITHUB_OPERATIONS.getCommitSha, pedido.workspaceId, {
       owner: pedido.alvo.owner,
       repo: pedido.alvo.repo,
       ref: pedido.alvo.branchBase
@@ -323,7 +328,7 @@ export class MergeService {
     const alvo = this.alvoDe(t.recurso)
     if (alvo === undefined) return undefined
 
-    const r = await this.chamar(GITHUB_OPERATIONS.getMergeState, t.workspaceId, {
+    const r = await this.chamarSeguro(GITHUB_OPERATIONS.getMergeState, t.workspaceId, {
       owner: alvo.owner,
       repo: alvo.repo,
       pullRequest: t.pullRequest
@@ -368,7 +373,7 @@ export class MergeService {
     // Renovo antes: a atualização é uma chamada de rede de até 30 s, e o lease vale 30 s.
     this.deps.leases.renovar(userId, recurso, pedido.runId, this.agora())
 
-    const r = await this.chamar(
+    const r = await this.chamarSeguro(
       GITHUB_OPERATIONS.updateBranch,
       pedido.workspaceId,
       {
@@ -617,10 +622,7 @@ export class MergeService {
     operation: string,
     workspaceId: WorkspaceId,
     input: Record<string, unknown>,
-    opcoes: {
-      readonly idempotencyKey?: string
-      readonly efeito?: { readonly recurso: string; readonly fencingToken: number }
-    } = {}
+    opcoes: OpcoesDeChamada = {}
   ): Promise<ConnectorOutcome> {
     const userId = this.deps.userId()
 
@@ -640,6 +642,43 @@ export class MergeService {
       workspace: workspaceId,
       ...(opcoes.efeito === undefined ? {} : { efeito: opcoes.efeito })
     })
+  }
+
+  /**
+   * Como `chamar`, mas **exceção vira falha de leitura**, nunca propaga.
+   *
+   * Vale para tudo o que só pergunta à origem (e para a atualização da branch): a SPEC-Pipeline-01
+   * §7 manda preservar o PR quando a base não pôde ser lida, e uma exceção do conector — permissão
+   * ausente, rede — não pode derrubar a entrega inteira num ponto em que o desfecho certo é
+   * "não sei, espero". O `squashMerge` **não** passa por aqui: uma exceção no meio do merge é o
+   * crash que a reconciliação existe para tratar, e escondê-la apagaria o rastro.
+   */
+  private async chamarSeguro(
+    operation: string,
+    workspaceId: WorkspaceId,
+    input: Record<string, unknown>,
+    opcoes: OpcoesDeChamada = {}
+  ): Promise<ConnectorOutcome> {
+    try {
+      return await this.chamar(operation, workspaceId, input, opcoes)
+    } catch (erro) {
+      log.agent.warn('Leitura da origem falhou; tratada como indisponível', {
+        operation,
+        erro: erro instanceof Error ? erro.message : String(erro)
+      })
+      return {
+        ok: false,
+        code: 'indisponivel',
+        mensagem: 'A origem não respondeu.',
+        retryable: true,
+        acao: 'retentar',
+        provenance: {
+          connector: 'github',
+          operation,
+          obtidoEm: new Date(this.agora()).toISOString()
+        }
+      }
+    }
   }
 
   private auditar(
