@@ -63,6 +63,20 @@ export interface CommandSubmission {
    * o par antes/depois continuam sendo gravados. O que sai é só o corpo do arquivo.
    */
   readonly saidaEhConteudo?: boolean
+  /**
+   * A saída deste comando **carrega segredo que o chamador precisa ler como ele é** (SPEC-
+   * Scheduler-03): o `docker inspect` do scanner de credenciais traz o `Config.Env` do container, e
+   * é justamente o valor que o scanner procura.
+   *
+   * Quando `true`, o `stdout` volta ao chamador **sem a redação** — a redação mascara
+   * `https://usuario:token@host` antes de o scanner ler, e o scanner passaria por limpo o que
+   * devia acusar — e a auditoria recebe só o marcador, como em `saidaEhConteudo`. Binário,
+   * argumentos, cwd, exit code e o par antes/depois continuam sendo gravados.
+   *
+   * **Não é um jeito de escapar da auditoria nem da redação em geral:** quem a usa recebe segredo
+   * em memória e é responsável por não o persistir nem o devolver.
+   */
+  readonly saidaEhSensivel?: boolean
 }
 
 /**

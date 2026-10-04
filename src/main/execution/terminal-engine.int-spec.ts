@@ -266,6 +266,174 @@ describe('segunda barreira — denylist destrutiva (critério 4)', () => {
   })
 })
 
+describe('exceção da limpeza do inventário (ADR-007)', () => {
+  /** O engine do Docker: o mesmo, com um autorizador que só ele recebe. */
+  function engineComAutorizador(
+    autorizador: (binario: string, args: readonly string[]) => boolean
+  ): InstanceType<typeof TerminalEngine> {
+    const policy = new PolicyService(audit, () => 'u-1')
+    const diretorios = new AllowlistRepository(db, audit, appDir)
+    diretorios.add('u-1', permitido)
+    return new TerminalEngine(
+      policy,
+      comandos,
+      diretorios,
+      new ExecutionRepository(db),
+      approvals,
+      audit,
+      () => 'u-1',
+      undefined,
+      autorizador
+    )
+  }
+
+  const destrutivo = (alvo: string): readonly string[] => [...criaArquivo(alvo), '--', '--force']
+
+  it('executa, sem pedir aprovação, o comando destrutivo que o autorizador libera', () => {
+    comandos.add('u-1', 'jarvis', 'node')
+    const alvo = join(permitido, 'liberado.txt')
+    const engineDocker = engineComAutorizador(() => true)
+
+    const execucao = engineDocker.run(
+      { binary: 'node', args: destrutivo(alvo), cwd: permitido },
+      'jarvis'
+    )
+
+    expect(execucao.state).toBe('concluido')
+    expect(existsSync(alvo)).toBe(true)
+    expect(approvals.listPending('u-1', 'jarvis')).toHaveLength(0)
+  })
+
+  it('a liberação deixa rastro: o AuditEvent "antes" diz qual padrão foi liberado', () => {
+    comandos.add('u-1', 'jarvis', 'node')
+    const engineDocker = engineComAutorizador(() => true)
+
+    engineDocker.run(
+      { binary: 'node', args: destrutivo(join(permitido, 'rastro.txt')), cwd: permitido },
+      'jarvis'
+    )
+
+    const antes = audit
+      .list('u-1')
+      .filter((e) => e.type === 'terminal-command' && e.payload['marco'] === 'antes')
+    expect(antes[0]?.payload['liberadoPeloInventario']).toBe('forcado')
+  })
+
+  it('autorizador que recusa mantém o gate: pausa para aprovação, sem efeito', () => {
+    comandos.add('u-1', 'jarvis', 'node')
+    const alvo = join(permitido, 'recusado.txt')
+    const engineDocker = engineComAutorizador(() => false)
+
+    const execucao = engineDocker.run(
+      { binary: 'node', args: destrutivo(alvo), cwd: permitido },
+      'jarvis'
+    )
+
+    expect(execucao.state).toBe('aguardando-aprovacao')
+    expect(existsSync(alvo)).toBe(false)
+  })
+
+  it('o autorizador só vale para comando destrutivo: não vira atalho para o resto', () => {
+    // Binário fora da allowlist continua barrado mesmo com um autorizador que diz sim a tudo.
+    const alvo = join(permitido, 'fora-da-allowlist.txt')
+    const engineDocker = engineComAutorizador(() => true)
+
+    const execucao = engineDocker.run(
+      { binary: 'node', args: destrutivo(alvo), cwd: permitido },
+      'jarvis'
+    )
+
+    expect(execucao.reason).toBe('binario-fora-da-allowlist')
+    expect(existsSync(alvo)).toBe(false)
+  })
+
+  it('autorizador que lança mantém o gate: erro na consulta é "não liberado", nunca "liberado"', () => {
+    comandos.add('u-1', 'jarvis', 'node')
+    const alvo = join(permitido, 'lancou.txt')
+    const engineDocker = engineComAutorizador(() => {
+      throw new Error('banco indisponível')
+    })
+
+    const execucao = engineDocker.run(
+      { binary: 'node', args: destrutivo(alvo), cwd: permitido },
+      'jarvis'
+    )
+
+    expect(execucao.state).toBe('aguardando-aprovacao')
+    expect(existsSync(alvo)).toBe(false)
+  })
+
+  it('o engine comum, sem autorizador, segue pausando o mesmo comando', () => {
+    comandos.add('u-1', 'jarvis', 'node')
+    const alvo = join(permitido, 'comum.txt')
+
+    const execucao = engine.run(
+      { binary: 'node', args: destrutivo(alvo), cwd: permitido },
+      'jarvis'
+    )
+
+    expect(execucao.state).toBe('aguardando-aprovacao')
+    expect(existsSync(alvo)).toBe(false)
+  })
+})
+
+describe('saída sensível (revisão de segurança da F03)', () => {
+  /** O texto só existe na **saída**: em base64 nos argumentos, para a auditoria dos args não o ter. */
+  const imprime = (texto: string): readonly string[] => [
+    '-e',
+    `process.stdout.write(Buffer.from(${JSON.stringify(Buffer.from(texto).toString('base64'))}, 'base64').toString())`
+  ]
+  const SEGREDO = 'ghp_abcdefghijklmnopqrstuvwxyz0123456789'
+  const URL_COM_CREDENCIAL = `https://x-access-token:${SEGREDO}@github.com/o/r.git`
+
+  it('devolve ao chamador a saída crua, sem a redação que mascararia o que ele precisa ler', () => {
+    comandos.add('u-1', 'jarvis', 'node')
+
+    const execucao = engine.run(
+      {
+        binary: 'node',
+        args: imprime(`GH_TOKEN=${SEGREDO} ${URL_COM_CREDENCIAL}`),
+        cwd: permitido,
+        saidaEhSensivel: true
+      },
+      'jarvis'
+    )
+
+    expect(execucao.stdout).toContain(SEGREDO)
+    expect(execucao.stdout).toContain(URL_COM_CREDENCIAL)
+  })
+
+  it('não grava a saída na auditoria: fica só o marcador, e o rastro do comando continua', () => {
+    comandos.add('u-1', 'jarvis', 'node')
+
+    engine.run(
+      {
+        binary: 'node',
+        args: imprime(`GH_TOKEN=${SEGREDO}`),
+        cwd: permitido,
+        saidaEhSensivel: true
+      },
+      'jarvis'
+    )
+
+    const eventos = audit.list('u-1').filter((e) => e.type === 'terminal-command')
+    expect(JSON.stringify(eventos)).not.toContain(SEGREDO)
+    expect(eventos.map((e) => e.payload['marco'])).toEqual(['antes', 'depois'])
+    expect(eventos[1]?.payload['stdout']).toBe('[conteúdo de arquivo omitido da evidência]')
+  })
+
+  it('sem a marca, a saída segue redigida e auditada como sempre', () => {
+    comandos.add('u-1', 'jarvis', 'node')
+
+    const execucao = engine.run(
+      { binary: 'node', args: imprime(URL_COM_CREDENCIAL), cwd: permitido },
+      'jarvis'
+    )
+
+    expect(execucao.stdout).not.toContain(SEGREDO)
+  })
+})
+
 describe('timeout obrigatório (critério 5)', () => {
   it('mata o processo que excede o limite e marca como falhou', () => {
     engine = montarEngine(300)

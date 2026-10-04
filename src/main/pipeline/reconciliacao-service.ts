@@ -78,6 +78,15 @@ export interface VerificadorDeRecurso {
   readonly emUso: (lease: Lease) => boolean | Promise<boolean>
 }
 
+/**
+ * O isolamento por run, visto pela reconciliação (SPEC-Scheduler-03): compara o inventário durável
+ * com o que o Docker e o Git realmente têm e devolve os recursos dos runs mortos. É o que enxerga
+ * container, rede e sidecar sem lease.
+ */
+export interface ReconciliadorDeIsolamento {
+  readonly reconciliar: () => Promise<readonly AchadoDaReconciliacao[]>
+}
+
 export interface ReconciliacaoDeps {
   readonly runs: PipelineRepository
   readonly leases: LeaseRepository
@@ -93,6 +102,8 @@ export interface ReconciliacaoDeps {
    * pool só a registra — e roda um ciclo, porque o slot liberado pode ser de quem espera.
    */
   readonly aoLiberarSlot?: (lease: Lease) => void
+  /** O isolamento por run. Opcional: sem ele a reconciliação só enxerga leases. */
+  readonly isolamento?: ReconciliadorDeIsolamento
   readonly agora?: () => number
 }
 
@@ -126,6 +137,10 @@ export class ReconciliacaoService {
       achados.push(this.reconciliarRun(run))
     }
 
+    // O inventário antes dos leases: o lease de um recurso que o isolamento acabou de devolver já
+    // caiu com ele, e o que sobra para `reconciliarLease` é só o que o inventário não conhece.
+    achados.push(...(await this.reconciliarIsolamento()))
+
     for (const lease of this.deps.leases.listar(userId)) {
       achados.push(await this.reconciliarLease(lease))
     }
@@ -143,6 +158,27 @@ export class ReconciliacaoService {
 
     log.agent.info('Reconciliação do boot concluída', { achados: achados.length })
     return achados
+  }
+
+  /**
+   * O isolamento que **não pôde** reconciliar é um achado bloqueado, nunca uma lista vazia: falha
+   * de detecção não é ausência de recurso. O boot segue — a reconciliação não pode travar o app —,
+   * mas o achado fica registrado para o PI ver.
+   */
+  private async reconciliarIsolamento(): Promise<readonly AchadoDaReconciliacao[]> {
+    if (this.deps.isolamento === undefined) return []
+    try {
+      return await this.deps.isolamento.reconciliar()
+    } catch (erro) {
+      const motivo = erro instanceof Error ? erro.message : 'erro desconhecido'
+      return [
+        {
+          recurso: 'isolamento',
+          decisao: 'bloqueado',
+          motivo: `A reconciliação do isolamento falhou (${motivo}). Os recursos dos runs não foram verificados.`
+        }
+      ]
+    }
   }
 
   /**

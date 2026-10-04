@@ -1937,6 +1937,43 @@ const MIGRATIONS: readonly string[] = [
     encerrada_em INTEGER
   );
   CREATE INDEX idx_pool_expansao_run ON pool_expansao(user_id, run_id);
+  `,
+
+  // 51 - inventario duravel de recursos por run (SPEC-Scheduler-03).
+  //
+  // Uma linha por recurso que um run cria (worktree, branch, container, rede, sidecar, porta,
+  // perfil). E gravada **antes** de criar (`planejado`) e confirmada depois (`criado`): um crash
+  // entre os dois deixa `planejado`, e a reconciliacao olha o disco/Docker antes de decidir. Sem
+  // isso o unico registro era o lease, que so cobria worktree e container — rede e sidecar nunca
+  // eram encontrados depois de um crash.
+  //
+  // O UNIQUE e **parcial** (`estado <> 'removido'`): dois runs nao registram o mesmo identificador
+  // ao mesmo tempo (a colisao de nome/branch/porta e recusada pelo banco), mas o nome de um recurso
+  // removido volta a ser usavel — o recurso recriado e um registro novo, nunca o antigo revivido.
+  //
+  // `labels` e o JSON das labels Docker do recurso: e o que a reconciliacao compara para provar que
+  // o que o Docker lista e deste run e nao de outro processo.
+  `
+  CREATE TABLE recurso_run (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id       TEXT NOT NULL,
+    run_id        TEXT NOT NULL,
+    project_id    TEXT NOT NULL,
+    tipo          TEXT NOT NULL CHECK (tipo IN
+      ('worktree', 'branch', 'container', 'rede', 'sidecar', 'porta', 'perfil')),
+    identificador TEXT NOT NULL,
+    estado        TEXT NOT NULL CHECK (estado IN ('planejado', 'criado', 'parado', 'removido')),
+    -- JSON: Record<string, string>
+    labels        TEXT NOT NULL,
+    -- JSON: Record<string, string> — o que a reconciliacao precisa para agir e que nao e label
+    -- Docker (ex.: o repositorio de um worktree, que e o cwd do git worktree remove)
+    detalhes      TEXT NOT NULL DEFAULT '{}',
+    criado_em     INTEGER NOT NULL,
+    atualizado_em INTEGER NOT NULL
+  );
+  CREATE UNIQUE INDEX idx_recurso_run_ident
+    ON recurso_run(user_id, tipo, identificador) WHERE estado <> 'removido';
+  CREATE INDEX idx_recurso_run_run ON recurso_run(user_id, run_id);
   `
 ]
 
