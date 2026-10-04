@@ -3,7 +3,8 @@
 Estado da revisão inicial: **FIX_REQUIRED**. As correções foram entregues na
 [PR #383](https://github.com/RodReis/rrb-jarvisOS/pull/383), mergeada em
 2026-10-04 (`b7a27b6`); os nove jobs do CI passaram no SHA final `3f226a2`.
-O aceite da issue permanece com o PI.
+A issue foi aceita pelo PI via ProPlan e fechada em 2026-10-04; a trilha do
+GitHub registra o comentário “proplan: finalizado pelo PI em 2026-10-04”.
 
 ## Decisão do PI nesta revisão
 
