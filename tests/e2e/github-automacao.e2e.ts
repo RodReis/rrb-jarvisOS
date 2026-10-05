@@ -327,7 +327,8 @@ test('as dezesseis capacidades chegam ao renderer pela listagem do núcleo', asy
     'label.ensure',
     'checks.required-for-branch',
     'pr.update-branch',
-    'rulesets.for-branch'
+    'rulesets.for-branch',
+    'pr.convert-to-draft'
   ])
 })
 

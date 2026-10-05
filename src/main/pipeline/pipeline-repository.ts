@@ -192,6 +192,14 @@ export class PipelineRepository {
     return row === undefined ? undefined : toRun(row)
   }
 
+  /** O espaço do run. O `PipelineRun` não o carrega; quem age por conta própria (a recuperação) precisa dele. */
+  workspaceDoRun(runId: string): WorkspaceId | undefined {
+    const row = this.db.prepare('SELECT workspace_id FROM pipeline_run WHERE id = ?').get(runId) as
+      { readonly workspace_id: WorkspaceId } | undefined
+
+    return row?.workspace_id
+  }
+
   /** Os runs de uma fatia, do mais recente para o mais antigo. */
   listarDaFatia(escopo: EscopoDoRun, sliceId: string): readonly PipelineRun[] {
     const rows = this.db

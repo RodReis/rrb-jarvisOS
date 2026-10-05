@@ -155,6 +155,8 @@ describe('migrations', () => {
     antigo.exec('DROP TABLE recurso_run')
     // A 52 cria as tentativas de merge sob o MergeLease (SPEC-Scheduler-04).
     antigo.exec('DROP TABLE merge_tentativa')
+    // A 53 guarda o PR que cada run publicou (SPEC-Scheduler-05).
+    antigo.exec('DROP TABLE run_pr')
     antigo.pragma('user_version = 1')
     antigo.close()
 

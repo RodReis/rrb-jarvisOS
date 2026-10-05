@@ -12,8 +12,8 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 2776 | 2776 | 0 | 82.5 | — | — |
-| — | — | — | Banco | 2141 | 2123 | 0 | 84.6 | — | — |
+| — | — | — | Regras de Negócio | 2818 | 2818 | 0 | 82.2 | — | — |
+| — | — | — | Banco | 2234 | 2216 | 0 | 84.7 | — | — |
 | — | — | — | Tela | 776 | 775 | 0 | 77.5 | — | — |
 
 ## Histórico por entrega
@@ -439,3 +439,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-10-04 | #131 | spec-scheduler-04-merge-serializado | Regras de Negócio | 2776 | 2776 | 0 | 82.5 | 395 | [395](https://github.com/RodReis/rrb-jarvisOS/pull/395) |
 | 2026-10-04 | #131 | spec-scheduler-04-merge-serializado | Banco | 2141 | 2123 | 0 | 84.6 | 395 | [395](https://github.com/RodReis/rrb-jarvisOS/pull/395) |
 | 2026-10-04 | #131 | spec-scheduler-04-merge-serializado | Tela | 776 | 775 | 0 | 77.5 | 395 | [395](https://github.com/RodReis/rrb-jarvisOS/pull/395) |
+| 2026-10-05 | #132 | spec-scheduler-05-recuperacao-e | Regras de Negócio | 2818 | 2818 | 0 | 82.2 | #397 | [#397](https://github.com/RodReis/rrb-jarvisOS/pull/397) |
+| 2026-10-05 | #132 | spec-scheduler-05-recuperacao-e | Banco | 2234 | 2216 | 0 | 84.7 | #397 | [#397](https://github.com/RodReis/rrb-jarvisOS/pull/397) |
+| 2026-10-05 | #132 | spec-scheduler-05-recuperacao-e | Tela | 776 | 775 | 0 | 77.5 | #397 | [#397](https://github.com/RodReis/rrb-jarvisOS/pull/397) |

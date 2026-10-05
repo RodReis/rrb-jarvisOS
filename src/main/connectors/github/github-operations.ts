@@ -20,6 +20,7 @@ import {
   corpoTemChaveExterna,
   type CheckNormalizado,
   type CommitShaInput,
+  type ConvertToDraftNormalizado,
   type EnsureBranchProtectionInput,
   type EnsureLabelInput,
   type EnsureBranchRefInput,
@@ -40,7 +41,14 @@ import {
   type WorkflowRunNormalizado
 } from '@shared/domain/github-automation'
 import { log } from '../../logging/logger'
-import { lista, numero, texto, type GithubRest, type RespostaRest } from './github-rest'
+import {
+  lista,
+  numero,
+  texto,
+  type GithubRest,
+  type Registro,
+  type RespostaRest
+} from './github-rest'
 
 /**
  * O desfecho de uma operação: o dado, mais se o recurso **já existia**.
@@ -761,6 +769,105 @@ export async function updatePullRequestBranch(
     externalRef: { id: `${input.owner}/${input.repo}/pulls/${input.pullRequest}` },
     criado: false
   }
+}
+
+/**
+ * `pr.convert-to-draft` — o PR aberto passa a rascunho (SPEC-Scheduler-05, regra 4).
+ *
+ * É o que o cancelamento faz com o trabalho que já está no remoto: **não fecha o PR e não apaga a
+ * branch**, só sinaliza que ninguém deve mergeá-lo. Não existe endpoint REST para isso — a única
+ * via é a mutation GraphQL `convertPullRequestToDraft`, que pede o `node_id` do PR; por isso a
+ * operação lê o PR antes (e a leitura também dá a idempotência: PR já em rascunho não é tocado).
+ *
+ * **PR que não está aberto nunca é convertido** (`motivo: 'pr-nao-aberto'`): mergeado é fato
+ * consumado, e um PR fechado reaberto como rascunho seria mudar o mundo além do que o cancelamento
+ * autoriza. **O GraphQL responde 200 com `errors`** quando a conversão não é possível (repositório
+ * sem rascunho, sem permissão): isso vira falha de validação — "draft quando possível" —, nunca
+ * sucesso.
+ */
+export async function convertPullRequestToDraft(
+  rest: GithubRest,
+  input: PullRequestInput
+): Promise<ResultadoDeOperacao<ConvertToDraftNormalizado>> {
+  const caminho = `/repos/${input.owner}/${input.repo}/pulls/${input.pullRequest}`
+  const corpo = exigirOk(await rest.request('GET', caminho)).corpo
+  const referencia = {
+    id: `${input.owner}/${input.repo}/pulls/${input.pullRequest}`,
+    ...(texto(corpo, 'html_url') === undefined ? {} : { url: texto(corpo, 'html_url') as string })
+  }
+
+  const aberto = (corpo as Registro | undefined)?.['state'] === 'open'
+  if (!aberto || (corpo as Registro | undefined)?.['merged'] === true) {
+    return {
+      data: { rascunho: false, jaEra: false, motivo: 'pr-nao-aberto' },
+      externalRef: referencia,
+      criado: false
+    }
+  }
+  if ((corpo as Registro | undefined)?.['draft'] === true) {
+    return { data: { rascunho: true, jaEra: true }, externalRef: referencia, criado: false }
+  }
+
+  const nodeId = texto(corpo, 'node_id')
+  if (nodeId === undefined) throw falhaSintetica(400)
+
+  const resposta = exigirOk(
+    await rest.request('POST', '/graphql', {
+      query:
+        'mutation($id: ID!) { convertPullRequestToDraft(input: { pullRequestId: $id }) { pullRequest { isDraft } } }',
+      variables: { id: nodeId }
+    })
+  )
+  const erros = lista(resposta.corpo, 'errors')
+  if (erros.length > 0) throw falhaDoGraphql(erros)
+
+  // Sucesso é a origem **confirmar** o rascunho, não a ausência de erro: `data: null` sem `errors`
+  // (ou um `errors` que não é lista) não afirma nada, e fail-closed é tratar como falha transitória.
+  const confirmou =
+    (
+      (resposta.corpo as Registro | undefined)?.['data'] as
+        { convertPullRequestToDraft?: { pullRequest?: { isDraft?: unknown } } } | null | undefined
+    )?.convertPullRequestToDraft?.pullRequest?.isDraft === true
+  if (!confirmou) throw falhaSintetica(502)
+
+  return { data: { rascunho: true, jaEra: false }, externalRef: referencia, criado: false }
+}
+
+/**
+ * O GraphQL responde 200 com `errors`, e o `type` diz de quem é a culpa — o que decide se vale
+ * tentar de novo. Cota (`RATE_LIMITED`) e erro sem tipo são transitórios; permissão e inexistência
+ * são do usuário; só `UNPROCESSABLE` (ou a recusa explícita de rascunho) é definitivo.
+ */
+function falhaDoGraphql(erros: readonly Registro[]): FalhaRest {
+  const tipos = erros.map((e) => texto(e, 'type'))
+  const mensagem = texto(erros[0], 'message')
+  if (tipos.includes('RATE_LIMITED')) return falhaSintetica(429, mensagem, { 'retry-after': '60' })
+  if (tipos.includes('FORBIDDEN') || tipos.includes('INSUFFICIENT_SCOPES')) {
+    return falhaSintetica(403, mensagem)
+  }
+  if (tipos.includes('NOT_FOUND')) return falhaSintetica(404, mensagem)
+  if (
+    tipos.includes('UNPROCESSABLE') ||
+    /draft pull requests are not supported/i.test(mensagem ?? '')
+  ) {
+    return falhaSintetica(422, mensagem)
+  }
+  // Sem tipo, ou tipo desconhecido: não dá para afirmar que repetir erra igual.
+  return falhaSintetica(502, mensagem)
+}
+
+/** Uma resposta que o GitHub deu com 200 mas que, para este contrato, é falha: o adapter a traduz como o status. */
+function falhaSintetica(
+  status: number,
+  mensagem?: string,
+  headers: Record<string, string> = {}
+): FalhaRest {
+  return new FalhaRest({
+    status,
+    ok: false,
+    corpo: mensagem === undefined ? undefined : { message: mensagem },
+    headers: new Headers(headers)
+  })
 }
 
 /**

@@ -94,6 +94,26 @@ export interface FilaDeps {
    * `CANCELLED` com o PR mergeado seria a mentira que a fila existe para impedir.
    */
   readonly mergeEmCurso?: (runId: string) => boolean
+  /**
+   * Executa `fn` numa transação do banco. É o que faz o terminal do run e a liberação do slot
+   * acontecerem **juntos ou nenhum dos dois** (limite declarado da SPEC-Scheduler-01): sem ela, um
+   * crash entre o `UPDATE` do run e a liberação deixava um run terminal segurando o slot.
+   * Opcional: sem ela `fn` roda direto, e o crash volta a abrir a janela.
+   */
+  readonly transacao?: <T>(fn: () => T) => T
+  /**
+   * Avisa que o run terminou **sem concluir** (`CANCELLED` ou `BLOCKED`): quem recupera devolve o
+   * slot e as travas — depois de provar que o executor parou. Depois do commit do terminal, nunca
+   * dentro dele: a devolução fala com o Docker, e isso não cabe numa transação do SQLite.
+   */
+  readonly aoEncerrarSemConclusao?: (runId: string, estado: EstadoDoRun) => void
+  /**
+   * Há uma transação do banco aberta **por fora** desta chamada? (A expansão de escopo bloqueia o
+   * run por dentro de uma.) Quando sim, o gancho espera o commit: ele fala com o Docker, e parar
+   * container e remover worktree com a transação aberta deixaria um efeito externo irreversível
+   * preso a um banco que ainda pode reverter.
+   */
+  readonly emTransacao?: () => boolean
   /** Relógio injetado: lease e expiração precisam ser determinísticos no teste. */
   readonly agora?: () => number
 }
@@ -238,27 +258,48 @@ export class FilaService {
       }
     }
 
-    const gravou =
-      exigeToken && fencingToken !== undefined
-        ? this.deps.runs.transicionarComFencing(
-            runId,
-            run.estado,
-            para,
-            new Date(this.agora()),
-            fencingToken,
-            para === 'BLOCKED' ? bloqueio : undefined
-          )
-        : this.deps.runs.transicionar(
-            runId,
-            run.estado,
-            para,
-            new Date(this.agora()),
-            para === 'BLOCKED' ? bloqueio : undefined
-          )
+    const transacao = this.deps.transacao ?? (<T>(fn: () => T): T => fn())
+    let saidos: string[] = []
+    let liberou = false
+
+    // O terminal, a saída da fila e a liberação do slot são **uma transação**: um crash no meio não
+    // pode deixar um run `MERGED` segurando o slot, nem um slot livre de um run ainda ativo.
+    const atualizado = transacao((): PipelineRun | undefined => {
+      const gravou =
+        exigeToken && fencingToken !== undefined
+          ? this.deps.runs.transicionarComFencing(
+              runId,
+              run.estado,
+              para,
+              new Date(this.agora()),
+              fencingToken,
+              para === 'BLOCKED' ? bloqueio : undefined
+            )
+          : this.deps.runs.transicionar(
+              runId,
+              run.estado,
+              para,
+              new Date(this.agora()),
+              para === 'BLOCKED' ? bloqueio : undefined
+            )
+      if (!gravou) return undefined
+
+      const gravado = this.deps.runs.buscar(runId) as PipelineRun
+      this.auditarTransicao(escopo, gravado, run.estado, para, bloqueio)
+
+      // O run terminou: sai da fila, se esperava. O slot é solto aqui nos desfechos **concluídos**
+      // — `terminal não segura a fila`. Em `BLOCKED` e `CANCELLED` quem o devolve é a recuperação,
+      // depois de provar que o executor parou (`aoEncerrarSemConclusao`).
+      if (ehTerminal(para)) {
+        saidos = this.deps.pool.cancelarDoRun(runId)
+        liberou = DESFECHOS_CONCLUIDOS.includes(para) && this.deps.pool.encerrarDoRun(runId)
+      }
+      return gravado
+    })
 
     // O compare-and-set falhou: outro processo transicionou este run entre a leitura e a escrita —
     // ou o token apresentado já não era o vigente (o dono antigo que perdeu o lease).
-    if (!gravou) {
+    if (atualizado === undefined) {
       return exigeToken
         ? {
             reason: 'fencing-invalido',
@@ -270,22 +311,35 @@ export class FilaService {
           }
     }
 
-    const atualizado = this.deps.runs.buscar(runId) as PipelineRun
-    this.auditarTransicao(escopo, atualizado, run.estado, para, bloqueio)
-
-    // O run terminou: sai da fila, se esperava. O slot só é solto aqui nos desfechos **concluídos**
-    // — `terminal não segura a fila` —; em `BLOCKED` e `CANCELLED` o lease fica até a reconciliação
-    // verificar se container e porta ainda estão em uso (a regra que a V1 já tinha). Liberar o slot
-    // no cancelamento, com a limpeza dos recursos, é da M12-F05.
-    if (ehTerminal(para)) {
-      const saidos = this.deps.pool.cancelarDoRun(runId)
-      if (saidos.length > 0) this.deps.aoCancelarEspera?.(saidos)
-      if (DESFECHOS_CONCLUIDOS.includes(para) && this.deps.pool.encerrarDoRun(runId)) {
-        this.despachar()
-      }
-    }
+    // Depois do commit: acordar quem esperava, passar a vez e recuperar o que o run segurava.
+    if (saidos.length > 0) this.deps.aoCancelarEspera?.(saidos)
+    if (liberou) this.despachar()
+    if (para === 'CANCELLED' || para === 'BLOCKED') this.avisarEncerramento(runId, para)
 
     return { reason: 'transicionado', run: atualizado, mensagem: `Run em ${para}.` }
+  }
+
+  /**
+   * O gancho depois do commit do terminal. **Nunca lança**: o terminal já está gravado, e uma
+   * exceção aqui sairia de `transicionar` como se a transição tivesse falhado. Se a recuperação
+   * não conseguiu, o slot fica preso e a varredura do supervisor o devolve na volta seguinte.
+   */
+  private avisarEncerramento(runId: string, estado: EstadoDoRun): void {
+    const hook = this.deps.aoEncerrarSemConclusao
+    if (hook === undefined) return
+    const chamar = (): void => {
+      try {
+        hook(runId, estado)
+      } catch (erro) {
+        log.agent.warn('A recuperação do run encerrado falhou; a varredura refaz', {
+          runId,
+          erro: erro instanceof Error ? erro.message : String(erro)
+        })
+      }
+    }
+    // Por fora há transação aberta: o microtask roda depois de ela terminar (o código é síncrono).
+    if (this.deps.emTransacao?.() === true) queueMicrotask(chamar)
+    else chamar()
   }
 
   /**

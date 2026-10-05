@@ -95,6 +95,16 @@ export interface ReconciliadorDeMerge {
   readonly reconciliar: () => Promise<readonly AchadoDaReconciliacao[]>
 }
 
+/**
+ * A recuperação por run (SPEC-Scheduler-05): recolhe slot e travas de run terminal e bloqueia o run
+ * ativo cujo dono sumiu — lease expirado **e** executor provadamente morto. É o que dá ao run
+ * `RUNNING` que o boot encontra um destino, em vez de só um achado que reaparece a cada boot.
+ */
+export interface ReconciliadorDeRecuperacao {
+  readonly supervisionar: () =>
+    readonly AchadoDaReconciliacao[] | Promise<readonly AchadoDaReconciliacao[]>
+}
+
 export interface ReconciliacaoDeps {
   readonly runs: PipelineRepository
   readonly leases: LeaseRepository
@@ -114,6 +124,8 @@ export interface ReconciliacaoDeps {
   readonly isolamento?: ReconciliadorDeIsolamento
   /** O merge serializado. Opcional: sem ele a reconciliação não enxerga tentativas de merge. */
   readonly merge?: ReconciliadorDeMerge
+  /** A recuperação por run. Opcional: sem ela o run ativo segue só como achado bloqueado. */
+  readonly recuperacao?: ReconciliadorDeRecuperacao
   readonly agora?: () => number
 }
 
@@ -154,6 +166,10 @@ export class ReconciliacaoService {
     // O merge antes dos leases: o MergeLease de uma tentativa que a origem mostrou resolvida já
     // caiu com ela, e o que sobra para `reconciliarLease` é só o que o merge não conhece.
     achados.push(...(await this.reconciliarMerge()))
+
+    // A recuperação depois do merge: o merge que a origem mostrou concluído já levou o run a
+    // `MERGED`, e o que sobra para ela é o slot de run terminal e o run que perdeu o dono.
+    achados.push(...(await this.reconciliarRecuperacao()))
 
     for (const lease of this.deps.leases.listar(userId)) {
       achados.push(await this.reconciliarLease(lease))
@@ -210,6 +226,26 @@ export class ReconciliacaoService {
           recurso: 'merge',
           decisao: 'bloqueado',
           motivo: `A reconciliação do merge falhou (${motivo}). As tentativas de merge não foram verificadas.`
+        }
+      ]
+    }
+  }
+
+  /**
+   * A recuperação que **não pôde** rodar é um achado bloqueado, nunca uma lista vazia: falha de
+   * detecção não é ausência de run perdido.
+   */
+  private async reconciliarRecuperacao(): Promise<readonly AchadoDaReconciliacao[]> {
+    if (this.deps.recuperacao === undefined) return []
+    try {
+      return await this.deps.recuperacao.supervisionar()
+    } catch (erro) {
+      const motivo = erro instanceof Error ? erro.message : 'erro desconhecido'
+      return [
+        {
+          recurso: 'recuperacao',
+          decisao: 'bloqueado',
+          motivo: `A recuperação dos runs falhou (${motivo}). Slots e runs não foram verificados.`
         }
       ]
     }

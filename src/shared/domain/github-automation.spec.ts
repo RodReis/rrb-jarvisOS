@@ -64,7 +64,8 @@ describe('capacidades declaradas', () => {
       'repo.set-default-branch',
       'branch.ensure-protection',
       'label.ensure',
-      'pr.update-branch'
+      'pr.update-branch',
+      'pr.convert-to-draft'
     ])
     // `commit.sha-for-ref` fica de fora de propósito: ler o commit da origem não muda nada, e
     // marcá-lo como mutação obrigaria a publicação a inventar chave de idempotência para conferir
@@ -85,6 +86,11 @@ describe('capacidades declaradas', () => {
       GITHUB_CAPABILITIES.find((c) => c.operation === operation)?.effect
     expect(efeito(GITHUB_OPERATIONS.getRulesForBranch)).toBe('leitura')
     expect(efeito(GITHUB_OPERATIONS.updateBranch)).toBe('mutacao')
+  })
+
+  it('converter para rascunho muda o mundo: é mutação, e portanto exige idempotência', () => {
+    const cap = GITHUB_CAPABILITIES.find((c) => c.operation === GITHUB_OPERATIONS.convertToDraft)
+    expect(cap?.effect).toBe('mutacao')
   })
 
   it('toda capacidade é do conector github e tem descrição', () => {
@@ -429,6 +435,47 @@ describe('validarEntrada', () => {
       expect(validarEntrada(GITHUB_OPERATIONS.getRulesForBranch, { ...REPO })).toMatch(/branch/)
       expect(
         validarEntrada(GITHUB_OPERATIONS.getRulesForBranch, { ...REPO, branch: 'main' })
+      ).toBeUndefined()
+    })
+  })
+
+  describe('owner e repo — a origem monta o caminho da API, então só o que o GitHub aceita', () => {
+    it.each(['../x', 'a/b', 'a b', 'x?y=1', 'a#b', '%2e%2e', '..', '.'])('recusa %s', (valor) => {
+      expect(
+        validarEntrada(GITHUB_OPERATIONS.getMergeState, {
+          owner: valor,
+          repo: 'r',
+          pullRequest: 1
+        })
+      ).toMatch(/owner|repo/i)
+      expect(
+        validarEntrada(GITHUB_OPERATIONS.getMergeState, {
+          owner: 'o',
+          repo: valor,
+          pullRequest: 1
+        })
+      ).toMatch(/owner|repo/i)
+    })
+
+    it('aceita o formato real: letras, dígitos, ponto, hífen e sublinhado', () => {
+      expect(
+        validarEntrada(GITHUB_OPERATIONS.getMergeState, {
+          owner: 'Rod-Reis_1',
+          repo: 'rrb-jarvisOS.v2',
+          pullRequest: 1
+        })
+      ).toBeUndefined()
+    })
+  })
+
+  describe('pr.convert-to-draft', () => {
+    it('exige o número do PR', () => {
+      expect(validarEntrada(GITHUB_OPERATIONS.convertToDraft, { ...REPO })).toMatch(/pullRequest/)
+      expect(validarEntrada(GITHUB_OPERATIONS.convertToDraft, { ...REPO, pullRequest: 0 })).toMatch(
+        /pullRequest/
+      )
+      expect(
+        validarEntrada(GITHUB_OPERATIONS.convertToDraft, { ...REPO, pullRequest: 7 })
       ).toBeUndefined()
     })
   })
