@@ -325,14 +325,33 @@ describe('registerIpcHandlers', () => {
     registerIpcHandlers(deps)
 
     const registrados = handle.mock.calls.map(([canal]) => canal).sort()
-    expect(registrados).toEqual(Object.values(IPC_CHANNELS).sort())
+    // O modo de chegada registra seus três canais em `registrarIpcDasBoasVindas`, junto do
+    // diálogo nativo e da confirmação de reprodução iniciada pelo main.
+    const daChegada = new Set<string>([
+      IPC_CHANNELS.boasVindasLer,
+      IPC_CHANNELS.boasVindasSalvar,
+      IPC_CHANNELS.boasVindasSelecionarMidia
+    ])
+    expect(registrados).toEqual(
+      Object.values(IPC_CHANNELS)
+        .filter((canal) => !daChegada.has(canal))
+        .sort()
+    )
   })
 
   it('registra um ouvinte para cada canal só de ida, e só para eles', () => {
     registerIpcHandlers(deps)
 
     const registrados = on.mock.calls.map(([canal]) => canal).sort()
-    expect(registrados).toEqual(Object.values(IPC_SEND_CHANNELS).sort())
+    const daChegada = new Set<string>([
+      IPC_SEND_CHANNELS.boasVindasPronto,
+      IPC_SEND_CHANNELS.boasVindasReproducaoConcluida
+    ])
+    expect(registrados).toEqual(
+      Object.values(IPC_SEND_CHANNELS)
+        .filter((canal) => !daChegada.has(canal))
+        .sort()
+    )
   })
 })
 

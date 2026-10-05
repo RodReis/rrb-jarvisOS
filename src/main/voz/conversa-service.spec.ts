@@ -73,6 +73,33 @@ function deps(parcial: Partial<DepsDaConversa> = {}): {
   }
 }
 
+describe('saudação proativa da SPEC-Escuta-03', () => {
+  it('envia hora e ausência ao ponto único com persona, sem criar pergunta no histórico', async () => {
+    const { deps: d, pedidos, packs } = deps()
+    const service = new ConversaService(d)
+    const hora = new Date(2026, 9, 5, 8, 30)
+    const texto = await service.saudar(hora, 90 * 60_000, new AbortController().signal)
+    expect(texto).toBe('Dois aguardando aceite.')
+    expect(pedidos[0]).toMatchObject({
+      taskType: 'conversa-de-voz',
+      model: 'qwen3:8b',
+      contextPackId: 'pack-1'
+    })
+    expect(pedidos[0].prompt).toContain('90 minutos')
+    expect(pedidos[0].prompt).toContain('08:30')
+    expect(packs[0].partes.map((parte) => parte.nome)).toEqual(['persona', 'snapshot', 'chegada'])
+    expect(service.trocas()).toEqual([])
+  })
+
+  it('não chama a IA quando a rota está indisponível', async () => {
+    const { deps: d, pedidos } = deps({ rotaDisponivel: async () => FORA })
+    await expect(
+      new ConversaService(d).saudar(new Date(), null, new AbortController().signal)
+    ).rejects.toThrow()
+    expect(pedidos).toEqual([])
+  })
+})
+
 describe('a conversa passa pelo ponto único (critério 2)', () => {
   it('declara o tipo de tarefa e o pack, nunca um provider', async () => {
     // `taskType` e não `provider`: quem escolhe quem atende é o `ProviderRoute`, e cravar o

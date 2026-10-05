@@ -2453,6 +2453,18 @@ Status: **entregue** — issue [#357](https://github.com/RodReis/rrb-jarvisOS/is
 
 **Limite aceito pelo PI na PR:** a correlação de PCM não substitui teste acústico com alto-falante e microfone reais. A confirmação de ausência de auto-disparo e a medição do barge-in na máquina do PI permanecem pendentes; os critérios físicos 5 e 11 não estão comprovados. A execução local ampla de Banco perdeu um worker, mas a categoria completa passou no CI com Docker.
 
+### Fatia 03 — Modo Boas-Vindas (`docs/spec/spec-escuta-03-boas-vindas.md`)
+
+Status: **em implementação** — issue [#358](https://github.com/RodReis/rrb-jarvisOS/issues/358). O PI decidiu em 2026-10-05 que a primeira instalação começa com o modo desligado até a configuração; a medição de áudio usa o indicador nativo da saída do Windows, sem capturar PCM, e falha fechada quando não consegue comprovar silêncio.
+
+- [x] Gatilho no `powerMonitor` após desbloqueio, primeiro dia local, estado persistido e teto por período.
+- [x] Guardas de janela, kill switch, áudio do sistema e liga/desliga próprio.
+- [x] Persona pelo ponto único com hora e ausência, timeout configurável e frases de fallback por período.
+- [x] Reprodução de fala e mídia local escolhida em Settings no dispositivo de saída configurado; evento `boas-vindas` publicado após a fala.
+- [x] Ponte IPC tipada, escolha de arquivo/pasta no main e testes de contrato, regras e tela.
+- [ ] Validação completa, prova visual, relatório por SPEC/issue, CI e PR mergeada.
+- [ ] Verificação física do PI: chegar, desbloquear e confirmar a experiência acústica real.
+
 ## Registro de entregas
 
 | Data | Fatia | PR | Observação |

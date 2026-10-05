@@ -764,6 +764,31 @@ export const RECURSOS = {
         erroInesperado: 'Não foi possível montar o contexto. Tente novamente.'
       },
       settings: {
+        boasVindas: {
+          titulo: 'Modo Boas-Vindas',
+          descricao:
+            'No primeiro desbloqueio do dia, o JARVIS pode saudar você. Ele se cala fora do horário, com a escuta desligada ou quando outro áudio toca. Começa desligado até você configurar.',
+          ativar: 'Ativar Modo Boas-Vindas',
+          inicio: 'Início da janela (HH:MM)',
+          fim: 'Fim da janela (HH:MM)',
+          teto: 'Tempo máximo da saudação personalizada',
+          tetoDescricao: 'Se a IA local não responder a tempo, usa a frase fixa da faixa do dia.',
+          manha: 'Frase fixa da manhã',
+          tarde: 'Frase fixa da tarde',
+          noite: 'Frase fixa da noite',
+          fraseDescricao: 'Usada quando a IA local não está disponível ou demora.',
+          midia: 'Tocar mídia local depois da saudação',
+          semMidia: 'Nenhum arquivo ou pasta escolhido.',
+          arquivo: 'Escolher arquivo',
+          pasta: 'Escolher pasta',
+          remover: 'Remover mídia',
+          salvar: 'Salvar boas-vindas',
+          salvo: 'Configuração salva.',
+          erroLeitura: 'Não foi possível ler o Modo Boas-Vindas.',
+          erroValidacao: 'Confira os horários e preencha as três frases.',
+          erroSalvar: 'Não foi possível salvar as boas-vindas.',
+          erroMidia: 'Não foi possível escolher a mídia.'
+        },
         escuta: {
           titulo: 'Escuta contínua',
           descricao:
@@ -1606,6 +1631,31 @@ export const RECURSOS = {
         erroInesperado: 'Could not build the context. Try again.'
       },
       settings: {
+        boasVindas: {
+          titulo: 'Welcome Mode',
+          descricao:
+            'On the first unlock of the day, JARVIS can greet you. It stays quiet outside the window, with listening off, or while other audio plays. It starts off until configured.',
+          ativar: 'Enable Welcome Mode',
+          inicio: 'Window start (HH:MM)',
+          fim: 'Window end (HH:MM)',
+          teto: 'Maximum time for personalized greeting',
+          tetoDescricao: 'If local AI does not respond in time, a fixed phrase is used.',
+          manha: 'Morning fallback phrase',
+          tarde: 'Afternoon fallback phrase',
+          noite: 'Evening fallback phrase',
+          fraseDescricao: 'Used when local AI is unavailable or too slow.',
+          midia: 'Play local media after greeting',
+          semMidia: 'No file or folder selected.',
+          arquivo: 'Choose file',
+          pasta: 'Choose folder',
+          remover: 'Remove media',
+          salvar: 'Save welcome settings',
+          salvo: 'Settings saved.',
+          erroLeitura: 'Could not load Welcome Mode.',
+          erroValidacao: 'Check the times and fill in all three phrases.',
+          erroSalvar: 'Could not save welcome settings.',
+          erroMidia: 'Could not choose media.'
+        },
         escuta: {
           titulo: 'Continuous listening',
           descricao:

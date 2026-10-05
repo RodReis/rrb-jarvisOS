@@ -29,6 +29,7 @@ import type {
   TrocaDaConversa
 } from '@shared/domain/voz'
 import type { DesfechoDaFala, ProntidaoDoTts } from '@shared/domain/visemes'
+import type { ConfiguracaoDasBoasVindas, ReproducaoDasBoasVindas } from '@shared/domain/boas-vindas'
 import type { PendenciaDeLimpeza } from '@shared/domain/limpeza'
 import type { MergePolicyOutcome, PoliticaDeMerge, VistaDaFila } from '@shared/domain/pipeline'
 import type { VistaDoPool } from '@shared/domain/pool-vista'
@@ -223,6 +224,24 @@ const bridge: JarvisBridge = {
    * aceita a "via" da auditoria — ela é fixada do lado de lá.
    */
   estadoDaEscuta: (): Promise<EstadoDaEscuta> => ipcRenderer.invoke(IPC_CHANNELS.escutaEstado),
+  lerBoasVindas: (): Promise<ConfiguracaoDasBoasVindas> =>
+    ipcRenderer.invoke(IPC_CHANNELS.boasVindasLer),
+  salvarBoasVindas: (config: ConfiguracaoDasBoasVindas): Promise<ConfiguracaoDasBoasVindas> =>
+    ipcRenderer.invoke(IPC_CHANNELS.boasVindasSalvar, config),
+  selecionarMidiaDasBoasVindas: (
+    tipo: 'arquivo' | 'pasta' | null
+  ): Promise<ConfiguracaoDasBoasVindas> =>
+    ipcRenderer.invoke(IPC_CHANNELS.boasVindasSelecionarMidia, tipo),
+  onReproducaoDasBoasVindas: (
+    listener: (pedido: ReproducaoDasBoasVindas) => void
+  ): (() => void) => {
+    const wrapped = (_event: unknown, pedido: ReproducaoDasBoasVindas): void => listener(pedido)
+    ipcRenderer.on(IPC_EVENT_CHANNELS.boasVindasReproduzir, wrapped)
+    return () => ipcRenderer.removeListener(IPC_EVENT_CHANNELS.boasVindasReproduzir, wrapped)
+  },
+  confirmarReproducaoDasBoasVindas: (id: string, sucesso: boolean): void =>
+    ipcRenderer.send(IPC_SEND_CHANNELS.boasVindasReproducaoConcluida, id, sucesso),
+  informarBoasVindasProntas: (): void => ipcRenderer.send(IPC_SEND_CHANNELS.boasVindasPronto),
   definirEscutaAtiva: (ativa: boolean): Promise<DesfechoDeLigarEscuta> =>
     ipcRenderer.invoke(IPC_CHANNELS.escutaDefinirAtiva, ativa),
   definirGatilhosDaEscuta: (gatilhos: {
