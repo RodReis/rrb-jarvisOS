@@ -2019,6 +2019,31 @@ const MIGRATIONS: readonly string[] = [
   CREATE UNIQUE INDEX idx_merge_tentativa_efeito
     ON merge_tentativa(user_id, run_id, pull_request, head_sha) WHERE estado <> 'abandonada';
   CREATE INDEX idx_merge_tentativa_run ON merge_tentativa(user_id, run_id);
+  `,
+
+  // 53 - o PR que cada run publicou (SPEC-Scheduler-05).
+  //
+  // O run nao lembrava o proprio PR: o numero morava na memoria da entrega e, no fim, no ledger do
+  // run encerrado. Cancelar um run com o trabalho ja no remoto precisa achar o PR para convertê-lo
+  // em rascunho, e a conversao precisa sobreviver a um crash entre o cancelamento e a chamada.
+  //
+  // `rascunho` e a intencao gravada **antes** da chamada (`pendente`) e o resultado depois — o mesmo
+  // padrao do diario de efeitos. NULL = ninguem pediu rascunho. Uma linha por run: um run publica
+  // um PR so; a retomada e um run novo, com a linha dela.
+  `
+  CREATE TABLE run_pr (
+    user_id      TEXT NOT NULL,
+    run_id       TEXT NOT NULL,
+    owner        TEXT NOT NULL,
+    repo         TEXT NOT NULL,
+    pull_request INTEGER NOT NULL,
+    branch       TEXT NOT NULL,
+    rascunho     TEXT CHECK (rascunho IN ('pendente', 'convertido', 'indisponivel', 'nao-aberto')),
+    created_at   INTEGER NOT NULL,
+    updated_at   INTEGER NOT NULL,
+    PRIMARY KEY (user_id, run_id)
+  );
+  CREATE INDEX idx_run_pr_pendente ON run_pr(user_id) WHERE rascunho = 'pendente';
   `
 ]
 

@@ -104,13 +104,16 @@ export function decidirRecuperacao(o: ObservacaoDoRun): DecisaoDeRecuperacao {
  * A fase da matriz de cancelamento (V2 §11.3) em que um run em `estado` se encontra, ou
  * `undefined` quando o run já terminou e não há o que cancelar.
  *
- * **`VALIDATING` conta como execução**: a validação local roda no container do executor, e o
- * trabalho ainda não está no remoto. `PR_CI` é a fase em que o PR existe e o CI corre. A fase
- * `depois-do-push` não tem estado próprio — o push acontece dentro de `VALIDATING`/`PR_CI` —, e a
- * entrega pede o rascunho do PR sempre que há PR, independentemente da fase (ver o serviço de
- * cancelamento).
+ * **`depois-do-push` não tem estado próprio**: o run em `RUNNING`/`VALIDATING` com o PR já
+ * publicado (volta a validar depois de a base avançar) tem o trabalho no remoto, e a matriz manda
+ * preservar o PR e convertê-lo em rascunho. Por isso quem chama diz se há PR (`temPr`): o estado
+ * sozinho não distingue "ainda escrevendo" de "revalidando um PR aberto". `PR_CI` é a fase em que o
+ * PR existe e o CI corre; antes do executor não existe PR.
  */
-export function faseDoCancelamento(estado: EstadoDoRun): FaseDeCancelamento | undefined {
+export function faseDoCancelamento(
+  estado: EstadoDoRun,
+  temPr = false
+): FaseDeCancelamento | undefined {
   switch (estado) {
     case 'PLANNED':
     case 'AWAITING_PI':
@@ -118,7 +121,7 @@ export function faseDoCancelamento(estado: EstadoDoRun): FaseDeCancelamento | un
       return 'antes-do-executor'
     case 'RUNNING':
     case 'VALIDATING':
-      return 'durante-execucao'
+      return temPr ? 'depois-do-push' : 'durante-execucao'
     case 'PR_CI':
       return 'durante-ci'
     default:

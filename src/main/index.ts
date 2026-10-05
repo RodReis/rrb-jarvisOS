@@ -98,7 +98,9 @@ import { MergeRepository } from './pipeline/merge-repository'
 import { MergeService } from './pipeline/merge-service'
 import { PipelineRepository } from './pipeline/pipeline-repository'
 import { ReconciliacaoService } from './pipeline/reconciliacao-service'
+import { CancelamentoService } from './pipeline/cancelamento-service'
 import { RecuperacaoService } from './pipeline/recuperacao-service'
+import { RunPrRepository } from './pipeline/run-pr-repository'
 import { MarcosService } from './projects/marcos-service'
 import { RoadmapService } from './projects/roadmap-service'
 import { RoadmapGeradoService } from './projects/roadmap-gerado-service'
@@ -1536,6 +1538,20 @@ if (!app.requestSingleInstanceLock()) {
     })
     recuperacaoDosRuns.servico = recuperacao
 
+    // O PR que cada run publicou: o cancelamento o acha aqui para convertê-lo em rascunho.
+    const runPrs = new RunPrRepository(storage.db)
+    // O cancelamento seletivo (SPEC-Scheduler-05). **Ainda sem chamador de produção:** cancelar é
+    // ato do PI e o canal (IPC e tela) é do quadro do MVP-028; o que já roda é a reconciliação do
+    // rascunho que um crash ou a origem fora do ar deixou pendente.
+    const cancelamento = new CancelamentoService({
+      runs: pipelineRepository,
+      fila,
+      prs: runPrs,
+      connectors,
+      audit: storage.audit,
+      userId: userIdAtual
+    })
+
     /*
      * O coletor de retenção, **instanciado** (SPEC-Fases-03 § Persistência).
      *
@@ -1564,6 +1580,7 @@ if (!app.requestSingleInstanceLock()) {
     // revisor é o próprio executor em invocação separada no container, e a M9-F06 é quem o liga;
     // até lá nenhum achado bloqueia, e o gate segue barrando por CI e por regra da origem.
     const entrega = new EntregaService({
+      prs: runPrs,
       construtor: new ConstrutorService(
         docker,
         pipelineRepository,
@@ -1678,8 +1695,14 @@ if (!app.requestSingleInstanceLock()) {
       // As tentativas de merge que um crash deixou: resolvidas contra o GitHub antes de qualquer
       // repetição (SPEC-Scheduler-04, critério 4).
       merge: mergeService,
-      // O run que perdeu o dono e o slot de run terminal (SPEC-Scheduler-05).
-      recuperacao
+      // O run que perdeu o dono, o slot de run terminal e o rascunho de PR pendente
+      // (SPEC-Scheduler-05).
+      recuperacao: {
+        supervisionar: async () => [
+          ...recuperacao.supervisionar(),
+          ...(await cancelamento.reconciliarRascunhos())
+        ]
+      }
     })
 
     // **`reconcileAll` é bloqueante** (decisão cravada da spec): nenhum trabalho novo é adquirido
@@ -1698,6 +1721,12 @@ if (!app.requestSingleInstanceLock()) {
           motivo: erro instanceof Error ? erro.message : 'desconhecido'
         })
       }
+      // O rascunho pendente depende da rede: roda à parte, sem segurar a varredura síncrona.
+      void cancelamento.reconciliarRascunhos().catch((erro: unknown) => {
+        log.sistema.warn('A reconciliação do rascunho do PR falhou', {
+          motivo: erro instanceof Error ? erro.message : 'desconhecido'
+        })
+      })
     }, INTERVALO_DO_SUPERVISOR_MS)
     supervisor.unref()
     app.on('will-quit', () => clearInterval(supervisor))

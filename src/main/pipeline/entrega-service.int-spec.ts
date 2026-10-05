@@ -273,6 +273,7 @@ function montar(
       pedido: unknown,
       delta?: { headAnterior: string; headNovo: string }
     ) => Promise<unknown[]>
+    prs?: { registrar: ReturnType<typeof vi.fn> }
   } = {}
 ): EntregaServiceType {
   const gitFalso = {
@@ -300,6 +301,7 @@ function montar(
     budget: budgetRepo,
     audit: { append: vi.fn() } as never,
     userId: () => USER,
+    ...(opcoes.prs === undefined ? {} : { prs: opcoes.prs as never }),
     revisar: (opcoes.revisar ?? (async () => achados)) as never,
     token: async () => undefined,
     // Sem espera real, mas o relógio **anda**: `dormir` avança o tempo simulado pelo mesmo
@@ -1370,6 +1372,32 @@ describe('EntregaService — correlação com a execução de CI (SPEC-Pipeline-
 
     const correlacao = ledgerRepo.buscar(USER, 'run-1')?.correlacaoDeCi
     expect('tentativaDoCi' in (correlacao ?? {})).toBe(false)
+  })
+})
+
+describe('EntregaService — o run lembra o PR que publicou (SPEC-Scheduler-05)', () => {
+  it('registra o PR no run assim que a origem o confirma', async () => {
+    const registrar = vi.fn()
+
+    const r = await montar({ prs: { registrar } }).entregar(pedido())
+
+    expect(registrar).toHaveBeenCalledWith(
+      USER,
+      expect.objectContaining({
+        runId: pedido().runId,
+        owner: pedido().alvo.owner,
+        repo: pedido().alvo.repo,
+        pullRequest: r.pullRequest,
+        branch: pedido().alvo.branchDaFatia
+      }),
+      expect.any(Number)
+    )
+  })
+
+  it('a entrega não depende do registro: sem ele, entrega do mesmo jeito', async () => {
+    const r = await montar().entregar(pedido())
+
+    expect(r.pullRequest).toBe(PR)
   })
 })
 

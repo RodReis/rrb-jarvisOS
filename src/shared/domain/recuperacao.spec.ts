@@ -86,6 +86,20 @@ describe('faseDoCancelamento — a matriz aprovada por estado do run', () => {
     expect(faseDoCancelamento(estado)).toBe(fase)
   })
 
+  it('executando com o PR já publicado é depois do push: o trabalho está no remoto', () => {
+    // O run volta a VALIDATING para revalidar depois de a base avançar, com o PR aberto.
+    expect(faseDoCancelamento('RUNNING', true)).toBe('depois-do-push')
+    expect(faseDoCancelamento('VALIDATING', true)).toBe('depois-do-push')
+  })
+
+  it('o CI com PR continua sendo a fase do CI', () => {
+    expect(faseDoCancelamento('PR_CI', true)).toBe('durante-ci')
+  })
+
+  it('antes do executor não há PR, mesmo se alguém disser que há', () => {
+    expect(faseDoCancelamento('READY', true)).toBe('antes-do-executor')
+  })
+
   it('run terminal não tem fase de cancelamento: não há o que cancelar', () => {
     expect(faseDoCancelamento('MERGED')).toBeUndefined()
     expect(faseDoCancelamento('CANCELLED')).toBeUndefined()

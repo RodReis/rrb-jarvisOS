@@ -101,7 +101,8 @@ export interface ReconciliadorDeMerge {
  * `RUNNING` que o boot encontra um destino, em vez de só um achado que reaparece a cada boot.
  */
 export interface ReconciliadorDeRecuperacao {
-  readonly supervisionar: () => readonly AchadoDaReconciliacao[]
+  readonly supervisionar: () =>
+    readonly AchadoDaReconciliacao[] | Promise<readonly AchadoDaReconciliacao[]>
 }
 
 export interface ReconciliacaoDeps {
@@ -168,7 +169,7 @@ export class ReconciliacaoService {
 
     // A recuperação depois do merge: o merge que a origem mostrou concluído já levou o run a
     // `MERGED`, e o que sobra para ela é o slot de run terminal e o run que perdeu o dono.
-    achados.push(...this.reconciliarRecuperacao())
+    achados.push(...(await this.reconciliarRecuperacao()))
 
     for (const lease of this.deps.leases.listar(userId)) {
       achados.push(await this.reconciliarLease(lease))
@@ -234,10 +235,10 @@ export class ReconciliacaoService {
    * A recuperação que **não pôde** rodar é um achado bloqueado, nunca uma lista vazia: falha de
    * detecção não é ausência de run perdido.
    */
-  private reconciliarRecuperacao(): readonly AchadoDaReconciliacao[] {
+  private async reconciliarRecuperacao(): Promise<readonly AchadoDaReconciliacao[]> {
     if (this.deps.recuperacao === undefined) return []
     try {
-      return this.deps.recuperacao.supervisionar()
+      return await this.deps.recuperacao.supervisionar()
     } catch (erro) {
       const motivo = erro instanceof Error ? erro.message : 'erro desconhecido'
       return [

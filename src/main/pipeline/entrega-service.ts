@@ -68,6 +68,7 @@ import type { BudgetRepository } from '../budget/budget-repository'
 import type { ExecutionLedgerRepository } from './execution-ledger-repository'
 import type { LimpezaService } from './limpeza-service'
 import type { RulesetRepository } from './ruleset-repository'
+import type { RunPrRepository } from './run-pr-repository'
 
 /** O hash de um conteúdo. `src/shared` não pode calcular: `node:crypto` não existe no renderer. */
 function sha256(conteudo: string): string {
@@ -204,6 +205,12 @@ export interface EntregaDeps {
   readonly budget: BudgetRepository
   readonly audit: AuditRepository
   readonly userId: () => string
+  /**
+   * Onde o run guarda o PR que publicou (SPEC-Scheduler-05). Sem isso o cancelamento não acha o PR
+   * para convertê-lo em rascunho. Opcional: o registro é do que vem depois da publicação, e a
+   * entrega não depende dele para entregar.
+   */
+  readonly prs?: Pick<RunPrRepository, 'registrar'>
   /**
    * Revisa o delta e devolve os achados ainda abertos.
    *
@@ -591,6 +598,17 @@ export class EntregaService {
       }
     }
 
+    this.deps.prs?.registrar(
+      this.deps.userId(),
+      {
+        runId: pedido.runId,
+        owner: pedido.alvo.owner,
+        repo: pedido.alvo.repo,
+        pullRequest: numero,
+        branch: pedido.alvo.branchDaFatia
+      },
+      this.agora()
+    )
     return { ok: true, pullRequest: numero }
   }
 
