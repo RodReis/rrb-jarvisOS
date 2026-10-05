@@ -201,6 +201,16 @@ export function EscutaDaVoz({
   }
   const ouvindo = visao === 'ligada'
   const problema = visao === 'sem-microfone'
+  const textoDaFase =
+    estado.fase === 'gravando'
+      ? t('voz.gravando')
+      : estado.fase === 'transcrevendo'
+        ? t('voz.transcrevendo')
+        : estado.fase === 'pensando'
+          ? t('voz.conversa.pensando')
+          : estado.fase === 'falando'
+            ? t('voz.conversa.falando')
+            : TEXTO[visao]
 
   return (
     <div role="group" aria-label={t('escuta.grupo')} className="flex items-center gap-2">
@@ -233,7 +243,7 @@ export function EscutaDaVoz({
                 : 'border border-[var(--jos-cor-texto-suave)]'
           }`}
         />
-        {visao === 'ligada' && estado.fase === 'gravando' ? t('voz.gravando') : TEXTO[visao]}
+        {visao === 'ligada' ? textoDaFase : TEXTO[visao]}
       </span>
       {sinalDeOcupado && <span role="alert">{t('escuta.ocupado')}</span>}
       {motivoDaRecusa !== undefined && (

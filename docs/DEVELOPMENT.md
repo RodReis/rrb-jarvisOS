@@ -2446,7 +2446,8 @@ Status: **em andamento** — issue [#357](https://github.com/RodReis/rrb-jarvisO
 - [x] Fase no main projetada para o mascote e legenda; quinto estado `escutando` com arcos próprios e prova nos dois temas e movimento reduzido.
 - [x] Timeout configurado para os dois gatilhos e auditoria da troca de posse com cadeia de hash testada.
 - [x] Validação local: Regras 2.823/2.823; Tela 779/779 (1 todo); Banco 2.221 passaram, 42 ignorados, runner encerrou com perda de worker; lint, typecheck e seis provas visuais passaram.
-- [ ] Relatório por SPEC/issue com artefatos do CI, prova física de auto-disparo e latência na máquina do PI, PR e integração.
+- [x] PR [#402](https://github.com/RodReis/rrb-jarvisOS/pull/402) aberta. Primeira rodada de CI: Regras, Banco, Tela, qualidade e visual passaram; E2E apontou três métodos novos ausentes da lista fechada do teste de login, corrigida antes da segunda rodada.
+- [ ] Relatório por SPEC/issue no SHA final, prova física de auto-disparo e latência na máquina do PI, gate verde e integração.
 
 **Limite em validação:** a correlação de PCM não substitui teste acústico com alto-falante e microfone reais. A medição do barge-in na máquina do PI permanece pendente. Na suíte ampla de Banco, Docker estava indisponível e o Vitest perdeu um worker; o teste de integração da cadeia de auditoria da fatia passou isolado. A categoria completa ainda não pode ser declarada verde.
 

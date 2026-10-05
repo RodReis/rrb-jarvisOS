@@ -88,6 +88,21 @@ function montar(captura = capturaFalsa(), aoDisparar = vi.fn()) {
 }
 
 describe('indicador permanente (critério 9)', () => {
+  it('projeta as fases do main no indicador, sem estado de turno local', async () => {
+    montar()
+    await screen.findByText(/escuta ligada/i)
+    for (const [fase, texto] of [
+      ['gravando', /ouvindo/i],
+      ['transcrevendo', /transcrevendo/i],
+      ['pensando', /pensando/i],
+      ['falando', /falando/i],
+      ['escutando', /escuta ligada/i]
+    ] as const) {
+      act(() => avisarMudanca?.({ ...LIGADA, fase }))
+      expect(screen.getByRole('status')).toHaveTextContent(texto)
+    }
+  })
+
   it('sinaliza disparo recusado durante turno ocupado', async () => {
     montar()
     await screen.findByText(/escuta ligada/i)
