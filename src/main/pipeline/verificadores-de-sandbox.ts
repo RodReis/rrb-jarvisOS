@@ -20,6 +20,7 @@
  */
 
 import { RECURSO_CONTAINER, RECURSO_PORTA } from '@shared/domain/preflight'
+import type { ExecutorObservado } from '@shared/domain/recuperacao'
 import type { VerificadorDeRecurso } from './reconciliacao-service'
 import type { DockerRunner } from './docker-runner'
 
@@ -59,6 +60,34 @@ export function verificadorDePorta(docker: DockerRunner, cwd: () => string): Ver
       } catch {
         return true
       }
+    }
+  }
+}
+
+/**
+ * O executor do run está vivo? É a observação que a recuperação (SPEC-Scheduler-05) compara com o
+ * lease: lease expirado **e** executor morto é a única combinação que autoriza bloquear um run.
+ *
+ * `vivo` quando o Docker lista um container gerido cuja label de run é o run — ou uma unidade de
+ * sandbox dele (`<run>-<escritor>-…`, prefixo **por segmento**: `run-10` não é de `run-1`) — ou,
+ * para o run anterior ao inventário, o container nomeado pelo run. **`desconhecido` quando o Docker
+ * não lista ou lança:** não ver o container porque o Docker não respondeu não é ele ter sumido.
+ */
+export function observadorDeExecutor(
+  docker: Pick<DockerRunner, 'listarGeridos' | 'containerExiste'>,
+  cwd: () => string
+): (runId: string) => ExecutorObservado {
+  return (runId) => {
+    try {
+      const geridos = docker.listarGeridos(cwd())
+      if (geridos === undefined) return 'desconhecido'
+      const doRun = geridos.containers.some(
+        (c) => c.runId !== undefined && (c.runId === runId || c.runId.startsWith(`${runId}-`))
+      )
+      if (doRun) return 'vivo'
+      return docker.containerExiste(`jarvisos-run-${runId}`, cwd()) ? 'vivo' : 'morto'
+    } catch {
+      return 'desconhecido'
     }
   }
 }

@@ -125,3 +125,9 @@ export function faseDoCancelamento(estado: EstadoDoRun): FaseDeCancelamento | un
       return undefined
   }
 }
+
+/**
+ * De quanto em quanto tempo o supervisor varre os slots. Metade da validade do lease: um run que
+ * morre é visto em até 45 s, e a varredura (só SQLite quando nada expirou) não pesa.
+ */
+export const INTERVALO_DO_SUPERVISOR_MS = 15_000

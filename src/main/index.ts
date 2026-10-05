@@ -91,12 +91,14 @@ import { LockRepository } from './pipeline/lock-repository'
 import { EffectJournalRepository } from './pipeline/effect-journal-repository'
 import { LeaseRepository } from './pipeline/lease-repository'
 import { comandoDeLimpezaDoInventario, runOuUnidadeAtiva } from '@shared/domain/isolamento'
+import { INTERVALO_DO_SUPERVISOR_MS } from '@shared/domain/recuperacao'
 import { MergePolicyRepository } from './pipeline/merge-policy-repository'
 import { MergePolicyService } from './pipeline/merge-policy-service'
 import { MergeRepository } from './pipeline/merge-repository'
 import { MergeService } from './pipeline/merge-service'
 import { PipelineRepository } from './pipeline/pipeline-repository'
 import { ReconciliacaoService } from './pipeline/reconciliacao-service'
+import { RecuperacaoService } from './pipeline/recuperacao-service'
 import { MarcosService } from './projects/marcos-service'
 import { RoadmapService } from './projects/roadmap-service'
 import { RoadmapGeradoService } from './projects/roadmap-gerado-service'
@@ -174,7 +176,11 @@ import { RetencaoService } from './pipeline/retencao-service'
 import { ExecutorProxy } from './pipeline/executor-proxy'
 import { RulesetRepository } from './pipeline/ruleset-repository'
 import { PreflightService } from './pipeline/preflight-service'
-import { verificadorDeContainer, verificadorDePorta } from './pipeline/verificadores-de-sandbox'
+import {
+  observadorDeExecutor,
+  verificadorDeContainer,
+  verificadorDePorta
+} from './pipeline/verificadores-de-sandbox'
 import { ContextRepository } from './context/context-repository'
 import { ContextService } from './context/context-service'
 import { CredentialService } from './credentials/credential-service'
@@ -1409,6 +1415,7 @@ if (!app.requestSingleInstanceLock()) {
     // termina cancela a espera pelos ganchos da fila. O gerente nasce **depois** da fila, que
     // precisa dele — por isso os ganchos o leem por função.
     const slotsDosSquads: { gerente?: GerenteDeSlots } = {}
+    const recuperacaoDosRuns: { servico?: RecuperacaoService } = {}
     const fila: FilaService = new FilaService({
       ...ganchosDosSlots(() => slotsDosSquads.gerente),
       runs: pipelineRepository,
@@ -1421,7 +1428,13 @@ if (!app.requestSingleInstanceLock()) {
         roadmap.revisoesDoGate(escopo.projectId, 'SLICE_ENTRY', escopo.workspaceId),
       userId: userIdAtual,
       mergeAutonomoLigado: (projectId) => mergePolicy.autonomoLigado(projectId),
-      mergeEmCurso: (runId) => mergeRepository.emCursoDoRun(userIdAtual(), runId)
+      mergeEmCurso: (runId) => mergeRepository.emCursoDoRun(userIdAtual(), runId),
+      // O terminal do run e a liberação do slot são uma transação só (SPEC-Scheduler-05): um crash
+      // entre os dois deixava um run terminal segurando o slot.
+      transacao: (fn) => storage.db.transaction(fn)(),
+      // `CANCELLED` e `BLOCKED` devolvem o slot pela recuperação, depois de provar que o executor
+      // parou. O serviço nasce depois da fila (precisa dela), por isso a indireção por função.
+      aoEncerrarSemConclusao: (runId) => void recuperacaoDosRuns.servico?.recolher(runId)
     })
     // A seção crítica do merge (SPEC-Scheduler-04): lease exclusivo por repositório e base,
     // reconciliação com o GitHub antes de agir, atualização da base e tentativa gravada antes da
@@ -1506,6 +1519,22 @@ if (!app.requestSingleInstanceLock()) {
       portaLivreNoHost,
       cwd: () => app.getAppPath()
     })
+
+    // A recuperação por run (SPEC-Scheduler-05): devolve slot e travas de run terminal e bloqueia o
+    // run que perdeu o dono (lease expirado **e** executor provadamente morto). A pergunta "o
+    // executor está vivo?" é do Docker, nunca do lease.
+    const recuperacao = new RecuperacaoService({
+      runs: pipelineRepository,
+      leases: leaseRepository,
+      pool,
+      fila,
+      audit: storage.audit,
+      userId: userIdAtual,
+      isolamento,
+      executor: observadorDeExecutor(docker, () => app.getAppPath()),
+      mergeEmCurso: (runId) => mergeRepository.emCursoDoRun(userIdAtual(), runId)
+    })
+    recuperacaoDosRuns.servico = recuperacao
 
     /*
      * O coletor de retenção, **instanciado** (SPEC-Fases-03 § Persistência).
@@ -1648,13 +1677,30 @@ if (!app.requestSingleInstanceLock()) {
       isolamento,
       // As tentativas de merge que um crash deixou: resolvidas contra o GitHub antes de qualquer
       // repetição (SPEC-Scheduler-04, critério 4).
-      merge: mergeService
+      merge: mergeService,
+      // O run que perdeu o dono e o slot de run terminal (SPEC-Scheduler-05).
+      recuperacao
     })
 
     // **`reconcileAll` é bloqueante** (decisão cravada da spec): nenhum trabalho novo é adquirido
     // antes de ela terminar. Sem isso, o app pegaria a próxima fatia com um lease órfão ainda de
     // pé — e o WIP=1 valeria para os runs que ele conhece, não para a máquina.
     await reconciliacao.reconcileAll()
+
+    // O supervisor: a mesma recuperação do boot, em intervalo, para o slot de um run que morreu com
+    // o app aberto não esperar o próximo boot. A varredura é só SQLite; o Docker só é consultado
+    // quando um lease expirou ou um run terminal ainda segura slot. Nunca derruba o app.
+    const supervisor = setInterval(() => {
+      try {
+        recuperacao.supervisionar()
+      } catch (erro) {
+        log.sistema.warn('A supervisão dos runs falhou', {
+          motivo: erro instanceof Error ? erro.message : 'desconhecido'
+        })
+      }
+    }, INTERVALO_DO_SUPERVISOR_MS)
+    supervisor.unref()
+    app.on('will-quit', () => clearInterval(supervisor))
 
     /*
      * A voz (SPEC-Voz-01), segunda entrega: o engine real.
