@@ -159,10 +159,6 @@ export class ReconciliacaoService {
       achados.push(this.reconciliarRun(run))
     }
 
-    // O inventário antes dos leases: o lease de um recurso que o isolamento acabou de devolver já
-    // caiu com ele, e o que sobra para `reconciliarLease` é só o que o inventário não conhece.
-    achados.push(...(await this.reconciliarIsolamento()))
-
     // O merge antes dos leases: o MergeLease de uma tentativa que a origem mostrou resolvida já
     // caiu com ela, e o que sobra para `reconciliarLease` é só o que o merge não conhece.
     achados.push(...(await this.reconciliarMerge()))
@@ -170,6 +166,14 @@ export class ReconciliacaoService {
     // A recuperação depois do merge: o merge que a origem mostrou concluído já levou o run a
     // `MERGED`, e o que sobra para ela é o slot de run terminal e o run que perdeu o dono.
     achados.push(...(await this.reconciliarRecuperacao()))
+
+    // O inventário **depois** do merge e da recuperação, e antes dos leases. Depois: o isolamento
+    // não toca recurso de run ativo, e um run que a reconciliação acabou de concluir (merge
+    // confirmado na origem) ou de bloquear deixou de ser ativo — olhar antes deixava o container
+    // dele de pé até o próximo boot. Antes dos leases: o lease de um recurso que o isolamento
+    // acabou de devolver já caiu com ele, e o que sobra para `reconciliarLease` é só o que o
+    // inventário não conhece.
+    achados.push(...(await this.reconciliarIsolamento()))
 
     for (const lease of this.deps.leases.listar(userId)) {
       achados.push(await this.reconciliarLease(lease))

@@ -543,15 +543,60 @@ export async function getMergeState(
   const merged = (resposta.corpo as { merged?: unknown } | undefined)?.merged === true
   const mergeSha = texto(resposta.corpo, 'merge_commit_sha')
 
+  const headSha = texto((resposta.corpo as { head?: unknown } | undefined)?.head, 'sha') ?? ''
+  const abertoNaOrigem = texto(resposta.corpo, 'state') !== 'closed'
+  const baseRef = texto((resposta.corpo as { base?: unknown } | undefined)?.base, 'ref')
+  const atrasadoPor =
+    abertoNaOrigem && headSha !== '' && baseRef !== undefined
+      ? await commitsAtrasados(rest, input, baseRef, headSha)
+      : undefined
+
   const estado: MergeStateNormalizado = {
     numero: numero(resposta.corpo, 'number') ?? input.pullRequest,
-    estado: texto(resposta.corpo, 'state') === 'closed' ? 'closed' : 'open',
+    estado: abertoNaOrigem ? 'open' : 'closed',
     merged,
     ...(merged && mergeSha !== undefined ? { mergeSha } : {}),
-    headSha: texto((resposta.corpo as { head?: unknown } | undefined)?.head, 'sha') ?? ''
+    headSha,
+    ...(atrasadoPor === undefined ? {} : { atrasadoPor })
   }
 
   return { data: estado, externalRef: { id: String(estado.numero) }, criado: false }
+}
+
+/**
+ * Quantos commits da base o head não contém, ou `undefined` quando a origem não soube dizer.
+ *
+ * **Falha aqui não derruba o estado do PR e não vira zero:** o estado já foi lido, e "não consegui
+ * comparar" é "não sei" — o chamador (`decidirMerge`) trata a ausência como observação incompleta e
+ * o merge espera, em vez de afirmar "em dia" sobre uma comparação que não aconteceu.
+ */
+async function commitsAtrasados(
+  rest: GithubRest,
+  input: PullRequestInput,
+  baseRef: string,
+  headSha: string
+): Promise<number | undefined> {
+  // O head vem do corpo da resposta (entrada não confiável): só um SHA entra no caminho.
+  if (!/^[0-9a-f]{40,64}$/i.test(headSha)) return undefined
+  try {
+    const comparacao = await rest.request(
+      'GET',
+      `/repos/${input.owner}/${input.repo}/compare/${baseRef.split('/').map(encodeURIComponent).join('/')}...${headSha}`
+    )
+    if (!comparacao.ok) {
+      // O motivo fica no log: sem ele, "não sei" parece o mesmo para permissão, limite e queda.
+      log.agent.warn('A comparação base...head não respondeu: o merge espera', {
+        status: comparacao.status
+      })
+      return undefined
+    }
+    return numero(comparacao.corpo, 'behind_by')
+  } catch (erro) {
+    log.agent.warn('A comparação base...head falhou: o merge espera', {
+      erro: erro instanceof Error ? erro.name : 'desconhecido'
+    })
+    return undefined
+  }
 }
 
 /**

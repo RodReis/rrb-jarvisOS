@@ -46,6 +46,8 @@ let pool: InstanceType<typeof PoolService>
 let fila: InstanceType<typeof FilaService>
 let recuperacao: InstanceType<typeof RecuperacaoService>
 let executores: Map<string, ExecutorObservado>
+/** Os runs cujo container o isolamento para ao devolver os recursos (o `docker stop` por label). */
+let paradosAoLiberar: Set<string>
 let falhaDaRecuperacao: boolean
 
 const aprovacao = (projectId: string): Approval => ({
@@ -65,6 +67,7 @@ beforeEach(() => {
   db = openDatabase(join(dir, 'teste.db'))
   relogio = AGORA
   executores = new Map()
+  paradosAoLiberar = new Set()
   falhaDaRecuperacao = false
   runs = new PipelineRepository(db)
   leases = new LeaseRepository(db)
@@ -101,6 +104,12 @@ beforeEach(() => {
     fila,
     audit,
     userId: () => USER,
+    isolamento: {
+      liberarRunEUnidades: (runId) => {
+        if (paradosAoLiberar.has(runId)) executores.set(runId, 'morto')
+        return { removidos: [], pendencias: [] }
+      }
+    },
     executor: (runId) => executores.get(runId) ?? 'morto',
     mergeEmCurso: () => false,
     agora: () => relogio
@@ -160,15 +169,21 @@ describe('reconcileAll chama a recuperação — o boot dá destino ao run que p
     expect(estado(espera.id)).toBe('RUNNING')
   })
 
-  it('o container sobreviveu ao reinício: o run não é tocado (lentidão, não morte)', async () => {
+  it('o container sobreviveu ao reinício: o app anterior morreu, então ele não tem dono — é parado e o run bloqueado', async () => {
     const a = executando('p-a')
+    const espera = fila.criarRun('p-b', WS, 'f1')
+    fila.transicionar('p-b', WS, espera.id, 'AWAITING_PI')
+    fila.transicionar('p-b', WS, espera.id, 'READY')
+    expect(fila.adquirirSlot('p-b', WS, espera.id).reason).toBe('ocupado')
     executores.set(a.id, 'vivo')
+    paradosAoLiberar.add(a.id)
     relogio += VALIDADE_DO_LEASE_MS + 1
 
     await reconciliacao().reconcileAll()
 
-    expect(estado(a.id)).toBe('RUNNING')
-    expect(slotDe(a.id)).toBeDefined()
+    expect(estado(a.id)).toBe('BLOCKED')
+    expect(slotDe(a.id)).toBeUndefined()
+    expect(estado(espera.id)).toBe('RUNNING')
   })
 
   it('crash entre o terminal e a liberação: o slot do run terminal volta no boot, mesmo vigente', async () => {
@@ -192,5 +207,43 @@ describe('reconcileAll chama a recuperação — o boot dá destino ao run que p
     expect(falha?.decisao).toBe('bloqueado')
     expect(falha?.motivo).toMatch(/docker mudo/)
     expect(estado(a.id)).toBe('RUNNING')
+  })
+})
+
+describe('a ordem do boot — o isolamento olha depois de o merge e a recuperação terminarem os runs', () => {
+  it('o run que o merge reconciliado concluiu já não é ativo quando o isolamento devolve os recursos', async () => {
+    // O app caiu entre o merge na origem e a limpeza da entrega: o run ainda consta como ativo, o
+    // container segue de pé (`sleep infinity`). Se o isolamento olhasse antes do merge, veria um
+    // run ativo e deixaria o container para o próximo boot.
+    const a = executando('p-a')
+    fila.transicionar('p-a', WS, a.id, 'VALIDATING', undefined, a.token)
+    fila.transicionar('p-a', WS, a.id, 'PR_CI', undefined, a.token)
+    relogio += VALIDADE_DO_LEASE_MS + 1
+    let ativosQuandoOIsolamentoOlhou: string[] = []
+
+    await new ReconciliacaoService({
+      runs,
+      leases,
+      audit: new AuditRepository(db, 'chave-de-teste'),
+      userId: () => USER,
+      workspaceId: () => WS,
+      merge: {
+        // O merge aconteceu na origem: a reconciliação conclui o run, como `aoReconciliarMergeado`.
+        reconciliar: async () => {
+          fila.concluir('p-a', WS, a.id, a.token, true)
+          return []
+        }
+      },
+      isolamento: {
+        reconciliar: async () => {
+          ativosQuandoOIsolamentoOlhou = runs.listarAtivos(USER).map((r) => r.id)
+          return []
+        }
+      },
+      agora: () => relogio
+    }).reconcileAll()
+
+    expect(estado(a.id)).toBe('MERGED')
+    expect(ativosQuandoOIsolamentoOlhou).not.toContain(a.id)
   })
 })

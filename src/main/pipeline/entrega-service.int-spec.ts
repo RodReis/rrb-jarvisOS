@@ -237,7 +237,9 @@ function connectorFalso(): { call: (r: ConnectorRequest) => Promise<ConnectorOut
             merged: origem.merged,
             // `mergeSha` só sai com `merged: true` — em PR aberto seria um *test merge commit*.
             ...(origem.merged ? { mergeSha: SHA_MERGE } : {}),
-            headSha: origem.headSha
+            headSha: origem.headSha,
+            // O adapter sempre diz se o PR aberto contém a base; sem o campo o merge não sai.
+            ...(origem.merged ? {} : { atrasadoPor: 0 })
           })
 
         default:
@@ -790,7 +792,11 @@ describe('EntregaService — correlação do run (pendência da M9-F04)', () => 
       userId: () => USER,
       revisar: async () => [],
       token: async () => undefined,
-      dormir: async () => {},
+      // O relógio anda com o `dormir`: congelado, um laço de espera que não termina nunca cede ao
+      // event loop (só microtasks), o timeout do Vitest não dispara e o worker cresce sem limite.
+      dormir: async (ms: number) => {
+        relogio += ms
+      },
       agora: () => relogio
     })
 
@@ -969,7 +975,11 @@ describe('EntregaService — um contexto por run (SPEC-Scheduler-05)', () => {
       userId: () => USER,
       revisar: async () => [],
       token: async () => undefined,
-      dormir: async () => {},
+      // O relógio anda com o `dormir`: congelado, um laço de espera que não termina nunca cede ao
+      // event loop (só microtasks), o timeout do Vitest não dispara e o worker cresce sem limite.
+      dormir: async (ms: number) => {
+        relogio += ms
+      },
       agora: () => relogio
     })
 
@@ -1066,7 +1076,11 @@ describe('encerramento do run (SPEC-Entrega-06)', () => {
       userId: () => USER,
       revisar: async () => [],
       token: async () => undefined,
-      dormir: async () => {},
+      // O relógio anda com o `dormir`: congelado, um laço de espera que não termina nunca cede ao
+      // event loop (só microtasks), o timeout do Vitest não dispara e o worker cresce sem limite.
+      dormir: async (ms: number) => {
+        relogio += ms
+      },
       agora: () => relogio
     })
 
