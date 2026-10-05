@@ -80,6 +80,17 @@ export function isCodexBillingMode(value: unknown): value is CodexBillingMode {
 }
 
 /**
+ * O recurso do lease que dá a **posse exclusiva** do `CODEX_HOME` da pipeline a um run
+ * (SPEC-Scheduler-05, decisão do PI de 2026-10-05).
+ *
+ * O perfil é um só — o que o PI autenticou, que o app nunca lê nem copia — e tem diretório gravável
+ * (sessão, logs). Em vez de duplicá-lo por run, o run que usa o Codex **possui** o perfil enquanto
+ * roda e o seguinte espera: nenhum diretório gravável é dividido entre runs, e a assinatura única
+ * (um login, um limite) nunca é usada em dois lugares ao mesmo tempo.
+ */
+export const RECURSO_DO_PERFIL_CODEX = 'codex:perfil'
+
+/**
  * O modo com que um perfil nasce.
  *
  * `subscription_limited` e não "nenhum": o modo que não gasta é o default seguro, e obrigar uma
