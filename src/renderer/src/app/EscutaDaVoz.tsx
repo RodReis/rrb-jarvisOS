@@ -9,6 +9,7 @@ import {
   type CapturaDoTurno
 } from './captura-continua'
 import { log } from '../lib/log'
+import { suprimirPropriaFala } from './referencia-da-fala'
 
 /**
  * O indicador permanente e o kill switch da escuta contínua (SPEC-Escuta-01, critérios 8 e 9).
@@ -42,6 +43,8 @@ export function EscutaDaVoz({
   entradaId,
   entradaRotulo,
   aoDisparar,
+  aoMudarCaptura,
+  aoMudarAtiva,
   abrirCaptura = abrirCapturaContinua
 }: {
   /** O dispositivo escolhido na F05; sem ele, o padrão do sistema. */
@@ -49,6 +52,8 @@ export function EscutaDaVoz({
   readonly entradaRotulo?: string | null
   /** Quem conduz o turno de conversa quando um gatilho dispara. */
   readonly aoDisparar: (disparo: DisparoDaEscuta, capturaDoTurno: CapturaDoTurno) => void
+  readonly aoMudarCaptura?: (captura: CapturaContinua | undefined) => void
+  readonly aoMudarAtiva?: (ativa: boolean) => void
   /** Injetada para teste: `getUserMedia` não existe em jsdom. */
   readonly abrirCaptura?: typeof abrirCapturaContinua
 }): React.JSX.Element | null {
@@ -57,6 +62,8 @@ export function EscutaDaVoz({
   const [capturando, setCapturando] = useState(false)
   const [falhouAoAbrir, setFalhouAoAbrir] = useState(false)
   const [motivoDaRecusa, setMotivoDaRecusa] = useState<string | undefined>(undefined)
+  const [sinalDeOcupado, setSinalDeOcupado] = useState(false)
+  const ultimoSinal = useRef(0)
   const capturaAtual = useRef<CapturaContinua | undefined>(undefined)
 
   // O disparo chega por assinatura estável; quem conduz o turno muda a cada render do shell.
@@ -94,13 +101,28 @@ export function EscutaDaVoz({
   const ativa = estado?.ativa ?? false
 
   useEffect(() => {
+    const serial = estado?.recusaSerial ?? 0
+    if (serial <= ultimoSinal.current) return
+    ultimoSinal.current = serial
+    const mostrar = Promise.resolve().then(() => setSinalDeOcupado(true))
+    const relogio = setTimeout(() => void mostrar.then(() => setSinalDeOcupado(false)), 3_000)
+    return () => clearTimeout(relogio)
+  }, [estado?.recusaSerial])
+
+  useEffect(() => {
+    if (estado !== undefined) aoMudarAtiva?.(estado.ativa)
+  }, [estado, aoMudarAtiva])
+
+  useEffect(() => {
     if (!ativa) return
 
     let cancelado = false
     let captura: CapturaContinua | undefined
 
     resolverEntradaSelecionada(entradaId ?? undefined, entradaRotulo ?? undefined)
-      .then((id) => abrirCaptura(id, (bloco) => window.jarvis.enviarPcmDaEscuta(bloco)))
+      .then((id) =>
+        abrirCaptura(id, (bloco) => window.jarvis.enviarPcmDaEscuta(suprimirPropriaFala(bloco)))
+      )
       .then((aberta) => {
         // O stream que chega depois de o estado ter mudado nasce condenado: sem este `parar`, a
         // permissão demorada deixaria o microfone aberto sem ninguém para fechá-lo.
@@ -110,12 +132,15 @@ export function EscutaDaVoz({
         }
         captura = aberta
         capturaAtual.current = aberta
+        window.jarvis.confirmarCapturaDaEscuta?.(true)
+        aoMudarCaptura?.(aberta)
         setFalhouAoAbrir(false)
         setCapturando(true)
       })
       .catch((erro: unknown) => {
         if (cancelado) return
         setFalhouAoAbrir(true)
+        window.jarvis.confirmarCapturaDaEscuta?.(false)
         log.ui.warn('A escuta não conseguiu abrir o microfone', {
           motivo: erro instanceof Error ? erro.name : 'desconhecido',
           restricao:
@@ -126,10 +151,12 @@ export function EscutaDaVoz({
     return () => {
       cancelado = true
       if (capturaAtual.current === captura) capturaAtual.current = undefined
+      window.jarvis?.confirmarCapturaDaEscuta?.(false)
+      aoMudarCaptura?.(undefined)
       setCapturando(false)
       void captura?.parar()
     }
-  }, [ativa, entradaId, entradaRotulo, abrirCaptura])
+  }, [ativa, entradaId, entradaRotulo, abrirCaptura, aoMudarCaptura])
 
   if (estado === undefined) return null
 
@@ -174,6 +201,16 @@ export function EscutaDaVoz({
   }
   const ouvindo = visao === 'ligada'
   const problema = visao === 'sem-microfone'
+  const textoDaFase =
+    estado.fase === 'gravando'
+      ? t('voz.gravando')
+      : estado.fase === 'transcrevendo'
+        ? t('voz.transcrevendo')
+        : estado.fase === 'pensando'
+          ? t('voz.conversa.pensando')
+          : estado.fase === 'falando'
+            ? t('voz.conversa.falando')
+            : TEXTO[visao]
 
   return (
     <div role="group" aria-label={t('escuta.grupo')} className="flex items-center gap-2">
@@ -206,8 +243,9 @@ export function EscutaDaVoz({
                 : 'border border-[var(--jos-cor-texto-suave)]'
           }`}
         />
-        {TEXTO[visao]}
+        {visao === 'ligada' ? textoDaFase : TEXTO[visao]}
       </span>
+      {sinalDeOcupado && <span role="alert">{t('escuta.ocupado')}</span>}
       {motivoDaRecusa !== undefined && (
         <p
           role="alert"

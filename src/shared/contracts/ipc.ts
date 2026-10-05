@@ -117,6 +117,7 @@ import type {
   DisparoDaEscuta,
   DisparoDeTesteDaEscuta,
   EstadoDaEscuta,
+  FaseDaVoz,
   PersonaEditavel,
   ProntidaoDaVoz,
   TrocaDaConversa
@@ -705,7 +706,10 @@ export const IPC_SEND_CHANNELS = {
    * ignorados enquanto um turno está ativo). Booleano e nada mais; o main ainda impõe um teto,
    * porque uma tela que esquece de avisar o fim não pode deixar a escuta surda.
    */
-  escutaTurno: 'escuta:turno'
+  escutaTurno: 'escuta:turno',
+  escutaFase: 'escuta:fase',
+  escutaPosse: 'escuta:posse',
+  escutaCapturaAberta: 'escuta:captura-aberta'
 } as const
 
 /**
@@ -965,6 +969,9 @@ export interface JarvisBridge {
   enviarPcmDaEscuta(pcm: Int16Array): void
   /** Avisa o main que um turno de conversa começou (`true`) ou terminou (`false`). */
   informarTurnoDaEscuta(ativo: boolean): void
+  informarFaseDaVoz(fase: FaseDaVoz): void
+  informarPosseDoMicrofone(dono: 'nenhum' | 'wake-word' | 'push-to-talk'): void
+  confirmarCapturaDaEscuta(aberta: boolean): void
   /** Avisa a tela de toda mudança de estado — inclusive a feita pela hotkey de mute. */
   onEscutaMudou(listener: (estado: EstadoDaEscuta) => void): () => void
   onEscutaDisparo(listener: (disparo: DisparoDaEscuta) => void): () => void

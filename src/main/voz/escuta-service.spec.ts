@@ -185,7 +185,10 @@ describe('EscutaService — restauração (SPEC-Escuta-01, critérios 8 e 10)', 
   it('a restauração que liga é auditada com a via "restauracao"', async () => {
     const m = montar({ persistido: undefined })
     await m.servico.restaurar()
-    expect(m.auditados).toEqual([{ type: 'voz.escuta.ligada', payload: { via: 'restauracao' } }])
+    expect(m.auditados).toEqual([
+      { type: 'voz.microfone.posse', payload: { de: 'nenhum', para: 'wake-word' } },
+      { type: 'voz.escuta.ligada', payload: { via: 'restauracao' } }
+    ])
   })
 })
 
@@ -202,7 +205,10 @@ describe('EscutaService — kill switch (critérios 8 e 10)', () => {
     // `getUserMedia`. Manter `ativa = false` sem avisar deixaria o microfone aberto.
     expect(m.capturas).toEqual([false])
     expect(m.servico.estado().ativa).toBe(false)
-    expect(m.auditados).toEqual([{ type: 'voz.escuta.desligada', payload: { via: 'interface' } }])
+    expect(m.auditados).toEqual([
+      { type: 'voz.microfone.posse', payload: { de: 'wake-word', para: 'nenhum' } },
+      { type: 'voz.escuta.desligada', payload: { via: 'interface' } }
+    ])
   })
 
   it('o desligamento fica persistido, para sobreviver ao reinício', async () => {
@@ -223,7 +229,7 @@ describe('EscutaService — kill switch (critérios 8 e 10)', () => {
     await m.servico.desligar('hotkey')
 
     expect(m.capturas).toEqual([false])
-    expect(m.auditados.map((a) => a.payload.via)).toEqual(['hotkey'])
+    expect(m.auditados.map((a) => a.type)).toEqual(['voz.microfone.posse', 'voz.escuta.desligada'])
   })
 
   it('ligar sem modelo pronto é recusado e não abre a captura', async () => {
@@ -248,7 +254,9 @@ describe('EscutaService — hotkey de mute (critério 11)', () => {
     expect(m.servico.estado().ativa).toBe(true)
 
     expect(m.auditados.map((a) => [a.type, a.payload.via])).toEqual([
+      ['voz.microfone.posse', undefined],
       ['voz.escuta.desligada', 'hotkey'],
+      ['voz.microfone.posse', undefined],
       ['voz.escuta.ligada', 'hotkey']
     ])
   })
@@ -410,6 +418,52 @@ describe('EscutaService — o turno aberto pelo disparo', () => {
     await m.servico.desligar('hotkey')
 
     expect(m.agendados.every((a) => a.cancelado)).toBe(true)
+  })
+})
+
+describe('arbitragem do microfone (SPEC-Escuta-02)', () => {
+  it('só anuncia escutando depois da confirmação do stream aberto', async () => {
+    const m = montar({ persistido: undefined })
+    await m.servico.restaurar()
+    expect(m.servico.estado().fase).toBe('ocioso')
+    m.servico.confirmarCapturaAberta(true)
+    expect(m.servico.estado().fase).toBe('escutando')
+    m.servico.confirmarCapturaAberta(false)
+    expect(m.servico.estado().fase).toBe('ocioso')
+  })
+
+  it('push-to-talk suspende o detector e soltar permite novo disparo', async () => {
+    const m = montar({ persistido: undefined, resposta: DETECCAO })
+    await m.servico.restaurar()
+    m.servico.definirDono('push-to-talk')
+    await m.servico.receberPcm(PCM)
+    expect(m.alimentados).toHaveLength(0)
+    expect(m.disparos).toHaveLength(0)
+
+    m.servico.definirDono('wake-word')
+    await m.servico.receberPcm(PCM)
+    expect(m.disparos).toHaveLength(1)
+    expect(m.auditados).toContainEqual({
+      type: 'voz.microfone.posse',
+      payload: { de: 'wake-word', para: 'push-to-talk' }
+    })
+  })
+
+  it('recusa durante pensamento e aceita durante fala, sem enfileirar', async () => {
+    const m = montar({ persistido: undefined, resposta: DETECCAO })
+    await m.servico.restaurar()
+    m.servico.definirTurno(true)
+    m.servico.definirFase('pensando')
+    await m.servico.receberPcm(PCM)
+    expect(m.disparos).toHaveLength(0)
+    expect(m.servico.estado().recusaSerial).toBe(1)
+
+    m.servico.definirFase('falando')
+    await m.servico.receberPcm(PCM)
+    expect(m.disparos).toHaveLength(1)
+    expect(m.servico.estado().fase).toBe('gravando')
+    await m.servico.receberPcm(PCM)
+    expect(m.disparos).toHaveLength(1)
   })
 })
 

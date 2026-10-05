@@ -19,7 +19,14 @@ const TELAS: Readonly<Record<string, NonNullable<ModuloRegistrado['renderizar']>
       nomeDoEspaco={nomeDoEspaco}
     />
   ),
-  voz: ({ workspace, preferencias, disparo, aoTratarDisparo }) => (
+  voz: ({
+    workspace,
+    preferencias,
+    disparo,
+    aoTratarDisparo,
+    capturaCompartilhada,
+    escutaAtiva
+  }) => (
     <Microfone
       workspace={workspace}
       vozDaFala={preferencias.vozDaFala}
@@ -27,6 +34,9 @@ const TELAS: Readonly<Record<string, NonNullable<ModuloRegistrado['renderizar']>
       entradaRotulo={preferencias.vozEntradaRotulo}
       saidaId={preferencias.vozSaidaId}
       disparo={disparo}
+      capturaCompartilhada={capturaCompartilhada}
+      escutaAtiva={escutaAtiva}
+      vozTimeoutMs={preferencias.vozTimeoutMs}
       aoTratarDisparo={aoTratarDisparo}
     />
   ),

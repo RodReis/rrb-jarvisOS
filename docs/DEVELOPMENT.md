@@ -2435,6 +2435,24 @@ Status: **finalizado** ([PR #383](https://github.com/RodReis/rrb-jarvisOS/pull/3
 **Decisões técnicas desta fatia** (nenhuma altera escopo; a confirmar pelo PI estão no corpo da PR): a hotkey de mute é o próprio kill switch por outro caminho; o disparo vindo do NOA passa para o JARVIS pela troca auditada, porque o Command Center só existe lá; o estado vive em arquivo local e não em coluna de preferências (sem migração); a tela diz "limiar de disparo" porque maior exige mais certeza.
 
 **Limites declarados:** limiar de fala (1200 de RMS) e silêncio de fim (1,5 s) sem calibração com voz real; o `.onnx` próprio é candidato técnico, ainda sem aceite físico do PI; sem modelo válido a escuta fica indisponível.
+
+### Fatia 02 — Arbitração wake word ↔ push-to-talk e estados do microfone (`docs/spec/spec-escuta-02-arbitracao-microfone.md`)
+
+Status: **entregue** — issue [#357](https://github.com/RodReis/rrb-jarvisOS/issues/357), protótipo do estado `escutando` e PR [#402](https://github.com/RodReis/rrb-jarvisOS/pull/402) aprovados pelo PI em 2026-10-05.
+
+- [x] Captura única no renderer: o push-to-talk consome o stream da escuta ativa, sem abrir segundo `getUserMedia`.
+- [x] Posse explícita com prioridade do push-to-talk; recusa de disparo durante gravação, transcrição e pensamento, com aviso.
+- [x] Barge-in durante a fala encerra a fonte de áudio e abre novo turno; referência PCM protege contra auto-disparo.
+- [x] Fase no main projetada para o mascote e legenda; quinto estado `escutando` com arcos próprios e prova nos dois temas e movimento reduzido.
+- [x] Timeout configurado para os dois gatilhos e auditoria da troca de posse com cadeia de hash testada.
+- [x] Validação local: Regras 2.823/2.823; Tela 779/779 (1 todo); Banco 2.221 passaram, 42 ignorados, runner encerrou com perda de worker; lint, typecheck e seis provas visuais passaram.
+- [x] PR [#402](https://github.com/RodReis/rrb-jarvisOS/pull/402) aberta. Primeira rodada de CI: Regras, Banco, Tela, qualidade e visual passaram; E2E apontou três métodos novos ausentes da lista fechada do teste de login, corrigida antes da segunda rodada.
+- [x] Relatório por SPEC/issue regenerado dos artefatos do CI: Regras 2.858/2.858; Banco 2.280 aprovados de 2.298 (18 ignorados); Tela 787 aprovados de 788 (1 todo). Guarda anti-drift e histórico passaram localmente.
+- [x] Após avanço da `main`, nova rodada da CI passou em Regras, Banco, Tela, E2E, qualidade e visual. Relatório regenerado dos artefatos: Regras 2.870/2.870; Banco 2.310 aprovados de 2.328 (18 ignorados); Tela 787 aprovados de 788 (1 todo). Guarda anti-drift e histórico passaram localmente.
+- [ ] Prova física de auto-disparo e latência na máquina do PI.
+
+**Limite aceito pelo PI na PR:** a correlação de PCM não substitui teste acústico com alto-falante e microfone reais. A confirmação de ausência de auto-disparo e a medição do barge-in na máquina do PI permanecem pendentes; os critérios físicos 5 e 11 não estão comprovados. A execução local ampla de Banco perdeu um worker, mas a categoria completa passou no CI com Docker.
+
 ## Registro de entregas
 
 | Data | Fatia | PR | Observação |

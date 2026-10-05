@@ -2651,6 +2651,28 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     if (typeof ativo === 'boolean') deps.escuta.definirTurno(ativo)
   })
 
+  ipcMain.on(IPC_SEND_CHANNELS.escutaFase, (_event, fase: unknown) => {
+    if (
+      fase === 'ocioso' ||
+      fase === 'escutando' ||
+      fase === 'gravando' ||
+      fase === 'transcrevendo' ||
+      fase === 'pensando' ||
+      fase === 'falando'
+    )
+      deps.escuta.definirFase(fase)
+  })
+
+  ipcMain.on(IPC_SEND_CHANNELS.escutaPosse, (_event, dono: unknown) => {
+    if (dono === 'push-to-talk' || dono === 'wake-word' || dono === 'nenhum') {
+      deps.escuta.definirDono(dono)
+    }
+  })
+
+  ipcMain.on(IPC_SEND_CHANNELS.escutaCapturaAberta, (_event, aberta: unknown) => {
+    if (typeof aberta === 'boolean') deps.escuta.confirmarCapturaAberta(aberta)
+  })
+
   ipcMain.on(IPC_SEND_CHANNELS.windowMinimizeToTray, () => {
     log.ipc.info('Janela minimizada para o tray', {
       canal: IPC_SEND_CHANNELS.windowMinimizeToTray

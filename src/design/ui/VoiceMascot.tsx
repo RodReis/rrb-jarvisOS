@@ -48,7 +48,7 @@ const POR_TAMANHO = {
   grande: 'size-40'
 } as const
 
-export type EstadoDoMascote = 'idle' | 'ouvindo' | 'pensando' | 'falando'
+export type EstadoDoMascote = 'idle' | 'escutando' | 'ouvindo' | 'pensando' | 'falando'
 
 export interface PoseDaBoca {
   readonly abertura: number
@@ -186,7 +186,7 @@ export function VoiceMascot({
       data-mascote={modulo}
       data-estado={estado}
       className={cx(
-        'relative grid shrink-0 place-items-center overflow-hidden rounded-full',
+        'relative grid shrink-0 place-items-center rounded-full',
         'border border-[rgba(var(--jos-borda-rgb),0.24)]',
         POR_TAMANHO[tamanho],
         'motion-safe:animate-[bob_6s_ease-in-out_infinite]'
@@ -219,6 +219,30 @@ export function VoiceMascot({
         className="size-full rounded-full object-cover mix-blend-screen"
         style={{ maskImage: MASCARA_MASCOTE }}
       />
+
+      {estado === 'escutando' && (
+        <svg
+          aria-hidden
+          data-arcos-da-escuta
+          viewBox="0 0 100 100"
+          className="pointer-events-none absolute -inset-2 text-[var(--jos-cor-acento)] drop-shadow-[0_0_7px_var(--jos-cor-acento)] motion-safe:animate-[corepulse_9s_ease-in-out_infinite] motion-reduce:animate-none"
+        >
+          <path
+            d="M 18 14 A 48 48 0 0 0 18 86"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="4"
+            strokeLinecap="round"
+          />
+          <path
+            d="M 82 14 A 48 48 0 0 1 82 86"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="4"
+            strokeLinecap="round"
+          />
+        </svg>
+      )}
 
       {vozAtiva && (
         <>
@@ -276,9 +300,11 @@ export function VoiceMascot({
           ? `${id.nome} está falando`
           : estado === 'ouvindo'
             ? `${id.nome} está ouvindo`
-            : estado === 'pensando'
-              ? `${id.nome} está pensando`
-              : `${id.nome} em repouso`}
+            : estado === 'escutando'
+              ? `${id.nome} está com escuta ativa, aguardando Ei, amigo`
+              : estado === 'pensando'
+                ? `${id.nome} está pensando`
+                : `${id.nome} em repouso`}
       </span>
     </div>
   )
