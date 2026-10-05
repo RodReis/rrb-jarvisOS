@@ -897,6 +897,97 @@ describe('EntregaService — correlação do run (pendência da M9-F04)', () => 
   })
 })
 
+describe('EntregaService — dono sem direito não publica (SPEC-Scheduler-05)', () => {
+  it('sinal abortado depois da construção: nenhum push, nenhum PR, run bloqueado com o token', async () => {
+    const controle = new AbortController()
+    const service = montar({
+      revisar: async () => {
+        // O cancelamento (ou a perda do lease) chega enquanto o delta é revisado.
+        controle.abort()
+        return []
+      }
+    })
+
+    const r = await service.entregar({ ...pedido(), signal: controle.signal, fencingToken: 9 })
+
+    expect(r.estadoFinal).toBe('BLOCKED')
+    expect(pushes).toEqual([])
+    expect(chamadasDe(GITHUB_OPERATIONS.ensurePullRequest)).toEqual([])
+    expect(transicionarDaFila).toHaveBeenCalledWith(
+      'p-1',
+      WS,
+      'run-1',
+      'BLOCKED',
+      expect.objectContaining({ causa: 'externo' }),
+      9
+    )
+  })
+})
+
+describe('EntregaService — um contexto por run (SPEC-Scheduler-05)', () => {
+  it('dois runs na mesma instância não se sobrescrevem: o global só responde com um run só', async () => {
+    let liberarA: () => void = () => {}
+    const portaDoA = new Promise<void>((resolver) => {
+      liberarA = resolver
+    })
+    let doA: unknown
+    let doB: unknown
+    const service = new EntregaService({
+      construtor: {
+        construir: vi.fn(async (p: { runId: string }) => {
+          if (p.runId === 'run-1') {
+            doA = service.contextoDoRun()
+            await portaDoA
+            return construcao
+          }
+          // O segundo run entra enquanto o primeiro ainda constrói: o global não sabe de quem é.
+          doB = service.contextoDoRun()
+          return {
+            estadoFinal: 'BLOCKED',
+            tentativas: [],
+            bloqueio: { causa: 'externo', evidencia: 'x', retomada: 'y' }
+          }
+        })
+      } as never,
+      connectors: connectorFalso() as never,
+      merge: mergeDoTeste(),
+      git: {
+        run: vi.fn(() => ({ ok: true })),
+        push: vi.fn(() => ({ ok: true })),
+        pushComToken: vi.fn(() => ({ ok: true }))
+      } as never,
+      fila: {
+        concluir: vi.fn(() => ({ reason: 'transicionado' })),
+        transicionar: transicionarDaFila
+      } as never,
+      mergePolicy: { autonomoLigado: vi.fn(() => true) } as never,
+      ruleset,
+      ledger: ledgerRepo,
+      limpeza: limpezaFalsa(),
+      budget: budgetRepo,
+      audit: { append: vi.fn() } as never,
+      userId: () => USER,
+      revisar: async () => [],
+      token: async () => undefined,
+      dormir: async () => {},
+      agora: () => relogio
+    })
+
+    const a = service.entregar(pedido())
+    await service.entregar({ ...pedido(), runId: 'run-2' })
+
+    expect(doA).toMatchObject({ runId: 'run-1' })
+    // Com dois em curso, o contexto global recusa em vez de atribuir o custo ao run errado.
+    expect(doB).toBeUndefined()
+    // O segundo terminou e limpou **o dele**: o contexto do primeiro continua de pé.
+    expect(service.contextoDoRun()).toMatchObject({ runId: 'run-1' })
+
+    liberarA()
+    await a
+    expect(service.contextoDoRun()).toBeUndefined()
+  })
+})
+
 describe('encerramento do run (SPEC-Entrega-06)', () => {
   it('grava o ledger ao terminar, com head, merge e checks coerentes', async () => {
     const resultado = await montar().entregar(pedido())

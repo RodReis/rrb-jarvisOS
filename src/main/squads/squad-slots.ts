@@ -19,7 +19,12 @@ import type { Aquisicao } from '../pipeline/pool-service'
 
 export type FilaParaOEscritor = Pick<
   FilaService,
-  'adquirirSlotDoEscritor' | 'renovarSlot' | 'confirmarSlot' | 'liberarSlot' | 'desistirDoSlot'
+  | 'adquirirSlot'
+  | 'adquirirSlotDoEscritor'
+  | 'renovarSlot'
+  | 'confirmarSlot'
+  | 'liberarSlot'
+  | 'desistirDoSlot'
 >
 
 export type ResultadoDoSlot =
@@ -31,6 +36,14 @@ export interface PedidoDeSlot {
   readonly workspaceId: WorkspaceId
   readonly runId: string
   readonly escritor: string
+  readonly signal?: AbortSignal
+}
+
+/** O pedido de slot de um **run** inteiro (o encadeador da SPEC-Scheduler-05): a unidade é o run. */
+export interface PedidoDeSlotDoRun {
+  readonly projectId: string
+  readonly workspaceId: WorkspaceId
+  readonly runId: string
   readonly signal?: AbortSignal
 }
 
@@ -57,6 +70,27 @@ export class GerenteDeSlots {
       pedido.runId,
       pedido.escritor
     )
+    return this.esperar(unidade, r, pedido.signal)
+  }
+
+  /**
+   * Pede o slot de um run inteiro e espera por ele — o mesmo contrato do escritor, com o run como
+   * unidade. O encadeador de produção usa este caminho: sem slot ele nunca roda, e cancelar a
+   * espera tira o run da fila.
+   */
+  adquirirRun(pedido: PedidoDeSlotDoRun): Promise<ResultadoDoSlot> {
+    if (pedido.signal?.aborted === true) {
+      return Promise.resolve({ ok: false, motivo: 'cancelada' })
+    }
+    const r = this.fila.adquirirSlot(pedido.projectId, pedido.workspaceId, pedido.runId)
+    return this.esperar(pedido.runId, r, pedido.signal)
+  }
+
+  private esperar(
+    unidade: string,
+    r: ReturnType<FilaParaOEscritor['adquirirSlot']>,
+    signal: AbortSignal | undefined
+  ): Promise<ResultadoDoSlot> {
     if (r.reason === 'adquirido') {
       const fencingToken = r.lease?.fencingToken
       return Promise.resolve(
@@ -73,7 +107,7 @@ export class GerenteDeSlots {
     // registro vem logo depois do pedido, no mesmo laço de eventos: nada pode anunciar no meio.
     return new Promise<ResultadoDoSlot>((resolver) => {
       const fim = (resultado: ResultadoDoSlot): void => {
-        pedido.signal?.removeEventListener('abort', aoCancelar)
+        signal?.removeEventListener('abort', aoCancelar)
         resolver(resultado)
       }
       const aguardo: Espera = {
@@ -87,7 +121,7 @@ export class GerenteDeSlots {
         aguardo.cancelar()
       }
       this.entrar(unidade, aguardo)
-      pedido.signal?.addEventListener('abort', aoCancelar)
+      signal?.addEventListener('abort', aoCancelar)
     })
   }
 

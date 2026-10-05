@@ -99,6 +99,7 @@ import { MergeService } from './pipeline/merge-service'
 import { PipelineRepository } from './pipeline/pipeline-repository'
 import { ReconciliacaoService } from './pipeline/reconciliacao-service'
 import { CancelamentoService } from './pipeline/cancelamento-service'
+import { EncadeadorDeRuns } from './pipeline/encadeador-de-runs'
 import { RecuperacaoService } from './pipeline/recuperacao-service'
 import { RunPrRepository } from './pipeline/run-pr-repository'
 import { MarcosService } from './projects/marcos-service'
@@ -1380,7 +1381,9 @@ if (!app.requestSingleInstanceLock()) {
       locks: new LockRepository(storage.db),
       pool: poolRepository,
       userId: userIdAtual,
-      fonte: () => undefined,
+      // O write set previsto vem do run em voo (os paths da SPEC, via encadeador). Sem resposta, o
+      // run segue em sequência.
+      fonte: (item) => encadeadorDosRuns.servico?.writeSetPrevisto(item.runId),
       dependencias: (item) => {
         const { mvps, slices } = roadmapRepository.carregar({
           userId: item.userId,
@@ -1418,6 +1421,9 @@ if (!app.requestSingleInstanceLock()) {
     // precisa dele — por isso os ganchos o leem por função.
     const slotsDosSquads: { gerente?: GerenteDeSlots } = {}
     const recuperacaoDosRuns: { servico?: RecuperacaoService } = {}
+    // O encadeador nasce depois do preflight, que precisa do proxy; o cancelamento e o gancho de
+    // encerramento o leem por função.
+    const encadeadorDosRuns: { servico?: EncadeadorDeRuns } = {}
     const fila: FilaService = new FilaService({
       ...ganchosDosSlots(() => slotsDosSquads.gerente),
       runs: pipelineRepository,
@@ -1437,7 +1443,12 @@ if (!app.requestSingleInstanceLock()) {
       emTransacao: () => storage.db.inTransaction,
       // `CANCELLED` e `BLOCKED` devolvem o slot pela recuperação, depois de provar que o executor
       // parou. O serviço nasce depois da fila (precisa dela), por isso a indireção por função.
-      aoEncerrarSemConclusao: (runId) => void recuperacaoDosRuns.servico?.recolher(runId)
+      // Primeiro para a entrega em voo (se este processo a roda), depois recolhe: o container e o
+      // worktree só saem quando o dono parou de usá-los.
+      aoEncerrarSemConclusao: (runId) => {
+        encadeadorDosRuns.servico?.interromper(runId)
+        recuperacaoDosRuns.servico?.recolher(runId)
+      }
     })
     // A seção crítica do merge (SPEC-Scheduler-04): lease exclusivo por repositório e base,
     // reconciliação com o GitHub antes de agir, atualização da base e tentativa gravada antes da
@@ -1535,7 +1546,11 @@ if (!app.requestSingleInstanceLock()) {
       userId: userIdAtual,
       isolamento,
       executor: observadorDeExecutor(docker, () => app.getAppPath()),
-      mergeEmCurso: (runId) => mergeRepository.emCursoDoRun(userIdAtual(), runId)
+      mergeEmCurso: (runId) => mergeRepository.emCursoDoRun(userIdAtual(), runId),
+      // Quem executa um run renova o slot dele do início ao fim: o escritor do Squad e o
+      // encadeador (que bate de a aquisição até o desfecho, inclusive no CI). Lease vencido de run
+      // ativo, sem container, passa a ser run perdido também na varredura periódica.
+      renovacaoGarantida: true
     })
     recuperacaoDosRuns.servico = recuperacao
 
@@ -1550,7 +1565,8 @@ if (!app.requestSingleInstanceLock()) {
       prs: runPrs,
       connectors,
       audit: storage.audit,
-      userId: userIdAtual
+      userId: userIdAtual,
+      interromper: (runId) => void encadeadorDosRuns.servico?.interromper(runId)
     })
 
     /*
@@ -1587,7 +1603,10 @@ if (!app.requestSingleInstanceLock()) {
         pipelineRepository,
         storage.audit,
         userIdAtual,
-        () => workspaces.atual()
+        () => workspaces.atual(),
+        undefined,
+        // As transições da construção passam pela fila, com o fencing token do run.
+        fila
       ),
       connectors,
       git: gitRunner,
@@ -1669,6 +1688,18 @@ if (!app.requestSingleInstanceLock()) {
         ),
       prepararGitMeta,
       isolamento
+    })
+
+    // O encadeador de produção (SPEC-Scheduler-05, PR-B): slot → heartbeat → preflight → entrega.
+    // **Sem chamador de produção**: o gatilho "iniciar run" é do quadro do MVP-028; hoje só o teste
+    // e o E2E o acionam. O paralelismo segue desligado (`pool.configurar`).
+    encadeadorDosRuns.servico = new EncadeadorDeRuns({
+      slots: slotsDosSquads.gerente,
+      fila,
+      runs: pipelineRepository,
+      preflight,
+      entrega,
+      proxy: executorProxy
     })
 
     const reconciliacao = new ReconciliacaoService({
