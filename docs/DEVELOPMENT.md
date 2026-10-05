@@ -2435,6 +2435,21 @@ Status: **finalizado** ([PR #383](https://github.com/RodReis/rrb-jarvisOS/pull/3
 **Decisões técnicas desta fatia** (nenhuma altera escopo; a confirmar pelo PI estão no corpo da PR): a hotkey de mute é o próprio kill switch por outro caminho; o disparo vindo do NOA passa para o JARVIS pela troca auditada, porque o Command Center só existe lá; o estado vive em arquivo local e não em coluna de preferências (sem migração); a tela diz "limiar de disparo" porque maior exige mais certeza.
 
 **Limites declarados:** limiar de fala (1200 de RMS) e silêncio de fim (1,5 s) sem calibração com voz real; o `.onnx` próprio é candidato técnico, ainda sem aceite físico do PI; sem modelo válido a escuta fica indisponível.
+
+### Fatia 02 — Arbitração wake word ↔ push-to-talk e estados do microfone (`docs/spec/spec-escuta-02-arbitracao-microfone.md`)
+
+Status: **em andamento** — issue [#357](https://github.com/RodReis/rrb-jarvisOS/issues/357), protótipo do estado `escutando` aprovado pelo PI em 2026-10-05.
+
+- [x] Captura única no renderer: o push-to-talk consome o stream da escuta ativa, sem abrir segundo `getUserMedia`.
+- [x] Posse explícita com prioridade do push-to-talk; recusa de disparo durante gravação, transcrição e pensamento, com aviso.
+- [x] Barge-in durante a fala encerra a fonte de áudio e abre novo turno; referência PCM protege contra auto-disparo.
+- [x] Fase no main projetada para o mascote e legenda; quinto estado `escutando` com arcos próprios e prova nos dois temas e movimento reduzido.
+- [x] Timeout configurado para os dois gatilhos e auditoria da troca de posse com cadeia de hash testada.
+- [x] Validação local: Regras 2.823/2.823; Tela 779/779 (1 todo); Banco 2.221 passaram, 42 ignorados, runner encerrou com perda de worker; lint, typecheck e seis provas visuais passaram.
+- [ ] Relatório por SPEC/issue com artefatos do CI, prova física de auto-disparo e latência na máquina do PI, PR e integração.
+
+**Limite em validação:** a correlação de PCM não substitui teste acústico com alto-falante e microfone reais. A medição do barge-in na máquina do PI permanece pendente. Na suíte ampla de Banco, Docker estava indisponível e o Vitest perdeu um worker; o teste de integração da cadeia de auditoria da fatia passou isolado. A categoria completa ainda não pode ser declarada verde.
+
 ## Registro de entregas
 
 | Data | Fatia | PR | Observação |

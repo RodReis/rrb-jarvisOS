@@ -164,7 +164,11 @@ export const RECURSOS = {
         semPerguntaAposGatilho:
           'Gatilho detectado, mas não ouvi uma pergunta. Fale logo após “Ei, amigo” ou as duas palmas.',
         naoPronta:
-          'A palavra de ativação foi ouvida, mas a voz ainda não está pronta. Baixe o que falta nesta tela.'
+          'A palavra de ativação foi ouvida, mas a voz ainda não está pronta. Baixe o que falta nesta tela.',
+        escutando: 'ESCUTA ATIVA · AGUARDANDO “EI, AMIGO”',
+        ocupado: 'Ouvi “Ei, amigo”, mas estou atendendo o turno atual.',
+        falaInterrompida: 'Fala interrompida por um novo pedido.',
+        turnoCanceladoPeloBotao: 'Turno por voz cancelado; push-to-talk assumiu o microfone.'
       },
       janela: {
         minimizar: 'Minimizar para a bandeja'
@@ -1072,7 +1076,11 @@ export const RECURSOS = {
         semPerguntaAposGatilho:
           'Wake trigger detected, but I did not hear a question. Speak right after “Ei, amigo” or two claps.',
         naoPronta:
-          'The wake word was heard, but voice is not ready yet. Download what is missing on this screen.'
+          'The wake word was heard, but voice is not ready yet. Download what is missing on this screen.',
+        escutando: 'LISTENING · WAITING FOR “EI, AMIGO”',
+        ocupado: 'I heard “Ei, amigo”, but I am handling the current turn.',
+        falaInterrompida: 'Speech stopped for a new request.',
+        turnoCanceladoPeloBotao: 'Voice turn canceled; push-to-talk took the microphone.'
       },
       janela: {
         minimizar: 'Minimize to tray'

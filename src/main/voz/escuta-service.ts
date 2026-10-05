@@ -23,7 +23,7 @@
  * diz quem disparou e se a sessão estava bloqueada; quem abre o turno decide o resto.
  */
 
-import type { HotkeyDeMuteDaEscuta } from '@shared/domain/voz'
+import type { FaseDaVoz, HotkeyDeMuteDaEscuta } from '@shared/domain/voz'
 import { HOTKEY_DE_MUTE_PADRAO, isHotkeyDeMuteDaEscuta } from '@shared/domain/voz'
 import type { WakeWordEngine } from './wake-word-engine'
 import { LIMIAR_PADRAO_WAKE_WORD, validarLimiar } from './wake-word-engine'
@@ -57,6 +57,8 @@ export interface DisparoDeTeste {
 }
 
 export interface EstadoDaEscutaNoMain extends EstadoPersistidoDaEscuta {
+  readonly fase: FaseDaVoz
+  readonly recusaSerial: number
   /** Se o modelo da wake word está pronto no disco. */
   readonly disponivel: boolean
   /** Se o SO aceitou registrar a hotkey de mute. */
@@ -78,16 +80,24 @@ export interface DepsDaEscuta {
   }
   /** Se o modelo da wake word está baixado e verificado. */
   readonly modeloPronto: () => Promise<boolean>
-  readonly auditar: (evento: {
-    readonly type: 'voz.escuta.ligada' | 'voz.escuta.desligada'
-    readonly payload: { readonly via: ViaDaEscuta }
-  }) => void
+  readonly auditar: (
+    evento:
+      | {
+          readonly type: 'voz.escuta.ligada' | 'voz.escuta.desligada'
+          readonly payload: { readonly via: ViaDaEscuta }
+        }
+      | {
+          readonly type: 'voz.microfone.posse'
+          readonly payload: { readonly de: DonoDoMicrofone; readonly para: DonoDoMicrofone }
+        }
+  ) => void
   /** `powerMonitor` do Electron: lido a cada disparo. */
   readonly sessaoBloqueada: () => boolean
   /** Se um turno de conversa já está em andamento. */
   readonly turnoAtivo: () => boolean
   /** Avisa a tela que abra (`true`) ou **encerre** (`false`) o stream do microfone. */
   readonly aoMudarCaptura: (aberta: boolean) => void
+  readonly aoMudarEstado?: () => void
   readonly aoDisparar: (evento: EventoDeEscuta) => void
   /** Onde o disparo cai no modo de teste, no lugar de `aoDisparar`. */
   readonly aoTestar?: (disparo: DisparoDeTeste) => void
@@ -112,6 +122,8 @@ export const TETO_DO_TURNO_PADRAO_MS = 120_000
 /** O modo de teste esquecido ligado deixaria a escuta sem abrir turno nenhum, em silêncio. */
 export const TETO_DO_TESTE_PADRAO_MS = 120_000
 
+export type DonoDoMicrofone = 'nenhum' | 'wake-word' | 'push-to-talk'
+
 const PADRAO: EstadoPersistidoDaEscuta = {
   ativa: true,
   frase: true,
@@ -126,6 +138,10 @@ export class EscutaService {
   private disponivel = false
   private hotkeyRegistrada = false
   private turno = false
+  private fase: FaseDaVoz = 'ocioso'
+  private capturaAberta = false
+  private dono: DonoDoMicrofone = 'nenhum'
+  private recusaSerial = 0
   private relogioDoTurno: ReturnType<typeof setTimeout> | undefined
   private teste = false
   private relogioDoTeste: ReturnType<typeof setTimeout> | undefined
@@ -136,6 +152,8 @@ export class EscutaService {
     return {
       ...this.persistido,
       ativa: this.ativa,
+      fase: this.ativa && this.capturaAberta && this.fase === 'ocioso' ? 'escutando' : this.fase,
+      recusaSerial: this.recusaSerial,
       disponivel: this.disponivel,
       hotkeyRegistrada: this.hotkeyRegistrada
     }
@@ -171,6 +189,7 @@ export class EscutaService {
     if (this.ativa) return { ok: true }
 
     this.ativa = true
+    if (this.dono === 'nenhum') this.definirDono('wake-word')
     this.persistir({ ativa: true })
     this.deps.palmas.limpar()
     this.deps.aoMudarCaptura(true)
@@ -182,6 +201,8 @@ export class EscutaService {
     if (!this.ativa) return
 
     this.ativa = false
+    this.capturaAberta = false
+    if (this.dono === 'wake-word') this.definirDono('nenhum')
     this.persistir({ ativa: false })
     this.definirTurno(false)
     this.definirModoDeTeste(false)
@@ -245,6 +266,27 @@ export class EscutaService {
     }, this.deps.tetoDoTurnoMs ?? TETO_DO_TURNO_PADRAO_MS)
   }
 
+  /** A fase do turno mora no main; o renderer apenas relata os marcos da captura e da fala. */
+  definirFase(fase: FaseDaVoz): void {
+    if (this.fase === fase) return
+    this.fase = fase
+    this.deps.aoMudarEstado?.()
+  }
+
+  confirmarCapturaAberta(aberta: boolean): void {
+    if (this.capturaAberta === aberta) return
+    this.capturaAberta = aberta
+    this.deps.aoMudarEstado?.()
+  }
+
+  definirDono(dono: DonoDoMicrofone): void {
+    if (this.dono === dono) return
+    const de = this.dono
+    this.deps.auditar({ type: 'voz.microfone.posse', payload: { de, para: dono } })
+    this.dono = dono
+    this.deps.aoMudarEstado?.()
+  }
+
   /**
    * Settings pede para ver cada disparo com a confiança medida (critério 12). No modo de teste o
    * disparo **não** abre turno nem sobe a janela: quem ajusta a sensibilidade não quer começar
@@ -267,12 +309,13 @@ export class EscutaService {
   }
 
   private emTurno(): boolean {
-    return this.turno || this.deps.turnoAtivo()
+    return this.fase !== 'falando' && (this.turno || this.deps.turnoAtivo())
   }
 
   /** Um bloco de PCM 16 kHz mono vindo da captura. Desligada, ou em turno, não faz nada. */
   async receberPcm(pcm: Int16Array): Promise<void> {
-    if (!this.ativa || this.emTurno()) return
+    if (!this.ativa || this.dono === 'push-to-talk') return
+    if (this.emTurno() && this.fase === 'ocioso') return
 
     if (this.persistido.palmas && this.deps.palmas.alimentar(pcm)) {
       this.disparar({ gatilho: 'palmas', fimDoGatilhoMs: Date.now() })
@@ -282,7 +325,7 @@ export class EscutaService {
 
     const deteccao = await this.deps.engine.alimentar(pcm)
     // O turno pode ter começado enquanto o engine pensava: o disparo tardio seria um segundo turno.
-    if (deteccao !== null && !this.emTurno()) {
+    if (deteccao !== null) {
       this.disparar({
         gatilho: 'frase',
         confianca: deteccao.confianca,
@@ -300,7 +343,13 @@ export class EscutaService {
       })
       return
     }
+    if (this.emTurno()) {
+      this.recusaSerial++
+      this.deps.aoMudarEstado?.()
+      return
+    }
     this.definirTurno(true)
+    this.definirFase('gravando')
     this.deps.aoDisparar({ ...evento, sessaoBloqueada: this.deps.sessaoBloqueada() })
   }
 

@@ -26,12 +26,35 @@ async function abrir(page: import('@playwright/test').Page, query: string): Prom
 }
 
 test.describe('SPEC-Voz-04 — prova visual do mascote', () => {
-  test('captura as 15 poses e os 4 estados', async ({ page }) => {
+  test('captura as 15 poses e os 5 estados', async ({ page }) => {
     await abrir(page, 'modo=dark')
 
-    await expect(page.locator('[data-prova="estados"] [data-mascote]')).toHaveCount(4)
+    await expect(page.locator('[data-prova="estados"] [data-mascote]')).toHaveCount(5)
     await expect(page.locator('[data-prova="visemes"] [data-viseme]')).toHaveCount(15)
     await page.screenshot({ path: 'reports/prova/mascote-visemes-estados.png', fullPage: true })
+  })
+
+  for (const modo of ['dark', 'light']) {
+    test(`escutando tem arcos próprios e texto nos dois temas (${modo})`, async ({ page }) => {
+      await abrir(page, `modo=${modo}`)
+      const mascote = page.locator('[data-estado-card="escutando"] [data-mascote]')
+      await expect(mascote).toHaveAttribute('data-estado', 'escutando')
+      await expect(mascote.locator('[data-arcos-da-escuta]')).toBeVisible()
+      await expect(mascote).toContainText('JARVIS OS está com escuta ativa')
+      await page.screenshot({ path: `reports/prova/mascote-escutando-${modo}.png`, fullPage: true })
+    })
+  }
+
+  test('escutando permanece distinto com movimento reduzido', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await abrir(page, 'modo=dark')
+    const arcos = page.locator('[data-estado-card="escutando"] [data-arcos-da-escuta]')
+    await expect(arcos).toBeVisible()
+    expect(await arcos.evaluate((el) => getComputedStyle(el).animationName)).toBe('none')
+    await page.screenshot({
+      path: 'reports/prova/mascote-escutando-reduced-motion.png',
+      fullPage: true
+    })
   })
 
   test('cada viseme pinta a pose declarada no mapa', async ({ page }) => {

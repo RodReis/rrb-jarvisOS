@@ -155,6 +155,10 @@ export const JANELAS_DA_CONVERSA = [0, 5, 10, 20, 50] as const
 export interface EstadoDaEscuta {
   /** Se a escuta contínua está ligada (kill switch). */
   readonly ativa: boolean
+  /** Projeção da máquina de estados do main (SPEC-Escuta-02). */
+  readonly fase?: FaseDaVoz
+  /** Incrementa quando um disparo foi ouvido, mas recusado por turno ocupado. */
+  readonly recusaSerial?: number
   /** Se o interpretador e o modelo da wake word estão prontos no disco. */
   readonly disponivel: boolean
   /** Sensibilidade calibrada [0.1, 0.95]. */
@@ -167,6 +171,9 @@ export interface EstadoDaEscuta {
   /** Se o SO aceitou registrá-la; `false` quando outro app já tem o atalho. */
   readonly hotkeyRegistrada: boolean
 }
+
+export type FaseDaVoz =
+  'ocioso' | 'escutando' | 'gravando' | 'transcrevendo' | 'pensando' | 'falando'
 
 /**
  * O desfecho de pedir a escuta ligada. Desligar não falha, então só ligar tem desfecho: sem

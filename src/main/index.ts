@@ -2120,6 +2120,7 @@ if (!app.requestSingleInstanceLock()) {
       turnoAtivo: () => hotkeyDaVoz.estaGravando,
       // É este aviso que fecha o `getUserMedia` na tela (critério 8): o estado vai inteiro.
       aoMudarCaptura: () => avisarTela(IPC_EVENT_CHANNELS.escutaMudou, escuta.estado()),
+      aoMudarEstado: () => avisarTela(IPC_EVENT_CHANNELS.escutaMudou, escuta.estado()),
       aoTestar: (disparo) => avisarTela(IPC_EVENT_CHANNELS.escutaTeste, disparo),
       aoDisparar: criarAoDispararDaEscuta({
         revelarJanela: () => {

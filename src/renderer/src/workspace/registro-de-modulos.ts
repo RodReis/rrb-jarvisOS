@@ -24,6 +24,7 @@ import type { ReactNode } from 'react'
 import type { PreferencesSnapshot } from '@shared/contracts/ipc'
 import type { UserPreferences, WorkspaceId } from '@shared/domain/entities'
 import type { DisparoRecebido } from '../app/EscutaDaVoz'
+import type { CapturaContinua } from '../app/captura-continua'
 
 export interface ContextoDoModulo {
   readonly workspace: WorkspaceId
@@ -34,6 +35,8 @@ export interface ContextoDoModulo {
   readonly nomeDoEspaco: string
   /** Um disparo da escuta ainda não tratado (SPEC-Escuta-01); só o Command Center o consome. */
   readonly disparo?: DisparoRecebido
+  readonly capturaCompartilhada?: CapturaContinua
+  readonly escutaAtiva?: boolean | null
   readonly aoTratarDisparo?: (id: number) => void
 }
 

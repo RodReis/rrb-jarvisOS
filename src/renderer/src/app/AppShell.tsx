@@ -15,7 +15,7 @@ import {
 import { VoiceMascot } from '@design/ui'
 import type { DisparoDaEscuta } from '@shared/domain/voz'
 import { EscutaDaVoz, type DisparoRecebido } from './EscutaDaVoz'
-import type { CapturaDoTurno } from './captura-continua'
+import type { CapturaContinua, CapturaDoTurno } from './captura-continua'
 import { ACENTO_PADRAO } from '@design/tokens'
 import { log } from '../lib/log'
 import { usePreferences } from '../preferences/usePreferences'
@@ -76,6 +76,8 @@ export function AppShell({ perfil, onSair }: AppShellProps = {}): React.JSX.Elem
   const [erro, setErro] = useState<string | null>(null)
   /** O disparo da escuta ainda não tratado pelo Command Center; consumido uma vez. */
   const [disparo, setDisparo] = useState<DisparoRecebido | undefined>(undefined)
+  const [capturaCompartilhada, setCapturaCompartilhada] = useState<CapturaContinua | undefined>()
+  const [escutaAtiva, setEscutaAtiva] = useState<boolean | null>(null)
   const contadorDeDisparos = useRef(0)
 
   useEffect(() => {
@@ -173,6 +175,8 @@ export function AppShell({ perfil, onSair }: AppShellProps = {}): React.JSX.Elem
       uiTheme,
       nomeDoEspaco: nomeEspaco,
       disparo,
+      capturaCompartilhada,
+      escutaAtiva,
       aoTratarDisparo: (id) => setDisparo((atual) => (atual?.id === id ? undefined : atual))
     }) ?? null
   const outroEspaco: WorkspaceId = workspace === 'jarvis' ? 'noa' : 'jarvis'
@@ -322,6 +326,8 @@ export function AppShell({ perfil, onSair }: AppShellProps = {}): React.JSX.Elem
             entradaId={preferencias.vozEntradaId}
             entradaRotulo={preferencias.vozEntradaRotulo}
             aoDisparar={(d, capturaDoTurno) => void aoDispararDaEscuta(d, capturaDoTurno)}
+            aoMudarCaptura={setCapturaCompartilhada}
+            aoMudarAtiva={setEscutaAtiva}
           />
           <button
             type="button"

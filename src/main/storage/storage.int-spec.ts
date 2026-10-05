@@ -184,6 +184,26 @@ describe('migrations', () => {
   })
 })
 
+describe('posse do microfone na cadeia de auditoria (SPEC-Escuta-02)', () => {
+  it('registra as duas transições e verifica a hash-chain real', () => {
+    audit.append({
+      user_id: 'u-voz',
+      type: 'voz.microfone.posse',
+      payload: { de: 'wake-word', para: 'push-to-talk' }
+    })
+    audit.append({
+      user_id: 'u-voz',
+      type: 'voz.microfone.posse',
+      payload: { de: 'push-to-talk', para: 'wake-word' }
+    })
+    expect(audit.verify('u-voz')).toEqual({ ok: true, checked: 2 })
+    expect(audit.list('u-voz').map((e) => e.payload)).toEqual([
+      { de: 'wake-word', para: 'push-to-talk' },
+      { de: 'push-to-talk', para: 'wake-word' }
+    ])
+  })
+})
+
 describe('AuditEvent — append-only no storage (ADR-004, camada 1)', () => {
   it('o trigger rejeita UPDATE mesmo por SQL direto, fora do repositório', () => {
     // O repositório não expõe update; isto prova que nem contornando ele dá.

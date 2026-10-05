@@ -74,6 +74,7 @@ export function GaleriaDaEscuta({
   // A captura da prova abre sempre, exceto na cena em que o microfone é recusado.
   const abrirCaptura = async (): Promise<{
     parar: () => Promise<void>
+    nivelRms: () => number
     iniciarTurno: () => {
       capturar: () => Promise<() => Promise<Int16Array>>
       cancelar: () => void
@@ -82,6 +83,7 @@ export function GaleriaDaEscuta({
     if (cena === 'sem-microfone') throw new DOMException('negado', 'NotAllowedError')
     return {
       parar: async () => undefined,
+      nivelRms: () => 0,
       iniciarTurno: () => ({
         capturar: async () => async () => new Int16Array(),
         cancelar: () => undefined

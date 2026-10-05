@@ -23,6 +23,7 @@ import type {
   DisparoDaEscuta,
   DisparoDeTesteDaEscuta,
   EstadoDaEscuta,
+  FaseDaVoz,
   PersonaEditavel,
   ProntidaoDaVoz,
   TrocaDaConversa
@@ -237,6 +238,12 @@ const bridge: JarvisBridge = {
   enviarPcmDaEscuta: (pcm: Int16Array): void => ipcRenderer.send(IPC_SEND_CHANNELS.escutaPcm, pcm),
   informarTurnoDaEscuta: (ativo: boolean): void =>
     ipcRenderer.send(IPC_SEND_CHANNELS.escutaTurno, ativo),
+  informarFaseDaVoz: (fase: FaseDaVoz): void =>
+    ipcRenderer.send(IPC_SEND_CHANNELS.escutaFase, fase),
+  informarPosseDoMicrofone: (dono: 'nenhum' | 'wake-word' | 'push-to-talk'): void =>
+    ipcRenderer.send(IPC_SEND_CHANNELS.escutaPosse, dono),
+  confirmarCapturaDaEscuta: (aberta: boolean): void =>
+    ipcRenderer.send(IPC_SEND_CHANNELS.escutaCapturaAberta, aberta),
   onEscutaMudou: (listener: (estado: EstadoDaEscuta) => void): (() => void) => {
     const wrapped = (_event: unknown, estado: EstadoDaEscuta): void => listener(estado)
 

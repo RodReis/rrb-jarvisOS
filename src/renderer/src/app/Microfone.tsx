@@ -3,14 +3,15 @@ import { useTranslation } from 'react-i18next'
 import { Button, Card, InlineAlert, VoiceMascot, type EstadoDoMascote } from '@design/ui'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { VisemeEvent } from '@shared/domain/visemes'
-import type { DesfechoDaTranscricao, ProntidaoDaVoz } from '@shared/domain/voz'
+import type { DesfechoDaTranscricao, FaseDaVoz, ProntidaoDaVoz } from '@shared/domain/voz'
 import { capturarPcm, type CapturaDeAudio } from './captura-de-audio'
-import type { CapturaDoTurno } from './captura-continua'
+import type { CapturaContinua, CapturaDoTurno } from './captura-continua'
 import { criarReprodutor } from './reproducao-de-fala'
 import { criarMedidorDeEntrada, type MedidorDeEntrada } from './medidor-de-audio'
 import { criarDetectorDeFimDaFala } from './fim-da-fala'
 import type { DisparoRecebido } from './EscutaDaVoz'
 import { log } from '../lib/log'
+import { iniciarReferenciaDaFala } from './referencia-da-fala'
 import type { TrocaDaConversa } from '@shared/domain/voz'
 
 /**
@@ -56,6 +57,9 @@ export function Microfone({
   capturar = capturarPcm,
   criarFala = criarReprodutor,
   criarMedidor = criarMedidorDeEntrada,
+  capturaCompartilhada,
+  escutaAtiva = false,
+  vozTimeoutMs = 60_000,
   disparo,
   aoTratarDisparo
 }: {
@@ -80,10 +84,14 @@ export function Microfone({
   /** Injetado pela mesma razão: Web Audio também não existe em jsdom. */
   readonly criarFala?: typeof criarReprodutor
   readonly criarMedidor?: typeof criarMedidorDeEntrada
+  readonly capturaCompartilhada?: CapturaContinua
+  readonly escutaAtiva?: boolean | null
+  readonly vozTimeoutMs?: number
 }): React.JSX.Element {
   const { t } = useTranslation()
   const [prontidao, setProntidao] = useState<ProntidaoDaVoz | undefined>(undefined)
   const [estado, setEstado] = useState<EstadoDoMicrofone>('ocioso')
+  const [faseDoMain, setFaseDoMain] = useState<FaseDaVoz | undefined>()
   const [texto, setTexto] = useState<string | undefined>(undefined)
   const [erro, setErro] = useState<string | undefined>(undefined)
   /*
@@ -119,6 +127,9 @@ export function Microfone({
   const soltouCedo = useRef(false)
   /** O relógio que decide o fim do turno aberto pela escuta; nunca existe no push-to-talk. */
   const monitorDoTurno = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
+  const tetoDaGravacao = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const origemDoTurno = useRef<'voz' | 'push-to-talk' | undefined>(undefined)
+  const geracaoDoTurno = useRef(0)
   const ultimoDisparoTratado = useRef<number | undefined>(undefined)
   /** O último valor avisado ao main; `undefined` até a primeira transição real. */
   const turnoRelatado = useRef<boolean | undefined>(undefined)
@@ -143,10 +154,14 @@ export function Microfone({
    * trás é justamente a que as guardas leem, então o sintoma seria o travamento silencioso de
    * novo. Uma função só é o que torna isso impossível por construção.
    */
-  const marcar = useCallback((novo: EstadoDoMicrofone): void => {
-    estadoAtual.current = novo
-    setEstado(novo)
-  }, [])
+  const marcar = useCallback(
+    (novo: EstadoDoMicrofone): void => {
+      estadoAtual.current = novo
+      setEstado(novo)
+      window.jarvis.informarFaseDaVoz?.(novo === 'ocioso' && escutaAtiva ? 'escutando' : novo)
+    },
+    [escutaAtiva]
+  )
 
   const consultar = useCallback(async (): Promise<void> => {
     setProntidao(await window.jarvis.prontidaoDaVoz())
@@ -184,14 +199,15 @@ export function Microfone({
   }
 
   useEffect(() => {
-    if (!entradaId || !navigator.mediaDevices) return
+    if (!entradaId || !navigator.mediaDevices || escutaAtiva !== false) return
     void Promise.resolve().then(pedirPermissao)
     // A preferência existente autoriza validar dispositivos no boot da tela.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entradaId])
+  }, [entradaId, escutaAtiva])
 
   useEffect(() => {
-    if (!permissaoConcedida || !entradaEfetivaId || estado !== 'ocioso') return
+    if (escutaAtiva !== false || !permissaoConcedida || !entradaEfetivaId || estado !== 'ocioso')
+      return
     let ativo = true
     void criarMedidor(entradaEfetivaId)
       .then((novoMedidor) => {
@@ -209,7 +225,7 @@ export function Microfone({
       medidor.current = undefined
       void atual?.parar()
     }
-  }, [criarMedidor, entradaEfetivaId, estado, permissaoConcedida, t])
+  }, [criarMedidor, entradaEfetivaId, escutaAtiva, estado, permissaoConcedida, t])
 
   useEffect(() => {
     let quadro = 0
@@ -217,7 +233,9 @@ export function Microfone({
       const nivel =
         estado === 'falando'
           ? (falaAtual?.nivelRms() ?? 0)
-          : (medidor.current?.nivelRms() ?? nivelEntrada.current)
+          : (capturaCompartilhada?.nivelRms() ??
+            medidor.current?.nivelRms() ??
+            nivelEntrada.current)
       barraDoMedidor.current?.style.setProperty('width', `${Math.min(100, nivel / 32.767)}%`)
       barraDoMedidor.current?.parentElement?.setAttribute('aria-valuenow', String(nivel))
       const ativo = estado === 'gravando' || estado === 'falando'
@@ -229,7 +247,7 @@ export function Microfone({
     }
     quadro = requestAnimationFrame(atualizar)
     return () => cancelAnimationFrame(quadro)
-  }, [estado, falaAtual])
+  }, [capturaCompartilhada, estado, falaAtual])
 
   /*
    * A consulta inicial roda **dentro** da promessa, não no corpo do efeito: `setState` síncrono
@@ -245,6 +263,19 @@ export function Microfone({
 
     return () => {
       cancelado = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!window.jarvis.estadoDaEscuta || !window.jarvis.onEscutaMudou) return
+    let ativo = true
+    void window.jarvis.estadoDaEscuta().then((e) => {
+      if (ativo) setFaseDoMain(e.fase)
+    })
+    const cancelar = window.jarvis.onEscutaMudou((e) => setFaseDoMain(e.fase))
+    return () => {
+      ativo = false
+      cancelar()
     }
   }, [])
 
@@ -268,15 +299,37 @@ export function Microfone({
   }
 
   async function comecar(porEscuta = false, capturaDoTurno?: CapturaDoTurno): Promise<void> {
-    if (estadoAtual.current !== 'ocioso') {
+    const interrompendoFala = estadoAtual.current === 'falando'
+    const assumindoTurnoDaVoz =
+      !porEscuta && estadoAtual.current === 'gravando' && origemDoTurno.current === 'voz'
+    if (estadoAtual.current !== 'ocioso' && !interrompendoFala && !assumindoTurnoDaVoz) {
       capturaDoTurno?.cancelar()
       return
     }
+    const geracao = ++geracaoDoTurno.current
+    if (interrompendoFala) {
+      reprodutor.current?.cancelar()
+    }
+    if (assumindoTurnoDaVoz) {
+      pararMonitorDoTurno()
+      const anterior = encerrarCaptura.current
+      encerrarCaptura.current = undefined
+      if (anterior) void anterior().then(() => undefined)
+    }
+    origemDoTurno.current = porEscuta ? 'voz' : 'push-to-talk'
+    if (!porEscuta) window.jarvis.informarPosseDoMicrofone?.('push-to-talk')
     setErro(undefined)
-    setAviso(undefined)
+    setAviso(
+      assumindoTurnoDaVoz
+        ? t('escuta.turnoCanceladoPeloBotao')
+        : interrompendoFala
+          ? t('escuta.falaInterrompida')
+          : undefined
+    )
     setTexto(undefined)
     soltouCedo.current = false
     marcar('gravando')
+    if (!porEscuta) window.jarvis.informarTurnoDaEscuta(true)
 
     try {
       const medidorAtual = medidor.current
@@ -286,19 +339,31 @@ export function Microfone({
       if (porEscuta && capturaDoTurno === undefined) {
         throw new Error('Captura contínua indisponível para o turno da escuta.')
       }
-      encerrarCaptura.current = await (capturaDoTurno?.capturar ?? capturar)(
+      if (!porEscuta && escutaAtiva && !capturaCompartilhada) {
+        throw new Error('A captura compartilhada ainda não abriu o microfone.')
+      }
+      const capturaDoPush =
+        !porEscuta && escutaAtiva ? capturaCompartilhada?.iniciarTurno(false) : undefined
+      const encerrar = await (capturaDoTurno?.capturar ?? capturaDoPush?.capturar ?? capturar)(
         entradaEfetivaId || undefined,
         (valor) => {
           nivelEntrada.current = valor
         }
       )
+      if (geracao !== geracaoDoTurno.current) {
+        void encerrar()
+        return
+      }
+      encerrarCaptura.current = encerrar
       if (porEscuta) armarMonitorDoTurno()
+      else tetoDaGravacao.current = setTimeout(() => void acoes.current.terminar(), vozTimeoutMs)
     } catch {
       // Microfone negado ou ausente. Não é falha do runtime — a próxima ação é do sistema
       // operacional, não do app.
       marcar('ocioso')
       capturaDoTurno?.cancelar()
-      if (porEscuta) window.jarvis.informarTurnoDaEscuta(false)
+      if (!porEscuta) window.jarvis.informarPosseDoMicrofone?.(escutaAtiva ? 'wake-word' : 'nenhum')
+      window.jarvis.informarTurnoDaEscuta(false)
       setErro(t('voz.microfoneIndisponivel'))
       return
     }
@@ -320,7 +385,7 @@ export function Microfone({
    */
   function armarMonitorDoTurno(): void {
     pararMonitorDoTurno()
-    const detector = criarDetectorDeFimDaFala()
+    const detector = criarDetectorDeFimDaFala({ tetoMs: vozTimeoutMs })
     const inicio = Date.now()
     monitorDoTurno.current = setInterval(() => {
       const veredito = detector.alimentar(nivelEntrada.current, Date.now() - inicio)
@@ -331,7 +396,7 @@ export function Microfone({
   }
 
   async function cancelarTurno(): Promise<void> {
-    if (estadoAtual.current !== 'gravando') return
+    if (estadoAtual.current !== 'gravando' || origemDoTurno.current !== 'voz') return
     const parar = encerrarCaptura.current
     encerrarCaptura.current = undefined
     // Fecha o microfone e joga o áudio fora: ninguém falou, não há o que transcrever.
@@ -342,6 +407,8 @@ export function Microfone({
 
   async function terminar(): Promise<void> {
     pararMonitorDoTurno()
+    if (tetoDaGravacao.current) clearTimeout(tetoDaGravacao.current)
+    tetoDaGravacao.current = undefined
     if (estadoAtual.current !== 'gravando') return
 
     // A captura ainda não abriu: registra a intenção e deixa `comecar` encerrar quando puder.
@@ -351,6 +418,9 @@ export function Microfone({
     }
 
     marcar('transcrevendo')
+    if (origemDoTurno.current === 'push-to-talk') {
+      window.jarvis.informarPosseDoMicrofone?.(escutaAtiva ? 'wake-word' : 'nenhum')
+    }
 
     const parar = encerrarCaptura.current
     encerrarCaptura.current = undefined
@@ -422,10 +492,12 @@ export function Microfone({
    * caminho para a nuvem em nenhum dos três passos.
    */
   async function conversar(pergunta: string): Promise<void> {
+    const geracao = geracaoDoTurno.current
     marcar('pensando')
 
     try {
       const desfecho = await window.jarvis.perguntarAoJarvis(pergunta, workspace)
+      if (geracao !== geracaoDoTurno.current) return
       log.ui.info('Conversa respondeu', {
         estado: desfecho.estado,
         caracteres: desfecho.estado === 'ok' ? desfecho.resposta.length : 0
@@ -452,10 +524,12 @@ export function Microfone({
       // acidente do usuário, não erro do app.
       if (desfecho.estado !== 'ok') return
 
-      setTrocas(await window.jarvis.historicoDaConversa())
+      const historico = await window.jarvis.historicoDaConversa()
+      if (geracao !== geracaoDoTurno.current) return
+      setTrocas(historico)
       await falar(desfecho.resposta)
     } finally {
-      marcar('ocioso')
+      if (geracao === geracaoDoTurno.current) marcar('ocioso')
     }
   }
 
@@ -467,16 +541,23 @@ export function Microfone({
    * estado volta a `ocioso` no `finally` de quem chamou.
    */
   async function falar(texto: string): Promise<void> {
+    const geracao = geracaoDoTurno.current
     marcar('falando')
     setVisemesDaFala([])
     setFalaAtual(undefined)
     if (legenda.current) legenda.current.textContent = ''
 
     const fala = await window.jarvis.falar(texto, vozDaFala)
+    if (geracao !== geracaoDoTurno.current) return
     if (fala.estado !== 'ok') return
 
     const emCurso = reprodutor.current?.tocar(fala.fala, saidaId || undefined)
     if (emCurso === undefined) return
+    const limparReferencia = iniciarReferenciaDaFala(
+      fala.fala.pcm,
+      fala.fala.sampleRate,
+      emCurso.posicaoMs
+    )
     void emCurso.saidaAplicada.then((aplicada) => {
       if (!aplicada) setAviso(t('voz.saidaSemSuporte'))
     })
@@ -492,7 +573,12 @@ export function Microfone({
       if (proporcao < 1) requestAnimationFrame(revelar)
     }
     requestAnimationFrame(revelar)
-    await emCurso.terminou
+    try {
+      await emCurso.terminou
+    } finally {
+      limparReferencia()
+    }
+    if (geracao !== geracaoDoTurno.current) return
     if (legenda.current) legenda.current.textContent = texto
     setVisemesDaFala([])
     setFalaAtual(undefined)
@@ -553,6 +639,7 @@ export function Microfone({
   useEffect(
     () => () => {
       pararMonitorDoTurno()
+      if (tetoDaGravacao.current) clearTimeout(tetoDaGravacao.current)
       if (turnoRelatado.current === true) window.jarvis.informarTurnoDaEscuta(false)
     },
     []
@@ -576,19 +663,26 @@ export function Microfone({
   }
 
   const rotuloDoBotao = ROTULO_DO_ESTADO[estado] ?? t('voz.segureParaFalar')
+  const faseVisivel =
+    faseDoMain === 'escutando' && !capturaCompartilhada
+      ? 'ocioso'
+      : (faseDoMain ??
+        (estado === 'ocioso' && escutaAtiva && capturaCompartilhada ? 'escutando' : estado))
   const estadoDoMascote: EstadoDoMascote =
-    estado === 'gravando'
+    faseVisivel === 'gravando'
       ? 'ouvindo'
-      : estado === 'transcrevendo' || estado === 'pensando'
+      : faseVisivel === 'transcrevendo' || faseVisivel === 'pensando'
         ? 'pensando'
-        : estado === 'falando'
+        : faseVisivel === 'falando'
           ? 'falando'
-          : 'idle'
+          : faseVisivel === 'escutando'
+            ? 'escutando'
+            : 'idle'
 
   // Segurar para falar só vale de `ocioso`: durante transcrição, resposta ou fala, um novo
   // aperto abriria uma segunda conversa por cima da primeira.
-  const ocupado = estado !== 'ocioso' && estado !== 'gravando'
-  const escolhaPendente = !entradaEfetivaId
+  const ocupado = estado !== 'ocioso' && estado !== 'gravando' && estado !== 'falando'
+  const escolhaPendente = !entradaEfetivaId || (escutaAtiva !== false && !capturaCompartilhada)
 
   return (
     <div
@@ -619,7 +713,7 @@ export function Microfone({
           ref={ondas}
           className="flex h-14 w-full items-end justify-center gap-1"
           data-fonte-da-onda={
-            estado === 'gravando' ? 'entrada' : estado === 'falando' ? 'saida' : 'repouso'
+            faseVisivel === 'gravando' ? 'entrada' : faseVisivel === 'falando' ? 'saida' : 'repouso'
           }
           aria-label={t('voz.ondas')}
         >
@@ -634,6 +728,7 @@ export function Microfone({
         </div>
 
         <p aria-live="polite" className="min-h-7 text-center text-[length:var(--jos-texto-corpo)]">
+          {faseVisivel === 'escutando' ? t('escuta.escutando') : null}
           <span ref={legenda} />
           {estado === 'falando' ? <span aria-hidden> |</span> : null}
         </p>
@@ -650,7 +745,7 @@ export function Microfone({
           </InlineAlert>
         )}
 
-        {prontidao.pronta && permissaoConcedida ? (
+        {prontidao.pronta && (permissaoConcedida || capturaCompartilhada) ? (
           <Button
             /*
              * **O ponteiro é capturado no `pointerdown`**, e é isso que faz o gesto sobreviver

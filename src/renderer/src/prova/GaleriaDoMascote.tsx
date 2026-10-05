@@ -21,8 +21,8 @@ export function GaleriaDoMascote({ modo, acento }: GaleriaProps): React.JSX.Elem
     >
       <FundoDaIdentidade className="min-h-screen p-6 font-[family-name:var(--jos-fonte-corpo)] text-[var(--jos-cor-texto)]">
         <div className="mx-auto flex max-w-6xl flex-col gap-8" data-testid="galeria-mascote">
-          <section className="grid grid-cols-4 gap-4" data-prova="estados">
-            {(['idle', 'ouvindo', 'pensando', 'falando'] as const).map((estado) => (
+          <section className="grid grid-cols-5 gap-4" data-prova="estados">
+            {(['idle', 'escutando', 'ouvindo', 'pensando', 'falando'] as const).map((estado) => (
               <div
                 key={estado}
                 className="flex items-center gap-3 border border-[rgba(var(--jos-borda-rgb),0.18)] p-4"

@@ -555,6 +555,7 @@ export const AUDIT_EVENT_TYPES = [
   // por qualquer caminho. O `via` (interface, hotkey, restauracao) vai no payload: a pergunta de
   // quem audita é *quem fechou o microfone*, e o hash-chain só prova isso se o caminho constar.
   'voz.escuta.ligada',
+  'voz.microfone.posse',
   'voz.escuta.desligada',
   // SPEC-Squads-01: o perfil e a resolução que um Squad usou, pela revisão (hash) do perfil. Tipo
   // próprio, e não `policy-decision`: aquele classifica uma ação, e a pergunta aqui é "com qual

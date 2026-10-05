@@ -75,7 +75,7 @@ function capturaFalsa() {
   let aoBloco: ((b: Int16Array) => void) | undefined
   const abrir = vi.fn(async (_id: string | undefined, receber: (b: Int16Array) => void) => {
     aoBloco = receber
-    return { parar, iniciarTurno }
+    return { parar, iniciarTurno, nivelRms: () => 0 }
   })
   return { abrir, parar, iniciarTurno, bloco: (b: Int16Array) => aoBloco?.(b) }
 }
@@ -88,6 +88,13 @@ function montar(captura = capturaFalsa(), aoDisparar = vi.fn()) {
 }
 
 describe('indicador permanente (critério 9)', () => {
+  it('sinaliza disparo recusado durante turno ocupado', async () => {
+    montar()
+    await screen.findByText(/escuta ligada/i)
+    act(() => avisarMudanca?.({ ...LIGADA, fase: 'pensando', recusaSerial: 1 }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/estou atendendo o turno atual/i)
+  })
+
   it('com a escuta ativa e o microfone aberto, o indicador diz que está ouvindo', async () => {
     montar()
 
@@ -205,7 +212,11 @@ describe('captura e kill switch (critério 8)', () => {
       () =>
         new Promise((resolver) => {
           terminarDeAbrir = () =>
-            resolver({ parar: captura.parar, iniciarTurno: captura.iniciarTurno })
+            resolver({
+              parar: captura.parar,
+              iniciarTurno: captura.iniciarTurno,
+              nivelRms: () => 0
+            })
         })
     )
     montar(captura)

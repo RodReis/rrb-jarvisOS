@@ -31,7 +31,9 @@ export interface CapturaContinua {
   /** Fecha as trilhas do stream, o contexto de áudio e para de entregar blocos. Idempotente. */
   readonly parar: () => Promise<void>
   /** Reserva o pré-roll imediatamente ao disparar, antes da navegação para o Command Center. */
-  readonly iniciarTurno: () => CapturaDoTurno
+  readonly iniciarTurno: (comPreRoll?: boolean) => CapturaDoTurno
+  /** Nível do mesmo stream, sem abrir um medidor concorrente. */
+  readonly nivelRms: () => number
 }
 
 export interface DepsDaCapturaContinua {
@@ -101,6 +103,7 @@ export async function abrirCapturaContinua(
   const historico = new Int16Array(AMOSTRAS_PRE_ROLL)
   let posicao = 0
   let preenchimento = 0
+  let ultimoNivel = 0
   let turno:
     | {
         pedacos: Int16Array[]
@@ -110,6 +113,9 @@ export async function abrirCapturaContinua(
     | undefined
 
   const empacotar = criarEmpacotador((bloco) => {
+    let energia = 0
+    for (const amostra of bloco) energia += amostra * amostra
+    ultimoNivel = Math.round(Math.sqrt(energia / bloco.length))
     for (const amostra of bloco) {
       historico[posicao] = amostra
       posicao = (posicao + 1) % AMOSTRAS_PRE_ROLL
@@ -139,10 +145,17 @@ export async function abrirCapturaContinua(
   processador.connect(contexto.destination)
 
   return {
-    iniciarTurno: () => {
-      const anterior = new Int16Array(preenchimento)
+    nivelRms: () => ultimoNivel,
+    iniciarTurno: (comPreRoll = true) => {
+      // Nunca há dois consumidores gravando: a posse nova cancela a anterior.
+      if (turno) {
+        turno.pedacos = []
+        turno.tamanho = 0
+      }
+      const amostrasAnteriores = comPreRoll ? preenchimento : 0
+      const anterior = new Int16Array(amostrasAnteriores)
       const inicio = (posicao - preenchimento + AMOSTRAS_PRE_ROLL) % AMOSTRAS_PRE_ROLL
-      for (let i = 0; i < preenchimento; i++) {
+      for (let i = 0; i < amostrasAnteriores; i++) {
         anterior[i] = historico[(inicio + i) % AMOSTRAS_PRE_ROLL]
       }
       const atual = {

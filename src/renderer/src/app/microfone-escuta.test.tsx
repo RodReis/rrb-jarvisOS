@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Microfone } from './Microfone'
 import type { DisparoRecebido } from './EscutaDaVoz'
@@ -75,7 +75,8 @@ const reprodutorFalso = () => ({
 
 function montar(
   captura: ReturnType<typeof capturaConduzida>,
-  disparo?: Omit<DisparoRecebido, 'capturaDoTurno'>
+  disparo?: Omit<DisparoRecebido, 'capturaDoTurno'>,
+  criarFala: typeof reprodutorFalso = reprodutorFalso
 ) {
   const aoTratarDisparo = vi.fn()
   const capturarPushToTalk = vi.fn(async () => {
@@ -87,7 +88,7 @@ function montar(
       vozDaFala="pt_BR-faber-medium"
       entradaId="microfone-teste"
       capturar={capturarPushToTalk}
-      criarFala={reprodutorFalso as never}
+      criarFala={criarFala as never}
       criarMedidor={async () => ({ nivelRms: () => 0, parar: async () => {} })}
       disparo={
         disparo
@@ -97,7 +98,7 @@ function montar(
       aoTratarDisparo={aoTratarDisparo}
     />
   )
-  return { ...resultado, aoTratarDisparo, capturarPushToTalk }
+  return { ...resultado, aoTratarDisparo, capturarPushToTalk, criarFala }
 }
 
 /** Avança o relógio em passos de 250 ms, o ritmo com que a captura mede o nível. */
@@ -141,6 +142,158 @@ describe('o disparo começa o turno sem botão', () => {
 
     await screen.findByRole('button', { name: /segure para falar/i }, { timeout: 5_000 })
     expect(informarTurnoDaEscuta).toHaveBeenLastCalledWith(false)
+  })
+})
+
+describe('posse compartilhada do microfone (SPEC-Escuta-02, critério 1)', () => {
+  it('aguarda a decisão inicial da escuta antes de pedir permissão', async () => {
+    const abrirStream = vi.fn()
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      mediaDevices: {
+        getUserMedia: abrirStream,
+        enumerateDevices: vi.fn(async () => [])
+      }
+    })
+    render(
+      <Microfone
+        workspace="jarvis"
+        vozDaFala="pt_BR-faber-medium"
+        entradaId="microfone-teste"
+        escutaAtiva={null}
+        criarFala={reprodutorFalso as never}
+      />
+    )
+    await screen.findByRole('button', { name: /segure para falar/i })
+    expect(abrirStream).not.toHaveBeenCalled()
+  })
+
+  it('push-to-talk usa o stream da escuta sem abrir segunda captura', async () => {
+    const captura = capturaConduzida()
+    const capturarSeparado = vi.fn(async () => {
+      throw new Error('Segundo getUserMedia proibido')
+    })
+    const iniciarTurno = vi.fn(() => ({ capturar: captura.capturar, cancelar: vi.fn() }))
+    render(
+      <Microfone
+        workspace="jarvis"
+        vozDaFala="pt_BR-faber-medium"
+        entradaId="microfone-teste"
+        capturaCompartilhada={{ iniciarTurno, nivelRms: () => 0, parar: async () => {} }}
+        escutaAtiva
+        capturar={capturarSeparado}
+        criarFala={reprodutorFalso as never}
+        criarMedidor={async () => {
+          throw new Error('Medidor abriu segundo getUserMedia')
+        }}
+      />
+    )
+    const botao = await screen.findByRole('button', { name: /segure para falar/i })
+    fireEvent.pointerDown(botao, { pointerId: 1 })
+    await waitFor(() => expect(captura.capturar).toHaveBeenCalledTimes(1))
+    expect(iniciarTurno).toHaveBeenCalledWith(false)
+    expect(capturarSeparado).not.toHaveBeenCalled()
+    fireEvent.pointerUp(botao)
+    await waitFor(() => expect(captura.encerrar).toHaveBeenCalledTimes(1))
+  })
+})
+
+describe('teto de gravação (SPEC-Escuta-02, critério 8)', () => {
+  it('encerra o turno aberto por voz no teto configurado mesmo com fala contínua', async () => {
+    const captura = capturaConduzida()
+    render(
+      <Microfone
+        workspace="jarvis"
+        vozDaFala="pt_BR-faber-medium"
+        entradaId="microfone-teste"
+        vozTimeoutMs={2_000}
+        capturar={async () => {
+          throw new Error('Segundo microfone proibido')
+        }}
+        criarFala={reprodutorFalso as never}
+        criarMedidor={async () => ({ nivelRms: () => 0, parar: async () => {} })}
+        disparo={{ ...DISPARO, capturaDoTurno: { capturar: captura.capturar, cancelar: vi.fn() } }}
+      />
+    )
+    await screen.findByRole('button', { name: /ouvindo/i })
+    await passar(2_250, () => captura.nivel(3_000))
+    await waitFor(() => expect(captura.encerrar).toHaveBeenCalledTimes(1))
+  })
+
+  it('encerra o push-to-talk no mesmo teto configurado', async () => {
+    const captura = capturaConduzida()
+    render(
+      <Microfone
+        workspace="jarvis"
+        vozDaFala="pt_BR-faber-medium"
+        entradaId="microfone-teste"
+        vozTimeoutMs={2_000}
+        capturar={captura.capturar}
+        criarFala={reprodutorFalso as never}
+        criarMedidor={async () => ({ nivelRms: () => 0, parar: async () => {} })}
+      />
+    )
+    const botao = await screen.findByRole('button', { name: /segure para falar/i })
+    fireEvent.pointerDown(botao, { pointerId: 1 })
+    await waitFor(() => expect(captura.capturar).toHaveBeenCalledTimes(1))
+    await passar(2_250, () => captura.nivel(3_000))
+    await waitFor(() => expect(captura.encerrar).toHaveBeenCalledTimes(1))
+  })
+})
+
+describe('barge-in (SPEC-Escuta-02, critério 4)', () => {
+  it('novo disparo durante a fala para a fonte de áudio e abre novo turno', async () => {
+    const captura = capturaConduzida()
+    const pararFonte = vi.fn()
+    let resolverFim: (() => void) | undefined
+    const terminou = new Promise<void>((resolver) => {
+      resolverFim = resolver
+    })
+    const cancelar = vi.fn(() => {
+      pararFonte()
+      resolverFim?.()
+    })
+    const criarFala = () => ({
+      cancelar,
+      tocar: () => ({
+        cancelar,
+        terminou,
+        posicaoMs: () => 0,
+        saidaAplicada: Promise.resolve(true),
+        nivelRms: () => 0
+      })
+    })
+    falar.mockResolvedValue({
+      estado: 'ok',
+      fala: { pcm: new Int16Array(22_050), sampleRate: 22_050, visemes: [], timeline: 'estimado' }
+    })
+    const segundoCaptura = capturaConduzida()
+    const segundo = {
+      ...DISPARO,
+      id: 2,
+      capturaDoTurno: { capturar: segundoCaptura.capturar, cancelar: vi.fn() }
+    }
+    const { rerender, aoTratarDisparo, capturarPushToTalk } = montar(captura, DISPARO, criarFala)
+    await screen.findByRole('button', { name: /ouvindo/i })
+    await passar(1_000, () => captura.nivel(3_000))
+    await passar(2_000, () => captura.nivel(100))
+    await waitFor(() => expect(falar).toHaveBeenCalled())
+
+    rerender(
+      <Microfone
+        workspace="jarvis"
+        vozDaFala="pt_BR-faber-medium"
+        entradaId="microfone-teste"
+        capturar={capturarPushToTalk}
+        criarFala={criarFala as never}
+        criarMedidor={async () => ({ nivelRms: () => 0, parar: async () => {} })}
+        disparo={segundo}
+        aoTratarDisparo={aoTratarDisparo}
+      />
+    )
+    await waitFor(() => expect(segundoCaptura.capturar).toHaveBeenCalledTimes(1))
+    expect(pararFonte).toHaveBeenCalledTimes(1)
+    expect(screen.getByText(/Fala interrompida por um novo pedido/i)).toBeInTheDocument()
   })
 })
 
