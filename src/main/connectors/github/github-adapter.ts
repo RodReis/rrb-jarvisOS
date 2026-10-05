@@ -49,6 +49,7 @@ import {
 } from '@shared/domain/github-automation'
 import type { ConnectorAdapter, ConnectorExecution } from '../adapter'
 import {
+  convertPullRequestToDraft,
   ensureBranchProtection,
   ensureBranchRef,
   ensureIssue,
@@ -236,6 +237,9 @@ export class GithubAdapter implements ConnectorAdapter {
 
       case GITHUB_OPERATIONS.getRulesForBranch:
         return await getRulesForBranch(rest, input as RulesForBranchInput)
+
+      case GITHUB_OPERATIONS.convertToDraft:
+        return await convertPullRequestToDraft(rest, input as PullRequestInput)
 
       default:
         // Inalcançável pelo caminho normal (o registro filtra antes), mas o `default` mantém a

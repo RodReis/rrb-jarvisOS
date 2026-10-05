@@ -82,7 +82,8 @@ export const GITHUB_OPERATIONS = {
   ensureLabel: 'label.ensure',
   getRequiredChecks: 'checks.required-for-branch',
   updateBranch: 'pr.update-branch',
-  getRulesForBranch: 'rulesets.for-branch'
+  getRulesForBranch: 'rulesets.for-branch',
+  convertToDraft: 'pr.convert-to-draft'
 } as const
 
 export type GithubOperation = (typeof GITHUB_OPERATIONS)[keyof typeof GITHUB_OPERATIONS]
@@ -197,6 +198,13 @@ export const GITHUB_CAPABILITIES: readonly ConnectorCapability[] = [
     operation: GITHUB_OPERATIONS.getRulesForBranch,
     effect: 'leitura',
     descricao: 'Lê da origem as regras ativas que valem para a branch, inclusive as de rulesets.'
+  },
+  {
+    connector: 'github',
+    operation: GITHUB_OPERATIONS.convertToDraft,
+    effect: 'mutacao',
+    descricao:
+      'Converte o pull request aberto em rascunho, sem fechá-lo nem apagar a branch: é o que sinaliza que ninguém deve mergeá-lo.'
   }
 ]
 
@@ -268,6 +276,20 @@ export interface SquashMergeInput extends RepoAlvo {
 export interface UpdateBranchInput extends RepoAlvo {
   readonly pullRequest: number
   readonly expectedHeadSha: string
+}
+
+/**
+ * A saída de `pr.convert-to-draft`.
+ *
+ * `rascunho` é o **estado final observado**: `true` quando o PR terminou em rascunho (convertido
+ * agora ou já era), `false` quando não é aberto — PR fechado ou mergeado nunca é tocado. O
+ * cancelamento (SPEC-Scheduler-05) usa o `motivo` para registrar por que o rascunho não aconteceu.
+ */
+export interface ConvertToDraftNormalizado {
+  readonly rascunho: boolean
+  /** O PR já estava em rascunho: nada foi mudado. */
+  readonly jaEra: boolean
+  readonly motivo?: 'pr-nao-aberto'
 }
 
 /** Entrada de `rulesets.for-branch`: a branch cujas regras efetivas se quer ler. */
@@ -708,6 +730,7 @@ export function validarEntrada(operation: string, input: unknown): string | unde
       return texto('branch') ? undefined : 'Informe `branch`.'
 
     case GITHUB_OPERATIONS.getMergeState:
+    case GITHUB_OPERATIONS.convertToDraft:
       return inteiroPositivo('pullRequest') ? undefined : 'Informe `pullRequest` como número.'
 
     case GITHUB_OPERATIONS.setDefaultBranch:

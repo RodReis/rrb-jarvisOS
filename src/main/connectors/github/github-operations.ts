@@ -20,6 +20,7 @@ import {
   corpoTemChaveExterna,
   type CheckNormalizado,
   type CommitShaInput,
+  type ConvertToDraftNormalizado,
   type EnsureBranchProtectionInput,
   type EnsureLabelInput,
   type EnsureBranchRefInput,
@@ -40,7 +41,14 @@ import {
   type WorkflowRunNormalizado
 } from '@shared/domain/github-automation'
 import { log } from '../../logging/logger'
-import { lista, numero, texto, type GithubRest, type RespostaRest } from './github-rest'
+import {
+  lista,
+  numero,
+  texto,
+  type GithubRest,
+  type Registro,
+  type RespostaRest
+} from './github-rest'
 
 /**
  * O desfecho de uma operação: o dado, mais se o recurso **já existia**.
@@ -761,6 +769,69 @@ export async function updatePullRequestBranch(
     externalRef: { id: `${input.owner}/${input.repo}/pulls/${input.pullRequest}` },
     criado: false
   }
+}
+
+/**
+ * `pr.convert-to-draft` — o PR aberto passa a rascunho (SPEC-Scheduler-05, regra 4).
+ *
+ * É o que o cancelamento faz com o trabalho que já está no remoto: **não fecha o PR e não apaga a
+ * branch**, só sinaliza que ninguém deve mergeá-lo. Não existe endpoint REST para isso — a única
+ * via é a mutation GraphQL `convertPullRequestToDraft`, que pede o `node_id` do PR; por isso a
+ * operação lê o PR antes (e a leitura também dá a idempotência: PR já em rascunho não é tocado).
+ *
+ * **PR que não está aberto nunca é convertido** (`motivo: 'pr-nao-aberto'`): mergeado é fato
+ * consumado, e um PR fechado reaberto como rascunho seria mudar o mundo além do que o cancelamento
+ * autoriza. **O GraphQL responde 200 com `errors`** quando a conversão não é possível (repositório
+ * sem rascunho, sem permissão): isso vira falha de validação — "draft quando possível" —, nunca
+ * sucesso.
+ */
+export async function convertPullRequestToDraft(
+  rest: GithubRest,
+  input: PullRequestInput
+): Promise<ResultadoDeOperacao<ConvertToDraftNormalizado>> {
+  const caminho = `/repos/${input.owner}/${input.repo}/pulls/${input.pullRequest}`
+  const corpo = exigirOk(await rest.request('GET', caminho)).corpo
+  const referencia = {
+    id: `${input.owner}/${input.repo}/pulls/${input.pullRequest}`,
+    ...(texto(corpo, 'html_url') === undefined ? {} : { url: texto(corpo, 'html_url') as string })
+  }
+
+  const aberto = (corpo as Registro | undefined)?.['state'] === 'open'
+  if (!aberto || (corpo as Registro | undefined)?.['merged'] === true) {
+    return {
+      data: { rascunho: false, jaEra: false, motivo: 'pr-nao-aberto' },
+      externalRef: referencia,
+      criado: false
+    }
+  }
+  if ((corpo as Registro | undefined)?.['draft'] === true) {
+    return { data: { rascunho: true, jaEra: true }, externalRef: referencia, criado: false }
+  }
+
+  const nodeId = texto(corpo, 'node_id')
+  if (nodeId === undefined) throw falhaSintetica(400)
+
+  const resposta = exigirOk(
+    await rest.request('POST', '/graphql', {
+      query:
+        'mutation($id: ID!) { convertPullRequestToDraft(input: { pullRequestId: $id }) { pullRequest { isDraft } } }',
+      variables: { id: nodeId }
+    })
+  )
+  const erros = lista(resposta.corpo, 'errors')
+  if (erros.length > 0) throw falhaSintetica(422, texto(erros[0], 'message'))
+
+  return { data: { rascunho: true, jaEra: false }, externalRef: referencia, criado: false }
+}
+
+/** Uma resposta que o GitHub deu com 200 mas que, para este contrato, é falha: o adapter a traduz como o status. */
+function falhaSintetica(status: number, mensagem?: string): FalhaRest {
+  return new FalhaRest({
+    status,
+    ok: false,
+    corpo: mensagem === undefined ? undefined : { message: mensagem },
+    headers: new Headers()
+  })
 }
 
 /**

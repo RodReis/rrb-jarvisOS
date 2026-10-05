@@ -93,7 +93,8 @@ describe('capacidades', () => {
       'label.ensure',
       'checks.required-for-branch',
       'pr.update-branch',
-      'rulesets.for-branch'
+      'rulesets.for-branch',
+      'pr.convert-to-draft'
     ])
     expect(caps[0]).toMatchObject({ connector: 'github', effect: 'leitura' })
   })

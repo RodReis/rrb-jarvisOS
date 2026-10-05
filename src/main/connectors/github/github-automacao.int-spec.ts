@@ -49,6 +49,8 @@ interface EstadoFake {
     merged: boolean
     merge_commit_sha?: string
     html_url: string
+    node_id: string
+    draft: boolean
   }[]
   checkRuns: Record<string, unknown>[]
   workflowRuns: Record<string, unknown>[]
@@ -60,6 +62,8 @@ interface EstadoFake {
   commits: Map<string, string>
   /** As regras ativas efetivas por branch, como `GET /rules/branches/{branch}` as devolve. */
   regras: Map<string, unknown[]>
+  /** O repositório não aceita rascunho: o GraphQL responde 200 com `errors`. */
+  rascunhoIndisponivel: boolean
 }
 
 let estado: EstadoFake
@@ -92,7 +96,8 @@ function estadoInicial(): EstadoFake {
     protecoes: new Map(),
     commits: new Map(),
     rotulos: new Map(),
-    regras: new Map()
+    regras: new Map(),
+    rascunhoIndisponivel: false
   }
 }
 
@@ -237,6 +242,8 @@ function responder(
       head: { sha: SHA, ref: String(corpoObj.head) },
       base: { ref: String(corpoObj.base) },
       merged: false,
+      node_id: `PR_node_${numeroNovo}`,
+      draft: false,
       // PR aberto tem `merge_commit_sha` de **test merge commit** — o dado que o normalizador
       // precisa descartar, e que este fake reproduz de propósito.
       merge_commit_sha: 'test0000merge0000commit0000sha0000000000',
@@ -269,6 +276,27 @@ function responder(
     pr.state = 'closed'
     pr.merge_commit_sha = 'merged00sha00000000000000000000000000000'
     return { status: 200, corpo: { sha: pr.merge_commit_sha, merged: true } }
+  }
+
+  // POST /graphql — só a mutation `convertPullRequestToDraft`, que é a única que o app usa
+  if (metodo === 'POST' && semQuery === '/graphql') {
+    const variaveis = (corpoObj.variables ?? {}) as Record<string, unknown>
+    const pr = estado.pulls.find((p) => p.node_id === variaveis.id)
+    if (pr === undefined) {
+      return { status: 200, corpo: { errors: [{ message: 'Could not resolve to a node.' }] } }
+    }
+    if (estado.rascunhoIndisponivel) {
+      // Como o GitHub real: 200 com `errors`, e o estado não muda.
+      return {
+        status: 200,
+        corpo: { errors: [{ message: 'Draft pull requests are not supported in this repository.' }] }
+      }
+    }
+    pr.draft = true
+    return {
+      status: 200,
+      corpo: { data: { convertPullRequestToDraft: { pullRequest: { isDraft: true } } } }
+    }
   }
 
   // PUT /repos/{o}/{r}/pulls/{n}/update-branch
@@ -1388,6 +1416,98 @@ describe('rulesets.for-branch — SPEC-Scheduler-04', () => {
     const r = (await executar(GITHUB_OPERATIONS.getRulesForBranch, entrada)) as ConnectorResult
 
     expect(r.data).toMatchObject({ contextsExigidos: ['a'], tipos: ['required_status_checks'] })
+  })
+})
+
+describe('pr.convert-to-draft — SPEC-Scheduler-05', () => {
+  const entrada = { owner: OWNER, repo: REPO, pullRequest: 1 }
+
+  beforeEach(async () => {
+    await executar(GITHUB_OPERATIONS.ensurePullRequest, {
+      owner: OWNER,
+      repo: REPO,
+      head: 'feat/x',
+      base: 'main',
+      title: 'T',
+      body: ''
+    })
+  })
+
+  it('PR aberto vira rascunho pela mutation GraphQL, com o node_id lido do PR', async () => {
+    const r = (await executar(GITHUB_OPERATIONS.convertToDraft, entrada)) as ConnectorResult
+
+    expect(r.ok).toBe(true)
+    expect(r.data).toEqual({ rascunho: true, jaEra: false })
+    expect(estado.pulls[0]?.draft).toBe(true)
+    const graphql = requisicoes.find((q) => q.caminho === '/graphql')
+    expect(graphql?.corpo).toMatchObject({ variables: { id: 'PR_node_1' } })
+  })
+
+  it('repetir não chama o GraphQL de novo: PR que já é rascunho não é tocado', async () => {
+    await executar(GITHUB_OPERATIONS.convertToDraft, entrada)
+    const antes = contar('POST', /graphql/)
+
+    const r = (await executar(GITHUB_OPERATIONS.convertToDraft, entrada)) as ConnectorResult
+
+    expect(r.data).toEqual({ rascunho: true, jaEra: true })
+    expect(contar('POST', /graphql/)).toBe(antes)
+  })
+
+  it('PR mergeado nunca é convertido: mergeado é fato consumado', async () => {
+    const pr = estado.pulls[0]
+    if (pr !== undefined) {
+      pr.merged = true
+      pr.state = 'closed'
+    }
+
+    const r = (await executar(GITHUB_OPERATIONS.convertToDraft, entrada)) as ConnectorResult
+
+    expect(r.data).toEqual({ rascunho: false, jaEra: false, motivo: 'pr-nao-aberto' })
+    expect(contar('POST', /graphql/)).toBe(0)
+    expect(estado.pulls[0]?.draft).toBe(false)
+  })
+
+  it('PR fechado sem merge também não é reaberto como rascunho', async () => {
+    const pr = estado.pulls[0]
+    if (pr !== undefined) pr.state = 'closed'
+
+    const r = (await executar(GITHUB_OPERATIONS.convertToDraft, entrada)) as ConnectorResult
+
+    expect(r.data).toMatchObject({ rascunho: false, motivo: 'pr-nao-aberto' })
+    expect(contar('POST', /graphql/)).toBe(0)
+  })
+
+  it('GraphQL que responde 200 com errors NÃO é sucesso: vira falha de validação', async () => {
+    estado.rascunhoIndisponivel = true
+
+    const r = (await executar(GITHUB_OPERATIONS.convertToDraft, entrada)) as ConnectorError
+
+    expect(r.ok).toBe(false)
+    expect(r.code).toBe('validacao-invalida')
+    expect(r.retryable).toBe(false)
+    expect(estado.pulls[0]?.draft).toBe(false)
+  })
+
+  it('PR inexistente é 404 traduzido, sem chamar o GraphQL', async () => {
+    const r = (await executar(GITHUB_OPERATIONS.convertToDraft, {
+      ...entrada,
+      pullRequest: 99
+    })) as ConnectorError
+
+    expect(r.ok).toBe(false)
+    expect(contar('POST', /graphql/)).toBe(0)
+  })
+
+  it('sem número de PR, a chamada nem sai do app', async () => {
+    const antes = requisicoes.length
+
+    const r = (await executar(GITHUB_OPERATIONS.convertToDraft, {
+      owner: OWNER,
+      repo: REPO
+    })) as ConnectorError
+
+    expect(r.code).toBe('validacao-invalida')
+    expect(requisicoes).toHaveLength(antes)
   })
 })
 
