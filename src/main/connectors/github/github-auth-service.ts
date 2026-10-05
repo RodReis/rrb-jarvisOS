@@ -30,6 +30,7 @@ import {
   lerPayloadDeToken,
   origemDoOAuth,
   precisaRenovar,
+  descreverOverrideDoClientId,
   resolverClientId,
   type DeviceCodeGrant,
   type GithubAuthSnapshot,
@@ -106,11 +107,14 @@ export class GithubAuthService {
    * o payload é lido, e mesmo aí nada dele sai deste método.
    */
   snapshot(ctx: GithubAuthContext): GithubAuthSnapshot {
-    const clientIdConfigurado = resolverClientId(this.clientIdOverride(ctx)) !== undefined
+    const override = this.clientIdOverride(ctx)
+    const clientIdConfigurado = resolverClientId(override) !== undefined
+    // O que a tela pode saber do override salvo: o client ID, se válido; só o aviso, se não.
+    const salvo = descreverOverrideDoClientId(override)
     const linha = this.credentials.find(ctx.userId, ctx.workspace, GITHUB_VAULT_KEY)
 
     if (linha === undefined) {
-      return { estado: 'missing', renovavel: false, clientIdConfigurado }
+      return { estado: 'missing', renovavel: false, clientIdConfigurado, ...salvo }
     }
 
     const expiraEm = this.credentials.expiresAt(ctx.userId, ctx.workspace, GITHUB_VAULT_KEY)
@@ -119,7 +123,7 @@ export class GithubAuthService {
     // Payload ilegível (cofre de outra máquina) é o mesmo desfecho de "não autenticado": não há
     // token utilizável, e dizer `present` faria a tela oferecer um botão que sempre falha.
     if (payload === undefined) {
-      return { estado: 'missing', renovavel: false, clientIdConfigurado }
+      return { estado: 'missing', renovavel: false, clientIdConfigurado, ...salvo }
     }
 
     const vencido = expiraEm !== undefined && Date.parse(expiraEm) <= this.agora()
@@ -128,7 +132,8 @@ export class GithubAuthService {
       estado: vencido ? 'expirado' : 'present',
       ...(expiraEm === undefined ? {} : { expiraEm }),
       renovavel: payload.refreshToken !== undefined,
-      clientIdConfigurado
+      clientIdConfigurado,
+      ...salvo
     }
   }
 

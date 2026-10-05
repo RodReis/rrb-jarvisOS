@@ -448,6 +448,9 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-10-05 | #132 | spec-scheduler-05-recuperacao-e | Regras de Negócio | 2818 | 2818 | 0 | 82.2 | #399 | [#399](https://github.com/RodReis/rrb-jarvisOS/pull/399) |
 | 2026-10-05 | #132 | spec-scheduler-05-recuperacao-e | Banco | 2293 | 2275 | 0 | 84.9 | #399 | [#399](https://github.com/RodReis/rrb-jarvisOS/pull/399) |
 | 2026-10-05 | #132 | spec-scheduler-05-recuperacao-e | Tela | 776 | 775 | 0 | 77.5 | #399 | [#399](https://github.com/RodReis/rrb-jarvisOS/pull/399) |
+| 2026-10-05 | #400 | spec-conectores-03-github-app-autenticacao | Regras de Negócio | 2853 | 2853 | 0 | 82.2 | #401 | [#401](https://github.com/RodReis/rrb-jarvisOS/pull/401) |
+| 2026-10-05 | #400 | spec-conectores-03-github-app-autenticacao | Banco | 2297 | 2279 | 0 | 85.0 | #401 | [#401](https://github.com/RodReis/rrb-jarvisOS/pull/401) |
+| 2026-10-05 | #400 | spec-conectores-03-github-app-autenticacao | Tela | 781 | 780 | 0 | 76.8 | #401 | [#401](https://github.com/RodReis/rrb-jarvisOS/pull/401) |
 | 2026-10-05 | #357 | spec-escuta-02-arbitracao-microfone | Regras de Negócio | 2858 | 2858 | 0 | 82.2 | #402 | [#402](https://github.com/RodReis/rrb-jarvisOS/pull/402) |
 | 2026-10-05 | #357 | spec-escuta-02-arbitracao-microfone | Banco | 2298 | 2280 | 0 | 84.9 | #402 | [#402](https://github.com/RodReis/rrb-jarvisOS/pull/402) |
 | 2026-10-05 | #357 | spec-escuta-02-arbitracao-microfone | Tela | 788 | 787 | 0 | 76.2 | #402 | [#402](https://github.com/RodReis/rrb-jarvisOS/pull/402) |

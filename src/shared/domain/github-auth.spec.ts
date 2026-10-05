@@ -11,7 +11,9 @@ import {
   GITHUB_CLIENT_ID_EMBUTIDO,
   GITHUB_OAUTH_ORIGIN,
   MARGEM_DE_RENOVACAO_MS,
+  MENSAGEM_DO_CLIENT_ID,
   SLOW_DOWN_ACRESCIMO_MS,
+  descreverOverrideDoClientId,
   erroDeInstalacaoAusente,
   grantExpirou,
   interpretarRespostaDeToken,
@@ -20,7 +22,8 @@ import {
   origemDoOAuth,
   precisaRenovar,
   resolverClientId,
-  urlDeInstalacao
+  urlDeInstalacao,
+  validarClientId
 } from './github-auth'
 
 const AGORA = Date.parse('2026-08-29T12:00:00.000Z')
@@ -46,6 +49,89 @@ describe('resolverClientId', () => {
     // `client_id` real for embutido, este teste falha e cobra a atualização — que é o ponto.
     expect(GITHUB_CLIENT_ID_EMBUTIDO).toBe('')
     expect(resolverClientId()).toBeUndefined()
+  })
+})
+
+describe('validarClientId (SPEC-Conectores-03, regra 7: o client ID não é segredo)', () => {
+  it('aceita as duas formas de client ID de GitHub App, com e sem espaço em volta', () => {
+    expect(validarClientId('Iv1.0123456789abcdef')).toEqual({
+      ok: true,
+      clientId: 'Iv1.0123456789abcdef'
+    })
+    expect(validarClientId('  Iv23liAbCdEfGhIjKlMn\n')).toEqual({
+      ok: true,
+      clientId: 'Iv23liAbCdEfGhIjKlMn'
+    })
+  })
+
+  it('vazio limpa o override: ok, sem valor', () => {
+    expect(validarClientId('')).toEqual({ ok: true, clientId: undefined })
+    expect(validarClientId('   ')).toEqual({ ok: true, clientId: undefined })
+  })
+
+  it.each(['ghp_', 'gho_', 'ghu_', 'ghs_', 'ghr_', 'github_pat_'])(
+    'recusa valor com prefixo de token do GitHub (%s…) como segredo, não como client ID',
+    (prefixo) => {
+      expect(validarClientId(`${prefixo}AbCdEfGhIjKl`)).toEqual({
+        ok: false,
+        problema: 'parece-segredo'
+      })
+    }
+  )
+
+  it('o prefixo de token vale em qualquer caixa', () => {
+    expect(validarClientId('GITHUB_PAT_AbCdEfGhIjKl')).toEqual({
+      ok: false,
+      problema: 'parece-segredo'
+    })
+  })
+
+  it('recusa um client secret (40 caracteres hexadecimais): é longo demais para um client ID', () => {
+    expect(validarClientId('a'.repeat(40))).toEqual({ ok: false, problema: 'formato' })
+  })
+
+  it('recusa o valor de 93 caracteres que apareceu no campo (forma de token)', () => {
+    expect(validarClientId(`github${'x'.repeat(87)}`)).toEqual({ ok: false, problema: 'formato' })
+  })
+
+  it.each(['curto', 'tem espaço no meio ok', 'com/barra/aqui1', 'acento-áéíóú-1'])(
+    'recusa por formato: %s',
+    (valor) => {
+      expect(validarClientId(valor)).toEqual({ ok: false, problema: 'formato' })
+    }
+  )
+
+  it('a mensagem de cada problema existe e nunca ecoa o valor recusado', () => {
+    expect(MENSAGEM_DO_CLIENT_ID['parece-segredo']).toMatch(/segredo|token/i)
+    expect(MENSAGEM_DO_CLIENT_ID.formato).toMatch(/client ID/)
+    expect(JSON.stringify(MENSAGEM_DO_CLIENT_ID)).not.toMatch(/ghp_|github_pat_/)
+  })
+})
+
+describe('resolverClientId ignora o override inválido (fail-closed)', () => {
+  it('um override com forma de token nunca é usado: não vai ao GitHub como client_id', () => {
+    expect(resolverClientId(`github_pat_${'x'.repeat(80)}`)).toBeUndefined()
+    expect(resolverClientId('a'.repeat(40))).toBeUndefined()
+  })
+})
+
+describe('descreverOverrideDoClientId (o que a tela pode saber do que está salvo)', () => {
+  it('sem override, não há o que dizer', () => {
+    expect(descreverOverrideDoClientId(undefined)).toEqual({})
+    expect(descreverOverrideDoClientId('  ')).toEqual({})
+  })
+
+  it('override válido: devolve o client ID (público por desenho)', () => {
+    expect(descreverOverrideDoClientId('Iv1.0123456789abcdef')).toEqual({
+      clientIdSalvo: 'Iv1.0123456789abcdef'
+    })
+  })
+
+  it('override inválido: só avisa que é inválido — o valor nunca sai, nem em parte', () => {
+    const r = descreverOverrideDoClientId(`github_pat_${'x'.repeat(80)}`)
+
+    expect(r).toEqual({ clientIdSalvoInvalido: true })
+    expect(JSON.stringify(r)).not.toMatch(/github_pat_|xxxx/)
   })
 })
 
@@ -163,7 +249,7 @@ describe('interpretarRespostaDeToken', () => {
     expect(decisao).toMatchObject({ code })
   })
 
-  it('erro desconhecido é normalizado, e a mensagem do GitHub não vaza para a tela', () => {
+  it('erro desconhecido é normalizado: o código entra, a descrição do GitHub não vaza para a tela', () => {
     const decisao = interpretarRespostaDeToken(
       { error: 'inventado', error_description: 'token ghu_segredo rejeitado' },
       INTERVALO,
@@ -172,7 +258,9 @@ describe('interpretarRespostaDeToken', () => {
 
     expect(decisao).toMatchObject({ tipo: 'falhou', code: 'resposta-invalida' })
     expect((decisao as { mensagem: string }).mensagem).not.toContain('ghu_segredo')
-    expect((decisao as { mensagem: string }).mensagem).not.toContain('inventado')
+    // O **código** (vocabulário fechado do OAuth) entra para o erro ser diagnosticável; a descrição
+    // livre do serviço, não (decisão do PI, 2026-10-05, na correção do campo de client ID).
+    expect((decisao as { mensagem: string }).mensagem).toContain('inventado')
   })
 
   it('sucesso devolve o payload estruturado com expirações absolutas', () => {
@@ -224,6 +312,33 @@ describe('interpretarRespostaDeToken', () => {
       const decisao = interpretarRespostaDeToken(resposta, INTERVALO, AGORA)
       expect(['concluido', 'esperar', 'falhou']).toContain(decisao.tipo)
     }
+  })
+})
+
+describe('interpretarRespostaDeToken — erro desconhecido do GitHub', () => {
+  it('inclui o código do GitHub quando ele tem a forma de um código (diagnosticável, sem texto do serviço)', () => {
+    const r = interpretarRespostaDeToken(
+      { error: 'unauthorized_client', error_description: 'texto livre do GitHub' },
+      INTERVALO,
+      AGORA
+    )
+
+    expect(r).toMatchObject({ tipo: 'falhou', code: 'resposta-invalida' })
+    expect(r.tipo === 'falhou' && r.mensagem).toContain('unauthorized_client')
+    // A descrição livre do GitHub continua fora da mensagem.
+    expect(r.tipo === 'falhou' && r.mensagem).not.toContain('texto livre')
+  })
+
+  it('código com forma estranha não entra na mensagem (pode ser qualquer coisa)', () => {
+    const r = interpretarRespostaDeToken(
+      { error: 'Isto não é um código <script>' },
+      INTERVALO,
+      AGORA
+    )
+
+    expect(r.tipo === 'falhou' && r.mensagem).toBe(
+      'O GitHub recusou a autorização por um motivo não previsto.'
+    )
   })
 })
 

@@ -57,6 +57,20 @@ Contract fixtures do Device Flow, `authorization_pending`, `slow_down`, expiraç
 2. **Emenda ao Vault (SPEC-Providers-01):** o suporte a **payload cifrado estruturado** (access + refresh + `expires_at`), a `expires_at` como **metadado não secreto** e à **rotação atômica** é **escopo desta fatia**, não uma fatia nova do MVP-005. A SPEC-Providers-01 declara rotação como "futuro" e guarda um valor único; a emenda fica registrada lá apontando para cá, e a M5-F01 (#77) não é reaberta. — decidido.
 3. **UI:** **mínima, dentro desta fatia** — mesmo padrão da "UI mínima de aprovação" do MVP-004. Não existe fatia dedicada de UI de Conectores no MVP-006. — decidido.
 
+## Emenda de correção (2026-10-05, [#400](https://github.com/RodReis/rrb-jarvisOS/issues/400))
+
+Achada ao conectar o GitHub pela primeira vez: o campo do override aceitava qualquer texto (um valor de 93 caracteres com forma de token foi gravado em claro e enviado ao GitHub como `client_id`), não mostrava o valor salvo, e o link de instalação usava um slug que não era o da App registrada. **A regra 7 já dizia o certo** ("nenhum dos dois é segredo"); o que faltava era fazê-la valer.
+
+- **Só um `client_id` entra no override.** Validação de forma no domínio (`validarClientId`): vazio limpa; prefixo de token do GitHub (`ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_`, `github_pat_`, em qualquer caixa) é recusado como segredo; fora de `[A-Za-z0-9._-]{10,30}` é recusado por forma (um client secret tem 40). A mensagem **nunca ecoa o valor recusado**. Aplicada na tela e no `main` (`gravarClientIdDoOverride`, a fronteira de confiança).
+- **Override gravado que não passa na validação é ignorado**, nunca enviado (`resolverClientId`, fail-closed): vale para valor de antes da validação existir.
+- **O estado informa o override salvo** (regra 9): `clientIdSalvo` (só quando válido; o client ID é público por desenho) e `clientIdSalvoInvalido` (só o aviso — o valor não sai, nem em parte). A tela mostra "Em uso" e avisa para substituir.
+- **Erro desconhecido do GitHub inclui o código** (`[a-z_]{1,40}`), sem a descrição livre do serviço (decisão do PI, 2026-10-05, ao aprovar a correção): sem ele o erro era indiagnosticável.
+- **`GITHUB_APP_SLUG` = `app-jarvisos`** (a App registrada se chama `app-jarvisOS`; o GitHub gera o slug em minúsculas). Decisão do PI: ajustar a constante. Não verificado pela API pública (a App é privada e responde 404): **confirmar pela URL da página da App**.
+- **O valor inválido de antes sai do disco.** Ao ler o estado da conexão, o `main` apaga o override salvo que não passa na validação (`limparOverrideInvalido`): ignorá-lo basta para a rede, mas a coluna é texto puro e, se o valor era um segredo, mantê-lo é mantê-lo em claro e em backup sem uso. O estado devolvido na mesma leitura ainda carrega o aviso, para a tela explicar. **Ação do PI:** se o valor que apareceu no campo era um token real, ele já foi enviado ao GitHub como `client_id` — revogue-o em Settings → Developer settings.
+- **Um segredo colado por engano não fica à vista:** a tela limpa o campo ao recusar um valor com forma de token.
+- **Revisão independente de segurança** (0 CRITICAL/HIGH; 1 MEDIUM, 3 LOW) e **17 contrafactuais medidos**. Corrigidos: o valor antigo continuar em disco e o segredo recusado ficar visível no campo. **Decisão de produto deixada como está:** o alfabeto e o teto de 30 caracteres aceitam mais do que um client ID (uma senha curta passaria); uma allowlist estrita (`Iv1.` + 16 hex, `Iv23li` + 14, ou 20 hex) fecha isso, mas quebra se o GitHub mudar a forma e os E2E teriam de usar IDs em hex — fica para o PI decidir.
+- **Limite:** o override continua em coluna de texto puro (decisão da migration 14, correta para um `client_id`); a validação é o que impede que ela receba um segredo.
+
 ## Decisões cravadas pelo Cowork (coerentes com decisões anteriores; PI pode vetar)
 
 - **Credencial GitHub escopada por `user_id` + `workspace_id`** (espelha o `CredentialRef`): no NOA ela simplesmente aparece `missing`, sem bloqueio nem erro — o JARVIS OS é quem usa GitHub.
