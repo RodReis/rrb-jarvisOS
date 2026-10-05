@@ -400,6 +400,25 @@ export class IsolamentoService {
   }
 
   /**
+   * Devolve o run **e as unidades de sandbox dele** (`<run>-<escritor>-…`, o que o Squad registra no
+   * lugar do `runId`). Prefixo por segmento, como `runOuUnidadeAtiva`: `run-10` não é de `run-1`.
+   */
+  liberarRunEUnidades(runId: string): ResultadoDaLiberacao {
+    const removidos: TipoDeRecurso[] = []
+    const pendencias: PendenciaDeLimpeza[] = []
+    const alvos = this.deps.inventario
+      .runsComRecurso(this.deps.userId())
+      .filter((id) => id === runId || id.startsWith(`${runId}-`))
+
+    for (const alvo of alvos.length === 0 ? [runId] : alvos) {
+      const r = this.liberarRun(alvo)
+      removidos.push(...r.removidos)
+      pendencias.push(...r.pendencias)
+    }
+    return { removidos, pendencias }
+  }
+
+  /**
    * O recurso Docker sumiu da listagem? Reconsulta algumas vezes, porque o `docker stop` de um
    * container `--rm` volta antes de ele sair da lista. `indeterminado` quando a listagem falha:
    * não ver o recurso porque o Docker não respondeu **não** é ele ter sumido.
