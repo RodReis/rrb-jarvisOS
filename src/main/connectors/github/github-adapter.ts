@@ -74,11 +74,12 @@ import { GithubRest, texto, type BuscadorHttp } from './github-rest'
 /**
  * O slug público da GitHub App, usado só para montar a URL de instalação.
  *
- * Acompanha o `client_id` embutido: enquanto a App do projeto não existe (decisão do PI de
- * 2026-08-29), o slug é o nome pretendido. Não é segredo nem identificador de autenticação — é o
- * pedaço de URL que leva o usuário à página de instalação.
+ * É o slug da App **registrada** pelo PI (nome `app-jarvisOS`; o GitHub gera o slug em minúsculas,
+ * `app-jarvisos`) — o valor anterior (`jarvis-os`) era o nome pretendido antes de a App existir, e
+ * quebrava o link de instalação (decisão do PI, 2026-10-05: ajustar a constante). Não é segredo
+ * nem identificador de autenticação — é o pedaço de URL que leva o usuário à página de instalação.
  */
-export const GITHUB_APP_SLUG = 'jarvis-os'
+export const GITHUB_APP_SLUG = 'app-jarvisos'
 
 /** O que `auth.identify` devolve — **dado normalizado, nunca o objeto do SDK** (crit. 3 da F01). */
 export interface GithubIdentity {

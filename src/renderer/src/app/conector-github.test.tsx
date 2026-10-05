@@ -239,6 +239,67 @@ describe('client ID override', () => {
     montar()
     expect(await screen.findByText(/deixe em branco para voltar ao padrão/i)).toBeInTheDocument()
   })
+
+  it('mostra o client ID em uso quando há um salvo (o campo não volta mudo)', async () => {
+    getGithubAuthStatus.mockResolvedValue(snapshot({ clientIdSalvo: 'Iv1.0123456789abcdef' }))
+    montar()
+
+    expect(await screen.findByText(/em uso:/i)).toHaveTextContent('Iv1.0123456789abcdef')
+  })
+
+  it('override salvo inválido: avisa que não está em uso e nunca mostra o valor', async () => {
+    getGithubAuthStatus.mockResolvedValue(
+      snapshot({ clientIdConfigurado: false, clientIdSalvoInvalido: true })
+    )
+    montar()
+
+    const aviso = await screen.findByText(/removido por segurança/i)
+    expect(aviso).toBeInTheDocument()
+    // O valor inválido pode ser um segredo: a tela só sabe que ele existe.
+    expect(document.body.textContent ?? '').not.toMatch(/github_pat_|ghp_/)
+    // O aviso genérico "falta o client ID" não compete com o específico.
+    expect(screen.queryByText(/falta o client id da github app/i)).not.toBeInTheDocument()
+  })
+
+  it('recusa um token colado no campo: a ponte nem é chamada, a mensagem não ecoa o valor', async () => {
+    montar()
+    await screen.findByText('Não conectado')
+
+    const campo = screen.getByRole('textbox', { name: /client id/i })
+    await userEvent.type(campo, 'github_pat_AbCdEfGhIjKlMnOp')
+    await userEvent.click(screen.getByRole('button', { name: /^salvar$/i }))
+
+    expect(await screen.findByText(/parece um token ou segredo/i)).toBeInTheDocument()
+    expect(setGithubClientId).not.toHaveBeenCalled()
+    // A mensagem não repete o valor, e o segredo colado por engano sai do campo (texto comum).
+    expect(screen.getByText(/parece um token ou segredo/i).textContent).not.toContain(
+      'github_pat_AbCdEfGhIjKlMnOp'
+    )
+    expect(campo).toHaveValue('')
+  })
+
+  it('recusa um valor com forma errada, e a mensagem some quando o usuário volta a digitar', async () => {
+    montar()
+    await screen.findByText('Não conectado')
+
+    const campo = screen.getByRole('textbox', { name: /client id/i })
+    await userEvent.type(campo, 'curto')
+    await userEvent.click(screen.getByRole('button', { name: /^salvar$/i }))
+    expect(await screen.findByText(/não tem a forma esperada/i)).toBeInTheDocument()
+    expect(setGithubClientId).not.toHaveBeenCalled()
+
+    await userEvent.type(campo, 'x')
+    expect(screen.queryByText(/não tem a forma esperada/i)).not.toBeInTheDocument()
+  })
+
+  it('texto vazio ainda limpa o override (voltar ao padrão)', async () => {
+    montar()
+    await screen.findByText('Não conectado')
+
+    await userEvent.click(screen.getByRole('button', { name: /^salvar$/i }))
+
+    await waitFor(() => expect(setGithubClientId).toHaveBeenCalledWith('', 'jarvis'))
+  })
 })
 
 describe('escopo', () => {

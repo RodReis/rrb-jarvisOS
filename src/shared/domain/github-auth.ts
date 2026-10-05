@@ -86,21 +86,102 @@ export function urlDeInstalacao(appSlug: string): string {
 export const GITHUB_CLIENT_ID_EMBUTIDO = ''
 
 /**
- * Qual `client_id` usar: o override do usuário quando preenchido, senão o embutido.
+ * Os prefixos dos tokens e segredos que o GitHub emite (`ghp_` PAT clássico, `gho_` OAuth, `ghu_`
+ * user-to-server, `ghs_` instalação, `ghr_` refresh, `github_pat_` PAT fino). Um valor que começa
+ * por um deles **é** segredo, e a coluna do override é texto puro justamente porque o `client_id`
+ * não é.
+ */
+const PREFIXOS_DE_SEGREDO_DO_GITHUB = [
+  'ghp_',
+  'gho_',
+  'ghu_',
+  'ghs_',
+  'ghr_',
+  'github_pat_'
+] as const
+
+/**
+ * A forma de um `client_id` de GitHub App: `Iv1.` + 16 hexadecimais, ou `Iv23li` + 14 caracteres —
+ * 20 em ambos. O teto de 30 é folga para a forma mudar, e **exclui** o client secret (40), o token
+ * clássico e o PAT fino (mais de 80). O alfabeto exclui espaço e barra: o valor vai no corpo de um
+ * formulário e na URL que o usuário abre.
+ */
+const FORMA_DO_CLIENT_ID = /^[A-Za-z0-9._-]{10,30}$/
+
+/** A forma de um código de erro do OAuth do GitHub: minúsculas e sublinhado. */
+const CODIGO_DE_ERRO_DO_GITHUB = /^[a-z_]{1,40}$/
+
+export type ProblemaDoClientId = 'parece-segredo' | 'formato'
+
+export type ValidacaoDoClientId =
+  /** `clientId: undefined` é "limpar o override" (texto vazio). */
+  | { readonly ok: true; readonly clientId: string | undefined }
+  | { readonly ok: false; readonly problema: ProblemaDoClientId }
+
+/**
+ * Mensagens de tela, uma por problema. **Nunca ecoam o valor recusado**: se ele for de fato um
+ * segredo colado por engano, repeti-lo na tela e no log seria a segunda exposição.
+ */
+export const MENSAGEM_DO_CLIENT_ID: Readonly<Record<ProblemaDoClientId, string>> = {
+  'parece-segredo':
+    'Isto parece um token ou segredo do GitHub, não um client ID. Cole só o client ID da GitHub App (começa por "Iv").',
+  formato:
+    'O client ID não tem a forma esperada: de 10 a 30 caracteres entre letras, números, ponto, hífen e sublinhado.'
+}
+
+/**
+ * O texto digitado é um `client_id`? (SPEC-Conectores-03, regra 7: "nenhum dos dois é segredo".)
+ *
+ * Vazio é válido e significa limpar. Valor com cara de token é recusado **antes** de qualquer
+ * regra de forma, para a mensagem dizer o motivo certo.
+ */
+export function validarClientId(texto: string): ValidacaoDoClientId {
+  const limpo = texto.trim()
+  if (limpo === '') return { ok: true, clientId: undefined }
+
+  const minusculo = limpo.toLowerCase()
+  if (PREFIXOS_DE_SEGREDO_DO_GITHUB.some((prefixo) => minusculo.startsWith(prefixo))) {
+    return { ok: false, problema: 'parece-segredo' }
+  }
+  if (!FORMA_DO_CLIENT_ID.test(limpo)) return { ok: false, problema: 'formato' }
+
+  return { ok: true, clientId: limpo }
+}
+
+/**
+ * Qual `client_id` usar: o override do usuário quando preenchido **e válido**, senão o embutido.
  *
  * Precedência do override (critério 7), e a mesma forma do vault>env do `CredentialService`: o
  * valor que o usuário configurou vence o de fábrica, porque senão a tela diria "salvo" e a rede
  * usaria outro — a divergência silenciosa que a M5-F01 já tinha fechado.
  *
+ * **Override que não passa na validação é tratado como ausente**, nunca enviado: um valor gravado
+ * antes da validação existir (ou por outro caminho) com forma de token iria ao GitHub como
+ * `client_id`. Fail-closed — a tela mostra que o salvo é inválido (`descreverOverrideDoClientId`).
+ *
  * Espaços são aparados antes de decidir: um override colado com quebra de linha é a intenção de
  * configurar, não um `client_id` cujo último caractere é uma quebra.
  */
 export function resolverClientId(override?: string): string | undefined {
-  const limpo = override?.trim()
-  if (limpo !== undefined && limpo !== '') return limpo
+  const validado = override === undefined ? undefined : validarClientId(override)
+  if (validado?.ok === true && validado.clientId !== undefined) return validado.clientId
 
   const embutido = GITHUB_CLIENT_ID_EMBUTIDO.trim()
   return embutido === '' ? undefined : embutido
+}
+
+/**
+ * O que a tela pode saber do override salvo. Válido: o próprio client ID (público por desenho).
+ * Inválido: **só o aviso** — o valor não sai, nem em parte, porque pode ser um segredo.
+ */
+export function descreverOverrideDoClientId(override?: string): {
+  readonly clientIdSalvo?: string
+  readonly clientIdSalvoInvalido?: true
+} {
+  if (override === undefined) return {}
+  const validado = validarClientId(override)
+  if (!validado.ok) return { clientIdSalvoInvalido: true }
+  return validado.clientId === undefined ? {} : { clientIdSalvo: validado.clientId }
 }
 
 /** O que o GitHub devolve ao abrir o Device Flow (`POST /login/device/code`). */
@@ -237,9 +318,12 @@ export function interpretarRespostaDeToken(
       return {
         tipo: 'falhou',
         code: 'resposta-invalida',
-        // A mensagem do GitHub **não** entra: ela é texto do serviço e a spec pede erro
-        // normalizado. O código bruto vira evidência sanitizada no serviço, não mensagem de tela.
-        mensagem: 'O GitHub recusou a autorização por um motivo não previsto.'
+        // A descrição do GitHub **não** entra: é texto livre do serviço e a spec pede erro
+        // normalizado. O **código** entra quando tem a forma de um (`unauthorized_client`): sem ele
+        // o erro é indiagnosticável. Forma estranha fica de fora — pode ser qualquer coisa.
+        mensagem: CODIGO_DE_ERRO_DO_GITHUB.test(erro)
+          ? `O GitHub recusou a autorização (código: ${erro}).`
+          : 'O GitHub recusou a autorização por um motivo não previsto.'
       }
   }
 }
@@ -348,6 +432,10 @@ export interface GithubAuthSnapshot {
   readonly renovavel: boolean
   /** O `client_id` está resolvido? `false` = falta preencher o override em Configurações. */
   readonly clientIdConfigurado: boolean
+  /** O override salvo, **só quando válido**: o `client_id` é público por desenho e a tela o mostra. */
+  readonly clientIdSalvo?: string
+  /** Há override salvo que não passa na validação (forma de token, por exemplo). Nunca vai o valor. */
+  readonly clientIdSalvoInvalido?: true
 }
 
 /**

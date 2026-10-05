@@ -221,6 +221,8 @@ describe('executar', () => {
 
     expect(erro.code).toBe('permissao-negada')
     expect(erro.mensagem).toContain(urlDeInstalacao(GITHUB_APP_SLUG))
+    // O slug é o da App **registrada** (`app-jarvisOS` → `app-jarvisos`), não o nome pretendido antes.
+    expect(erro.mensagem).toContain('https://github.com/apps/app-jarvisos/installations/new')
   })
 
   it('500 é indisponível e retentável', async () => {
