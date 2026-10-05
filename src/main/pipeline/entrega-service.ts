@@ -230,7 +230,8 @@ export interface EntregaDeps {
 }
 
 export class EntregaService {
-  private runCorrente?: RunCorrente
+  /** Um contexto **por run**: dois `entregar` concorrentes não se sobrescrevem. */
+  private readonly runsCorrentes = new Map<string, RunCorrente>()
   private readonly agora: () => number
   private readonly dormir: (ms: number) => Promise<void>
   private readonly tetoDeEsperaMs: number
@@ -243,22 +244,23 @@ export class EntregaService {
   }
 
   /**
-   * O run e a tentativa correntes.
+   * O run e a tentativa correntes, para o contexto **global** do `ExecutorProxy` (o caminho de um
+   * run só, sem `/u/<chave>`).
    *
-   * É o que o boot passa ao `ExecutorProxy` no lugar dos `() => undefined` que a M9-F04 deixou:
-   * sem isto o gate de ContextPack recusa **toda** chamada do executor, e a rota não opera em
-   * produção. Fecha a pendência declarada por aquela fatia.
+   * Só responde quando há exatamente **um** run em curso: com dois, o global não sabe de quem é a
+   * chamada, e atribuir o custo e o ContextPack de um ao outro é pior que recusar. Run
+   * concorrente chama pela unidade (`registrarUnidade`), que carrega o próprio contexto.
    */
   contextoDoRun(): RunCorrente | undefined {
-    return this.runCorrente
+    return this.runsCorrentes.size === 1 ? [...this.runsCorrentes.values()][0] : undefined
   }
 
   async entregar(pedido: PedidoDeEntrega): Promise<ResultadoDaEntrega> {
-    this.runCorrente = {
+    this.runsCorrentes.set(pedido.runId, {
       runId: pedido.runId,
       tentativa: 1,
       ...(pedido.contextPackId === undefined ? {} : { contextPackId: pedido.contextPackId })
-    }
+    })
 
     const iniciadoEm = this.agora()
     let resultado: ResultadoDaEntrega | undefined
@@ -267,8 +269,8 @@ export class EntregaService {
       resultado = await this.executar(pedido)
       return resultado
     } finally {
-      const tentativa = this.runCorrente?.tentativa ?? 1
-      this.runCorrente = undefined
+      const tentativa = this.runsCorrentes.get(pedido.runId)?.tentativa ?? 1
+      this.runsCorrentes.delete(pedido.runId)
       this.encerrar(pedido, resultado, iniciadoEm, tentativa)
     }
   }
@@ -400,7 +402,14 @@ export class EntregaService {
       sandbox: pedido.sandbox,
       promptInicial: pedido.promptInicial,
       comandosDeValidacao: pedido.comandosDeValidacao,
-      signal: pedido.signal
+      signal: pedido.signal,
+      // Com o escopo e o token, a construção avança o run pela fila (e perde o run quando o dono
+      // perde o slot); sem token (run que não passou pelo pool), o caminho continua o de antes.
+      escopo: {
+        projectId: pedido.projectId,
+        workspaceId: pedido.workspaceId,
+        ...(pedido.fencingToken === undefined ? {} : { fencingToken: pedido.fencingToken })
+      }
     })
 
     if (construcao.estadoFinal === 'BLOCKED') {
@@ -411,18 +420,23 @@ export class EntregaService {
       )
     }
 
-    this.runCorrente = {
+    this.runsCorrentes.set(pedido.runId, {
       runId: pedido.runId,
       tentativa: construcao.tentativas.length === 0 ? 1 : construcao.tentativas.length,
       ...(pedido.contextPackId === undefined ? {} : { contextPackId: pedido.contextPackId })
-    }
+    })
 
     // (3) Revisão do delta. P0/P1 abertos bloqueiam o merge mesmo com o kill-switch ligado.
     const achados = await this.deps.revisar(pedido)
 
+    // Cada efeito externo (push, PR, proteção da base) confere antes se o dono ainda é o dono: run
+    // cancelado ou sem lease (o heartbeat aborta o sinal) não publica nada na origem.
+    if (this.foiInterrompida(pedido)) return await this.interrompida(pedido)
+
     // (4) Publica e garante o PR — **sempre o mesmo**, mesmo depois de recuperação (critério 5).
     const publicacao = await this.publicar(pedido)
     if (!publicacao.ok) return publicacao.bloqueio
+    if (this.foiInterrompida(pedido)) return await this.interrompida(pedido)
 
     // (5) Proteção da branch-base exigindo o check que acabamos de gerar. É o que fecha os
     // critérios 9 e 10 sem intervenção humana: sem context obrigatório, o gate barra por ausência
@@ -430,6 +444,20 @@ export class EntregaService {
     await this.exigirCheckObrigatorio(pedido)
 
     return await this.aguardarEConcluir(pedido, publicacao.pullRequest, achados)
+  }
+
+  /** Por função: o sinal muda durante os `await`, e o TS estreitaria a leitura repetida. */
+  private foiInterrompida(pedido: PedidoDeEntrega): boolean {
+    return pedido.signal?.aborted === true
+  }
+
+  private async interrompida(pedido: PedidoDeEntrega): Promise<ResultadoDaEntrega> {
+    return await this.bloquear(
+      pedido,
+      'externo',
+      'Retomar a entrega.',
+      'A entrega foi interrompida (run cancelado ou slot perdido) antes do próximo efeito externo.'
+    )
   }
 
   /**

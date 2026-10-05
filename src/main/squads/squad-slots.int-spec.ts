@@ -343,6 +343,7 @@ describe('o estado da espera não vaza entre usos', () => {
 
   it('um slot sem token no lease não é entregue como sucesso', async () => {
     const stub = {
+      adquirirSlot: () => ({ reason: 'ocupado' as const, mensagem: 'x' }),
       adquirirSlotDoEscritor: () => ({
         reason: 'adquirido' as const,
         mensagem: 'ok',
@@ -362,6 +363,61 @@ describe('o estado da espera não vaza entre usos', () => {
     })
 
     expect(r).toEqual({ ok: false, motivo: 'indisponivel' })
+  })
+})
+
+describe('adquirirRun (o run inteiro, SPEC-Scheduler-05)', () => {
+  const pedirRun = (runId: string, signal?: AbortSignal) => {
+    relogio += 1000
+    return gerente.adquirirRun({
+      projectId: 'p-a',
+      workspaceId: WS,
+      runId,
+      ...(signal === undefined ? {} : { signal })
+    })
+  }
+
+  it('com vaga, resolve na hora com o token do slot do run', async () => {
+    const run = pronto()
+
+    const r = await pedirRun(run)
+
+    expect(r).toEqual({ ok: true, unidade: run, fencingToken: pool.slotDoRun(run)?.fencingToken })
+  })
+
+  it('o segundo run espera o slot e acorda quando o primeiro o libera', async () => {
+    const um = pronto()
+    const dois = pronto()
+    const a = await pedirRun(um)
+    if (!a.ok) throw new Error('o primeiro deveria ter slot')
+
+    const espera = pedirRun(dois)
+
+    expect(await estado(espera)).toBe('pendente')
+    gerente.liberar('p-a', WS, um, a.fencingToken)
+    const b = await espera
+    expect(b).toMatchObject({ ok: true, unidade: dois })
+    expect(b.ok && b.fencingToken).not.toBe(a.fencingToken)
+  })
+
+  it('cancelar a espera tira o run da fila, e a liberação seguinte não o adquire', async () => {
+    const um = pronto()
+    const dois = pronto()
+    const a = await pedirRun(um)
+    if (!a.ok) throw new Error('sem slot')
+    const controle = new AbortController()
+    const espera = pedirRun(dois, controle.signal)
+
+    controle.abort()
+
+    expect(await espera).toEqual({ ok: false, motivo: 'cancelada' })
+    gerente.liberar('p-a', WS, um, a.fencingToken)
+    expect(pool.slotDoRun(dois)).toBeUndefined()
+    expect(pool.vista().fila).toEqual([])
+  })
+
+  it('run inexistente é indisponível, sem esperar', async () => {
+    expect(await pedirRun('nao-existe')).toEqual({ ok: false, motivo: 'indisponivel' })
   })
 })
 

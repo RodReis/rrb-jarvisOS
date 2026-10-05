@@ -28,6 +28,7 @@ import {
 import type { AuditRepository } from '../storage/audit-repository'
 import { log } from '../logging/logger'
 import type { DockerRunner, ExecucaoNoContainer } from './docker-runner'
+import type { FilaService } from './fila-service'
 import type { PipelineRepository } from './pipeline-repository'
 
 /**
@@ -47,6 +48,16 @@ export interface PedidoDeConstrucao {
   readonly comandosDeValidacao: ComandosDeValidacao
   /** Cancelamento cooperativo: checado entre passos (critério 5). Ausente = não cancelável. */
   readonly signal?: AbortSignal
+  /**
+   * O escopo e o fencing token do run (SPEC-Scheduler-05). Presente (e com a fila injetada), as
+   * transições passam pela `FilaService` com o token: o dono que perdeu o slot não avança, e o
+   * `BLOCKED` dispara a recuperação. Ausente, o caminho é o de antes, direto no repositório.
+   */
+  readonly escopo?: {
+    readonly projectId: string
+    readonly workspaceId: WorkspaceId
+    readonly fencingToken?: number
+  }
 }
 
 export interface ResultadoDaConstrucao {
@@ -66,7 +77,9 @@ export class ConstrutorService {
     private readonly audit: AuditRepository,
     private readonly userId: () => string,
     private readonly workspaceId: () => WorkspaceId,
-    private readonly agora: () => Date = () => new Date()
+    private readonly agora: () => Date = () => new Date(),
+    /** Só as transições do run: com ela, o construtor deixa de escrever `estado` por fora da fila. */
+    private readonly fila?: Pick<FilaService, 'transicionar'>
   ) {}
 
   async construir(pedido: PedidoDeConstrucao): Promise<ResultadoDaConstrucao> {
@@ -77,13 +90,7 @@ export class ConstrutorService {
     for (;;) {
       if (pedido.signal?.aborted === true) {
         this.docker.matarProcesso(pedido.sandbox.containerNome, pedido.sandbox.worktreeNoHost)
-        return this.bloquear(
-          pedido.runId,
-          'RUNNING',
-          tentativas,
-          'externo',
-          'Cancelado pelo usuário.'
-        )
+        return this.bloquear(pedido, 'RUNNING', tentativas, 'externo', 'Cancelado pelo usuário.')
       }
 
       // (1) Invoca o `claude` dentro do container — o único ponto por onde o prompt entra.
@@ -109,11 +116,11 @@ export class ConstrutorService {
           diagnostico: execucaoClaude.stderr
         })
         // Ainda em RUNNING aqui: a transição para VALIDATING (abaixo) não aconteceu.
-        return this.bloquear(pedido.runId, 'RUNNING', tentativas, causa, execucaoClaude.stderr)
+        return this.bloquear(pedido, 'RUNNING', tentativas, causa, execucaoClaude.stderr)
       }
 
       // (2) Move para VALIDATING e roda test/lint/type/build — **sempre no container** (critério 11).
-      this.transicionar(pedido.runId, 'RUNNING', 'VALIDATING')
+      if (!this.transicionar(pedido, 'RUNNING', 'VALIDATING')) return this.perdeuODono(tentativas)
       const validacao = this.validar(pedido.sandbox, pedido.comandosDeValidacao, pedido.signal)
 
       if (validacao.ok) {
@@ -129,22 +136,16 @@ export class ConstrutorService {
             classificacao: causa,
             diagnostico: escopo.evidencia
           })
-          return this.bloquear(pedido.runId, 'VALIDATING', tentativas, causa, escopo.evidencia)
+          return this.bloquear(pedido, 'VALIDATING', tentativas, causa, escopo.evidencia)
         }
 
         tentativas.push({ numero, runId: pedido.runId })
-        this.transicionar(pedido.runId, 'VALIDATING', 'PR_CI')
+        if (!this.transicionar(pedido, 'VALIDATING', 'PR_CI')) return this.perdeuODono(tentativas)
         return { estadoFinal: 'PR_CI', tentativas }
       }
 
       if (validacao.cancelado) {
-        return this.bloquear(
-          pedido.runId,
-          'VALIDATING',
-          tentativas,
-          'externo',
-          'Cancelado pelo usuário.'
-        )
+        return this.bloquear(pedido, 'VALIDATING', tentativas, 'externo', 'Cancelado pelo usuário.')
       }
 
       const causa = classificarFalha(validacao.falha)
@@ -158,16 +159,16 @@ export class ConstrutorService {
       // Falha externa não gasta ciclo de correção: recuperar com o mesmo código não muda o
       // desfecho de um serviço fora do ar (spec § Classificação).
       if (causa !== 'corrigivel') {
-        return this.bloquear(pedido.runId, 'VALIDATING', tentativas, causa, validacao.falha.stderr)
+        return this.bloquear(pedido, 'VALIDATING', tentativas, causa, validacao.falha.stderr)
       }
 
       if (!proximaTentativaPermitida(numero)) {
-        return this.bloquear(pedido.runId, 'VALIDATING', tentativas, causa, validacao.falha.stderr)
+        return this.bloquear(pedido, 'VALIDATING', tentativas, causa, validacao.falha.stderr)
       }
 
       // (3) Recuperação: volta a RUNNING com prompt resumido (delta + erro novo), nunca releitura
       // integral do repositório (spec § Regras: "não relê o repositório inteiro por padrão").
-      this.transicionar(pedido.runId, 'VALIDATING', 'RUNNING')
+      if (!this.transicionar(pedido, 'VALIDATING', 'RUNNING')) return this.perdeuODono(tentativas)
       promptDaVez = promptDeRecuperacao(validacao.falha, tentativas)
       numero += 1
     }
@@ -285,40 +286,98 @@ export class ConstrutorService {
   }
 
   private bloquear(
-    runId: string,
+    pedido: PedidoDeConstrucao,
     de: Parameters<PipelineRepository['transicionar']>[1],
     tentativas: readonly Tentativa[],
     causa: ClassificacaoDeFalha,
     evidencia: string
   ): ResultadoDaConstrucao {
     const retomada = retomadaPara(causa)
+    // A fila recusa bloqueio sem evidência (CONVENTION §4), e falha comum — teste que escreve só no
+    // stdout, `docker exec` que estoura o prazo — chega aqui com o `stderr` vazio. Recusado, o run
+    // ficaria ativo segurando o slot, com a causa real perdida.
+    const evidenciaDoBloqueio =
+      evidencia.trim() === ''
+        ? 'A etapa falhou sem escrever nada no stderr (veja a saída do container no log).'
+        : evidencia
     const bloqueio: BloqueioExterno = {
       causa,
-      evidencia,
+      evidencia: evidenciaDoBloqueio,
       tentativas: tentativas.length,
       porQueNaoSeguir: porQueNaoSeguirPara(causa),
       retomada
     }
-    this.transicionar(runId, de, 'BLOCKED', bloqueio)
-    return { estadoFinal: 'BLOCKED', tentativas, bloqueio: { causa, evidencia, retomada } }
+    this.transicionar(pedido, de, 'BLOCKED', bloqueio)
+    return {
+      estadoFinal: 'BLOCKED',
+      tentativas,
+      bloqueio: { causa, evidencia: evidenciaDoBloqueio, retomada }
+    }
   }
 
+  /**
+   * Quem perdeu o run (cancelado, ou o slot passou a outro dono) não segue construindo: o run já
+   * não é dele, e a transição que ele tentou foi recusada pela fila.
+   */
+  private perdeuODono(tentativas: readonly Tentativa[]): ResultadoDaConstrucao {
+    const causa: ClassificacaoDeFalha = 'externo'
+    return {
+      estadoFinal: 'BLOCKED',
+      tentativas,
+      bloqueio: {
+        causa,
+        evidencia: 'O run não aceitou a transição: foi cancelado ou este executor perdeu o slot.',
+        retomada: retomadaPara(causa)
+      }
+    }
+  }
+
+  /**
+   * Devolve se a transição valeu. Com a fila e o escopo, é a fila quem decide (token vigente, run
+   * ainda ativo) e quem audita; sem eles, o compare-and-set do repositório de antes.
+   */
   private transicionar(
-    runId: string,
+    pedido: PedidoDeConstrucao,
     de: Parameters<PipelineRepository['transicionar']>[1],
     para: Parameters<PipelineRepository['transicionar']>[2],
     bloqueio?: BloqueioExterno
-  ): void {
-    const ok = this.pipeline.transicionar(runId, de, para, this.agora(), bloqueio)
+  ): boolean {
+    if (this.fila !== undefined && pedido.escopo !== undefined) {
+      const { projectId, workspaceId, fencingToken } = pedido.escopo
+      const r = this.fila.transicionar(
+        projectId,
+        workspaceId,
+        pedido.runId,
+        para,
+        bloqueio,
+        fencingToken
+      )
+      if (r.reason !== 'transicionado') {
+        log.agent.warn('Transição de pipeline recusada pela fila', {
+          runId: pedido.runId,
+          de,
+          para,
+          motivo: r.reason
+        })
+      }
+      return r.reason === 'transicionado'
+    }
+
+    const ok = this.pipeline.transicionar(pedido.runId, de, para, this.agora(), bloqueio)
     this.audit.append({
       user_id: this.userId(),
       workspace_id: this.workspaceId(),
       type: 'pipeline-transition',
-      payload: { runId, de, para, aplicada: ok }
+      payload: { runId: pedido.runId, de, para, aplicada: ok }
     })
     if (!ok) {
-      log.agent.warn('Transição de pipeline recusada pelo compare-and-set', { runId, de, para })
+      log.agent.warn('Transição de pipeline recusada pelo compare-and-set', {
+        runId: pedido.runId,
+        de,
+        para
+      })
     }
+    return ok
   }
 }
 

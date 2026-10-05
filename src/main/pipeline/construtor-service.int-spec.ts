@@ -949,3 +949,151 @@ describe('ConstrutorService — bloqueio persiste os cinco campos do BloqueioExt
     )
   })
 })
+
+describe('ConstrutorService — transições pela fila com o fencing token (SPEC-Scheduler-05)', () => {
+  const escopo = { projectId: 'p1', workspaceId: 'ws1' as never, fencingToken: 7 }
+  const ok = { ok: true, stdout: '', stderr: '', exitCode: 0, timeoutExcedido: false }
+
+  function filaDuble(recusaEm?: string) {
+    return {
+      transicionar: vi.fn(
+        (
+          _p: string,
+          _w: unknown,
+          _run: string,
+          para: string,
+          _bloqueio?: unknown,
+          _token?: number
+        ): { reason: string; mensagem: string } =>
+          para === recusaEm
+            ? { reason: 'fencing-invalido', mensagem: 'dono antigo' }
+            : { reason: 'transicionado', mensagem: 'ok' }
+      )
+    }
+  }
+
+  it('avança o run pela fila, com o token, sem escrever estado por fora dela', async () => {
+    const docker = dockerDuble(() => ok)
+    const pipeline = repoDuble()
+    const audit = auditDuble()
+    const fila = filaDuble()
+    const service = new ConstrutorService(
+      docker,
+      pipeline,
+      audit,
+      () => 'u1',
+      () => 'ws1' as never,
+      undefined,
+      fila as never
+    )
+
+    const resultado = await service.construir({
+      runId: 'run-1',
+      sandbox,
+      promptInicial: 'x',
+      comandosDeValidacao,
+      escopo
+    })
+
+    expect(resultado.estadoFinal).toBe('PR_CI')
+    expect(fila.transicionar).toHaveBeenCalledWith('p1', 'ws1', 'run-1', 'VALIDATING', undefined, 7)
+    expect(fila.transicionar).toHaveBeenCalledWith('p1', 'ws1', 'run-1', 'PR_CI', undefined, 7)
+    expect(pipeline.transicionar).not.toHaveBeenCalled()
+    // A fila é quem audita a transição: o construtor não a duplica.
+    expect(audit.append).not.toHaveBeenCalled()
+  })
+
+  it('o dono que perdeu o slot (fila recusa) para de construir: nada de validação em cima do run alheio', async () => {
+    const docker = dockerDuble(() => ok)
+    const fila = filaDuble('VALIDATING')
+    const service = new ConstrutorService(
+      docker,
+      repoDuble(),
+      auditDuble(),
+      () => 'u1',
+      () => 'ws1' as never,
+      undefined,
+      fila as never
+    )
+
+    const resultado = await service.construir({
+      runId: 'run-1',
+      sandbox,
+      promptInicial: 'x',
+      comandosDeValidacao,
+      escopo
+    })
+
+    expect(resultado.estadoFinal).toBe('BLOCKED')
+    expect(resultado.bloqueio?.causa).toBe('externo')
+    // Só o `claude` rodou; os quatro comandos de validação não.
+    expect(docker.exec).toHaveBeenCalledTimes(1)
+  })
+
+  it('o bloqueio sai pela fila, com os cinco campos e o token', async () => {
+    const docker = dockerDuble((comando) =>
+      comando[0] === 'claude'
+        ? { ok: false, stdout: '', stderr: 'ECONNREFUSED', exitCode: 1, timeoutExcedido: false }
+        : ok
+    )
+    const fila = filaDuble()
+    const service = new ConstrutorService(
+      docker,
+      repoDuble(),
+      auditDuble(),
+      () => 'u1',
+      () => 'ws1' as never,
+      undefined,
+      fila as never
+    )
+
+    await service.construir({
+      runId: 'run-1',
+      sandbox,
+      promptInicial: 'x',
+      comandosDeValidacao,
+      escopo
+    })
+
+    expect(fila.transicionar).toHaveBeenCalledWith(
+      'p1',
+      'ws1',
+      'run-1',
+      'BLOCKED',
+      expect.objectContaining({ causa: 'externo', evidencia: 'ECONNREFUSED' }),
+      7
+    )
+  })
+  it('falha sem stderr (teste que escreve no stdout) bloqueia com evidência não vazia, que a fila aceita', async () => {
+    const docker = dockerDuble((comando) =>
+      comando.includes('test')
+        ? { ok: false, stdout: 'FAIL', stderr: '', exitCode: 1, timeoutExcedido: false }
+        : ok
+    )
+    const fila = filaDuble()
+    const service = new ConstrutorService(
+      docker,
+      repoDuble(),
+      auditDuble(),
+      () => 'u1',
+      () => 'ws1' as never,
+      undefined,
+      fila as never
+    )
+
+    const resultado = await service.construir({
+      runId: 'run-1',
+      sandbox,
+      promptInicial: 'x',
+      comandosDeValidacao,
+      escopo
+    })
+
+    expect(resultado.estadoFinal).toBe('BLOCKED')
+    // `bloqueioCompleto` da fila recusa evidência vazia: o run ficaria ativo segurando o slot.
+    expect(resultado.bloqueio?.evidencia.trim()).not.toBe('')
+    const bloqueio = fila.transicionar.mock.calls.find((c) => c[3] === 'BLOCKED')?.[4] as
+      { evidencia: string } | undefined
+    expect(bloqueio?.evidencia.trim()).not.toBe('')
+  })
+})
