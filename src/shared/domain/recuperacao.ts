@@ -49,14 +49,26 @@ export interface ObservacaoDoRun {
    * anterior morreu e nenhum dono em memória sobreviveu.
    */
   readonly donoNesteProcesso: boolean
+  /**
+   * O run é **herdado do processo anterior** — a varredura do boot, ou uma depois dela sobre um slot
+   * que já existia ao subir —: o dono morreu com aquele processo, e com ele todo dono em memória. O
+   * container do sandbox é `sleep infinity`, detached — a queda do app não o para, então "o
+   * container está de pé" deixa de significar "alguém o dirige". Ausente = o run é deste processo.
+   */
+  readonly herdado?: boolean
 }
 
 export type AcaoDeRecuperacao = 'manter' | 'aguardar' | 'recolher' | 'bloquear-e-recolher'
+
+/** Por que o run perdeu o dono: o executor morreu, ou ficou de pé sem ninguém que o dirija. */
+export type CausaDaPerda = 'executor-morto' | 'executor-sem-dono'
 
 export interface DecisaoDeRecuperacao {
   readonly acao: AcaoDeRecuperacao
   /** Em português, para a auditoria e para o PI: por que a recuperação fez (ou não) isto. */
   readonly motivo: string
+  /** Presente quando a ação é `bloquear-e-recolher`: o que o bloqueio dirá como evidência. */
+  readonly causa?: CausaDaPerda
 }
 
 export function decidirRecuperacao(o: ObservacaoDoRun): DecisaoDeRecuperacao {
@@ -88,7 +100,9 @@ export function decidirRecuperacao(o: ObservacaoDoRun): DecisaoDeRecuperacao {
     }
   }
 
-  if (o.executor === 'vivo') {
+  // Fora do boot, container de pé é lentidão: o dono vive neste processo e pode só estar atrasado.
+  // No boot não existe dono: o processo que o dirigia morreu, e o container sobrevive a ele.
+  if (o.executor === 'vivo' && o.herdado !== true) {
     return {
       acao: 'manter',
       motivo: 'Lease expirado, mas o executor está vivo: lentidão, não morte.'
@@ -110,8 +124,19 @@ export function decidirRecuperacao(o: ObservacaoDoRun): DecisaoDeRecuperacao {
     }
   }
 
+  if (o.executor === 'vivo') {
+    return {
+      acao: 'bloquear-e-recolher',
+      causa: 'executor-sem-dono',
+      motivo:
+        'Lease expirado e o container do run, herdado do processo anterior, ainda está de pé: quem o dirigia ' +
+        'morreu, e ele não termina sozinho.'
+    }
+  }
+
   return {
     acao: 'bloquear-e-recolher',
+    causa: 'executor-morto',
     motivo: 'Lease expirado e executor morto: o run perdeu o dono e não vai terminar sozinho.'
   }
 }

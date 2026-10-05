@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 2858 | 2858 | 0 | 82.2 | — | — |
-| — | — | — | Banco | 2298 | 2280 | 0 | 84.9 | — | — |
-| — | — | — | Tela | 788 | 787 | 0 | 76.2 | — | — |
+| — | — | — | Regras de Negócio | 2865 | 2865 | 0 | 82.1 | — | — |
+| — | — | — | Banco | 2327 | 2309 | 0 | 85.3 | — | — |
+| — | — | — | Tela | 781 | 780 | 0 | 76.8 | — | — |
 
 ## Histórico por entrega
 
@@ -451,6 +451,9 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-10-05 | #400 | spec-conectores-03-github-app-autenticacao | Regras de Negócio | 2853 | 2853 | 0 | 82.2 | #401 | [#401](https://github.com/RodReis/rrb-jarvisOS/pull/401) |
 | 2026-10-05 | #400 | spec-conectores-03-github-app-autenticacao | Banco | 2297 | 2279 | 0 | 85.0 | #401 | [#401](https://github.com/RodReis/rrb-jarvisOS/pull/401) |
 | 2026-10-05 | #400 | spec-conectores-03-github-app-autenticacao | Tela | 781 | 780 | 0 | 76.8 | #401 | [#401](https://github.com/RodReis/rrb-jarvisOS/pull/401) |
+| 2026-10-05 | #132 | spec-scheduler-05-recuperacao-e | Regras de Negócio | 2865 | 2865 | 0 | 82.1 | 403 | [403](https://github.com/RodReis/rrb-jarvisOS/pull/403) |
+| 2026-10-05 | #132 | spec-scheduler-05-recuperacao-e | Banco | 2327 | 2309 | 0 | 85.3 | 403 | [403](https://github.com/RodReis/rrb-jarvisOS/pull/403) |
+| 2026-10-05 | #132 | spec-scheduler-05-recuperacao-e | Tela | 781 | 780 | 0 | 76.8 | 403 | [403](https://github.com/RodReis/rrb-jarvisOS/pull/403) |
 | 2026-10-05 | #357 | spec-escuta-02-arbitracao-microfone | Regras de Negócio | 2858 | 2858 | 0 | 82.2 | #402 | [#402](https://github.com/RodReis/rrb-jarvisOS/pull/402) |
 | 2026-10-05 | #357 | spec-escuta-02-arbitracao-microfone | Banco | 2298 | 2280 | 0 | 84.9 | #402 | [#402](https://github.com/RodReis/rrb-jarvisOS/pull/402) |
 | 2026-10-05 | #357 | spec-escuta-02-arbitracao-microfone | Tela | 788 | 787 | 0 | 76.2 | #402 | [#402](https://github.com/RodReis/rrb-jarvisOS/pull/402) |

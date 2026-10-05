@@ -493,6 +493,17 @@ export interface MergeStateNormalizado {
    */
   readonly mergeSha?: string
   readonly headSha: string
+  /**
+   * Quantos commits da base o PR ainda **não contém** (o `behind_by` da comparação base...head).
+   * `0` é "em dia"; **ausente é "não sei"** — comparação que falhou nunca vira "em dia".
+   *
+   * É a fonte de verdade de "a base avançou desde que este head foi testado". A pipeline não pode
+   * deduzi-la do que a proteção `strict` barra: o merge autônomo roda como o dono
+   * (`enforce_admins: false`), e o admin passa pela exigência de branch atualizada — o PR atrasado
+   * entraria sobre uma base que o CI dele nunca viu. Só em PR aberto: PR fechado ou mergeado não
+   * tem o que atualizar.
+   */
+  readonly atrasadoPor?: number
 }
 
 /**

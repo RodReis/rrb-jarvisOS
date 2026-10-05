@@ -27,6 +27,53 @@ describe('decidirRecuperacao — o que a fonte real mostra vence a suposição l
     expect(d.acao).toBe('manter')
   })
 
+  describe('no boot, o processo anterior morreu e nenhum dono em memória sobreviveu', () => {
+    it('lease expirado com container vivo é container sem dono: para e bloqueia', () => {
+      // O container do sandbox é `sleep infinity`, detached: a queda do app não o para. Sem esta
+      // regra o run ficaria `RUNNING` com o slot preso para sempre, esperando um executor que
+      // ninguém mais dirige.
+      const d = decidirRecuperacao(com({ slot: 'expirado', executor: 'vivo', herdado: true }))
+      expect(d.acao).toBe('bloquear-e-recolher')
+      expect(d.causa).toBe('executor-sem-dono')
+    })
+
+    it('lease vigente com container vivo continua intacto: o dono renovou há pouco', () => {
+      const d = decidirRecuperacao(com({ slot: 'vigente', executor: 'vivo', herdado: true }))
+      expect(d.acao).toBe('manter')
+    })
+
+    it('merge em curso vence: a origem decide antes de qualquer bloqueio', () => {
+      const d = decidirRecuperacao(
+        com({
+          estado: 'PR_CI',
+          slot: 'expirado',
+          executor: 'vivo',
+          mergeEmCurso: true,
+          herdado: true
+        })
+      )
+      expect(d.acao).toBe('aguardar')
+    })
+
+    it('executor indeterminado continua esperando: falha de detecção não é morte nem abandono', () => {
+      const d = decidirRecuperacao(
+        com({ slot: 'expirado', executor: 'desconhecido', herdado: true })
+      )
+      expect(d.acao).toBe('aguardar')
+    })
+
+    it('executor morto segue a causa de sempre', () => {
+      const d = decidirRecuperacao(com({ slot: 'expirado', executor: 'morto', herdado: true }))
+      expect(d.acao).toBe('bloquear-e-recolher')
+      expect(d.causa).toBe('executor-morto')
+    })
+
+    it('fora do boot o container vivo segue sendo lentidão', () => {
+      const d = decidirRecuperacao(com({ slot: 'expirado', executor: 'vivo', herdado: false }))
+      expect(d.acao).toBe('manter')
+    })
+  })
+
   it('lease expirado e executor morto bloqueia o run e recolhe os recursos', () => {
     const d = decidirRecuperacao(com({ slot: 'expirado', executor: 'morto' }))
     expect(d.acao).toBe('bloquear-e-recolher')

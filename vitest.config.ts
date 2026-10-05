@@ -19,6 +19,13 @@ const alias = {
   '@design': resolve(__dirname, 'src/design')
 }
 
+/**
+ * Teto de heap de cada worker. Sem ele, um laço que nunca termina num teste (ex.: espera cujo
+ * relógio falso não anda) cresce até esgotar a RAM da máquina — já chegou a 20 GB num worker só.
+ * Com o teto, o worker morre cedo com OOM e o arquivo culpado aparece no relatório.
+ */
+const execArgv = ['--max-old-space-size=4096']
+
 export default defineConfig({
   resolve: { alias },
   test: {
@@ -27,6 +34,7 @@ export default defineConfig({
         resolve: { alias },
         test: {
           name: 'regras',
+          execArgv,
           environment: 'node',
           // `src/design/tokens` entra aqui (e não em `tela`) porque é regra pura: a camada
           // não depende de React, e o ambiente `node` é o que **prova** isso — um teste em
@@ -46,6 +54,7 @@ export default defineConfig({
         resolve: { alias },
         test: {
           name: 'banco',
+          execArgv,
           environment: 'node',
           include: ['src/main/**/*.int-spec.ts', 'tests/**/*.int-spec.ts'],
           // Integração toca disco e singletons de processo (o logger é um): em paralelo,
@@ -58,6 +67,7 @@ export default defineConfig({
         resolve: { alias },
         test: {
           name: 'tela',
+          execArgv,
           environment: 'jsdom',
           globals: true,
           setupFiles: ['./src/renderer/tests/setup-tela.ts'],

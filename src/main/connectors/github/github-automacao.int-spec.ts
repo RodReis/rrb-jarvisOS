@@ -68,6 +68,8 @@ interface EstadoFake {
   graphqlErro: { type?: string; message: string } | undefined
   /** O GraphQL responde 200 sem `errors`, mas sem confirmar `isDraft` (`data: null`). */
   graphqlSemConfirmacao: boolean
+  /** Quantos commits da base cada PR (pelo número) ainda não contém — o `behind_by` da comparação. */
+  atrasoDosPrs: Map<number, number>
 }
 
 let estado: EstadoFake
@@ -103,7 +105,8 @@ function estadoInicial(): EstadoFake {
     regras: new Map(),
     rascunhoIndisponivel: false,
     graphqlErro: undefined,
-    graphqlSemConfirmacao: false
+    graphqlSemConfirmacao: false,
+    atrasoDosPrs: new Map()
   }
 }
 
@@ -264,6 +267,20 @@ function responder(
   if (metodo === 'GET' && prGet) {
     const pr = estado.pulls.find((p) => p.number === Number(prGet[1]))
     return pr ? { status: 200, corpo: pr } : { status: 404, corpo: { message: 'Not Found' } }
+  }
+
+  // GET /repos/{o}/{r}/compare/{base}...{head} — só o `behind_by`, que é o que o app lê
+  const comparacao = /\/compare\/(.+)\.\.\.(.+)$/.exec(semQuery)
+  if (metodo === 'GET' && comparacao) {
+    const pr = estado.pulls.find((p) => p.head.sha === comparacao[2])
+    return {
+      status: 200,
+      corpo: {
+        status: 'ahead',
+        ahead_by: 1,
+        behind_by: estado.atrasoDosPrs.get(pr?.number ?? 0) ?? 0
+      }
+    }
   }
 
   // PUT /repos/{o}/{r}/pulls/{n}/merge
@@ -488,6 +505,11 @@ beforeEach(async () => {
       requisicoes.push({ metodo: req.method ?? '', caminho: req.url ?? '', corpo })
 
       const r = responder(req.method ?? '', req.url ?? '', corpo)
+      // Status 0 é a conexão que cai no meio: o `fetch` do adapter lança, em vez de responder.
+      if (r.status === 0) {
+        req.socket.destroy()
+        return
+      }
       res.writeHead(r.status, { 'Content-Type': 'application/json', ...(r.headers ?? {}) })
       res.end(JSON.stringify(r.corpo ?? {}))
     })
@@ -921,6 +943,93 @@ describe('pr.merge-state', () => {
     expect(r.data).toMatchObject({ numero: 1, estado: 'open', merged: false })
     expect(r.data).not.toHaveProperty('mergeSha')
     expect(JSON.stringify(r.data)).not.toContain('test0000merge')
+  })
+
+  it('PR atrás da base informa quantos commits faltam: a pipeline atualiza a branch em vez de apostar', async () => {
+    // `behind_by` vem da comparação da base com o head, e é **a** fonte: o merge de um admin
+    // (`enforce_admins: false`) passa mesmo com a proteção `strict`, então a origem não barra o PR
+    // atrasado — se a pipeline não perguntar, ele entra sobre uma base que o CI dele nunca viu.
+    estado.atrasoDosPrs.set(1, 2)
+
+    const r = (await executar(GITHUB_OPERATIONS.getMergeState, {
+      owner: OWNER,
+      repo: REPO,
+      pullRequest: 1
+    })) as ConnectorResult
+
+    expect(r.data).toMatchObject({ estado: 'open', atrasadoPor: 2 })
+    // A comparação é entre a branch base do PR e o head dele — não entre dois nomes quaisquer.
+    expect(contar('GET', new RegExp(`/compare/main\\.\\.\\.${SHA}$`))).toBe(1)
+  })
+
+  it('PR em dia informa 0, e 0 é diferente de "não sei"', async () => {
+    const r = (await executar(GITHUB_OPERATIONS.getMergeState, {
+      owner: OWNER,
+      repo: REPO,
+      pullRequest: 1
+    })) as ConnectorResult
+
+    expect(r.data).toMatchObject({ atrasadoPor: 0 })
+  })
+
+  it('a comparação que falha não vira "em dia": o campo fica ausente e o estado do PR segue válido', async () => {
+    forcadas.set(`GET /repos/${OWNER}/${REPO}/compare/main...${SHA}`, { status: 502 })
+
+    const r = (await executar(GITHUB_OPERATIONS.getMergeState, {
+      owner: OWNER,
+      repo: REPO,
+      pullRequest: 1
+    })) as ConnectorResult
+
+    expect(r.ok).toBe(true)
+    expect(r.data).toMatchObject({ numero: 1, estado: 'open', merged: false })
+    expect(r.data).not.toHaveProperty('atrasadoPor')
+  })
+
+  it('a conexão que cai na comparação também não vira "em dia": o estado do PR volta sem o campo', async () => {
+    forcadas.set(`GET /repos/${OWNER}/${REPO}/compare/main...${SHA}`, { status: 0 })
+
+    const r = (await executar(GITHUB_OPERATIONS.getMergeState, {
+      owner: OWNER,
+      repo: REPO,
+      pullRequest: 1
+    })) as ConnectorResult
+
+    expect(r.ok).toBe(true)
+    expect(r.data).toMatchObject({ numero: 1, estado: 'open', headSha: SHA })
+    expect(r.data).not.toHaveProperty('atrasadoPor')
+  })
+
+  it('head que não é um SHA nunca entra no caminho da comparação', async () => {
+    estado.pulls[0]!.head.sha = '../../orgs/outra/repos'
+
+    const r = (await executar(GITHUB_OPERATIONS.getMergeState, {
+      owner: OWNER,
+      repo: REPO,
+      pullRequest: 1
+    })) as ConnectorResult
+
+    expect(r.ok).toBe(true)
+    expect(r.data).not.toHaveProperty('atrasadoPor')
+    expect(contar('GET', /\/compare\//)).toBe(0)
+  })
+
+  it('PR já mergeado não gasta a comparação: não há mais o que atualizar', async () => {
+    await executar(GITHUB_OPERATIONS.squashMerge, {
+      owner: OWNER,
+      repo: REPO,
+      pullRequest: 1,
+      expectedHeadSha: SHA
+    })
+
+    const r = (await executar(GITHUB_OPERATIONS.getMergeState, {
+      owner: OWNER,
+      repo: REPO,
+      pullRequest: 1
+    })) as ConnectorResult
+
+    expect(r.data).not.toHaveProperty('atrasadoPor')
+    expect(contar('GET', /\/compare\//)).toBe(0)
   })
 
   it('depois do merge, devolve o mergeSha real consultado na origem', async () => {
