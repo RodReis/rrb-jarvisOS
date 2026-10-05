@@ -196,7 +196,11 @@ function dobles(entregar?: (pedido: { runId: string; signal?: AbortSignal }) => 
   return d
 }
 
-function encadeador(d: Dobles, intervaloDoHeartbeatMs = 5) {
+function encadeador(
+  d: Dobles,
+  intervaloDoHeartbeatMs = 5,
+  perfilCodex?: { renovar: (r: string) => boolean; liberar: (r: string) => boolean }
+) {
   return new EncadeadorDeRuns({
     slots: gerente,
     fila,
@@ -204,11 +208,18 @@ function encadeador(d: Dobles, intervaloDoHeartbeatMs = 5) {
     preflight: d.preflight as never,
     entrega: d.entrega as never,
     proxy: d.proxy as never,
-    intervaloDoHeartbeatMs
+    intervaloDoHeartbeatMs,
+    ...(perfilCodex === undefined ? {} : { perfilCodex })
   })
 }
 
 const volta = (ms = 5): Promise<void> => new Promise((r) => setTimeout(r, ms))
+
+/** Espera até a condição valer (ou o teto), em vez de apostar quantas batidas cabem em N ms. */
+async function ate(condicao: () => boolean, tetoMs = 2_000): Promise<void> {
+  const limite = Date.now() + tetoMs
+  while (!condicao() && Date.now() < limite) await volta(5)
+}
 
 describe('o caminho do run: slot → preflight → entrega', () => {
   it('encadeia com o token do slot, a unidade do proxy e a branch que o preflight criou', async () => {
@@ -407,7 +418,7 @@ describe('o heartbeat vai da aquisição ao desfecho (regra 1 da SPEC-Scheduler-
     const renovar = vi.spyOn(fila, 'renovarSlot')
     const pendente = encadeador(d, 5).executar(pedidoDe(run))
 
-    await volta(40)
+    await ate(() => renovar.mock.calls.length >= 3)
     const token = pool.slotDoRun(run)?.fencingToken
     expect(renovar.mock.calls.length).toBeGreaterThanOrEqual(3)
     expect(renovar).toHaveBeenCalledWith(run, token)
@@ -531,6 +542,131 @@ describe('a entrega que devolve BLOCKED sem mexer no run não o deixa ativo e se
     expect(runs.buscar(run)?.estado).toBe('CANCELLED')
     // A fila já recusaria; o que se prova é que o encadeador nem tenta bloquear o terminal.
     expect(transicionar.mock.calls.filter((c) => c[3] === 'BLOCKED')).toEqual([])
+  })
+})
+
+describe('a posse do perfil do Codex acompanha o run (decisão do PI, 2026-10-05)', () => {
+  const perfil = () => ({ renovar: vi.fn(() => true), liberar: vi.fn(() => true) })
+
+  it('a batida do slot renova também a posse do perfil, enquanto o run existir', async () => {
+    let soltar: () => void = () => {}
+    const d = dobles(
+      () =>
+        new Promise((r) => {
+          soltar = () => r({ estadoFinal: 'AWAITING_MERGE' })
+        })
+    )
+    const run = pronto()
+    const p = perfil()
+    const pendente = encadeador(d, 5, p).executar(pedidoDe(run))
+
+    await ate(() => p.renovar.mock.calls.length >= 3)
+    expect(p.renovar.mock.calls.length).toBeGreaterThanOrEqual(3)
+    expect(p.renovar).toHaveBeenCalledWith(run)
+
+    soltar()
+    await pendente
+    const depois = p.renovar.mock.calls.length
+    await volta(30)
+    expect(p.renovar.mock.calls.length).toBe(depois)
+  })
+
+  it('devolve a posse ao terminar com a entrega', async () => {
+    const p = perfil()
+    const run = pronto()
+
+    await encadeador(dobles(), 5, p).executar(pedidoDe(run))
+
+    expect(p.liberar).toHaveBeenCalledWith(run)
+  })
+
+  it('devolve a posse quando o preflight recusa', async () => {
+    const p = perfil()
+    const d = dobles()
+    d.preflight.preparar.mockReturnValue({
+      reason: 'docker-indisponivel',
+      mensagem: 'x',
+      retomada: 'y'
+    })
+    const run = pronto()
+
+    await encadeador(d, 5, p).executar(pedidoDe(run))
+
+    expect(p.liberar).toHaveBeenCalledWith(run)
+  })
+
+  it('devolve a posse quando a execução explode', async () => {
+    const p = perfil()
+    const d = dobles(async () => {
+      throw new Error('explodiu')
+    })
+    const run = pronto()
+
+    await expect(encadeador(d, 5, p).executar(pedidoDe(run))).rejects.toThrow()
+
+    expect(p.liberar).toHaveBeenCalledWith(run)
+  })
+
+  it('cancelar o run em voo devolve a posse quando a entrega termina (o perfil não fica preso)', async () => {
+    const run = pronto()
+    const p = perfil()
+    const e = encadeador(
+      dobles(
+        (pedido) =>
+          new Promise((r) => {
+            pedido.signal?.addEventListener('abort', () => r({ estadoFinal: 'BLOCKED' }))
+          })
+      ),
+      5,
+      p
+    )
+    const pendente = e.executar(pedidoDe(run))
+    await volta(15)
+    expect(p.liberar).not.toHaveBeenCalled()
+
+    e.interromper(run)
+    await pendente
+
+    expect(p.liberar).toHaveBeenCalledWith(run)
+  })
+
+  it('uma falha passageira ao devolver é tentada de novo: o perfil não fica preso', async () => {
+    const run = pronto()
+    let chamadas = 0
+    const p = {
+      renovar: vi.fn(() => true),
+      liberar: vi.fn(() => {
+        chamadas += 1
+        if (chamadas === 1) throw new Error('SQLITE_BUSY')
+        return true
+      })
+    }
+
+    await encadeador(dobles(), 5, p).executar(pedidoDe(run))
+
+    expect(p.liberar).toHaveBeenCalledTimes(2)
+  })
+
+  it('falha ao renovar ou devolver a posse não derruba a batida nem o desfecho do run', async () => {
+    const run = pronto()
+    const p = {
+      renovar: vi.fn(() => {
+        throw new Error('SQLITE_BUSY')
+      }),
+      liberar: vi.fn(() => {
+        throw new Error('SQLITE_BUSY')
+      })
+    }
+    const d = dobles(async () => {
+      await volta(30)
+      return { estadoFinal: 'AWAITING_MERGE' as const }
+    })
+
+    const r = await encadeador(d, 5, p).executar(pedidoDe(run))
+
+    expect(r).toEqual({ tipo: 'entrega', resultado: { estadoFinal: 'AWAITING_MERGE' } })
+    expect(p.renovar).toHaveBeenCalled()
+    expect(p.liberar).toHaveBeenCalled()
   })
 })
 

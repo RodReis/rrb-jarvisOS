@@ -33,6 +33,7 @@ import type { AlvoDaEntrega, EntregaService, ResultadoDaEntrega } from './entreg
 import type { ExecutorProxy } from './executor-proxy'
 import type { FilaService } from './fila-service'
 import type { PipelineRepository } from './pipeline-repository'
+import type { PosseDoPerfilCodex } from './posse-do-perfil-codex'
 import type { PreflightService } from './preflight-service'
 import type { GerenteDeSlots } from '../squads/squad-slots'
 
@@ -86,6 +87,12 @@ export interface EncadeadorDeps {
   readonly preflight: Pick<PreflightService, 'preparar' | 'bloqueioDe'>
   readonly entrega: Pick<EntregaService, 'entregar'>
   readonly proxy: Pick<ExecutorProxy, 'registrarUnidade' | 'liberarUnidade' | 'url'>
+  /**
+   * A posse do perfil do Codex (decisão do PI, 2026-10-05). Quem roda o Codex a pede por conta
+   * própria; aqui o encadeador só a **mantém viva** (a mesma batida do slot) e a **devolve** ao
+   * fim do run, em qualquer desfecho — cancelar, falhar ou terminar não prende o perfil.
+   */
+  readonly perfilCodex?: Pick<PosseDoPerfilCodex, 'renovar' | 'liberar'>
   /** Ausente = `INTERVALO_DO_HEARTBEAT_MS`. Existe para o teste não esperar segundos. */
   readonly intervaloDoHeartbeatMs?: number
 }
@@ -236,6 +243,7 @@ export class EncadeadorDeRuns {
       throw erro
     } finally {
       if (batida !== undefined) clearInterval(batida)
+      this.liberarPerfilCodex(pedido.runId)
       if (chave !== undefined) this.deps.proxy.liberarUnidade(chave)
       this.emVoo.delete(pedido.runId)
       this.writeSets.delete(pedido.runId)
@@ -299,7 +307,10 @@ export class EncadeadorDeRuns {
         excecoesSeguidas += 1
         if (excecoesSeguidas < 2) return
       }
-      if (renovou) return
+      if (renovou) {
+        this.renovarPerfilCodex(runId)
+        return
+      }
       voo.motivo ??= 'lease-perdido'
       log.agent.warn('O slot do run não pôde ser renovado: a entrega é abortada', { runId })
       voo.controle.abort()
@@ -307,6 +318,34 @@ export class EncadeadorDeRuns {
     // O heartbeat nunca segura o processo vivo: o app que fecha leva o intervalo junto.
     batida.unref()
     return batida
+  }
+
+  /** Mantém a posse do perfil do Codex (se este run a tem) a cada batida. Nunca derruba a batida. */
+  private renovarPerfilCodex(runId: string): void {
+    try {
+      this.deps.perfilCodex?.renovar(runId)
+    } catch {
+      // A próxima batida tenta de novo; a posse só vence se várias seguidas falharem.
+    }
+  }
+
+  /** Devolve a posse do perfil. Idempotente, e nunca lança: o run já terminou. */
+  private liberarPerfilCodex(runId: string): void {
+    // Uma segunda tentativa: banco ocupado por um instante não pode prender o perfil. Se as duas
+    // falharem, o supervisor recolhe a posse órfã na volta seguinte (`recolherOrfa`).
+    for (let tentativa = 1; tentativa <= 2; tentativa += 1) {
+      try {
+        this.deps.perfilCodex?.liberar(runId)
+        return
+      } catch (erro) {
+        if (tentativa === 2) {
+          log.agent.warn('A posse do perfil do Codex não pôde ser devolvida', {
+            runId,
+            erro: erro instanceof Error ? erro.name : 'desconhecido'
+          })
+        }
+      }
+    }
   }
 
   /**

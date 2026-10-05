@@ -99,7 +99,9 @@ import { MergeService } from './pipeline/merge-service'
 import { PipelineRepository } from './pipeline/pipeline-repository'
 import { ReconciliacaoService } from './pipeline/reconciliacao-service'
 import { CancelamentoService } from './pipeline/cancelamento-service'
+import { ehTerminal } from '@shared/domain/pipeline'
 import { EncadeadorDeRuns } from './pipeline/encadeador-de-runs'
+import { PosseDoPerfilCodex } from './pipeline/posse-do-perfil-codex'
 import { RecuperacaoService } from './pipeline/recuperacao-service'
 import { RunPrRepository } from './pipeline/run-pr-repository'
 import { MarcosService } from './projects/marcos-service'
@@ -1693,13 +1695,22 @@ if (!app.requestSingleInstanceLock()) {
     // O encadeador de produção (SPEC-Scheduler-05, PR-B): slot → heartbeat → preflight → entrega.
     // **Sem chamador de produção**: o gatilho "iniciar run" é do quadro do MVP-028; hoje só o teste
     // e o E2E o acionam. O paralelismo segue desligado (`pool.configurar`).
+    // A posse exclusiva do perfil do Codex (decisão do PI, 2026-10-05): o run que usa o Codex possui
+    // o `CODEX_HOME` da pipeline, e o seguinte espera. Nenhuma credencial é copiada nem lida.
+    const posseDoPerfilCodex = new PosseDoPerfilCodex({
+      leases: leaseRepository,
+      userId: userIdAtual,
+      codexHome: () => codexProfile.codexHome
+    })
     encadeadorDosRuns.servico = new EncadeadorDeRuns({
       slots: slotsDosSquads.gerente,
       fila,
       runs: pipelineRepository,
       preflight,
       entrega,
-      proxy: executorProxy
+      proxy: executorProxy,
+      // O perfil do Codex tem um dono por vez; o encadeador o mantém vivo e o devolve ao fim.
+      perfilCodex: posseDoPerfilCodex
     })
 
     const reconciliacao = new ReconciliacaoService({
@@ -1746,6 +1757,21 @@ if (!app.requestSingleInstanceLock()) {
     // o app aberto não esperar o próximo boot. A varredura é só SQLite; o Docker só é consultado
     // quando um lease expirou ou um run terminal ainda segura slot. Nunca derruba o app.
     const supervisor = setInterval(() => {
+      try {
+        // A posse do perfil do Codex de um run que terminou e não foi devolvida (banco ocupado no
+        // `finally`): sem isto o Codex ficaria indisponível até o próximo boot.
+        posseDoPerfilCodex.recolherOrfa({
+          emVoo: (runId) => encadeadorDosRuns.servico?.estaEmVoo(runId) === true,
+          terminou: (runId) => {
+            const run = pipelineRepository.buscar(runId)
+            return run === undefined || ehTerminal(run.estado)
+          }
+        })
+      } catch (erro) {
+        log.sistema.warn('A varredura da posse do perfil do Codex falhou', {
+          motivo: erro instanceof Error ? erro.message : 'desconhecido'
+        })
+      }
       try {
         recuperacao.supervisionar()
       } catch (erro) {
