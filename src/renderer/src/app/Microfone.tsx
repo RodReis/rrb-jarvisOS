@@ -298,7 +298,11 @@ export function Microfone({
     await consultar()
   }
 
-  async function comecar(porEscuta = false, capturaDoTurno?: CapturaDoTurno): Promise<void> {
+  async function comecar(
+    porEscuta = false,
+    capturaDoTurno?: CapturaDoTurno,
+    fimDoGatilhoMs?: number
+  ): Promise<void> {
     const interrompendoFala = estadoAtual.current === 'falando'
     const assumindoTurnoDaVoz =
       !porEscuta && estadoAtual.current === 'gravando' && origemDoTurno.current === 'voz'
@@ -309,6 +313,11 @@ export function Microfone({
     const geracao = ++geracaoDoTurno.current
     if (interrompendoFala) {
       reprodutor.current?.cancelar()
+      if (porEscuta && fimDoGatilhoMs !== undefined) {
+        log.ui.info('Fala interrompida por barge-in', {
+          latenciaBargeInMs: Math.max(0, Date.now() - fimDoGatilhoMs)
+        })
+      }
     }
     if (assumindoTurnoDaVoz) {
       pararMonitorDoTurno()
@@ -622,7 +631,7 @@ export function Microfone({
       window.jarvis.informarTurnoDaEscuta(false)
       return
     }
-    void acoes.current.comecar(true, disparo.capturaDoTurno)
+    void acoes.current.comecar(true, disparo.capturaDoTurno, disparo.fimDoGatilhoMs)
   }, [disparo, prontidao, aoTratarDisparo, t])
 
   // O main só impede um segundo turno se souber que este começou e quando terminou. Só transições

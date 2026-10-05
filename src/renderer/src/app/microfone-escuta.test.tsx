@@ -271,6 +271,7 @@ describe('barge-in (SPEC-Escuta-02, critério 4)', () => {
     const segundo = {
       ...DISPARO,
       id: 2,
+      fimDoGatilhoMs: Date.now() - 250,
       capturaDoTurno: { capturar: segundoCaptura.capturar, cancelar: vi.fn() }
     }
     const { rerender, aoTratarDisparo, capturarPushToTalk } = montar(captura, DISPARO, criarFala)
@@ -293,6 +294,12 @@ describe('barge-in (SPEC-Escuta-02, critério 4)', () => {
     )
     await waitFor(() => expect(segundoCaptura.capturar).toHaveBeenCalledTimes(1))
     expect(pararFonte).toHaveBeenCalledTimes(1)
+    expect(window.jarvis.sendLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        msg: 'Fala interrompida por barge-in',
+        ctx: expect.objectContaining({ latenciaBargeInMs: expect.any(Number) })
+      })
+    )
     expect(screen.getByText(/Fala interrompida por um novo pedido/i)).toBeInTheDocument()
   })
 })

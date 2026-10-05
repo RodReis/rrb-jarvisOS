@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 2818 | 2818 | 0 | 82.2 | — | — |
-| — | — | — | Banco | 2293 | 2275 | 0 | 84.9 | — | — |
-| — | — | — | Tela | 776 | 775 | 0 | 77.5 | — | — |
+| — | — | — | Regras de Negócio | 2858 | 2858 | 0 | 82.2 | — | — |
+| — | — | — | Banco | 2298 | 2280 | 0 | 84.9 | — | — |
+| — | — | — | Tela | 788 | 787 | 0 | 76.2 | — | — |
 
 ## Histórico por entrega
 
@@ -448,3 +448,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-10-05 | #132 | spec-scheduler-05-recuperacao-e | Regras de Negócio | 2818 | 2818 | 0 | 82.2 | #399 | [#399](https://github.com/RodReis/rrb-jarvisOS/pull/399) |
 | 2026-10-05 | #132 | spec-scheduler-05-recuperacao-e | Banco | 2293 | 2275 | 0 | 84.9 | #399 | [#399](https://github.com/RodReis/rrb-jarvisOS/pull/399) |
 | 2026-10-05 | #132 | spec-scheduler-05-recuperacao-e | Tela | 776 | 775 | 0 | 77.5 | #399 | [#399](https://github.com/RodReis/rrb-jarvisOS/pull/399) |
+| 2026-10-05 | #357 | spec-escuta-02-arbitracao-microfone | Regras de Negócio | 2858 | 2858 | 0 | 82.2 | #402 | [#402](https://github.com/RodReis/rrb-jarvisOS/pull/402) |
+| 2026-10-05 | #357 | spec-escuta-02-arbitracao-microfone | Banco | 2298 | 2280 | 0 | 84.9 | #402 | [#402](https://github.com/RodReis/rrb-jarvisOS/pull/402) |
+| 2026-10-05 | #357 | spec-escuta-02-arbitracao-microfone | Tela | 788 | 787 | 0 | 76.2 | #402 | [#402](https://github.com/RodReis/rrb-jarvisOS/pull/402) |
