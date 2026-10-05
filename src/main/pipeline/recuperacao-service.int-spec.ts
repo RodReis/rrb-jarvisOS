@@ -52,6 +52,8 @@ let recuperacao: InstanceType<typeof RecuperacaoService>
 let executores: Map<string, ExecutorObservado>
 let pendenciasDoIsolamento: Map<string, readonly PendenciaDeLimpeza[]>
 let liberados: string[]
+/** Os runs cujo container o isolamento **para** ao devolver os recursos (o `docker stop` por label). */
+let paradosAoLiberar: Set<string>
 let mergesEmCurso: Set<string>
 
 const aprovacao = (projectId: string): Approval => ({
@@ -73,6 +75,7 @@ beforeEach(() => {
   executores = new Map()
   pendenciasDoIsolamento = new Map()
   liberados = []
+  paradosAoLiberar = new Set()
   mergesEmCurso = new Set()
   runs = new PipelineRepository(db)
   leases = new LeaseRepository(db)
@@ -117,6 +120,7 @@ beforeEach(() => {
     isolamento: {
       liberarRunEUnidades: (runId) => {
         liberados.push(runId)
+        if (paradosAoLiberar.has(runId)) executores.set(runId, 'morto')
         return { removidos: [], pendencias: pendenciasDoIsolamento.get(runId) ?? [] }
       }
     },
@@ -382,7 +386,7 @@ describe('supervisionar — o dono pode estar neste processo (varredura periódi
 
   it('a varredura periódica não consulta o Docker quando a decisão independe dele', () => {
     const consultas: string[] = []
-    const a = executando('p-a')
+    // O serviço nasce antes do run: o run é deste processo, não herdado.
     const periodica = new RecuperacaoService({
       runs,
       leases,
@@ -397,6 +401,7 @@ describe('supervisionar — o dono pode estar neste processo (varredura periódi
       mergeEmCurso: () => false,
       agora: () => relogio
     })
+    const a = executando('p-a')
     expirar()
 
     periodica.supervisionar()
@@ -467,15 +472,141 @@ describe('supervisionar — recuperação por run, sem interromper fatia saudáv
     expect(bloqueio?.tentativas).toBe(0)
   })
 
-  it('lease expirado com executor vivo é lentidão: o run segue intacto', () => {
+  it('boot: lease expirado com o container de pé (o app caiu) para o container, bloqueia o run e devolve o slot', () => {
+    const a = executando('p-a')
+    const b = pronto('p-b')
+    fila.adquirirSlot('p-b', WS, b)
+    executores.set(a.id, 'vivo')
+    paradosAoLiberar.add(a.id)
+    expirar()
+
+    const achados = recuperacao.supervisionar({ aoSubir: true })
+
+    expect(estado(a.id)).toBe('BLOCKED')
+    expect(liberados).toContain(a.id)
+    expect(slotDe(a.id)).toBeUndefined()
+    expect(achados.find((x) => x.recurso === `run:${a.id}`)?.decisao).toBe('liberado')
+    // A causa diz a verdade: não foi "container não encontrado", foi container sem ninguém.
+    const bloqueio = runs.buscar(a.id)?.bloqueio
+    expect(bloqueio?.causa).toBe('executor-perdido')
+    expect(bloqueio?.evidencia).toMatch(/sobreviveu|sem dono|caiu/i)
+    expect(bloqueio?.retomada).toMatch(/continuaDe|vinculado/i)
+    // A fila andou: quem esperava o slot adquiriu.
+    expect(estado(b)).toBe('RUNNING')
+  })
+
+  it('boot: se o container não parar, o slot continua preso — nunca se passa a vez com executor de pé', () => {
     const a = executando('p-a')
     executores.set(a.id, 'vivo')
+    // O isolamento não consegue parar o container: continua vivo depois da tentativa.
     expirar()
 
     recuperacao.supervisionar({ aoSubir: true })
 
+    expect(estado(a.id)).toBe('BLOCKED')
+    expect(slotDe(a.id)).toBeDefined()
+  })
+
+  it('boot: lease vigente com o container de pé não é tocado — o dono renovou há pouco', () => {
+    const a = executando('p-a')
+    executores.set(a.id, 'vivo')
+
+    recuperacao.supervisionar({ aoSubir: true })
+
+    expect(estado(a.id)).toBe('RUNNING')
+    expect(liberados).toEqual([])
+  })
+
+  it('varredura periódica: lease expirado com o container de pé é lentidão, o run segue intacto', () => {
+    const periodica = new RecuperacaoService({
+      runs,
+      leases,
+      pool,
+      fila,
+      audit: new AuditRepository(db, 'chave-de-teste'),
+      userId: () => USER,
+      executor: () => 'vivo',
+      mergeEmCurso: () => false,
+      renovacaoGarantida: true,
+      agora: () => relogio
+    })
+    const a = executando('p-a')
+    executores.set(a.id, 'vivo')
+    expirar()
+
+    periodica.supervisionar()
+
     expect(estado(a.id)).toBe('RUNNING')
     expect(slotDe(a.id)).toBeDefined()
+  })
+
+  describe('o run que o boot herdou não tem dono neste processo, nem depois de o lease vencer', () => {
+    const periodica = (): InstanceType<typeof RecuperacaoService> =>
+      new RecuperacaoService({
+        runs,
+        leases,
+        pool,
+        fila,
+        audit: new AuditRepository(db, 'chave-de-teste'),
+        userId: () => USER,
+        isolamento: {
+          liberarRunEUnidades: (runId) => {
+            liberados.push(runId)
+            if (paradosAoLiberar.has(runId)) executores.set(runId, 'morto')
+            return { removidos: [], pendencias: [] }
+          }
+        },
+        executor: (runId) => executores.get(runId) ?? 'morto',
+        mergeEmCurso: () => false,
+        renovacaoGarantida: true,
+        agora: () => relogio
+      })
+
+    it('reinício rápido: o lease ainda valia no boot; quando vence com o container de pé, a varredura bloqueia', () => {
+      // O app cai e volta em menos de 30 s: no boot o slot está vigente e nada se decide. O
+      // container (`sleep infinity`) segue de pé, e ninguém neste processo vai renová-lo.
+      const a = executando('p-a')
+      executores.set(a.id, 'vivo')
+      paradosAoLiberar.add(a.id)
+      const servico = periodica()
+      servico.supervisionar({ aoSubir: true })
+      expect(estado(a.id)).toBe('RUNNING')
+
+      expirar()
+      servico.supervisionar()
+
+      expect(estado(a.id)).toBe('BLOCKED')
+      expect(liberados).toContain(a.id)
+      expect(slotDe(a.id)).toBeUndefined()
+    })
+
+    it('a varredura do boot que falhou não deixa o run desprotegido: o critério é o token, não uma passada', () => {
+      // Se o boot nunca chegou a varrer (SQLite ocupado, exceção engolida pela reconciliação), o
+      // run continua herdado — o teto de fencing token foi fixado quando o serviço nasceu.
+      const a = executando('p-a')
+      executores.set(a.id, 'vivo')
+      paradosAoLiberar.add(a.id)
+      const servico = periodica()
+      expirar()
+
+      servico.supervisionar()
+
+      expect(estado(a.id)).toBe('BLOCKED')
+      expect(slotDe(a.id)).toBeUndefined()
+    })
+
+    it('o run adquirido depois do boot é deste processo: lease vencido com container de pé segue sendo lentidão', () => {
+      const servico = periodica()
+      servico.supervisionar({ aoSubir: true })
+      const a = executando('p-a')
+      executores.set(a.id, 'vivo')
+      expirar()
+
+      servico.supervisionar()
+
+      expect(estado(a.id)).toBe('RUNNING')
+      expect(slotDe(a.id)).toBeDefined()
+    })
   })
 
   it('lease expirado com executor indeterminado: nada é tocado', () => {

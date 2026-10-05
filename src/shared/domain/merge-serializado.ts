@@ -91,6 +91,15 @@ export interface ObservacaoDoMerge {
   readonly regra?: RegraObservada | undefined
   /** O commit de merge, quando `estado` é `mergeado`. */
   readonly mergeSha?: string | undefined
+  /**
+   * Quantos commits da base o PR **não contém**, segundo a origem. Ausente é "não sei" — e "não
+   * sei" **não** é "em dia": a decisão vira `observacao-incompleta` e o merge não sai.
+   *
+   * Existe porque a base lida duas vezes (na avaliação e sob o lease) responde só "a base mudou
+   * entre as duas leituras" — e o PR que ficou para trás de um merge **anterior** à avaliação passa
+   * por ela sem alarme: os dois lados leem a base nova. O CI dele, porém, rodou sem aquele commit.
+   */
+  readonly atrasadoPor?: number | undefined
 }
 
 export type DecisaoDoMerge =
@@ -115,7 +124,8 @@ export type DecisaoDoMerge =
  *     antes de qualquer outra pergunta;
  *  4. **regra mudou** — a regra nova decide o que "verde" significa, e isso vem antes de saber se
  *     a base andou;
- *  5. **base avançou** — a pipeline sabe atualizar a branch e revalidar.
+ *  5. **base avançou** — a pipeline sabe atualizar a branch e revalidar. Duas fontes: a base que
+ *     mudou entre a avaliação e o lease, e o PR que a origem diz estar atrás dela.
  *
  * **Ilegível não é igual.** Head e regra ilegíveis são `observacao-incompleta`: tratar "não sei"
  * como "não mudou" é a afirmação sem prova que a SPEC-Pipeline-01 proíbe. A **base** ilegível é
@@ -152,6 +162,16 @@ export function decidirMerge(
     avaliacao.baseSha !== observacao.baseSha
   ) {
     return { reason: 'base-avancou', baseSha: observacao.baseSha }
+  }
+
+  // Sem saber se o PR contém a base, não há afirmação possível: fail closed, como head e regra.
+  if (observacao.atrasadoPor === undefined) {
+    return { reason: 'observacao-incompleta', faltou: 'comparação base...head do pull request' }
+  }
+
+  // O PR não contém a base atual: o CI dele validou um head que não inclui o commit do vizinho.
+  if (observacao.atrasadoPor > 0) {
+    return { reason: 'base-avancou', baseSha: observacao.baseSha ?? avaliacao.baseSha ?? '' }
   }
 
   return { reason: 'pode-mergear' }

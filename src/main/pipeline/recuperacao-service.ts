@@ -27,6 +27,7 @@ import type { PendenciaDeLimpeza } from '@shared/domain/limpeza'
 import { ehTerminal, type PipelineRun } from '@shared/domain/pipeline'
 import {
   decidirRecuperacao,
+  type CausaDaPerda,
   type ExecutorObservado,
   type ObservacaoDoRun,
   type SlotObservado
@@ -99,9 +100,22 @@ export class RecuperacaoService {
   private readonly agora: () => number
   /** Quando cada run adiado pode ser tentado de novo pela varredura. Só a varredura respeita. */
   private readonly adiadoAte = new Map<string, number>()
+  /**
+   * O maior fencing token que existia quando este processo subiu. O contador é monotônico por
+   * usuário, então todo slot com token até aqui é **herdado**: o dono dele morreu com o processo
+   * anterior e nenhum dono em memória o herdou — nem quando o lease valia no boot (reinício em menos
+   * de 30 s) e só venceu depois. Sem isso a varredura periódica o leria como lentidão para sempre:
+   * o container `sleep infinity` segue de pé e ninguém o renova. É um critério **sem estado**: não
+   * depende de uma passada do boot que possa ter falhado.
+   */
+  private readonly tetoDosHerdados: number
 
   constructor(private readonly deps: RecuperacaoDeps) {
     this.agora = deps.agora ?? ((): number => Date.now())
+    this.tetoDosHerdados = Math.max(
+      0,
+      ...deps.leases.listarSlots(deps.userId()).map((l) => l.fencingToken ?? 0)
+    )
   }
 
   /**
@@ -161,16 +175,20 @@ export class RecuperacaoService {
    */
   supervisionar(opcoes: OpcoesDaSupervisao = {}): readonly AchadoDaReconciliacao[] {
     const achados: AchadoDaReconciliacao[] = []
-    const donoNesteProcesso = opcoes.aoSubir !== true && this.deps.renovacaoGarantida !== true
-
     for (const [runId, slots] of this.slotsPorRun()) {
       const run = this.deps.runs.buscar(runId)
       if (run === undefined) continue
 
+      // No boot todo run com slot é herdado; depois dele, os slots que já existiam ao subir.
+      const herdado =
+        opcoes.aoSubir === true ||
+        slots.every((l) => l.fencingToken !== undefined && l.fencingToken <= this.tetoDosHerdados)
+      const donoNesteProcesso = !herdado && this.deps.renovacaoGarantida !== true
+
       // Cada run é recuperado sozinho: a falha de um (SQLite ocupado, Docker mudo) não pode deixar
       // os outros sem varredura a cada volta.
       try {
-        achados.push(this.recuperar(run, slots, donoNesteProcesso))
+        achados.push(this.recuperar(run, slots, donoNesteProcesso, herdado))
       } catch (erro) {
         achados.push({
           recurso: `run:${runId}`,
@@ -186,10 +204,11 @@ export class RecuperacaoService {
   private recuperar(
     run: PipelineRun,
     slots: readonly Lease[],
-    donoNesteProcesso: boolean
+    donoNesteProcesso: boolean,
+    herdado: boolean
   ): AchadoDaReconciliacao {
     const recurso = `run:${run.id}`
-    const decisao = decidirRecuperacao(this.observar(run, slots, donoNesteProcesso))
+    const decisao = decidirRecuperacao(this.observar(run, slots, donoNesteProcesso, herdado))
 
     switch (decisao.acao) {
       case 'manter':
@@ -197,7 +216,7 @@ export class RecuperacaoService {
       case 'aguardar':
         return { recurso, decisao: 'bloqueado', motivo: decisao.motivo }
       case 'bloquear-e-recolher':
-        return this.bloquearERecolher(run, slots, decisao.motivo)
+        return this.bloquearERecolher(run, slots, decisao.motivo, decisao.causa)
       case 'recolher': {
         const ate = this.adiadoAte.get(run.id)
         if (ate !== undefined && ate > this.agora()) {
@@ -218,7 +237,8 @@ export class RecuperacaoService {
   private observar(
     run: PipelineRun,
     slots: readonly Lease[],
-    donoNesteProcesso: boolean
+    donoNesteProcesso: boolean,
+    herdado: boolean
   ): ObservacaoDoRun {
     const slot = estadoDoSlot(slots, this.agora())
     // Com o dono possivelmente neste processo a decisão é `manter` seja qual for o executor: nem
@@ -229,7 +249,8 @@ export class RecuperacaoService {
       slot,
       executor: precisaDoExecutor ? this.deps.executor(run.id) : 'desconhecido',
       mergeEmCurso: precisaDoExecutor && this.deps.mergeEmCurso(run.id),
-      donoNesteProcesso
+      donoNesteProcesso,
+      herdado
     }
   }
 
@@ -240,7 +261,8 @@ export class RecuperacaoService {
   private bloquearERecolher(
     run: PipelineRun,
     slots: readonly Lease[],
-    motivo: string
+    motivo: string,
+    causa: CausaDaPerda = 'executor-morto'
   ): AchadoDaReconciliacao {
     const recurso = `run:${run.id}`
     const dono = slots.find((l) => l.proprietario === run.id) ?? slots[0]
@@ -260,7 +282,10 @@ export class RecuperacaoService {
       'BLOCKED',
       {
         causa: 'executor-perdido',
-        evidencia: `O lease do slot expirou em ${new Date(dono.expiraEm).toISOString()} e a consulta ao Docker não encontrou container do run em execução.`,
+        evidencia:
+          causa === 'executor-sem-dono'
+            ? `O lease do slot expirou em ${new Date(dono.expiraEm).toISOString()} e o processo que o dirigia morreu: o container do run sobreviveu sem dono, e a parada dele é tentada em seguida.`
+            : `O lease do slot expirou em ${new Date(dono.expiraEm).toISOString()} e a consulta ao Docker não encontrou container do run em execução.`,
         tentativas: 0,
         porQueNaoSeguir:
           'O executor morreu e o trabalho local pode estar incompleto: continuar sem olhar o worktree e a branch arriscaria sobrescrever ou duplicar trabalho.',

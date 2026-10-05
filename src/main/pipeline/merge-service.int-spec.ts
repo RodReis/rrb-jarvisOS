@@ -54,6 +54,8 @@ interface Pr {
   aberto: boolean
   merged: boolean
   mergeSha?: string
+  /** Quantos commits da base o PR não contém. Ausente: a origem não soube dizer (comparação falhou). */
+  atrasadoPor?: number | 'desconhecido'
 }
 
 interface Origem {
@@ -136,7 +138,12 @@ function conector(): { call: (r: ConnectorRequest, ctx?: unknown) => Promise<Con
             estado: pr.aberto ? 'open' : 'closed',
             merged: pr.merged,
             ...(pr.merged ? { mergeSha: pr.mergeSha } : {}),
-            headSha: pr.headSha
+            headSha: pr.headSha,
+            // Por padrão a origem diz que o PR está em dia; `desconhecido` é a comparação que falhou.
+            // Como o adapter: o campo só existe em PR aberto, e `desconhecido` é a comparação que falhou.
+            ...(!pr.aberto || pr.atrasadoPor === 'desconhecido'
+              ? {}
+              : { atrasadoPor: pr.atrasadoPor ?? 0 })
           })
 
         case GITHUB_OPERATIONS.getCommitSha:
@@ -195,6 +202,8 @@ function conector(): { call: (r: ConnectorRequest, ctx?: unknown) => Promise<Con
           }
           // A base entra na branch da fatia: o head **muda**, e os checks do head antigo deixam de valer.
           pr.headSha = `atualizado-${numero}-${origem.baseSha.slice(0, 6)}`.padEnd(40, '1')
+          // O head novo contém a base: não há mais nada atrás dele.
+          if (pr.atrasadoPor !== undefined && pr.atrasadoPor !== 'desconhecido') pr.atrasadoPor = 0
           return ok({ aceito: true })
         }
 
@@ -388,6 +397,61 @@ describe('corrida de dois PRs verdes (critérios 1 e 2)', () => {
     expect(r.headSha).not.toBe('b'.repeat(40))
     expect(r.headSha).toBe(origem.prs.get(8)?.headSha)
     // O lease foi devolvido: a base está livre para quem vier.
+    expect(leases.buscar(USER, RECURSO)).toBeUndefined()
+  })
+
+  it('o PR avaliado DEPOIS do merge do vizinho, mas atrás da base segundo a origem, também atualiza a branch', async () => {
+    // O caso comum, e o que a avaliação sozinha não vê: a pipeline lê a base a cada volta da
+    // espera, então ao avaliar o segundo PR ela já lê a base **nova** — avaliação e lease concordam.
+    // Foi o PR que ficou para trás: o CI dele rodou sem o commit do primeiro.
+    const a = runEm()
+    const b = runEm()
+    abrirPr(7, 'a'.repeat(40))
+    abrirPr(8, 'b'.repeat(40))
+    await servico().tentar(pedidoDe(a, 7))
+    const origemDoPr8 = origem.prs.get(8)
+    if (origemDoPr8 !== undefined) origemDoPr8.atrasadoPor = 1
+    const pedidoB = pedidoDe(b, 8)
+    expect(pedidoB.avaliacao.baseSha).toBe(origem.baseSha)
+
+    const r = await servico().tentar(pedidoB)
+
+    expect(r.tipo).toBe('revalidar')
+    if (r.tipo !== 'revalidar') return
+    expect(r.motivo).toBe('base-atualizada')
+    expect(deQuantos(GITHUB_OPERATIONS.squashMerge)).toHaveLength(1)
+    expect(deQuantos(GITHUB_OPERATIONS.updateBranch)).toHaveLength(1)
+    expect(r.headSha).toBe(origem.prs.get(8)?.headSha)
+  })
+
+  it('depois de atualizada, a origem já não a vê atrás: o merge sai', async () => {
+    const a = runEm()
+    const b = runEm()
+    abrirPr(7, 'a'.repeat(40))
+    abrirPr(8, 'b'.repeat(40))
+    await servico().tentar(pedidoDe(a, 7))
+    const origemDoPr8 = origem.prs.get(8)
+    if (origemDoPr8 !== undefined) origemDoPr8.atrasadoPor = 1
+    await servico().tentar(pedidoDe(b, 8))
+
+    const r = await servico().tentar(pedidoDe(b, 8))
+
+    expect(r.tipo).toBe('mergeado')
+    expect(deQuantos(GITHUB_OPERATIONS.updateBranch)).toHaveLength(1)
+  })
+
+  it('a origem que não soube comparar (campo ausente) não mergeia: fail closed, e a volta seguinte relê', async () => {
+    const a = runEm()
+    abrirPr(7, 'a'.repeat(40))
+    const origemDoPr7 = origem.prs.get(7)
+    if (origemDoPr7 !== undefined) origemDoPr7.atrasadoPor = 'desconhecido'
+
+    const r = await servico().tentar(pedidoDe(a, 7))
+
+    expect(r).toEqual({ tipo: 'aguardar', motivo: 'origem-indisponivel' })
+    expect(deQuantos(GITHUB_OPERATIONS.squashMerge)).toHaveLength(0)
+    expect(deQuantos(GITHUB_OPERATIONS.updateBranch)).toHaveLength(0)
+    // O lease volta: a base não fica presa por uma comparação que falhou.
     expect(leases.buscar(USER, RECURSO)).toBeUndefined()
   })
 

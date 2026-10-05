@@ -247,7 +247,9 @@ export class MergeService {
 
   private async lerEstadoDoPr(
     pedido: PedidoDeMerge
-  ): Promise<Pick<ObservacaoDoMerge, 'estado' | 'headSha' | 'mergeSha'> | undefined> {
+  ): Promise<
+    Pick<ObservacaoDoMerge, 'estado' | 'headSha' | 'mergeSha' | 'atrasadoPor'> | undefined
+  > {
     const r = await this.chamarSeguro(GITHUB_OPERATIONS.getMergeState, pedido.workspaceId, {
       owner: pedido.alvo.owner,
       repo: pedido.alvo.repo,
@@ -260,13 +262,18 @@ export class MergeService {
       readonly merged?: boolean
       readonly mergeSha?: string
       readonly headSha?: string
+      readonly atrasadoPor?: unknown
     }
     const estado = d.merged === true ? 'mergeado' : d.estado === 'closed' ? 'fechado' : 'aberto'
 
     return {
       estado,
       ...(d.headSha === undefined || d.headSha === '' ? {} : { headSha: d.headSha }),
-      ...(d.mergeSha === undefined ? {} : { mergeSha: d.mergeSha })
+      ...(d.mergeSha === undefined ? {} : { mergeSha: d.mergeSha }),
+      // Entrada da origem: só número inteiro não negativo vale; qualquer outra coisa é "não sei".
+      ...(Number.isInteger(d.atrasadoPor) && (d.atrasadoPor as number) >= 0
+        ? { atrasadoPor: d.atrasadoPor as number }
+        : {})
     }
   }
 

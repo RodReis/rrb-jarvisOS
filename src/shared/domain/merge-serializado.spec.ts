@@ -42,7 +42,8 @@ const ABERTO: ObservacaoDoMerge = {
   estado: 'aberto',
   headSha: SHA_A,
   baseSha: SHA_B,
-  regra: REGRA
+  regra: REGRA,
+  atrasadoPor: 0
 }
 
 describe('recurso do MergeLease', () => {
@@ -149,6 +150,65 @@ describe('decidirMerge', () => {
     expect(decidirMerge(AVALIACAO, { ...ABERTO, baseSha: SHA_C })).toEqual({
       reason: 'base-avancou',
       baseSha: SHA_C
+    })
+  })
+
+  describe('o PR que não contém a base atual (a origem diz quantos commits faltam)', () => {
+    it('atrasado: a base avançou para este head, mesmo que ela não tenha mudado desde a avaliação', () => {
+      // A avaliação leu a base **depois** de o vizinho mergear: baseSha igual nos dois lados. Foi
+      // o PR que ficou para trás — o CI dele rodou sem o commit do vizinho.
+      expect(decidirMerge(AVALIACAO, { ...ABERTO, atrasadoPor: 1 })).toEqual({
+        reason: 'base-avancou',
+        baseSha: SHA_B
+      })
+    })
+
+    it('o adapter omite o campo em PR já mergeado ou fechado: a precedência impede o "incompleto"', () => {
+      // Sem o `return` antecipado de `mergeado`/`fechado`, o PR que já entrou viraria
+      // `observacao-incompleta` e o run nunca adotaria o merge nem iria a `MERGED`.
+      expect(
+        decidirMerge(AVALIACAO, {
+          ...ABERTO,
+          estado: 'mergeado',
+          mergeSha: SHA_C,
+          atrasadoPor: undefined
+        }).reason
+      ).toBe('ja-mergeado')
+      expect(
+        decidirMerge(AVALIACAO, { ...ABERTO, estado: 'fechado', atrasadoPor: undefined }).reason
+      ).toBe('pr-fechado')
+      expect(
+        decidirMerge(AVALIACAO, { ...ABERTO, headSha: SHA_C, atrasadoPor: undefined }).reason
+      ).toBe('head-mudou')
+    })
+
+    it('em dia (0) pode mergear', () => {
+      expect(decidirMerge(AVALIACAO, { ...ABERTO, atrasadoPor: 0 })).toEqual({
+        reason: 'pode-mergear'
+      })
+    })
+
+    it('não saber (ausente) é observação incompleta, nunca "em dia": o merge não sai', () => {
+      // O merge autônomo roda como o dono e a proteção `strict` não o barra: se a comparação
+      // falhou (429, 5xx, rede) e a decisão seguisse, o PR atrasado entraria sobre uma base que o
+      // CI dele nunca viu. Mesma postura de head e regra ilegíveis.
+      expect(decidirMerge(AVALIACAO, { ...ABERTO, atrasadoPor: undefined })).toEqual({
+        reason: 'observacao-incompleta',
+        faltou: 'comparação base...head do pull request'
+      })
+    })
+
+    it('atrasado com a base ilegível ainda manda atualizar: o que a origem disse basta', () => {
+      expect(
+        decidirMerge(AVALIACAO, { ...ABERTO, baseSha: undefined, atrasadoPor: 2 }).reason
+      ).toBe('base-avancou')
+    })
+
+    it('a regra que mudou vence o atraso, como vence a base avançada', () => {
+      expect(
+        decidirMerge(AVALIACAO, { ...ABERTO, atrasadoPor: 1, regra: { ...REGRA, strict: true } })
+          .reason
+      ).toBe('regra-mudou')
     })
   })
 
