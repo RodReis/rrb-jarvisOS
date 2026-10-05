@@ -25,7 +25,8 @@ const { PoolRepository } = await import('./pool-repository')
 const { PoolService } = await import('./pool-service')
 const { RecuperacaoService } = await import('./recuperacao-service')
 const { RunPrRepository } = await import('./run-pr-repository')
-const { CancelamentoService } = await import('./cancelamento-service')
+const { CancelamentoService, ESPACAMENTO_DO_RASCUNHO_MS, MAXIMO_DE_TENTATIVAS_DO_RASCUNHO } =
+  await import('./cancelamento-service')
 
 const USER = 'u-1'
 const WS = 'jarvis' as const
@@ -40,7 +41,8 @@ const SLICES: readonly Slice[] = [
 ]
 const REVISOES: readonly RevisaoAprovada[] = [{ artefato: 'spec-f1', hash: 'h-1' }]
 
-type Resposta = 'ok' | 'ja-era' | 'nao-aberto' | 'indisponivel' | 'sem-suporte' | 'explode'
+type Resposta =
+  'ok' | 'ja-era' | 'nao-aberto' | 'indisponivel' | 'sem-suporte' | 'credencial' | 'explode'
 
 let dir: string
 let db: Db
@@ -91,6 +93,15 @@ const desfecho = (): ConnectorOutcome => {
         mensagem: 'x',
         retryable: true,
         acao: 'retentar',
+        ...base
+      } as never
+    case 'credencial':
+      return {
+        ok: false,
+        code: 'credencial-recusada',
+        mensagem: 'x',
+        retryable: false,
+        acao: 'reautenticar',
         ...base
       } as never
     default:
@@ -191,7 +202,7 @@ function executando(projectId: string): string {
 const comPr = (runId: string, numero = 7): void =>
   prs.registrar(
     USER,
-    { runId, owner: 'o', repo: 'r', pullRequest: numero, branch: 'feat/x' },
+    { runId, workspaceId: WS, owner: 'o', repo: 'r', pullRequest: numero, branch: 'feat/x' },
     AGORA
   )
 
@@ -293,6 +304,170 @@ describe('cancelar uma fatia não interrompe a outra', () => {
   })
 })
 
+describe('cancelar só age no escopo do próprio run (o chamador não escolhe o workspace)', () => {
+  it('workspace trocado: o run não é encontrado e nada sai para a origem', async () => {
+    const a = executando('p-a')
+    comPr(a)
+
+    const r = await cancelamento.cancelar('p-a', 'noa', a)
+
+    expect(r).toMatchObject({ cancelado: false, motivo: 'run-inexistente' })
+    expect(estado(a)).toBe('RUNNING')
+    expect(chamadas).toHaveLength(0)
+  })
+
+  it('projeto trocado: idem — o run de outro projeto não é cancelado por quem erra o projeto', async () => {
+    const a = executando('p-a')
+    comPr(a)
+
+    const r = await cancelamento.cancelar('p-outro', WS, a)
+
+    expect(r).toMatchObject({ cancelado: false, motivo: 'run-inexistente' })
+    expect(estado(a)).toBe('RUNNING')
+    expect(chamadas).toHaveLength(0)
+  })
+
+  it('a credencial e a auditoria do rascunho usam o workspace do run, não o do chamador', async () => {
+    const a = executando('p-a')
+    comPr(a)
+
+    await cancelamento.cancelar('p-a', WS, a)
+
+    expect(chamadas[0]?.credential).toMatchObject({ workspace_id: WS })
+  })
+})
+
+describe('a origem pode errar de formas diferentes — só o definitivo sela o rascunho', () => {
+  it('credencial recusada é remediável (reconectar): continua pendente e conta a tentativa', async () => {
+    const a = executando('p-a')
+    comPr(a)
+    resposta = 'credencial'
+
+    const r = await cancelamento.cancelar('p-a', WS, a)
+
+    expect(r).toMatchObject({ cancelado: true, rascunho: 'pendente' })
+    expect(prs.doRun(USER, a)?.rascunho).toBe('pendente')
+
+    resposta = 'ok'
+    relogio += ESPACAMENTO_DO_RASCUNHO_MS
+    await cancelamento.reconciliarRascunhos()
+    expect(prs.doRun(USER, a)?.rascunho).toBe('convertido')
+  })
+
+  it('a reconciliação espera entre as tentativas: origem fora do ar não é chamada a cada volta', async () => {
+    const a = executando('p-a')
+    comPr(a)
+    resposta = 'indisponivel'
+    await cancelamento.cancelar('p-a', WS, a)
+    chamadas.length = 0
+
+    await cancelamento.reconciliarRascunhos()
+    expect(chamadas).toHaveLength(0)
+
+    relogio += ESPACAMENTO_DO_RASCUNHO_MS
+    await cancelamento.reconciliarRascunhos()
+    expect(chamadas).toHaveLength(1)
+  })
+
+  it('desiste depois de tentar o bastante: o estado final é indisponível, e registrado', async () => {
+    const a = executando('p-a')
+    comPr(a)
+    resposta = 'indisponivel'
+    await cancelamento.cancelar('p-a', WS, a)
+
+    for (let i = 1; i < MAXIMO_DE_TENTATIVAS_DO_RASCUNHO; i += 1) {
+      relogio += ESPACAMENTO_DO_RASCUNHO_MS
+      await cancelamento.reconciliarRascunhos()
+    }
+
+    expect(prs.doRun(USER, a)?.rascunho).toBe('indisponivel')
+    chamadas.length = 0
+    relogio += ESPACAMENTO_DO_RASCUNHO_MS
+    expect(await cancelamento.reconciliarRascunhos()).toHaveLength(0)
+    expect(chamadas).toHaveLength(0)
+  })
+
+  it('duas reconciliações ao mesmo tempo fazem uma chamada só', async () => {
+    const a = executando('p-a')
+    comPr(a)
+    resposta = 'indisponivel'
+    await cancelamento.cancelar('p-a', WS, a)
+    chamadas.length = 0
+    relogio += ESPACAMENTO_DO_RASCUNHO_MS
+    resposta = 'ok'
+
+    await Promise.all([cancelamento.reconciliarRascunhos(), cancelamento.reconciliarRascunhos()])
+
+    expect(chamadas).toHaveLength(1)
+  })
+})
+
+describe('PR publicado DEPOIS do cancelamento — a entrega em voo termina o que começou', () => {
+  it('o PR que nasce num run já cancelado vira rascunho na reconciliação', async () => {
+    const a = executando('p-a')
+    const r = await cancelamento.cancelar('p-a', WS, a)
+    expect(r).toMatchObject({ cancelado: true, rascunho: 'sem-pr' })
+    // A entrega estava no meio do `ensurePullRequest` e a origem respondeu depois do cancelamento.
+    comPr(a)
+    expect(chamadas).toHaveLength(0)
+
+    await cancelamento.reconciliarRascunhos()
+
+    expect(chamadas.map((c) => c.operation)).toEqual([GITHUB_OPERATIONS.convertToDraft])
+    expect(prs.doRun(USER, a)?.rascunho).toBe('convertido')
+  })
+
+  it('run que NÃO foi cancelado, com PR sem pedido de rascunho, nunca é tocado', async () => {
+    const a = executando('p-a')
+    comPr(a)
+
+    await cancelamento.reconciliarRascunhos()
+
+    expect(chamadas).toHaveLength(0)
+  })
+
+  it('run bloqueado (não cancelado) mantém o PR como está: bloqueio é decisão do PI', async () => {
+    const a = executando('p-a')
+    comPr(a)
+    runs.transicionar(a, 'RUNNING', 'BLOCKED', new Date(AGORA))
+
+    await cancelamento.reconciliarRascunhos()
+
+    expect(chamadas).toHaveLength(0)
+  })
+})
+
+describe('retomada reaproveitou o PR: o rascunho não pode atingir o run vivo', () => {
+  it('outro run ativo no mesmo PR: o rascunho do cancelado não é pedido', async () => {
+    const a = executando('p-a')
+    comPr(a)
+    const b = fila.criarRun('p-b', WS, 'f1', a)
+    comPr(b.id)
+
+    const r = await cancelamento.cancelar('p-a', WS, a)
+
+    expect(r).toMatchObject({ cancelado: true, rascunho: 'reaproveitado' })
+    expect(chamadas).toHaveLength(0)
+    expect(prs.doRun(USER, a)?.rascunho).toBe('reaproveitado')
+  })
+
+  it('pendente de um run cancelado que o outro passou a usar: a reconciliação respeita', async () => {
+    const a = executando('p-a')
+    comPr(a)
+    resposta = 'indisponivel'
+    await cancelamento.cancelar('p-a', WS, a)
+    const b = fila.criarRun('p-b', WS, 'f1', a)
+    comPr(b.id)
+    chamadas.length = 0
+    relogio += ESPACAMENTO_DO_RASCUNHO_MS
+
+    await cancelamento.reconciliarRascunhos()
+
+    expect(chamadas).toHaveLength(0)
+    expect(prs.doRun(USER, a)?.rascunho).toBe('reaproveitado')
+  })
+})
+
 describe('cancelar não vence o que já aconteceu', () => {
   it('merge em curso recusa o cancelamento: run vivo, PR intacto e entrega não interrompida', async () => {
     const a = executando('p-a')
@@ -341,6 +516,7 @@ describe('rascunho "quando possível" — a origem pode recusar e o cancelamento
     expect(prs.doRun(USER, a)?.rascunho).toBe('pendente')
 
     resposta = 'ok'
+    relogio += ESPACAMENTO_DO_RASCUNHO_MS
     const achados = await cancelamento.reconciliarRascunhos()
 
     expect(prs.doRun(USER, a)?.rascunho).toBe('convertido')

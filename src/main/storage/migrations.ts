@@ -2034,16 +2034,25 @@ const MIGRATIONS: readonly string[] = [
   CREATE TABLE run_pr (
     user_id      TEXT NOT NULL,
     run_id       TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
     owner        TEXT NOT NULL,
     repo         TEXT NOT NULL,
-    pull_request INTEGER NOT NULL,
+    pull_request INTEGER NOT NULL CHECK (pull_request > 0),
     branch       TEXT NOT NULL,
-    rascunho     TEXT CHECK (rascunho IN ('pendente', 'convertido', 'indisponivel', 'nao-aberto')),
+    -- 'reaproveitado': outro run ativo (retomada vinculada) passou a usar o mesmo PR; converte-lo
+    -- em rascunho no meio da entrega do outro seria o oposto do cancelamento seletivo.
+    rascunho     TEXT CHECK (rascunho IN
+                   ('pendente', 'convertido', 'indisponivel', 'nao-aberto', 'reaproveitado')),
+    -- Tentativas de chamar a origem e quando foi a ultima: a reconciliacao espaca e desiste, em
+    -- vez de repetir a cada volta uma origem que esta fora do ar.
+    tentativas   INTEGER NOT NULL DEFAULT 0,
+    tentou_em    INTEGER,
     created_at   INTEGER NOT NULL,
     updated_at   INTEGER NOT NULL,
     PRIMARY KEY (user_id, run_id)
   );
   CREATE INDEX idx_run_pr_pendente ON run_pr(user_id) WHERE rascunho = 'pendente';
+  CREATE INDEX idx_run_pr_pr ON run_pr(user_id, owner, repo, pull_request);
   `
 ]
 

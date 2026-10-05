@@ -217,6 +217,25 @@ export class DockerRunner {
   }
 
   /** O container com este nome existe (rodando ou parado)? Base da reutilização e do lease. */
+  /**
+   * O container existe? **Três respostas**, e a terceira é a que importa: `desconhecido` quando o
+   * Docker não respondeu (timeout, política bloqueou, caiu entre duas chamadas). `containerExiste`
+   * devolve `false` nesses casos, e quem decide "o executor morreu" a partir dele troca falha de
+   * detecção por ausência — exatamente o que a recuperação não pode fazer (SPEC-Scheduler-05).
+   */
+  statusDoContainer(nome: string, cwd: string): 'existe' | 'ausente' | 'desconhecido' {
+    const execucao = this.terminal.run(
+      {
+        binary: BINARIO_DOCKER,
+        args: ['ps', '--all', '--filter', `name=^${nome}$`, '--format', '{{.Names}}'],
+        cwd
+      },
+      this.workspaceId()
+    )
+    if (execucao.state !== 'concluido') return 'desconhecido'
+    return execucao.stdout.trim() === nome ? 'existe' : 'ausente'
+  }
+
   containerExiste(nome: string, cwd: string): boolean {
     const execucao = this.terminal.run(
       {

@@ -819,18 +819,54 @@ export async function convertPullRequestToDraft(
     })
   )
   const erros = lista(resposta.corpo, 'errors')
-  if (erros.length > 0) throw falhaSintetica(422, texto(erros[0], 'message'))
+  if (erros.length > 0) throw falhaDoGraphql(erros)
+
+  // Sucesso é a origem **confirmar** o rascunho, não a ausência de erro: `data: null` sem `errors`
+  // (ou um `errors` que não é lista) não afirma nada, e fail-closed é tratar como falha transitória.
+  const confirmou =
+    (
+      (resposta.corpo as Registro | undefined)?.['data'] as
+        { convertPullRequestToDraft?: { pullRequest?: { isDraft?: unknown } } } | null | undefined
+    )?.convertPullRequestToDraft?.pullRequest?.isDraft === true
+  if (!confirmou) throw falhaSintetica(502)
 
   return { data: { rascunho: true, jaEra: false }, externalRef: referencia, criado: false }
 }
 
+/**
+ * O GraphQL responde 200 com `errors`, e o `type` diz de quem é a culpa — o que decide se vale
+ * tentar de novo. Cota (`RATE_LIMITED`) e erro sem tipo são transitórios; permissão e inexistência
+ * são do usuário; só `UNPROCESSABLE` (ou a recusa explícita de rascunho) é definitivo.
+ */
+function falhaDoGraphql(erros: readonly Registro[]): FalhaRest {
+  const tipos = erros.map((e) => texto(e, 'type'))
+  const mensagem = texto(erros[0], 'message')
+  if (tipos.includes('RATE_LIMITED')) return falhaSintetica(429, mensagem, { 'retry-after': '60' })
+  if (tipos.includes('FORBIDDEN') || tipos.includes('INSUFFICIENT_SCOPES')) {
+    return falhaSintetica(403, mensagem)
+  }
+  if (tipos.includes('NOT_FOUND')) return falhaSintetica(404, mensagem)
+  if (
+    tipos.includes('UNPROCESSABLE') ||
+    /draft pull requests are not supported/i.test(mensagem ?? '')
+  ) {
+    return falhaSintetica(422, mensagem)
+  }
+  // Sem tipo, ou tipo desconhecido: não dá para afirmar que repetir erra igual.
+  return falhaSintetica(502, mensagem)
+}
+
 /** Uma resposta que o GitHub deu com 200 mas que, para este contrato, é falha: o adapter a traduz como o status. */
-function falhaSintetica(status: number, mensagem?: string): FalhaRest {
+function falhaSintetica(
+  status: number,
+  mensagem?: string,
+  headers: Record<string, string> = {}
+): FalhaRest {
   return new FalhaRest({
     status,
     ok: false,
     corpo: mensagem === undefined ? undefined : { message: mensagem },
-    headers: new Headers()
+    headers: new Headers(headers)
   })
 }
 

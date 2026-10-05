@@ -187,12 +187,18 @@ export class ExecutionLedgerRepository {
                   EXISTS (SELECT 1 FROM merge_tentativa m
                            WHERE m.user_id = a.user_id AND m.run_id = a.run_id
                              AND m.estado = 'iniciada')
+                  -- Rascunho pendente só conta de run CANCELLED: o pedido esquecido de um run que
+                  -- seguiu vivo não pode proteger o anexo para sempre.
                   OR EXISTS (SELECT 1 FROM run_pr p
+                               JOIN pipeline_run r ON r.id = p.run_id AND r.user_id = p.user_id
                               WHERE p.user_id = a.user_id AND p.run_id = a.run_id
-                                AND p.rascunho = 'pendente')
+                                AND p.rascunho = 'pendente' AND r.estado = 'CANCELLED')
+                  -- Pendência de limpeza protege por 30 dias (a janela da retenção): nada resolve a
+                  -- pendência em produção, e a proteção sem prazo seria disco sem limite.
                   OR EXISTS (SELECT 1 FROM pendencia_de_limpeza l
                               WHERE l.user_id = a.user_id AND l.run_id = a.run_id
-                                AND l.resolvida_em IS NULL)
+                                AND l.resolvida_em IS NULL
+                                AND l.em > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 days'))
                 ) AS ambiguo
            FROM artefato_retido a
           WHERE a.user_id = ? AND a.expirado_em IS NULL

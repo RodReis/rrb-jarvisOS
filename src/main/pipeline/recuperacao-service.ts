@@ -22,7 +22,6 @@
  * "observei" e "agi" que o JavaScript síncrono não tem.
  */
 
-import type { WorkspaceId } from '@shared/domain/entities'
 import { estadoDoLease, type Lease } from '@shared/domain/lease'
 import type { PendenciaDeLimpeza } from '@shared/domain/limpeza'
 import { ehTerminal, type PipelineRun } from '@shared/domain/pipeline'
@@ -66,7 +65,19 @@ export interface RecuperacaoDeps {
   readonly executor: (runId: string) => ExecutorObservado
   /** Há merge no ar (ou confirmado e ainda não registrado) para o run? */
   readonly mergeEmCurso: (runId: string) => boolean
+  /**
+   * Quem executa o run **renova o lease** do início ao fim (inclusive esperando o CI). Só então a
+   * varredura periódica pode tratar "lease vencido e sem container" como run perdido. Hoje nenhum
+   * chamador de produção renova: o padrão (`false`) deixa o run ativo para a varredura do boot, em
+   * que nenhum dono em memória sobreviveu.
+   */
+  readonly renovacaoGarantida?: boolean
   readonly agora?: () => number
+}
+
+export interface OpcoesDaSupervisao {
+  /** A varredura do boot: o processo anterior morreu, então nenhum dono em memória existe. */
+  readonly aoSubir?: boolean
 }
 
 export interface ResultadoDoRecolhimento {
@@ -77,8 +88,17 @@ export interface ResultadoDoRecolhimento {
 
 const SEM_PENDENCIAS: readonly PendenciaDeLimpeza[] = []
 
+/**
+ * Quanto a varredura espera antes de tentar de novo um recolhimento adiado. O Docker é síncrono no
+ * processo principal (cada consulta pode custar segundos e é auditada pelo terminal): um container
+ * que não para não pode ser reconsultado a cada volta de 15 s.
+ */
+export const ESPERA_APOS_RECOLHIMENTO_ADIADO_MS = 60_000
+
 export class RecuperacaoService {
   private readonly agora: () => number
+  /** Quando cada run adiado pode ser tentado de novo pela varredura. Só a varredura respeita. */
+  private readonly adiadoAte = new Map<string, number>()
 
   constructor(private readonly deps: RecuperacaoDeps) {
     this.agora = deps.agora ?? ((): number => Date.now())
@@ -120,12 +140,16 @@ export class RecuperacaoService {
       )
     }
 
+    this.adiadoAte.delete(runId)
     const liberou = this.deps.pool.encerrarDoRun(runId)
+    if (!liberou) {
+      return { recolhido: false, motivo: 'O slot já tinha sido devolvido.', pendencias }
+    }
     this.auditar(run, 'recolhido', `Run em ${run.estado}: slot e travas devolvidos.`)
     // A vez passa a quem esperava; o terminal que chegou até aqui não pode deixar a fila parada.
     this.deps.fila.despachar()
     return {
-      recolhido: liberou,
+      recolhido: true,
       motivo: `Run em ${run.estado}: slot e travas devolvidos.`,
       pendencias
     }
@@ -135,51 +159,77 @@ export class RecuperacaoService {
    * Varre os slots e recupera o que perdeu o dono. **Cada run é decidido pelo que foi observado
    * sobre ele** — o saudável não é tocado porque o vizinho morreu.
    */
-  supervisionar(): readonly AchadoDaReconciliacao[] {
+  supervisionar(opcoes: OpcoesDaSupervisao = {}): readonly AchadoDaReconciliacao[] {
     const achados: AchadoDaReconciliacao[] = []
+    const donoNesteProcesso = opcoes.aoSubir !== true && this.deps.renovacaoGarantida !== true
 
     for (const [runId, slots] of this.slotsPorRun()) {
       const run = this.deps.runs.buscar(runId)
       if (run === undefined) continue
 
-      const observacao = this.observar(run, slots)
-      const decisao = decidirRecuperacao(observacao)
-      const recurso = `run:${runId}`
-
-      switch (decisao.acao) {
-        case 'manter':
-          achados.push({ recurso, decisao: 'intacto', motivo: decisao.motivo })
-          break
-        case 'aguardar':
-          achados.push({ recurso, decisao: 'bloqueado', motivo: decisao.motivo })
-          break
-        case 'recolher': {
-          const r = this.recolher(runId)
-          achados.push({
-            recurso,
-            decisao: r.recolhido ? 'liberado' : 'bloqueado',
-            motivo: r.motivo
-          })
-          break
-        }
-        case 'bloquear-e-recolher':
-          achados.push(this.bloquearERecolher(run, slots, decisao.motivo))
-          break
+      // Cada run é recuperado sozinho: a falha de um (SQLite ocupado, Docker mudo) não pode deixar
+      // os outros sem varredura a cada volta.
+      try {
+        achados.push(this.recuperar(run, slots, donoNesteProcesso))
+      } catch (erro) {
+        achados.push({
+          recurso: `run:${runId}`,
+          decisao: 'bloqueado',
+          motivo: `A recuperação do run falhou (${erro instanceof Error ? erro.message : 'erro desconhecido'}): a próxima varredura tenta de novo.`
+        })
       }
     }
 
     return achados
   }
 
+  private recuperar(
+    run: PipelineRun,
+    slots: readonly Lease[],
+    donoNesteProcesso: boolean
+  ): AchadoDaReconciliacao {
+    const recurso = `run:${run.id}`
+    const decisao = decidirRecuperacao(this.observar(run, slots, donoNesteProcesso))
+
+    switch (decisao.acao) {
+      case 'manter':
+        return { recurso, decisao: 'intacto', motivo: decisao.motivo }
+      case 'aguardar':
+        return { recurso, decisao: 'bloqueado', motivo: decisao.motivo }
+      case 'bloquear-e-recolher':
+        return this.bloquearERecolher(run, slots, decisao.motivo)
+      case 'recolher': {
+        const ate = this.adiadoAte.get(run.id)
+        if (ate !== undefined && ate > this.agora()) {
+          return {
+            recurso,
+            decisao: 'bloqueado',
+            motivo:
+              'O recolhimento foi adiado há pouco: a varredura espera para não martelar o Docker.'
+          }
+        }
+        const r = this.recolher(run.id)
+        return { recurso, decisao: r.recolhido ? 'liberado' : 'bloqueado', motivo: r.motivo }
+      }
+    }
+  }
+
   /** Executor e merge só são consultados quando a decisão depende deles: Docker custa. */
-  private observar(run: PipelineRun, slots: readonly Lease[]): ObservacaoDoRun {
+  private observar(
+    run: PipelineRun,
+    slots: readonly Lease[],
+    donoNesteProcesso: boolean
+  ): ObservacaoDoRun {
     const slot = estadoDoSlot(slots, this.agora())
-    const precisaDoExecutor = !ehTerminal(run.estado) && slot === 'expirado'
+    // Com o dono possivelmente neste processo a decisão é `manter` seja qual for o executor: nem
+    // gasta a chamada ao Docker (síncrona, no processo principal) nem arrisca a conclusão errada.
+    const precisaDoExecutor = !ehTerminal(run.estado) && slot === 'expirado' && !donoNesteProcesso
     return {
       estado: run.estado,
       slot,
       executor: precisaDoExecutor ? this.deps.executor(run.id) : 'desconhecido',
-      mergeEmCurso: precisaDoExecutor && this.deps.mergeEmCurso(run.id)
+      mergeEmCurso: precisaDoExecutor && this.deps.mergeEmCurso(run.id),
+      donoNesteProcesso
     }
   }
 
@@ -244,6 +294,7 @@ export class RecuperacaoService {
     motivo: string,
     pendencias: readonly PendenciaDeLimpeza[]
   ): ResultadoDoRecolhimento {
+    this.adiadoAte.set(run.id, this.agora() + ESPERA_APOS_RECOLHIMENTO_ADIADO_MS)
     // Só o log: a varredura repete a cada ciclo, e uma linha de auditoria por volta afogaria a
     // cadeia. A pendência que importa ao PI já está no ledger, gravada pelo isolamento.
     log.agent.warn('Recolhimento adiado', { runId: run.id, motivo })
@@ -265,9 +316,13 @@ export class RecuperacaoService {
   }
 
   private auditar(run: PipelineRun, acao: string, motivo: string): void {
+    // Sem o espaço do run não há a quem atribuir o evento: omitir é melhor que rotular no espaço
+    // errado (o run existe, então isto é inalcançável hoje).
+    const workspaceId = this.deps.runs.workspaceDoRun(run.id)
+    if (workspaceId === undefined) return
     this.deps.audit.append({
       user_id: this.deps.userId(),
-      workspace_id: (this.deps.runs.workspaceDoRun(run.id) ?? 'jarvis') as WorkspaceId,
+      workspace_id: workspaceId,
       type: 'pipeline-lease',
       payload: { acao, runId: run.id, estado: run.estado, motivo }
     })

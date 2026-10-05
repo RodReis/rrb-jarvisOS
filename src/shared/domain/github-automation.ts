@@ -662,6 +662,9 @@ export function significadoDo404(autenticado: boolean): {
  * O que se valida é forma, não existência: "o repositório existe?" é pergunta para a rede, e
  * respondê-la aqui exigiria a chamada que a validação existe para evitar.
  */
+/** O que o GitHub aceita em nome de dono e de repositório. */
+const NOME_NO_GITHUB = /^(?!\.{1,2}$)[A-Za-z0-9._-]+$/
+
 export function validarEntrada(operation: string, input: unknown): string | undefined {
   if (typeof input !== 'object' || input === null) {
     return 'A operação exige um objeto de entrada.'
@@ -676,6 +679,11 @@ export function validarEntrada(operation: string, input: unknown): string | unde
   // em nove ramos — e evita que um ramo futuro esqueça.
   if (!texto('owner') || !texto('repo')) {
     return 'Informe `owner` e `repo`.'
+  }
+  // O caminho da API é montado por interpolação: só o formato que o GitHub aceita entra, para um
+  // valor persistido (agora há replay) nunca virar outro caminho — `../`, query, fragmento.
+  if (!NOME_NO_GITHUB.test(v.owner as string) || !NOME_NO_GITHUB.test(v.repo as string)) {
+    return '`owner` e `repo` só aceitam letras, dígitos, ponto, hífen e sublinhado.'
   }
 
   switch (operation) {

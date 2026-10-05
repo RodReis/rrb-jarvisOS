@@ -439,12 +439,41 @@ describe('validarEntrada', () => {
     })
   })
 
+  describe('owner e repo — a origem monta o caminho da API, então só o que o GitHub aceita', () => {
+    it.each(['../x', 'a/b', 'a b', 'x?y=1', 'a#b', '%2e%2e', '..', '.'])('recusa %s', (valor) => {
+      expect(
+        validarEntrada(GITHUB_OPERATIONS.getMergeState, {
+          owner: valor,
+          repo: 'r',
+          pullRequest: 1
+        })
+      ).toMatch(/owner|repo/i)
+      expect(
+        validarEntrada(GITHUB_OPERATIONS.getMergeState, {
+          owner: 'o',
+          repo: valor,
+          pullRequest: 1
+        })
+      ).toMatch(/owner|repo/i)
+    })
+
+    it('aceita o formato real: letras, dígitos, ponto, hífen e sublinhado', () => {
+      expect(
+        validarEntrada(GITHUB_OPERATIONS.getMergeState, {
+          owner: 'Rod-Reis_1',
+          repo: 'rrb-jarvisOS.v2',
+          pullRequest: 1
+        })
+      ).toBeUndefined()
+    })
+  })
+
   describe('pr.convert-to-draft', () => {
     it('exige o número do PR', () => {
       expect(validarEntrada(GITHUB_OPERATIONS.convertToDraft, { ...REPO })).toMatch(/pullRequest/)
-      expect(
-        validarEntrada(GITHUB_OPERATIONS.convertToDraft, { ...REPO, pullRequest: 0 })
-      ).toMatch(/pullRequest/)
+      expect(validarEntrada(GITHUB_OPERATIONS.convertToDraft, { ...REPO, pullRequest: 0 })).toMatch(
+        /pullRequest/
+      )
       expect(
         validarEntrada(GITHUB_OPERATIONS.convertToDraft, { ...REPO, pullRequest: 7 })
       ).toBeUndefined()

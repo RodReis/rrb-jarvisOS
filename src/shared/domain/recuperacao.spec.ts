@@ -11,7 +11,8 @@ const base: ObservacaoDoRun = {
   estado: 'RUNNING',
   slot: 'vigente',
   executor: 'vivo',
-  mergeEmCurso: false
+  mergeEmCurso: false,
+  donoNesteProcesso: false
 }
 
 const com = (parcial: Partial<ObservacaoDoRun>): ObservacaoDoRun => ({ ...base, ...parcial })
@@ -29,6 +30,15 @@ describe('decidirRecuperacao — o que a fonte real mostra vence a suposição l
   it('lease expirado e executor morto bloqueia o run e recolhe os recursos', () => {
     const d = decidirRecuperacao(com({ slot: 'expirado', executor: 'morto' }))
     expect(d.acao).toBe('bloquear-e-recolher')
+  })
+
+  it('o dono pode estar neste processo e ninguém garante a renovação do lease: não bloqueia', () => {
+    // Run esperando CI (sandbox já removido) ou ainda no preflight (container ainda não criado):
+    // sem container e com o lease vencido, "morto" seria a leitura errada de um run saudável.
+    const d = decidirRecuperacao(
+      com({ slot: 'expirado', executor: 'morto', donoNesteProcesso: true })
+    )
+    expect(d.acao).toBe('manter')
   })
 
   it('lease expirado e executor indeterminado espera: falha de detecção não é morte', () => {

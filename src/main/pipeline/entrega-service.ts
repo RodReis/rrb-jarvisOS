@@ -602,6 +602,7 @@ export class EntregaService {
       this.deps.userId(),
       {
         runId: pedido.runId,
+        workspaceId: pedido.workspaceId,
         owner: pedido.alvo.owner,
         repo: pedido.alvo.repo,
         pullRequest: numero,

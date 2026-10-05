@@ -102,6 +102,7 @@ beforeEach(() => {
     userId: () => USER,
     mergeAutonomoLigado: () => true,
     transacao: (fn) => db.transaction(fn)(),
+    emTransacao: () => db.inTransaction,
     // O cancelamento e o bloqueio terminam o run: a recuperação devolve o que ele segurava.
     aoEncerrarSemConclusao: (runId) => void recuperacao.recolher(runId),
     agora: () => relogio
@@ -251,6 +252,99 @@ describe('recolher — o run terminou e devolve o que segurava', () => {
   })
 })
 
+describe('backoff — o Docker é síncrono no processo principal e não pode ser martelado a cada volta', () => {
+  const containerPreso = (id: string): void =>
+    void pendenciasDoIsolamento.set(id, [
+      {
+        runId: id,
+        recurso: 'container',
+        identificador: `jarvisos-run-${id}`,
+        motivo: 'O Docker recusou parar o container.',
+        em: new Date(AGORA).toISOString()
+      }
+    ])
+
+  it('recolhimento adiado só é tentado de novo depois da espera, não a cada varredura', () => {
+    const a = executando('p-a')
+    containerPreso(a.id)
+    fila.transicionar('p-a', WS, a.id, 'CANCELLED')
+    const tentativas = (): number => liberados.filter((id) => id === a.id).length
+    expect(tentativas()).toBe(1)
+
+    recuperacao.supervisionar()
+    recuperacao.supervisionar()
+    expect(tentativas()).toBe(1)
+
+    relogio += 61_000
+    recuperacao.supervisionar()
+    expect(tentativas()).toBe(2)
+  })
+
+  it('o que destrava dentro da espera é recolhido na primeira tentativa depois dela', () => {
+    const a = executando('p-a')
+    containerPreso(a.id)
+    fila.transicionar('p-a', WS, a.id, 'CANCELLED')
+    pendenciasDoIsolamento.delete(a.id)
+
+    relogio += 61_000
+    recuperacao.supervisionar()
+
+    expect(slotDe(a.id)).toBeUndefined()
+  })
+
+  it('a espera é por run: o adiado de um não segura o recolhimento do outro', () => {
+    pool.configurar({ ...CONFIG_PADRAO, paralelismo: true })
+    const a = executando('p-a')
+    const b = executando('p-b')
+    containerPreso(a.id)
+    fila.transicionar('p-a', WS, a.id, 'CANCELLED')
+    runs.transicionar(b.id, 'RUNNING', 'CANCELLED', new Date(relogio))
+
+    recuperacao.supervisionar()
+
+    expect(slotDe(b.id)).toBeUndefined()
+  })
+})
+
+describe('o gancho do cancelamento nunca derruba a transição que já foi commitada', () => {
+  it('recolher que lança não desfaz o CANCELLED nem sai de fila.transicionar', () => {
+    const a = executando('p-a')
+    const original = recuperacao.recolher.bind(recuperacao)
+    recuperacao.recolher = () => {
+      throw new Error('sqlite ocupado')
+    }
+
+    const r = fila.transicionar('p-a', WS, a.id, 'CANCELLED')
+
+    expect(r.reason).toBe('transicionado')
+    expect(estado(a.id)).toBe('CANCELLED')
+    // O slot continua preso, e a varredura o devolve na volta seguinte.
+    recuperacao.recolher = original
+    recuperacao.supervisionar()
+    expect(slotDe(a.id)).toBeUndefined()
+  })
+
+  it('dentro de uma transação externa o gancho espera o commit: o Docker nunca roda com ela aberta', async () => {
+    const a = executando('p-a')
+    const durante: boolean[] = []
+    const original = recuperacao.recolher.bind(recuperacao)
+    recuperacao.recolher = (runId) => {
+      durante.push(db.inTransaction)
+      return original(runId)
+    }
+
+    db.transaction(() => {
+      fila.transicionar('p-a', WS, a.id, 'CANCELLED')
+      // Ainda dentro da transação: o gancho não pode ter rodado.
+      expect(durante).toEqual([])
+    })()
+    await Promise.resolve()
+
+    expect(durante).toEqual([false])
+    expect(slotDe(a.id)).toBeUndefined()
+  })
+})
+
 describe('terminal e liberação são uma transação só (limite declarado da SPEC-Scheduler-01)', () => {
   it('se a liberação do slot falha, o run NÃO fica terminal com o slot preso', () => {
     const a = executando('p-a')
@@ -273,12 +367,72 @@ describe('terminal e liberação são uma transação só (limite declarado da S
   })
 })
 
+describe('supervisionar — o dono pode estar neste processo (varredura periódica)', () => {
+  it('lease vencido e sem container NÃO bloqueia: ninguém garante que o dono renova o lease', () => {
+    // Run esperando o CI (sandbox já removido) ou ainda no preflight (container ainda não criado).
+    const a = executando('p-a')
+    expirar()
+
+    const achados = recuperacao.supervisionar()
+
+    expect(estado(a.id)).toBe('RUNNING')
+    expect(slotDe(a.id)).toBeDefined()
+    expect(achados.find((x) => x.recurso === `run:${a.id}`)?.decisao).toBe('intacto')
+  })
+
+  it('a varredura periódica não consulta o Docker quando a decisão independe dele', () => {
+    const consultas: string[] = []
+    const a = executando('p-a')
+    const periodica = new RecuperacaoService({
+      runs,
+      leases,
+      pool,
+      fila,
+      audit: new AuditRepository(db, 'chave-de-teste'),
+      userId: () => USER,
+      executor: (runId) => {
+        consultas.push(runId)
+        return 'morto'
+      },
+      mergeEmCurso: () => false,
+      agora: () => relogio
+    })
+    expirar()
+
+    periodica.supervisionar()
+
+    expect(consultas).toEqual([])
+    expect(estado(a.id)).toBe('RUNNING')
+  })
+
+  it('com a renovação do lease garantida, a varredura periódica volta a bloquear o run perdido', () => {
+    const a = executando('p-a')
+    const garantida = new RecuperacaoService({
+      runs,
+      leases,
+      pool,
+      fila,
+      audit: new AuditRepository(db, 'chave-de-teste'),
+      userId: () => USER,
+      executor: () => 'morto',
+      mergeEmCurso: () => false,
+      renovacaoGarantida: true,
+      agora: () => relogio
+    })
+    expirar()
+
+    garantida.supervisionar()
+
+    expect(estado(a.id)).toBe('BLOCKED')
+  })
+})
+
 describe('supervisionar — recuperação por run, sem interromper fatia saudável', () => {
   it('run ativo com lease vigente não é tocado', () => {
     const a = executando('p-a')
     executores.set(a.id, 'morto')
 
-    recuperacao.supervisionar()
+    recuperacao.supervisionar({ aoSubir: true })
 
     expect(estado(a.id)).toBe('RUNNING')
     expect(slotDe(a.id)).toBeDefined()
@@ -290,7 +444,7 @@ describe('supervisionar — recuperação por run, sem interromper fatia saudáv
     fila.adquirirSlot('p-b', WS, b)
     expirar()
 
-    const achados = recuperacao.supervisionar()
+    const achados = recuperacao.supervisionar({ aoSubir: true })
 
     expect(estado(a.id)).toBe('BLOCKED')
     expect(slotDe(a.id)).toBeUndefined()
@@ -303,7 +457,7 @@ describe('supervisionar — recuperação por run, sem interromper fatia saudáv
     const a = executando('p-a')
     expirar()
 
-    recuperacao.supervisionar()
+    recuperacao.supervisionar({ aoSubir: true })
 
     const bloqueio = runs.buscar(a.id)?.bloqueio
     expect(bloqueio?.causa).toBe('executor-perdido')
@@ -318,7 +472,7 @@ describe('supervisionar — recuperação por run, sem interromper fatia saudáv
     executores.set(a.id, 'vivo')
     expirar()
 
-    recuperacao.supervisionar()
+    recuperacao.supervisionar({ aoSubir: true })
 
     expect(estado(a.id)).toBe('RUNNING')
     expect(slotDe(a.id)).toBeDefined()
@@ -329,7 +483,7 @@ describe('supervisionar — recuperação por run, sem interromper fatia saudáv
     executores.set(a.id, 'desconhecido')
     expirar()
 
-    const achados = recuperacao.supervisionar()
+    const achados = recuperacao.supervisionar({ aoSubir: true })
 
     expect(estado(a.id)).toBe('RUNNING')
     expect(achados.find((x) => x.recurso === `run:${a.id}`)?.decisao).toBe('bloqueado')
@@ -342,7 +496,7 @@ describe('supervisionar — recuperação por run, sem interromper fatia saudáv
     mergesEmCurso.add(a.id)
     expirar()
 
-    recuperacao.supervisionar()
+    recuperacao.supervisionar({ aoSubir: true })
 
     expect(estado(a.id)).toBe('PR_CI')
     expect(slotDe(a.id)).toBeDefined()
@@ -361,7 +515,7 @@ describe('supervisionar — recuperação por run, sem interromper fatia saudáv
     relogio += 2_000
     executores.set(b.id, 'vivo')
 
-    recuperacao.supervisionar()
+    recuperacao.supervisionar({ aoSubir: true })
 
     expect(estado(a.id)).toBe('BLOCKED')
     expect(slotDe(a.id)).toBeUndefined()
@@ -376,20 +530,38 @@ describe('supervisionar — recuperação por run, sem interromper fatia saudáv
     runs.transicionar(a.id, 'RUNNING', 'CANCELLED', new Date(relogio))
     expect(slotDe(a.id)).toBeDefined()
 
-    recuperacao.supervisionar()
+    recuperacao.supervisionar({ aoSubir: true })
 
     expect(slotDe(a.id)).toBeUndefined()
+  })
+
+  it('a falha ao recuperar um run não impede a varredura dos outros', () => {
+    pool.configurar({ ...CONFIG_PADRAO, paralelismo: true })
+    const a = executando('p-a')
+    const b = executando('p-b')
+    runs.transicionar(a.id, 'RUNNING', 'CANCELLED', new Date(relogio))
+    runs.transicionar(b.id, 'RUNNING', 'CANCELLED', new Date(relogio))
+    const original = recuperacao.recolher.bind(recuperacao)
+    recuperacao.recolher = (runId) => {
+      if (runId === a.id) throw new Error('sqlite ocupado')
+      return original(runId)
+    }
+
+    const achados = recuperacao.supervisionar()
+
+    expect(slotDe(b.id)).toBeUndefined()
+    expect(achados.find((x) => x.recurso === `run:${a.id}`)?.decisao).toBe('bloqueado')
   })
 
   it('é idempotente: rodar de novo sem mudança não escreve nada', () => {
     const a = executando('p-a')
     expirar()
-    recuperacao.supervisionar()
+    recuperacao.supervisionar({ aoSubir: true })
     const eventos = (): number =>
       (db.prepare('SELECT COUNT(*) AS n FROM audit_event').get() as { n: number }).n
     const antes = eventos()
 
-    recuperacao.supervisionar()
+    recuperacao.supervisionar({ aoSubir: true })
 
     expect(eventos()).toBe(antes)
     expect(estado(a.id)).toBe('BLOCKED')

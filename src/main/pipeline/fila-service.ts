@@ -107,6 +107,13 @@ export interface FilaDeps {
    * dentro dele: a devolução fala com o Docker, e isso não cabe numa transação do SQLite.
    */
   readonly aoEncerrarSemConclusao?: (runId: string, estado: EstadoDoRun) => void
+  /**
+   * Há uma transação do banco aberta **por fora** desta chamada? (A expansão de escopo bloqueia o
+   * run por dentro de uma.) Quando sim, o gancho espera o commit: ele fala com o Docker, e parar
+   * container e remover worktree com a transação aberta deixaria um efeito externo irreversível
+   * preso a um banco que ainda pode reverter.
+   */
+  readonly emTransacao?: () => boolean
   /** Relógio injetado: lease e expiração precisam ser determinísticos no teste. */
   readonly agora?: () => number
 }
@@ -307,9 +314,32 @@ export class FilaService {
     // Depois do commit: acordar quem esperava, passar a vez e recuperar o que o run segurava.
     if (saidos.length > 0) this.deps.aoCancelarEspera?.(saidos)
     if (liberou) this.despachar()
-    if (para === 'CANCELLED' || para === 'BLOCKED') this.deps.aoEncerrarSemConclusao?.(runId, para)
+    if (para === 'CANCELLED' || para === 'BLOCKED') this.avisarEncerramento(runId, para)
 
     return { reason: 'transicionado', run: atualizado, mensagem: `Run em ${para}.` }
+  }
+
+  /**
+   * O gancho depois do commit do terminal. **Nunca lança**: o terminal já está gravado, e uma
+   * exceção aqui sairia de `transicionar` como se a transição tivesse falhado. Se a recuperação
+   * não conseguiu, o slot fica preso e a varredura do supervisor o devolve na volta seguinte.
+   */
+  private avisarEncerramento(runId: string, estado: EstadoDoRun): void {
+    const hook = this.deps.aoEncerrarSemConclusao
+    if (hook === undefined) return
+    const chamar = (): void => {
+      try {
+        hook(runId, estado)
+      } catch (erro) {
+        log.agent.warn('A recuperação do run encerrado falhou; a varredura refaz', {
+          runId,
+          erro: erro instanceof Error ? erro.message : String(erro)
+        })
+      }
+    }
+    // Por fora há transação aberta: o microtask roda depois de ela terminar (o código é síncrono).
+    if (this.deps.emTransacao?.() === true) queueMicrotask(chamar)
+    else chamar()
   }
 
   /**

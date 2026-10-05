@@ -1434,6 +1434,7 @@ if (!app.requestSingleInstanceLock()) {
       // O terminal do run e a liberação do slot são uma transação só (SPEC-Scheduler-05): um crash
       // entre os dois deixava um run terminal segurando o slot.
       transacao: (fn) => storage.db.transaction(fn)(),
+      emTransacao: () => storage.db.inTransaction,
       // `CANCELLED` e `BLOCKED` devolvem o slot pela recuperação, depois de provar que o executor
       // parou. O serviço nasce depois da fila (precisa dela), por isso a indireção por função.
       aoEncerrarSemConclusao: (runId) => void recuperacaoDosRuns.servico?.recolher(runId)
@@ -1699,7 +1700,7 @@ if (!app.requestSingleInstanceLock()) {
       // (SPEC-Scheduler-05).
       recuperacao: {
         supervisionar: async () => [
-          ...recuperacao.supervisionar(),
+          ...recuperacao.supervisionar({ aoSubir: true }),
           ...(await cancelamento.reconciliarRascunhos())
         ]
       }

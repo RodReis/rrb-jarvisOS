@@ -19,7 +19,7 @@
  * reatribuir — exatamente o roubo que o critério 3 da M9-F02 proíbe.
  */
 
-import { RECURSO_CONTAINER, RECURSO_PORTA } from '@shared/domain/preflight'
+import { RECURSO_CONTAINER, RECURSO_PORTA, nomeDoContainer } from '@shared/domain/preflight'
 import type { ExecutorObservado } from '@shared/domain/recuperacao'
 import type { VerificadorDeRecurso } from './reconciliacao-service'
 import type { DockerRunner } from './docker-runner'
@@ -74,7 +74,7 @@ export function verificadorDePorta(docker: DockerRunner, cwd: () => string): Ver
  * não lista ou lança:** não ver o container porque o Docker não respondeu não é ele ter sumido.
  */
 export function observadorDeExecutor(
-  docker: Pick<DockerRunner, 'listarGeridos' | 'containerExiste'>,
+  docker: Pick<DockerRunner, 'listarGeridos' | 'statusDoContainer'>,
   cwd: () => string
 ): (runId: string) => ExecutorObservado {
   return (runId) => {
@@ -85,7 +85,8 @@ export function observadorDeExecutor(
         (c) => c.runId !== undefined && (c.runId === runId || c.runId.startsWith(`${runId}-`))
       )
       if (doRun) return 'vivo'
-      return docker.containerExiste(`jarvisos-run-${runId}`, cwd()) ? 'vivo' : 'morto'
+      const legado = docker.statusDoContainer(nomeDoContainer(runId), cwd())
+      return legado === 'existe' ? 'vivo' : legado === 'ausente' ? 'morto' : 'desconhecido'
     } catch {
       return 'desconhecido'
     }

@@ -41,6 +41,14 @@ export interface ObservacaoDoRun {
   readonly executor: ExecutorObservado
   /** Há tentativa de merge no ar, ou confirmada e ainda não registrada no run. */
   readonly mergeEmCurso: boolean
+  /**
+   * O dono do run **pode estar neste processo** e nada garante que ele renova o lease. É o caso da
+   * varredura periódica sem heartbeat de produção: o run esperando o CI não tem container, o que
+   * ainda está no preflight não tem container **ainda**, e nenhum dos dois renova o lease de 30 s —
+   * "lease vencido e sem container" descreveria um run saudável. No boot é `false`: o processo
+   * anterior morreu e nenhum dono em memória sobreviveu.
+   */
+  readonly donoNesteProcesso: boolean
 }
 
 export type AcaoDeRecuperacao = 'manter' | 'aguardar' | 'recolher' | 'bloquear-e-recolher'
@@ -72,6 +80,14 @@ export function decidirRecuperacao(o: ObservacaoDoRun): DecisaoDeRecuperacao {
   }
 
   // Daqui em diante o lease expirou.
+  if (o.donoNesteProcesso) {
+    return {
+      acao: 'manter',
+      motivo:
+        'Lease expirado e sem container, mas o dono pode estar neste processo e a renovação do lease não é garantida: a varredura do boot é quem decide.'
+    }
+  }
+
   if (o.executor === 'vivo') {
     return {
       acao: 'manter',

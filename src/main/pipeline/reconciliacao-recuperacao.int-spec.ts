@@ -126,7 +126,7 @@ const reconciliacao = (): InstanceType<typeof ReconciliacaoService> =>
     recuperacao: {
       supervisionar: () => {
         if (falhaDaRecuperacao) throw new Error('docker mudo')
-        return recuperacao.supervisionar()
+        return recuperacao.supervisionar({ aoSubir: true })
       }
     },
     agora: () => relogio

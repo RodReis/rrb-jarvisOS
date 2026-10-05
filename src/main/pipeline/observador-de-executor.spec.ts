@@ -5,6 +5,8 @@ import { observadorDeExecutor } from './verificadores-de-sandbox'
 interface DockerFalso {
   geridos: RecursosGeridos | undefined | 'explode'
   legados: Set<string>
+  /** A consulta ao container nomeado pelo run falhou (timeout, política, Docker caiu no meio). */
+  legadoIndeterminado?: boolean
 }
 
 const docker = (f: DockerFalso) => ({
@@ -12,7 +14,8 @@ const docker = (f: DockerFalso) => ({
     if (f.geridos === 'explode') throw new Error('docker caiu')
     return f.geridos
   },
-  containerExiste: (nome: string): boolean => f.legados.has(nome)
+  statusDoContainer: (nome: string): 'existe' | 'ausente' | 'desconhecido' =>
+    f.legadoIndeterminado === true ? 'desconhecido' : f.legados.has(nome) ? 'existe' : 'ausente'
 })
 
 const geridos = (...runIds: (string | undefined)[]): RecursosGeridos => ({
@@ -47,6 +50,13 @@ describe('observadorDeExecutor — o que o Docker diz do executor de um run', ()
   it('run anterior ao inventário: o container nomeado pelo run ainda conta', () => {
     const f = { geridos: geridos(), legados: new Set(['jarvisos-run-run-1']) }
     expect(observar(f, 'run-1')).toBe('vivo')
+  })
+
+  it('a listagem funcionou mas a consulta ao container do run falhou: desconhecido, nunca morto', () => {
+    // O Docker respondeu a primeira pergunta e engasgou na segunda. Tratar a falha como "não
+    // existe" bloquearia um run saudável e passaria o slot a um segundo executor (SPEC-Scheduler-05).
+    const f = { geridos: geridos(), legados: new Set<string>(), legadoIndeterminado: true }
+    expect(observar(f, 'run-1')).toBe('desconhecido')
   })
 
   it('Docker que não lista é desconhecido, nunca morto', () => {

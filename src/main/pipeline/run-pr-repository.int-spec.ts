@@ -15,7 +15,14 @@ const { RunPrRepository } = await import('./run-pr-repository')
 
 const USER = 'u-1'
 const AGORA = 1_700_000_000_000
-const PR = { runId: 'r-1', owner: 'o', repo: 'r', pullRequest: 7, branch: 'feat/x' } as const
+const PR = {
+  runId: 'r-1',
+  workspaceId: 'jarvis',
+  owner: 'o',
+  repo: 'r',
+  pullRequest: 7,
+  branch: 'feat/x'
+} as const
 
 let dir: string
 let db: Db
@@ -64,11 +71,11 @@ describe('RunPrRepository — o PR que o run publicou', () => {
     expect(repo.doRun(USER, 'r-1')?.rascunho).toBeUndefined()
 
     expect(repo.pedirRascunho(USER, 'r-1', AGORA)).toBe(true)
-    expect(repo.pendentes(USER).map((p) => p.runId)).toEqual(['r-1'])
+    expect(repo.pendentes(USER, AGORA, 0).map((p) => p.runId)).toEqual(['r-1'])
 
     expect(repo.concluirRascunho(USER, 'r-1', 'convertido', AGORA)).toBe(true)
     expect(repo.doRun(USER, 'r-1')?.rascunho).toBe('convertido')
-    expect(repo.pendentes(USER)).toEqual([])
+    expect(repo.pendentes(USER, AGORA, 0)).toEqual([])
   })
 
   it('só conclui o que estava pendente: o resultado não é sobrescrito por outro', () => {
@@ -80,6 +87,84 @@ describe('RunPrRepository — o PR que o run publicou', () => {
     expect(repo.doRun(USER, 'r-1')?.rascunho).toBe('convertido')
   })
 
+  it('o PR carrega o workspace do run: o escopo é dado, não derivado', () => {
+    repo.registrar(USER, PR, AGORA)
+
+    expect(repo.doRun(USER, 'r-1')?.workspaceId).toBe('jarvis')
+  })
+
+  describe('tentativas e espaçamento — a origem fora do ar não é martelada', () => {
+    const ESPACO = 300_000
+
+    it('a tentativa conta e o pedido só volta a ser listado depois do espaçamento', () => {
+      repo.registrar(USER, PR, AGORA)
+      repo.pedirRascunho(USER, 'r-1', AGORA)
+      expect(repo.pendentes(USER, AGORA, ESPACO)).toHaveLength(1)
+
+      expect(repo.registrarTentativa(USER, 'r-1', AGORA)).toBe(1)
+
+      expect(repo.pendentes(USER, AGORA + ESPACO - 1, ESPACO)).toEqual([])
+      expect(repo.pendentes(USER, AGORA + ESPACO, ESPACO)).toHaveLength(1)
+    })
+
+    it('o contador cresce a cada tentativa e é por run', () => {
+      repo.registrar(USER, PR, AGORA)
+      repo.registrar(USER, { ...PR, runId: 'r-2', pullRequest: 8 }, AGORA)
+      repo.pedirRascunho(USER, 'r-1', AGORA)
+
+      repo.registrarTentativa(USER, 'r-1', AGORA)
+      expect(repo.registrarTentativa(USER, 'r-1', AGORA + 1)).toBe(2)
+      expect(repo.registrarTentativa(USER, 'r-2', AGORA)).toBe(1)
+    })
+
+    it('registrar o PR de novo não zera o contador', () => {
+      repo.registrar(USER, PR, AGORA)
+      repo.pedirRascunho(USER, 'r-1', AGORA)
+      repo.registrarTentativa(USER, 'r-1', AGORA)
+
+      repo.registrar(USER, PR, AGORA + 5)
+
+      expect(repo.registrarTentativa(USER, 'r-1', AGORA + 6)).toBe(2)
+    })
+  })
+
+  describe('PR reaproveitado por outro run (retomada vinculada)', () => {
+    const noRun = (runId: string, estado: string): void =>
+      void db
+        .prepare(
+          `INSERT INTO pipeline_run (id, user_id, workspace_id, project_id, slice_id, estado, created_at, updated_at)
+           VALUES (?, ?, 'jarvis', 'p', 's', ?, 'x', 'x')`
+        )
+        .run(runId, USER, estado)
+
+    it('outro run ativo apontando para o mesmo PR é detectado', () => {
+      noRun('r-1', 'CANCELLED')
+      noRun('r-2', 'RUNNING')
+      repo.registrar(USER, PR, AGORA)
+      repo.registrar(USER, { ...PR, runId: 'r-2' }, AGORA)
+
+      expect(repo.outroRunAtivoUsa(USER, 'r-1')).toBe(true)
+    })
+
+    it('outro run já terminado não conta, nem o PR de outro número', () => {
+      noRun('r-1', 'CANCELLED')
+      noRun('r-2', 'BLOCKED')
+      noRun('r-3', 'RUNNING')
+      repo.registrar(USER, PR, AGORA)
+      repo.registrar(USER, { ...PR, runId: 'r-2' }, AGORA)
+      repo.registrar(USER, { ...PR, runId: 'r-3', pullRequest: 99 }, AGORA)
+
+      expect(repo.outroRunAtivoUsa(USER, 'r-1')).toBe(false)
+    })
+
+    it('o próprio run não conta como "outro"', () => {
+      noRun('r-1', 'RUNNING')
+      repo.registrar(USER, PR, AGORA)
+
+      expect(repo.outroRunAtivoUsa(USER, 'r-1')).toBe(false)
+    })
+  })
+
   it('desfazer o pedido volta ao estado sem rascunho (cancelamento recusado)', () => {
     repo.registrar(USER, PR, AGORA)
     repo.pedirRascunho(USER, 'r-1', AGORA)
@@ -87,7 +172,7 @@ describe('RunPrRepository — o PR que o run publicou', () => {
     expect(repo.desfazerPedido(USER, 'r-1', AGORA)).toBe(true)
 
     expect(repo.doRun(USER, 'r-1')?.rascunho).toBeUndefined()
-    expect(repo.pendentes(USER)).toEqual([])
+    expect(repo.pendentes(USER, AGORA, 0)).toEqual([])
   })
 
   it('pedir o rascunho de PR que já tem resultado não reabre o pedido', () => {

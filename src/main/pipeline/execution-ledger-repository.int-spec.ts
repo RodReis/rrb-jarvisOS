@@ -159,11 +159,15 @@ describe('ExecutionLedgerRepository', () => {
       expect(ambiguo()).toBe(false)
     })
 
-    it('rascunho de PR pendente torna o run ambíguo; com resultado, não', () => {
+    it('rascunho de PR pendente torna o run cancelado ambíguo; com resultado, não', () => {
       db.prepare(
-        `INSERT INTO run_pr (user_id, run_id, owner, repo, pull_request, branch, rascunho,
-                             created_at, updated_at)
-         VALUES (?, ?, 'o', 'r', 1, 'b', 'pendente', 1, 1)`
+        `INSERT INTO pipeline_run (id, user_id, workspace_id, project_id, slice_id, estado, created_at, updated_at)
+         VALUES (?, ?, 'jarvis', 'p', 's', 'CANCELLED', 'x', 'x')`
+      ).run(RUN, USER)
+      db.prepare(
+        `INSERT INTO run_pr (user_id, run_id, workspace_id, owner, repo, pull_request, branch,
+                             rascunho, created_at, updated_at)
+         VALUES (?, ?, 'jarvis', 'o', 'r', 1, 'b', 'pendente', 1, 1)`
       ).run(USER, RUN)
       expect(ambiguo()).toBe(true)
 
@@ -177,7 +181,7 @@ describe('ExecutionLedgerRepository', () => {
         recurso: 'container',
         identificador: 'jarvisos-run-1',
         motivo: 'docker recusou',
-        em: '2026-09-02T00:00:00.000Z'
+        em: new Date().toISOString()
       })
       expect(ambiguo()).toBe(true)
 
@@ -185,12 +189,46 @@ describe('ExecutionLedgerRepository', () => {
       expect(ambiguo()).toBe(false)
     })
 
+    it('pendência antiga demais não protege para sempre: a proteção tem prazo', () => {
+      repo.registrarPendencia(USER, {
+        runId: RUN,
+        recurso: 'worktree',
+        identificador: '/x',
+        motivo: 'git recusou',
+        em: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString()
+      })
+
+      expect(ambiguo()).toBe(false)
+    })
+
+    it('rascunho pendente só protege run CANCELLED: pedido esquecido de run vivo não conta', () => {
+      repo.registrarArtefato(
+        USER,
+        artefato({ id: 'art-v', runId: 'run-v', estadoDoRun: 'RUNNING' })
+      )
+      db.prepare(
+        `INSERT INTO pipeline_run (id, user_id, workspace_id, project_id, slice_id, estado, created_at, updated_at)
+         VALUES ('run-v', ?, 'jarvis', 'p', 's', 'RUNNING', 'x', 'x')`
+      ).run(USER)
+      db.prepare(
+        `INSERT INTO run_pr (user_id, run_id, workspace_id, owner, repo, pull_request, branch,
+                             rascunho, created_at, updated_at)
+         VALUES (?, 'run-v', 'jarvis', 'o', 'r', 2, 'b', 'pendente', 1, 1)`
+      ).run(USER)
+
+      expect(ambiguo('art-v')).toBe(false)
+    })
+
     it('a ambiguidade de um run não contamina o artefato de outro', () => {
       repo.registrarArtefato(USER, artefato({ id: 'art-2', runId: 'run-2', estadoDoRun: 'MERGED' }))
       db.prepare(
-        `INSERT INTO run_pr (user_id, run_id, owner, repo, pull_request, branch, rascunho,
-                             created_at, updated_at)
-         VALUES (?, ?, 'o', 'r', 1, 'b', 'pendente', 1, 1)`
+        `INSERT INTO pipeline_run (id, user_id, workspace_id, project_id, slice_id, estado, created_at, updated_at)
+         VALUES (?, ?, 'jarvis', 'p', 's', 'CANCELLED', 'x', 'x')`
+      ).run(RUN, USER)
+      db.prepare(
+        `INSERT INTO run_pr (user_id, run_id, workspace_id, owner, repo, pull_request, branch,
+                             rascunho, created_at, updated_at)
+         VALUES (?, ?, 'jarvis', 'o', 'r', 1, 'b', 'pendente', 1, 1)`
       ).run(USER, RUN)
 
       expect(ambiguo('art-1')).toBe(true)

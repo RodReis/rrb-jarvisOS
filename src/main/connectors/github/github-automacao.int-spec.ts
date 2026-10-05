@@ -64,6 +64,10 @@ interface EstadoFake {
   regras: Map<string, unknown[]>
   /** O repositório não aceita rascunho: o GraphQL responde 200 com `errors`. */
   rascunhoIndisponivel: boolean
+  /** Um erro arbitrário do GraphQL (200 com `errors`), com o `type` que o GitHub deu, se deu. */
+  graphqlErro: { type?: string; message: string } | undefined
+  /** O GraphQL responde 200 sem `errors`, mas sem confirmar `isDraft` (`data: null`). */
+  graphqlSemConfirmacao: boolean
 }
 
 let estado: EstadoFake
@@ -97,7 +101,9 @@ function estadoInicial(): EstadoFake {
     commits: new Map(),
     rotulos: new Map(),
     regras: new Map(),
-    rascunhoIndisponivel: false
+    rascunhoIndisponivel: false,
+    graphqlErro: undefined,
+    graphqlSemConfirmacao: false
   }
 }
 
@@ -285,11 +291,22 @@ function responder(
     if (pr === undefined) {
       return { status: 200, corpo: { errors: [{ message: 'Could not resolve to a node.' }] } }
     }
+    if (estado.graphqlErro !== undefined) {
+      return { status: 200, corpo: { errors: [estado.graphqlErro] } }
+    }
+    if (estado.graphqlSemConfirmacao) return { status: 200, corpo: { data: null } }
     if (estado.rascunhoIndisponivel) {
       // Como o GitHub real: 200 com `errors`, e o estado não muda.
       return {
         status: 200,
-        corpo: { errors: [{ message: 'Draft pull requests are not supported in this repository.' }] }
+        corpo: {
+          errors: [
+            {
+              type: 'UNPROCESSABLE',
+              message: 'Draft pull requests are not supported in this repository.'
+            }
+          ]
+        }
       }
     }
     pr.draft = true
@@ -1485,6 +1502,36 @@ describe('pr.convert-to-draft — SPEC-Scheduler-05', () => {
     expect(r.ok).toBe(false)
     expect(r.code).toBe('validacao-invalida')
     expect(r.retryable).toBe(false)
+    expect(estado.pulls[0]?.draft).toBe(false)
+  })
+
+  it('rate limit do GraphQL (200 com RATE_LIMITED) é retentável, nunca definitivo', async () => {
+    estado.graphqlErro = { type: 'RATE_LIMITED', message: 'API rate limit exceeded' }
+
+    const r = (await executar(GITHUB_OPERATIONS.convertToDraft, entrada)) as ConnectorError
+
+    expect(r.ok).toBe(false)
+    expect(r.code).toBe('limite-excedido')
+    expect(r.retryable).toBe(true)
+    expect(estado.pulls[0]?.draft).toBe(false)
+  })
+
+  it('erro do GraphQL sem tipo ("Something went wrong") é transitório: indisponível e retentável', async () => {
+    estado.graphqlErro = { message: 'Something went wrong while executing your query.' }
+
+    const r = (await executar(GITHUB_OPERATIONS.convertToDraft, entrada)) as ConnectorError
+
+    expect(r.ok).toBe(false)
+    expect(r.code).toBe('indisponivel')
+    expect(r.retryable).toBe(true)
+  })
+
+  it('200 sem erro mas sem confirmar isDraft NÃO é sucesso (fail closed)', async () => {
+    estado.graphqlSemConfirmacao = true
+
+    const r = (await executar(GITHUB_OPERATIONS.convertToDraft, entrada)) as ConnectorError
+
+    expect(r.ok).toBe(false)
     expect(estado.pulls[0]?.draft).toBe(false)
   })
 

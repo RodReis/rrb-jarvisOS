@@ -49,6 +49,15 @@ import type { PrDoRun, RunPrRepository } from './run-pr-repository'
 
 const TIMEOUT_DA_CHAMADA_MS = 30_000
 
+/**
+ * Entre duas tentativas de refazer o rascunho. A origem fora do ar não pode ser chamada a cada
+ * volta da varredura (cada chamada é auditada duas vezes pelo conector).
+ */
+export const ESPACAMENTO_DO_RASCUNHO_MS = 5 * 60_000
+
+/** Depois de tantas tentativas sem resposta definitiva, o rascunho vira `indisponivel`. */
+export const MAXIMO_DE_TENTATIVAS_DO_RASCUNHO = 5
+
 /** O que aconteceu com o PR do run cancelado. */
 export type DesfechoDoRascunho =
   /** O run não tinha PR (ou a fase não pede rascunho). */
@@ -58,8 +67,10 @@ export type DesfechoDoRascunho =
   | 'ja-era'
   /** O PR não está aberto (fechado ou mergeado): nunca é reaberto como rascunho. */
   | 'nao-aberto'
-  /** A origem recusou de forma definitiva (ex.: repositório sem suporte a rascunho). */
+  /** A origem recusou de forma definitiva, ou não respondeu depois de todas as tentativas. */
   | 'indisponivel'
+  /** Outro run ativo (retomada vinculada) usa o mesmo PR: ele não é tocado. */
+  | 'reaproveitado'
   /** A origem não respondeu: o pedido fica gravado e a reconciliação o refaz. */
   | 'pendente'
 
@@ -92,6 +103,8 @@ export interface CancelamentoDeps {
 
 export class CancelamentoService {
   private readonly agora: () => number
+  /** A reconciliação em andamento: chamadas concorrentes (tick e boot) esperam a mesma. */
+  private reconciliando: Promise<readonly AchadoDaReconciliacao[]> | undefined
 
   constructor(private readonly deps: CancelamentoDeps) {
     this.agora = deps.agora ?? ((): number => Date.now())
@@ -104,7 +117,16 @@ export class CancelamentoService {
   ): Promise<ResultadoDoCancelamento> {
     const userId = this.deps.userId()
     const run = this.deps.runs.buscar(runId)
-    if (run === undefined || run.user_id !== userId) {
+    // O escopo é do **run**, e o chamador só o confirma: o workspace vira credencial do GitHub e
+    // escopo da auditoria, e um valor trocado faria o PR de um workspace ser convertido com o
+    // token do outro. Divergência é "não encontrado" — o run de outro escopo não existe para quem
+    // pergunta por ele errado.
+    if (
+      run === undefined ||
+      run.user_id !== userId ||
+      run.projectId !== projectId ||
+      this.deps.runs.workspaceDoRun(runId) !== workspaceId
+    ) {
       return { cancelado: false, motivo: 'run-inexistente', mensagem: 'Run não encontrado.' }
     }
 
@@ -137,7 +159,7 @@ export class CancelamentoService {
 
     const rascunho =
       pr !== undefined && this.deps.prs.doRun(userId, runId)?.rascunho === 'pendente'
-        ? await this.converterEmRascunho(userId, workspaceId, pr)
+        ? await this.converterEmRascunho(userId, pr)
         : 'sem-pr'
 
     this.deps.audit.append({
@@ -154,18 +176,27 @@ export class CancelamentoService {
    * fato está `CANCELLED`**. Um pedido pendente de run que ainda vive é resto de um cancelamento
    * que não chegou a acontecer, e converter o PR de um run saudável seria o oposto da regra 2.
    */
-  async reconciliarRascunhos(): Promise<readonly AchadoDaReconciliacao[]> {
+  reconciliarRascunhos(): Promise<readonly AchadoDaReconciliacao[]> {
+    // Uma só por vez: o tick de 15 s e a chamada de rede de até 30 s se sobreporiam, e duas
+    // chamadas ao mesmo PR gravariam resultados que se atropelam.
+    this.reconciliando ??= this.refazerRascunhos().finally(() => {
+      this.reconciliando = undefined
+    })
+    return this.reconciliando
+  }
+
+  private async refazerRascunhos(): Promise<readonly AchadoDaReconciliacao[]> {
     const userId = this.deps.userId()
     const achados: AchadoDaReconciliacao[] = []
 
-    for (const pr of this.deps.prs.pendentes(userId)) {
+    for (const pr of this.deps.prs.pendentes(userId, this.agora(), ESPACAMENTO_DO_RASCUNHO_MS)) {
       const run = this.deps.runs.buscar(pr.runId)
       if (run?.estado !== 'CANCELLED') continue
 
-      const workspaceId = this.deps.runs.workspaceDoRun(pr.runId)
-      if (workspaceId === undefined) continue
+      // O PR que nasceu depois do cancelamento ainda não tem pedido: grava a intenção antes de agir.
+      if (pr.rascunho === undefined) this.deps.prs.pedirRascunho(userId, pr.runId, this.agora())
 
-      const desfecho = await this.converterEmRascunho(userId, workspaceId, pr)
+      const desfecho = await this.converterEmRascunho(userId, pr)
       achados.push({
         recurso: `pr:${pr.runId}`,
         decisao: desfecho === 'pendente' ? 'bloqueado' : 'completado',
@@ -183,27 +214,35 @@ export class CancelamentoService {
    * Chama a origem e grava o desfecho. **Nunca lança**: exceção e erro retentável deixam o pedido
    * `pendente`; erro definitivo o fecha como `indisponivel`.
    */
-  private async converterEmRascunho(
-    userId: string,
-    workspaceId: WorkspaceId,
-    pr: PrDoRun
-  ): Promise<DesfechoDoRascunho> {
+  private async converterEmRascunho(userId: string, pr: PrDoRun): Promise<DesfechoDoRascunho> {
+    // Retomada vinculada: se outro run ativo passou a usar este PR, converter agora o tiraria do
+    // caminho de um run que está entregando.
+    if (this.deps.prs.outroRunAtivoUsa(userId, pr.runId)) {
+      this.deps.prs.concluirRascunho(userId, pr.runId, 'reaproveitado', this.agora())
+      return 'reaproveitado'
+    }
+
+    const tentativas = this.deps.prs.registrarTentativa(userId, pr.runId, this.agora())
     let outcome: ConnectorOutcome
     try {
-      outcome = await this.chamar(userId, workspaceId, pr)
+      outcome = await this.chamar(userId, pr)
     } catch (erro) {
       log.agent.warn('Rascunho do PR não pôde ser pedido; fica pendente', {
         runId: pr.runId,
         erro: erro instanceof Error ? erro.message : String(erro)
       })
-      return 'pendente'
+      return this.pendenteOuEsgotado(userId, pr.runId, tentativas)
     }
 
     const agora = this.agora()
     if (!outcome.ok) {
-      if (outcome.retryable) return 'pendente'
-      this.deps.prs.concluirRascunho(userId, pr.runId, 'indisponivel', agora)
-      return 'indisponivel'
+      // Só o que a origem recusa de forma **definitiva** sela o estado. Credencial recusada se
+      // conserta reconectando, e erro de rede ou cota passa: ficam pendentes, até o limite.
+      if (outcome.code === 'validacao-invalida') {
+        this.deps.prs.concluirRascunho(userId, pr.runId, 'indisponivel', agora)
+        return 'indisponivel'
+      }
+      return this.pendenteOuEsgotado(userId, pr.runId, tentativas)
     }
 
     const dado = outcome.data as { rascunho?: boolean; jaEra?: boolean } | undefined
@@ -215,11 +254,20 @@ export class CancelamentoService {
     return dado.jaEra === true ? 'ja-era' : 'convertido'
   }
 
-  private async chamar(
+  /** Sem resposta definitiva: continua pendente — até o limite de tentativas, que sela. */
+  private pendenteOuEsgotado(
     userId: string,
-    workspaceId: WorkspaceId,
-    pr: PrDoRun
-  ): Promise<ConnectorOutcome> {
+    runId: string,
+    tentativas: number
+  ): DesfechoDoRascunho {
+    if (tentativas < MAXIMO_DE_TENTATIVAS_DO_RASCUNHO) return 'pendente'
+    this.deps.prs.concluirRascunho(userId, runId, 'indisponivel', this.agora())
+    return 'indisponivel'
+  }
+
+  private async chamar(userId: string, pr: PrDoRun): Promise<ConnectorOutcome> {
+    // O workspace é o **do run** (gravado com o PR), nunca o do chamador.
+    const workspaceId = pr.workspaceId
     const request: ConnectorRequest = {
       contractVersion: CONNECTOR_CONTRACT_VERSION,
       connector: 'github',
