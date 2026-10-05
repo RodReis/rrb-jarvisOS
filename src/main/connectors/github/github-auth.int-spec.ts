@@ -431,6 +431,44 @@ describe('Estado e logout', () => {
   })
 })
 
+describe('o client ID salvo (correção do campo de Client ID, SPEC-Conectores-03 regra 7)', () => {
+  const TOKEN_COLADO = `github_pat_${'x'.repeat(80)}`
+
+  it('o estado informa o client ID em uso quando é válido (público por desenho)', () => {
+    expect(servico([]).snapshot(CTX)).toMatchObject({
+      clientIdConfigurado: true,
+      clientIdSalvo: CLIENT_ID
+    })
+  })
+
+  it('o estado conectado também informa o client ID em uso', async () => {
+    const service = servico([GRANT_OK, TOKEN_OK])
+    await service.iniciar(CTX)
+    await service.aguardarAutorizacao(CTX)
+
+    expect(service.snapshot(CTX)).toMatchObject({ estado: 'present', clientIdSalvo: CLIENT_ID })
+  })
+
+  it('override salvo com forma de token: o estado avisa que é inválido e NUNCA devolve o valor', () => {
+    const snapshot = servico([], { clientId: TOKEN_COLADO }).snapshot(CTX)
+
+    expect(snapshot).toMatchObject({ clientIdConfigurado: false, clientIdSalvoInvalido: true })
+    expect(snapshot).not.toHaveProperty('clientIdSalvo')
+    expect(JSON.stringify(snapshot)).not.toContain('github_pat_')
+    expect(JSON.stringify(snapshot)).not.toContain('xxxx')
+  })
+
+  it('override inválido nunca vai ao GitHub: o Device Flow recusa antes de qualquer requisição', async () => {
+    const service = servico([GRANT_OK], { clientId: TOKEN_COLADO })
+
+    const r = await service.iniciar(CTX)
+
+    expect(r).toMatchObject({ ok: false, code: 'credencial-ausente' })
+    // O critério que importa: o valor com cara de segredo não saiu do processo.
+    expect(requisicoes).toEqual([])
+  })
+})
+
 describe('Auditoria', () => {
   it('registra as fases sem jamais gravar código ou token', async () => {
     const service = servico([GRANT_OK, TOKEN_OK])

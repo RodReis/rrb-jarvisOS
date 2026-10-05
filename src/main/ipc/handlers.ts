@@ -81,6 +81,10 @@ import type { ConnectorService } from '../connectors/connector-service'
 import { CreditInputError, type CreditService } from '../connectors/credit-service'
 import type { GithubAuthService } from '../connectors/github/github-auth-service'
 import type { GithubAuthSnapshot, GithubDeviceFlowView } from '@shared/domain/github-auth'
+import {
+  gravarClientIdDoOverride,
+  limparOverrideInvalido
+} from '../connectors/github/client-id-do-override'
 import type { UserProfileRepository } from '../storage/repositories'
 import type { ProjectService } from '../projects/project-service'
 import type { WizardService } from '../projects/wizard-service'
@@ -1626,7 +1630,11 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     IPC_CHANNELS.githubAuthStatus,
     (_event, workspace: unknown): GithubAuthSnapshot => {
       const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
-      return deps.githubAuth.snapshot({ userId: deps.userId(), workspace: escopo })
+      const snapshot = deps.githubAuth.snapshot({ userId: deps.userId(), workspace: escopo })
+      // O override salvo que não é um client ID (valor anterior à validação) sai do disco: o
+      // snapshot acima ainda carrega o aviso para a tela explicar, e a leitura seguinte já o vê limpo.
+      limparOverrideInvalido(deps.profiles, deps.userId())
+      return snapshot
     }
   )
 
@@ -1670,10 +1678,11 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       // Só texto é aceito; qualquer outra coisa vira "limpar", que é voltar ao embutido. O
       // renderer é fronteira de confiança, e um objeto gravado aqui viraria `[object Object]`
       // na URL do Device Flow.
-      deps.profiles.saveGithubClientId(
-        deps.userId(),
-        typeof clientId === 'string' ? clientId : undefined
-      )
+      //
+      // E só um **client ID** é aceito (SPEC-Conectores-03, regra 7): a coluna é texto puro porque
+      // o client ID não é segredo. A validação e a gravação moram em `gravarClientIdDoOverride`,
+      // que tem teste próprio — esta é a fronteira de confiança, e o valor recusado nunca é ecoado.
+      gravarClientIdDoOverride(deps.profiles, deps.userId(), clientId)
       return deps.githubAuth.snapshot({ userId: deps.userId(), workspace: escopo })
     }
   )

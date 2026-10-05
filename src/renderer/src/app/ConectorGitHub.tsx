@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { ConnectorError } from '@shared/domain/connectors'
-import type { GithubAuthSnapshot, GithubDeviceFlowView } from '@shared/domain/github-auth'
+import {
+  MENSAGEM_DO_CLIENT_ID,
+  validarClientId,
+  type GithubAuthSnapshot,
+  type GithubDeviceFlowView
+} from '@shared/domain/github-auth'
 import { StatusOperacional, type EstadoOperacional } from '@design/patterns'
 import { Button, Field, Input, InlineAlert, Panel, Tag } from '@design/ui'
 import { log } from '../lib/log'
@@ -57,6 +62,8 @@ export function ConectorGitHub({
   const [erro, setErro] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState(false)
   const [clientId, setClientId] = useState('')
+  /** O que está errado no texto digitado (a mensagem nunca ecoa o valor). */
+  const [erroDoClientId, setErroDoClientId] = useState<string | null>(null)
   const [copiado, setCopiado] = useState(false)
   /**
    * O relógio da contagem regressiva, em estado.
@@ -182,6 +189,17 @@ export function ConectorGitHub({
   }
 
   async function salvarClientId(): Promise<void> {
+    // A mesma validação do main (que é a fronteira de confiança): aqui só dá o retorno imediato.
+    // Texto vazio é válido e limpa o override.
+    const validado = validarClientId(clientId)
+    if (!validado.ok) {
+      setErroDoClientId(MENSAGEM_DO_CLIENT_ID[validado.problema])
+      // Um segredo colado por engano não fica à vista num campo de texto comum.
+      if (validado.problema === 'parece-segredo') setClientId('')
+      return
+    }
+
+    setErroDoClientId(null)
     setOcupado(true)
     try {
       setSnapshot(await window.jarvis.setGithubClientId(clientId, workspace))
@@ -209,6 +227,7 @@ export function ConectorGitHub({
   const visual = ESTADO_VISUAL[snapshot?.estado ?? 'missing']
   const conectado = snapshot?.estado === 'present'
   const semClientId = snapshot !== null && !snapshot.clientIdConfigurado
+  const salvoInvalido = snapshot?.clientIdSalvoInvalido === true
 
   return (
     <Panel titulo={`GitHub · ${nomeDoEspaco}`}>
@@ -239,7 +258,15 @@ export function ConectorGitHub({
          * mesma recusa, e oferecer uma ação que não pode dar certo é pior que explicar o que
          * falta. Com ele configurado, o campo sai da frente e vira ajuste secundário.
          */}
-        {semClientId && (
+        {salvoInvalido && (
+          <InlineAlert tom="warn" titulo="O client ID salvo não é usado">
+            O valor salvo não passa na validação (não tem a forma de um client ID de GitHub App):
+            foi ignorado e removido por segurança. Informe o client ID correto abaixo, ou deixe em
+            branco para usar o padrão.
+          </InlineAlert>
+        )}
+
+        {semClientId && !salvoInvalido && (
           <InlineAlert tom="warn" titulo="Falta o client ID da GitHub App">
             Informe o client ID de uma GitHub App com Device Flow habilitado. Ele é público — não é
             uma senha, e não é guardado no cofre de credenciais.
@@ -321,7 +348,12 @@ export function ConectorGitHub({
          */}
         <Field
           rotulo="Client ID da GitHub App (opcional)"
-          descricao="Sobrepõe o client ID de fábrica. Deixe em branco para voltar ao padrão."
+          descricao={
+            snapshot?.clientIdSalvo === undefined
+              ? 'Sobrepõe o client ID de fábrica. Deixe em branco para voltar ao padrão.'
+              : `Em uso: ${snapshot.clientIdSalvo}. Sobrepõe o client ID de fábrica. Deixe em branco e salve para voltar ao padrão.`
+          }
+          erro={erroDoClientId ?? undefined}
         >
           {(atributos) => (
             <div className="flex flex-wrap items-end gap-2">
@@ -329,7 +361,10 @@ export function ConectorGitHub({
                 <Input
                   {...atributos}
                   valor={clientId}
-                  onMudar={setClientId}
+                  onMudar={(texto) => {
+                    setClientId(texto)
+                    setErroDoClientId(null)
+                  }}
                   placeholder="Iv1.0123456789abcdef"
                   autoComplete="off"
                   desabilitado={ocupado}
