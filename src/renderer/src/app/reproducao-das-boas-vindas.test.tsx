@@ -8,6 +8,7 @@ vi.mock('./referencia-da-fala', () => ({ iniciarReferenciaDaFala: vi.fn(() => vi
 
 function ambiente(saidaAplicada: boolean) {
   let listener: ((pedido: ReproducaoDasBoasVindas) => void) | undefined
+  let disparar: (() => void) | undefined
   const confirmar = vi.fn()
   const tocar = vi.fn(() => ({
     cancelar: vi.fn(),
@@ -23,7 +24,10 @@ function ambiente(saidaAplicada: boolean) {
         listener = fn
         return vi.fn()
       },
-      onEscutaDisparo: () => vi.fn(),
+      onEscutaDisparo: (fn: () => void) => {
+        disparar = fn
+        return vi.fn()
+      },
       informarBoasVindasProntas: vi.fn(),
       confirmarReproducaoDasBoasVindas: confirmar,
       informarFaseDaVoz: vi.fn(),
@@ -34,7 +38,12 @@ function ambiente(saidaAplicada: boolean) {
       })
     }
   })
-  return { enviar: (pedido: ReproducaoDasBoasVindas) => listener?.(pedido), confirmar, tocar }
+  return {
+    enviar: (pedido: ReproducaoDasBoasVindas) => listener?.(pedido),
+    disparar: () => disparar?.(),
+    confirmar,
+    tocar
+  }
 }
 
 afterEach(() => {
@@ -72,6 +81,22 @@ describe('reprodução da chegada no dispositivo escolhido', () => {
     const remover = instalarReproducaoDasBoasVindas('voz-padrao')
     c.enviar({ id: 'chegada-turno', acao: 'fala', texto: 'Bom dia.' })
     await vi.waitFor(() => expect(c.confirmar).toHaveBeenCalledWith('chegada-turno', false))
+    expect(c.tocar).not.toHaveBeenCalled()
+    remover()
+  })
+
+  it('recusa saudação se o usuário disparou a escuta durante a síntese', async () => {
+    const c = ambiente(true)
+    let liberar: ((valor: unknown) => void) | undefined
+    vi.spyOn(window.jarvis, 'falar').mockImplementationOnce(
+      () => new Promise((resolve) => (liberar = resolve)) as never
+    )
+    const remover = instalarReproducaoDasBoasVindas('voz-padrao')
+    c.enviar({ id: 'chegada-interrompida', acao: 'fala', texto: 'Bom dia.' })
+    await vi.waitFor(() => expect(window.jarvis.falar).toHaveBeenCalledOnce())
+    c.disparar()
+    liberar?.({ estado: 'ok', fala: { pcm: new Int16Array([1]), sampleRate: 22050 } })
+    await vi.waitFor(() => expect(c.confirmar).toHaveBeenCalledWith('chegada-interrompida', false))
     expect(c.tocar).not.toHaveBeenCalled()
     remover()
   })
