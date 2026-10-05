@@ -46,6 +46,29 @@ describe('elegiveisParaExpirar', () => {
     }
   })
 
+  it('nunca expira artefato de run ambíguo, mesmo terminal e velho (SPEC-Scheduler-05, regra 3)', () => {
+    // CANCELLED e MERGED são terminais e expiráveis — até haver um efeito sem desfecho conhecido
+    // (merge no ar, rascunho pendente, limpeza que falhou): aí o anexo é o que sobrou de evidência.
+    for (const estado of ['CANCELLED', 'MERGED'] as const) {
+      const ambiguo = item({
+        id: estado,
+        estadoDoRun: estado,
+        ambiguo: true,
+        criadoEm: new Date(AGORA - 400 * DIA_MS).toISOString()
+      })
+      expect(elegiveisParaExpirar([ambiguo], AGORA)).toEqual([])
+    }
+  })
+
+  it('run cancelado e sem ambiguidade continua expirável: a proteção não é de graça', () => {
+    const cancelado = item({
+      id: 'c',
+      estadoDoRun: 'CANCELLED',
+      criadoEm: new Date(AGORA - 400 * DIA_MS).toISOString()
+    })
+    expect(elegiveisParaExpirar([cancelado], AGORA).map((i) => i.id)).toEqual(['c'])
+  })
+
   it('estourada a cota, remove primeiro o elegível mais antigo', () => {
     const metadeDaCota = Math.floor(COTA_BYTES / 2) + 1
     const antigo = item({

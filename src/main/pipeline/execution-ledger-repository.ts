@@ -62,6 +62,7 @@ interface ArtefatoRow {
   readonly criado_em: string
   readonly fixado: number
   readonly estado_do_run: string
+  readonly ambiguo: number
 }
 
 interface PendenciaRow {
@@ -180,10 +181,22 @@ export class ExecutionLedgerRepository {
   listarArtefatos(userId: string): readonly ArtefatoRetido[] {
     const rows = this.db
       .prepare(
-        `SELECT id, run_id, hash, bytes, criado_em, fixado, estado_do_run
-           FROM artefato_retido
-          WHERE user_id = ? AND expirado_em IS NULL
-          ORDER BY criado_em`
+        `SELECT a.id, a.run_id, a.hash, a.bytes, a.criado_em, a.fixado, a.estado_do_run,
+                -- Efeito sem desfecho conhecido (SPEC-Scheduler-05, regra 3): o anexo é a evidência.
+                (
+                  EXISTS (SELECT 1 FROM merge_tentativa m
+                           WHERE m.user_id = a.user_id AND m.run_id = a.run_id
+                             AND m.estado = 'iniciada')
+                  OR EXISTS (SELECT 1 FROM run_pr p
+                              WHERE p.user_id = a.user_id AND p.run_id = a.run_id
+                                AND p.rascunho = 'pendente')
+                  OR EXISTS (SELECT 1 FROM pendencia_de_limpeza l
+                              WHERE l.user_id = a.user_id AND l.run_id = a.run_id
+                                AND l.resolvida_em IS NULL)
+                ) AS ambiguo
+           FROM artefato_retido a
+          WHERE a.user_id = ? AND a.expirado_em IS NULL
+          ORDER BY a.criado_em`
       )
       .all(userId) as readonly ArtefatoRow[]
 
@@ -194,7 +207,8 @@ export class ExecutionLedgerRepository {
       bytes: row.bytes,
       criadoEm: row.criado_em,
       fixado: row.fixado === 1,
-      estadoDoRun: row.estado_do_run as EstadoDoRun
+      estadoDoRun: row.estado_do_run as EstadoDoRun,
+      ambiguo: row.ambiguo === 1
     }))
   }
 

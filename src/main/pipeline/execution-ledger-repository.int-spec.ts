@@ -133,6 +133,71 @@ describe('ExecutionLedgerRepository', () => {
     expect(repo.listarArtefatos(USER).map((a) => a.id)).toEqual(['velho', 'novo'])
   })
 
+  describe('run ambíguo — o artefato é protegido da retenção (SPEC-Scheduler-05, regra 3)', () => {
+    const ambiguo = (id = 'art-1'): boolean | undefined =>
+      repo.listarArtefatos(USER).find((a) => a.id === id)?.ambiguo
+
+    beforeEach(() => repo.registrarArtefato(USER, artefato({ estadoDoRun: 'CANCELLED' })))
+
+    it('run sem pendência não é ambíguo', () => {
+      expect(ambiguo()).toBe(false)
+    })
+
+    it('merge iniciado sem desfecho torna o run ambíguo; confirmado ou abandonado, não', () => {
+      const inserir = (estado: string): void => {
+        db.prepare(
+          `INSERT INTO merge_tentativa
+             (user_id, run_id, workspace_id, project_id, recurso, pull_request, head_sha,
+              fencing_token, estado, iniciada_em)
+           VALUES (?, ?, 'jarvis', 'p', 'merge:o/r:main', 1, 'sha', 1, ?, 1)`
+        ).run(USER, RUN, estado)
+      }
+      inserir('iniciada')
+      expect(ambiguo()).toBe(true)
+
+      db.prepare("UPDATE merge_tentativa SET estado = 'abandonada'").run()
+      expect(ambiguo()).toBe(false)
+    })
+
+    it('rascunho de PR pendente torna o run ambíguo; com resultado, não', () => {
+      db.prepare(
+        `INSERT INTO run_pr (user_id, run_id, owner, repo, pull_request, branch, rascunho,
+                             created_at, updated_at)
+         VALUES (?, ?, 'o', 'r', 1, 'b', 'pendente', 1, 1)`
+      ).run(USER, RUN)
+      expect(ambiguo()).toBe(true)
+
+      db.prepare("UPDATE run_pr SET rascunho = 'convertido'").run()
+      expect(ambiguo()).toBe(false)
+    })
+
+    it('limpeza que falhou e não foi resolvida torna o run ambíguo; resolvida, não', () => {
+      repo.registrarPendencia(USER, {
+        runId: RUN,
+        recurso: 'container',
+        identificador: 'jarvisos-run-1',
+        motivo: 'docker recusou',
+        em: '2026-09-02T00:00:00.000Z'
+      })
+      expect(ambiguo()).toBe(true)
+
+      db.prepare("UPDATE pendencia_de_limpeza SET resolvida_em = '2026-09-03T00:00:00.000Z'").run()
+      expect(ambiguo()).toBe(false)
+    })
+
+    it('a ambiguidade de um run não contamina o artefato de outro', () => {
+      repo.registrarArtefato(USER, artefato({ id: 'art-2', runId: 'run-2', estadoDoRun: 'MERGED' }))
+      db.prepare(
+        `INSERT INTO run_pr (user_id, run_id, owner, repo, pull_request, branch, rascunho,
+                             created_at, updated_at)
+         VALUES (?, ?, 'o', 'r', 1, 'b', 'pendente', 1, 1)`
+      ).run(USER, RUN)
+
+      expect(ambiguo('art-1')).toBe(true)
+      expect(ambiguo('art-2')).toBe(false)
+    })
+  })
+
   it('marca artefato expirado sem apagar a linha — o hash continua sendo prova', () => {
     repo.registrarArtefato(USER, artefato())
     repo.marcarExpirado(USER, 'art-1')

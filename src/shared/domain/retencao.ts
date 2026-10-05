@@ -36,6 +36,11 @@ export interface ArtefatoRetido {
   /** Fixado pelo usuário: nunca expira, por mais velho que fique. */
   readonly fixado: boolean
   readonly estadoDoRun: EstadoDoRun
+  /**
+   * O run tem efeito sem desfecho conhecido — merge no ar, rascunho de PR pendente, limpeza que
+   * falhou e ninguém resolveu (SPEC-Scheduler-05, regra 3). Ausente = não é ambíguo.
+   */
+  readonly ambiguo?: boolean
 }
 
 /**
@@ -45,9 +50,15 @@ export interface ArtefatoRetido {
  * retenção: no primeiro o PI ainda vai olhar aquele PR, e o anexo é o que ele lê; no segundo o
  * anexo é a evidência da causa do bloqueio. Expirar qualquer um dos dois apagaria exatamente o
  * material de quem ainda tem uma decisão a tomar.
+ *
+ * **Run ambíguo também é protegido, terminal ou não** (SPEC-Scheduler-05, regra 3): `CANCELLED` e
+ * `MERGED` são expiráveis, mas um efeito sem desfecho conhecido (o merge que não se sabe se saiu, o
+ * rascunho que a origem não respondeu, o container que não parou) é justamente o caso em que o
+ * anexo é a evidência de que alguém vai precisar para decidir.
  */
 function protegido(item: ArtefatoRetido): boolean {
   if (item.fixado) return true
+  if (item.ambiguo === true) return true
   if (!ehTerminal(item.estadoDoRun)) return true
   return item.estadoDoRun === 'AWAITING_MERGE' || item.estadoDoRun === 'BLOCKED'
 }
