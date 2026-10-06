@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 2870 | 2870 | 0 | 82.1 | — | — |
-| — | — | — | Banco | 2328 | 2310 | 0 | 85.2 | — | — |
-| — | — | — | Tela | 788 | 787 | 0 | 76.2 | — | — |
+| — | — | — | Regras de Negócio | 2894 | 2894 | 0 | 81.8 | — | — |
+| — | — | — | Banco | 2334 | 2316 | 0 | 85.2 | — | — |
+| — | — | — | Tela | 796 | 795 | 0 | 76.6 | — | — |
 
 ## Histórico por entrega
 
@@ -460,3 +460,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-10-05 | #357 | spec-escuta-02-arbitracao-microfone | Regras de Negócio | 2870 | 2870 | 0 | 82.1 | #402 | [#402](https://github.com/RodReis/rrb-jarvisOS/pull/402) |
 | 2026-10-05 | #357 | spec-escuta-02-arbitracao-microfone | Banco | 2328 | 2310 | 0 | 85.2 | #402 | [#402](https://github.com/RodReis/rrb-jarvisOS/pull/402) |
 | 2026-10-05 | #357 | spec-escuta-02-arbitracao-microfone | Tela | 788 | 787 | 0 | 76.2 | #402 | [#402](https://github.com/RodReis/rrb-jarvisOS/pull/402) |
+| 2026-10-06 | #358 | spec-escuta-03-boas-vindas | Regras de Negócio | 2894 | 2894 | 0 | 81.8 | #405 | [#405](https://github.com/RodReis/rrb-jarvisOS/pull/405) |
+| 2026-10-06 | #358 | spec-escuta-03-boas-vindas | Banco | 2334 | 2316 | 0 | 85.2 | #405 | [#405](https://github.com/RodReis/rrb-jarvisOS/pull/405) |
+| 2026-10-06 | #358 | spec-escuta-03-boas-vindas | Tela | 796 | 795 | 0 | 76.6 | #405 | [#405](https://github.com/RodReis/rrb-jarvisOS/pull/405) |
