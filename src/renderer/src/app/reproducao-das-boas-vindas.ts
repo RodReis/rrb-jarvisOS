@@ -8,9 +8,13 @@ export function instalarReproducaoDasBoasVindas(voz: string, saidaId?: string | 
   let midiaEmCurso: HTMLAudioElement | undefined
   let urlEmCurso: string | undefined
   let falaEmCurso = false
+  let rejeitarMidia: ((erro: Error) => void) | undefined
   let disparos = 0
+  let pedidoEmCurso: string | undefined
 
   const liberarMidia = (): void => {
+    rejeitarMidia?.(new Error('Reprodução interrompida'))
+    rejeitarMidia = undefined
     midiaEmCurso?.pause()
     midiaEmCurso = undefined
     if (urlEmCurso) URL.revokeObjectURL(urlEmCurso)
@@ -71,8 +75,6 @@ export function instalarReproducaoDasBoasVindas(voz: string, saidaId?: string | 
     urlEmCurso = url
     const audio = new Audio(url)
     midiaEmCurso = audio
-    audio.onended = liberarMidia
-    audio.onerror = liberarMidia
     const comSaida = audio as HTMLAudioElement & { setSinkId?: (id: string) => Promise<void> }
     try {
       if (saidaId) {
@@ -80,6 +82,20 @@ export function instalarReproducaoDasBoasVindas(voz: string, saidaId?: string | 
         await comSaida.setSinkId(saidaId)
       }
       await audio.play()
+      if (!(await podeReproduzir())) throw new Error('Reprodução interrompida')
+      await new Promise<void>((resolve, reject) => {
+        rejeitarMidia = reject
+        audio.onended = () => {
+          rejeitarMidia = undefined
+          liberarMidia()
+          resolve()
+        }
+        audio.onerror = () => {
+          rejeitarMidia = undefined
+          liberarMidia()
+          reject(new Error('Falha ao reproduzir mídia local'))
+        }
+      })
     } catch (erro) {
       liberarMidia()
       throw erro
@@ -87,10 +103,23 @@ export function instalarReproducaoDasBoasVindas(voz: string, saidaId?: string | 
   }
 
   const remover = window.jarvis.onReproducaoDasBoasVindas((pedido) => {
+    pedidoEmCurso = pedido.id
     void reproduzir(pedido).then(
-      () => window.jarvis.confirmarReproducaoDasBoasVindas(pedido.id, true),
-      () => window.jarvis.confirmarReproducaoDasBoasVindas(pedido.id, false)
+      () => {
+        if (pedidoEmCurso === pedido.id) pedidoEmCurso = undefined
+        window.jarvis.confirmarReproducaoDasBoasVindas(pedido.id, true)
+      },
+      () => {
+        if (pedidoEmCurso === pedido.id) pedidoEmCurso = undefined
+        window.jarvis.confirmarReproducaoDasBoasVindas(pedido.id, false)
+      }
     )
+  })
+  const removerCancelamento = window.jarvis.onCancelamentoDasBoasVindas((id) => {
+    if (pedidoEmCurso !== id) return
+    disparos += 1
+    if (falaEmCurso) reprodutor.cancelar()
+    liberarMidia()
   })
   const removerDisparo = window.jarvis.onEscutaDisparo(() => {
     disparos += 1
@@ -100,6 +129,7 @@ export function instalarReproducaoDasBoasVindas(voz: string, saidaId?: string | 
   window.jarvis.informarBoasVindasProntas()
   return () => {
     remover()
+    removerCancelamento()
     removerDisparo()
     reprodutor.cancelar()
     liberarMidia()

@@ -6,7 +6,9 @@ import type { EstadoDaEscuta } from '@shared/domain/voz'
 import { EscutaDaVoz } from '../app/EscutaDaVoz'
 import { PreferenciasDaEscuta } from '../app/PreferenciasDaEscuta'
 import { PreferenciasDasBoasVindas } from '../app/PreferenciasDasBoasVindas'
+import { PreferenciasDoCronograma } from '../app/PreferenciasDoCronograma'
 import type { ConfiguracaoDasBoasVindas } from '@shared/domain/boas-vindas'
+import type { ConfiguracaoDoCronograma } from '@shared/domain/cronograma'
 
 const CONFIGURACAO_DA_PROVA: ConfiguracaoDasBoasVindas = {
   ativa: false,
@@ -16,6 +18,26 @@ const CONFIGURACAO_DA_PROVA: ConfiguracaoDasBoasVindas = {
   frases: { manha: 'Bom dia.', tarde: 'Boa tarde.', noite: 'Boa noite.' },
   midiaAtiva: false,
   midia: null
+}
+const CRONOGRAMA_DA_PROVA: ConfiguracaoDoCronograma = {
+  versao: 1,
+  ativa: true,
+  sequencias: [
+    {
+      id: 'chegada',
+      nome: 'Chegada de trabalho',
+      ativa: true,
+      gatilho: { tipo: 'evento', evento: 'boas-vindas' },
+      atividades: [
+        { id: 'fala', tipo: 'falar' },
+        {
+          id: 'midia',
+          tipo: 'tocar-midia-local',
+          midia: { tipo: 'arquivo', caminho: 'C:/Musica/entrada.mp3' }
+        }
+      ]
+    }
+  ]
 }
 
 /**
@@ -31,7 +53,13 @@ const CONFIGURACAO_DA_PROVA: ConfiguracaoDasBoasVindas = {
  */
 
 export type CenaDaEscuta =
-  'ligada' | 'desligada' | 'indisponivel' | 'sem-microfone' | 'settings' | 'boas-vindas'
+  | 'ligada'
+  | 'desligada'
+  | 'indisponivel'
+  | 'sem-microfone'
+  | 'settings'
+  | 'boas-vindas'
+  | 'cronograma'
 
 const BASE: EstadoDaEscuta = {
   ativa: true,
@@ -49,7 +77,8 @@ const ESTADO_POR_CENA: Readonly<Record<CenaDaEscuta, EstadoDaEscuta>> = {
   indisponivel: { ...BASE, ativa: false, disponivel: false },
   'sem-microfone': BASE,
   settings: { ...BASE, palmas: false, hotkeyRegistrada: false },
-  'boas-vindas': BASE
+  'boas-vindas': BASE,
+  cronograma: BASE
 }
 
 function ponteDaProva(cena: CenaDaEscuta): JarvisBridge {
@@ -69,6 +98,10 @@ function ponteDaProva(cena: CenaDaEscuta): JarvisBridge {
     lerBoasVindas: async () => CONFIGURACAO_DA_PROVA,
     salvarBoasVindas: async (config: ConfiguracaoDasBoasVindas) => config,
     selecionarMidiaDasBoasVindas: async () => CONFIGURACAO_DA_PROVA,
+    lerCronograma: async () => CRONOGRAMA_DA_PROVA,
+    salvarCronograma: async (config: ConfiguracaoDoCronograma) => config,
+    selecionarMidiaDoCronograma: async () => null,
+    historicoDoCronograma: async () => [],
     sendLog: () => {}
   } as unknown as JarvisBridge
 }
@@ -118,7 +151,11 @@ export function GaleriaDaEscuta({
     >
       <FundoDaIdentidade className="min-h-screen font-[family-name:var(--jos-fonte-corpo)] text-[var(--jos-cor-texto)]">
         <main data-testid="galeria-escuta" data-cena={cena}>
-          {cena === 'boas-vindas' ? (
+          {cena === 'cronograma' ? (
+            <div className="mx-auto max-w-2xl p-6">
+              <PreferenciasDoCronograma />
+            </div>
+          ) : cena === 'boas-vindas' ? (
             <div className="mx-auto max-w-md p-6">
               <PreferenciasDasBoasVindas />
             </div>

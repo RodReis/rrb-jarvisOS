@@ -23,6 +23,7 @@ import type {
 } from '../domain/entities'
 import type { AuthSnapshot } from './auth'
 import type { ConfiguracaoDasBoasVindas, ReproducaoDasBoasVindas } from '../domain/boas-vindas'
+import type { ConfiguracaoDoCronograma, ResultadoDoCronograma } from '../domain/cronograma'
 import type { LogInput } from './logging'
 import type { PolicyContext, PolicyDecision } from '../policies/contracts'
 import type {
@@ -228,6 +229,10 @@ export const IPC_CHANNELS = {
   boasVindasLer: 'boas-vindas:ler',
   boasVindasSalvar: 'boas-vindas:salvar',
   boasVindasSelecionarMidia: 'boas-vindas:selecionar-midia',
+  cronogramaLer: 'cronograma:ler',
+  cronogramaSalvar: 'cronograma:salvar',
+  cronogramaHistorico: 'cronograma:historico',
+  cronogramaSelecionarMidia: 'cronograma:selecionar-midia',
   escutaDefinirSensibilidade: 'escuta:definir-sensibilidade',
   /**
    * Liga ou desliga o modo de teste de Settings: o disparo aparece com a confiança medida e **não**
@@ -775,7 +780,9 @@ export const IPC_EVENT_CHANNELS = {
   escutaDisparo: 'escuta:disparo',
   /** Um disparo visto no modo de teste, com a confiança medida (SPEC-Escuta-01, critério 12). */
   escutaTeste: 'escuta:teste',
-  boasVindasReproduzir: 'boas-vindas:reproduzir'
+  boasVindasReproduzir: 'boas-vindas:reproduzir',
+  boasVindasCancelarReproducao: 'boas-vindas:cancelar-reproducao',
+  cronogramaResultado: 'cronograma:resultado'
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]
@@ -980,8 +987,16 @@ export interface JarvisBridge {
   salvarBoasVindas(config: ConfiguracaoDasBoasVindas): Promise<ConfiguracaoDasBoasVindas>
   selecionarMidiaDasBoasVindas(tipo: 'arquivo' | 'pasta' | null): Promise<ConfiguracaoDasBoasVindas>
   onReproducaoDasBoasVindas(listener: (pedido: ReproducaoDasBoasVindas) => void): () => void
+  onCancelamentoDasBoasVindas(listener: (id: string) => void): () => void
   confirmarReproducaoDasBoasVindas(id: string, sucesso: boolean): void
   informarBoasVindasProntas(): void
+  lerCronograma(): Promise<ConfiguracaoDoCronograma>
+  salvarCronograma(config: ConfiguracaoDoCronograma): Promise<ConfiguracaoDoCronograma>
+  historicoDoCronograma(): Promise<readonly ResultadoDoCronograma[]>
+  onResultadoDoCronograma(listener: (resultado: ResultadoDoCronograma) => void): () => void
+  selecionarMidiaDoCronograma(
+    tipo: 'arquivo' | 'pasta'
+  ): Promise<{ readonly tipo: 'arquivo' | 'pasta'; readonly caminho: string } | null>
   informarFaseDaVoz(fase: FaseDaVoz): void
   informarPosseDoMicrofone(dono: 'nenhum' | 'wake-word' | 'push-to-talk'): void
   confirmarCapturaDaEscuta(aberta: boolean): void

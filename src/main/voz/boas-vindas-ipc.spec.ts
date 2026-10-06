@@ -98,4 +98,31 @@ describe('ponte fechada das boas-vindas', () => {
     )
     await expect(reproduzindo).resolves.toBeUndefined()
   })
+
+  it('pede cancelamento no prazo e espera ACK de parada antes de liberar a fila', async () => {
+    vi.useFakeTimers()
+    try {
+      const c = cenario()
+      c.ouvinte(IPC_SEND_CHANNELS.boasVindasPronto)({ sender: c.webContents })
+      const reproduzindo = c.ponte.reproduzir({
+        acao: 'midia',
+        dados: new Uint8Array([1]),
+        tipo: 'audio/wav'
+      })
+      const pedido = c.send.mock.calls[0]?.[1] as { id: string }
+      await vi.advanceTimersByTimeAsync(120_000)
+      expect(c.send).toHaveBeenLastCalledWith(
+        IPC_EVENT_CHANNELS.boasVindasCancelarReproducao,
+        pedido.id
+      )
+      c.ouvinte(IPC_SEND_CHANNELS.boasVindasReproducaoConcluida)(
+        { sender: c.webContents },
+        pedido.id,
+        false
+      )
+      await expect(reproduzindo).rejects.toThrow('não concluída')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

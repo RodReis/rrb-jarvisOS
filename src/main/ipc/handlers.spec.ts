@@ -330,7 +330,11 @@ describe('registerIpcHandlers', () => {
     const daChegada = new Set<string>([
       IPC_CHANNELS.boasVindasLer,
       IPC_CHANNELS.boasVindasSalvar,
-      IPC_CHANNELS.boasVindasSelecionarMidia
+      IPC_CHANNELS.boasVindasSelecionarMidia,
+      IPC_CHANNELS.cronogramaLer,
+      IPC_CHANNELS.cronogramaSalvar,
+      IPC_CHANNELS.cronogramaHistorico,
+      IPC_CHANNELS.cronogramaSelecionarMidia
     ])
     expect(registrados).toEqual(
       Object.values(IPC_CHANNELS)

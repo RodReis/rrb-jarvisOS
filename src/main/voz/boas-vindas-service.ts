@@ -24,6 +24,7 @@ export interface DepsDasBoasVindas {
   readonly falar: (texto: string) => Promise<void>
   readonly tocarMidia: () => Promise<void>
   readonly publicar: (evento: EventoBoasVindas) => void
+  readonly temSequenciaDeBoasVindas?: () => boolean
   readonly agendar?: (acao: () => void, ms: number) => ReturnType<typeof setTimeout>
   readonly cancelar?: (relogio: ReturnType<typeof setTimeout>) => void
 }
@@ -50,6 +51,27 @@ export class BoasVindasService {
 
   constructor(private readonly deps: DepsDasBoasVindas) {}
 
+  async podeReproduzirAudio(): Promise<boolean> {
+    return (
+      dentroDaJanela(this.deps.configuracao(), this.deps.agora()) &&
+      this.deps.escutaAtiva() &&
+      (await this.deps.audioAtivo()) === false
+    )
+  }
+
+  async falarNoCronograma(): Promise<void> {
+    const agora = this.deps.agora()
+    const config = this.deps.configuracao()
+    const texto = await this.saudarComTeto(
+      agora,
+      null,
+      config.tetoDaPersonaMs,
+      config.frases[periodo(agora)]
+    )
+    if (!(await this.podeReproduzirAudio())) throw new Error('Guarda de áudio recusou a fala')
+    await this.deps.falar(texto)
+  }
+
   async desbloqueou(): Promise<'saudou' | 'ignorado'> {
     if (this.emAndamento) return 'ignorado'
     this.emAndamento = true
@@ -70,9 +92,10 @@ export class BoasVindasService {
       })
 
       const config = this.deps.configuracao()
+      const temSequencia = this.deps.temSequenciaDeBoasVindas?.() ?? false
       const chaveDoPeriodo = `${dia}:${periodo(agora)}`
       if (
-        !config.ativa ||
+        (!config.ativa && !temSequencia) ||
         !dentroDaJanela(config, agora) ||
         !this.deps.escutaAtiva() ||
         estado.ultimoPeriodoSaudado === chaveDoPeriodo
@@ -81,6 +104,15 @@ export class BoasVindasService {
       }
       // Uma falha da consulta nativa não é prova de silêncio. Não interromper uma chamada vence.
       if ((await this.deps.audioAtivo()) !== false) return 'ignorado'
+
+      if (temSequencia) {
+        this.deps.estado.gravar({
+          ...this.deps.estado.ler(),
+          ultimoPeriodoSaudado: chaveDoPeriodo
+        })
+        this.deps.publicar({ tipo: 'boas-vindas', hora: agora.toISOString(), ausenciaMs })
+        return 'saudou'
+      }
 
       const fraseFixa = config.frases[periodo(agora)]
       const saudacao = await this.saudarComTeto(

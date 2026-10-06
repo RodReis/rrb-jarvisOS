@@ -2466,6 +2466,22 @@ Status: **validada na PR [#405](https://github.com/RodReis/rrb-jarvisOS/pull/405
 - [ ] Prova física do PI: chegar, desbloquear e confirmar a experiência acústica real.
 - [ ] Verificação física do PI: chegar, desbloquear e confirmar a experiência acústica real.
 
+### Fatia 04 — Cronograma de atividades configurável (`docs/spec/spec-escuta-04-cronograma.md`)
+
+Status: **em andamento** — issue [#359](https://github.com/RodReis/rrb-jarvisOS/issues/359), SPEC `aprovada-pi`; protótipo do editor aprovado pelo PI em 2026-10-06. Plano em `docs/superpowers/plans/2026-10-06-m18-f04-cronograma.md`.
+
+- [x] Contrato versionado, catálogo fechado de falar/mídia local e política `allow` no salvamento; recusa nomeada para tier superior e ação desconhecida.
+- [x] Persistência local por usuário, arquivo atômico, auditoria antes/depois e `verifyAuditChain` com SQLite real.
+- [x] Gatilhos `boas-vindas` e horário local, relógio injetado no teste, fila serial e resumo por atividade no histórico.
+- [x] Guardas acústicas consumidas da F03, mídia na saída escolhida com confirmação ao término, ponte IPC tipada e editor em Settings.
+- [x] Prova visual do editor em claro/escuro com movimento reduzido; testes direcionados de regras, banco, tela e contrato IPC.
+- [x] Suíte Regras (2904/2904), Banco no CI Linux (2319 pass, 18 skipped) e Tela (799 pass, 1 todo), relatório `reports/TESTS.md` conferido por `--check --require-entry`, build e lint dos arquivos alterados.
+- [x] E2E Electron (68/68), prova visual e os nove jobs do CI verdes no commit `d73bf3f`.
+- [ ] Conferir o CI no SHA final após esta atualização documental.
+- [ ] PR mergeada na `main`, comentário de encerramento e `proplan:done`; prova física do PI de chegada com sequência configurada.
+
+**Limite físico:** o teste acústico na máquina do PI não é substituído pela galeria nem pelos testes dublados. A validação automatizada final da PR foi executada no runner Linux; o lint global local encontra arquivos antigos em `.worktrees` e um E2E anterior fora do delta.
+
 ## Registro de entregas
 
 | Data | Fatia | PR | Observação |
