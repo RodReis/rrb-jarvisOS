@@ -2455,14 +2455,15 @@ Status: **entregue** — issue [#357](https://github.com/RodReis/rrb-jarvisOS/is
 
 ### Fatia 03 — Modo Boas-Vindas (`docs/spec/spec-escuta-03-boas-vindas.md`)
 
-Status: **em implementação** — issue [#358](https://github.com/RodReis/rrb-jarvisOS/issues/358). O PI decidiu em 2026-10-05 que a primeira instalação começa com o modo desligado até a configuração; a medição de áudio usa o indicador nativo da saída do Windows, sem capturar PCM, e falha fechada quando não consegue comprovar silêncio.
+Status: **implementada e validada na PR [#405](https://github.com/RodReis/rrb-jarvisOS/pull/405)** — CI verde nos nove jobs em 2026-10-06; aguardando merge. A prova física do PI continua pendente. O PI decidiu em 2026-10-05 que a primeira instalação começa com o modo desligado até a configuração; a medição de áudio usa o indicador nativo da saída do Windows, sem capturar PCM, e falha fechada quando não consegue comprovar silêncio.
 
 - [x] Gatilho no `powerMonitor` após desbloqueio, primeiro dia local, estado persistido e teto por período.
 - [x] Guardas de janela, kill switch, áudio do sistema e liga/desliga próprio.
 - [x] Persona pelo ponto único com hora e ausência, timeout configurável e frases de fallback por período.
 - [x] Reprodução de fala e mídia local escolhida em Settings no dispositivo de saída configurado; evento `boas-vindas` publicado após a fala.
 - [x] Ponte IPC tipada, escolha de arquivo/pasta no main e testes de contrato, regras e tela.
-- [ ] Validação completa, prova visual, relatório por SPEC/issue, CI e PR mergeada.
+- [x] Validação local completa: 5.997 testes aprovados, 25 ignorados e 1 todo; build, typecheck, lint dos arquivos alterados e prova visual em tema claro/escuro passaram. Relatório do CI: Regras 2.894/2.894; Banco 2.316 aprovados de 2.334 (18 ignorados); Tela 795 aprovados de 796 (1 todo); zero falhas. Histórico, anti-drift, qualidade, visual e os nove jobs da PR #405 passaram.
+- [ ] Merge da PR #405 e prova física do PI: chegar, desbloquear e confirmar a experiência acústica real.
 - [ ] Verificação física do PI: chegar, desbloquear e confirmar a experiência acústica real.
 
 ## Registro de entregas
