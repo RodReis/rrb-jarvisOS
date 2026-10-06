@@ -23,6 +23,7 @@ import type {
 } from '../domain/entities'
 import type { AuthSnapshot } from './auth'
 import type { ConfiguracaoDasBoasVindas, ReproducaoDasBoasVindas } from '../domain/boas-vindas'
+import type { ConfiguracaoDoCronograma, ResultadoDoCronograma } from '../domain/cronograma'
 import type { LogInput } from './logging'
 import type { PolicyContext, PolicyDecision } from '../policies/contracts'
 import type {
@@ -228,6 +229,10 @@ export const IPC_CHANNELS = {
   boasVindasLer: 'boas-vindas:ler',
   boasVindasSalvar: 'boas-vindas:salvar',
   boasVindasSelecionarMidia: 'boas-vindas:selecionar-midia',
+  cronogramaLer: 'cronograma:ler',
+  cronogramaSalvar: 'cronograma:salvar',
+  cronogramaHistorico: 'cronograma:historico',
+  cronogramaSelecionarMidia: 'cronograma:selecionar-midia',
   escutaDefinirSensibilidade: 'escuta:definir-sensibilidade',
   /**
    * Liga ou desliga o modo de teste de Settings: o disparo aparece com a confiança medida e **não**
@@ -982,6 +987,12 @@ export interface JarvisBridge {
   onReproducaoDasBoasVindas(listener: (pedido: ReproducaoDasBoasVindas) => void): () => void
   confirmarReproducaoDasBoasVindas(id: string, sucesso: boolean): void
   informarBoasVindasProntas(): void
+  lerCronograma(): Promise<ConfiguracaoDoCronograma>
+  salvarCronograma(config: ConfiguracaoDoCronograma): Promise<ConfiguracaoDoCronograma>
+  historicoDoCronograma(): Promise<readonly ResultadoDoCronograma[]>
+  selecionarMidiaDoCronograma(
+    tipo: 'arquivo' | 'pasta'
+  ): Promise<{ readonly tipo: 'arquivo' | 'pasta'; readonly caminho: string } | null>
   informarFaseDaVoz(fase: FaseDaVoz): void
   informarPosseDoMicrofone(dono: 'nenhum' | 'wake-word' | 'push-to-talk'): void
   confirmarCapturaDaEscuta(aberta: boolean): void

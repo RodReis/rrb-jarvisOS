@@ -105,13 +105,19 @@ describe('reprodução da chegada no dispositivo escolhido', () => {
     const c = ambiente(true)
     const setSinkId = vi.fn().mockResolvedValue(undefined)
     const play = vi.fn().mockResolvedValue(undefined)
+    const controle: { terminar?: () => void } = {}
     vi.stubGlobal(
       'Audio',
       class {
         setSinkId = setSinkId
         play = play
         pause = vi.fn()
-        onended: (() => void) | null = null
+        set onended(fn: (() => void) | null) {
+          controle.terminar = fn ?? undefined
+        }
+        get onended(): (() => void) | null {
+          return controle.terminar ?? null
+        }
         onerror: (() => void) | null = null
       }
     )
@@ -121,6 +127,9 @@ describe('reprodução da chegada no dispositivo escolhido', () => {
     })
     const remover = instalarReproducaoDasBoasVindas('voz-padrao', 'headset-g432')
     c.enviar({ id: 'chegada-3', acao: 'midia', dados: new Uint8Array([1, 2]), tipo: 'audio/wav' })
+    await vi.waitFor(() => expect(play).toHaveBeenCalledOnce())
+    expect(c.confirmar).not.toHaveBeenCalled()
+    controle.terminar?.()
     await vi.waitFor(() => expect(c.confirmar).toHaveBeenCalledWith('chegada-3', true))
     expect(setSinkId).toHaveBeenCalledWith('headset-g432')
     expect(play).toHaveBeenCalledOnce()

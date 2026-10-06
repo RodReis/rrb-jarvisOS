@@ -2466,6 +2466,20 @@ Status: **validada na PR [#405](https://github.com/RodReis/rrb-jarvisOS/pull/405
 - [ ] Prova física do PI: chegar, desbloquear e confirmar a experiência acústica real.
 - [ ] Verificação física do PI: chegar, desbloquear e confirmar a experiência acústica real.
 
+### Fatia 04 — Cronograma de atividades configurável (`docs/spec/spec-escuta-04-cronograma.md`)
+
+Status: **em andamento** — issue [#359](https://github.com/RodReis/rrb-jarvisOS/issues/359), SPEC `aprovada-pi`; protótipo do editor aprovado pelo PI em 2026-10-06. Plano em `docs/superpowers/plans/2026-10-06-m18-f04-cronograma.md`.
+
+- [x] Contrato versionado, catálogo fechado de falar/mídia local e política `allow` no salvamento; recusa nomeada para tier superior e ação desconhecida.
+- [x] Persistência local por usuário, arquivo atômico, auditoria antes/depois e `verifyAuditChain` com SQLite real.
+- [x] Gatilhos `boas-vindas` e horário local, relógio injetado no teste, fila serial e resumo por atividade no histórico.
+- [x] Guardas acústicas consumidas da F03, mídia na saída escolhida com confirmação ao término, ponte IPC tipada e editor em Settings.
+- [x] Prova visual do editor em claro/escuro com movimento reduzido; testes direcionados de regras, banco, tela e contrato IPC.
+- [ ] Suíte completa, relatório `reports/TESTS.md`, E2E Electron e CI no SHA final.
+- [ ] PR mergeada na `main`, comentário de encerramento e `proplan:done`; prova física do PI de chegada com sequência configurada.
+
+**Limites ainda em validação:** o teste acústico na máquina do PI não é substituído pela galeria nem pelos testes dublados. O lint global encontra arquivos gerados antigos em `.worktrees` e um E2E anterior fora do delta; a categoria do CI decidirá o gate do SHA da PR.
+
 ## Registro de entregas
 
 | Data | Fatia | PR | Observação |

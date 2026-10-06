@@ -30,6 +30,7 @@ import type {
 } from '@shared/domain/voz'
 import type { DesfechoDaFala, ProntidaoDoTts } from '@shared/domain/visemes'
 import type { ConfiguracaoDasBoasVindas, ReproducaoDasBoasVindas } from '@shared/domain/boas-vindas'
+import type { ConfiguracaoDoCronograma, ResultadoDoCronograma } from '@shared/domain/cronograma'
 import type { PendenciaDeLimpeza } from '@shared/domain/limpeza'
 import type { MergePolicyOutcome, PoliticaDeMerge, VistaDaFila } from '@shared/domain/pipeline'
 import type { VistaDoPool } from '@shared/domain/pool-vista'
@@ -242,6 +243,16 @@ const bridge: JarvisBridge = {
   confirmarReproducaoDasBoasVindas: (id: string, sucesso: boolean): void =>
     ipcRenderer.send(IPC_SEND_CHANNELS.boasVindasReproducaoConcluida, id, sucesso),
   informarBoasVindasProntas: (): void => ipcRenderer.send(IPC_SEND_CHANNELS.boasVindasPronto),
+  lerCronograma: (): Promise<ConfiguracaoDoCronograma> =>
+    ipcRenderer.invoke(IPC_CHANNELS.cronogramaLer),
+  salvarCronograma: (config: ConfiguracaoDoCronograma): Promise<ConfiguracaoDoCronograma> =>
+    ipcRenderer.invoke(IPC_CHANNELS.cronogramaSalvar, config),
+  historicoDoCronograma: (): Promise<readonly ResultadoDoCronograma[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.cronogramaHistorico),
+  selecionarMidiaDoCronograma: (
+    tipo: 'arquivo' | 'pasta'
+  ): Promise<{ readonly tipo: 'arquivo' | 'pasta'; readonly caminho: string } | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.cronogramaSelecionarMidia, tipo),
   definirEscutaAtiva: (ativa: boolean): Promise<DesfechoDeLigarEscuta> =>
     ipcRenderer.invoke(IPC_CHANNELS.escutaDefinirAtiva, ativa),
   definirGatilhosDaEscuta: (gatilhos: {

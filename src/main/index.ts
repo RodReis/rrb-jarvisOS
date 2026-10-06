@@ -1,5 +1,6 @@
 import { dirname, join, resolve } from 'node:path'
 import { EventEmitter } from 'node:events'
+import { createHash } from 'node:crypto'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { VozService } from './voz/voz-service'
 import { TtsService } from './voz/tts-service'
@@ -21,6 +22,9 @@ import { criarEstadoDasBoasVindasEmDisco } from './voz/estado-das-boas-vindas-em
 import { atividadeDeAudioNoWindows } from './voz/atividade-de-audio-windows'
 import { registrarIpcDasBoasVindas } from './voz/boas-vindas-ipc'
 import { lerMidiaDasBoasVindas } from './voz/midia-das-boas-vindas'
+import { CronogramaService } from './voz/cronograma-service'
+import { criarCronogramaEmDisco } from './voz/cronograma-em-disco'
+import { registrarIpcDoCronograma } from './voz/cronograma-ipc'
 import { MODELO_PADRAO } from '@shared/domain/ai'
 import { MODELO_PADRAO_DA_CONVERSA, type HotkeyDeMuteDaEscuta } from '@shared/domain/voz'
 import { criarRotaLocal } from './voz/rota-local'
@@ -2138,6 +2142,68 @@ if (!app.requestSingleInstanceLock()) {
     const estadoDasBoasVindas = criarEstadoDasBoasVindasEmDisco(diretorioDaVoz('boas-vindas.json'))
     const ponteDasBoasVindas = registrarIpcDasBoasVindas(estadoDasBoasVindas, () => janela)
     const eventosDasBoasVindas = new EventEmitter()
+    const arquivosDoCronograma = new Map<string, ReturnType<typeof criarCronogramaEmDisco>>()
+    const midiasDoCronograma = new Map<string, Set<string>>()
+    const arquivoPorId = (id: string): ReturnType<typeof criarCronogramaEmDisco> => {
+      let arquivo = arquivosDoCronograma.get(id)
+      if (!arquivo) {
+        const chave = createHash('sha256').update(id).digest('hex')
+        arquivo = criarCronogramaEmDisco(diretorioDaVoz('cronograma', chave, 'estado.json'), id)
+        arquivosDoCronograma.set(id, arquivo)
+      }
+      return arquivo
+    }
+    const arquivoDoUsuario = (): ReturnType<typeof criarCronogramaEmDisco> =>
+      arquivoPorId(userIdAtual())
+    const caminhosDoUsuario = (): Set<string> => {
+      const id = userIdAtual()
+      let caminhos = midiasDoCronograma.get(id)
+      if (!caminhos) {
+        caminhos = new Set<string>()
+        for (const sequencia of arquivoDoUsuario().ler().sequencias)
+          for (const atividade of sequencia.atividades)
+            if (atividade.tipo === 'tocar-midia-local') caminhos.add(atividade.midia.caminho)
+        midiasDoCronograma.set(id, caminhos)
+      }
+      return caminhos
+    }
+    const cronograma = new CronogramaService({
+      agora: () => new Date(),
+      usuarioAtual: userIdAtual,
+      estado: {
+        ler: () => arquivoDoUsuario().ler(),
+        salvar: (config) => arquivoDoUsuario().salvar(config),
+        historico: () => arquivoDoUsuario().historico(),
+        registrar: (resultado) => arquivoDoUsuario().registrar(resultado)
+      },
+      registrarParaUsuario: (id, resultado) => arquivoPorId(id).registrar(resultado),
+      avaliar: (acao) =>
+        policy.classify(acao, {
+          workspace: 'jarvis',
+          pathAllowed: acao === 'cronograma.tocar-midia-local' ? true : undefined
+        }),
+      auditar: (marco, payload) =>
+        storage.audit.append({
+          user_id: typeof payload.usuarioId === 'string' ? payload.usuarioId : userIdAtual(),
+          workspace_id: 'jarvis',
+          type: 'voz.cronograma',
+          payload: { marco, ...payload }
+        }),
+      midiaAutorizada: (atividade) => caminhosDoUsuario().has(atividade.midia.caminho),
+      podeReproduzir: () => boasVindas.podeReproduzirAudio(),
+      sessaoBloqueada: () => sessaoBloqueada,
+      falar: () => boasVindas.falarNoCronograma(),
+      tocarMidia: async (fonte) => {
+        const midia = await lerMidiaDasBoasVindas(fonte)
+        await ponteDasBoasVindas.reproduzir({ acao: 'midia', ...midia })
+      }
+    })
+    registrarIpcDoCronograma(cronograma, caminhosDoUsuario)
+    eventosDasBoasVindas.on('boas-vindas', () => {
+      cronograma.dispararEvento('boas-vindas')
+    })
+    const relogioDoCronograma = setInterval(() => cronograma.verificarHorario(), 15_000)
+    cronograma.verificarHorario()
     const boasVindas = new BoasVindasService({
       agora: () => new Date(),
       configuracao: estadoDasBoasVindas.configuracao,
@@ -2157,6 +2223,15 @@ if (!app.requestSingleInstanceLock()) {
       },
       publicar: (evento) => {
         eventosDasBoasVindas.emit('boas-vindas', evento)
+      },
+      temSequenciaDeBoasVindas: () => {
+        const atual = cronograma.ler()
+        return (
+          atual.ativa &&
+          atual.sequencias.some(
+            (s) => s.ativa && s.gatilho.tipo === 'evento' && s.gatilho.evento === 'boas-vindas'
+          )
+        )
       }
     })
     powerMonitor.on('unlock-screen', () => {
@@ -2175,6 +2250,7 @@ if (!app.requestSingleInstanceLock()) {
      * tecla apertada iria para um processo que não existe mais.
      */
     app.on('will-quit', () => {
+      clearInterval(relogioDoCronograma)
       hotkeyDaVoz.liberar()
       if (muteAtual !== undefined) globalShortcut.unregister(muteAtual)
       void engineDaEscuta.encerrar()

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { HistoricoDoCronograma } from './HistoricoDoCronograma'
 import { Button, Card, InlineAlert, VoiceMascot, type EstadoDoMascote } from '@design/ui'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { VisemeEvent } from '@shared/domain/visemes'
@@ -865,6 +866,7 @@ export function Microfone({
             ))}
           </ol>
         )}
+        <HistoricoDoCronograma />
       </div>
     </div>
   )

@@ -6,6 +6,7 @@ import type { ProntidaoDoTts } from '@shared/domain/visemes'
 import { criarReprodutor } from './reproducao-de-fala'
 import { PreferenciasDaEscuta } from './PreferenciasDaEscuta'
 import { PreferenciasDasBoasVindas } from './PreferenciasDasBoasVindas'
+import { PreferenciasDoCronograma } from './PreferenciasDoCronograma'
 import { DispositivosDeVoz } from './DispositivosDeVoz'
 import {
   HOTKEYS_DE_VOZ,
@@ -142,6 +143,7 @@ export function PreferenciasDeVoz({
 
       <PreferenciasDaEscuta />
       <PreferenciasDasBoasVindas />
+      <PreferenciasDoCronograma />
     </div>
   )
 }

@@ -38,6 +38,12 @@ const BAIXO: readonly TaxonomyEntry[] = [
   { id: 'workflow.run-simulated', tier: 'baixo', descricao: 'Executar workflow simulado' },
   { id: 'text.draft', tier: 'baixo', descricao: 'Gerar rascunho de texto sem publicar' },
   { id: 'analysis.read-only', tier: 'baixo', descricao: 'Rodar análise local somente leitura' },
+  { id: 'cronograma.falar', tier: 'baixo', descricao: 'Falar localmente no cronograma' },
+  {
+    id: 'cronograma.tocar-midia-local',
+    tier: 'baixo',
+    descricao: 'Tocar mídia local no cronograma'
+  },
   {
     id: 'settings.change-preference',
     tier: 'baixo',
