@@ -5,6 +5,7 @@ import type { PreferencesSnapshot } from '@shared/contracts/ipc'
 import type { ProntidaoDoTts } from '@shared/domain/visemes'
 import { criarReprodutor } from './reproducao-de-fala'
 import { PreferenciasDaEscuta } from './PreferenciasDaEscuta'
+import { PreferenciasDasBoasVindas } from './PreferenciasDasBoasVindas'
 import { DispositivosDeVoz } from './DispositivosDeVoz'
 import {
   HOTKEYS_DE_VOZ,
@@ -140,6 +141,7 @@ export function PreferenciasDeVoz({
       <VozDaFala preferencias={preferencias} onSalvar={onSalvar} />
 
       <PreferenciasDaEscuta />
+      <PreferenciasDasBoasVindas />
     </div>
   )
 }

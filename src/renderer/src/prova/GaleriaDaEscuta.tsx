@@ -5,6 +5,18 @@ import type { JarvisBridge } from '@shared/contracts/ipc'
 import type { EstadoDaEscuta } from '@shared/domain/voz'
 import { EscutaDaVoz } from '../app/EscutaDaVoz'
 import { PreferenciasDaEscuta } from '../app/PreferenciasDaEscuta'
+import { PreferenciasDasBoasVindas } from '../app/PreferenciasDasBoasVindas'
+import type { ConfiguracaoDasBoasVindas } from '@shared/domain/boas-vindas'
+
+const CONFIGURACAO_DA_PROVA: ConfiguracaoDasBoasVindas = {
+  ativa: false,
+  janelaInicio: 360,
+  janelaFim: 1380,
+  tetoDaPersonaMs: 4000,
+  frases: { manha: 'Bom dia.', tarde: 'Boa tarde.', noite: 'Boa noite.' },
+  midiaAtiva: false,
+  midia: null
+}
 
 /**
  * Galeria de prova da escuta contínua (SPEC-Escuta-01, critérios 8 e 9).
@@ -18,7 +30,8 @@ import { PreferenciasDaEscuta } from '../app/PreferenciasDaEscuta'
  * de foco —, que jsdom não mede.
  */
 
-export type CenaDaEscuta = 'ligada' | 'desligada' | 'indisponivel' | 'sem-microfone' | 'settings'
+export type CenaDaEscuta =
+  'ligada' | 'desligada' | 'indisponivel' | 'sem-microfone' | 'settings' | 'boas-vindas'
 
 const BASE: EstadoDaEscuta = {
   ativa: true,
@@ -35,7 +48,8 @@ const ESTADO_POR_CENA: Readonly<Record<CenaDaEscuta, EstadoDaEscuta>> = {
   desligada: { ...BASE, ativa: false },
   indisponivel: { ...BASE, ativa: false, disponivel: false },
   'sem-microfone': BASE,
-  settings: { ...BASE, palmas: false, hotkeyRegistrada: false }
+  settings: { ...BASE, palmas: false, hotkeyRegistrada: false },
+  'boas-vindas': BASE
 }
 
 function ponteDaProva(cena: CenaDaEscuta): JarvisBridge {
@@ -52,6 +66,9 @@ function ponteDaProva(cena: CenaDaEscuta): JarvisBridge {
     onEscutaMudou: () => () => {},
     onEscutaDisparo: () => () => {},
     onEscutaTeste: () => () => {},
+    lerBoasVindas: async () => CONFIGURACAO_DA_PROVA,
+    salvarBoasVindas: async (config: ConfiguracaoDasBoasVindas) => config,
+    selecionarMidiaDasBoasVindas: async () => CONFIGURACAO_DA_PROVA,
     sendLog: () => {}
   } as unknown as JarvisBridge
 }
@@ -101,7 +118,11 @@ export function GaleriaDaEscuta({
     >
       <FundoDaIdentidade className="min-h-screen font-[family-name:var(--jos-fonte-corpo)] text-[var(--jos-cor-texto)]">
         <main data-testid="galeria-escuta" data-cena={cena}>
-          {cena === 'settings' ? (
+          {cena === 'boas-vindas' ? (
+            <div className="mx-auto max-w-md p-6">
+              <PreferenciasDasBoasVindas />
+            </div>
+          ) : cena === 'settings' ? (
             <div className="mx-auto max-w-md p-6">
               <PreferenciasDaEscuta />
             </div>

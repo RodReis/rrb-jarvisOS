@@ -1,4 +1,5 @@
 import { dirname, join, resolve } from 'node:path'
+import { EventEmitter } from 'node:events'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { VozService } from './voz/voz-service'
 import { TtsService } from './voz/tts-service'
@@ -15,6 +16,11 @@ import { criarEstadoDaEscutaEmDisco } from './voz/estado-da-escuta-em-disco'
 import { criarAoDispararDaEscuta } from './voz/disparo-da-escuta'
 import { prepararRuntime, runtimeUsavel } from './voz/preparo-do-runtime'
 import { ConversaService } from './voz/conversa-service'
+import { BoasVindasService } from './voz/boas-vindas-service'
+import { criarEstadoDasBoasVindasEmDisco } from './voz/estado-das-boas-vindas-em-disco'
+import { atividadeDeAudioNoWindows } from './voz/atividade-de-audio-windows'
+import { registrarIpcDasBoasVindas } from './voz/boas-vindas-ipc'
+import { lerMidiaDasBoasVindas } from './voz/midia-das-boas-vindas'
 import { MODELO_PADRAO } from '@shared/domain/ai'
 import { MODELO_PADRAO_DA_CONVERSA, type HotkeyDeMuteDaEscuta } from '@shared/domain/voz'
 import { criarRotaLocal } from './voz/rota-local'
@@ -2072,7 +2078,6 @@ if (!app.requestSingleInstanceLock()) {
     // Bloqueio lido do `powerMonitor`, e não de heurística de foco (decisão da SPEC).
     let sessaoBloqueada = false
     powerMonitor.on('lock-screen', () => (sessaoBloqueada = true))
-    powerMonitor.on('unlock-screen', () => (sessaoBloqueada = false))
 
     /*
      * A hotkey de mute é o próprio kill switch por outro caminho: corta a captura com a janela
@@ -2127,6 +2132,39 @@ if (!app.requestSingleInstanceLock()) {
           if (janela !== undefined && !janela.isDestroyed()) revelarJanela(janela)
         },
         avisarTela: (disparo) => avisarTela(IPC_EVENT_CHANNELS.escutaDisparo, disparo)
+      })
+    })
+
+    const estadoDasBoasVindas = criarEstadoDasBoasVindasEmDisco(diretorioDaVoz('boas-vindas.json'))
+    const ponteDasBoasVindas = registrarIpcDasBoasVindas(estadoDasBoasVindas, () => janela)
+    const eventosDasBoasVindas = new EventEmitter()
+    const boasVindas = new BoasVindasService({
+      agora: () => new Date(),
+      configuracao: estadoDasBoasVindas.configuracao,
+      estado: estadoDasBoasVindas,
+      escutaAtiva: () => {
+        const atual = escuta.estado()
+        return atual.ativa && (atual.fase === 'escutando' || atual.fase === 'ocioso')
+      },
+      audioAtivo: atividadeDeAudioNoWindows,
+      gerarSaudacao: (hora, ausenciaMs, signal) => conversa.saudar(hora, ausenciaMs, signal),
+      falar: (texto) => ponteDasBoasVindas.reproduzir({ acao: 'fala', texto }),
+      tocarMidia: async () => {
+        const fonte = estadoDasBoasVindas.configuracao().midia
+        if (!fonte) throw new Error('Mídia local não configurada')
+        const midia = await lerMidiaDasBoasVindas(fonte)
+        await ponteDasBoasVindas.reproduzir({ acao: 'midia', ...midia })
+      },
+      publicar: (evento) => {
+        eventosDasBoasVindas.emit('boas-vindas', evento)
+      }
+    })
+    powerMonitor.on('unlock-screen', () => {
+      sessaoBloqueada = false
+      void boasVindas.desbloqueou().catch((erro: unknown) => {
+        log.sistema.warn('A chegada não pôde ser concluída', {
+          motivo: erro instanceof Error ? erro.message : 'desconhecido'
+        })
       })
     })
 

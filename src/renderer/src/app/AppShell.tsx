@@ -15,6 +15,7 @@ import {
 import { VoiceMascot } from '@design/ui'
 import type { DisparoDaEscuta } from '@shared/domain/voz'
 import { EscutaDaVoz, type DisparoRecebido } from './EscutaDaVoz'
+import { instalarReproducaoDasBoasVindas } from './reproducao-das-boas-vindas'
 import type { CapturaContinua, CapturaDoTurno } from './captura-continua'
 import { ACENTO_PADRAO } from '@design/tokens'
 import { log } from '../lib/log'
@@ -79,6 +80,13 @@ export function AppShell({ perfil, onSair }: AppShellProps = {}): React.JSX.Elem
   const [capturaCompartilhada, setCapturaCompartilhada] = useState<CapturaContinua | undefined>()
   const [escutaAtiva, setEscutaAtiva] = useState<boolean | null>(null)
   const contadorDeDisparos = useRef(0)
+  const vozDaFalaDaChegada = preferencias?.vozDaFala
+  const saidaDaChegada = preferencias?.vozSaidaId
+
+  useEffect(() => {
+    if (!vozDaFalaDaChegada || !window.jarvis?.onReproducaoDasBoasVindas) return
+    return instalarReproducaoDasBoasVindas(vozDaFalaDaChegada, saidaDaChegada)
+  }, [vozDaFalaDaChegada, saidaDaChegada])
 
   useEffect(() => {
     window.jarvis

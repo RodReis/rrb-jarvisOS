@@ -33,7 +33,7 @@ export interface DepsDaConversa {
   readonly ai: {
     readonly call: (
       request: AiRequest,
-      ctx: { userId: string; workspace: WorkspaceId }
+      ctx: { userId: string; workspace: WorkspaceId; signal?: AbortSignal }
     ) => AsyncIterable<AiStreamEvent>
   }
   /** Monta o pack do app. É o `ContextService.montarDoApp` (emenda E1). */
@@ -84,6 +84,70 @@ export class ConversaService {
   /** Zera a janela. Existe para o teste e para quando a tela quiser recomeçar. */
   limpar(): void {
     this.historico = []
+  }
+
+  /** Saudação proativa da SPEC-Escuta-03: usa a persona e o ponto único, sem criar pergunta falsa. */
+  async saudar(hora: Date, ausenciaMs: number | null, signal: AbortSignal): Promise<string> {
+    const workspace: WorkspaceId = 'jarvis'
+    const rota = await this.deps.rotaDisponivel()
+    if (!rota.ok) throw new Error(rota.proximaAcao)
+    if (signal.aborted) throw new Error('Saudação cancelada')
+
+    const horaLocal = new Intl.DateTimeFormat('pt-BR', {
+      dateStyle: 'full',
+      timeStyle: 'short'
+    }).format(hora)
+    const ausencia =
+      ausenciaMs === null
+        ? 'primeira sessão registrada'
+        : `${Math.floor(ausenciaMs / 60_000)} minutos desde o último desbloqueio`
+    const prompt = `Saúde o usuário ao chegar. Hora local: ${horaLocal}. Ausência: ${ausencia}. Responda em uma frase curta, sem markdown. Não execute ações.`
+    const pack = this.deps.montarContexto(
+      {
+        tarefa: 'conversa-de-voz: boas-vindas',
+        etapa: 'boas-vindas',
+        partes: [
+          {
+            nome: 'persona',
+            texto: systemDaPersona(this.deps.persona(workspace)),
+            motivo: 'persona ativa'
+          },
+          {
+            nome: 'snapshot',
+            texto: textoDoSnapshot(this.deps.snapshot(workspace)),
+            motivo: 'estado local do app'
+          },
+          {
+            nome: 'chegada',
+            texto: `Hora local: ${horaLocal}. Ausência: ${ausencia}.`,
+            motivo: 'contexto da chegada'
+          }
+        ],
+        rota: 'ollama'
+      },
+      workspace
+    )
+    const request: AiRequest = {
+      taskType: 'conversa-de-voz',
+      prompt,
+      system: systemDaPersona(this.deps.persona(workspace)),
+      contextPackId: pack.id,
+      model: this.deps.modeloDaConversa(),
+      maxTokens: 80
+    }
+    let texto = ''
+    for await (const evento of this.deps.ai.call(request, {
+      userId: this.deps.userId(),
+      workspace,
+      signal
+    })) {
+      if (evento.tipo === 'chunk') texto += evento.texto
+      if (evento.tipo === 'fim' && evento.estado !== 'concluido') {
+        throw new Error(evento.erro ?? 'A saudação não foi concluída')
+      }
+    }
+    if (signal.aborted || texto.trim() === '') throw new Error('Saudação sem resposta')
+    return texto.trim()
   }
 
   async perguntar(pergunta: string, workspace: WorkspaceId): Promise<DesfechoDaConversa> {

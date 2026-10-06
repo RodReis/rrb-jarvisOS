@@ -22,6 +22,7 @@ import type {
   WorkspaceId
 } from '../domain/entities'
 import type { AuthSnapshot } from './auth'
+import type { ConfiguracaoDasBoasVindas, ReproducaoDasBoasVindas } from '../domain/boas-vindas'
 import type { LogInput } from './logging'
 import type { PolicyContext, PolicyDecision } from '../policies/contracts'
 import type {
@@ -224,6 +225,9 @@ export const IPC_CHANNELS = {
   escutaEstado: 'escuta:estado',
   escutaDefinirAtiva: 'escuta:definir-ativa',
   escutaDefinirGatilhos: 'escuta:definir-gatilhos',
+  boasVindasLer: 'boas-vindas:ler',
+  boasVindasSalvar: 'boas-vindas:salvar',
+  boasVindasSelecionarMidia: 'boas-vindas:selecionar-midia',
   escutaDefinirSensibilidade: 'escuta:definir-sensibilidade',
   /**
    * Liga ou desliga o modo de teste de Settings: o disparo aparece com a confiança medida e **não**
@@ -701,6 +705,8 @@ export const IPC_SEND_CHANNELS = {
    * com `getUserMedia`; quem decide o que o áudio significa é o main.
    */
   escutaPcm: 'escuta:pcm',
+  boasVindasReproducaoConcluida: 'boas-vindas:reproducao-concluida',
+  boasVindasPronto: 'boas-vindas:pronto',
   /**
    * A tela avisa que um turno de conversa começou ou terminou (SPEC-Escuta-01: gatilhos são
    * ignorados enquanto um turno está ativo). Booleano e nada mais; o main ainda impõe um teto,
@@ -768,7 +774,8 @@ export const IPC_EVENT_CHANNELS = {
    */
   escutaDisparo: 'escuta:disparo',
   /** Um disparo visto no modo de teste, com a confiança medida (SPEC-Escuta-01, critério 12). */
-  escutaTeste: 'escuta:teste'
+  escutaTeste: 'escuta:teste',
+  boasVindasReproduzir: 'boas-vindas:reproduzir'
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]
@@ -969,6 +976,12 @@ export interface JarvisBridge {
   enviarPcmDaEscuta(pcm: Int16Array): void
   /** Avisa o main que um turno de conversa começou (`true`) ou terminou (`false`). */
   informarTurnoDaEscuta(ativo: boolean): void
+  lerBoasVindas(): Promise<ConfiguracaoDasBoasVindas>
+  salvarBoasVindas(config: ConfiguracaoDasBoasVindas): Promise<ConfiguracaoDasBoasVindas>
+  selecionarMidiaDasBoasVindas(tipo: 'arquivo' | 'pasta' | null): Promise<ConfiguracaoDasBoasVindas>
+  onReproducaoDasBoasVindas(listener: (pedido: ReproducaoDasBoasVindas) => void): () => void
+  confirmarReproducaoDasBoasVindas(id: string, sucesso: boolean): void
+  informarBoasVindasProntas(): void
   informarFaseDaVoz(fase: FaseDaVoz): void
   informarPosseDoMicrofone(dono: 'nenhum' | 'wake-word' | 'push-to-talk'): void
   confirmarCapturaDaEscuta(aberta: boolean): void

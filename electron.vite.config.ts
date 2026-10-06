@@ -24,7 +24,8 @@ const SIDECARES_DE_VOZ = [
   'sidecar-stt.py',
   'sidecar-tts.py',
   'sidecar-wake.py',
-  'features_wake.py'
+  'features_wake.py',
+  'atividade-de-audio.ps1'
 ] as const
 
 function copiarSidecarDeVoz(): Plugin {
