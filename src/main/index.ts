@@ -107,6 +107,7 @@ import { ReconciliacaoService } from './pipeline/reconciliacao-service'
 import { CancelamentoService } from './pipeline/cancelamento-service'
 import { ehTerminal } from '@shared/domain/pipeline'
 import { EncadeadorDeRuns } from './pipeline/encadeador-de-runs'
+import { QuadroExecucaoService } from './pipeline/quadro-execucao-service'
 import { PosseDoPerfilCodex } from './pipeline/posse-do-perfil-codex'
 import { RecuperacaoService } from './pipeline/recuperacao-service'
 import { RunPrRepository } from './pipeline/run-pr-repository'
@@ -1349,10 +1350,11 @@ if (!app.requestSingleInstanceLock()) {
     // adapter injetado aqui seria o segundo caminho sem gate — o mesmo erro que o `GitRunner`
     // impede do lado do Git. O `token` é só para o push, que o terminal controlado não consegue
     // autenticar por ambiente; o conector resolve o dele por dentro.
+    const externalRefRepository = new ExternalRefRepository(storage.db)
     const publicacao = new PublicacaoService({
       projects: projectRepository,
       roadmap: roadmapRepository,
-      refs: new ExternalRefRepository(storage.db),
+      refs: externalRefRepository,
       git: gitRunner,
       connectors,
       audit: storage.audit,
@@ -1717,6 +1719,23 @@ if (!app.requestSingleInstanceLock()) {
       proxy: executorProxy,
       // O perfil do Codex tem um dono por vez; o encadeador o mantém vivo e o devolve ao fim.
       perfilCodex: posseDoPerfilCodex
+    })
+
+    const quadroExecucao = new QuadroExecucaoService({
+      userId: userIdAtual,
+      roadmap: roadmapRepository,
+      roadmapService: roadmap,
+      refs: externalRefRepository,
+      projects: projectRepository,
+      contexts,
+      phaseModels,
+      runs: pipelineRepository,
+      fila,
+      runPrs,
+      connectors,
+      // O encadeador legado não executa o Squad da ADR-006. Play permanece fail closed até a
+      // composição real do Squad; anunciar run iniciado aqui executaria outro fluxo.
+      raizOperacional: () => join(app.getPath('userData'), 'pipeline')
     })
 
     const reconciliacao = new ReconciliacaoService({
@@ -2294,6 +2313,7 @@ if (!app.requestSingleInstanceLock()) {
       publicacao,
       mergePolicy,
       fila,
+      quadroExecucao,
       pool,
       preflight,
       executionLedger,

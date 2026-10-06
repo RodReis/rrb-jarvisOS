@@ -31,6 +31,9 @@ const aprovarGate = vi.fn()
 const marcosDoProjeto = vi.fn()
 const generationHistory = vi.fn()
 const onGenerationEvent = vi.fn()
+const quadroDeExecucao = vi.fn()
+const playNoQuadro = vi.fn()
+const lerPromptDoProjeto = vi.fn()
 
 const PROJETO: Project = {
   id: 'p-1',
@@ -89,6 +92,15 @@ beforeEach(() => {
   })
   generationHistory.mockReset().mockResolvedValue([])
   onGenerationEvent.mockReset().mockReturnValue(() => {})
+  quadroDeExecucao.mockReset().mockResolvedValue({
+    projectId: 'p-1',
+    geradoEm: '2026-10-06T12:00:00.000Z',
+    colunas: ['a-fazer', 'developer', 'teste', 'reviewer', 'pr-merge', 'done', 'finalizado'].map(
+      (id) => ({ id, titulo: id, cartoes: [] })
+    )
+  })
+  playNoQuadro.mockReset().mockResolvedValue([])
+  lerPromptDoProjeto.mockReset().mockResolvedValue(null)
 
   vi.stubGlobal('jarvis', {
     estadoDaJornada,
@@ -98,11 +110,21 @@ beforeEach(() => {
     aprovarGate,
     marcosDoProjeto,
     generationHistory,
-    onGenerationEvent
+    onGenerationEvent,
+    quadroDeExecucao,
+    playNoQuadro,
+    lerPromptDoProjeto
   })
 })
 
 describe('o botão da trilha executa a ação da etapa', () => {
+  it('exibe o quadro dentro do projeto aberto', async () => {
+    estadoDaJornada.mockResolvedValue(jornada('prompt'))
+    montar()
+    expect(await screen.findByRole('heading', { name: 'Quadro de execução' })).toBeInTheDocument()
+    await waitFor(() => expect(quadroDeExecucao).toHaveBeenCalledWith('p-1', 'jarvis'))
+  })
+
   it('gerar a arquitetura chama o main — não rola a página até outro botão', async () => {
     const usuario = userEvent.setup()
     estadoDaJornada.mockResolvedValue(jornada('arquitetura'))

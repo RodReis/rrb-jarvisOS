@@ -38,6 +38,7 @@ export const ESTADOS_DO_RUN = [
   'READY',
   'RUNNING',
   'VALIDATING',
+  'REVIEWING',
   'PR_CI',
   'MERGED',
   'AWAITING_MERGE',
@@ -69,8 +70,10 @@ const TRANSICOES: Readonly<Record<EstadoDoRun, readonly EstadoDoRun[]>> = {
   READY: ['RUNNING', 'BLOCKED', 'CANCELLED'],
   // O executor está construindo (M9-F04).
   RUNNING: ['VALIDATING', 'BLOCKED', 'CANCELLED'],
-  // Testes, lint, type, build e revisões (M9-F05). Volta a `RUNNING` na correção elegível.
-  VALIDATING: ['PR_CI', 'RUNNING', 'BLOCKED', 'CANCELLED'],
+  // Testes, lint, type e build. Volta a `RUNNING` na correção elegível.
+  VALIDATING: ['REVIEWING', 'RUNNING', 'BLOCKED', 'CANCELLED'],
+  // Revisão separada e persistida, antes de publicar o PR.
+  REVIEWING: ['PR_CI', 'BLOCKED', 'CANCELLED'],
   // PR aberto, checks correndo na origem. `AWAITING_MERGE` é o kill-switch desligado.
   PR_CI: ['MERGED', 'AWAITING_MERGE', 'VALIDATING', 'BLOCKED', 'CANCELLED'],
   MERGED: [],

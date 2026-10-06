@@ -2466,6 +2466,23 @@ Status: **validada na PR [#405](https://github.com/RodReis/rrb-jarvisOS/pull/405
 - [ ] Prova física do PI: chegar, desbloquear e confirmar a experiência acústica real.
 - [ ] Verificação física do PI: chegar, desbloquear e confirmar a experiência acústica real.
 
+## MVP-028 — Quadro de execução e governança dos Squads
+
+### Fatia 01 — Quadro de execução, play e PR/MERGE (`docs/spec/spec-execucao-01-quadro-play-pr-merge.md`)
+
+Status: **em implementação** — SPEC `aprovada-pi`; issue [#370](https://github.com/RodReis/rrb-jarvisOS/issues/370) em `proplan:doing` conferida em 2026-10-06. Entrega e aceite ainda dependem de PR/CI e dos critérios de prova abaixo.
+
+- [x] Projeção local das sete colunas por run, fila e refs publicadas; `REVIEWING` é estado persistido entre validação e PR.
+- [x] Consulta do SHA e dos checks do PR pelo kernel; falha fica desconhecida com horário. Finalizado (PI) requer issue fechada com `proplan:finalizado` observados no GitHub.
+- [x] Seleção do mesmo MVP e validação de escopo, issue, revisão aprovada, perfil de CI e ContextPack exercitadas em integração; dependência recusa o avanço e expõe a causa.
+- [ ] Ligar o Play ao Squad orquestrado (planejador, executor, TESTE, REVIEWER e entrega) no bootstrap. O encadeador legado executa outro fluxo; no app real o Play recusa antes de criar run até essa ligação existir.
+- [x] `SLICE_ENTRY` inclui o hash do `ci-profile.json` válido; mudança ou ausência do arquivo invalida o aceite anterior.
+- [x] Tela por IPC tipado, seleção e atualização em 60 s; o renderer não recebe credencial nem executa comandos.
+- [ ] Prova E2E do app real: play de uma e três issues, worktrees distintos, dependência e slots. Os testes de integração provam a seleção e o bloqueio; a execução real ainda precisa de ambiente com perfil aprovado e executor operacional.
+- [ ] Gate completo de qualidade, relatório por categoria, PR com `refs #370`, CI e merge confirmados. Só então publicar encerramento e mover para `proplan:done`.
+
+**Limite de escopo:** selo de aprovação de ação sensível, tetos e cancelamento pertencem à M28-F02 (#126), por decisão do PI em 2026-10-06; painel ao vivo e console pertencem à M28-F03 (#378), conforme a ordem aprovada do MVP-028. A execução por Squad e a equipe acionada pelo Play continuam critérios da F01 e ainda não foram entregues.
+
 ## Registro de entregas
 
 | Data | Fatia | PR | Observação |

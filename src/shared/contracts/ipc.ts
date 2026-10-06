@@ -84,6 +84,7 @@ import type { ExecutionLedger } from '../domain/execution-ledger'
 import type { PendenciaDeLimpeza } from '../domain/limpeza'
 import type { MergePolicyOutcome, PoliticaDeMerge, VistaDaFila } from '../domain/pipeline'
 import type { VistaDoPool } from '../domain/pool-vista'
+import type { QuadroDeExecucao, PedidoDePlay, ResultadoDoPlay } from '../domain/quadro-execucao'
 import type { Roadmap } from '../domain/roadmap'
 import type { MvpGerado, RoadmapGeradoOutcome, RoadmapRegistrado } from '../domain/roadmap-gerado'
 import type { EstadoDaJornada, TransicaoOutcome } from '../domain/jornada'
@@ -636,6 +637,8 @@ export const IPC_CHANNELS = {
   mergePolicyDefinir: 'merge-policy:definir',
   /** SPEC-Entrega-02: o estado da fila — runs ativos, concluídas e o que está travado. */
   filaVista: 'fila:vista',
+  quadroExecucaoVista: 'quadro-execucao:vista',
+  quadroExecucaoPlay: 'quadro-execucao:play',
   /**
    * SPEC-Scheduler-01: o pool de execução — slots, fila, motivo de espera e métricas. **Só leitura.**
    *
@@ -1573,6 +1576,10 @@ export interface JarvisBridge {
   ): Promise<PublicacaoOutcome>
   /** O estado da fila de execução (SPEC-Entrega-02). Só leitura: o renderer não move a pipeline. */
   vistaDaFila(projectId: string, workspace: WorkspaceId): Promise<VistaDaFila>
+  /** Quadro local derivado do ledger e das consultas reais da origem. */
+  quadroDeExecucao(projectId: string, workspace: WorkspaceId): Promise<QuadroDeExecucao>
+  /** Play governado pelo main; o renderer só identifica projeto e fatias escolhidas. */
+  playNoQuadro(pedido: PedidoDePlay, workspace: WorkspaceId): Promise<readonly ResultadoDoPlay[]>
   /** O pool de execução (SPEC-Scheduler-01). Só leitura, sem o token de nenhum slot. */
   vistaDoPool(): Promise<VistaDoPool>
   /**

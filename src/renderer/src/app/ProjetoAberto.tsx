@@ -18,6 +18,7 @@ import { PromptDoProjeto } from './PromptDoProjeto'
 import { BriefDoProjeto } from './BriefDoProjeto'
 import { PrdDoProjeto } from './PrdDoProjeto'
 import { RefinamentoDoProjeto } from './RefinamentoDoProjeto'
+import { QuadroDeExecucao } from './QuadroDeExecucao'
 
 /**
  * Um projeto aberto: a trilha da jornada e o conteúdo da etapa atual (SPEC-Jornada-01).
@@ -178,6 +179,8 @@ export function ProjetoAberto({
           </span>
         </div>
       </div>
+
+      <QuadroDeExecucao projectId={projeto.id} workspace={workspace} />
 
       {carregando ? (
         <LoadingState rotulo={t('jornada.carregando')} />

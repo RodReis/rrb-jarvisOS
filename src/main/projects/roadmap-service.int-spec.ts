@@ -16,13 +16,14 @@
  *    revisões vazia é o que faz `aprovar` recusar.
  */
 
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Database as Db } from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ResultadoDaVerificacao } from '@shared/domain/marcos'
 import type { MvpGerado, RoadmapRegistrado, SpecGerada } from '@shared/domain/roadmap-gerado'
+import { perfilNodeEmWindows } from '@shared/domain/ci-profile-perfis'
 
 const logCat = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 vi.mock('../logging/logger', () => ({
@@ -182,6 +183,8 @@ function aprovacoesNoBanco(): number {
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'jarvis-roadmap-'))
   raiz = join(dir, 'projeto')
+  mkdirSync(raiz)
+  writeFileSync(join(raiz, 'ci-profile.json'), JSON.stringify(perfilNodeEmWindows('node')))
   db = openDatabase(join(dir, 'jarvis.db'))
   audit = new AuditRepository(db, 'chave-de-teste')
   projects = new ProjectRepository(db)
@@ -293,8 +296,38 @@ describe('revisoesDoGate — o que cada gate cobre', () => {
 
     const revisoes = service.revisoesDoGate(PROJETO, 'SLICE_ENTRY', WS)
 
-    expect(revisoes).toHaveLength(1)
+    expect(revisoes).toHaveLength(2)
     expect(revisoes[0]?.artefato).toContain('docs/spec/')
+    expect(revisoes[1]?.artefato).toBe('ci-profile.json')
+  })
+
+  it('mudança no perfil de CI invalida o aceite da revisão anterior', () => {
+    gerado = revisao({
+      mvpEscolhido: 'mvp-1',
+      spec: spec({ perguntas: [{ ...spec().perguntas[0]!, resposta: 'a' }] })
+    })
+    gravarProjecao()
+    const antes = service.revisoesDoGate(PROJETO, 'SLICE_ENTRY', WS)[1]?.hash
+
+    writeFileSync(
+      join(raiz, 'ci-profile.json'),
+      JSON.stringify({ ...perfilNodeEmWindows('node'), profileId: 'revisao-2' })
+    )
+
+    expect(service.revisoesDoGate(PROJETO, 'SLICE_ENTRY', WS)[1]?.hash).not.toBe(antes)
+  })
+
+  it('SLICE_ENTRY sem perfil de CI válido não tem revisão aprovável', () => {
+    gerado = revisao({
+      mvpEscolhido: 'mvp-1',
+      spec: spec({ perguntas: [{ ...spec().perguntas[0]!, resposta: 'a' }] })
+    })
+    gravarProjecao()
+    writeFileSync(join(raiz, 'ci-profile.json'), '{invalido')
+
+    expect(service.revisoesDoGate(PROJETO, 'SLICE_ENTRY', WS)).toEqual([])
+    expect(service.aprovar(PROJETO, 'SLICE_ENTRY', WS).reason).toBe('sem-revisoes')
+    expect(aprovacoesNoBanco()).toBe(0)
   })
 
   /** Responder **é** mudança da SPEC: um hash cego às respostas aprovaria outro documento. */

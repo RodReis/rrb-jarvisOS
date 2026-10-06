@@ -538,6 +538,7 @@ describe('kill-switch do merge (critério 7)', () => {
     const runId = runPronto()
     tokenDoRun = adquirir(PROJETO_A, runId)
     fila.transicionar(PROJETO_A, WS, runId, 'VALIDATING', undefined, tokenDoRun)
+    fila.transicionar(PROJETO_A, WS, runId, 'REVIEWING', undefined, tokenDoRun)
     fila.transicionar(PROJETO_A, WS, runId, 'PR_CI', undefined, tokenDoRun)
     return runId
   }
@@ -612,6 +613,7 @@ describe('cancelamento tardio não desfaz merge (SPEC-Scheduler-04, critério 5)
     const runId = runPronto()
     tokenDoRun = adquirir(PROJETO_A, runId)
     fila.transicionar(PROJETO_A, WS, runId, 'VALIDATING', undefined, tokenDoRun)
+    fila.transicionar(PROJETO_A, WS, runId, 'REVIEWING', undefined, tokenDoRun)
     fila.transicionar(PROJETO_A, WS, runId, 'PR_CI', undefined, tokenDoRun)
     return runId
   }

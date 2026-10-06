@@ -44,6 +44,7 @@ describe('máquina de estados do run', () => {
       'READY',
       'RUNNING',
       'VALIDATING',
+      'REVIEWING',
       'PR_CI',
       'MERGED'
     ]

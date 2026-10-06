@@ -170,7 +170,7 @@ describe('fencing token nas transições — critério 4', () => {
     // O construtor ainda leva o run a PR_CI direto pelo repositório; ninguém lhe deu slot nem token.
     const id = pronto('p-a')
     const agora = new Date(relogio)
-    for (const para of ['RUNNING', 'VALIDATING', 'PR_CI'] as const) {
+    for (const para of ['RUNNING', 'VALIDATING', 'REVIEWING', 'PR_CI'] as const) {
       expect(runs.transicionar(id, estado(id) as never, para, agora)).toBe(true)
     }
 
@@ -200,6 +200,7 @@ describe('fencing token nas transições — critério 4', () => {
     const id = pronto('p-a')
     const token = fila.adquirirSlot('p-a', WS, id).lease?.fencingToken as number
     fila.transicionar('p-a', WS, id, 'VALIDATING', undefined, token)
+    fila.transicionar('p-a', WS, id, 'REVIEWING', undefined, token)
     fila.transicionar('p-a', WS, id, 'PR_CI', undefined, token)
 
     expect(fila.concluir('p-a', WS, id, token + 1).reason).toBe('fencing-invalido')
@@ -256,6 +257,7 @@ describe('a fila anda quando o slot é liberado', () => {
     const ta = fila.adquirirSlot('p-a', WS, a).lease?.fencingToken as number
     fila.adquirirSlot('p-b', WS, b)
     fila.transicionar('p-a', WS, a, 'VALIDATING', undefined, ta)
+    fila.transicionar('p-a', WS, a, 'REVIEWING', undefined, ta)
     fila.transicionar('p-a', WS, a, 'PR_CI', undefined, ta)
 
     fila.concluir('p-a', WS, a, ta, true)

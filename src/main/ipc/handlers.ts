@@ -131,6 +131,7 @@ import { NATUREZAS, isGate } from '@shared/domain/aprovacoes'
 import type { PublicacaoService } from '../projects/publicacao-service'
 import type { MergePolicyService } from '../pipeline/merge-policy-service'
 import type { FilaService } from '../pipeline/fila-service'
+import type { QuadroExecucaoService } from '../pipeline/quadro-execucao-service'
 import type { PoolService } from '../pipeline/pool-service'
 import type { VistaDeMarcos } from '@shared/domain/marcos'
 import type { MarcosService } from '../projects/marcos-service'
@@ -414,6 +415,7 @@ export interface IpcDependencies {
   readonly mergePolicy: MergePolicyService
   /** A fila de execução (SPEC-Entrega-02). Exposta só para leitura. */
   readonly fila: FilaService
+  readonly quadroExecucao: QuadroExecucaoService
   /** O pool de execução (SPEC-Scheduler-01). Exposto só para leitura. */
   readonly pool: PoolService
   readonly preflight: PreflightService
@@ -2356,6 +2358,35 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
         return { ativos: [], concluidas: [], bloqueadas: [] }
       }
       return deps.fila.vista(projectId, workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.quadroExecucaoVista,
+    async (_event, projectId: unknown, workspace: unknown) => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
+        return { projectId: '', colunas: [], geradoEm: new Date().toISOString() }
+      }
+      return await deps.quadroExecucao.vista(projectId, workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.quadroExecucaoPlay,
+    async (_event, pedido: unknown, workspace: unknown) => {
+      if (
+        !isWorkspaceId(workspace) ||
+        typeof pedido !== 'object' ||
+        pedido === null ||
+        typeof (pedido as { projectId?: unknown }).projectId !== 'string' ||
+        !Array.isArray((pedido as { sliceIds?: unknown }).sliceIds) ||
+        !(pedido as { sliceIds: unknown[] }).sliceIds.every((id) => typeof id === 'string')
+      )
+        return []
+      return await deps.quadroExecucao.play(
+        pedido as { projectId: string; sliceIds: readonly string[] },
+        workspace
+      )
     }
   )
 

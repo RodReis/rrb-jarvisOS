@@ -119,7 +119,7 @@ export interface FilaDeps {
 }
 
 /** Os estados em que o run **executa**: só avança com o token de um lease vivo. */
-const ESTADOS_EM_EXECUCAO: readonly EstadoDoRun[] = ['RUNNING', 'VALIDATING', 'PR_CI']
+const ESTADOS_EM_EXECUCAO: readonly EstadoDoRun[] = ['RUNNING', 'VALIDATING', 'REVIEWING', 'PR_CI']
 
 /** Os terminais em que o trabalho acabou: o slot não tem mais o que proteger. */
 const DESFECHOS_CONCLUIDOS: readonly EstadoDoRun[] = ['MERGED', 'AWAITING_MERGE']
@@ -244,7 +244,7 @@ export class FilaService {
     // confirmar progresso sem fiscalização. Cancelar é ato do PI e dispensa o token. A conferência
     // é o próprio `UPDATE`: entre "o token confere?" e "grava" não há janela para o lease mudar.
     //
-    // **Só de quem passou pelo pool.** O construtor ainda leva o run por `RUNNING → PR_CI` direto
+    // **Só de quem passou pelo pool.** O construtor ainda leva o run até `REVIEWING` direto
     // pelo repositório, sem slot nem token, e o `EntregaService` o conclui por aqui: exigir token de
     // quem nunca recebeu um travaria a entrega em `PR_CI`. Migrar esse caminho é da M12-F03.
     const passouPeloPool =

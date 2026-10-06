@@ -432,6 +432,21 @@ export class EntregaService {
     // Cada efeito externo (push, PR, proteção da base) confere antes se o dono ainda é o dono: run
     // cancelado ou sem lease (o heartbeat aborta o sinal) não publica nada na origem.
     if (this.foiInterrompida(pedido)) return await this.interrompida(pedido)
+    const prontoParaPr = this.deps.fila.transicionar(
+      pedido.projectId,
+      pedido.workspaceId,
+      pedido.runId,
+      'PR_CI',
+      undefined,
+      pedido.fencingToken
+    )
+    if (prontoParaPr.reason !== 'transicionado') {
+      return this.bloqueado(
+        'externo',
+        'Verificar o estado e a posse do run antes de publicar.',
+        'A revisão terminou, mas o run não pôde avançar para PR/CI.'
+      )
+    }
 
     // (4) Publica e garante o PR — **sempre o mesmo**, mesmo depois de recuperação (critério 5).
     const publicacao = await this.publicar(pedido)

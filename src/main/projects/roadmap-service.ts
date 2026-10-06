@@ -35,6 +35,7 @@ import type { AnexoService } from './anexo-service'
 import type { PacoteRepository } from './pacote-repository'
 import type { ProjectRepository } from './project-repository'
 import type { EscopoDoRoadmap, RoadmapRepository } from './roadmap-repository'
+import { lerPerfilDeCiVersionado } from './ci-profile-revision'
 
 interface RoadmapDeps {
   readonly repository: RoadmapRepository
@@ -175,6 +176,9 @@ export class RoadmapService {
     if (spec === undefined || !specPodeSerAceita(spec)) return []
 
     const fatia = this.repository.carregar(escopo).slices.find((s) => s.id === spec.fatiaId)
+    const projeto = this.projects.findById(userId, projectId)
+    const perfil = projeto === undefined ? undefined : lerPerfilDeCiVersionado(projeto.diretorio)
+    if (perfil === undefined) return []
 
     return [
       {
@@ -190,7 +194,8 @@ export class RoadmapService {
             respostas: spec.perguntas.map((pergunta) => `${pergunta.id}=${pergunta.resposta ?? ''}`)
           })
         )
-      }
+      },
+      { artefato: 'ci-profile.json', hash: perfil.hash }
     ]
   }
 

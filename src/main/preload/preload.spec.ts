@@ -227,6 +227,8 @@ describe('ponte do preload', () => {
         'validarPrototipos',
         'verifyAuditChain',
         'vistaDaFila',
+        'quadroDeExecucao',
+        'playNoQuadro',
         'vistaDoPool'
       ].sort()
     )

@@ -29,6 +29,8 @@ import {
   type EnsurePullRequestInput,
   type EnsureRepositoryInput,
   type HeadShaInput,
+  type IssueStateInput,
+  type IssueStateNormalizado,
   type MergeStateNormalizado,
   type PullRequestInput,
   type RequiredChecksInput,
@@ -561,6 +563,28 @@ export async function getMergeState(
   }
 
   return { data: estado, externalRef: { id: String(estado.numero) }, criado: false }
+}
+
+/** Lê o aceite externo sem alterar a issue nem inferir fechamento por merge. */
+export async function getIssueState(
+  rest: GithubRest,
+  input: IssueStateInput
+): Promise<ResultadoDeOperacao<IssueStateNormalizado>> {
+  const resposta = exigirOk(
+    await rest.request('GET', `/repos/${input.owner}/${input.repo}/issues/${input.issue}`)
+  )
+  const estado = texto(resposta.corpo, 'state')
+  if (estado !== 'open' && estado !== 'closed') {
+    throw new Error('Estado inválido da issue na origem.')
+  }
+  const labels = lista(resposta.corpo, 'labels')
+  const finalizado = labels.some((label) => texto(label, 'name') === 'proplan:finalizado')
+  const data: IssueStateNormalizado = {
+    numero: numero(resposta.corpo, 'number') ?? input.issue,
+    estado,
+    finalizado
+  }
+  return { data, externalRef: { id: String(data.numero) }, criado: false }
 }
 
 /**

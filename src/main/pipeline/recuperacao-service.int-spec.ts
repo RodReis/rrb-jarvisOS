@@ -359,6 +359,7 @@ describe('terminal e liberação são uma transação só (limite declarado da S
 
     // Um run em PR_CI concluindo: o terminal e o slot saem juntos ou nenhum dos dois.
     fila.transicionar('p-a', WS, a.id, 'VALIDATING', undefined, a.token)
+    fila.transicionar('p-a', WS, a.id, 'REVIEWING', undefined, a.token)
     fila.transicionar('p-a', WS, a.id, 'PR_CI', undefined, a.token)
     expect(() => fila.concluir('p-a', WS, a.id, a.token, true)).toThrow(/crash/)
 
@@ -623,6 +624,7 @@ describe('supervisionar — recuperação por run, sem interromper fatia saudáv
   it('merge em curso: o run não é bloqueado por suposição', () => {
     const a = executando('p-a')
     fila.transicionar('p-a', WS, a.id, 'VALIDATING', undefined, a.token)
+    fila.transicionar('p-a', WS, a.id, 'REVIEWING', undefined, a.token)
     fila.transicionar('p-a', WS, a.id, 'PR_CI', undefined, a.token)
     mergesEmCurso.add(a.id)
     expirar()

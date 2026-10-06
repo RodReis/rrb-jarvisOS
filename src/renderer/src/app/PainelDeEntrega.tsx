@@ -66,7 +66,8 @@ const DESFECHOS: Readonly<
   AWAITING_PI: { rotulo: 'Aguardando o PI', tom: 'info', decisao: 'A fatia aguarda aprovação.' },
   READY: { rotulo: 'Pronto', tom: 'info', decisao: 'A fatia aguarda o slot de execução.' },
   RUNNING: { rotulo: 'Em execução', tom: 'info', decisao: 'O executor está construindo.' },
-  VALIDATING: { rotulo: 'Validando', tom: 'info', decisao: 'Testes, lint e revisão em curso.' },
+  VALIDATING: { rotulo: 'Validando', tom: 'info', decisao: 'Testes e verificações em curso.' },
+  REVIEWING: { rotulo: 'Em revisão', tom: 'info', decisao: 'O revisor está analisando a entrega.' },
   PR_CI: { rotulo: 'No CI', tom: 'info', decisao: 'Os checks estão correndo na origem.' }
 }
 

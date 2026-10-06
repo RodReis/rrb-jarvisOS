@@ -188,6 +188,7 @@ describe('duas fatias sem aresta no DAG, no mesmo projeto', () => {
     const token = fila.adquirirSlot(PROJETO, WS, a).lease?.fencingToken as number
     fila.adquirirSlot(PROJETO, WS, b)
     fila.transicionar(PROJETO, WS, a, 'VALIDATING', undefined, token)
+    fila.transicionar(PROJETO, WS, a, 'REVIEWING', undefined, token)
     fila.transicionar(PROJETO, WS, a, 'PR_CI', undefined, token)
 
     expect(fila.concluir(PROJETO, WS, a, token).reason).toBe('transicionado')
