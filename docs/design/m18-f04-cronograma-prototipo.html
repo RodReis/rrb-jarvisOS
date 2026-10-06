@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>M18-F04 · Protótipo do cronograma</title>
+  <style>
+    :root { font: 15px/1.5 system-ui, sans-serif; color-scheme: dark; --bg:#101923; --panel:#182431; --line:#344454; --ink:#f0f5f6; --muted:#a9b9c5; --accent:#6fe0b3; --danger:#ffaf9b; }
+    :root[data-theme="light"] { color-scheme:light; --bg:#f3f7f7; --panel:#fff; --line:#c9d5d9; --ink:#162a32; --muted:#526873; --accent:#08775d; --danger:#aa3c25; }
+    * { box-sizing:border-box; } body { margin:0; background:var(--bg); color:var(--ink); } button, input, select { font:inherit; } button { cursor:pointer; }
+    .shell { max-width:1150px; margin:auto; padding:32px 24px 72px; } .top { display:flex; justify-content:space-between; gap:16px; align-items:start; border-bottom:1px solid var(--line); padding-bottom:24px; }
+    .eyebrow { color:var(--accent); text-transform:uppercase; letter-spacing:.15em; font-size:.72rem; font-weight:700; } h1 { font-size:2rem; line-height:1.1; margin:8px 0; } h2 { font-size:1.15rem; margin:0; } p { color:var(--muted); margin:6px 0; }
+    .layout { display:grid; grid-template-columns: minmax(0,1.7fr) minmax(270px,1fr); gap:20px; margin-top:24px; } .panel { border:1px solid var(--line); background:var(--panel); border-radius:14px; padding:22px; }
+    .row { display:flex; align-items:center; justify-content:space-between; gap:16px; } .stack { display:grid; gap:16px; } .sub { border-top:1px solid var(--line); margin-top:20px; padding-top:20px; }
+    label { display:block; font-weight:600; margin-bottom:6px; } input:not([type=checkbox]), select { width:100%; background:var(--bg); color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:10px 12px; min-height:44px; }
+    input[type=checkbox] { width:20px; height:20px; accent-color:var(--accent); } .fields { display:grid; grid-template-columns:1fr 1fr; gap:12px; } .hint { font-size:.83rem; color:var(--muted); }
+    .card { border:1px solid var(--line); border-radius:10px; padding:14px; margin-top:12px; } .card strong { display:block; } .card p { font-size:.85rem; }
+    .actions { display:flex; gap:8px; flex-wrap:wrap; } .btn { background:var(--bg); border:1px solid var(--line); color:var(--ink); border-radius:8px; min-height:38px; padding:6px 12px; } .btn.primary { background:var(--accent); border-color:var(--accent); color:#0d2421; font-weight:700; } :root[data-theme=light] .btn.primary { color:white; }
+    .badge { color:var(--accent); border:1px solid currentColor; border-radius:20px; padding:2px 9px; font-size:.75rem; white-space:nowrap; } .error { border-left:3px solid var(--danger); padding:10px 14px; color:var(--danger); background:var(--bg); } .preview { list-style:none; padding:0; margin:16px 0 0; } .preview li { border-left:2px solid var(--accent); padding:0 0 22px 16px; position:relative; } .preview li::before { content:""; width:8px; height:8px; border-radius:50%; background:var(--accent); position:absolute; left:-5px; top:5px; }
+    .footer { display:flex; justify-content:flex-end; gap:12px; margin-top:20px; align-items:center; } .sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); } :focus-visible { outline:3px solid var(--accent); outline-offset:3px; }
+    @media(max-width:760px) { .layout { grid-template-columns:1fr; } .top { flex-direction:column; } .fields { grid-template-columns:1fr; } .shell { padding:20px 14px 48px; } }
+    @media(prefers-reduced-motion:no-preference) { .btn { transition:transform .15s, border-color .15s; } .btn:hover { transform:translateY(-2px); border-color:var(--accent); } }
+  </style>
+</head>
+<body>
+<main class="shell">
+  <header class="top"><div><div class="eyebrow">Settings / Voz / Cronograma · protótipo F04</div><h1>Seu ritmo, na ordem certa.</h1><p>Monte sequências para a chegada ou para um horário. Cada atividade é validada antes de salvar.</p></div><button class="btn" id="theme">Tema claro</button></header>
+  <div class="layout">
+    <section class="panel" aria-labelledby="editor"><div class="row"><div><h2 id="editor">Cronograma de atividades</h2><p>As sequências começam desligadas até você ativá-las.</p></div><label><span class="sr">Ativar todo o cronograma</span><input type="checkbox" id="global"></label></div>
+      <div class="sub stack"><div class="row"><div><strong>Chegada de trabalho</strong><p>Uma sequência · editando</p></div><label><span class="sr">Ativar sequência</span><input type="checkbox" id="enabled"></label></div>
+      <div><label for="name">Nome da sequência</label><input id="name" value="Chegada de trabalho"></div>
+      <div><label for="trigger">Quando executar</label><select id="trigger"><option value="event">Ao chegar · boas-vindas</option><option value="schedule">Em horário recorrente</option></select></div>
+      <div id="schedule" class="fields" hidden><div><label for="day">Dia da semana</label><select id="day"><option>Terça-feira</option><option>Segunda-feira</option><option>Quarta-feira</option><option>Quinta-feira</option><option>Sexta-feira</option><option>Sábado</option><option>Domingo</option></select></div><div><label for="time">Hora local</label><input type="time" id="time" value="08:00"></div></div>
+      <div><div class="row"><div><strong>Atividades</strong><p>A ordem abaixo é a ordem de execução.</p></div><span class="badge">2 atividades</span></div><div id="activities"></div><div class="actions" style="margin-top:14px"><button class="btn" id="addSpeak">+ Falar</button><button class="btn" id="addMedia">+ Tocar mídia local</button></div></div>
+      <div id="policyError" class="error" role="alert" hidden>“Abrir aplicativo” foi recusada pela política: atividade fora do catálogo permitido.</div>
+      <div class="footer"><span id="saveStatus" class="hint" role="status">Alterações não salvas</span><button class="btn primary" id="save">Validar e salvar</button></div></div>
+    </section>
+    <aside class="stack"><section class="panel"><div class="eyebrow">Prévia da execução</div><h2>O que acontece</h2><p id="when">Depois das boas-vindas</p><ol class="preview" id="preview"></ol><p class="hint">Se uma atividade falhar, a próxima continua. O resultado fica no histórico do Command Center.</p></section><section class="panel"><div class="eyebrow">Proteções</div><h2>Antes de tocar qualquer áudio</h2><p>O app respeita silêncio do sistema, janela de horário, escuta desligada e limite por período. Horários não reproduzem áudio com a sessão bloqueada.</p><button class="btn" id="showError">Ver recusa da política</button></section></aside>
+  </div>
+</main>
+<script>
+  const activities = [{type:'Falar', detail:'Saudação pela persona · com frase de reserva'}, {type:'Tocar mídia local', detail:'Pasta selecionada em Settings · saída de áudio escolhida'}];
+  const $ = id => document.getElementById(id);
+  function render() {
+    $('activities').innerHTML = activities.map((a,i) => `<div class="card"><div class="row"><div><strong>${i+1}. ${a.type}</strong><p>${a.detail}</p></div><div class="actions"><button class="btn" data-move="${i}" data-dir="-1" aria-label="Subir atividade ${i+1}" ${i===0?'disabled':''}>↑</button><button class="btn" data-move="${i}" data-dir="1" aria-label="Descer atividade ${i+1}" ${i===activities.length-1?'disabled':''}>↓</button><button class="btn" data-remove="${i}" aria-label="Remover atividade ${i+1}">×</button></div></div></div>`).join('');
+    $('preview').innerHTML = activities.map(a=>`<li><strong>${a.type}</strong><br><span class="hint">${a.detail}</span></li>`).join('');
+    document.querySelector('.badge').textContent = `${activities.length} atividade${activities.length===1?'':'s'}`;
+    $('saveStatus').textContent='Alterações não salvas';
+  }
+  $('activities').addEventListener('click', e => { const b=e.target.closest('button'); if(!b)return; if(b.dataset.remove!==undefined) activities.splice(Number(b.dataset.remove),1); else {const i=Number(b.dataset.move), j=i+Number(b.dataset.dir); [activities[i],activities[j]]=[activities[j],activities[i]];} render(); });
+  $('addSpeak').onclick=()=>{activities.push({type:'Falar',detail:'Saudação pela persona · com frase de reserva'});render()};
+  $('addMedia').onclick=()=>{activities.push({type:'Tocar mídia local',detail:'Pasta selecionada em Settings · saída de áudio escolhida'});render()};
+  $('trigger').onchange=()=>{const timed=$('trigger').value==='schedule';$('schedule').hidden=!timed;$('when').textContent=timed?'Toda terça-feira às 08:00':'Depois das boas-vindas';};
+  $('time').onchange=()=>{$('when').textContent=`Toda terça-feira às ${$('time').value}`};
+  $('theme').onclick=()=>{const light=document.documentElement.dataset.theme==='light';document.documentElement.dataset.theme=light?'dark':'light';$('theme').textContent=light?'Tema claro':'Tema escuro'};
+  $('showError').onclick=()=>{$('policyError').hidden=false;$('policyError').scrollIntoView({block:'center'})};
+  $('save').onclick=()=>{$('saveStatus').textContent=$('global').checked&&$('enabled').checked?'Configuração validada · prévia de salvamento':'Salva como desligada · prévia de salvamento';$('policyError').hidden=true};
+  render();
+</script>
+</body>
+</html>
