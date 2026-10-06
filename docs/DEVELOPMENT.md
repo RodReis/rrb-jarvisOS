@@ -2475,10 +2475,11 @@ Status: **em andamento** — issue [#359](https://github.com/RodReis/rrb-jarvisO
 - [x] Gatilhos `boas-vindas` e horário local, relógio injetado no teste, fila serial e resumo por atividade no histórico.
 - [x] Guardas acústicas consumidas da F03, mídia na saída escolhida com confirmação ao término, ponte IPC tipada e editor em Settings.
 - [x] Prova visual do editor em claro/escuro com movimento reduzido; testes direcionados de regras, banco, tela e contrato IPC.
-- [ ] Suíte completa, relatório `reports/TESTS.md`, E2E Electron e CI no SHA final.
+- [x] Suíte Regras (2904/2904), Banco (2293 pass, 44 skipped) e Tela (799 pass, 1 todo), relatório `reports/TESTS.md` conferido por `--check --require-entry`, build e lint dos arquivos alterados.
+- [ ] Reexecutar E2E Electron após o ajuste final de cancelamento, conferir CI no SHA final.
 - [ ] PR mergeada na `main`, comentário de encerramento e `proplan:done`; prova física do PI de chegada com sequência configurada.
 
-**Limites ainda em validação:** o teste acústico na máquina do PI não é substituído pela galeria nem pelos testes dublados. O lint global encontra arquivos gerados antigos em `.worktrees` e um E2E anterior fora do delta; a categoria do CI decidirá o gate do SHA da PR.
+**Limites ainda em validação:** o teste acústico na máquina do PI não é substituído pela galeria nem pelos testes dublados. O E2E Electron passou 3/3 antes do ajuste final de cancelamento; a reexecução fora da sandbox foi bloqueada em 2026-10-06 porque a revisão automática não pôde ser concluída por limite de uso, sem executar o comando. O lint global encontra arquivos gerados antigos em `.worktrees` e um E2E anterior fora do delta; a categoria do CI decidirá o gate do SHA da PR.
 
 ## Registro de entregas
 

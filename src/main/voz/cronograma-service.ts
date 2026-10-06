@@ -18,6 +18,7 @@ export interface DepsDoCronograma {
     readonly registrar: (resultado: ResultadoDoCronograma) => void
   }
   readonly registrarParaUsuario?: (usuarioId: string, resultado: ResultadoDoCronograma) => void
+  readonly aoResultado?: (resultado: ResultadoDoCronograma) => void
   readonly avaliar: (acao: string) => PolicyDecision
   readonly auditar: (marco: string, payload: Record<string, unknown>) => void
   readonly midiaAutorizada: (
@@ -115,7 +116,7 @@ export class CronogramaService {
         gatilho.minuto !== minuto
       )
         continue
-      const chave = `${sequencia.id}:${minuta}`
+      const chave = `${this.deps.usuarioAtual?.() ?? 'local'}:${sequencia.id}:${minuta}`
       if (this.minutosDisparados.has(chave)) continue
       this.minutosDisparados.add(chave)
       this.enfileirar(sequencia, 'horario')
@@ -203,5 +204,6 @@ export class CronogramaService {
     if (usuarioAoDisparar && this.deps.registrarParaUsuario)
       this.deps.registrarParaUsuario(usuarioAoDisparar, resultado)
     else this.deps.estado.registrar(resultado)
+    if (usuarioAoDisparar === this.deps.usuarioAtual?.()) this.deps.aoResultado?.(resultado)
   }
 }

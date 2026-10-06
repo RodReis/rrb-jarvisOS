@@ -2177,6 +2177,7 @@ if (!app.requestSingleInstanceLock()) {
         registrar: (resultado) => arquivoDoUsuario().registrar(resultado)
       },
       registrarParaUsuario: (id, resultado) => arquivoPorId(id).registrar(resultado),
+      aoResultado: (resultado) => avisarTela(IPC_EVENT_CHANNELS.cronogramaResultado, resultado),
       avaliar: (acao) =>
         policy.classify(acao, {
           workspace: 'jarvis',

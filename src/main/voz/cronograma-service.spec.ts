@@ -211,4 +211,37 @@ describe('SPEC-Escuta-04 · cronograma', () => {
     expect(c.falar).not.toHaveBeenCalled()
     expect(c.midia).not.toHaveBeenCalled()
   })
+
+  it('o disparo do mesmo minuto é independente por usuário', async () => {
+    let usuario = 'usuario-a'
+    const c = montar('horario')
+    const base = c.servico.ler()
+    const salvos: string[] = []
+    const servico = new CronogramaService({
+      agora: () => new Date(2026, 9, 6, 8, 0),
+      usuarioAtual: () => usuario,
+      estado: {
+        ler: () => base,
+        salvar: () => undefined,
+        historico: () => [],
+        registrar: () => undefined
+      },
+      registrarParaUsuario: (id) => {
+        salvos.push(id)
+      },
+      avaliar: (acao) => evaluate(acao, { workspace: 'jarvis' }),
+      auditar: c.auditar,
+      midiaAutorizada: () => true,
+      podeReproduzir: async () => true,
+      sessaoBloqueada: () => false,
+      falar: c.falar,
+      tocarMidia: c.midia
+    })
+    servico.verificarHorario()
+    await servico.aguardarFila()
+    usuario = 'usuario-b'
+    servico.verificarHorario()
+    await servico.aguardarFila()
+    expect(salvos).toEqual(['usuario-a', 'usuario-b'])
+  })
 })

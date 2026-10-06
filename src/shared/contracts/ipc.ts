@@ -780,7 +780,9 @@ export const IPC_EVENT_CHANNELS = {
   escutaDisparo: 'escuta:disparo',
   /** Um disparo visto no modo de teste, com a confiança medida (SPEC-Escuta-01, critério 12). */
   escutaTeste: 'escuta:teste',
-  boasVindasReproduzir: 'boas-vindas:reproduzir'
+  boasVindasReproduzir: 'boas-vindas:reproduzir',
+  boasVindasCancelarReproducao: 'boas-vindas:cancelar-reproducao',
+  cronogramaResultado: 'cronograma:resultado'
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]
@@ -985,11 +987,13 @@ export interface JarvisBridge {
   salvarBoasVindas(config: ConfiguracaoDasBoasVindas): Promise<ConfiguracaoDasBoasVindas>
   selecionarMidiaDasBoasVindas(tipo: 'arquivo' | 'pasta' | null): Promise<ConfiguracaoDasBoasVindas>
   onReproducaoDasBoasVindas(listener: (pedido: ReproducaoDasBoasVindas) => void): () => void
+  onCancelamentoDasBoasVindas(listener: (id: string) => void): () => void
   confirmarReproducaoDasBoasVindas(id: string, sucesso: boolean): void
   informarBoasVindasProntas(): void
   lerCronograma(): Promise<ConfiguracaoDoCronograma>
   salvarCronograma(config: ConfiguracaoDoCronograma): Promise<ConfiguracaoDoCronograma>
   historicoDoCronograma(): Promise<readonly ResultadoDoCronograma[]>
+  onResultadoDoCronograma(listener: (resultado: ResultadoDoCronograma) => void): () => void
   selecionarMidiaDoCronograma(
     tipo: 'arquivo' | 'pasta'
   ): Promise<{ readonly tipo: 'arquivo' | 'pasta'; readonly caminho: string } | null>

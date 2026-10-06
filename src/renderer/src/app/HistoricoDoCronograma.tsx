@@ -10,14 +10,27 @@ export function HistoricoDoCronograma(): React.JSX.Element | null {
       void window.jarvis
         .historicoDoCronograma()
         .then((lista) => {
-          if (vivo) setResultados(lista)
+          if (vivo)
+            setResultados((atual) => {
+              const unidos = new Map([...atual, ...lista].map((item) => [item.id, item]))
+              return [...unidos.values()]
+                .sort((a, b) => b.iniciadoEm.localeCompare(a.iniciadoEm))
+                .slice(0, 100)
+            })
         })
         .catch(() => undefined)
     }
     atualizar()
+    const remover = window.jarvis?.onResultadoDoCronograma?.((resultado) => {
+      if (vivo)
+        setResultados((atual) =>
+          [resultado, ...atual.filter((item) => item.id !== resultado.id)].slice(0, 100)
+        )
+    })
     window.addEventListener('focus', atualizar)
     return () => {
       vivo = false
+      remover?.()
       window.removeEventListener('focus', atualizar)
     }
   }, [])

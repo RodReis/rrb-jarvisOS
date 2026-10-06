@@ -239,6 +239,8 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'onEscutaTeste',
     'onGenerationEvent',
     'onReproducaoDasBoasVindas',
+    'onCancelamentoDasBoasVindas',
+    'onResultadoDoCronograma',
     'onVozHotkey',
     'pendenciasDeLimpeza',
     'perguntarAoJarvis',

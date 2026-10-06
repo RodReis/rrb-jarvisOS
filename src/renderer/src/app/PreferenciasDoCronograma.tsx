@@ -17,6 +17,7 @@ export function PreferenciasDoCronograma(): React.JSX.Element | null {
   const [aviso, setAviso] = useState<string>()
   const [ocupado, setOcupado] = useState(false)
   useEffect(() => {
+    if (!window.jarvis?.lerCronograma) return
     let vivo = true
     void window.jarvis
       .lerCronograma()

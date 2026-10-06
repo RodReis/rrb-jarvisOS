@@ -240,6 +240,12 @@ const bridge: JarvisBridge = {
     ipcRenderer.on(IPC_EVENT_CHANNELS.boasVindasReproduzir, wrapped)
     return () => ipcRenderer.removeListener(IPC_EVENT_CHANNELS.boasVindasReproduzir, wrapped)
   },
+  onCancelamentoDasBoasVindas: (listener: (id: string) => void): (() => void) => {
+    const wrapped = (_event: unknown, id: string): void => listener(id)
+    ipcRenderer.on(IPC_EVENT_CHANNELS.boasVindasCancelarReproducao, wrapped)
+    return () =>
+      ipcRenderer.removeListener(IPC_EVENT_CHANNELS.boasVindasCancelarReproducao, wrapped)
+  },
   confirmarReproducaoDasBoasVindas: (id: string, sucesso: boolean): void =>
     ipcRenderer.send(IPC_SEND_CHANNELS.boasVindasReproducaoConcluida, id, sucesso),
   informarBoasVindasProntas: (): void => ipcRenderer.send(IPC_SEND_CHANNELS.boasVindasPronto),
@@ -249,6 +255,11 @@ const bridge: JarvisBridge = {
     ipcRenderer.invoke(IPC_CHANNELS.cronogramaSalvar, config),
   historicoDoCronograma: (): Promise<readonly ResultadoDoCronograma[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.cronogramaHistorico),
+  onResultadoDoCronograma: (listener: (resultado: ResultadoDoCronograma) => void): (() => void) => {
+    const wrapped = (_event: unknown, resultado: ResultadoDoCronograma): void => listener(resultado)
+    ipcRenderer.on(IPC_EVENT_CHANNELS.cronogramaResultado, wrapped)
+    return () => ipcRenderer.removeListener(IPC_EVENT_CHANNELS.cronogramaResultado, wrapped)
+  },
   selecionarMidiaDoCronograma: (
     tipo: 'arquivo' | 'pasta'
   ): Promise<{ readonly tipo: 'arquivo' | 'pasta'; readonly caminho: string } | null> =>
