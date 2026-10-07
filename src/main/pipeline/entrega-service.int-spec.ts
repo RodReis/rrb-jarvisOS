@@ -118,7 +118,7 @@ let limpezas: { runId: string; fase: string; estadoFinal: string }[]
 let autonomo: boolean
 let achados: { severidade: 'P0' | 'P1' | 'P2' | 'P3'; titulo: string }[]
 let construcao: {
-  estadoFinal: 'PR_CI' | 'BLOCKED'
+  estadoFinal: 'REVIEWING' | 'BLOCKED'
   tentativas: { numero: number; runId: string }[]
   bloqueio?: Record<string, string>
 }
@@ -395,7 +395,7 @@ beforeEach(() => {
   achados = []
   autonomo = true
   relogio = 1_000
-  construcao = { estadoFinal: 'PR_CI', tentativas: [{ numero: 1, runId: 'run-1' }] }
+  construcao = { estadoFinal: 'REVIEWING', tentativas: [{ numero: 1, runId: 'run-1' }] }
   origem = {
     contexts: [NOME_DO_JOB_DE_CI],
     protegida: true,
@@ -854,7 +854,7 @@ describe('EntregaService — correlação do run (pendência da M9-F04)', () => 
     // recuperação apareceria como se fosse do primeiro esforço, e a pergunta "quanto custou
     // recuperar" deixaria de ter resposta.
     construcao = {
-      estadoFinal: 'PR_CI',
+      estadoFinal: 'REVIEWING',
       tentativas: [
         { numero: 1, runId: 'run-1' },
         { numero: 2, runId: 'run-1' }

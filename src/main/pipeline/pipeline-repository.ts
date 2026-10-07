@@ -18,6 +18,7 @@ import type { Database } from 'better-sqlite3'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { BloqueioExterno } from '@shared/domain/pacote-estrutural'
 import type { EstadoDoRun, PipelineRun } from '@shared/domain/pipeline'
+import { verificarSnapshot, type SnapshotDoSquad } from '../squads/squad-snapshot'
 import { log } from '../logging/logger'
 
 /** O escopo obrigatório de toda leitura e escrita (CONVENTION §2). */
@@ -35,6 +36,10 @@ interface RunRow {
   readonly estado: string
   readonly continua_de: string | null
   readonly bloqueio: string | null
+  readonly squad_snapshot: string | null
+  readonly squad_progress: string | null
+  readonly squad_cost_limit_usd: number | null
+  readonly squad_cost_measured: number | null
   readonly created_at: string
   readonly updated_at: string
 }
@@ -56,6 +61,25 @@ function toRun(row: RunRow): PipelineRun {
       log.db.warn('Bloqueio ilegível no pipeline_run; lido como ausente.', { runId: row.id })
     }
   }
+  let squadSnapshot: SnapshotDoSquad | undefined
+  let squadProgress: PipelineRun['squadProgress']
+  try {
+    if (row.squad_snapshot !== null) {
+      const candidato: unknown = JSON.parse(row.squad_snapshot)
+      if (snapshotValido(candidato)) squadSnapshot = candidato
+      else log.db.warn('Snapshot do Squad inválido no pipeline_run.', { runId: row.id })
+    }
+  } catch {
+    log.db.warn('Snapshot do Squad ilegível no pipeline_run.', { runId: row.id })
+  }
+  try {
+    if (row.squad_progress !== null) {
+      const lido: unknown = JSON.parse(row.squad_progress)
+      if (Array.isArray(lido)) squadProgress = lido as PipelineRun['squadProgress']
+    }
+  } catch {
+    log.db.warn('Progresso do Squad ilegível no pipeline_run.', { runId: row.id })
+  }
 
   return {
     id: row.id,
@@ -65,8 +89,41 @@ function toRun(row: RunRow): PipelineRun {
     estado: row.estado as EstadoDoRun,
     ...(row.continua_de === null ? {} : { continuaDe: row.continua_de }),
     ...(bloqueio === undefined ? {} : { bloqueio }),
+    ...(squadSnapshot === undefined ? {} : { squadSnapshot }),
+    ...(squadProgress === undefined ? {} : { squadProgress }),
+    ...(row.squad_cost_limit_usd === null ? {} : { squadCostLimitUsd: row.squad_cost_limit_usd }),
+    ...(row.squad_cost_measured === null
+      ? {}
+      : { squadCostMeasured: row.squad_cost_measured === 1 }),
     created_at: row.created_at,
     updated_at: row.updated_at
+  }
+}
+
+/** Checagem estrutural antes de passar o JSON persistido ao verificador de hash/resolução. */
+function ehSnapshotDoSquad(valor: unknown): valor is SnapshotDoSquad {
+  if (typeof valor !== 'object' || valor === null || Array.isArray(valor)) return false
+  const v = valor as Record<string, unknown>
+  return (
+    typeof v.registroDeCapacidades === 'number' &&
+    typeof v.perfil === 'object' &&
+    v.perfil !== null &&
+    typeof v.revisao === 'string' &&
+    typeof v.ambiente === 'object' &&
+    v.ambiente !== null &&
+    typeof v.modeloDaFase === 'object' &&
+    v.modeloDaFase !== null &&
+    typeof v.resolucao === 'object' &&
+    v.resolucao !== null
+  )
+}
+
+function snapshotValido(valor: unknown): valor is SnapshotDoSquad {
+  if (!ehSnapshotDoSquad(valor)) return false
+  try {
+    return verificarSnapshot(valor)
+  } catch {
+    return false
   }
 }
 
@@ -111,6 +168,95 @@ export class PipelineRepository {
       created_at: iso,
       updated_at: iso
     }
+  }
+
+  /** Persiste o snapshot do Squad antes de qualquer dispatch, restrito ao escopo do run. */
+  registrarSnapshotDoSquad(
+    escopo: EscopoDoRun,
+    runId: string,
+    snapshot: SnapshotDoSquad,
+    agora: Date
+  ): boolean {
+    if (!snapshotValido(snapshot)) return false
+    const resultado = this.db
+      .prepare(
+        `UPDATE pipeline_run SET squad_snapshot = ?, updated_at = ?
+        WHERE id = ? AND user_id = ? AND workspace_id = ? AND project_id = ?
+          AND squad_snapshot IS NULL AND estado = 'PLANNED'`
+      )
+      .run(
+        JSON.stringify(snapshot),
+        agora.toISOString(),
+        runId,
+        escopo.userId,
+        escopo.workspaceId,
+        escopo.projectId
+      )
+    return resultado.changes === 1
+  }
+
+  /** Resumo mínimo de tarefas, atualizado só enquanto o run permanece ativo e escopado. */
+  registrarProgressoDoSquad(
+    escopo: EscopoDoRun,
+    runId: string,
+    progresso: NonNullable<PipelineRun['squadProgress']>,
+    agora: Date
+  ): boolean {
+    if (
+      progresso.some(
+        (item) =>
+          typeof item.tarefaId !== 'string' ||
+          typeof item.papel !== 'string' ||
+          typeof item.estado !== 'string' ||
+          (item.motivo !== undefined &&
+            (typeof item.motivo !== 'string' || item.motivo.length > 160)) ||
+          (item.commitSha !== undefined && !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(item.commitSha))
+      )
+    )
+      return false
+    const resultado = this.db
+      .prepare(
+        `UPDATE pipeline_run SET squad_progress = ?, updated_at = ?
+        WHERE id = ? AND user_id = ? AND workspace_id = ? AND project_id = ?
+          AND squad_snapshot IS NOT NULL AND estado NOT IN ('MERGED','AWAITING_MERGE','BLOCKED','CANCELLED')`
+      )
+      .run(
+        JSON.stringify(progresso),
+        agora.toISOString(),
+        runId,
+        escopo.userId,
+        escopo.workspaceId,
+        escopo.projectId
+      )
+    return resultado.changes === 1
+  }
+
+  /** Teto de custo versionado com o run, calculado antes da primeira chamada do Squad. */
+  registrarCustoMaximoDoSquad(
+    escopo: EscopoDoRun,
+    runId: string,
+    limiteUsd: number,
+    medido: boolean,
+    agora: Date
+  ): boolean {
+    if (!Number.isFinite(limiteUsd) || limiteUsd < 0) return false
+    const resultado = this.db
+      .prepare(
+        `UPDATE pipeline_run SET squad_cost_limit_usd = ?, squad_cost_measured = ?, updated_at = ?
+          WHERE id = ? AND user_id = ? AND workspace_id = ? AND project_id = ?
+            AND squad_snapshot IS NOT NULL AND squad_cost_limit_usd IS NULL
+            AND estado NOT IN ('MERGED','AWAITING_MERGE','BLOCKED','CANCELLED')`
+      )
+      .run(
+        limiteUsd,
+        medido ? 1 : 0,
+        agora.toISOString(),
+        runId,
+        escopo.userId,
+        escopo.workspaceId,
+        escopo.projectId
+      )
+    return resultado.changes === 1
   }
 
   /**

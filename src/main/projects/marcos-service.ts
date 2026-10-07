@@ -20,6 +20,7 @@
 
 import { createHash } from 'node:crypto'
 import type { WorkspaceId } from '@shared/domain/entities'
+import type { RevisaoAprovada } from '@shared/domain/aprovacoes'
 import type { CommandExecution } from '@shared/domain/terminal'
 import type {
   EstadoDoRepositorio,
@@ -105,11 +106,36 @@ export class MarcosService {
    * instante do aceite. Git indisponível resulta em bloqueio, nunca em liberação: uma verificação
    * que não pôde rodar não é uma verificação que passou.
    */
-  verificar(projectId: string, workspaceId: WorkspaceId): ResultadoDaVerificacao {
+  verificar(
+    projectId: string,
+    workspaceId: WorkspaceId,
+    revisoesAprovadas: readonly RevisaoAprovada[] = []
+  ): ResultadoDaVerificacao {
     const vista = this.vista(projectId, workspaceId)
 
+    // A aprovação hash-a artefatos do pacote além dos documentos cadastrados como anexos.
+    // Recalcula o marco pelo blob do HEAD para garantir que o mesmo byte aprovado está commitado.
+    const fatosPorCaminho = new Map<string, FatoDoMarco>()
+    for (const linha of vista.linhas) {
+      const { estado: _estado, ...fato } = linha
+      void _estado
+      fatosPorCaminho.set(linha.caminho, fato)
+    }
+    const projeto = this.deps.projects.findById(this.deps.userId(), projectId)
+    if (vista.disponivel && projeto !== undefined) {
+      for (const revisao of revisoesAprovadas) {
+        const caminho = revisao.artefato.startsWith('file:')
+          ? revisao.artefato.slice('file:'.length)
+          : revisao.artefato
+        fatosPorCaminho.set(
+          caminho,
+          this.fatoDoDocumento({ caminho, hash: revisao.hash }, projeto.diretorio, workspaceId)
+        )
+      }
+    }
+
     const resultado = vista.disponivel
-      ? verificarMarcos(vista.linhas, vista.repositorio)
+      ? verificarMarcos([...fatosPorCaminho.values()], vista.repositorio)
       : {
           ok: false,
           head: '',

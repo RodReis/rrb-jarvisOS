@@ -15,7 +15,6 @@ Dar ao PI um quadro de execução do projeto em que ele escolhe o que roda (play
 - **Play** em uma issue ou em várias selecionadas **do mesmo MVP** em "A fazer". Cada issue ganha seu worktree e segue o fluxo.
 - Issue com dependência não satisfeita ou sem prova de independência espera em "A fazer" com o motivo visível; não há salto.
 - Coluna **PR/MERGE** alimentada pelo estado real dos checks e do merge, consultado pelo kernel a cada transição e **a cada 60 s** (decisão do PI, 2026-10-02). O card mostra o check pendente, o tempo de espera e a última consulta.
-- **Selo "Aguardando PI"** no card, que fica na coluna atual com o motivo, para alteração estrutural de banco e comando destrutivo. Aprovar ou recusar no próprio card, com `AuditEvent`.
 - Card com camada de modelo e escritores ativos, tentativas usadas, achados abertos e link do console da geração (MVP-026).
 - RF-014.1: a equipe da issue (agentes, papéis, objetivo, workflow padrão, limite de custo) visível e acionada pelo play.
 
@@ -26,6 +25,7 @@ Dar ao PI um quadro de execução do projeto em que ele escolhe o que roda (play
 - Mover issue para "Finalizado" (só o PI, como hoje).
 - Priorização automática ou reordenação de "A fazer".
 - Acionamento por automação (RF-014.2, MVP-013) e performance por equipe (RF-014.3, MVP-015).
+- Selo "Aguardando PI", decisão no card e respectivo `AuditEvent`: M28-F02, SPEC-Execucao-02, issue #126 (decisão do PI em 2026-10-06).
 
 ## Regras
 
@@ -40,15 +40,14 @@ Dar ao PI um quadro de execução do projeto em que ele escolhe o que roda (play
 1. Play de uma issue e de três do mesmo MVP cria um worktree por issue e respeita dependências e slots.
 2. Uma issue com CI rodando aparece em PR/MERGE, não em TESTE, com o check pendente visível.
 3. Falha de consulta ao GitHub aparece como estado desconhecido com horário.
-4. Card com ação que exige aprovação fica com o selo e não avança sem decisão do PI; a decisão é auditada.
-5. Reabrir o app reconstrói o quadro a partir do ledger, sem estado só em memória.
+4. Reabrir o app reconstrói o quadro a partir do ledger, sem estado só em memória.
 
 ## Testes e evidência
 
 - testes de projeção (ledger → coluna) por estado, incluindo falha de consulta;
-- teste de tela do quadro e do selo;
+- teste de tela do quadro;
 - E2E do play múltiplo com dependência bloqueando a segunda issue.
 
 ## Perguntas abertas ao PI
 
-Nenhuma. Intervalo de 60 s decidido pelo PI em 2026-10-02.
+Nenhuma. Intervalo de 60 s decidido pelo PI em 2026-10-02. Em 2026-10-06, o PI confirmou que as aprovações, inclusive o selo e a decisão auditada no card, pertencem à F02 (#126).

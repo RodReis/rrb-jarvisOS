@@ -556,6 +556,23 @@ export const RECURSOS = {
         abaMvps: 'MVPs',
         abaSpec: 'SPEC da fatia',
         abaGates: 'Aprovações',
+        ciTitulo: 'Stack de CI do projeto',
+        ciDescricao:
+          'Escolha a stack declarada no pacote antes de aceitar a fatia. O perfil gerado entra na revisão aprovada.',
+        ciNode: 'Node / npm',
+        ciPython: 'Python / pip',
+        matrizTitulo: 'Matriz de prova da SPEC',
+        matrizAjuda:
+          'Associe cada critério a validações do perfil e justifique toda categoria não aplicável.',
+        matrizCriterio: 'Critério {{numero}}: {{texto}}',
+        matrizEstado: 'Aplicabilidade de {{categoria}}',
+        matrizAplicavel: 'Aplicável',
+        matrizNaoAplicavel: 'Não aplicável',
+        matrizJustificativa: 'Justificativa para {{categoria}}',
+        matrizJustificativaPlaceholder:
+          'Explique por que esta categoria não se aplica a esta fatia.',
+        matrizSalvar: 'Salvar matriz na SPEC',
+        matrizCategoria: { regra: 'Regra', banco: 'Banco', tela: 'Tela', e2e: 'E2E' },
         specAusente: 'Nenhuma SPEC ainda',
         specAusenteDescricao:
           'A SPEC da primeira fatia nasce quando você escolhe o MVP que entra na fila. Escolha um na aba MVPs.',
@@ -1426,6 +1443,22 @@ export const RECURSOS = {
         abaMvps: 'MVPs',
         abaSpec: 'Slice SPEC',
         abaGates: 'Approvals',
+        ciTitulo: 'Project CI stack',
+        ciDescricao:
+          'Choose the stack declared by the project package before accepting the slice. The generated profile becomes part of the approved revision.',
+        ciNode: 'Node / npm',
+        ciPython: 'Python / pip',
+        matrizTitulo: 'SPEC proof matrix',
+        matrizAjuda:
+          'Map every criterion to profile validations and justify every not applicable category.',
+        matrizCriterio: 'Criterion {{numero}}: {{texto}}',
+        matrizEstado: '{{categoria}} applicability',
+        matrizAplicavel: 'Applicable',
+        matrizNaoAplicavel: 'Not applicable',
+        matrizJustificativa: 'Justification for {{categoria}}',
+        matrizJustificativaPlaceholder: 'Explain why this category does not apply to this slice.',
+        matrizSalvar: 'Save matrix to SPEC',
+        matrizCategoria: { regra: 'Rules', banco: 'Database', tela: 'UI', e2e: 'E2E' },
         specAusente: 'No SPEC yet',
         specAusenteDescricao:
           'The first slice SPEC is born when you choose the MVP that enters the queue. Choose one in the MVPs tab.',

@@ -80,6 +80,7 @@ describe('capacidades', () => {
       'auth.identify',
       'repo.ensure',
       'issue.ensure',
+      'issue.get-state',
       'issue.ensure-dependency',
       'ref.ensure',
       'pr.ensure',

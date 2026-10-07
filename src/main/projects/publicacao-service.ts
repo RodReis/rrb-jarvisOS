@@ -23,6 +23,7 @@ import { randomUUID } from 'node:crypto'
 import type { ConnectorOutcome, ConnectorRequest } from '@shared/domain/connectors'
 import { CONNECTOR_CONTRACT_VERSION } from '@shared/domain/connectors'
 import type { WorkspaceId } from '@shared/domain/entities'
+import { aprovacaoVigente } from '@shared/domain/aprovacoes'
 import { GITHUB_OPERATIONS } from '@shared/domain/github-automation'
 import type { BloqueioExterno } from '@shared/domain/pacote-estrutural'
 import {
@@ -44,6 +45,12 @@ import type { RoadmapRepository } from './roadmap-repository'
 export interface PublicacaoDeps {
   readonly projects: ProjectRepository
   readonly roadmap: RoadmapRepository
+  /** Recalcula preflight e hashes atuais do SLICE_ENTRY antes de qualquer efeito de publicação. */
+  readonly revisoesAtuaisDoSlice: (
+    projectId: string,
+    workspaceId: WorkspaceId,
+    slice: Slice
+  ) => readonly import('@shared/domain/aprovacoes').RevisaoAprovada[]
   /** Onde as referências publicadas ficam (emenda 6): a M9-F02 e a M9-F05 leem daqui. */
   readonly refs: ExternalRefRepository
   readonly git: GitRunner
@@ -96,12 +103,39 @@ export class PublicacaoService {
     // As SPECs com `SLICE_ENTRY` aprovado (emenda 3). O artefato do gate é o `specSlug` — é assim
     // que `revisoesDoGate` o registra —, então o conjunto de slugs aprovados responde diretamente
     // "esta fatia pode virar issue?".
+    const aprovacoes = this.deps.roadmap.listarAprovacoes(escopo)
     const aprovadas = new Set(
-      this.deps.roadmap
-        .listarAprovacoes(escopo)
-        .filter((a) => a.gate === 'SLICE_ENTRY')
-        .flatMap((a) => a.revisoes.map((r) => r.artefato))
+      slices
+        .filter((slice) => {
+          const atuais = this.deps.revisoesAtuaisDoSlice(projectId, workspaceId, slice)
+          return (
+            atuais.length > 0 && aprovacaoVigente(aprovacoes, 'SLICE_ENTRY', atuais) !== undefined
+          )
+        })
+        .map((slice) => slice.specSlug)
     )
+
+    const detalhadasSemAceiteAtual = slices.filter(
+      (slice) =>
+        naFila.some((mvp) => mvp.id === slice.mvpId) &&
+        slice.detalhada &&
+        !aprovadas.has(slice.specSlug)
+    )
+    if (detalhadasSemAceiteAtual.length > 0) {
+      return {
+        reason: 'bloqueado',
+        criados: 0,
+        bloqueio: {
+          causa: 'preflight-ci-pendente',
+          evidencia: `O SLICE_ENTRY atual da fatia ${detalhadasSemAceiteAtual[0]?.specSlug} não está vigente ou o preflight falhou.`,
+          tentativas: 0,
+          porQueNaoSeguir:
+            'Publicar repositório, branch ou issue antes do preflight criaria trabalho remoto sobre uma revisão que o PI não aprovou.',
+          retomada:
+            'Corrija a SPEC, a matriz, o perfil ou o workflow e aprove novamente o SLICE_ENTRY.'
+        }
+      }
+    }
 
     let criados = 0
     const contar = (o: ConnectorOutcome): void => {

@@ -49,6 +49,8 @@ import type {
   RotaComModelo
 } from '@shared/domain/modelo-da-fase'
 import type { CodexBillingMode, CodexProfileState } from '@shared/domain/codex-profile'
+import type { ResultadoDaSelecaoDeStack, RuntimeDoPerfil } from '@shared/domain/ci-profile'
+import type { EstadoDaMatrizDeProva, MatrizDeProva } from '@shared/domain/ci-proof-matrix'
 import type { ExecutorOperationalView } from '@shared/domain/executor-operacional'
 import type {
   ConnectorCapability,
@@ -85,6 +87,7 @@ import type { ExecutionLedger } from '../domain/execution-ledger'
 import type { PendenciaDeLimpeza } from '../domain/limpeza'
 import type { MergePolicyOutcome, PoliticaDeMerge, VistaDaFila } from '../domain/pipeline'
 import type { VistaDoPool } from '../domain/pool-vista'
+import type { QuadroDeExecucao, PedidoDePlay, ResultadoDoPlay } from '../domain/quadro-execucao'
 import type { Roadmap } from '../domain/roadmap'
 import type { MvpGerado, RoadmapGeradoOutcome, RoadmapRegistrado } from '../domain/roadmap-gerado'
 import type { EstadoDaJornada, TransicaoOutcome } from '../domain/jornada'
@@ -518,6 +521,10 @@ export const IPC_CHANNELS = {
   roadmapCarregarGerado: 'roadmap:carregar-gerado',
   roadmapEscolherMvp: 'roadmap:escolher-mvp',
   roadmapResponderPergunta: 'roadmap:responder-pergunta',
+  ciProfileEstado: 'ci-profile:estado',
+  ciProfileSelecionar: 'ci-profile:selecionar',
+  ciProfileMatrizEstado: 'ci-profile:matriz-estado',
+  ciProfileMatrizSalvar: 'ci-profile:matriz-salvar',
   roadmapElegiveis: 'roadmap:elegiveis',
   aprovacaoListar: 'aprovacao:listar',
   aprovacaoRevisoes: 'aprovacao:revisoes',
@@ -641,6 +648,8 @@ export const IPC_CHANNELS = {
   mergePolicyDefinir: 'merge-policy:definir',
   /** SPEC-Entrega-02: o estado da fila — runs ativos, concluídas e o que está travado. */
   filaVista: 'fila:vista',
+  quadroExecucaoVista: 'quadro-execucao:vista',
+  quadroExecucaoPlay: 'quadro-execucao:play',
   /**
    * SPEC-Scheduler-01: o pool de execução — slots, fila, motivo de espera e métricas. **Só leitura.**
    *
@@ -1428,6 +1437,18 @@ export interface JarvisBridge {
     resposta: string,
     workspace: WorkspaceId
   ): Promise<RoadmapGeradoOutcome>
+  estadoDoPerfilCi(projectId: string, workspace: WorkspaceId): Promise<ResultadoDaSelecaoDeStack>
+  selecionarStackCi(
+    projectId: string,
+    runtime: RuntimeDoPerfil,
+    workspace: WorkspaceId
+  ): Promise<ResultadoDaSelecaoDeStack>
+  estadoDaMatrizCi(projectId: string, workspace: WorkspaceId): Promise<EstadoDaMatrizDeProva>
+  salvarMatrizCi(
+    projectId: string,
+    workspace: WorkspaceId,
+    matriz: MatrizDeProva
+  ): Promise<EstadoDaMatrizDeProva>
   /**
    * O estado da jornada do projeto: etapa atual, CTA único e a trilha (SPEC-Jornada-01).
    *
@@ -1588,6 +1609,10 @@ export interface JarvisBridge {
   ): Promise<PublicacaoOutcome>
   /** O estado da fila de execução (SPEC-Entrega-02). Só leitura: o renderer não move a pipeline. */
   vistaDaFila(projectId: string, workspace: WorkspaceId): Promise<VistaDaFila>
+  /** Quadro local derivado do ledger e das consultas reais da origem. */
+  quadroDeExecucao(projectId: string, workspace: WorkspaceId): Promise<QuadroDeExecucao>
+  /** Play governado pelo main; o renderer só identifica projeto e fatias escolhidas. */
+  playNoQuadro(pedido: PedidoDePlay, workspace: WorkspaceId): Promise<readonly ResultadoDoPlay[]>
   /** O pool de execução (SPEC-Scheduler-01). Só leitura, sem o token de nenhum slot. */
   vistaDoPool(): Promise<VistaDoPool>
   /**

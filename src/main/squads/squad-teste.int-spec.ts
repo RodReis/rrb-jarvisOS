@@ -119,6 +119,33 @@ describe('SuiteNoSandbox', () => {
     expect(r).toEqual({ estado: 'verde', passos: ['test', 'lint', 'typecheck', 'build'] })
   })
 
+  it('roda somente as validações declaradas no perfil aprovado, na ordem do perfil', async () => {
+    const perfil = {
+      schemaVersion: 1,
+      profileId: 'python-1',
+      runtime: 'python',
+      versaoDoRuntime: '3.12',
+      sistema: 'windows',
+      shell: 'pwsh',
+      instalacao: { argv: ['pip', 'install', '-r', 'requirements.txt'] },
+      timeoutEmMinutos: 30,
+      validacoes: [
+        { id: 'ruff', nome: 'lint', argv: ['ruff', 'check', '.'], grupo: 'qualidade' },
+        { id: 'mypy', nome: 'typecheck', argv: ['mypy', '.'], grupo: 'qualidade' },
+        { id: 'pytest', nome: 'test', argv: ['pytest', '-q'], grupo: 'testes' }
+      ]
+    } as const
+
+    const r = await suite().rodar(pedido({ perfilDeCi: perfil as never }))
+
+    expect(r).toEqual({ estado: 'verde', passos: ['ruff', 'mypy', 'pytest'] })
+    expect(docker.exec.mock.calls.map(([, comando]) => comando)).toEqual([
+      ['ruff', 'check', '.'],
+      ['mypy', '.'],
+      ['pytest', '-q']
+    ])
+  })
+
   it('sobe o sandbox SOBRE o commit integrado, com unidade e branch próprias da tentativa', async () => {
     await suite().rodar(pedido({ tentativa: 2 }))
 

@@ -15,14 +15,15 @@
 import type { ClassificacaoDeFalha } from '@shared/domain/attempt'
 import { classificarFalha } from '@shared/domain/attempt'
 import type { ComandosDeValidacao } from '@shared/domain/ci-workflow'
+import type { PerfilDeCi } from '@shared/domain/ci-profile'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { PreflightOutcome, SandboxPreparado } from '@shared/domain/preflight'
 import type { PedidoDePreflight } from '../pipeline/preflight-service'
 import type { ExecucaoNoContainer } from '../pipeline/docker-runner'
 import type { AuditRepository } from '../storage/audit-repository'
+import { IMAGEM_DO_SQUAD } from './squad-imagem'
 
-export const PASSOS_DA_SUITE = ['test', 'lint', 'typecheck', 'build'] as const
-export type PassoDaSuite = (typeof PASSOS_DA_SUITE)[number]
+export type PassoDaSuite = string
 
 /** O fim da saída de um passo que falhou: o erro está no fim, e o resto é ruído. */
 export const MAX_EVIDENCIA = 2000
@@ -35,6 +36,8 @@ export interface PedidoDaSuite {
   /** O commit integrado: é sobre ele que a suíte roda. */
   readonly commitSha: string
   readonly comandos: ComandosDeValidacao
+  /** Perfil versionado aprovado no SLICE_ENTRY; quando presente, é a fonte dos argv de TESTE. */
+  readonly perfilDeCi?: PerfilDeCi
   /** A tentativa do DEVELOPER que está sendo testada, a partir de 1. */
   readonly tentativa: number
   readonly signal?: AbortSignal
@@ -98,10 +101,17 @@ export class SuiteNoSandbox implements ExecutorDeSuite {
   constructor(private readonly deps: DependenciasDaSuiteNoSandbox) {}
 
   async rodar(pedido: PedidoDaSuite): Promise<ResultadoDaSuite> {
-    const faltando = PASSOS_DA_SUITE.find((p) => pedido.comandos[p].length === 0)
-    // Passo sem comando não é passo que passou: a suíte que não existe não está verde.
+    const passos = pedido.perfilDeCi?.validacoes.map(({ id, argv }) => ({ id, argv })) ?? [
+      { id: 'test', argv: pedido.comandos.test },
+      { id: 'lint', argv: pedido.comandos.lint },
+      { id: 'typecheck', argv: pedido.comandos.typecheck },
+      { id: 'build', argv: pedido.comandos.build }
+    ]
+    if (passos.length === 0) return { estado: 'nao-rodou', motivo: 'perfil-sem-validacoes' }
+    const faltando = passos.find(({ argv }) => argv.length === 0)
+    // Uma validação declarada sem argv não existe de fato: nunca a considerar verde.
     if (faltando !== undefined)
-      return { estado: 'nao-rodou', motivo: `comando-ausente:${faltando}` }
+      return { estado: 'nao-rodou', motivo: `comando-ausente:${faltando.id}` }
     if (pedido.signal?.aborted === true) return { estado: 'cancelada' }
 
     const unidade = unidadeDaSuite(pedido.runId, pedido.tentativa)
@@ -113,6 +123,7 @@ export class SuiteNoSandbox implements ExecutorDeSuite {
       repositorio: pedido.repositorio,
       base: pedido.commitSha,
       proxyUrl: this.deps.proxyUrl(),
+      imagemDoSandbox: IMAGEM_DO_SQUAD,
       sufixoDaBranch: `teste-t${pedido.tentativa}`
     })
     const sandbox = preflight.sandbox
@@ -120,16 +131,20 @@ export class SuiteNoSandbox implements ExecutorDeSuite {
       return { estado: 'nao-rodou', motivo: `${preflight.reason}: ${preflight.mensagem}` }
     }
     try {
-      return this.passos(sandbox, pedido)
+      return this.passos(sandbox, pedido, passos)
     } finally {
       this.deps.docker.parar(sandbox.containerNome, this.deps.cwdDoDocker())
       this.deps.isolamento?.liberarRun(sandbox.runId, { preservarWorktree: true })
     }
   }
 
-  private passos(sandbox: SandboxPreparado, pedido: PedidoDaSuite): ResultadoDaSuite {
+  private passos(
+    sandbox: SandboxPreparado,
+    pedido: PedidoDaSuite,
+    passos: readonly { readonly id: string; readonly argv: readonly string[] }[]
+  ): ResultadoDaSuite {
     const feitos: PassoDaSuite[] = []
-    for (const passo of PASSOS_DA_SUITE) {
+    for (const passo of passos) {
       if (pedido.signal?.aborted === true) {
         this.deps.docker.matarProcesso(sandbox.containerNome, sandbox.worktreeNoHost)
         return { estado: 'cancelada' }
@@ -138,19 +153,19 @@ export class SuiteNoSandbox implements ExecutorDeSuite {
       // roda dentro do container, como no `ConstrutorService`.
       const execucao = this.deps.docker.exec(
         sandbox.containerNome,
-        pedido.comandos[passo],
+        passo.argv,
         sandbox.worktreeNoHost
       )
       if (!execucao.ok) {
         return {
           estado: 'vermelha',
-          passo,
+          passo: passo.id,
           classificacao: classificarFalha(execucao),
           evidencia: cauda(`${execucao.stderr}\n${execucao.stdout}`.trim()),
           passos: feitos
         }
       }
-      feitos.push(passo)
+      feitos.push(passo.id)
     }
     return { estado: 'verde', passos: feitos }
   }

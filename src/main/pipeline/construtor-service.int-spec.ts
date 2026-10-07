@@ -90,7 +90,7 @@ describe('ConstrutorService — tentativa única bem-sucedida', () => {
       comandosDeValidacao
     })
 
-    expect(resultado.estadoFinal).toBe('PR_CI')
+    expect(resultado.estadoFinal).toBe('REVIEWING')
     expect(resultado.tentativas).toHaveLength(1)
     expect(resultado.tentativas[0]?.numero).toBe(1)
     expect(pipeline.transicionar).toHaveBeenCalledWith(
@@ -103,7 +103,7 @@ describe('ConstrutorService — tentativa única bem-sucedida', () => {
     expect(pipeline.transicionar).toHaveBeenCalledWith(
       'run-1',
       'VALIDATING',
-      'PR_CI',
+      'REVIEWING',
       expect.any(Date),
       undefined
     )
@@ -150,7 +150,7 @@ describe('ConstrutorService — recuperação corrigível', () => {
       comandosDeValidacao
     })
 
-    expect(resultado.estadoFinal).toBe('PR_CI')
+    expect(resultado.estadoFinal).toBe('REVIEWING')
     expect(resultado.tentativas).toHaveLength(2)
     expect(resultado.tentativas[0]?.classificacao).toBe('corrigivel')
     expect(pipeline.transicionar).toHaveBeenCalledWith(
@@ -212,7 +212,7 @@ describe('ConstrutorService — recuperação corrigível', () => {
       comandosDeValidacao
     })
 
-    expect(resultado.estadoFinal).toBe('PR_CI')
+    expect(resultado.estadoFinal).toBe('REVIEWING')
     expect(promptsDoClaude).toHaveLength(2)
     expect(promptsDoClaude[0]).toBe('Implemente a SPEC.')
     expect(promptsDoClaude[1]).not.toBe('Implemente a SPEC.')
@@ -669,7 +669,7 @@ describe('ConstrutorService — alteração fora do escopo bloqueia (critério 4
       comandosDeValidacao
     })
 
-    expect(resultado.estadoFinal).toBe('PR_CI')
+    expect(resultado.estadoFinal).toBe('REVIEWING')
   })
 
   it('git status ilegível bloqueia com causa externo — falha fechado (decisão do PI, 2026-09-02)', async () => {
@@ -845,7 +845,7 @@ describe('ConstrutorService — verificação de escopo contra Git real (critica
         comandosDeValidacao
       })
 
-      expect(resultado.estadoFinal).toBe('PR_CI')
+      expect(resultado.estadoFinal).toBe('REVIEWING')
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
@@ -995,9 +995,9 @@ describe('ConstrutorService — transições pela fila com o fencing token (SPEC
       escopo
     })
 
-    expect(resultado.estadoFinal).toBe('PR_CI')
+    expect(resultado.estadoFinal).toBe('REVIEWING')
     expect(fila.transicionar).toHaveBeenCalledWith('p1', 'ws1', 'run-1', 'VALIDATING', undefined, 7)
-    expect(fila.transicionar).toHaveBeenCalledWith('p1', 'ws1', 'run-1', 'PR_CI', undefined, 7)
+    expect(fila.transicionar).toHaveBeenCalledWith('p1', 'ws1', 'run-1', 'REVIEWING', undefined, 7)
     expect(pipeline.transicionar).not.toHaveBeenCalled()
     // A fila é quem audita a transição: o construtor não a duplica.
     expect(audit.append).not.toHaveBeenCalled()

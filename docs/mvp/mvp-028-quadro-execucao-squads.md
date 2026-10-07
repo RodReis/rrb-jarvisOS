@@ -27,7 +27,7 @@ O PI escolhe o que roda e vê o estágio real de cada issue, inclusive a espera 
 - quadro local A fazer → DEVELOPER → TESTE → REVIEWER → PR/MERGE → DONE → Finalizado (PI);
 - play de uma issue ou de várias do mesmo MVP, um worktree por issue;
 - PR/MERGE pelo estado real dos checks (consulta a cada transição e a cada 60 s);
-- selo "Aguardando PI" para alteração estrutural de banco e comando destrutivo; deploy registrado;
+- selo "Aguardando PI" para alteração estrutural de banco e comando destrutivo, com decisão auditada no card, na F02 (#126; decisão do PI em 2026-10-06); deploy registrado;
 - tetos agregados, cancelamento em cascata, limpeza e E2E;
 - ligar o multi-escritor por padrão ao fim da F02 (ADR-006, decisão 16);
 - RF-014.1 (parte de acionamento manual pelo play);

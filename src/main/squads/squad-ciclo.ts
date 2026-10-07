@@ -20,6 +20,7 @@
  */
 
 import type { ComandosDeValidacao } from '@shared/domain/ci-workflow'
+import type { PerfilDeCi } from '@shared/domain/ci-profile'
 import type { WorkspaceId } from '@shared/domain/entities'
 import {
   correcoesParaOEscritor,
@@ -64,6 +65,7 @@ export interface PedidoDoCiclo {
   readonly repositorio: string
   readonly baseSha: string
   readonly comandos: ComandosDeValidacao
+  readonly perfilDeCi?: PerfilDeCi
   readonly revisao: RevisaoDoCiclo
   readonly signal?: AbortSignal
 }
@@ -163,6 +165,7 @@ export class CicloDeRevisao {
         repositorio: pedido.repositorio,
         commitSha: produzido.commitSha,
         comandos: pedido.comandos,
+        ...(pedido.perfilDeCi === undefined ? {} : { perfilDeCi: pedido.perfilDeCi }),
         tentativa,
         ...(pedido.signal === undefined ? {} : { signal: pedido.signal })
       })

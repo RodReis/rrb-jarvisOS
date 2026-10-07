@@ -61,7 +61,7 @@ export interface PedidoDeConstrucao {
 }
 
 export interface ResultadoDaConstrucao {
-  readonly estadoFinal: 'PR_CI' | 'BLOCKED'
+  readonly estadoFinal: 'REVIEWING' | 'BLOCKED'
   readonly tentativas: readonly Tentativa[]
   readonly bloqueio?: {
     readonly causa: ClassificacaoDeFalha
@@ -140,8 +140,9 @@ export class ConstrutorService {
         }
 
         tentativas.push({ numero, runId: pedido.runId })
-        if (!this.transicionar(pedido, 'VALIDATING', 'PR_CI')) return this.perdeuODono(tentativas)
-        return { estadoFinal: 'PR_CI', tentativas }
+        if (!this.transicionar(pedido, 'VALIDATING', 'REVIEWING'))
+          return this.perdeuODono(tentativas)
+        return { estadoFinal: 'REVIEWING', tentativas }
       }
 
       if (validacao.cancelado) {

@@ -97,7 +97,9 @@ describe('ponte do preload', () => {
         'escolherMvpDoRoadmap',
         'estadoDaEscuta',
         'estadoDaJornada',
+        'estadoDaMatrizCi',
         'estadoDoCodex',
+        'estadoDoPerfilCi',
         'estadoDoRefinamento',
         'estadoDoSandbox',
         'executorView',
@@ -206,6 +208,7 @@ describe('ponte do preload', () => {
         'salvarPersona',
         'salvarBoasVindas',
         'salvarCronograma',
+        'salvarMatrizCi',
         'salvarPromptDoProjeto',
         'saveExecutorPreference',
         'savePlanningAnswers',
@@ -213,6 +216,7 @@ describe('ponte do preload', () => {
         'sendLog',
         'selecionarMidiaDasBoasVindas',
         'selecionarMidiaDoCronograma',
+        'selecionarStackCi',
         'setAutomationEnabled',
         'setBudgetLimits',
         'setConnectorCredential',
@@ -233,6 +237,8 @@ describe('ponte do preload', () => {
         'validarPrototipos',
         'verifyAuditChain',
         'vistaDaFila',
+        'quadroDeExecucao',
+        'playNoQuadro',
         'vistaDoPool'
       ].sort()
     )

@@ -25,7 +25,8 @@ export const TOM_DA_APROVACAO: Readonly<Record<AprovacaoReason, 'ok' | 'err' | '
   'dag-invalido': 'err',
   // `warn`, e não `err`: nada quebrou — falta commitar o que já foi aceito, e cada pendência vem
   // com a ação que a resolve. `err` diria ao PI que o app falhou, quando o que falta é um passo.
-  'marcos-pendentes': 'warn'
+  'marcos-pendentes': 'warn',
+  'preflight-ci-pendente': 'warn'
 }
 
 export function DesfechoDaAprovacao({

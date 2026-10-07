@@ -772,6 +772,7 @@ describe('o paralelismo desligado serializa os runs (decisão 2 do PI)', () => {
       // O terminal concluído solta o slot e passa a vez, como o `EntregaService` faz em produção.
       const token = pool.slotDoRun(p.runId)?.fencingToken
       fila.transicionar(PROJETO, WS, p.runId, 'VALIDATING', undefined, token)
+      fila.transicionar(PROJETO, WS, p.runId, 'REVIEWING', undefined, token)
       fila.transicionar(PROJETO, WS, p.runId, 'PR_CI', undefined, token)
       fila.concluir(PROJETO, WS, p.runId, token)
       return { estadoFinal: 'AWAITING_MERGE' }

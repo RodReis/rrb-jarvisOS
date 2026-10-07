@@ -2466,6 +2466,26 @@ Status: **validada na PR [#405](https://github.com/RodReis/rrb-jarvisOS/pull/405
 - [ ] Prova física do PI: chegar, desbloquear e confirmar a experiência acústica real.
 - [ ] Verificação física do PI: chegar, desbloquear e confirmar a experiência acústica real.
 
+## MVP-028 — Quadro de execução e governança dos Squads
+
+### Fatia 01 — Quadro de execução, play e PR/MERGE (`docs/spec/spec-execucao-01-quadro-play-pr-merge.md`)
+
+Status: **em implementação** — SPEC `aprovada-pi`; issue [#370](https://github.com/RodReis/rrb-jarvisOS/issues/370) em `proplan:doing`; [PR #408](https://github.com/RodReis/rrb-jarvisOS/pull/408) em rascunho, sem aceite. Stack Node/Python escolhida pelo PI no app; E1 produz o perfil, persiste a matriz na SPEC e aprova hashes dos artefatos atuais. O gate compara esse conjunto com blobs commitados, incluindo `ci-profile.json` e, quando adotados, workflow e manifesto. Workflow preexistente sem manifesto confiável bloqueia o aceite. O PI aprovou a composição de produção do Squad e o desenho técnico em 2026-10-07. O bootstrap injeta o orquestrador Squad no Play: plano validado, escritores isolados, TESTE pelo perfil aprovado, REVIEWER independente e publicação do SHA aprovado; o encadeador legado não é fallback. Cada run mantém o workspace de origem também nas operações compartilhadas de Docker, preflight, isolamento e entrega, mesmo quando há troca de espaço ou runs concorrentes. Snapshot e teto de custo ficam no ledger; o teto é imutável no run, e objetivo/correções de agentes são cercados como dados no prompt. A imagem fixada `jarvisos/squad-executor:claude-code-2.1.278` foi construída com checksum validado; smoke Docker confirma versão `2.1.278`. Verificação local: Regras 2932/2932; Banco 2347/2365 (18 smoke tests externos `skipped`, RLS 8/8); Tela 802/803 (1 `todo`); self-check 31/31; guarda `--check --no-run --require-entry`, typecheck, lint, build e E2E negativo 1/1 passaram. Ainda falta a prova positiva integrada do Play (uma e três issues, worktrees, dependências, slots e ciclo), o smoke não interativo via proxy e CI verde no SHA final. O opt-in pago do perfil permanece desligado; nenhuma chamada a modelo pago foi feita.
+
+- [x] Projeção local das sete colunas por run, fila e refs publicadas; `REVIEWING` é estado persistido entre validação e PR.
+- [x] Consulta do SHA e dos checks do PR pelo kernel; falha fica desconhecida com horário. Finalizado (PI) requer issue fechada com `proplan:finalizado` observados no GitHub.
+- [x] Seleção do mesmo MVP e validação de escopo, issue, revisão aprovada, perfil de CI e ContextPack exercitadas em integração; dependência recusa o avanço e expõe a causa.
+- [x] Caminho da SPEC no Play corrigido para usar `specSlug` relativo completo (`docs/spec/...md`); antes, o fluxo duplicava `docs/spec` e anexava `.md` outra vez.
+- [x] Ligar o Play ao Squad orquestrado no bootstrap: planejamento validado, execução por worktree/slot de escritor, TESTE com `ci-profile.json` aprovado, REVIEWER independente e entrega do SHA do ciclo. O encadeador legado não é fallback; falha do ciclo bloqueia o run antes da publicação.
+- [x] `SLICE_ENTRY` valida perfil, SPEC com matriz completa, `TESTING.md` e `REVIEW.md`; o preflight é fail-closed e a publicação recalcula as revisões atuais. Seleção explícita do runtime, edição persistida da matriz, parser YAML e bloqueio de adoção sem manifesto estão implementados.
+- [x] E1: escolha Node/Python no app, perfil e matriz no pacote, hashes exatos na aprovação e conferência dos blobs commitados; workflow adotado e manifesto também entram na revisão. Testes de integração cobrem alteração/ausência e o gate fail-closed. O relatório foi regenerado dos artefatos Linux da CI: Regras 2927/2927, Banco 2332/2350, Tela 801/802; `--check --no-run --require-entry` passou com a entrega #370 carimbada.
+- [x] Tela por IPC tipado, seleção e atualização em 60 s; o renderer não recebe credencial nem executa comandos.
+- [ ] Provar Play positivo integrado para uma issue e três issues do mesmo MVP; confirmar worktrees, dependências, slots e TESTE → REVIEWER → publicação somente do SHA aprovado. As integrações individuais passaram, mas não substituem esta prova pelo Play.
+- [ ] Smoke da CLI não interativa pelo proxy, com prova de credencial ausente no container e egress externo bloqueado; executar somente com autorização/opt-in do perfil.
+- [ ] Gate completo de qualidade, relatório por categoria, PR com `refs #370`, CI verde no SHA final e merge confirmados. Só então publicar encerramento e mover para `proplan:done`.
+
+**Limite de escopo:** selo de aprovação de ação sensível e cancelamento pertencem à M28-F02 (#126), por decisão do PI em 2026-10-06; painel ao vivo e console pertencem à M28-F03 (#378), conforme a ordem aprovada do MVP-028. O quadro F01 mostra equipe, objetivo, workflow e teto de custo; a aprovação auditada no card continua na F02.
+
 ### Fatia 04 — Cronograma de atividades configurável (`docs/spec/spec-escuta-04-cronograma.md`)
 
 Status: **em andamento** — issue [#359](https://github.com/RodReis/rrb-jarvisOS/issues/359), SPEC `aprovada-pi`; protótipo do editor aprovado pelo PI em 2026-10-06. Plano em `docs/superpowers/plans/2026-10-06-m18-f04-cronograma.md`.

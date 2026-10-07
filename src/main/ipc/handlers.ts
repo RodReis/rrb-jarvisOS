@@ -131,11 +131,15 @@ import { NATUREZAS, isGate } from '@shared/domain/aprovacoes'
 import type { PublicacaoService } from '../projects/publicacao-service'
 import type { MergePolicyService } from '../pipeline/merge-policy-service'
 import type { FilaService } from '../pipeline/fila-service'
+import type { QuadroExecucaoService } from '../pipeline/quadro-execucao-service'
 import type { PoolService } from '../pipeline/pool-service'
 import type { VistaDeMarcos } from '@shared/domain/marcos'
 import type { MarcosService } from '../projects/marcos-service'
 import type { RoadmapService } from '../projects/roadmap-service'
 import type { RoadmapGeradoService } from '../projects/roadmap-gerado-service'
+import type { CiProfileSetupService } from '../projects/ci-profile-setup'
+import type { ResultadoDaSelecaoDeStack } from '@shared/domain/ci-profile'
+import type { EstadoDaMatrizDeProva } from '@shared/domain/ci-proof-matrix'
 import type { JornadaService } from '../projects/jornada-service'
 import type { BriefService } from '../projects/brief-service'
 import type { PrdService } from '../projects/prd-service'
@@ -395,6 +399,7 @@ export interface IpcDependencies {
   readonly anexos: AnexoService
   readonly roadmap: RoadmapService
   readonly roadmapGerado: RoadmapGeradoService
+  readonly ciProfileSetup: CiProfileSetupService
   readonly marcos: MarcosService
   readonly jornada: JornadaService
   /**
@@ -414,6 +419,7 @@ export interface IpcDependencies {
   readonly mergePolicy: MergePolicyService
   /** A fila de execução (SPEC-Entrega-02). Exposta só para leitura. */
   readonly fila: FilaService
+  readonly quadroExecucao: QuadroExecucaoService
   /** O pool de execução (SPEC-Scheduler-01). Exposto só para leitura. */
   readonly pool: PoolService
   readonly preflight: PreflightService
@@ -1968,6 +1974,49 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     }
   )
 
+  ipcMain.handle(
+    IPC_CHANNELS.ciProfileEstado,
+    (_event, projectId: unknown, workspace: unknown): ResultadoDaSelecaoDeStack => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string')
+        return { ok: false, mensagem: 'Projeto não encontrado.' }
+      return deps.ciProfileSetup.estado(projectId, workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.ciProfileSelecionar,
+    (
+      _event,
+      projectId: unknown,
+      runtime: unknown,
+      workspace: unknown
+    ): ResultadoDaSelecaoDeStack => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string')
+        return { ok: false, mensagem: 'Projeto não encontrado.' }
+      if (runtime !== 'node' && runtime !== 'python')
+        return { ok: false, mensagem: 'Stack de CI não suportada.' }
+      return deps.ciProfileSetup.selecionar(projectId, workspace, runtime)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.ciProfileMatrizEstado,
+    (_event, projectId: unknown, workspace: unknown): EstadoDaMatrizDeProva => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string')
+        return { ok: false, mensagem: 'Projeto não encontrado.', criterios: [], validacoes: [] }
+      return deps.ciProfileSetup.estadoDaMatriz(projectId, workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.ciProfileMatrizSalvar,
+    (_event, projectId: unknown, matriz: unknown, workspace: unknown): EstadoDaMatrizDeProva => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string')
+        return { ok: false, mensagem: 'Projeto não encontrado.', criterios: [], validacoes: [] }
+      return deps.ciProfileSetup.salvarMatriz(projectId, workspace, matriz)
+    }
+  )
+
   /**
    * A jornada de planejamento (SPEC-Jornada-01).
    *
@@ -2356,6 +2405,35 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
         return { ativos: [], concluidas: [], bloqueadas: [] }
       }
       return deps.fila.vista(projectId, workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.quadroExecucaoVista,
+    async (_event, projectId: unknown, workspace: unknown) => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
+        return { projectId: '', colunas: [], geradoEm: new Date().toISOString() }
+      }
+      return await deps.quadroExecucao.vista(projectId, workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.quadroExecucaoPlay,
+    async (_event, pedido: unknown, workspace: unknown) => {
+      if (
+        !isWorkspaceId(workspace) ||
+        typeof pedido !== 'object' ||
+        pedido === null ||
+        typeof (pedido as { projectId?: unknown }).projectId !== 'string' ||
+        !Array.isArray((pedido as { sliceIds?: unknown }).sliceIds) ||
+        !(pedido as { sliceIds: unknown[] }).sliceIds.every((id) => typeof id === 'string')
+      )
+        return []
+      return await deps.quadroExecucao.play(
+        pedido as { projectId: string; sliceIds: readonly string[] },
+        workspace
+      )
     }
   )
 

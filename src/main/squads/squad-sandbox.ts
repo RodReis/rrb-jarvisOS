@@ -22,6 +22,7 @@ import type { PreflightOutcome } from '@shared/domain/preflight'
 import type { SandboxPreparado } from '@shared/domain/preflight'
 import type { PedidoDeSandbox, SandboxDoEscritor } from './squad-escritor'
 import type { SquadGit } from './squad-git'
+import { IMAGEM_DO_SQUAD } from './squad-imagem'
 
 export interface PreflightParaOEscritor {
   preparar(pedido: PedidoDePreflight): PreflightOutcome
@@ -105,6 +106,7 @@ export class SandboxDoEscritorReal implements SandboxDoEscritor {
         base: pedido.baseSha,
         pathsDaSpec: pedido.pathsPermitidos,
         proxyUrl: this.deps.proxyUrl(),
+        imagemDoSandbox: IMAGEM_DO_SQUAD,
         sufixoDaBranch: sufixoDoSandbox(pedido),
         caminhoDoProxy: rota.caminho
       })

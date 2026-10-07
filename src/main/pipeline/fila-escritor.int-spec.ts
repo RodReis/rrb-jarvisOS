@@ -361,6 +361,7 @@ describe('o gate do escritor é o estado do run', () => {
     fila.adquirirSlotDoEscritor('p-b', WS, outro, 'api')
     expect(pool.slotDoRun(idDoEscritor(outro, 'api'))).toBeUndefined()
     fila.transicionar('p-a', WS, run, 'VALIDATING')
+    fila.transicionar('p-a', WS, run, 'REVIEWING')
     fila.transicionar('p-a', WS, run, 'PR_CI')
 
     expect(fila.concluir('p-a', WS, run).reason).toBe('transicionado')

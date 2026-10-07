@@ -14,6 +14,7 @@ Fechar a governança operacional dos Squads orquestrados e provar, numa issue re
 - Tetos por Squad, escritor e worker: quantidade, tokens/contexto observado, chamadas, turnos, tempo e custo monetário quando aplicável.
 - Reserva e consumo agregados ao orçamento do run e do projeto; uso do orquestrador local registrado como uso local, sem USD.
 - **Aprovação do PI** antes de alteração estrutural de banco e de comando destrutivo, detectados pelo Policy Engine (fail closed) antes da execução. Deploy fica registrado na mesma política para quando entrar no escopo.
+- Selo "Aguardando PI" no card, mantendo a coluna atual e mostrando o motivo; aprovação ou recusa no card com `AuditEvent` (decisão do PI em 2026-10-06, transferida da F01).
 - Cancelamento em cascata: orquestrador, workers, escritores, integrador e consultas de PR; timeout pai; coleta de resultados parciais.
 - Limpeza de worktrees temporários só após snapshot e reconciliação, sem apagar diff nem evidência.
 - Resumo por issue: tarefas, camadas, consumo, falhas, achados, aprovações.
@@ -39,15 +40,17 @@ Fechar a governança operacional dos Squads orquestrados e provar, numa issue re
 1. O teto impede criação ou chamada adicional antes do excesso.
 2. O cancelamento encerra tudo e não deixa processo, container ou worktree órfão.
 3. Migração e comando destrutivo não executam sem aprovação registrada; a recusa encerra a tarefa com motivo.
-4. A auditoria reconstrói plano, camadas, escritores, manifesto, consumo, aprovações e motivo terminal.
-5. O E2E comprova que só o kernel executou Git e que cada escritor tocou só seu worktree.
-6. Testes de crash e cancelamento não perdem evidência nem criam efeito remoto.
+4. Card com ação que exige aprovação mostra o selo e não avança sem decisão do PI; a decisão fica auditada.
+5. A auditoria reconstrói plano, camadas, escritores, manifesto, consumo, aprovações e motivo terminal.
+6. O E2E comprova que só o kernel executou Git e que cada escritor tocou só seu worktree.
+7. Testes de crash e cancelamento não perdem evidência nem criam efeito remoto.
 
 ## Testes e evidência
 
 - testes de teto em cada dimensão;
 - crash e cancelamento em cada fronteira (inclusive durante a integração e em PR/MERGE);
 - política de aprovação com migração e `rm` simulados;
+- teste de tela do selo e da decisão no card;
 - E2E real limitado com snapshot de permissões e diffs por worktree;
 - relatório de custo e contexto antes e depois.
 

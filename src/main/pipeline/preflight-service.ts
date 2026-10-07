@@ -55,6 +55,7 @@ import { RAIZ_NO_CONTAINER, type DockerRunner } from './docker-runner'
 import type { RecursoDoRun } from './inventario-repository'
 import type { ResultadoDaReserva, ResultadoDoScanner } from './isolamento-service'
 import type { LeaseRepository } from './lease-repository'
+import type { ImagemDoSquad } from '../squads/squad-imagem'
 
 /**
  * O que o preflight pede ao isolamento por run (SPEC-Scheduler-03). Interface mínima: o tipo é a
@@ -99,6 +100,8 @@ export interface PedidoDePreflight {
    */
   readonly portasDeServico?: readonly number[]
   readonly proxyUrl: string
+  /** Imagem local validada para este sandbox; ausente mantém a imagem padrão da pipeline. */
+  readonly imagemDoSandbox?: ImagemDoSquad
   /**
    * Dá branch própria ao **escritor** de um Squad: ele passa `<escritor>-t<tentativa>`, e dois
    * escritores do mesmo run não dividem a branch. Ausente no run comum (SPEC-Squads-03).
@@ -205,6 +208,24 @@ export class PreflightService {
         'O Docker não respondeu. O executor roda no container, e não existe execução no host.',
         'Subir o Docker Desktop e retomar a fatia.'
       )
+    }
+
+    // Imagem produzida localmente para o Squad: validar no daemon antes de worktree, lease ou
+    // inventário. O DockerRunner também recebe exigirImagemLocal para fechar a corrida entre
+    // inspeção e docker run, sem tentar baixar a tag do registry.
+    if (pedido.imagemDoSandbox !== undefined) {
+      const inspecionar = this.deps.docker.imagemExiste
+      if (
+        inspecionar === undefined ||
+        !inspecionar.call(this.deps.docker, pedido.imagemDoSandbox, pedido.raizOperacional)
+      ) {
+        return this.recusar(
+          pedido,
+          'imagem-local-ausente',
+          'A imagem local fixada para o executor do Squad não está instalada neste Docker.',
+          'Executar npm run build:squad-executor-image e retomar o Play.'
+        )
+      }
     }
 
     // 2. O proxy é o único caminho até o modelo (critério 11). Sem ele o run começaria e
@@ -531,7 +552,10 @@ export class PreflightService {
         proxyUrl: proxyUrlDoExecutor,
         labels,
         ...(perfilClaudeNoHost === undefined ? {} : { perfilClaudeNoHost }),
-        ...(this.deps.imagemDoSandbox === undefined ? {} : { imagem: this.deps.imagemDoSandbox })
+        ...((pedido.imagemDoSandbox ?? this.deps.imagemDoSandbox) === undefined
+          ? {}
+          : { imagem: pedido.imagemDoSandbox ?? this.deps.imagemDoSandbox }),
+        ...(pedido.imagemDoSandbox === undefined ? {} : { exigirImagemLocal: true })
       },
       pedido.raizOperacional
     )

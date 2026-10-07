@@ -16,13 +16,19 @@
  *    revisões vazia é o que faz `aprovar` recusar.
  */
 
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Database as Db } from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ResultadoDaVerificacao } from '@shared/domain/marcos'
+import type { RevisaoAprovada } from '@shared/domain/aprovacoes'
 import type { MvpGerado, RoadmapRegistrado, SpecGerada } from '@shared/domain/roadmap-gerado'
+import { perfilNodeEmWindows } from '@shared/domain/ci-profile-perfis'
+import { escreverMatrizDeProva } from '@shared/domain/ci-proof-matrix'
+import { gerarWorkflowDoPerfil } from '@shared/domain/ci-profile-workflow'
+import { VERSAO_DO_GERADOR } from '@shared/domain/ci-profile'
 
 const logCat = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 vi.mock('../logging/logger', () => ({
@@ -56,6 +62,7 @@ let identidadeAtual: string | undefined
 /** A revisão gerada que os gates do roadmap aprovam. */
 let gerado: RoadmapRegistrado | undefined
 let marcos: ResultadoDaVerificacao
+let revisoesPassadasAosMarcos: readonly RevisaoAprovada[]
 
 function mvp(over: Partial<MvpGerado> = {}): MvpGerado {
   return {
@@ -150,6 +157,36 @@ function gravarProjecao(): void {
       )
     }
   )
+  if (gerado?.spec !== undefined) {
+    mkdirSync(join(raiz, 'docs', 'spec'), { recursive: true })
+    writeFileSync(
+      join(raiz, 'docs', 'spec', 'spec-mvp-1-01-f-1.md'),
+      escreverMatrizDeProva({
+        criterios: [{ numero: 1, validacoes: ['lint', 'typecheck', 'test', 'build'] }],
+        categorias: [
+          { nome: 'regra', estado: 'aplicavel', validacoes: ['test'] },
+          {
+            nome: 'banco',
+            estado: 'nao-aplicavel',
+            validacoes: [],
+            justificativa: 'Sem persistencia.'
+          },
+          {
+            nome: 'tela',
+            estado: 'nao-aplicavel',
+            validacoes: [],
+            justificativa: 'Sem interface.'
+          },
+          {
+            nome: 'e2e',
+            estado: 'nao-aplicavel',
+            validacoes: [],
+            justificativa: 'Sem jornada integrada.'
+          }
+        ]
+      })
+    )
+  }
 }
 
 function gravarPrd(): string {
@@ -182,6 +219,11 @@ function aprovacoesNoBanco(): number {
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'jarvis-roadmap-'))
   raiz = join(dir, 'projeto')
+  mkdirSync(raiz)
+  writeFileSync(join(raiz, 'ci-profile.json'), JSON.stringify(perfilNodeEmWindows('node')))
+  mkdirSync(join(raiz, 'docs'))
+  writeFileSync(join(raiz, 'docs', 'TESTING.md'), '# Testes')
+  writeFileSync(join(raiz, 'docs', 'REVIEW.md'), '# Revisao')
   db = openDatabase(join(dir, 'jarvis.db'))
   audit = new AuditRepository(db, 'chave-de-teste')
   projects = new ProjectRepository(db)
@@ -194,6 +236,7 @@ beforeEach(() => {
   // Marcos em dia é o caso comum: os testes deste arquivo falam sobre os gates, e um repositório
   // sujo por padrão faria todos eles falharem por um motivo que não é o que estão medindo.
   marcos = { ok: true, head: 'abc1234', pendencias: [] }
+  revisoesPassadasAosMarcos = []
 
   projects.save({
     id: PROJETO,
@@ -219,7 +262,10 @@ beforeEach(() => {
     userId: () => USER,
     identidade: () => identidadeAtual,
     roadmapGerado: () => gerado,
-    verificarMarcos: () => marcos
+    verificarMarcos: (_projectId, _workspaceId, revisoes) => {
+      revisoesPassadasAosMarcos = revisoes
+      return marcos
+    }
   })
 
   vi.clearAllMocks()
@@ -293,8 +339,94 @@ describe('revisoesDoGate — o que cada gate cobre', () => {
 
     const revisoes = service.revisoesDoGate(PROJETO, 'SLICE_ENTRY', WS)
 
-    expect(revisoes).toHaveLength(1)
+    expect(revisoes).toHaveLength(5)
     expect(revisoes[0]?.artefato).toContain('docs/spec/')
+    expect(revisoes[1]?.artefato).toBe('ci-profile.json')
+    expect(revisoes[4]?.artefato).toContain('file:docs/spec/')
+  })
+
+  it('mudança no perfil de CI invalida o aceite da revisão anterior', () => {
+    gerado = revisao({
+      mvpEscolhido: 'mvp-1',
+      spec: spec({ perguntas: [{ ...spec().perguntas[0]!, resposta: 'a' }] })
+    })
+    gravarProjecao()
+    const antes = service.revisoesDoGate(PROJETO, 'SLICE_ENTRY', WS)[1]?.hash
+
+    writeFileSync(
+      join(raiz, 'ci-profile.json'),
+      JSON.stringify({ ...perfilNodeEmWindows('node'), profileId: 'revisao-2' })
+    )
+
+    expect(service.revisoesDoGate(PROJETO, 'SLICE_ENTRY', WS)[1]?.hash).not.toBe(antes)
+  })
+
+  it('SLICE_ENTRY sem perfil de CI válido não tem revisão aprovável', () => {
+    gerado = revisao({
+      mvpEscolhido: 'mvp-1',
+      spec: spec({ perguntas: [{ ...spec().perguntas[0]!, resposta: 'a' }] })
+    })
+    gravarProjecao()
+    writeFileSync(join(raiz, 'ci-profile.json'), '{invalido')
+
+    expect(service.revisoesDoGate(PROJETO, 'SLICE_ENTRY', WS)).toEqual([])
+    expect(service.aprovar(PROJETO, 'SLICE_ENTRY', WS).reason).toBe('preflight-ci-pendente')
+    expect(aprovacoesNoBanco()).toBe(0)
+  })
+
+  it('bloqueia workflow existente sem manifesto de procedência', () => {
+    gerado = revisao({
+      mvpEscolhido: 'mvp-1',
+      spec: spec({ perguntas: [{ ...spec().perguntas[0]!, resposta: 'a' }] })
+    })
+    gravarProjecao()
+    mkdirSync(join(raiz, '.github', 'workflows'), { recursive: true })
+    writeFileSync(
+      join(raiz, '.github', 'workflows', 'ci.yml'),
+      gerarWorkflowDoPerfil(perfilNodeEmWindows(PROJETO))
+    )
+
+    const r = service.aprovar(PROJETO, 'SLICE_ENTRY', WS)
+
+    expect(r.reason).toBe('preflight-ci-pendente')
+    expect(r.problemas?.some((p) => p.mensagem.includes('registro se perdeu'))).toBe(true)
+    expect(aprovacoesNoBanco()).toBe(0)
+  })
+
+  it('aceita workflow existente quando o manifesto comprova os bytes e o perfil', () => {
+    gerado = revisao({
+      mvpEscolhido: 'mvp-1',
+      spec: spec({ perguntas: [{ ...spec().perguntas[0]!, resposta: 'a' }] })
+    })
+    gravarProjecao()
+    mkdirSync(join(raiz, '.github', 'workflows'), { recursive: true })
+    const perfil = perfilNodeEmWindows(PROJETO)
+    const workflow = gerarWorkflowDoPerfil(perfil)
+    const hash = (valor: string): string => createHash('sha256').update(valor).digest('hex')
+    writeFileSync(join(raiz, '.github', 'workflows', 'ci.yml'), workflow)
+    writeFileSync(
+      join(raiz, '.github', 'ci-workflow-manifesto.json'),
+      JSON.stringify({
+        profileId: perfil.profileId,
+        hashDoPerfil: hash(JSON.stringify(perfil)),
+        hashDoConteudo: hash(workflow),
+        versaoDoGerador: VERSAO_DO_GERADOR
+      })
+    )
+
+    expect(service.aprovar(PROJETO, 'SLICE_ENTRY', WS).reason).toBe('aprovado')
+    const artefatos = service
+      .revisoesDoGate(PROJETO, 'SLICE_ENTRY', WS)
+      .map((item) => item.artefato)
+    expect(artefatos).toContain('.github/workflows/ci.yml')
+    expect(artefatos).toContain('.github/ci-workflow-manifesto.json')
+    expect(revisoesPassadasAosMarcos.map((item) => item.artefato)).toContain('ci-profile.json')
+    expect(revisoesPassadasAosMarcos.map((item) => item.artefato)).toContain(
+      'file:docs/spec/spec-mvp-1-01-f-1.md'
+    )
+    expect(revisoesPassadasAosMarcos.map((item) => item.artefato)).not.toContain(
+      'docs/spec/spec-mvp-1-01-f-1.md'
+    )
   })
 
   /** Responder **é** mudança da SPEC: um hash cego às respostas aprovaria outro documento. */

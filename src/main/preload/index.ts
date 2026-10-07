@@ -37,6 +37,8 @@ import type { VistaDoPool } from '@shared/domain/pool-vista'
 import type { ContextPack, ContextPackOutcome, FalhaRegistrada } from '@shared/domain/context-pack'
 import type { CapacidadeResolvida } from '@shared/domain/skills'
 import type { CodexBillingMode, CodexProfileState } from '@shared/domain/codex-profile'
+import type { RuntimeDoPerfil } from '@shared/domain/ci-profile'
+import type { EstadoDaMatrizDeProva, MatrizDeProva } from '@shared/domain/ci-proof-matrix'
 import type { ExecutorOperationalView } from '@shared/domain/executor-operacional'
 import type { AuthSnapshot } from '@shared/contracts/auth'
 import type { LogInput } from '@shared/contracts/logging'
@@ -655,6 +657,18 @@ const bridge: JarvisBridge = {
       resposta,
       workspace
     ),
+  estadoDoPerfilCi: (projectId: string, workspace: WorkspaceId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ciProfileEstado, projectId, workspace),
+  selecionarStackCi: (projectId: string, runtime: RuntimeDoPerfil, workspace: WorkspaceId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ciProfileSelecionar, projectId, runtime, workspace),
+  estadoDaMatrizCi: (projectId: string, workspace: WorkspaceId): Promise<EstadoDaMatrizDeProva> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ciProfileMatrizEstado, projectId, workspace),
+  salvarMatrizCi: (
+    projectId: string,
+    workspace: WorkspaceId,
+    matriz: MatrizDeProva
+  ): Promise<EstadoDaMatrizDeProva> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ciProfileMatrizSalvar, projectId, matriz, workspace),
   // A jornada: duas leituras e uma escrita. Nenhuma recebe etapa — só evento nomeado, porque
   // onde o projeto está é conclusão do main a partir dos fatos, não afirmação do renderer.
   estadoDaJornada: (projectId: string, workspace: WorkspaceId): Promise<EstadoDaJornada | null> =>
@@ -779,6 +793,12 @@ const bridge: JarvisBridge = {
     ipcRenderer.invoke(IPC_CHANNELS.publicacaoPublicar, projectId, alvo, workspace),
   vistaDaFila: (projectId: string, workspace: WorkspaceId): Promise<VistaDaFila> =>
     ipcRenderer.invoke(IPC_CHANNELS.filaVista, projectId, workspace),
+  quadroDeExecucao: (projectId: string, workspace: WorkspaceId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.quadroExecucaoVista, projectId, workspace),
+  playNoQuadro: (
+    pedido: { readonly projectId: string; readonly sliceIds: readonly string[] },
+    workspace: WorkspaceId
+  ) => ipcRenderer.invoke(IPC_CHANNELS.quadroExecucaoPlay, pedido, workspace),
   vistaDoPool: (): Promise<VistaDoPool> => ipcRenderer.invoke(IPC_CHANNELS.poolVista),
   estadoDoSandbox: (): Promise<{
     readonly dockerNoAr: boolean

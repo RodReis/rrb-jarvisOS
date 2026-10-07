@@ -38,6 +38,7 @@ export const ESTADOS_DO_RUN = [
   'READY',
   'RUNNING',
   'VALIDATING',
+  'REVIEWING',
   'PR_CI',
   'MERGED',
   'AWAITING_MERGE',
@@ -69,8 +70,11 @@ const TRANSICOES: Readonly<Record<EstadoDoRun, readonly EstadoDoRun[]>> = {
   READY: ['RUNNING', 'BLOCKED', 'CANCELLED'],
   // O executor está construindo (M9-F04).
   RUNNING: ['VALIDATING', 'BLOCKED', 'CANCELLED'],
-  // Testes, lint, type, build e revisões (M9-F05). Volta a `RUNNING` na correção elegível.
-  VALIDATING: ['PR_CI', 'RUNNING', 'BLOCKED', 'CANCELLED'],
+  // Testes, lint, type e build. Volta a `RUNNING` na correção elegível.
+  VALIDATING: ['REVIEWING', 'RUNNING', 'BLOCKED', 'CANCELLED'],
+  // Revisão separada e persistida, antes de publicar o PR. Um ciclo Squad reprovado volta ao
+  // DEVELOPER com correções aceitas dentro do limite: esse retrabalho continua no mesmo run.
+  REVIEWING: ['RUNNING', 'PR_CI', 'BLOCKED', 'CANCELLED'],
   // PR aberto, checks correndo na origem. `AWAITING_MERGE` é o kill-switch desligado.
   PR_CI: ['MERGED', 'AWAITING_MERGE', 'VALIDATING', 'BLOCKED', 'CANCELLED'],
   MERGED: [],
@@ -123,6 +127,19 @@ export interface PipelineRun {
   readonly continuaDe?: string
   /** Obrigatório em `BLOCKED`, ausente no resto (critério 6). */
   readonly bloqueio?: BloqueioExterno
+  /** Snapshot versionado e validado do Squad; ausente nos runs anteriores à M28-F01. */
+  readonly squadSnapshot?: unknown
+  /** Teto calculado antes do dispatch a partir do perfil e dos critérios da SPEC aprovada. */
+  readonly squadCostLimitUsd?: number
+  readonly squadCostMeasured?: boolean
+  /** Resumo seguro por tarefa, sem prompt, resposta, contexto ou credenciais. */
+  readonly squadProgress?: readonly {
+    readonly tarefaId: string
+    readonly papel: string
+    readonly estado: string
+    readonly motivo?: string
+    readonly commitSha?: string
+  }[]
   readonly created_at: string
   readonly updated_at: string
 }

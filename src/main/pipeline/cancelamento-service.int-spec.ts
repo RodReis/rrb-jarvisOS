@@ -240,6 +240,7 @@ describe('cancelar — a matriz aprovada por fase, sem apagar trabalho remoto', 
     const a = executando('p-a')
     const token = leases.buscarSlotDoRun(USER, a)?.fencingToken as number
     fila.transicionar('p-a', WS, a, 'VALIDATING', undefined, token)
+    fila.transicionar('p-a', WS, a, 'REVIEWING', undefined, token)
     fila.transicionar('p-a', WS, a, 'PR_CI', undefined, token)
     comPr(a)
 

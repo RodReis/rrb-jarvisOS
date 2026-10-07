@@ -69,6 +69,7 @@ export interface RepoAlvo {
 export const GITHUB_OPERATIONS = {
   ensureRepository: 'repo.ensure',
   ensureIssue: 'issue.ensure',
+  getIssueState: 'issue.get-state',
   ensureIssueDependency: 'issue.ensure-dependency',
   ensureBranchRef: 'ref.ensure',
   ensurePullRequest: 'pr.ensure',
@@ -113,6 +114,12 @@ export const GITHUB_CAPABILITIES: readonly ConnectorCapability[] = [
     operation: GITHUB_OPERATIONS.ensureIssue,
     effect: 'mutacao',
     descricao: 'Garante uma issue com a chave externa informada, reusando a que já existir.'
+  },
+  {
+    connector: 'github',
+    operation: GITHUB_OPERATIONS.getIssueState,
+    effect: 'leitura',
+    descricao: 'Consulta o estado e as labels atuais da issue, para observar o aceite do PI.'
   },
   {
     connector: 'github',
@@ -232,6 +239,16 @@ export interface EnsureIssueInput extends RepoAlvo {
 export interface EnsureIssueDependencyInput extends RepoAlvo {
   readonly parentIssue: number
   readonly childIssue: number
+}
+
+export interface IssueStateInput extends RepoAlvo {
+  readonly issue: number
+}
+
+export interface IssueStateNormalizado {
+  readonly numero: number
+  readonly estado: 'open' | 'closed'
+  readonly finalizado: boolean
 }
 
 /** Entrada de `ref.ensure`: o branch e o commit para onde ele aponta. */
@@ -714,6 +731,9 @@ export function validarEntrada(operation: string, input: unknown): string | unde
           ? 'Uma issue não pode ser sub-issue dela mesma.'
           : undefined
         : 'Informe `parentIssue` e `childIssue` como números de issue.'
+
+    case GITHUB_OPERATIONS.getIssueState:
+      return inteiroPositivo('issue') ? undefined : 'Informe `issue` como número.'
 
     case GITHUB_OPERATIONS.ensureBranchRef:
       if (!texto('branch')) return 'Informe `branch`.'

@@ -23,6 +23,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Database as Db } from 'better-sqlite3'
+import type { RevisaoAprovada } from '@shared/domain/aprovacoes'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const logCat = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
@@ -291,6 +292,28 @@ comGit('MarcosService — verificação do gate', () => {
 
     expect(resultado.ok).toBe(false)
     expect(resultado.pendencias[0]?.acao).toBe(`Commitar marco ${PRD}`)
+  })
+
+  it('confere o hash do perfil de CI aprovado com o blob commitado', () => {
+    const perfil = JSON.stringify({ runtime: 'node', versao: '24' })
+    const revisoes: readonly RevisaoAprovada[] = [
+      { artefato: 'ci-profile.json', hash: commitar('ci-profile.json', perfil) }
+    ]
+
+    expect(service.verificar(PROJETO, WS, revisoes).ok).toBe(true)
+  })
+
+  it('recusa perfil de CI aprovado que não está commitado', () => {
+    const perfil = JSON.stringify({ runtime: 'node', versao: '24' })
+    writeFileSync(join(repo, 'ci-profile.json'), perfil, 'utf8')
+    const revisoes: readonly RevisaoAprovada[] = [
+      { artefato: 'ci-profile.json', hash: hashDaRevisao(perfil) }
+    ]
+
+    const resultado = service.verificar(PROJETO, WS, revisoes)
+
+    expect(resultado.ok).toBe(false)
+    expect(resultado.pendencias.some((item) => item.caminho === 'ci-profile.json')).toBe(true)
   })
 
   it('bloqueia — nunca libera — quando o Git não pôde ser lido', () => {

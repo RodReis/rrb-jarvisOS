@@ -217,6 +217,7 @@ describe('a ordem do boot — o isolamento olha depois de o merge e a recuperaç
     // run ativo e deixaria o container para o próximo boot.
     const a = executando('p-a')
     fila.transicionar('p-a', WS, a.id, 'VALIDATING', undefined, a.token)
+    fila.transicionar('p-a', WS, a.id, 'REVIEWING', undefined, a.token)
     fila.transicionar('p-a', WS, a.id, 'PR_CI', undefined, a.token)
     relogio += VALIDADE_DO_LEASE_MS + 1
     let ativosQuandoOIsolamentoOlhou: string[] = []

@@ -156,6 +156,23 @@ function caminhoRelativoSeguro(caminho: string): boolean {
 export class SquadGit {
   constructor(private readonly deps: DependenciasDoSquadGit) {}
 
+  /** Resolve uma referência do projeto para um commit imutável antes de planejar ou revisar. */
+  resolverSha(repositorio: string, revisao: string): ResultadoGit<string> {
+    if (!isAbsolute(repositorio)) return recusa('o repositório precisa ser um caminho absoluto')
+    if (revisao.trim() === '' || revisao.startsWith('-') || /[\s\0]/.test(revisao)) {
+      return recusa('referência Git inválida')
+    }
+    const r = this.executar(
+      ['rev-parse', '--verify', '--end-of-options', `${revisao}^{commit}`],
+      repositorio
+    )
+    if (!r.ok) return recusa(r.motivo)
+    const sha = r.saida.trim().toLowerCase()
+    return /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(sha)
+      ? { ok: true, valor: sha }
+      : recusa('a referência não resolveu para um commit')
+  }
+
   /**
    * Cria o worktree do escritor, a partir de um SHA fixo, numa branch própria.
    */

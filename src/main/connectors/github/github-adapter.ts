@@ -40,6 +40,7 @@ import {
   type EnsurePullRequestInput,
   type EnsureRepositoryInput,
   type HeadShaInput,
+  type IssueStateInput,
   type PullRequestInput,
   type RequiredChecksInput,
   type RulesForBranchInput,
@@ -60,6 +61,7 @@ import {
   getChecksForHead,
   getCommitSha,
   getMergeState,
+  getIssueState,
   getRequiredChecksForBranch,
   getRulesForBranch,
   getWorkflowRunsForHead,
@@ -217,6 +219,9 @@ export class GithubAdapter implements ConnectorAdapter {
 
       case GITHUB_OPERATIONS.getMergeState:
         return await getMergeState(rest, input as PullRequestInput)
+
+      case GITHUB_OPERATIONS.getIssueState:
+        return await getIssueState(rest, input as IssueStateInput)
 
       case GITHUB_OPERATIONS.setDefaultBranch:
         return await setDefaultBranch(rest, input as SetDefaultBranchInput)

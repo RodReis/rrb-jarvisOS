@@ -107,6 +107,8 @@ export interface PedidoDeEntrega {
   readonly projectId: string
   readonly workspaceId: WorkspaceId
   readonly sandbox: SandboxPreparado
+  /** SHA criado pelo kernel do Squad e aprovado por TESTE/REVIEWER; não se commita outro head. */
+  readonly commitSquad?: string
   readonly alvo: AlvoDaEntrega
   /** A issue-fatia. Entra no corpo do PR como `refs #N`, nunca `closes`. */
   readonly issue: number
@@ -275,6 +277,101 @@ export class EntregaService {
     }
   }
 
+  /** Continua apenas com PR/check/merge para um commit já revisado pelo ciclo do Squad. */
+  async entregarCommitDoSquad(pedido: PedidoDeEntrega): Promise<ResultadoDaEntrega> {
+    if (!/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(pedido.commitSquad ?? '')) {
+      return this.bloqueado(
+        'externo',
+        'Executar novamente o ciclo do Squad.',
+        'O commit aprovado pelo Squad não foi informado.'
+      )
+    }
+    this.runsCorrentes.set(pedido.runId, {
+      runId: pedido.runId,
+      tentativa: 1,
+      ...(pedido.contextPackId === undefined ? {} : { contextPackId: pedido.contextPackId })
+    })
+    const iniciadoEm = this.agora()
+    let resultado: ResultadoDaEntrega | undefined
+    try {
+      resultado = await this.executarCommitDoSquad(pedido)
+      return resultado
+    } catch (erro) {
+      resultado = this.bloqueado(
+        'externo',
+        'Verificar a origem e reconciliar o run.',
+        erro instanceof Error ? erro.message : 'Falha ao entregar o commit aprovado.'
+      )
+      return resultado
+    } finally {
+      this.runsCorrentes.delete(pedido.runId)
+      this.encerrar(pedido, resultado, iniciadoEm, 1)
+    }
+  }
+
+  private async executarCommitDoSquad(pedido: PedidoDeEntrega): Promise<ResultadoDaEntrega> {
+    if (this.foiInterrompida(pedido))
+      return this.bloqueado('externo', 'Retomar a entrega.', 'Run cancelado antes da publicação.')
+    const branch = this.deps.git.run(
+      ['rev-parse', 'HEAD'],
+      pedido.sandbox.worktreeNoHost,
+      pedido.workspaceId
+    )
+    if (!branch.ok || branch.saida.trim().toLowerCase() !== pedido.commitSquad?.toLowerCase()) {
+      return this.bloqueado(
+        'externo',
+        'Verificar o worktree do Squad.',
+        'HEAD não corresponde ao commit revisado e aprovado.'
+      )
+    }
+    const problema = this.garantirWorkflowDeCi(pedido)
+    if (problema !== undefined)
+      return this.bloqueado(
+        'perfil-de-ci-invalido',
+        'Revisar o workflow no pacote aprovado.',
+        problema
+      )
+    // A preparação do workflow nunca pode alterar o resultado depois do TESTE/REVIEWER. Caso
+    // o pacote não tenha workflow equivalente ao perfil aprovado, a execução para aqui e precisa
+    // voltar ao ciclo sobre um commit novo; publicar HEAD ainda limpo e deixar mudanças locais
+    // para trás faria o SHA da PR diferir do que os revisores aprovaram.
+    const estadoDoWorktree = this.deps.git.run(
+      ['status', '--porcelain', '--untracked-files=all'],
+      pedido.sandbox.worktreeNoHost,
+      pedido.workspaceId
+    )
+    if (!estadoDoWorktree.ok || estadoDoWorktree.saida.trim() !== '') {
+      return this.bloqueado(
+        'perfil-de-ci-invalido',
+        'Atualizar o workflow antes de repetir TESTE e REVIEWER.',
+        'A preparação do workflow alterou o worktree depois da revisão do Squad.'
+      )
+    }
+    const alvo: PedidoDeEntrega = {
+      ...pedido,
+      alvo: { ...pedido.alvo, branchDaFatia: pedido.sandbox.branch }
+    }
+    const pronto = this.deps.fila.transicionar(
+      pedido.projectId,
+      pedido.workspaceId,
+      pedido.runId,
+      'PR_CI',
+      undefined,
+      pedido.fencingToken
+    )
+    if (pronto.reason !== 'transicionado')
+      return this.bloqueado(
+        'externo',
+        'Reconciliar estado e posse do run.',
+        'O run não pôde avançar para PR_CI.'
+      )
+    const publicacao = await this.publicar(alvo, true)
+    if (!publicacao.ok) return publicacao.bloqueio
+    if (this.foiInterrompida(pedido)) return await this.interrompida(alvo)
+    await this.exigirCheckObrigatorio(alvo)
+    return await this.aguardarEConcluir(alvo, publicacao.pullRequest, [])
+  }
+
   /**
    * Grava a prova e devolve os recursos — em **todo** desfecho (M9-F06, critérios 1 e 5).
    *
@@ -432,6 +529,21 @@ export class EntregaService {
     // Cada efeito externo (push, PR, proteção da base) confere antes se o dono ainda é o dono: run
     // cancelado ou sem lease (o heartbeat aborta o sinal) não publica nada na origem.
     if (this.foiInterrompida(pedido)) return await this.interrompida(pedido)
+    const prontoParaPr = this.deps.fila.transicionar(
+      pedido.projectId,
+      pedido.workspaceId,
+      pedido.runId,
+      'PR_CI',
+      undefined,
+      pedido.fencingToken
+    )
+    if (prontoParaPr.reason !== 'transicionado') {
+      return this.bloqueado(
+        'externo',
+        'Verificar o estado e a posse do run antes de publicar.',
+        'A revisão terminou, mas o run não pôde avançar para PR/CI.'
+      )
+    }
 
     // (4) Publica e garante o PR — **sempre o mesmo**, mesmo depois de recuperação (critério 5).
     const publicacao = await this.publicar(pedido)
@@ -548,7 +660,8 @@ export class EntregaService {
    * direto na branch-base, que a invariante 10 da CONVENTION proíbe.
    */
   private async publicar(
-    pedido: PedidoDeEntrega
+    pedido: PedidoDeEntrega,
+    commitExistente = false
   ): Promise<
     | { readonly ok: true; readonly pullRequest: number }
     | { readonly ok: false; readonly bloqueio: ResultadoDaEntrega }
@@ -561,14 +674,15 @@ export class EntregaService {
     // doc que a fatia devia atualizar e não atualizou some do commit sem ninguém notar, e a
     // invariante 10 da CONVENTION viraria acidente de varredura.
     const docs = pedido.docsDoProjeto ?? []
-    this.deps.git.run(['add', '--all', ...docs], worktreeNoHost, ws)
+    if (!commitExistente) this.deps.git.run(['add', '--all', ...docs], worktreeNoHost, ws)
     // `--allow-empty` não entra: um run que não mudou nada não deve produzir commit vazio e seguir
     // como se tivesse entregue. O `commit` falha, e o push não acontece.
-    this.deps.git.run(
-      ['commit', '-m', `${pedido.titulo}\n\nrefs #${pedido.issue}`],
-      worktreeNoHost,
-      ws
-    )
+    if (!commitExistente)
+      this.deps.git.run(
+        ['commit', '-m', `${pedido.titulo}\n\nrefs #${pedido.issue}`],
+        worktreeNoHost,
+        ws
+      )
 
     const token = await this.deps.token(this.deps.userId(), ws)
     const push =
@@ -600,7 +714,7 @@ export class EntregaService {
       head: pedido.alvo.branchDaFatia,
       base: pedido.alvo.branchBase,
       title: pedido.titulo,
-      body: `Entrega automática da fatia.\n\nrefs #${pedido.issue}`
+      body: `Entrega automática da fatia; commit validado pelo Squad.\n\nrefs #${pedido.issue}`
     })
 
     if (!pr.ok) {
