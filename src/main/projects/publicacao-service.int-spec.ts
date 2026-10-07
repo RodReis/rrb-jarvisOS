@@ -278,16 +278,15 @@ comGit('publicação do repositório e do backlog', () => {
     expect(operacoes(GITHUB_OPERATIONS.ensureIssueDependency)).toHaveLength(1)
   })
 
-  it('não publica fatia quando o aceite antigo deixou de cobrir os arquivos atuais', async () => {
+  it('falha antes de qualquer efeito remoto quando o aceite deixou de cobrir os arquivos atuais', async () => {
     comRoadmapAprovado()
     specAtual = false
 
     const r = await service.publicar(PROJETO, WS, { owner: OWNER, repo: REPO, origem: bare })
 
-    expect(r.reason).toBe('publicado')
-    const chaves = operacoes(GITHUB_OPERATIONS.ensureIssue).map((c) => String(c.input.externalKey))
-    expect(chaves).toContain(chaveDeMvp(PROJETO, 1))
-    expect(chaves).not.toContain(chaveDeFatia(PROJETO, 1, 1))
+    expect(r.reason).toBe('bloqueado')
+    expect(r.criados).toBe(0)
+    expect(chamadas).toEqual([])
   })
 
   it('as issues carregam a chave determinística do par MVP/Fatia (critério 3)', async () => {

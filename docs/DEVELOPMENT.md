@@ -2470,7 +2470,7 @@ Status: **validada na PR [#405](https://github.com/RodReis/rrb-jarvisOS/pull/405
 
 ### Fatia 01 — Quadro de execução, play e PR/MERGE (`docs/spec/spec-execucao-01-quadro-play-pr-merge.md`)
 
-Status: **em implementação** — SPEC `aprovada-pi`; issue [#370](https://github.com/RodReis/rrb-jarvisOS/issues/370) em `proplan:doing` conferida em 2026-10-06; [PR #408](https://github.com/RodReis/rrb-jarvisOS/pull/408) em rascunho, sem aceite. Stack Node/Python escolhida pelo PI no app; E1 tem serviço de perfil, preflight de documentos/matriz, parser YAML e revalidação de hashes na publicação. Workflow preexistente sem manifesto confiável bloqueia o aceite. Ainda falta gerar/revisar a matriz no fluxo, ligar a integração real do Squad e provar Play positivo.
+Status: **em implementação** — SPEC `aprovada-pi`; issue [#370](https://github.com/RodReis/rrb-jarvisOS/issues/370) em `proplan:doing` conferida em 2026-10-06; [PR #408](https://github.com/RodReis/rrb-jarvisOS/pull/408) em rascunho, sem aceite. Stack Node/Python escolhida pelo PI no app; E1 tem serviço de perfil, preflight de documentos/matriz, parser YAML, revalidação de hashes e bloqueio antes de efeitos remotos na publicação. Workflow preexistente sem manifesto confiável bloqueia o aceite. Ainda falta gerar/revisar a matriz no fluxo, ligar a integração real do Squad e provar Play positivo.
 
 - [x] Projeção local das sete colunas por run, fila e refs publicadas; `REVIEWING` é estado persistido entre validação e PR.
 - [x] Consulta do SHA e dos checks do PR pelo kernel; falha fica desconhecida com horário. Finalizado (PI) requer issue fechada com `proplan:finalizado` observados no GitHub.

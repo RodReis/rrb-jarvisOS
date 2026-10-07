@@ -115,6 +115,28 @@ export class PublicacaoService {
         .map((slice) => slice.specSlug)
     )
 
+    const detalhadasSemAceiteAtual = slices.filter(
+      (slice) =>
+        naFila.some((mvp) => mvp.id === slice.mvpId) &&
+        slice.detalhada &&
+        !aprovadas.has(slice.specSlug)
+    )
+    if (detalhadasSemAceiteAtual.length > 0) {
+      return {
+        reason: 'bloqueado',
+        criados: 0,
+        bloqueio: {
+          causa: 'preflight-ci-pendente',
+          evidencia: `O SLICE_ENTRY atual da fatia ${detalhadasSemAceiteAtual[0]?.specSlug} não está vigente ou o preflight falhou.`,
+          tentativas: 0,
+          porQueNaoSeguir:
+            'Publicar repositório, branch ou issue antes do preflight criaria trabalho remoto sobre uma revisão que o PI não aprovou.',
+          retomada:
+            'Corrija a SPEC, a matriz, o perfil ou o workflow e aprove novamente o SLICE_ENTRY.'
+        }
+      }
+    }
+
     let criados = 0
     const contar = (o: ConnectorOutcome): void => {
       if (this.foiCriado(o)) criados += 1
