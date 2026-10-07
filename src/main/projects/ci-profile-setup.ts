@@ -96,11 +96,20 @@ export class CiProfileSetupService {
         if (lstatSync(alvo).isSymbolicLink())
           return { ok: false, mensagem: 'ci-profile.json é um link simbólico.' }
         const anterior = lerPerfilDeCiVersionado(raiz)
-        if (anterior === undefined || anterior.perfil.profileId !== projectId)
+        const perfilNode = perfilNodeEmWindows(projectId)
+        const perfilPython = perfilPythonEmWindows(projectId)
+        const pertenceAoGerador =
+          anterior !== undefined &&
+          anterior.perfil.profileId === projectId &&
+          (JSON.stringify(anterior.perfil) === JSON.stringify(perfilNode) ||
+            JSON.stringify(anterior.perfil) === JSON.stringify(perfilPython))
+        if (!pertenceAoGerador)
           return {
             ok: false,
             mensagem: 'O pacote já contém um perfil próprio; revise-o sem sobrescrita automática.'
           }
+        if (anterior.perfil.runtime === runtime)
+          return { ok: true, runtime, mensagem: 'O perfil escolhido já está presente.' }
       }
 
       const temporario = join(raiz, `.ci-profile-${randomUUID()}.tmp`)

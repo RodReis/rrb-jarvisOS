@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { perfilPythonEmWindows } from '@shared/domain/ci-profile-perfis'
+import { perfilNodeEmWindows, perfilPythonEmWindows } from '@shared/domain/ci-profile-perfis'
 import { CiProfileSetupService } from './ci-profile-setup'
 
 let raiz: string | undefined
@@ -58,5 +58,28 @@ describe('escolha explícita de stack para E1', () => {
     expect(JSON.parse(readFileSync(join(raiz!, 'ci-profile.json'), 'utf8')).profileId).toBe(
       'personalizado'
     )
+  })
+
+  it('não sobrescreve perfil editado que manteve o id do projeto', () => {
+    const service = montar()
+    writeFileSync(
+      join(raiz!, 'package.json'),
+      JSON.stringify({
+        scripts: {
+          lint: 'eslint .',
+          typecheck: 'tsc',
+          test: 'vitest',
+          build: 'vite'
+        }
+      })
+    )
+    writeFileSync(join(raiz!, 'package-lock.json'), '{}')
+    const editado = { ...perfilNodeEmWindows('p-1'), timeoutEmMinutos: 29 }
+    writeFileSync(join(raiz!, 'ci-profile.json'), JSON.stringify(editado))
+
+    expect(service.selecionar('p-1', 'jarvis', 'node').ok).toBe(false)
+    expect(JSON.parse(readFileSync(join(raiz!, 'ci-profile.json'), 'utf8'))).toMatchObject({
+      timeoutEmMinutos: 29
+    })
   })
 })
