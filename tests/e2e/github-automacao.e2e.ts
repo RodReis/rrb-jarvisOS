@@ -290,7 +290,7 @@ function invocar(
   )
 }
 
-test('as dezesseis capacidades chegam ao renderer pela listagem do núcleo', async () => {
+test('as capacidades do GitHub chegam ao renderer pela listagem do núcleo', async () => {
   const janela = await app.firstWindow()
   await janela.waitForLoadState('domcontentloaded')
 
@@ -314,6 +314,7 @@ test('as dezesseis capacidades chegam ao renderer pela listagem do núcleo', asy
     'auth.identify',
     'repo.ensure',
     'issue.ensure',
+    'issue.get-state',
     'issue.ensure-dependency',
     'ref.ensure',
     'pr.ensure',
