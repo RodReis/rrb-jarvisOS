@@ -75,7 +75,13 @@ const resumoSeguro = (resultado: ResultadoDoSquad) =>
   }))
 
 export class SquadOrquestradorDeExecucao {
+  private readonly emVoo = new Map<string, AbortController>()
+
   constructor(private readonly deps: DependenciasDoOrquestradorDeExecucao) {}
+
+  interromper(runId: string): void {
+    this.emVoo.get(runId)?.abort()
+  }
 
   async executar(pedido: PedidoDeExecucao): Promise<ResultadoDaEntrega | ResultadoDoCiclo> {
     const run = this.deps.runs.buscar(pedido.runId)
@@ -97,8 +103,16 @@ export class SquadOrquestradorDeExecucao {
       return { estado: 'parado', motivo: 'erro-interno', detalhe: 'spec-ausente', tentativas: 0 }
     }
 
+    const controle = new AbortController()
+    this.emVoo.set(pedido.runId, controle)
+    const abortar = (): void => controle.abort()
+    pedido.signal?.addEventListener('abort', abortar, { once: true })
+    if (pedido.signal?.aborted) abortar()
+    const pedidoDoRun: PedidoDeExecucao = { ...pedido, signal: controle.signal }
     try {
-      const preparado = await this.deps.preparar(pedido)
+      if (controle.signal.aborted) return this.cancelado()
+      const preparado = await this.deps.preparar(pedidoDoRun)
+      if (controle.signal.aborted) return this.cancelado()
       const atual = this.deps.runs.buscar(pedido.runId)
       if (atual !== undefined && atual.squadPlan === undefined) {
         const salvo = this.deps.runs.registrarPlanoDoSquad(
@@ -109,8 +123,8 @@ export class SquadOrquestradorDeExecucao {
         )
         if (!salvo) throw new Error('Não foi possível persistir o plano validado do Squad.')
       }
-      const composto = this.deps.ciclo(pedido, preparado, async (producao) => {
-        const executada = await this.deps.produzir(pedido, preparado, producao)
+      const composto = this.deps.ciclo(pedidoDoRun, preparado, async (producao) => {
+        const executada = await this.deps.produzir(pedidoDoRun, preparado, producao)
         this.registrarProgresso(pedido, executada.resultado)
         return executada.producao
       })
@@ -122,15 +136,17 @@ export class SquadOrquestradorDeExecucao {
         baseSha: preparado.baseSha,
         comandos: pedido.comandosDeValidacao,
         perfilDeCi: preparado.perfilCi,
-        revisao: composto.revisao
+        revisao: composto.revisao,
+        signal: controle.signal
       })
 
+      if (controle.signal.aborted) return this.cancelado()
       if (resultado.estado !== 'aprovado') {
         this.bloquear(pedido, resultado.motivo, resultado.detalhe ?? resultado.motivo)
         return resultado
       }
 
-      const sandbox = this.deps.prepararSandboxDePublicacao(pedido, preparado, resultado.commitSha)
+      const sandbox = this.deps.prepararSandboxDePublicacao(pedidoDoRun, preparado, resultado.commitSha)
       if (sandbox.sandbox === undefined) {
         this.bloquear(
           pedido,
@@ -144,8 +160,9 @@ export class SquadOrquestradorDeExecucao {
           tentativas: resultado.tentativas
         }
       }
+      if (controle.signal.aborted) return this.cancelado()
       const entregue = await this.deps.publicar(
-        pedido,
+        pedidoDoRun,
         preparado,
         resultado.commitSha,
         sandbox.sandbox
@@ -170,7 +187,14 @@ export class SquadOrquestradorDeExecucao {
         detalhe: mensagem,
         tentativas: 0
       }
+    } finally {
+      pedido.signal?.removeEventListener('abort', abortar)
+      if (this.emVoo.get(pedido.runId) === controle) this.emVoo.delete(pedido.runId)
     }
+  }
+
+  private cancelado(): ResultadoDoCiclo {
+    return { estado: 'parado', motivo: 'cancelada', tentativas: 0 }
   }
 
   registrarProgresso(pedido: PedidoDeExecucao, resultado: ResultadoDoSquad): void {

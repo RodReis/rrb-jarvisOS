@@ -1618,6 +1618,7 @@ if (!app.requestSingleInstanceLock()) {
 
     // O PR que cada run publicou: o cancelamento o acha aqui para convertê-lo em rascunho.
     const runPrs = new RunPrRepository(storage.db)
+    const squadEmExecucao: { servico?: SquadOrquestradorDeExecucao } = {}
     // O cancelamento seletivo (SPEC-Scheduler-05). **Ainda sem chamador de produção:** cancelar é
     // ato do PI e o canal (IPC e tela) é do quadro do MVP-028; o que já roda é a reconciliação do
     // rascunho que um crash ou a origem fora do ar deixou pendente.
@@ -1628,7 +1629,10 @@ if (!app.requestSingleInstanceLock()) {
       connectors,
       audit: storage.audit,
       userId: userIdAtual,
-      interromper: (runId) => void encadeadorDosRuns.servico?.interromper(runId)
+      interromper: (runId) => {
+        squadEmExecucao.servico?.interromper(runId)
+        void encadeadorDosRuns.servico?.interromper(runId)
+      }
     })
 
     /*
@@ -2086,7 +2090,7 @@ if (!app.requestSingleInstanceLock()) {
               ...(origem.origem === 'modelo' && origem.numCtx ? { numCtx: origem.numCtx } : {})
             }
           },
-          signal: producao.signal
+          signal: producao.signal ?? pedido.signal
         })
         const escritor = resultado.tarefas.findLast(
           (tarefa) => tarefa.papel === 'desenvolvedor' && tarefa.estado === 'concluida'
@@ -2138,9 +2142,10 @@ if (!app.requestSingleInstanceLock()) {
           contextPackId: pedido.contextPackId,
           comandosDeValidacao: pedido.comandosDeValidacao,
           perfilDeCi: preparar.perfilCi,
-          signal: undefined
+          signal: pedido.signal
         })
     })
+    squadEmExecucao.servico = orquestradorSquad
 
     const quadroExecucao = new QuadroExecucaoService({
       userId: userIdAtual,
