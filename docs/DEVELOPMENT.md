@@ -2493,7 +2493,7 @@ Status: **em andamento** — SPEC `aprovada-pi`; issue [#378](https://github.com
 - [x] Migrar associação de traces e plano Squad; registrar início/conclusão de tarefa e eventos de cada trace por run.
 - [x] Persistir snapshots e diffs antes da remoção do worktree; escopo por usuário/workspace/projeto/run, hashes, cota de run e retenção M9-F06.
 - [x] Expor painel read-only via IPC: plano, agente, diff, arquivos, checks e evidência de testes redigida; busca e destaque sintático no visualizador.
-- [x] Executar regras (2944/2944), banco (2338 pass, 35 skipped, 0 falhas), tela (804 pass, 1 todo, 0 falhas) e prova visual (4/4); validar `reports/TESTS.md` com `--check --no-run --require-entry`. RLS local ficou skipped porque a stack Supabase não está ativa; o job obrigatório do CI ainda precisa prová-la.
+- [x] Executar regras (2944/2944), banco no CI (2355 pass, 18 skipped, 0 falhas), tela (804 pass, 1 todo, 0 falhas) e prova visual do painel (4/4); validar `reports/TESTS.md` com `--check --no-run --require-entry`. A execução local não tinha a stack Supabase ativa; a execução oficial do CI cobriu RLS.
 - [ ] PR com `refs #378`, CI verde no SHA final, merge em `main`, comentário de encerramento e `proplan:done`; issue fica aberta para aceite do PI.
 
 ### Fatia 04 — Cronograma de atividades configurável (`docs/spec/spec-escuta-04-cronograma.md`)

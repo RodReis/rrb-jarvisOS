@@ -63,12 +63,14 @@ const painel: Modelo = {
   atualizadoEm: '2026-10-07T18:03:00.000Z'
 }
 
-window.jarvis = {
-  painelDaTarefa: async () => painel,
-  painelDaTarefaConteudo: async () =>
-    'export const maximoPorArquivo = 10 * 1024 * 1024\nexport const maximoPorRun = 50 * 1024 * 1024\n',
-  onSquadTaskEvent: () => () => {}
-} as unknown as JarvisBridge
+export function prepararPonteDoPainelDaTarefa(): void {
+  window.jarvis = {
+    painelDaTarefa: async () => painel,
+    painelDaTarefaConteudo: async () =>
+      'export const maximoPorArquivo = 10 * 1024 * 1024\nexport const maximoPorRun = 50 * 1024 * 1024\n',
+    onSquadTaskEvent: () => () => {}
+  } as unknown as JarvisBridge
+}
 
 export function GaleriaDoPainelDaTarefa({ modo }: { readonly modo: ModoUi }): React.JSX.Element {
   return (

@@ -18,7 +18,7 @@ import { GaleriaDaArquitetura, type CenaDaArquitetura } from './GaleriaDaArquite
 import { GaleriaDoMascote } from './GaleriaDoMascote'
 import { GaleriaDoCommandCenter } from './GaleriaDoCommandCenter'
 import { GaleriaDaEscuta, prepararPonteDaEscuta, type CenaDaEscuta } from './GaleriaDaEscuta'
-import { GaleriaDoPainelDaTarefa } from './GaleriaDoPainelDaTarefa'
+import { GaleriaDoPainelDaTarefa, prepararPonteDoPainelDaTarefa } from './GaleriaDoPainelDaTarefa'
 import { initI18n } from '@renderer/i18n'
 import type { ModoUi, Modulo } from '@design/tokens/semantic'
 import type { CorAcento } from '@design/tokens/acento'
@@ -164,7 +164,10 @@ const GALERIAS = {
     prepararPonteDaEscuta(cena)
     return <GaleriaDaEscuta modo={modo} cena={cena} />
   },
-  'painel-tarefa': () => <GaleriaDoPainelDaTarefa modo={modo} />,
+  'painel-tarefa': () => {
+    prepararPonteDoPainelDaTarefa()
+    return <GaleriaDoPainelDaTarefa modo={modo} />
+  },
   planejamento: () => (
     <GaleriaDaJornadaDePlanejamento
       modo={modo}
