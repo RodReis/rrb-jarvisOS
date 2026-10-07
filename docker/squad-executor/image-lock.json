@@ -1,0 +1,5 @@
+{
+  "version": "2.1.278",
+  "linuxX64Sha256": "5c4735937844e84f8a93306e841a5b0e12252909b07870f789b190468da147ab",
+  "image": "jarvisos/squad-executor:claude-code-2.1.278"
+}

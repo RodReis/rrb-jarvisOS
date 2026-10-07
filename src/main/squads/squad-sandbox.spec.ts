@@ -3,6 +3,7 @@ import type { PreflightOutcome, SandboxPreparado } from '@shared/domain/prefligh
 import type { PedidoDePreflight } from '../pipeline/preflight-service'
 import type { PedidoDeSandbox } from './squad-escritor'
 import { SandboxDoEscritorReal, unidadeDeSandbox } from './squad-sandbox'
+import { CLAUDE_CODE_LINUX_X64_SHA256, CLAUDE_CODE_VERSION, IMAGEM_DO_SQUAD } from './squad-imagem'
 
 const PEDIDO: PedidoDeSandbox = {
   runId: 'run-1',
@@ -91,6 +92,15 @@ function montar(
 }
 
 describe('unidade de sandbox', () => {
+  it('fixa a imagem local na versão e no checksum aprovados', () => {
+    expect(CLAUDE_CODE_VERSION).toBe('2.1.278')
+    expect(CLAUDE_CODE_LINUX_X64_SHA256).toBe(
+      '5c4735937844e84f8a93306e841a5b0e12252909b07870f789b190468da147ab'
+    )
+    expect(IMAGEM_DO_SQUAD).toBe('jarvisos/squad-executor:claude-code-2.1.278')
+    expect(IMAGEM_DO_SQUAD).not.toContain('latest')
+  })
+
   it('é única por run, escritor, tarefa e tentativa', () => {
     const base = { runId: 'run-1', escritor: 'api', tarefaId: 'tar-1', tentativa: 1 }
 
@@ -118,10 +128,21 @@ describe('preparar', () => {
         base: 'a'.repeat(40),
         pathsDaSpec: PEDIDO.pathsPermitidos,
         proxyUrl: 'http://proxy',
+        imagemDoSandbox: 'jarvisos/squad-executor:claude-code-2.1.278',
         sufixoDaBranch: 'api-tar-1-t1',
         caminhoDoProxy: '/u/chave-1'
       }
     ])
+  })
+
+  it('seleciona a imagem local fixada da CLI sem alterar a imagem dos outros sandboxes', async () => {
+    const { sandbox, preparados } = montar()
+
+    await sandbox.preparar(PEDIDO)
+
+    expect(preparados[0]).toMatchObject({
+      imagemDoSandbox: 'jarvisos/squad-executor:claude-code-2.1.278'
+    })
   })
 
   it('adota o worktree que o Preflight criou, na base e na branch dele', async () => {

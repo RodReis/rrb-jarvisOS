@@ -514,6 +514,16 @@ describe('preflight — liberação', () => {
     expect(montagem.redeDeEgress).toBe(`jarvisos-egress-${RUN}`)
   })
 
+  it('usa a imagem local solicitada pelo escritor do Squad', () => {
+    const chamadas: ChamadaDocker[] = []
+    const imagem = 'jarvisos/squad-executor:claude-code-2.1.278'
+
+    const outcome = montarServico({ chamadas }).preparar(pedido({ imagemDoSandbox: imagem }))
+
+    expect(outcome.reason).toBe('liberado')
+    expect(chamadas[0]?.montagem?.imagem).toBe(imagem)
+  })
+
   /**
    * Emenda 5: o `.git` principal é montado **somente-leitura**. Medido com Docker real que sem
    * ele o `git` do container responde `fatal: not a git repository` — a montagem prescrita

@@ -27,7 +27,8 @@
     "test:report:regras": "node scripts/test-report.mjs --project regras",
     "test:report:banco": "node scripts/test-report.mjs --project banco",
     "test:report:tela": "node scripts/test-report.mjs --project tela",
-    "test:report:selfcheck": "node scripts/test-report.mjs --selfcheck"
+    "test:report:selfcheck": "node scripts/test-report.mjs --selfcheck",
+    "build:squad-executor-image": "node scripts/build-squad-executor-image.mjs"
   },
   "devDependencies": {
     "@electron-toolkit/tsconfig": "^2.0.0",

@@ -55,6 +55,7 @@ import { RAIZ_NO_CONTAINER, type DockerRunner } from './docker-runner'
 import type { RecursoDoRun } from './inventario-repository'
 import type { ResultadoDaReserva, ResultadoDoScanner } from './isolamento-service'
 import type { LeaseRepository } from './lease-repository'
+import type { ImagemDoSquad } from '../squads/squad-imagem'
 
 /**
  * O que o preflight pede ao isolamento por run (SPEC-Scheduler-03). Interface mínima: o tipo é a
@@ -99,6 +100,8 @@ export interface PedidoDePreflight {
    */
   readonly portasDeServico?: readonly number[]
   readonly proxyUrl: string
+  /** Imagem local validada para este sandbox; ausente mantém a imagem padrão da pipeline. */
+  readonly imagemDoSandbox?: ImagemDoSquad
   /**
    * Dá branch própria ao **escritor** de um Squad: ele passa `<escritor>-t<tentativa>`, e dois
    * escritores do mesmo run não dividem a branch. Ausente no run comum (SPEC-Squads-03).
@@ -531,7 +534,9 @@ export class PreflightService {
         proxyUrl: proxyUrlDoExecutor,
         labels,
         ...(perfilClaudeNoHost === undefined ? {} : { perfilClaudeNoHost }),
-        ...(this.deps.imagemDoSandbox === undefined ? {} : { imagem: this.deps.imagemDoSandbox })
+        ...((pedido.imagemDoSandbox ?? this.deps.imagemDoSandbox) === undefined
+          ? {}
+          : { imagem: pedido.imagemDoSandbox ?? this.deps.imagemDoSandbox })
       },
       pedido.raizOperacional
     )
