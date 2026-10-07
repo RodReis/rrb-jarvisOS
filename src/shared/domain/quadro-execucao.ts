@@ -60,6 +60,11 @@ export interface CartaoDoQuadro {
   readonly equipe?: EquipeDoQuadro
   readonly dependenciasAbertas: readonly DependenciaAberta[]
   readonly consulta: ConsultaDeChecks
+  readonly aprovacaoPendente?: {
+    readonly id: string
+    readonly acao: string
+    readonly motivo: string
+  }
 }
 
 export interface EquipeDoQuadro {
@@ -178,6 +183,7 @@ export interface EntradaDoQuadro {
   readonly issues?: ReadonlyMap<string, { readonly numero: number; readonly url?: string }>
   readonly consultas?: ReadonlyMap<string, ConsultaDeChecks>
   readonly finalizadas?: ReadonlySet<string>
+  readonly aprovacoesPendentes?: ReadonlyMap<string, CartaoDoQuadro['aprovacaoPendente']>
   readonly agora?: string
 }
 
@@ -226,7 +232,10 @@ export function projetarQuadro(entrada: EntradaDoQuadro): QuadroDeExecucao {
       dependenciasAbertas: bloqueadas.get(slice.id) ?? [],
       consulta:
         entrada.consultas?.get(run?.id ?? slice.id) ??
-        ({ estado: 'nao-consultado', checksPendentes: [], checks: [] } satisfies ConsultaDeChecks)
+        ({ estado: 'nao-consultado', checksPendentes: [], checks: [] } satisfies ConsultaDeChecks),
+      ...(run === undefined || entrada.aprovacoesPendentes?.get(run.id) === undefined
+        ? {}
+        : { aprovacaoPendente: entrada.aprovacoesPendentes.get(run.id) })
     }
     return [cartao]
   })

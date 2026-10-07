@@ -243,6 +243,7 @@ describe('ponte do preload', () => {
         'quadroDeExecucao',
         'playNoQuadro',
         'cancelarNoQuadro',
+        'resolverAprovacaoDoSquad',
         'vistaDoPool'
       ].sort()
     )

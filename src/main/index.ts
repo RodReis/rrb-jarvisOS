@@ -123,6 +123,11 @@ import { ExecutorDoSquad } from './squads/squad-executor'
 import { ExecutorDeWorker } from './squads/squad-worker'
 import { ExecutorDeEscritor } from './squads/squad-escritor'
 import { IntegradorService } from './squads/squad-integrador'
+import {
+  SquadAprovacaoService,
+  alteraEstruturaDeBanco,
+  comandosDestrutivosDoPerfil
+} from './squads/squad-aprovacao'
 import { consolidarProducao } from './squads/squad-producao'
 import { SandboxDoEscritorReal } from './squads/squad-sandbox'
 import { AgenteNoContainer } from './squads/squad-agente-container'
@@ -1620,6 +1625,15 @@ if (!app.requestSingleInstanceLock()) {
 
     // O PR que cada run publicou: o cancelamento o acha aqui para convertê-lo em rascunho.
     const runPrs = new RunPrRepository(storage.db)
+    const squadAprovacao = new SquadAprovacaoService({
+      db: storage.db,
+      requests: approvals,
+      policy,
+      audit: storage.audit,
+      runs: pipelineRepository,
+      userId: userIdAtual
+    })
+    squadAprovacao.reconciliarPendentes()
     const squadEmExecucao: { servico?: SquadOrquestradorDeExecucao } = {}
     // O cancelamento seletivo (SPEC-Scheduler-05). **Ainda sem chamador de produção:** cancelar é
     // ato do PI e o canal (IPC e tela) é do quadro do MVP-028; o que já roda é a reconciliação do
@@ -1975,6 +1989,41 @@ if (!app.requestSingleInstanceLock()) {
         }
         const etapaTeste = {
           executar: async (entrada: Parameters<EtapaDeTeste['executar']>[0]) => {
+            const anterior = squadGit.listarNaRevisao(entrada.repositorio, preparar.baseSha)
+            const atual = squadGit.listarNaRevisao(entrada.repositorio, entrada.commitSha)
+            if (!anterior.ok || !atual.ok) {
+              return { estado: 'nao-rodou' as const, motivo: 'diff-do-squad-indisponivel' }
+            }
+            const caminhos = [...new Set([...anterior.valor.keys(), ...atual.valor.keys()])].filter(
+              (path) => anterior.valor.get(path) !== atual.valor.get(path)
+            )
+            if (alteraEstruturaDeBanco({ paths: caminhos })) {
+              const aprovado = await squadAprovacao.exigir({
+                runId: pedido.runId,
+                projectId: pedido.projectId!,
+                workspaceId: pedido.workspaceId,
+                tarefaId: '__suite__',
+                acao: 'alteracao-estrutural-de-banco',
+                alvo: entrada.commitSha,
+                signal: entrada.signal
+              })
+              if (!aprovado) return { estado: 'nao-rodou' as const, motivo: 'aprovacao-negada' }
+            }
+            if (comandosDestrutivosDoPerfil(preparar.perfilCi).length > 0) {
+              const aprovado = await squadAprovacao.exigir({
+                runId: pedido.runId,
+                projectId: pedido.projectId!,
+                workspaceId: pedido.workspaceId,
+                tarefaId: '__suite__',
+                acao: 'comando-destrutivo',
+                alvo: JSON.stringify({
+                  commitSha: entrada.commitSha,
+                  comandos: comandosDestrutivosDoPerfil(preparar.perfilCi)
+                }),
+                signal: entrada.signal
+              })
+              if (!aprovado) return { estado: 'nao-rodou' as const, motivo: 'aprovacao-negada' }
+            }
             transicionar('VALIDATING')
             return suite.executar(entrada)
           }
@@ -2115,7 +2164,11 @@ if (!app.requestSingleInstanceLock()) {
               repositorio: pedido.repositorio,
               baseSha: preparar.baseSha,
               escritores,
-              worktree: join(pedido.raizOperacional, pedido.runId, `integracao-${producao.tentativa}`),
+              worktree: join(
+                pedido.raizOperacional,
+                pedido.runId,
+                `integracao-${producao.tentativa}`
+              ),
               branch: `jarvis/${pedido.runId}/integracao-${producao.tentativa}`,
               modelo,
               rota: 'claude-code',
@@ -2178,6 +2231,7 @@ if (!app.requestSingleInstanceLock()) {
       runPrs,
       connectors,
       cancelamento,
+      squadAprovacao,
       raizOperacional: () => join(app.getPath('userData'), 'pipeline'),
       criarSnapshotDoSquad: (modelo) =>
         criarSnapshotDoSquad(

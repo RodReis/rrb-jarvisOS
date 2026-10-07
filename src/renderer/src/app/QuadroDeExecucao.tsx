@@ -36,6 +36,7 @@ export function QuadroDeExecucao({
   const [runAberto, setRunAberto] = useState<string | undefined>()
   const [cancelando, setCancelando] = useState<string | undefined>()
   const [mensagemDoCancelamento, setMensagemDoCancelamento] = useState<string | undefined>()
+  const [decidindo, setDecidindo] = useState<string | undefined>()
 
   const atualizar = useCallback(async () => {
     try {
@@ -133,6 +134,27 @@ export function QuadroDeExecucao({
     }
   }
 
+  const decidirAprovacao = async (id: string, decisao: 'aprovado' | 'negado') => {
+    if (decidindo !== undefined) return
+    setDecidindo(id)
+    try {
+      const resolvida = await window.jarvis.resolverAprovacaoDoSquad(
+        projectId,
+        id,
+        decisao,
+        workspace
+      )
+      setMensagemDoCancelamento(
+        resolvida ? 'Decisão do PI registrada.' : 'O pedido já não está disponível para decisão.'
+      )
+      await atualizar()
+    } catch {
+      setMensagemDoCancelamento('Não foi possível registrar a decisão do PI.')
+    } finally {
+      setDecidindo(undefined)
+    }
+  }
+
   if (carregando) return <LoadingState rotulo="Carregando quadro de execução" />
   if (falhou || quadro === null) {
     return (
@@ -181,7 +203,11 @@ export function QuadroDeExecucao({
           ))}
         </div>
       )}
-      {mensagemDoCancelamento && <p role="status" className="text-sm">{mensagemDoCancelamento}</p>}
+      {mensagemDoCancelamento && (
+        <p role="status" className="text-sm">
+          {mensagemDoCancelamento}
+        </p>
+      )}
 
       <div
         className="grid gap-3 overflow-x-auto xl:grid-cols-7"
@@ -221,6 +247,37 @@ export function QuadroDeExecucao({
                       MVP-{cartao.numeroDoMvp} · F{cartao.numeroDaFatia}
                       {cartao.issue ? ` · #${cartao.issue}` : ''}
                     </p>
+                    {cartao.aprovacaoPendente && (
+                      <section
+                        className="mt-2 rounded border border-amber-400/40 bg-amber-400/10 p-2 text-xs"
+                        aria-label="Aguardando decisão do PI"
+                      >
+                        <p className="font-semibold text-amber-300">Aguardando PI</p>
+                        <p className="mt-1 text-[var(--jos-cor-texto)]">
+                          {cartao.aprovacaoPendente.motivo}
+                        </p>
+                        <div className="mt-2 flex gap-2">
+                          <button
+                            type="button"
+                            disabled={decidindo !== undefined}
+                            onClick={() =>
+                              void decidirAprovacao(cartao.aprovacaoPendente!.id, 'aprovado')
+                            }
+                          >
+                            Aprovar ação
+                          </button>
+                          <button
+                            type="button"
+                            disabled={decidindo !== undefined}
+                            onClick={() =>
+                              void decidirAprovacao(cartao.aprovacaoPendente!.id, 'negado')
+                            }
+                          >
+                            Recusar ação
+                          </button>
+                        </div>
+                      </section>
+                    )}
                     {cartao.run !== undefined && (
                       <button
                         type="button"

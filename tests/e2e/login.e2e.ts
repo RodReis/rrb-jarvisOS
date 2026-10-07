@@ -253,6 +253,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'pickProjectDirectory',
     'playNoQuadro',
     'cancelarNoQuadro',
+    'resolverAprovacaoDoSquad',
     'prontidaoDaVoz',
     'prontidaoDoTts',
     'proporTermoDePesquisa',

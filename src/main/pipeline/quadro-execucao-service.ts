@@ -40,6 +40,7 @@ import type { GenerationTraceService } from '../ai/generation-trace-service'
 import type { PainelDaTarefaRepository } from './painel-tarefa-repository'
 import type { RunPrRepository } from './run-pr-repository'
 import type { CancelamentoService, ResultadoDoCancelamento } from './cancelamento-service'
+import type { SquadAprovacaoService } from '../squads/squad-aprovacao'
 import { log } from '../logging/logger'
 
 export interface QuadroExecucaoDeps {
@@ -58,6 +59,7 @@ export interface QuadroExecucaoDeps {
   readonly runPrs: RunPrRepository
   readonly connectors: ConnectorService
   readonly cancelamento?: Pick<CancelamentoService, 'cancelar'>
+  readonly squadAprovacao?: Pick<SquadAprovacaoService, 'pendentesDoRun' | 'resolver'>
   readonly audit?: import('../storage/audit-repository').AuditRepository
   readonly criarSnapshotDoSquad?: (modelo: { provider: string; modelo: string }) => SnapshotDoSquad
   /** Só é fornecido quando o caminho de produção do Squad estiver composto. */
@@ -96,6 +98,15 @@ export class QuadroExecucaoService {
       return { cancelado: false, motivo: 'recusado', mensagem: 'Cancelamento indisponível.' }
     }
     return this.deps.cancelamento.cancelar(projectId, workspaceId, runId)
+  }
+
+  resolverAprovacao(
+    projectId: string,
+    workspaceId: WorkspaceId,
+    approvalId: string,
+    decisao: 'aprovado' | 'negado'
+  ): boolean {
+    return this.deps.squadAprovacao?.resolver(approvalId, decisao, projectId, workspaceId) ?? false
   }
 
   async vista(projectId: string, workspaceId: WorkspaceId): Promise<QuadroDeExecucao> {
@@ -140,6 +151,14 @@ export class QuadroExecucaoService {
 
     const todosOsRuns = roadmap.slices.flatMap((slice) =>
       this.deps.runs.listarDaFatia(escopo, slice.id)
+    )
+    const aprovacoesPendentes = new Map(
+      todosOsRuns.flatMap((run) => {
+        const request = this.deps.squadAprovacao?.pendentesDoRun(run.id, workspaceId)[0]
+        return request === undefined
+          ? []
+          : [[run.id, { id: request.id, acao: request.action, motivo: request.reason }] as const]
+      })
     )
     const consultas = new Map<string, ConsultaDeChecks>()
     await Promise.all(
@@ -186,6 +205,7 @@ export class QuadroExecucaoService {
       issues: refsPorFatia,
       consultas,
       finalizadas,
+      aprovacoesPendentes,
       agora: new Date(this.agora()).toISOString()
     })
   }

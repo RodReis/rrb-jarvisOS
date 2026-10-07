@@ -103,6 +103,7 @@ const ALTO: readonly TaxonomyEntry[] = [
   },
   { id: 'deploy.production', tier: 'alto', descricao: 'Fazer deploy em produção' },
   { id: 'db.alter-remote', tier: 'alto', descricao: 'Alterar banco de dados remoto' },
+  { id: 'db.alter-structure', tier: 'alto', descricao: 'Alterar estrutura de banco de dados' },
   {
     id: 'permissions.change',
     tier: 'alto',
