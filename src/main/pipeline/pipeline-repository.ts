@@ -18,6 +18,7 @@ import type { Database } from 'better-sqlite3'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { BloqueioExterno } from '@shared/domain/pacote-estrutural'
 import type { EstadoDoRun, PipelineRun } from '@shared/domain/pipeline'
+import { verificarSnapshot, type SnapshotDoSquad } from '../squads/squad-snapshot'
 import { log } from '../logging/logger'
 
 /** O escopo obrigatório de toda leitura e escrita (CONVENTION §2). */
@@ -58,10 +59,14 @@ function toRun(row: RunRow): PipelineRun {
       log.db.warn('Bloqueio ilegível no pipeline_run; lido como ausente.', { runId: row.id })
     }
   }
-  let squadSnapshot: unknown
+  let squadSnapshot: SnapshotDoSquad | undefined
   let squadProgress: PipelineRun['squadProgress']
   try {
-    if (row.squad_snapshot !== null) squadSnapshot = JSON.parse(row.squad_snapshot) as unknown
+    if (row.squad_snapshot !== null) {
+      const candidato: unknown = JSON.parse(row.squad_snapshot)
+      if (snapshotValido(candidato)) squadSnapshot = candidato
+      else log.db.warn('Snapshot do Squad inválido no pipeline_run.', { runId: row.id })
+    }
   } catch {
     log.db.warn('Snapshot do Squad ilegível no pipeline_run.', { runId: row.id })
   }
@@ -86,6 +91,33 @@ function toRun(row: RunRow): PipelineRun {
     ...(squadProgress === undefined ? {} : { squadProgress }),
     created_at: row.created_at,
     updated_at: row.updated_at
+  }
+}
+
+/** Checagem estrutural antes de passar o JSON persistido ao verificador de hash/resolução. */
+function ehSnapshotDoSquad(valor: unknown): valor is SnapshotDoSquad {
+  if (typeof valor !== 'object' || valor === null || Array.isArray(valor)) return false
+  const v = valor as Record<string, unknown>
+  return (
+    typeof v.registroDeCapacidades === 'number' &&
+    typeof v.perfil === 'object' &&
+    v.perfil !== null &&
+    typeof v.revisao === 'string' &&
+    typeof v.ambiente === 'object' &&
+    v.ambiente !== null &&
+    typeof v.modeloDaFase === 'object' &&
+    v.modeloDaFase !== null &&
+    typeof v.resolucao === 'object' &&
+    v.resolucao !== null
+  )
+}
+
+function snapshotValido(valor: unknown): valor is SnapshotDoSquad {
+  if (!ehSnapshotDoSquad(valor)) return false
+  try {
+    return verificarSnapshot(valor)
+  } catch {
+    return false
   }
 }
 
@@ -136,9 +168,10 @@ export class PipelineRepository {
   registrarSnapshotDoSquad(
     escopo: EscopoDoRun,
     runId: string,
-    snapshot: unknown,
+    snapshot: SnapshotDoSquad,
     agora: Date
   ): boolean {
+    if (!snapshotValido(snapshot)) return false
     const resultado = this.db
       .prepare(
         `UPDATE pipeline_run SET squad_snapshot = ?, updated_at = ?
