@@ -36,7 +36,12 @@ const slices = [1, 2, 3].map((numero) => ({
 }))
 const snapshotSquad = criarSnapshotDoSquad(
   PERFIL_PADRAO,
-  { skills: ['code-review'], ferramentas: [], ollama: { disponivel: false, modelos: [] }, optInApiPaga: false },
+  {
+    skills: ['code-review'],
+    ferramentas: [],
+    ollama: { disponivel: false, modelos: [] },
+    optInApiPaga: false
+  },
   { provider: 'claude-code', modelo: 'claude-fable-5-1' }
 )
 
@@ -110,7 +115,10 @@ describe('play de três fatias do mesmo MVP', () => {
     expect(executar).toHaveBeenCalledTimes(1)
     expect(executar.mock.calls[0]?.[0].perfilDeCi).toEqual(perfil.perfil)
     expect(executar.mock.calls[0]?.[0].comandosDeValidacao).toEqual({
-      test: [], lint: [], typecheck: [], build: []
+      test: [],
+      lint: [],
+      typecheck: [],
+      build: []
     })
   })
 

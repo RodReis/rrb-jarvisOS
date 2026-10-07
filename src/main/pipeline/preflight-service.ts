@@ -219,12 +219,12 @@ export class PreflightService {
         inspecionar === undefined ||
         !inspecionar.call(this.deps.docker, pedido.imagemDoSandbox, pedido.raizOperacional)
       ) {
-      return this.recusar(
-        pedido,
-        'imagem-local-ausente',
-        'A imagem local fixada para o executor do Squad não está instalada neste Docker.',
-        'Executar npm run build:squad-executor-image e retomar o Play.'
-      )
+        return this.recusar(
+          pedido,
+          'imagem-local-ausente',
+          'A imagem local fixada para o executor do Squad não está instalada neste Docker.',
+          'Executar npm run build:squad-executor-image e retomar o Play.'
+        )
       }
     }
 

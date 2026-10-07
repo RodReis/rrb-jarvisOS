@@ -4,10 +4,7 @@ import { resolve, relative, isAbsolute } from 'node:path'
 import type { WorkspaceId } from '@shared/domain/entities'
 import { validarPerfilDeCi } from '@shared/domain/ci-profile'
 import { IMAGEM_DO_SQUAD } from '../squads/squad-imagem'
-import {
-  auditarSnapshotDoSquad,
-  type SnapshotDoSquad
-} from '../squads/squad-snapshot'
+import { auditarSnapshotDoSquad, type SnapshotDoSquad } from '../squads/squad-snapshot'
 import type { ContextService } from '../context/context-service'
 import type { PhaseModelService } from '../ai/phase-model-service'
 import type { PathsPermitidos } from '@shared/domain/preflight'
@@ -343,9 +340,13 @@ export class QuadroExecucaoService {
           snapshotSquad,
           new Date(this.agora())
         )
-        if (!registrado) throw new Error('Não foi possível persistir o snapshot do Squad antes do Play.')
+        if (!registrado)
+          throw new Error('Não foi possível persistir o snapshot do Squad antes do Play.')
         auditarSnapshotDoSquad(
-          this.deps.audit ?? (() => { throw new Error('A auditoria do Squad não está configurada.') })(),
+          this.deps.audit ??
+            (() => {
+              throw new Error('A auditoria do Squad não está configurada.')
+            })(),
           { userId, workspaceId },
           snapshotSquad
         )

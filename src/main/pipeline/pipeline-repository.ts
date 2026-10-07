@@ -139,11 +139,20 @@ export class PipelineRepository {
     snapshot: unknown,
     agora: Date
   ): boolean {
-    const resultado = this.db.prepare(
-      `UPDATE pipeline_run SET squad_snapshot = ?, updated_at = ?
+    const resultado = this.db
+      .prepare(
+        `UPDATE pipeline_run SET squad_snapshot = ?, updated_at = ?
         WHERE id = ? AND user_id = ? AND workspace_id = ? AND project_id = ?
           AND squad_snapshot IS NULL AND estado = 'PLANNED'`
-    ).run(JSON.stringify(snapshot), agora.toISOString(), runId, escopo.userId, escopo.workspaceId, escopo.projectId)
+      )
+      .run(
+        JSON.stringify(snapshot),
+        agora.toISOString(),
+        runId,
+        escopo.userId,
+        escopo.workspaceId,
+        escopo.projectId
+      )
     return resultado.changes === 1
   }
 
@@ -154,18 +163,32 @@ export class PipelineRepository {
     progresso: NonNullable<PipelineRun['squadProgress']>,
     agora: Date
   ): boolean {
-    if (progresso.some((item) =>
-      typeof item.tarefaId !== 'string' ||
-      typeof item.papel !== 'string' ||
-      typeof item.estado !== 'string' ||
-      (item.motivo !== undefined && (typeof item.motivo !== 'string' || item.motivo.length > 160)) ||
-      (item.commitSha !== undefined && !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(item.commitSha))
-    )) return false
-    const resultado = this.db.prepare(
-      `UPDATE pipeline_run SET squad_progress = ?, updated_at = ?
+    if (
+      progresso.some(
+        (item) =>
+          typeof item.tarefaId !== 'string' ||
+          typeof item.papel !== 'string' ||
+          typeof item.estado !== 'string' ||
+          (item.motivo !== undefined &&
+            (typeof item.motivo !== 'string' || item.motivo.length > 160)) ||
+          (item.commitSha !== undefined && !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(item.commitSha))
+      )
+    )
+      return false
+    const resultado = this.db
+      .prepare(
+        `UPDATE pipeline_run SET squad_progress = ?, updated_at = ?
         WHERE id = ? AND user_id = ? AND workspace_id = ? AND project_id = ?
           AND squad_snapshot IS NOT NULL AND estado NOT IN ('MERGED','AWAITING_MERGE','BLOCKED','CANCELLED')`
-    ).run(JSON.stringify(progresso), agora.toISOString(), runId, escopo.userId, escopo.workspaceId, escopo.projectId)
+      )
+      .run(
+        JSON.stringify(progresso),
+        agora.toISOString(),
+        runId,
+        escopo.userId,
+        escopo.workspaceId,
+        escopo.projectId
+      )
     return resultado.changes === 1
   }
 

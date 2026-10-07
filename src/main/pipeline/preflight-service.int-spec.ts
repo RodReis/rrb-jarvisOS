@@ -538,7 +538,9 @@ describe('preflight — liberação', () => {
     const chamadas: ChamadaDocker[] = []
     const imagem = 'jarvisos/squad-executor:claude-code-2.1.278'
 
-    const outcome = montarServico({ chamadas, validarImagemLocal: true }).preparar(pedido({ imagemDoSandbox: imagem }))
+    const outcome = montarServico({ chamadas, validarImagemLocal: true }).preparar(
+      pedido({ imagemDoSandbox: imagem })
+    )
 
     expect(outcome.reason).toBe('liberado')
     expect(chamadas[0]?.montagem?.imagem).toBe(imagem)

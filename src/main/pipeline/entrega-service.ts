@@ -280,7 +280,11 @@ export class EntregaService {
   /** Continua apenas com PR/check/merge para um commit já revisado pelo ciclo do Squad. */
   async entregarCommitDoSquad(pedido: PedidoDeEntrega): Promise<ResultadoDaEntrega> {
     if (!/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(pedido.commitSquad ?? '')) {
-      return this.bloqueado('externo', 'Executar novamente o ciclo do Squad.', 'O commit aprovado pelo Squad não foi informado.')
+      return this.bloqueado(
+        'externo',
+        'Executar novamente o ciclo do Squad.',
+        'O commit aprovado pelo Squad não foi informado.'
+      )
     }
     this.runsCorrentes.set(pedido.runId, {
       runId: pedido.runId,
@@ -293,7 +297,11 @@ export class EntregaService {
       resultado = await this.executarCommitDoSquad(pedido)
       return resultado
     } catch (erro) {
-      resultado = this.bloqueado('externo', 'Verificar a origem e reconciliar o run.', erro instanceof Error ? erro.message : 'Falha ao entregar o commit aprovado.')
+      resultado = this.bloqueado(
+        'externo',
+        'Verificar a origem e reconciliar o run.',
+        erro instanceof Error ? erro.message : 'Falha ao entregar o commit aprovado.'
+      )
       return resultado
     } finally {
       this.runsCorrentes.delete(pedido.runId)
@@ -303,20 +311,44 @@ export class EntregaService {
 
   private async executarCommitDoSquad(pedido: PedidoDeEntrega): Promise<ResultadoDaEntrega> {
     const problema = this.garantirWorkflowDeCi(pedido)
-    if (problema !== undefined) return this.bloqueado('perfil-de-ci-invalido', 'Revisar o workflow no pacote aprovado.', problema)
-    if (this.foiInterrompida(pedido)) return this.bloqueado('externo', 'Retomar a entrega.', 'Run cancelado antes da publicação.')
-    const branch = this.deps.git.run(['rev-parse', 'HEAD'], pedido.sandbox.worktreeNoHost, pedido.workspaceId)
+    if (problema !== undefined)
+      return this.bloqueado(
+        'perfil-de-ci-invalido',
+        'Revisar o workflow no pacote aprovado.',
+        problema
+      )
+    if (this.foiInterrompida(pedido))
+      return this.bloqueado('externo', 'Retomar a entrega.', 'Run cancelado antes da publicação.')
+    const branch = this.deps.git.run(
+      ['rev-parse', 'HEAD'],
+      pedido.sandbox.worktreeNoHost,
+      pedido.workspaceId
+    )
     if (!branch.ok || branch.saida.trim().toLowerCase() !== pedido.commitSquad?.toLowerCase()) {
-      return this.bloqueado('externo', 'Verificar o worktree do Squad.', 'HEAD não corresponde ao commit revisado e aprovado.')
+      return this.bloqueado(
+        'externo',
+        'Verificar o worktree do Squad.',
+        'HEAD não corresponde ao commit revisado e aprovado.'
+      )
     }
     const alvo: PedidoDeEntrega = {
       ...pedido,
       alvo: { ...pedido.alvo, branchDaFatia: pedido.sandbox.branch }
     }
     const pronto = this.deps.fila.transicionar(
-      pedido.projectId, pedido.workspaceId, pedido.runId, 'PR_CI', undefined, pedido.fencingToken
+      pedido.projectId,
+      pedido.workspaceId,
+      pedido.runId,
+      'PR_CI',
+      undefined,
+      pedido.fencingToken
     )
-    if (pronto.reason !== 'transicionado') return this.bloqueado('externo', 'Reconciliar estado e posse do run.', 'O run não pôde avançar para PR_CI.')
+    if (pronto.reason !== 'transicionado')
+      return this.bloqueado(
+        'externo',
+        'Reconciliar estado e posse do run.',
+        'O run não pôde avançar para PR_CI.'
+      )
     const publicacao = await this.publicar(alvo, true)
     if (!publicacao.ok) return publicacao.bloqueio
     if (this.foiInterrompida(pedido)) return await this.interrompida(alvo)
@@ -629,11 +661,12 @@ export class EntregaService {
     if (!commitExistente) this.deps.git.run(['add', '--all', ...docs], worktreeNoHost, ws)
     // `--allow-empty` não entra: um run que não mudou nada não deve produzir commit vazio e seguir
     // como se tivesse entregue. O `commit` falha, e o push não acontece.
-    if (!commitExistente) this.deps.git.run(
-      ['commit', '-m', `${pedido.titulo}\n\nrefs #${pedido.issue}`],
-      worktreeNoHost,
-      ws
-    )
+    if (!commitExistente)
+      this.deps.git.run(
+        ['commit', '-m', `${pedido.titulo}\n\nrefs #${pedido.issue}`],
+        worktreeNoHost,
+        ws
+      )
 
     const token = await this.deps.token(this.deps.userId(), ws)
     const push =
