@@ -12,8 +12,8 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 2927 | 2927 | 0 | 80.9 | — | — |
-| — | — | — | Banco | 2350 | 2332 | 0 | — | — | — |
+| — | — | — | Regras de Negócio | 2929 | 2929 | 0 | 80.9 | — | — |
+| — | — | — | Banco | 2360 | 2342 | 0 | 85.2 | — | — |
 | — | — | — | Tela | 802 | 801 | 0 | 75.1 | — | — |
 
 ## Histórico por entrega
@@ -471,4 +471,7 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-10-06 | #359 | spec-escuta-04-cronograma | Tela | 800 | 799 | 0 | 76.5 | #406 | [#406](https://github.com/RodReis/rrb-jarvisOS/pull/406) |
 | 2026-10-07 | #370 | spec-execucao-01-quadro-play-pr-merge | Regras de Negócio | 2927 | 2927 | 0 | 80.9 | #408 | [#408](https://github.com/RodReis/rrb-jarvisOS/pull/408) |
 | 2026-10-07 | #370 | spec-execucao-01-quadro-play-pr-merge | Banco | 2350 | 2332 | 0 | — | #408 | [#408](https://github.com/RodReis/rrb-jarvisOS/pull/408) |
+| 2026-10-07 | #370 | spec-execucao-01-quadro-play-pr-merge | Tela | 802 | 801 | 0 | 75.1 | #408 | [#408](https://github.com/RodReis/rrb-jarvisOS/pull/408) |
+| 2026-10-07 | #370 | spec-execucao-01-quadro-play-pr-merge | Regras de Negócio | 2929 | 2929 | 0 | 80.9 | #408 | [#408](https://github.com/RodReis/rrb-jarvisOS/pull/408) |
+| 2026-10-07 | #370 | spec-execucao-01-quadro-play-pr-merge | Banco | 2360 | 2342 | 0 | 85.2 | #408 | [#408](https://github.com/RodReis/rrb-jarvisOS/pull/408) |
 | 2026-10-07 | #370 | spec-execucao-01-quadro-play-pr-merge | Tela | 802 | 801 | 0 | 75.1 | #408 | [#408](https://github.com/RodReis/rrb-jarvisOS/pull/408) |
