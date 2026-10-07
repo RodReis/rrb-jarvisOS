@@ -104,6 +104,7 @@ export type MotivoDaParada =
   | 'escritores-invalidos'
   | 'provider-com-ferramenta'
   | 'modelo-local-sem-janela'
+  | 'modelo-ausente'
   | 'diff-recusado'
   | 'arquivo-de-configuracao-do-git'
   | 'worktree-recusado'

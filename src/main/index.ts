@@ -122,6 +122,8 @@ import { ContextoDaTarefa } from './squads/squad-contexto'
 import { ExecutorDoSquad } from './squads/squad-executor'
 import { ExecutorDeWorker } from './squads/squad-worker'
 import { ExecutorDeEscritor } from './squads/squad-escritor'
+import { IntegradorService } from './squads/squad-integrador'
+import { consolidarProducao } from './squads/squad-producao'
 import { SandboxDoEscritorReal } from './squads/squad-sandbox'
 import { AgenteNoContainer } from './squads/squad-agente-container'
 import { SuiteNoSandbox, EtapaDeTeste } from './squads/squad-teste'
@@ -2092,22 +2094,36 @@ if (!app.requestSingleInstanceLock()) {
           },
           signal: producao.signal ?? pedido.signal
         })
-        const escritor = resultado.tarefas.findLast(
-          (tarefa) => tarefa.papel === 'desenvolvedor' && tarefa.estado === 'concluida'
+        const producaoFinal = await consolidarProducao(
+          resultado,
+          snapshot.perfil.escritores,
+          async (escritores) => {
+            const camadaDoIntegrador = snapshot.perfil.integrador?.camada
+            const modelo =
+              camadaDoIntegrador && snapshot.resolucao.camadas[camadaDoIntegrador].modelo
+            if (modelo === undefined) return { estado: 'parado', motivo: 'modelo-ausente' }
+            return new IntegradorService({
+              git: squadGit,
+              contexto: contexts,
+              ia: ai,
+              audit: storage.audit,
+              userId: userIdAtual,
+              workspaceId: () => pedido.workspaceId
+            }).integrar({
+              runId: pedido.runId,
+              projectId: pedido.projectId!,
+              repositorio: pedido.repositorio,
+              baseSha: preparar.baseSha,
+              escritores,
+              worktree: join(pedido.raizOperacional, pedido.runId, `integracao-${producao.tentativa}`),
+              branch: `jarvis/${pedido.runId}/integracao-${producao.tentativa}`,
+              modelo,
+              rota: 'claude-code',
+              signal: producao.signal ?? pedido.signal
+            })
+          }
         )
-        const commitSha =
-          escritor?.execucao !== undefined && 'commitSha' in escritor.execucao
-            ? escritor.execucao.commitSha
-            : undefined
-        return commitSha === undefined
-          ? {
-              producao: {
-                estado: 'parado',
-                motivo: 'o executor do Squad não produziu um commit do kernel'
-              },
-              resultado
-            }
-          : { producao: { estado: 'pronto', commitSha, manifesto: '' }, resultado }
+        return { producao: producaoFinal, resultado }
       },
       prepararSandboxDePublicacao: (pedido, preparar, commitSha) => {
         const outcome = preflight.preparar({
