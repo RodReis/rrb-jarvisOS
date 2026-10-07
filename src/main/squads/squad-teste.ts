@@ -22,6 +22,7 @@ import type { PedidoDePreflight } from '../pipeline/preflight-service'
 import type { ExecucaoNoContainer } from '../pipeline/docker-runner'
 import type { AuditRepository } from '../storage/audit-repository'
 import { IMAGEM_DO_SQUAD } from './squad-imagem'
+import { redigirSegredos } from '@shared/domain/segredos'
 
 export type PassoDaSuite = string
 
@@ -88,6 +89,7 @@ export interface DependenciasDaSuiteNoSandbox {
   readonly proxyUrl: () => string
   /** O diretório de onde o `docker` roda (dentro da allowlist do terminal). */
   readonly cwdDoDocker: () => string
+  readonly registrarEvidencia?: (runId: string, tentativa: number, conteudo: string) => void
 }
 
 /** Uma unidade de sandbox por run e tentativa: a suíte nunca reaproveita o ambiente de outra. */
@@ -131,7 +133,23 @@ export class SuiteNoSandbox implements ExecutorDeSuite {
       return { estado: 'nao-rodou', motivo: `${preflight.reason}: ${preflight.mensagem}` }
     }
     try {
-      return this.passos(sandbox, pedido, passos)
+      const resultado = this.passos(sandbox, pedido, passos)
+      const segura =
+        resultado.estado === 'vermelha'
+          ? {
+              estado: resultado.estado,
+              passo: resultado.passo,
+              classificacao: resultado.classificacao,
+              passos: resultado.passos,
+              evidencia: redigirSegredos(resultado.evidencia).slice(-MAX_EVIDENCIA)
+            }
+          : resultado
+      try {
+        this.deps.registrarEvidencia?.(pedido.runId, pedido.tentativa, JSON.stringify(segura))
+      } catch {
+        // Evidência do painel é melhor esforço e não altera o veredito da suíte.
+      }
+      return segura
     } finally {
       this.deps.docker.parar(sandbox.containerNome, this.deps.cwdDoDocker())
       this.deps.isolamento?.liberarRun(sandbox.runId, { preservarWorktree: true })

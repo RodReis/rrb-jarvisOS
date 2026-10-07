@@ -20,6 +20,7 @@ import type { EventoDaGeracao, GenerationEvent, StatusDoTrace } from '@shared/do
 import { faseDaEtapa, type Fase } from '@shared/domain/fase'
 import type { Etapa } from '@shared/domain/jornada'
 import { RETENCAO_DIAS } from '@shared/domain/retencao'
+import type { EventoDeTarefaDoSquad } from '@shared/domain/painel-tarefa'
 import { log } from '../logging/logger'
 import type { RegraDeRetencao } from '../pipeline/retencao-service'
 import {
@@ -39,6 +40,8 @@ export interface AberturaDoTrace {
   readonly etapa: Etapa
   readonly provider: string
   readonly modelo: string
+  readonly runId?: string
+  readonly tarefaId?: string
 }
 
 /**
@@ -58,7 +61,8 @@ export class GenerationTraceService {
      * — é o que faz a trilha existir para gerações que ninguém está olhando.
      */
     private readonly publicar?: (evento: EventoDaGeracao) => void,
-    private readonly agora: () => Date = () => new Date()
+    private readonly agora: () => Date = () => new Date(),
+    private readonly publicarTarefa?: (evento: EventoDeTarefaDoSquad) => void
   ) {}
 
   /** Abre o trace e devolve o coletor da geração. */
@@ -76,7 +80,29 @@ export class GenerationTraceService {
       iniciadoEm: this.agora().toISOString()
     })
 
-    return new Coletor(abertura.traceId, this.repo, this.publicar, this.agora)
+    if (abertura.runId !== undefined && abertura.tarefaId !== undefined) {
+      this.repo.associarTarefa(
+        abertura.escopo,
+        abertura.projectId,
+        abertura.runId,
+        abertura.tarefaId,
+        abertura.traceId,
+        this.agora().toISOString()
+      )
+    }
+
+    const publicar = (evento: EventoDaGeracao): void => {
+      this.publicar?.(evento)
+      if (abertura.runId !== undefined && abertura.tarefaId !== undefined) {
+        this.publicarTarefa?.({
+          runId: abertura.runId,
+          tarefaId: abertura.tarefaId,
+          traceId: abertura.traceId,
+          evento: evento.evento
+        })
+      }
+    }
+    return new Coletor(abertura.traceId, this.repo, publicar, this.agora)
   }
 
   /** O histórico da etapa (a lista que o painel mostra). */
@@ -91,6 +117,26 @@ export class GenerationTraceService {
   /** Os eventos de uma geração anterior — o que reabre o painel do histórico (critério 6). */
   eventos(escopo: EscopoDaGeracao, traceId: string): readonly GenerationEvent[] {
     return this.repo.eventos(escopo, traceId)
+  }
+
+  tarefasDoRun(escopo: EscopoDaGeracao, projectId: string, runId: string) {
+    return this.repo.tarefasDoRun(escopo, projectId, runId)
+  }
+
+  eventosDasTarefas(
+    escopo: EscopoDaGeracao,
+    traces: readonly import('@shared/domain/geracao').GenerationTrace[]
+  ) {
+    return this.repo.eventosDasTarefas(escopo, traces)
+  }
+
+  eventosDeTraces(
+    escopo: EscopoDaGeracao,
+    traces: readonly import('@shared/domain/geracao').GenerationTrace[]
+  ): Readonly<Record<string, readonly GenerationEvent[]>> {
+    return Object.fromEntries(
+      traces.map((trace) => [trace.id, this.repo.eventos(escopo, trace.id)])
+    )
   }
 
   /**

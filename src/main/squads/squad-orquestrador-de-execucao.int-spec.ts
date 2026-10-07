@@ -86,8 +86,8 @@ describe('Play → ciclo do Squad → publicação', () => {
   it('publica somente o SHA devolvido como aprovado e persiste o resumo seguro', async () => {
     const run = criarRunPronto()
     const executar = new SquadOrquestradorDeExecucao({
-      runs,
       fila: { transicionar: vi.fn() } as never,
+      runs: Object.assign(runs, { registrarPlanoDoSquad: () => true }),
       userId: () => ESCOPO.userId,
       preparar: async () => preparar(),
       ciclo: (_pedido, _preparacao, produzir) => ({
@@ -146,7 +146,7 @@ describe('Play → ciclo do Squad → publicação', () => {
     const transicionar = vi.fn(() => ({ reason: 'transicionado', mensagem: 'ok' }))
     const publicar = vi.fn()
     const executar = new SquadOrquestradorDeExecucao({
-      runs,
+      runs: Object.assign(runs, { registrarPlanoDoSquad: () => true }),
       fila: { transicionar } as never,
       userId: () => ESCOPO.userId,
       preparar: async () => preparar(),
@@ -183,7 +183,7 @@ describe('Play → ciclo do Squad → publicação', () => {
     const run = criarRunPronto()
     const transicionar = vi.fn(() => ({ reason: 'transicionado', mensagem: 'ok' }))
     const executar = new SquadOrquestradorDeExecucao({
-      runs,
+      runs: Object.assign(runs, { registrarPlanoDoSquad: () => true }),
       fila: { transicionar } as never,
       userId: () => ESCOPO.userId,
       preparar: async () => {

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { QuadroDeExecucao, ResultadoDoPlay } from '@shared/domain/quadro-execucao'
 import { Button, ErrorState, LoadingState } from '@design/ui'
+import { PainelDaTarefa } from './PainelDaTarefa'
 
 function estadoDaTarefa(estado: string): string {
   const rotulos: Record<string, string> = {
@@ -32,6 +33,7 @@ export function QuadroDeExecucao({
   const [carregando, setCarregando] = useState(true)
   const [ocupado, setOcupado] = useState(false)
   const [falhou, setFalhou] = useState(false)
+  const [runAberto, setRunAberto] = useState<string | undefined>()
 
   const atualizar = useCallback(async () => {
     try {
@@ -198,6 +200,15 @@ export function QuadroDeExecucao({
                       MVP-{cartao.numeroDoMvp} · F{cartao.numeroDaFatia}
                       {cartao.issue ? ` · #${cartao.issue}` : ''}
                     </p>
+                    {cartao.run !== undefined && (
+                      <button
+                        type="button"
+                        className="mt-2 rounded border border-[rgba(var(--jos-borda-rgb),0.18)] px-2 py-1 text-xs"
+                        onClick={() => setRunAberto(cartao.run?.id)}
+                      >
+                        Ver atividade dos agentes
+                      </button>
+                    )}
                     {cartao.equipe && (
                       <section
                         className="mt-3 rounded-md border border-[rgba(var(--jos-borda-rgb),0.12)] p-2 text-xs"
@@ -230,6 +241,9 @@ export function QuadroDeExecucao({
                             {cartao.equipe.progresso.map((tarefa) => (
                               <li key={tarefa.tarefaId}>
                                 {tarefa.papel}: {estadoDaTarefa(tarefa.estado)}
+                                {tarefa.estado === 'falhou' && tarefa.motivo && (
+                                  <span className="ml-1 text-red-400">· {tarefa.motivo}</span>
+                                )}
                               </li>
                             ))}
                           </ul>
@@ -310,6 +324,13 @@ export function QuadroDeExecucao({
                 </p>
               )}
             </div>
+            {runAberto !== undefined && (
+              <PainelDaTarefa
+                runId={runAberto}
+                workspace={workspace}
+                onFechar={() => setRunAberto(undefined)}
+              />
+            )}
           </section>
         ))}
       </div>

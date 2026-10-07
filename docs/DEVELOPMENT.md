@@ -2486,6 +2486,16 @@ Status: **entregue, aguardando aceite do PI** — SPEC `aprovada-pi`; issue [#37
 
 **Limite de escopo:** selo de aprovação de ação sensível e cancelamento pertencem à M28-F02 (#126), por decisão do PI em 2026-10-06; painel ao vivo e console pertencem à M28-F03 (#378), conforme a ordem aprovada do MVP-028. O quadro F01 mostra equipe, objetivo, workflow e teto de custo; a aprovação auditada no card continua na F02.
 
+### Fatia 03 — Painel da tarefa (`docs/spec/spec-execucao-03-painel-da-tarefa.md`)
+
+Status: **em andamento** — SPEC `aprovada-pi`; issue [#378](https://github.com/RodReis/rrb-jarvisOS/issues/378), `proplan:doing`. O PI aprovou em 2026-10-07 a associação persistida run/tarefa→trace e snapshots de arquivos/diff com 10 MiB por arquivo, 50 MiB por run, binários somente como metadados; excedente sinalizado incompleto sem bloquear publicação. Plano em [2026-10-07-m28-f03-painel-da-tarefa.md](superpowers/plans/2026-10-07-m28-f03-painel-da-tarefa.md).
+
+- [x] Migrar associação de traces e plano Squad; registrar início/conclusão de tarefa e eventos de cada trace por run.
+- [x] Persistir snapshots e diffs antes da remoção do worktree; escopo por usuário/workspace/projeto/run, hashes, cota de run e retenção M9-F06.
+- [x] Expor painel read-only via IPC: plano, agente, diff, arquivos, checks e evidência de testes redigida; busca e destaque sintático no visualizador.
+- [x] Executar regras (2944/2944), banco (2338 pass, 35 skipped, 0 falhas), tela (804 pass, 1 todo, 0 falhas) e prova visual (4/4); validar `reports/TESTS.md` com `--check --no-run --require-entry`. RLS local ficou skipped porque a stack Supabase não está ativa; o job obrigatório do CI ainda precisa prová-la.
+- [ ] PR com `refs #378`, CI verde no SHA final, merge em `main`, comentário de encerramento e `proplan:done`; issue fica aberta para aceite do PI.
+
 ### Fatia 04 — Cronograma de atividades configurável (`docs/spec/spec-escuta-04-cronograma.md`)
 
 Status: **em andamento** — issue [#359](https://github.com/RodReis/rrb-jarvisOS/issues/359), SPEC `aprovada-pi`; protótipo do editor aprovado pelo PI em 2026-10-06. Plano em `docs/superpowers/plans/2026-10-06-m18-f04-cronograma.md`.

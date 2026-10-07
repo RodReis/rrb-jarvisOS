@@ -22,6 +22,7 @@ import type {
   WorkspaceId
 } from '../domain/entities'
 import type { AuthSnapshot } from './auth'
+import type { PainelDaTarefa, EventoDeTarefaDoSquad } from '../domain/painel-tarefa'
 import type { ConfiguracaoDasBoasVindas, ReproducaoDasBoasVindas } from '../domain/boas-vindas'
 import type { ConfiguracaoDoCronograma, ResultadoDoCronograma } from '../domain/cronograma'
 import type { LogInput } from './logging'
@@ -650,6 +651,8 @@ export const IPC_CHANNELS = {
   filaVista: 'fila:vista',
   quadroExecucaoVista: 'quadro-execucao:vista',
   quadroExecucaoPlay: 'quadro-execucao:play',
+  painelDaTarefa: 'quadro-execucao:painel-tarefa',
+  painelDaTarefaConteudo: 'quadro-execucao:painel-tarefa-conteudo',
   /**
    * SPEC-Scheduler-01: o pool de execução — slots, fila, motivo de espera e métricas. **Só leitura.**
    *
@@ -764,6 +767,7 @@ export const IPC_EVENT_CHANNELS = {
    * lhe diz respeito.
    */
   generationEvent: 'geracao:evento',
+  squadTaskEvent: 'squad:tarefa-evento',
   /**
    * O toggle da hotkey global de voz (SPEC-Voz-01, critério 5).
    *
@@ -1116,6 +1120,7 @@ export interface JarvisBridge {
   /** Avisa a tela que a hotkey global abriu ou fechou a gravação (SPEC-Voz-01, critério 5). */
   onVozHotkey(listener: (gravando: boolean) => void): () => void
   onGenerationEvent(listener: (payload: EventoDaGeracao) => void): () => void
+  onSquadTaskEvent(runId: string, listener: (payload: EventoDeTarefaDoSquad) => void): () => void
   /** As gerações anteriores de uma etapa, da mais recente para a mais antiga (critério 6). */
   generationHistory(
     projectId: string,
@@ -1611,6 +1616,12 @@ export interface JarvisBridge {
   vistaDaFila(projectId: string, workspace: WorkspaceId): Promise<VistaDaFila>
   /** Quadro local derivado do ledger e das consultas reais da origem. */
   quadroDeExecucao(projectId: string, workspace: WorkspaceId): Promise<QuadroDeExecucao>
+  painelDaTarefa(runId: string, workspace: WorkspaceId): Promise<PainelDaTarefa | undefined>
+  painelDaTarefaConteudo(
+    runId: string,
+    snapshotId: string,
+    workspace: WorkspaceId
+  ): Promise<string | undefined>
   /** Play governado pelo main; o renderer só identifica projeto e fatias escolhidas. */
   playNoQuadro(pedido: PedidoDePlay, workspace: WorkspaceId): Promise<readonly ResultadoDoPlay[]>
   /** O pool de execução (SPEC-Scheduler-01). Só leitura, sem o token de nenhum slot. */

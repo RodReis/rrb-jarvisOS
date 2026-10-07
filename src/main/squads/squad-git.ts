@@ -19,16 +19,24 @@
 
 import {
   existsSync,
+  createReadStream,
   lstatSync,
   mkdirSync,
+  readlinkSync,
   readFileSync,
   realpathSync,
   rmSync,
   writeFileSync
 } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { dirname, isAbsolute, join, resolve, sep } from 'node:path'
 import type { WorkspaceId } from '@shared/domain/entities'
 import { ehControleOuDirecao } from '@shared/domain/squad-plano'
+import {
+  MAX_BYTES_POR_ARQUIVO_DO_PAINEL,
+  caminhoRelativoDoPainelValido
+} from '@shared/domain/painel-tarefa'
+import type { SnapshotCapturado } from '../pipeline/painel-tarefa-repository'
 import { GitRunner } from '../projects/git-runner'
 
 export interface WorktreeDeEscritor {
@@ -101,7 +109,7 @@ const MAX_TERMO_DE_BUSCA = 200
 /** O teto de ocorrências devolvidas: uma busca que casa tudo não vira contexto. */
 export const MAX_OCORRENCIAS_DA_BUSCA = 500
 const MAX_MENSAGEM = 200
-/** O teto de leitura de um arquivo em conflito: acima disso o arquivo não é texto de código. */
+/** O teto de leitura em conflito permanece independente do snapshot do painel. */
 const MAX_BYTES_DO_ARQUIVO_EM_CONFLITO = 1024 * 1024
 
 /** Onde um hook do repositório deixaria de existir: o caminho nulo do sistema. */
@@ -365,6 +373,109 @@ export class SquadGit {
     } catch {
       return recusa('arquivo ilegível')
     }
+  }
+
+  /** Captura paths já provados pelo kernel antes do commit/limpeza. Nunca segue links. */
+  async capturarSnapshots(
+    w: WorktreeDeEscritor,
+    caminhos: readonly string[]
+  ): Promise<ResultadoGit<readonly SnapshotCapturado[]>> {
+    const capturados: SnapshotCapturado[] = []
+    for (const caminho of caminhos) {
+      if (!caminhoRelativoDoPainelValido(caminho)) return recusa('caminho inválido no snapshot')
+      const alvo = this.caminhoNoWorktree(w, caminho)
+      if (typeof alvo !== 'string') return alvo
+      try {
+        const info = lstatSync(alvo, { throwIfNoEntry: false })
+        if (info === undefined) {
+          const diferenca = this.noWorktree(w, [
+            '-c',
+            'core.quotePath=false',
+            'diff',
+            '--no-ext-diff',
+            '--no-textconv',
+            '--no-color',
+            '-U0',
+            w.baseSha,
+            '--',
+            caminho
+          ])
+          if (!diferenca.ok) return recusa(diferenca.motivo)
+          capturados.push({
+            caminho,
+            tipo: 'removido',
+            bytes: 0,
+            sha256: createHash('sha256').update('').digest('hex'),
+            ...(diferenca.bruto === '' ? {} : { diff: diferenca.bruto })
+          })
+          continue
+        }
+        if (info.isSymbolicLink() || !info.isFile()) {
+          const material = info.isSymbolicLink()
+            ? `link:${readlinkSync(alvo)}`
+            : `arquivo:${info.size}`
+          capturados.push({
+            caminho,
+            tipo: 'binario',
+            bytes: info.size,
+            sha256: createHash('sha256').update(material).digest('hex')
+          })
+          continue
+        }
+        if (info.size > MAX_BYTES_POR_ARQUIVO_DO_PAINEL) {
+          const sha256 = await hashArquivo(alvo)
+          capturados.push({
+            caminho,
+            tipo: 'texto',
+            bytes: info.size,
+            sha256
+          })
+          continue
+        }
+        const bytes = readFileSync(alvo)
+        const hash = createHash('sha256').update(bytes).digest('hex')
+        const texto = bytes.toString('utf8')
+        const textoValido = !bytes.includes(0) && Buffer.from(texto, 'utf8').equals(bytes)
+        if (!textoValido) {
+          capturados.push({ caminho, tipo: 'binario', bytes: bytes.byteLength, sha256: hash })
+          continue
+        }
+        const existente = this.noWorktree(w, ['cat-file', '-e', `${w.baseSha}:${caminho}`])
+        let diff: string
+        if (!existente.ok) {
+          diff = `--- /dev/null\n+++ b/${caminho}\n${texto
+            .split('\n')
+            .map((linha) => `+${linha}`)
+            .join('\n')}`
+        } else {
+          const diferenca = this.noWorktree(w, [
+            '-c',
+            'core.quotePath=false',
+            'diff',
+            '--no-ext-diff',
+            '--no-textconv',
+            '--no-color',
+            '-U0',
+            w.baseSha,
+            '--',
+            caminho
+          ])
+          if (!diferenca.ok) return recusa(diferenca.motivo)
+          diff = diferenca.bruto
+        }
+        capturados.push({
+          caminho,
+          tipo: 'texto',
+          bytes: bytes.byteLength,
+          sha256: hash,
+          conteudo: texto,
+          ...(diff === '' ? {} : { diff })
+        })
+      } catch {
+        return recusa('arquivo não pôde ser capturado')
+      }
+    }
+    return { ok: true, valor: capturados }
   }
 
   /** Grava a resolução de um arquivo em conflito e o marca como resolvido. */
@@ -649,4 +760,10 @@ function ehSimbolico(w: WorktreeDeEscritor, caminho: string): boolean {
     // Arquivo removido: não há o que ser link.
     return false
   }
+}
+
+async function hashArquivo(caminho: string): Promise<string> {
+  const hash = createHash('sha256')
+  for await (const bloco of createReadStream(caminho)) hash.update(bloco)
+  return hash.digest('hex')
 }

@@ -35,6 +35,8 @@ export interface ProxyParaOEscritor {
     runId: string
     tentativa: number
     contextPackId: string
+    projectId: string
+    tarefaId: string
   }): {
     chave: string
     caminho: string
@@ -93,7 +95,9 @@ export class SandboxDoEscritorReal implements SandboxDoEscritor {
       workspaceId: pedido.workspaceId,
       runId: pedido.runId,
       tentativa: pedido.tentativa,
-      contextPackId: pedido.contextPackId
+      contextPackId: pedido.contextPackId,
+      projectId: pedido.projectId,
+      tarefaId: pedido.tarefaId
     })
     let sandbox: SandboxPreparado | undefined
     try {

@@ -31,7 +31,10 @@ export interface PreparacaoDoSquad {
 }
 
 export interface DependenciasDoOrquestradorDeExecucao {
-  readonly runs: Pick<PipelineRepository, 'buscar' | 'workspaceDoRun' | 'registrarProgressoDoSquad'>
+  readonly runs: Pick<
+    PipelineRepository,
+    'buscar' | 'workspaceDoRun' | 'registrarProgressoDoSquad' | 'registrarPlanoDoSquad'
+  >
   readonly fila: Pick<FilaService, 'transicionar'>
   readonly preparar: (pedido: PedidoDeExecucao) => Promise<PreparacaoDoSquad>
   readonly ciclo: (
@@ -96,6 +99,16 @@ export class SquadOrquestradorDeExecucao {
 
     try {
       const preparado = await this.deps.preparar(pedido)
+      const atual = this.deps.runs.buscar(pedido.runId)
+      if (atual !== undefined && atual.squadPlan === undefined) {
+        const salvo = this.deps.runs.registrarPlanoDoSquad(
+          { userId: atual.user_id, workspaceId: pedido.workspaceId, projectId: atual.projectId },
+          pedido.runId,
+          preparado.plano,
+          new Date()
+        )
+        if (!salvo) throw new Error('Não foi possível persistir o plano validado do Squad.')
+      }
       const composto = this.deps.ciclo(pedido, preparado, async (producao) => {
         const executada = await this.deps.produzir(pedido, preparado, producao)
         this.registrarProgresso(pedido, executada.resultado)

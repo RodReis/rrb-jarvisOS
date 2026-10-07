@@ -66,6 +66,8 @@ export interface ContextoDaUnidade {
   readonly runId: string
   readonly tentativa: number
   readonly contextPackId: string
+  readonly projectId?: string
+  readonly tarefaId?: string
 }
 
 /** O prefixo de caminho que identifica uma unidade: `/u/<chave>`. */
@@ -215,7 +217,10 @@ export class ExecutorProxy {
       provider: this.deps.rota(),
       prompt,
       ...(packId === undefined ? {} : { contextPackId: packId }),
-      ...(contexto === undefined ? {} : { runId: contexto.runId, tentativa: contexto.tentativa })
+      ...(contexto === undefined ? {} : { runId: contexto.runId, tentativa: contexto.tentativa }),
+      ...(unidade?.projectId === undefined || unidade.tarefaId === undefined
+        ? {}
+        : { painelTarefa: { projectId: unidade.projectId, tarefaId: unidade.tarefaId } })
     }
 
     res.writeHead(200, {

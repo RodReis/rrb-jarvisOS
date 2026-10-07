@@ -2066,6 +2066,49 @@ const MIGRATIONS: readonly string[] = [
   `
   ALTER TABLE pipeline_run ADD COLUMN squad_cost_limit_usd REAL;
   ALTER TABLE pipeline_run ADD COLUMN squad_cost_measured INTEGER CHECK (squad_cost_measured IN (0, 1));
+  `,
+
+  // 56 - associação escopada dos traces de IA às tarefas do Squad (M28-F03).
+  `
+  CREATE TABLE squad_task_trace (
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    project_id TEXT NOT NULL,
+    run_id TEXT NOT NULL,
+    task_id TEXT NOT NULL,
+    trace_id TEXT NOT NULL REFERENCES generation_trace(id) ON DELETE CASCADE,
+    iniciado_em TEXT NOT NULL,
+    PRIMARY KEY (user_id, workspace_id, run_id, task_id, trace_id)
+  );
+  CREATE INDEX idx_squad_task_trace_run
+    ON squad_task_trace(user_id, workspace_id, project_id, run_id, task_id, iniciado_em);
+  `,
+
+  // 57 - snapshots hash-verified por tarefa, sujeitos às cotas/retenção da M28-F03.
+  `
+  CREATE TABLE squad_task_snapshot (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    project_id TEXT NOT NULL,
+    run_id TEXT NOT NULL,
+    task_id TEXT NOT NULL,
+    path TEXT NOT NULL,
+    sha256 TEXT NOT NULL,
+    bytes INTEGER NOT NULL CHECK (bytes >= 0),
+    kind TEXT NOT NULL CHECK (kind IN ('texto','binario','removido','diff')),
+    state TEXT NOT NULL CHECK (state IN ('disponivel','incompleto','expirado','ausente')),
+    content BLOB,
+    created_at TEXT NOT NULL,
+    expired_at TEXT,
+    UNIQUE (user_id, workspace_id, run_id, task_id, path)
+  );
+  CREATE INDEX idx_squad_task_snapshot_run
+    ON squad_task_snapshot(user_id, workspace_id, project_id, run_id, task_id, path);
+  `,
+  // 58 - plano aprovado do Squad fica associado ao run para consulta read-only do painel.
+  `
+  ALTER TABLE pipeline_run ADD COLUMN squad_plan TEXT;
   `
 ]
 

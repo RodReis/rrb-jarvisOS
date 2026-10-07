@@ -134,6 +134,99 @@ export class GenerationTraceRepository {
       )
   }
 
+  associarTarefa(
+    escopo: EscopoDaGeracao,
+    projectId: string,
+    runId: string,
+    tarefaId: string,
+    traceId: string,
+    iniciadoEm: string
+  ): void {
+    if ([projectId, runId, tarefaId, traceId].some((valor) => valor.trim() === '')) {
+      throw new Error('A associação do trace à tarefa está incompleta.')
+    }
+    this.db
+      .prepare(
+        `INSERT INTO squad_task_trace
+         (user_id, workspace_id, project_id, run_id, task_id, trace_id, iniciado_em)
+       SELECT ?, ?, ?, ?, ?, ?, ?
+        WHERE EXISTS (
+          SELECT 1 FROM generation_trace
+           WHERE id = ? AND user_id = ? AND workspace_id = ? AND project_id = ?
+        )
+       ON CONFLICT (user_id, workspace_id, run_id, task_id, trace_id) DO NOTHING`
+      )
+      .run(
+        escopo.userId,
+        escopo.workspace,
+        projectId,
+        runId,
+        tarefaId,
+        traceId,
+        iniciadoEm,
+        traceId,
+        escopo.userId,
+        escopo.workspace,
+        projectId
+      )
+  }
+
+  tracesDaTarefa(
+    escopo: EscopoDaGeracao,
+    projectId: string,
+    runId: string,
+    tarefaId: string
+  ): readonly GenerationTrace[] {
+    const rows = this.db
+      .prepare(
+        `SELECT t.id, t.ledger_entry_id, t.project_id, t.etapa, t.fase, t.provider, t.model,
+              t.iniciado_em, t.terminado_em, t.status
+         FROM squad_task_trace s JOIN generation_trace t
+           ON t.id = s.trace_id AND t.user_id = s.user_id AND t.workspace_id = s.workspace_id
+        WHERE s.user_id = ? AND s.workspace_id = ? AND s.project_id = ?
+          AND s.run_id = ? AND s.task_id = ?
+        ORDER BY s.iniciado_em, t.id`
+      )
+      .all(escopo.userId, escopo.workspace, projectId, runId, tarefaId) as TraceRow[]
+    return rows.map(paraTrace)
+  }
+
+  tarefasDoRun(
+    escopo: EscopoDaGeracao,
+    projectId: string,
+    runId: string
+  ): readonly { readonly tarefaId: string; readonly traces: readonly GenerationTrace[] }[] {
+    const rows = this.db
+      .prepare(
+        `SELECT s.task_id, t.id, t.ledger_entry_id, t.project_id, t.etapa, t.fase,
+                t.provider, t.model, t.iniciado_em, t.terminado_em, t.status
+           FROM squad_task_trace s JOIN generation_trace t
+             ON t.id = s.trace_id AND t.user_id = s.user_id AND t.workspace_id = s.workspace_id
+          WHERE s.user_id = ? AND s.workspace_id = ? AND s.project_id = ? AND s.run_id = ?
+          ORDER BY s.task_id, s.iniciado_em, t.id`
+      )
+      .all(escopo.userId, escopo.workspace, projectId, runId) as (TraceRow & {
+      readonly task_id: string
+    })[]
+    const porTarefa = new Map<string, GenerationTrace[]>()
+    for (const row of rows) {
+      const lista = porTarefa.get(row.task_id) ?? []
+      lista.push(paraTrace(row))
+      porTarefa.set(row.task_id, lista)
+    }
+    return [...porTarefa].map(([tarefaId, traces]) => ({ tarefaId, traces }))
+  }
+
+  eventosDasTarefas(
+    escopo: EscopoDaGeracao,
+    traces: readonly GenerationTrace[]
+  ): Readonly<Record<string, readonly GenerationEvent[]>> {
+    const eventos = Object.fromEntries(
+      traces.map((trace) => [trace.id, this.eventos(escopo, trace.id)])
+    )
+    return eventos
+  }
+
   /**
    * Grava um lote de eventos numa transação só.
    *

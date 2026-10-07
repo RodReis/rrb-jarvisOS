@@ -113,6 +113,7 @@ import { CancelamentoService } from './pipeline/cancelamento-service'
 import { ehTerminal } from '@shared/domain/pipeline'
 import { EncadeadorDeRuns } from './pipeline/encadeador-de-runs'
 import { QuadroExecucaoService } from './pipeline/quadro-execucao-service'
+import { PainelDaTarefaRepository } from './pipeline/painel-tarefa-repository'
 import { SquadOrquestradorDeExecucao } from './squads/squad-orquestrador-de-execucao'
 import { SquadGit } from './squads/squad-git'
 import { planejarSquad } from './squads/squad-planejador'
@@ -548,6 +549,12 @@ if (!app.requestSingleInstanceLock()) {
       (evento) => {
         if (janela !== undefined && !janela.isDestroyed()) {
           janela.webContents.send(IPC_EVENT_CHANNELS.generationEvent, evento)
+        }
+      },
+      undefined,
+      (evento) => {
+        if (janela !== undefined && !janela.isDestroyed()) {
+          janela.webContents.send(IPC_EVENT_CHANNELS.squadTaskEvent, evento)
         }
       }
     )
@@ -1560,6 +1567,7 @@ if (!app.requestSingleInstanceLock()) {
     // A prova e a limpeza de cada run (SPEC-Entrega-06). O mesmo repositório serve aos dois: o
     // ledger grava o desfecho, e a limpeza registra nele a pendência do que não pôde ser removido.
     const executionLedger = new ExecutionLedgerRepository(storage.db)
+    const painelSnapshots = new PainelDaTarefaRepository(storage.db)
 
     // O isolamento por run (SPEC-Scheduler-03): inventário durável, portas inéditas, scanner de
     // credenciais e devolução dos recursos pela posse provada (label). Run em andamento nunca é
@@ -1908,7 +1916,41 @@ if (!app.requestSingleInstanceLock()) {
             isolamento,
             raizOperacional: () => pedido.raizOperacional,
             proxyUrl: () => executorProxy.url(),
-            cwdDoDocker: () => app.getAppPath()
+            cwdDoDocker: () => app.getAppPath(),
+            registrarEvidencia: (runId, tentativa, conteudo) => {
+              const estado = JSON.parse(conteudo) as {
+                estado?: string
+                passos?: readonly string[]
+                passo?: string
+                classificacao?: string
+                motivo?: string
+              }
+              const evidencia = JSON.stringify({
+                estado: estado.estado,
+                passos: estado.passos,
+                passo: estado.passo,
+                classificacao: estado.classificacao,
+                motivo: estado.motivo
+              }).slice(0, 2000)
+              painelSnapshots.salvarSnapshots(
+                {
+                  userId: userIdAtual(),
+                  workspace: pedido.workspaceId,
+                  projectId: pedido.projectId!
+                },
+                runId,
+                '__suite__',
+                [
+                  {
+                    caminho: `tentativa-${tentativa}.json`,
+                    tipo: 'texto',
+                    bytes: Buffer.byteLength(evidencia, 'utf8'),
+                    sha256: createHash('sha256').update(evidencia).digest('hex'),
+                    conteudo: evidencia
+                  }
+                ]
+              )
+            }
           }),
           audit: storage.audit,
           userId: userIdAtual,
@@ -1988,6 +2030,7 @@ if (!app.requestSingleInstanceLock()) {
           }),
           escritor: new ExecutorDeEscritor({
             git: squadGit,
+            painelSnapshots,
             slots: slotsDosSquads.gerente!,
             sandbox: squadSandbox,
             agente,
@@ -1997,7 +2040,24 @@ if (!app.requestSingleInstanceLock()) {
           }),
           audit: storage.audit,
           userId: userIdAtual,
-          workspaceId: () => pedido.workspaceId
+          workspaceId: () => pedido.workspaceId,
+          aoAtualizarTarefa: (tarefa) => {
+            const atual = pipelineRepository.buscar(pedido.runId)
+            if (atual === undefined) return
+            const restantes = (atual.squadProgress ?? []).filter(
+              (item) => item.tarefaId !== tarefa.tarefaId
+            )
+            pipelineRepository.registrarProgressoDoSquad(
+              {
+                userId: atual.user_id,
+                workspaceId: pedido.workspaceId,
+                projectId: atual.projectId
+              },
+              pedido.runId,
+              [...restantes, tarefa],
+              new Date()
+            )
+          }
         })
         const atual = pipelineRepository.buscar(pedido.runId)
         if (atual?.estado === 'VALIDATING' || atual?.estado === 'REVIEWING')
@@ -2091,6 +2151,8 @@ if (!app.requestSingleInstanceLock()) {
       contexts,
       phaseModels,
       runs: pipelineRepository,
+      generationTraces,
+      painelSnapshots,
       fila,
       runPrs,
       connectors,

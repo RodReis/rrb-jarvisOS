@@ -24,6 +24,7 @@ import type {
   ResultadoDoPlay
 } from '@shared/domain/quadro-execucao'
 import { projetarQuadro } from '@shared/domain/quadro-execucao'
+import type { PainelDaTarefa } from '@shared/domain/painel-tarefa'
 import { chaveDeFatia } from '@shared/domain/publicacao'
 import { custoMaximoUsd } from '@shared/domain/squad-resolucao'
 import type { RoadmapRepository } from '../projects/roadmap-repository'
@@ -35,6 +36,8 @@ import type { ConnectorService } from '../connectors/connector-service'
 import type { PedidoDeExecucao } from './encadeador-de-runs'
 import type { FilaService } from './fila-service'
 import type { PipelineRepository } from './pipeline-repository'
+import type { GenerationTraceService } from '../ai/generation-trace-service'
+import type { PainelDaTarefaRepository } from './painel-tarefa-repository'
 import type { RunPrRepository } from './run-pr-repository'
 import { log } from '../logging/logger'
 
@@ -48,6 +51,8 @@ export interface QuadroExecucaoDeps {
   readonly phaseModels: PhaseModelService
   readonly raizOperacional: () => string
   readonly runs: PipelineRepository
+  readonly generationTraces: GenerationTraceService
+  readonly painelSnapshots: PainelDaTarefaRepository
   readonly fila: FilaService
   readonly runPrs: RunPrRepository
   readonly connectors: ConnectorService
@@ -170,6 +175,109 @@ export class QuadroExecucaoService {
       finalizadas,
       agora: new Date(this.agora()).toISOString()
     })
+  }
+
+  async painel(runId: string, workspaceId: WorkspaceId): Promise<PainelDaTarefa | undefined> {
+    const userId = this.deps.userId()
+    const run = this.deps.runs.buscar(runId)
+    if (
+      run === undefined ||
+      run.user_id !== userId ||
+      this.deps.runs.workspaceDoRun(runId) !== workspaceId
+    )
+      return undefined
+    const escopo = { userId, workspace: workspaceId, projectId: run.projectId }
+    const tarefas = this.deps.generationTraces.tarefasDoRun(escopo, run.projectId, runId)
+    const progresso = new Map((run.squadProgress ?? []).map((item) => [item.tarefaId, item]))
+    const traces = tarefas.flatMap((item) => item.traces)
+    const plano = run.squadPlan?.tarefas ?? []
+    const arquivosDeTeste = this.deps.painelSnapshots
+      .snapshots(escopo, runId, '__suite__')
+      .arquivos.map((item) => ({
+        ...item,
+        resumo:
+          this.deps.painelSnapshots.conteudo(escopo, runId, item.id) ?? 'Conteúdo indisponível.'
+      }))
+    const snapshotsTarefas = plano.map((tarefa) =>
+      this.deps.painelSnapshots.snapshots(escopo, runId, tarefa.id)
+    )
+    const snapshotsCompletos = [
+      ...snapshotsTarefas.flatMap((itens) => [...itens.arquivos, ...itens.diffs]),
+      ...arquivosDeTeste
+    ].every((item) => item.estado !== 'incompleto')
+    const checks = ['PR_CI', 'AWAITING_MERGE'].includes(run.estado)
+      ? await this.consultarChecks(userId, workspaceId, runId)
+      : undefined
+    return {
+      projectId: run.projectId,
+      runId,
+      workspace: workspaceId,
+      estado: ['MERGED', 'AWAITING_MERGE', 'BLOCKED', 'CANCELLED', 'DONE'].includes(run.estado)
+        ? 'encerrado'
+        : 'ativo',
+      snapshotsCompletos,
+      tarefas: plano.map((tarefa) => {
+        const tarefaId = tarefa.id
+        const taskTraces = tarefas.find((item) => item.tarefaId === tarefaId)?.traces ?? []
+        const item = progresso.get(tarefaId)
+        const ultimo = taskTraces.at(-1)
+        return {
+          tarefaId,
+          papel: tarefa.papel,
+          camada: tarefa.camada,
+          ...(tarefa.escritor === undefined ? {} : { escritor: tarefa.escritor }),
+          paths: tarefa.paths,
+          regraDeConclusao: tarefa.regraDeConclusao,
+          estado: item?.estado ?? (ultimo?.terminadoEm === undefined ? 'pendente' : 'sem-sinal'),
+          ...(item === undefined ? {} : { atualizadoEm: run.updated_at }),
+          ...(item?.motivo === undefined ? {} : { motivo: item.motivo }),
+          dependencias: tarefa.dependencias,
+          traces: taskTraces,
+          snapshots: this.deps.painelSnapshots.snapshots(escopo, runId, tarefaId).arquivos,
+          diffs: this.deps.painelSnapshots.snapshots(escopo, runId, tarefaId).diffs,
+          ...(ultimo?.terminadoEm === undefined ? {} : { ultimoEventoEm: ultimo.terminadoEm })
+        }
+      }),
+      plano: plano.map(({ id, papel, dependencias }) => ({ tarefaId: id, papel, dependencias })),
+      arquivosDeTeste,
+      conteudosDeTeste: arquivosDeTeste.map(({ id, caminho, estado, resumo }) => ({
+        id,
+        caminho,
+        estado,
+        resumo
+      })),
+      ...(checks === undefined ? {} : { checks }),
+      traces: this.deps.generationTraces.eventosDeTraces(
+        { userId, workspace: workspaceId },
+        traces
+      ),
+      eventosDeTarefa: this.deps.generationTraces.eventosDasTarefas(
+        { userId, workspace: workspaceId },
+        traces
+      ),
+      tracesPorTarefa: Object.fromEntries(tarefas.map((item) => [item.tarefaId, item.traces])),
+      atualizadoEm: new Date(this.agora()).toISOString()
+    }
+  }
+
+  conteudoDoPainel(
+    runId: string,
+    snapshotId: string,
+    workspaceId: WorkspaceId
+  ): string | undefined {
+    const userId = this.deps.userId()
+    const run = this.deps.runs.buscar(runId)
+    if (
+      run === undefined ||
+      run.user_id !== userId ||
+      this.deps.runs.workspaceDoRun(runId) !== workspaceId
+    )
+      return undefined
+    return this.deps.painelSnapshots.conteudo(
+      { userId, workspace: workspaceId, projectId: run.projectId },
+      runId,
+      snapshotId
+    )
   }
 
   async play(pedido: PedidoDePlay, workspaceId: WorkspaceId): Promise<readonly ResultadoDoPlay[]> {

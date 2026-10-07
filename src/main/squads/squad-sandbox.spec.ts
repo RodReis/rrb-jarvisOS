@@ -268,7 +268,14 @@ describe('a unidade no proxy (SPEC-Squads-03, critério 5)', () => {
     await sandbox.preparar({ ...PEDIDO, tentativa: 2 })
 
     expect(registrados).toEqual([
-      { runId: 'run-1', tentativa: 2, contextPackId: 'pack-1', workspaceId: 'jarvis' }
+      {
+        runId: 'run-1',
+        tentativa: 2,
+        contextPackId: 'pack-1',
+        workspaceId: 'jarvis',
+        projectId: 'p-1',
+        tarefaId: 'tar-1'
+      }
     ])
     expect(preparados[0].caminhoDoProxy).toBe('/u/chave-1')
   })

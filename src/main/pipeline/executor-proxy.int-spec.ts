@@ -236,7 +236,9 @@ describe('ExecutorProxy — contexto por unidade (SPEC-Squads-03, critério 5)',
       workspaceId: WS,
       runId: 'run-A',
       tentativa: 1,
-      contextPackId: 'pack-A'
+      contextPackId: 'pack-A',
+      projectId: 'project-A',
+      tarefaId: 'task-A'
     })
     const b = proxy.registrarUnidade({
       workspaceId: WS,
@@ -248,9 +250,9 @@ describe('ExecutorProxy — contexto por unidade (SPEC-Squads-03, critério 5)',
     await (await pedidoHttp(`${a.caminho}/v1/messages`)).text()
     await (await pedidoHttp(`${b.caminho}/v1/messages`)).text()
 
-    expect(recebidos.map((r) => [r.runId, r.tentativa, r.contextPackId])).toEqual([
-      ['run-A', 1, 'pack-A'],
-      ['run-B', 3, 'pack-B']
+    expect(recebidos.map((r) => [r.runId, r.tentativa, r.contextPackId, r.painelTarefa])).toEqual([
+      ['run-A', 1, 'pack-A', { projectId: 'project-A', tarefaId: 'task-A' }],
+      ['run-B', 3, 'pack-B', undefined]
     ])
   })
 

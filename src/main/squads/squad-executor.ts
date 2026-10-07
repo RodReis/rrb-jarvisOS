@@ -83,6 +83,12 @@ export interface DependenciasDoExecutorDoSquad {
   readonly workspaceId: () => WorkspaceId
   /** O teto de workers em paralelo. Inválido (zero, negativo, NaN) cai no padrão. */
   readonly maxWorkers?: number
+  readonly aoAtualizarTarefa?: (tarefa: {
+    readonly tarefaId: string
+    readonly papel: TarefaDoPlano['papel']
+    readonly estado: EstadoDaTarefa
+    readonly motivo?: string
+  }) => void
 }
 
 export class ExecutorDoSquad {
@@ -109,6 +115,12 @@ export class ExecutorDoSquad {
       r: Omit<ResultadoDaTarefaDoSquad, 'tarefaId' | 'papel'>
     ): void => {
       resultados.set(t.id, { tarefaId: t.id, papel: t.papel, ...r })
+      this.deps.aoAtualizarTarefa?.({
+        tarefaId: t.id,
+        papel: t.papel,
+        estado: r.estado,
+        ...(r.motivo === undefined ? {} : { motivo: r.motivo.slice(0, 160) })
+      })
     }
     let falha: unknown
     try {
@@ -127,6 +139,11 @@ export class ExecutorDoSquad {
 
           if (escreve) escritoresOcupados.add(escritor)
           else workersRodando += 1
+          this.deps.aoAtualizarTarefa?.({
+            tarefaId: tarefa.id,
+            papel: tarefa.papel,
+            estado: 'em-execucao'
+          })
           const base = escreve ? (baseDoEscritor.get(escritor) ?? pedido.baseSha) : pedido.baseSha
           const rodando = this.rodar(pedido, tarefa, base)
             .then((r) => {
@@ -258,6 +275,7 @@ export class ExecutorDoSquad {
       const tentativa = pedido.tentativas?.get(tarefa.id) ?? 1
       const base = {
         runId: pedido.runId,
+        projectId: pedido.projectId,
         tarefa,
         objetivo: pedido.objetivoDe(tarefa),
         contexto: { pack: contexto.pack, fontes: contexto.fontes },

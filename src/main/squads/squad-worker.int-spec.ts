@@ -71,6 +71,7 @@ const resultadoValido = (parcial: Record<string, unknown> = {}): Record<string, 
 function pedido(parcial: Partial<PedidoDoWorker> = {}): PedidoDoWorker {
   return {
     runId: 'run-1',
+    projectId: 'project-1',
     tarefa: {
       id: 't1',
       papel: 'revisor',

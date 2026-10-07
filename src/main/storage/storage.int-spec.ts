@@ -124,6 +124,9 @@ describe('migrations', () => {
     antigo.exec('DROP TABLE project_executor_policy')
     antigo.exec('DROP TABLE generation_trace')
     antigo.exec('DROP TABLE generation_trace_event')
+    // As migrations 56/57 criam evidência de painel e 58 associa o plano ao run.
+    antigo.exec('DROP TABLE squad_task_snapshot')
+    antigo.exec('DROP TABLE squad_task_trace')
     antigo.exec('DROP TABLE persona')
     // A 44 acrescenta coluna a uma tabela que a v1 já tem: desfazer é remover a coluna, não a
     // tabela — dropar `user_profile` levaria junto o perfil que a v1 gravou.
