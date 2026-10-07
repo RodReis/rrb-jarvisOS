@@ -50,11 +50,15 @@ describe('PipelineRepository — snapshot do Squad', () => {
     const run = repo.criar(ESCOPO, { sliceId: 'f01', estado: 'PLANNED' }, AGORA)
 
     expect(repo.registrarSnapshotDoSquad(ESCOPO, run.id, SNAPSHOT, AGORA)).toBe(true)
+    expect(repo.registrarCustoMaximoDoSquad(ESCOPO, run.id, 12.5, true, AGORA)).toBe(true)
+    expect(repo.registrarCustoMaximoDoSquad(ESCOPO, run.id, 0, false, AGORA)).toBe(false)
     expect(repo.buscar(run.id)).toMatchObject({
       id: run.id,
       user_id: USER,
       projectId: ESCOPO.projectId,
-      squadSnapshot: SNAPSHOT
+      squadSnapshot: SNAPSHOT,
+      squadCostLimitUsd: 12.5,
+      squadCostMeasured: true
     })
     expect(
       repo.registrarSnapshotDoSquad({ ...ESCOPO, projectId: 'p-2' }, run.id, SNAPSHOT, AGORA)

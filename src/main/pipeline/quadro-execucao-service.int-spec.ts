@@ -56,7 +56,10 @@ describe('play de três fatias do mesmo MVP', () => {
     raiz = mkdtempSync(join(tmpdir(), 'jarvis-quadro-snapshot-'))
     mkdirSync(join(raiz, 'docs', 'spec'), { recursive: true })
     writeFileSync(join(raiz, 'ci-profile.json'), JSON.stringify(perfilNodeEmWindows('node')))
-    writeFileSync(join(raiz, slices[0]!.specSlug), '## Paths permitidos\n- `src`\n')
+    writeFileSync(
+      join(raiz, slices[0]!.specSlug),
+      '## Critérios de aceite\n1. Executar com segurança.\n## Paths permitidos\n- `src`\n'
+    )
     const perfil = lerPerfilDeCiVersionado(raiz)!
     const revisoes = [
       { artefato: slices[0]!.specSlug, hash: 'a'.repeat(64) },
@@ -91,6 +94,11 @@ describe('play de três fatias do mesmo MVP', () => {
         buscar: (id: string) => runs.get(id),
         registrarSnapshotDoSquad: (_e: unknown, _id: string, valor: unknown) => {
           expect(valor).toEqual(snapshot)
+          return true
+        },
+        registrarCustoMaximoDoSquad: (_e: unknown, _id: string, usd: number, medido: boolean) => {
+          expect(usd).toBe(0)
+          expect(medido).toBe(false)
           return true
         }
       } as never,
@@ -147,7 +155,10 @@ describe('play de três fatias do mesmo MVP', () => {
     mkdirSync(join(raiz, 'docs', 'spec'), { recursive: true })
     writeFileSync(join(raiz, 'ci-profile.json'), JSON.stringify(perfilNodeEmWindows('node')))
     for (const slice of slices) {
-      writeFileSync(join(raiz, slice.specSlug), '## Paths permitidos\n- `src`\n')
+      writeFileSync(
+        join(raiz, slice.specSlug),
+        '## Critérios de aceite\n1. Executar com segurança.\n## Paths permitidos\n- `src`\n'
+      )
     }
     const perfil = lerPerfilDeCiVersionado(raiz)
     expect(perfil).toBeDefined()
@@ -191,7 +202,8 @@ describe('play de três fatias do mesmo MVP', () => {
       raizOperacional: () => join(raiz!, 'operacional'),
       runs: {
         buscar: (id: string) => runs.get(id),
-        registrarSnapshotDoSquad: () => true
+        registrarSnapshotDoSquad: () => true,
+        registrarCustoMaximoDoSquad: () => true
       } as never,
       fila: {
         criarRun: (_p: string, _w: string, sliceId: string) => {

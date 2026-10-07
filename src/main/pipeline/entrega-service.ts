@@ -310,13 +310,6 @@ export class EntregaService {
   }
 
   private async executarCommitDoSquad(pedido: PedidoDeEntrega): Promise<ResultadoDaEntrega> {
-    const problema = this.garantirWorkflowDeCi(pedido)
-    if (problema !== undefined)
-      return this.bloqueado(
-        'perfil-de-ci-invalido',
-        'Revisar o workflow no pacote aprovado.',
-        problema
-      )
     if (this.foiInterrompida(pedido))
       return this.bloqueado('externo', 'Retomar a entrega.', 'Run cancelado antes da publicação.')
     const branch = this.deps.git.run(
@@ -329,6 +322,29 @@ export class EntregaService {
         'externo',
         'Verificar o worktree do Squad.',
         'HEAD não corresponde ao commit revisado e aprovado.'
+      )
+    }
+    const problema = this.garantirWorkflowDeCi(pedido)
+    if (problema !== undefined)
+      return this.bloqueado(
+        'perfil-de-ci-invalido',
+        'Revisar o workflow no pacote aprovado.',
+        problema
+      )
+    // A preparação do workflow nunca pode alterar o resultado depois do TESTE/REVIEWER. Caso
+    // o pacote não tenha workflow equivalente ao perfil aprovado, a execução para aqui e precisa
+    // voltar ao ciclo sobre um commit novo; publicar HEAD ainda limpo e deixar mudanças locais
+    // para trás faria o SHA da PR diferir do que os revisores aprovaram.
+    const estadoDoWorktree = this.deps.git.run(
+      ['status', '--porcelain', '--untracked-files=all'],
+      pedido.sandbox.worktreeNoHost,
+      pedido.workspaceId
+    )
+    if (!estadoDoWorktree.ok || estadoDoWorktree.saida.trim() !== '') {
+      return this.bloqueado(
+        'perfil-de-ci-invalido',
+        'Atualizar o workflow antes de repetir TESTE e REVIEWER.',
+        'A preparação do workflow alterou o worktree depois da revisão do Squad.'
       )
     }
     const alvo: PedidoDeEntrega = {

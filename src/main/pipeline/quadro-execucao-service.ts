@@ -25,6 +25,7 @@ import type {
 } from '@shared/domain/quadro-execucao'
 import { projetarQuadro } from '@shared/domain/quadro-execucao'
 import { chaveDeFatia } from '@shared/domain/publicacao'
+import { custoMaximoUsd } from '@shared/domain/squad-resolucao'
 import type { RoadmapRepository } from '../projects/roadmap-repository'
 import type { RoadmapService } from '../projects/roadmap-service'
 import { lerPerfilDeCiVersionado } from '../projects/ci-profile-revision'
@@ -63,6 +64,11 @@ function pathsAutorizadosDaSpec(texto: string): PathsPermitidos | undefined {
   const paths = [...secao.matchAll(/^\s*[-*]\s+`([^`]+)`/gm)].map(([, caminho]) => caminho.trim())
   if (paths.length === 0) return undefined
   return { origem: 'spec', paths, justificativa: 'Seção Paths permitidos da SPEC aprovada.' }
+}
+
+function contarCriteriosDaSpec(texto: string): number {
+  const secao = texto.match(/^## Critérios de aceite\s*\r?\n([\s\S]*?)(?=^##?\s|\s*$)/im)?.[1]
+  return [...(secao ?? '').matchAll(/^\s*\d+\.\s+.+$/gm)].length
 }
 
 /** Projeção do estado persistido da fila e consultas reais ao GitHub no processo principal. */
@@ -342,6 +348,27 @@ export class QuadroExecucaoService {
         )
         if (!registrado)
           throw new Error('Não foi possível persistir o snapshot do Squad antes do Play.')
+        const quantidadeDeCriterios = contarCriteriosDaSpec(textoDaSpec)
+        if (quantidadeDeCriterios === 0)
+          throw new Error(
+            'A SPEC aprovada não tem critérios numerados para estimar o teto de custo.'
+          )
+        const custoMaximo = custoMaximoUsd(
+          snapshotSquad.perfil,
+          snapshotSquad.resolucao,
+          quantidadeDeCriterios
+        )
+        if (
+          !this.deps.runs.registrarCustoMaximoDoSquad(
+            escopo,
+            run.id,
+            custoMaximo.usd,
+            custoMaximo.camadasMedidas.length > 0,
+            new Date(this.agora())
+          )
+        ) {
+          throw new Error('Não foi possível persistir o limite de custo antes do Play.')
+        }
         auditarSnapshotDoSquad(
           this.deps.audit ??
             (() => {
@@ -352,11 +379,15 @@ export class QuadroExecucaoService {
         )
         const execucao: PedidoDeExecucao = {
           runId: run.id,
+          projectId: pedido.projectId,
           workspaceId,
+          sliceId,
           raizOperacional: this.deps.raizOperacional(),
           repositorio: projeto.diretorio,
           base: branchRef.refId,
           pathsDaSpec: caminhos,
+          specPath: relativoDaSpec,
+          specText: textoDaSpec,
           alvo: { owner: repoParts[0], repo: repoParts[1], branchBase: branchRef.refId },
           issue,
           titulo: fatia.titulo,

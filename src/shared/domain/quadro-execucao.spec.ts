@@ -56,6 +56,49 @@ describe('colunaDoRun', () => {
 })
 
 describe('projetarQuadro', () => {
+  it('projeta equipe, teto de custo e progresso sem expor o snapshot bruto', () => {
+    const comSquad: PipelineRun = {
+      ...run('RUNNING'),
+      squadSnapshot: {
+        perfil: { escritores: 1, revisor: { camada: 'especialista' } },
+        resolucao: {
+          camadas: {
+            orquestrador: { modelo: { provider: 'claude-code', modelo: 'fable' } },
+            executor: { modelo: { provider: 'claude-code', modelo: 'fable' } },
+            especialista: { modelo: { provider: 'claude-code', modelo: 'fable' } }
+          }
+        }
+      },
+      squadCostLimitUsd: 8.25,
+      squadCostMeasured: true,
+      squadProgress: [{ tarefaId: 'dev-1', papel: 'desenvolvedor', estado: 'concluida' }]
+    }
+    const quadro = projetarQuadro({
+      projectId: 'project-1',
+      mvps: [mvp],
+      slices: [slice('slice-1', 1)],
+      runs: [comSquad],
+      concluidas: [],
+      bloqueadas: []
+    })
+    const cartao = quadro.colunas.find((coluna) => coluna.id === 'developer')?.cartoes[0]
+
+    expect(cartao?.equipe).toEqual(
+      expect.objectContaining({
+        objetivo: 'Fatia 1',
+        escritores: 1,
+        limiteCusto: { usd: 8.25, medido: true },
+        workflow: expect.arrayContaining(['DEVELOPER', 'TESTE', 'REVIEWER', 'PR/MERGE']),
+        progresso: [{ tarefaId: 'dev-1', papel: 'desenvolvedor', estado: 'concluida' }]
+      })
+    )
+    expect(cartao?.equipe?.membros.map((membro) => membro.papel)).toEqual([
+      'Orquestrador',
+      'Executor',
+      'Reviewer'
+    ])
+  })
+
   it('reconstrói cartões do ledger, ordena colunas e conserva a causa da dependência', () => {
     const quadro = projetarQuadro({
       projectId: 'project-1',

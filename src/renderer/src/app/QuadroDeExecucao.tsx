@@ -3,6 +3,20 @@ import type { WorkspaceId } from '@shared/domain/entities'
 import type { QuadroDeExecucao, ResultadoDoPlay } from '@shared/domain/quadro-execucao'
 import { Button, ErrorState, LoadingState } from '@design/ui'
 
+function estadoDaTarefa(estado: string): string {
+  const rotulos: Record<string, string> = {
+    concluida: 'concluída',
+    pendente: 'pendente',
+    'em-execucao': 'em execução',
+    falhou: 'falhou',
+    cancelada: 'cancelada',
+    recusada: 'recusada',
+    incompleta: 'incompleta',
+    'escopo-violado': 'fora do escopo'
+  }
+  return rotulos[estado] ?? 'estado registrado'
+}
+
 const INTERVALO_DA_CONSULTA_MS = 60_000
 
 export function QuadroDeExecucao({
@@ -184,6 +198,44 @@ export function QuadroDeExecucao({
                       MVP-{cartao.numeroDoMvp} · F{cartao.numeroDaFatia}
                       {cartao.issue ? ` · #${cartao.issue}` : ''}
                     </p>
+                    {cartao.equipe && (
+                      <section
+                        className="mt-3 rounded-md border border-[rgba(var(--jos-borda-rgb),0.12)] p-2 text-xs"
+                        aria-label={`Equipe e execução de ${cartao.titulo}`}
+                      >
+                        <p className="font-medium text-[var(--jos-cor-texto)]">
+                          Equipe · {cartao.equipe.escritores} escritor(es)
+                        </p>
+                        <ul className="mt-1 space-y-0.5 text-[var(--jos-cor-texto-suave)]">
+                          {cartao.equipe.membros.map((membro) => (
+                            <li key={`${membro.papel}-${membro.modelo}`}>
+                              {membro.papel}: {membro.modelo} ({membro.provider})
+                            </li>
+                          ))}
+                        </ul>
+                        <p className="mt-1 text-[var(--jos-cor-texto-suave)]">
+                          Teto de custo:{' '}
+                          {cartao.equipe.limiteCusto.medido
+                            ? `até US$ ${cartao.equipe.limiteCusto.usd.toFixed(2)}`
+                            : 'sem custo variável medido para a rota escolhida'}
+                        </p>
+                        <p className="mt-1 text-[var(--jos-cor-texto-suave)]">
+                          Fluxo: {cartao.equipe.workflow.join(' → ')}
+                        </p>
+                        {cartao.equipe.progresso.length > 0 && (
+                          <ul
+                            className="mt-1 space-y-0.5"
+                            aria-label="Progresso das tarefas do Squad"
+                          >
+                            {cartao.equipe.progresso.map((tarefa) => (
+                              <li key={tarefa.tarefaId}>
+                                {tarefa.papel}: {estadoDaTarefa(tarefa.estado)}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </section>
+                    )}
                     {coluna.id === 'a-fazer' &&
                       cartao.issue !== undefined &&
                       !cartao.specExecutavel && (

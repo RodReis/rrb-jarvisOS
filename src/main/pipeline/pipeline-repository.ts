@@ -38,6 +38,8 @@ interface RunRow {
   readonly bloqueio: string | null
   readonly squad_snapshot: string | null
   readonly squad_progress: string | null
+  readonly squad_cost_limit_usd: number | null
+  readonly squad_cost_measured: number | null
   readonly created_at: string
   readonly updated_at: string
 }
@@ -89,6 +91,10 @@ function toRun(row: RunRow): PipelineRun {
     ...(bloqueio === undefined ? {} : { bloqueio }),
     ...(squadSnapshot === undefined ? {} : { squadSnapshot }),
     ...(squadProgress === undefined ? {} : { squadProgress }),
+    ...(row.squad_cost_limit_usd === null ? {} : { squadCostLimitUsd: row.squad_cost_limit_usd }),
+    ...(row.squad_cost_measured === null
+      ? {}
+      : { squadCostMeasured: row.squad_cost_measured === 1 }),
     created_at: row.created_at,
     updated_at: row.updated_at
   }
@@ -216,6 +222,34 @@ export class PipelineRepository {
       )
       .run(
         JSON.stringify(progresso),
+        agora.toISOString(),
+        runId,
+        escopo.userId,
+        escopo.workspaceId,
+        escopo.projectId
+      )
+    return resultado.changes === 1
+  }
+
+  /** Teto de custo versionado com o run, calculado antes da primeira chamada do Squad. */
+  registrarCustoMaximoDoSquad(
+    escopo: EscopoDoRun,
+    runId: string,
+    limiteUsd: number,
+    medido: boolean,
+    agora: Date
+  ): boolean {
+    if (!Number.isFinite(limiteUsd) || limiteUsd < 0) return false
+    const resultado = this.db
+      .prepare(
+        `UPDATE pipeline_run SET squad_cost_limit_usd = ?, squad_cost_measured = ?, updated_at = ?
+          WHERE id = ? AND user_id = ? AND workspace_id = ? AND project_id = ?
+            AND squad_snapshot IS NOT NULL AND squad_cost_limit_usd IS NULL
+            AND estado NOT IN ('MERGED','AWAITING_MERGE','BLOCKED','CANCELLED')`
+      )
+      .run(
+        limiteUsd,
+        medido ? 1 : 0,
         agora.toISOString(),
         runId,
         escopo.userId,

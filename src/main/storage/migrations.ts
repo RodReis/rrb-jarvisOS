@@ -2060,6 +2060,12 @@ const MIGRATIONS: readonly string[] = [
   `
   ALTER TABLE pipeline_run ADD COLUMN squad_snapshot TEXT;
   ALTER TABLE pipeline_run ADD COLUMN squad_progress TEXT;
+  `,
+
+  // 55 - limite máximo calculado antes do Play e exibido no cartão do quadro (M28-F01).
+  `
+  ALTER TABLE pipeline_run ADD COLUMN squad_cost_limit_usd REAL;
+  ALTER TABLE pipeline_run ADD COLUMN squad_cost_measured INTEGER CHECK (squad_cost_measured IN (0, 1));
   `
 ]
 

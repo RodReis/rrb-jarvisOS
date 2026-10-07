@@ -53,8 +53,22 @@ export interface CartaoDoQuadro {
   readonly issueUrl?: string
   readonly coluna: ColunaDoQuadro
   readonly run?: PipelineRun
+  readonly equipe?: EquipeDoQuadro
   readonly dependenciasAbertas: readonly DependenciaAberta[]
   readonly consulta: ConsultaDeChecks
+}
+
+export interface EquipeDoQuadro {
+  readonly objetivo: string
+  readonly escritores: number
+  readonly membros: readonly {
+    readonly papel: string
+    readonly provider: string
+    readonly modelo: string
+  }[]
+  readonly workflow: readonly string[]
+  readonly limiteCusto: { readonly usd: number; readonly medido: boolean }
+  readonly progresso: NonNullable<PipelineRun['squadProgress']>
 }
 
 export interface ColunaDoQuadroDeExecucao {
@@ -77,6 +91,50 @@ export const TITULOS_DAS_COLUNAS: Readonly<Record<ColunaDoQuadro, string>> = {
   'pr-merge': 'PR/MERGE',
   done: 'DONE',
   finalizado: 'Finalizado (PI)'
+}
+
+function objeto(valor: unknown): Record<string, unknown> | undefined {
+  return typeof valor === 'object' && valor !== null && !Array.isArray(valor)
+    ? (valor as Record<string, unknown>)
+    : undefined
+}
+
+function membroDoSnapshot(
+  papel: string,
+  camada: unknown,
+  resolucao: unknown
+): { readonly papel: string; readonly provider: string; readonly modelo: string } | undefined {
+  if (typeof camada !== 'string') return undefined
+  const resolvida = objeto(objeto(resolucao)?.[camada])
+  const modelo = objeto(resolvida?.modelo)
+  if (typeof modelo?.provider !== 'string' || typeof modelo.modelo !== 'string') return undefined
+  return { papel, provider: modelo.provider, modelo: modelo.modelo }
+}
+
+function equipeDoRun(titulo: string, run: PipelineRun | undefined): EquipeDoQuadro | undefined {
+  if (run?.squadSnapshot === undefined) return undefined
+  const snapshot = objeto(run.squadSnapshot)
+  const perfil = objeto(snapshot?.perfil)
+  const resolucao = objeto(snapshot?.resolucao)?.camadas
+  const revisor = objeto(perfil?.revisor)?.camada
+  const membros = [
+    membroDoSnapshot('Orquestrador', 'orquestrador', resolucao),
+    membroDoSnapshot('Executor', 'executor', resolucao),
+    membroDoSnapshot('Reviewer', revisor, resolucao)
+  ].filter((membro): membro is NonNullable<typeof membro> => membro !== undefined)
+  const escritores = perfil?.escritores
+  if (typeof escritores !== 'number' || membros.length === 0) return undefined
+  return {
+    objetivo: titulo,
+    escritores,
+    membros,
+    workflow: ['DEVELOPER', 'TESTE', 'REVIEWER', 'PR/MERGE', 'DONE', 'Finalizado (PI)'],
+    limiteCusto: {
+      usd: run.squadCostLimitUsd ?? 0,
+      medido: run.squadCostMeasured ?? false
+    },
+    progresso: run.squadProgress ?? []
+  }
 }
 
 /** A coluna deriva apenas do estado persistido do run. Um run ausente permanece em A fazer. */
@@ -146,6 +204,7 @@ export function projetarQuadro(entrada: EntradaDoQuadro): QuadroDeExecucao {
         ? 'done'
         : colunaDoRun(run?.estado)
     const issue = entrada.issues?.get(slice.id)
+    const equipe = equipeDoRun(slice.titulo, run)
 
     const cartao: CartaoDoQuadro = {
       sliceId: slice.id,
@@ -159,6 +218,7 @@ export function projetarQuadro(entrada: EntradaDoQuadro): QuadroDeExecucao {
         : { issue: issue.numero, ...(issue.url ? { issueUrl: issue.url } : {}) }),
       coluna,
       ...(run === undefined ? {} : { run }),
+      ...(equipe === undefined ? {} : { equipe }),
       dependenciasAbertas: bloqueadas.get(slice.id) ?? [],
       consulta:
         entrada.consultas?.get(run?.id ?? slice.id) ??

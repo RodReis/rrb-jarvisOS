@@ -48,8 +48,10 @@ const MAXIMO_DE_ELOS = 50
 
 export interface PedidoDeExecucao {
   readonly runId: string
+  readonly projectId?: string
   /** O espaço do run: o run não o guarda, e ele é a credencial e o escopo de auditoria. */
   readonly workspaceId: WorkspaceId
+  readonly sliceId?: string
   /** A raiz operacional validada: onde o worktree pode nascer. Nunca o checkout ativo. */
   readonly raizOperacional: string
   /** O repositório do projeto-alvo, no host. */
@@ -57,6 +59,8 @@ export interface PedidoDeExecucao {
   /** A branch base de onde o run parte. */
   readonly base: string
   readonly pathsDaSpec?: PathsPermitidos
+  readonly specPath?: string
+  readonly specText?: string
   readonly portasDeServico?: readonly number[]
   /** A branch da fatia **não** entra: é a que o preflight cria, e a entrega publica essa. */
   readonly alvo: Omit<AlvoDaEntrega, 'branchDaFatia'>

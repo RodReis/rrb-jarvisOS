@@ -40,6 +40,7 @@ import { createSupabaseClient, readSupabaseConfig } from './auth/supabase-client
 import { SafeStorageTokenVault } from './auth/token-vault'
 import { registerIpcHandlers } from './ipc/handlers'
 import { AiCallService } from './ai/call-provider'
+import { WorkspaceRunContext } from './workspace/workspace-run-context'
 import { AnthropicAdapter } from './ai/anthropic-adapter'
 import { GeminiAdapter } from './ai/gemini-adapter'
 import { OllamaAdapter } from './ai/ollama-adapter'
@@ -112,6 +113,24 @@ import { CancelamentoService } from './pipeline/cancelamento-service'
 import { ehTerminal } from '@shared/domain/pipeline'
 import { EncadeadorDeRuns } from './pipeline/encadeador-de-runs'
 import { QuadroExecucaoService } from './pipeline/quadro-execucao-service'
+import { SquadOrquestradorDeExecucao } from './squads/squad-orquestrador-de-execucao'
+import { SquadGit } from './squads/squad-git'
+import { planejarSquad } from './squads/squad-planejador'
+import { GeradorViaPontoUnico } from './squads/squad-gerador'
+import { ContextoDaTarefa } from './squads/squad-contexto'
+import { ExecutorDoSquad } from './squads/squad-executor'
+import { ExecutorDeWorker } from './squads/squad-worker'
+import { ExecutorDeEscritor } from './squads/squad-escritor'
+import { SandboxDoEscritorReal } from './squads/squad-sandbox'
+import { AgenteNoContainer } from './squads/squad-agente-container'
+import { SuiteNoSandbox, EtapaDeTeste } from './squads/squad-teste'
+import { RevisorService } from './squads/squad-revisor'
+import { escolherRevisores } from '@shared/domain/squad-revisores'
+import { CicloDeRevisao } from './squads/squad-ciclo'
+import { AchadoRepository } from './squads/achado-repository'
+import { criarSnapshotDoSquad, verificarSnapshot } from './squads/squad-snapshot'
+import { PERFIL_PADRAO } from '@shared/domain/squad-perfil'
+import { custoMaximoUsd } from '@shared/domain/squad-resolucao'
 import { PosseDoPerfilCodex } from './pipeline/posse-do-perfil-codex'
 import { RecuperacaoService } from './pipeline/recuperacao-service'
 import { RunPrRepository } from './pipeline/run-pr-repository'
@@ -285,6 +304,8 @@ if (!app.requestSingleInstanceLock()) {
     const userIdAtual = (): string => auth?.usuarioAtual()?.id ?? LOCAL_USER_ID
 
     const workspaces = new WorkspaceService(storage.audit, userIdAtual)
+    const workspaceDoRun = new WorkspaceRunContext()
+    const workspaceAtual = (): WorkspaceId => workspaceDoRun.atual(() => workspaces.atual())
     // `nativeTheme` é a única fonte confiável do tema do SO; entra por injeção para o
     // serviço seguir testável sem Electron.
     const preferences = new PreferencesService(storage.profiles, LOCAL_USER_ID, () =>
@@ -431,7 +452,7 @@ if (!app.requestSingleInstanceLock()) {
       userDataDir: app.getPath('userData'),
       audit: storage.audit,
       userId: userIdAtual,
-      workspaceId: () => workspaces.atual()
+      workspaceId: workspaceAtual
     })
 
     const ollamaAdapter = new OllamaAdapter()
@@ -1433,7 +1454,7 @@ if (!app.requestSingleInstanceLock()) {
       leases: leaseRepository,
       audit: storage.audit,
       userId: userIdAtual,
-      workspaceId: () => workspaces.atual(),
+      workspaceId: workspaceAtual,
       gates: (item) => fila.gatesDoItem(item),
       ativar: (item) => fila.ativarRun(item),
       independencia,
@@ -1461,7 +1482,7 @@ if (!app.requestSingleInstanceLock()) {
       ...ganchosDosSlots(() => slotsDosSquads.gerente),
       runs: pipelineRepository,
       pool,
-      workspaceId: () => workspaces.atual(),
+      workspaceId: workspaceAtual,
       audit: storage.audit,
       roadmap: (escopo) => roadmapRepository.carregar(escopo),
       aprovacoes: (escopo) => roadmapRepository.listarAprovacoes(escopo),
@@ -1534,7 +1555,7 @@ if (!app.requestSingleInstanceLock()) {
           redes: inventario.redesAtivas(userIdAtual())
         })
     )
-    const docker = new DockerRunner(terminalDocker, () => workspaces.atual())
+    const docker = new DockerRunner(terminalDocker, workspaceAtual)
 
     // A prova e a limpeza de cada run (SPEC-Entrega-06). O mesmo repositório serve aos dois: o
     // ledger grava o desfecho, e a limpeza registra nele a pendência do que não pôde ser removido.
@@ -1551,7 +1572,7 @@ if (!app.requestSingleInstanceLock()) {
       ledger: executionLedger,
       audit: storage.audit,
       userId: userIdAtual,
-      workspaceId: () => workspaces.atual(),
+      workspaceId: workspaceAtual,
       // O inventário registra também a **unidade** de sandbox de um Squad (`<run>-<escritor>-…`):
       // procurá-la entre os runs ativos a daria por morta e devolveria o sandbox de um run vivo.
       runAtivo: (runId) =>
@@ -1636,7 +1657,7 @@ if (!app.requestSingleInstanceLock()) {
         pipelineRepository,
         storage.audit,
         userIdAtual,
-        () => workspaces.atual(),
+        workspaceAtual,
         undefined,
         // As transições da construção passam pela fila, com o fencing token do run.
         fila
@@ -1654,7 +1675,7 @@ if (!app.requestSingleInstanceLock()) {
         leases: leaseRepository,
         ledger: executionLedger,
         isolamento,
-        workspaceId: () => workspaces.atual()
+        workspaceId: workspaceAtual
       }),
       budget: budgetRepository,
       audit: storage.audit,
@@ -1669,7 +1690,7 @@ if (!app.requestSingleInstanceLock()) {
     const executorProxy = new ExecutorProxy({
       ai,
       userId: userIdAtual,
-      workspaceId: () => workspaces.atual(),
+      workspaceId: workspaceAtual,
       rota: () => 'claude-code',
       // O run corrente vem do `EntregaService` (M9-F05), que só é construído abaixo — o proxy
       // precisa subir antes porque é ele que o preflight pergunta se está no ar. A indireção por
@@ -1693,7 +1714,7 @@ if (!app.requestSingleInstanceLock()) {
       leases: leaseRepository,
       audit: storage.audit,
       userId: userIdAtual,
-      workspaceId: () => workspaces.atual(),
+      workspaceId: workspaceAtual,
       proxyNoAr: () => executorProxy.noAr(),
       // A derivação a partir da arquitetura aprovada é da M9-F04, que conhece o pacote do
       // projeto-alvo. Sem ela, a SPEC precisa trazer a seção — e o preflight recusa se não vier,
@@ -1744,6 +1765,323 @@ if (!app.requestSingleInstanceLock()) {
       perfilCodex: posseDoPerfilCodex
     })
 
+    const transicionarSquadParaRunning = (
+      pedido: import('./pipeline/encadeador-de-runs').PedidoDeExecucao
+    ): void => {
+      const atual = pipelineRepository.buscar(pedido.runId)
+      if (atual?.estado === 'RUNNING') return
+      if (atual === undefined || !['READY', 'VALIDATING', 'REVIEWING'].includes(atual.estado))
+        throw new Error('O run não está em um estado que permita iniciar a produção do Squad.')
+      const mudou = fila.transicionar(atual.projectId, pedido.workspaceId, pedido.runId, 'RUNNING')
+      if (mudou.reason !== 'transicionado') throw new Error(mudou.mensagem)
+    }
+
+    const orquestradorSquad = new SquadOrquestradorDeExecucao({
+      runs: pipelineRepository,
+      fila,
+      userId: userIdAtual,
+      preparar: async (pedido) => {
+        const squadGit = new SquadGit({ git: gitRunner, workspaceId: () => pedido.workspaceId })
+        const run = pipelineRepository.buscar(pedido.runId)
+        const snapshot = run?.squadSnapshot as
+          import('./squads/squad-snapshot').SnapshotDoSquad | undefined
+        if (snapshot === undefined || !verificarSnapshot(snapshot))
+          throw new Error('O run não tem snapshot válido do Squad.')
+        if (pedido.projectId === undefined || pedido.sliceId === undefined)
+          throw new Error('O run não contém projectId e sliceId para o Squad.')
+        if (
+          pedido.specPath === undefined ||
+          pedido.specText === undefined ||
+          pedido.pathsDaSpec === undefined
+        )
+          throw new Error('A SPEC aprovada precisa declarar caminho, texto e Paths permitidos.')
+        if (pedido.perfilDeCi === undefined)
+          throw new Error('O perfil de CI aprovado não foi enviado ao Squad.')
+
+        const base = squadGit.resolverSha(pedido.repositorio, pedido.base)
+        if (!base.ok) throw new Error(`A base do projeto não resolveu para um SHA: ${base.motivo}`)
+        const arvore = squadGit.listarNaRevisao(pedido.repositorio, base.valor)
+        if (!arvore.ok)
+          throw new Error(`Não foi possível listar os arquivos da base: ${arvore.motivo}`)
+        const criteriosSecao = pedido.specText.match(
+          /^## Critérios de aceite\s*\r?\n([\s\S]*?)(?=^##?\s|\s*$)/im
+        )?.[1]
+        const criterios = [...(criteriosSecao ?? '').matchAll(/^\s*(\d+)\.\s+(.+)$/gm)].map(
+          ([, numero, texto]) => ({ numero: Number(numero), texto: texto.trim() })
+        )
+        if (criterios.length === 0)
+          throw new Error('A SPEC aprovada não tem critérios numerados legíveis.')
+        const riscosSecao = pedido.specText.match(
+          /^## Riscos\s*\r?\n([\s\S]*?)(?=^##?\s|\s*$)/im
+        )?.[1]
+        const riscos = [...(riscosSecao ?? '').matchAll(/^\s*[-*]\s+(.+)$/gm)].map(([, texto]) =>
+          texto.trim()
+        )
+        const arquivos = [...arvore.valor.keys()].sort()
+        const fontesPermitidas = arquivos.filter((arquivo) =>
+          pedido.pathsDaSpec!.paths.some(
+            (path) => arquivo === path || arquivo.startsWith(`${path.replace(/\/$/, '')}/`)
+          )
+        )
+        const custo = custoMaximoUsd(snapshot.perfil, snapshot.resolucao, criterios.length)
+        const gerador = new GeradorViaPontoUnico(
+          'fase',
+          snapshot.modeloDaFase,
+          ai,
+          { userId: userIdAtual(), workspace: pedido.workspaceId },
+          { contextPackId: pedido.contextPackId, runId: pedido.runId }
+        )
+        const planejado = await planejarSquad(
+          {
+            geradorFase: gerador,
+            auditoria: storage.audit,
+            escopo: { userId: userIdAtual(), workspaceId: pedido.workspaceId }
+          },
+          {
+            runId: pedido.runId,
+            specRevisao: createHash('sha256').update(pedido.specText).digest('hex'),
+            spec: { titulo: pedido.titulo, criterios, ...(riscos.length === 0 ? {} : { riscos }) },
+            snapshot,
+            base: {
+              pathsPermitidos: pedido.pathsDaSpec.paths,
+              fontesPermitidas: [...new Set([...fontesPermitidas, pedido.specPath])],
+              arquivosDaBase: arquivos,
+              orcamentoUsd: custo.usd
+            }
+          }
+        )
+        if (!planejado.ok)
+          throw new Error(`O planejador não gerou plano válido: ${planejado.motivo}.`)
+        return {
+          snapshot,
+          baseSha: base.valor,
+          paths: pedido.pathsDaSpec,
+          plano: planejado.plano,
+          perfilCi: pedido.perfilDeCi,
+          git: squadGit
+        }
+      },
+      ciclo: (pedido, preparar, produzir) => {
+        const squadGit = preparar.git
+        const camadaRevisor = preparar.snapshot.perfil.revisor.camada
+        const resolucaoRevisor = preparar.snapshot.resolucao.camadas[camadaRevisor]
+        if (resolucaoRevisor.modelo === undefined)
+          throw new Error('O snapshot não resolveu modelo de reviewer.')
+        const origemRevisor = preparar.snapshot.perfil.camadas[camadaRevisor]
+        const candidato = {
+          id: 'revisor-principal',
+          modelo: resolucaoRevisor.modelo,
+          ...(origemRevisor.origem === 'modelo' && origemRevisor.numCtx !== undefined
+            ? { numCtx: origemRevisor.numCtx }
+            : {})
+        }
+        const participantes = preparar.plano.tarefas
+          .filter((tarefa) => tarefa.papel === 'desenvolvedor')
+          .map((tarefa) => {
+            const camada = preparar.snapshot.resolucao.camadas[tarefa.camada]
+            if (camada.modelo === undefined)
+              throw new Error(`Sem modelo resolvido para ${tarefa.camada}.`)
+            return { id: tarefa.escritor ?? tarefa.id, modelo: camada.modelo }
+          })
+        const escolha = escolherRevisores([candidato], participantes)
+        if (!escolha.ok) throw new Error('Nenhum reviewer elegível foi resolvido pelo snapshot.')
+        const arvoreBase = squadGit.listarNaRevisao(pedido.repositorio, preparar.baseSha)
+        if (!arvoreBase.ok)
+          throw new Error(`Não foi possível ler docs/REVIEW.md: ${arvoreBase.motivo}`)
+        const reviewOid = arvoreBase.valor.get('docs/REVIEW.md')
+        if (reviewOid === undefined) throw new Error('A base aprovada não contém docs/REVIEW.md.')
+        const contrato = squadGit.lerNaRevisao(pedido.repositorio, reviewOid)
+        if (!contrato.ok) throw new Error(`docs/REVIEW.md não pôde ser lido: ${contrato.motivo}`)
+        const revisor = new RevisorService({
+          git: squadGit,
+          contexto: contexts,
+          ia: ai,
+          achados: new AchadoRepository(storage.db),
+          audit: storage.audit,
+          userId: userIdAtual,
+          workspaceId: () => pedido.workspaceId
+        })
+        const suite = new EtapaDeTeste({
+          suite: new SuiteNoSandbox({
+            preflight,
+            docker,
+            isolamento,
+            raizOperacional: () => pedido.raizOperacional,
+            proxyUrl: () => executorProxy.url(),
+            cwdDoDocker: () => app.getAppPath()
+          }),
+          audit: storage.audit,
+          userId: userIdAtual,
+          workspaceId: () => pedido.workspaceId
+        })
+        const transicionar = (estado: 'RUNNING' | 'VALIDATING' | 'REVIEWING'): void => {
+          const atual = pipelineRepository.buscar(pedido.runId)
+          if (atual?.estado === estado) return
+          const mudou = fila.transicionar(
+            atual?.projectId ?? pedido.projectId!,
+            pedido.workspaceId,
+            pedido.runId,
+            estado
+          )
+          if (mudou.reason !== 'transicionado') throw new Error(mudou.mensagem)
+        }
+        const etapaTeste = {
+          executar: async (entrada: Parameters<EtapaDeTeste['executar']>[0]) => {
+            transicionar('VALIDATING')
+            return suite.executar(entrada)
+          }
+        }
+        const etapaRevisor = {
+          revisar: async (entrada: Parameters<RevisorService['revisar']>[0]) => {
+            transicionar('REVIEWING')
+            return revisor.revisar(entrada)
+          }
+        }
+        const ciclo = new CicloDeRevisao({
+          produzir,
+          teste: etapaTeste,
+          revisor: etapaRevisor,
+          achados: new AchadoRepository(storage.db),
+          audit: storage.audit,
+          userId: userIdAtual,
+          workspaceId: () => pedido.workspaceId
+        })
+        return {
+          ciclo,
+          revisao: {
+            runId: pedido.runId,
+            projectId: pedido.projectId!,
+            repositorio: pedido.repositorio,
+            baseSha: preparar.baseSha,
+            rota: 'claude-code',
+            revisores: escolha.revisores,
+            spec: { caminho: pedido.specPath!, texto: pedido.specText! },
+            contratoDeRevisao: contrato.valor,
+            manifesto: ''
+          }
+        }
+      },
+      produzir: async (pedido, preparar, producao) => {
+        const squadGit = preparar.git
+        const snapshot = preparar.snapshot
+        const squadSandbox = new SandboxDoEscritorReal({
+          preflight,
+          git: squadGit,
+          docker,
+          isolamento,
+          proxy: executorProxy,
+          raizOperacional: () => pedido.raizOperacional,
+          proxyUrl: () => executorProxy.url(),
+          cwdDoDocker: () => app.getAppPath()
+        })
+        const agente = new AgenteNoContainer({
+          containerDe: (alvo) => squadSandbox.containerDe(alvo.worktree.worktree),
+          matarNoContainer: (container) => docker.matarProcesso(container, app.getAppPath())
+        })
+        const squad = new ExecutorDoSquad({
+          contexto: new ContextoDaTarefa({ git: squadGit, contexto: contexts }),
+          worker: new ExecutorDeWorker({
+            ia: ai,
+            audit: storage.audit,
+            userId: userIdAtual,
+            workspaceId: () => pedido.workspaceId
+          }),
+          escritor: new ExecutorDeEscritor({
+            git: squadGit,
+            slots: slotsDosSquads.gerente!,
+            sandbox: squadSandbox,
+            agente,
+            audit: storage.audit,
+            userId: userIdAtual,
+            workspaceId: () => pedido.workspaceId
+          }),
+          audit: storage.audit,
+          userId: userIdAtual,
+          workspaceId: () => pedido.workspaceId
+        })
+        const atual = pipelineRepository.buscar(pedido.runId)
+        if (atual?.estado === 'VALIDATING' || atual?.estado === 'REVIEWING')
+          transicionarSquadParaRunning(pedido)
+        const correcoes = producao.correcoes.map((item) => JSON.stringify(item)).join('\n')
+        const resultado = await squad.executar({
+          runId: pedido.runId,
+          projectId: pedido.projectId!,
+          workspaceId: pedido.workspaceId,
+          sliceId: pedido.sliceId!,
+          repositorio: pedido.repositorio,
+          baseSha: preparar.baseSha,
+          rota: 'claude-code',
+          plano: preparar.plano,
+          objetivoDe: () =>
+            [pedido.promptInicial, correcoes, producao.falhaDeTeste?.evidencia ?? '']
+              .filter(Boolean)
+              .join('\n\n'),
+          modeloDe: (tarefa) => {
+            const resolvido = snapshot.resolucao.camadas[tarefa.camada]
+            if (resolvido.modelo === undefined)
+              throw new Error(`Camada sem modelo: ${tarefa.camada}`)
+            const origem = snapshot.perfil.camadas[tarefa.camada]
+            return {
+              modelo: resolvido.modelo,
+              ...(origem.origem === 'modelo' && origem.numCtx ? { numCtx: origem.numCtx } : {})
+            }
+          },
+          signal: producao.signal
+        })
+        const escritor = resultado.tarefas.findLast(
+          (tarefa) => tarefa.papel === 'desenvolvedor' && tarefa.estado === 'concluida'
+        )
+        const commitSha =
+          escritor?.execucao !== undefined && 'commitSha' in escritor.execucao
+            ? escritor.execucao.commitSha
+            : undefined
+        return commitSha === undefined
+          ? {
+              producao: {
+                estado: 'parado',
+                motivo: 'o executor do Squad não produziu um commit do kernel'
+              },
+              resultado
+            }
+          : { producao: { estado: 'pronto', commitSha, manifesto: '' }, resultado }
+      },
+      prepararSandboxDePublicacao: (pedido, preparar, commitSha) => {
+        const outcome = preflight.preparar({
+          // A EntregaService limpa os recursos pelo runId pai. O sandbox final precisa conservar
+          // essa identidade para a limpeza e o inventário fecharem o mesmo recurso.
+          runId: pedido.runId,
+          projectId: pedido.projectId!,
+          sliceId: pedido.sliceId!,
+          raizOperacional: pedido.raizOperacional,
+          repositorio: pedido.repositorio,
+          base: commitSha,
+          pathsDaSpec: preparar.paths,
+          proxyUrl: executorProxy.url(),
+          imagemDoSandbox: pedido.imagemDoSandbox,
+          sufixoDaBranch: 'squad-publicacao'
+        })
+        return outcome.reason === 'liberado' && outcome.sandbox !== undefined
+          ? { sandbox: outcome.sandbox }
+          : { motivo: `${outcome.reason}: ${outcome.mensagem}` }
+      },
+      publicar: async (pedido, preparar, commitSha, sandbox) =>
+        entrega.entregarCommitDoSquad({
+          runId: pedido.runId,
+          projectId: pedido.projectId!,
+          workspaceId: pedido.workspaceId,
+          sandbox,
+          commitSquad: commitSha,
+          alvo: { ...pedido.alvo, branchDaFatia: sandbox.branch },
+          issue: pedido.issue,
+          titulo: pedido.titulo,
+          promptInicial: pedido.promptInicial,
+          contextPackId: pedido.contextPackId,
+          comandosDeValidacao: pedido.comandosDeValidacao,
+          perfilDeCi: preparar.perfilCi,
+          signal: undefined
+        })
+    })
+
     const quadroExecucao = new QuadroExecucaoService({
       userId: userIdAtual,
       roadmap: roadmapRepository,
@@ -1756,9 +2094,20 @@ if (!app.requestSingleInstanceLock()) {
       fila,
       runPrs,
       connectors,
-      // O encadeador legado não executa o Squad da ADR-006. Play permanece fail closed até a
-      // composição real do Squad; anunciar run iniciado aqui executaria outro fluxo.
-      raizOperacional: () => join(app.getPath('userData'), 'pipeline')
+      raizOperacional: () => join(app.getPath('userData'), 'pipeline'),
+      criarSnapshotDoSquad: (modelo) =>
+        criarSnapshotDoSquad(
+          PERFIL_PADRAO,
+          {
+            skills: [],
+            ferramentas: [],
+            ollama: { disponivel: false, modelos: [] },
+            optInApiPaga: false
+          },
+          modelo as import('@shared/domain/modelo-da-fase').ModeloEscolhido
+        ),
+      executar: (pedido) =>
+        workspaceDoRun.run(pedido.workspaceId, () => orquestradorSquad.executar(pedido))
     })
 
     const reconciliacao = new ReconciliacaoService({
@@ -1767,7 +2116,7 @@ if (!app.requestSingleInstanceLock()) {
       audit: storage.audit,
       effectJournal,
       userId: userIdAtual,
-      workspaceId: () => workspaces.atual(),
+      workspaceId: workspaceAtual,
       // A reconciliação liberou um slot: o pool registra a decisão dela e a fila anda — o slot
       // pode ser de quem espera.
       aoLiberarSlot: (lease) => {
