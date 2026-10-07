@@ -9,6 +9,7 @@ vi.mock('./referencia-da-fala', () => ({ iniciarReferenciaDaFala: vi.fn(() => vi
 function ambiente(saidaAplicada: boolean) {
   let listener: ((pedido: ReproducaoDasBoasVindas) => void) | undefined
   let disparar: (() => void) | undefined
+  let cancelar: ((id: string) => void) | undefined
   const confirmar = vi.fn()
   const tocar = vi.fn(() => ({
     cancelar: vi.fn(),
@@ -28,6 +29,10 @@ function ambiente(saidaAplicada: boolean) {
         disparar = fn
         return vi.fn()
       },
+      onCancelamentoDasBoasVindas: (fn: (id: string) => void) => {
+        cancelar = fn
+        return vi.fn()
+      },
       informarBoasVindasProntas: vi.fn(),
       confirmarReproducaoDasBoasVindas: confirmar,
       informarFaseDaVoz: vi.fn(),
@@ -41,6 +46,7 @@ function ambiente(saidaAplicada: boolean) {
   return {
     enviar: (pedido: ReproducaoDasBoasVindas) => listener?.(pedido),
     disparar: () => disparar?.(),
+    cancelar: (id: string) => cancelar?.(id),
     confirmar,
     tocar
   }
@@ -105,13 +111,19 @@ describe('reprodução da chegada no dispositivo escolhido', () => {
     const c = ambiente(true)
     const setSinkId = vi.fn().mockResolvedValue(undefined)
     const play = vi.fn().mockResolvedValue(undefined)
+    const controle: { terminar?: () => void } = {}
     vi.stubGlobal(
       'Audio',
       class {
         setSinkId = setSinkId
         play = play
         pause = vi.fn()
-        onended: (() => void) | null = null
+        set onended(fn: (() => void) | null) {
+          controle.terminar = fn ?? undefined
+        }
+        get onended(): (() => void) | null {
+          return controle.terminar ?? null
+        }
         onerror: (() => void) | null = null
       }
     )
@@ -121,9 +133,40 @@ describe('reprodução da chegada no dispositivo escolhido', () => {
     })
     const remover = instalarReproducaoDasBoasVindas('voz-padrao', 'headset-g432')
     c.enviar({ id: 'chegada-3', acao: 'midia', dados: new Uint8Array([1, 2]), tipo: 'audio/wav' })
+    await vi.waitFor(() => expect(play).toHaveBeenCalledOnce())
+    expect(c.confirmar).not.toHaveBeenCalled()
+    controle.terminar?.()
     await vi.waitFor(() => expect(c.confirmar).toHaveBeenCalledWith('chegada-3', true))
     expect(setSinkId).toHaveBeenCalledWith('headset-g432')
     expect(play).toHaveBeenCalledOnce()
+    remover()
+  })
+
+  it('interrompe mídia no prazo da ponte antes de confirmar falha', async () => {
+    const c = ambiente(true)
+    const pause = vi.fn()
+    const play = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal(
+      'Audio',
+      class {
+        play = play
+        pause = pause
+        onended: (() => void) | null = null
+        onerror: (() => void) | null = null
+      }
+    )
+    vi.stubGlobal('URL', {
+      createObjectURL: vi.fn(() => 'blob:cronograma'),
+      revokeObjectURL: vi.fn()
+    })
+    const remover = instalarReproducaoDasBoasVindas('voz-padrao')
+    c.enviar({ id: 'midia-longa', acao: 'midia', dados: new Uint8Array([1]), tipo: 'audio/wav' })
+    await vi.waitFor(() => expect(play).toHaveBeenCalledOnce())
+    c.cancelar('outra-midia')
+    expect(pause).not.toHaveBeenCalled()
+    c.cancelar('midia-longa')
+    await vi.waitFor(() => expect(c.confirmar).toHaveBeenCalledWith('midia-longa', false))
+    expect(pause).toHaveBeenCalledOnce()
     remover()
   })
 })

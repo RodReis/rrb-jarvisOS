@@ -75,7 +75,15 @@ const CENAS_POR_GALERIA: Readonly<Record<string, readonly string[]>> = {
   // O pacote de arquitetura (#333): o tamanho que um projeto pequeno produz, e um enxuto ao lado.
   arquitetura: ['pacote-cheio', 'pacote-magro', 'gerando', 'gerando-falhou'],
   // A escuta contínua (M18-F01): os quatro estados da barra e a seção de Settings.
-  escuta: ['ligada', 'desligada', 'indisponivel', 'sem-microfone', 'settings', 'boas-vindas']
+  escuta: [
+    'ligada',
+    'desligada',
+    'indisponivel',
+    'sem-microfone',
+    'settings',
+    'boas-vindas',
+    'cronograma'
+  ]
 }
 
 const cenaBruta = params.get('cena')

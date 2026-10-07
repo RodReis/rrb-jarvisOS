@@ -105,8 +105,19 @@ export function registrarIpcDasBoasVindas(
       const id = randomUUID()
       const resultado = new Promise<boolean>((resolver) => {
         const relogio = setTimeout(() => {
-          pendentes.delete(id)
-          resolver(false)
+          // O renderer interrompe o áudio antes de liberar a próxima atividade.
+          try {
+            ativa.webContents.send(IPC_EVENT_CHANNELS.boasVindasCancelarReproducao, id)
+          } catch {
+            pendentes.delete(id)
+            resolver(false)
+            return
+          }
+          const esperaCancelamento = setTimeout(() => {
+            pendentes.delete(id)
+            resolver(false)
+          }, 2_000)
+          pendentes.set(id, { resolver, relogio: esperaCancelamento })
         }, 120_000)
         pendentes.set(id, { resolver, relogio })
       })

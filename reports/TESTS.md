@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 2894 | 2894 | 0 | 81.8 | — | — |
-| — | — | — | Banco | 2334 | 2316 | 0 | 85.2 | — | — |
-| — | — | — | Tela | 796 | 795 | 0 | 76.6 | — | — |
+| — | — | — | Regras de Negócio | 2904 | 2904 | 0 | 81.7 | — | — |
+| — | — | — | Banco | 2337 | 2319 | 0 | 85.1 | — | — |
+| — | — | — | Tela | 800 | 799 | 0 | 76.5 | — | — |
 
 ## Histórico por entrega
 
@@ -463,3 +463,9 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-10-06 | #358 | spec-escuta-03-boas-vindas | Regras de Negócio | 2894 | 2894 | 0 | 81.8 | #405 | [#405](https://github.com/RodReis/rrb-jarvisOS/pull/405) |
 | 2026-10-06 | #358 | spec-escuta-03-boas-vindas | Banco | 2334 | 2316 | 0 | 85.2 | #405 | [#405](https://github.com/RodReis/rrb-jarvisOS/pull/405) |
 | 2026-10-06 | #358 | spec-escuta-03-boas-vindas | Tela | 796 | 795 | 0 | 76.6 | #405 | [#405](https://github.com/RodReis/rrb-jarvisOS/pull/405) |
+| 2026-10-06 | #359 | spec-escuta-04-cronograma | Regras de Negócio | 2904 | 2904 | 0 | 81.7 | #406 | [#406](https://github.com/RodReis/rrb-jarvisOS/pull/406) |
+| 2026-10-06 | #359 | spec-escuta-04-cronograma | Banco | 2337 | 2293 | 0 | 84.8 | #406 | [#406](https://github.com/RodReis/rrb-jarvisOS/pull/406) |
+| 2026-10-06 | #359 | spec-escuta-04-cronograma | Tela | 800 | 799 | 0 | 76.5 | #406 | [#406](https://github.com/RodReis/rrb-jarvisOS/pull/406) |
+| 2026-10-06 | #359 | spec-escuta-04-cronograma | Regras de Negócio | 2904 | 2904 | 0 | 81.7 | #406 | [#406](https://github.com/RodReis/rrb-jarvisOS/pull/406) |
+| 2026-10-06 | #359 | spec-escuta-04-cronograma | Banco | 2337 | 2319 | 0 | 85.1 | #406 | [#406](https://github.com/RodReis/rrb-jarvisOS/pull/406) |
+| 2026-10-06 | #359 | spec-escuta-04-cronograma | Tela | 800 | 799 | 0 | 76.5 | #406 | [#406](https://github.com/RodReis/rrb-jarvisOS/pull/406) |
