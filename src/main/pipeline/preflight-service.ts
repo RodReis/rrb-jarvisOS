@@ -210,6 +210,24 @@ export class PreflightService {
       )
     }
 
+    // Imagem produzida localmente para o Squad: validar no daemon antes de worktree, lease ou
+    // inventário. O DockerRunner também recebe exigirImagemLocal para fechar a corrida entre
+    // inspeção e docker run, sem tentar baixar a tag do registry.
+    if (pedido.imagemDoSandbox !== undefined) {
+      const inspecionar = this.deps.docker.imagemExiste
+      if (
+        inspecionar === undefined ||
+        !inspecionar.call(this.deps.docker, pedido.imagemDoSandbox, pedido.raizOperacional)
+      ) {
+      return this.recusar(
+        pedido,
+        'imagem-local-ausente',
+        'A imagem local fixada para o executor do Squad não está instalada neste Docker.',
+        'Executar npm run build:squad-executor-image e retomar o Play.'
+      )
+      }
+    }
+
     // 2. O proxy é o único caminho até o modelo (critério 11). Sem ele o run começaria e
     //    morreria na primeira chamada, com worktree e container já criados.
     if (!this.deps.proxyNoAr()) {
@@ -536,7 +554,8 @@ export class PreflightService {
         ...(perfilClaudeNoHost === undefined ? {} : { perfilClaudeNoHost }),
         ...((pedido.imagemDoSandbox ?? this.deps.imagemDoSandbox) === undefined
           ? {}
-          : { imagem: pedido.imagemDoSandbox ?? this.deps.imagemDoSandbox })
+          : { imagem: pedido.imagemDoSandbox ?? this.deps.imagemDoSandbox }),
+        ...(pedido.imagemDoSandbox === undefined ? {} : { exigirImagemLocal: true })
       },
       pedido.raizOperacional
     )

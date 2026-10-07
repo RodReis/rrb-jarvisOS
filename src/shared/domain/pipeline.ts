@@ -126,6 +126,16 @@ export interface PipelineRun {
   readonly continuaDe?: string
   /** Obrigatório em `BLOCKED`, ausente no resto (critério 6). */
   readonly bloqueio?: BloqueioExterno
+  /** Snapshot versionado e validado do Squad; ausente nos runs anteriores à M28-F01. */
+  readonly squadSnapshot?: unknown
+  /** Resumo seguro por tarefa, sem prompt, resposta, contexto ou credenciais. */
+  readonly squadProgress?: readonly {
+    readonly tarefaId: string
+    readonly papel: string
+    readonly estado: string
+    readonly motivo?: string
+    readonly commitSha?: string
+  }[]
   readonly created_at: string
   readonly updated_at: string
 }

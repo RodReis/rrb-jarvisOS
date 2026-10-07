@@ -121,6 +121,8 @@ export interface MontagemDoSandbox {
    */
   readonly proxyUrl: string
   readonly imagem?: string
+  /** Impede pull remoto e exige inspeção local quando a imagem foi construída pelo app. */
+  readonly exigirImagemLocal?: boolean
   /** As labels do run (`labelsDoRecurso`): é por elas que o recurso é achado e reconciliado. */
   readonly labels?: Readonly<Record<string, string>>
   /**
@@ -271,6 +273,7 @@ export class DockerRunner {
         binary: BINARIO_DOCKER,
         args: [
           'run',
+          ...(montagem.exigirImagemLocal === true ? ['--pull=never'] : []),
           '--detach',
           // `--rm` é o que permite a limpeza da M9-F06 **remover** o container sem `docker rm`:
           // aquele comando casa a política de destrutivos do MVP-004 e abriria `ApprovalRequest`,
@@ -323,6 +326,19 @@ export class DockerRunner {
       return false
     }
     return true
+  }
+
+  /** Só retorna true quando o daemon inspeciona uma imagem que já existe localmente. */
+  imagemExiste(imagem: string, cwd: string): boolean {
+    const execucao = this.terminal.run(
+      {
+        binary: BINARIO_DOCKER,
+        args: ['image', 'inspect', '--format', '{{.Id}}', imagem],
+        cwd
+      },
+      this.workspaceId()
+    )
+    return execucao.state === 'concluido' && execucao.stdout.trim().length > 0
   }
 
   /**

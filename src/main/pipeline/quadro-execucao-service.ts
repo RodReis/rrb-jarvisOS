@@ -2,6 +2,12 @@ import { randomUUID } from 'node:crypto'
 import { readFileSync, realpathSync } from 'node:fs'
 import { resolve, relative, isAbsolute } from 'node:path'
 import type { WorkspaceId } from '@shared/domain/entities'
+import { validarPerfilDeCi } from '@shared/domain/ci-profile'
+import { IMAGEM_DO_SQUAD } from '../squads/squad-imagem'
+import {
+  auditarSnapshotDoSquad,
+  type SnapshotDoSquad
+} from '../squads/squad-snapshot'
 import type { ContextService } from '../context/context-service'
 import type { PhaseModelService } from '../ai/phase-model-service'
 import type { PathsPermitidos } from '@shared/domain/preflight'
@@ -47,6 +53,8 @@ export interface QuadroExecucaoDeps {
   readonly fila: FilaService
   readonly runPrs: RunPrRepository
   readonly connectors: ConnectorService
+  readonly audit?: import('../storage/audit-repository').AuditRepository
+  readonly criarSnapshotDoSquad?: (modelo: { provider: string; modelo: string }) => SnapshotDoSquad
   /** Só é fornecido quando o caminho de produção do Squad estiver composto. */
   readonly executar?: (pedido: PedidoDeExecucao) => Promise<unknown>
   readonly agora?: () => number
@@ -263,6 +271,8 @@ export class QuadroExecucaoService {
         const textoDaSpec = readFileSync(caminhoDaSpec, 'utf8')
         const perfil = lerPerfilDeCiVersionado(projeto.diretorio)
         if (perfil === undefined) throw new Error('O pacote não contém um perfil de CI válido.')
+        const problemasDoPerfil = validarPerfilDeCi(perfil.perfil)
+        if (problemasDoPerfil.length > 0) throw new Error('O perfil de CI aprovado é inválido.')
         const aprovacoes = this.deps.roadmap.listarAprovacoes(escopo)
         const revisoesAtuais = this.deps.roadmapService.revisoesDoGate(
           pedido.projectId,
@@ -296,6 +306,12 @@ export class QuadroExecucaoService {
         )
         if (modelo.provider !== 'claude-code')
           throw new Error('A rota de construção não corresponde ao executor configurado.')
+        const criarSnapshot = this.deps.criarSnapshotDoSquad
+        if (criarSnapshot === undefined)
+          throw new Error('O snapshot de produção do Squad não está configurado.')
+        const snapshotSquad = criarSnapshot(modelo)
+        if (!snapshotSquad.resolucao.elegivel)
+          throw new Error('O perfil do Squad não é elegível para esta rota.')
         const caminhos = pathsAutorizadosDaSpec(textoDaSpec)
         if (caminhos === undefined)
           throw new Error(
@@ -321,6 +337,18 @@ export class QuadroExecucaoService {
           workspaceId
         )
         if (contexto.pack === undefined) throw new Error(contexto.mensagem)
+        const registrado = this.deps.runs.registrarSnapshotDoSquad(
+          escopo,
+          run.id,
+          snapshotSquad,
+          new Date(this.agora())
+        )
+        if (!registrado) throw new Error('Não foi possível persistir o snapshot do Squad antes do Play.')
+        auditarSnapshotDoSquad(
+          this.deps.audit ?? (() => { throw new Error('A auditoria do Squad não está configurada.') })(),
+          { userId, workspaceId },
+          snapshotSquad
+        )
         const execucao: PedidoDeExecucao = {
           runId: run.id,
           workspaceId,
@@ -333,8 +361,12 @@ export class QuadroExecucaoService {
           titulo: fatia.titulo,
           promptInicial: textoDaSpec,
           contextPackId: contexto.pack.id,
+          // O Squad executa as validações dinâmicas do PerfilDeCi no SuiteNoSandbox.
+          // Este campo é apenas legado do EncadeadorDeRuns e não deve condensar Python em quatro
+          // comandos fixos nem sugerir equivalência com o workflow aprovado.
           comandosDeValidacao: { test: [], lint: [], typecheck: [], build: [] },
-          perfilDeCi: perfil.perfil
+          perfilDeCi: perfil.perfil,
+          imagemDoSandbox: IMAGEM_DO_SQUAD
         }
         const aguardando = this.deps.fila.transicionar(
           pedido.projectId,

@@ -106,3 +106,92 @@ describe('DockerRunner.exec — comando dentro do container (critério 11)', () 
     runner.matarProcesso('meu-container', '/host/cwd')
   })
 })
+
+describe('DockerRunner.subir — uso da imagem fixada localmente', () => {
+  it('usa --pull=never quando a montagem exige uma imagem local', () => {
+    const terminal = terminalDuble((args) => {
+      expect(args).toContain('--pull=never')
+      expect(args).toContain('jarvisos/squad-executor:claude-code-2.1.278')
+      return { stdout: 'id', stderr: '', state: 'concluido', reason: 'executado', exitCode: 0 }
+    })
+    const runner = new DockerRunner(terminal, () => 'ws1' as never)
+
+    runner.subir({
+      worktreeNoHost: '/wt',
+      gitMetaNoHost: '/wt/.gitmeta',
+      gitCommonNoHost: '/repo/.git',
+      containerNome: 'squad-test',
+      redeDeEgress: 'egress-test',
+      proxyUrl: 'http://proxy',
+      imagem: 'jarvisos/squad-executor:claude-code-2.1.278',
+      exigirImagemLocal: true
+    }, '/repo')
+  })
+
+  it('mantém a política existente para montagens que não exigem imagem local', () => {
+    const terminal = terminalDuble((args) => {
+      expect(args).not.toContain('--pull=never')
+      return { stdout: 'id', stderr: '', state: 'concluido', reason: 'executado', exitCode: 0 }
+    })
+    const runner = new DockerRunner(terminal, () => 'ws1' as never)
+
+    runner.subir({
+      worktreeNoHost: '/wt',
+      gitMetaNoHost: '/wt/.gitmeta',
+      gitCommonNoHost: '/repo/.git',
+      containerNome: 'regular-test',
+      redeDeEgress: 'egress-test',
+      proxyUrl: 'http://proxy'
+    }, '/repo')
+  })
+})
+
+describe('DockerRunner.imagemExiste — imagem no daemon local', () => {
+  it('inspeciona a tag e exige id de imagem no stdout', () => {
+    const terminal = terminalDuble((args) => {
+      expect(args).toEqual(['image', 'inspect', '--format', '{{.Id}}', 'local:test'])
+      return { stdout: 'sha256:abc\n', stderr: '', state: 'concluido', reason: 'executado', exitCode: 0 }
+    })
+    const runner = new DockerRunner(terminal, () => 'ws1' as never)
+
+    expect(runner.imagemExiste('local:test', '/repo')).toBe(true)
+  })
+
+  it('recusa imagem ausente ou resposta vazia', () => {
+    const terminal = terminalDuble(() => ({
+      stdout: '',
+      stderr: 'No such image',
+      state: 'falhou',
+      reason: 'falha-na-execucao',
+      exitCode: 1
+    }))
+    const runner = new DockerRunner(terminal, () => 'ws1' as never)
+
+    expect(runner.imagemExiste('local:test', '/repo')).toBe(false)
+  })
+})
+
+describe('DockerRunner.imagemExiste — imagem no daemon local', () => {
+  it('inspeciona a tag e exige id de imagem no stdout', () => {
+    const terminal = terminalDuble((args) => {
+      expect(args).toEqual(['image', 'inspect', '--format', '{{.Id}}', 'local:test'])
+      return { stdout: 'sha256:abc\n', stderr: '', state: 'concluido', reason: 'executado', exitCode: 0 }
+    })
+    const runner = new DockerRunner(terminal, () => 'ws1' as never)
+
+    expect(runner.imagemExiste('local:test', '/repo')).toBe(true)
+  })
+
+  it('recusa imagem ausente ou resposta vazia', () => {
+    const terminal = terminalDuble(() => ({
+      stdout: '',
+      stderr: 'No such image',
+      state: 'falhou',
+      reason: 'falha-na-execucao',
+      exitCode: 1
+    }))
+    const runner = new DockerRunner(terminal, () => 'ws1' as never)
+
+    expect(runner.imagemExiste('local:test', '/repo')).toBe(false)
+  })
+})

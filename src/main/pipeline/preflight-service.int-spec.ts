@@ -102,12 +102,17 @@ function montarServico(opcoes: {
   readonly portasOcupadas?: readonly number[]
   /** O par que o `PhaseModelService` devolveria. Omitido = o padrão da Construção. */
   readonly modelo?: ModeloEscolhido
+  readonly imagemLocalExiste?: boolean
+  readonly validarImagemLocal?: boolean
 }): InstanceType<typeof PreflightService> {
   const chamadas = opcoes.chamadas ?? []
   return new PreflightService({
     git: gitRunnerReal() as never,
     docker: {
       disponivel: () => opcoes.dockerNoAr !== false,
+      imagemExiste: opcoes.validarImagemLocal
+        ? () => opcoes.imagemLocalExiste !== false
+        : undefined,
       portaOcupadaPorContainer: (porta: number) => (opcoes.portasOcupadas ?? []).includes(porta),
       containerExiste: () => false,
       redeDeEgressExiste: () => false,
@@ -189,6 +194,19 @@ describe('preflight — recusas que não deixam rastro', () => {
     expect(outcome.reason).toBe('docker-indisponivel')
     expect(outcome.retomada).toContain('Docker')
     expect(linhasDeLease()).toBe(0)
+  })
+
+  it('recusa imagem do Squad ausente antes de worktree, leases e sandbox', () => {
+    const chamadas: ChamadaDocker[] = []
+    const outcome = montarServico({ imagemLocalExiste: false, chamadas }).preparar(
+      pedido({ imagemDoSandbox: 'jarvisos/squad-executor:claude-code-2.1.278' })
+    )
+
+    expect(outcome.reason).toBe('imagem-local-ausente')
+    expect(outcome.retomada).toContain('build:squad-executor-image')
+    expect(linhasDeLease()).toBe(0)
+    expect(chamadas).toEqual([])
+    expect(git(['worktree', 'list', '--porcelain'], repo)).not.toContain(raiz)
   })
 
   /** Critério 11: sem proxy o executor não alcança modelo — falha no preflight, não na 1ª chamada. */
@@ -349,6 +367,7 @@ describe('preflight — liberação', () => {
       git: gitRunnerReal() as never,
       docker: {
         disponivel: () => true,
+        imagemExiste: () => true,
         portaOcupadaPorContainer: () => false,
         containerExiste: () => false,
         redeDeEgressExiste: () => false,
@@ -410,6 +429,7 @@ describe('preflight — liberação', () => {
       git: gitRunnerReal() as never,
       docker: {
         disponivel: () => true,
+        imagemExiste: () => true,
         portaOcupadaPorContainer: () => false,
         containerExiste: () => false,
         redeDeEgressExiste: () => false,
@@ -518,7 +538,7 @@ describe('preflight — liberação', () => {
     const chamadas: ChamadaDocker[] = []
     const imagem = 'jarvisos/squad-executor:claude-code-2.1.278'
 
-    const outcome = montarServico({ chamadas }).preparar(pedido({ imagemDoSandbox: imagem }))
+    const outcome = montarServico({ chamadas, validarImagemLocal: true }).preparar(pedido({ imagemDoSandbox: imagem }))
 
     expect(outcome.reason).toBe('liberado')
     expect(chamadas[0]?.montagem?.imagem).toBe(imagem)

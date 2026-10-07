@@ -71,6 +71,7 @@ export interface PedidoDeExecucao {
   readonly comandosDeValidacao: ComandosDeValidacao
   readonly perfilDeCi?: PerfilDeCi
   readonly docsDoProjeto?: readonly string[]
+  readonly imagemDoSandbox?: import('../squads/squad-imagem').ImagemDoSquad
 }
 
 export type ResultadoDaExecucao =
@@ -198,6 +199,7 @@ export class EncadeadorDeRuns {
         repositorio: pedido.repositorio,
         base: pedido.base,
         ...(pedido.pathsDaSpec === undefined ? {} : { pathsDaSpec: pedido.pathsDaSpec }),
+        ...(pedido.imagemDoSandbox === undefined ? {} : { imagemDoSandbox: pedido.imagemDoSandbox }),
         ...(pedido.portasDeServico === undefined
           ? {}
           : { portasDeServico: pedido.portasDeServico }),

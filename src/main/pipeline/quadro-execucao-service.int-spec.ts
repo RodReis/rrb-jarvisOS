@@ -4,6 +4,8 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { perfilNodeEmWindows } from '@shared/domain/ci-profile-perfis'
 import { chaveDeFatia, chaveDeProjeto } from '@shared/domain/publicacao'
+import { PERFIL_PADRAO } from '@shared/domain/squad-perfil'
+import { criarSnapshotDoSquad } from '../squads/squad-snapshot'
 import { lerPerfilDeCiVersionado } from '../projects/ci-profile-revision'
 import type { PedidoDeExecucao } from './encadeador-de-runs'
 
@@ -32,6 +34,11 @@ const slices = [1, 2, 3].map((numero) => ({
   detalhada: true,
   origem: mvp.origem
 }))
+const snapshotSquad = criarSnapshotDoSquad(
+  PERFIL_PADRAO,
+  { skills: ['code-review'], ferramentas: [], ollama: { disponivel: false, modelos: [] }, optInApiPaga: false },
+  { provider: 'claude-code', modelo: 'claude-fable-5-1' }
+)
 
 let raiz: string | undefined
 afterEach(() => {
@@ -40,6 +47,73 @@ afterEach(() => {
 })
 
 describe('play de três fatias do mesmo MVP', () => {
+  it('fatia elegível persiste snapshot e chama executor com perfil CI e comandos do workflow', async () => {
+    raiz = mkdtempSync(join(tmpdir(), 'jarvis-quadro-snapshot-'))
+    mkdirSync(join(raiz, 'docs', 'spec'), { recursive: true })
+    writeFileSync(join(raiz, 'ci-profile.json'), JSON.stringify(perfilNodeEmWindows('node')))
+    writeFileSync(join(raiz, slices[0]!.specSlug), '## Paths permitidos\n- `src`\n')
+    const perfil = lerPerfilDeCiVersionado(raiz)!
+    const revisoes = [
+      { artefato: slices[0]!.specSlug, hash: 'a'.repeat(64) },
+      { artefato: 'ci-profile.json', hash: perfil.hash }
+    ]
+    const executar = vi.fn(async (_pedido: PedidoDeExecucao) => undefined)
+    const snapshot = snapshotSquad
+    const runs = new Map<string, { id: string; bloqueio?: { evidencia: string } }>()
+    const transicionar = vi.fn(() => ({ reason: 'transicionado', mensagem: 'ok' }))
+    const refs = [
+      { alvo: 'repositorio', chaveExterna: chaveDeProjeto(projectId), refId: 'org/repo' },
+      { alvo: 'branch', chaveExterna: chaveDeProjeto(projectId), refId: 'main' },
+      { alvo: 'issue', chaveExterna: chaveDeFatia(projectId, 28, 1), refId: '371' }
+    ]
+    const service = new QuadroExecucaoService({
+      userId: () => 'u-1',
+      projects: { findById: () => ({ diretorio: raiz, workspace_id: WS }) } as never,
+      roadmap: {
+        carregar: () => ({ mvps: [mvp], slices }),
+        listarAprovacoes: () => [{ gate: 'SLICE_ENTRY', revisoes }]
+      } as never,
+      roadmapService: { revisoesDoGate: () => revisoes } as never,
+      refs: {
+        listar: () => refs,
+        buscar: (_e: unknown, alvo: string, chave: string) =>
+          refs.find((ref) => ref.alvo === alvo && ref.chaveExterna === chave)
+      } as never,
+      contexts: { montarDaTarefa: () => ({ pack: { id: 'pack-1' } }) } as never,
+      phaseModels: { resolver: () => ({ provider: 'claude-code' }) } as never,
+      raizOperacional: () => join(raiz!, 'operacional'),
+      runs: {
+        buscar: (id: string) => runs.get(id),
+        registrarSnapshotDoSquad: (_e: unknown, _id: string, valor: unknown) => {
+          expect(valor).toEqual(snapshot)
+          return true
+        }
+      } as never,
+      fila: {
+        criarRun: () => {
+          const run = { id: 'run-s-1' }
+          runs.set(run.id, run)
+          return run
+        },
+        transicionar
+      } as never,
+      runPrs: {} as never,
+      connectors: {} as never,
+      audit: { append: vi.fn() } as never,
+      criarSnapshotDoSquad: () => snapshot,
+      executar
+    } as never)
+
+    const resposta = await service.play({ projectId, sliceIds: ['s-1'] }, WS)
+
+    expect(resposta[0]?.estado).toBe('iniciado')
+    expect(executar).toHaveBeenCalledTimes(1)
+    expect(executar.mock.calls[0]?.[0].perfilDeCi).toEqual(perfil.perfil)
+    expect(executar.mock.calls[0]?.[0].comandosDeValidacao).toEqual({
+      test: [], lint: [], typecheck: [], build: []
+    })
+  })
+
   it('recusa no app sem composição do Squad antes de criar qualquer run', async () => {
     const criarRun = vi.fn()
     const service = new QuadroExecucaoService({
@@ -107,7 +181,10 @@ describe('play de três fatias do mesmo MVP', () => {
       contexts: { montarDaTarefa: () => ({ pack: { id: 'pack-1' } }) } as never,
       phaseModels: { resolver: () => ({ provider: 'claude-code' }) } as never,
       raizOperacional: () => join(raiz!, 'operacional'),
-      runs: { buscar: (id: string) => runs.get(id) } as never,
+      runs: {
+        buscar: (id: string) => runs.get(id),
+        registrarSnapshotDoSquad: () => true
+      } as never,
       fila: {
         criarRun: (_p: string, _w: string, sliceId: string) => {
           const run = { id: `run-${sliceId}` }
@@ -118,6 +195,8 @@ describe('play de três fatias do mesmo MVP', () => {
       } as never,
       runPrs: {} as never,
       connectors: {} as never,
+      audit: { append: vi.fn() } as never,
+      criarSnapshotDoSquad: () => snapshotSquad,
       executar
     })
 

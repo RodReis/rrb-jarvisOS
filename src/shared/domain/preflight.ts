@@ -121,6 +121,8 @@ export const PREFLIGHT_REASONS = [
   'liberado',
   /** Docker ausente ou desligado. `BLOCKED_EXTERNAL` — nunca há fallback para o host. */
   'docker-indisponivel',
+  /** A imagem fixa do Squad não existe no daemon local; nenhum pull remoto é permitido. */
+  'imagem-local-ausente',
   /** O proxy do host não está no ar: sem ele o executor não alcança modelo nenhum. */
   'proxy-indisponivel',
   /** A base não resolve (branch/SHA inexistente) — não dá para fixar de onde o run parte. */

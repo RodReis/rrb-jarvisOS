@@ -35,6 +35,8 @@ interface RunRow {
   readonly estado: string
   readonly continua_de: string | null
   readonly bloqueio: string | null
+  readonly squad_snapshot: string | null
+  readonly squad_progress: string | null
   readonly created_at: string
   readonly updated_at: string
 }
@@ -56,6 +58,21 @@ function toRun(row: RunRow): PipelineRun {
       log.db.warn('Bloqueio ilegível no pipeline_run; lido como ausente.', { runId: row.id })
     }
   }
+  let squadSnapshot: unknown
+  let squadProgress: PipelineRun['squadProgress']
+  try {
+    if (row.squad_snapshot !== null) squadSnapshot = JSON.parse(row.squad_snapshot) as unknown
+  } catch {
+    log.db.warn('Snapshot do Squad ilegível no pipeline_run.', { runId: row.id })
+  }
+  try {
+    if (row.squad_progress !== null) {
+      const lido: unknown = JSON.parse(row.squad_progress)
+      if (Array.isArray(lido)) squadProgress = lido as PipelineRun['squadProgress']
+    }
+  } catch {
+    log.db.warn('Progresso do Squad ilegível no pipeline_run.', { runId: row.id })
+  }
 
   return {
     id: row.id,
@@ -65,6 +82,8 @@ function toRun(row: RunRow): PipelineRun {
     estado: row.estado as EstadoDoRun,
     ...(row.continua_de === null ? {} : { continuaDe: row.continua_de }),
     ...(bloqueio === undefined ? {} : { bloqueio }),
+    ...(squadSnapshot === undefined ? {} : { squadSnapshot }),
+    ...(squadProgress === undefined ? {} : { squadProgress }),
     created_at: row.created_at,
     updated_at: row.updated_at
   }
@@ -111,6 +130,43 @@ export class PipelineRepository {
       created_at: iso,
       updated_at: iso
     }
+  }
+
+  /** Persiste o snapshot do Squad antes de qualquer dispatch, restrito ao escopo do run. */
+  registrarSnapshotDoSquad(
+    escopo: EscopoDoRun,
+    runId: string,
+    snapshot: unknown,
+    agora: Date
+  ): boolean {
+    const resultado = this.db.prepare(
+      `UPDATE pipeline_run SET squad_snapshot = ?, updated_at = ?
+        WHERE id = ? AND user_id = ? AND workspace_id = ? AND project_id = ?
+          AND squad_snapshot IS NULL AND estado = 'PLANNED'`
+    ).run(JSON.stringify(snapshot), agora.toISOString(), runId, escopo.userId, escopo.workspaceId, escopo.projectId)
+    return resultado.changes === 1
+  }
+
+  /** Resumo mínimo de tarefas, atualizado só enquanto o run permanece ativo e escopado. */
+  registrarProgressoDoSquad(
+    escopo: EscopoDoRun,
+    runId: string,
+    progresso: NonNullable<PipelineRun['squadProgress']>,
+    agora: Date
+  ): boolean {
+    if (progresso.some((item) =>
+      typeof item.tarefaId !== 'string' ||
+      typeof item.papel !== 'string' ||
+      typeof item.estado !== 'string' ||
+      (item.motivo !== undefined && (typeof item.motivo !== 'string' || item.motivo.length > 160)) ||
+      (item.commitSha !== undefined && !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(item.commitSha))
+    )) return false
+    const resultado = this.db.prepare(
+      `UPDATE pipeline_run SET squad_progress = ?, updated_at = ?
+        WHERE id = ? AND user_id = ? AND workspace_id = ? AND project_id = ?
+          AND squad_snapshot IS NOT NULL AND estado NOT IN ('MERGED','AWAITING_MERGE','BLOCKED','CANCELLED')`
+    ).run(JSON.stringify(progresso), agora.toISOString(), runId, escopo.userId, escopo.workspaceId, escopo.projectId)
+    return resultado.changes === 1
   }
 
   /**
