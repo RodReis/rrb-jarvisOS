@@ -316,6 +316,7 @@ export class ExecutorDeEscritor {
 
     const execucao = await this.rodarAgente(pedido, escopo, worktree, unidade, fencingToken)
     if (execucao.causa !== undefined) {
+      await this.preservarParcial(pedido, escopo, worktree)
       return {
         ...desfechoDaCausa(execucao.causa),
         descartadas: [],
@@ -324,6 +325,7 @@ export class ExecutorDeEscritor {
       }
     }
     if (!execucao.saida.ok) {
+      await this.preservarParcial(pedido, escopo, worktree)
       return {
         estado: 'falhou',
         motivo: execucao.saida.motivo.slice(0, MAX_MOTIVO_AUDITADO),
@@ -438,33 +440,54 @@ export class ExecutorDeEscritor {
       return { ...base, estado: 'incompleta', motivo: 'sem-alteracoes', arquivos: [] }
     }
 
-    if (this.deps.painelSnapshots !== undefined) {
-      const captura = await this.deps.git.capturarSnapshots?.(worktree, veredito.dentro)
-      const snapshots: readonly SnapshotCapturado[] = captura?.ok
-        ? captura.valor
-        : veredito.dentro.map((caminho) => ({
-            caminho,
-            tipo: 'texto',
-            bytes: 0,
-            sha256: '0'.repeat(64)
-          }))
-      try {
-        this.deps.painelSnapshots.salvarSnapshots(
-          {
-            userId: this.deps.userId(),
-            workspace: pedido.workspaceId,
-            projectId: pedido.projectId
-          },
-          pedido.runId,
-          pedido.tarefa.id,
-          snapshots
-        )
-      } catch {
-        // Evidência de painel é melhor esforço: não altera a publicação do trabalho provado.
-      }
-    }
+    await this.salvarSnapshots(pedido, worktree, veredito.dentro)
 
     return this.validarECommitar(pedido, worktree, veredito.dentro, texto, base)
+  }
+
+  /** Preserva apenas arquivos dentro do write set antes de soltar o sandbox cancelado ou falho. */
+  private async preservarParcial(
+    pedido: PedidoDoEscritor,
+    escopo: PathsPermitidos,
+    worktree: WorktreeDeEscritor
+  ): Promise<void> {
+    if (this.deps.painelSnapshots === undefined) return
+    const diff = this.deps.git.alteracoes(worktree)
+    if (!diff.ok) return
+    const veredito = avaliarEscopoDoEscritor(diff.valor, escopo)
+    if (!veredito.ok || veredito.dentro.length === 0) return
+    await this.salvarSnapshots(pedido, worktree, veredito.dentro)
+  }
+
+  private async salvarSnapshots(
+    pedido: PedidoDoEscritor,
+    worktree: WorktreeDeEscritor,
+    caminhos: readonly string[]
+  ): Promise<void> {
+    if (this.deps.painelSnapshots === undefined) return
+    const captura = await this.deps.git.capturarSnapshots?.(worktree, caminhos)
+    const snapshots: readonly SnapshotCapturado[] = captura?.ok
+      ? captura.valor
+      : caminhos.map((caminho) => ({
+          caminho,
+          tipo: 'texto',
+          bytes: 0,
+          sha256: '0'.repeat(64)
+        }))
+    try {
+      this.deps.painelSnapshots.salvarSnapshots(
+        {
+          userId: this.deps.userId(),
+          workspace: pedido.workspaceId,
+          projectId: pedido.projectId
+        },
+        pedido.runId,
+        pedido.tarefa.id,
+        snapshots
+      )
+    } catch {
+      // Evidência de painel é melhor esforço: não altera a publicação do trabalho provado.
+    }
   }
 
   private validarECommitar(

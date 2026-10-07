@@ -53,6 +53,7 @@ const { FilaService } = await import('../pipeline/fila-service')
 const { PoolRepository } = await import('../pipeline/pool-repository')
 const { PoolService } = await import('../pipeline/pool-service')
 const { SquadGit } = await import('./squad-git')
+const { PainelDaTarefaRepository } = await import('../pipeline/painel-tarefa-repository')
 const { GerenteDeSlots } = await import('./squad-slots')
 const { ExecutorDeEscritor } = await import('./squad-escritor')
 
@@ -263,8 +264,9 @@ function montarExecutor(
   gitDoKernel: Pick<
     InstanceType<typeof SquadGit>,
     'alteracoes' | 'commitar' | 'remover'
-  > = squadGit,
-  aoPreparar?: () => void
+  > & Partial<Pick<InstanceType<typeof SquadGit>, 'capturarSnapshots'>> = squadGit,
+  aoPreparar?: () => void,
+  painelSnapshots?: InstanceType<typeof PainelDaTarefaRepository>
 ): InstanceType<typeof ExecutorDeEscritor> {
   const sandbox: SandboxDoEscritor = {
     preparar: async (p) => {
@@ -285,6 +287,7 @@ function montarExecutor(
   const porWorktree = new Map<string, PedidoDeSandbox>()
   return new ExecutorDeEscritor({
     git: gitDoKernel,
+    painelSnapshots,
     slots: gerente,
     sandbox: {
       preparar: async (p) => {
@@ -626,6 +629,25 @@ comGit('falha, prazo, cancelamento e lease têm estado terminal próprio (crité
     expect(r).toMatchObject({ estado: 'cancelada', motivo: 'cancelada' })
     expect(pool.vista().ocupados).toEqual([])
     expect(eventos().map((e) => e.estado)).toEqual(['em-execucao', 'cancelada'])
+  })
+
+  it('preserva snapshot parcial antes de encerrar o sandbox cancelado', async () => {
+    const painel = new PainelDaTarefaRepository(db)
+    executor = montarExecutor(squadGit, undefined, painel)
+    agente = (p) => {
+      escrever(p, 'src/api/a.ts', 'export const a = 200\n')
+      return pendurado(p)
+    }
+    const controle = new AbortController()
+    setTimeout(() => controle.abort(), 40)
+
+    const r = await executor.executar(pedido({ signal: controle.signal }))
+
+    expect(r.estado).toBe('cancelada')
+    expect(git(['rev-parse', 'feat/api-t1'])).toBe(baseSha)
+    expect(painel.snapshots({ userId: USER, workspace: WS, projectId: PROJETO }, runAtual, 't1').arquivos)
+      .toEqual(expect.arrayContaining([expect.objectContaining({ caminho: 'src/api/a.ts' })]))
+    expect(encerrados).toHaveLength(1)
   })
 
   it('cancelada antes de começar: nem toma slot, nem prepara sandbox, e só o fim é auditado', async () => {
