@@ -2488,13 +2488,13 @@ Status: **entregue, aguardando aceite do PI** — SPEC `aprovada-pi`; issue [#37
 
 ### Fatia 03 — Painel da tarefa (`docs/spec/spec-execucao-03-painel-da-tarefa.md`)
 
-Status: **em andamento** — SPEC `aprovada-pi`; issue [#378](https://github.com/RodReis/rrb-jarvisOS/issues/378), `proplan:doing`. O PI aprovou em 2026-10-07 a associação persistida run/tarefa→trace e snapshots de arquivos/diff com 10 MiB por arquivo, 50 MiB por run, binários somente como metadados; excedente sinalizado incompleto sem bloquear publicação. Plano em [2026-10-07-m28-f03-painel-da-tarefa.md](superpowers/plans/2026-10-07-m28-f03-painel-da-tarefa.md).
+Status: **entregue, aguardando aceite do PI** — SPEC `aprovada-pi`; issue [#378](https://github.com/RodReis/rrb-jarvisOS/issues/378), aberta em `proplan:done`. O PI aprovou em 2026-10-07 a associação persistida run/tarefa→trace e snapshots de arquivos/diff com 10 MiB por arquivo, 50 MiB por run, binários somente como metadados; excedente sinalizado incompleto sem bloquear publicação. Entregue pela [PR #410](https://github.com/RodReis/rrb-jarvisOS/pull/410), mergeada em `main` em 2026-10-07 (`e986682e97185a5cfadc77bd4b568723fa59cced`); CI verde no head `54c6afc2441dfb98b7e7c8d93ecae0af6672de54`, run [37677657739](https://github.com/RodReis/rrb-jarvisOS/actions/runs/37677657739). Plano em [2026-10-07-m28-f03-painel-da-tarefa.md](superpowers/plans/2026-10-07-m28-f03-painel-da-tarefa.md).
 
 - [x] Migrar associação de traces e plano Squad; registrar início/conclusão de tarefa e eventos de cada trace por run.
 - [x] Persistir snapshots e diffs antes da remoção do worktree; escopo por usuário/workspace/projeto/run, hashes, cota de run e retenção M9-F06.
 - [x] Expor painel read-only via IPC: plano, agente, diff, arquivos, checks e evidência de testes redigida; busca e destaque sintático no visualizador.
 - [x] Executar regras (2944/2944), banco no CI (2355 pass, 18 skipped, 0 falhas), tela (804 pass, 1 todo, 0 falhas) e prova visual do painel (4/4); validar `reports/TESTS.md` com `--check --no-run --require-entry`. A execução local não tinha a stack Supabase ativa; a execução oficial do CI cobriu RLS.
-- [ ] PR com `refs #378`, CI verde no SHA final, merge em `main`, comentário de encerramento e `proplan:done`; issue fica aberta para aceite do PI.
+- [x] PR #410 com `refs #378`; CI verde (Regras 2944/2944, Banco 2355 pass/18 skipped, Tela 804 pass/1 todo, E2E 69/69, visual 217/217), merge em `main`, comentário de encerramento e `proplan:done`; issue fica aberta para aceite do PI.
 
 ### Fatia 04 — Cronograma de atividades configurável (`docs/spec/spec-escuta-04-cronograma.md`)
 
