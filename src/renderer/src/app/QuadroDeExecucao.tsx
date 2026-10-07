@@ -34,6 +34,8 @@ export function QuadroDeExecucao({
   const [ocupado, setOcupado] = useState(false)
   const [falhou, setFalhou] = useState(false)
   const [runAberto, setRunAberto] = useState<string | undefined>()
+  const [cancelando, setCancelando] = useState<string | undefined>()
+  const [mensagemDoCancelamento, setMensagemDoCancelamento] = useState<string | undefined>()
 
   const atualizar = useCallback(async () => {
     try {
@@ -113,6 +115,24 @@ export function QuadroDeExecucao({
     }
   }
 
+  const cancelar = async (runId: string) => {
+    if (cancelando !== undefined || !window.confirm('Cancelar este run e suas tarefas?')) return
+    setCancelando(runId)
+    try {
+      const resposta = await window.jarvis.cancelarNoQuadro(projectId, runId, workspace)
+      setMensagemDoCancelamento(
+        resposta.cancelado
+          ? 'Run cancelado. Recursos e evidências serão reconciliados.'
+          : resposta.mensagem
+      )
+      await atualizar()
+    } catch {
+      setMensagemDoCancelamento('Não foi possível cancelar o run.')
+    } finally {
+      setCancelando(undefined)
+    }
+  }
+
   if (carregando) return <LoadingState rotulo="Carregando quadro de execução" />
   if (falhou || quadro === null) {
     return (
@@ -161,6 +181,7 @@ export function QuadroDeExecucao({
           ))}
         </div>
       )}
+      {mensagemDoCancelamento && <p role="status" className="text-sm">{mensagemDoCancelamento}</p>}
 
       <div
         className="grid gap-3 overflow-x-auto xl:grid-cols-7"
@@ -209,6 +230,17 @@ export function QuadroDeExecucao({
                         Ver atividade dos agentes
                       </button>
                     )}
+                    {cartao.run !== undefined &&
+                      !['BLOCKED', 'CANCELLED', 'MERGED'].includes(cartao.run.estado) && (
+                        <button
+                          type="button"
+                          className="mt-2 ml-2 rounded border border-red-400/40 px-2 py-1 text-xs text-red-400"
+                          disabled={cancelando !== undefined}
+                          onClick={() => void cancelar(cartao.run!.id)}
+                        >
+                          {cancelando === cartao.run.id ? 'Cancelando…' : 'Cancelar run'}
+                        </button>
+                      )}
                     {cartao.equipe && (
                       <section
                         className="mt-3 rounded-md border border-[rgba(var(--jos-borda-rgb),0.12)] p-2 text-xs"

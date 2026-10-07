@@ -26,6 +26,10 @@ export interface ResultadoDoPlay {
   readonly mensagem: string
 }
 
+export type ResultadoDoCancelamentoNoQuadro =
+  | { readonly cancelado: true; readonly fase: string; readonly rascunho: string }
+  | { readonly cancelado: false; readonly motivo: string; readonly mensagem: string }
+
 export const ESTADOS_DA_CONSULTA = ['nao-consultado', 'atualizado', 'desconhecido'] as const
 export type EstadoDaConsulta = (typeof ESTADOS_DA_CONSULTA)[number]
 

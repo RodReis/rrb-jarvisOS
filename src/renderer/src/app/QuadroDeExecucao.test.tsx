@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { QuadroDeExecucao } from '@shared/domain/quadro-execucao'
 import { QuadroDeExecucao as TelaDoQuadro } from './QuadroDeExecucao'
@@ -66,8 +66,10 @@ describe('equipe do Squad no cartão do quadro', () => {
     }
     vi.stubGlobal('jarvis', {
       quadroDeExecucao: vi.fn(async () => quadro),
-      playNoQuadro: vi.fn(async () => [])
+      playNoQuadro: vi.fn(async () => []),
+      cancelarNoQuadro: vi.fn(async () => ({ cancelado: true, fase: 'durante-execucao', rascunho: 'sem-pr' }))
     })
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
     render(<TelaDoQuadro projectId="p-1" workspace="jarvis" />)
 
     expect(await screen.findByText('Equipe · 1 escritor(es)')).toBeInTheDocument()
@@ -77,6 +79,10 @@ describe('equipe do Squad no cartão do quadro', () => {
     ).toBeInTheDocument()
     expect(screen.getByText(/DEVELOPER → TESTE → REVIEWER → PR\/MERGE → DONE/)).toBeInTheDocument()
     expect(screen.getByText('desenvolvedor: concluída')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar run' }))
+    await waitFor(() =>
+      expect(window.jarvis.cancelarNoQuadro).toHaveBeenCalledWith('p-1', 'run-1', 'jarvis')
+    )
     await waitFor(() => expect(window.jarvis.quadroDeExecucao).toHaveBeenCalled())
     vi.unstubAllGlobals()
   })

@@ -39,6 +39,7 @@ import type { PipelineRepository } from './pipeline-repository'
 import type { GenerationTraceService } from '../ai/generation-trace-service'
 import type { PainelDaTarefaRepository } from './painel-tarefa-repository'
 import type { RunPrRepository } from './run-pr-repository'
+import type { CancelamentoService, ResultadoDoCancelamento } from './cancelamento-service'
 import { log } from '../logging/logger'
 
 export interface QuadroExecucaoDeps {
@@ -56,6 +57,7 @@ export interface QuadroExecucaoDeps {
   readonly fila: FilaService
   readonly runPrs: RunPrRepository
   readonly connectors: ConnectorService
+  readonly cancelamento?: Pick<CancelamentoService, 'cancelar'>
   readonly audit?: import('../storage/audit-repository').AuditRepository
   readonly criarSnapshotDoSquad?: (modelo: { provider: string; modelo: string }) => SnapshotDoSquad
   /** Só é fornecido quando o caminho de produção do Squad estiver composto. */
@@ -83,6 +85,17 @@ export class QuadroExecucaoService {
 
   constructor(private readonly deps: QuadroExecucaoDeps) {
     this.agora = deps.agora ?? Date.now
+  }
+
+  async cancelar(
+    projectId: string,
+    workspaceId: WorkspaceId,
+    runId: string
+  ): Promise<ResultadoDoCancelamento> {
+    if (this.deps.cancelamento === undefined) {
+      return { cancelado: false, motivo: 'recusado', mensagem: 'Cancelamento indisponível.' }
+    }
+    return this.deps.cancelamento.cancelar(projectId, workspaceId, runId)
   }
 
   async vista(projectId: string, workspaceId: WorkspaceId): Promise<QuadroDeExecucao> {

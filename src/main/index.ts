@@ -2161,6 +2161,7 @@ if (!app.requestSingleInstanceLock()) {
       fila,
       runPrs,
       connectors,
+      cancelamento,
       raizOperacional: () => join(app.getPath('userData'), 'pipeline'),
       criarSnapshotDoSquad: (modelo) =>
         criarSnapshotDoSquad(
