@@ -4,6 +4,11 @@ import { GitBranch, ShieldCheck, Sparkles } from 'lucide-react'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { Approval, AprovacaoOutcome, Gate } from '@shared/domain/aprovacoes'
 import type { ResultadoDaSelecaoDeStack, RuntimeDoPerfil } from '@shared/domain/ci-profile'
+import {
+  CATEGORIAS_DE_PROVA,
+  type EstadoDaMatrizDeProva,
+  type MatrizDeProva
+} from '@shared/domain/ci-proof-matrix'
 import { GATES } from '@shared/domain/aprovacoes'
 import type {
   MvpGerado,
@@ -124,6 +129,8 @@ export function RoadmapDoProjeto({
     'nao' | 'gerando' | 'escolhendo' | 'aprovando' | 'configurando-ci'
   >('nao')
   const [perfilCi, setPerfilCi] = useState<ResultadoDaSelecaoDeStack | null>(null)
+  const [estadoMatriz, setEstadoMatriz] = useState<EstadoDaMatrizDeProva | null>(null)
+  const [matrizRascunho, setMatrizRascunho] = useState<MatrizDeProva | null>(null)
   const [desfecho, setDesfecho] = useState<RoadmapGeradoOutcome | null>(null)
   const [aprovacao, setAprovacao] = useState<AprovacaoOutcome | null>(null)
   const [etapas, setEtapas] = useState<ReadonlyMap<EtapaDaGeracao, AndamentoDaEtapa>>(new Map())
@@ -138,17 +145,32 @@ export function RoadmapDoProjeto({
         window.jarvis.carregarRoadmapGerado(projectId, workspace),
         window.jarvis.mvpsElegiveis(projectId, workspace),
         window.jarvis.listarAprovacoes(projectId, workspace),
-        window.jarvis.estadoDoPerfilCi(projectId, workspace)
+        window.jarvis.estadoDoPerfilCi(projectId, workspace),
+        window.jarvis.estadoDaMatrizCi(projectId, workspace)
       ]),
     [projectId, workspace]
   )
 
   const aplicar = useCallback(
-    ([gerado, lista, aceites, perfil]: Awaited<ReturnType<typeof buscar>>): void => {
+    ([gerado, lista, aceites, perfil, matriz]: Awaited<ReturnType<typeof buscar>>): void => {
       setRoadmap(gerado)
       setElegiveis(lista)
       setAprovacoes(aceites)
       setPerfilCi(perfil)
+      setEstadoMatriz(matriz)
+      setMatrizRascunho(
+        matriz.matriz ?? {
+          criterios: matriz.criterios.map((_criterio, indice) => ({
+            numero: indice + 1,
+            validacoes: []
+          })),
+          categorias: CATEGORIAS_DE_PROVA.map((nome) => ({
+            nome,
+            estado: 'aplicavel',
+            validacoes: []
+          }))
+        }
+      )
     },
     []
   )
@@ -309,9 +331,30 @@ export function RoadmapDoProjeto({
     try {
       const resultado = await window.jarvis.selecionarStackCi(projectId, runtime, workspace)
       setPerfilCi(resultado)
-      if (resultado.ok) setAprovacao(null)
+      if (resultado.ok) {
+        setAprovacao(null)
+        await recarregar()
+      }
     } catch (causa: unknown) {
       log.ui.error('Falha ao selecionar a stack de CI', {
+        projectId,
+        stack: causa instanceof Error ? causa.stack : undefined
+      })
+    } finally {
+      setOcupado('nao')
+    }
+  }
+
+  async function salvarMatriz(): Promise<void> {
+    if (matrizRascunho === null) return
+    setOcupado('configurando-ci')
+    try {
+      const resultado = await window.jarvis.salvarMatrizCi(projectId, workspace, matrizRascunho)
+      setEstadoMatriz(resultado)
+      setMatrizRascunho(resultado.matriz ?? matrizRascunho)
+      setAprovacao(null)
+    } catch (causa: unknown) {
+      log.ui.error('Falha ao salvar a matriz de prova', {
         projectId,
         stack: causa instanceof Error ? causa.stack : undefined
       })
@@ -458,6 +501,18 @@ export function RoadmapDoProjeto({
                     {perfilCi !== null && (
                       <InlineAlert tom={perfilCi.ok ? 'ok' : 'warn'} titulo={perfilCi.mensagem} />
                     )}
+                    {estadoMatriz?.ok && matrizRascunho !== null && (
+                      <EditorDaMatrizDeProva
+                        estado={estadoMatriz}
+                        matriz={matrizRascunho}
+                        desabilitado={trabalhando}
+                        onChange={setMatrizRascunho}
+                        onSalvar={() => void salvarMatriz()}
+                      />
+                    )}
+                    {estadoMatriz !== null && !estadoMatriz.ok && (
+                      <InlineAlert tom="warn" titulo={estadoMatriz.mensagem} />
+                    )}
                   </section>
                 </div>
               )}
@@ -483,6 +538,182 @@ export function RoadmapDoProjeto({
           {aprovacao !== null && <DesfechoDaAprovacao aprovacao={aprovacao} />}
         </>
       )}
+    </section>
+  )
+}
+
+function EditorDaMatrizDeProva({
+  estado,
+  matriz,
+  desabilitado,
+  onChange,
+  onSalvar
+}: {
+  readonly estado: EstadoDaMatrizDeProva
+  readonly matriz: MatrizDeProva
+  readonly desabilitado: boolean
+  readonly onChange: (matriz: MatrizDeProva) => void
+  readonly onSalvar: () => void
+}): React.JSX.Element {
+  const { t } = useTranslation()
+
+  function atualizarCriterio(numero: number, validacao: string, marcado: boolean): void {
+    onChange({
+      ...matriz,
+      criterios: matriz.criterios.map((criterio) =>
+        criterio.numero !== numero
+          ? criterio
+          : {
+              ...criterio,
+              validacoes: marcado
+                ? [...new Set([...criterio.validacoes, validacao])]
+                : criterio.validacoes.filter((id) => id !== validacao)
+            }
+      )
+    })
+  }
+
+  function atualizarCategoria(
+    nome: (typeof CATEGORIAS_DE_PROVA)[number],
+    alterar: (categoria: MatrizDeProva['categorias'][number]) => MatrizDeProva['categorias'][number]
+  ): void {
+    onChange({
+      ...matriz,
+      categorias: matriz.categorias.map((categoria) =>
+        categoria.nome === nome ? alterar(categoria) : categoria
+      )
+    })
+  }
+
+  return (
+    <section
+      className="flex flex-col gap-3 rounded-[var(--jos-raio-card)] border border-[rgba(var(--jos-borda-rgb),0.18)] p-4"
+      aria-label={t('roadmap.matrizTitulo')}
+    >
+      <div>
+        <h5 className="font-[var(--jos-peso-semi)] text-[var(--jos-cor-texto)]">
+          {t('roadmap.matrizTitulo')}
+        </h5>
+        <p className="text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-secundario)]">
+          {estado.mensagem} {t('roadmap.matrizAjuda')}
+        </p>
+      </div>
+      <div className="flex flex-col gap-3">
+        {estado.criterios.map((texto, indice) => {
+          const numero = indice + 1
+          const criterio = matriz.criterios.find((item) => item.numero === numero)
+          return (
+            <fieldset
+              key={numero}
+              className="flex flex-col gap-2 rounded border border-[rgba(var(--jos-borda-rgb),0.14)] p-3"
+            >
+              <legend className="px-1 text-sm text-[var(--jos-cor-texto)]">
+                {t('roadmap.matrizCriterio', { numero, texto })}
+              </legend>
+              <div className="flex flex-wrap gap-x-4 gap-y-2">
+                {estado.validacoes.map((validacao) => (
+                  <label
+                    key={validacao.id}
+                    className="flex items-center gap-2 text-sm text-[var(--jos-cor-texto-secundario)]"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={criterio?.validacoes.includes(validacao.id) ?? false}
+                      disabled={desabilitado}
+                      onChange={(event) =>
+                        atualizarCriterio(numero, validacao.id, event.currentTarget.checked)
+                      }
+                    />
+                    {validacao.nome} ({validacao.id})
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )
+        })}
+      </div>
+      <div className="flex flex-col gap-3">
+        {CATEGORIAS_DE_PROVA.map((nome) => {
+          const categoria = matriz.categorias.find((item) => item.nome === nome)
+          if (categoria === undefined) return null
+          return (
+            <fieldset
+              key={nome}
+              className="flex flex-col gap-2 rounded border border-[rgba(var(--jos-borda-rgb),0.14)] p-3"
+            >
+              <legend className="px-1 text-sm text-[var(--jos-cor-texto)]">
+                {t(`roadmap.matrizCategoria.${nome}`)}
+              </legend>
+              <select
+                value={categoria.estado}
+                disabled={desabilitado}
+                aria-label={t('roadmap.matrizEstado', {
+                  categoria: t(`roadmap.matrizCategoria.${nome}`)
+                })}
+                onChange={(event) => {
+                  const estadoNovo = event.currentTarget.value as 'aplicavel' | 'nao-aplicavel'
+                  atualizarCategoria(nome, (atual) => ({
+                    nome,
+                    estado: estadoNovo,
+                    validacoes: estadoNovo === 'nao-aplicavel' ? [] : atual.validacoes,
+                    ...(estadoNovo === 'nao-aplicavel' && atual.justificativa !== undefined
+                      ? { justificativa: atual.justificativa }
+                      : {})
+                  }))
+                }}
+                className="w-fit rounded border border-[rgba(var(--jos-borda-rgb),0.2)] bg-[var(--jos-cor-superficie)] px-2 py-1 text-sm text-[var(--jos-cor-texto)]"
+              >
+                <option value="aplicavel">{t('roadmap.matrizAplicavel')}</option>
+                <option value="nao-aplicavel">{t('roadmap.matrizNaoAplicavel')}</option>
+              </select>
+              {categoria.estado === 'aplicavel' ? (
+                <div className="flex flex-wrap gap-x-4 gap-y-2">
+                  {estado.validacoes.map((validacao) => (
+                    <label
+                      key={validacao.id}
+                      className="flex items-center gap-2 text-sm text-[var(--jos-cor-texto-secundario)]"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={categoria.validacoes.includes(validacao.id)}
+                        disabled={desabilitado}
+                        onChange={(event) =>
+                          atualizarCategoria(nome, (atual) => ({
+                            ...atual,
+                            validacoes: event.currentTarget.checked
+                              ? [...new Set([...atual.validacoes, validacao.id])]
+                              : atual.validacoes.filter((id) => id !== validacao.id)
+                          }))
+                        }
+                      />
+                      {validacao.nome} ({validacao.id})
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <textarea
+                  value={categoria.justificativa ?? ''}
+                  disabled={desabilitado}
+                  aria-label={t('roadmap.matrizJustificativa', {
+                    categoria: t(`roadmap.matrizCategoria.${nome}`)
+                  })}
+                  placeholder={t('roadmap.matrizJustificativaPlaceholder')}
+                  onChange={(event) =>
+                    atualizarCategoria(nome, (atual) => ({
+                      ...atual,
+                      justificativa: event.currentTarget.value
+                    }))
+                  }
+                  className="min-h-16 rounded border border-[rgba(var(--jos-borda-rgb),0.2)] bg-[var(--jos-cor-superficie)] px-3 py-2 text-sm text-[var(--jos-cor-texto)]"
+                />
+              )}
+            </fieldset>
+          )
+        })}
+      </div>
+      <Button variante="secundaria" desabilitado={desabilitado} onClick={onSalvar}>
+        {t('roadmap.matrizSalvar')}
+      </Button>
     </section>
   )
 }

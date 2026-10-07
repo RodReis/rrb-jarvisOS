@@ -2470,14 +2470,15 @@ Status: **validada na PR [#405](https://github.com/RodReis/rrb-jarvisOS/pull/405
 
 ### Fatia 01 — Quadro de execução, play e PR/MERGE (`docs/spec/spec-execucao-01-quadro-play-pr-merge.md`)
 
-Status: **em implementação** — SPEC `aprovada-pi`; issue [#370](https://github.com/RodReis/rrb-jarvisOS/issues/370) em `proplan:doing` conferida em 2026-10-06; [PR #408](https://github.com/RodReis/rrb-jarvisOS/pull/408) em rascunho, sem aceite. Stack Node/Python escolhida pelo PI no app; E1 tem serviço de perfil, preflight de documentos/matriz, parser YAML, revalidação de hashes e bloqueio antes de efeitos remotos na publicação. Workflow preexistente sem manifesto confiável bloqueia o aceite. Ainda falta gerar/revisar a matriz no fluxo, ligar a integração real do Squad e provar Play positivo.
+Status: **em implementação** — SPEC `aprovada-pi`; issue [#370](https://github.com/RodReis/rrb-jarvisOS/issues/370) em `proplan:doing` conferida em 2026-10-06; [PR #408](https://github.com/RodReis/rrb-jarvisOS/pull/408) em rascunho, sem aceite. Stack Node/Python escolhida pelo PI no app; E1 tem serviço de perfil, editor persistido da matriz na SPEC, preflight de documentos/matriz, parser YAML, revalidação de hashes e bloqueio antes de efeitos remotos na publicação. Workflow preexistente sem manifesto confiável bloqueia o aceite. Ainda falta fechar a prova de E1 no pacote versionado, ligar a integração real do Squad e provar Play positivo.
 
 - [x] Projeção local das sete colunas por run, fila e refs publicadas; `REVIEWING` é estado persistido entre validação e PR.
 - [x] Consulta do SHA e dos checks do PR pelo kernel; falha fica desconhecida com horário. Finalizado (PI) requer issue fechada com `proplan:finalizado` observados no GitHub.
 - [x] Seleção do mesmo MVP e validação de escopo, issue, revisão aprovada, perfil de CI e ContextPack exercitadas em integração; dependência recusa o avanço e expõe a causa.
 - [x] Caminho da SPEC no Play corrigido para usar `specSlug` relativo completo (`docs/spec/...md`); antes, o fluxo duplicava `docs/spec` e anexava `.md` outra vez.
 - [ ] Ligar o Play ao Squad orquestrado (planejador, executor, TESTE, REVIEWER e entrega) no bootstrap. O encadeador legado executa outro fluxo; no app real o Play recusa antes de criar run até essa ligação existir.
-- [ ] `SLICE_ENTRY` cobre o perfil, SPEC com matriz completa, `TESTING.md` e `REVIEW.md`; o preflight é fail-closed e a publicação recalcula as revisões atuais. Seleção explícita do runtime, parser YAML e bloqueio de adoção sem manifesto estão implementados; geração/edição da matriz ainda pendente.
+- [x] `SLICE_ENTRY` valida perfil, SPEC com matriz completa, `TESTING.md` e `REVIEW.md`; o preflight é fail-closed e a publicação recalcula as revisões atuais. Seleção explícita do runtime, edição persistida da matriz, parser YAML e bloqueio de adoção sem manifesto estão implementados.
+- [ ] Provar a jornada E1 ponta a ponta com os artefatos versionados no pacote e a aprovação vinculada aos hashes atuais.
 - [x] Tela por IPC tipado, seleção e atualização em 60 s; o renderer não recebe credencial nem executa comandos.
 - [ ] Prova E2E do app real: play de uma e três issues, worktrees distintos, dependência e slots. Os testes de integração provam a seleção e o bloqueio; a execução real ainda precisa de ambiente com perfil aprovado e executor operacional.
 - [ ] Gate completo de qualidade, relatório por categoria, PR com `refs #370`, CI e merge confirmados. Só então publicar encerramento e mover para `proplan:done`.

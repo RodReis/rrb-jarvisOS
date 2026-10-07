@@ -10,20 +10,37 @@ import {
 } from 'node:fs'
 import { isAbsolute, join, relative } from 'node:path'
 import type { WorkspaceId } from '@shared/domain/entities'
+import type { SpecGerada } from '@shared/domain/roadmap-gerado'
 import {
   validarPerfilDeCi,
   type ResultadoDaSelecaoDeStack,
   type RuntimeDoPerfil
 } from '@shared/domain/ci-profile'
 import { perfilNodeEmWindows, perfilPythonEmWindows } from '@shared/domain/ci-profile-perfis'
+import {
+  escreverMatrizDeProva,
+  ehMatrizDeProva,
+  lerMatrizDeProva,
+  type EstadoDaMatrizDeProva,
+  type MatrizDeProva
+} from '@shared/domain/ci-proof-matrix'
 import type { ProjectRepository } from './project-repository'
 import { lerPerfilDeCiVersionado } from './ci-profile-revision'
+
+export interface SpecAtualDoProjeto {
+  readonly specSlug: string
+  readonly spec: SpecGerada
+}
 
 /** O PI escolhe a stack; o planejamento não a deduz dos arquivos ou do projeto JarvisOS. */
 export class CiProfileSetupService {
   constructor(
     private readonly projects: Pick<ProjectRepository, 'findById'>,
-    private readonly userId: () => string
+    private readonly userId: () => string,
+    private readonly specAtual?: (
+      projectId: string,
+      workspaceId: WorkspaceId
+    ) => SpecAtualDoProjeto | undefined
   ) {}
 
   estado(projectId: string, workspaceId: WorkspaceId): ResultadoDaSelecaoDeStack {
@@ -34,6 +51,106 @@ export class CiProfileSetupService {
     return lido === undefined
       ? { ok: false, mensagem: 'Escolha a stack de CI antes do aceite da fatia.' }
       : { ok: true, runtime: lido.perfil.runtime, mensagem: 'Perfil de CI presente no pacote.' }
+  }
+
+  estadoDaMatriz(projectId: string, workspaceId: WorkspaceId): EstadoDaMatrizDeProva {
+    const specAtual = this.specAtual?.(projectId, workspaceId)
+    const projeto = this.projects.findById(this.userId(), projectId)
+    const perfil = projeto === undefined ? undefined : lerPerfilDeCiVersionado(projeto.diretorio)
+    if (
+      projeto === undefined ||
+      projeto.workspace_id !== workspaceId ||
+      specAtual === undefined ||
+      perfil === undefined
+    )
+      return {
+        ok: false,
+        mensagem: 'Gere a SPEC e escolha a stack antes de preparar a matriz.',
+        criterios: [],
+        validacoes: []
+      }
+
+    try {
+      const raiz = realpathSync(projeto.diretorio)
+      const arquivo = realpathSync(join(raiz, specAtual.specSlug))
+      const relativo = relative(raiz, arquivo)
+      if (
+        isAbsolute(relativo) ||
+        relativo === '..' ||
+        relativo.startsWith('..\\') ||
+        relativo.startsWith('../')
+      )
+        throw new Error('SPEC fora do projeto')
+      const texto = readFileSync(arquivo, 'utf8')
+      const matriz = lerMatrizDeProva(texto)
+      return {
+        ok: true,
+        mensagem:
+          matriz === undefined
+            ? 'Matriz pendente de classificação pelo PI.'
+            : 'Matriz carregada para revisão.',
+        criterios: specAtual.spec.criteriosDeAceite,
+        validacoes: perfil.perfil.validacoes.map(({ id, nome }) => ({ id, nome })),
+        ...(matriz === undefined ? {} : { matriz })
+      }
+    } catch {
+      return {
+        ok: false,
+        mensagem: 'A SPEC versionada não está disponível para editar a matriz.',
+        criterios: [],
+        validacoes: []
+      }
+    }
+  }
+
+  salvarMatriz(
+    projectId: string,
+    workspaceId: WorkspaceId,
+    entrada: unknown
+  ): EstadoDaMatrizDeProva {
+    const estado = this.estadoDaMatriz(projectId, workspaceId)
+    if (!estado.ok) return estado
+    if (!ehMatrizDeProva(entrada))
+      return { ...estado, ok: false, mensagem: 'A matriz enviada tem estrutura inválida.' }
+    const matriz: MatrizDeProva = entrada
+    const projeto = this.projects.findById(this.userId(), projectId)
+    const specAtual = this.specAtual?.(projectId, workspaceId)
+    if (projeto === undefined || specAtual === undefined)
+      return { ...estado, ok: false, mensagem: 'A SPEC atual mudou; recarregue antes de salvar.' }
+
+    try {
+      const raiz = realpathSync(projeto.diretorio)
+      const arquivo = realpathSync(join(raiz, specAtual.specSlug))
+      const relativo = relative(raiz, arquivo)
+      if (
+        isAbsolute(relativo) ||
+        relativo === '..' ||
+        relativo.startsWith('..\\') ||
+        relativo.startsWith('../')
+      )
+        throw new Error('SPEC fora do projeto')
+      const conteudo = readFileSync(arquivo, 'utf8')
+      const secao = escreverMatrizDeProva(matriz)
+      const inicio = conteudo.search(/^## Matriz de prova\s*$/m)
+      let atualizado: string
+      if (inicio < 0) {
+        atualizado = `${conteudo.trimEnd()}\n\n${secao}`
+      } else {
+        const seguinte = conteudo.slice(inicio + 1).search(/^##\s/m)
+        const fim = seguinte < 0 ? conteudo.length : inicio + 1 + seguinte
+        atualizado = `${conteudo.slice(0, inicio)}${secao}${conteudo.slice(fim)}`
+      }
+      const temporario = join(raiz, `.spec-matriz-${randomUUID()}.tmp`)
+      try {
+        writeFileSync(temporario, atualizado, { flag: 'wx' })
+        renameSync(temporario, arquivo)
+      } finally {
+        if (existsSync(temporario)) unlinkSync(temporario)
+      }
+      return this.estadoDaMatriz(projectId, workspaceId)
+    } catch {
+      return { ...estado, ok: false, mensagem: 'Não foi possível salvar a matriz na SPEC.' }
+    }
   }
 
   selecionar(

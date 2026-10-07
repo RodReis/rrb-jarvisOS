@@ -49,6 +49,7 @@ import type {
 } from '@shared/domain/modelo-da-fase'
 import type { CodexBillingMode, CodexProfileState } from '@shared/domain/codex-profile'
 import type { ResultadoDaSelecaoDeStack, RuntimeDoPerfil } from '@shared/domain/ci-profile'
+import type { EstadoDaMatrizDeProva, MatrizDeProva } from '@shared/domain/ci-proof-matrix'
 import type { ExecutorOperationalView } from '@shared/domain/executor-operacional'
 import type {
   ConnectorCapability,
@@ -517,6 +518,8 @@ export const IPC_CHANNELS = {
   roadmapResponderPergunta: 'roadmap:responder-pergunta',
   ciProfileEstado: 'ci-profile:estado',
   ciProfileSelecionar: 'ci-profile:selecionar',
+  ciProfileMatrizEstado: 'ci-profile:matriz-estado',
+  ciProfileMatrizSalvar: 'ci-profile:matriz-salvar',
   roadmapElegiveis: 'roadmap:elegiveis',
   aprovacaoListar: 'aprovacao:listar',
   aprovacaoRevisoes: 'aprovacao:revisoes',
@@ -1425,6 +1428,12 @@ export interface JarvisBridge {
     runtime: RuntimeDoPerfil,
     workspace: WorkspaceId
   ): Promise<ResultadoDaSelecaoDeStack>
+  estadoDaMatrizCi(projectId: string, workspace: WorkspaceId): Promise<EstadoDaMatrizDeProva>
+  salvarMatrizCi(
+    projectId: string,
+    workspace: WorkspaceId,
+    matriz: MatrizDeProva
+  ): Promise<EstadoDaMatrizDeProva>
   /**
    * O estado da jornada do projeto: etapa atual, CTA único e a trilha (SPEC-Jornada-01).
    *

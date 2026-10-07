@@ -37,6 +37,7 @@ import type { ContextPack, ContextPackOutcome, FalhaRegistrada } from '@shared/d
 import type { CapacidadeResolvida } from '@shared/domain/skills'
 import type { CodexBillingMode, CodexProfileState } from '@shared/domain/codex-profile'
 import type { RuntimeDoPerfil } from '@shared/domain/ci-profile'
+import type { EstadoDaMatrizDeProva, MatrizDeProva } from '@shared/domain/ci-proof-matrix'
 import type { ExecutorOperationalView } from '@shared/domain/executor-operacional'
 import type { AuthSnapshot } from '@shared/contracts/auth'
 import type { LogInput } from '@shared/contracts/logging'
@@ -638,6 +639,14 @@ const bridge: JarvisBridge = {
     ipcRenderer.invoke(IPC_CHANNELS.ciProfileEstado, projectId, workspace),
   selecionarStackCi: (projectId: string, runtime: RuntimeDoPerfil, workspace: WorkspaceId) =>
     ipcRenderer.invoke(IPC_CHANNELS.ciProfileSelecionar, projectId, runtime, workspace),
+  estadoDaMatrizCi: (projectId: string, workspace: WorkspaceId): Promise<EstadoDaMatrizDeProva> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ciProfileMatrizEstado, projectId, workspace),
+  salvarMatrizCi: (
+    projectId: string,
+    workspace: WorkspaceId,
+    matriz: MatrizDeProva
+  ): Promise<EstadoDaMatrizDeProva> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ciProfileMatrizSalvar, projectId, matriz, workspace),
   // A jornada: duas leituras e uma escrita. Nenhuma recebe etapa — só evento nomeado, porque
   // onde o projeto está é conclusão do main a partir dos fatos, não afirmação do renderer.
   estadoDaJornada: (projectId: string, workspace: WorkspaceId): Promise<EstadoDaJornada | null> =>

@@ -15,6 +15,14 @@ export interface MatrizDeProva {
   }[]
 }
 
+export interface EstadoDaMatrizDeProva {
+  readonly ok: boolean
+  readonly mensagem: string
+  readonly criterios: readonly string[]
+  readonly validacoes: readonly { readonly id: string; readonly nome: string }[]
+  readonly matriz?: MatrizDeProva
+}
+
 const ehObjeto = (valor: unknown): valor is Record<string, unknown> =>
   typeof valor === 'object' && valor !== null && !Array.isArray(valor)
 
@@ -24,31 +32,34 @@ export function lerMatrizDeProva(spec: string): MatrizDeProva | undefined {
   if (bloco === undefined) return undefined
   try {
     const valor: unknown = JSON.parse(bloco)
-    if (!ehObjeto(valor) || !Array.isArray(valor.criterios) || !Array.isArray(valor.categorias))
-      return undefined
-    if (
-      !valor.criterios.every(
-        (linha: unknown) =>
-          ehObjeto(linha) &&
-          Number.isInteger(linha.numero) &&
-          Array.isArray(linha.validacoes) &&
-          linha.validacoes.every((id: unknown) => typeof id === 'string')
-      ) ||
-      !valor.categorias.every(
-        (linha: unknown) =>
-          ehObjeto(linha) &&
-          typeof linha.nome === 'string' &&
-          (linha.estado === 'aplicavel' || linha.estado === 'nao-aplicavel') &&
-          Array.isArray(linha.validacoes) &&
-          linha.validacoes.every((id: unknown) => typeof id === 'string') &&
-          (linha.justificativa === undefined || typeof linha.justificativa === 'string')
-      )
-    )
-      return undefined
-    return valor as unknown as MatrizDeProva
+    return ehMatrizDeProva(valor) ? valor : undefined
   } catch {
     return undefined
   }
+}
+
+export function ehMatrizDeProva(valor: unknown): valor is MatrizDeProva {
+  return (
+    ehObjeto(valor) &&
+    Array.isArray(valor.criterios) &&
+    Array.isArray(valor.categorias) &&
+    valor.criterios.every(
+      (linha: unknown) =>
+        ehObjeto(linha) &&
+        Number.isInteger(linha.numero) &&
+        Array.isArray(linha.validacoes) &&
+        linha.validacoes.every((id: unknown) => typeof id === 'string')
+    ) &&
+    valor.categorias.every(
+      (linha: unknown) =>
+        ehObjeto(linha) &&
+        typeof linha.nome === 'string' &&
+        (linha.estado === 'aplicavel' || linha.estado === 'nao-aplicavel') &&
+        Array.isArray(linha.validacoes) &&
+        linha.validacoes.every((id: unknown) => typeof id === 'string') &&
+        (linha.justificativa === undefined || typeof linha.justificativa === 'string')
+    )
+  )
 }
 
 export function escreverMatrizDeProva(matriz: MatrizDeProva): string {

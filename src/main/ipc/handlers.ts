@@ -139,6 +139,7 @@ import type { RoadmapService } from '../projects/roadmap-service'
 import type { RoadmapGeradoService } from '../projects/roadmap-gerado-service'
 import type { CiProfileSetupService } from '../projects/ci-profile-setup'
 import type { ResultadoDaSelecaoDeStack } from '@shared/domain/ci-profile'
+import type { EstadoDaMatrizDeProva } from '@shared/domain/ci-proof-matrix'
 import type { JornadaService } from '../projects/jornada-service'
 import type { BriefService } from '../projects/brief-service'
 import type { PrdService } from '../projects/prd-service'
@@ -1995,6 +1996,24 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       if (runtime !== 'node' && runtime !== 'python')
         return { ok: false, mensagem: 'Stack de CI não suportada.' }
       return deps.ciProfileSetup.selecionar(projectId, workspace, runtime)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.ciProfileMatrizEstado,
+    (_event, projectId: unknown, workspace: unknown): EstadoDaMatrizDeProva => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string')
+        return { ok: false, mensagem: 'Projeto não encontrado.', criterios: [], validacoes: [] }
+      return deps.ciProfileSetup.estadoDaMatriz(projectId, workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.ciProfileMatrizSalvar,
+    (_event, projectId: unknown, matriz: unknown, workspace: unknown): EstadoDaMatrizDeProva => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string')
+        return { ok: false, mensagem: 'Projeto não encontrado.', criterios: [], validacoes: [] }
+      return deps.ciProfileSetup.salvarMatriz(projectId, workspace, matriz)
     }
   )
 

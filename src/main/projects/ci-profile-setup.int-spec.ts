@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { perfilNodeEmWindows, perfilPythonEmWindows } from '@shared/domain/ci-profile-perfis'
+import type { SpecGerada } from '@shared/domain/roadmap-gerado'
+import { lerMatrizDeProva } from '@shared/domain/ci-proof-matrix'
 import { CiProfileSetupService } from './ci-profile-setup'
 
 let raiz: string | undefined
@@ -81,5 +83,64 @@ describe('escolha explícita de stack para E1', () => {
     expect(JSON.parse(readFileSync(join(raiz!, 'ci-profile.json'), 'utf8'))).toMatchObject({
       timeoutEmMinutos: 29
     })
+  })
+
+  it('grava a matriz na SPEC atual e preserva as demais seções', () => {
+    montar()
+    const spec: SpecGerada = {
+      fatiaId: 'f-1',
+      titulo: 'Fatia',
+      objetivo: 'Objetivo',
+      fluxo: ['Abrir'],
+      regras: ['Regra'],
+      criteriosDeAceite: ['Salva com sucesso'],
+      testes: ['Teste'],
+      perguntas: []
+    }
+    const specSlug = 'docs/spec/spec-atual.md'
+    mkdirSync(join(raiz!, 'docs', 'spec'), { recursive: true })
+    writeFileSync(join(raiz!, 'ci-profile.json'), JSON.stringify(perfilNodeEmWindows('p-1')))
+    writeFileSync(
+      join(raiz!, specSlug),
+      '# SPEC\n\n## Critérios\n\nTexto.\n\n## Perguntas abertas\n\nNenhuma.\n'
+    )
+    const comSpecAtual = new CiProfileSetupService(
+      { findById: () => ({ diretorio: raiz, workspace_id: 'jarvis' }) } as never,
+      () => 'u-1',
+      () => ({ specSlug, spec })
+    )
+
+    const matriz = {
+      criterios: [{ numero: 1, validacoes: ['test'] }],
+      categorias: [
+        { nome: 'regra' as const, estado: 'aplicavel' as const, validacoes: ['test'] },
+        {
+          nome: 'banco' as const,
+          estado: 'nao-aplicavel' as const,
+          validacoes: [],
+          justificativa: 'Não há persistência.'
+        },
+        {
+          nome: 'tela' as const,
+          estado: 'nao-aplicavel' as const,
+          validacoes: [],
+          justificativa: 'Sem UI.'
+        },
+        {
+          nome: 'e2e' as const,
+          estado: 'nao-aplicavel' as const,
+          validacoes: [],
+          justificativa: 'Sem fluxo integrado.'
+        }
+      ]
+    }
+
+    const resultado = comSpecAtual.salvarMatriz('p-1', 'jarvis', matriz)
+    const conteudo = readFileSync(join(raiz!, specSlug), 'utf8')
+
+    expect(resultado.ok).toBe(true)
+    expect(lerMatrizDeProva(conteudo)).toEqual(matriz)
+    expect(conteudo).toContain('## Perguntas abertas')
+    expect(conteudo).toContain('Nenhuma.')
   })
 })

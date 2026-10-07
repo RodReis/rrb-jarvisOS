@@ -1345,7 +1345,19 @@ if (!app.requestSingleInstanceLock()) {
         return spec === undefined ? {} : { spec }
       }
     })
-    const ciProfileSetup = new CiProfileSetupService(projectRepository, userIdAtual)
+    const ciProfileSetup = new CiProfileSetupService(
+      projectRepository,
+      userIdAtual,
+      (projectId, workspaceId) => {
+        const gerado = roadmapGeradoRepository.vigente(userIdAtual(), projectId)
+        const spec = gerado?.spec
+        if (spec === undefined) return undefined
+        const slice = roadmapRepository
+          .carregar({ userId: userIdAtual(), workspaceId, projectId })
+          .slices.find((item) => item.id === spec.fatiaId)
+        return slice === undefined ? undefined : { specSlug: slice.specSlug, spec }
+      }
+    )
 
     // Publicação no GitHub (SPEC-Entrega-01). Recebe o `ConnectorService`, **não** o
     // `GithubAdapter`: o gate de créditos, a policy e a auditoria vivem dentro do `call()`, e um
