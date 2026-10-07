@@ -255,9 +255,7 @@ export class QuadroExecucaoService {
       try {
         const fatia = slice
         const raizReal = realpathSync(projeto.diretorio)
-        const caminhoDaSpec = realpathSync(
-          resolve(raizReal, 'docs', 'spec', `${fatia.specSlug}.md`)
-        )
+        const caminhoDaSpec = realpathSync(resolve(raizReal, fatia.specSlug))
         const relativoDaSpec = relative(raizReal, caminhoDaSpec)
         if (isAbsolute(relativoDaSpec) || relativoDaSpec.startsWith('..')) {
           throw new Error('O caminho da SPEC excede o diretório do projeto.')

@@ -28,7 +28,7 @@ const slices = [1, 2, 3].map((numero) => ({
   mvpId: mvp.id,
   numero,
   titulo: `Fatia ${numero}`,
-  specSlug: `spec-${numero}`,
+  specSlug: `docs/spec/spec-${numero}.md`,
   detalhada: true,
   origem: mvp.origem
 }))
@@ -65,15 +65,12 @@ describe('play de três fatias do mesmo MVP', () => {
     mkdirSync(join(raiz, 'docs', 'spec'), { recursive: true })
     writeFileSync(join(raiz, 'ci-profile.json'), JSON.stringify(perfilNodeEmWindows('node')))
     for (const slice of slices) {
-      writeFileSync(
-        join(raiz, 'docs', 'spec', `${slice.specSlug}.md`),
-        '## Paths permitidos\n- `src`\n'
-      )
+      writeFileSync(join(raiz, slice.specSlug), '## Paths permitidos\n- `src`\n')
     }
     const perfil = lerPerfilDeCiVersionado(raiz)
     expect(perfil).toBeDefined()
     const revisoes = [
-      { artefato: 'docs/spec/spec-1', hash: 'a'.repeat(64) },
+      { artefato: slices[0]!.specSlug, hash: 'a'.repeat(64) },
       { artefato: 'ci-profile.json', hash: perfil!.hash }
     ]
     const executar = vi.fn(async (_pedido: PedidoDeExecucao) => undefined)

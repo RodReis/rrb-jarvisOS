@@ -2475,6 +2475,7 @@ Status: **em implementação** — SPEC `aprovada-pi`; issue [#370](https://gith
 - [x] Projeção local das sete colunas por run, fila e refs publicadas; `REVIEWING` é estado persistido entre validação e PR.
 - [x] Consulta do SHA e dos checks do PR pelo kernel; falha fica desconhecida com horário. Finalizado (PI) requer issue fechada com `proplan:finalizado` observados no GitHub.
 - [x] Seleção do mesmo MVP e validação de escopo, issue, revisão aprovada, perfil de CI e ContextPack exercitadas em integração; dependência recusa o avanço e expõe a causa.
+- [x] Caminho da SPEC no Play corrigido para usar `specSlug` relativo completo (`docs/spec/...md`); antes, o fluxo duplicava `docs/spec` e anexava `.md` outra vez.
 - [ ] Ligar o Play ao Squad orquestrado (planejador, executor, TESTE, REVIEWER e entrega) no bootstrap. O encadeador legado executa outro fluxo; no app real o Play recusa antes de criar run até essa ligação existir.
 - [ ] `SLICE_ENTRY` cobre o perfil, SPEC com matriz completa, `TESTING.md` e `REVIEW.md`; o preflight é fail-closed e a publicação recalcula as revisões atuais. A seleção do runtime já está na tela; geração/edição da matriz e validação YAML/workflow ainda pendentes.
 - [x] Tela por IPC tipado, seleção e atualização em 60 s; o renderer não recebe credencial nem executa comandos.
