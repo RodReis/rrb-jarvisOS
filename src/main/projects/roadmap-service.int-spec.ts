@@ -23,6 +23,7 @@ import { join } from 'node:path'
 import type { Database as Db } from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ResultadoDaVerificacao } from '@shared/domain/marcos'
+import type { RevisaoAprovada } from '@shared/domain/aprovacoes'
 import type { MvpGerado, RoadmapRegistrado, SpecGerada } from '@shared/domain/roadmap-gerado'
 import { perfilNodeEmWindows } from '@shared/domain/ci-profile-perfis'
 import { escreverMatrizDeProva } from '@shared/domain/ci-proof-matrix'
@@ -61,6 +62,7 @@ let identidadeAtual: string | undefined
 /** A revisão gerada que os gates do roadmap aprovam. */
 let gerado: RoadmapRegistrado | undefined
 let marcos: ResultadoDaVerificacao
+let revisoesPassadasAosMarcos: readonly RevisaoAprovada[]
 
 function mvp(over: Partial<MvpGerado> = {}): MvpGerado {
   return {
@@ -234,6 +236,7 @@ beforeEach(() => {
   // Marcos em dia é o caso comum: os testes deste arquivo falam sobre os gates, e um repositório
   // sujo por padrão faria todos eles falharem por um motivo que não é o que estão medindo.
   marcos = { ok: true, head: 'abc1234', pendencias: [] }
+  revisoesPassadasAosMarcos = []
 
   projects.save({
     id: PROJETO,
@@ -259,7 +262,10 @@ beforeEach(() => {
     userId: () => USER,
     identidade: () => identidadeAtual,
     roadmapGerado: () => gerado,
-    verificarMarcos: () => marcos
+    verificarMarcos: (_projectId, _workspaceId, revisoes) => {
+      revisoesPassadasAosMarcos = revisoes
+      return marcos
+    }
   })
 
   vi.clearAllMocks()
@@ -409,6 +415,18 @@ describe('revisoesDoGate — o que cada gate cobre', () => {
     )
 
     expect(service.aprovar(PROJETO, 'SLICE_ENTRY', WS).reason).toBe('aprovado')
+    const artefatos = service
+      .revisoesDoGate(PROJETO, 'SLICE_ENTRY', WS)
+      .map((item) => item.artefato)
+    expect(artefatos).toContain('.github/workflows/ci.yml')
+    expect(artefatos).toContain('.github/ci-workflow-manifesto.json')
+    expect(revisoesPassadasAosMarcos.map((item) => item.artefato)).toContain('ci-profile.json')
+    expect(revisoesPassadasAosMarcos.map((item) => item.artefato)).toContain(
+      'file:docs/spec/spec-mvp-1-01-f-1.md'
+    )
+    expect(revisoesPassadasAosMarcos.map((item) => item.artefato)).not.toContain(
+      'docs/spec/spec-mvp-1-01-f-1.md'
+    )
   })
 
   /** Responder **é** mudança da SPEC: um hash cego às respostas aprovaria outro documento. */

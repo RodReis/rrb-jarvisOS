@@ -677,7 +677,8 @@ if (!app.requestSingleInstanceLock()) {
       userId: userIdAtual,
       identidade: () => auth?.usuarioAtual()?.id,
       roadmapGerado: (projectId) => roadmapGeradoRepository.vigente(userIdAtual(), projectId),
-      verificarMarcos: (projectId, workspaceId) => marcos.verificar(projectId, workspaceId)
+      verificarMarcos: (projectId, workspaceId, revisoes) =>
+        marcos.verificar(projectId, workspaceId, revisoes)
     })
 
     // A jornada de planejamento (SPEC-Jornada-01).

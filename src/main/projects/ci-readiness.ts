@@ -164,6 +164,14 @@ export function verificarProntidaoDeCi(
             mensagem: decisao.mensagem,
             acao: 'Revise e adote o workflow no pacote antes do aceite da fatia.'
           })
+        else {
+          revisoes.push({ artefato: CAMINHO_DO_WORKFLOW, hash: workflowAtual.hash })
+          if (manifestoArquivo !== undefined)
+            revisoes.push({
+              artefato: '.github/ci-workflow-manifesto.json',
+              hash: manifestoArquivo.hash
+            })
+        }
       }
     } catch {
       problemas.push({

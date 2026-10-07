@@ -66,7 +66,11 @@ interface RoadmapDeps {
    * verificação nenhuma. Sendo obrigatória, o compilador aponta todo ponto de montagem, e um
    * `SLICE_ENTRY` sem gate deixa de ser possível por construção.
    */
-  readonly verificarMarcos: (projectId: string, workspaceId: WorkspaceId) => ResultadoDaVerificacao
+  readonly verificarMarcos: (
+    projectId: string,
+    workspaceId: WorkspaceId,
+    revisoes: readonly RevisaoAprovada[]
+  ) => ResultadoDaVerificacao
 }
 
 export class RoadmapService {
@@ -80,7 +84,8 @@ export class RoadmapService {
   private readonly roadmapGerado: (projectId: string) => RoadmapRegistrado | undefined
   private readonly verificarMarcos: (
     projectId: string,
-    workspaceId: WorkspaceId
+    workspaceId: WorkspaceId,
+    revisoes: readonly RevisaoAprovada[]
   ) => ResultadoDaVerificacao
 
   constructor(deps: RoadmapDeps) {
@@ -236,12 +241,14 @@ export class RoadmapService {
     }
 
     const escopo = this.escopo(projectId, workspaceId)
+    let specSlugDaRevisao: string | undefined
     if (gate === 'SLICE_ENTRY') {
       const gerado = this.roadmapGerado(projectId)
       const spec = gerado?.spec
       if (spec !== undefined && specPodeSerAceita(spec)) {
         const fatia = this.repository.carregar(escopo).slices.find((s) => s.id === spec.fatiaId)
         if (fatia !== undefined) {
+          specSlugDaRevisao = fatia.specSlug
           const prontidao = verificarProntidaoDeCi(projeto.diretorio, fatia.specSlug, spec)
           if (prontidao.problemas.length > 0)
             return {
@@ -275,7 +282,13 @@ export class RoadmapService {
     // aceite gravado para um estado que o PI não aprovaria — e o aceite é o que a jornada lê para
     // avançar. Só o `SLICE_ENTRY` verifica: é o gate que abre a Construção.
     if (gate === 'SLICE_ENTRY') {
-      const marcos = this.verificarMarcos(projectId, workspaceId)
+      // A prova de versionamento usa exatamente os arquivos cujo hash o PI está aprovando.
+      // A revisão sintética da SPEC não é caminho de arquivo; os artefatos físicos vêm do
+      // preflight e incluem ci-profile.json, matriz, TESTING/REVIEW e workflow adotado.
+      const artefatosVersionados = revisoes.filter(
+        (revisao) => revisao.artefato !== specSlugDaRevisao
+      )
+      const marcos = this.verificarMarcos(projectId, workspaceId, artefatosVersionados)
       if (!marcos.ok) {
         return {
           reason: 'marcos-pendentes',
