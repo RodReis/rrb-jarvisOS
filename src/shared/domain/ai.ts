@@ -335,6 +335,8 @@ export interface AiRequest {
     readonly projectId: string
     readonly etapa: Etapa
   }
+  /** Vínculo interno de uma chamada de Squad ao painel da tarefa; nunca vai para provider/renderer. */
+  readonly painelTarefa?: { readonly projectId: string; readonly tarefaId: string }
   /**
    * `true` só para o painel de diagnóstico do Settings — a chamada que testa se o provider
    * responde, sem gerar nada para um projeto.

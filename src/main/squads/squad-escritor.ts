@@ -40,6 +40,10 @@ import type { AuditRepository } from '../storage/audit-repository'
 import { extrairJsonFinal } from './squad-planejador'
 import { recusaDaTentativa, recusaDoContexto, recusaDosLimites } from './squad-recusas'
 import type { SquadGit, WorktreeDeEscritor } from './squad-git'
+import type {
+  PainelDaTarefaRepository,
+  SnapshotCapturado
+} from '../pipeline/painel-tarefa-repository'
 import type { GerenteDeSlots } from './squad-slots'
 import { montarPromptDoEscritor } from './squad-worker-prompt'
 
@@ -95,7 +99,9 @@ export interface AgenteDoEscritor {
 }
 
 export interface DependenciasDoEscritor {
-  readonly git: Pick<SquadGit, 'alteracoes' | 'commitar' | 'remover'>
+  readonly git: Pick<SquadGit, 'alteracoes' | 'commitar' | 'remover'> &
+    Partial<Pick<SquadGit, 'capturarSnapshots'>>
+  readonly painelSnapshots?: PainelDaTarefaRepository
   readonly slots: Pick<GerenteDeSlots, 'adquirir' | 'renovar' | 'confirmar' | 'liberar'>
   readonly sandbox: SandboxDoEscritor
   readonly agente: AgenteDoEscritor
@@ -430,6 +436,32 @@ export class ExecutorDeEscritor {
     }
     if (veredito.dentro.length === 0) {
       return { ...base, estado: 'incompleta', motivo: 'sem-alteracoes', arquivos: [] }
+    }
+
+    if (this.deps.painelSnapshots !== undefined) {
+      const captura = await this.deps.git.capturarSnapshots?.(worktree, veredito.dentro)
+      const snapshots: readonly SnapshotCapturado[] = captura?.ok
+        ? captura.valor
+        : veredito.dentro.map((caminho) => ({
+            caminho,
+            tipo: 'texto',
+            bytes: 0,
+            sha256: '0'.repeat(64)
+          }))
+      try {
+        this.deps.painelSnapshots.salvarSnapshots(
+          {
+            userId: this.deps.userId(),
+            workspace: pedido.workspaceId,
+            projectId: pedido.projectId
+          },
+          pedido.runId,
+          pedido.tarefa.id,
+          snapshots
+        )
+      } catch {
+        // Evidência de painel é melhor esforço: não altera a publicação do trabalho provado.
+      }
     }
 
     return this.validarECommitar(pedido, worktree, veredito.dentro, texto, base)

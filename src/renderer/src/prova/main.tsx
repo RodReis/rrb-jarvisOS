@@ -18,6 +18,7 @@ import { GaleriaDaArquitetura, type CenaDaArquitetura } from './GaleriaDaArquite
 import { GaleriaDoMascote } from './GaleriaDoMascote'
 import { GaleriaDoCommandCenter } from './GaleriaDoCommandCenter'
 import { GaleriaDaEscuta, prepararPonteDaEscuta, type CenaDaEscuta } from './GaleriaDaEscuta'
+import { GaleriaDoPainelDaTarefa, prepararPonteDoPainelDaTarefa } from './GaleriaDoPainelDaTarefa'
 import { initI18n } from '@renderer/i18n'
 import type { ModoUi, Modulo } from '@design/tokens/semantic'
 import type { CorAcento } from '@design/tokens/acento'
@@ -83,7 +84,8 @@ const CENAS_POR_GALERIA: Readonly<Record<string, readonly string[]>> = {
     'settings',
     'boas-vindas',
     'cronograma'
-  ]
+  ],
+  'painel-tarefa': ['snapshot', 'incompleto']
 }
 
 const cenaBruta = params.get('cena')
@@ -162,6 +164,10 @@ const GALERIAS = {
     prepararPonteDaEscuta(cena)
     return <GaleriaDaEscuta modo={modo} cena={cena} />
   },
+  'painel-tarefa': () => {
+    prepararPonteDoPainelDaTarefa()
+    return <GaleriaDoPainelDaTarefa modo={modo} />
+  },
   planejamento: () => (
     <GaleriaDaJornadaDePlanejamento
       modo={modo}
@@ -211,7 +217,8 @@ const TRADUZ_POR_I18N: readonly string[] = [
   'projetos',
   'arquitetura',
   'command-center',
-  'escuta'
+  'escuta',
+  'painel-tarefa'
 ]
 if (TRADUZ_POR_I18N.includes(qual)) await initI18n('pt-BR')
 

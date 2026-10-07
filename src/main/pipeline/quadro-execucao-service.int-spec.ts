@@ -102,6 +102,11 @@ describe('play de três fatias do mesmo MVP', () => {
           return true
         }
       } as never,
+      generationTraces: {
+        tarefasDoRun: () => [],
+        eventosDeTraces: () => ({}),
+        eventosDasTarefas: () => ({})
+      } as never,
       fila: {
         criarRun: () => {
           const run = { id: 'run-s-1' }
@@ -203,7 +208,18 @@ describe('play de três fatias do mesmo MVP', () => {
       runs: {
         buscar: (id: string) => runs.get(id),
         registrarSnapshotDoSquad: () => true,
+        workspaceDoRun: () => WS,
+        registrarPlanoDoSquad: () => true,
         registrarCustoMaximoDoSquad: () => true
+      } as never,
+      generationTraces: {
+        tarefasDoRun: () => [],
+        eventosDeTraces: () => ({}),
+        eventosDasTarefas: () => ({})
+      } as never,
+      painelSnapshots: {
+        snapshots: () => ({ arquivos: [], diffs: [] }),
+        conteudo: () => undefined
       } as never,
       fila: {
         criarRun: (_p: string, _w: string, sliceId: string) => {

@@ -7,6 +7,14 @@
 - Ordem no MVP-028 (PI, 2026-10-02): **F01 → F03 → F02**.
 - Depende de: M28-F01 (quadro e card); M26-F03 (`GenerationEvent`, `GenerationTrace`, `ConsoleDaGeracao`).
 
+## Emenda de implementação — contrato run/tarefa e snapshots (decisão do PI, 2026-10-07)
+
+- Um painel de tarefa pode agregar **vários traces**: cada chamada ao ponto único continua com seu próprio `ledgerEntryId` (M26-F03); o main persiste a relação escopada `runId + tarefaId → traceId[]`, em ordem de início. O payload global `EventoDaGeracao` não recebe `runId/tarefaId`; a assinatura do painel é por `runId` e o main/preload entregam somente eventos associados àquele run.
+- O kernel salva, antes da limpeza do worktree, snapshot imutável dos **arquivos regulares alterados** pela tarefa e o diff textual contra a base. Links simbólicos, submódulos e binários não têm conteúdo persistido; binários aparecem com caminho relativo, tamanho e hash. O renderer só recebe caminhos relativos e conteúdo; nunca recebe caminho absoluto nem operação de gravação.
+- Cada arquivo textual tem teto de **10 MiB**; o conjunto de snapshots de todas as tarefas é limitado pela cota de **50 MiB por run** (contabilizada em bytes UTF-8, incluindo diffs). O item que excederia qualquer cota não é gravado, e a evidência da tarefa/run fica explicitamente `incompleta`; isso não altera a decisão de publicar o run. A captura usa apenas paths que o kernel provou no escopo do escritor.
+- Blobs de conteúdo e diffs seguem M9-F06: expiram em 30 dias ou quando a cota global superar 5 GB, pelo elegível mais antigo; runs ativos, bloqueados ou pendentes não expiram. Metadados e hashes permanecem após a expiração e a UI distingue conteúdo expirado de snapshot vazio.
+- As abas de Plano, tarefas, Diff, Arquivos, Checks e Testes leem contratos tipados no main. Checks vêm da consulta de origem já usada pelo quadro; eventos de TESTE são registrados como artefato textual redigido, com hash e cota; nenhum canal executa comando no renderer.
+
 ## Objetivo
 
 Clicar num card do quadro e ver, ao vivo e só para leitura, o que cada agente daquela issue está fazendo: o texto que produz, as ferramentas que chama, o diff que já existe no worktree, os checks e a saída dos testes. A SPEC-Execucao-01 só previa um link para o console da geração, o que não atende a esse pedido.

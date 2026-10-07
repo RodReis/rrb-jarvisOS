@@ -39,6 +39,7 @@ import { montarPromptDoWorker } from './squad-worker-prompt'
 
 export interface PedidoDoWorker {
   readonly runId: string
+  readonly projectId: string
   readonly tarefa: Pick<
     TarefaDoPlano,
     'id' | 'papel' | 'capacidade' | 'camada' | 'schemaDeResultado' | 'limites' | 'regraDeConclusao'
@@ -193,6 +194,7 @@ export class ExecutorDeWorker {
       maxTokens: tarefa.limites.maxTokensSaida,
       contextPackId: contexto.pack.id,
       runId: pedido.runId,
+      painelTarefa: { projectId: pedido.projectId, tarefaId: pedido.tarefa.id },
       tentativa: pedido.tentativa,
       // Sem ferramentas, sem settings do ambiente, esquema imposto: é a fase que o adapter isola
       // assim. É política de isolamento, não de roteamento — o modelo vem do snapshot, acima.

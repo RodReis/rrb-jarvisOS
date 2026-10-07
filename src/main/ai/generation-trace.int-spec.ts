@@ -84,6 +84,59 @@ describe('trace ligado ao ledger (critério 2)', () => {
     expect(repo.buscar({ userId: 'outro', workspace: 'jarvis' }, 't1')).toBeUndefined()
     expect(repo.eventos({ userId: 'outro', workspace: 'jarvis' }, 't1')).toEqual([])
   })
+
+  it('associa uma chamada ao run/tarefa sem trocar o ledger original', () => {
+    service.abrir({ ...ABERTURA, runId: 'run-1', tarefaId: 'dev-1' }).fechar('concluido')
+    service
+      .abrir({
+        ...ABERTURA,
+        traceId: 't2',
+        ledgerEntryId: 'call-2',
+        runId: 'run-1',
+        tarefaId: 'dev-1'
+      })
+      .fechar('concluido')
+
+    expect(repo.tracesDaTarefa(ESCOPO, 'p1', 'run-1', 'dev-1').map((trace) => trace.id)).toEqual([
+      't1',
+      't2'
+    ])
+    expect(
+      repo.tracesDaTarefa({ userId: 'outro', workspace: 'jarvis' }, 'p1', 'run-1', 'dev-1')
+    ).toEqual([])
+    expect(repo.buscar(ESCOPO, 't1')?.ledgerEntryId).toBe('call-abc')
+  })
+
+  it('lê as associações do painel com escopo de usuário, projeto, run e tarefa', () => {
+    service.abrir({ ...ABERTURA, runId: 'run-panel', tarefaId: 'task-a' }).fechar('concluido')
+    service
+      .abrir({
+        ...ABERTURA,
+        traceId: 't-other',
+        ledgerEntryId: 'call-other',
+        runId: 'run-panel',
+        tarefaId: 'task-b'
+      })
+      .fechar('concluido')
+
+    expect(
+      repo
+        .tarefasDoRun(ESCOPO, 'p1', 'run-panel')
+        .map(({ tarefaId, traces }) => [tarefaId, traces.map((trace) => trace.id)])
+    ).toEqual([
+      ['task-a', ['t1']],
+      ['task-b', ['t-other']]
+    ])
+    expect(repo.tarefasDoRun({ userId: 'other', workspace: 'jarvis' }, 'p1', 'run-panel')).toEqual(
+      []
+    )
+    expect(
+      service.eventosDasTarefas(
+        ESCOPO,
+        repo.tarefasDoRun(ESCOPO, 'p1', 'run-panel').flatMap((t) => t.traces)
+      )
+    ).toEqual({ t1: [], 't-other': [] })
+  })
 })
 
 describe('escrita em lote', () => {

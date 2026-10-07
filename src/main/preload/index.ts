@@ -58,6 +58,7 @@ import type { ProviderRoute, ProviderStatus, RoutingPolicy } from '@shared/domai
 import type { Fase } from '@shared/domain/fase'
 import type { Etapa } from '@shared/domain/jornada'
 import type { EventoDaGeracao, GenerationEvent, GenerationTrace } from '@shared/domain/geracao'
+import type { EventoDeTarefaDoSquad } from '@shared/domain/painel-tarefa'
 import type {
   PhaseModelPolicy,
   ProjectModelOverride,
@@ -414,6 +415,17 @@ const bridge: JarvisBridge = {
     ipcRenderer.on(IPC_EVENT_CHANNELS.generationEvent, wrapped)
 
     return () => ipcRenderer.removeListener(IPC_EVENT_CHANNELS.generationEvent, wrapped)
+  },
+
+  onSquadTaskEvent: (
+    runId: string,
+    listener: (payload: EventoDeTarefaDoSquad) => void
+  ): (() => void) => {
+    const wrapped = (_event: unknown, payload: EventoDeTarefaDoSquad): void => {
+      if (payload.runId === runId) listener(payload)
+    }
+    ipcRenderer.on(IPC_EVENT_CHANNELS.squadTaskEvent, wrapped)
+    return () => ipcRenderer.removeListener(IPC_EVENT_CHANNELS.squadTaskEvent, wrapped)
   },
 
   generationHistory: (
@@ -795,6 +807,10 @@ const bridge: JarvisBridge = {
     ipcRenderer.invoke(IPC_CHANNELS.filaVista, projectId, workspace),
   quadroDeExecucao: (projectId: string, workspace: WorkspaceId) =>
     ipcRenderer.invoke(IPC_CHANNELS.quadroExecucaoVista, projectId, workspace),
+  painelDaTarefa: (runId: string, workspace: WorkspaceId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.painelDaTarefa, runId, workspace),
+  painelDaTarefaConteudo: (runId: string, snapshotId: string, workspace: WorkspaceId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.painelDaTarefaConteudo, runId, snapshotId, workspace),
   playNoQuadro: (
     pedido: { readonly projectId: string; readonly sliceIds: readonly string[] },
     workspace: WorkspaceId

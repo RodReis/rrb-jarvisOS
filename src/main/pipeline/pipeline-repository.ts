@@ -18,6 +18,7 @@ import type { Database } from 'better-sqlite3'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { BloqueioExterno } from '@shared/domain/pacote-estrutural'
 import type { EstadoDoRun, PipelineRun } from '@shared/domain/pipeline'
+import type { SquadPlan } from '@shared/domain/squad-plano'
 import { verificarSnapshot, type SnapshotDoSquad } from '../squads/squad-snapshot'
 import { log } from '../logging/logger'
 
@@ -38,6 +39,7 @@ interface RunRow {
   readonly bloqueio: string | null
   readonly squad_snapshot: string | null
   readonly squad_progress: string | null
+  readonly squad_plan: string | null
   readonly squad_cost_limit_usd: number | null
   readonly squad_cost_measured: number | null
   readonly created_at: string
@@ -63,6 +65,7 @@ function toRun(row: RunRow): PipelineRun {
   }
   let squadSnapshot: SnapshotDoSquad | undefined
   let squadProgress: PipelineRun['squadProgress']
+  let squadPlan: SquadPlan | undefined
   try {
     if (row.squad_snapshot !== null) {
       const candidato: unknown = JSON.parse(row.squad_snapshot)
@@ -80,6 +83,16 @@ function toRun(row: RunRow): PipelineRun {
   } catch {
     log.db.warn('Progresso do Squad ilegível no pipeline_run.', { runId: row.id })
   }
+  try {
+    if (row.squad_plan !== null) {
+      const lido: unknown = JSON.parse(row.squad_plan)
+      if (typeof lido === 'object' && lido !== null && Array.isArray((lido as SquadPlan).tarefas)) {
+        squadPlan = lido as SquadPlan
+      }
+    }
+  } catch {
+    log.db.warn('Plano do Squad ilegível no pipeline_run.', { runId: row.id })
+  }
 
   return {
     id: row.id,
@@ -91,6 +104,7 @@ function toRun(row: RunRow): PipelineRun {
     ...(bloqueio === undefined ? {} : { bloqueio }),
     ...(squadSnapshot === undefined ? {} : { squadSnapshot }),
     ...(squadProgress === undefined ? {} : { squadProgress }),
+    ...(squadPlan === undefined ? {} : { squadPlan }),
     ...(row.squad_cost_limit_usd === null ? {} : { squadCostLimitUsd: row.squad_cost_limit_usd }),
     ...(row.squad_cost_measured === null
       ? {}
@@ -222,6 +236,31 @@ export class PipelineRepository {
       )
       .run(
         JSON.stringify(progresso),
+        agora.toISOString(),
+        runId,
+        escopo.userId,
+        escopo.workspaceId,
+        escopo.projectId
+      )
+    return resultado.changes === 1
+  }
+
+  registrarPlanoDoSquad(
+    escopo: EscopoDoRun,
+    runId: string,
+    plano: SquadPlan,
+    agora: Date
+  ): boolean {
+    if (!Array.isArray(plano.tarefas)) return false
+    const resultado = this.db
+      .prepare(
+        `UPDATE pipeline_run SET squad_plan = ?, updated_at = ?
+        WHERE id = ? AND user_id = ? AND workspace_id = ? AND project_id = ?
+          AND squad_snapshot IS NOT NULL AND squad_plan IS NULL
+          AND estado NOT IN ('MERGED','AWAITING_MERGE','BLOCKED','CANCELLED')`
+      )
+      .run(
+        JSON.stringify(plano),
         agora.toISOString(),
         runId,
         escopo.userId,

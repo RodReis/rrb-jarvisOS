@@ -24,6 +24,7 @@
 
 import type { DependenciaAberta } from './fila'
 import type { BloqueioExterno } from './pacote-estrutural'
+import type { SquadPlan } from './squad-plano'
 
 /**
  * Os estados de um run.
@@ -140,6 +141,8 @@ export interface PipelineRun {
     readonly motivo?: string
     readonly commitSha?: string
   }[]
+  /** Plano validado que o Squad executou, para evidência no painel da tarefa. */
+  readonly squadPlan?: SquadPlan
   readonly created_at: string
   readonly updated_at: string
 }

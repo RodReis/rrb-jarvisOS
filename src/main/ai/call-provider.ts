@@ -114,6 +114,8 @@ export interface AberturaDoConsole {
     readonly etapa: Etapa
     readonly provider: string
     readonly modelo: string
+    readonly runId?: string
+    readonly tarefaId?: string
   }): ColetorDaGeracao
 }
 
@@ -395,16 +397,23 @@ export class AiCallService {
     // Falha ao abrir não impede a geração — mesma ordem de prioridade do resto da fatia: o
     // documento é o produto, o console é evidência.
     let coletor: ColetorDaGeracao | undefined
-    if (this.console !== undefined && request.console !== undefined) {
+    if (
+      this.console !== undefined &&
+      (request.console !== undefined || request.painelTarefa !== undefined)
+    ) {
       try {
+        const painel = request.painelTarefa
         coletor = this.console.abrir({
           traceId: randomUUID(),
           escopo: { userId: ctx.userId, workspace: ctx.workspace },
-          projectId: request.console.projectId,
+          projectId: request.console?.projectId ?? painel?.projectId ?? '',
           ledgerEntryId: id,
-          etapa: request.console.etapa,
+          etapa: request.console?.etapa ?? 'construcao',
           provider,
-          modelo: model
+          modelo: model,
+          ...(painel === undefined || request.runId === undefined
+            ? {}
+            : { runId: request.runId, tarefaId: painel.tarefaId })
         })
       } catch (erro) {
         log.ai.warn('Console da geração não pôde ser aberto', { correlationId: id, erro })

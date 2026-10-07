@@ -134,6 +134,35 @@ comGit('criar o worktree', () => {
     expect(w.baseSha).toBe(baseSha)
   })
 
+  it('captura texto, diff, binário e remoção antes da limpeza, sem seguir links', async () => {
+    writeFileSync(join(repo, 'src', 'removido.ts'), 'export const removido = true\n')
+    git(['add', 'src/removido.ts'])
+    git(['commit', '-m', 'adiciona arquivo removido no teste'])
+    baseSha = git(['rev-parse', 'HEAD'])
+    const w = criar('snapshot')
+    writeFileSync(join(w.worktree, 'src', 'a.ts'), 'export const a = 2\n')
+    writeFileSync(join(w.worktree, 'src', 'novo.ts'), 'export const novo = true\n')
+    writeFileSync(join(w.worktree, 'src', 'imagem.bin'), Buffer.from([0, 1, 2]))
+    rmSync(join(w.worktree, 'src', 'removido.ts'))
+    const capturado = await squadGit.capturarSnapshots(w, [
+      'src/a.ts',
+      'src/novo.ts',
+      'src/imagem.bin',
+      'src/removido.ts'
+    ])
+    expect(capturado.ok).toBe(true)
+    if (!capturado.ok) return
+    expect(capturado.valor.map((item) => item.tipo)).toEqual([
+      'texto',
+      'texto',
+      'binario',
+      'removido'
+    ])
+    expect(capturado.valor[0]).toMatchObject({ conteudo: 'export const a = 2\n' })
+    expect(capturado.valor[0]?.diff).toContain('+export const a = 2')
+    expect(capturado.valor[1]?.diff).toContain('+export const novo = true')
+  })
+
   it('o checkout sai com LF mesmo quando a máquina converte para CRLF', () => {
     // Premissa: com `autocrlf=true` o Git puro grava CRLF — é o que quebraria o gate de escopo.
     git(['config', 'core.autocrlf', 'true'])

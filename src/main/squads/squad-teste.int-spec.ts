@@ -113,6 +113,43 @@ const suite = () =>
   })
 
 describe('SuiteNoSandbox', () => {
+  it('registra evidência resumida e redigida da suíte', async () => {
+    const registrarEvidencia = vi.fn()
+    const resultado = await new SuiteNoSandbox({
+      preflight,
+      docker,
+      raizOperacional: () => '/raiz',
+      proxyUrl: () => 'http://proxy',
+      cwdDoDocker: () => '/docker-cwd',
+      registrarEvidencia
+    }).rodar(pedido())
+    expect(resultado.estado).toBe('verde')
+    expect(registrarEvidencia).toHaveBeenCalledWith(
+      'run-1',
+      1,
+      JSON.stringify({ estado: 'verde', passos: ['test', 'lint', 'typecheck', 'build'] })
+    )
+  })
+
+  it('redige evidência antes de retornar e não transforma falha de persistência em falha da suíte', async () => {
+    respostas['t'] = falha('token=chave_falsa_de_fixture_sem_credencial')
+    const registrarEvidencia = vi.fn(() => {
+      throw new Error('SQLite indisponível')
+    })
+    const resultado = await new SuiteNoSandbox({
+      preflight,
+      docker,
+      raizOperacional: () => '/raiz',
+      proxyUrl: () => 'http://proxy',
+      cwdDoDocker: () => '/docker-cwd',
+      registrarEvidencia
+    }).rodar(pedido())
+
+    expect(resultado.estado).toBe('vermelha')
+    expect(JSON.stringify(resultado)).not.toContain('sk_live_')
+    expect(JSON.stringify(resultado)).toContain('[redigido]')
+  })
+
   it('todo passo passou: verde, com os passos na ordem', async () => {
     const r = await suite().rodar(pedido())
 

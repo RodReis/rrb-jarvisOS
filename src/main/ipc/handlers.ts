@@ -2418,6 +2418,27 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     }
   )
 
+  ipcMain.handle(IPC_CHANNELS.painelDaTarefa, (_event, runId: unknown, workspace: unknown) => {
+    if (typeof runId !== 'string' || runId.length === 0) return undefined
+    const escopo = isWorkspaceId(workspace) ? workspace : 'noa'
+    return deps.quadroExecucao.painel(runId, escopo)
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.painelDaTarefaConteudo,
+    (_event, runId: unknown, snapshotId: unknown, workspace: unknown) => {
+      if (
+        typeof runId !== 'string' ||
+        !runId ||
+        typeof snapshotId !== 'string' ||
+        !snapshotId ||
+        !isWorkspaceId(workspace)
+      )
+        return undefined
+      return deps.quadroExecucao.conteudoDoPainel(runId, snapshotId, workspace)
+    }
+  )
+
   ipcMain.handle(
     IPC_CHANNELS.quadroExecucaoPlay,
     async (_event, pedido: unknown, workspace: unknown) => {
