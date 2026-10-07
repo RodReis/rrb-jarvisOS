@@ -17,6 +17,7 @@
  */
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Database as Db } from 'better-sqlite3'
@@ -25,6 +26,8 @@ import type { ResultadoDaVerificacao } from '@shared/domain/marcos'
 import type { MvpGerado, RoadmapRegistrado, SpecGerada } from '@shared/domain/roadmap-gerado'
 import { perfilNodeEmWindows } from '@shared/domain/ci-profile-perfis'
 import { escreverMatrizDeProva } from '@shared/domain/ci-proof-matrix'
+import { gerarWorkflowDoPerfil } from '@shared/domain/ci-profile-workflow'
+import { VERSAO_DO_GERADOR } from '@shared/domain/ci-profile'
 
 const logCat = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 vi.mock('../logging/logger', () => ({
@@ -363,6 +366,49 @@ describe('revisoesDoGate — o que cada gate cobre', () => {
     expect(service.revisoesDoGate(PROJETO, 'SLICE_ENTRY', WS)).toEqual([])
     expect(service.aprovar(PROJETO, 'SLICE_ENTRY', WS).reason).toBe('preflight-ci-pendente')
     expect(aprovacoesNoBanco()).toBe(0)
+  })
+
+  it('bloqueia workflow existente sem manifesto de procedência', () => {
+    gerado = revisao({
+      mvpEscolhido: 'mvp-1',
+      spec: spec({ perguntas: [{ ...spec().perguntas[0]!, resposta: 'a' }] })
+    })
+    gravarProjecao()
+    mkdirSync(join(raiz, '.github', 'workflows'), { recursive: true })
+    writeFileSync(
+      join(raiz, '.github', 'workflows', 'ci.yml'),
+      gerarWorkflowDoPerfil(perfilNodeEmWindows(PROJETO))
+    )
+
+    const r = service.aprovar(PROJETO, 'SLICE_ENTRY', WS)
+
+    expect(r.reason).toBe('preflight-ci-pendente')
+    expect(r.problemas?.some((p) => p.mensagem.includes('registro se perdeu'))).toBe(true)
+    expect(aprovacoesNoBanco()).toBe(0)
+  })
+
+  it('aceita workflow existente quando o manifesto comprova os bytes e o perfil', () => {
+    gerado = revisao({
+      mvpEscolhido: 'mvp-1',
+      spec: spec({ perguntas: [{ ...spec().perguntas[0]!, resposta: 'a' }] })
+    })
+    gravarProjecao()
+    mkdirSync(join(raiz, '.github', 'workflows'), { recursive: true })
+    const perfil = perfilNodeEmWindows(PROJETO)
+    const workflow = gerarWorkflowDoPerfil(perfil)
+    const hash = (valor: string): string => createHash('sha256').update(valor).digest('hex')
+    writeFileSync(join(raiz, '.github', 'workflows', 'ci.yml'), workflow)
+    writeFileSync(
+      join(raiz, '.github', 'ci-workflow-manifesto.json'),
+      JSON.stringify({
+        profileId: perfil.profileId,
+        hashDoPerfil: hash(JSON.stringify(perfil)),
+        hashDoConteudo: hash(workflow),
+        versaoDoGerador: VERSAO_DO_GERADOR
+      })
+    )
+
+    expect(service.aprovar(PROJETO, 'SLICE_ENTRY', WS).reason).toBe('aprovado')
   })
 
   /** Responder **é** mudança da SPEC: um hash cego às respostas aprovaria outro documento. */
