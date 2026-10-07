@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { GitBranch, ShieldCheck, Sparkles } from 'lucide-react'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { Approval, AprovacaoOutcome, Gate } from '@shared/domain/aprovacoes'
+import type { ResultadoDaSelecaoDeStack, RuntimeDoPerfil } from '@shared/domain/ci-profile'
 import { GATES } from '@shared/domain/aprovacoes'
 import type {
   MvpGerado,
@@ -119,7 +120,10 @@ export function RoadmapDoProjeto({
   const [elegiveis, setElegiveis] = useState<readonly MvpGerado[]>([])
   const [aprovacoes, setAprovacoes] = useState<readonly Approval[]>([])
   const [carregando, setCarregando] = useState(true)
-  const [ocupado, setOcupado] = useState<'nao' | 'gerando' | 'escolhendo' | 'aprovando'>('nao')
+  const [ocupado, setOcupado] = useState<
+    'nao' | 'gerando' | 'escolhendo' | 'aprovando' | 'configurando-ci'
+  >('nao')
+  const [perfilCi, setPerfilCi] = useState<ResultadoDaSelecaoDeStack | null>(null)
   const [desfecho, setDesfecho] = useState<RoadmapGeradoOutcome | null>(null)
   const [aprovacao, setAprovacao] = useState<AprovacaoOutcome | null>(null)
   const [etapas, setEtapas] = useState<ReadonlyMap<EtapaDaGeracao, AndamentoDaEtapa>>(new Map())
@@ -133,16 +137,18 @@ export function RoadmapDoProjeto({
       Promise.all([
         window.jarvis.carregarRoadmapGerado(projectId, workspace),
         window.jarvis.mvpsElegiveis(projectId, workspace),
-        window.jarvis.listarAprovacoes(projectId, workspace)
+        window.jarvis.listarAprovacoes(projectId, workspace),
+        window.jarvis.estadoDoPerfilCi(projectId, workspace)
       ]),
     [projectId, workspace]
   )
 
   const aplicar = useCallback(
-    ([gerado, lista, aceites]: Awaited<ReturnType<typeof buscar>>): void => {
+    ([gerado, lista, aceites, perfil]: Awaited<ReturnType<typeof buscar>>): void => {
       setRoadmap(gerado)
       setElegiveis(lista)
       setAprovacoes(aceites)
+      setPerfilCi(perfil)
     },
     []
   )
@@ -298,6 +304,22 @@ export function RoadmapDoProjeto({
     }
   }
 
+  async function selecionarStack(runtime: RuntimeDoPerfil): Promise<void> {
+    setOcupado('configurando-ci')
+    try {
+      const resultado = await window.jarvis.selecionarStackCi(projectId, runtime, workspace)
+      setPerfilCi(resultado)
+      if (resultado.ok) setAprovacao(null)
+    } catch (causa: unknown) {
+      log.ui.error('Falha ao selecionar a stack de CI', {
+        projectId,
+        stack: causa instanceof Error ? causa.stack : undefined
+      })
+    } finally {
+      setOcupado('nao')
+    }
+  }
+
   const trabalhando = ocupado !== 'nao'
 
   if (carregando) return <LoadingState rotulo={t('roadmap.carregando')} />
@@ -403,12 +425,41 @@ export function RoadmapDoProjeto({
                   descricao={t('roadmap.specAusenteDescricao')}
                 />
               ) : (
-                <SpecDaFatia
-                  spec={roadmap.spec}
-                  mvp={escolhido}
-                  ocupado={trabalhando}
-                  onResponder={(perguntaId, resposta) => void responder(perguntaId, resposta)}
-                />
+                <div className="flex flex-col gap-5">
+                  <SpecDaFatia
+                    spec={roadmap.spec}
+                    mvp={escolhido}
+                    ocupado={trabalhando}
+                    onResponder={(perguntaId, resposta) => void responder(perguntaId, resposta)}
+                  />
+                  <section className="flex flex-col gap-2" aria-label={t('roadmap.ciTitulo')}>
+                    <h4 className="text-[length:var(--jos-texto-corpo)] font-[var(--jos-peso-semi)] text-[var(--jos-cor-texto)]">
+                      {t('roadmap.ciTitulo')}
+                    </h4>
+                    <p className="max-w-[62ch] text-[length:var(--jos-texto-micro)] text-[var(--jos-cor-texto-secundario)]">
+                      {t('roadmap.ciDescricao')}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variante={perfilCi?.runtime === 'node' ? 'primaria' : 'secundaria'}
+                        desabilitado={trabalhando}
+                        onClick={() => void selecionarStack('node')}
+                      >
+                        {t('roadmap.ciNode')}
+                      </Button>
+                      <Button
+                        variante={perfilCi?.runtime === 'python' ? 'primaria' : 'secundaria'}
+                        desabilitado={trabalhando}
+                        onClick={() => void selecionarStack('python')}
+                      >
+                        {t('roadmap.ciPython')}
+                      </Button>
+                    </div>
+                    {perfilCi !== null && (
+                      <InlineAlert tom={perfilCi.ok ? 'ok' : 'warn'} titulo={perfilCi.mensagem} />
+                    )}
+                  </section>
+                </div>
               )}
             </TabPanel>
 

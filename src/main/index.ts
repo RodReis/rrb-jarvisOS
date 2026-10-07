@@ -114,6 +114,7 @@ import { RunPrRepository } from './pipeline/run-pr-repository'
 import { MarcosService } from './projects/marcos-service'
 import { RoadmapService } from './projects/roadmap-service'
 import { RoadmapGeradoService } from './projects/roadmap-gerado-service'
+import { CiProfileSetupService } from './projects/ci-profile-setup'
 import { RoadmapGeradoRepository } from './projects/roadmap-gerado-repository'
 import { JornadaService } from './projects/jornada-service'
 import { BriefService } from './projects/brief-service'
@@ -1344,6 +1345,7 @@ if (!app.requestSingleInstanceLock()) {
         return spec === undefined ? {} : { spec }
       }
     })
+    const ciProfileSetup = new CiProfileSetupService(projectRepository, userIdAtual)
 
     // Publicação no GitHub (SPEC-Entrega-01). Recebe o `ConnectorService`, **não** o
     // `GithubAdapter`: o gate de créditos, a policy e a auditoria vivem dentro do `call()`, e um
@@ -1354,6 +1356,10 @@ if (!app.requestSingleInstanceLock()) {
     const publicacao = new PublicacaoService({
       projects: projectRepository,
       roadmap: roadmapRepository,
+      revisoesAtuaisDoSlice: (projectId, workspaceId, slice) => {
+        const revisoes = roadmap.revisoesDoGate(projectId, 'SLICE_ENTRY', workspaceId)
+        return revisoes.some((revisao) => revisao.artefato === slice.specSlug) ? revisoes : []
+      },
       refs: externalRefRepository,
       git: gitRunner,
       connectors,
@@ -2293,6 +2299,7 @@ if (!app.requestSingleInstanceLock()) {
       anexos,
       roadmap,
       roadmapGerado,
+      ciProfileSetup,
       marcos,
       jornada,
       /*

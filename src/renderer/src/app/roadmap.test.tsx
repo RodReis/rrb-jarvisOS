@@ -24,6 +24,8 @@ const revisoesDoGate = vi.fn()
 const gerarRoadmapPorIa = vi.fn()
 const escolherMvpDoRoadmap = vi.fn()
 const responderPerguntaDaSpec = vi.fn()
+const estadoDoPerfilCi = vi.fn()
+const selecionarStackCi = vi.fn()
 const aprovarGate = vi.fn()
 const aplicarEventoDaJornada = vi.fn()
 const sendLog = vi.fn()
@@ -157,6 +159,8 @@ beforeEach(() => {
   gerarRoadmapPorIa.mockReset()
   escolherMvpDoRoadmap.mockReset()
   responderPerguntaDaSpec.mockReset()
+  estadoDoPerfilCi.mockReset().mockResolvedValue({ ok: false, mensagem: 'Escolha a stack.' })
+  selecionarStackCi.mockReset()
   aprovarGate.mockReset()
   aplicarEventoDaJornada.mockReset().mockResolvedValue(null)
   sendLog.mockReset()
@@ -175,6 +179,8 @@ beforeEach(() => {
       gerarRoadmapPorIa,
       escolherMvpDoRoadmap,
       responderPerguntaDaSpec,
+      estadoDoPerfilCi,
+      selecionarStackCi,
       aprovarGate,
       aplicarEventoDaJornada,
       sendLog,
@@ -346,6 +352,17 @@ describe('as abas do roadmap (issue #333)', () => {
 })
 
 describe('a SPEC e as perguntas abertas (critério 4)', () => {
+  it('a escolha explícita de stack passa apenas runtime, projeto e espaço ao main', async () => {
+    carregarRoadmapGerado.mockResolvedValue(comSpec('a'))
+    selecionarStackCi.mockResolvedValue({ ok: true, runtime: 'node', mensagem: 'Perfil gerado.' })
+
+    await abrirAba('SPEC da fatia')
+    await userEvent.click(await screen.findByRole('button', { name: 'Node / npm' }))
+
+    expect(selecionarStackCi).toHaveBeenCalledWith('p-1', 'node', 'jarvis')
+    expect(await screen.findByText('Perfil gerado.')).toBeInTheDocument()
+  })
+
   it('sem MVP escolhido, a aba diz o que falta em vez de sumir', async () => {
     carregarRoadmapGerado.mockResolvedValue(roadmapGerado())
 

@@ -42,6 +42,12 @@ export const NOME_DO_JOB_AGREGADO = 'validacao'
 export const RUNTIMES_SUPORTADOS = ['node', 'python'] as const
 export type RuntimeDoPerfil = (typeof RUNTIMES_SUPORTADOS)[number]
 
+export interface ResultadoDaSelecaoDeStack {
+  readonly ok: boolean
+  readonly mensagem: string
+  readonly runtime?: RuntimeDoPerfil
+}
+
 /**
  * Os sistemas de runner.
  *

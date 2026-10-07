@@ -189,7 +189,9 @@ export const APROVACAO_REASONS = [
    * **Não existe "aceitar mesmo assim".** Um parâmetro de bypass transformaria a regra em
    * sugestão, e o remédio de cada item vem em `problemas` — o bloqueio é um passo, não um beco.
    */
-  'marcos-pendentes'
+  'marcos-pendentes',
+  /** Perfil, matriz ou documentos de prova incompletos antes do SLICE_ENTRY (Emenda E1). */
+  'preflight-ci-pendente'
 ] as const
 
 export type AprovacaoReason = (typeof APROVACAO_REASONS)[number]

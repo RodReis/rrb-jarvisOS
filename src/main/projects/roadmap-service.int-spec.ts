@@ -24,6 +24,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ResultadoDaVerificacao } from '@shared/domain/marcos'
 import type { MvpGerado, RoadmapRegistrado, SpecGerada } from '@shared/domain/roadmap-gerado'
 import { perfilNodeEmWindows } from '@shared/domain/ci-profile-perfis'
+import { escreverMatrizDeProva } from '@shared/domain/ci-proof-matrix'
 
 const logCat = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 vi.mock('../logging/logger', () => ({
@@ -151,6 +152,36 @@ function gravarProjecao(): void {
       )
     }
   )
+  if (gerado?.spec !== undefined) {
+    mkdirSync(join(raiz, 'docs', 'spec'), { recursive: true })
+    writeFileSync(
+      join(raiz, 'docs', 'spec', 'spec-mvp-1-01-f-1.md'),
+      escreverMatrizDeProva({
+        criterios: [{ numero: 1, validacoes: ['lint', 'typecheck', 'test', 'build'] }],
+        categorias: [
+          { nome: 'regra', estado: 'aplicavel', validacoes: ['test'] },
+          {
+            nome: 'banco',
+            estado: 'nao-aplicavel',
+            validacoes: [],
+            justificativa: 'Sem persistencia.'
+          },
+          {
+            nome: 'tela',
+            estado: 'nao-aplicavel',
+            validacoes: [],
+            justificativa: 'Sem interface.'
+          },
+          {
+            nome: 'e2e',
+            estado: 'nao-aplicavel',
+            validacoes: [],
+            justificativa: 'Sem jornada integrada.'
+          }
+        ]
+      })
+    )
+  }
 }
 
 function gravarPrd(): string {
@@ -185,6 +216,9 @@ beforeEach(() => {
   raiz = join(dir, 'projeto')
   mkdirSync(raiz)
   writeFileSync(join(raiz, 'ci-profile.json'), JSON.stringify(perfilNodeEmWindows('node')))
+  mkdirSync(join(raiz, 'docs'))
+  writeFileSync(join(raiz, 'docs', 'TESTING.md'), '# Testes')
+  writeFileSync(join(raiz, 'docs', 'REVIEW.md'), '# Revisao')
   db = openDatabase(join(dir, 'jarvis.db'))
   audit = new AuditRepository(db, 'chave-de-teste')
   projects = new ProjectRepository(db)
@@ -296,9 +330,10 @@ describe('revisoesDoGate — o que cada gate cobre', () => {
 
     const revisoes = service.revisoesDoGate(PROJETO, 'SLICE_ENTRY', WS)
 
-    expect(revisoes).toHaveLength(2)
+    expect(revisoes).toHaveLength(5)
     expect(revisoes[0]?.artefato).toContain('docs/spec/')
     expect(revisoes[1]?.artefato).toBe('ci-profile.json')
+    expect(revisoes[4]?.artefato).toContain('file:docs/spec/')
   })
 
   it('mudança no perfil de CI invalida o aceite da revisão anterior', () => {
@@ -326,7 +361,7 @@ describe('revisoesDoGate — o que cada gate cobre', () => {
     writeFileSync(join(raiz, 'ci-profile.json'), '{invalido')
 
     expect(service.revisoesDoGate(PROJETO, 'SLICE_ENTRY', WS)).toEqual([])
-    expect(service.aprovar(PROJETO, 'SLICE_ENTRY', WS).reason).toBe('sem-revisoes')
+    expect(service.aprovar(PROJETO, 'SLICE_ENTRY', WS).reason).toBe('preflight-ci-pendente')
     expect(aprovacoesNoBanco()).toBe(0)
   })
 

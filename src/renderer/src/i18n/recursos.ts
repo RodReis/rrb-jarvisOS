@@ -556,6 +556,11 @@ export const RECURSOS = {
         abaMvps: 'MVPs',
         abaSpec: 'SPEC da fatia',
         abaGates: 'Aprovações',
+        ciTitulo: 'Stack de CI do projeto',
+        ciDescricao:
+          'Escolha a stack declarada no pacote antes de aceitar a fatia. O perfil gerado entra na revisão aprovada.',
+        ciNode: 'Node / npm',
+        ciPython: 'Python / pip',
         specAusente: 'Nenhuma SPEC ainda',
         specAusenteDescricao:
           'A SPEC da primeira fatia nasce quando você escolhe o MVP que entra na fila. Escolha um na aba MVPs.',
@@ -1426,6 +1431,11 @@ export const RECURSOS = {
         abaMvps: 'MVPs',
         abaSpec: 'Slice SPEC',
         abaGates: 'Approvals',
+        ciTitulo: 'Project CI stack',
+        ciDescricao:
+          'Choose the stack declared by the project package before accepting the slice. The generated profile becomes part of the approved revision.',
+        ciNode: 'Node / npm',
+        ciPython: 'Python / pip',
         specAusente: 'No SPEC yet',
         specAusenteDescricao:
           'The first slice SPEC is born when you choose the MVP that enters the queue. Choose one in the MVPs tab.',

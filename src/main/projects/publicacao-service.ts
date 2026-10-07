@@ -23,6 +23,7 @@ import { randomUUID } from 'node:crypto'
 import type { ConnectorOutcome, ConnectorRequest } from '@shared/domain/connectors'
 import { CONNECTOR_CONTRACT_VERSION } from '@shared/domain/connectors'
 import type { WorkspaceId } from '@shared/domain/entities'
+import { aprovacaoVigente } from '@shared/domain/aprovacoes'
 import { GITHUB_OPERATIONS } from '@shared/domain/github-automation'
 import type { BloqueioExterno } from '@shared/domain/pacote-estrutural'
 import {
@@ -44,6 +45,12 @@ import type { RoadmapRepository } from './roadmap-repository'
 export interface PublicacaoDeps {
   readonly projects: ProjectRepository
   readonly roadmap: RoadmapRepository
+  /** Recalcula preflight e hashes atuais do SLICE_ENTRY antes de qualquer efeito de publicação. */
+  readonly revisoesAtuaisDoSlice: (
+    projectId: string,
+    workspaceId: WorkspaceId,
+    slice: Slice
+  ) => readonly import('@shared/domain/aprovacoes').RevisaoAprovada[]
   /** Onde as referências publicadas ficam (emenda 6): a M9-F02 e a M9-F05 leem daqui. */
   readonly refs: ExternalRefRepository
   readonly git: GitRunner
@@ -96,11 +103,16 @@ export class PublicacaoService {
     // As SPECs com `SLICE_ENTRY` aprovado (emenda 3). O artefato do gate é o `specSlug` — é assim
     // que `revisoesDoGate` o registra —, então o conjunto de slugs aprovados responde diretamente
     // "esta fatia pode virar issue?".
+    const aprovacoes = this.deps.roadmap.listarAprovacoes(escopo)
     const aprovadas = new Set(
-      this.deps.roadmap
-        .listarAprovacoes(escopo)
-        .filter((a) => a.gate === 'SLICE_ENTRY')
-        .flatMap((a) => a.revisoes.map((r) => r.artefato))
+      slices
+        .filter((slice) => {
+          const atuais = this.deps.revisoesAtuaisDoSlice(projectId, workspaceId, slice)
+          return (
+            atuais.length > 0 && aprovacaoVigente(aprovacoes, 'SLICE_ENTRY', atuais) !== undefined
+          )
+        })
+        .map((slice) => slice.specSlug)
     )
 
     let criados = 0

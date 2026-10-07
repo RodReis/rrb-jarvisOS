@@ -14,7 +14,7 @@
 
 1. [ ] Compor o Squad no bootstrap: snapshot de perfil, planejamento pela rota da fase, ContextPack, executor de worker e escritor, sandbox/worktree, ciclo TESTE/REVIEWER e integração com a entrega/PR. Um escritor por padrão, conforme ADR-006; dois só na F02.
 2. [ ] Preservar slot, fencing token, heartbeat, cancelamento e recuperação ao ligar essa composição. Nenhum run pode ficar ativo sem dono após erro ou reinício.
-3. [ ] Obter `ci-profile.json` versionado no pacote aprovado por um produtor real (Emenda E1 da SPEC-Pipeline-01). O leitor e o hash existem, mas a geração no fluxo do projeto ainda não foi ligada.
+3. [ ] Fechar E1 da SPEC-Pipeline-01: a stack explícita Node/Python já é selecionada no app; geração de perfil e preflight de arquivos/matriz/hash existem. Falta gerar e permitir revisar a matriz na jornada, validar YAML e política de adoção do workflow, e provar o marco versionado no pacote.
 4. [ ] Provar no app real o Play de uma e três issues do mesmo MVP: um worktree por issue, dependência bloqueada, slots, equipe acionada e PR/MERGE com check real. Executar os testes e relatórios por categoria da SPEC.
 5. [ ] Revisar o diff, commitar e publicar o branch, abrir PR com `refs #370`, acompanhar CI, integrar após gate verde, publicar encerramento e mover a issue para `proplan:done`. Não fechar a issue; aceite final é do PI.
 

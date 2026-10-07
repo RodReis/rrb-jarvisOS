@@ -137,6 +137,8 @@ import type { VistaDeMarcos } from '@shared/domain/marcos'
 import type { MarcosService } from '../projects/marcos-service'
 import type { RoadmapService } from '../projects/roadmap-service'
 import type { RoadmapGeradoService } from '../projects/roadmap-gerado-service'
+import type { CiProfileSetupService } from '../projects/ci-profile-setup'
+import type { ResultadoDaSelecaoDeStack } from '@shared/domain/ci-profile'
 import type { JornadaService } from '../projects/jornada-service'
 import type { BriefService } from '../projects/brief-service'
 import type { PrdService } from '../projects/prd-service'
@@ -396,6 +398,7 @@ export interface IpcDependencies {
   readonly anexos: AnexoService
   readonly roadmap: RoadmapService
   readonly roadmapGerado: RoadmapGeradoService
+  readonly ciProfileSetup: CiProfileSetupService
   readonly marcos: MarcosService
   readonly jornada: JornadaService
   /**
@@ -1967,6 +1970,31 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
         return { resultado: 'projeto-inexistente', mensagem: 'Projeto não encontrado.' }
       }
       return deps.roadmapGerado.responderPergunta(projectId, perguntaId, resposta, workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.ciProfileEstado,
+    (_event, projectId: unknown, workspace: unknown): ResultadoDaSelecaoDeStack => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string')
+        return { ok: false, mensagem: 'Projeto não encontrado.' }
+      return deps.ciProfileSetup.estado(projectId, workspace)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.ciProfileSelecionar,
+    (
+      _event,
+      projectId: unknown,
+      runtime: unknown,
+      workspace: unknown
+    ): ResultadoDaSelecaoDeStack => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string')
+        return { ok: false, mensagem: 'Projeto não encontrado.' }
+      if (runtime !== 'node' && runtime !== 'python')
+        return { ok: false, mensagem: 'Stack de CI não suportada.' }
+      return deps.ciProfileSetup.selecionar(projectId, workspace, runtime)
     }
   )
 

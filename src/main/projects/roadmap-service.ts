@@ -35,7 +35,7 @@ import type { AnexoService } from './anexo-service'
 import type { PacoteRepository } from './pacote-repository'
 import type { ProjectRepository } from './project-repository'
 import type { EscopoDoRoadmap, RoadmapRepository } from './roadmap-repository'
-import { lerPerfilDeCiVersionado } from './ci-profile-revision'
+import { verificarProntidaoDeCi } from './ci-readiness'
 
 interface RoadmapDeps {
   readonly repository: RoadmapRepository
@@ -177,12 +177,13 @@ export class RoadmapService {
 
     const fatia = this.repository.carregar(escopo).slices.find((s) => s.id === spec.fatiaId)
     const projeto = this.projects.findById(userId, projectId)
-    const perfil = projeto === undefined ? undefined : lerPerfilDeCiVersionado(projeto.diretorio)
-    if (perfil === undefined) return []
+    if (projeto === undefined || fatia === undefined) return []
+    const prontidao = verificarProntidaoDeCi(projeto.diretorio, fatia.specSlug, spec)
+    if (prontidao.problemas.length > 0) return []
 
     return [
       {
-        artefato: fatia?.specSlug ?? spec.fatiaId,
+        artefato: fatia.specSlug,
         hash: hashDoTexto(
           JSON.stringify({
             titulo: spec.titulo,
@@ -191,11 +192,20 @@ export class RoadmapService {
             regras: spec.regras,
             criterios: spec.criteriosDeAceite,
             testes: spec.testes,
-            respostas: spec.perguntas.map((pergunta) => `${pergunta.id}=${pergunta.resposta ?? ''}`)
+            respostas: spec.perguntas.map(
+              (pergunta) => `${pergunta.id}=${pergunta.resposta ?? ''}`
+            ),
+            arquivos: prontidao.revisoes
           })
         )
       },
-      { artefato: 'ci-profile.json', hash: perfil.hash }
+      ...prontidao.revisoes.filter((revisao) => revisao.artefato !== fatia.specSlug),
+      ...prontidao.revisoes
+        .filter((revisao) => revisao.artefato === fatia.specSlug)
+        .map((revisao) => ({
+          ...revisao,
+          artefato: `file:${revisao.artefato}`
+        }))
     ]
   }
 
@@ -226,6 +236,22 @@ export class RoadmapService {
     }
 
     const escopo = this.escopo(projectId, workspaceId)
+    if (gate === 'SLICE_ENTRY') {
+      const gerado = this.roadmapGerado(projectId)
+      const spec = gerado?.spec
+      if (spec !== undefined && specPodeSerAceita(spec)) {
+        const fatia = this.repository.carregar(escopo).slices.find((s) => s.id === spec.fatiaId)
+        if (fatia !== undefined) {
+          const prontidao = verificarProntidaoDeCi(projeto.diretorio, fatia.specSlug, spec)
+          if (prontidao.problemas.length > 0)
+            return {
+              reason: 'preflight-ci-pendente',
+              problemas: prontidao.problemas,
+              mensagem: 'O pacote de CI e a matriz de prova precisam estar prontos antes do aceite.'
+            }
+        }
+      }
+    }
     const revisoes = this.revisoesDoGate(projectId, gate, workspaceId)
     if (revisoes.length === 0) {
       return {

@@ -48,6 +48,7 @@ import type {
   RotaComModelo
 } from '@shared/domain/modelo-da-fase'
 import type { CodexBillingMode, CodexProfileState } from '@shared/domain/codex-profile'
+import type { ResultadoDaSelecaoDeStack, RuntimeDoPerfil } from '@shared/domain/ci-profile'
 import type { ExecutorOperationalView } from '@shared/domain/executor-operacional'
 import type {
   ConnectorCapability,
@@ -514,6 +515,8 @@ export const IPC_CHANNELS = {
   roadmapCarregarGerado: 'roadmap:carregar-gerado',
   roadmapEscolherMvp: 'roadmap:escolher-mvp',
   roadmapResponderPergunta: 'roadmap:responder-pergunta',
+  ciProfileEstado: 'ci-profile:estado',
+  ciProfileSelecionar: 'ci-profile:selecionar',
   roadmapElegiveis: 'roadmap:elegiveis',
   aprovacaoListar: 'aprovacao:listar',
   aprovacaoRevisoes: 'aprovacao:revisoes',
@@ -1416,6 +1419,12 @@ export interface JarvisBridge {
     resposta: string,
     workspace: WorkspaceId
   ): Promise<RoadmapGeradoOutcome>
+  estadoDoPerfilCi(projectId: string, workspace: WorkspaceId): Promise<ResultadoDaSelecaoDeStack>
+  selecionarStackCi(
+    projectId: string,
+    runtime: RuntimeDoPerfil,
+    workspace: WorkspaceId
+  ): Promise<ResultadoDaSelecaoDeStack>
   /**
    * O estado da jornada do projeto: etapa atual, CTA único e a trilha (SPEC-Jornada-01).
    *

@@ -74,6 +74,7 @@ let falhas: Map<string, ConnectorOutcome>
 /** Issues que o GitHub falso já tem, por chave externa — o estado que sobrevive ao "crash". */
 let issuesPorChave: Map<string, number>
 let repoExiste: boolean
+let specAtual = true
 
 /**
  * O dublê do `ConnectorService`.
@@ -202,6 +203,7 @@ beforeEach(() => {
   falhas = new Map()
   issuesPorChave = new Map()
   repoExiste = false
+  specAtual = true
 
   const audit = new AuditRepository(db, 'chave-de-teste')
   const policy = new PolicyService(audit, () => USER)
@@ -235,6 +237,8 @@ beforeEach(() => {
   service = new PublicacaoService({
     projects,
     roadmap: repository,
+    revisoesAtuaisDoSlice: (_projectId, _workspaceId, slice) =>
+      specAtual && slice.id === 'slice-1' ? [{ artefato: slice.specSlug, hash: 'h1' }] : [],
     refs,
     git: new GitRunner(
       new TerminalEngine(
@@ -272,6 +276,18 @@ comGit('publicação do repositório e do backlog', () => {
     // isso não vira card (emenda 3) — publicar as duas criaria trabalho que ninguém liberou.
     expect(operacoes(GITHUB_OPERATIONS.ensureIssue)).toHaveLength(2)
     expect(operacoes(GITHUB_OPERATIONS.ensureIssueDependency)).toHaveLength(1)
+  })
+
+  it('não publica fatia quando o aceite antigo deixou de cobrir os arquivos atuais', async () => {
+    comRoadmapAprovado()
+    specAtual = false
+
+    const r = await service.publicar(PROJETO, WS, { owner: OWNER, repo: REPO, origem: bare })
+
+    expect(r.reason).toBe('publicado')
+    const chaves = operacoes(GITHUB_OPERATIONS.ensureIssue).map((c) => String(c.input.externalKey))
+    expect(chaves).toContain(chaveDeMvp(PROJETO, 1))
+    expect(chaves).not.toContain(chaveDeFatia(PROJETO, 1, 1))
   })
 
   it('as issues carregam a chave determinística do par MVP/Fatia (critério 3)', async () => {
