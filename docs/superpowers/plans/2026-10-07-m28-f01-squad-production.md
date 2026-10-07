@@ -18,9 +18,9 @@
 - src/shared/domain/pipeline.ts, src/main/storage/migrations.ts, src/main/pipeline/pipeline-repository.ts: persistem snapshot verificado e resumo de progresso do Squad no registro já escopado do run.
 - src/main/pipeline/docker-runner.ts, src/main/squads/squad-sandbox.ts, src/main/squads/squad-agente-container.ts: imagem local com CLI pinada, sem segredo, executada pelo proxy existente.
 - src/shared/domain/quadro-execucao.ts, src/renderer/src/app/QuadroDeExecucao.tsx: exposição da equipe e dos papéis no card a partir do snapshot persistido.
-- src/main/squads/squad-orquestrador-de-execucao.int-spec.ts (novo), src/main/pipeline/quadro-execucao-service.int-spec.ts, src/renderer/src/app/QuadroDeExecucao.test.tsx e tests/e2e/quadro-execucao.e2e.ts: provas de contrato, persistência, UI e Play real.
+- src/main/squads/squad-orquestrador-de-execucao.int-spec.ts (novo), src/main/pipeline/quadro-execucao-service.int-spec.ts, src/renderer/src/app/QuadroDeExecucao.test.tsx (novo) e tests/e2e/quadro-execucao.e2e.ts: provas de contrato, persistência, UI e Play real.
 - docker/squad-executor/Dockerfile e scripts/build-squad-executor-image.mjs (novos): build local reproduzível da imagem e verificação de versão/checksum.
-- docs/DEVELOPMENT.md, docs/STATUS.md, docs/superpowers/plans/2026-10-06-m28-f01-quadro-play-merge.md, reports/TESTS.md: estado/evidência gerados segundo o contrato do repo.
+- docs/DEVELOPMENT.md, docs/STATUS.md, docs/superpowers/plans/2026-10-07-m28-f01-squad-production.md, reports/TESTS.md: estado/evidência gerados segundo o contrato do repo.
 
 ## Tarefa 1 — Persistir snapshot e progresso visível do Squad
 
@@ -72,7 +72,7 @@
 
 ## Tarefa 5 — Verificar e documentar a entrega
 
-**Arquivos:** docs/DEVELOPMENT.md; docs/STATUS.md; docs/superpowers/plans/2026-10-06-m28-f01-quadro-play-merge.md; reports/.arquivos-por-categoria.json; reports/TESTS.md.
+**Arquivos:** docs/DEVELOPMENT.md; docs/STATUS.md; docs/superpowers/plans/2026-10-07-m28-f01-squad-production.md; reports/.arquivos-por-categoria.json; reports/TESTS.md.
 
 1. Rodar verificações direcionadas; em seguida npm run typecheck, npm run lint, npm test, build e E2E aplicáveis. Gerar relatório a partir dos runners/artefatos, nunca editar contagens à mão.
 2. Atualizar DEVELOPMENT e STATUS para diferenciar testes unitários/integrados, E2E físico not_run, CI e SHA. Preservar proplan:doing até o merge; não fechar #370.

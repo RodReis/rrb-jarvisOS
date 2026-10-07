@@ -2,7 +2,7 @@
 
 - **Data:** 2026-10-07
 - **Fatia:** M28-F01 / SPEC-Execucao-01 / issue #370
-- **Estado:** desenho aprovado pelo PI em conversa; aguardando revisão deste documento antes da implementação.
+- **Estado:** desenho aprovado pelo PI em conversa em 2026-10-07; implementação autorizada.
 - **Base normativa:** `spec-execucao-01-quadro-play-pr-merge.md`, `spec-squads-03-workers-isolados.md`, `spec-squads-04-revisao-independente.md`, ADR-006 e `spec-pipeline-01-politica-pr-ci.md` (Emenda E1).
 
 ## Problema e limite
