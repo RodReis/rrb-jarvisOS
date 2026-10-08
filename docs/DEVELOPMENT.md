@@ -2650,7 +2650,7 @@ Status: entregue pela [PR #416](https://github.com/RodReis/rrb-jarvisOS/pull/416
 
 ### M13-F03 — Controles operacionais (`docs/spec/spec-continuo-03-controles-operacionais.md`)
 
-Status: implementação no branch `feat/m13-f03-controles`; issue #136 permanece em `proplan:todo` porque a integração GitHub negou a transição para `doing` (403). O PI confirmou pausa drenando o run inteiro, execução OFF cancelando imediatamente pela matriz existente e cancelamento em cascata como ação separada com prévia dos descendentes vinculados.
+Status: entregue pela [PR #417](https://github.com/RodReis/rrb-jarvisOS/pull/417), merge confirmado em 2026-10-08 (`7976761`); issue #136 permanece aberta em `proplan:done`, aguardando aceite do PI. O PI confirmou pausa drenando o run inteiro, execução OFF cancelando imediatamente pela matriz existente e cancelamento em cascata como ação separada com prévia dos descendentes vinculados.
 
 - [x] Contratos de domínio, persistência SQLite versionada e journal idempotente por usuário/workspace/projeto.
 - [x] Serviço de controle com herança de switches do workspace, auditoria e cancelamento pela matriz existente.
@@ -2659,7 +2659,7 @@ Status: implementação no branch `feat/m13-f03-controles`; issue #136 permanece
 - [x] Implementar prévia e confirmação de cancelamento em cascata por DAG/MVP/fatia, apenas para descendentes vinculados, recusando prévia desatualizada.
 - [x] Testes direcionados de regras e banco, categoria Tela completa e E2E do quadro; typecheck, lint e build passaram.
 - [x] Repetir a suíte agregada após corrigir os mocks de `window.jarvis`: 345 arquivos aprovados, 8 ignorados; 6.169 testes aprovados, 25 ignorados e 1 todo.
-- [ ] Relatório categorizado e self-check regenerados dos artefatos do CI.
-- [ ] Revisão de diff, push, PR `refs #136`, CI verde, merge e comentário de encerramento.
+- [x] Relatório categorizado regenerado dos artefatos oficiais do CI #493: Regras 2.983 pass; Banco 2.389 pass / 18 ignorados; Tela 804 pass / 1 todo. Self-check passou.
+- [x] Revisão de diff, push, PR `refs #136`, CI verde, merge confirmado (`7976761`) e comentário de encerramento publicado na issue.
 
-Limite atual: a integração GitHub recusou a troca do label de #136 para `proplan:doing` (403); issue permanece em `proplan:todo`. A rodada agregada precisa ser repetida após a correção dos mocks, e o relatório final depende dos artefatos do CI.
+Entrega integrada na `main`; a issue #136 continua aberta para aceite do PI.
