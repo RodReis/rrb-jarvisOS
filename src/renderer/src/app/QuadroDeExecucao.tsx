@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { AlvoDeCancelamentoEmCascata } from '@shared/domain/roadmap'
 import type { QuadroDeExecucao, ResultadoDoPlay } from '@shared/domain/quadro-execucao'
+import type { EstadoDaFatiaProjetada, PacoteDoProximoGate } from '@shared/domain/projecoes-execucao'
 import type { PreviaDeCancelamentoEmCascata } from '@shared/domain/quadro-execucao'
 import { Button, ErrorState, LoadingState } from '@design/ui'
 import { PainelDaTarefa } from './PainelDaTarefa'
@@ -62,6 +63,8 @@ export function QuadroDeExecucao({
   const [escopoWorkspace, setEscopoWorkspace] = useState(false)
   const [controles, setControles] = useState<SnapshotDeControles | undefined>()
   const [salvandoControle, setSalvandoControle] = useState(false)
+  const [reconciliando, setReconciliando] = useState(false)
+  const [erroDaReconciliacao, setErroDaReconciliacao] = useState<string | undefined>()
 
   const atualizarControles = useCallback(async () => {
     const snapshot = await window.jarvis.lerControlesContinuos({
@@ -161,6 +164,21 @@ export function QuadroDeExecucao({
       setMensagemDoCancelamento('Não foi possível atualizar o controle operacional.')
     } finally {
       setSalvandoControle(false)
+    }
+  }
+
+  const reconciliar = async () => {
+    if (reconciliando) return
+    setReconciliando(true)
+    setErroDaReconciliacao(undefined)
+    try {
+      setQuadro(await window.jarvis.reconciliarQuadroDeExecucao(projectId, workspace))
+    } catch {
+      setErroDaReconciliacao(
+        'Não foi possível reconciliar STATUS local com GitHub. O snapshot anterior foi preservado.'
+      )
+    } finally {
+      setReconciliando(false)
     }
   }
 
@@ -354,6 +372,14 @@ export function QuadroDeExecucao({
         <div className="flex flex-wrap gap-2">
           <Button
             variante="secundaria"
+            desabilitado={reconciliando}
+            carregando={reconciliando}
+            onClick={() => void reconciliar()}
+          >
+            Reconciliar DAG
+          </Button>
+          <Button
+            variante="secundaria"
             desabilitado={cancelandoCascata}
             onClick={() => {
               setCascataAberta((aberta) => !aberta)
@@ -376,6 +402,50 @@ export function QuadroDeExecucao({
           </Button>
         </div>
       </header>
+
+      <section
+        className="rounded-xl border border-[rgba(var(--jos-borda-rgb),0.14)] bg-[rgba(var(--jos-borda-rgb),0.035)] p-4"
+        aria-labelledby="projecoes-dag-titulo"
+      >
+        <header className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h4 id="projecoes-dag-titulo" className="font-semibold">
+              Projeção do DAG e próximo gate
+            </h4>
+            <p className="mt-1 text-xs text-[var(--jos-cor-texto-suave)]">
+              {quadro.inventarioDisponivel
+                ? `Inventário reconciliado ${quadro.inventarioObservadoEm ? new Date(quadro.inventarioObservadoEm).toLocaleString() : ''}`
+                : 'Sem snapshot reconciliado. Use “Reconciliar DAG” para consultar STATUS e GitHub.'}
+            </p>
+          </div>
+          <span className="rounded-full border border-[rgba(var(--jos-borda-rgb),0.18)] px-2 py-1 text-xs">
+            Somente leitura · sem aprovação automática
+          </span>
+        </header>
+        {erroDaReconciliacao && (
+          <p role="alert" className="mt-3 text-sm text-red-400">
+            {erroDaReconciliacao}
+          </p>
+        )}
+        {quadro.falhaDeReconciliacao && (
+          <p role="alert" className="mt-3 text-sm text-amber-300">
+            {quadro.falhaDeReconciliacao}
+          </p>
+        )}
+        {quadro.inventarioDisponivel && (
+          <>
+            <ol
+              className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3"
+              aria-label="Nós projetados do DAG"
+            >
+              {(quadro.dag ?? []).map((no) => (
+                <NoProjetado key={no.id} no={no} />
+              ))}
+            </ol>
+            {quadro.pacoteDoProximoGate && <PacoteGate pacote={quadro.pacoteDoProximoGate} />}
+          </>
+        )}
+      </section>
 
       {cascataAberta && (
         <section
@@ -836,6 +906,128 @@ export function QuadroDeExecucao({
       <p className="text-xs text-[var(--jos-cor-texto-suave)]">
         Checks e merge são consultados novamente a cada 60 segundos. A coluna DONE exige confirmação
         do merge pela origem.
+      </p>
+    </section>
+  )
+}
+
+function NoProjetado({ no }: { readonly no: EstadoDaFatiaProjetada }): React.JSX.Element {
+  const run = no.run
+  const pull = no.pullRequest
+  const rotuloEstado: Record<string, string> = {
+    pendente: 'Pendente',
+    'em-andamento': 'Em andamento',
+    mergeado: 'Merge confirmado',
+    bloqueado: 'Bloqueado',
+    desconhecido: 'Desconhecido'
+  }
+  return (
+    <li className="rounded-lg border border-[rgba(var(--jos-borda-rgb),0.14)] bg-[var(--jos-cor-fundo)] p-3 text-sm">
+      <p className="font-medium">{no.id}</p>
+      {no.issue && (
+        <p className="mt-1 text-xs">
+          <a className="underline" href={no.issue.url} target="_blank" rel="noreferrer">
+            Issue #{no.issue.numero}
+          </a>
+        </p>
+      )}
+      <p className="mt-1 text-xs text-[var(--jos-cor-texto-suave)]">
+        {rotuloEstado[no.estadoTecnico]}
+      </p>
+      {run && <p className="mt-1 text-xs">Run: {run.estado}</p>}
+      {no.branch && (
+        <p className="mt-1 text-xs">
+          Branch: {no.branch.nome} ·{' '}
+          {no.branch.estadoRemoto === 'confirmada'
+            ? 'confirmado'
+            : no.branch.estadoRemoto === 'divergente'
+              ? 'divergente'
+              : 'não observado'}
+        </p>
+      )}
+      {pull && (
+        <p className="mt-1 text-xs">
+          <a className="underline" href={pull.url} target="_blank" rel="noreferrer">
+            PR #{pull.numero}
+          </a>
+          {pull.headSha ? ` · ${pull.headSha.slice(0, 12)}` : ''}
+          {pull.mergeSha ? ` · merge ${pull.mergeSha.slice(0, 12)}` : ''}
+          {pull.checks ? ` · checks ${pull.checks}` : ''}
+        </p>
+      )}
+      {no.divergencias.map((item) => (
+        <p key={item} className="mt-2 text-xs text-amber-300">
+          {item}
+        </p>
+      ))}
+    </li>
+  )
+}
+
+function PacoteGate({ pacote }: { readonly pacote: PacoteDoProximoGate }): React.JSX.Element {
+  const rotulos: Record<PacoteDoProximoGate['estado'], string> = {
+    'sem-gate-pendente': 'Nenhum gate pendente',
+    'reconciliacao-necessaria': 'Reconciliação necessária',
+    'aguardando-dependencias': 'Aguardando dependências',
+    bloqueado: 'Bloqueado',
+    'pronto-para-revisao': 'Pronto para revisão do PI'
+  }
+  return (
+    <section
+      className="mt-4 rounded-lg border border-indigo-400/30 bg-indigo-400/5 p-4"
+      aria-labelledby="pacote-gate-titulo"
+    >
+      <div className="flex flex-wrap justify-between gap-2">
+        <h5 id="pacote-gate-titulo" className="font-semibold">
+          Próximo gate: {pacote.no?.titulo ?? 'não identificado'}
+        </h5>
+        <span className="text-xs">{rotulos[pacote.estado]}</span>
+      </div>
+      {pacote.gate && (
+        <p className="mt-1 text-xs text-[var(--jos-cor-texto-suave)]">
+          Gate {pacote.gate} · revisão {pacote.fingerprint.slice(0, 12)}
+        </p>
+      )}
+      <p className="mt-2 text-sm">{pacote.recomendacao}</p>
+      {pacote.revisoes.length > 0 && (
+        <ul className="mt-3 space-y-1 text-xs" aria-label="Artefatos da revisão">
+          {pacote.revisoes.map((item) => (
+            <li key={`${item.artefato}-${item.hash}`} className="break-all">
+              {item.artefato} · SHA-256 {item.hash}
+            </li>
+          ))}
+        </ul>
+      )}
+      {pacote.mudancas.length > 0 && (
+        <ul className="mt-3 space-y-1 text-xs" aria-label="Mudanças desde a revisão aprovada">
+          {pacote.mudancas.map((item) => (
+            <li key={`${item.artefato}-${item.hashAtual}`} className="break-all">
+              Mudança: {item.artefato}
+              {item.hashAnterior ? ` · ${item.hashAnterior.slice(0, 12)} → ` : ' · novo → '}
+              {item.hashAtual.slice(0, 12)}
+            </li>
+          ))}
+        </ul>
+      )}
+      {pacote.questoes.length > 0 && (
+        <ul className="mt-3 space-y-1 text-xs" aria-label="Questões do gate">
+          {pacote.questoes.map((item) => (
+            <li key={item.id}>
+              {item.respondida ? 'Respondida' : 'Em aberto'} · {item.texto}
+            </li>
+          ))}
+        </ul>
+      )}
+      {pacote.diagnosticos.map((item) => (
+        <p
+          key={`${item.codigo}-${item.envolvidos.join(',')}`}
+          className="mt-2 text-xs text-amber-300"
+        >
+          {item.mensagem}
+        </p>
+      ))}
+      <p className="mt-3 border-t border-[rgba(var(--jos-borda-rgb),0.12)] pt-2 text-xs text-[var(--jos-cor-texto-suave)]">
+        Pacote informativo. Aprovação e encerramento exigem decisão explícita do PI.
       </p>
     </section>
   )

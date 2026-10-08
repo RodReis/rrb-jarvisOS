@@ -813,6 +813,8 @@ const bridge: JarvisBridge = {
     ipcRenderer.invoke(IPC_CHANNELS.filaVista, projectId, workspace),
   quadroDeExecucao: (projectId: string, workspace: WorkspaceId) =>
     ipcRenderer.invoke(IPC_CHANNELS.quadroExecucaoVista, projectId, workspace),
+  reconciliarQuadroDeExecucao: (projectId: string, workspace: WorkspaceId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.quadroExecucaoReconciliar, projectId, workspace),
   painelDaTarefa: (runId: string, workspace: WorkspaceId) =>
     ipcRenderer.invoke(IPC_CHANNELS.painelDaTarefa, runId, workspace),
   painelDaTarefaConteudo: (runId: string, snapshotId: string, workspace: WorkspaceId) =>

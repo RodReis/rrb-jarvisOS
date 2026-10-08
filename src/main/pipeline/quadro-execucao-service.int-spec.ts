@@ -126,6 +126,86 @@ describe('cancelamento em cascata do quadro', () => {
   })
 })
 
+describe('reconciliação explícita do inventário pelo quadro', () => {
+  it('preserva o link da issue no nó do DAG projetado a partir do cartão', async () => {
+    const issueUrl = 'https://github.com/RodReis/rrb-jarvisOS/issues/137'
+    const carregar = vi.fn(() => ({
+      observadoEm: '2026-10-08T00:00:00.000Z',
+      inventario: {
+        nos: [
+          {
+            id: 'MVP28-F01',
+            tipo: 'fatia',
+            numero: 1,
+            titulo: 'Fatia 1',
+            dependeDe: [],
+            estadoTecnico: 'pendente',
+            spec: { estado: 'aprovada' },
+            gateAprovado: false,
+            bloqueado: false
+          }
+        ],
+        ordem: ['MVP28-F01'],
+        diagnosticos: [],
+        fingerprint: 'f'.repeat(64)
+      }
+    }))
+    const service = new QuadroExecucaoService({
+      userId: () => 'u-1',
+      projects: { findById: () => ({ workspace_id: WS }) },
+      roadmap: { carregar: () => ({ mvps: [mvp], slices: [slices[0]!] }) },
+      roadmapService: { aprovacoes: () => [], revisoesDoGate: () => [] },
+      refs: {
+        listar: () => [
+          {
+            alvo: 'issue',
+            chaveExterna: chaveDeFatia(projectId, 28, 1),
+            refId: '137',
+            url: issueUrl
+          }
+        ]
+      },
+      runs: { listarDaFatia: () => [] },
+      fila: { vista: () => ({ concluidas: [], bloqueadas: [] }) },
+      runPrs: {},
+      connectors: {},
+      inventarioGlobal: { carregar },
+      audit: { append: vi.fn() }
+    } as never)
+
+    const quadro = await service.vista(projectId, WS)
+    expect(quadro.dag?.[0]?.issue).toEqual({ numero: 137, aberta: true, url: issueUrl })
+  })
+
+  it('confere workspace e persiste somente pela fonte global antes de projetar a vista', async () => {
+    const reconciliar = vi.fn(async () => ({
+      nos: [],
+      ordem: [],
+      diagnosticos: [],
+      fingerprint: 'a'.repeat(64)
+    }))
+    const carregar = vi.fn(() => undefined)
+    const service = new QuadroExecucaoService({
+      userId: () => 'u-1',
+      projects: { findById: vi.fn(() => ({ workspace_id: WS })) },
+      inventarioGlobal: { reconciliar, carregar },
+      roadmap: { carregar: () => ({ mvps: [], slices: [] }) },
+      refs: { listar: () => [] },
+      runs: { listarDaFatia: () => [] },
+      fila: { vista: () => ({ concluidas: [], bloqueadas: [] }) },
+      roadmapService: { aprovacoes: () => [] },
+      runPrs: {},
+      connectors: {}
+    } as never)
+
+    await service.reconciliarInventario(projectId, WS)
+    expect(reconciliar).toHaveBeenCalledWith({ userId: 'u-1', workspaceId: WS, projectId })
+    expect(carregar).toHaveBeenCalled()
+    await expect(service.reconciliarInventario(projectId, 'noa')).rejects.toThrow('não encontrado')
+    expect(reconciliar).toHaveBeenCalledTimes(1)
+  })
+})
+
 let raiz: string | undefined
 afterEach(() => {
   if (raiz) rmSync(raiz, { recursive: true, force: true })

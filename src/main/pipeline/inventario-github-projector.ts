@@ -10,9 +10,18 @@ export function projetarEstadoGithub(
   const prsPorIssue = new Map<number, NonNullable<EstadoRemotoDoNo['pullRequests']>[number][]>()
 
   for (const pull of remoto.pullRequests) {
+    const pullProjetado = {
+      numero: pull.numero,
+      estado: pull.estado,
+      merged: pull.merged,
+      headBranch: pull.headBranch,
+      headSha: pull.headSha,
+      ...(pull.mergeSha === undefined ? {} : { mergeSha: pull.mergeSha }),
+      checks: pull.checks
+    }
     for (const issueNumero of pull.issuesReferenciadas) {
       const prs = prsPorIssue.get(issueNumero) ?? []
-      prs.push(pull)
+      prs.push(pullProjetado)
       prsPorIssue.set(issueNumero, prs)
     }
   }

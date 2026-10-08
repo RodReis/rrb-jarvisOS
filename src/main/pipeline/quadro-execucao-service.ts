@@ -35,6 +35,11 @@ import { chaveDeFatia } from '@shared/domain/publicacao'
 import { custoMaximoUsd } from '@shared/domain/squad-resolucao'
 import type { RoadmapRepository } from '../projects/roadmap-repository'
 import type { RoadmapService } from '../projects/roadmap-service'
+import type { RoadmapGeradoService } from '../projects/roadmap-gerado-service'
+import type { InventarioGlobalService } from './inventario-global-service'
+import type { InventarioGlobal, NoInventario } from './inventario-global'
+import { projetarEstadoDaFatia, projetarProximoGate } from '@shared/domain/projecoes-execucao'
+import { aprovacaoVigente } from '@shared/domain/aprovacoes'
 import { lerPerfilDeCiVersionado } from '../projects/ci-profile-revision'
 import type { ExternalRefRepository } from '../projects/external-ref-repository'
 import type { ProjectRepository } from '../projects/project-repository'
@@ -53,6 +58,8 @@ export interface QuadroExecucaoDeps {
   readonly userId: () => string
   readonly roadmap: RoadmapRepository
   readonly roadmapService: RoadmapService
+  readonly roadmapGerado?: Pick<RoadmapGeradoService, 'carregar'>
+  readonly inventarioGlobal?: Pick<InventarioGlobalService, 'carregar' | 'reconciliar'>
   readonly refs: ExternalRefRepository
   readonly projects: ProjectRepository
   readonly contexts: ContextService
@@ -316,7 +323,7 @@ export class QuadroExecucaoService {
       )
     }
 
-    return projetarQuadro({
+    const quadro = projetarQuadro({
       projectId,
       mvps: roadmap.mvps,
       slices: roadmap.slices,
@@ -329,6 +336,236 @@ export class QuadroExecucaoService {
       aprovacoesPendentes,
       agora: new Date(this.agora()).toISOString()
     })
+    return this.anexarProjecoes(escopo, roadmap, quadro)
+  }
+
+  async reconciliarInventario(
+    projectId: string,
+    workspaceId: WorkspaceId
+  ): Promise<QuadroDeExecucao> {
+    const userId = this.deps.userId()
+    const projeto = this.deps.projects.findById(userId, projectId)
+    if (projeto === undefined || projeto.workspace_id !== workspaceId) {
+      throw new Error('Projeto não encontrado neste espaço.')
+    }
+    if (this.deps.inventarioGlobal === undefined) throw new Error('Reconciliação indisponível.')
+    await this.deps.inventarioGlobal.reconciliar({ userId, workspaceId, projectId })
+    return this.vista(projectId, workspaceId)
+  }
+
+  private anexarProjecoes(
+    escopo: { userId: string; workspaceId: WorkspaceId; projectId: string },
+    roadmap: Roadmap,
+    quadro: QuadroDeExecucao
+  ): QuadroDeExecucao {
+    const snapshot = this.deps.inventarioGlobal?.carregar(escopo)
+    if (snapshot === undefined) return { ...quadro, inventarioDisponivel: false }
+    const inventario = snapshot.inventario
+    const noPorId = new Map(inventario.nos.map((no) => [no.id, no]))
+    const mvpPorId = new Map(roadmap.mvps.map((mvp) => [mvp.id, mvp]))
+    const runs = quadro.colunas.flatMap((coluna) =>
+      coluna.cartoes.flatMap((cartao) => cartao.run ?? [])
+    )
+    const prPorRun = new Map(
+      runs.flatMap((run) => {
+        const pr = this.deps.runPrs.doRun(escopo.userId, run.id)
+        return pr === undefined ? [] : [[run.id, pr] as const]
+      })
+    )
+    const dag = quadro.colunas
+      .flatMap((coluna) => coluna.cartoes)
+      .flatMap((cartao) => {
+        const mvp = mvpPorId.get(cartao.mvpId)
+        if (mvp === undefined) return []
+        const no = noPorId.get(`MVP${mvp.numero}-F${String(cartao.numeroDaFatia).padStart(2, '0')}`)
+        if (no === undefined) return []
+        const run = cartao.run
+        const pr = run === undefined ? undefined : prPorRun.get(run.id)
+        return [
+          projetarEstadoDaFatia(
+            {
+              ...this.noDoDag(no),
+              ...(cartao.issueUrl === undefined
+                ? {}
+                : {
+                    issue: {
+                      numero: cartao.issue ?? no.issue?.numero ?? 0,
+                      aberta: no.issue?.aberta ?? true,
+                      url: cartao.issueUrl
+                    }
+                  })
+            },
+            run,
+            pr === undefined
+              ? undefined
+              : {
+                  pullRequest: pr.pullRequest,
+                  owner: pr.owner,
+                  repo: pr.repo,
+                  branch: pr.branch
+                }
+          )
+        ]
+      })
+    const pacoteDoProximoGate = this.projetarPacote(escopo, roadmap, inventario)
+    return {
+      ...quadro,
+      dag,
+      pacoteDoProximoGate,
+      inventarioObservadoEm: snapshot.observadoEm,
+      inventarioDisponivel: true
+    }
+  }
+
+  private projetarPacote(
+    escopo: { userId: string; workspaceId: WorkspaceId; projectId: string },
+    roadmap: Roadmap,
+    inventario: InventarioGlobal
+  ) {
+    const gerado = this.deps.roadmapGerado?.carregar(escopo.projectId)
+    const aprovacoes = this.deps.roadmapService.aprovacoes(escopo.projectId, escopo.workspaceId)
+    const candidatos = roadmap.mvps.flatMap((mvp) => {
+      const mvpNoId = `MVP${mvp.numero}`
+      const geradoMvp =
+        gerado?.mvpEscolhido === mvp.id ? gerado.mvps.find((item) => item.id === mvp.id) : undefined
+      const candidatosDoMvp =
+        geradoMvp === undefined
+          ? []
+          : [
+              {
+                noId: mvpNoId,
+                gate: 'MVP_ENTRY' as const,
+                revisoesAtuais: this.deps.roadmapService.revisoesDoGate(
+                  escopo.projectId,
+                  'MVP_ENTRY',
+                  escopo.workspaceId
+                ),
+                revisoesAprovadas:
+                  aprovacoes.find(
+                    (aprovacao) =>
+                      aprovacaoVigente(
+                        [aprovacao],
+                        'MVP_ENTRY',
+                        this.deps.roadmapService.revisoesDoGate(
+                          escopo.projectId,
+                          'MVP_ENTRY',
+                          escopo.workspaceId
+                        )
+                      ) !== undefined
+                  )?.revisoes ?? [],
+                questoes: [] as { id: string; texto: string; respondida: boolean }[]
+              }
+            ]
+      const fatia = roadmap.slices
+        .filter((item) => item.mvpId === mvp.id)
+        .flatMap((item) => {
+          const spec =
+            gerado?.mvpEscolhido === mvp.id && gerado.spec?.fatiaId === item.id
+              ? gerado.spec
+              : undefined
+          if (spec === undefined) return []
+          return [
+            {
+              noId: `MVP${mvp.numero}-F${String(item.numero).padStart(2, '0')}`,
+              gate: 'SLICE_ENTRY' as const,
+              revisoesAtuais: spec.perguntas.every((p) => p.resposta?.trim())
+                ? this.deps.roadmapService.revisoesDoGate(
+                    escopo.projectId,
+                    'SLICE_ENTRY',
+                    escopo.workspaceId
+                  )
+                : [],
+              revisoesAprovadas:
+                aprovacoes.find(
+                  (aprovacao) =>
+                    aprovacaoVigente(
+                      [aprovacao],
+                      'SLICE_ENTRY',
+                      this.deps.roadmapService.revisoesDoGate(
+                        escopo.projectId,
+                        'SLICE_ENTRY',
+                        escopo.workspaceId
+                      )
+                    ) !== undefined
+                )?.revisoes ?? [],
+              questoes: spec.perguntas.map((p) => ({
+                id: p.id,
+                texto: p.enunciado,
+                respondida: p.resposta !== undefined && p.resposta.trim() !== ''
+              }))
+            }
+          ]
+        })
+      return [...candidatosDoMvp, ...fatia]
+    })
+    const revisoesMvp = this.deps.roadmapService.revisoesDoGate(
+      escopo.projectId,
+      'MVP_ENTRY',
+      escopo.workspaceId
+    )
+    const candidatosComAprovacaoVigente = candidatos.map((candidato) => ({
+      ...candidato,
+      revisoesAprovadas:
+        candidato.gate === 'MVP_ENTRY'
+          ? (aprovacoes.find(
+              (aprovacao) => aprovacaoVigente([aprovacao], 'MVP_ENTRY', revisoesMvp) !== undefined
+            )?.revisoes ?? [])
+          : (aprovacoes
+              .filter((aprovacao) => aprovacao.gate === 'SLICE_ENTRY')
+              .filter((aprovacao) =>
+                aprovacao.revisoes.every((revisao) =>
+                  candidatos.some(
+                    (candidatoDeGate) =>
+                      candidatoDeGate.gate === 'SLICE_ENTRY' &&
+                      candidatoDeGate.revisoesAtuais.some(
+                        (atual) =>
+                          atual.artefato === revisao.artefato && atual.hash === revisao.hash
+                      )
+                  )
+                )
+              )
+              .sort((a, b) => b.created_at.localeCompare(a.created_at))[0]?.revisoes ?? [])
+    }))
+    const pacote = projetarProximoGate(
+      {
+        nos: inventario.nos.map((no) => this.noDoDag(no)),
+        ordem: inventario.ordem,
+        diagnosticos: inventario.diagnosticos.map((d) => ({
+          codigo: d.codigo,
+          envolvidos: d.envolvidos,
+          mensagem: d.mensagem
+        })),
+        fingerprint: inventario.fingerprint,
+        noLocalPorId: new Map(inventario.nos.map((no) => [no.id, this.noDoDag(no)]))
+      },
+      candidatosComAprovacaoVigente
+    )
+    const semResposta =
+      candidatosComAprovacaoVigente
+        .find((candidato) => candidato.noId === pacote.no?.id)
+        ?.questoes.filter((questao) => !questao.respondida) ?? []
+    return pacote.estado === 'bloqueado' && pacote.gate === 'SLICE_ENTRY' && semResposta.length > 0
+      ? {
+          ...pacote,
+          questoes: semResposta,
+          recomendacao:
+            'Responder às questões da SPEC antes de preparar o gate de entrada da fatia.'
+        }
+      : pacote
+  }
+
+  private noDoDag(no: NoInventario) {
+    return {
+      id: no.id,
+      tipo: no.tipo,
+      numero: no.numero,
+      titulo: no.titulo,
+      dependeDe: no.dependeDe,
+      estadoTecnico: no.estadoTecnico,
+      gateAprovado: no.gateAprovado,
+      ...(no.issue === undefined ? {} : { issue: { ...no.issue } }),
+      ...(no.pullRequests === undefined ? {} : { pullRequests: no.pullRequests })
+    }
   }
 
   async painel(runId: string, workspaceId: WorkspaceId): Promise<PainelDaTarefa | undefined> {

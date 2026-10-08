@@ -2423,6 +2423,16 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     }
   )
 
+  ipcMain.handle(
+    IPC_CHANNELS.quadroExecucaoReconciliar,
+    async (_event, projectId: unknown, workspace: unknown) => {
+      if (!isWorkspaceId(workspace) || typeof projectId !== 'string') {
+        return { projectId: '', colunas: [], geradoEm: new Date().toISOString() }
+      }
+      return await deps.quadroExecucao.reconciliarInventario(projectId, workspace)
+    }
+  )
+
   ipcMain.handle(IPC_CHANNELS.painelDaTarefa, (_event, runId: unknown, workspace: unknown) => {
     if (typeof runId !== 'string' || runId.length === 0) return undefined
     const escopo = isWorkspaceId(workspace) ? workspace : 'noa'

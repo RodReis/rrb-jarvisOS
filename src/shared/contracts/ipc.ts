@@ -665,6 +665,7 @@ export const IPC_CHANNELS = {
   /** SPEC-Entrega-02: o estado da fila — runs ativos, concluídas e o que está travado. */
   filaVista: 'fila:vista',
   quadroExecucaoVista: 'quadro-execucao:vista',
+  quadroExecucaoReconciliar: 'quadro-execucao:reconciliar',
   quadroExecucaoPlay: 'quadro-execucao:play',
   quadroExecucaoCancelar: 'quadro-execucao:cancelar',
   quadroExecucaoPreverCancelamentoCascata: 'quadro-execucao:cancelar-cascata:prever',
@@ -1635,6 +1636,7 @@ export interface JarvisBridge {
   vistaDaFila(projectId: string, workspace: WorkspaceId): Promise<VistaDaFila>
   /** Quadro local derivado do ledger e das consultas reais da origem. */
   quadroDeExecucao(projectId: string, workspace: WorkspaceId): Promise<QuadroDeExecucao>
+  reconciliarQuadroDeExecucao(projectId: string, workspace: WorkspaceId): Promise<QuadroDeExecucao>
   painelDaTarefa(runId: string, workspace: WorkspaceId): Promise<PainelDaTarefa | undefined>
   painelDaTarefaConteudo(
     runId: string,
