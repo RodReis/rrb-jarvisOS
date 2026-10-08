@@ -2170,6 +2170,41 @@ const MIGRATIONS: readonly string[] = [
   );
   CREATE INDEX idx_dag_inventory_fingerprint
     ON dag_inventory_snapshot(user_id, workspace_id, fingerprint);
+  `,
+
+  // 61 — decisões idempotentes do dispatcher contínuo e correlação durável com o run.
+  `
+  ALTER TABLE pipeline_run ADD COLUMN dispatch_key TEXT;
+  CREATE UNIQUE INDEX idx_pipeline_run_dispatch_key
+    ON pipeline_run(user_id, workspace_id, project_id, dispatch_key)
+    WHERE dispatch_key IS NOT NULL;
+
+  CREATE TABLE continuous_dispatch_cursor (
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    project_id TEXT NOT NULL,
+    dag_fingerprint TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, workspace_id, project_id)
+  );
+
+  CREATE TABLE continuous_dispatch_decision (
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    project_id TEXT NOT NULL,
+    idempotency_key TEXT NOT NULL,
+    dag_fingerprint TEXT NOT NULL,
+    node_id TEXT,
+    run_id TEXT,
+    state TEXT NOT NULL CHECK (state IN ('dispatched','waiting','blocked','drained')),
+    cause TEXT,
+    retry_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, workspace_id, project_id, idempotency_key)
+  );
+  CREATE INDEX idx_continuous_dispatch_run
+    ON continuous_dispatch_decision(user_id, workspace_id, run_id);
   `
 ]
 

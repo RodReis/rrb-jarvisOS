@@ -18,14 +18,17 @@ interface RepoAlvo {
 export class GithubInventarioFonte {
   constructor(
     private readonly connectors: ConnectorService,
-    private readonly repoDoProjeto: (projectId: string) => RepoAlvo | undefined
+    private readonly repoDoProjeto: (
+      projectId: string,
+      escopo: EscopoDoInventario
+    ) => RepoAlvo | undefined
   ) {}
 
   async lerGithub(
     escopo: EscopoDoInventario,
     nosLocais: readonly NoInventario[]
   ): Promise<ProjecaoGithubDoInventario> {
-    const repo = this.repoDoProjeto(escopo.projectId)
+    const repo = this.repoDoProjeto(escopo.projectId, escopo)
     if (repo === undefined) throw new Error('Projeto sem referência de repositório GitHub.')
 
     const request: ConnectorRequest = {

@@ -164,6 +164,9 @@ describe('migrations', () => {
     antigo.exec('DROP TABLE run_pr')
     // A 60 guarda o snapshot reconstruível do inventário global (SPEC-Contínuo-01).
     antigo.exec('DROP TABLE dag_inventory_snapshot')
+    // A 61 acrescenta a chave de dispatch ao run e cria cursor/decisões do dispatcher.
+    antigo.exec('DROP TABLE continuous_dispatch_decision')
+    antigo.exec('DROP TABLE continuous_dispatch_cursor')
     antigo.pragma('user_version = 1')
     antigo.close()
 

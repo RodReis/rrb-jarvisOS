@@ -461,7 +461,13 @@ export class QuadroExecucaoService {
           throw new Error(
             'A SPEC aprovada não declara Paths permitidos; o preflight recusa execução sem esse escopo.'
           )
-        const run = this.deps.fila.criarRun(pedido.projectId, workspaceId, sliceId)
+        const run = this.deps.fila.criarRun(
+          pedido.projectId,
+          workspaceId,
+          sliceId,
+          undefined,
+          pedido.dispatchKey === undefined ? undefined : `${pedido.dispatchKey}:${sliceId}`
+        )
         runId = run.id
         const contexto = this.deps.contexts.montarDaTarefa(
           {
@@ -510,14 +516,15 @@ export class QuadroExecucaoService {
         ) {
           throw new Error('Não foi possível persistir o limite de custo antes do Play.')
         }
-        auditarSnapshotDoSquad(
-          this.deps.audit ??
-            (() => {
-              throw new Error('A auditoria do Squad não está configurada.')
-            })(),
-          { userId, workspaceId },
-          snapshotSquad
-        )
+        if (run.squadSnapshot === undefined)
+          auditarSnapshotDoSquad(
+            this.deps.audit ??
+              (() => {
+                throw new Error('A auditoria do Squad não está configurada.')
+              })(),
+            { userId, workspaceId },
+            snapshotSquad
+          )
         const execucao: PedidoDeExecucao = {
           runId: run.id,
           projectId: pedido.projectId,
@@ -541,24 +548,34 @@ export class QuadroExecucaoService {
           perfilDeCi: perfil.perfil,
           imagemDoSandbox: IMAGEM_DO_SQUAD
         }
-        const aguardando = this.deps.fila.transicionar(
-          pedido.projectId,
-          workspaceId,
-          run.id,
-          'AWAITING_PI'
-        )
-        if (aguardando.reason !== 'transicionado') throw new Error(aguardando.mensagem)
-        const pronto = this.deps.fila.transicionar(pedido.projectId, workspaceId, run.id, 'READY')
-        if (pronto.reason !== 'transicionado') {
-          const atual = this.deps.runs.buscar(run.id)
-          throw new Error(atual?.bloqueio?.evidencia ?? pronto.mensagem)
-        }
-        void executar(execucao).catch((erro: unknown) => {
-          log.agent.error('A execução do run falhou fora do fluxo esperado', {
-            runId: run.id,
-            motivo: erro instanceof Error ? erro.message : 'desconhecido'
+        const atual = this.deps.runs.buscar(run.id)
+        if (pedido.dispatchKey === undefined || atual?.estado === 'PLANNED') {
+          const aguardando = this.deps.fila.transicionar(
+            pedido.projectId,
+            workspaceId,
+            run.id,
+            'AWAITING_PI'
+          )
+          if (aguardando.reason !== 'transicionado') throw new Error(aguardando.mensagem)
+          const pronto = this.deps.fila.transicionar(pedido.projectId, workspaceId, run.id, 'READY')
+          if (pronto.reason !== 'transicionado') {
+            const atualizado = this.deps.runs.buscar(run.id)
+            throw new Error(atualizado?.bloqueio?.evidencia ?? pronto.mensagem)
+          }
+          void executar(execucao).catch((erro: unknown) => {
+            log.agent.error('A execução do run falhou fora do fluxo esperado', {
+              runId: run.id,
+              motivo: erro instanceof Error ? erro.message : 'desconhecido'
+            })
           })
-        })
+        } else if (atual?.estado === 'READY') {
+          void executar(execucao).catch((erro: unknown) => {
+            log.agent.error('A retomada do run READY falhou fora do fluxo esperado', {
+              runId: run.id,
+              motivo: erro instanceof Error ? erro.message : 'desconhecido'
+            })
+          })
+        }
         resultados.push({
           sliceId,
           runId: run.id,

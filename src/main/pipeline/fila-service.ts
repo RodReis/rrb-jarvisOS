@@ -107,6 +107,8 @@ export interface FilaDeps {
    * dentro dele: a devolução fala com o Docker, e isso não cabe numa transação do SQLite.
    */
   readonly aoEncerrarSemConclusao?: (runId: string, estado: EstadoDoRun) => void
+  /** Evento de conclusão; o dispatcher reconcilia as fontes antes de escolher outro nó. */
+  readonly aoConcluir?: (projectId: string, workspaceId: WorkspaceId) => void
   /**
    * Há uma transação do banco aberta **por fora** desta chamada? (A expansão de escopo bloqueia o
    * run por dentro de uma.) Quando sim, o gancho espera o commit: ele fala com o Docker, e parar
@@ -145,12 +147,22 @@ export class FilaService {
     projectId: string,
     workspaceId: WorkspaceId,
     sliceId: string,
-    continuaDe?: string
+    continuaDe?: string,
+    dispatchKey?: string
   ): PipelineRun {
     const escopo = this.escopo(projectId, workspaceId)
+    if (dispatchKey !== undefined) {
+      const existente = this.deps.runs.buscarPorChaveDispatch(escopo, dispatchKey)
+      if (existente !== undefined) return existente
+    }
     const run = this.deps.runs.criar(
       escopo,
-      { sliceId, estado: 'PLANNED', ...(continuaDe === undefined ? {} : { continuaDe }) },
+      {
+        sliceId,
+        estado: 'PLANNED',
+        ...(continuaDe === undefined ? {} : { continuaDe }),
+        ...(dispatchKey === undefined ? {} : { dispatchKey })
+      },
       new Date(this.agora())
     )
 
@@ -315,6 +327,7 @@ export class FilaService {
     if (saidos.length > 0) this.deps.aoCancelarEspera?.(saidos)
     if (liberou) this.despachar()
     if (para === 'CANCELLED' || para === 'BLOCKED') this.avisarEncerramento(runId, para)
+    if (para === 'MERGED') this.deps.aoConcluir?.(projectId, workspaceId)
 
     return { reason: 'transicionado', run: atualizado, mensagem: `Run em ${para}.` }
   }

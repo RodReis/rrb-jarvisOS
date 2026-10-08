@@ -124,6 +124,8 @@ export interface PipelineRun {
   readonly projectId: string
   /** A fatia que este run executa. */
   readonly sliceId: string
+  /** Correlação idempotente de dispatch contínuo; ausente nos runs manuais. */
+  readonly dispatchKey?: string
   readonly estado: EstadoDoRun
   /** O run anterior de que este é continuação, quando houver (retomada de bloqueio). */
   readonly continuaDe?: string

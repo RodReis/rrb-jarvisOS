@@ -46,9 +46,26 @@ afterEach(() => {
 })
 
 describe('PipelineRepository — snapshot do Squad', () => {
+  it('reutiliza o run da mesma chave idempotente do dispatcher', () => {
+    const primeiro = repo.criar(
+      ESCOPO,
+      { sliceId: 'f01', estado: 'PLANNED', dispatchKey: 'dispatch-1' },
+      AGORA
+    )
+    const repetido = repo.criar(
+      ESCOPO,
+      { sliceId: 'f01', estado: 'PLANNED', dispatchKey: 'dispatch-1' },
+      new Date(AGORA.getTime() + 1_000)
+    )
+
+    expect(repetido.id).toBe(primeiro.id)
+    expect(repo.buscarPorChaveDispatch(ESCOPO, 'dispatch-1')?.id).toBe(primeiro.id)
+  })
+
   it('persiste e recarrega snapshot válido com o escopo do run', () => {
     const run = repo.criar(ESCOPO, { sliceId: 'f01', estado: 'PLANNED' }, AGORA)
 
+    expect(repo.registrarSnapshotDoSquad(ESCOPO, run.id, SNAPSHOT, AGORA)).toBe(true)
     expect(repo.registrarSnapshotDoSquad(ESCOPO, run.id, SNAPSHOT, AGORA)).toBe(true)
     expect(repo.registrarCustoMaximoDoSquad(ESCOPO, run.id, 12.5, true, AGORA)).toBe(true)
     expect(repo.registrarCustoMaximoDoSquad(ESCOPO, run.id, 0, false, AGORA)).toBe(false)

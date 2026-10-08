@@ -108,6 +108,12 @@ import { MergePolicyService } from './pipeline/merge-policy-service'
 import { MergeRepository } from './pipeline/merge-repository'
 import { MergeService } from './pipeline/merge-service'
 import { PipelineRepository } from './pipeline/pipeline-repository'
+import { ContinuousDispatcher, INTERVALO_DO_DISPATCHER_MS } from './pipeline/continuous-dispatcher'
+import { ContinuousDispatcherRepositorySqlite } from './pipeline/continuous-dispatcher-repository'
+import { InventarioGlobalService } from './pipeline/inventario-global-service'
+import { InventarioLocalFonte } from './pipeline/inventario-local-source'
+import { InventarioSnapshotRepository } from './pipeline/inventario-snapshot-repository'
+import { GithubInventarioFonte } from './pipeline/github-inventario-source'
 import { ReconciliacaoService } from './pipeline/reconciliacao-service'
 import { CancelamentoService } from './pipeline/cancelamento-service'
 import { ehTerminal } from '@shared/domain/pipeline'
@@ -1491,6 +1497,7 @@ if (!app.requestSingleInstanceLock()) {
     // precisa dele — por isso os ganchos o leem por função.
     const slotsDosSquads: { gerente?: GerenteDeSlots } = {}
     const recuperacaoDosRuns: { servico?: RecuperacaoService } = {}
+    const dispatcherDosRuns: { servico?: ContinuousDispatcher } = {}
     const squadEmExecucao: { servico?: SquadOrquestradorDeExecucao } = {}
     // O encadeador nasce depois do preflight, que precisa do proxy; o cancelamento e o gancho de
     // encerramento o leem por função.
@@ -1508,6 +1515,12 @@ if (!app.requestSingleInstanceLock()) {
       userId: userIdAtual,
       mergeAutonomoLigado: (projectId) => mergePolicy.autonomoLigado(projectId),
       mergeEmCurso: (runId) => mergeRepository.emCursoDoRun(userIdAtual(), runId),
+      aoConcluir: (projectId, workspaceId) =>
+        dispatcherDosRuns.servico?.sinalizar({
+          userId: userIdAtual(),
+          workspaceId,
+          projectId
+        }),
       // O terminal do run e a liberação do slot são uma transação só (SPEC-Scheduler-05): um crash
       // entre os dois deixava um run terminal segurando o slot.
       transacao: (fn) => storage.db.transaction(fn)(),
@@ -2294,6 +2307,70 @@ if (!app.requestSingleInstanceLock()) {
         workspaceDoRun.run(pedido.workspaceId, () => orquestradorSquad.executar(pedido))
     })
 
+    const fonteLocalDoInventario = new InventarioLocalFonte(roadmap, roadmapGerado)
+    const fonteGithubDoInventario = new GithubInventarioFonte(connectors, (_projectId, escopo) => {
+      const referencia = externalRefRepository
+        .listar(escopo)
+        .find((ref) => ref.alvo === 'repositorio')
+      const partes = referencia?.refId.split('/')
+      return partes?.length === 2 ? { owner: partes[0]!, repo: partes[1]! } : undefined
+    })
+    const inventarioGlobal = new InventarioGlobalService(
+      {
+        lerLocal: (escopo) => fonteLocalDoInventario.lerLocal(escopo),
+        lerGithub: (escopo, nosLocais) => fonteGithubDoInventario.lerGithub(escopo, nosLocais)
+      },
+      new InventarioSnapshotRepository(storage.db)
+    )
+    const dispatcher = new ContinuousDispatcher({
+      inventario: inventarioGlobal,
+      repository: new ContinuousDispatcherRepositorySqlite(storage.db),
+      sliceId: (escopo, no) => {
+        const identificador = /^MVP(\d+)-F(\d+)$/.exec(no.id)
+        if (identificador === null) return undefined
+        const roadmapDoProjeto = roadmapRepository.carregar(escopo)
+        const numeroMvp = Number(identificador[1])
+        const numeroFatia = Number(identificador[2])
+        const mvp = roadmapDoProjeto.mvps.find((item) => item.numero === numeroMvp)
+        return mvp === undefined
+          ? undefined
+          : roadmapDoProjeto.slices.find(
+              (item) => item.mvpId === mvp.id && item.numero === numeroFatia
+            )?.id
+      },
+      runs: pipelineRepository,
+      play: async (escopo, sliceId, idempotencyKey) => {
+        const resposta = await quadroExecucao.play(
+          { projectId: escopo.projectId, sliceIds: [sliceId], dispatchKey: idempotencyKey },
+          escopo.workspaceId
+        )
+        const resultado = resposta[0]
+        return resultado === undefined
+          ? { estado: 'recusado', mensagem: 'O quadro não retornou resultado para a fatia.' }
+          : {
+              estado: resultado.estado,
+              mensagem: resultado.mensagem,
+              ...(resultado.runId === undefined ? {} : { runId: resultado.runId })
+            }
+      },
+      quotaReset: (escopo) => {
+        try {
+          const rota = phaseModels.resolver(
+            { userId: escopo.userId, workspace: escopo.workspaceId },
+            'construcao',
+            'assinatura',
+            escopo.projectId
+          )
+          const estado = quota.ler(escopo.userId, escopo.workspaceId, rota.provider)
+          return estado?.restante === 0 ? estado.resetEm : undefined
+        } catch {
+          // Rota ausente será recusada pelo próprio fluxo de Play; sem reset oficial, não esperar.
+          return undefined
+        }
+      }
+    })
+    dispatcherDosRuns.servico = dispatcher
+
     const reconciliacao = new ReconciliacaoService({
       runs: pipelineRepository,
       leases: leaseRepository,
@@ -2334,6 +2411,21 @@ if (!app.requestSingleInstanceLock()) {
     // pé — e o WIP=1 valeria para os runs que ele conhece, não para a máquina.
     await reconciliacao.reconcileAll()
 
+    const reconciliarDispatcher = async (): Promise<void> => {
+      const userId = userIdAtual()
+      const workspaceId = workspaceAtual()
+      await Promise.all(
+        projectRepository
+          .list(userId, workspaceId)
+          .map((projeto) => dispatcher.reconciliar({ userId, workspaceId, projectId: projeto.id }))
+      )
+    }
+    void reconciliarDispatcher().catch((erro: unknown) => {
+      log.agent.warn('A reconciliação inicial do dispatcher falhou', {
+        motivo: erro instanceof Error ? erro.message : 'desconhecido'
+      })
+    })
+
     // O supervisor: a mesma recuperação do boot, em intervalo, para o slot de um run que morreu com
     // o app aberto não esperar o próximo boot. A varredura é só SQLite; o Docker só é consultado
     // quando um lease expirou ou um run terminal ainda segura slot. Nunca derruba o app.
@@ -2368,7 +2460,18 @@ if (!app.requestSingleInstanceLock()) {
       })
     }, INTERVALO_DO_SUPERVISOR_MS)
     supervisor.unref()
-    app.on('will-quit', () => clearInterval(supervisor))
+    const dispatcherInterval = setInterval(() => {
+      void reconciliarDispatcher().catch((erro: unknown) => {
+        log.agent.warn('A reconciliação periódica do dispatcher falhou', {
+          motivo: erro instanceof Error ? erro.message : 'desconhecido'
+        })
+      })
+    }, INTERVALO_DO_DISPATCHER_MS)
+    dispatcherInterval.unref()
+    app.on('will-quit', () => {
+      clearInterval(supervisor)
+      clearInterval(dispatcherInterval)
+    })
 
     /*
      * A voz (SPEC-Voz-01), segunda entrega: o engine real.
