@@ -26,6 +26,7 @@ import type { PreflightService } from '../pipeline/preflight-service'
 import { parseLogInput } from '@shared/contracts/logging-input'
 import { isSensitivity, type PolicyContext, type PolicyDecision } from '@shared/policies'
 import { isWorkspaceId, type AuditEvent, type AuditEventType } from '@shared/domain/entities'
+import { isAlvoDeCancelamentoEmCascata } from '@shared/domain/roadmap'
 import type { AuthService } from '../auth/auth-service'
 import { log, writeLog } from '../logging/logger'
 import type { AllowlistRepository } from '../policy/allowlist-repository'
@@ -2475,6 +2476,36 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
         return { cancelado: false, motivo: 'recusado', mensagem: 'Parâmetros inválidos.' }
       }
       return await deps.quadroExecucao.cancelar(projectId, workspace, runId)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.quadroExecucaoPreverCancelamentoCascata,
+    (_event, projectId: unknown, alvo: unknown, workspace: unknown) => {
+      if (
+        !isWorkspaceId(workspace) ||
+        typeof projectId !== 'string' ||
+        projectId.length === 0 ||
+        !isAlvoDeCancelamentoEmCascata(alvo)
+      )
+        return { ok: false, mensagem: 'Parâmetros inválidos.' }
+      return deps.quadroExecucao.preverCancelamentoEmCascata(projectId, workspace, alvo)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.quadroExecucaoCancelarCascata,
+    async (_event, projectId: unknown, alvo: unknown, fingerprint: unknown, workspace: unknown) => {
+      if (
+        !isWorkspaceId(workspace) ||
+        typeof projectId !== 'string' ||
+        projectId.length === 0 ||
+        !isAlvoDeCancelamentoEmCascata(alvo) ||
+        typeof fingerprint !== 'string' ||
+        !/^[a-f0-9]{64}$/i.test(fingerprint)
+      )
+        return { status: 'invalid', mensagem: 'Parâmetros inválidos.' }
+      return await deps.quadroExecucao.cancelarEmCascata(projectId, workspace, alvo, fingerprint)
     }
   )
 

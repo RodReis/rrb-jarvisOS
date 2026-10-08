@@ -2322,6 +2322,7 @@ if (!app.requestSingleInstanceLock()) {
       connectors,
       cancelamento,
       squadAprovacao,
+      audit: storage.audit,
       raizOperacional: () => join(app.getPath('userData'), 'pipeline'),
       criarSnapshotDoSquad: (modelo) =>
         criarSnapshotDoSquad(

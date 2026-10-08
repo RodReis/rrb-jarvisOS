@@ -823,6 +823,30 @@ const bridge: JarvisBridge = {
   ) => ipcRenderer.invoke(IPC_CHANNELS.quadroExecucaoPlay, pedido, workspace),
   cancelarNoQuadro: (projectId: string, runId: string, workspace: WorkspaceId) =>
     ipcRenderer.invoke(IPC_CHANNELS.quadroExecucaoCancelar, projectId, runId, workspace),
+  preverCancelamentoEmCascataNoQuadro: (
+    projectId: string,
+    alvo: import('@shared/domain/roadmap').AlvoDeCancelamentoEmCascata,
+    workspace: WorkspaceId
+  ) =>
+    ipcRenderer.invoke(
+      IPC_CHANNELS.quadroExecucaoPreverCancelamentoCascata,
+      projectId,
+      alvo,
+      workspace
+    ),
+  cancelarEmCascataNoQuadro: (
+    projectId: string,
+    alvo: import('@shared/domain/roadmap').AlvoDeCancelamentoEmCascata,
+    fingerprint: string,
+    workspace: WorkspaceId
+  ) =>
+    ipcRenderer.invoke(
+      IPC_CHANNELS.quadroExecucaoCancelarCascata,
+      projectId,
+      alvo,
+      fingerprint,
+      workspace
+    ),
   resolverAprovacaoDoSquad: (
     projectId: string,
     approvalId: string,

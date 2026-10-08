@@ -246,9 +246,31 @@ describe('ponte do preload', () => {
         'quadroDeExecucao',
         'playNoQuadro',
         'cancelarNoQuadro',
+        'preverCancelamentoEmCascataNoQuadro',
+        'cancelarEmCascataNoQuadro',
         'resolverAprovacaoDoSquad',
         'vistaDoPool'
       ].sort()
+    )
+  })
+
+  it('expõe prévia e confirmação da cascata em canais IPC separados', async () => {
+    const bridge = (await carregarPonte()) as unknown as JarvisBridge
+    const alvo = { tipo: 'fatia' as const, sliceId: 'f-2' }
+    await bridge.preverCancelamentoEmCascataNoQuadro('p-1', alvo, 'jarvis')
+    expect(invoke).toHaveBeenCalledWith(
+      IPC_CHANNELS.quadroExecucaoPreverCancelamentoCascata,
+      'p-1',
+      alvo,
+      'jarvis'
+    )
+    await bridge.cancelarEmCascataNoQuadro('p-1', alvo, 'f'.repeat(64), 'jarvis')
+    expect(invoke).toHaveBeenCalledWith(
+      IPC_CHANNELS.quadroExecucaoCancelarCascata,
+      'p-1',
+      alvo,
+      'f'.repeat(64),
+      'jarvis'
     )
   })
 

@@ -75,6 +75,69 @@ export interface Roadmap {
   readonly slices: readonly Slice[]
 }
 
+/** Alvo explícito para o cancelamento operacional em cascata (SPEC-Contínuo-03). */
+export type AlvoDeCancelamentoEmCascata =
+  | { readonly tipo: 'dag' }
+  | { readonly tipo: 'mvp'; readonly mvpId: string }
+  | { readonly tipo: 'fatia'; readonly sliceId: string }
+
+export function isAlvoDeCancelamentoEmCascata(
+  value: unknown
+): value is AlvoDeCancelamentoEmCascata {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
+  const alvo = value as Record<string, unknown>
+  if (alvo.tipo === 'dag') return Object.keys(alvo).length === 1
+  if (alvo.tipo === 'mvp') return typeof alvo.mvpId === 'string' && alvo.mvpId.trim() !== ''
+  if (alvo.tipo === 'fatia') return typeof alvo.sliceId === 'string' && alvo.sliceId.trim() !== ''
+  return false
+}
+
+/**
+ * Resolve a fatia escolhida e somente os nós que dependem dela no roadmap.
+ * `undefined` significa alvo ausente ou topologia ambígua/inválida; o chamador deve falhar
+ * fechado. Para uma fatia, as fatias anteriores do mesmo MVP ficam fora do alcance; todas as
+ * posteriores e as fatias dos MVPs que dependem desse MVP entram.
+ */
+export function fatiasAlcancadasPeloCancelamento(
+  roadmap: Roadmap,
+  alvo: AlvoDeCancelamentoEmCascata
+): readonly Slice[] | undefined {
+  const { mvps, slices } = roadmap
+  if (
+    validarDag(mvps).length > 0 ||
+    new Set(mvps.map((mvp) => mvp.id)).size !== mvps.length ||
+    new Set(slices.map((slice) => slice.id)).size !== slices.length ||
+    slices.some((slice) => !mvps.some((mvp) => mvp.id === slice.mvpId))
+  )
+    return undefined
+
+  if (alvo.tipo === 'dag') return [...slices]
+
+  const sliceAlvo =
+    alvo.tipo === 'fatia' ? slices.find((slice) => slice.id === alvo.sliceId) : undefined
+  const mvpAlvoId = alvo.tipo === 'mvp' ? alvo.mvpId : sliceAlvo?.mvpId
+  if (mvpAlvoId === undefined || !mvps.some((mvp) => mvp.id === mvpAlvoId)) return undefined
+
+  const mvpIds = new Set([mvpAlvoId])
+  let mudou = true
+  while (mudou) {
+    mudou = false
+    for (const mvp of mvps) {
+      if (!mvpIds.has(mvp.id) && mvp.dependeDe.some((dependencia) => mvpIds.has(dependencia))) {
+        mvpIds.add(mvp.id)
+        mudou = true
+      }
+    }
+  }
+
+  return slices.filter((slice) => {
+    if (!mvpIds.has(slice.mvpId)) return false
+    return (
+      alvo.tipo !== 'fatia' || slice.mvpId !== sliceAlvo!.mvpId || slice.numero >= sliceAlvo!.numero
+    )
+  })
+}
+
 /**
  * Por que o DAG é inválido. Enum fechado: a tela decide o que mostrar a partir dele, e um
  * problema novo no roadmap é mudança de contrato.

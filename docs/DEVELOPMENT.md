@@ -2650,15 +2650,15 @@ Status: entregue pela [PR #416](https://github.com/RodReis/rrb-jarvisOS/pull/416
 
 ### M13-F03 — Controles operacionais (`docs/spec/spec-continuo-03-controles-operacionais.md`)
 
-Status: implementação no branch `feat/m13-f03-controles`; issue #136 permanece em `proplan:todo` porque a integração GitHub negou a transição para `doing` (403). Pausa decidida pelo PI aguarda o run inteiro terminar; execução OFF usa a matriz existente para cancelar ativos.
+Status: implementação no branch `feat/m13-f03-controles`; issue #136 permanece em `proplan:todo` porque a integração GitHub negou a transição para `doing` (403). O PI confirmou pausa drenando o run inteiro, execução OFF cancelando imediatamente pela matriz existente e cancelamento em cascata como ação separada com prévia dos descendentes vinculados.
 
 - [x] Contratos de domínio, persistência SQLite versionada e journal idempotente por usuário/workspace/projeto.
 - [x] Serviço de controle com herança de switches do workspace, auditoria e cancelamento pela matriz existente.
 - [x] Gates no dispatcher, pool/fila, chamada monetária, push, criação de PR e merge.
 - [x] API IPC tipada e painel no quadro para pausa, retomada, escopo e cinco switches.
-- [ ] Definir a ação de cancelamento em cascata por DAG/MVP/fatia no quadro; decisão do PI solicitada porque a SPEC exige descendentes vinculados, mas não fixa o fluxo de seleção/prévia.
+- [x] Implementar prévia e confirmação de cancelamento em cascata por DAG/MVP/fatia, apenas para descendentes vinculados, recusando prévia desatualizada.
 - [x] Testes direcionados de regras e banco, categoria Tela completa e E2E do quadro; typecheck, lint e build passaram.
-- [ ] Repetir a suíte agregada após corrigir os mocks de `window.jarvis`; a primeira rodada teve falhas nas telas `projetos`/`projeto-aberto`, provocadas pela ausência do novo método nos mocks.
+- [x] Repetir a suíte agregada após corrigir os mocks de `window.jarvis`: 345 arquivos aprovados, 8 ignorados; 6.169 testes aprovados, 25 ignorados e 1 todo.
 - [ ] Relatório categorizado e self-check regenerados dos artefatos do CI.
 - [ ] Revisão de diff, push, PR `refs #136`, CI verde, merge e comentário de encerramento.
 

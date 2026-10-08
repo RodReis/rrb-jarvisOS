@@ -80,6 +80,20 @@ describe('equipe do Squad no cartão do quadro', () => {
         fase: 'durante-execucao',
         rascunho: 'sem-pr'
       })),
+      preverCancelamentoEmCascataNoQuadro: vi.fn(async () => previaCascata),
+      cancelarEmCascataNoQuadro: vi
+        .fn()
+        .mockResolvedValueOnce({ status: 'stale', previa: previaCascata })
+        .mockResolvedValueOnce({
+          status: 'completed',
+          resultados: [
+            {
+              runId: 'run-1',
+              sliceId: 's-1',
+              resultado: { cancelado: true, fase: 'durante-execucao', rascunho: 'sem-pr' }
+            }
+          ]
+        }),
       resolverAprovacaoDoSquad: vi.fn(async () => true)
     })
     vi.spyOn(window, 'confirm').mockReturnValue(true)
@@ -118,9 +132,42 @@ describe('equipe do Squad no cartão do quadro', () => {
       expect(window.jarvis.cancelarNoQuadro).toHaveBeenCalledWith('p-1', 'run-1', 'jarvis')
     )
     await waitFor(() => expect(window.jarvis.quadroDeExecucao).toHaveBeenCalled())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelamento em cascata' }))
+    fireEvent.change(screen.getByRole('combobox', { name: 'Alvo do cancelamento em cascata' }), {
+      target: { value: 'fatia:s-1' }
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Atualizar prévia' }))
+    expect(await screen.findByText(/1 fatia\(s\) vinculada\(s\)/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar cancelamento de 1 run(s)' }))
+    expect(
+      await screen.findByText(
+        'Roadmap ou runs mudaram. Revise a prévia atualizada antes de confirmar.'
+      )
+    ).toBeInTheDocument()
+    expect(window.jarvis.cancelarEmCascataNoQuadro).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar cancelamento de 1 run(s)' }))
+    await waitFor(() => expect(window.jarvis.cancelarEmCascataNoQuadro).toHaveBeenCalledTimes(2))
     vi.unstubAllGlobals()
   })
 })
+
+const previaCascata = {
+  ok: true as const,
+  fingerprint: 'f'.repeat(64),
+  alvo: { tipo: 'fatia' as const, sliceId: 's-1' },
+  fatias: [
+    {
+      sliceId: 's-1',
+      mvpId: 'm-1',
+      numeroDoMvp: 28,
+      numeroDaFatia: 1,
+      titulo: 'Fatia de execução'
+    }
+  ],
+  runs: [{ runId: 'run-1', sliceId: 's-1', estado: 'RUNNING' as const }]
+}
 
 const controles: SnapshotDeControles = {
   escopo: 'projeto',

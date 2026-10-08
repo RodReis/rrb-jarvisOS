@@ -30,9 +30,11 @@ Controlar uma execução longa com pausa, retomada, cancelamento, quotas, orçam
 1. Pausa não equivale a cancelamento e não perde posição/fila.
    Decisão do PI (2026-10-08): uma pausa solicitada deixa cada run ativo terminar por inteiro; só então impede novos dispatches até retomada explícita.
 2. O kill-switch de execução tem efeito próprio: desligado, cancela os runs ativos pela matriz existente e impede novas aquisições; branch e PR já publicados são preservados.
+   Decisão do PI (2026-10-08): este cancelamento é imediato, pela matriz de fase já existente.
 3. Kill-switch de merge termina em PR verde aguardando o PI.
 4. Orçamento monetário é necessário, mas nunca substitui habilitação explícita da rota paga.
 5. Comando repetido usa a mesma chave/fingerprint e não duplica efeito.
+6. O cancelamento por DAG/MVP/fatia é uma ação separada do cancelamento individual de run. Antes da confirmação, a prévia lista o alvo, todos os nós descendentes vinculados e os runs ativos que serão tentados; dependentes sem caminho no DAG não entram. A confirmação só vale para o fingerprint da prévia atual; se o roadmap ou os runs mudarem, a tela exige nova prévia.
 
 ## Critérios de aceite
 
@@ -46,6 +48,7 @@ Controlar uma execução longa com pausa, retomada, cancelamento, quotas, orçam
 ## Testes e evidência
 
 - matriz fase × pausa/cancelamento/kill-switch;
+- prévia de cancelamento por DAG/MVP/fatia, sem nós independentes, e recusa de confirmação sobre prévia desatualizada;
 - comandos duplicados e crash durante controle;
 - quota/teto/health mudando durante execução;
 - auditoria e projeção da fronteira segura.

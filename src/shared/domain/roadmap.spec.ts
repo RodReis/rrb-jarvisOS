@@ -9,7 +9,12 @@
 
 import { describe, expect, it } from 'vitest'
 import type { Mvp, Slice } from './roadmap'
-import { ordemDeExecucao, proximaFatia, validarDag } from './roadmap'
+import {
+  fatiasAlcancadasPeloCancelamento,
+  ordemDeExecucao,
+  proximaFatia,
+  validarDag
+} from './roadmap'
 
 const ORIGEM = { tipo: 'decisao' as const, decisaoId: 'd-1', perguntaId: 'escopo' }
 
@@ -153,5 +158,52 @@ describe('proximaFatia — § Saídas', () => {
       slices: [slice('s1', 'a', 1)]
     }
     expect(proximaFatia(roadmap)).toBeUndefined()
+  })
+})
+
+describe('fatiasAlcancadasPeloCancelamento — SPEC-Contínuo-03', () => {
+  const roadmap = {
+    mvps: [mvp('m1', 1), mvp('m2', 2, ['m1']), mvp('m3', 3)],
+    slices: [
+      slice('m1-f1', 'm1', 1),
+      slice('m1-f2', 'm1', 2),
+      slice('m2-f1', 'm2', 1),
+      slice('m2-f2', 'm2', 2),
+      slice('m3-f1', 'm3', 1)
+    ]
+  }
+
+  it('inclui a fatia alvo, as posteriores e os MVPs que dependem dela', () => {
+    expect(
+      fatiasAlcancadasPeloCancelamento(roadmap, { tipo: 'fatia', sliceId: 'm1-f2' })?.map(
+        (item) => item.id
+      )
+    ).toEqual(['m1-f2', 'm2-f1', 'm2-f2'])
+  })
+
+  it('inclui as fatias do MVP alvo e dos MVPs dependentes, sem incluir ramos independentes', () => {
+    expect(
+      fatiasAlcancadasPeloCancelamento(roadmap, { tipo: 'mvp', mvpId: 'm1' })?.map(
+        (item) => item.id
+      )
+    ).toEqual(['m1-f1', 'm1-f2', 'm2-f1', 'm2-f2'])
+  })
+
+  it('inclui todas as fatias para o alvo DAG', () => {
+    expect(
+      fatiasAlcancadasPeloCancelamento(roadmap, { tipo: 'dag' })?.map((item) => item.id)
+    ).toEqual(['m1-f1', 'm1-f2', 'm2-f1', 'm2-f2', 'm3-f1'])
+  })
+
+  it('falha fechado para alvo ou topologia inválidos', () => {
+    expect(
+      fatiasAlcancadasPeloCancelamento(roadmap, { tipo: 'fatia', sliceId: 'missing' })
+    ).toBeUndefined()
+    expect(
+      fatiasAlcancadasPeloCancelamento(
+        { ...roadmap, mvps: [mvp('m1', 1, ['missing'])] },
+        { tipo: 'dag' }
+      )
+    ).toBeUndefined()
   })
 })

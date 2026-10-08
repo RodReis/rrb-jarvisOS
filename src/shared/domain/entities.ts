@@ -479,6 +479,8 @@ export const AUDIT_EVENT_TYPES = [
   'merge-policy-change',
   // SPEC-Contínuo-03: controles operacionais mudam autorização de efeitos da pipeline.
   'pipeline-control-change',
+  // SPEC-Contínuo-03: solicitação e resultado do cancelamento por alvo no DAG.
+  'pipeline-cascade-cancellation',
   // SPEC-Entrega-05: a pipeline mergeou um pull request na branch-base. **Ação sensível**: é o
   // único momento em que a máquina escreve na base sem aceite humano no ato, e a
   // `ARCHITECTURE.md` exige `AuditEvent` para ação sensível.

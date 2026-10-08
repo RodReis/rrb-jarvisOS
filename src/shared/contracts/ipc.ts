@@ -94,7 +94,14 @@ import type {
   SnapshotDeControles
 } from '../domain/continuous-controls'
 import type { VistaDoPool } from '../domain/pool-vista'
-import type { QuadroDeExecucao, PedidoDePlay, ResultadoDoPlay } from '../domain/quadro-execucao'
+import type {
+  QuadroDeExecucao,
+  PedidoDePlay,
+  ResultadoDoPlay,
+  RespostaDaPreviaDeCancelamentoEmCascata,
+  ResultadoDoCancelamentoEmCascata
+} from '../domain/quadro-execucao'
+import type { AlvoDeCancelamentoEmCascata } from '../domain/roadmap'
 import type { Roadmap } from '../domain/roadmap'
 import type { MvpGerado, RoadmapGeradoOutcome, RoadmapRegistrado } from '../domain/roadmap-gerado'
 import type { EstadoDaJornada, TransicaoOutcome } from '../domain/jornada'
@@ -660,6 +667,8 @@ export const IPC_CHANNELS = {
   quadroExecucaoVista: 'quadro-execucao:vista',
   quadroExecucaoPlay: 'quadro-execucao:play',
   quadroExecucaoCancelar: 'quadro-execucao:cancelar',
+  quadroExecucaoPreverCancelamentoCascata: 'quadro-execucao:cancelar-cascata:prever',
+  quadroExecucaoCancelarCascata: 'quadro-execucao:cancelar-cascata:executar',
   quadroExecucaoResolverAprovacao: 'quadro-execucao:resolver-aprovacao',
   painelDaTarefa: 'quadro-execucao:painel-tarefa',
   painelDaTarefaConteudo: 'quadro-execucao:painel-tarefa-conteudo',
@@ -1639,6 +1648,17 @@ export interface JarvisBridge {
     runId: string,
     workspace: WorkspaceId
   ): Promise<import('@shared/domain/quadro-execucao').ResultadoDoCancelamentoNoQuadro>
+  preverCancelamentoEmCascataNoQuadro(
+    projectId: string,
+    alvo: AlvoDeCancelamentoEmCascata,
+    workspace: WorkspaceId
+  ): Promise<RespostaDaPreviaDeCancelamentoEmCascata>
+  cancelarEmCascataNoQuadro(
+    projectId: string,
+    alvo: AlvoDeCancelamentoEmCascata,
+    fingerprint: string,
+    workspace: WorkspaceId
+  ): Promise<ResultadoDoCancelamentoEmCascata>
   resolverAprovacaoDoSquad(
     projectId: string,
     approvalId: string,
