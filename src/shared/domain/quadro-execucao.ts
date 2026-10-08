@@ -77,6 +77,16 @@ export interface EquipeDoQuadro {
   }[]
   readonly workflow: readonly string[]
   readonly limiteCusto: { readonly usd: number; readonly medido: boolean }
+  readonly consumo?: {
+    readonly chamadas: number
+    readonly tokensEntrada: number
+    readonly tokensSaida: number
+    readonly turnos: number
+    readonly duracaoMs: number
+    readonly usd: number
+    readonly pendentes: number
+    readonly falhasDeTeto: number
+  }
   readonly progresso: NonNullable<PipelineRun['squadProgress']>
 }
 
@@ -142,6 +152,7 @@ function equipeDoRun(titulo: string, run: PipelineRun | undefined): EquipeDoQuad
       usd: run.squadCostLimitUsd ?? 0,
       medido: run.squadCostMeasured ?? false
     },
+    ...(run.squadBudgetUsage === undefined ? {} : { consumo: run.squadBudgetUsage }),
     progresso: run.squadProgress ?? []
   }
 }

@@ -59,6 +59,63 @@ export interface OpcoesDoClaudeNoContainer {
   readonly maxTurnos: number
 }
 
+export interface UsoDoAgente {
+  readonly tokensEntrada: number
+  readonly tokensSaida: number
+  readonly turnos: number
+}
+
+function parsearResposta(
+  stdout: string
+): { readonly texto: string; readonly uso?: UsoDoAgente } | undefined {
+  try {
+    const bruto: unknown = JSON.parse(stdout)
+    if (typeof bruto !== 'object' || bruto === null || Array.isArray(bruto)) return undefined
+    const v = bruto as Record<string, unknown>
+    if (typeof v.result !== 'string' || v.is_error === true) return undefined
+    const numTurnos = v.num_turns
+    const modelUsage = v.modelUsage
+    let tokensEntrada: number | undefined
+    let tokensSaida: number | undefined
+    if (typeof modelUsage === 'object' && modelUsage !== null && !Array.isArray(modelUsage)) {
+      const modelos = Object.values(modelUsage as Record<string, unknown>)
+      const usos = modelos.filter(
+        (item): item is Record<string, unknown> =>
+          typeof item === 'object' && item !== null && !Array.isArray(item)
+      )
+      if (usos.length > 0) {
+        tokensEntrada = usos.reduce(
+          (soma, item) =>
+            soma +
+            (typeof item.inputTokens === 'number' ? item.inputTokens : 0) +
+            (typeof item.cacheReadInputTokens === 'number' ? item.cacheReadInputTokens : 0) +
+            (typeof item.cacheCreationInputTokens === 'number' ? item.cacheCreationInputTokens : 0),
+          0
+        )
+        tokensSaida = usos.reduce(
+          (soma, item) => soma + (typeof item.outputTokens === 'number' ? item.outputTokens : 0),
+          0
+        )
+      }
+    }
+    if (
+      typeof numTurnos !== 'number' ||
+      !Number.isSafeInteger(numTurnos) ||
+      numTurnos < 1 ||
+      tokensEntrada === undefined ||
+      !Number.isSafeInteger(tokensEntrada) ||
+      tokensEntrada < 0 ||
+      tokensSaida === undefined ||
+      !Number.isSafeInteger(tokensSaida) ||
+      tokensSaida < 0
+    )
+      return { texto: v.result }
+    return { texto: v.result, uso: { tokensEntrada, tokensSaida, turnos: numTurnos } }
+  } catch {
+    return undefined
+  }
+}
+
 /** Os argumentos do `docker exec`. O prompt **não** está aqui: vai por stdin. */
 export function argsDoClaudeNoContainer(o: OpcoesDoClaudeNoContainer): readonly string[] {
   return [
@@ -72,7 +129,7 @@ export function argsDoClaudeNoContainer(o: OpcoesDoClaudeNoContainer): readonly 
     '--model',
     o.modelo,
     '--output-format',
-    'text',
+    'json',
     '--tools',
     FERRAMENTAS_DO_ESCRITOR.join(','),
     '--permission-mode',
@@ -143,7 +200,10 @@ export class AgenteNoContainer implements AgenteDoEscritor {
 
   async executar(
     pedido: PedidoAoAgente
-  ): Promise<{ ok: true; texto: string } | { ok: false; motivo: string }> {
+  ): Promise<
+    | { ok: true; texto: string; uso?: UsoDoAgente }
+    | { ok: false; motivo: string; uso?: UsoDoAgente }
+  > {
     // O Claude Code é o único agente que roda no container com este conjunto de ferramentas.
     if (pedido.modelo.provider !== 'claude-code')
       return { ok: false, motivo: 'modelo-nao-suportado' }
@@ -169,9 +229,11 @@ export class AgenteNoContainer implements AgenteDoEscritor {
       this.deps.matarNoContainer(alvo.container)
       return { ok: false, motivo: 'interrompido' }
     }
+    const resposta = parsearResposta(saida.stdout)
     if (saida.codigo !== 0) {
       return { ok: false, motivo: `claude-saiu-com-codigo-${saida.codigo ?? 'nenhum'}` }
     }
-    return { ok: true, texto: saida.stdout.trim() }
+    if (resposta === undefined) return { ok: false, motivo: 'resposta-json-invalida' }
+    return { ok: true, ...resposta }
   }
 }

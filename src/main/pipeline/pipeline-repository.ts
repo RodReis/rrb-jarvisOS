@@ -19,6 +19,9 @@ import type { WorkspaceId } from '@shared/domain/entities'
 import type { BloqueioExterno } from '@shared/domain/pacote-estrutural'
 import type { EstadoDoRun, PipelineRun } from '@shared/domain/pipeline'
 import type { SquadPlan } from '@shared/domain/squad-plano'
+import type { Camada } from '@shared/domain/squad-perfil'
+import type { LimitesAgregadosDoPlano } from '@shared/domain/squad-resolucao'
+import { isCamada } from '@shared/domain/squad-perfil'
 import { verificarSnapshot, type SnapshotDoSquad } from '../squads/squad-snapshot'
 import { log } from '../logging/logger'
 
@@ -40,6 +43,7 @@ interface RunRow {
   readonly squad_snapshot: string | null
   readonly squad_progress: string | null
   readonly squad_plan: string | null
+  readonly squad_budget_limits: string | null
   readonly squad_cost_limit_usd: number | null
   readonly squad_cost_measured: number | null
   readonly created_at: string
@@ -66,6 +70,7 @@ function toRun(row: RunRow): PipelineRun {
   let squadSnapshot: SnapshotDoSquad | undefined
   let squadProgress: PipelineRun['squadProgress']
   let squadPlan: SquadPlan | undefined
+  let squadBudgetLimits: LimitesAgregadosDoPlano | undefined
   try {
     if (row.squad_snapshot !== null) {
       const candidato: unknown = JSON.parse(row.squad_snapshot)
@@ -93,6 +98,15 @@ function toRun(row: RunRow): PipelineRun {
   } catch {
     log.db.warn('Plano do Squad ilegível no pipeline_run.', { runId: row.id })
   }
+  try {
+    if (row.squad_budget_limits !== null) {
+      const lido: unknown = JSON.parse(row.squad_budget_limits)
+      if (limitesAgregadosValidos(lido)) squadBudgetLimits = lido
+      else log.db.warn('Tetos do Squad inválidos no pipeline_run.', { runId: row.id })
+    }
+  } catch {
+    log.db.warn('Tetos do Squad ilegíveis no pipeline_run.', { runId: row.id })
+  }
 
   return {
     id: row.id,
@@ -105,6 +119,7 @@ function toRun(row: RunRow): PipelineRun {
     ...(squadSnapshot === undefined ? {} : { squadSnapshot }),
     ...(squadProgress === undefined ? {} : { squadProgress }),
     ...(squadPlan === undefined ? {} : { squadPlan }),
+    ...(squadBudgetLimits === undefined ? {} : { squadBudgetLimits }),
     ...(row.squad_cost_limit_usd === null ? {} : { squadCostLimitUsd: row.squad_cost_limit_usd }),
     ...(row.squad_cost_measured === null
       ? {}
@@ -139,6 +154,30 @@ function snapshotValido(valor: unknown): valor is SnapshotDoSquad {
   } catch {
     return false
   }
+}
+
+function limitesAgregadosValidos(valor: unknown): valor is LimitesAgregadosDoPlano {
+  if (typeof valor !== 'object' || valor === null || Array.isArray(valor)) return false
+  const limite = valor as Record<string, unknown>
+  const contagens = [
+    'tarefas',
+    'escritores',
+    'workers',
+    'chamadas',
+    'tokensEntrada',
+    'tokensSaida',
+    'turnos',
+    'duracaoMs'
+  ]
+  return (
+    contagens.every(
+      (chave) => Number.isSafeInteger(limite[chave]) && (limite[chave] as number) >= 0
+    ) &&
+    Number.isFinite(limite.usd) &&
+    (limite.usd as number) >= 0 &&
+    Array.isArray(limite.camadasMedidas) &&
+    limite.camadasMedidas.every(isCamada)
+  )
 }
 
 export class PipelineRepository {
@@ -249,23 +288,43 @@ export class PipelineRepository {
     escopo: EscopoDoRun,
     runId: string,
     plano: SquadPlan,
-    agora: Date
+    agora: Date,
+    congelamento?: {
+      readonly limiteUsd: number
+      readonly medido: boolean
+      readonly limites?: LimitesAgregadosDoPlano
+    }
   ): boolean {
     if (!Array.isArray(plano.tarefas)) return false
+    if (
+      congelamento !== undefined &&
+      (!Number.isFinite(congelamento.limiteUsd) ||
+        congelamento.limiteUsd < 0 ||
+        (congelamento.limites !== undefined && !limitesAgregadosValidos(congelamento.limites)))
+    )
+      return false
     const resultado = this.db
       .prepare(
-        `UPDATE pipeline_run SET squad_plan = ?, updated_at = ?
+        `UPDATE pipeline_run SET squad_plan = ?,
+          squad_cost_limit_usd = COALESCE(?, squad_cost_limit_usd),
+          squad_cost_measured = COALESCE(?, squad_cost_measured),
+          squad_budget_limits = COALESCE(?, squad_budget_limits), updated_at = ?
         WHERE id = ? AND user_id = ? AND workspace_id = ? AND project_id = ?
           AND squad_snapshot IS NOT NULL AND squad_plan IS NULL
+          AND (? IS NULL OR estado = 'READY')
           AND estado NOT IN ('MERGED','AWAITING_MERGE','BLOCKED','CANCELLED')`
       )
       .run(
         JSON.stringify(plano),
+        congelamento?.limiteUsd ?? null,
+        congelamento === undefined ? null : congelamento.medido ? 1 : 0,
+        congelamento?.limites === undefined ? null : JSON.stringify(congelamento.limites),
         agora.toISOString(),
         runId,
         escopo.userId,
         escopo.workspaceId,
-        escopo.projectId
+        escopo.projectId,
+        congelamento?.limiteUsd ?? null
       )
     return resultado.changes === 1
   }
@@ -373,8 +432,11 @@ export class PipelineRepository {
   buscar(runId: string): PipelineRun | undefined {
     const row = this.db.prepare('SELECT * FROM pipeline_run WHERE id = ?').get(runId) as
       RunRow | undefined
-
-    return row === undefined ? undefined : toRun(row)
+    if (row === undefined) return undefined
+    const run = toRun(row)
+    if (run.squadPlan === undefined) return run
+    const uso = this.consumo(run)
+    return uso === undefined ? run : { ...run, squadBudgetUsage: uso }
   }
 
   /** O espaço do run. O `PipelineRun` não o carrega; quem age por conta própria (a recuperação) precisa dele. */
@@ -395,7 +457,12 @@ export class PipelineRepository {
       )
       .all(escopo.userId, escopo.projectId, sliceId) as RunRow[]
 
-    return rows.map(toRun)
+    return rows.map((row) => {
+      const run = toRun(row)
+      if (run.squadPlan === undefined) return run
+      const uso = this.consumo(run)
+      return uso === undefined ? run : { ...run, squadBudgetUsage: uso }
+    })
   }
 
   /**
@@ -415,7 +482,65 @@ export class PipelineRepository {
       )
       .all(userId) as RunRow[]
 
-    return rows.map(toRun)
+    return rows.map((row) => {
+      const run = toRun(row)
+      if (run.squadPlan === undefined) return run
+      const uso = this.consumo(run)
+      return uso === undefined ? run : { ...run, squadBudgetUsage: uso }
+    })
+  }
+
+  private consumo(run: PipelineRun): PipelineRun['squadBudgetUsage'] | undefined {
+    const linha = this.db
+      .prepare(
+        `SELECT COUNT(DISTINCT CASE WHEN state <> 'released' THEN task_id END) AS tarefas,
+              GROUP_CONCAT(DISTINCT CASE WHEN state <> 'released' THEN layer END) AS camadas,
+              COUNT(DISTINCT CASE WHEN state <> 'released' THEN writer_id END) AS escritores,
+              COUNT(DISTINCT CASE WHEN state <> 'released' AND writer_id IS NULL THEN task_id END) AS workers,
+              COALESCE(SUM(CASE WHEN state IN ('reserved','indeterminate') THEN reserved_calls ELSE COALESCE(actual_calls,0) END),0) AS chamadas,
+              COALESCE(SUM(CASE WHEN state IN ('reserved','indeterminate') THEN reserved_tokens_in ELSE COALESCE(actual_tokens_in,0) END),0) AS tokensEntrada,
+              COALESCE(SUM(CASE WHEN state IN ('reserved','indeterminate') THEN reserved_tokens_out ELSE COALESCE(actual_tokens_out,0) END),0) AS tokensSaida,
+              COALESCE(SUM(CASE WHEN state IN ('reserved','indeterminate') THEN reserved_turns ELSE COALESCE(actual_turns,0) END),0) AS turnos,
+              COALESCE(SUM(CASE WHEN state IN ('reserved','indeterminate') THEN reserved_duration_ms ELSE COALESCE(actual_duration_ms,0) END),0) AS duracaoMs,
+              COALESCE(SUM(CASE WHEN state IN ('reserved','indeterminate') THEN reserved_usd ELSE COALESCE(actual_usd,0) END),0) AS usd,
+              SUM(CASE WHEN state IN ('reserved','indeterminate') THEN 1 ELSE 0 END) AS pendentes,
+              SUM(CASE WHEN state = 'overrun' THEN 1 ELSE 0 END) AS falhasDeTeto
+         FROM squad_budget_reservation
+        WHERE user_id = ? AND workspace_id = ? AND project_id = ? AND run_id = ?`
+      )
+      .get(run.user_id, this.workspaceDoRun(run.id), run.projectId, run.id) as
+      | ({ readonly camadas: string | null } & Record<
+          | 'tarefas'
+          | 'escritores'
+          | 'workers'
+          | 'chamadas'
+          | 'tokensEntrada'
+          | 'tokensSaida'
+          | 'turnos'
+          | 'duracaoMs'
+          | 'usd'
+          | 'pendentes'
+          | 'falhasDeTeto',
+          number
+        >)
+      | undefined
+    if (linha === undefined || linha.pendentes === undefined) return undefined
+    return {
+      tarefas: linha.tarefas,
+      escritores: linha.escritores,
+      workers: linha.workers,
+      chamadas: linha.chamadas,
+      tokensEntrada: linha.tokensEntrada,
+      tokensSaida: linha.tokensSaida,
+      turnos: linha.turnos,
+      duracaoMs: linha.duracaoMs,
+      usd: linha.usd,
+      camadasMedidas: (typeof linha.camadas === 'string'
+        ? linha.camadas.split(',')
+        : []) as Camada[],
+      pendentes: linha.pendentes,
+      falhasDeTeto: linha.falhasDeTeto
+    }
   }
 
   /**

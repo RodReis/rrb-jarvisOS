@@ -45,6 +45,7 @@ import type {
   SnapshotCapturado
 } from '../pipeline/painel-tarefa-repository'
 import type { GerenteDeSlots } from './squad-slots'
+import type { SquadOrcamentoService } from './squad-orcamento'
 import { montarPromptDoEscritor } from './squad-worker-prompt'
 
 const MS_POR_MINUTO = 60_000
@@ -91,11 +92,20 @@ export interface PedidoAoAgente {
   readonly signal: AbortSignal
 }
 
+export interface UsoDoAgente {
+  readonly tokensEntrada: number
+  readonly tokensSaida: number
+  readonly turnos: number
+}
+
 /** O agente que edita arquivos no worktree. Devolve o texto final; o que ele fez, o kernel prova. */
 export interface AgenteDoEscritor {
   executar(
     pedido: PedidoAoAgente
-  ): Promise<{ ok: true; texto: string } | { ok: false; motivo: string }>
+  ): Promise<
+    | { ok: true; texto: string; uso?: UsoDoAgente }
+    | { ok: false; motivo: string; uso?: UsoDoAgente }
+  >
 }
 
 export interface DependenciasDoEscritor {
@@ -105,6 +115,10 @@ export interface DependenciasDoEscritor {
   readonly slots: Pick<GerenteDeSlots, 'adquirir' | 'renovar' | 'confirmar' | 'liberar'>
   readonly sandbox: SandboxDoEscritor
   readonly agente: AgenteDoEscritor
+  readonly orcamento: Pick<
+    SquadOrcamentoService,
+    'registrarConsumo' | 'marcarIndeterminado' | 'liberarAntesDoDispatch'
+  >
   readonly audit: AuditRepository
   readonly userId: () => string
   readonly workspaceId: () => WorkspaceId
@@ -166,6 +180,7 @@ export interface ResultadoDoEscritor {
   readonly packId: string
   readonly tentativa: number
   readonly duracaoMs: number
+  readonly uso?: UsoDoAgente
 }
 
 type Causa = 'timeout' | 'cancelada' | 'lease-perdido'
@@ -195,11 +210,13 @@ export class ExecutorDeEscritor {
     const escopo = escopoDoEscritor(pedido)
     const recusa = this.recusar(pedido, escopo)
     if (recusa !== undefined) {
+      this.liberarReserva(pedido)
       const r = finalizar({ estado: 'recusada', motivo: recusa, descartadas: [], arquivos: [] })
       this.auditar(pedido, 'fim', r)
       return r
     }
     if (pedido.signal?.aborted === true) {
+      this.liberarReserva(pedido)
       const r = finalizar({
         estado: 'cancelada',
         motivo: 'cancelada-antes-de-iniciar',
@@ -260,6 +277,19 @@ export class ExecutorDeEscritor {
       : undefined
   }
 
+  private liberarReserva(pedido: PedidoDoEscritor): void {
+    this.deps.orcamento.liberarAntesDoDispatch(
+      {
+        userId: this.deps.userId(),
+        workspaceId: pedido.workspaceId,
+        projectId: pedido.projectId
+      },
+      pedido.runId,
+      pedido.tarefa.id,
+      pedido.tentativa
+    )
+  }
+
   /** Da vez na fila até o slot solto: o slot é liberado **sempre**, qualquer que seja o desfecho. */
   private async noSlot(pedido: PedidoDoEscritor, escopo: PathsPermitidos): Promise<Desfecho> {
     const slot = await this.deps.slots.adquirir({
@@ -270,6 +300,7 @@ export class ExecutorDeEscritor {
       ...(pedido.signal === undefined ? {} : { signal: pedido.signal })
     })
     if (!slot.ok) {
+      this.liberarReserva(pedido)
       return slot.motivo === 'cancelada'
         ? { estado: 'cancelada', motivo: 'cancelada-na-fila', descartadas: [], arquivos: [] }
         : { estado: 'falhou', motivo: 'slot-indisponivel', descartadas: [], arquivos: [] }
@@ -303,8 +334,10 @@ export class ExecutorDeEscritor {
     unidade: string,
     fencingToken: number
   ): Promise<Desfecho> {
+    const inicio = this.agora()
     const preparado = await this.deps.sandbox.preparar(sandbox)
     if (!preparado.ok) {
+      this.liberarReserva(pedido)
       return {
         estado: 'falhou',
         motivo: `sandbox-indisponivel: ${preparado.motivo}`.slice(0, MAX_MOTIVO_AUDITADO),
@@ -315,12 +348,106 @@ export class ExecutorDeEscritor {
     const worktree = preparado.worktree
 
     const execucao = await this.rodarAgente(pedido, escopo, worktree, unidade, fencingToken)
+    const escopoDoRun = {
+      userId: this.deps.userId(),
+      workspaceId: pedido.workspaceId,
+      projectId: pedido.projectId
+    }
+    if (execucao.saida.uso === undefined && (execucao.causa !== undefined || !execucao.saida.ok)) {
+      this.deps.orcamento.marcarIndeterminado(
+        escopoDoRun,
+        pedido.runId,
+        pedido.tarefa.id,
+        pedido.tentativa
+      )
+      await this.preservarParcial(pedido, escopo, worktree)
+      if (execucao.causa !== undefined) {
+        return {
+          ...desfechoDaCausa(execucao.causa),
+          descartadas: [],
+          arquivos: [],
+          worktree: worktree.worktree
+        }
+      }
+      if (execucao.saida.ok === false) {
+        return {
+          estado: 'falhou',
+          motivo: execucao.saida.motivo.slice(0, MAX_MOTIVO_AUDITADO),
+          descartadas: [],
+          arquivos: [],
+          worktree: worktree.worktree
+        }
+      }
+      return {
+        estado: 'falhou',
+        motivo: 'consumo-nao-observado',
+        descartadas: [],
+        arquivos: [],
+        worktree: worktree.worktree
+      }
+    }
+    if (execucao.saida.uso === undefined) {
+      this.deps.orcamento.marcarIndeterminado(
+        escopoDoRun,
+        pedido.runId,
+        pedido.tarefa.id,
+        pedido.tentativa
+      )
+      await this.preservarParcial(pedido, escopo, worktree)
+      return {
+        estado: 'falhou',
+        motivo: 'consumo-nao-observado',
+        descartadas: [],
+        arquivos: [],
+        worktree: worktree.worktree
+      }
+    } else {
+      let observado = false
+      try {
+        observado = this.deps.orcamento.registrarConsumo(
+          escopoDoRun,
+          pedido.runId,
+          pedido.tarefa.id,
+          pedido.tentativa,
+          {
+            chamadas: 1,
+            tokensEntrada: execucao.saida.uso.tokensEntrada,
+            tokensSaida: execucao.saida.uso.tokensSaida,
+            turnos: execucao.saida.uso.turnos,
+            duracaoMs: this.agora() - inicio,
+            usd: 0
+          }
+        )
+      } catch {
+        try {
+          this.deps.orcamento.marcarIndeterminado(
+            escopoDoRun,
+            pedido.runId,
+            pedido.tarefa.id,
+            pedido.tentativa
+          )
+        } catch {
+          /* falha do ledger mantém execução fechada */
+        }
+      }
+      if (!observado) {
+        await this.preservarParcial(pedido, escopo, worktree)
+        return {
+          estado: 'falhou',
+          motivo: 'teto-agregado-excedido-ou-ledger-indisponivel',
+          descartadas: [],
+          arquivos: [],
+          worktree: worktree.worktree
+        }
+      }
+    }
     if (execucao.causa !== undefined) {
       await this.preservarParcial(pedido, escopo, worktree)
       return {
         ...desfechoDaCausa(execucao.causa),
         descartadas: [],
         arquivos: [],
+        ...(execucao.saida.uso === undefined ? {} : { uso: execucao.saida.uso }),
         worktree: worktree.worktree
       }
     }
@@ -331,10 +458,19 @@ export class ExecutorDeEscritor {
         motivo: execucao.saida.motivo.slice(0, MAX_MOTIVO_AUDITADO),
         descartadas: [],
         arquivos: [],
+        ...(execucao.saida.uso === undefined ? {} : { uso: execucao.saida.uso }),
         worktree: worktree.worktree
       }
     }
-    return this.provar(pedido, escopo, worktree, unidade, fencingToken, execucao.saida.texto)
+    const provado = await this.provar(
+      pedido,
+      escopo,
+      worktree,
+      unidade,
+      fencingToken,
+      execucao.saida.texto
+    )
+    return { ...provado, ...(execucao.saida.uso === undefined ? {} : { uso: execucao.saida.uso }) }
   }
 
   /** Roda o agente com prazo, cancelamento e heartbeat; devolve o que o parou, se algo parou. */
@@ -577,8 +713,8 @@ export class ExecutorDeEscritor {
               ...(r.assinatura === undefined ? {} : { assinatura: r.assinatura }),
               ...(r.commitSha === undefined ? {} : { commitSha: r.commitSha }),
               ...(r.violacoes === undefined ? {} : { violacoes: r.violacoes }),
-              arquivos: r.arquivos.length,
-              descartadas: r.descartadas.length,
+              arquivos: r.arquivos?.length ?? 0,
+              descartadas: r.descartadas?.length ?? 0,
               duracaoMs: r.duracaoMs
             })
       }

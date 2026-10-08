@@ -322,6 +322,23 @@ export function QuadroDeExecucao({
                         <p className="mt-1 text-[var(--jos-cor-texto-suave)]">
                           Fluxo: {cartao.equipe.workflow.join(' → ')}
                         </p>
+                        {cartao.equipe.consumo && (
+                          <p
+                            className="mt-1 text-[var(--jos-cor-texto-suave)]"
+                            aria-label="Consumo do Squad"
+                          >
+                            Uso observado: {cartao.equipe.consumo.chamadas} chamada(s),{' '}
+                            {cartao.equipe.consumo.tokensEntrada +
+                              cartao.equipe.consumo.tokensSaida}{' '}
+                            tokens, {Math.ceil(cartao.equipe.consumo.duracaoMs / 1000)} s
+                            {cartao.equipe.limiteCusto.medido &&
+                              `, US$ ${cartao.equipe.consumo.usd.toFixed(4)}`}
+                            {cartao.equipe.consumo.pendentes > 0 &&
+                              ` · ${cartao.equipe.consumo.pendentes} pendente(s)`}
+                            {cartao.equipe.consumo.falhasDeTeto > 0 &&
+                              ` · ${cartao.equipe.consumo.falhasDeTeto} estouro(s)`}
+                          </p>
+                        )}
                         {cartao.equipe.progresso.length > 0 && (
                           <ul
                             className="mt-1 space-y-0.5"

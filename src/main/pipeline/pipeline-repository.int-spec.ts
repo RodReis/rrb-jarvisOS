@@ -65,6 +65,45 @@ describe('PipelineRepository — snapshot do Squad', () => {
     ).toBe(false)
   })
 
+  it('congela plano e soma de custo juntos, uma vez, no estado READY', () => {
+    const run = repo.criar(ESCOPO, { sliceId: 'f01', estado: 'PLANNED' }, AGORA)
+    expect(repo.registrarSnapshotDoSquad(ESCOPO, run.id, SNAPSHOT, AGORA)).toBe(true)
+    expect(repo.registrarCustoMaximoDoSquad(ESCOPO, run.id, 99, true, AGORA)).toBe(true)
+    expect(repo.transicionar(run.id, 'PLANNED', 'AWAITING_PI', AGORA)).toBe(true)
+    expect(repo.transicionar(run.id, 'AWAITING_PI', 'READY', AGORA)).toBe(true)
+
+    expect(
+      repo.registrarPlanoDoSquad(ESCOPO, run.id, { tarefas: [] }, AGORA, {
+        limiteUsd: 2.5,
+        medido: true,
+        limites: {
+          tarefas: 0,
+          escritores: 0,
+          workers: 0,
+          chamadas: 0,
+          tokensEntrada: 0,
+          tokensSaida: 0,
+          turnos: 0,
+          duracaoMs: 0,
+          usd: 2.5,
+          camadasMedidas: []
+        }
+      })
+    ).toBe(true)
+    expect(repo.buscar(run.id)).toMatchObject({
+      squadPlan: { tarefas: [] },
+      squadCostLimitUsd: 2.5,
+      squadCostMeasured: true,
+      squadBudgetLimits: { tarefas: 0, usd: 2.5 }
+    })
+    expect(
+      repo.registrarPlanoDoSquad(ESCOPO, run.id, { tarefas: [] }, AGORA, {
+        limiteUsd: 7,
+        medido: true
+      })
+    ).toBe(false)
+  })
+
   it('recusa adulteração e não projeta snapshot adulterado lido do SQLite', () => {
     const run = repo.criar(ESCOPO, { sliceId: 'f01', estado: 'PLANNED' }, AGORA)
     const adulterado = structuredClone(SNAPSHOT)

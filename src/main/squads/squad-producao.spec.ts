@@ -28,7 +28,10 @@ describe('consolidação de commits do Squad', () => {
       manifestoTexto: '2/2 hunks conferidos'
     }))
     const producao = await consolidarProducao(
-      { estado: 'concluido', tarefas: [concluido('a', sha('a')), concluido('b', sha('b'))] } as never,
+      {
+        estado: 'concluido',
+        tarefas: [concluido('a', sha('a')), concluido('b', sha('b'))]
+      } as never,
       2,
       integrar as never
     )
@@ -44,12 +47,17 @@ describe('consolidação de commits do Squad', () => {
   })
 
   it('não publica resultado parcial nem dois commits sem integração aprovada', async () => {
-    const integrar = vi.fn(async () => ({ estado: 'parado' as const, motivo: 'hunk-perdido-sem-registro' as const }))
+    const integrar = vi.fn(async () => ({
+      estado: 'parado' as const,
+      motivo: 'hunk-perdido-sem-registro' as const
+    }))
     const tarefas = [concluido('a', sha('a')), concluido('b', sha('b'))]
-    expect(await consolidarProducao({ estado: 'parcial', tarefas } as never, 2, integrar as never))
-      .toMatchObject({ estado: 'parado' })
+    expect(
+      await consolidarProducao({ estado: 'parcial', tarefas } as never, 2, integrar as never)
+    ).toMatchObject({ estado: 'parado' })
     expect(integrar).not.toHaveBeenCalled()
-    expect(await consolidarProducao({ estado: 'concluido', tarefas } as never, 2, integrar as never))
-      .toEqual({ estado: 'parado', motivo: 'integracao-hunk-perdido-sem-registro' })
+    expect(
+      await consolidarProducao({ estado: 'concluido', tarefas } as never, 2, integrar as never)
+    ).toEqual({ estado: 'parado', motivo: 'integracao-hunk-perdido-sem-registro' })
   })
 })

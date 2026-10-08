@@ -20,8 +20,9 @@
  */
 
 import type { ModeloEscolhido } from './modelo-da-fase'
+import type { SquadPlan } from './squad-plano'
 import type { CapacidadeId, DefinicaoDeCapacidade } from './squad-capacidades'
-import type { Camada, PerfilDeSquad } from './squad-perfil'
+import { isCamada, type Camada, type PerfilDeSquad } from './squad-perfil'
 import { calcularCustoUsd, isRotaUnmetered } from './ai'
 import { REGISTRO_DE_CAPACIDADES } from './squad-capacidades'
 import { CAMADAS, limitesDoPerfil } from './squad-perfil'
@@ -206,6 +207,80 @@ export interface CustoMaximo {
   readonly camadasMedidas: readonly Camada[]
   readonly slots: number
   readonly maxTarefas: number
+}
+
+export interface CustoDoPlano {
+  readonly usd: number
+  readonly camadasMedidas: readonly Camada[]
+}
+
+export interface LimitesAgregadosDoPlano extends CustoDoPlano {
+  readonly tarefas: number
+  readonly escritores: number
+  readonly workers: number
+  readonly chamadas: number
+  readonly tokensEntrada: number
+  readonly tokensSaida: number
+  readonly turnos: number
+  readonly duracaoMs: number
+}
+
+/**
+ * Soma os limites das tarefas validadas, usando o modelo congelado da camada de cada tarefa.
+ * Esta é a cota que acompanha o run; não usa multiplicador por camada nem por tarefa hipotética.
+ */
+export function limitesAgregadosDoPlano(
+  plano: SquadPlan,
+  resolucao: ResolucaoDoPerfil
+): LimitesAgregadosDoPlano {
+  const camadasMedidas = new Set<Camada>()
+  const escritores = new Set<string>()
+  let usd = 0
+  let chamadas = 0
+  let tokensEntrada = 0
+  let tokensSaida = 0
+  let turnos = 0
+  let duracaoMs = 0
+  let workers = 0
+
+  for (const tarefa of plano.tarefas) {
+    const escreve = tarefa.escritor !== undefined && tarefa.escritor.length > 0
+    if (escreve) escritores.add(tarefa.escritor as string)
+    else workers += 1
+    chamadas += 1
+    tokensEntrada += tarefa.limites.maxTokensEntrada
+    tokensSaida += tarefa.limites.maxTokensSaida
+    turnos += tarefa.limites.maxTurnos
+    duracaoMs += tarefa.limites.maxMinutos * 60_000
+    if (!isCamada(tarefa.camada)) continue
+    const modelo = resolucao.camadas[tarefa.camada].modelo
+    if (modelo !== undefined && !isRotaUnmetered(modelo.provider)) {
+      camadasMedidas.add(tarefa.camada)
+      usd += calcularCustoUsd(modelo.provider, modelo.modelo, {
+        tokensEntrada: tarefa.limites.maxTokensEntrada,
+        tokensSaida: tarefa.limites.maxTokensSaida
+      })
+    }
+  }
+
+  return {
+    tarefas: plano.tarefas.length,
+    escritores: escritores.size,
+    workers,
+    chamadas,
+    tokensEntrada,
+    tokensSaida,
+    turnos,
+    duracaoMs,
+    usd,
+    camadasMedidas: [...camadasMedidas]
+  }
+}
+
+/** Apenas o trecho monetário para telas e contratos que exibem o USD do plano. */
+export const custoDoPlanoUsd = (plano: SquadPlan, resolucao: ResolucaoDoPerfil): CustoDoPlano => {
+  const limites = limitesAgregadosDoPlano(plano, resolucao)
+  return { usd: limites.usd, camadasMedidas: limites.camadasMedidas }
 }
 
 /**

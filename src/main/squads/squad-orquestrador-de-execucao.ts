@@ -20,6 +20,7 @@ import type {
   RevisaoDoCiclo
 } from './squad-ciclo'
 import type { ResultadoDoSquad } from './squad-executor'
+import { limitesAgregadosDoPlano } from '@shared/domain/squad-resolucao'
 
 export interface PreparacaoDoSquad {
   readonly snapshot: SnapshotDoSquad
@@ -75,12 +76,24 @@ const resumoSeguro = (resultado: ResultadoDoSquad) =>
   }))
 
 export class SquadOrquestradorDeExecucao {
-  private readonly emVoo = new Map<string, AbortController>()
+  private readonly emVoo = new Map<
+    string,
+    {
+      readonly controle: AbortController
+      readonly terminou: Promise<void>
+      readonly concluir: () => void
+    }
+  >()
 
   constructor(private readonly deps: DependenciasDoOrquestradorDeExecucao) {}
 
   interromper(runId: string): void {
-    this.emVoo.get(runId)?.abort()
+    this.emVoo.get(runId)?.controle.abort()
+  }
+
+  /** A recuperação espera os snapshots e o finally dos escritores antes de remover recursos. */
+  quandoParar(runId: string): Promise<void> | undefined {
+    return this.emVoo.get(runId)?.terminou
   }
 
   async executar(pedido: PedidoDeExecucao): Promise<ResultadoDaEntrega | ResultadoDoCiclo> {
@@ -104,7 +117,12 @@ export class SquadOrquestradorDeExecucao {
     }
 
     const controle = new AbortController()
-    this.emVoo.set(pedido.runId, controle)
+    let concluir!: () => void
+    const terminou = new Promise<void>((resolve) => {
+      concluir = resolve
+    })
+    const emVoo = { controle, terminou, concluir }
+    this.emVoo.set(pedido.runId, emVoo)
     const abortar = (): void => controle.abort()
     pedido.signal?.addEventListener('abort', abortar, { once: true })
     if (pedido.signal?.aborted) abortar()
@@ -115,11 +133,17 @@ export class SquadOrquestradorDeExecucao {
       if (controle.signal.aborted) return this.cancelado()
       const atual = this.deps.runs.buscar(pedido.runId)
       if (atual !== undefined && atual.squadPlan === undefined) {
+        const limites = limitesAgregadosDoPlano(preparado.plano, preparado.snapshot.resolucao)
         const salvo = this.deps.runs.registrarPlanoDoSquad(
           { userId: atual.user_id, workspaceId: pedido.workspaceId, projectId: atual.projectId },
           pedido.runId,
           preparado.plano,
-          new Date()
+          new Date(),
+          {
+            limiteUsd: limites.usd,
+            medido: limites.camadasMedidas.length > 0,
+            limites
+          }
         )
         if (!salvo) throw new Error('Não foi possível persistir o plano validado do Squad.')
       }
@@ -146,7 +170,11 @@ export class SquadOrquestradorDeExecucao {
         return resultado
       }
 
-      const sandbox = this.deps.prepararSandboxDePublicacao(pedidoDoRun, preparado, resultado.commitSha)
+      const sandbox = this.deps.prepararSandboxDePublicacao(
+        pedidoDoRun,
+        preparado,
+        resultado.commitSha
+      )
       if (sandbox.sandbox === undefined) {
         this.bloquear(
           pedido,
@@ -189,7 +217,8 @@ export class SquadOrquestradorDeExecucao {
       }
     } finally {
       pedido.signal?.removeEventListener('abort', abortar)
-      if (this.emVoo.get(pedido.runId) === controle) this.emVoo.delete(pedido.runId)
+      if (this.emVoo.get(pedido.runId) === emVoo) this.emVoo.delete(pedido.runId)
+      concluir()
     }
   }
 

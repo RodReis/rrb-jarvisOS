@@ -122,6 +122,7 @@ import { ContextoDaTarefa } from './squads/squad-contexto'
 import { ExecutorDoSquad } from './squads/squad-executor'
 import { ExecutorDeWorker } from './squads/squad-worker'
 import { ExecutorDeEscritor } from './squads/squad-escritor'
+import { SquadOrcamentoService } from './squads/squad-orcamento'
 import { IntegradorService } from './squads/squad-integrador'
 import {
   SquadAprovacaoService,
@@ -1426,6 +1427,7 @@ if (!app.requestSingleInstanceLock()) {
     // inteiro: a fila só precisa da resposta, e depender do serviço a acoplaria à auditoria da
     // mudança de política — que é outro assunto, com outro tipo de evento.
     const pipelineRepository = new PipelineRepository(storage.db)
+    const squadOrcamento = new SquadOrcamentoService(storage.db, pipelineRepository, storage.audit)
     const leaseRepository = new LeaseRepository(storage.db)
     const mergePolicy = new MergePolicyService({
       repository: new MergePolicyRepository(storage.db),
@@ -1489,6 +1491,7 @@ if (!app.requestSingleInstanceLock()) {
     // precisa dele — por isso os ganchos o leem por função.
     const slotsDosSquads: { gerente?: GerenteDeSlots } = {}
     const recuperacaoDosRuns: { servico?: RecuperacaoService } = {}
+    const squadEmExecucao: { servico?: SquadOrquestradorDeExecucao } = {}
     // O encadeador nasce depois do preflight, que precisa do proxy; o cancelamento e o gancho de
     // encerramento o leem por função.
     const encadeadorDosRuns: { servico?: EncadeadorDeRuns } = {}
@@ -1512,10 +1515,27 @@ if (!app.requestSingleInstanceLock()) {
       // `CANCELLED` e `BLOCKED` devolvem o slot pela recuperação, depois de provar que o executor
       // parou. O serviço nasce depois da fila (precisa dela), por isso a indireção por função.
       // Primeiro para a entrega em voo (se este processo a roda), depois recolhe: o container e o
-      // worktree só saem quando o dono parou de usá-los.
+      // worktree só saem quando o dono parou de usá-los e o escritor terminou seus snapshots.
       aoEncerrarSemConclusao: (runId) => {
         encadeadorDosRuns.servico?.interromper(runId)
-        recuperacaoDosRuns.servico?.recolher(runId)
+        squadEmExecucao.servico?.interromper(runId)
+        const recolher = (): void => {
+          try {
+            recuperacaoDosRuns.servico?.recolher(runId)
+          } catch (error) {
+            // A supervisão do boot também tentará recolher; não deixe rejeição assíncrona solta.
+            log.sistema.error('Falha ao reconciliar recursos após cancelamento do Squad', {
+              runId,
+              error
+            })
+          }
+        }
+        const aguardandoSquad = squadEmExecucao.servico?.quandoParar(runId)
+        if (aguardandoSquad !== undefined) {
+          void aguardandoSquad.then(recolher)
+        } else {
+          recolher()
+        }
       }
     })
     // A seção crítica do merge (SPEC-Scheduler-04): lease exclusivo por repositório e base,
@@ -1634,7 +1654,6 @@ if (!app.requestSingleInstanceLock()) {
       userId: userIdAtual
     })
     squadAprovacao.reconciliarPendentes()
-    const squadEmExecucao: { servico?: SquadOrquestradorDeExecucao } = {}
     // O cancelamento seletivo (SPEC-Scheduler-05). **Ainda sem chamador de produção:** cancelar é
     // ato do PI e o canal (IPC e tela) é do quadro do MVP-028; o que já roda é a reconciliação do
     // rascunho que um crash ou a origem fora do ar deixou pendente.
@@ -2089,10 +2108,12 @@ if (!app.requestSingleInstanceLock()) {
             slots: slotsDosSquads.gerente!,
             sandbox: squadSandbox,
             agente,
+            orcamento: squadOrcamento,
             audit: storage.audit,
             userId: userIdAtual,
             workspaceId: () => pedido.workspaceId
           }),
+          orcamento: squadOrcamento,
           audit: storage.audit,
           userId: userIdAtual,
           workspaceId: () => pedido.workspaceId,

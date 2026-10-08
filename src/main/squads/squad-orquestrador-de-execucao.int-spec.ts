@@ -76,7 +76,7 @@ function preparar() {
     snapshot: SNAPSHOT,
     baseSha: 'b'.repeat(40),
     paths: { origem: 'spec' as const, paths: ['src'], justificativa: 'escopo aprovado' },
-    plano: {} as never,
+    plano: { tarefas: [] } as never,
     perfilCi: {} as never,
     git: {} as never
   }
@@ -86,7 +86,9 @@ describe('Play → ciclo do Squad → publicação', () => {
   it('cancelamento pai alcança o ciclo e impede publicação mesmo com resultado tardio', async () => {
     const run = criarRunPronto()
     let liberar: (() => void) | undefined
-    const aguardando = new Promise<void>((resolve) => { liberar = resolve })
+    const aguardando = new Promise<void>((resolve) => {
+      liberar = resolve
+    })
     const publicar = vi.fn()
     const transicionar = vi.fn()
     const executar = new SquadOrquestradorDeExecucao({
@@ -109,10 +111,18 @@ describe('Play → ciclo do Squad → publicação', () => {
       publicar
     })
     const resultado = executar.executar(criarPedido(run.id))
+    const terminou = executar.quandoParar(run.id)
+    let finalizou = false
+    void terminou?.then(() => {
+      finalizou = true
+    })
     await vi.waitFor(() => expect(liberar).toBeDefined())
     executar.interromper(run.id)
+    expect(finalizou).toBe(false)
     liberar?.()
     expect(await resultado).toMatchObject({ estado: 'parado', motivo: 'cancelada' })
+    await terminou
+    expect(finalizou).toBe(true)
     expect(publicar).not.toHaveBeenCalled()
     expect(transicionar).not.toHaveBeenCalled()
   })

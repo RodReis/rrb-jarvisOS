@@ -29,6 +29,8 @@ import type { AuditRepository } from '../storage/audit-repository'
 import type { ContextoDaTarefa, BuscaDaTarefa } from './squad-contexto'
 import type { ExecutorDeEscritor, ResultadoDoEscritor } from './squad-escritor'
 import type { ExecutorDeWorker, ResultadoDoWorker } from './squad-worker'
+import type { SquadOrcamentoService } from './squad-orcamento'
+import { calcularCustoUsd, isRotaUnmetered } from '@shared/domain/ai'
 
 /** Quantos workers somente leitura rodam ao mesmo tempo. Escritores são limitados pelo pool. */
 export const MAX_WORKERS_EM_PARALELO = 4
@@ -78,6 +80,10 @@ export interface DependenciasDoExecutorDoSquad {
   readonly contexto: Pick<ContextoDaTarefa, 'montar'>
   readonly worker: Pick<ExecutorDeWorker, 'executar'>
   readonly escritor: Pick<ExecutorDeEscritor, 'executar'>
+  readonly orcamento: Pick<
+    SquadOrcamentoService,
+    'reservar' | 'registrarConsumo' | 'marcarIndeterminado' | 'liberarAntesDoDispatch'
+  >
   readonly audit: AuditRepository
   readonly userId: () => string
   readonly workspaceId: () => WorkspaceId
@@ -271,8 +277,25 @@ export class ExecutorDoSquad {
         return { estado: 'recusada', motivo }
       }
 
-      const { modelo, numCtx } = pedido.modeloDe(tarefa)
       const tentativa = pedido.tentativas?.get(tarefa.id) ?? 1
+      const escopoDoRun = {
+        userId: this.deps.userId(),
+        workspaceId: pedido.workspaceId,
+        projectId: pedido.projectId
+      }
+      const reserva = this.deps.orcamento.reservar(escopoDoRun, pedido.runId, tarefa.id, tentativa)
+      if (!reserva.permitido) {
+        const motivo = reserva.motivo ?? 'teto-agregado-excedido'
+        this.registrar(pedido, tarefa, 'recusada', motivo)
+        return { estado: 'recusada', motivo }
+      }
+      if (pedido.signal?.aborted === true) {
+        this.deps.orcamento.liberarAntesDoDispatch(escopoDoRun, pedido.runId, tarefa.id, tentativa)
+        this.registrar(pedido, tarefa, 'cancelada', 'cancelada-antes-do-dispatch')
+        return { estado: 'cancelada', motivo: 'cancelada-antes-do-dispatch' }
+      }
+
+      const { modelo, numCtx } = pedido.modeloDe(tarefa)
       const base = {
         runId: pedido.runId,
         projectId: pedido.projectId,
@@ -294,6 +317,18 @@ export class ExecutorDoSquad {
           repositorio: pedido.repositorio,
           baseSha: revisao
         })
+        if (execucao.estado === 'recusada') {
+          this.deps.orcamento.liberarAntesDoDispatch(
+            {
+              userId: this.deps.userId(),
+              workspaceId: pedido.workspaceId,
+              projectId: pedido.projectId
+            },
+            pedido.runId,
+            tarefa.id,
+            tentativa
+          )
+        }
         return {
           estado: execucao.estado,
           ...(execucao.motivo === undefined ? {} : { motivo: execucao.motivo }),
@@ -305,6 +340,39 @@ export class ExecutorDoSquad {
         ...base,
         ...(numCtx === undefined ? {} : { numCtx })
       })
+      if (execucao.custo?.usage !== undefined) {
+        const uso = execucao.custo.usage
+        const usd = isRotaUnmetered(execucao.custo.provider)
+          ? 0
+          : (execucao.custo.realUsd ??
+            calcularCustoUsd(execucao.custo.provider, execucao.custo.model, uso))
+        const registrado = this.deps.orcamento.registrarConsumo(
+          escopoDoRun,
+          pedido.runId,
+          tarefa.id,
+          tentativa,
+          {
+            chamadas: 1,
+            tokensEntrada: uso.tokensEntrada,
+            tokensSaida: uso.tokensSaida,
+            turnos: 1,
+            duracaoMs: execucao.duracaoMs,
+            usd
+          }
+        )
+        if (!registrado) {
+          return {
+            estado: 'falhou',
+            motivo: 'teto-agregado-excedido-ou-ledger-indisponivel',
+            execucao
+          }
+        }
+      } else if (execucao.estado === 'recusada') {
+        this.deps.orcamento.liberarAntesDoDispatch(escopoDoRun, pedido.runId, tarefa.id, tentativa)
+      } else {
+        this.deps.orcamento.marcarIndeterminado(escopoDoRun, pedido.runId, tarefa.id, tentativa)
+        return { estado: 'falhou', motivo: 'consumo-nao-observado', execucao }
+      }
       return {
         estado: execucao.estado,
         ...(execucao.motivo === undefined ? {} : { motivo: execucao.motivo }),
