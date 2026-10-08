@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { QuadroDeExecucao } from '@shared/domain/quadro-execucao'
+import type { SnapshotDeControles } from '@shared/domain/continuous-controls'
 import { QuadroDeExecucao as TelaDoQuadro } from './QuadroDeExecucao'
 
 describe('equipe do Squad no cartão do quadro', () => {
@@ -71,6 +72,8 @@ describe('equipe do Squad no cartão do quadro', () => {
     }
     vi.stubGlobal('jarvis', {
       quadroDeExecucao: vi.fn(async () => quadro),
+      lerControlesContinuos: vi.fn(async () => controles),
+      definirControleContinuo: vi.fn(async () => ({ status: 'updated', snapshot: controles })),
       playNoQuadro: vi.fn(async () => []),
       cancelarNoQuadro: vi.fn(async () => ({
         cancelado: true,
@@ -81,6 +84,17 @@ describe('equipe do Squad no cartão do quadro', () => {
     })
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     render(<TelaDoQuadro projectId="p-1" workspace="jarvis" />)
+
+    expect(await screen.findByText('Controles operacionais')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Pausar após os runs ativos' }))
+    await waitFor(() =>
+      expect(window.jarvis.definirControleContinuo).toHaveBeenCalledWith(
+        expect.objectContaining({
+          escopo: { workspaceId: 'jarvis', projectId: 'p-1' },
+          acao: { tipo: 'pausa', pausada: true }
+        })
+      )
+    )
 
     expect(await screen.findByText('Equipe · 1 escritor(es)')).toBeInTheDocument()
     expect(screen.getByText('Orquestrador: claude-fable-5-1 (claude-code)')).toBeInTheDocument()
@@ -107,3 +121,17 @@ describe('equipe do Squad no cartão do quadro', () => {
     vi.unstubAllGlobals()
   })
 })
+
+const controles: SnapshotDeControles = {
+  escopo: 'projeto',
+  projetoId: 'p-1',
+  pausa: { pausada: false, drenando: false, noEscopoAtual: false, noWorkspace: false },
+  controles: {
+    execucao: { enabled: true, herdado: false },
+    gasto: { enabled: true, herdado: false },
+    push: { enabled: true, herdado: false },
+    'criacao-pr': { enabled: true, herdado: false },
+    merge: { enabled: true, herdado: false }
+  },
+  ativos: []
+}

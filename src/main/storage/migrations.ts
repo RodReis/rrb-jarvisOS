@@ -2205,6 +2205,30 @@ const MIGRATIONS: readonly string[] = [
   );
   CREATE INDEX idx_continuous_dispatch_run
     ON continuous_dispatch_decision(user_id, workspace_id, run_id);
+  `,
+  // 62 — controles operacionais da execução contínua (SPEC-Contínuo-03).
+  `
+  CREATE TABLE pipeline_control_policy (
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    scope_project_id TEXT NOT NULL DEFAULT '',
+    chave TEXT NOT NULL CHECK (chave IN ('pausa','execucao','gasto','push','criacao-pr','merge')),
+    valor INTEGER NOT NULL CHECK (valor IN (0,1)),
+    actor TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, workspace_id, scope_project_id, chave)
+  );
+
+  CREATE TABLE pipeline_control_scope_command (
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    scope_project_id TEXT NOT NULL,
+    idempotency_key TEXT NOT NULL,
+    fingerprint TEXT NOT NULL,
+    resultado TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, workspace_id, scope_project_id, idempotency_key)
+  );
   `
 ]
 

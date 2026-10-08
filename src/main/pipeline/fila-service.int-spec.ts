@@ -119,6 +119,8 @@ let leases: InstanceType<typeof LeaseRepository>
 let merges: InstanceType<typeof MergeRepository>
 let fila: InstanceType<typeof FilaService>
 let mergeLigado: boolean
+let execucaoHabilitada: boolean
+let pipelinePausada: boolean
 
 function leaseNoBanco(): number {
   return (db.prepare('SELECT COUNT(*) AS n FROM lease').get() as { n: number }).n
@@ -136,6 +138,8 @@ beforeEach(() => {
   relogio = AGORA
   aprovacoes = []
   mergeLigado = true
+  execucaoHabilitada = true
+  pipelinePausada = false
 
   runs = new PipelineRepository(db)
   leases = new LeaseRepository(db)
@@ -164,6 +168,8 @@ beforeEach(() => {
     revisoesDoGate: () => REVISOES,
     userId: () => USER,
     mergeAutonomoLigado: () => mergeLigado,
+    execucaoHabilitada: () => execucaoHabilitada,
+    pausada: () => pipelinePausada,
     mergeEmCurso: (runId) => merges.emCursoDoRun(USER, runId),
     agora: () => relogio
   })
@@ -191,6 +197,23 @@ function adquirir(projectId: string, runId: string): number {
 }
 
 describe('máquina de estados contra o banco', () => {
+  it('pausa e execução OFF impedem novas aquisições sem alterar o run READY', () => {
+    const pausado = runPronto(PROJETO_A)
+    pipelinePausada = true
+
+    expect(fila.adquirirSlot(PROJETO_A, WS, pausado).reason).toBe('ocupado')
+    expect(estadoNoBanco(pausado)).toBe('READY')
+    expect(leaseNoBanco()).toBe(0)
+
+    pipelinePausada = false
+    const desligado = runPronto(PROJETO_A)
+    execucaoHabilitada = false
+
+    expect(fila.adquirirSlot(PROJETO_A, WS, desligado).reason).toBe('ocupado')
+    expect(estadoNoBanco(desligado)).toBe('READY')
+    expect(leaseNoBanco()).toBe(0)
+  })
+
   it('grava a transição válida e recusa a inválida sem tocar a linha', () => {
     const run = fila.criarRun(PROJETO_A, WS, 'f1')
 

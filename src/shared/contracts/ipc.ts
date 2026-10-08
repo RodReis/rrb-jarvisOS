@@ -87,6 +87,12 @@ import type { AlvoDaPublicacao, PublicacaoOutcome } from '../domain/publicacao'
 import type { ExecutionLedger } from '../domain/execution-ledger'
 import type { PendenciaDeLimpeza } from '../domain/limpeza'
 import type { MergePolicyOutcome, PoliticaDeMerge, VistaDaFila } from '../domain/pipeline'
+import type {
+  ComandoDeControle,
+  EscopoDeControle,
+  ResultadoDeControle,
+  SnapshotDeControles
+} from '../domain/continuous-controls'
 import type { VistaDoPool } from '../domain/pool-vista'
 import type { QuadroDeExecucao, PedidoDePlay, ResultadoDoPlay } from '../domain/quadro-execucao'
 import type { Roadmap } from '../domain/roadmap'
@@ -647,6 +653,8 @@ export const IPC_CHANNELS = {
    */
   mergePolicyLer: 'merge-policy:ler',
   mergePolicyDefinir: 'merge-policy:definir',
+  continuousControlsGet: 'continuous-controls:get',
+  continuousControlsSet: 'continuous-controls:set',
   /** SPEC-Entrega-02: o estado da fila — runs ativos, concluídas e o que está travado. */
   filaVista: 'fila:vista',
   quadroExecucaoVista: 'quadro-execucao:vista',
@@ -1667,6 +1675,14 @@ export interface JarvisBridge {
     autonomo: boolean,
     workspace: WorkspaceId
   ): Promise<MergePolicyOutcome>
+  lerControlesContinuos(
+    scope: Pick<EscopoDeControle, 'workspaceId' | 'projectId'>
+  ): Promise<SnapshotDeControles | undefined>
+  definirControleContinuo(
+    command: Omit<ComandoDeControle, 'escopo'> & {
+      readonly escopo: Pick<EscopoDeControle, 'workspaceId' | 'projectId'>
+    }
+  ): Promise<ResultadoDeControle>
   /** As aprovações registradas, da mais recente à mais antiga. */
   listarAprovacoes(projectId: string, workspace: WorkspaceId): Promise<readonly Approval[]>
   /** As revisões que este gate aprova hoje — os hashes exatos (critério 4). */

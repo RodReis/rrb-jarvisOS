@@ -55,6 +55,7 @@ import type { Etapa } from '@shared/domain/jornada'
 import { faseDaEtapa } from '@shared/domain/fase'
 import type { StatusDoTrace } from '@shared/domain/geracao'
 import type { ColetorDaGeracao } from './generation-trace-service'
+import type { ContinuousControlsService } from '../pipeline/continuous-controls-service'
 
 /** Quem chama: usuário e espaço, para escopo de credencial, auditoria e (na F03) orçamento. */
 export interface AiCallContext {
@@ -172,7 +173,8 @@ export class AiCallService {
      * (decisão do PI de 2026-09-04). Aberto no call site, o trace teria de inventar o próprio
      * identificador — e seria a segunda contabilidade que o critério 2 proíbe.
      */
-    private readonly console?: AberturaDoConsole
+    private readonly console?: AberturaDoConsole,
+    private readonly controls?: ContinuousControlsService
   ) {}
 
   /**
@@ -231,6 +233,28 @@ export class AiCallService {
     const model = request.model ?? rota.modelo
     const maxTokens = request.maxTokens ?? MAX_TOKENS_PADRAO
     const estimadoUsd = estimarCustoUsd(provider, model, request.prompt, maxTokens)
+    const projectIdDoControle = request.console?.projectId ?? request.painelTarefa?.projectId
+    if (
+      !isRotaUnmetered(provider) &&
+      this.controls !== undefined &&
+      !this.controls.habilitado(
+        {
+          userId: ctx.userId,
+          workspaceId: ctx.workspace,
+          ...(projectIdDoControle === undefined ? {} : { projectId: projectIdDoControle })
+        },
+        'gasto'
+      )
+    ) {
+      yield this.finalizar(id, ctx, provider, model, {
+        estado: 'falhou',
+        erro: 'Gasto monetário desabilitado pelo controle operacional.',
+        latenciaTotalMs: 0,
+        estimadoUsd,
+        naoSaiu: true
+      })
+      return
+    }
 
     // (2) **Nenhuma geração sem ContextPack** (SPEC-Planejamento-02, critério 1).
     //

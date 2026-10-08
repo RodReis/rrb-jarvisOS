@@ -58,6 +58,7 @@ export interface ContinuousDispatcherDeps {
     readonly mensagem: string
   }>
   readonly quotaReset?: (escopo: EscopoDoInventario, no: NoInventario) => string | undefined
+  readonly podeDespachar?: (escopo: EscopoDoInventario) => boolean
   readonly agora?: () => Date
 }
 
@@ -103,6 +104,17 @@ export class ContinuousDispatcher {
     }
 
     this.deps.repository.cursor(escopo, inventario.fingerprint, observadoEm)
+    if (this.deps.podeDespachar?.(escopo) === false) {
+      const decisao = this.gravar(
+        escopo,
+        inventario,
+        undefined,
+        'waiting',
+        'Execução pausada ou desabilitada por controle operacional.',
+        observadoEm
+      )
+      return { estado: 'waiting', decisoes: [decisao] }
+    }
     if (inventario.diagnosticos.length > 0 || inventario.ordem.length === 0) {
       const decisao = this.gravar(
         escopo,

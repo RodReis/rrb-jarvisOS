@@ -3,6 +3,19 @@ import type { WorkspaceId } from '@shared/domain/entities'
 import type { QuadroDeExecucao, ResultadoDoPlay } from '@shared/domain/quadro-execucao'
 import { Button, ErrorState, LoadingState } from '@design/ui'
 import { PainelDaTarefa } from './PainelDaTarefa'
+import {
+  CONTROLES_OPERACIONAIS,
+  type ControleOperacional,
+  type SnapshotDeControles
+} from '@shared/domain/continuous-controls'
+
+const NOMES_DOS_CONTROLES: Record<ControleOperacional, string> = {
+  execucao: 'Novas execuções',
+  gasto: 'Gasto monetário',
+  push: 'Push de branch',
+  'criacao-pr': 'Criação de PR',
+  merge: 'Merge automático'
+}
 
 function estadoDaTarefa(estado: string): string {
   const rotulos: Record<string, string> = {
@@ -37,6 +50,17 @@ export function QuadroDeExecucao({
   const [cancelando, setCancelando] = useState<string | undefined>()
   const [mensagemDoCancelamento, setMensagemDoCancelamento] = useState<string | undefined>()
   const [decidindo, setDecidindo] = useState<string | undefined>()
+  const [escopoWorkspace, setEscopoWorkspace] = useState(false)
+  const [controles, setControles] = useState<SnapshotDeControles | undefined>()
+  const [salvandoControle, setSalvandoControle] = useState(false)
+
+  const atualizarControles = useCallback(async () => {
+    const snapshot = await window.jarvis.lerControlesContinuos({
+      workspaceId: workspace,
+      ...(escopoWorkspace ? {} : { projectId })
+    })
+    setControles(snapshot)
+  }, [projectId, workspace, escopoWorkspace])
 
   const atualizar = useCallback(async () => {
     try {
@@ -65,12 +89,71 @@ export function QuadroDeExecucao({
       }
     }
     void carregar()
-    const timer = window.setInterval(() => void carregar(), INTERVALO_DA_CONSULTA_MS)
+    const timer = window.setInterval(() => {
+      void carregar()
+      void window.jarvis
+        .lerControlesContinuos({
+          workspaceId: workspace,
+          ...(escopoWorkspace ? {} : { projectId })
+        })
+        .then((snapshot) => {
+          if (ativo) setControles(snapshot)
+        })
+        .catch(() => {
+          if (ativo) setControles(undefined)
+        })
+    }, INTERVALO_DA_CONSULTA_MS)
     return () => {
       ativo = false
       window.clearInterval(timer)
     }
-  }, [projectId, workspace])
+  }, [projectId, workspace, escopoWorkspace])
+
+  useEffect(() => {
+    let ativo = true
+    void window.jarvis
+      .lerControlesContinuos({ workspaceId: workspace, ...(escopoWorkspace ? {} : { projectId }) })
+      .then((snapshot) => {
+        if (ativo) setControles(snapshot)
+      })
+      .catch(() => {
+        if (ativo) setControles(undefined)
+      })
+    return () => {
+      ativo = false
+    }
+  }, [projectId, workspace, escopoWorkspace])
+
+  const aplicarControle = async (
+    acao:
+      | { tipo: 'pausa'; pausada: boolean | null }
+      | { tipo: 'switch'; controle: ControleOperacional; habilitado: boolean | null }
+  ) => {
+    if (salvandoControle) return
+    setSalvandoControle(true)
+    try {
+      const resultado = await window.jarvis.definirControleContinuo({
+        escopo: { workspaceId: workspace, ...(escopoWorkspace ? {} : { projectId }) },
+        acao,
+        idempotencyKey: `${Date.now()}-${Math.random().toString(36).slice(2)}`
+      })
+      if (resultado.status === 'invalid' || resultado.status === 'idempotency-conflict')
+        throw new Error(resultado.message)
+      await atualizarControles()
+      await atualizar()
+      setMensagemDoCancelamento(
+        acao.tipo === 'pausa'
+          ? acao.pausada
+            ? 'Pausa solicitada; os runs ativos vão terminar antes de suspender novos dispatches.'
+            : 'Retomada solicitada; o dispatcher verificará novamente no próximo ciclo.'
+          : 'Controle operacional atualizado.'
+      )
+    } catch {
+      setMensagemDoCancelamento('Não foi possível atualizar o controle operacional.')
+    } finally {
+      setSalvandoControle(false)
+    }
+  }
 
   const cartoes = quadro?.colunas.flatMap((coluna) => coluna.cartoes) ?? []
   const elegiveis = cartoes.filter(
@@ -192,6 +275,114 @@ export function QuadroDeExecucao({
           {ocupado ? 'Iniciando…' : `Play${selecionadas.length ? ` (${selecionadas.length})` : ''}`}
         </Button>
       </header>
+
+      <section
+        className="rounded-xl border border-[rgba(var(--jos-borda-rgb),0.16)] bg-[rgba(var(--jos-borda-rgb),0.035)] p-4"
+        aria-labelledby="controles-continuos-titulo"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h4 id="controles-continuos-titulo" className="font-semibold">
+              Controles operacionais
+            </h4>
+            <p className="text-xs text-[var(--jos-cor-texto-suave)]">
+              Escopo: {escopoWorkspace ? 'workspace' : 'projeto'}
+            </p>
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={escopoWorkspace}
+              onChange={(event) => setEscopoWorkspace(event.target.checked)}
+            />
+            Aplicar ao workspace
+          </label>
+        </div>
+        {controles === undefined ? (
+          <p className="mt-3 text-sm text-amber-400">Estado dos controles indisponível.</p>
+        ) : (
+          <>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <Button
+                variante={controles.pausa.noEscopoAtual ? 'secundaria' : 'primaria'}
+                desabilitado={salvandoControle || (!escopoWorkspace && controles.pausa.noWorkspace)}
+                onClick={() =>
+                  void aplicarControle({ tipo: 'pausa', pausada: !controles.pausa.noEscopoAtual })
+                }
+              >
+                {controles.pausa.noEscopoAtual
+                  ? 'Retomar dispatches'
+                  : 'Pausar após os runs ativos'}
+              </Button>
+              {!escopoWorkspace && (
+                <button
+                  type="button"
+                  className="text-xs underline"
+                  disabled={salvandoControle || !controles.pausa.noEscopoAtual}
+                  onClick={() => void aplicarControle({ tipo: 'pausa', pausada: null })}
+                >
+                  Herdar pausa do workspace
+                </button>
+              )}
+              <span role="status" className="text-sm text-[var(--jos-cor-texto-suave)]">
+                {controles.pausa.pausada
+                  ? controles.pausa.drenando
+                    ? 'Pausa solicitada · aguardando run(s) terminar(em)'
+                    : 'Dispatch pausado'
+                  : 'Dispatch ativo'}
+              </span>
+            </div>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {CONTROLES_OPERACIONAIS.map((controle) => {
+                const estado = controles.controles[controle]
+                return (
+                  <label
+                    key={controle}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-[rgba(var(--jos-borda-rgb),0.12)] p-3 text-sm"
+                  >
+                    <span>
+                      {NOMES_DOS_CONTROLES[controle]}
+                      {estado.herdado ? (
+                        <small className="block text-xs text-[var(--jos-cor-texto-suave)]">
+                          Herdado do workspace
+                        </small>
+                      ) : null}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {!escopoWorkspace && (
+                        <button
+                          type="button"
+                          className="text-xs underline"
+                          disabled={salvandoControle}
+                          aria-label={`Herdar ${NOMES_DOS_CONTROLES[controle]} do workspace`}
+                          onClick={() =>
+                            void aplicarControle({ tipo: 'switch', controle, habilitado: null })
+                          }
+                        >
+                          Herdar
+                        </button>
+                      )}
+                      <input
+                        type="checkbox"
+                        checked={estado.enabled}
+                        disabled={salvandoControle}
+                        aria-label={NOMES_DOS_CONTROLES[controle]}
+                        onChange={(event) =>
+                          void aplicarControle({
+                            tipo: 'switch',
+                            controle,
+                            habilitado: event.target.checked
+                          })
+                        }
+                      />
+                    </div>
+                  </label>
+                )
+              })}
+            </div>
+          </>
+        )}
+      </section>
 
       {resultados.length > 0 && (
         <div

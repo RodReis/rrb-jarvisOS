@@ -33,6 +33,12 @@ import type { ConfiguracaoDasBoasVindas, ReproducaoDasBoasVindas } from '@shared
 import type { ConfiguracaoDoCronograma, ResultadoDoCronograma } from '@shared/domain/cronograma'
 import type { PendenciaDeLimpeza } from '@shared/domain/limpeza'
 import type { MergePolicyOutcome, PoliticaDeMerge, VistaDaFila } from '@shared/domain/pipeline'
+import type {
+  ComandoDeControle,
+  EscopoDeControle,
+  ResultadoDeControle,
+  SnapshotDeControles
+} from '@shared/domain/continuous-controls'
 import type { VistaDoPool } from '@shared/domain/pool-vista'
 import type { ContextPack, ContextPackOutcome, FalhaRegistrada } from '@shared/domain/context-pack'
 import type { CapacidadeResolvida } from '@shared/domain/skills'
@@ -847,6 +853,16 @@ const bridge: JarvisBridge = {
     workspace: WorkspaceId
   ): Promise<MergePolicyOutcome> =>
     ipcRenderer.invoke(IPC_CHANNELS.mergePolicyDefinir, projectId, autonomo, workspace),
+  lerControlesContinuos: (
+    scope: Pick<EscopoDeControle, 'workspaceId' | 'projectId'>
+  ): Promise<SnapshotDeControles | undefined> =>
+    ipcRenderer.invoke(IPC_CHANNELS.continuousControlsGet, scope),
+  definirControleContinuo: (
+    command: Omit<ComandoDeControle, 'escopo'> & {
+      readonly escopo: Pick<EscopoDeControle, 'workspaceId' | 'projectId'>
+    }
+  ): Promise<ResultadoDeControle> =>
+    ipcRenderer.invoke(IPC_CHANNELS.continuousControlsSet, command),
   listarAprovacoes: (projectId: string, workspace: WorkspaceId): Promise<readonly Approval[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.aprovacaoListar, projectId, workspace),
   revisoesDoGate: (

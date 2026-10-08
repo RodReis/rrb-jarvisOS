@@ -28,9 +28,11 @@ Controlar uma execução longa com pausa, retomada, cancelamento, quotas, orçam
 ## Regras
 
 1. Pausa não equivale a cancelamento e não perde posição/fila.
-2. Kill-switch de merge termina em PR verde aguardando o PI.
-3. Orçamento monetário é necessário, mas nunca substitui habilitação explícita da rota paga.
-4. Comando repetido usa a mesma chave/fingerprint e não duplica efeito.
+   Decisão do PI (2026-10-08): uma pausa solicitada deixa cada run ativo terminar por inteiro; só então impede novos dispatches até retomada explícita.
+2. O kill-switch de execução tem efeito próprio: desligado, cancela os runs ativos pela matriz existente e impede novas aquisições; branch e PR já publicados são preservados.
+3. Kill-switch de merge termina em PR verde aguardando o PI.
+4. Orçamento monetário é necessário, mas nunca substitui habilitação explícita da rota paga.
+5. Comando repetido usa a mesma chave/fingerprint e não duplica efeito.
 
 ## Critérios de aceite
 

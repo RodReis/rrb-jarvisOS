@@ -69,6 +69,7 @@ import type { ExecutionLedgerRepository } from './execution-ledger-repository'
 import type { LimpezaService } from './limpeza-service'
 import type { RulesetRepository } from './ruleset-repository'
 import type { RunPrRepository } from './run-pr-repository'
+import type { ContinuousControlsService } from './continuous-controls-service'
 
 /** O hash de um conteúdo. `src/shared` não pode calcular: `node:crypto` não existe no renderer. */
 function sha256(conteudo: string): string {
@@ -198,6 +199,7 @@ export interface EntregaDeps {
   /** A seção crítica do merge (SPEC-Scheduler-04): todo merge passa por aqui, nunca direto ao conector. */
   readonly merge: Pick<MergeService, 'tentar'>
   readonly mergePolicy: MergePolicyService
+  readonly controls?: ContinuousControlsService
   readonly ruleset: RulesetRepository
   /** Onde a prova do run é gravada ao encerrar (M9-F06, critério 1). */
   readonly ledger: ExecutionLedgerRepository
@@ -668,7 +670,6 @@ export class EntregaService {
   > {
     const { worktreeNoHost } = pedido.sandbox
     const ws = pedido.workspaceId
-
     // Os documentos do projeto-alvo entram **nomeados**, não só pelo `--all` (critério 13). O
     // `--all` os pegaria por estarem no worktree, mas nomeá-los torna a intenção verificável: um
     // doc que a fatia devia atualizar e não atualizou some do commit sem ninguém notar, e a
@@ -684,6 +685,22 @@ export class EntregaService {
         ws
       )
 
+    if (
+      this.deps.controls !== undefined &&
+      !this.deps.controls.habilitado(
+        { userId: this.deps.userId(), workspaceId: ws, projectId: pedido.projectId },
+        'push'
+      )
+    ) {
+      return {
+        ok: false,
+        bloqueio: this.bloqueado(
+          'externo',
+          'Habilitar o push nos controles operacionais e retomar a entrega.',
+          'Push desabilitado antes do efeito remoto; o commit local e o branch foram preservados.'
+        )
+      }
+    }
     const token = await this.deps.token(this.deps.userId(), ws)
     const push =
       token === undefined
@@ -708,6 +725,22 @@ export class EntregaService {
     }
 
     // `refs #N`, nunca `closes`: o merge integra código e não fecha a issue — o aceite é do PI.
+    if (
+      this.deps.controls !== undefined &&
+      !this.deps.controls.habilitado(
+        { userId: this.deps.userId(), workspaceId: ws, projectId: pedido.projectId },
+        'criacao-pr'
+      )
+    ) {
+      return {
+        ok: false,
+        bloqueio: this.bloqueado(
+          'externo',
+          'Habilitar criação de PR e retomar a entrega.',
+          'Criação de PR desabilitada; branch publicado foi preservado.'
+        )
+      }
+    }
     const pr = await this.chamar(GITHUB_OPERATIONS.ensurePullRequest, ws, {
       owner: pedido.alvo.owner,
       repo: pedido.alvo.repo,
@@ -969,7 +1002,17 @@ export class EntregaService {
     baseNaAvaliacao: string | undefined,
     snapshot: SnapshotDeRuleset
   ): Promise<Avanco> {
-    if (!this.deps.mergePolicy.autonomoLigado(pedido.projectId)) {
+    if (
+      !this.deps.mergePolicy.autonomoLigado(pedido.projectId) ||
+      this.deps.controls?.habilitado(
+        {
+          userId: this.deps.userId(),
+          workspaceId: pedido.workspaceId,
+          projectId: pedido.projectId
+        },
+        'merge'
+      ) === false
+    ) {
       this.deps.fila.concluir(
         pedido.projectId,
         pedido.workspaceId,

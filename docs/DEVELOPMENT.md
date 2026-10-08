@@ -2638,7 +2638,7 @@ Status: **entregue, aguardando aceite do PI** — issue [#134](https://github.co
 
 ### M13-F02 — Dispatcher e retomada (`docs/spec/spec-continuo-02-dispatcher-retomada.md`)
 
-Status: implementação na [PR #416](https://github.com/RodReis/rrb-jarvisOS/pull/416), CI remoto em andamento; issue #135 permanece aberta para aceite do PI.
+Status: entregue pela [PR #416](https://github.com/RodReis/rrb-jarvisOS/pull/416), merge confirmado em 2026-10-08 (`a41aeaba0ee898db8f6a3d36e582e798524ddb32`); issue #135 permanece aberta para aceite do PI.
 
 - [x] Dispatcher serializado por escopo; reconciliação completa F01 no boot, após merge e no ciclo periódico.
 - [x] Seleção pela ordem reconciliada, apenas para issue aberta em `proplan:todo`; backlog/`next`, gate pendente e projeção em andamento ficam em espera/bloqueio verificável.
@@ -2647,3 +2647,19 @@ Status: implementação na [PR #416](https://github.com/RodReis/rrb-jarvisOS/pul
 - [x] Fila e pool M12 continuam governando capacidade e independência; nenhum gate é aprovado e nenhuma issue é fechada pelo dispatcher.
 - [x] Testes de regras, reinício SQLite, migration legada, run idempotente, branches, gate, quota e retomada; 38 testes focados passaram.
 - [x] Relatório categorizado regenerado dos artefatos CI: Regras 2.975 pass; Banco 2.379 pass / 18 skip; Tela 804 pass / 1 todo. Self-check passou; reteste do CI pendente após corrigir a expectativa E2E de `repo.inventory`.
+
+### M13-F03 — Controles operacionais (`docs/spec/spec-continuo-03-controles-operacionais.md`)
+
+Status: implementação no branch `feat/m13-f03-controles`; issue #136 permanece em `proplan:todo` porque a integração GitHub negou a transição para `doing` (403). Pausa decidida pelo PI aguarda o run inteiro terminar; execução OFF usa a matriz existente para cancelar ativos.
+
+- [x] Contratos de domínio, persistência SQLite versionada e journal idempotente por usuário/workspace/projeto.
+- [x] Serviço de controle com herança de switches do workspace, auditoria e cancelamento pela matriz existente.
+- [x] Gates no dispatcher, pool/fila, chamada monetária, push, criação de PR e merge.
+- [x] API IPC tipada e painel no quadro para pausa, retomada, escopo e cinco switches.
+- [ ] Definir a ação de cancelamento em cascata por DAG/MVP/fatia no quadro; decisão do PI solicitada porque a SPEC exige descendentes vinculados, mas não fixa o fluxo de seleção/prévia.
+- [x] Testes direcionados de regras e banco, categoria Tela completa e E2E do quadro; typecheck, lint e build passaram.
+- [ ] Repetir a suíte agregada após corrigir os mocks de `window.jarvis`; a primeira rodada teve falhas nas telas `projetos`/`projeto-aberto`, provocadas pela ausência do novo método nos mocks.
+- [ ] Relatório categorizado e self-check regenerados dos artefatos do CI.
+- [ ] Revisão de diff, push, PR `refs #136`, CI verde, merge e comentário de encerramento.
+
+Limite atual: a integração GitHub recusou a troca do label de #136 para `proplan:doing` (403); issue permanece em `proplan:todo`. A rodada agregada precisa ser repetida após a correção dos mocks, e o relatório final depende dos artefatos do CI.

@@ -110,6 +110,8 @@ import { MergeService } from './pipeline/merge-service'
 import { PipelineRepository } from './pipeline/pipeline-repository'
 import { ContinuousDispatcher, INTERVALO_DO_DISPATCHER_MS } from './pipeline/continuous-dispatcher'
 import { ContinuousDispatcherRepositorySqlite } from './pipeline/continuous-dispatcher-repository'
+import { ContinuousControlsRepository } from './pipeline/continuous-controls-repository'
+import { ContinuousControlsService } from './pipeline/continuous-controls-service'
 import { InventarioGlobalService } from './pipeline/inventario-global-service'
 import { InventarioLocalFonte } from './pipeline/inventario-local-source'
 import { InventarioSnapshotRepository } from './pipeline/inventario-snapshot-repository'
@@ -553,6 +555,11 @@ if (!app.requestSingleInstanceLock()) {
     // aqui pela mesma razão do `budget`: é dependência do ponto único, não consulta opcional —
     // sem ele o gate de quota do `claude-code` fica sempre "desconhecido" em produção.
     const quota = new QuotaRepository(storage.db)
+    const continuousControls = new ContinuousControlsService({
+      repository: new ContinuousControlsRepository(storage.db),
+      audit: storage.audit,
+      userId: userIdAtual
+    })
 
     // O console da geração (SPEC-Fases-03). O `publicar` empurra cada evento para o renderer no
     // canal único; quem filtra por `traceId` é o preload. `isDestroyed` pela mesma razão do
@@ -582,7 +589,8 @@ if (!app.requestSingleInstanceLock()) {
       routing,
       contexts,
       quota,
-      generationTraces
+      generationTraces,
+      continuousControls
     )
 
     // Ponto único de conectores (SPEC-Conectores-01). **Runtime separado** do ponto único de
@@ -1441,6 +1449,7 @@ if (!app.requestSingleInstanceLock()) {
       userId: userIdAtual,
       identidade: () => auth?.usuarioAtual()?.id
     })
+    let cancelamento: CancelamentoService | undefined
     // O pool de execução (SPEC-Scheduler-01) substitui o slot global único. Pool e fila se
     // conhecem: o pool pergunta à fila quais gates seguram cada run e pede a ela que ative o run
     // **dentro** do ciclo; a fila pede ao pool que decida. A referência cruzada é resolvida por
@@ -1514,6 +1523,13 @@ if (!app.requestSingleInstanceLock()) {
         roadmap.revisoesDoGate(escopo.projectId, 'SLICE_ENTRY', escopo.workspaceId),
       userId: userIdAtual,
       mergeAutonomoLigado: (projectId) => mergePolicy.autonomoLigado(projectId),
+      execucaoHabilitada: (projectId, workspaceId) =>
+        continuousControls.habilitado(
+          { userId: userIdAtual(), workspaceId, projectId },
+          'execucao'
+        ),
+      pausada: (projectId, workspaceId) =>
+        continuousControls.pausada({ userId: userIdAtual(), workspaceId, projectId }),
       mergeEmCurso: (runId) => mergeRepository.emCursoDoRun(userIdAtual(), runId),
       aoConcluir: (projectId, workspaceId) =>
         dispatcherDosRuns.servico?.sinalizar({
@@ -1670,7 +1686,9 @@ if (!app.requestSingleInstanceLock()) {
     // O cancelamento seletivo (SPEC-Scheduler-05). **Ainda sem chamador de produção:** cancelar é
     // ato do PI e o canal (IPC e tela) é do quadro do MVP-028; o que já roda é a reconciliação do
     // rascunho que um crash ou a origem fora do ar deixou pendente.
-    const cancelamento = new CancelamentoService({
+    // Reutiliza a referência capturada nos callbacks criados antes do serviço.
+    // eslint-disable-next-line prefer-const
+    cancelamento = new CancelamentoService({
       runs: pipelineRepository,
       fila,
       prs: runPrs,
@@ -1681,6 +1699,19 @@ if (!app.requestSingleInstanceLock()) {
         squadEmExecucao.servico?.interromper(runId)
         void encadeadorDosRuns.servico?.interromper(runId)
       }
+    })
+    continuousControls.configureExecutionCancellation({
+      ativosDoEscopo: (escopo) =>
+        pipelineRepository
+          .listarAtivos(escopo.userId)
+          .filter(
+            (run) =>
+              pipelineRepository.workspaceDoRun(run.id) === escopo.workspaceId &&
+              (escopo.projectId === undefined || run.projectId === escopo.projectId)
+          )
+          .map((run) => ({ runId: run.id, projectId: run.projectId })),
+      cancelarRun: (projectId, workspaceId, runId) =>
+        cancelamento?.cancelar(projectId, workspaceId, runId)
     })
 
     /*
@@ -1727,6 +1758,7 @@ if (!app.requestSingleInstanceLock()) {
       fila,
       merge: mergeService,
       mergePolicy,
+      controls: continuousControls,
       ruleset: new RulesetRepository(storage.db),
       ledger: executionLedger,
       limpeza: new LimpezaService({
@@ -2367,7 +2399,9 @@ if (!app.requestSingleInstanceLock()) {
           // Rota ausente será recusada pelo próprio fluxo de Play; sem reset oficial, não esperar.
           return undefined
         }
-      }
+      },
+      podeDespachar: (escopo) =>
+        continuousControls.habilitado(escopo, 'execucao') && !continuousControls.pausada(escopo)
     })
     dispatcherDosRuns.servico = dispatcher
 
@@ -2411,6 +2445,24 @@ if (!app.requestSingleInstanceLock()) {
     // pé — e o WIP=1 valeria para os runs que ele conhece, não para a máquina.
     await reconciliacao.reconcileAll()
 
+    const cancelarRunsComExecucaoDesligada = async (): Promise<void> => {
+      for (const run of pipelineRepository.listarAtivos(userIdAtual())) {
+        const workspaceId = pipelineRepository.workspaceDoRun(run.id)
+        if (workspaceId === undefined) continue
+        const escopo = { userId: run.user_id, workspaceId, projectId: run.projectId }
+        if (continuousControls.habilitado(escopo, 'execucao')) continue
+        try {
+          await cancelamento.cancelar(run.projectId, workspaceId, run.id)
+        } catch (erro) {
+          log.sistema.warn('O kill-switch de execução não concluiu o cancelamento do run', {
+            runId: run.id,
+            motivo: erro instanceof Error ? erro.message : 'desconhecido'
+          })
+        }
+      }
+    }
+    await cancelarRunsComExecucaoDesligada()
+
     const reconciliarDispatcher = async (): Promise<void> => {
       const userId = userIdAtual()
       const workspaceId = workspaceAtual()
@@ -2452,6 +2504,7 @@ if (!app.requestSingleInstanceLock()) {
           motivo: erro instanceof Error ? erro.message : 'desconhecido'
         })
       }
+      void cancelarRunsComExecucaoDesligada()
       // O rascunho pendente depende da rede: roda à parte, sem segurar a varredura síncrona.
       void cancelamento.reconciliarRascunhos().catch((erro: unknown) => {
         log.sistema.warn('A reconciliação do rascunho do PR falhou', {
@@ -3045,6 +3098,7 @@ if (!app.requestSingleInstanceLock()) {
       refinamento,
       publicacao,
       mergePolicy,
+      continuousControls,
       fila,
       quadroExecucao,
       pool,

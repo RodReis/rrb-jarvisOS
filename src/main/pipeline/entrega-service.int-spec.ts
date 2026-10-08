@@ -123,6 +123,7 @@ let construcao: {
   bloqueio?: Record<string, string>
 }
 let pushes: string[]
+let gitComandos: string[][]
 /**
  * Gancho para o teste intervir **durante** a sequência de chamadas à origem.
  *
@@ -276,10 +277,14 @@ function montar(
       delta?: { headAnterior: string; headNovo: string }
     ) => Promise<unknown[]>
     prs?: { registrar: ReturnType<typeof vi.fn> }
+    controls?: { habilitado: (escopo: unknown, controle: string) => boolean }
   } = {}
 ): EntregaServiceType {
   const gitFalso = {
-    run: vi.fn(() => ({ ok: true })),
+    run: vi.fn((args: string[]) => {
+      gitComandos.push(args)
+      return { ok: true }
+    }),
     push: vi.fn((_origem: string, branch: string) => {
       pushes.push(branch)
       return { ok: true }
@@ -297,6 +302,7 @@ function montar(
     git: gitFalso as never,
     fila: { concluir: concluirDaFila, transicionar: transicionarDaFila } as never,
     mergePolicy: { autonomoLigado: vi.fn(() => autonomo) } as never,
+    ...(opcoes.controls === undefined ? {} : { controls: opcoes.controls as never }),
     ruleset,
     ledger: ledgerRepo,
     limpeza: limpezaFalsa(),
@@ -392,6 +398,7 @@ beforeEach(() => {
   chamadas = []
   chamadaExtra = undefined
   pushes = []
+  gitComandos = []
   achados = []
   autonomo = true
   relogio = 1_000
@@ -444,6 +451,31 @@ describe('EntregaService — kill-switch desligado (critério 8)', () => {
 
     expect(r.estadoFinal).toBe('AWAITING_MERGE')
     expect(r.pullRequest).toBe(PR)
+    expect(chamadasDe(GITHUB_OPERATIONS.squashMerge)).toHaveLength(0)
+  })
+
+  it('com push desligado preserva o commit local e não publica branch nem PR', async () => {
+    const controles = {
+      habilitado: (_escopo: unknown, controle: string) => controle !== 'push'
+    }
+
+    const resultado = await montar({ controls: controles }).entregar(pedido())
+
+    expect(resultado.estadoFinal).toBe('BLOCKED')
+    expect(gitComandos.some((comando) => comando[0] === 'commit')).toBe(true)
+    expect(pushes).toHaveLength(0)
+    expect(chamadasDe(GITHUB_OPERATIONS.ensurePullRequest)).toHaveLength(0)
+  })
+
+  it('com merge desligado publica PR verde e aguarda o PI', async () => {
+    const controles = {
+      habilitado: (_escopo: unknown, controle: string) => controle !== 'merge'
+    }
+
+    const resultado = await montar({ controls: controles }).entregar(pedido())
+
+    expect(resultado.estadoFinal).toBe('AWAITING_MERGE')
+    expect(resultado.pullRequest).toBe(PR)
     expect(chamadasDe(GITHUB_OPERATIONS.squashMerge)).toHaveLength(0)
   })
 })

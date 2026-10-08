@@ -114,6 +114,9 @@ import type { AlvoDaPublicacao, PublicacaoOutcome } from '@shared/domain/publica
 import type { ExecutionLedger } from '@shared/domain/execution-ledger'
 import type { PendenciaDeLimpeza } from '@shared/domain/limpeza'
 import type { MergePolicyOutcome, PoliticaDeMerge, VistaDaFila } from '@shared/domain/pipeline'
+import { isComandoDeControle, isEscopoDeControle } from '@shared/domain/continuous-controls'
+import type { ComandoDeControle } from '@shared/domain/continuous-controls'
+import type { ContinuousControlsService } from '../pipeline/continuous-controls-service'
 import type { Roadmap } from '@shared/domain/roadmap'
 import type {
   MvpGerado,
@@ -417,6 +420,7 @@ export interface IpcDependencies {
   readonly publicacao: PublicacaoService
   /** O kill-switch do merge autônomo (SPEC-Entrega-02/05). */
   readonly mergePolicy: MergePolicyService
+  readonly continuousControls: ContinuousControlsService
   /** A fila de execução (SPEC-Entrega-02). Exposta só para leitura. */
   readonly fila: FilaService
   readonly quadroExecucao: QuadroExecucaoService
@@ -2547,6 +2551,30 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       return deps.mergePolicy.definir(projectId, workspace, autonomo)
     }
   )
+
+  ipcMain.handle(IPC_CHANNELS.continuousControlsGet, (_event, scope: unknown) => {
+    if (scope === null || typeof scope !== 'object') return undefined
+    const candidato = scope as { workspaceId?: unknown; projectId?: unknown }
+    const escopo = { ...candidato, userId: deps.userId() }
+    if (!isEscopoDeControle(escopo)) return undefined
+    return deps.continuousControls.snapshot(escopo)
+  })
+  ipcMain.handle(IPC_CHANNELS.continuousControlsSet, async (_event, command: unknown) => {
+    if (
+      command === null ||
+      typeof command !== 'object' ||
+      !isComandoDeControle({
+        ...(command as object),
+        escopo: { ...(command as ComandoDeControle).escopo, userId: deps.userId() }
+      })
+    )
+      return { status: 'invalid', message: 'Comando inválido.' }
+    const candidate = command as ComandoDeControle
+    return await deps.continuousControls.aplicar({
+      ...candidate,
+      escopo: { ...candidate.escopo, userId: deps.userId() }
+    })
+  })
 
   ipcMain.handle(
     IPC_CHANNELS.aprovacaoListar,
