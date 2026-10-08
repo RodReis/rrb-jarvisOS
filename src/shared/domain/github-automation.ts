@@ -70,6 +70,7 @@ export const GITHUB_OPERATIONS = {
   ensureRepository: 'repo.ensure',
   ensureIssue: 'issue.ensure',
   getIssueState: 'issue.get-state',
+  getRepositoryInventory: 'repo.inventory',
   ensureIssueDependency: 'issue.ensure-dependency',
   ensureBranchRef: 'ref.ensure',
   ensurePullRequest: 'pr.ensure',
@@ -93,8 +94,9 @@ export type GithubOperation = (typeof GITHUB_OPERATIONS)[keyof typeof GITHUB_OPE
  * As capacidades declaradas ao núcleo (critério 1 da F01: declaradas, não descobertas).
  *
  * `effect` separa leitura de mutação, e é o que a governança da F02 usa para exigir chave de
- * idempotência: mutação sem ela nunca é repetida automaticamente. As quatro leituras não a
- * exigem porque repetir uma consulta é seguro por natureza.
+ * idempotência: mutação sem ela nunca é repetida automaticamente. Operações de leitura não a
+ * exigem porque repetir uma consulta é seguro por natureza; o inventário paginado da M13-F01
+ * continua protegido contra resposta parcial pelo contrato `completa` do serviço consumidor.
  */
 export const GITHUB_CAPABILITIES: readonly ConnectorCapability[] = [
   {
@@ -120,6 +122,12 @@ export const GITHUB_CAPABILITIES: readonly ConnectorCapability[] = [
     operation: GITHUB_OPERATIONS.getIssueState,
     effect: 'leitura',
     descricao: 'Consulta o estado e as labels atuais da issue, para observar o aceite do PI.'
+  },
+  {
+    connector: 'github',
+    operation: GITHUB_OPERATIONS.getRepositoryInventory,
+    effect: 'leitura',
+    descricao: 'Reconcilia issues, pull requests, branches e checks atuais do repositório.'
   },
   {
     connector: 'github',
@@ -243,6 +251,29 @@ export interface EnsureIssueDependencyInput extends RepoAlvo {
 
 export interface IssueStateInput extends RepoAlvo {
   readonly issue: number
+}
+
+export type RepositoryInventoryInput = RepoAlvo
+
+export interface RepositoryInventoryNormalizado {
+  readonly issues: readonly {
+    readonly numero: number
+    readonly titulo: string
+    readonly estado: 'open' | 'closed'
+    readonly labels: readonly string[]
+  }[]
+  readonly pullRequests: readonly {
+    readonly numero: number
+    readonly estado: 'open' | 'closed'
+    readonly merged: boolean
+    readonly headBranch: string
+    readonly headSha: string
+    readonly baseBranch: string
+    readonly issuesReferenciadas: readonly number[]
+    readonly mergeSha?: string
+    readonly checks: 'pending' | 'success' | 'failure' | 'unknown'
+  }[]
+  readonly branches: readonly { readonly nome: string; readonly sha: string }[]
 }
 
 export interface IssueStateNormalizado {
@@ -734,6 +765,9 @@ export function validarEntrada(operation: string, input: unknown): string | unde
 
     case GITHUB_OPERATIONS.getIssueState:
       return inteiroPositivo('issue') ? undefined : 'Informe `issue` como número.'
+
+    case GITHUB_OPERATIONS.getRepositoryInventory:
+      return undefined
 
     case GITHUB_OPERATIONS.ensureBranchRef:
       if (!texto('branch')) return 'Informe `branch`.'

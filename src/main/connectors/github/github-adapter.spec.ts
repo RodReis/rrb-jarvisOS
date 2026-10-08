@@ -70,7 +70,7 @@ function adapter(devolver: () => Response): {
 }
 
 describe('capacidades', () => {
-  it('declara auth.identify, as nove da M6-F04, as quatro da M9-F01 e a leitura da M9-F05', () => {
+  it('declara todas as capacidades GitHub, incluindo o inventário global da M13-F01', () => {
     // O teste da F03 afirmava `['auth.identify']` e nada mais — e foi ele que cobrou esta
     // atualização quando a F04 chegou, que era o ponto de tê-lo escrito assim. Cobrou de novo
     // na M9-F01, quando a publicação precisou de branch base, proteção e leitura de commit, e
@@ -81,6 +81,7 @@ describe('capacidades', () => {
       'repo.ensure',
       'issue.ensure',
       'issue.get-state',
+      'repo.inventory',
       'issue.ensure-dependency',
       'ref.ensure',
       'pr.ensure',
