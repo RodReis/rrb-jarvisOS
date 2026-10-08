@@ -262,6 +262,7 @@ test('a ponte expõe só o contrato — sem ipcRenderer, sem token (critério 4)
     'proporTermoDePesquisa',
     'publicarNoGitHub',
     'quadroDeExecucao',
+    'reconciliarQuadroDeExecucao',
     'removeAllowedCommand',
     'removeAllowedDirectory',
     'removeAutomation',
