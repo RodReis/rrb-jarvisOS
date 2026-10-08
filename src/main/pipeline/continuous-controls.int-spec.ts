@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { openDatabase } from '../storage/database'
 import { AuditRepository } from '../storage/audit-repository'
 import type { Database } from 'better-sqlite3'
@@ -13,13 +13,15 @@ describe('ContinuousControlsService', () => {
   let dir: string
   let service: ContinuousControlsService
   let audit: AuditRepository
+  let repository: ContinuousControlsRepository
 
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'jarvis-controles-'))
     db = openDatabase(join(dir, 'controles.db'))
     audit = new AuditRepository(db, 'test-key')
+    repository = new ContinuousControlsRepository(db)
     service = new ContinuousControlsService({
-      repository: new ContinuousControlsRepository(db),
+      repository,
       audit,
       userId: () => 'u-1',
       agora: () => new Date('2026-10-08T12:00:00.000Z')
@@ -93,6 +95,22 @@ describe('ContinuousControlsService', () => {
       enabled: false,
       herdado: false
     })
+  })
+
+  it('propaga falhas de persistência ao registrar um comando sem alteração', async () => {
+    const escopo = { userId: 'u-1', workspaceId: 'jarvis' as const, projectId: 'p-1' }
+    const comando = {
+      escopo,
+      acao: { tipo: 'switch' as const, controle: 'push' as const, habilitado: false },
+      idempotencyKey: 'push-unchanged-storage-error'
+    }
+    await service.aplicar({ ...comando, idempotencyKey: 'push-off-initial' })
+    const erroDisco = new Error('SQLITE_FULL: database or disk is full')
+    vi.spyOn(repository, 'executarIdempotente').mockImplementation(() => {
+      throw erroDisco
+    })
+
+    await expect(service.aplicar(comando)).rejects.toBe(erroDisco)
   })
 
   it('cancela os runs ativos quando o switch de execução é desligado no escopo deles', async () => {

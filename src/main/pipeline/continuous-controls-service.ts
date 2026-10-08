@@ -175,7 +175,8 @@ export class ContinuousControlsService {
         if (acao.tipo === 'switch' && acao.controle === 'execucao' && acao.habilitado === false)
           await this.cancelarRunsAtivos(escopo)
         return this.comAtualizado(aplicado, escopo)
-      } catch {
+      } catch (error) {
+        if (!(error instanceof Error) || error.message !== 'idempotency-conflict') throw error
         return {
           status: 'idempotency-conflict',
           message: 'A chave já foi usada para outro comando.'
