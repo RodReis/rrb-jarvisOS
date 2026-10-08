@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 2983 | 2983 | 0 | 81.1 | — | — |
-| — | — | — | Banco | 2407 | 2389 | 0 | 84.3 | — | — |
-| — | — | — | Tela | 805 | 804 | 0 | 74.7 | — | — |
+| — | — | — | Regras de Negócio | 2994 | 2994 | 0 | 81.1 | — | — |
+| — | — | — | Banco | 2409 | 2391 | 0 | 84.5 | — | — |
+| — | — | — | Tela | 806 | 805 | 0 | 74.5 | — | — |
 
 ## Histórico por entrega
 
@@ -514,4 +514,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-10-08 | #136 | spec-continuo-03-controles-operacionais | Regras de Negócio | 2983 | 2983 | 0 | 81.1 | #417 | [#417](https://github.com/RodReis/rrb-jarvisOS/pull/417) |
 | 2026-10-08 | #136 | spec-continuo-03-controles-operacionais | Banco | 2407 | 2389 | 0 | 84.3 | #417 | [#417](https://github.com/RodReis/rrb-jarvisOS/pull/417) |
 | 2026-10-08 | #136 | spec-continuo-03-controles-operacionais | Tela | 805 | 804 | 0 | 74.7 | #417 | [#417](https://github.com/RodReis/rrb-jarvisOS/pull/417) |
-
+| 2026-10-08 | #137 | spec-continuo-04-projecoes-gates | Regras de Negócio | 2994 | 2994 | 0 | 81.1 | #419 | [#419](https://github.com/RodReis/rrb-jarvisOS/pull/419) |
+| 2026-10-08 | #137 | spec-continuo-04-projecoes-gates | Banco | 2409 | 2391 | 0 | 84.5 | #419 | [#419](https://github.com/RodReis/rrb-jarvisOS/pull/419) |
+| 2026-10-08 | #137 | spec-continuo-04-projecoes-gates | Tela | 806 | 805 | 0 | 74.5 | #419 | [#419](https://github.com/RodReis/rrb-jarvisOS/pull/419) |

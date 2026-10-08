@@ -2674,6 +2674,6 @@ Status: em andamento na issue [#137](https://github.com/RodReis/rrb-jarvisOS/iss
 - [x] Montar pacote idempotente de revisão do gate sem ação de aprovação.
 - [x] Integrar IPC de reconciliação e painel somente leitura.
 - [x] Build, typecheck, lint, formatação e 57 testes direcionados passaram; provas cobrem SHA/branch/PR, preservação do link da issue e ausência de aprovação automática.
-- [ ] Validar `reports/TESTS.md` com os artefatos de CI. O self-check local não pôde reconstruir a tabela: faltam os JSONs brutos e a execução limpa resulta em zero; preservar as contagens versionadas até a evidência oficial.
+- [x] Regenerar `reports/TESTS.md` a partir dos três JSONs brutos da CI #496 e passar `npm run test:report:check -- --no-run --require-entry`: Regras 2.994 pass; Banco 2.391 pass / 18 ignorados; Tela 805 pass / 1 todo. A primeira guarda da CI detectou o relatório anterior; o relatório gerado com os artefatos oficiais está na atualização seguinte da PR.
 - [x] Revisar diff, fronteira IPC, escopo do snapshot e projeção fail-closed; teste confirmou o link publicado da issue no nó do DAG.
-- [ ] Abrir PR com `refs #137`, verificar CI, integrar e publicar comentário de encerramento; issue fica aberta até aceite do PI.
+- [ ] PR [#419](https://github.com/RodReis/rrb-jarvisOS/pull/419), `refs #137`: a execução CI #496 aprovou qualidade, regras, banco, tela, visual e E2E; o agregador falhou pela divergência do relatório anterior. Relatório oficial regenerado e guard local aprovado; aguardar nova CI, integrar e publicar comentário de encerramento. A issue fica aberta até aceite do PI.
