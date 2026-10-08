@@ -25,6 +25,7 @@
 import type { DependenciaAberta } from './fila'
 import type { BloqueioExterno } from './pacote-estrutural'
 import type { SquadPlan } from './squad-plano'
+import type { LimitesAgregadosDoPlano } from './squad-resolucao'
 
 /**
  * Os estados de um run.
@@ -143,6 +144,13 @@ export interface PipelineRun {
   }[]
   /** Plano validado que o Squad executou, para evidência no painel da tarefa. */
   readonly squadPlan?: SquadPlan
+  /** Tetos agregados calculados do plano e congelados antes do primeiro dispatch. */
+  readonly squadBudgetLimits?: LimitesAgregadosDoPlano
+  /** Consumo observado do ledger por run; ausência preservada em runs anteriores à F02. */
+  readonly squadBudgetUsage?: LimitesAgregadosDoPlano & {
+    readonly pendentes: number
+    readonly falhasDeTeto: number
+  }
   readonly created_at: string
   readonly updated_at: string
 }

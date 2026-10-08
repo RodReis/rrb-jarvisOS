@@ -70,7 +70,7 @@ describe('argumentos do claude no container', () => {
     expect(args[args.indexOf('--max-turns') + 1]).toBe('7')
     expect(args[args.indexOf('--append-system-prompt') + 1]).toBe('SISTEMA DO ESCRITOR')
     expect(args).toContain('--print')
-    expect(args[args.indexOf('--output-format') + 1]).toBe('text')
+    expect(args[args.indexOf('--output-format') + 1]).toBe('json')
     // O material vai por stdin: a linha de comando não o comporta.
     expect(args.join('\n')).not.toContain('PROMPT')
   })
@@ -83,7 +83,8 @@ describe('argumentos do claude no container', () => {
 describe('o agente no container', () => {
   const saida = (parcial: Partial<SaidaDoProcesso> = {}): SaidaDoProcesso => ({
     codigo: 0,
-    stdout: '  {"ok":true}\n',
+    stdout:
+      '{"result":"  {\\"ok\\":true}","num_turns":1,"modelUsage":{"claude-sonnet-5-5":{"inputTokens":1,"outputTokens":1}}}',
     stderr: '',
     abortado: false,
     ...parcial
@@ -109,7 +110,11 @@ describe('o agente no container', () => {
 
     const r = await agente.executar(pedidoAoAgente())
 
-    expect(r).toEqual({ ok: true, texto: '{"ok":true}' })
+    expect(r).toEqual({
+      ok: true,
+      texto: '  {"ok":true}',
+      uso: { tokensEntrada: 1, tokensSaida: 1, turnos: 1 }
+    })
     expect(chamadas[0].binario).toBe('docker')
     expect(chamadas[0].stdin).toBe('PROMPT GRANDE')
     expect(chamadas[0].args).toContain('SISTEMA')

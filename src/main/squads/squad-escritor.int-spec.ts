@@ -53,6 +53,7 @@ const { FilaService } = await import('../pipeline/fila-service')
 const { PoolRepository } = await import('../pipeline/pool-repository')
 const { PoolService } = await import('../pipeline/pool-service')
 const { SquadGit } = await import('./squad-git')
+const { PainelDaTarefaRepository } = await import('../pipeline/painel-tarefa-repository')
 const { GerenteDeSlots } = await import('./squad-slots')
 const { ExecutorDeEscritor } = await import('./squad-escritor')
 
@@ -97,7 +98,14 @@ let sandboxFalha: string | undefined
 let agente: (
   p: PedidoAoAgente,
   sandbox: PedidoDeSandbox
-) => Promise<{ ok: true; texto: string } | { ok: false; motivo: string }>
+) => Promise<
+  | {
+      ok: true
+      texto: string
+      uso?: { tokensEntrada: number; tokensSaida: number; turnos: number }
+    }
+  | { ok: false; motivo: string }
+>
 let intervaloDoHeartbeatMs = 3_600_000
 
 const git = (args: string[], cwd = repo): string =>
@@ -152,6 +160,7 @@ function pedido(parcial: Partial<PedidoDoEscritor> = {}): PedidoDoEscritor {
 }
 
 let runAtual: string
+let reservasLiberadas: string[]
 function novoRun(projectId = PROJETO): string {
   const run = fila.criarRun(projectId, WS, 'f1')
   fila.transicionar(projectId, WS, run.id, 'AWAITING_PI')
@@ -172,8 +181,11 @@ const escrever = (p: PedidoAoAgente, caminho: string, conteudo = 'novo\n'): void
 
 const agentePadrao: typeof agente = async (p) => {
   escrever(p, 'src/api/a.ts', 'export const a = 100\n')
-  return { ok: true, texto: resultado() }
+  return { ok: true, texto: resultado(), uso: { tokensEntrada: 1, tokensSaida: 1, turnos: 1 } }
 }
+
+const comUso = (r: Awaited<ReturnType<typeof agente>>) =>
+  r.ok ? { ...r, uso: { tokensEntrada: 1, tokensSaida: 1, turnos: 1 } } : r
 
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'jarvis-squad-escritor-'))
@@ -251,6 +263,7 @@ beforeEach(() => {
   agente = agentePadrao
   intervaloDoHeartbeatMs = 3_600_000
   runAtual = novoRun()
+  reservasLiberadas = []
   executor = montarExecutor()
 })
 
@@ -260,11 +273,10 @@ afterEach(() => {
 })
 
 function montarExecutor(
-  gitDoKernel: Pick<
-    InstanceType<typeof SquadGit>,
-    'alteracoes' | 'commitar' | 'remover'
-  > = squadGit,
-  aoPreparar?: () => void
+  gitDoKernel: Pick<InstanceType<typeof SquadGit>, 'alteracoes' | 'commitar' | 'remover'> &
+    Partial<Pick<InstanceType<typeof SquadGit>, 'capturarSnapshots'>> = squadGit,
+  aoPreparar?: () => void,
+  painelSnapshots?: InstanceType<typeof PainelDaTarefaRepository>
 ): InstanceType<typeof ExecutorDeEscritor> {
   const sandbox: SandboxDoEscritor = {
     preparar: async (p) => {
@@ -285,6 +297,7 @@ function montarExecutor(
   const porWorktree = new Map<string, PedidoDeSandbox>()
   return new ExecutorDeEscritor({
     git: gitDoKernel,
+    painelSnapshots,
     slots: gerente,
     sandbox: {
       preparar: async (p) => {
@@ -294,7 +307,17 @@ function montarExecutor(
       },
       encerrar: sandbox.encerrar
     },
-    agente: { executar: (p) => agente(p, porWorktree.get(p.worktree.worktree) as PedidoDeSandbox) },
+    agente: {
+      executar: async (p) =>
+        comUso(await agente(p, porWorktree.get(p.worktree.worktree) as PedidoDeSandbox))
+    },
+    orcamento: {
+      registrarConsumo: () => true,
+      marcarIndeterminado: () => undefined,
+      liberarAntesDoDispatch: (_escopo, runId, taskId, tentativa) => {
+        reservasLiberadas.push(`${runId}:${taskId}:${tentativa}`)
+      }
+    },
     audit,
     userId: () => USER,
     workspaceId: () => WS,
@@ -308,7 +331,6 @@ const remontar = (): void => void (executor = montarExecutor())
 comGit('o escritor conclui: o kernel prova e commita (critérios 1 e 2)', () => {
   it('commita só o que provou dentro do write set, com a identidade do kernel', async () => {
     const r = await executor.executar(pedido())
-
     expect(r.estado).toBe('concluida')
     expect(r.escritor).toBe('api')
     expect(r.arquivos).toEqual(['src/api/a.ts'])
@@ -337,7 +359,8 @@ comGit('o escritor conclui: o kernel prova e commita (critérios 1 e 2)', () => 
       escrever(p, 'src/api/novo.ts', 'novo\n')
       return {
         ok: true,
-        texto: resultado({ evidencia: [{ tipo: 'arquivo', referencia: 'src/api/novo.ts' }] })
+        texto: resultado({ evidencia: [{ tipo: 'arquivo', referencia: 'src/api/novo.ts' }] }),
+        uso: { tokensEntrada: 1, tokensSaida: 1, turnos: 1 }
       }
     }
 
@@ -350,7 +373,11 @@ comGit('o escritor conclui: o kernel prova e commita (critérios 1 e 2)', () => 
   it('solta o slot, derruba o sandbox e audita início e fim — sem o texto do agente', async () => {
     agente = async (p) => {
       escrever(p, 'src/api/a.ts', 'conteudo-unico-do-arquivo-xyz\n')
-      return { ok: true, texto: resultado({ conclusao: 'conclusao-unica-do-agente-abc' }) }
+      return {
+        ok: true,
+        texto: resultado({ conclusao: 'conclusao-unica-do-agente-abc' }),
+        uso: { tokensEntrada: 1, tokensSaida: 1, turnos: 1 }
+      }
     }
 
     const r = await executor.executar(pedido())
@@ -388,7 +415,7 @@ comGit('o escritor conclui: o kernel prova e commita (critérios 1 e 2)', () => 
     agente = async (p) => {
       recebido = p
       escrever(p, 'src/api/a.ts')
-      return { ok: true, texto: resultado() }
+      return { ok: true, texto: resultado(), uso: { tokensEntrada: 1, tokensSaida: 1, turnos: 1 } }
     }
 
     await executor.executar(pedido())
@@ -415,7 +442,7 @@ comGit('o escopo é provado pelo diff, e reprova o escritor inteiro (critério 2
     agente = async (p) => {
       escrever(p, 'src/api/a.ts')
       escrever(p, 'src/ui/fora.ts')
-      return { ok: true, texto: resultado() }
+      return { ok: true, texto: resultado(), uso: { tokensEntrada: 1, tokensSaida: 1, turnos: 1 } }
     }
 
     const r = await semCommit(executor.executar(pedido()))
@@ -436,7 +463,7 @@ comGit('o escopo é provado pelo diff, e reprova o escritor inteiro (critério 2
   it('o write set é por segmento: `src/api-v2` não é `src/api`', async () => {
     agente = async (p) => {
       escrever(p, 'src/api-v2/x.ts')
-      return { ok: true, texto: resultado() }
+      return { ok: true, texto: resultado(), uso: { tokensEntrada: 1, tokensSaida: 1, turnos: 1 } }
     }
 
     const r = await semCommit(executor.executar(pedido()))
@@ -448,7 +475,7 @@ comGit('o escopo é provado pelo diff, e reprova o escritor inteiro (critério 2
     agente = async (p) => {
       escrever(p, 'src/api/.env', 'X=1\n')
       escrever(p, 'src/api/NUL.ts')
-      return { ok: true, texto: resultado() }
+      return { ok: true, texto: resultado(), uso: { tokensEntrada: 1, tokensSaida: 1, turnos: 1 } }
     }
 
     const r = await semCommit(executor.executar(pedido()))
@@ -464,7 +491,7 @@ comGit('o escopo é provado pelo diff, e reprova o escritor inteiro (critério 2
       } catch {
         // Sem privilégio de symlink (Windows sem modo desenvolvedor): nada a provar aqui.
       }
-      return { ok: true, texto: resultado() }
+      return { ok: true, texto: resultado(), uso: { tokensEntrada: 1, tokensSaida: 1, turnos: 1 } }
     }
 
     const r = await executor.executar(pedido())
@@ -483,7 +510,8 @@ comGit('o escopo é provado pelo diff, e reprova o escritor inteiro (critério 2
       else escrever(p, 'src/ui/u.ts')
       return {
         ok: true,
-        texto: resultado({ evidencia: [{ tipo: 'arquivo', referencia: 'src/ui/u.ts' }] })
+        texto: resultado({ evidencia: [{ tipo: 'arquivo', referencia: 'src/ui/u.ts' }] }),
+        uso: { tokensEntrada: 1, tokensSaida: 1, turnos: 1 }
       }
     }
     const ui = {
@@ -503,7 +531,7 @@ comGit('o escopo é provado pelo diff, e reprova o escritor inteiro (critério 2
   })
 
   it('sem nenhuma alteração é incompleta, não sucesso presumido', async () => {
-    agente = async () => ({ ok: true, texto: resultado() })
+    agente = async () => comUso({ ok: true, texto: resultado() })
 
     const r = await semCommit(executor.executar(pedido()))
 
@@ -533,7 +561,11 @@ comGit('o resultado do agente é dado não confiável: só `concluida` commita',
     for (const ruim of [{ schema: 'achados@1' }, { extra: 1 }, { assinatura: 'forjada' }]) {
       agente = async (p) => {
         escrever(p, 'src/api/a.ts')
-        return { ok: true, texto: resultado(ruim) }
+        return {
+          ok: true,
+          texto: resultado(ruim),
+          uso: { tokensEntrada: 1, tokensSaida: 1, turnos: 1 }
+        }
       }
       const r = await executor.executar(pedido({ tentativa: 1 }))
       expect(r.estado).toBe('invalida')
@@ -550,7 +582,8 @@ comGit('o resultado do agente é dado não confiável: só `concluida` commita',
       escrever(p, 'src/api/a.ts')
       return {
         ok: true,
-        texto: resultado({ evidencia: [{ tipo: 'arquivo', referencia: 'src/api/inventado.ts' }] })
+        texto: resultado({ evidencia: [{ tipo: 'arquivo', referencia: 'src/api/inventado.ts' }] }),
+        uso: { tokensEntrada: 1, tokensSaida: 1, turnos: 1 }
       }
     }
 
@@ -628,6 +661,26 @@ comGit('falha, prazo, cancelamento e lease têm estado terminal próprio (crité
     expect(eventos().map((e) => e.estado)).toEqual(['em-execucao', 'cancelada'])
   })
 
+  it('preserva snapshot parcial antes de encerrar o sandbox cancelado', async () => {
+    const painel = new PainelDaTarefaRepository(db)
+    executor = montarExecutor(squadGit, undefined, painel)
+    agente = (p) => {
+      escrever(p, 'src/api/a.ts', 'export const a = 200\n')
+      return pendurado(p)
+    }
+    const controle = new AbortController()
+    setTimeout(() => controle.abort(), 40)
+
+    const r = await executor.executar(pedido({ signal: controle.signal }))
+
+    expect(r.estado).toBe('cancelada')
+    expect(git(['rev-parse', 'feat/api-t1'])).toBe(baseSha)
+    expect(
+      painel.snapshots({ userId: USER, workspace: WS, projectId: PROJETO }, runAtual, 't1').arquivos
+    ).toEqual(expect.arrayContaining([expect.objectContaining({ caminho: 'src/api/a.ts' })]))
+    expect(encerrados).toHaveLength(1)
+  })
+
   it('cancelada antes de começar: nem toma slot, nem prepara sandbox, e só o fim é auditado', async () => {
     const controle = new AbortController()
     controle.abort()
@@ -635,6 +688,7 @@ comGit('falha, prazo, cancelamento e lease têm estado terminal próprio (crité
     const r = await executor.executar(pedido({ signal: controle.signal }))
 
     expect(r).toMatchObject({ estado: 'cancelada', motivo: 'cancelada-antes-de-iniciar' })
+    expect(reservasLiberadas).toContain(`${runAtual}:t1:1`)
     expect(preparados).toHaveLength(0)
     expect(eventos().map((e) => [e.marco, e.estado])).toEqual([['fim', 'cancelada']])
   })
@@ -653,6 +707,7 @@ comGit('falha, prazo, cancelamento e lease têm estado terminal próprio (crité
     const r = await executor.executar(pedido({ signal: controle.signal }))
 
     expect(r).toMatchObject({ estado: 'cancelada', motivo: 'cancelada-na-fila' })
+    expect(reservasLiberadas).toContain(`${runAtual}:t1:1`)
     expect(preparados).toHaveLength(0)
     expect(pool.vista().fila).toEqual([])
     gerente.liberar(PROJETO, WS, outro.unidade, outro.fencingToken)
@@ -683,7 +738,7 @@ comGit('falha, prazo, cancelamento e lease têm estado terminal próprio (crité
       pool.encerrar(unidade)
       pool.reabrir(unidade)
       pool.ciclo()
-      return { ok: true, texto: resultado() }
+      return { ok: true, texto: resultado(), uso: { tokensEntrada: 1, tokensSaida: 1, turnos: 1 } }
     }
 
     const r = await executor.executar(pedido())
@@ -702,7 +757,7 @@ comGit('falha, prazo, cancelamento e lease têm estado terminal próprio (crité
       antes = pool.slotDoRun(idDoEscritor(runAtual, 'api'))?.heartbeatEm ?? 0
       await new Promise((r) => setTimeout(r, 120))
       depois = pool.slotDoRun(idDoEscritor(runAtual, 'api'))?.heartbeatEm ?? 0
-      return { ok: true, texto: resultado() }
+      return { ok: true, texto: resultado(), uso: { tokensEntrada: 1, tokensSaida: 1, turnos: 1 } }
     }
 
     const r = await executor.executar(pedido())
@@ -1024,7 +1079,7 @@ comGit('o commit e a evidência cobrem o que o escritor provou', () => {
   it('a evidência pode citar um arquivo do pacote que o escritor não alterou', async () => {
     agente = async (p) => {
       escrever(p, 'src/api/novo.ts')
-      return { ok: true, texto: resultado() } // cita src/api/a.ts, que só está no pacote
+      return { ok: true, texto: resultado(), uso: { tokensEntrada: 1, tokensSaida: 1, turnos: 1 } } // cita src/api/a.ts, que só está no pacote
     }
 
     const r = await executor.executar(pedido())
@@ -1036,7 +1091,11 @@ comGit('o commit e a evidência cobrem o que o escritor provou', () => {
   it('com mais de um objeto na saída, lê o que tem a forma do resultado', async () => {
     agente = async (p) => {
       escrever(p, 'src/api/a.ts')
-      return { ok: true, texto: `exemplo: {"outra":1}\nresultado: ${resultado()}` }
+      return {
+        ok: true,
+        texto: `exemplo: {"outra":1}\nresultado: ${resultado()}`,
+        uso: { tokensEntrada: 1, tokensSaida: 1, turnos: 1 }
+      }
     }
 
     const r = await executor.executar(pedido())

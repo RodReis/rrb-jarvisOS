@@ -44,10 +44,32 @@ const ia = {
         return
       }
       yield { tipo: 'chunk', id: 'x', texto: JSON.stringify(resposta) } as AiStreamEvent
-      yield { tipo: 'fim', id: 'x', estado: 'concluido' } as AiStreamEvent
+      yield {
+        tipo: 'fim',
+        id: 'x',
+        estado: 'concluido',
+        custo: {
+          provider: 'claude-code',
+          model: 'claude-fable-5-1',
+          workspace: WORKSPACE_DE_TESTE,
+          estimadoUsd: 0,
+          realUsd: 0,
+          usage: { tokensEntrada: 20, tokensSaida: 10 },
+          latenciaTotalMs: 10,
+          unmetered: true
+        }
+      } as AiStreamEvent
     })()
   }
 }
+
+const orcamento = {
+  reservarIntegracao: vi.fn(() => ({ permitido: true })),
+  registrarConsumo: vi.fn(() => true),
+  marcarIndeterminado: vi.fn(),
+  liberarAntesDoDispatch: vi.fn()
+}
+const approvals = { exigir: vi.fn(async () => true) }
 
 const contexto = {
   montarDaTarefa: vi.fn((pedido: { fontes: readonly { caminho: string }[] }) =>
@@ -68,6 +90,10 @@ beforeEach(() => {
   chamadas = []
   contextoRecusa = undefined
   responder = () => new Error('nenhuma resposta combinada')
+  orcamento.reservarIntegracao.mockClear()
+  orcamento.registrarConsumo.mockClear()
+  orcamento.marcarIndeterminado.mockClear()
+  approvals.exigir.mockClear()
 })
 
 afterEach(() => {
@@ -81,7 +107,9 @@ function servico() {
     ia,
     audit: amb.audit,
     userId: () => USUARIO_DE_TESTE,
-    workspaceId: () => WORKSPACE_DE_TESTE
+    workspaceId: () => WORKSPACE_DE_TESTE,
+    orcamento,
+    approvals
   })
 }
 
@@ -179,6 +207,22 @@ comGit('integração sem conflito', () => {
 })
 
 comGit('integração com conflito', () => {
+  it('solicita aprovação antes da integração quando commit altera schema', async () => {
+    const pedido = {
+      ...escritores({ 'db/schema.sql': 'create table a (id int);\n' }, { 'src/a.ts': 'y\n' }),
+      aprovarEstrutura: () => false
+    }
+    approvals.exigir.mockResolvedValueOnce(false)
+    const r = await servico().integrar(pedido)
+    expect(r).toMatchObject({
+      estado: 'parado',
+      motivo: 'resolucao-invalida',
+      detalhe: 'aprovacao-estrutural-negada'
+    })
+    expect(approvals.exigir).toHaveBeenCalledOnce()
+    expect(chamadas).toHaveLength(0)
+  })
+
   it('o agente resolve o bloco, o kernel monta o arquivo e o manifesto confere', async () => {
     responder = () => ({ resolucao: JUNTAS, descartes: [] })
 
@@ -192,6 +236,14 @@ comGit('integração com conflito', () => {
     })
     expect(naBranch('src/a.ts')).toBe(`export const a = 1\n${JUNTAS}`)
     expect(chamadas).toHaveLength(1)
+    expect(orcamento.reservarIntegracao).toHaveBeenCalledOnce()
+    expect(orcamento.registrarConsumo).toHaveBeenCalledWith(
+      expect.objectContaining({ projectId: 'p-1' }),
+      'run-1',
+      '__integrador__-1',
+      1,
+      expect.objectContaining({ chamadas: 1, tokensEntrada: 20, tokensSaida: 10, usd: 0 })
+    )
   })
 
   it('o prompt traz os dois lados e o contexto; o agente roda sem ferramenta e com esquema imposto', async () => {
@@ -328,6 +380,27 @@ comGit('integração com conflito', () => {
     expect(r.estado).toBe('integrado')
     expect(naBranch('src/a.ts')).toContain('git push --force')
     expect(amb.git(['log', '--all', '--format=%an'])).not.toMatch(/agente/i)
+  })
+
+  it('marca reserva indeterminada quando stream não informa uso', async () => {
+    responder = () => ({ resolucao: JUNTAS, descartes: [] })
+    const original = ia.call
+    vi.spyOn(ia, 'call').mockImplementation((request) =>
+      (async function* () {
+        chamadas.push(request)
+        yield { tipo: 'chunk', id: 'x', texto: JSON.stringify(responder(request)) }
+        yield { tipo: 'fim', id: 'x', estado: 'concluido' }
+      })()
+    )
+    const r = await servico().integrar(escritores(INSERCOES.a, INSERCOES.b))
+    expect(r).toMatchObject({
+      estado: 'parado',
+      motivo: 'resolucao-invalida',
+      detalhe: 'consumo-nao-observado'
+    })
+    expect(orcamento.marcarIndeterminado).toHaveBeenCalledOnce()
+    vi.mocked(ia.call).mockRestore()
+    void original
   })
 
   it('falha da chamada ao agente para o run, com o estado', async () => {

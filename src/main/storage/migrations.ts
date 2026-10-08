@@ -2109,6 +2109,49 @@ const MIGRATIONS: readonly string[] = [
   // 58 - plano aprovado do Squad fica associado ao run para consulta read-only do painel.
   `
   ALTER TABLE pipeline_run ADD COLUMN squad_plan TEXT;
+  `,
+  // 59 - tetos do plano e reservas duráveis por tarefa/tentativa (M28-F02).
+  `
+  ALTER TABLE pipeline_run ADD COLUMN squad_budget_limits TEXT;
+
+  CREATE TABLE squad_budget_reservation (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    project_id TEXT NOT NULL,
+    run_id TEXT NOT NULL,
+    task_id TEXT NOT NULL,
+    writer_id TEXT,
+    role TEXT NOT NULL,
+    layer TEXT NOT NULL,
+    attempt INTEGER NOT NULL CHECK (attempt > 0),
+    state TEXT NOT NULL CHECK (state IN ('reserved','consumed','indeterminate','released','overrun')),
+    reserved_tasks INTEGER NOT NULL,
+    reserved_writers INTEGER NOT NULL,
+    reserved_workers INTEGER NOT NULL,
+    reserved_calls INTEGER NOT NULL,
+    reserved_tokens_in INTEGER NOT NULL,
+    reserved_tokens_out INTEGER NOT NULL,
+    reserved_turns INTEGER NOT NULL,
+    reserved_duration_ms INTEGER NOT NULL,
+    reserved_usd REAL NOT NULL,
+    actual_tasks INTEGER,
+    actual_writers INTEGER,
+    actual_workers INTEGER,
+    actual_calls INTEGER,
+    actual_tokens_in INTEGER,
+    actual_tokens_out INTEGER,
+    actual_turns INTEGER,
+    actual_duration_ms INTEGER,
+    actual_usd REAL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (user_id, workspace_id, run_id, task_id, attempt)
+  );
+  CREATE INDEX idx_squad_budget_run
+    ON squad_budget_reservation(user_id, workspace_id, project_id, run_id, state);
+  CREATE INDEX idx_squad_budget_project
+    ON squad_budget_reservation(user_id, workspace_id, project_id, state);
   `
 ]
 

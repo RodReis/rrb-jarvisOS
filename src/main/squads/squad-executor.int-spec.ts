@@ -104,24 +104,60 @@ function pedido(tarefas: TarefaDoPlano[], extra: Partial<PedidoDoSquad> = {}): P
 function executarTarefa(
   id: string,
   ehWorker: boolean
-): Promise<{ estado: string; motivo?: string; commitSha?: string }> {
+): Promise<{
+  estado: string
+  motivo?: string
+  commitSha?: string
+  custo?: unknown
+  duracaoMs?: number
+}> {
   ordemDeInicio.push(id)
   emParalelo += 1
   if (ehWorker) picoDeWorkers = Math.max(picoDeWorkers, emParalelo)
   if (!manual) {
     emParalelo -= 1
-    return Promise.resolve(resposta(id))
+    return Promise.resolve({
+      ...resposta(id),
+      ...(ehWorker
+        ? {
+            custo: {
+              provider: 'claude-code',
+              model: 'm',
+              realUsd: 0,
+              usage: { tokensEntrada: 1, tokensSaida: 1 }
+            },
+            duracaoMs: 1
+          }
+        : {})
+    })
   }
   let liberarFn: (estado?: string, motivo?: string, commitSha?: string) => void = () => undefined
   let iniciadaFn: () => void = () => undefined
   const iniciada = new Promise<void>((r) => (iniciadaFn = r))
-  const fim = new Promise<{ estado: string; motivo?: string; commitSha?: string }>((resolve) => {
+  const fim = new Promise<{
+    estado: string
+    motivo?: string
+    commitSha?: string
+    custo?: unknown
+    duracaoMs?: number
+  }>((resolve) => {
     liberarFn = (estado = 'concluida', motivo, commitSha) => {
       emParalelo -= 1
       resolve({
         estado,
         ...(motivo === undefined ? {} : { motivo }),
-        ...(commitSha === undefined ? {} : { commitSha })
+        ...(commitSha === undefined ? {} : { commitSha }),
+        ...(ehWorker
+          ? {
+              custo: {
+                provider: 'claude-code',
+                model: 'm',
+                realUsd: 0,
+                usage: { tokensEntrada: 1, tokensSaida: 1 }
+              },
+              duracaoMs: 1
+            }
+          : {})
       })
     }
   })
@@ -144,7 +180,25 @@ function montar(extra: { maxWorkers?: number } = {}) {
     worker: {
       executar: async (p) => {
         pedidosAoWorker.push(p as never)
-        return (await executarTarefa(p.tarefa.id, true)) as never
+        const retorno = await executarTarefa(p.tarefa.id, true)
+        if (
+          retorno.estado !== 'recusada' &&
+          retorno.estado !== 'cancelada' &&
+          retorno.estado !== 'falhou' &&
+          retorno.custo === undefined
+        ) {
+          return {
+            ...retorno,
+            custo: {
+              provider: 'claude-code',
+              model: 'm',
+              realUsd: 0,
+              usage: { tokensEntrada: 1, tokensSaida: 1 }
+            },
+            duracaoMs: 1
+          } as never
+        }
+        return retorno as never
       }
     },
     escritor: {
@@ -152,6 +206,12 @@ function montar(extra: { maxWorkers?: number } = {}) {
         pedidosAoEscritor.push(p as never)
         return (await executarTarefa(p.tarefa.id, false)) as never
       }
+    },
+    orcamento: {
+      reservar: () => ({ permitido: true }),
+      registrarConsumo: () => true,
+      marcarIndeterminado: () => undefined,
+      liberarAntesDoDispatch: () => undefined
     },
     audit,
     userId: () => USER,
@@ -172,7 +232,16 @@ beforeEach(() => {
   pedidosAoEscritor = []
   pedidosAoContexto = []
   contextoFalha = new Map()
-  resposta = () => ({ estado: 'concluida' })
+  resposta = () => ({
+    estado: 'concluida',
+    custo: {
+      provider: 'claude-code',
+      model: 'm',
+      realUsd: 0,
+      usage: { tokensEntrada: 1, tokensSaida: 1 }
+    },
+    duracaoMs: 1
+  })
   manual = false
 })
 
@@ -455,6 +524,20 @@ describe('um escritor com várias tarefas', () => {
     )
   })
 
+  it('nega path estrutural antes de contexto ou dispatch do escritor', async () => {
+    const aprovarEstrutura = vi.fn().mockResolvedValue(false)
+    const r = await montar().executar(
+      pedido([escritora('migration', 'db', { paths: ['db/schema.sql'] })], { aprovarEstrutura })
+    )
+    expect(aprovarEstrutura).toHaveBeenCalledOnce()
+    expect(r.tarefas[0]).toMatchObject({
+      estado: 'recusada',
+      motivo: 'aprovacao-estrutural-negada'
+    })
+    expect(pedidosAoContexto).toHaveLength(0)
+    expect(pedidosAoEscritor).toHaveLength(0)
+  })
+
   it('duas tarefas cujo escritor-tarefa vira o mesmo nome: a segunda é recusada e auditada', async () => {
     // `a_b` + `c` e `a` + `b_c` viram `a-b-c`: o mesmo container e a mesma branch.
     const r = await montar().executar(
@@ -563,7 +646,17 @@ describe('o despacho', () => {
   })
 
   it('o estado e o motivo do executor viram os da tarefa, com a execução anexada', async () => {
-    resposta = () => ({ estado: 'incompleta', motivo: 'sem-evidencia' })
+    resposta = () => ({
+      estado: 'incompleta',
+      motivo: 'sem-evidencia',
+      custo: {
+        provider: 'claude-code',
+        model: 'm',
+        realUsd: 0,
+        usage: { tokensEntrada: 1, tokensSaida: 1 }
+      },
+      duracaoMs: 1
+    })
 
     const r = await montar().executar(pedido([tarefa('w1')]))
 
@@ -604,10 +697,25 @@ describe('o que o executor recusa antes de rodar', () => {
       worker: {
         executar: async (p) => {
           if (p.tarefa.id === 'a') throw new TypeError('detalhe interno')
-          return { estado: 'concluida' } as never
+          return {
+            estado: 'concluida',
+            custo: {
+              provider: 'claude-code',
+              model: 'm',
+              realUsd: 0,
+              usage: { tokensEntrada: 1, tokensSaida: 1 }
+            },
+            duracaoMs: 1
+          } as never
         }
       },
       escritor: { executar: async () => ({ estado: 'concluida' }) as never },
+      orcamento: {
+        reservar: () => ({ permitido: true }),
+        registrarConsumo: () => true,
+        marcarIndeterminado: () => undefined,
+        liberarAntesDoDispatch: () => undefined
+      },
       audit,
       userId: () => USER,
       workspaceId: () => 'jarvis'
@@ -685,10 +793,25 @@ describe('cancelamento', () => {
       worker: {
         executar: async () => {
           controle.abort()
-          return { estado: 'concluida' } as never
+          return {
+            estado: 'concluida',
+            custo: {
+              provider: 'claude-code',
+              model: 'm',
+              realUsd: 0,
+              usage: { tokensEntrada: 1, tokensSaida: 1 }
+            },
+            duracaoMs: 1
+          } as never
         }
       },
       escritor: { executar: async () => ({ estado: 'concluida' }) as never },
+      orcamento: {
+        reservar: () => ({ permitido: true }),
+        registrarConsumo: () => true,
+        marcarIndeterminado: () => undefined,
+        liberarAntesDoDispatch: () => undefined
+      },
       audit,
       userId: () => USER,
       workspaceId: () => 'jarvis'

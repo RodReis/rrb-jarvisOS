@@ -2486,6 +2486,21 @@ Status: **entregue, aguardando aceite do PI** — SPEC `aprovada-pi`; issue [#37
 
 **Limite de escopo:** selo de aprovação de ação sensível e cancelamento pertencem à M28-F02 (#126), por decisão do PI em 2026-10-06; painel ao vivo e console pertencem à M28-F03 (#378), conforme a ordem aprovada do MVP-028. O quadro F01 mostra equipe, objetivo, workflow e teto de custo; a aprovação auditada no card continua na F02.
 
+### Fatia 02 — Tetos, aprovações do PI, cancelamento e E2E (`docs/spec/spec-execucao-02-tetos-aprovacoes-cancelamento-e2e.md`)
+
+Status: **em implementação** — SPEC `aprovada-pi`; issue [#126](https://github.com/RodReis/rrb-jarvisOS/issues/126) em `proplan:doing`. O plano congela cotas agregadas na validação do Squad e antes do Play; cada dispatch grava reserva por run/tarefa/tentativa e o consumo observado substitui a reserva. O Integrador reserva cada bloco, registra tokens, duração e custo medidos e para se o uso não puder ser determinado. Multi-escritor e integração passam a ativos por padrão no perfil de produção. Alteração estrutural é classificada antes de qualquer executor ou integração; aprovação/recusa fica auditada e falha de classificação bloqueia.
+
+- [x] Congelar limites agregados do plano validado, incluindo teto de 50 blocos do Integrador e custo do modelo resolvido; reservar antes de cada dispatch.
+- [x] Registrar uso observado de escritores e Integrador; uso ausente fica indeterminado e impede novas chamadas.
+- [x] Ligar dois escritores e Integrador na composição de produção.
+- [x] Exigir aprovação auditada antes do executor ou da integração quando o diff estrutural de banco for detectado; recusar se a classificação não puder ser feita.
+- [x] Cobrir consumo, overrun, bloqueio de despacho, aprovação negada, schema SQL e fluxo de integração com testes direcionados.
+- [ ] E2E de ponta a ponta com orquestrador, dois escritores, Integrador, TESTE, REVIEWER e PR/MERGE; execução real com modelo permaneceu `not_run` localmente.
+- [ ] Suíte integral limpa e E2E CI no SHA final da PR.
+- [ ] PR com `refs #126`, CI verde, merge confirmado, comentário de encerramento e `proplan:done`.
+
+**Evidência (2026-10-08):** typecheck, lint e build passaram; 146 testes direcionados passaram. O relatório foi regenerado dos artefatos oficiais do CI: Regras 2948/2948, Banco 2371/2389 (18 skipped), Tela 804/805 (1 todo); self-check 31/31 e `--check --no-run --require-entry` passaram. A execução local do Banco registrou 2340 aprovados, 25 skipped e um worker encerrado inesperadamente; a diferença veio do ambiente local, e os números do CI são a fonte publicada. `npm test` local também encerrou com worker inesperado. E2E: a CI identificou a allowlist do preload desatualizada; a expectativa foi corrigida e o teste isolado passou. A execução E2E local completa teve também uma falha de recuperação do scheduler, fora do escopo. Executor real de modelo permaneceu `not_run`; nenhuma chamada paga foi feita. A nova validação remota deste SHA está pendente.
+
 ### Fatia 03 — Painel da tarefa (`docs/spec/spec-execucao-03-painel-da-tarefa.md`)
 
 Status: **entregue, aguardando aceite do PI** — SPEC `aprovada-pi`; issue [#378](https://github.com/RodReis/rrb-jarvisOS/issues/378), aberta em `proplan:done`. O PI aprovou em 2026-10-07 a associação persistida run/tarefa→trace e snapshots de arquivos/diff com 10 MiB por arquivo, 50 MiB por run, binários somente como metadados; excedente sinalizado incompleto sem bloquear publicação. Entregue pela [PR #410](https://github.com/RodReis/rrb-jarvisOS/pull/410), mergeada em `main` em 2026-10-07 (`e986682e97185a5cfadc77bd4b568723fa59cced`); CI verde no head `54c6afc2441dfb98b7e7c8d93ecae0af6672de54`, run [37677657739](https://github.com/RodReis/rrb-jarvisOS/actions/runs/37677657739). Plano em [2026-10-07-m28-f03-painel-da-tarefa.md](superpowers/plans/2026-10-07-m28-f03-painel-da-tarefa.md).

@@ -651,6 +651,8 @@ export const IPC_CHANNELS = {
   filaVista: 'fila:vista',
   quadroExecucaoVista: 'quadro-execucao:vista',
   quadroExecucaoPlay: 'quadro-execucao:play',
+  quadroExecucaoCancelar: 'quadro-execucao:cancelar',
+  quadroExecucaoResolverAprovacao: 'quadro-execucao:resolver-aprovacao',
   painelDaTarefa: 'quadro-execucao:painel-tarefa',
   painelDaTarefaConteudo: 'quadro-execucao:painel-tarefa-conteudo',
   /**
@@ -1624,6 +1626,17 @@ export interface JarvisBridge {
   ): Promise<string | undefined>
   /** Play governado pelo main; o renderer só identifica projeto e fatias escolhidas. */
   playNoQuadro(pedido: PedidoDePlay, workspace: WorkspaceId): Promise<readonly ResultadoDoPlay[]>
+  cancelarNoQuadro(
+    projectId: string,
+    runId: string,
+    workspace: WorkspaceId
+  ): Promise<import('@shared/domain/quadro-execucao').ResultadoDoCancelamentoNoQuadro>
+  resolverAprovacaoDoSquad(
+    projectId: string,
+    approvalId: string,
+    decisao: 'aprovado' | 'negado',
+    workspace: WorkspaceId
+  ): Promise<boolean>
   /** O pool de execução (SPEC-Scheduler-01). Só leitura, sem o token de nenhum slot. */
   vistaDoPool(): Promise<VistaDoPool>
   /**

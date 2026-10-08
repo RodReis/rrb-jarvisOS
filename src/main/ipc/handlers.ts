@@ -2458,6 +2458,38 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     }
   )
 
+  ipcMain.handle(
+    IPC_CHANNELS.quadroExecucaoCancelar,
+    async (_event, projectId: unknown, runId: unknown, workspace: unknown) => {
+      if (
+        !isWorkspaceId(workspace) ||
+        typeof projectId !== 'string' ||
+        projectId.length === 0 ||
+        typeof runId !== 'string' ||
+        runId.length === 0
+      ) {
+        return { cancelado: false, motivo: 'recusado', mensagem: 'Parâmetros inválidos.' }
+      }
+      return await deps.quadroExecucao.cancelar(projectId, workspace, runId)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.quadroExecucaoResolverAprovacao,
+    (_event, projectId: unknown, approvalId: unknown, decisao: unknown, workspace: unknown) => {
+      if (
+        !isWorkspaceId(workspace) ||
+        typeof projectId !== 'string' ||
+        projectId.length === 0 ||
+        typeof approvalId !== 'string' ||
+        approvalId.length === 0 ||
+        (decisao !== 'aprovado' && decisao !== 'negado')
+      )
+        return false
+      return deps.quadroExecucao.resolverAprovacao(projectId, workspace, approvalId, decisao)
+    }
+  )
+
   // Só leitura: a vista sai do banco, sem o fencing token, e nenhum canal mexe no pool.
   ipcMain.handle(IPC_CHANNELS.poolVista, () => deps.pool.vista())
 

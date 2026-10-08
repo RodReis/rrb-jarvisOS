@@ -26,6 +26,10 @@ export interface ResultadoDoPlay {
   readonly mensagem: string
 }
 
+export type ResultadoDoCancelamentoNoQuadro =
+  | { readonly cancelado: true; readonly fase: string; readonly rascunho: string }
+  | { readonly cancelado: false; readonly motivo: string; readonly mensagem: string }
+
 export const ESTADOS_DA_CONSULTA = ['nao-consultado', 'atualizado', 'desconhecido'] as const
 export type EstadoDaConsulta = (typeof ESTADOS_DA_CONSULTA)[number]
 
@@ -56,6 +60,11 @@ export interface CartaoDoQuadro {
   readonly equipe?: EquipeDoQuadro
   readonly dependenciasAbertas: readonly DependenciaAberta[]
   readonly consulta: ConsultaDeChecks
+  readonly aprovacaoPendente?: {
+    readonly id: string
+    readonly acao: string
+    readonly motivo: string
+  }
 }
 
 export interface EquipeDoQuadro {
@@ -68,6 +77,16 @@ export interface EquipeDoQuadro {
   }[]
   readonly workflow: readonly string[]
   readonly limiteCusto: { readonly usd: number; readonly medido: boolean }
+  readonly consumo?: {
+    readonly chamadas: number
+    readonly tokensEntrada: number
+    readonly tokensSaida: number
+    readonly turnos: number
+    readonly duracaoMs: number
+    readonly usd: number
+    readonly pendentes: number
+    readonly falhasDeTeto: number
+  }
   readonly progresso: NonNullable<PipelineRun['squadProgress']>
 }
 
@@ -133,6 +152,7 @@ function equipeDoRun(titulo: string, run: PipelineRun | undefined): EquipeDoQuad
       usd: run.squadCostLimitUsd ?? 0,
       medido: run.squadCostMeasured ?? false
     },
+    ...(run.squadBudgetUsage === undefined ? {} : { consumo: run.squadBudgetUsage }),
     progresso: run.squadProgress ?? []
   }
 }
@@ -174,6 +194,7 @@ export interface EntradaDoQuadro {
   readonly issues?: ReadonlyMap<string, { readonly numero: number; readonly url?: string }>
   readonly consultas?: ReadonlyMap<string, ConsultaDeChecks>
   readonly finalizadas?: ReadonlySet<string>
+  readonly aprovacoesPendentes?: ReadonlyMap<string, CartaoDoQuadro['aprovacaoPendente']>
   readonly agora?: string
 }
 
@@ -222,7 +243,10 @@ export function projetarQuadro(entrada: EntradaDoQuadro): QuadroDeExecucao {
       dependenciasAbertas: bloqueadas.get(slice.id) ?? [],
       consulta:
         entrada.consultas?.get(run?.id ?? slice.id) ??
-        ({ estado: 'nao-consultado', checksPendentes: [], checks: [] } satisfies ConsultaDeChecks)
+        ({ estado: 'nao-consultado', checksPendentes: [], checks: [] } satisfies ConsultaDeChecks),
+      ...(run === undefined || entrada.aprovacoesPendentes?.get(run.id) === undefined
+        ? {}
+        : { aprovacaoPendente: entrada.aprovacoesPendentes.get(run.id) })
     }
     return [cartao]
   })

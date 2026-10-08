@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 2944 | 2944 | 0 | 80.9 | — | — |
-| — | — | — | Banco | 2373 | 2355 | 0 | 84.8 | — | — |
-| — | — | — | Tela | 805 | 804 | 0 | 75.0 | — | — |
+| — | — | — | Regras de Negócio | 2948 | 2948 | 0 | 80.9 | — | — |
+| — | — | — | Banco | 2389 | 2371 | 0 | 84.9 | — | — |
+| — | — | — | Tela | 805 | 804 | 0 | 75.2 | — | — |
 
 ## Histórico por entrega
 
@@ -493,3 +493,12 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-10-07 | #378 | SPEC-Execucao-03 | Regras de Negócio | 2944 | 2944 | 0 | 80.9 | #410 | [#410](https://github.com/RodReis/rrb-jarvisOS/pull/410) |
 | 2026-10-07 | #378 | SPEC-Execucao-03 | Banco | 2373 | 2355 | 0 | 84.8 | #410 | [#410](https://github.com/RodReis/rrb-jarvisOS/pull/410) |
 | 2026-10-07 | #378 | SPEC-Execucao-03 | Tela | 805 | 804 | 0 | 75.0 | #410 | [#410](https://github.com/RodReis/rrb-jarvisOS/pull/410) |
+| — | #126 | spec-execucao-02-tetos-aprovacoes-cancelamento-e2e | Regras de Negócio | 2948 | 2948 | 0 | 80.9 | — | — |
+| — | #126 | spec-execucao-02-tetos-aprovacoes-cancelamento-e2e | Banco | 2389 | 2340 | 0 | 84.8 | — | — |
+| — | #126 | spec-execucao-02-tetos-aprovacoes-cancelamento-e2e | Tela | 805 | 804 | 0 | 75.2 | — | — |
+| 2026-10-08 | #126 | spec-execucao-02-tetos-aprovacoes-cancelamento-e2e | Regras de Negócio | 2948 | 2948 | 0 | 80.9 | #412 | [#412](https://github.com/RodReis/rrb-jarvisOS/pull/412) |
+| 2026-10-08 | #126 | spec-execucao-02-tetos-aprovacoes-cancelamento-e2e | Banco | 2389 | 2340 | 0 | — | #412 | [#412](https://github.com/RodReis/rrb-jarvisOS/pull/412) |
+| 2026-10-08 | #126 | spec-execucao-02-tetos-aprovacoes-cancelamento-e2e | Tela | 805 | 804 | 0 | 75.2 | #412 | [#412](https://github.com/RodReis/rrb-jarvisOS/pull/412) |
+| 2026-10-08 | #126 | spec-execucao-02-tetos-aprovacoes-cancelamento-e2e | Regras de Negócio | 2948 | 2948 | 0 | 80.9 | #412 | [#412](https://github.com/RodReis/rrb-jarvisOS/pull/412) |
+| 2026-10-08 | #126 | spec-execucao-02-tetos-aprovacoes-cancelamento-e2e | Banco | 2389 | 2371 | 0 | 84.9 | #412 | [#412](https://github.com/RodReis/rrb-jarvisOS/pull/412) |
+| 2026-10-08 | #126 | spec-execucao-02-tetos-aprovacoes-cancelamento-e2e | Tela | 805 | 804 | 0 | 75.2 | #412 | [#412](https://github.com/RodReis/rrb-jarvisOS/pull/412) |

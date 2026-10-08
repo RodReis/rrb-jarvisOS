@@ -815,6 +815,21 @@ const bridge: JarvisBridge = {
     pedido: { readonly projectId: string; readonly sliceIds: readonly string[] },
     workspace: WorkspaceId
   ) => ipcRenderer.invoke(IPC_CHANNELS.quadroExecucaoPlay, pedido, workspace),
+  cancelarNoQuadro: (projectId: string, runId: string, workspace: WorkspaceId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.quadroExecucaoCancelar, projectId, runId, workspace),
+  resolverAprovacaoDoSquad: (
+    projectId: string,
+    approvalId: string,
+    decisao: 'aprovado' | 'negado',
+    workspace: WorkspaceId
+  ) =>
+    ipcRenderer.invoke(
+      IPC_CHANNELS.quadroExecucaoResolverAprovacao,
+      projectId,
+      approvalId,
+      decisao,
+      workspace
+    ),
   vistaDoPool: (): Promise<VistaDoPool> => ipcRenderer.invoke(IPC_CHANNELS.poolVista),
   estadoDoSandbox: (): Promise<{
     readonly dockerNoAr: boolean

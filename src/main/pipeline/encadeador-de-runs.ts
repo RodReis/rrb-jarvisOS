@@ -47,6 +47,8 @@ export const INTERVALO_DO_HEARTBEAT_MS = VALIDADE_DO_LEASE_MS / 3
 const MAXIMO_DE_ELOS = 50
 
 export interface PedidoDeExecucao {
+  /** Sinal pai do run do Squad; propagado até todos os efeitos do ciclo. */
+  readonly signal?: AbortSignal
   readonly runId: string
   readonly projectId?: string
   /** O espaço do run: o run não o guarda, e ele é a credencial e o escopo de auditoria. */

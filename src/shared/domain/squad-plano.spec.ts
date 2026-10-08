@@ -147,7 +147,9 @@ describe('escritores — terceiro escritor, sem escritor, sem path', () => {
     p.tarefas.push(
       tarefa('t4', { escritor: 'w2', paths: ['src/main/squads/a.ts'], fundamento: { criterio: 2 } })
     )
-    expect(motivos(validarPlano(p, contexto()))).toContain('ESCRITORES_EXCEDIDOS')
+    expect(motivos(validarPlano(p, contexto({ ...PERFIL_PADRAO, escritores: 1 })))).toContain(
+      'ESCRITORES_EXCEDIDOS'
+    )
   })
 
   it('rejeita plano sem nenhum escritor (Emenda E1)', () => {

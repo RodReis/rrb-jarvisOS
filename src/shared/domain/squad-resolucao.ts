@@ -20,11 +20,14 @@
  */
 
 import type { ModeloEscolhido } from './modelo-da-fase'
+import type { SquadPlan } from './squad-plano'
 import type { CapacidadeId, DefinicaoDeCapacidade } from './squad-capacidades'
-import type { Camada, PerfilDeSquad } from './squad-perfil'
+import { isCamada, type Camada, type PerfilDeSquad } from './squad-perfil'
 import { calcularCustoUsd, isRotaUnmetered } from './ai'
 import { REGISTRO_DE_CAPACIDADES } from './squad-capacidades'
 import { CAMADAS, limitesDoPerfil } from './squad-perfil'
+
+export const MAX_BLOCOS_DO_INTEGRADOR = 50
 
 /** O que o chamador mediu do mundo. Entra por parâmetro: esta função não olha o disco. */
 export interface AmbienteDeResolucao {
@@ -208,6 +211,102 @@ export interface CustoMaximo {
   readonly maxTarefas: number
 }
 
+export interface CustoDoPlano {
+  readonly usd: number
+  readonly camadasMedidas: readonly Camada[]
+}
+
+export interface LimitesAgregadosDoPlano extends CustoDoPlano {
+  readonly tarefas: number
+  readonly escritores: number
+  readonly workers: number
+  readonly chamadas: number
+  readonly tokensEntrada: number
+  readonly tokensSaida: number
+  readonly turnos: number
+  readonly duracaoMs: number
+}
+
+/**
+ * Soma os limites das tarefas validadas, usando o modelo congelado da camada de cada tarefa.
+ * Esta é a cota que acompanha o run; não usa multiplicador por camada nem por tarefa hipotética.
+ */
+export function limitesAgregadosDoPlano(
+  plano: SquadPlan,
+  resolucao: ResolucaoDoPerfil,
+  perfil?: Pick<PerfilDeSquad, 'integrador' | 'limites'>
+): LimitesAgregadosDoPlano {
+  const camadasMedidas = new Set<Camada>()
+  const escritores = new Set<string>()
+  let usd = 0
+  let chamadas = 0
+  let tokensEntrada = 0
+  let tokensSaida = 0
+  let turnos = 0
+  let duracaoMs = 0
+  let workers = 0
+
+  for (const tarefa of plano.tarefas) {
+    const escreve = tarefa.escritor !== undefined && tarefa.escritor.length > 0
+    if (escreve) escritores.add(tarefa.escritor as string)
+    else workers += 1
+    chamadas += 1
+    tokensEntrada += tarefa.limites.maxTokensEntrada
+    tokensSaida += tarefa.limites.maxTokensSaida
+    turnos += tarefa.limites.maxTurnos
+    duracaoMs += tarefa.limites.maxMinutos * 60_000
+    if (!isCamada(tarefa.camada)) continue
+    const modelo = resolucao.camadas[tarefa.camada].modelo
+    if (modelo !== undefined && !isRotaUnmetered(modelo.provider)) {
+      camadasMedidas.add(tarefa.camada)
+      usd += calcularCustoUsd(modelo.provider, modelo.modelo, {
+        tokensEntrada: tarefa.limites.maxTokensEntrada,
+        tokensSaida: tarefa.limites.maxTokensSaida
+      })
+    }
+  }
+
+  const camadaIntegrador = perfil?.integrador?.camada
+  const modeloIntegrador =
+    camadaIntegrador === undefined ? undefined : resolucao.camadas[camadaIntegrador].modelo
+  if (perfil !== undefined && camadaIntegrador !== undefined && modeloIntegrador !== undefined) {
+    const vezes = MAX_BLOCOS_DO_INTEGRADOR
+    const entrada = perfil.limites.maxTokensEntradaPorTarefa
+    const saida = perfil.limites.maxTokensSaidaPorTarefa
+    chamadas += vezes
+    tokensEntrada += entrada * vezes
+    tokensSaida += saida * vezes
+    turnos += vezes
+    duracaoMs += perfil.limites.maxMinutosPorTarefa * 60_000 * vezes
+    if (!isRotaUnmetered(modeloIntegrador.provider)) {
+      camadasMedidas.add(camadaIntegrador)
+      usd += calcularCustoUsd(modeloIntegrador.provider, modeloIntegrador.modelo, {
+        tokensEntrada: entrada * vezes,
+        tokensSaida: saida * vezes
+      })
+    }
+  }
+
+  return {
+    tarefas: plano.tarefas.length,
+    escritores: escritores.size,
+    workers,
+    chamadas,
+    tokensEntrada,
+    tokensSaida,
+    turnos,
+    duracaoMs,
+    usd,
+    camadasMedidas: [...camadasMedidas]
+  }
+}
+
+/** Apenas o trecho monetário para telas e contratos que exibem o USD do plano. */
+export const custoDoPlanoUsd = (plano: SquadPlan, resolucao: ResolucaoDoPerfil): CustoDoPlano => {
+  const limites = limitesAgregadosDoPlano(plano, resolucao)
+  return { usd: limites.usd, camadasMedidas: limites.camadasMedidas }
+}
+
 /**
  * O custo e os limites máximos **antes** de instanciar o Squad (critério 4).
  *
@@ -234,9 +333,22 @@ export function custoMaximoUsd(
   })
 
   const maisCara = Math.max(0, ...medidas.map((m) => m.porTarefa))
+  const camadaIntegrador = perfil.integrador?.camada
+  const modeloIntegrador =
+    camadaIntegrador === undefined ? undefined : resolucao.camadas[camadaIntegrador].modelo
+  const custoIntegrador =
+    modeloIntegrador === undefined || isRotaUnmetered(modeloIntegrador.provider)
+      ? 0
+      : MAX_BLOCOS_DO_INTEGRADOR *
+        calcularCustoUsd(modeloIntegrador.provider, modeloIntegrador.modelo, {
+          tokensEntrada: perfil.limites.maxTokensEntradaPorTarefa,
+          tokensSaida: perfil.limites.maxTokensSaidaPorTarefa
+        })
+  const camadasMedidas = new Set(medidas.map((m) => m.camada))
+  if (custoIntegrador > 0 && camadaIntegrador !== undefined) camadasMedidas.add(camadaIntegrador)
   return {
-    usd: maxTarefas * maisCara,
-    camadasMedidas: medidas.map((m) => m.camada),
+    usd: maxTarefas * maisCara + custoIntegrador,
+    camadasMedidas: [...camadasMedidas],
     slots,
     maxTarefas
   }

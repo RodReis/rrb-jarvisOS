@@ -34,6 +34,9 @@ export function QuadroDeExecucao({
   const [ocupado, setOcupado] = useState(false)
   const [falhou, setFalhou] = useState(false)
   const [runAberto, setRunAberto] = useState<string | undefined>()
+  const [cancelando, setCancelando] = useState<string | undefined>()
+  const [mensagemDoCancelamento, setMensagemDoCancelamento] = useState<string | undefined>()
+  const [decidindo, setDecidindo] = useState<string | undefined>()
 
   const atualizar = useCallback(async () => {
     try {
@@ -113,6 +116,45 @@ export function QuadroDeExecucao({
     }
   }
 
+  const cancelar = async (runId: string) => {
+    if (cancelando !== undefined || !window.confirm('Cancelar este run e suas tarefas?')) return
+    setCancelando(runId)
+    try {
+      const resposta = await window.jarvis.cancelarNoQuadro(projectId, runId, workspace)
+      setMensagemDoCancelamento(
+        resposta.cancelado
+          ? 'Run cancelado. Recursos e evidências serão reconciliados.'
+          : resposta.mensagem
+      )
+      await atualizar()
+    } catch {
+      setMensagemDoCancelamento('Não foi possível cancelar o run.')
+    } finally {
+      setCancelando(undefined)
+    }
+  }
+
+  const decidirAprovacao = async (id: string, decisao: 'aprovado' | 'negado') => {
+    if (decidindo !== undefined) return
+    setDecidindo(id)
+    try {
+      const resolvida = await window.jarvis.resolverAprovacaoDoSquad(
+        projectId,
+        id,
+        decisao,
+        workspace
+      )
+      setMensagemDoCancelamento(
+        resolvida ? 'Decisão do PI registrada.' : 'O pedido já não está disponível para decisão.'
+      )
+      await atualizar()
+    } catch {
+      setMensagemDoCancelamento('Não foi possível registrar a decisão do PI.')
+    } finally {
+      setDecidindo(undefined)
+    }
+  }
+
   if (carregando) return <LoadingState rotulo="Carregando quadro de execução" />
   if (falhou || quadro === null) {
     return (
@@ -161,6 +203,11 @@ export function QuadroDeExecucao({
           ))}
         </div>
       )}
+      {mensagemDoCancelamento && (
+        <p role="status" className="text-sm">
+          {mensagemDoCancelamento}
+        </p>
+      )}
 
       <div
         className="grid gap-3 overflow-x-auto xl:grid-cols-7"
@@ -200,6 +247,37 @@ export function QuadroDeExecucao({
                       MVP-{cartao.numeroDoMvp} · F{cartao.numeroDaFatia}
                       {cartao.issue ? ` · #${cartao.issue}` : ''}
                     </p>
+                    {cartao.aprovacaoPendente && (
+                      <section
+                        className="mt-2 rounded border border-amber-400/40 bg-amber-400/10 p-2 text-xs"
+                        aria-label="Aguardando decisão do PI"
+                      >
+                        <p className="font-semibold text-amber-300">Aguardando PI</p>
+                        <p className="mt-1 text-[var(--jos-cor-texto)]">
+                          {cartao.aprovacaoPendente.motivo}
+                        </p>
+                        <div className="mt-2 flex gap-2">
+                          <button
+                            type="button"
+                            disabled={decidindo !== undefined}
+                            onClick={() =>
+                              void decidirAprovacao(cartao.aprovacaoPendente!.id, 'aprovado')
+                            }
+                          >
+                            Aprovar ação
+                          </button>
+                          <button
+                            type="button"
+                            disabled={decidindo !== undefined}
+                            onClick={() =>
+                              void decidirAprovacao(cartao.aprovacaoPendente!.id, 'negado')
+                            }
+                          >
+                            Recusar ação
+                          </button>
+                        </div>
+                      </section>
+                    )}
                     {cartao.run !== undefined && (
                       <button
                         type="button"
@@ -209,6 +287,17 @@ export function QuadroDeExecucao({
                         Ver atividade dos agentes
                       </button>
                     )}
+                    {cartao.run !== undefined &&
+                      !['BLOCKED', 'CANCELLED', 'MERGED'].includes(cartao.run.estado) && (
+                        <button
+                          type="button"
+                          className="mt-2 ml-2 rounded border border-red-400/40 px-2 py-1 text-xs text-red-400"
+                          disabled={cancelando !== undefined}
+                          onClick={() => void cancelar(cartao.run!.id)}
+                        >
+                          {cancelando === cartao.run.id ? 'Cancelando…' : 'Cancelar run'}
+                        </button>
+                      )}
                     {cartao.equipe && (
                       <section
                         className="mt-3 rounded-md border border-[rgba(var(--jos-borda-rgb),0.12)] p-2 text-xs"
@@ -233,6 +322,23 @@ export function QuadroDeExecucao({
                         <p className="mt-1 text-[var(--jos-cor-texto-suave)]">
                           Fluxo: {cartao.equipe.workflow.join(' → ')}
                         </p>
+                        {cartao.equipe.consumo && (
+                          <p
+                            className="mt-1 text-[var(--jos-cor-texto-suave)]"
+                            aria-label="Consumo do Squad"
+                          >
+                            Uso observado: {cartao.equipe.consumo.chamadas} chamada(s),{' '}
+                            {cartao.equipe.consumo.tokensEntrada +
+                              cartao.equipe.consumo.tokensSaida}{' '}
+                            tokens, {Math.ceil(cartao.equipe.consumo.duracaoMs / 1000)} s
+                            {cartao.equipe.limiteCusto.medido &&
+                              `, US$ ${cartao.equipe.consumo.usd.toFixed(4)}`}
+                            {cartao.equipe.consumo.pendentes > 0 &&
+                              ` · ${cartao.equipe.consumo.pendentes} pendente(s)`}
+                            {cartao.equipe.consumo.falhasDeTeto > 0 &&
+                              ` · ${cartao.equipe.consumo.falhasDeTeto} estouro(s)`}
+                          </p>
+                        )}
                         {cartao.equipe.progresso.length > 0 && (
                           <ul
                             className="mt-1 space-y-0.5"

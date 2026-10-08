@@ -56,7 +56,7 @@ describe('snapshot do run', () => {
     mutavel.escritores = 2
 
     expect(snap.perfil.versao).toBe(PERFIL_PADRAO.versao)
-    expect(snap.perfil.escritores).toBe(1)
+    expect(snap.perfil.escritores).toBe(2)
     expect(snap.revisao).toBe(revisaoAntes)
   })
 
@@ -134,14 +134,16 @@ describe('snapshot só nasce de perfil válido', () => {
     )
   })
 
-  it('recusa dois escritores sem o multi-escritor ligado, e aceita com ele (E2E de teste)', () => {
+  it('perfil padrão F02 aceita dois escritores; opção legada pode desativar', () => {
     const dois: PerfilDeSquad = {
       ...PERFIL_PADRAO,
       escritores: 2,
       integrador: { camada: 'executor' }
     }
-    expect(() => criarSnapshotDoSquad(dois, AMBIENTE, FASE)).toThrow(/MULTI_ESCRITOR_DESLIGADO/)
-    const snap = criarSnapshotDoSquad(dois, AMBIENTE, FASE, { multiEscritor: true })
+    expect(() => criarSnapshotDoSquad(dois, AMBIENTE, FASE, { multiEscritor: false })).toThrow(
+      /MULTI_ESCRITOR_DESLIGADO/
+    )
+    const snap = criarSnapshotDoSquad(dois, AMBIENTE, FASE)
     expect(snap.perfil.escritores).toBe(2)
   })
 })

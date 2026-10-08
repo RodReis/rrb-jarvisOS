@@ -106,10 +106,12 @@ describe('validarPerfil — critério 3 (escritores, integrador, Git/GitHub)', (
     expect(codigos(r)).toContain('ESCRITORES_EXCEDIDOS')
   })
 
-  it('recusa 2 escritores por padrão (ADR-006, decisão 16) e aceita no E2E de teste', () => {
+  it('F02 aceita dois escritores por padrão e permite validar perfil legado explicitamente', () => {
     const dois = perfil({ escritores: 2, integrador: { camada: 'executor' } })
-    expect(codigos(validarPerfil(dois))).toContain('MULTI_ESCRITOR_DESLIGADO')
-    expect(validarPerfil(dois, { multiEscritor: true }).ok).toBe(true)
+    expect(validarPerfil(dois).ok).toBe(true)
+    expect(codigos(validarPerfil(dois, { multiEscritor: false }))).toContain(
+      'MULTI_ESCRITOR_DESLIGADO'
+    )
   })
 
   it('exige integrador quando há 2 escritores', () => {
@@ -190,7 +192,7 @@ describe('validarPerfil — orquestrador local (SPEC-Squads-02, Emenda E1)', () 
 
 describe('limitesDoPerfil — critério 4 (limites antes de instanciar)', () => {
   it('conta um slot por escritor', () => {
-    expect(limitesDoPerfil(PERFIL_PADRAO, 6).slots).toBe(1)
+    expect(limitesDoPerfil(PERFIL_PADRAO, 6).slots).toBe(2)
     expect(limitesDoPerfil({ ...PERFIL_PADRAO, escritores: 2 }, 6).slots).toBe(2)
   })
 

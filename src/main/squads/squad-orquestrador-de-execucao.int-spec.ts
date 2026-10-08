@@ -76,13 +76,57 @@ function preparar() {
     snapshot: SNAPSHOT,
     baseSha: 'b'.repeat(40),
     paths: { origem: 'spec' as const, paths: ['src'], justificativa: 'escopo aprovado' },
-    plano: {} as never,
+    plano: { tarefas: [] } as never,
     perfilCi: {} as never,
     git: {} as never
   }
 }
 
 describe('Play → ciclo do Squad → publicação', () => {
+  it('cancelamento pai alcança o ciclo e impede publicação mesmo com resultado tardio', async () => {
+    const run = criarRunPronto()
+    let liberar: (() => void) | undefined
+    const aguardando = new Promise<void>((resolve) => {
+      liberar = resolve
+    })
+    const publicar = vi.fn()
+    const transicionar = vi.fn()
+    const executar = new SquadOrquestradorDeExecucao({
+      runs: Object.assign(runs, { registrarPlanoDoSquad: () => true }),
+      fila: { transicionar } as never,
+      userId: () => ESCOPO.userId,
+      preparar: async () => preparar(),
+      ciclo: () => ({
+        revisao: {} as never,
+        ciclo: {
+          executar: async (pedido: { signal?: AbortSignal }) => {
+            await aguardando
+            expect(pedido.signal?.aborted).toBe(true)
+            return { estado: 'aprovado', commitSha: APROVADO, tentativas: 1 }
+          }
+        } as never
+      }),
+      produzir: vi.fn(),
+      prepararSandboxDePublicacao: vi.fn(),
+      publicar
+    })
+    const resultado = executar.executar(criarPedido(run.id))
+    const terminou = executar.quandoParar(run.id)
+    let finalizou = false
+    void terminou?.then(() => {
+      finalizou = true
+    })
+    await vi.waitFor(() => expect(liberar).toBeDefined())
+    executar.interromper(run.id)
+    expect(finalizou).toBe(false)
+    liberar?.()
+    expect(await resultado).toMatchObject({ estado: 'parado', motivo: 'cancelada' })
+    await terminou
+    expect(finalizou).toBe(true)
+    expect(publicar).not.toHaveBeenCalled()
+    expect(transicionar).not.toHaveBeenCalled()
+  })
+
   it('publica somente o SHA devolvido como aprovado e persiste o resumo seguro', async () => {
     const run = criarRunPronto()
     const executar = new SquadOrquestradorDeExecucao({

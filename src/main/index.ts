@@ -122,6 +122,14 @@ import { ContextoDaTarefa } from './squads/squad-contexto'
 import { ExecutorDoSquad } from './squads/squad-executor'
 import { ExecutorDeWorker } from './squads/squad-worker'
 import { ExecutorDeEscritor } from './squads/squad-escritor'
+import { SquadOrcamentoService } from './squads/squad-orcamento'
+import { IntegradorService } from './squads/squad-integrador'
+import {
+  SquadAprovacaoService,
+  alteraEstruturaDeBanco,
+  comandosDestrutivosDoPerfil
+} from './squads/squad-aprovacao'
+import { consolidarProducao } from './squads/squad-producao'
 import { SandboxDoEscritorReal } from './squads/squad-sandbox'
 import { AgenteNoContainer } from './squads/squad-agente-container'
 import { SuiteNoSandbox, EtapaDeTeste } from './squads/squad-teste'
@@ -1419,6 +1427,7 @@ if (!app.requestSingleInstanceLock()) {
     // inteiro: a fila só precisa da resposta, e depender do serviço a acoplaria à auditoria da
     // mudança de política — que é outro assunto, com outro tipo de evento.
     const pipelineRepository = new PipelineRepository(storage.db)
+    const squadOrcamento = new SquadOrcamentoService(storage.db, pipelineRepository, storage.audit)
     const leaseRepository = new LeaseRepository(storage.db)
     const mergePolicy = new MergePolicyService({
       repository: new MergePolicyRepository(storage.db),
@@ -1482,6 +1491,7 @@ if (!app.requestSingleInstanceLock()) {
     // precisa dele — por isso os ganchos o leem por função.
     const slotsDosSquads: { gerente?: GerenteDeSlots } = {}
     const recuperacaoDosRuns: { servico?: RecuperacaoService } = {}
+    const squadEmExecucao: { servico?: SquadOrquestradorDeExecucao } = {}
     // O encadeador nasce depois do preflight, que precisa do proxy; o cancelamento e o gancho de
     // encerramento o leem por função.
     const encadeadorDosRuns: { servico?: EncadeadorDeRuns } = {}
@@ -1505,10 +1515,27 @@ if (!app.requestSingleInstanceLock()) {
       // `CANCELLED` e `BLOCKED` devolvem o slot pela recuperação, depois de provar que o executor
       // parou. O serviço nasce depois da fila (precisa dela), por isso a indireção por função.
       // Primeiro para a entrega em voo (se este processo a roda), depois recolhe: o container e o
-      // worktree só saem quando o dono parou de usá-los.
+      // worktree só saem quando o dono parou de usá-los e o escritor terminou seus snapshots.
       aoEncerrarSemConclusao: (runId) => {
         encadeadorDosRuns.servico?.interromper(runId)
-        recuperacaoDosRuns.servico?.recolher(runId)
+        squadEmExecucao.servico?.interromper(runId)
+        const recolher = (): void => {
+          try {
+            recuperacaoDosRuns.servico?.recolher(runId)
+          } catch (error) {
+            // A supervisão do boot também tentará recolher; não deixe rejeição assíncrona solta.
+            log.sistema.error('Falha ao reconciliar recursos após cancelamento do Squad', {
+              runId,
+              error
+            })
+          }
+        }
+        const aguardandoSquad = squadEmExecucao.servico?.quandoParar(runId)
+        if (aguardandoSquad !== undefined) {
+          void aguardandoSquad.then(recolher)
+        } else {
+          recolher()
+        }
       }
     })
     // A seção crítica do merge (SPEC-Scheduler-04): lease exclusivo por repositório e base,
@@ -1618,6 +1645,15 @@ if (!app.requestSingleInstanceLock()) {
 
     // O PR que cada run publicou: o cancelamento o acha aqui para convertê-lo em rascunho.
     const runPrs = new RunPrRepository(storage.db)
+    const squadAprovacao = new SquadAprovacaoService({
+      db: storage.db,
+      requests: approvals,
+      policy,
+      audit: storage.audit,
+      runs: pipelineRepository,
+      userId: userIdAtual
+    })
+    squadAprovacao.reconciliarPendentes()
     // O cancelamento seletivo (SPEC-Scheduler-05). **Ainda sem chamador de produção:** cancelar é
     // ato do PI e o canal (IPC e tela) é do quadro do MVP-028; o que já roda é a reconciliação do
     // rascunho que um crash ou a origem fora do ar deixou pendente.
@@ -1628,7 +1664,10 @@ if (!app.requestSingleInstanceLock()) {
       connectors,
       audit: storage.audit,
       userId: userIdAtual,
-      interromper: (runId) => void encadeadorDosRuns.servico?.interromper(runId)
+      interromper: (runId) => {
+        squadEmExecucao.servico?.interromper(runId)
+        void encadeadorDosRuns.servico?.interromper(runId)
+      }
     })
 
     /*
@@ -1969,6 +2008,41 @@ if (!app.requestSingleInstanceLock()) {
         }
         const etapaTeste = {
           executar: async (entrada: Parameters<EtapaDeTeste['executar']>[0]) => {
+            const anterior = squadGit.listarNaRevisao(entrada.repositorio, preparar.baseSha)
+            const atual = squadGit.listarNaRevisao(entrada.repositorio, entrada.commitSha)
+            if (!anterior.ok || !atual.ok) {
+              return { estado: 'nao-rodou' as const, motivo: 'diff-do-squad-indisponivel' }
+            }
+            const caminhos = [...new Set([...anterior.valor.keys(), ...atual.valor.keys()])].filter(
+              (path) => anterior.valor.get(path) !== atual.valor.get(path)
+            )
+            if (alteraEstruturaDeBanco({ paths: caminhos })) {
+              const aprovado = await squadAprovacao.exigir({
+                runId: pedido.runId,
+                projectId: pedido.projectId!,
+                workspaceId: pedido.workspaceId,
+                tarefaId: '__suite__',
+                acao: 'alteracao-estrutural-de-banco',
+                alvo: entrada.commitSha,
+                signal: entrada.signal
+              })
+              if (!aprovado) return { estado: 'nao-rodou' as const, motivo: 'aprovacao-negada' }
+            }
+            if (comandosDestrutivosDoPerfil(preparar.perfilCi).length > 0) {
+              const aprovado = await squadAprovacao.exigir({
+                runId: pedido.runId,
+                projectId: pedido.projectId!,
+                workspaceId: pedido.workspaceId,
+                tarefaId: '__suite__',
+                acao: 'comando-destrutivo',
+                alvo: JSON.stringify({
+                  commitSha: entrada.commitSha,
+                  comandos: comandosDestrutivosDoPerfil(preparar.perfilCi)
+                }),
+                signal: entrada.signal
+              })
+              if (!aprovado) return { estado: 'nao-rodou' as const, motivo: 'aprovacao-negada' }
+            }
             transicionar('VALIDATING')
             return suite.executar(entrada)
           }
@@ -2034,10 +2108,12 @@ if (!app.requestSingleInstanceLock()) {
             slots: slotsDosSquads.gerente!,
             sandbox: squadSandbox,
             agente,
+            orcamento: squadOrcamento,
             audit: storage.audit,
             userId: userIdAtual,
             workspaceId: () => pedido.workspaceId
           }),
+          orcamento: squadOrcamento,
           audit: storage.audit,
           userId: userIdAtual,
           workspaceId: () => pedido.workspaceId,
@@ -2072,6 +2148,16 @@ if (!app.requestSingleInstanceLock()) {
           baseSha: preparar.baseSha,
           rota: 'claude-code',
           plano: preparar.plano,
+          aprovarEstrutura: async (tarefa) =>
+            await squadAprovacao.exigir({
+              runId: pedido.runId,
+              projectId: pedido.projectId!,
+              workspaceId: pedido.workspaceId,
+              tarefaId: tarefa.id,
+              acao: 'alteracao-estrutural-de-banco',
+              alvo: tarefa.paths.join('\n'),
+              signal: producao.signal ?? pedido.signal
+            }),
           objetivoDe: () =>
             [pedido.promptInicial, correcoes, producao.falhaDeTeste?.evidencia ?? '']
               .filter(Boolean)
@@ -2086,24 +2172,56 @@ if (!app.requestSingleInstanceLock()) {
               ...(origem.origem === 'modelo' && origem.numCtx ? { numCtx: origem.numCtx } : {})
             }
           },
-          signal: producao.signal
+          signal: producao.signal ?? pedido.signal
         })
-        const escritor = resultado.tarefas.findLast(
-          (tarefa) => tarefa.papel === 'desenvolvedor' && tarefa.estado === 'concluida'
-        )
-        const commitSha =
-          escritor?.execucao !== undefined && 'commitSha' in escritor.execucao
-            ? escritor.execucao.commitSha
-            : undefined
-        return commitSha === undefined
-          ? {
-              producao: {
-                estado: 'parado',
-                motivo: 'o executor do Squad não produziu um commit do kernel'
+        const producaoFinal = await consolidarProducao(
+          resultado,
+          snapshot.perfil.escritores,
+          async (escritores) => {
+            const camadaDoIntegrador = snapshot.perfil.integrador?.camada
+            const modelo =
+              camadaDoIntegrador && snapshot.resolucao.camadas[camadaDoIntegrador].modelo
+            if (modelo === undefined) return { estado: 'parado', motivo: 'modelo-ausente' }
+            return new IntegradorService({
+              git: squadGit,
+              contexto: contexts,
+              ia: ai,
+              audit: storage.audit,
+              userId: userIdAtual,
+              workspaceId: () => pedido.workspaceId,
+              orcamento: squadOrcamento,
+              approvals: squadAprovacao
+            }).integrar({
+              runId: pedido.runId,
+              projectId: pedido.projectId!,
+              repositorio: pedido.repositorio,
+              baseSha: preparar.baseSha,
+              escritores,
+              worktree: join(
+                pedido.raizOperacional,
+                pedido.runId,
+                `integracao-${producao.tentativa}`
+              ),
+              branch: `jarvis/${pedido.runId}/integracao-${producao.tentativa}`,
+              modelo,
+              rota: 'claude-code',
+              maxTokensEntrada: snapshot.perfil.limites.maxTokensEntradaPorTarefa,
+              maxTokensSaidaPorBloco: snapshot.perfil.limites.maxTokensSaidaPorTarefa,
+              maxMinutos: Math.min(snapshot.perfil.limites.maxMinutosPorTarefa, 10),
+              aprovarEstrutura: (commitSha) => {
+                const anterior = squadGit.listarNaRevisao(pedido.repositorio, preparar.baseSha)
+                const atual = squadGit.listarNaRevisao(pedido.repositorio, commitSha)
+                if (!anterior.ok || !atual.ok) return undefined
+                const caminhos = [
+                  ...new Set([...anterior.valor.keys(), ...atual.valor.keys()])
+                ].filter((path) => anterior.valor.get(path) !== atual.valor.get(path))
+                return !alteraEstruturaDeBanco({ paths: caminhos })
               },
-              resultado
-            }
-          : { producao: { estado: 'pronto', commitSha, manifesto: '' }, resultado }
+              signal: producao.signal ?? pedido.signal
+            })
+          }
+        )
+        return { producao: producaoFinal, resultado }
       },
       prepararSandboxDePublicacao: (pedido, preparar, commitSha) => {
         const outcome = preflight.preparar({
@@ -2138,9 +2256,10 @@ if (!app.requestSingleInstanceLock()) {
           contextPackId: pedido.contextPackId,
           comandosDeValidacao: pedido.comandosDeValidacao,
           perfilDeCi: preparar.perfilCi,
-          signal: undefined
+          signal: pedido.signal
         })
     })
+    squadEmExecucao.servico = orquestradorSquad
 
     const quadroExecucao = new QuadroExecucaoService({
       userId: userIdAtual,
@@ -2156,6 +2275,8 @@ if (!app.requestSingleInstanceLock()) {
       fila,
       runPrs,
       connectors,
+      cancelamento,
+      squadAprovacao,
       raizOperacional: () => join(app.getPath('userData'), 'pipeline'),
       criarSnapshotDoSquad: (modelo) =>
         criarSnapshotDoSquad(
@@ -2166,7 +2287,8 @@ if (!app.requestSingleInstanceLock()) {
             ollama: { disponivel: false, modelos: [] },
             optInApiPaga: false
           },
-          modelo as import('@shared/domain/modelo-da-fase').ModeloEscolhido
+          modelo as import('@shared/domain/modelo-da-fase').ModeloEscolhido,
+          { multiEscritor: true }
         ),
       executar: (pedido) =>
         workspaceDoRun.run(pedido.workspaceId, () => orquestradorSquad.executar(pedido))

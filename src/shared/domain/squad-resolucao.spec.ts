@@ -4,7 +4,7 @@ import type { AmbienteDeResolucao } from './squad-resolucao'
 import type { PerfilDeSquad } from './squad-perfil'
 import { PERFIL_PADRAO } from './squad-perfil'
 import { REGISTRO_DE_CAPACIDADES } from './squad-capacidades'
-import { custoMaximoUsd, resolverPerfil } from './squad-resolucao'
+import { custoDoPlanoUsd, custoMaximoUsd, resolverPerfil } from './squad-resolucao'
 
 const FASE: ModeloEscolhido = { provider: 'claude-code', modelo: 'claude-fable-5-1' }
 
@@ -282,7 +282,7 @@ describe('custo e limites antes de instanciar — critério 4', () => {
     const c = custoMaximoUsd(PERFIL_PADRAO, r, 6)
     expect(c.usd).toBe(0)
     expect(c.camadasMedidas).toEqual([])
-    expect(c.slots).toBe(1)
+    expect(c.slots).toBe(2)
     expect(c.maxTarefas).toBe(12)
   })
 
@@ -315,6 +315,37 @@ describe('custo e limites antes de instanciar — critério 4', () => {
     }
     const r = resolverPerfil(dois, AMBIENTE_COMPLETO, FASE)
     expect(custoMaximoUsd(dois, r, 6).slots).toBe(2)
+  })
+
+  it('congela a soma dos limites das tarefas e ignora rotas sem preço por chamada', () => {
+    const paga: PerfilDeSquad = {
+      ...PERFIL_PADRAO,
+      camadas: {
+        ...PERFIL_PADRAO.camadas,
+        especialista: { origem: 'modelo', provider: 'anthropic', modelo: 'claude-opus-5' }
+      }
+    }
+    const r = resolverPerfil(paga, { ...AMBIENTE_COMPLETO, optInApiPaga: true }, FASE)
+    const limite = custoDoPlanoUsd(
+      {
+        tarefas: [
+          {
+            id: 'review-1',
+            camada: 'especialista',
+            limites: { maxTokensEntrada: 1000, maxTokensSaida: 500 }
+          },
+          {
+            id: 'dev-1',
+            camada: 'executor',
+            limites: { maxTokensEntrada: 8000, maxTokensSaida: 4000 }
+          }
+        ]
+      } as never,
+      r
+    )
+
+    expect(limite.usd).toBeCloseTo((1000 / 1e6) * 5 + (500 / 1e6) * 25, 10)
+    expect(limite.camadasMedidas).toEqual(['especialista'])
   })
 })
 
