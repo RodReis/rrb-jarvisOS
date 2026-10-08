@@ -37,7 +37,7 @@ const ACAO_DA_POLITICA = {
 
 export function alteraEstruturaDeBanco(tarefa: Pick<TarefaDoPlano, 'paths'>): boolean {
   return tarefa.paths.some((path) =>
-    /(?:^|\/)(?:migrations?|schema)(?:\/|\.|$)|(?:^|\/)schema\.prisma$/i.test(
+    /(?:^|\/)(?:migrations?|schema|drizzle)(?:\/|\.|$)|(?:^|\/)(?:db|database)(?:\/|$)|\.sql$/i.test(
       path.replaceAll('\\', '/')
     )
   )

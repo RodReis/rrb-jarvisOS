@@ -27,6 +27,8 @@ import { calcularCustoUsd, isRotaUnmetered } from './ai'
 import { REGISTRO_DE_CAPACIDADES } from './squad-capacidades'
 import { CAMADAS, limitesDoPerfil } from './squad-perfil'
 
+export const MAX_BLOCOS_DO_INTEGRADOR = 50
+
 /** O que o chamador mediu do mundo. Entra por parâmetro: esta função não olha o disco. */
 export interface AmbienteDeResolucao {
   readonly skills: readonly string[]
@@ -231,7 +233,8 @@ export interface LimitesAgregadosDoPlano extends CustoDoPlano {
  */
 export function limitesAgregadosDoPlano(
   plano: SquadPlan,
-  resolucao: ResolucaoDoPerfil
+  resolucao: ResolucaoDoPerfil,
+  perfil?: Pick<PerfilDeSquad, 'integrador' | 'limites'>
 ): LimitesAgregadosDoPlano {
   const camadasMedidas = new Set<Camada>()
   const escritores = new Set<string>()
@@ -259,6 +262,27 @@ export function limitesAgregadosDoPlano(
       usd += calcularCustoUsd(modelo.provider, modelo.modelo, {
         tokensEntrada: tarefa.limites.maxTokensEntrada,
         tokensSaida: tarefa.limites.maxTokensSaida
+      })
+    }
+  }
+
+  const camadaIntegrador = perfil?.integrador?.camada
+  const modeloIntegrador =
+    camadaIntegrador === undefined ? undefined : resolucao.camadas[camadaIntegrador].modelo
+  if (perfil !== undefined && camadaIntegrador !== undefined && modeloIntegrador !== undefined) {
+    const vezes = MAX_BLOCOS_DO_INTEGRADOR
+    const entrada = perfil.limites.maxTokensEntradaPorTarefa
+    const saida = perfil.limites.maxTokensSaidaPorTarefa
+    chamadas += vezes
+    tokensEntrada += entrada * vezes
+    tokensSaida += saida * vezes
+    turnos += vezes
+    duracaoMs += perfil.limites.maxMinutosPorTarefa * 60_000 * vezes
+    if (!isRotaUnmetered(modeloIntegrador.provider)) {
+      camadasMedidas.add(camadaIntegrador)
+      usd += calcularCustoUsd(modeloIntegrador.provider, modeloIntegrador.modelo, {
+        tokensEntrada: entrada * vezes,
+        tokensSaida: saida * vezes
       })
     }
   }
@@ -309,9 +333,22 @@ export function custoMaximoUsd(
   })
 
   const maisCara = Math.max(0, ...medidas.map((m) => m.porTarefa))
+  const camadaIntegrador = perfil.integrador?.camada
+  const modeloIntegrador =
+    camadaIntegrador === undefined ? undefined : resolucao.camadas[camadaIntegrador].modelo
+  const custoIntegrador =
+    modeloIntegrador === undefined || isRotaUnmetered(modeloIntegrador.provider)
+      ? 0
+      : MAX_BLOCOS_DO_INTEGRADOR *
+        calcularCustoUsd(modeloIntegrador.provider, modeloIntegrador.modelo, {
+          tokensEntrada: perfil.limites.maxTokensEntradaPorTarefa,
+          tokensSaida: perfil.limites.maxTokensSaidaPorTarefa
+        })
+  const camadasMedidas = new Set(medidas.map((m) => m.camada))
+  if (custoIntegrador > 0 && camadaIntegrador !== undefined) camadasMedidas.add(camadaIntegrador)
   return {
-    usd: maxTarefas * maisCara,
-    camadasMedidas: medidas.map((m) => m.camada),
+    usd: maxTarefas * maisCara + custoIntegrador,
+    camadasMedidas: [...camadasMedidas],
     slots,
     maxTarefas
   }

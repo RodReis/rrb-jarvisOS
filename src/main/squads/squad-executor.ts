@@ -30,6 +30,7 @@ import type { ContextoDaTarefa, BuscaDaTarefa } from './squad-contexto'
 import type { ExecutorDeEscritor, ResultadoDoEscritor } from './squad-escritor'
 import type { ExecutorDeWorker, ResultadoDoWorker } from './squad-worker'
 import type { SquadOrcamentoService } from './squad-orcamento'
+import { alteraEstruturaDeBanco } from './squad-aprovacao'
 import { calcularCustoUsd, isRotaUnmetered } from '@shared/domain/ai'
 
 /** Quantos workers somente leitura rodam ao mesmo tempo. Escritores são limitados pelo pool. */
@@ -65,6 +66,8 @@ export interface PedidoDoSquad {
   readonly baseSha: string
   readonly rota: AiProvider
   readonly plano: SquadPlan
+  /** Gate humano para mudanças estruturais declaradas nos paths da tarefa, antes do agente. */
+  readonly aprovarEstrutura?: (tarefa: TarefaDoPlano) => Promise<boolean>
   /** O que a tarefa precisa fazer, em texto do kernel (nunca texto de agente). */
   readonly objetivoDe: (tarefa: TarefaDoPlano) => string
   /** O modelo da camada da tarefa, do snapshot do Squad. `numCtx` é obrigatório para o local. */
@@ -260,6 +263,17 @@ export class ExecutorDoSquad {
     revisao: string
   ): Promise<Omit<ResultadoDaTarefaDoSquad, 'tarefaId' | 'papel'>> {
     try {
+      if (
+        pedido.aprovarEstrutura !== undefined &&
+        tarefa.papel === 'desenvolvedor' &&
+        alteraEstruturaDeBanco({ paths: tarefa.paths })
+      ) {
+        const aprovada = await pedido.aprovarEstrutura(tarefa)
+        if (!aprovada) {
+          this.registrar(pedido, tarefa, 'recusada', 'aprovacao-estrutural-negada')
+          return { estado: 'recusada', motivo: 'aprovacao-estrutural-negada' }
+        }
+      }
       const contexto = this.deps.contexto.montar({
         projectId: pedido.projectId,
         workspaceId: pedido.workspaceId,

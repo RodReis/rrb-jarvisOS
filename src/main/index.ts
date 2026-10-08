@@ -2148,6 +2148,16 @@ if (!app.requestSingleInstanceLock()) {
           baseSha: preparar.baseSha,
           rota: 'claude-code',
           plano: preparar.plano,
+          aprovarEstrutura: async (tarefa) =>
+            await squadAprovacao.exigir({
+              runId: pedido.runId,
+              projectId: pedido.projectId!,
+              workspaceId: pedido.workspaceId,
+              tarefaId: tarefa.id,
+              acao: 'alteracao-estrutural-de-banco',
+              alvo: tarefa.paths.join('\n'),
+              signal: producao.signal ?? pedido.signal
+            }),
           objetivoDe: () =>
             [pedido.promptInicial, correcoes, producao.falhaDeTeste?.evidencia ?? '']
               .filter(Boolean)
@@ -2178,7 +2188,9 @@ if (!app.requestSingleInstanceLock()) {
               ia: ai,
               audit: storage.audit,
               userId: userIdAtual,
-              workspaceId: () => pedido.workspaceId
+              workspaceId: () => pedido.workspaceId,
+              orcamento: squadOrcamento,
+              approvals: squadAprovacao
             }).integrar({
               runId: pedido.runId,
               projectId: pedido.projectId!,
@@ -2193,6 +2205,18 @@ if (!app.requestSingleInstanceLock()) {
               branch: `jarvis/${pedido.runId}/integracao-${producao.tentativa}`,
               modelo,
               rota: 'claude-code',
+              maxTokensEntrada: snapshot.perfil.limites.maxTokensEntradaPorTarefa,
+              maxTokensSaidaPorBloco: snapshot.perfil.limites.maxTokensSaidaPorTarefa,
+              maxMinutos: Math.min(snapshot.perfil.limites.maxMinutosPorTarefa, 10),
+              aprovarEstrutura: (commitSha) => {
+                const anterior = squadGit.listarNaRevisao(pedido.repositorio, preparar.baseSha)
+                const atual = squadGit.listarNaRevisao(pedido.repositorio, commitSha)
+                if (!anterior.ok || !atual.ok) return undefined
+                const caminhos = [
+                  ...new Set([...anterior.valor.keys(), ...atual.valor.keys()])
+                ].filter((path) => anterior.valor.get(path) !== atual.valor.get(path))
+                return !alteraEstruturaDeBanco({ paths: caminhos })
+              },
               signal: producao.signal ?? pedido.signal
             })
           }
@@ -2263,7 +2287,8 @@ if (!app.requestSingleInstanceLock()) {
             ollama: { disponivel: false, modelos: [] },
             optInApiPaga: false
           },
-          modelo as import('@shared/domain/modelo-da-fase').ModeloEscolhido
+          modelo as import('@shared/domain/modelo-da-fase').ModeloEscolhido,
+          { multiEscritor: true }
         ),
       executar: (pedido) =>
         workspaceDoRun.run(pedido.workspaceId, () => orquestradorSquad.executar(pedido))

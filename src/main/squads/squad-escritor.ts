@@ -19,6 +19,7 @@
 
 import { createHash } from 'node:crypto'
 import type { ContextPack } from '@shared/domain/context-pack'
+import { calcularCustoUsd, isRotaUnmetered } from '@shared/domain/ai'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { ModeloEscolhido } from '@shared/domain/modelo-da-fase'
 import { VALIDADE_DO_LEASE_MS } from '@shared/domain/lease'
@@ -415,7 +416,12 @@ export class ExecutorDeEscritor {
             tokensSaida: execucao.saida.uso.tokensSaida,
             turnos: execucao.saida.uso.turnos,
             duracaoMs: this.agora() - inicio,
-            usd: 0
+            usd: isRotaUnmetered(pedido.modelo.provider)
+              ? 0
+              : calcularCustoUsd(pedido.modelo.provider, pedido.modelo.modelo, {
+                  tokensEntrada: execucao.saida.uso.tokensEntrada,
+                  tokensSaida: execucao.saida.uso.tokensSaida
+                })
           }
         )
       } catch {

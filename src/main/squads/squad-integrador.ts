@@ -20,6 +20,8 @@
  */
 
 import type { AiProvider, AiRequest } from '@shared/domain/ai'
+import { MAX_BLOCOS_DO_INTEGRADOR } from '@shared/domain/squad-resolucao'
+import { calcularCustoUsd, isRotaUnmetered } from '@shared/domain/ai'
 import type { WorkspaceId } from '@shared/domain/entities'
 import type { ModeloEscolhido } from '@shared/domain/modelo-da-fase'
 import {
@@ -38,6 +40,8 @@ import {
 import { providerSemFerramenta } from '@shared/domain/squad-revisores'
 import type { ContextService, FonteDaTarefa } from '../context/context-service'
 import type { AuditRepository } from '../storage/audit-repository'
+import type { SquadOrcamentoService } from './squad-orcamento'
+import type { SquadAprovacaoService } from './squad-aprovacao'
 import { MS_POR_MINUTO, chamarModelo } from './squad-chamada'
 import { lerDiff } from './squad-diff'
 import type { ChamadorDeIa } from './squad-gerador'
@@ -60,7 +64,7 @@ const MAX_TOKENS_DA_SAIDA_PADRAO = 16_384
 const MAX_TOKENS_DA_ENTRADA_PADRAO = 100_000
 const MAX_MINUTOS_PADRAO = 10
 /** Uma chamada paga por bloco: sem teto, um arquivo de 1 MB gera milhares delas. */
-const MAX_BLOCOS_PADRAO = 50
+const MAX_BLOCOS_PADRAO = MAX_BLOCOS_DO_INTEGRADOR
 /**
  * Os arquivos que dizem ao Git o que executar (filtro, driver de merge, LFS) ou o que é
  * submódulo. Quem os escreve é o agente, e nem o merge nem a resolução do integrador os tocam.
@@ -97,6 +101,9 @@ export interface PedidoDeIntegracao {
   readonly maxTokensEntrada?: number
   readonly maxMinutos?: number
   readonly maxBlocos?: number
+  readonly maxTokensSaidaPorBloco?: number
+  /** Identifica alteração estrutural no diff do commit antes de começar resolver conflitos. */
+  readonly aprovarEstrutura?: (commitSha: string) => boolean | undefined
   readonly signal?: AbortSignal
 }
 
@@ -162,6 +169,11 @@ export interface DependenciasDoIntegrador {
   readonly audit: AuditRepository
   readonly userId: () => string
   readonly workspaceId: () => WorkspaceId
+  readonly orcamento: Pick<
+    SquadOrcamentoService,
+    'reservarIntegracao' | 'registrarConsumo' | 'marcarIndeterminado' | 'liberarAntesDoDispatch'
+  >
+  readonly approvals: Pick<SquadAprovacaoService, 'exigir'>
 }
 
 type Parada = Extract<ResultadoDaIntegracao, { estado: 'parado' }>
@@ -210,6 +222,23 @@ export class IntegradorService {
   private async executar(pedido: PedidoDeIntegracao): Promise<ResultadoDaIntegracao> {
     const invalido = this.recusar(pedido)
     if (invalido !== undefined) return invalido
+    for (const escritor of pedido.escritores) {
+      const estrutura = pedido.aprovarEstrutura?.(escritor.commitSha)
+      if (estrutura === undefined && pedido.aprovarEstrutura !== undefined)
+        return parada('diff-recusado', 'nao-foi-possivel-classificar-alteracao-estrutural')
+      if (estrutura === false) {
+        const aprovada = await this.deps.approvals.exigir({
+          runId: pedido.runId,
+          projectId: pedido.projectId,
+          workspaceId: this.deps.workspaceId(),
+          tarefaId: `integracao-${escritor.escritor}`,
+          acao: 'alteracao-estrutural-de-banco',
+          alvo: escritor.commitSha,
+          signal: pedido.signal
+        })
+        if (!aprovada) return parada('resolucao-invalida', 'aprovacao-estrutural-negada')
+      }
+    }
     const [a, b] = pedido.escritores as readonly [EscritorIntegrado, EscritorIntegrado]
 
     // Os dois escritores partiram da base declarada: um commit de outra história traria arquivos
@@ -448,7 +477,10 @@ export class IntegradorService {
       model: pedido.modelo.modelo,
       system,
       prompt,
-      maxTokens: pedido.maxTokensSaida ?? MAX_TOKENS_DA_SAIDA_PADRAO,
+      maxTokens: Math.min(
+        pedido.maxTokensSaida ?? MAX_TOKENS_DA_SAIDA_PADRAO,
+        pedido.maxTokensSaidaPorBloco ?? MAX_TOKENS_DA_SAIDA_PADRAO
+      ),
       contextPackId: montado.pack.id,
       runId: pedido.runId,
       tentativa: 1,
@@ -460,6 +492,35 @@ export class IntegradorService {
         : { jsonSchema: esquema })
     }
 
+    const tentativa = numero
+    const taskId = `__integrador__-${numero}`
+    const escopo = {
+      userId: this.deps.userId(),
+      workspaceId: this.deps.workspaceId(),
+      projectId: pedido.projectId
+    }
+    const tokensSaidaMaxima = Math.min(
+      pedido.maxTokensSaida ?? MAX_TOKENS_DA_SAIDA_PADRAO,
+      pedido.maxTokensSaidaPorBloco ?? MAX_TOKENS_DA_SAIDA_PADRAO
+    )
+    const duracaoMsMaxima = (pedido.maxMinutos ?? MAX_MINUTOS_PADRAO) * MS_POR_MINUTO
+    const reserva = this.deps.orcamento.reservarIntegracao(
+      escopo,
+      pedido.runId,
+      taskId,
+      tentativa,
+      {
+        tokensEntrada: tokensDeEntrada,
+        tokensSaida: tokensSaidaMaxima,
+        duracaoMs: duracaoMsMaxima
+      }
+    )
+    if (!reserva.permitido) return parada('blocos-demais', reserva.motivo ?? 'teto-agregado')
+    if (pedido.signal?.aborted) {
+      this.deps.orcamento.liberarAntesDoDispatch(escopo, pedido.runId, taskId, tentativa)
+      return parada('cancelada')
+    }
+    const inicio = Date.now()
     const chamada = await chamarModelo({
       ia: this.deps.ia,
       request,
@@ -468,6 +529,31 @@ export class IntegradorService {
       prazoMs: (pedido.maxMinutos ?? MAX_MINUTOS_PADRAO) * MS_POR_MINUTO,
       ...(pedido.signal === undefined ? {} : { signal: pedido.signal })
     })
+    const custo = chamada.custo
+    if (custo?.usage === undefined) {
+      this.deps.orcamento.marcarIndeterminado(escopo, pedido.runId, taskId, tentativa)
+      return parada(
+        chamada.ok || chamada.estado === 'invalida' ? 'resolucao-invalida' : chamada.estado,
+        'consumo-nao-observado'
+      )
+    }
+    const registrado = this.deps.orcamento.registrarConsumo(
+      escopo,
+      pedido.runId,
+      taskId,
+      tentativa,
+      {
+        chamadas: 1,
+        tokensEntrada: custo.usage.tokensEntrada,
+        tokensSaida: custo.usage.tokensSaida,
+        turnos: 1,
+        duracaoMs: Date.now() - inicio,
+        usd: isRotaUnmetered(custo.provider)
+          ? 0
+          : (custo.realUsd ?? calcularCustoUsd(custo.provider, custo.model, custo.usage))
+      }
+    )
+    if (!registrado) return parada('resolucao-invalida', 'teto-agregado-excedido-ou-ledger')
     if (!chamada.ok) {
       return parada(
         chamada.estado === 'invalida' ? 'resolucao-invalida' : chamada.estado,

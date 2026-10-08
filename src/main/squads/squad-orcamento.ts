@@ -70,6 +70,9 @@ function limitesValidos(valor: unknown): valor is LimitesAgregadosDoPlano {
   )
 }
 
+const PREFIXO_TAREFA_INTEGRADOR = '__integrador__-'
+const ehTarefaIntegrador = (taskId: string): boolean => taskId.startsWith(PREFIXO_TAREFA_INTEGRADOR)
+
 function tarefaDoRun(
   run: ReturnType<PipelineRepository['buscar']>,
   taskId: string
@@ -84,36 +87,68 @@ function tarefaDoRun(
   const snapshot = run?.squadSnapshot as SnapshotDoSquad | undefined
   const limites = run?.squadBudgetLimits
   if (plano === undefined || snapshot === undefined || !limitesValidos(limites)) return undefined
-  const tarefa = plano.tarefas.find((item) => item.id === taskId)
+  const tarefa =
+    plano.tarefas.find((item) => item.id === taskId) ??
+    (ehTarefaIntegrador(taskId) && snapshot.perfil.integrador !== undefined
+      ? ({
+          id: taskId,
+          papel: 'integrador',
+          capacidade: 'analise',
+          camada: snapshot.perfil.integrador.camada,
+          entradas: [],
+          dependencias: [],
+          paths: [],
+          schemaDeResultado: 'integracao@1',
+          limites: {
+            maxTurnos: snapshot.perfil.limites.maxTurnosPorTarefa,
+            maxMinutos: snapshot.perfil.limites.maxMinutosPorTarefa,
+            maxTokensEntrada: snapshot.perfil.limites.maxTokensEntradaPorTarefa,
+            maxTokensSaida: snapshot.perfil.limites.maxTokensSaidaPorTarefa
+          },
+          fundamento: { criterio: 1 },
+          regraDeConclusao: 'integracao validada pelo manifesto'
+        } satisfies TarefaDoPlano)
+      : undefined)
   return tarefa === undefined ? undefined : { tarefa, snapshot, limites }
 }
 
 function calcularReserva(
   tarefa: TarefaDoPlano,
-  snapshot: SnapshotDoSquad
+  snapshot: SnapshotDoSquad,
+  override?: {
+    readonly tokensEntrada: number
+    readonly tokensSaida: number
+    readonly duracaoMs: number
+  }
 ): ReservaCalculada | undefined {
   const modelo =
     snapshot.resolucao.camadas[tarefa.camada as keyof typeof snapshot.resolucao.camadas]?.modelo
   if (modelo === undefined) return undefined
-  const escritor = PAPEIS_QUE_ESCREVEM.includes(tarefa.papel) ? tarefa.escritor : undefined
-  if (PAPEIS_QUE_ESCREVEM.includes(tarefa.papel) && escritor === undefined) return undefined
+  const tokensEntrada = override?.tokensEntrada ?? tarefa.limites.maxTokensEntrada
+  const tokensSaida = override?.tokensSaida ?? tarefa.limites.maxTokensSaida
+  const duracaoMs = override?.duracaoMs ?? tarefa.limites.maxMinutos * 60_000
+  const escritor =
+    PAPEIS_QUE_ESCREVEM.includes(tarefa.papel) && tarefa.papel !== 'integrador'
+      ? tarefa.escritor
+      : undefined
+  if (tarefa.papel === 'desenvolvedor' && escritor === undefined) return undefined
   const usd = isRotaUnmetered(modelo.provider)
     ? 0
     : calcularCustoUsd(modelo.provider, modelo.modelo, {
-        tokensEntrada: tarefa.limites.maxTokensEntrada,
-        tokensSaida: tarefa.limites.maxTokensSaida
+        tokensEntrada,
+        tokensSaida
       })
   return {
     tarefa,
     ...(escritor === undefined ? {} : { escritor }),
     tarefas: 1,
     escritores: escritor === undefined ? 0 : 1,
-    workers: escritor === undefined ? 1 : 0,
+    workers: tarefa.papel === 'integrador' ? 0 : escritor === undefined ? 1 : 0,
     chamadas: 1,
-    tokensEntrada: tarefa.limites.maxTokensEntrada,
-    tokensSaida: tarefa.limites.maxTokensSaida,
-    turnos: tarefa.limites.maxTurnos,
-    duracaoMs: tarefa.limites.maxMinutos * 60_000,
+    tokensEntrada,
+    tokensSaida,
+    turnos: override === undefined ? tarefa.limites.maxTurnos : 1,
+    duracaoMs,
     usd
   }
 }
@@ -159,6 +194,36 @@ export class SquadOrcamentoService {
     taskId: string,
     tentativa: number
   ): { readonly permitido: boolean; readonly motivo?: string } {
+    return this.reservarComLimites(escopo, runId, taskId, tentativa)
+  }
+
+  reservarIntegracao(
+    escopo: EscopoDoRun,
+    runId: string,
+    taskId: string,
+    tentativa: number,
+    limites: {
+      readonly tokensEntrada: number
+      readonly tokensSaida: number
+      readonly duracaoMs: number
+    }
+  ): { readonly permitido: boolean; readonly motivo?: string } {
+    if (!ehTarefaIntegrador(taskId) || !Object.values(limites).every(numeroSeguro))
+      return { permitido: false, motivo: 'limites-invalidos' }
+    return this.reservarComLimites(escopo, runId, taskId, tentativa, limites)
+  }
+
+  private reservarComLimites(
+    escopo: EscopoDoRun,
+    runId: string,
+    taskId: string,
+    tentativa: number,
+    override?: {
+      readonly tokensEntrada: number
+      readonly tokensSaida: number
+      readonly duracaoMs: number
+    }
+  ): { readonly permitido: boolean; readonly motivo?: string } {
     if (!Number.isSafeInteger(tentativa) || tentativa < 1)
       return { permitido: false, motivo: 'tentativa-invalida' }
     const executar = this.db.transaction(() => {
@@ -173,10 +238,16 @@ export class SquadOrcamentoService {
         return { permitido: false, motivo: 'run-indisponivel' }
 
       const item = tarefaDoRun(run, taskId)
-      const reserva = item === undefined ? undefined : calcularReserva(item.tarefa, item.snapshot)
-      if (item === undefined || reserva === undefined)
+      const limites = item?.limites ?? (override === undefined ? undefined : run.squadBudgetLimits)
+      const reserva =
+        item === undefined ? undefined : calcularReserva(item.tarefa, item.snapshot, override)
+      if (
+        (item === undefined && !ehTarefaIntegrador(taskId)) ||
+        limites === undefined ||
+        reserva === undefined
+      )
         return { permitido: false, motivo: 'teto-ausente-ou-tarefa-desconhecida' }
-      if (Math.abs(item.limites.usd - (run.squadCostLimitUsd ?? Number.NaN)) > 1e-9) {
+      if (Math.abs(limites.usd - (run.squadCostLimitUsd ?? Number.NaN)) > 1e-9) {
         return { permitido: false, motivo: 'teto-financeiro-divergente' }
       }
 
@@ -200,22 +271,37 @@ export class SquadOrcamentoService {
         )
         .all(escopo.userId, escopo.workspaceId, escopo.projectId, runId) as LinhaDaReserva[]
 
+      if (linhas.some((linha) => linha.state === 'overrun')) {
+        this.auditar(escopo, runId, taskId, tentativa, 'bloqueado', 'sobreconsumo-anterior', {})
+        return { permitido: false, motivo: 'teto-agregado-excedido' }
+      }
+
       const tarefasVistas = new Set(
-        linhas.filter((linha) => linha.state !== 'released').map((linha) => linha.task_id)
+        linhas
+          .filter((linha) => linha.state !== 'released' && !ehTarefaIntegrador(linha.task_id))
+          .map((linha) => linha.task_id)
       )
       const ativas = linhas.filter((linha) => linha.state !== 'released')
       const escritoresVistos = new Set(ativas.flatMap((linha) => lineWriter(linha)))
       const workersVistos = new Set(
-        ativas.filter((linha) => linha.writer_id === null).map((linha) => linha.task_id)
+        ativas
+          .filter((linha) => linha.writer_id === null && !ehTarefaIntegrador(linha.task_id))
+          .map((linha) => linha.task_id)
       )
       const totais = {
-        tarefas: tarefasVistas.size + (tarefasVistas.has(taskId) ? 0 : 1),
+        tarefas:
+          tarefasVistas.size +
+          (tarefasVistas.has(taskId) || ehTarefaIntegrador(taskId) || item === undefined ? 0 : 1),
         escritores:
           escritoresVistos.size +
           (reserva.escritor !== undefined && !escritoresVistos.has(reserva.escritor) ? 1 : 0),
         workers:
           workersVistos.size +
-          (reserva.escritor === undefined && !workersVistos.has(taskId) ? 1 : 0),
+          (reserva.escritor === undefined &&
+          !ehTarefaIntegrador(taskId) &&
+          !workersVistos.has(taskId)
+            ? 1
+            : 0),
         chamadas: soma(linhas, 'chamadas') + reserva.chamadas,
         tokensEntrada: soma(linhas, 'tokensEntrada') + reserva.tokensEntrada,
         tokensSaida: soma(linhas, 'tokensSaida') + reserva.tokensSaida,
@@ -234,15 +320,15 @@ export class SquadOrcamentoService {
         usd: soma(anteriorDaTarefa, 'usd') + reserva.usd
       }
       const excedeu =
-        (!jaFoiContada && totais.tarefas > item.limites.tarefas) ||
-        totais.escritores > item.limites.escritores ||
-        totais.workers > item.limites.workers ||
-        totais.chamadas > item.limites.chamadas ||
-        totais.tokensEntrada > item.limites.tokensEntrada ||
-        totais.tokensSaida > item.limites.tokensSaida ||
-        totais.turnos > item.limites.turnos ||
-        totais.duracaoMs > item.limites.duracaoMs ||
-        totais.usd > item.limites.usd + 1e-9 ||
+        (!jaFoiContada && totais.tarefas > limites.tarefas) ||
+        totais.escritores > limites.escritores ||
+        totais.workers > limites.workers ||
+        totais.chamadas > limites.chamadas ||
+        totais.tokensEntrada > limites.tokensEntrada ||
+        totais.tokensSaida > limites.tokensSaida ||
+        totais.turnos > limites.turnos ||
+        totais.duracaoMs > limites.duracaoMs ||
+        totais.usd > limites.usd + 1e-9 ||
         reservadoTarefa.chamadas > reserva.tarefa.limites.maxTurnos ||
         reservadoTarefa.tokensEntrada > reserva.tarefa.limites.maxTokensEntrada ||
         reservadoTarefa.tokensSaida > reserva.tarefa.limites.maxTokensSaida ||
@@ -440,13 +526,20 @@ export class SquadOrcamentoService {
   private resumo(linhas: readonly LinhaDaReserva[]) {
     return {
       tarefas: new Set(
-        linhas.filter((linha) => linha.state !== 'released').map((linha) => linha.task_id)
+        linhas
+          .filter((linha) => linha.state !== 'released' && !ehTarefaIntegrador(linha.task_id))
+          .map((linha) => linha.task_id)
       ).size,
       escritores: new Set(linhas.filter((linha) => linha.state !== 'released').flatMap(lineWriter))
         .size,
       workers: new Set(
         linhas
-          .filter((linha) => linha.state !== 'released' && linha.writer_id === null)
+          .filter(
+            (linha) =>
+              linha.state !== 'released' &&
+              linha.writer_id === null &&
+              !ehTarefaIntegrador(linha.task_id)
+          )
           .map((linha) => linha.task_id)
       ).size,
       chamadas: soma(linhas, 'chamadas'),

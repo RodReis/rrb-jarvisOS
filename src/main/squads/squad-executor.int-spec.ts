@@ -524,6 +524,20 @@ describe('um escritor com várias tarefas', () => {
     )
   })
 
+  it('nega path estrutural antes de contexto ou dispatch do escritor', async () => {
+    const aprovarEstrutura = vi.fn().mockResolvedValue(false)
+    const r = await montar().executar(
+      pedido([escritora('migration', 'db', { paths: ['db/schema.sql'] })], { aprovarEstrutura })
+    )
+    expect(aprovarEstrutura).toHaveBeenCalledOnce()
+    expect(r.tarefas[0]).toMatchObject({
+      estado: 'recusada',
+      motivo: 'aprovacao-estrutural-negada'
+    })
+    expect(pedidosAoContexto).toHaveLength(0)
+    expect(pedidosAoEscritor).toHaveLength(0)
+  })
+
   it('duas tarefas cujo escritor-tarefa vira o mesmo nome: a segunda é recusada e auditada', async () => {
     // `a_b` + `c` e `a` + `b_c` viram `a-b-c`: o mesmo container e a mesma branch.
     const r = await montar().executar(

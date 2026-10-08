@@ -78,7 +78,14 @@ describe.skipIf(!habilitado)('integrador e revisor — smoke real (modelo da fas
         ia: chamadorViaCli,
         audit: amb.audit,
         userId: () => USUARIO_DE_TESTE,
-        workspaceId: () => WORKSPACE_DE_TESTE
+        workspaceId: () => WORKSPACE_DE_TESTE,
+        orcamento: {
+          reservarIntegracao: () => ({ permitido: true }),
+          registrarConsumo: () => true,
+          marcarIndeterminado: () => undefined,
+          liberarAntesDoDispatch: () => undefined
+        },
+        approvals: { exigir: async () => true }
       }).integrar({
         runId: 'run-smoke',
         projectId: 'p-smoke',

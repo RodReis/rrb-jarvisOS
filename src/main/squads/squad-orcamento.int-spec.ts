@@ -64,7 +64,7 @@ beforeEach(() => {
   audit = new AuditRepository(db, 'chave-de-teste')
   snapshot = SNAPSHOT
   plano = { tarefas: [tarefa('worker-a'), tarefa('worker-b')] as SquadPlan['tarefas'] }
-  limites = limitesAgregadosDoPlano(plano, snapshot.resolucao)
+  limites = limitesAgregadosDoPlano(plano, snapshot.resolucao, snapshot.perfil)
   const run = runs.criar(ESCOPO, { sliceId: 'slice-budget', estado: 'PLANNED' }, AGORA)
   runId = run.id
   expect(runs.registrarSnapshotDoSquad(ESCOPO, runId, snapshot, AGORA)).toBe(true)
@@ -88,7 +88,7 @@ afterEach(() => {
 
 describe('ledger agregado do Squad', () => {
   it('reserva cada tarefa uma vez e mantém reserva após reinício do serviço', () => {
-    expect(limites).toMatchObject({ chamadas: 2, turnos: 4 })
+    expect(limites).toMatchObject({ chamadas: 52, turnos: 54 })
     expect(service.reservar(ESCOPO, runId, 'worker-a', 1)).toEqual({ permitido: true })
     service = new SquadOrcamentoService(db, runs, audit, () => AGORA)
     expect(service.reservar(ESCOPO, runId, 'worker-a', 1)).toMatchObject({ permitido: false })
@@ -96,7 +96,7 @@ describe('ledger agregado do Squad', () => {
     expect(service.consumoDoRun(ESCOPO, runId)).toMatchObject({
       tarefas: 2,
       pendentes: 2,
-      tokensEntrada: limites.tokensEntrada
+      tokensEntrada: 200
     })
   })
 
@@ -122,6 +122,32 @@ describe('ledger agregado do Squad', () => {
     })
     expect(service.consumoDoProjeto(ESCOPO)).toMatchObject({ chamadas: 1, usd: 0 })
     expect(audit.list(USER).filter((item) => item.type === 'budget-decision')).toHaveLength(2)
+  })
+
+  it('reserva cada bloco do integrador no teto agregado sem contar nova tarefa ou writer', () => {
+    expect(
+      service.reservarIntegracao(ESCOPO, runId, '__integrador__-1', 1, {
+        tokensEntrada: 20,
+        tokensSaida: 10,
+        duracaoMs: 1000
+      }).permitido
+    ).toBe(true)
+    expect(
+      service.registrarConsumo(ESCOPO, runId, '__integrador__-1', 1, {
+        chamadas: 1,
+        tokensEntrada: 20,
+        tokensSaida: 10,
+        turnos: 1,
+        duracaoMs: 500,
+        usd: 0
+      })
+    ).toBe(true)
+    expect(service.consumoDoRun(ESCOPO, runId)).toMatchObject({
+      tarefas: 0,
+      escritores: 0,
+      workers: 0,
+      chamadas: 1
+    })
   })
 
   it('sobreconsumo vira overrun e impede outro dispatch dentro da mesma soma', () => {
@@ -158,7 +184,10 @@ describe('ledger agregado do Squad', () => {
         tarefa('writer-b', 'escritor-b')
       ] as SquadPlan['tarefas']
     }
-    limites = { ...limitesAgregadosDoPlano(plano, snapshot.resolucao), escritores: 1 }
+    limites = {
+      ...limitesAgregadosDoPlano(plano, snapshot.resolucao, snapshot.perfil),
+      escritores: 1
+    }
     db.prepare('UPDATE pipeline_run SET squad_plan = ?, squad_budget_limits = ? WHERE id = ?').run(
       JSON.stringify(plano),
       JSON.stringify(limites),

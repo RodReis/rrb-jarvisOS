@@ -133,7 +133,11 @@ export class SquadOrquestradorDeExecucao {
       if (controle.signal.aborted) return this.cancelado()
       const atual = this.deps.runs.buscar(pedido.runId)
       if (atual !== undefined && atual.squadPlan === undefined) {
-        const limites = limitesAgregadosDoPlano(preparado.plano, preparado.snapshot.resolucao)
+        const limites = limitesAgregadosDoPlano(
+          preparado.plano,
+          preparado.snapshot.resolucao,
+          preparado.snapshot.perfil
+        )
         const salvo = this.deps.runs.registrarPlanoDoSquad(
           { userId: atual.user_id, workspaceId: pedido.workspaceId, projectId: atual.projectId },
           pedido.runId,

@@ -282,7 +282,7 @@ describe('custo e limites antes de instanciar — critério 4', () => {
     const c = custoMaximoUsd(PERFIL_PADRAO, r, 6)
     expect(c.usd).toBe(0)
     expect(c.camadasMedidas).toEqual([])
-    expect(c.slots).toBe(1)
+    expect(c.slots).toBe(2)
     expect(c.maxTarefas).toBe(12)
   })
 

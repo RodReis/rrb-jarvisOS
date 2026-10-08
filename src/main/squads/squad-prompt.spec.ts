@@ -33,10 +33,10 @@ const dados = (texto = 'primeiro critério') => ({
 describe('montarPedido', () => {
   it('diz ao modelo as regras que o validador vai aplicar, tiradas do perfil', () => {
     const { system } = montarPedido(dados())
-    expect(system).toContain('No máximo 12 tarefas e 1 escritor(es)')
+    expect(system).toContain('No máximo 12 tarefas e 2 escritor(es)')
     expect(system).toContain('desenvolvedor: arquitetura, testes')
     expect(system).toContain('O revisor roda na camada especialista')
-    expect(system).toContain('Não há integrador')
+    expect(system).toContain('O integrador roda na camada executor')
     expect(system).toContain('src/shared/domain')
     expect(system).toContain('docs/spec')
   })

@@ -15,7 +15,7 @@
  *    para a recusa ser *verificável* — um perfil que não pudesse dizer `git: true` não provaria
  *    que o rejeita.
  *  - **Dois escritores ficam desligados por padrão** até o MVP-028 (ADR-006, decisão 16). O perfil
- *    de produção recusa `escritores: 2`; o E2E de teste liga `multiEscritor`.
+ *    de produção liga `multiEscritor` após a governança F02; a validação unitária exige opção explícita.
  *  - **O orquestrador padrão é o modelo da fase** (PI, 2026-10-02, após a M11-F00 reprovar o
  *    critério de 80%). O local via Ollama é opção, e só com o validador endurecido da Emenda E1.
  *
@@ -167,7 +167,7 @@ export type ResultadoDaValidacao =
   | { readonly ok: false; readonly problemas: readonly ProblemaDoPerfil[] }
 
 export interface OpcoesDeValidacao {
-  /** Liga o segundo escritor. Só o E2E de teste liga, até o MVP-028 (ADR-006, decisão 16). */
+  /** F02 liga dois escritores por padrão; `false` existe para validar configuração legada. */
   readonly multiEscritor?: boolean
 }
 
@@ -478,12 +478,12 @@ function validarContagemDeEscritores(
       'escritores',
       `${escritores} escritores; o teto é ${MAX_ESCRITORES}`
     )
-  } else if (escritores === 2 && opcoes.multiEscritor !== true) {
+  } else if (escritores === 2 && opcoes.multiEscritor === false) {
     registrar(
       problemas,
       'MULTI_ESCRITOR_DESLIGADO',
       'escritores',
-      'dois escritores ficam desligados até o MVP-028 (ADR-006, decisão 16)'
+      'multi-escritor desativado explicitamente pela configuração'
     )
   }
   return escritores
@@ -710,8 +710,9 @@ export const PERFIL_PADRAO: PerfilDeSquad = congelar({
     { id: 'revisao-de-design', obrigatoria: false, camadas: ['especialista'] },
     { id: 'pesquisa-documental', obrigatoria: false, camadas: ['executor', 'especialista'] }
   ],
-  escritores: 1,
+  escritores: 2,
   revisor: { camada: 'especialista' },
+  integrador: { camada: 'executor' },
   acessoPorFuncao: {
     leitura: { escrita: false, git: false, github: false },
     escritor: { escrita: true, git: false, github: false },

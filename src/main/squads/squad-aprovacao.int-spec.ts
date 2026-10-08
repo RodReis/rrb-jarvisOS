@@ -102,6 +102,8 @@ describe('aprovação sensível do Squad', () => {
   it('classifica paths de schema e migration antes do dispatch', () => {
     expect(alteraEstruturaDeBanco({ paths: ['src/main/storage/migrations.ts'] })).toBe(true)
     expect(alteraEstruturaDeBanco({ paths: ['prisma/schema.prisma'] })).toBe(true)
+    expect(alteraEstruturaDeBanco({ paths: ['db/schema.sql'] })).toBe(true)
+    expect(alteraEstruturaDeBanco({ paths: ['drizzle/0001_add.sql'] })).toBe(true)
     expect(alteraEstruturaDeBanco({ paths: ['src/components/Card.tsx'] })).toBe(false)
   })
 
