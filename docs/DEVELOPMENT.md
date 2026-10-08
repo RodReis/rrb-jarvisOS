@@ -2635,3 +2635,15 @@ Status: **entregue, aguardando aceite do PI** — issue [#134](https://github.co
 - [x] Testes de propriedade do DAG, revisão exata, mudança cosmética/material, projeção remota e round-trip/reinício do snapshot.
 - [x] Relatório categorizado por SPEC/issue gerado dos artefatos brutos e validado contra anti-drift.
 - [x] Revisão final, PR `refs #134`, CI verde e merge da #414; comentário de encerramento publicado e issue movida para `proplan:done` (aberta, aguardando aceite do PI).
+
+### M13-F02 — Dispatcher e retomada (`docs/spec/spec-continuo-02-dispatcher-retomada.md`)
+
+Status: implementação na [PR #416](https://github.com/RodReis/rrb-jarvisOS/pull/416), CI remoto em andamento; issue #135 permanece aberta para aceite do PI.
+
+- [x] Dispatcher serializado por escopo; reconciliação completa F01 no boot, após merge e no ciclo periódico.
+- [x] Seleção pela ordem reconciliada, apenas para issue aberta em `proplan:todo`; backlog/`next`, gate pendente e projeção em andamento ficam em espera/bloqueio verificável.
+- [x] Chave idempotente por usuário/workspace/projeto/nó/fingerprint; cursor e decisão persistidos em SQLite e run correlacionado pela mesma chave.
+- [x] Retomada de run `PLANNED`/`READY`; execução ativa, merge aguardando projeção e falha terminal não criam outro run. Quota com reset oficial conhecido fica em espera até a hora registrada.
+- [x] Fila e pool M12 continuam governando capacidade e independência; nenhum gate é aprovado e nenhuma issue é fechada pelo dispatcher.
+- [x] Testes de regras, reinício SQLite, migration legada, run idempotente, branches, gate, quota e retomada; 38 testes focados passaram.
+- [x] Relatório categorizado regenerado dos artefatos CI: Regras 2.975 pass; Banco 2.379 pass / 18 skip; Tela 804 pass / 1 todo. Self-check passou; reteste do CI pendente após corrigir a expectativa E2E de `repo.inventory`.

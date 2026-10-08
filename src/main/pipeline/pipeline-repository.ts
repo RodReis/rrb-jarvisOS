@@ -37,6 +37,7 @@ interface RunRow {
   readonly user_id: string
   readonly project_id: string
   readonly slice_id: string
+  readonly dispatch_key: string | null
   readonly estado: string
   readonly continua_de: string | null
   readonly bloqueio: string | null
@@ -113,6 +114,7 @@ function toRun(row: RunRow): PipelineRun {
     user_id: row.user_id,
     projectId: row.project_id,
     sliceId: row.slice_id,
+    ...(row.dispatch_key === null ? {} : { dispatchKey: row.dispatch_key }),
     estado: row.estado as EstadoDoRun,
     ...(row.continua_de === null ? {} : { continuaDe: row.continua_de }),
     ...(bloqueio === undefined ? {} : { bloqueio }),
@@ -186,30 +188,49 @@ export class PipelineRepository {
   /** Cria um run. `continuaDe` vincula a retomada ao run bloqueado que a originou. */
   criar(
     escopo: EscopoDoRun,
-    dados: { readonly sliceId: string; readonly estado: EstadoDoRun; readonly continuaDe?: string },
+    dados: {
+      readonly sliceId: string
+      readonly estado: EstadoDoRun
+      readonly continuaDe?: string
+      readonly dispatchKey?: string
+    },
     agora: Date
   ): PipelineRun {
+    if (dados.dispatchKey !== undefined) {
+      const existente = this.buscarPorChaveDispatch(escopo, dados.dispatchKey)
+      if (existente !== undefined) return existente
+    }
     const id = randomUUID()
     const iso = agora.toISOString()
 
-    this.db
-      .prepare(
-        `INSERT INTO pipeline_run
-           (id, user_id, workspace_id, project_id, slice_id, estado, continua_de, bloqueio,
+    try {
+      this.db
+        .prepare(
+          `INSERT INTO pipeline_run
+           (id, user_id, workspace_id, project_id, slice_id, estado, continua_de, bloqueio, dispatch_key,
             created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`
-      )
-      .run(
-        id,
-        escopo.userId,
-        escopo.workspaceId,
-        escopo.projectId,
-        dados.sliceId,
-        dados.estado,
-        dados.continuaDe ?? null,
-        iso,
-        iso
-      )
+         VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)`
+        )
+        .run(
+          id,
+          escopo.userId,
+          escopo.workspaceId,
+          escopo.projectId,
+          dados.sliceId,
+          dados.estado,
+          dados.continuaDe ?? null,
+          dados.dispatchKey ?? null,
+          iso,
+          iso
+        )
+    } catch (error) {
+      const concorrente =
+        dados.dispatchKey === undefined
+          ? undefined
+          : this.buscarPorChaveDispatch(escopo, dados.dispatchKey)
+      if (concorrente !== undefined) return concorrente
+      throw error
+    }
 
     return {
       id,
@@ -217,6 +238,7 @@ export class PipelineRepository {
       projectId: escopo.projectId,
       sliceId: dados.sliceId,
       estado: dados.estado,
+      ...(dados.dispatchKey === undefined ? {} : { dispatchKey: dados.dispatchKey }),
       ...(dados.continuaDe === undefined ? {} : { continuaDe: dados.continuaDe }),
       created_at: iso,
       updated_at: iso
@@ -231,6 +253,15 @@ export class PipelineRepository {
     agora: Date
   ): boolean {
     if (!snapshotValido(snapshot)) return false
+    const atual = this.db
+      .prepare(
+        `SELECT squad_snapshot FROM pipeline_run
+          WHERE id = ? AND user_id = ? AND workspace_id = ? AND project_id = ? AND estado = 'PLANNED'`
+      )
+      .get(runId, escopo.userId, escopo.workspaceId, escopo.projectId) as
+      { readonly squad_snapshot: string | null } | undefined
+    if (atual?.squad_snapshot !== null && atual?.squad_snapshot !== undefined)
+      return atual.squad_snapshot === JSON.stringify(snapshot)
     const resultado = this.db
       .prepare(
         `UPDATE pipeline_run SET squad_snapshot = ?, updated_at = ?
@@ -338,6 +369,21 @@ export class PipelineRepository {
     agora: Date
   ): boolean {
     if (!Number.isFinite(limiteUsd) || limiteUsd < 0) return false
+    const atual = this.db
+      .prepare(
+        `SELECT squad_cost_limit_usd, squad_cost_measured FROM pipeline_run
+          WHERE id = ? AND user_id = ? AND workspace_id = ? AND project_id = ?`
+      )
+      .get(runId, escopo.userId, escopo.workspaceId, escopo.projectId) as
+      | {
+          readonly squad_cost_limit_usd: number | null
+          readonly squad_cost_measured: number | null
+        }
+      | undefined
+    if (atual?.squad_cost_limit_usd !== null && atual?.squad_cost_limit_usd !== undefined)
+      return (
+        atual.squad_cost_limit_usd === limiteUsd && atual.squad_cost_measured === (medido ? 1 : 0)
+      )
     const resultado = this.db
       .prepare(
         `UPDATE pipeline_run SET squad_cost_limit_usd = ?, squad_cost_measured = ?, updated_at = ?
@@ -437,6 +483,16 @@ export class PipelineRepository {
     if (run.squadPlan === undefined) return run
     const uso = this.consumo(run)
     return uso === undefined ? run : { ...run, squadBudgetUsage: uso }
+  }
+
+  buscarPorChaveDispatch(escopo: EscopoDoRun, dispatchKey: string): PipelineRun | undefined {
+    const row = this.db
+      .prepare(
+        `SELECT * FROM pipeline_run
+          WHERE user_id = ? AND workspace_id = ? AND project_id = ? AND dispatch_key = ?`
+      )
+      .get(escopo.userId, escopo.workspaceId, escopo.projectId, dispatchKey) as RunRow | undefined
+    return row === undefined ? undefined : this.buscar(row.id)
   }
 
   /** O espaço do run. O `PipelineRun` não o carrega; quem age por conta própria (a recuperação) precisa dele. */

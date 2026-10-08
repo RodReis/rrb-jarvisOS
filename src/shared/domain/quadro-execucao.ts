@@ -17,6 +17,8 @@ export type ColunaDoQuadro = (typeof COLUNAS_DO_QUADRO)[number]
 export interface PedidoDePlay {
   readonly projectId: string
   readonly sliceIds: readonly string[]
+  /** Chave estável opcional para que o dispatcher retome sem criar um segundo run. */
+  readonly dispatchKey?: string
 }
 
 export interface ResultadoDoPlay {
