@@ -511,4 +511,7 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-10-08 | #135 | spec-continuo-02-dispatcher-retomada | Regras de Negócio | 2975 | 2975 | 0 | 81.2 | #416 | [#416](https://github.com/RodReis/rrb-jarvisOS/pull/416) |
 | 2026-10-08 | #135 | spec-continuo-02-dispatcher-retomada | Banco | 2397 | 2379 | 0 | 84.4 | #416 | [#416](https://github.com/RodReis/rrb-jarvisOS/pull/416) |
 | 2026-10-08 | #135 | spec-continuo-02-dispatcher-retomada | Tela | 805 | 804 | 0 | 75.2 | #416 | [#416](https://github.com/RodReis/rrb-jarvisOS/pull/416) |
+| 2026-10-08 | #136 | spec-continuo-03-controles-operacionais | Regras de Negócio | 2983 | 2983 | 0 | 81.1 | #417 | [#417](https://github.com/RodReis/rrb-jarvisOS/pull/417) |
+| 2026-10-08 | #136 | spec-continuo-03-controles-operacionais | Banco | 2407 | 2389 | 0 | 84.3 | #417 | [#417](https://github.com/RodReis/rrb-jarvisOS/pull/417) |
+| 2026-10-08 | #136 | spec-continuo-03-controles-operacionais | Tela | 805 | 804 | 0 | 74.7 | #417 | [#417](https://github.com/RodReis/rrb-jarvisOS/pull/417) |
 
