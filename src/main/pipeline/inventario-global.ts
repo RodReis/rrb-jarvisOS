@@ -36,6 +36,7 @@ export interface NoInventario {
     readonly numero: number
     readonly estado: 'open' | 'closed'
     readonly merged: boolean
+    readonly headBranch?: string
     readonly headSha: string
     readonly mergeSha?: string
     readonly checks: 'pending' | 'success' | 'failure' | 'unknown'
@@ -104,6 +105,7 @@ export function fingerprintInventario(
                 numero: pull.numero,
                 estado: pull.estado,
                 merged: pull.merged,
+                headBranch: pull.headBranch ?? null,
                 headSha: pull.headSha,
                 mergeSha: pull.mergeSha ?? null,
                 checks: pull.checks

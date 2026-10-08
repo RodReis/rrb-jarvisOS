@@ -2650,7 +2650,7 @@ Status: entregue pela [PR #416](https://github.com/RodReis/rrb-jarvisOS/pull/416
 
 ### M13-F03 — Controles operacionais (`docs/spec/spec-continuo-03-controles-operacionais.md`)
 
-Status: entregue pela [PR #417](https://github.com/RodReis/rrb-jarvisOS/pull/417), merge confirmado em 2026-10-08 (`7976761`); issue #136 permanece aberta em `proplan:done`, aguardando aceite do PI. O PI confirmou pausa drenando o run inteiro, execução OFF cancelando imediatamente pela matriz existente e cancelamento em cascata como ação separada com prévia dos descendentes vinculados.
+Status: entregue pela [PR #417](https://github.com/RodReis/rrb-jarvisOS/pull/417), merge confirmado em 2026-10-08 (`7976761`); aceita pelo PI em 2026-10-08, issue #136 fechada em `proplan:finalizado`. O PI confirmou pausa drenando o run inteiro, execução OFF cancelando imediatamente pela matriz existente e cancelamento em cascata como ação separada com prévia dos descendentes vinculados.
 
 - [x] Contratos de domínio, persistência SQLite versionada e journal idempotente por usuário/workspace/projeto.
 - [x] Serviço de controle com herança de switches do workspace, auditoria e cancelamento pela matriz existente.
@@ -2662,4 +2662,18 @@ Status: entregue pela [PR #417](https://github.com/RodReis/rrb-jarvisOS/pull/417
 - [x] Relatório categorizado regenerado dos artefatos oficiais do CI #493: Regras 2.983 pass; Banco 2.389 pass / 18 ignorados; Tela 804 pass / 1 todo. Self-check passou.
 - [x] Revisão de diff, push, PR `refs #136`, CI verde, merge confirmado (`7976761`) e comentário de encerramento publicado na issue.
 
-Entrega integrada na `main`; a issue #136 continua aberta para aceite do PI.
+Entrega integrada na `main`; a issue #136 foi aceita e fechada pelo PI.
+
+### M13-F04 — Projeções e gates (`docs/spec/spec-continuo-04-projecoes-gates.md`)
+
+Status: em andamento na issue [#137](https://github.com/RodReis/rrb-jarvisOS/issues/137), `proplan:doing`; SPEC aprovada pelo PI. Protótipo navegável aprovado em 2026-10-08.
+
+- [x] Conferir dependência F03 no GitHub: #136 fechada e finalizada pelo PI.
+- [x] Prototipar e obter aprovação do PI para o painel DAG e o pacote do gate.
+- [x] Projetar run, branch/PR, checks, merge e divergência a partir do snapshot reconciliado.
+- [x] Montar pacote idempotente de revisão do gate sem ação de aprovação.
+- [x] Integrar IPC de reconciliação e painel somente leitura.
+- [x] Build, typecheck, lint, formatação e 57 testes direcionados passaram; provas cobrem SHA/branch/PR, preservação do link da issue e ausência de aprovação automática.
+- [x] Regenerar `reports/TESTS.md` a partir dos três JSONs brutos da CI #496 e passar `npm run test:report:check -- --no-run --require-entry`: Regras 2.994 pass; Banco 2.391 pass / 18 ignorados; Tela 805 pass / 1 todo. A primeira guarda da CI detectou o relatório anterior; o relatório gerado com os artefatos oficiais está na atualização seguinte da PR.
+- [x] Revisar diff, fronteira IPC, escopo do snapshot e projeção fail-closed; teste confirmou o link publicado da issue no nó do DAG.
+- [ ] PR [#419](https://github.com/RodReis/rrb-jarvisOS/pull/419), `refs #137`: a execução CI #496 aprovou qualidade, regras, banco, tela, visual e E2E; o agregador falhou pela divergência do relatório anterior. Relatório oficial regenerado e guard local aprovado; aguardar nova CI, integrar e publicar comentário de encerramento. A issue fica aberta até aceite do PI.

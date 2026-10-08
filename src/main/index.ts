@@ -2306,10 +2306,28 @@ if (!app.requestSingleInstanceLock()) {
     })
     squadEmExecucao.servico = orquestradorSquad
 
+    const fonteLocalDoInventario = new InventarioLocalFonte(roadmap, roadmapGerado)
+    const fonteGithubDoInventario = new GithubInventarioFonte(connectors, (_projectId, escopo) => {
+      const referencia = externalRefRepository
+        .listar(escopo)
+        .find((ref) => ref.alvo === 'repositorio')
+      const partes = referencia?.refId.split('/')
+      return partes?.length === 2 ? { owner: partes[0]!, repo: partes[1]! } : undefined
+    })
+    const inventarioGlobal = new InventarioGlobalService(
+      {
+        lerLocal: (escopo) => fonteLocalDoInventario.lerLocal(escopo),
+        lerGithub: (escopo, nosLocais) => fonteGithubDoInventario.lerGithub(escopo, nosLocais)
+      },
+      new InventarioSnapshotRepository(storage.db)
+    )
+
     const quadroExecucao = new QuadroExecucaoService({
       userId: userIdAtual,
       roadmap: roadmapRepository,
       roadmapService: roadmap,
+      roadmapGerado,
+      inventarioGlobal,
       refs: externalRefRepository,
       projects: projectRepository,
       contexts,
@@ -2340,21 +2358,6 @@ if (!app.requestSingleInstanceLock()) {
         workspaceDoRun.run(pedido.workspaceId, () => orquestradorSquad.executar(pedido))
     })
 
-    const fonteLocalDoInventario = new InventarioLocalFonte(roadmap, roadmapGerado)
-    const fonteGithubDoInventario = new GithubInventarioFonte(connectors, (_projectId, escopo) => {
-      const referencia = externalRefRepository
-        .listar(escopo)
-        .find((ref) => ref.alvo === 'repositorio')
-      const partes = referencia?.refId.split('/')
-      return partes?.length === 2 ? { owner: partes[0]!, repo: partes[1]! } : undefined
-    })
-    const inventarioGlobal = new InventarioGlobalService(
-      {
-        lerLocal: (escopo) => fonteLocalDoInventario.lerLocal(escopo),
-        lerGithub: (escopo, nosLocais) => fonteGithubDoInventario.lerGithub(escopo, nosLocais)
-      },
-      new InventarioSnapshotRepository(storage.db)
-    )
     const dispatcher = new ContinuousDispatcher({
       inventario: inventarioGlobal,
       repository: new ContinuousDispatcherRepositorySqlite(storage.db),

@@ -244,6 +244,7 @@ describe('ponte do preload', () => {
         'verifyAuditChain',
         'vistaDaFila',
         'quadroDeExecucao',
+        'reconciliarQuadroDeExecucao',
         'playNoQuadro',
         'cancelarNoQuadro',
         'preverCancelamentoEmCascataNoQuadro',
@@ -272,6 +273,12 @@ describe('ponte do preload', () => {
       'f'.repeat(64),
       'jarvis'
     )
+  })
+
+  it('expõe reconciliação explícita do inventário pelo canal dedicado', async () => {
+    const bridge = (await carregarPonte()) as unknown as JarvisBridge
+    await bridge.reconciliarQuadroDeExecucao('p-1', 'jarvis')
+    expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.quadroExecucaoReconciliar, 'p-1', 'jarvis')
   })
 
   it('roteia comandos de controles operacionais por canais tipados', async () => {

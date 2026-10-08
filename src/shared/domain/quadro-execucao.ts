@@ -1,6 +1,7 @@
 import type { DependenciaAberta } from './fila'
 import type { EstadoDoRun, PipelineRun } from './pipeline'
 import type { AlvoDeCancelamentoEmCascata, Mvp, Slice } from './roadmap'
+import type { EstadoDaFatiaProjetada, PacoteDoProximoGate } from './projecoes-execucao'
 
 export const COLUNAS_DO_QUADRO = [
   'a-fazer',
@@ -135,6 +136,11 @@ export interface QuadroDeExecucao {
   readonly projectId: string
   readonly colunas: readonly ColunaDoQuadroDeExecucao[]
   readonly geradoEm: string
+  readonly dag?: readonly EstadoDaFatiaProjetada[]
+  readonly pacoteDoProximoGate?: PacoteDoProximoGate
+  readonly inventarioObservadoEm?: string
+  readonly falhaDeReconciliacao?: string
+  readonly inventarioDisponivel?: boolean
 }
 
 export const TITULOS_DAS_COLUNAS: Readonly<Record<ColunaDoQuadro, string>> = {

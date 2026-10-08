@@ -72,6 +72,7 @@ describe('equipe do Squad no cartão do quadro', () => {
     }
     vi.stubGlobal('jarvis', {
       quadroDeExecucao: vi.fn(async () => quadro),
+      reconciliarQuadroDeExecucao: vi.fn(async () => quadro),
       lerControlesContinuos: vi.fn(async () => controles),
       definirControleContinuo: vi.fn(async () => ({ status: 'updated', snapshot: controles })),
       playNoQuadro: vi.fn(async () => []),
@@ -149,6 +150,75 @@ describe('equipe do Squad no cartão do quadro', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar cancelamento de 1 run(s)' }))
     await waitFor(() => expect(window.jarvis.cancelarEmCascataNoQuadro).toHaveBeenCalledTimes(2))
+    vi.unstubAllGlobals()
+  })
+})
+
+describe('projeções do DAG e gate', () => {
+  it('mostra a revisão exata e não oferece ação de aprovação automática', async () => {
+    const quadro: QuadroDeExecucao = {
+      projectId: 'p-1',
+      geradoEm: '2026-10-08T12:00:00.000Z',
+      inventarioDisponivel: true,
+      inventarioObservadoEm: '2026-10-08T11:59:00.000Z',
+      colunas: [],
+      dag: [
+        {
+          id: 'MVP13-F04',
+          estadoTecnico: 'em-andamento',
+          run: { id: 'run-137', estado: 'PR_CI' },
+          branch: {
+            nome: 'feat/m13-f04-projecoes',
+            estadoRemoto: 'confirmada',
+            headSha: 'a'.repeat(40)
+          },
+          pullRequest: {
+            numero: 417,
+            url: 'https://github.com/RodReis/rrb-jarvisOS/pull/417',
+            estado: 'open',
+            merged: false,
+            headSha: 'a'.repeat(40),
+            checks: 'pending'
+          },
+          divergencias: []
+        }
+      ],
+      pacoteDoProximoGate: {
+        estado: 'pronto-para-revisao',
+        fingerprint: 'b'.repeat(64),
+        no: {
+          id: 'MVP13-F04',
+          tipo: 'fatia',
+          numero: 4,
+          titulo: 'Projeções e gates',
+          dependeDe: [],
+          estadoTecnico: 'pendente',
+          gateAprovado: false
+        },
+        gate: 'SLICE_ENTRY',
+        revisoes: [
+          { artefato: 'docs/spec/spec-continuo-04-projecoes-gates.md', hash: 'c'.repeat(64) }
+        ],
+        mudancas: [],
+        questoes: [],
+        diagnosticos: [],
+        recomendacao: 'Revisar os artefatos listados.'
+      }
+    }
+    vi.stubGlobal('jarvis', {
+      quadroDeExecucao: vi.fn(async () => quadro),
+      reconciliarQuadroDeExecucao: vi.fn(async () => quadro),
+      lerControlesContinuos: vi.fn(async () => controles)
+    })
+    render(<TelaDoQuadro projectId="p-1" workspace="jarvis" />)
+    expect(await screen.findByRole('list', { name: 'Nós projetados do DAG' })).toBeInTheDocument()
+    expect(screen.getByText(/Branch: feat\/m13-f04-projecoes/)).toHaveTextContent('confirmado')
+    expect(screen.getByRole('link', { name: 'PR #417' })).toHaveAttribute(
+      'href',
+      'https://github.com/RodReis/rrb-jarvisOS/pull/417'
+    )
+    expect(screen.getByText(/SHA-256/)).toHaveTextContent('c'.repeat(64))
+    expect(screen.getByText(/sem aprovação automática/)).toBeInTheDocument()
     vi.unstubAllGlobals()
   })
 })
