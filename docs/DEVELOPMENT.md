@@ -2625,7 +2625,7 @@ Status: **em andamento** — issue [#359](https://github.com/RodReis/rrb-jarvisO
 
 ### M13-F01 — Inventário e DAG global (`docs/spec/spec-continuo-01-inventario-dag.md`)
 
-Status: **em implementação** — issue [#134](https://github.com/RodReis/rrb-jarvisOS/issues/134) em `proplan:doing`; branch `feat/m13-f01-inventario`.
+Status: **entregue, aguardando aceite do PI** — issue [#134](https://github.com/RodReis/rrb-jarvisOS/issues/134) aberta em `proplan:done`; [PR #414](https://github.com/RodReis/rrb-jarvisOS/pull/414) mergeada em 2026-10-08 (merge SHA `3f88f9a`).
 
 - [x] Núcleo determinístico do DAG: ciclo, dependência ausente, duplicidade e referência quebrada bloqueiam a ordem.
 - [x] Fonte local adaptada do roadmap SQLite e dos gates existentes; só a fatia com SPEC vigente e aceite exato é elegível, e a ordem de fatias vira dependência.
@@ -2634,4 +2634,4 @@ Status: **em implementação** — issue [#134](https://github.com/RodReis/rrb-j
 - [x] Coleta paginada de issues, PRs, branches e checks pelo conector GitHub, sem armazenar corpos livres; estado de checks desconhecido nunca vira sucesso.
 - [x] Testes de propriedade do DAG, revisão exata, mudança cosmética/material, projeção remota e round-trip/reinício do snapshot.
 - [x] Relatório categorizado por SPEC/issue gerado dos artefatos brutos e validado contra anti-drift.
-- [ ] Revisão final, PR `refs #134`, CI, merge e encerramento em `proplan:done`.
+- [x] Revisão final, PR `refs #134`, CI verde e merge da #414; comentário de encerramento publicado e issue movida para `proplan:done` (aberta, aguardando aceite do PI).
