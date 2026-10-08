@@ -2152,6 +2152,24 @@ const MIGRATIONS: readonly string[] = [
     ON squad_budget_reservation(user_id, workspace_id, project_id, run_id, state);
   CREATE INDEX idx_squad_budget_project
     ON squad_budget_reservation(user_id, workspace_id, project_id, state);
+  `,
+  // Inventário reconciliado da SPEC-Contínuo-01. Snapshot é derivado das fontes e reconstruível;
+  // preservar o último estado permite retomar após reinício sem tratar o SQLite como autoridade remota.
+  `
+  CREATE TABLE dag_inventory_snapshot (
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    project_id TEXT NOT NULL,
+    -- Fingerprint semântico do DAG, usado para comparar revisões de decisão.
+    fingerprint TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    -- Integridade do snapshot serializado inteiro, incluindo revisões das fontes e ordem.
+    payload_hash TEXT NOT NULL,
+    observed_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, workspace_id, project_id)
+  );
+  CREATE INDEX idx_dag_inventory_fingerprint
+    ON dag_inventory_snapshot(user_id, workspace_id, fingerprint);
   `
 ]
 

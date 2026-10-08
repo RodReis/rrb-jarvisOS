@@ -2,7 +2,8 @@
  * O adapter do GitHub (SPEC-Conectores-03 e 04).
  *
  * A F03 o abriu com `auth.identify` — a operação que confirma usuário e instalação. A F04
- * acrescenta as nove capacidades de automação, e o desenho é o que a F01 previu: **acrescentar
+ * acrescenta as nove capacidades de automação, e a M13-F01 acrescenta a leitura paginada do
+ * inventário. O desenho da F01 é: **acrescentar
  * capacidade é escrever a operação e declará-la**, não tocar o ponto de chamada. O
  * `ConnectorService` não mudou por causa desta fatia, e é isso que o critério 1 da F01 afirmava.
  *
@@ -41,6 +42,7 @@ import {
   type EnsureRepositoryInput,
   type HeadShaInput,
   type IssueStateInput,
+  type RepositoryInventoryInput,
   type PullRequestInput,
   type RequiredChecksInput,
   type RulesForBranchInput,
@@ -62,6 +64,7 @@ import {
   getCommitSha,
   getMergeState,
   getIssueState,
+  getRepositoryInventory,
   getRequiredChecksForBranch,
   getRulesForBranch,
   getWorkflowRunsForHead,
@@ -222,6 +225,9 @@ export class GithubAdapter implements ConnectorAdapter {
 
       case GITHUB_OPERATIONS.getIssueState:
         return await getIssueState(rest, input as IssueStateInput)
+
+      case GITHUB_OPERATIONS.getRepositoryInventory:
+        return await getRepositoryInventory(rest, input as RepositoryInventoryInput)
 
       case GITHUB_OPERATIONS.setDefaultBranch:
         return await setDefaultBranch(rest, input as SetDefaultBranchInput)

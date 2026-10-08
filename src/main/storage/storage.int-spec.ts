@@ -162,6 +162,8 @@ describe('migrations', () => {
     antigo.exec('DROP TABLE merge_tentativa')
     // A 53 guarda o PR que cada run publicou (SPEC-Scheduler-05).
     antigo.exec('DROP TABLE run_pr')
+    // A 60 guarda o snapshot reconstruível do inventário global (SPEC-Contínuo-01).
+    antigo.exec('DROP TABLE dag_inventory_snapshot')
     antigo.pragma('user_version = 1')
     antigo.close()
 

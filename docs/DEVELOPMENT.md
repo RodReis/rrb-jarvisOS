@@ -2620,3 +2620,18 @@ Status: **em andamento** — issue [#359](https://github.com/RodReis/rrb-jarvisO
 | 2026-07-22 | MVP-002 · F02 Policy Engine (classificação) (#11) | [#33](https://github.com/RodReis/rrb-jarvisOS/pull/33) | Regras 107 (77.0%), Banco 74 (87.0%), Tela 33 (93.5%) — **+21 testes**. Backbone das fatias 03/05 do MVP-002. Núcleo `evaluate` puro (Regras) + `PolicyService` que audita cada decisão (Banco). Taxonomia como seed dos requisitos § Ações Possíveis — dado, não hardcode. Fail-closed na classificação: desconhecido ⇒ `bloqueado`. Modo report: nada barra (mesmo `bloqueado` volta ao chamador). Canal `policy:classify` provou a fronteira — o E2E e o `preload.spec` que listam a superfície da ponte pegaram o método novo, como esperado. |
 | 2026-07-22 | MVP-002 · F01 Supabase local + ambiente de sync (#15) | [#32](https://github.com/RodReis/rrb-jarvisOS/pull/32) | Regras 92 (79.6%), **Banco 68 (87.0%)**, Tela 33 (93.5%). Abre o MVP-002. Os 8 testes novos entram na categoria Banco: RLS real, contra a stack Docker, com JWT de usuário final pelo PostgREST — nunca a conexão do owner, que pularia RLS e faria tudo passar sem provar nada. A prova de que os testes provam algo veio por **mutação**: com `user_profile` sem RLS, dois deles ficam vermelhos. O CI passou a subir a stack (`supabase/setup-cli` + `supabase start`), e o teste **falha em vez de pular** quando `CI` está setado — sem isso, uma stack que não sobe deixaria o CI verde sobre RLS não testada. |
 | 2026-07-22 | MVP-001 · F03 Autenticação Google local-first (#4) | [#30](https://github.com/RodReis/rrb-jarvisOS/pull/30) | Regras 92 (79.6%), Banco 60 (87.0%), Tela 33 (93.5%) — **185 testes** contando os 3 E2E. **Fecha o MVP-001 (6/6 entregues).** Desbloqueada no mesmo dia, quando o PI criou as credenciais. A **categoria E2E deixa de contar 0**: o Playwright-Electron sobe o app empacotado e prova, com preload e IPC reais, que o shell não monta sem sessão e que a ponte não expõe caminho até o token. Dois achados de ambiente custaram tempo e ficaram registrados: `ELECTRON_RUN_AS_NODE` herdado do shell faz o Electron subir como Node puro (erro se disfarça de falha de bundle), e `close()`/`quit()` travam o teardown — o app vive no tray e os timers do `winston-daily-rotate-file` seguram o event loop. |
+
+## MVP-013 — Execução contínua
+
+### M13-F01 — Inventário e DAG global (`docs/spec/spec-continuo-01-inventario-dag.md`)
+
+Status: **em implementação** — issue [#134](https://github.com/RodReis/rrb-jarvisOS/issues/134) em `proplan:doing`; branch `feat/m13-f01-inventario`.
+
+- [x] Núcleo determinístico do DAG: ciclo, dependência ausente, duplicidade e referência quebrada bloqueiam a ordem.
+- [x] Fonte local adaptada do roadmap SQLite e dos gates existentes; só a fatia com SPEC vigente e aceite exato é elegível, e a ordem de fatias vira dependência.
+- [x] Reconciliação das projeções local/GitHub com órfãos e conflitos explícitos; merge confirmado satisfaz dependência técnica sem exigir fechamento da issue.
+- [x] Snapshot SQLite escopado por usuário/workspace/projeto, recuperável após reinício e validado por fingerprint; falha/incompletude GitHub preserva o snapshot anterior.
+- [x] Coleta paginada de issues, PRs, branches e checks pelo conector GitHub, sem armazenar corpos livres; estado de checks desconhecido nunca vira sucesso.
+- [x] Testes de propriedade do DAG, revisão exata, mudança cosmética/material, projeção remota e round-trip/reinício do snapshot.
+- [x] Relatório categorizado por SPEC/issue gerado dos artefatos brutos e validado contra anti-drift.
+- [ ] Revisão final, PR `refs #134`, CI, merge e encerramento em `proplan:done`.

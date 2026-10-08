@@ -1,5 +1,6 @@
 /**
- * As nove capacidades de automação (SPEC-Conectores-04).
+ * As operações declaradas do GitHub, incluindo automação (SPEC-Conectores-04) e inventário
+ * de leitura (SPEC-Contínuo-01).
  *
  * Cada função faz **uma** coisa: garante um recurso, ou lê um estado. Nenhuma decide quando será
  * usada — a orquestração é do MVP-009, e a spec repete isso de propósito para a fatia não crescer
@@ -31,6 +32,8 @@ import {
   type HeadShaInput,
   type IssueStateInput,
   type IssueStateNormalizado,
+  type RepositoryInventoryInput,
+  type RepositoryInventoryNormalizado,
   type MergeStateNormalizado,
   type PullRequestInput,
   type RequiredChecksInput,
@@ -585,6 +588,180 @@ export async function getIssueState(
     finalizado
   }
   return { data, externalRef: { id: String(data.numero) }, criado: false }
+}
+
+/** Lê o inventário paginado sem guardar corpos livres, URLs ou dados pessoais do GitHub. */
+export async function getRepositoryInventory(
+  rest: GithubRest,
+  input: RepositoryInventoryInput
+): Promise<ResultadoDeOperacao<RepositoryInventoryNormalizado>> {
+  const base = `/repos/${input.owner}/${input.repo}`
+  const [issuesBrutas, prsBrutos, branchesBrutas] = await Promise.all([
+    todasAsPaginas(rest, `${base}/issues?state=all`),
+    todasAsPaginas(rest, `${base}/pulls?state=all`),
+    todasAsPaginas(rest, `${base}/branches`)
+  ])
+
+  const issues = issuesBrutas
+    .filter((item) => item.pull_request === undefined)
+    .map((item) => {
+      const estado = texto(item, 'state')
+      const numeroIssue = numero(item, 'number')
+      const titulo = texto(item, 'title')
+      if (
+        (estado !== 'open' && estado !== 'closed') ||
+        numeroIssue === undefined ||
+        titulo === undefined
+      ) {
+        throw new Error('Issue em formato inesperado; inventário GitHub incompleto.')
+      }
+      return {
+        numero: numeroIssue,
+        titulo,
+        estado: estado as 'open' | 'closed',
+        labels: lista(item, 'labels').flatMap((label) => {
+          const nome = texto(label, 'name')
+          return nome === undefined ? [] : [nome]
+        })
+      }
+    })
+
+  const pullRequests = await mapearEmLotes(prsBrutos, 8, async (pr) => {
+    const head = pr.head
+    const baseRef = pr.base
+    const sha = typeof head === 'object' && head !== null ? (texto(head, 'sha') ?? '') : ''
+    const headBranch = typeof head === 'object' && head !== null ? (texto(head, 'ref') ?? '') : ''
+    const baseBranch =
+      typeof baseRef === 'object' && baseRef !== null ? (texto(baseRef, 'ref') ?? '') : ''
+    const estadoPull = texto(pr, 'state')
+    const numeroPull = numero(pr, 'number')
+    if (
+      (estadoPull !== 'open' && estadoPull !== 'closed') ||
+      numeroPull === undefined ||
+      headBranch === '' ||
+      baseBranch === '' ||
+      sha === ''
+    ) {
+      throw new Error('Pull request em formato inesperado; inventário GitHub incompleto.')
+    }
+    const checks = estadoPull === 'closed' ? 'unknown' : await estadoDosChecks(rest, input, sha)
+    const merged =
+      (pr as { merged?: unknown }).merged === true || texto(pr, 'merged_at') !== undefined
+    const mergeSha = texto(pr, 'merge_commit_sha')
+    if (merged && mergeSha === undefined)
+      throw new Error('Pull request mergeado sem SHA confirmado; inventário incompleto.')
+    return {
+      numero: numeroPull,
+      estado: estadoPull as 'open' | 'closed',
+      merged,
+      headBranch,
+      headSha: sha,
+      baseBranch,
+      issuesReferenciadas: referenciasIssue(texto(pr, 'body') ?? ''),
+      ...(mergeSha === undefined ? {} : { mergeSha }),
+      checks
+    }
+  })
+
+  const branches = branchesBrutas.map((branch) => {
+    const commit = branch.commit
+    const nome = texto(branch, 'name')
+    const sha = typeof commit === 'object' && commit !== null ? texto(commit, 'sha') : undefined
+    if (nome === undefined || sha === undefined)
+      throw new Error('Branch em formato inesperado; inventário GitHub incompleto.')
+    return {
+      nome,
+      sha
+    }
+  })
+
+  return {
+    data: { issues, pullRequests, branches },
+    externalRef: { id: `${input.owner}/${input.repo}` },
+    criado: false
+  }
+}
+
+/** Extrai somente as referências canônicas `refs #N`; o texto remoto nunca vira instrução. */
+function referenciasIssue(corpo: string): readonly number[] {
+  const numeros = new Set<number>()
+  for (const ocorrencia of corpo.matchAll(/\brefs\s+#(\d+)\b/gi)) {
+    const numeroIssue = Number(ocorrencia[1])
+    if (Number.isSafeInteger(numeroIssue) && numeroIssue > 0) numeros.add(numeroIssue)
+  }
+  return [...numeros].sort((a, b) => a - b)
+}
+
+async function todasAsPaginas(
+  rest: GithubRest,
+  caminho: string
+): Promise<readonly Record<string, unknown>[]> {
+  const registros: Record<string, unknown>[] = []
+  for (let pagina = 1; pagina <= 100; pagina += 1) {
+    const separador = caminho.includes('?') ? '&' : '?'
+    const resposta = exigirOk(
+      await rest.request('GET', `${caminho}${separador}per_page=100&page=${pagina}`)
+    )
+    if (!Array.isArray(resposta.corpo)) {
+      throw new Error('Resposta paginada fora do contrato; inventário GitHub incompleto.')
+    }
+    const itens = lista(resposta.corpo)
+    registros.push(...itens)
+    if (itens.length < 100) return registros
+  }
+  throw new Error(
+    'Inventário GitHub atingiu o limite de 10.000 itens sem confirmar o fim; coleta incompleta.'
+  )
+}
+
+/** Limita pressão/rate-limit ao consultar checks de muitos PRs sem abandonar nenhum resultado. */
+async function mapearEmLotes<T, R>(
+  itens: readonly T[],
+  tamanhoDoLote: number,
+  mapear: (item: T) => Promise<R>
+): Promise<R[]> {
+  const resultados: R[] = []
+  for (let inicio = 0; inicio < itens.length; inicio += tamanhoDoLote) {
+    const lote = itens.slice(inicio, inicio + tamanhoDoLote)
+    resultados.push(...(await Promise.all(lote.map(mapear))))
+  }
+  return resultados
+}
+
+async function estadoDosChecks(
+  rest: GithubRest,
+  input: RepositoryInventoryInput,
+  sha: string
+): Promise<'pending' | 'success' | 'failure' | 'unknown'> {
+  const resposta = exigirOk(
+    await rest.request(
+      'GET',
+      `/repos/${input.owner}/${input.repo}/commits/${sha}/check-runs?per_page=100`
+    )
+  )
+  const checks = lista(resposta.corpo, 'check_runs')
+  if (checks.length === 0) return 'unknown'
+  // O endpoint devolveu o limite da página. Sem percorrer as páginas restantes, PASS seria inferência.
+  if (checks.length === 100) return 'unknown'
+  if (
+    checks.some((check) => {
+      const conclusao = texto(check, 'conclusion')
+      return (
+        conclusao === 'failure' ||
+        conclusao === 'timed_out' ||
+        conclusao === 'cancelled' ||
+        conclusao === 'action_required'
+      )
+    })
+  )
+    return 'failure'
+  if (
+    checks.every(
+      (check) => texto(check, 'status') === 'completed' && texto(check, 'conclusion') === 'success'
+    )
+  )
+    return 'success'
+  return checks.every((check) => texto(check, 'status') === 'completed') ? 'unknown' : 'pending'
 }
 
 /**
