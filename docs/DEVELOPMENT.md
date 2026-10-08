@@ -2646,4 +2646,4 @@ Status: implementação na [PR #416](https://github.com/RodReis/rrb-jarvisOS/pul
 - [x] Retomada de run `PLANNED`/`READY`; execução ativa, merge aguardando projeção e falha terminal não criam outro run. Quota com reset oficial conhecido fica em espera até a hora registrada.
 - [x] Fila e pool M12 continuam governando capacidade e independência; nenhum gate é aprovado e nenhuma issue é fechada pelo dispatcher.
 - [x] Testes de regras, reinício SQLite, migration legada, run idempotente, branches, gate, quota e retomada; 38 testes focados passaram.
-- [x] Relatório categorizado regenerado a partir da suíte completa: Regras 2.975 pass; Banco 2.372 pass / 25 skip; Tela 804 pass / 1 todo. Self-check/anti-drift passou; CI remoto em andamento.
+- [x] Relatório categorizado regenerado dos artefatos CI: Regras 2.975 pass; Banco 2.379 pass / 18 skip; Tela 804 pass / 1 todo. Self-check passou; reteste do CI pendente após corrigir a expectativa E2E de `repo.inventory`.

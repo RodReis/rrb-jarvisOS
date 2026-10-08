@@ -9,7 +9,7 @@ import { _electron as electron, expect, test, type ElectronApplication } from '@
 /**
  * A automação do GitHub no **app real** (SPEC-Conectores-04).
  *
- * O que este arquivo prova e nenhuma outra camada prova: que as nove capacidades estão ligadas no
+ * O que este arquivo prova e nenhuma outra camada prova: que as capacidades estão ligadas no
  * caminho montado — preload real, IPC real, `ConnectorService` real com governança, adapter real.
  * Os testes de integração exercitam o adapter construído à mão; aqui ele é o que o `index.ts`
  * compôs no boot, e uma capacidade declarada mas não registrada apareceria como
@@ -315,6 +315,7 @@ test('as capacidades do GitHub chegam ao renderer pela listagem do núcleo', asy
     'repo.ensure',
     'issue.ensure',
     'issue.get-state',
+    'repo.inventory',
     'issue.ensure-dependency',
     'ref.ensure',
     'pr.ensure',
