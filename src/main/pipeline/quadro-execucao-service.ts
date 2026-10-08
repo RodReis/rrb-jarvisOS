@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { readFileSync, realpathSync } from 'node:fs'
 import { resolve, relative, isAbsolute } from 'node:path'
 import type { WorkspaceId } from '@shared/domain/entities'
@@ -17,10 +17,16 @@ import {
   type IssueStateNormalizado,
   type MergeStateNormalizado
 } from '@shared/domain/github-automation'
+import type { AlvoDeCancelamentoEmCascata, Roadmap } from '@shared/domain/roadmap'
+import { fatiasAlcancadasPeloCancelamento } from '@shared/domain/roadmap'
 import type {
   ConsultaDeChecks,
   PedidoDePlay,
+  PreviaDeCancelamentoEmCascata,
   QuadroDeExecucao,
+  RespostaDaPreviaDeCancelamentoEmCascata,
+  ResultadoDoCancelamentoEmCascata,
+  ResultadoDoCancelamentoNoQuadro,
   ResultadoDoPlay
 } from '@shared/domain/quadro-execucao'
 import { projetarQuadro } from '@shared/domain/quadro-execucao'
@@ -98,6 +104,121 @@ export class QuadroExecucaoService {
       return { cancelado: false, motivo: 'recusado', mensagem: 'Cancelamento indisponível.' }
     }
     return this.deps.cancelamento.cancelar(projectId, workspaceId, runId)
+  }
+
+  preverCancelamentoEmCascata(
+    projectId: string,
+    workspaceId: WorkspaceId,
+    alvo: AlvoDeCancelamentoEmCascata
+  ): RespostaDaPreviaDeCancelamentoEmCascata {
+    const previa = this.calcularPreviaDeCancelamento(projectId, workspaceId, alvo)
+    return previa ?? { ok: false, mensagem: 'Projeto, alvo ou DAG inválido neste workspace.' }
+  }
+
+  async cancelarEmCascata(
+    projectId: string,
+    workspaceId: WorkspaceId,
+    alvo: AlvoDeCancelamentoEmCascata,
+    fingerprint: string
+  ): Promise<ResultadoDoCancelamentoEmCascata> {
+    if (this.deps.cancelamento === undefined)
+      return { status: 'invalid', mensagem: 'Cancelamento indisponível.' }
+    const previa = this.calcularPreviaDeCancelamento(projectId, workspaceId, alvo)
+    if (previa === undefined)
+      return { status: 'invalid', mensagem: 'Projeto, alvo ou DAG inválido neste workspace.' }
+    if (previa.fingerprint !== fingerprint) return { status: 'stale', previa }
+
+    this.deps.audit?.append({
+      user_id: this.deps.userId(),
+      workspace_id: workspaceId,
+      type: 'pipeline-cascade-cancellation',
+      payload: {
+        fase: 'solicitada',
+        projectId,
+        alvo,
+        fingerprint,
+        sliceIds: previa.fatias.map((fatia) => fatia.sliceId),
+        runIds: previa.runs.map((run) => run.runId)
+      }
+    })
+
+    const resultados: {
+      runId: string
+      sliceId: string
+      resultado: ResultadoDoCancelamentoNoQuadro
+    }[] = []
+    for (const run of previa.runs) {
+      try {
+        resultados.push({
+          runId: run.runId,
+          sliceId: run.sliceId,
+          resultado: await this.deps.cancelamento.cancelar(projectId, workspaceId, run.runId)
+        })
+      } catch (error) {
+        resultados.push({
+          runId: run.runId,
+          sliceId: run.sliceId,
+          resultado: {
+            cancelado: false,
+            motivo: 'erro',
+            mensagem: error instanceof Error ? error.message : 'Falha desconhecida.'
+          }
+        })
+      }
+    }
+    this.deps.audit?.append({
+      user_id: this.deps.userId(),
+      workspace_id: workspaceId,
+      type: 'pipeline-cascade-cancellation',
+      payload: { fase: 'concluída', projectId, alvo, fingerprint, resultados }
+    })
+    return { status: 'completed', resultados }
+  }
+
+  private calcularPreviaDeCancelamento(
+    projectId: string,
+    workspaceId: WorkspaceId,
+    alvo: AlvoDeCancelamentoEmCascata
+  ): PreviaDeCancelamentoEmCascata | undefined {
+    const userId = this.deps.userId()
+    const projeto = this.deps.projects.findById(userId, projectId)
+    if (projeto === undefined || projeto.workspace_id !== workspaceId) return undefined
+    const escopo = { userId, workspaceId, projectId }
+    const roadmap: Roadmap = this.deps.roadmap.carregar(escopo)
+    const alcancadas = fatiasAlcancadasPeloCancelamento(roadmap, alvo)
+    if (alcancadas === undefined) return undefined
+
+    const mvps = new Map(roadmap.mvps.map((mvp) => [mvp.id, mvp]))
+    const fatias = [...alcancadas]
+      .sort((a, b) => {
+        const ordemMvp = (mvps.get(a.mvpId)?.numero ?? 0) - (mvps.get(b.mvpId)?.numero ?? 0)
+        return ordemMvp || a.numero - b.numero || a.id.localeCompare(b.id)
+      })
+      .map((slice) => {
+        const mvp = mvps.get(slice.mvpId)!
+        return {
+          sliceId: slice.id,
+          mvpId: mvp.id,
+          numeroDoMvp: mvp.numero,
+          numeroDaFatia: slice.numero,
+          titulo: slice.titulo
+        }
+      })
+    const sliceIds = new Set(fatias.map((fatia) => fatia.sliceId))
+    const runs = this.deps.runs
+      .listarAtivos(userId)
+      .filter(
+        (run) =>
+          run.projectId === projectId &&
+          this.deps.runs.workspaceDoRun(run.id) === workspaceId &&
+          sliceIds.has(run.sliceId)
+      )
+      .map((run) => ({ runId: run.id, sliceId: run.sliceId, estado: run.estado }))
+      .sort((a, b) => a.runId.localeCompare(b.runId))
+    const fingerprint = createHash('sha256')
+      .update(JSON.stringify({ alvo, fatias, runs }))
+      .digest('hex')
+    return { ok: true, fingerprint, alvo, fatias, runs }
   }
 
   resolverAprovacao(

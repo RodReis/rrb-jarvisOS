@@ -167,6 +167,9 @@ describe('migrations', () => {
     // A 61 acrescenta a chave de dispatch ao run e cria cursor/decisões do dispatcher.
     antigo.exec('DROP TABLE continuous_dispatch_decision')
     antigo.exec('DROP TABLE continuous_dispatch_cursor')
+    // A 62 guarda os controles operacionais e o journal idempotente por escopo.
+    antigo.exec('DROP TABLE pipeline_control_scope_command')
+    antigo.exec('DROP TABLE pipeline_control_policy')
     antigo.pragma('user_version = 1')
     antigo.close()
 

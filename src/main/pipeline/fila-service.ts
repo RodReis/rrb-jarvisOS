@@ -88,6 +88,9 @@ export interface FilaDeps {
    * assunto, com outro tipo de evento.
    */
   readonly mergeAutonomoLigado: (projectId: string) => boolean
+  /** F03: execução OFF impede aquisições; pausa só segura runs ainda não iniciados. */
+  readonly execucaoHabilitada?: (projectId: string, workspaceId: WorkspaceId) => boolean
+  readonly pausada?: (projectId: string, workspaceId: WorkspaceId) => boolean
   /**
    * O run tem merge no ar, ou confirmado e ainda não registrado? (SPEC-Scheduler-04, critério 5.)
    * Quando sim, o cancelamento não vence: o merge confirmado na origem não se desfaz, e um run
@@ -408,6 +411,13 @@ export class FilaService {
       return { reason: 'lease-inexistente', mensagem: 'Run não encontrado.' }
     }
 
+    if (this.deps.execucaoHabilitada?.(projectId, workspaceId) === false) {
+      return { reason: 'ocupado', mensagem: 'Execução desabilitada pelo controle operacional.' }
+    }
+    if (run.estado === 'READY' && this.deps.pausada?.(projectId, workspaceId) === true) {
+      return { reason: 'ocupado', mensagem: 'Execução pausada até o próximo comando de retomada.' }
+    }
+
     // O escritor tem até três tentativas (M9-F04), e cada uma é um pedido novo: o item que já
     // terminou o ciclo sem slot volta a esperar. O run comum é de ciclo único e não passa por aqui.
     if (itemId !== runId) this.deps.pool.reabrir(itemId)
@@ -477,7 +487,12 @@ export class FilaService {
     // o que segura um item é o run ainda não estar pronto. O escritor também entra com o run já
     // em execução — o primeiro escritor o levou até lá.
     const aceitos: readonly string[] = escritor === undefined ? ['READY'] : ['READY', 'RUNNING']
-    return run === undefined || !aceitos.includes(run.estado) ? ['run-nao-pronto'] : []
+    if (run === undefined || !aceitos.includes(run.estado)) return ['run-nao-pronto']
+    if (this.deps.execucaoHabilitada?.(item.projectId, item.workspaceId) === false)
+      return ['execucao-desabilitada']
+    if (run.estado === 'READY' && this.deps.pausada?.(item.projectId, item.workspaceId) === true)
+      return ['pipeline-pausada']
+    return []
   }
 
   /**

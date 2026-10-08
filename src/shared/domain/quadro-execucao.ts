@@ -1,6 +1,6 @@
 import type { DependenciaAberta } from './fila'
 import type { EstadoDoRun, PipelineRun } from './pipeline'
-import type { Mvp, Slice } from './roadmap'
+import type { AlvoDeCancelamentoEmCascata, Mvp, Slice } from './roadmap'
 
 export const COLUNAS_DO_QUADRO = [
   'a-fazer',
@@ -31,6 +31,39 @@ export interface ResultadoDoPlay {
 export type ResultadoDoCancelamentoNoQuadro =
   | { readonly cancelado: true; readonly fase: string; readonly rascunho: string }
   | { readonly cancelado: false; readonly motivo: string; readonly mensagem: string }
+
+export interface PreviaDeCancelamentoEmCascata {
+  readonly ok: true
+  readonly fingerprint: string
+  readonly alvo: AlvoDeCancelamentoEmCascata
+  readonly fatias: readonly {
+    readonly sliceId: string
+    readonly mvpId: string
+    readonly numeroDoMvp: number
+    readonly numeroDaFatia: number
+    readonly titulo: string
+  }[]
+  readonly runs: readonly {
+    readonly runId: string
+    readonly sliceId: string
+    readonly estado: EstadoDoRun
+  }[]
+}
+
+export type RespostaDaPreviaDeCancelamentoEmCascata =
+  PreviaDeCancelamentoEmCascata | { readonly ok: false; readonly mensagem: string }
+
+export type ResultadoDoCancelamentoEmCascata =
+  | {
+      readonly status: 'completed'
+      readonly resultados: readonly {
+        readonly runId: string
+        readonly sliceId: string
+        readonly resultado: ResultadoDoCancelamentoNoQuadro
+      }[]
+    }
+  | { readonly status: 'stale'; readonly previa: PreviaDeCancelamentoEmCascata }
+  | { readonly status: 'invalid'; readonly mensagem: string }
 
 export const ESTADOS_DA_CONSULTA = ['nao-consultado', 'atualizado', 'desconhecido'] as const
 export type EstadoDaConsulta = (typeof ESTADOS_DA_CONSULTA)[number]

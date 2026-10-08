@@ -21,15 +21,21 @@ test('a ponte real recusa play múltiplo fora do projeto e não cria runs', asyn
     const resultado = await janela.evaluate(async () => {
       const ponte = (window as unknown as { jarvis: JarvisBridge }).jarvis
       const antes = await ponte.quadroDeExecucao('inexistente', 'jarvis')
+      const controles = await ponte.lerControlesContinuos({
+        workspaceId: 'jarvis',
+        projectId: 'inexistente'
+      })
       const play = await ponte.playNoQuadro(
         { projectId: 'inexistente', sliceIds: ['f1', 'f2', 'f3'] },
         'jarvis'
       )
       const depois = await ponte.quadroDeExecucao('inexistente', 'jarvis')
-      return { antes, play, depois }
+      return { antes, controles, play, depois }
     })
 
     expect(resultado.antes.colunas).toHaveLength(7)
+    expect(resultado.controles?.escopo).toBe('projeto')
+    expect(resultado.controles?.projetoId).toBe('inexistente')
     expect(resultado.play).toHaveLength(3)
     expect(resultado.play.every((item) => item.estado === 'recusado')).toBe(true)
     expect(resultado.depois.colunas.every((coluna) => coluna.cartoes.length === 0)).toBe(true)

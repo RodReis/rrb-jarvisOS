@@ -5,6 +5,7 @@ import {
   IPC_EVENT_CHANNELS,
   IPC_SEND_CHANNELS
 } from '@shared/contracts/ipc'
+import type { JarvisBridge } from '@shared/contracts/ipc'
 
 const exposeInMainWorld = vi.fn()
 const invoke = vi.fn().mockResolvedValue({})
@@ -49,7 +50,7 @@ describe('ponte do preload', () => {
   })
 
   it('expõe somente os métodos do contrato — nenhum canal genérico', async () => {
-    const bridge = await carregarPonte()
+    const bridge = (await carregarPonte()) as unknown as JarvisBridge
     // Critério de aceite 4: a superfície é fechada. Um `invoke`/`send`/`on` cru aqui
     // deixaria o renderer alcançar qualquer handler do main.
     expect(Object.keys(bridge).sort()).toEqual(
@@ -88,6 +89,7 @@ describe('ponte do preload', () => {
         'definirGatilhosDaEscuta',
         'definirHotkeyDaEscuta',
         'definirModoDeTesteDaEscuta',
+        'definirControleContinuo',
         'definirPoliticaDeMerge',
         'definirSensibilidadeDaEscuta',
         'descartarAjusteDaArquitetura',
@@ -139,6 +141,7 @@ describe('ponte do preload', () => {
         'ledgerDoRun',
         'lerPersona',
         'lerBoasVindas',
+        'lerControlesContinuos',
         'lerCronograma',
         'lerPoliticaDeMerge',
         'lerPromptDoProjeto',
@@ -243,10 +246,46 @@ describe('ponte do preload', () => {
         'quadroDeExecucao',
         'playNoQuadro',
         'cancelarNoQuadro',
+        'preverCancelamentoEmCascataNoQuadro',
+        'cancelarEmCascataNoQuadro',
         'resolverAprovacaoDoSquad',
         'vistaDoPool'
       ].sort()
     )
+  })
+
+  it('expõe prévia e confirmação da cascata em canais IPC separados', async () => {
+    const bridge = (await carregarPonte()) as unknown as JarvisBridge
+    const alvo = { tipo: 'fatia' as const, sliceId: 'f-2' }
+    await bridge.preverCancelamentoEmCascataNoQuadro('p-1', alvo, 'jarvis')
+    expect(invoke).toHaveBeenCalledWith(
+      IPC_CHANNELS.quadroExecucaoPreverCancelamentoCascata,
+      'p-1',
+      alvo,
+      'jarvis'
+    )
+    await bridge.cancelarEmCascataNoQuadro('p-1', alvo, 'f'.repeat(64), 'jarvis')
+    expect(invoke).toHaveBeenCalledWith(
+      IPC_CHANNELS.quadroExecucaoCancelarCascata,
+      'p-1',
+      alvo,
+      'f'.repeat(64),
+      'jarvis'
+    )
+  })
+
+  it('roteia comandos de controles operacionais por canais tipados', async () => {
+    const bridge = (await carregarPonte()) as unknown as JarvisBridge
+    const scope = { workspaceId: 'jarvis' as const, projectId: 'p-1' }
+    await bridge.lerControlesContinuos(scope)
+    expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.continuousControlsGet, scope)
+    const command = {
+      escopo: scope,
+      acao: { tipo: 'pausa' as const, pausada: true },
+      idempotencyKey: 'cmd-1'
+    }
+    await bridge.definirControleContinuo(command)
+    expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.continuousControlsSet, command)
   })
 
   it('não expõe nada que grave auditoria — a UI não fabrica evidência', async () => {

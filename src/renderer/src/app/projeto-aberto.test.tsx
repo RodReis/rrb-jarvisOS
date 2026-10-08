@@ -34,6 +34,7 @@ const onGenerationEvent = vi.fn()
 const quadroDeExecucao = vi.fn()
 const playNoQuadro = vi.fn()
 const lerPromptDoProjeto = vi.fn()
+const lerControlesContinuos = vi.fn()
 
 const PROJETO: Project = {
   id: 'p-1',
@@ -101,6 +102,7 @@ beforeEach(() => {
   })
   playNoQuadro.mockReset().mockResolvedValue([])
   lerPromptDoProjeto.mockReset().mockResolvedValue(null)
+  lerControlesContinuos.mockReset().mockResolvedValue(undefined)
 
   vi.stubGlobal('jarvis', {
     estadoDaJornada,
@@ -113,7 +115,8 @@ beforeEach(() => {
     onGenerationEvent,
     quadroDeExecucao,
     playNoQuadro,
-    lerPromptDoProjeto
+    lerPromptDoProjeto,
+    lerControlesContinuos
   })
 })
 

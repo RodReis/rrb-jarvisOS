@@ -45,6 +45,87 @@ const snapshotSquad = criarSnapshotDoSquad(
   { provider: 'claude-code', modelo: 'claude-fable-5-1' }
 )
 
+describe('cancelamento em cascata do quadro', () => {
+  it('vincula a confirmação ao conjunto de runs ativo e recusa prévia obsoleta', async () => {
+    const ativos = [
+      { id: 'run-2', projectId, sliceId: 's-2', estado: 'RUNNING' },
+      { id: 'run-fora', projectId: 'outro-projeto', sliceId: 's-2', estado: 'RUNNING' }
+    ]
+    const cancelar = vi.fn(async () => ({
+      cancelado: true,
+      fase: 'durante-execucao',
+      rascunho: 'sem-pr'
+    }))
+    const service = new QuadroExecucaoService({
+      userId: () => 'u-1',
+      projects: { findById: () => ({ workspace_id: WS }) },
+      roadmap: { carregar: () => ({ mvps: [mvp], slices }) },
+      runs: {
+        listarAtivos: () => ativos,
+        workspaceDoRun: () => WS
+      },
+      cancelamento: { cancelar },
+      audit: { append: vi.fn() }
+    } as never)
+
+    const previa = service.preverCancelamentoEmCascata(projectId, WS, {
+      tipo: 'fatia',
+      sliceId: 's-2'
+    })
+    expect(previa.ok).toBe(true)
+    if (!previa.ok) return
+    expect(previa.fatias.map((fatia) => fatia.sliceId)).toEqual(['s-2', 's-3'])
+    expect(previa.runs.map((run) => run.runId)).toEqual(['run-2'])
+
+    ativos.push({ id: 'run-3', projectId, sliceId: 's-3', estado: 'RUNNING' })
+    const resultado = await service.cancelarEmCascata(
+      projectId,
+      WS,
+      { tipo: 'fatia', sliceId: 's-2' },
+      previa.fingerprint
+    )
+
+    expect(resultado.status).toBe('stale')
+    expect(cancelar).not.toHaveBeenCalled()
+  })
+
+  it('cancela sequencialmente apenas os runs ativos da prévia confirmada', async () => {
+    const ativos = [
+      { id: 'run-2', projectId, sliceId: 's-2', estado: 'RUNNING' },
+      { id: 'run-3', projectId, sliceId: 's-3', estado: 'BLOCKED' }
+    ]
+    const cancelar = vi.fn(async (_projeto: string, _workspace: string, runId: string) => ({
+      cancelado: true as const,
+      fase: 'durante-execucao',
+      rascunho: runId
+    }))
+    const service = new QuadroExecucaoService({
+      userId: () => 'u-1',
+      projects: { findById: () => ({ workspace_id: WS }) },
+      roadmap: { carregar: () => ({ mvps: [mvp], slices }) },
+      runs: {
+        listarAtivos: () => ativos,
+        workspaceDoRun: () => WS
+      },
+      cancelamento: { cancelar },
+      audit: { append: vi.fn() }
+    } as never)
+
+    const previa = service.preverCancelamentoEmCascata(projectId, WS, { tipo: 'mvp', mvpId: 'm-1' })
+    expect(previa.ok).toBe(true)
+    if (!previa.ok) return
+    const resultado = await service.cancelarEmCascata(
+      projectId,
+      WS,
+      { tipo: 'mvp', mvpId: 'm-1' },
+      previa.fingerprint
+    )
+
+    expect(resultado.status).toBe('completed')
+    expect(cancelar.mock.calls.map(([, , runId]) => runId)).toEqual(['run-2', 'run-3'])
+  })
+})
+
 let raiz: string | undefined
 afterEach(() => {
   if (raiz) rmSync(raiz, { recursive: true, force: true })

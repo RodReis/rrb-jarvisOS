@@ -26,6 +26,7 @@ import type { PreflightService } from '../pipeline/preflight-service'
 import { parseLogInput } from '@shared/contracts/logging-input'
 import { isSensitivity, type PolicyContext, type PolicyDecision } from '@shared/policies'
 import { isWorkspaceId, type AuditEvent, type AuditEventType } from '@shared/domain/entities'
+import { isAlvoDeCancelamentoEmCascata } from '@shared/domain/roadmap'
 import type { AuthService } from '../auth/auth-service'
 import { log, writeLog } from '../logging/logger'
 import type { AllowlistRepository } from '../policy/allowlist-repository'
@@ -114,6 +115,9 @@ import type { AlvoDaPublicacao, PublicacaoOutcome } from '@shared/domain/publica
 import type { ExecutionLedger } from '@shared/domain/execution-ledger'
 import type { PendenciaDeLimpeza } from '@shared/domain/limpeza'
 import type { MergePolicyOutcome, PoliticaDeMerge, VistaDaFila } from '@shared/domain/pipeline'
+import { isComandoDeControle, isEscopoDeControle } from '@shared/domain/continuous-controls'
+import type { ComandoDeControle } from '@shared/domain/continuous-controls'
+import type { ContinuousControlsService } from '../pipeline/continuous-controls-service'
 import type { Roadmap } from '@shared/domain/roadmap'
 import type {
   MvpGerado,
@@ -417,6 +421,7 @@ export interface IpcDependencies {
   readonly publicacao: PublicacaoService
   /** O kill-switch do merge autônomo (SPEC-Entrega-02/05). */
   readonly mergePolicy: MergePolicyService
+  readonly continuousControls: ContinuousControlsService
   /** A fila de execução (SPEC-Entrega-02). Exposta só para leitura. */
   readonly fila: FilaService
   readonly quadroExecucao: QuadroExecucaoService
@@ -2475,6 +2480,36 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
   )
 
   ipcMain.handle(
+    IPC_CHANNELS.quadroExecucaoPreverCancelamentoCascata,
+    (_event, projectId: unknown, alvo: unknown, workspace: unknown) => {
+      if (
+        !isWorkspaceId(workspace) ||
+        typeof projectId !== 'string' ||
+        projectId.length === 0 ||
+        !isAlvoDeCancelamentoEmCascata(alvo)
+      )
+        return { ok: false, mensagem: 'Parâmetros inválidos.' }
+      return deps.quadroExecucao.preverCancelamentoEmCascata(projectId, workspace, alvo)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.quadroExecucaoCancelarCascata,
+    async (_event, projectId: unknown, alvo: unknown, fingerprint: unknown, workspace: unknown) => {
+      if (
+        !isWorkspaceId(workspace) ||
+        typeof projectId !== 'string' ||
+        projectId.length === 0 ||
+        !isAlvoDeCancelamentoEmCascata(alvo) ||
+        typeof fingerprint !== 'string' ||
+        !/^[a-f0-9]{64}$/i.test(fingerprint)
+      )
+        return { status: 'invalid', mensagem: 'Parâmetros inválidos.' }
+      return await deps.quadroExecucao.cancelarEmCascata(projectId, workspace, alvo, fingerprint)
+    }
+  )
+
+  ipcMain.handle(
     IPC_CHANNELS.quadroExecucaoResolverAprovacao,
     (_event, projectId: unknown, approvalId: unknown, decisao: unknown, workspace: unknown) => {
       if (
@@ -2547,6 +2582,30 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       return deps.mergePolicy.definir(projectId, workspace, autonomo)
     }
   )
+
+  ipcMain.handle(IPC_CHANNELS.continuousControlsGet, (_event, scope: unknown) => {
+    if (scope === null || typeof scope !== 'object') return undefined
+    const candidato = scope as { workspaceId?: unknown; projectId?: unknown }
+    const escopo = { ...candidato, userId: deps.userId() }
+    if (!isEscopoDeControle(escopo)) return undefined
+    return deps.continuousControls.snapshot(escopo)
+  })
+  ipcMain.handle(IPC_CHANNELS.continuousControlsSet, async (_event, command: unknown) => {
+    if (
+      command === null ||
+      typeof command !== 'object' ||
+      !isComandoDeControle({
+        ...(command as object),
+        escopo: { ...(command as ComandoDeControle).escopo, userId: deps.userId() }
+      })
+    )
+      return { status: 'invalid', message: 'Comando inválido.' }
+    const candidate = command as ComandoDeControle
+    return await deps.continuousControls.aplicar({
+      ...candidate,
+      escopo: { ...candidate.escopo, userId: deps.userId() }
+    })
+  })
 
   ipcMain.handle(
     IPC_CHANNELS.aprovacaoListar,

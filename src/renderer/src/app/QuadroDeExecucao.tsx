@@ -1,8 +1,23 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { WorkspaceId } from '@shared/domain/entities'
+import type { AlvoDeCancelamentoEmCascata } from '@shared/domain/roadmap'
 import type { QuadroDeExecucao, ResultadoDoPlay } from '@shared/domain/quadro-execucao'
+import type { PreviaDeCancelamentoEmCascata } from '@shared/domain/quadro-execucao'
 import { Button, ErrorState, LoadingState } from '@design/ui'
 import { PainelDaTarefa } from './PainelDaTarefa'
+import {
+  CONTROLES_OPERACIONAIS,
+  type ControleOperacional,
+  type SnapshotDeControles
+} from '@shared/domain/continuous-controls'
+
+const NOMES_DOS_CONTROLES: Record<ControleOperacional, string> = {
+  execucao: 'Novas execuções',
+  gasto: 'Gasto monetário',
+  push: 'Push de branch',
+  'criacao-pr': 'Criação de PR',
+  merge: 'Merge automático'
+}
 
 function estadoDaTarefa(estado: string): string {
   const rotulos: Record<string, string> = {
@@ -36,7 +51,25 @@ export function QuadroDeExecucao({
   const [runAberto, setRunAberto] = useState<string | undefined>()
   const [cancelando, setCancelando] = useState<string | undefined>()
   const [mensagemDoCancelamento, setMensagemDoCancelamento] = useState<string | undefined>()
+  const [cascataAberta, setCascataAberta] = useState(false)
+  const [alvoDaCascata, setAlvoDaCascata] = useState<AlvoDeCancelamentoEmCascata | undefined>()
+  const [previaDaCascata, setPreviaDaCascata] = useState<
+    PreviaDeCancelamentoEmCascata | undefined
+  >()
+  const [erroDaCascata, setErroDaCascata] = useState<string | undefined>()
+  const [cancelandoCascata, setCancelandoCascata] = useState(false)
   const [decidindo, setDecidindo] = useState<string | undefined>()
+  const [escopoWorkspace, setEscopoWorkspace] = useState(false)
+  const [controles, setControles] = useState<SnapshotDeControles | undefined>()
+  const [salvandoControle, setSalvandoControle] = useState(false)
+
+  const atualizarControles = useCallback(async () => {
+    const snapshot = await window.jarvis.lerControlesContinuos({
+      workspaceId: workspace,
+      ...(escopoWorkspace ? {} : { projectId })
+    })
+    setControles(snapshot)
+  }, [projectId, workspace, escopoWorkspace])
 
   const atualizar = useCallback(async () => {
     try {
@@ -65,12 +98,71 @@ export function QuadroDeExecucao({
       }
     }
     void carregar()
-    const timer = window.setInterval(() => void carregar(), INTERVALO_DA_CONSULTA_MS)
+    const timer = window.setInterval(() => {
+      void carregar()
+      void window.jarvis
+        .lerControlesContinuos({
+          workspaceId: workspace,
+          ...(escopoWorkspace ? {} : { projectId })
+        })
+        .then((snapshot) => {
+          if (ativo) setControles(snapshot)
+        })
+        .catch(() => {
+          if (ativo) setControles(undefined)
+        })
+    }, INTERVALO_DA_CONSULTA_MS)
     return () => {
       ativo = false
       window.clearInterval(timer)
     }
-  }, [projectId, workspace])
+  }, [projectId, workspace, escopoWorkspace])
+
+  useEffect(() => {
+    let ativo = true
+    void window.jarvis
+      .lerControlesContinuos({ workspaceId: workspace, ...(escopoWorkspace ? {} : { projectId }) })
+      .then((snapshot) => {
+        if (ativo) setControles(snapshot)
+      })
+      .catch(() => {
+        if (ativo) setControles(undefined)
+      })
+    return () => {
+      ativo = false
+    }
+  }, [projectId, workspace, escopoWorkspace])
+
+  const aplicarControle = async (
+    acao:
+      | { tipo: 'pausa'; pausada: boolean | null }
+      | { tipo: 'switch'; controle: ControleOperacional; habilitado: boolean | null }
+  ) => {
+    if (salvandoControle) return
+    setSalvandoControle(true)
+    try {
+      const resultado = await window.jarvis.definirControleContinuo({
+        escopo: { workspaceId: workspace, ...(escopoWorkspace ? {} : { projectId }) },
+        acao,
+        idempotencyKey: `${Date.now()}-${Math.random().toString(36).slice(2)}`
+      })
+      if (resultado.status === 'invalid' || resultado.status === 'idempotency-conflict')
+        throw new Error(resultado.message)
+      await atualizarControles()
+      await atualizar()
+      setMensagemDoCancelamento(
+        acao.tipo === 'pausa'
+          ? acao.pausada
+            ? 'Pausa solicitada; os runs ativos vão terminar antes de suspender novos dispatches.'
+            : 'Retomada solicitada; o dispatcher verificará novamente no próximo ciclo.'
+          : 'Controle operacional atualizado.'
+      )
+    } catch {
+      setMensagemDoCancelamento('Não foi possível atualizar o controle operacional.')
+    } finally {
+      setSalvandoControle(false)
+    }
+  }
 
   const cartoes = quadro?.colunas.flatMap((coluna) => coluna.cartoes) ?? []
   const elegiveis = cartoes.filter(
@@ -94,6 +186,82 @@ export function QuadroDeExecucao({
     setSelecionadas((atual) =>
       atual.includes(sliceId) ? atual.filter((id) => id !== sliceId) : [...atual, sliceId]
     )
+  }
+
+  const preverCascata = async () => {
+    if (alvoDaCascata === undefined || cancelandoCascata) return
+    setErroDaCascata(undefined)
+    setPreviaDaCascata(undefined)
+    try {
+      const resposta = await window.jarvis.preverCancelamentoEmCascataNoQuadro(
+        projectId,
+        alvoDaCascata,
+        workspace
+      )
+      if (!resposta.ok) {
+        setErroDaCascata(resposta.mensagem)
+        return
+      }
+      setPreviaDaCascata(resposta)
+    } catch {
+      setErroDaCascata('Não foi possível calcular a prévia do cancelamento.')
+    }
+  }
+
+  const confirmarCascata = async () => {
+    if (
+      alvoDaCascata === undefined ||
+      previaDaCascata === undefined ||
+      previaDaCascata.runs.length === 0 ||
+      cancelandoCascata
+    )
+      return
+    setCancelandoCascata(true)
+    setErroDaCascata(undefined)
+    try {
+      const resultado = await window.jarvis.cancelarEmCascataNoQuadro(
+        projectId,
+        alvoDaCascata,
+        previaDaCascata.fingerprint,
+        workspace
+      )
+      if (resultado.status === 'stale') {
+        setPreviaDaCascata(resultado.previa)
+        setErroDaCascata('Roadmap ou runs mudaram. Revise a prévia atualizada antes de confirmar.')
+        return
+      }
+      if (resultado.status === 'invalid') {
+        setErroDaCascata(resultado.mensagem)
+        return
+      }
+      const cancelados = resultado.resultados.filter((item) => item.resultado.cancelado).length
+      const recusados = resultado.resultados.length - cancelados
+      setMensagemDoCancelamento(
+        `Cascata concluída: ${cancelados} run(s) cancelado(s), ${recusados} sem cancelamento.`
+      )
+      setPreviaDaCascata(undefined)
+      await atualizar()
+    } catch {
+      setErroDaCascata(
+        'Não foi possível concluir a cascata. Atualize a prévia para tentar de novo.'
+      )
+    } finally {
+      setCancelandoCascata(false)
+    }
+  }
+
+  const escolherAlvoDaCascata = (value: string) => {
+    setErroDaCascata(undefined)
+    setPreviaDaCascata(undefined)
+    if (value === 'dag') {
+      setAlvoDaCascata({ tipo: 'dag' })
+    } else if (value.startsWith('mvp:')) {
+      setAlvoDaCascata({ tipo: 'mvp', mvpId: value.slice('mvp:'.length) })
+    } else if (value.startsWith('fatia:')) {
+      setAlvoDaCascata({ tipo: 'fatia', sliceId: value.slice('fatia:'.length) })
+    } else {
+      setAlvoDaCascata(undefined)
+    }
   }
 
   const play = async () => {
@@ -183,15 +351,240 @@ export function QuadroDeExecucao({
             Atualizado {new Date(quadro.geradoEm).toLocaleTimeString()}
           </p>
         </div>
-        <Button
-          variante="primaria"
-          desabilitado={selecionadas.length === 0}
-          carregando={ocupado}
-          onClick={() => void play()}
-        >
-          {ocupado ? 'Iniciando…' : `Play${selecionadas.length ? ` (${selecionadas.length})` : ''}`}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variante="secundaria"
+            desabilitado={cancelandoCascata}
+            onClick={() => {
+              setCascataAberta((aberta) => !aberta)
+              setAlvoDaCascata(undefined)
+              setPreviaDaCascata(undefined)
+              setErroDaCascata(undefined)
+            }}
+          >
+            Cancelamento em cascata
+          </Button>
+          <Button
+            variante="primaria"
+            desabilitado={selecionadas.length === 0}
+            carregando={ocupado}
+            onClick={() => void play()}
+          >
+            {ocupado
+              ? 'Iniciando…'
+              : `Play${selecionadas.length ? ` (${selecionadas.length})` : ''}`}
+          </Button>
+        </div>
       </header>
+
+      {cascataAberta && (
+        <section
+          className="rounded-xl border border-red-400/30 bg-[rgba(var(--jos-borda-rgb),0.035)] p-4"
+          aria-labelledby="cancelamento-cascata-titulo"
+        >
+          <h4 id="cancelamento-cascata-titulo" className="font-semibold">
+            Cancelar alvo e descendentes vinculados
+          </h4>
+          <p className="mt-1 text-sm text-[var(--jos-cor-texto-suave)]">
+            A prévia mostra as fatias alcançadas e os runs ativos. Ramos independentes ficam fora.
+          </p>
+          <div className="mt-3 flex flex-wrap items-end gap-2">
+            <label className="flex min-w-64 flex-col gap-1 text-sm">
+              Alvo
+              <select
+                aria-label="Alvo do cancelamento em cascata"
+                value={
+                  alvoDaCascata?.tipo === 'dag'
+                    ? 'dag'
+                    : alvoDaCascata?.tipo === 'mvp'
+                      ? `mvp:${alvoDaCascata.mvpId}`
+                      : alvoDaCascata?.tipo === 'fatia'
+                        ? `fatia:${alvoDaCascata.sliceId}`
+                        : ''
+                }
+                disabled={cancelandoCascata}
+                onChange={(event) => escolherAlvoDaCascata(event.target.value)}
+              >
+                <option value="">Selecione DAG, MVP ou fatia</option>
+                <option value="dag">DAG inteiro</option>
+                {[...new Map(cartoes.map((cartao) => [cartao.mvpId, cartao])).values()]
+                  .sort((a, b) => a.numeroDoMvp - b.numeroDoMvp)
+                  .map((cartao) => (
+                    <option key={`mvp:${cartao.mvpId}`} value={`mvp:${cartao.mvpId}`}>
+                      MVP-{cartao.numeroDoMvp}
+                    </option>
+                  ))}
+                {[...cartoes]
+                  .sort(
+                    (a, b) => a.numeroDoMvp - b.numeroDoMvp || a.numeroDaFatia - b.numeroDaFatia
+                  )
+                  .map((cartao) => (
+                    <option key={`fatia:${cartao.sliceId}`} value={`fatia:${cartao.sliceId}`}>
+                      MVP-{cartao.numeroDoMvp} F{cartao.numeroDaFatia} · {cartao.titulo}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <Button
+              variante="secundaria"
+              desabilitado={alvoDaCascata === undefined || cancelandoCascata}
+              onClick={() => void preverCascata()}
+            >
+              Atualizar prévia
+            </Button>
+          </div>
+          {previaDaCascata && (
+            <div className="mt-3 rounded-lg border border-[rgba(var(--jos-borda-rgb),0.12)] p-3">
+              <p className="text-sm font-medium">
+                {previaDaCascata.fatias.length} fatia(s) vinculada(s) ·{' '}
+                {previaDaCascata.runs.length} run(s) ativo(s)
+              </p>
+              <ul
+                className="mt-2 max-h-48 space-y-1 overflow-y-auto text-xs text-[var(--jos-cor-texto-suave)]"
+                aria-label="Descendentes alcançados pela prévia"
+              >
+                {previaDaCascata.fatias.map((fatia) => {
+                  const runs = previaDaCascata.runs.filter((run) => run.sliceId === fatia.sliceId)
+                  return (
+                    <li key={fatia.sliceId}>
+                      MVP-{fatia.numeroDoMvp} F{fatia.numeroDaFatia} · {fatia.titulo}
+                      {runs.length > 0
+                        ? ` · ${runs.map((run) => `${run.runId} (${run.estado})`).join(', ')}`
+                        : ' · sem run ativo'}
+                    </li>
+                  )
+                })}
+                {previaDaCascata.fatias.length === 0 && <li>O alvo não contém fatias.</li>}
+              </ul>
+              <div className="mt-3">
+                <Button
+                  variante="perigo"
+                  desabilitado={previaDaCascata.runs.length === 0 || cancelandoCascata}
+                  carregando={cancelandoCascata}
+                  onClick={() => void confirmarCascata()}
+                >
+                  {cancelandoCascata
+                    ? 'Cancelando…'
+                    : `Confirmar cancelamento de ${previaDaCascata.runs.length} run(s)`}
+                </Button>
+              </div>
+            </div>
+          )}
+          {erroDaCascata && (
+            <p role="alert" className="mt-2 text-sm text-red-400">
+              {erroDaCascata}
+            </p>
+          )}
+        </section>
+      )}
+
+      <section
+        className="rounded-xl border border-[rgba(var(--jos-borda-rgb),0.16)] bg-[rgba(var(--jos-borda-rgb),0.035)] p-4"
+        aria-labelledby="controles-continuos-titulo"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h4 id="controles-continuos-titulo" className="font-semibold">
+              Controles operacionais
+            </h4>
+            <p className="text-xs text-[var(--jos-cor-texto-suave)]">
+              Escopo: {escopoWorkspace ? 'workspace' : 'projeto'}
+            </p>
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={escopoWorkspace}
+              onChange={(event) => setEscopoWorkspace(event.target.checked)}
+            />
+            Aplicar ao workspace
+          </label>
+        </div>
+        {controles === undefined ? (
+          <p className="mt-3 text-sm text-amber-400">Estado dos controles indisponível.</p>
+        ) : (
+          <>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <Button
+                variante={controles.pausa.noEscopoAtual ? 'secundaria' : 'primaria'}
+                desabilitado={salvandoControle || (!escopoWorkspace && controles.pausa.noWorkspace)}
+                onClick={() =>
+                  void aplicarControle({ tipo: 'pausa', pausada: !controles.pausa.noEscopoAtual })
+                }
+              >
+                {controles.pausa.noEscopoAtual
+                  ? 'Retomar dispatches'
+                  : 'Pausar após os runs ativos'}
+              </Button>
+              {!escopoWorkspace && (
+                <button
+                  type="button"
+                  className="text-xs underline"
+                  disabled={salvandoControle || !controles.pausa.noEscopoAtual}
+                  onClick={() => void aplicarControle({ tipo: 'pausa', pausada: null })}
+                >
+                  Herdar pausa do workspace
+                </button>
+              )}
+              <span role="status" className="text-sm text-[var(--jos-cor-texto-suave)]">
+                {controles.pausa.pausada
+                  ? controles.pausa.drenando
+                    ? 'Pausa solicitada · aguardando run(s) terminar(em)'
+                    : 'Dispatch pausado'
+                  : 'Dispatch ativo'}
+              </span>
+            </div>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {CONTROLES_OPERACIONAIS.map((controle) => {
+                const estado = controles.controles[controle]
+                return (
+                  <label
+                    key={controle}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-[rgba(var(--jos-borda-rgb),0.12)] p-3 text-sm"
+                  >
+                    <span>
+                      {NOMES_DOS_CONTROLES[controle]}
+                      {estado.herdado ? (
+                        <small className="block text-xs text-[var(--jos-cor-texto-suave)]">
+                          Herdado do workspace
+                        </small>
+                      ) : null}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {!escopoWorkspace && (
+                        <button
+                          type="button"
+                          className="text-xs underline"
+                          disabled={salvandoControle}
+                          aria-label={`Herdar ${NOMES_DOS_CONTROLES[controle]} do workspace`}
+                          onClick={() =>
+                            void aplicarControle({ tipo: 'switch', controle, habilitado: null })
+                          }
+                        >
+                          Herdar
+                        </button>
+                      )}
+                      <input
+                        type="checkbox"
+                        checked={estado.enabled}
+                        disabled={salvandoControle}
+                        aria-label={NOMES_DOS_CONTROLES[controle]}
+                        onChange={(event) =>
+                          void aplicarControle({
+                            tipo: 'switch',
+                            controle,
+                            habilitado: event.target.checked
+                          })
+                        }
+                      />
+                    </div>
+                  </label>
+                )
+              })}
+            </div>
+          </>
+        )}
+      </section>
 
       {resultados.length > 0 && (
         <div

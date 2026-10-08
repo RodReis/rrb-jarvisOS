@@ -87,8 +87,21 @@ import type { AlvoDaPublicacao, PublicacaoOutcome } from '../domain/publicacao'
 import type { ExecutionLedger } from '../domain/execution-ledger'
 import type { PendenciaDeLimpeza } from '../domain/limpeza'
 import type { MergePolicyOutcome, PoliticaDeMerge, VistaDaFila } from '../domain/pipeline'
+import type {
+  ComandoDeControle,
+  EscopoDeControle,
+  ResultadoDeControle,
+  SnapshotDeControles
+} from '../domain/continuous-controls'
 import type { VistaDoPool } from '../domain/pool-vista'
-import type { QuadroDeExecucao, PedidoDePlay, ResultadoDoPlay } from '../domain/quadro-execucao'
+import type {
+  QuadroDeExecucao,
+  PedidoDePlay,
+  ResultadoDoPlay,
+  RespostaDaPreviaDeCancelamentoEmCascata,
+  ResultadoDoCancelamentoEmCascata
+} from '../domain/quadro-execucao'
+import type { AlvoDeCancelamentoEmCascata } from '../domain/roadmap'
 import type { Roadmap } from '../domain/roadmap'
 import type { MvpGerado, RoadmapGeradoOutcome, RoadmapRegistrado } from '../domain/roadmap-gerado'
 import type { EstadoDaJornada, TransicaoOutcome } from '../domain/jornada'
@@ -647,11 +660,15 @@ export const IPC_CHANNELS = {
    */
   mergePolicyLer: 'merge-policy:ler',
   mergePolicyDefinir: 'merge-policy:definir',
+  continuousControlsGet: 'continuous-controls:get',
+  continuousControlsSet: 'continuous-controls:set',
   /** SPEC-Entrega-02: o estado da fila — runs ativos, concluídas e o que está travado. */
   filaVista: 'fila:vista',
   quadroExecucaoVista: 'quadro-execucao:vista',
   quadroExecucaoPlay: 'quadro-execucao:play',
   quadroExecucaoCancelar: 'quadro-execucao:cancelar',
+  quadroExecucaoPreverCancelamentoCascata: 'quadro-execucao:cancelar-cascata:prever',
+  quadroExecucaoCancelarCascata: 'quadro-execucao:cancelar-cascata:executar',
   quadroExecucaoResolverAprovacao: 'quadro-execucao:resolver-aprovacao',
   painelDaTarefa: 'quadro-execucao:painel-tarefa',
   painelDaTarefaConteudo: 'quadro-execucao:painel-tarefa-conteudo',
@@ -1631,6 +1648,17 @@ export interface JarvisBridge {
     runId: string,
     workspace: WorkspaceId
   ): Promise<import('@shared/domain/quadro-execucao').ResultadoDoCancelamentoNoQuadro>
+  preverCancelamentoEmCascataNoQuadro(
+    projectId: string,
+    alvo: AlvoDeCancelamentoEmCascata,
+    workspace: WorkspaceId
+  ): Promise<RespostaDaPreviaDeCancelamentoEmCascata>
+  cancelarEmCascataNoQuadro(
+    projectId: string,
+    alvo: AlvoDeCancelamentoEmCascata,
+    fingerprint: string,
+    workspace: WorkspaceId
+  ): Promise<ResultadoDoCancelamentoEmCascata>
   resolverAprovacaoDoSquad(
     projectId: string,
     approvalId: string,
@@ -1667,6 +1695,14 @@ export interface JarvisBridge {
     autonomo: boolean,
     workspace: WorkspaceId
   ): Promise<MergePolicyOutcome>
+  lerControlesContinuos(
+    scope: Pick<EscopoDeControle, 'workspaceId' | 'projectId'>
+  ): Promise<SnapshotDeControles | undefined>
+  definirControleContinuo(
+    command: Omit<ComandoDeControle, 'escopo'> & {
+      readonly escopo: Pick<EscopoDeControle, 'workspaceId' | 'projectId'>
+    }
+  ): Promise<ResultadoDeControle>
   /** As aprovações registradas, da mais recente à mais antiga. */
   listarAprovacoes(projectId: string, workspace: WorkspaceId): Promise<readonly Approval[]>
   /** As revisões que este gate aprova hoje — os hashes exatos (critério 4). */

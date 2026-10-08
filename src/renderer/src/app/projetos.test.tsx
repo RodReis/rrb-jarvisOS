@@ -56,6 +56,7 @@ const estadoDaJornada = vi.fn()
 // que investiga. É a mesma cadeia que o painel de contexto criou na M8-F04.
 const lerPromptDoProjeto = vi.fn()
 const rotaDaGeracao = vi.fn()
+const lerControlesContinuos = vi.fn()
 
 function projeto(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -98,6 +99,7 @@ beforeEach(() => {
   clearPhaseModelOverride.mockReset().mockResolvedValue(true)
   estadoDaJornada.mockReset().mockResolvedValue(null)
   lerPromptDoProjeto.mockReset().mockResolvedValue(null)
+  lerControlesContinuos.mockReset().mockResolvedValue(undefined)
   rotaDaGeracao.mockReset().mockResolvedValue({ decisao: 'assinatura' })
   listProjects.mockResolvedValue([])
 
@@ -128,6 +130,7 @@ beforeEach(() => {
       clearPhaseModelOverride,
       estadoDaJornada,
       lerPromptDoProjeto,
+      lerControlesContinuos,
       rotaDaGeracao,
       // O console da geração (SPEC-Fases-03) mora dentro do projeto aberto. Sem estes três a
       // tela nem monta — e o que esta suíte testa é a jornada, não o console, que tem suíte

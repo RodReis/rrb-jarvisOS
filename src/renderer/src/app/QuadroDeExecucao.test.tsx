@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { QuadroDeExecucao } from '@shared/domain/quadro-execucao'
+import type { SnapshotDeControles } from '@shared/domain/continuous-controls'
 import { QuadroDeExecucao as TelaDoQuadro } from './QuadroDeExecucao'
 
 describe('equipe do Squad no cartão do quadro', () => {
@@ -71,16 +72,43 @@ describe('equipe do Squad no cartão do quadro', () => {
     }
     vi.stubGlobal('jarvis', {
       quadroDeExecucao: vi.fn(async () => quadro),
+      lerControlesContinuos: vi.fn(async () => controles),
+      definirControleContinuo: vi.fn(async () => ({ status: 'updated', snapshot: controles })),
       playNoQuadro: vi.fn(async () => []),
       cancelarNoQuadro: vi.fn(async () => ({
         cancelado: true,
         fase: 'durante-execucao',
         rascunho: 'sem-pr'
       })),
+      preverCancelamentoEmCascataNoQuadro: vi.fn(async () => previaCascata),
+      cancelarEmCascataNoQuadro: vi
+        .fn()
+        .mockResolvedValueOnce({ status: 'stale', previa: previaCascata })
+        .mockResolvedValueOnce({
+          status: 'completed',
+          resultados: [
+            {
+              runId: 'run-1',
+              sliceId: 's-1',
+              resultado: { cancelado: true, fase: 'durante-execucao', rascunho: 'sem-pr' }
+            }
+          ]
+        }),
       resolverAprovacaoDoSquad: vi.fn(async () => true)
     })
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     render(<TelaDoQuadro projectId="p-1" workspace="jarvis" />)
+
+    expect(await screen.findByText('Controles operacionais')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Pausar após os runs ativos' }))
+    await waitFor(() =>
+      expect(window.jarvis.definirControleContinuo).toHaveBeenCalledWith(
+        expect.objectContaining({
+          escopo: { workspaceId: 'jarvis', projectId: 'p-1' },
+          acao: { tipo: 'pausa', pausada: true }
+        })
+      )
+    )
 
     expect(await screen.findByText('Equipe · 1 escritor(es)')).toBeInTheDocument()
     expect(screen.getByText('Orquestrador: claude-fable-5-1 (claude-code)')).toBeInTheDocument()
@@ -104,6 +132,53 @@ describe('equipe do Squad no cartão do quadro', () => {
       expect(window.jarvis.cancelarNoQuadro).toHaveBeenCalledWith('p-1', 'run-1', 'jarvis')
     )
     await waitFor(() => expect(window.jarvis.quadroDeExecucao).toHaveBeenCalled())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelamento em cascata' }))
+    fireEvent.change(screen.getByRole('combobox', { name: 'Alvo do cancelamento em cascata' }), {
+      target: { value: 'fatia:s-1' }
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Atualizar prévia' }))
+    expect(await screen.findByText(/1 fatia\(s\) vinculada\(s\)/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar cancelamento de 1 run(s)' }))
+    expect(
+      await screen.findByText(
+        'Roadmap ou runs mudaram. Revise a prévia atualizada antes de confirmar.'
+      )
+    ).toBeInTheDocument()
+    expect(window.jarvis.cancelarEmCascataNoQuadro).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar cancelamento de 1 run(s)' }))
+    await waitFor(() => expect(window.jarvis.cancelarEmCascataNoQuadro).toHaveBeenCalledTimes(2))
     vi.unstubAllGlobals()
   })
 })
+
+const previaCascata = {
+  ok: true as const,
+  fingerprint: 'f'.repeat(64),
+  alvo: { tipo: 'fatia' as const, sliceId: 's-1' },
+  fatias: [
+    {
+      sliceId: 's-1',
+      mvpId: 'm-1',
+      numeroDoMvp: 28,
+      numeroDaFatia: 1,
+      titulo: 'Fatia de execução'
+    }
+  ],
+  runs: [{ runId: 'run-1', sliceId: 's-1', estado: 'RUNNING' as const }]
+}
+
+const controles: SnapshotDeControles = {
+  escopo: 'projeto',
+  projetoId: 'p-1',
+  pausa: { pausada: false, drenando: false, noEscopoAtual: false, noWorkspace: false },
+  controles: {
+    execucao: { enabled: true, herdado: false },
+    gasto: { enabled: true, herdado: false },
+    push: { enabled: true, herdado: false },
+    'criacao-pr': { enabled: true, herdado: false },
+    merge: { enabled: true, herdado: false }
+  },
+  ativos: []
+}
