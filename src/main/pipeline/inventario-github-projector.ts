@@ -99,7 +99,11 @@ function estadoTecnico(
 }
 
 function idDoTitulo(titulo: string): string | undefined {
-  const tokens = /^\[(MVP\d+)\](?:\[SPEC-[^\]]+\])?\[(F\d+|FIX)\]/i.exec(titulo)
+  const tokens = /^\[(MVP\d+)\](?:\[SPEC-[^\]]+\])?(?:\[(F\d+|FIX)\])?/i.exec(titulo)
   if (tokens === null) return undefined
-  return `${tokens[1]?.toUpperCase()}-${tokens[2]?.toUpperCase()}`
+  const mvp = tokens[1]?.toUpperCase()
+  const fatia = tokens[2]?.toUpperCase()
+  if (mvp === undefined) return undefined
+  if (fatia === undefined) return mvp
+  return `${mvp}-${fatia.startsWith('F') && fatia !== 'FIX' ? `F${fatia.slice(1).padStart(2, '0')}` : fatia}`
 }

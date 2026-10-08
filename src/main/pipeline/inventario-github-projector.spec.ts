@@ -139,4 +139,19 @@ describe('projeção do inventário GitHub', () => {
       expect.objectContaining({ codigo: 'item-orfao', envolvidos: ['MVP13-F99'] })
     )
   })
+
+  it('reconhece o épico e normaliza número de fatia para os IDs locais', () => {
+    const remoto = projetarEstadoGithub(
+      [],
+      inventario({
+        issues: [
+          { numero: 133, titulo: '[MVP13] Execução contínua', estado: 'open', labels: [] },
+          { numero: 134, titulo: '[MVP13][F1] Inventário', estado: 'open', labels: [] }
+        ],
+        pullRequests: []
+      })
+    )
+
+    expect(remoto.map((no) => no.id)).toEqual(['MVP13', 'MVP13-F01'])
+  })
 })

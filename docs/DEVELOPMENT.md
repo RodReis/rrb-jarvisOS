@@ -2628,6 +2628,7 @@ Status: **em andamento** — issue [#359](https://github.com/RodReis/rrb-jarvisO
 Status: **em implementação** — issue [#134](https://github.com/RodReis/rrb-jarvisOS/issues/134) em `proplan:doing`; branch `feat/m13-f01-inventario`.
 
 - [x] Núcleo determinístico do DAG: ciclo, dependência ausente, duplicidade e referência quebrada bloqueiam a ordem.
+- [x] Fonte local adaptada do roadmap SQLite e dos gates existentes; só a fatia com SPEC vigente e aceite exato é elegível, e a ordem de fatias vira dependência.
 - [x] Reconciliação das projeções local/GitHub com órfãos e conflitos explícitos; merge confirmado satisfaz dependência técnica sem exigir fechamento da issue.
 - [x] Snapshot SQLite escopado por usuário/workspace/projeto, recuperável após reinício e validado por fingerprint; falha/incompletude GitHub preserva o snapshot anterior.
 - [x] Coleta paginada de issues, PRs, branches e checks pelo conector GitHub, sem armazenar corpos livres; estado de checks desconhecido nunca vira sucesso.
