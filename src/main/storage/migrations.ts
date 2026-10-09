@@ -2476,6 +2476,53 @@ const MIGRATIONS: readonly string[] = [
     state TEXT NOT NULL CHECK (state IN ('intended','confirmed','ambiguous','failed')),
     created_at TEXT NOT NULL
   );
+  `,
+  // SPEC-Release-02: preparação local. As tabelas de artefato e de referência de configuração
+  // da F01 não tinham escritor, então estão vazias: o artefato ganha uri e provenance por
+  // ALTER; a referência é recriada com fingerprint/estado e os quatro ambientes (local e
+  // preview também têm contrato de chaves). O diário é append-only.
+  `
+  ALTER TABLE release_artifact ADD COLUMN uri TEXT;
+  ALTER TABLE release_artifact ADD COLUMN provenance TEXT;
+
+  CREATE TABLE release_configuration_reference_v2 (
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL CHECK (workspace_id IN ('noa','jarvis')),
+    project_id TEXT NOT NULL,
+    release_id TEXT NOT NULL REFERENCES release_run(id),
+    environment TEXT NOT NULL CHECK (environment IN ('local','preview','staging','production')),
+    name TEXT NOT NULL,
+    fingerprint TEXT,
+    state TEXT NOT NULL CHECK (state IN ('configured','missing','divergent')),
+    PRIMARY KEY (user_id, workspace_id, project_id, release_id, environment, name)
+  );
+  INSERT INTO release_configuration_reference_v2
+    SELECT user_id, workspace_id, project_id, release_id, environment, name, version, 'configured'
+    FROM release_configuration_reference;
+  DROP TABLE release_configuration_reference;
+  ALTER TABLE release_configuration_reference_v2 RENAME TO release_configuration_reference;
+
+  CREATE TABLE release_local_effect (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL CHECK (workspace_id IN ('noa','jarvis')),
+    project_id TEXT NOT NULL,
+    release_id TEXT NOT NULL REFERENCES release_run(id),
+    kind TEXT NOT NULL CHECK (kind IN ('compose','migration','artifact','configuration')),
+    phase TEXT NOT NULL CHECK (phase IN ('intended','confirmed','failed')),
+    external_ref TEXT,
+    digest TEXT,
+    transport TEXT NOT NULL,
+    evidence_hash TEXT,
+    reason TEXT,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX idx_release_local_effect_timeline
+    ON release_local_effect(user_id,workspace_id,project_id,release_id,created_at,id);
+  CREATE TRIGGER release_local_effect_append_only_update BEFORE UPDATE ON release_local_effect
+  BEGIN SELECT RAISE(ABORT, 'release_local_effect é append-only'); END;
+  CREATE TRIGGER release_local_effect_append_only_delete BEFORE DELETE ON release_local_effect
+  BEGIN SELECT RAISE(ABORT, 'release_local_effect é append-only'); END;
   `
 ]
 

@@ -599,7 +599,10 @@ export const AUDIT_EVENT_TYPES = [
   // seguravam o lock; nunca o conteúdo do que está sendo escrito.
   'pool-lock',
   // SPEC-Release-01: transições do estado de release. Payload contém somente ids e estados.
-  'release-transition'
+  'release-transition',
+  // SPEC-Release-02: efeito local da preparação (compose, migration, artefato, configuração).
+  // Payload: ids, estado, digest e hash de evidência; nunca saída de comando nem valor de chave.
+  'release-local-effect'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]
