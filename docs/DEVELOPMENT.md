@@ -1,5 +1,20 @@
 # DEVELOPMENT.md — Ordem de execução e status
 
+## MVP-014 — M14-F01 Núcleo de release e fila (`SPEC-Release-01`, issue #150)
+
+Status: **em implementação**, branch `codex/m14-f01-release-core`; fila atualizada com #151 como `proplan:next`.
+
+- [x] Domínio tipado de Preview/Release, estados e invariantes de imutabilidade/idempotência.
+- [x] Migration SQLite com escopo, fila por projeto/ambiente, leases com fencing, ledger de passos, eventos, auditoria e artefatos.
+- [x] Repositório transacional: consolidação de SHA antes de Staging, writer único, recuperação de intenção ambígua e conflito de payload.
+- [x] Orquestrador por ports, PreviewCoordinator e CLI read-only para consulta/retomada.
+- [x] Guardas do diário por fase/ambiente, falha terminal, fingerprint SHA-256 sem payload livre e auditoria de transição recusada.
+- [x] Testes unitários e de integração SQLite direcionados: 41 passaram; `npm run typecheck`, `npm run lint`, `npm run build` e self-check do relatório passaram em 2026-10-09.
+- [ ] CI remoto e relatório categorizado por artefatos conforme `docs/TESTING.md`.
+- [ ] PR com `refs #150`, CI verde, merge e comentário de encerramento; depois mover #150 a `proplan:done` (sem fechar).
+
+Limite preservado da SPEC: nenhum provider, Docker, build ou deploy real é executado nesta fatia.
+
 > **Infra de CI (2026-09-06):** otimização autorizada pelo PI após a PR #308, entregue em duas PRs. A [#311](https://github.com/RodReis/rrb-jarvisOS/pull/311) eliminou a segunda execução da suíte — as guardas anti-drift e de carimbo passaram a rodar numa chamada só (`--check --require-entry`) — e pôs lint/typecheck e prova visual em jobs paralelos; a [#312](https://github.com/RodReis/rrb-jarvisOS/pull/312) paralelizou as três categorias (`test-regras`, `test-banco`, `test-tela`) e reduziu o `test` a agregador com `--no-run`, que lê os JSONs publicados e não reexecuta nada. Gate único, fechado em falhas. Node 24 LTS e Supabase CLI fixada em `v2.116.0`. Medição final da #312 (run `34054899376`): aproximadamente 6min16s de workflow contra 16min33s da #308; `test-banco` foi o caminho crítico, com 5min51s. Estrutura dos jobs em [TESTING.md](TESTING.md) §6; diagnóstico e critérios em [CI-PR.md](CI-PR.md). Rastreabilidade na issue [#310](https://github.com/RodReis/rrb-jarvisOS/issues/310).
 > **Planejamento de PR/CI (2026-09-06):** [guia operacional para Claude Code](GUIA-PRS-CLAUDE-CODE.md) e [SPEC-Pipeline-01 R2+E1](spec/spec-pipeline-01-politica-pr-ci.md) separados a pedido do PI. R2 aprovada como MVP-027/M27-F01 (#313/#314), com Windows obrigatório e Node 24 LTS. A **Emenda E1 aprovada** acrescenta o preflight de PR/Testing/QA/Banco no `SLICE_ENTRY`, antes da criação da issue de Construção; ela não inicia implementação nem muda a fila ou o merge autônomo da M9-F05.
 

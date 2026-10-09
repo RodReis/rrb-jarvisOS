@@ -12,8 +12,8 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 2994 | 2994 | 0 | 81.1 | — | — |
-| — | — | — | Banco | 2411 | 2393 | 0 | 84.4 | — | — |
+| — | — | — | Regras de Negócio | 2999 | 2999 | 0 | 81.1 | — | — |
+| — | — | — | Banco | 2425 | 2407 | 0 | 84.3 | — | — |
 | — | — | — | Tela | 806 | 805 | 0 | 74.5 | — | — |
 
 ## Histórico por entrega
@@ -520,3 +520,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-10-09 | #138 | spec-continuo-05-jornada-multi-mvp | Regras de Negócio | 2994 | 2994 | 0 | 81.1 | #420 | [#420](https://github.com/RodReis/rrb-jarvisOS/pull/420) |
 | 2026-10-09 | #138 | spec-continuo-05-jornada-multi-mvp | Banco | 2411 | 2393 | 0 | 84.4 | #420 | [#420](https://github.com/RodReis/rrb-jarvisOS/pull/420) |
 | 2026-10-09 | #138 | spec-continuo-05-jornada-multi-mvp | Tela | 806 | 805 | 0 | 74.5 | #420 | [#420](https://github.com/RodReis/rrb-jarvisOS/pull/420) |
+| 2026-10-09 | #150 | spec-release-01-nucleo-estados-fila | Regras de Negócio | 2999 | 2999 | 0 | 81.1 | #422 | [#422](https://github.com/RodReis/rrb-jarvisOS/pull/422) |
+| 2026-10-09 | #150 | spec-release-01-nucleo-estados-fila | Banco | 2425 | 2407 | 0 | 84.3 | #422 | [#422](https://github.com/RodReis/rrb-jarvisOS/pull/422) |
+| 2026-10-09 | #150 | spec-release-01-nucleo-estados-fila | Tela | 806 | 805 | 0 | 74.5 | #422 | [#422](https://github.com/RodReis/rrb-jarvisOS/pull/422) |
