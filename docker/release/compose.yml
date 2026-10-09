@@ -1,0 +1,67 @@
+# Ambiente local oficial da preparação de release (SPEC-Release-02).
+#
+# Template único: o projeto informa só contexto de build, porta do contêiner e migrations (perfil
+# do projeto). Tudo que é por run chega por variável de ambiente do `docker compose` — nome do
+# projeto, lease, portas e senha efêmera do Postgres —, nunca por literal neste arquivo.
+#
+# Posse: todo recurso leva `jarvisos.release-lease`, e o que é descartável leva também
+# `jarvisos.temporary=true`. A limpeza só remove o que tem as DUAS marcas e o lease do run.
+name: ${COMPOSE_PROJECT_NAME:?}
+
+x-posse: &posse
+  jarvisos.release-lease: ${RELEASE_LEASE:?}
+  jarvisos.temporary: 'true'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    labels: *posse
+    environment:
+      POSTGRES_USER: release
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_DB: release
+    ports:
+      - '127.0.0.1:${PORT_POSTGRES:?}:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U release -d release']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  backend:
+    # Imagem publicada por digest: o que sobe aqui é o que o registry guarda, sem segundo build.
+    image: ${BACKEND_IMAGE:?}
+    labels: *posse
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: ${BACKEND_CONTAINER_PORT:?}
+      DATABASE_HOST: postgres
+      DATABASE_PORT: '5432'
+      DATABASE_URL: postgres://release:${POSTGRES_PASSWORD:?}@postgres:5432/release
+    ports:
+      - '127.0.0.1:${PORT_BACKEND:?}:${BACKEND_CONTAINER_PORT:?}'
+
+  frontend:
+    build:
+      context: ${FRONTEND_CONTEXT:?}
+      dockerfile: ${FRONTEND_DOCKERFILE:-Dockerfile}
+    labels: *posse
+    depends_on:
+      - backend
+    environment:
+      PORT: ${FRONTEND_CONTAINER_PORT:?}
+      API_URL: http://backend:${BACKEND_CONTAINER_PORT:?}
+    ports:
+      - '127.0.0.1:${PORT_FRONTEND:?}:${FRONTEND_CONTAINER_PORT:?}'
+
+networks:
+  default:
+    labels: *posse
+
+volumes:
+  pgdata:
+    labels: *posse
