@@ -1,5 +1,21 @@
 # DEVELOPMENT.md — Ordem de execução e status
 
+## MVP-014 — M14-F02 Docker, artefatos e configuração (`SPEC-Release-02`, issue #151)
+
+Status: **em implementação**, branch `feat/m14-f02-docker-artefatos-config` (worktree `.worktrees/m14-f02`); #151 em `proplan:doing`. Decisões de implementação na SPEC (alvo = template por projeto + projeto de prova, PI 2026-10-09).
+
+- [x] Identidade OCI por digest e recusa de referência mutável (`release-artifact`).
+- [x] Validador de referências de configuração (nomes e HMAC, nunca valor) e `.env.example` só com nomes.
+- [x] Executor de comandos (`docker` apenas, env explícito, redação) e adapter GHCR com contract tests: sucesso, auth, timeout, digest divergente, resposta parcial, tag mutável e driver sem attestation.
+- [x] Compose oficial (`docker/release/compose.yml`), `LocalComposeAdapter` (portas livres, Docker sob demanda com autorização, limpeza por lease mais marca temporária) e projeto fixture.
+- [x] `DatabaseMigrationRunner` forward-only com checksum, seed e impressão do banco reproduzível.
+- [x] Migration 64 (artefato com uri e provenance, referência de configuração com fingerprint, diário local append-only) e `ReleaseLocalRepository`.
+- [x] `ReleasePreparationService` e comando `npm run release:prepare` (Electron). Smoke real do comando em 2026-10-09: preparada em 11 s; segunda execução reusa o artefato (`reused: true`); release inexistente → código 2; chave ausente → código 3 com nome e ambiente; 0 sentinelas em banco e saída; nenhum recurso Docker restante.
+- [x] Contrafactuais medidos: remover o filtro `temporary` da limpeza reprova o teste de volume persistente; vazar o valor da chave na evidência reprova o teste da sentinela.
+- [ ] Revisão independente (segurança e código) e correções.
+- [ ] PR com `refs #151`, CI verde (inclui o builder `docker-container` se o runner não tiver containerd store), relatório categorizado, merge e comentário de encerramento; depois #151 em `proplan:done` (sem fechar).
+- Smoke GHCR real: **`not_run`** — exige `docker login ghcr.io` com `write:packages` e cria pacote na conta do PI. Comando: `RELEASE_GHCR_SMOKE_REPOSITORY=ghcr.io/<dono>/<imagem> npx vitest run --project banco src/main/release/adapters/ghcr-artifact-adapter.smoke.int-spec.ts`.
+
 ## MVP-014 — M14-F01 Núcleo de release e fila (`SPEC-Release-01`, issue #150)
 
 Status: **entregue** pela [PR #422](https://github.com/RodReis/rrb-jarvisOS/pull/422), mergeada na `main` em 2026-10-09 (SHA `621fcb0a6d3c4b648b2a4926a908795f445fdab5`); issue #150 aberta em `proplan:done`, aguardando aceite do PI. #151 segue como `proplan:next`.

@@ -2,7 +2,7 @@
 
 - MVP/Fatia: MVP-014 · M14-F02.
 - Issue: [#151](https://github.com/RodReis/rrb-jarvisOS/issues/151).
-- Status: **aprovada-pi** (2026-08-29); issue em `proplan:backlog`; implementação depende da fila.
+- Status: **aprovada-pi** (2026-08-29); issue em `proplan:doing`; implementação na branch `feat/m14-f02-docker-artefatos-config`.
 - Depende de: M14-F01 aprovada e entregue.
 - Design: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v3-design.md`.
 
@@ -94,6 +94,19 @@ npm run test:prova
 - **Sempre:** usar digest, redaction e ownership antes de limpar.
 - **Consultar a SPEC:** novo registry, mudança do manifesto Compose ou migration destrutiva.
 - **Nunca:** usar `latest` no deploy, copiar segredo, executar sem Docker ou apagar volume persistente automaticamente.
+
+## Decisões de implementação
+
+Tomadas na implementação da F02. Registradas aqui porque a opção recusada também é decisão. Seguiram a recomendação por valor; o custo declarado entrou só como desempate.
+
+1. **O Compose oficial é um template por projeto, provado por um projeto fixture (PI, 2026-10-09).** O repositório é Electron com SQLite e não tem frontend, backend e Postgres separados; o alvo da F02 é preparar a release de *qualquer* projeto. `docker/release/compose.yml` recebe tudo por variável (nome do projeto, lease, portas, senha efêmera, imagem do backend) e o projeto informa só um perfil JSON (`release-profile.json`: contextos de build, portas do contêiner, health path, migrations, seed, repositório). A prova usa `tests/fixtures/release-project/`. *Recusada:* Compose fixo para este repositório — exigiria inventar frontend e backend que ele não tem e prenderia a F03 até a F05 a um alvo inexistente.
+2. **Ordem da preparação:** configuração → Docker → só o Postgres → migrations e seed → **publicação única do backend** → o backend publicado (por digest) e o frontend no Compose → verificação → limpeza. Assim a regra 4 vale por construção (migration quebrada nunca produz candidato) e o que é verificado localmente é a imagem que o registry guarda, sem segundo build.
+3. **O comando é `npm run release:prepare`, executado dentro do Electron.** A chave da cadeia de auditoria está selada no `safeStorage`; fora do Electron não há como gravar o `AuditEvent` do efeito. Os argumentos viajam por variável de ambiente, não pelo `argv`: o Chromium varre a linha de comando inteira e `--registry localhost:55790` seguido de outro `--switch` derruba o processo em ~20 ms com código -1 e sem mensagem (medido). Saída: JSON sem valor de chave; código 0 preparada, 3 bloqueada, 2 uso inválido.
+4. **Diário próprio da preparação local (migration 64).** `release_local_effect` é append-only e guarda intenção, referência externa, digest, transporte e hash de evidência; o `release_step` da F01 só admite staging e production, e a preparação local não é um passo de ambiente. O artefato ganha `uri` e `provenance` (ALTER); `release_configuration_reference` foi recriada com `fingerprint`, `state` e os quatro ambientes — as duas estavam vazias, sem escritor na F01.
+5. **`ConfigurationReference` guarda o HMAC do valor, nunca o valor.** Chave derivada da chave de auditoria por separação de domínio. `.env.example` com valor é **recusado** (a SPEC pede só nomes); o `.env.example` atual deste repositório traz `SUPABASE_URL=https://SEU-PROJETO.supabase.co` — se este repositório virar projeto de release, o PI decide entre esvaziar o valor ou aceitar placeholder.
+6. **Provenance = SLSA do registry, resumida e comparável.** Guardam-se tipo de build, builder e o hash do documento; a consulta posterior só vale se o digest e esse hash forem os mesmos. O `org.opencontainers.image.revision` da imagem carrega o SHA da release.
+7. **`buildx --provenance` exige containerd image store ou um builder `docker-container`.** O adapter aceita um `builder` nomeado e devolve `attestation-unsupported` quando o driver não gera provenance — nunca publica sem. O teste real cria o builder quando o Docker local não tem containerd store.
+8. **Limite declarado:** a F01 só tem lease por ambiente (staging e production). A preparação local usa um id de lease próprio para posse dos recursos Docker; **ela não serializa dois writers da mesma release** (o registro do artefato é idempotente e recusa digest divergente, mas duas preparações simultâneas disputariam portas). Serializar exige estender o lease da F01 e é decisão do PI.
 
 ## Perguntas abertas ao PI
 
