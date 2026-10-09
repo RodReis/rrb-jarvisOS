@@ -1,7 +1,7 @@
 # MVP-014 — Release e Deploy Governado
 
-- Status: **design e cinco SPECs aprovados pelo PI em 2026-08-29**; implementação aguarda a ordem da fila.
-- GitHub: épico [#149](https://github.com/RodReis/rrb-jarvisOS/issues/149); fatias [#150–#154](https://github.com/RodReis/rrb-jarvisOS/issues/150), estado `proplan:backlog`.
+- Status: **design e cinco SPECs aprovados pelo PI em 2026-08-29**; M14-F01 entregue pela [PR #422](https://github.com/RodReis/rrb-jarvisOS/pull/422), merge SHA `621fcb0a6d3c4b648b2a4926a908795f445fdab5`; #150 aberta em `proplan:done`, aguardando aceite do PI.
+- GitHub: épico [#149](https://github.com/RodReis/rrb-jarvisOS/issues/149); #150 em `proplan:done` (aberta para aceite), #151 em `proplan:next`, #152–#154 em Backlog.
 - Depende de: MVP-013 concluído.
 - Design: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v3-design.md`.
 
@@ -11,7 +11,7 @@ Transformar merges confirmados da Pipeline V2 em Preview, Staging e Produção v
 
 ## Fatias
 
-- [ ] M14-F01 [#150](https://github.com/RodReis/rrb-jarvisOS/issues/150) — Núcleo de release e fila — `spec-release-01-nucleo-estados-fila.md` (implementação em PR; aguardando CI e merge).
+- [x] M14-F01 [#150](https://github.com/RodReis/rrb-jarvisOS/issues/150) — Núcleo de release e fila — `spec-release-01-nucleo-estados-fila.md` (entregue pela [PR #422](https://github.com/RodReis/rrb-jarvisOS/pull/422); aguardando aceite do PI).
 - [ ] M14-F02 [#151](https://github.com/RodReis/rrb-jarvisOS/issues/151) — Docker, artefatos e configuração — `spec-release-02-compose-artefatos-config.md`.
 - [ ] M14-F03 [#152](https://github.com/RodReis/rrb-jarvisOS/issues/152) — Preview isolado por PR — `spec-release-03-preview-isolado.md`.
 - [ ] M14-F04 [#153](https://github.com/RodReis/rrb-jarvisOS/issues/153) — Staging e Produção automática — `spec-release-04-staging-producao.md`.
