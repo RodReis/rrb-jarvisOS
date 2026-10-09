@@ -2,7 +2,7 @@
 
 - MVP/Fatia: MVP-014 · M14-F02.
 - Issue: [#151](https://github.com/RodReis/rrb-jarvisOS/issues/151).
-- Status: **aprovada-pi** (2026-08-29); issue em `proplan:doing`; implementação na branch `feat/m14-f02-docker-artefatos-config`.
+- Status: **aprovada-pi** (2026-08-29); **entregue** pela PR #424 (merge `48b3af0`, 2026-10-09); issue em `proplan:done`, aguardando aceite do PI.
 - Depende de: M14-F01 aprovada e entregue.
 - Design: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v3-design.md`.
 

@@ -175,7 +175,7 @@ Merge ── ReleaseQueue ── ReleaseOrchestrator
                          └── Falha de código: correção pela Pipeline V2
 ```
 
-**Preparação local (M14-F02, em implementação):** `ReleasePreparationService` encadeia configuração, Docker Compose, migrations, publicação única do backend no GHCR por digest e verificação do publicado; adapters em `src/main/release/adapters/`, diário append-only `release_local_effect`, comando `npm run release:prepare`. Decisões em `docs/spec/spec-release-02-compose-artefatos-config.md` § Decisões de implementação.
+**Preparação local (M14-F02, entregue):** `ReleasePreparationService` encadeia configuração, Docker Compose, migrations, publicação única do backend no GHCR por digest e verificação do publicado; adapters em `src/main/release/adapters/`, diário append-only `release_local_effect`, comando `npm run release:prepare`. Decisões em `docs/spec/spec-release-02-compose-artefatos-config.md` § Decisões de implementação.
 
 Local, cada Preview, Staging e Produção possuem configurações e bancos separados. Migration é forward-only; compensação automática alcança aplicações, não restaura banco. Produção é automática depois dos gates e não espera fechamento administrativo da issue.
 

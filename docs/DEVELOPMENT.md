@@ -2,7 +2,7 @@
 
 ## MVP-014 — M14-F02 Docker, artefatos e configuração (`SPEC-Release-02`, issue #151)
 
-Status: **em implementação**, branch `feat/m14-f02-docker-artefatos-config` (worktree `.worktrees/m14-f02`); #151 em `proplan:doing`. Decisões de implementação na SPEC (alvo = template por projeto + projeto de prova, PI 2026-10-09).
+Status: **entregue** pela [PR #424](https://github.com/RodReis/rrb-jarvisOS/pull/424), mergeada na `main` em 2026-10-09 (SHA `48b3af0b8f361705d1d0f778a1250d1296380ab1`); issue #151 aberta em `proplan:done`, aguardando aceite do PI. Decisões de implementação na SPEC (alvo = template por projeto + projeto de prova, PI 2026-10-09).
 
 - [x] Identidade OCI por digest e recusa de referência mutável (`release-artifact`).
 - [x] Validador de referências de configuração (nomes e HMAC, nunca valor) e `.env.example` só com nomes.
@@ -13,7 +13,7 @@ Status: **em implementação**, branch `feat/m14-f02-docker-artefatos-config` (w
 - [x] `ReleasePreparationService` e comando `npm run release:prepare` (Electron). Smoke real do comando em 2026-10-09: preparada em 11 s; segunda execução reusa o artefato (`reused: true`); release inexistente → código 2; chave ausente → código 3 com nome e ambiente; 0 sentinelas em banco e saída; nenhum recurso Docker restante.
 - [x] Contrafactuais medidos: remover o filtro `temporary` da limpeza reprova o teste de volume persistente; vazar o valor da chave na evidência reprova o teste da sentinela.
 - [x] Revisão independente (segurança e código): 0 CRITICAL, 1 HIGH e 10 MEDIUM tratados com teste vermelho antes (SPEC, decisão 9); limites que ficam na decisão 10. Smoke do comando repetido com as guardas: árvore suja e `.env.local` no contexto → código 3; `--namespace` errado → código 2; caminho feliz em 12 s; reuso com rastro no diário; 0 sentinelas; 0 resíduos Docker.
-- [ ] PR com `refs #151`, CI verde (inclui o builder `docker-container` se o runner não tiver containerd store), relatório categorizado, merge e comentário de encerramento; depois #151 em `proplan:done` (sem fechar).
+- [x] PR com `refs #151`, CI verde ([run 37997826620](https://github.com/RodReis/rrb-jarvisOS/actions/runs/37997826620); o runner não tem containerd store e o builder `docker-container` funcionou), relatório categorizado a partir dos artefatos do CI, merge `48b3af0b8f361705d1d0f778a1250d1296380ab1`, comentário de encerramento publicado e #151 em `proplan:done` (sem fechar). Três rodadas do `test-banco` caíram por limite de pulls do Docker Hub e o `quality` travou em `npm ci`; reexecução dos jobs, sem mudança de código.
 - Smoke GHCR real: **`not_run`** — exige `docker login ghcr.io` com `write:packages` e cria pacote na conta do PI. Comando: `RELEASE_GHCR_SMOKE_REPOSITORY=ghcr.io/<dono>/<imagem> npx vitest run --project banco src/main/release/adapters/ghcr-artifact-adapter.smoke.int-spec.ts`.
 
 ## MVP-014 — M14-F01 Núcleo de release e fila (`SPEC-Release-01`, issue #150)
