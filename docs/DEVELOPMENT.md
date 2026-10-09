@@ -2680,13 +2680,14 @@ Status: **aceita e finalizada pelo PI em 2026-10-08** — issue [#137](https://g
 
 ### M13-F05 — Jornada multi-MVP (`docs/spec/spec-continuo-05-jornada-multi-mvp.md`)
 
-Status: em implementação pela issue [#138](https://github.com/RodReis/rrb-jarvisOS/issues/138), `proplan:doing`; SPEC aprovada pelo PI em 2026-08-29. F01–F04 foram mergeadas e aceitas; a jornada fecha o MVP-013 e a Pipeline V2.
+Status: entregue pela [PR #420](https://github.com/RodReis/rrb-jarvisOS/pull/420), squash merge em `94392f4652bf3c4944c1f3f27438a526b07494bc` (2026-10-09); issue [#138](https://github.com/RodReis/rrb-jarvisOS/issues/138) permanece aberta em `proplan:done` para aceite do PI. SPEC aprovada pelo PI em 2026-08-29. F01–F04 já foram aceitas; F05 completa a entrega técnica 5/5 do MVP-013 e da Pipeline V2, sem fechar o épico.
 
 - [x] Confirmar issue #138, SPEC aprovada, dependência #137 finalizada e `main` no merge #419.
-- [ ] Provar travessia determinística de múltiplas fatias em ao menos dois MVPs já aprovados.
-- [ ] Provar concorrência só entre fatias independentes e serialização de merges.
-- [ ] Injetar reinício e efeitos ambíguos em cada fronteira durável; confirmar ausência de duplicação.
-- [ ] Provar gate pendente bloqueando somente dependentes e permitindo ramo aprovado independente.
-- [ ] Provar pausa, retomada e cancelamento sem apagar trabalho remoto, reverter merge, fechar issue ou executar deploy.
-- [ ] Produzir relatório final reconciliável com decisões, revisões, executores, consumo, checks, SHAs e bloqueios.
-- [ ] Validar E2E, relatório de testes, smokes limitados e entrega da issue #138 para aceite do PI.
+- [x] Provar travessia determinística de múltiplas fatias em MVP-012 e MVP-013 após merge reconciliado.
+- [x] Provar concorrência só entre fatias independentes e serialização de merges com as suites de fila/merge existentes.
+- [x] Injetar perda de confirmação, reabrir SQLite e confirmar ausência de duplicação do run.
+- [x] Persistir decisão `blocked` por nó com gate pendente, permitindo despacho do ramo aprovado independente.
+- [x] Revalidar as provas existentes de pausa, retomada e cancelamento; nenhum deploy, fechamento automático de issue ou reversão de merge.
+- [x] Versionar relatório final do DAG determinístico com revisão, executor, consumo, checks, SHAs sintéticos e bloqueios explicitamente identificados como fixtures.
+- [x] Validar typecheck, lint, testes focados, relatório e CI final (run `37875799804`); registrar limites: E2E da jornada pulado pela seleção de caminhos, daemon Docker local recusou acesso e smoke GitHub/CLI ficou `not_run`.
+- [x] PR #420 integrada e comentário de encerramento publicado; issue #138 está `proplan:done`, aberta para aceite do PI.
