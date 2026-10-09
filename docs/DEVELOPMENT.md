@@ -2,7 +2,7 @@
 
 ## MVP-014 — M14-F01 Núcleo de release e fila (`SPEC-Release-01`, issue #150)
 
-Status: **em implementação**, branch `codex/m14-f01-release-core`; fila atualizada com #151 como `proplan:next`.
+Status: **entregue** pela [PR #422](https://github.com/RodReis/rrb-jarvisOS/pull/422), mergeada na `main` em 2026-10-09 (SHA `621fcb0a6d3c4b648b2a4926a908795f445fdab5`); issue #150 aberta em `proplan:done`, aguardando aceite do PI. #151 segue como `proplan:next`.
 
 - [x] Domínio tipado de Preview/Release, estados e invariantes de imutabilidade/idempotência.
 - [x] Migration SQLite com escopo, fila por projeto/ambiente, leases com fencing, ledger de passos, eventos, auditoria e artefatos.
@@ -10,8 +10,8 @@ Status: **em implementação**, branch `codex/m14-f01-release-core`; fila atuali
 - [x] Orquestrador por ports, PreviewCoordinator e CLI read-only para consulta/retomada.
 - [x] Guardas do diário por fase/ambiente, falha terminal, fingerprint SHA-256 sem payload livre e auditoria de transição recusada.
 - [x] Testes unitários e de integração SQLite direcionados: 41 passaram; `npm run typecheck`, `npm run lint`, `npm run build` e self-check do relatório passaram em 2026-10-09.
-- [ ] CI remoto e relatório categorizado por artefatos conforme `docs/TESTING.md`.
-- [ ] PR com `refs #150`, CI verde, merge e comentário de encerramento; depois mover #150 a `proplan:done` (sem fechar).
+- [x] CI remoto e relatório categorizado por artefatos: run [505](https://github.com/RodReis/rrb-jarvisOS/actions/runs/37941840394) verde; agregador validou o carimbo #150/SPEC-Release-01.
+- [x] PR [#422](https://github.com/RodReis/rrb-jarvisOS/pull/422) com `refs #150`, CI verde e merge SHA `621fcb0a6d3c4b648b2a4926a908795f445fdab5`; comentário de encerramento publicado e #150 movida para `proplan:done`, permanecendo aberta para aceite do PI.
 
 Limite preservado da SPEC: nenhum provider, Docker, build ou deploy real é executado nesta fatia.
 
