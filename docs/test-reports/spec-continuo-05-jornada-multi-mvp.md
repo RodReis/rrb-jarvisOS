@@ -1,6 +1,6 @@
 # Relatório de prova — SPEC-Contínuo-05 / issue #138
 
-**Estado:** rodada completa do CI passou no SHA `e34b865466f59d4bd840ccc521bb65189e76409c` (run `37874186270`). Uma correção subsequente tornou explícita e durável a decisão de gate bloqueado; validação local passou, e CI desse novo SHA está pendente. O relatório agregado foi regenerado dos artefatos oficiais. Este documento é a evidência versionada por SPEC/issue, conforme `docs/TESTING.md` §11.3.
+**Estado:** CI completo passou no SHA `72dbeaccbe6dc7cdd4a32d4d918fd78644b3bd6b` (run `37875080981`), incluindo a decisão durável de gate bloqueado. Os artefatos oficiais desta execução foram usados para validar os totais agregados. Este documento é a evidência versionada por SPEC/issue, conforme `docs/TESTING.md` §11.3.
 
 ## Escopo da prova
 
@@ -58,7 +58,7 @@ Todos os campos desta seção são sintéticos e exercitados pela fixture do tes
 - Smoke real do GitHub/CLI — `not_run`: repositório de prova exclusivo inacessível.
 - `npm test` completo — interrompido após vários minutos sem conclusão; houve testes que criam worktrees e a suíte alcança casos dependentes de infraestrutura não acessível neste ambiente. Nenhum resultado agregado foi declarado.
 
-Os totais acima são saídas observadas dos comandos locais, não contagens editadas à mão em `reports/TESTS.md`. O CI run `37873116955` executou as categorias oficiais no SHA `83dd9145b105975a96bfb49f28579923704029c8`: Regras 2994/2994 (81,1%); Banco 2411/2393, sem falhas e 18 ignorados (84,4%); Tela 806/805, sem falhas e 1 `todo` (74,5%). O agregado falhou pela divergência do relatório versionado com o total de Banco; os arquivos agregados foram regenerados dos artefatos oficiais e a guarda local passou. A repetição `37874186270` passou nos checks obrigatórios `changes`, `quality`, categorias Regras/Banco/Tela, `visual`, `test` e `gate`; E2E foi pulado pela seleção de caminhos. Essa repetição validou a correção dos relatórios, mas antecede a última correção de código, cujo CI ainda está pendente.
+Os totais acima são saídas observadas dos comandos locais, não contagens editadas à mão em `reports/TESTS.md`. O CI run `37875080981`, no SHA desta entrega, confirmou Regras 2994/2994 (81,1%); Banco 2411/2393, sem falhas e 18 ignorados (84,4%); Tela 806/805, sem falhas e 1 `todo` (74,5%). `changes`, `quality`, categorias Regras/Banco/Tela, `visual`, `test` e `gate` passaram. E2E foi pulado pela seleção de caminhos. Os artefatos oficiais do run foram baixados e conferidos; a guarda local `npm run test:report -- --check --no-run --require-entry` passou sem duplicar linhas do histórico desta mesma entrega.
 
 ## Evidência ainda pendente
 
