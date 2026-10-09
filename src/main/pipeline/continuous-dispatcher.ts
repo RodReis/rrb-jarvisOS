@@ -281,6 +281,29 @@ export class ContinuousDispatcher {
       if (resposta.estado === 'iniciado') continue
     }
 
+    // Registrar cada gate pendente individualmente mesmo quando outro ramo pode avançar.
+    // Sem esta decisão por nó, o resultado global "dispatched" escondia o bloqueio local.
+    for (const nodeId of inventario.ordem) {
+      const no = porId.get(nodeId)
+      if (
+        no === undefined ||
+        no.tipo !== 'fatia' ||
+        no.estadoTecnico !== 'pendente' ||
+        no.gateAprovado ||
+        decisoes.some((decisao) => decisao.nodeId === no.id)
+      )
+        continue
+      const decisao = this.gravar(
+        escopo,
+        inventario,
+        no,
+        'blocked',
+        `${no.id} aguarda gate aprovado pelo PI; somente este ramo permanece bloqueado.`,
+        observadoEm
+      )
+      decisoes.push(decisao)
+    }
+
     if (decisoes.some((decisao) => decisao.estado === 'dispatched'))
       return { estado: 'dispatched', decisoes }
     if (esperas.length > 0) return { estado: 'waiting', decisoes }

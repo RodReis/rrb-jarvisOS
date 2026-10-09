@@ -57,6 +57,18 @@ let nodes: NoInventario[]
 let runsByKey: Map<string, { id: string; estado: string; sliceId: string }>
 let createdRunCount: number
 let falharAposCriarRun: boolean
+const runEvidence = new Map<
+  string,
+  {
+    readonly executor: string
+    readonly model: string
+    readonly tokens: number
+    readonly custoUsd: number
+    readonly check: string
+    readonly headSha: string
+    readonly mergeSha: string
+  }
+>()
 
 function createDispatcher(): ContinuousDispatcher {
   return new ContinuousDispatcher({
@@ -78,6 +90,17 @@ function createDispatcher(): ContinuousDispatcher {
         createdRunCount += 1
         run = { id: `run-${createdRunCount}`, estado: 'RUNNING', sliceId }
         runsByKey.set(dispatchKey, run)
+        // Contrato sintético que compõe o relatório final do cenário sem alegar
+        // execução real de provider, consumo, CI ou GitHub.
+        runEvidence.set(run.id, {
+          executor: 'codex (fixture)',
+          model: 'executor-de-prova',
+          tokens: 128,
+          custoUsd: 0,
+          check: 'quality: success (fixture)',
+          headSha: String(createdRunCount).repeat(40),
+          mergeSha: String(createdRunCount + 2).repeat(40)
+        })
         if (falharAposCriarRun) {
           falharAposCriarRun = false
           throw new Error('Confirmação perdida depois da criação do run.')
@@ -110,6 +133,7 @@ beforeEach(() => {
   runsByKey = new Map()
   createdRunCount = 0
   falharAposCriarRun = true
+  runEvidence.clear()
 })
 
 afterEach(() => {
@@ -139,6 +163,37 @@ describe('jornada multi-MVP do dispatcher', () => {
     expect(acrossBoundary.decisoes.map((decision) => decision.nodeId)).toContain('MVP13-F01')
     expect(createdRunCount).toBe(2)
 
+    const relatorio = {
+      decisao: acrossBoundary.decisoes.find((decision) => decision.nodeId === 'MVP13-F01'),
+      revisao: nodes.find((node) => node.id === 'MVP13-F01')?.spec.revisaoAprovada,
+      runs: [...runEvidence.entries()].map(([runId, evidencias]) => ({ runId, ...evidencias }))
+    }
+    expect(relatorio.decisao?.nodeId).toBe('MVP13-F01')
+    expect(relatorio.revisao).toBe(revision)
+    expect(relatorio.runs).toHaveLength(2)
+    expect(relatorio.runs).toEqual([
+      {
+        runId: 'run-1',
+        executor: 'codex (fixture)',
+        model: 'executor-de-prova',
+        tokens: 128,
+        custoUsd: 0,
+        check: 'quality: success (fixture)',
+        headSha: '1'.repeat(40),
+        mergeSha: '3'.repeat(40)
+      },
+      {
+        runId: 'run-2',
+        executor: 'codex (fixture)',
+        model: 'executor-de-prova',
+        tokens: 128,
+        custoUsd: 0,
+        check: 'quality: success (fixture)',
+        headSha: '2'.repeat(40),
+        mergeSha: '4'.repeat(40)
+      }
+    ])
+
     nodes = nodes.map((node) =>
       node.id === 'MVP13-F01' ? { ...node, estadoTecnico: 'mergeado' } : node
     )
@@ -157,5 +212,13 @@ describe('jornada multi-MVP do dispatcher', () => {
     expect(result.decisoes.map((decision) => decision.nodeId)).toContain('MVP12-F02')
     expect(createdRunCount).toBe(1)
     expect(runsByKey.values().next().value?.sliceId).toBe('MVP12-F02')
+    const bloqueioDoGate = result.decisoes.find((decision) => decision.nodeId === 'MVP12-F01')
+    expect(bloqueioDoGate).toMatchObject({
+      nodeId: 'MVP12-F01',
+      causa: expect.stringContaining('gate')
+    })
+    if (bloqueioDoGate !== undefined) {
+      expect(repository.buscar(scope, bloqueioDoGate.idempotencyKey)).toEqual(bloqueioDoGate)
+    }
   })
 })
