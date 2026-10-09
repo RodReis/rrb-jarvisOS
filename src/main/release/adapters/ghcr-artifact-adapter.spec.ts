@@ -86,6 +86,8 @@ describe('GhcrArtifactAdapter.publish', () => {
     const erro = await new GhcrArtifactAdapter(runner).publish(entrada).catch((e) => e)
     expect(erro).toBeInstanceOf(ArtifactRegistryError)
     expect(erro.code).toBe('auth')
+    expect(erro.message).not.toContain('segredo-x')
+    expect(erro.message).not.toContain('token=')
   })
 
   it('builder nomeado vai no build; sem builder o argumento não existe', async () => {

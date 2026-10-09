@@ -16,7 +16,8 @@ import {
   type ComposeEnvironmentPort,
   type ComposePort,
   type PreparationProject,
-  type RegistryPort
+  type RegistryPort,
+  type SourcePort
 } from './release-preparation-service'
 
 const NOW = '2026-10-09T12:00:00.000Z'
@@ -92,7 +93,12 @@ function composeFalso(
   }
 }
 
-function registryFalso(erro?: ArtifactRegistryError): RegistryPort {
+const publicacoes: Array<{ dockerfile?: string; contextDir: string }> = []
+
+function registryFalso(
+  erro?: ArtifactRegistryError,
+  resolvido?: { digest?: string; provenanceDigest?: string }
+): RegistryPort {
   const artefato = {
     uri: URI,
     digest: DIGEST,
@@ -104,20 +110,43 @@ function registryFalso(erro?: ArtifactRegistryError): RegistryPort {
     }
   }
   return {
-    async publish() {
+    async publish(input) {
       chamadas.push('publish')
+      publicacoes.push({ dockerfile: input.dockerfile, contextDir: input.contextDir })
       if (erro) throw erro
       return artefato
     },
     async resolve() {
       chamadas.push('resolve')
-      return artefato
+      return {
+        ...artefato,
+        digest: resolvido?.digest ?? artefato.digest,
+        provenance: {
+          ...artefato.provenance,
+          provenanceDigest: resolvido?.provenanceDigest ?? artefato.provenance.provenanceDigest
+        }
+      }
     }
   }
 }
 
+let origem: Awaited<ReturnType<SourcePort['verify']>> = 'ok'
+
 function servico(compose: ComposePort, registry: RegistryPort): ReleasePreparationService {
-  return new ReleasePreparationService(repo, compose, registry, 'chave-de-fingerprint', () => NOW)
+  const fonte: SourcePort = {
+    async verify() {
+      chamadas.push('source')
+      return origem
+    }
+  }
+  return new ReleasePreparationService(
+    repo,
+    compose,
+    registry,
+    fonte,
+    'chave-de-fingerprint',
+    () => NOW
+  )
 }
 
 beforeEach(() => {
@@ -128,6 +157,8 @@ beforeEach(() => {
   releaseId = new ReleaseRepository(db, audit).enqueue(SCOPE, 'c'.repeat(40), NOW).release.id
   lease = { leaseId: 'lease-0123456789', ownerId: 'dono', fencingToken: 1 }
   chamadas = []
+  origem = 'ok'
+  publicacoes.length = 0
   const migrations = join(directory, 'migrations')
   writeFileSync(join(directory, 'seed.sql'), 'INSERT INTO itens VALUES (1);')
   projeto = {
@@ -141,6 +172,7 @@ beforeEach(() => {
     sourceSha: 'c'.repeat(40)
   }
   mkdirSync(migrations)
+  mkdirSync(join(directory, 'backend'))
   writeFileSync(join(migrations, '001_cria_itens.sql'), 'CREATE TABLE itens (id int);')
 })
 
@@ -156,6 +188,7 @@ describe('caminho feliz', () => {
     const r = await preparar(servico(composeFalso(), registryFalso()))
     expect(r).toMatchObject({ state: 'prepared', cleanup: 'done', reused: false })
     expect(chamadas.filter((c) => c !== 'sql')).toEqual([
+      'source',
       'open',
       'upDatabase',
       'publish',
@@ -238,6 +271,131 @@ describe('bloqueios', () => {
     expect(r).toMatchObject({ state: 'blocked', reason: 'auth' })
     expect(JSON.stringify(r)).not.toContain('segredo')
     expect(chamadas).toContain('cleanup')
+  })
+})
+
+describe('falha inesperada depois de subir o banco (H1)', () => {
+  it('erro do Node com code em maiúsculas vira bloqueio e a limpeza ainda roda', async () => {
+    writeFileSync(join(directory, 'seed.sql'), 'x')
+    projeto = { ...projeto, migrationsDir: join(directory, 'nao-existe') }
+    const r = await preparar(servico(composeFalso(), registryFalso()))
+    expect(r).toMatchObject({ state: 'blocked', reason: 'migration-failed', cleanup: 'done' })
+    expect(chamadas).toContain('cleanup')
+    expect(chamadas).not.toContain('publish')
+  })
+
+  it('o motivo gravado no diário é um código da lista, nunca o code cru do erro', async () => {
+    projeto = { ...projeto, migrationsDir: join(directory, 'nao-existe') }
+    await preparar(servico(composeFalso(), registryFalso()))
+    const motivos = repo
+      .listEffects(SCOPE, releaseId)
+      .map((e) => e.reason)
+      .filter(Boolean)
+    expect(motivos).toContain('migration-failed')
+    expect(motivos.join(' ')).not.toMatch(/ENOENT/i)
+  })
+
+  it('limpeza que falha junto com o bloqueio fica pendente e traz o lease para reconciliar', async () => {
+    projeto = { ...projeto, migrationsDir: join(directory, 'nao-existe') }
+    const r = await preparar(servico(composeFalso({ falhaLimpeza: true }), registryFalso()))
+    expect(r).toMatchObject({ state: 'blocked', cleanup: 'pending', leaseId: lease.leaseId })
+    const refs = repo.listEffects(SCOPE, releaseId).map((e) => e.externalRef)
+    expect(refs).toContain(`lease:${lease.leaseId}`)
+  })
+})
+
+describe('origem do build e segredo no contexto', () => {
+  it('contexto que não é o commit da release bloqueia antes de abrir o Docker', async () => {
+    origem = 'source-mismatch'
+    const r = await preparar(servico(composeFalso(), registryFalso()))
+    expect(r).toMatchObject({ state: 'blocked', reason: 'source-mismatch' })
+    expect(chamadas).not.toContain('open')
+    expect(chamadas).not.toContain('publish')
+  })
+
+  it('árvore suja bloqueia', async () => {
+    origem = 'source-dirty'
+    const r = await preparar(servico(composeFalso(), registryFalso()))
+    expect(r).toMatchObject({ state: 'blocked', reason: 'source-dirty' })
+  })
+
+  it('.env.local dentro do contexto, sem .dockerignore, bloqueia: iria para a imagem publicada', async () => {
+    writeFileSync(join(directory, 'backend', '.env.local'), 'X=1')
+    const r = await preparar(servico(composeFalso(), registryFalso()))
+    expect(r).toMatchObject({ state: 'blocked', reason: 'secret-in-context' })
+    expect(chamadas).not.toContain('open')
+  })
+
+  it('contexto inexistente bloqueia em vez de lançar', async () => {
+    projeto = { ...projeto, contextDir: join(directory, 'nao-existe') }
+    const r = await preparar(servico(composeFalso(), registryFalso()))
+    expect(r).toMatchObject({ state: 'blocked', reason: 'source-mismatch' })
+  })
+
+  it('com o artefato já gravado não há build, então nada disso é exigido', async () => {
+    await preparar(servico(composeFalso(), registryFalso()))
+    origem = 'source-dirty'
+    const r = await preparar(servico(composeFalso(), registryFalso()))
+    expect(r).toMatchObject({ state: 'prepared', reused: true })
+  })
+
+  it('.env.example com valor bloqueia com código e não ecoa o conteúdo', async () => {
+    writeFileSync(projeto.envExampleFile, 'API_TOKEN=valor-que-nao-pode-aparecer\n')
+    const r = await preparar(servico(composeFalso(), registryFalso()))
+    expect(r).toMatchObject({ state: 'blocked', reason: 'configuration-invalid' })
+    expect(JSON.stringify(r)).not.toContain('valor-que-nao-pode-aparecer')
+  })
+})
+
+describe('Dockerfile do perfil (M3)', () => {
+  it('o Dockerfile informado no perfil chega ao build, relativo ao contexto', async () => {
+    projeto = {
+      ...projeto,
+      profile: {
+        ...PROFILE,
+        backend: {
+          ...PROFILE.backend,
+          context: join(directory, 'backend'),
+          dockerfile: 'docker/Dockerfile.prod'
+        }
+      }
+    }
+    await preparar(servico(composeFalso(), registryFalso()))
+    expect(publicacoes[0]?.dockerfile).toBe(join(directory, 'backend', 'docker/Dockerfile.prod'))
+  })
+
+  it('sem Dockerfile no perfil o build usa o padrão do contexto', async () => {
+    await preparar(servico(composeFalso(), registryFalso()))
+    expect(publicacoes[0]?.dockerfile).toBeUndefined()
+  })
+})
+
+describe('reuso do artefato (L1)', () => {
+  it('digest que o registry devolve diferente do gravado bloqueia', async () => {
+    await preparar(servico(composeFalso(), registryFalso()))
+    const r = await preparar(
+      servico(composeFalso(), registryFalso(undefined, { digest: `sha256:${'e'.repeat(64)}` }))
+    )
+    expect(r).toMatchObject({ state: 'blocked', reason: 'digest-mismatch' })
+  })
+
+  it('provenance diferente da gravada bloqueia: o critério 4 exige digest E provenance', async () => {
+    await preparar(servico(composeFalso(), registryFalso()))
+    const r = await preparar(
+      servico(
+        composeFalso(),
+        registryFalso(undefined, { provenanceDigest: `sha256:${'9'.repeat(64)}` })
+      )
+    )
+    expect(r).toMatchObject({ state: 'blocked', reason: 'digest-mismatch' })
+  })
+
+  it('reutilizar o artefato deixa rastro no diário', async () => {
+    await preparar(servico(composeFalso(), registryFalso()))
+    const antes = repo.listEffects(SCOPE, releaseId).filter((e) => e.kind === 'artifact').length
+    await preparar(servico(composeFalso(), registryFalso()))
+    const depois = repo.listEffects(SCOPE, releaseId).filter((e) => e.kind === 'artifact').length
+    expect(depois).toBeGreaterThan(antes)
   })
 })
 

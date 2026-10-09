@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { assertReferenciaImutavel } from '@shared/domain/release-artifact'
 import { portaLivreNoHost } from '../../pipeline/isolamento-host'
 import type { SqlExecutor, SqlResult } from '../database-migration-runner'
 import type { CommandRunner } from './command-runner'
@@ -69,6 +70,10 @@ export interface ComposeAdapterOptions {
 const DOCKER = 'docker'
 const LEASE_VALIDO = /^[A-Za-z0-9._-]{8,80}$/
 const BASE_DATABASE = /^[a-z_][a-z0-9_]{0,62}$/
+/** Id curto ou longo de contêiner, rede ou volume do Docker. */
+const ID_DOCKER = /^[a-f0-9]{12,64}$/
+/** `docker volume ls -q` devolve nomes, não ids (medido); sem `-` inicial para nunca virar opção. */
+const NOME_DE_VOLUME = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/
 const TENTATIVAS_DE_PORTA = 50
 const ESPERA_DO_COMPOSE_S = 180
 const LABEL_LEASE = 'jarvisos.release-lease'
@@ -160,9 +165,15 @@ export class LocalComposeAdapter {
     ]
     const remover = async (
       listar: readonly string[],
-      apagar: readonly string[]
+      apagar: readonly string[],
+      valido: RegExp = ID_DOCKER
     ): Promise<number> => {
-      const ids = (await this.docker([...listar, ...filtros])).stdout.split(/\s+/).filter(Boolean)
+      // Falha de listagem não é "nada a remover": sem isto o serviço relataria limpeza feita
+      // com contêiner de pé.
+      const lista = await this.docker([...listar, ...filtros])
+      const ids = lista.stdout.split(/\s+/).filter(Boolean)
+      if (lista.code !== 0 || lista.timedOut || !ids.every((id) => valido.test(id)))
+        throw new ComposeBlockedError('cleanup-failed', 'A listagem do lease não foi confiável.')
       if (ids.length === 0) return 0
       const r = await this.docker([...apagar, ...ids])
       if (r.code !== 0)
@@ -172,7 +183,7 @@ export class LocalComposeAdapter {
     // Ordem importa: o contêiner prende a rede e o volume.
     const containers = await remover(['ps', '-aq'], ['rm', '-f', '-v'])
     const networks = await remover(['network', 'ls', '-q'], ['network', 'rm'])
-    const volumes = await remover(['volume', 'ls', '-q'], ['volume', 'rm'])
+    const volumes = await remover(['volume', 'ls', '-q'], ['volume', 'rm'], NOME_DE_VOLUME)
     return { containers, networks, volumes }
   }
 
@@ -186,9 +197,10 @@ export class LocalComposeAdapter {
 
   private async portasPublicadas(): Promise<Set<number>> {
     const r = await this.docker(['ps', '--format', '{{.Ports}}'])
-    const portas = new Set<number>()
-    for (const [, porta] of r.stdout.matchAll(/:(\d+)->/g)) portas.add(Number(porta))
-    return portas
+    // Sem a lista de portas publicadas não há como garantir que não vamos colidir com outro projeto.
+    if (r.code !== 0 || r.timedOut)
+      throw new ComposeBlockedError('compose-failed', 'Não foi possível listar as portas em uso.')
+    return portasPublicadas(r.stdout)
   }
 
   private docker(args: readonly string[]) {
@@ -228,6 +240,7 @@ export class ComposeEnvironment {
 
   /** Backend pela imagem publicada (por digest) e frontend construído do contexto do projeto. */
   async upApplication(backendImage: string): Promise<void> {
+    assertReferenciaImutavel(backendImage)
     await this.compose(
       [
         'up',
@@ -246,11 +259,7 @@ export class ComposeEnvironment {
   /** Os três serviços de pé e saudáveis, e HTTP respondendo nas portas reservadas. */
   async verify(): Promise<void> {
     const ps = await this.compose(['ps', '--format', 'json'])
-    const servicos = new Map<string, { State?: string; Health?: string }>()
-    for (const linha of ps.stdout.split(/\r?\n/).filter(Boolean)) {
-      const item = JSON.parse(linha) as { Service: string; State?: string; Health?: string }
-      servicos.set(item.Service, item)
-    }
+    const servicos = lerServicosDoCompose(ps.stdout)
     for (const nome of ['postgres', 'backend', 'frontend']) {
       const s = servicos.get(nome)
       if (!s || s.State !== 'running' || (s.Health && s.Health !== 'healthy'))
@@ -266,8 +275,10 @@ export class ComposeEnvironment {
 
   /** Banco do Postgres do run, via `psql` dentro do contêiner (sem senha em argumento). */
   readonly sql: SqlExecutor = {
-    run: (sql, database) => this.psql(['--single-transaction', '-d', database], sql),
+    run: async (sql, database) =>
+      this.psql(['--single-transaction', '-d', this.baseValida(database)], sql),
     dump: async (database, args) => {
+      const base = this.baseValida(database)
       const r = await this.docker([
         'exec',
         this.postgres(),
@@ -275,7 +286,7 @@ export class ComposeEnvironment {
         '-U',
         'release',
         ...args,
-        database
+        base
       ])
       if (r.code !== 0) throw new ComposeBlockedError('compose-failed', 'pg_dump falhou.')
       return r.stdout
@@ -286,6 +297,11 @@ export class ComposeEnvironment {
     if (!BASE_DATABASE.test(nome)) throw new TypeError(`Nome de banco inválido: ${nome}`)
     const r = await this.psql(['-d', 'postgres'], `CREATE DATABASE ${nome} TEMPLATE template0;`)
     if (!r.ok) throw new ComposeBlockedError('compose-failed', 'Não foi possível criar o banco.')
+  }
+
+  private baseValida(nome: string): string {
+    if (!BASE_DATABASE.test(nome)) throw new TypeError(`Nome de banco inválido: ${nome}`)
+    return nome
   }
 
   private postgres(): string {
@@ -320,7 +336,8 @@ export class ComposeEnvironment {
     const limite = Date.now() + (this.options.healthWaitMs ?? 30_000)
     for (;;) {
       try {
-        const r = await fetch(url, { signal: AbortSignal.timeout(3_000) })
+        // Sem seguir redirecionamento: um backend não manda o verify fazer GET em outro host.
+        const r = await fetch(url, { signal: AbortSignal.timeout(3_000), redirect: 'manual' })
         if (r.status === 200) return
       } catch {
         // ainda subindo
@@ -367,4 +384,34 @@ export class ComposeEnvironment {
     if (resultado.code !== 0) throw new ComposeBlockedError('compose-failed', 'O compose falhou.')
     return resultado
   }
+}
+
+/** Portas publicadas pelo `docker ps`: `127.0.0.1:55500->5432/tcp` e faixas `8000-8010->80/tcp`. */
+export function portasPublicadas(saida: string): Set<number> {
+  const portas = new Set<number>()
+  for (const [, inicio, fim] of saida.matchAll(/:(\d+)(?:-(\d+))?->/g)) {
+    const de = Number(inicio)
+    const ate = fim ? Number(fim) : de
+    for (let p = de; p <= Math.min(ate, de + 1_000); p += 1) portas.add(p)
+  }
+  return portas
+}
+
+interface ServicoDoCompose {
+  readonly State?: string
+  readonly Health?: string
+}
+
+/** `docker compose ps --format json`: uma linha por serviço (v2.21+) ou um array (versões antigas). */
+export function lerServicosDoCompose(saida: string): Map<string, ServicoDoCompose> {
+  const texto = saida.trim()
+  const itens: Array<ServicoDoCompose & { Service?: string }> = texto.startsWith('[')
+    ? JSON.parse(texto)
+    : texto
+        .split(/\r?\n/)
+        .filter(Boolean)
+        .map((linha) => JSON.parse(linha))
+  const servicos = new Map<string, ServicoDoCompose>()
+  for (const item of itens) if (item.Service) servicos.set(item.Service, item)
+  return servicos
 }

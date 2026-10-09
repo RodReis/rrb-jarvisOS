@@ -5,7 +5,11 @@
  */
 
 const DIGEST_OCI = /^sha256:[a-f0-9]{64}$/
-const REFERENCIA_POR_DIGEST = /^[^\s@:]+(?::\d+)?(?:\/[^\s@:]+)*@(sha256:[a-f0-9]{64})$/
+// Componentes OCI em minúsculas, sem `-` inicial: a referência vira argumento posicional do Docker.
+const COMPONENTE = '[a-z0-9]+(?:[._-][a-z0-9]+)*'
+const REFERENCIA_POR_DIGEST = new RegExp(
+  `^${COMPONENTE}(?::\\d{1,5})?(?:/${COMPONENTE})*@(sha256:[a-f0-9]{64})$`
+)
 
 export class ReferenciaMutavelError extends Error {
   constructor(referencia: string) {

@@ -47,6 +47,7 @@ export type MigrationOutcome =
     }
 
 const SEED_ID = '__seed__'
+const CONTROLE_ID = 'schema_migrations'
 const ID_VALIDO = /^[A-Za-z0-9._-]+$/
 const CHECKSUM_VALIDO = /^[a-f0-9]+$/
 const NOME_DE_MIGRATION = /^(\d+[_-].*)\.sql$/
@@ -94,12 +95,15 @@ export class DatabaseMigrationRunner {
         throw new TypeError(`Migration inválida: ${m.id}`)
     }
     const { database } = entrada
-    await this.executor.run(
+    const controle = await this.executor.run(
       `CREATE TABLE IF NOT EXISTS schema_migrations (
          id text PRIMARY KEY, checksum text NOT NULL, applied_at timestamptz NOT NULL DEFAULT now());`,
       database
     )
+    if (!controle.ok) return this.falha('migration-failed', CONTROLE_ID, [])
+    // Leitura que falha não é "nenhuma aplicada": pularia a checagem de checksum e de ausência.
     const aplicadasNoBanco = await this.lerAplicadas(database)
+    if (!aplicadasNoBanco) return this.falha('migration-failed', CONTROLE_ID, [])
     const noDiretorio = new Map(entrada.migrations.map((m) => [m.id, m.checksum]))
 
     for (const [id, checksum] of aplicadasNoBanco) {
@@ -148,11 +152,12 @@ export class DatabaseMigrationRunner {
     }
   }
 
-  private async lerAplicadas(database: string): Promise<Map<string, string>> {
+  private async lerAplicadas(database: string): Promise<Map<string, string> | null> {
     const resultado = await this.executor.run(
       `SELECT id || '|' || checksum FROM schema_migrations ORDER BY id;`,
       database
     )
+    if (!resultado.ok) return null
     const mapa = new Map<string, string>()
     for (const linha of resultado.stdout.split(/\r?\n/)) {
       const corte = linha.indexOf('|')

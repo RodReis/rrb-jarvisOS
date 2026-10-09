@@ -111,6 +111,33 @@ describe('DatabaseMigrationRunner', () => {
     expect(r).toMatchObject({ state: 'confirmed', seedApplied: false })
   })
 
+  it('falha ao criar a tabela de controle bloqueia', async () => {
+    const exec = executor('')
+    exec.run = async () => ({ ok: false, stdout: '', stderr: 'x' })
+    const r = await new DatabaseMigrationRunner(exec).apply({ database: 'd', migrations: [M1] })
+    expect(r).toMatchObject({
+      state: 'failed',
+      reason: 'migration-failed',
+      failedAt: 'schema_migrations'
+    })
+  })
+
+  it('falha ao ler o que já foi aplicado não vira "nada aplicado"', async () => {
+    const exec = executor('')
+    const original = exec.run
+    exec.run = async (sql, db) =>
+      sql.includes('FROM schema_migrations')
+        ? { ok: false, stdout: '', stderr: 'x' }
+        : original(sql, db)
+    const r = await new DatabaseMigrationRunner(exec).apply({ database: 'd', migrations: [M1] })
+    expect(r).toMatchObject({
+      state: 'failed',
+      reason: 'migration-failed',
+      failedAt: 'schema_migrations'
+    })
+    expect(exec.scripts.some((s) => s.includes('CREATE TABLE a'))).toBe(false)
+  })
+
   it('recusa id de migration fora do padrão (vai para SQL)', async () => {
     await expect(
       new DatabaseMigrationRunner(executor('')).apply({

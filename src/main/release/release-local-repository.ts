@@ -22,7 +22,10 @@ import type { AuditRepository } from '../storage/audit-repository'
  */
 
 export class ReleaseLocalConflictError extends Error {
-  constructor(message: string) {
+  constructor(
+    readonly code: 'artifact-conflict' | 'release-not-found',
+    message: string
+  ) {
     super(message)
     this.name = 'ReleaseLocalConflictError'
   }
@@ -121,6 +124,39 @@ export class ReleaseLocalRepository {
   ) {}
 
   /**
+   * Transação **imediata**: o escritor toma o lock antes de ler, então dois processos não leem
+   * "sem artefato" ao mesmo tempo. Violação de unicidade (índice por release e tipo) vira conflito.
+   */
+  private escrita<T>(fn: () => T): () => T {
+    return () => {
+      try {
+        return this.db.transaction(fn).immediate()
+      } catch (erro) {
+        if ((erro as { code?: unknown } | null)?.code === 'SQLITE_CONSTRAINT_UNIQUE')
+          throw new ReleaseLocalConflictError(
+            'artifact-conflict',
+            'Outra preparação gravou o artefato desta release primeiro.'
+          )
+        throw erro
+      }
+    }
+  }
+
+  /** A release existe **neste** escopo: FK sozinha não impede gravar sob o escopo de outro usuário. */
+  private assertRelease(scope: ReleaseScope, releaseId: string): void {
+    const achou = this.db
+      .prepare(
+        `SELECT 1 FROM release_run WHERE id=? AND user_id=? AND workspace_id=? AND project_id=?`
+      )
+      .get(releaseId, ...paramsDe(scope))
+    if (!achou)
+      throw new ReleaseLocalConflictError(
+        'release-not-found',
+        'Release não encontrada no escopo informado.'
+      )
+  }
+
+  /**
    * Grava o artefato uma vez por release e tipo (build único). Repetir o mesmo digest devolve a
    * linha existente; outro digest é conflito — o candidato é imutável.
    */
@@ -132,12 +168,14 @@ export class ReleaseLocalRepository {
   ): Artifact {
     assertReferenciaImutavel(input.uri)
     if (digestDaReferencia(input.uri) !== input.digest)
-      throw new ReleaseLocalConflictError('O digest informado não é o da referência do artefato.')
-    return this.db.transaction(() => {
+      throw new TypeError('O digest informado não é o da referência do artefato.')
+    return this.escrita(() => {
+      this.assertRelease(scope, releaseId)
       const atual = this.getArtifact(scope, releaseId, input.kind)
       if (atual) {
         if (atual.digest !== input.digest)
           throw new ReleaseLocalConflictError(
+            'artifact-conflict',
             'A release já tem outro artefato deste tipo: o candidato é imutável.'
           )
         return atual
@@ -185,6 +223,7 @@ export class ReleaseLocalRepository {
        ON CONFLICT (user_id,workspace_id,project_id,release_id,environment,name)
        DO UPDATE SET fingerprint=excluded.fingerprint, state=excluded.state`
     )
+    this.assertRelease(scope, releaseId)
     this.db.transaction(() => {
       for (const r of references)
         gravar.run(
@@ -226,6 +265,7 @@ export class ReleaseLocalRepository {
   ): LocalEffect {
     if (input.reason !== undefined && !CODIGO_DE_RAZAO.test(input.reason))
       throw new TypeError('A razão do efeito é um código curto, não texto livre.')
+    this.assertRelease(scope, releaseId)
     const id = randomUUID()
     this.db
       .prepare(

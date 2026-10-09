@@ -12,7 +12,7 @@ Status: **em implementação**, branch `feat/m14-f02-docker-artefatos-config` (w
 - [x] Migration 64 (artefato com uri e provenance, referência de configuração com fingerprint, diário local append-only) e `ReleaseLocalRepository`.
 - [x] `ReleasePreparationService` e comando `npm run release:prepare` (Electron). Smoke real do comando em 2026-10-09: preparada em 11 s; segunda execução reusa o artefato (`reused: true`); release inexistente → código 2; chave ausente → código 3 com nome e ambiente; 0 sentinelas em banco e saída; nenhum recurso Docker restante.
 - [x] Contrafactuais medidos: remover o filtro `temporary` da limpeza reprova o teste de volume persistente; vazar o valor da chave na evidência reprova o teste da sentinela.
-- [ ] Revisão independente (segurança e código) e correções.
+- [x] Revisão independente (segurança e código): 0 CRITICAL, 1 HIGH e 10 MEDIUM tratados com teste vermelho antes (SPEC, decisão 9); limites que ficam na decisão 10. Smoke do comando repetido com as guardas: árvore suja e `.env.local` no contexto → código 3; `--namespace` errado → código 2; caminho feliz em 12 s; reuso com rastro no diário; 0 sentinelas; 0 resíduos Docker.
 - [ ] PR com `refs #151`, CI verde (inclui o builder `docker-container` se o runner não tiver containerd store), relatório categorizado, merge e comentário de encerramento; depois #151 em `proplan:done` (sem fechar).
 - Smoke GHCR real: **`not_run`** — exige `docker login ghcr.io` com `write:packages` e cria pacote na conta do PI. Comando: `RELEASE_GHCR_SMOKE_REPOSITORY=ghcr.io/<dono>/<imagem> npx vitest run --project banco src/main/release/adapters/ghcr-artifact-adapter.smoke.int-spec.ts`.
 

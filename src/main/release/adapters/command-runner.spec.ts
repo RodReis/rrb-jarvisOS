@@ -1,3 +1,5 @@
+import { realpathSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { describe, expect, it } from 'vitest'
 import { createCommandRunner, redigir } from './command-runner'
 
@@ -42,6 +44,35 @@ describe('createCommandRunner', () => {
     })
     expect(r.stdout).not.toContain('SENTINELA-123')
     expect(r.stdout).toContain('[REDIGIDO]')
+  })
+
+  it('não repassa DOCKER_HOST nem DOCKER_CONTEXT: um daemon remoto não recebe o build', async () => {
+    process.env.DOCKER_HOST = 'tcp://remoto.exemplo:2375'
+    process.env.DOCKER_CONTEXT = 'remoto'
+    try {
+      const r = await runner.run(process.execPath, [
+        '-e',
+        'console.log(String(process.env.DOCKER_HOST) + "|" + String(process.env.DOCKER_CONTEXT))'
+      ])
+      expect(r.stdout.trim()).toBe('undefined|undefined')
+    } finally {
+      delete process.env.DOCKER_HOST
+      delete process.env.DOCKER_CONTEXT
+    }
+  })
+
+  it('o cwd padrão é neutro, não a pasta de execução', async () => {
+    const r = await runner.run(process.execPath, ['-e', 'console.log(process.cwd())'])
+    expect(r.stdout.trim().toLowerCase()).toBe(realpathSync(tmpdir()).toLowerCase())
+  })
+
+  it('saída enorme é cortada no teto e marcada', async () => {
+    const r = await runner.run(process.execPath, [
+      '-e',
+      'process.stdout.write("x".repeat(9 * 1024 * 1024))'
+    ])
+    expect(r.stdout.length).toBeLessThan(8 * 1024 * 1024 + 100)
+    expect(r.stdout.endsWith('[saída cortada]')).toBe(true)
   })
 
   it('o timeout mata o filho e marca timedOut', async () => {

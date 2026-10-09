@@ -8,10 +8,11 @@ import { loadOrCreateAuditKey } from '../storage/audit-key'
 import { openDatabase } from '../storage/database'
 import { createCommandRunner } from './adapters/command-runner'
 import { GhcrArtifactAdapter } from './adapters/ghcr-artifact-adapter'
+import { GitSourceVerifier } from './adapters/git-source-verifier'
 import { LocalComposeAdapter, iniciarDockerDesktop } from './adapters/local-compose-adapter'
 import { ReleaseLocalRepository } from './release-local-repository'
 import { ReleasePreparationService } from './release-preparation-service'
-import { carregarPerfilDoProjeto } from './release-project-profile'
+import { assertRepositorioPermitido, carregarPerfilDoProjeto } from './release-project-profile'
 import { ReleaseRepository } from './release-repository'
 
 /**
@@ -31,8 +32,11 @@ const OPCOES = [
   'release',
   'profile',
   'compose-file',
-  'registry'
+  'registry',
+  'builder',
+  'namespace'
 ] as const
+const OPCIONAIS: readonly Opcao[] = ['registry', 'builder', 'namespace']
 type Opcao = (typeof OPCOES)[number]
 
 class UsoInvalido extends Error {}
@@ -72,7 +76,7 @@ function lerArgumentos(argv: readonly string[]): {
     valores.set(nome, valor)
   }
   for (const nome of OPCOES) {
-    if (nome !== 'registry' && !valores.get(nome))
+    if (!OPCIONAIS.includes(nome) && !valores.get(nome))
       throw new UsoInvalido(`Informe --${nome} <valor>.`)
   }
   if (!['noa', 'jarvis'].includes(valores.get('workspace')!))
@@ -102,6 +106,16 @@ async function principal(): Promise<number> {
     if (!release) throw new UsoInvalido('Release não encontrada no escopo informado.')
 
     const runner = createCommandRunner({ allowed: ['docker'] })
+    const registry = valores.get('registry') ?? 'ghcr.io'
+    let projeto: ReturnType<typeof carregarPerfilDoProjeto>
+    try {
+      projeto = carregarPerfilDoProjeto(resolve(valores.get('profile')!), release.sha)
+      // O destino da publicação é decisão do operador, não do arquivo do projeto.
+      assertRepositorioPermitido(projeto.repository, registry, valores.get('namespace'))
+    } catch (erro) {
+      // Perfil inválido ou destino não permitido é erro de uso (código 2), não falha interna.
+      throw new UsoInvalido(erro instanceof Error ? erro.message : 'Perfil do projeto inválido.')
+    }
     // Separação de domínio: o fingerprint não reutiliza a chave da auditoria diretamente.
     const chaveDeFingerprint = createHmac('sha256', chaveDeAuditoria)
       .update('release-config-fingerprint')
@@ -113,14 +127,15 @@ async function principal(): Promise<number> {
         autoStartDocker,
         startDocker: iniciarDockerDesktop
       }),
-      new GhcrArtifactAdapter(runner, valores.get('registry') ?? 'ghcr.io'),
+      new GhcrArtifactAdapter(runner, registry, valores.get('builder')),
+      new GitSourceVerifier(createCommandRunner({ allowed: ['git'] })),
       chaveDeFingerprint
     )
     const resultado = await servico.prepare(
       scope,
       releaseId,
       { leaseId: `local-${randomUUID()}` },
-      carregarPerfilDoProjeto(resolve(valores.get('profile')!), release.sha)
+      projeto
     )
     process.stdout.write(`${JSON.stringify(resultado, null, 2)}\n`)
     return resultado.state === 'prepared' ? 0 : 3

@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -85,6 +85,68 @@ describe('artefato', () => {
     ).toThrow()
   })
 
+  it('o banco também garante um artefato por release e tipo (índice único)', () => {
+    repo.recordArtifact(SCOPE, releaseId, entrada(), NOW)
+    expect(() =>
+      db
+        .prepare(
+          `INSERT INTO release_artifact (id,user_id,workspace_id,project_id,release_id,kind,digest,created_at)
+           VALUES ('x',?,?,?,?,?,?,?)`
+        )
+        .run(
+          SCOPE.userId,
+          SCOPE.workspaceId,
+          SCOPE.projectId,
+          releaseId,
+          'backend-image',
+          `sha256:${'d'.repeat(64)}`,
+          NOW
+        )
+    ).toThrow(/UNIQUE/)
+  })
+
+  it('duas conexões disputando: a segunda recebe conflito, não um segundo digest', () => {
+    const outra = openDatabase(join(directory, 'release.db'))
+    try {
+      const repoB = new ReleaseLocalRepository(outra, new AuditRepository(outra, KEY))
+      repo.recordArtifact(SCOPE, releaseId, entrada(), NOW)
+      expect(() =>
+        repoB.recordArtifact(
+          SCOPE,
+          releaseId,
+          {
+            ...entrada(),
+            digest: `sha256:${'d'.repeat(64)}`,
+            uri: `ghcr.io/dono/projeto@sha256:${'d'.repeat(64)}`
+          },
+          NOW
+        )
+      ).toThrowError(expect.objectContaining({ code: 'artifact-conflict' }))
+    } finally {
+      outra.close()
+    }
+  })
+
+  it('release de outro escopo é recusada, mesmo existindo (FK não basta)', () => {
+    const outro = { ...SCOPE, userId: 'user-2' }
+    expect(() => repo.recordArtifact(outro, releaseId, entrada(), NOW)).toThrowError(
+      expect.objectContaining({ code: 'release-not-found' })
+    )
+    expect(() =>
+      repo.saveConfigurationReferences(outro, releaseId, [
+        { name: 'X', environment: 'local', state: 'missing' }
+      ])
+    ).toThrow(ReleaseLocalConflictError)
+    expect(() =>
+      repo.appendEffect(
+        outro,
+        releaseId,
+        { kind: 'compose', phase: 'intended', transport: 'docker-cli' },
+        NOW
+      )
+    ).toThrow(ReleaseLocalConflictError)
+  })
+
   it('recusa uri cujo digest não é o informado', () => {
     expect(() =>
       repo.recordArtifact(
@@ -93,7 +155,7 @@ describe('artefato', () => {
         { ...entrada(), uri: `ghcr.io/dono/projeto@sha256:${'e'.repeat(64)}` },
         NOW
       )
-    ).toThrow(ReleaseLocalConflictError)
+    ).toThrow(TypeError)
   })
 
   it('outro escopo não enxerga o artefato', () => {
@@ -108,6 +170,29 @@ describe('artefato', () => {
 })
 
 describe('referências de configuração', () => {
+  it('o banco recusa fingerprint que não é hexadecimal de 64 e estado incoerente', () => {
+    const inserir = (fp: string | null, estado: string) =>
+      db
+        .prepare(
+          `INSERT INTO release_configuration_reference
+             (user_id,workspace_id,project_id,release_id,environment,name,fingerprint,state)
+           VALUES (?,?,?,?,?,?,?,?)`
+        )
+        .run(
+          SCOPE.userId,
+          SCOPE.workspaceId,
+          SCOPE.projectId,
+          releaseId,
+          'local',
+          `N_${Math.random()}`,
+          fp,
+          estado
+        )
+    expect(() => inserir('valor-em-claro-com-cara-de-segredo', 'configured')).toThrow(/CHECK/)
+    expect(() => inserir(null, 'configured')).toThrow(/CHECK/)
+    expect(() => inserir('f'.repeat(64), 'missing')).toThrow(/CHECK/)
+  })
+
   it('persiste nome, ambiente, fingerprint e estado, e regravar atualiza o estado', () => {
     repo.saveConfigurationReferences(SCOPE, releaseId, [
       { name: 'API_TOKEN', environment: 'local', fingerprint: 'f'.repeat(64), state: 'configured' },
@@ -193,17 +278,5 @@ describe('diário local append-only', () => {
     )
     const eventos = new AuditRepository(db, KEY).list(SCOPE.userId)
     expect(eventos.some((e) => e.type === 'release-local-effect')).toBe(true)
-  })
-})
-
-describe('sentinela secreta', () => {
-  it('um valor que nunca foi passado ao repositório não existe no arquivo do banco', () => {
-    const sentinela = 'SENTINELA-SECRETA-ZZZ-9981'
-    repo.saveConfigurationReferences(SCOPE, releaseId, [
-      { name: 'API_TOKEN', environment: 'local', fingerprint: 'f'.repeat(64), state: 'configured' }
-    ])
-    db.pragma('wal_checkpoint(TRUNCATE)')
-    const bytes = readFileSync(join(directory, 'release.db')).toString('latin1')
-    expect(bytes).not.toContain(sentinela)
   })
 })

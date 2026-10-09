@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { tmpdir } from 'node:os'
 
 /**
  * Porta de execução das CLIs dos adapters (SPEC-Release-02, regra 6: o adaptador declara a CLI
@@ -28,6 +29,9 @@ export interface CommandRunner {
 }
 
 const TIMEOUT_PADRAO_MS = 5 * 60_000
+/** Teto por fluxo: um `pg_dump` ou build verboso não pode esgotar a memória do app. */
+const TETO_DE_SAIDA = 8 * 1024 * 1024
+const MARCA_DE_CORTE = '\n[saída cortada]'
 /** O mínimo para o SO achar o binário e o Docker achar seu daemon e credential store. */
 const VARIAVEIS_BASE = [
   'PATH',
@@ -42,10 +46,24 @@ const VARIAVEIS_BASE = [
   'APPDATA',
   'LOCALAPPDATA',
   'ProgramData',
-  'DOCKER_HOST',
-  'DOCKER_CONFIG',
-  'DOCKER_CONTEXT'
+  'DOCKER_CONFIG'
 ] as const
+
+function acumular(atual: string, parte: Buffer): string {
+  // Maior que o teto = já cortada (o corte acrescenta a marca): nada mais entra.
+  if (atual.length > TETO_DE_SAIDA) return atual
+  const proximo = atual + parte.toString('utf8')
+  return proximo.length > TETO_DE_SAIDA ? proximo.slice(0, TETO_DE_SAIDA) + MARCA_DE_CORTE : proximo
+}
+
+/** `kill` no Windows mata só o `docker.exe`; o plugin (compose, buildx) filho sobreviveria. */
+function encerrar(pid: number | undefined): void {
+  if (pid === undefined || process.platform !== 'win32') return
+  spawn('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true }).on(
+    'error',
+    () => undefined
+  )
+}
 
 export function redigir(texto: string, segredos: readonly string[]): string {
   let saida = texto
@@ -74,7 +92,9 @@ export function createCommandRunner(config: {
       }
       return new Promise<CommandResult>((resolve, reject) => {
         const filho = spawn(binary, [...args], {
-          cwd: options.cwd,
+          // No Windows o libuv procura o binário no cwd antes do PATH: um `docker.exe` plantado
+          // na pasta de execução seria o escolhido. O cwd padrão é neutro.
+          cwd: options.cwd ?? tmpdir(),
           env: ambienteMinimo(options.env ?? {}),
           shell: false,
           windowsHide: true,
@@ -85,10 +105,11 @@ export function createCommandRunner(config: {
         let timedOut = false
         const relogio = setTimeout(() => {
           timedOut = true
+          encerrar(filho.pid)
           filho.kill('SIGKILL')
         }, options.timeoutMs ?? TIMEOUT_PADRAO_MS)
-        filho.stdout.on('data', (parte: Buffer) => (stdout += parte.toString('utf8')))
-        filho.stderr.on('data', (parte: Buffer) => (stderr += parte.toString('utf8')))
+        filho.stdout.on('data', (parte: Buffer) => (stdout = acumular(stdout, parte)))
+        filho.stderr.on('data', (parte: Buffer) => (stderr = acumular(stderr, parte)))
         filho.on('error', (erro) => {
           clearTimeout(relogio)
           reject(erro)

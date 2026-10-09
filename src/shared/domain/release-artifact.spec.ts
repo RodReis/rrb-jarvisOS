@@ -46,6 +46,20 @@ describe('referência imutável (contrafactual: deploy por tag mutável)', () =>
     )
   })
 
+  it.each([
+    `--flag@${DIGEST}`,
+    `GHCR.io/Dono/Img@${DIGEST}`,
+    `ghcr.io/dono/img @${DIGEST}`,
+    `ghcr.io/dono/img"@${DIGEST}`,
+    `ghcr.io//img@${DIGEST}`
+  ])('recusa referência que poderia virar opção ou fugir da gramática: %s', (ref) => {
+    expect(() => assertReferenciaImutavel(ref)).toThrow(ReferenciaMutavelError)
+  })
+
+  it('aceita host com porta', () => {
+    expect(() => assertReferenciaImutavel(`localhost:55790/smoke/backend@${DIGEST}`)).not.toThrow()
+  })
+
   it('aceita repositório@digest', () => {
     expect(() => assertReferenciaImutavel(`ghcr.io/dono/projeto@${DIGEST}`)).not.toThrow()
   })

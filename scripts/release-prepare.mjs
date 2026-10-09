@@ -7,9 +7,11 @@
  * Uso:
  *   npm run release:prepare -- --data-dir <userData> --user <id> --workspace noa|jarvis \
  *     --project <id> --release <id> --profile <release-profile.json> [--registry ghcr.io] \
- *     [--auto-start-docker]
+ *     [--namespace <dono>] [--builder <nome>] [--auto-start-docker]
  *
  * `--auto-start-docker` é a autorização para ligar o Docker se ele estiver desligado.
+ * `--namespace` fixa o dono permitido no registry: sem ele, quem manda no destino é o perfil.
+ * `--builder` nomeia um builder `docker-container` quando o Docker local não gera provenance.
  * Sai com 0 (preparada), 3 (bloqueada, com a razão no JSON) ou 2 (uso inválido).
  */
 import { spawn } from 'node:child_process'

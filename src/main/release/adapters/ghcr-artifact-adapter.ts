@@ -53,6 +53,8 @@ export interface PublishInput {
 }
 
 const BINARIO = 'docker'
+const REGISTRY_VALIDO = /^[a-z0-9]+(?:[.-][a-z0-9]+)*(?::\d{1,5})?$/
+const CAMINHO_VALIDO = /^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:\/[a-z0-9]+(?:[._-][a-z0-9]+)*)*$/
 const PADRAO_AUTH = /unauthorized|denied|authentication required|\b40[13]\b|insufficient_scope/i
 const PADRAO_NAO_ENCONTRADO = /not found|manifest unknown|no such manifest/i
 const PADRAO_SEM_ATTESTATION = /attestation is not supported|provenance.*not supported/i
@@ -170,8 +172,12 @@ export class GhcrArtifactAdapter {
   }
 
   private assertRepositorio(repository: string): void {
+    if (!REGISTRY_VALIDO.test(this.registry))
+      throw new TypeError('Registry inválido: informe host[:porta].')
+    // Comparação por prefixo e gramática de componentes OCI: nada vira regex nem opção do Docker.
     if (
-      !new RegExp(`^${this.registry.replace(/\./g, '\\.')}(:\\d+)?/[a-z0-9._/-]+$`).test(repository)
+      !repository.startsWith(`${this.registry}/`) ||
+      !CAMINHO_VALIDO.test(repository.slice(this.registry.length + 1))
     )
       throw new TypeError(
         `O repositório deve estar em ${this.registry}/<dono>/<imagem> em minúsculas.`

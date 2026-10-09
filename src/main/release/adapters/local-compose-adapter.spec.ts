@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import type { CommandResult, CommandRunner } from './command-runner'
+import { ReferenciaMutavelError } from '@shared/domain/release-artifact'
 import {
   ComposeBlockedError,
   LocalComposeAdapter,
+  lerServicosDoCompose,
+  portasPublicadas,
   type ComposeProfile
 } from './local-compose-adapter'
 
 const LEASE = 'lease-0123456789'
+const ID1 = 'a'.repeat(12)
+const ID2 = 'b'.repeat(64)
 const PROFILE: ComposeProfile = {
   postgresPreferredPort: 55_500,
   backend: { context: 'b', containerPort: 3000, healthPath: '/health', preferredPort: 55_510 },
@@ -154,7 +159,7 @@ describe('portas', () => {
 describe('cleanup', () => {
   it('filtra pelas DUAS marcas (lease e temporário) em contêiner, rede e volume', async () => {
     const r = runner((args) =>
-      args.includes('-q') || args.includes('-aq') ? ok('id1\nid2\n') : ok()
+      args.includes('-q') || args.includes('-aq') ? ok(`${ID1}\n${ID2}\n`) : ok()
     )
     const out = await new LocalComposeAdapter(r, opcoes).cleanup(LEASE)
     expect(out).toEqual({ containers: 2, networks: 2, volumes: 2 })
@@ -174,15 +179,124 @@ describe('cleanup', () => {
   })
 
   it('falha ao remover não finge sucesso', async () => {
-    const r = runner((args) => (args[0] === 'rm' ? falha : ok('id1')))
+    const r = runner((args) => (args[0] === 'rm' ? falha : ok(ID1)))
     await expect(new LocalComposeAdapter(r, opcoes).cleanup(LEASE)).rejects.toMatchObject({
       code: 'cleanup-failed'
     })
   })
 
   it('lease vazio ou malformado nunca vira filtro que casa com tudo', async () => {
-    const r = runner(() => ok('id1'))
+    const r = runner(() => ok(ID1))
     await expect(new LocalComposeAdapter(r, opcoes).cleanup('')).rejects.toThrow(TypeError)
     expect(r.chamadas).toHaveLength(0)
+  })
+})
+
+describe('cleanup: falha de detecção não é ausência (revisão)', () => {
+  it.each([
+    ['contêineres', 'ps'],
+    ['redes', 'network'],
+    ['volumes', 'volume']
+  ])(
+    'listagem de %s que falha bloqueia em vez de relatar limpeza feita',
+    async (_nome, comando) => {
+      const r = runner((args) =>
+        args[0] === comando && args.includes('--filter') ? falha : ok('')
+      )
+      await expect(new LocalComposeAdapter(r, opcoes).cleanup(LEASE)).rejects.toMatchObject({
+        code: 'cleanup-failed'
+      })
+    }
+  )
+
+  it('listagem com timeout também bloqueia', async () => {
+    const r = runner(() => ({ code: null, stdout: '', stderr: '', timedOut: true }))
+    await expect(new LocalComposeAdapter(r, opcoes).cleanup(LEASE)).rejects.toMatchObject({
+      code: 'cleanup-failed'
+    })
+  })
+
+  it('volumes são listados por NOME (como o Docker devolve) e são removidos', async () => {
+    const r = runner((args) => {
+      if (args[0] === 'volume' && args.includes('--filter')) return ok('jarvisrel_abc123_pgdata\n')
+      if (args.includes('--filter')) return ok('')
+      return ok()
+    })
+    const out = await new LocalComposeAdapter(r, opcoes).cleanup(LEASE)
+    expect(out.volumes).toBe(1)
+    expect(r.chamadas).toContainEqual(['volume', 'rm', 'jarvisrel_abc123_pgdata'])
+  })
+
+  it('nome de volume começando com hífen nunca chega ao rm', async () => {
+    const r = runner((args) =>
+      args[0] === 'volume' && args.includes('--filter') ? ok('-f\n') : ok('')
+    )
+    await expect(new LocalComposeAdapter(r, opcoes).cleanup(LEASE)).rejects.toMatchObject({
+      code: 'cleanup-failed'
+    })
+  })
+
+  it('id fora do formato do Docker nunca chega ao rm (poderia ser uma opção)', async () => {
+    const r = runner((args) => (args.includes('--filter') ? ok('--force\n') : ok()))
+    await expect(new LocalComposeAdapter(r, opcoes).cleanup(LEASE)).rejects.toMatchObject({
+      code: 'cleanup-failed'
+    })
+    expect(r.chamadas.some((a) => a[0] === 'rm')).toBe(false)
+  })
+})
+
+describe('portas: detecção que falha bloqueia', () => {
+  it('docker ps que falha não vira "nenhuma porta em uso"', async () => {
+    const r = runner((args) => (args[0] === 'ps' ? falha : ok('29.0')))
+    await expect(new LocalComposeAdapter(r, opcoes).open(PROFILE, LEASE)).rejects.toMatchObject({
+      code: 'compose-failed'
+    })
+  })
+
+  it('portasPublicadas entende faixas e portas únicas', () => {
+    const portas = portasPublicadas('0.0.0.0:8000-8002->80/tcp, 127.0.0.1:55500->5432/tcp')
+    expect([...portas].sort()).toEqual([55500, 8000, 8001, 8002].sort())
+  })
+
+  it('faixa gigante não trava: tem teto', () => {
+    expect(portasPublicadas('0.0.0.0:1-65000->80/tcp').size).toBeLessThanOrEqual(1_001)
+  })
+})
+
+describe('lerServicosDoCompose', () => {
+  it('aceita uma linha JSON por serviço', () => {
+    const m = lerServicosDoCompose(
+      '{"Service":"a","State":"running"}\n{"Service":"b","State":"exited"}\n'
+    )
+    expect(m.get('a')?.State).toBe('running')
+    expect(m.get('b')?.State).toBe('exited')
+  })
+
+  it('aceita um array JSON (Compose antigo)', () => {
+    const m = lerServicosDoCompose('[{"Service":"a","State":"running","Health":"healthy"}]')
+    expect(m.get('a')).toMatchObject({ State: 'running', Health: 'healthy' })
+  })
+
+  it('saída vazia é nenhum serviço, nunca exceção silenciosa de parse', () => {
+    expect(lerServicosDoCompose('').size).toBe(0)
+  })
+})
+
+describe('ambiente: entradas que viram argumento', () => {
+  const docker = runner((args) => (args[0] === 'ps' ? ok('') : ok('29.0')))
+
+  it('nome de banco fora do padrão é recusado antes de qualquer chamada ao contêiner', async () => {
+    const env = await new LocalComposeAdapter(docker, opcoes).open(PROFILE, LEASE)
+    docker.chamadas.length = 0
+    await expect(env.sql.run('SELECT 1', '-v')).rejects.toThrow(TypeError)
+    await expect(env.sql.dump('x=y', [])).rejects.toThrow(TypeError)
+    expect(docker.chamadas).toHaveLength(0)
+  })
+
+  it('imagem do backend por tag é recusada: só digest sobe', async () => {
+    const env = await new LocalComposeAdapter(docker, opcoes).open(PROFILE, LEASE)
+    await expect(env.upApplication('ghcr.io/dono/img:latest')).rejects.toBeInstanceOf(
+      ReferenciaMutavelError
+    )
   })
 })
