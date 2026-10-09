@@ -2625,7 +2625,7 @@ Status: **em andamento** — issue [#359](https://github.com/RodReis/rrb-jarvisO
 
 ### M13-F01 — Inventário e DAG global (`docs/spec/spec-continuo-01-inventario-dag.md`)
 
-Status: **entregue, aguardando aceite do PI** — issue [#134](https://github.com/RodReis/rrb-jarvisOS/issues/134) aberta em `proplan:done`; [PR #414](https://github.com/RodReis/rrb-jarvisOS/pull/414) mergeada em 2026-10-08 (merge SHA `3f88f9a`).
+Status: **aceita e finalizada pelo PI em 2026-10-08** — issue [#134](https://github.com/RodReis/rrb-jarvisOS/issues/134) fechada em `proplan:finalizado`; [PR #414](https://github.com/RodReis/rrb-jarvisOS/pull/414) mergeada em 2026-10-08 (merge SHA `3f88f9a`).
 
 - [x] Núcleo determinístico do DAG: ciclo, dependência ausente, duplicidade e referência quebrada bloqueiam a ordem.
 - [x] Fonte local adaptada do roadmap SQLite e dos gates existentes; só a fatia com SPEC vigente e aceite exato é elegível, e a ordem de fatias vira dependência.
@@ -2638,7 +2638,7 @@ Status: **entregue, aguardando aceite do PI** — issue [#134](https://github.co
 
 ### M13-F02 — Dispatcher e retomada (`docs/spec/spec-continuo-02-dispatcher-retomada.md`)
 
-Status: entregue pela [PR #416](https://github.com/RodReis/rrb-jarvisOS/pull/416), merge confirmado em 2026-10-08 (`a41aeaba0ee898db8f6a3d36e582e798524ddb32`); issue #135 permanece aberta para aceite do PI.
+Status: **aceita e finalizada pelo PI em 2026-10-08** — issue [#135](https://github.com/RodReis/rrb-jarvisOS/issues/135) fechada em `proplan:finalizado`; [PR #416](https://github.com/RodReis/rrb-jarvisOS/pull/416) mergeada em 2026-10-08 (`a41aeaba0ee898db8f6a3d36e582e798524ddb32`).
 
 - [x] Dispatcher serializado por escopo; reconciliação completa F01 no boot, após merge e no ciclo periódico.
 - [x] Seleção pela ordem reconciliada, apenas para issue aberta em `proplan:todo`; backlog/`next`, gate pendente e projeção em andamento ficam em espera/bloqueio verificável.
@@ -2646,7 +2646,7 @@ Status: entregue pela [PR #416](https://github.com/RodReis/rrb-jarvisOS/pull/416
 - [x] Retomada de run `PLANNED`/`READY`; execução ativa, merge aguardando projeção e falha terminal não criam outro run. Quota com reset oficial conhecido fica em espera até a hora registrada.
 - [x] Fila e pool M12 continuam governando capacidade e independência; nenhum gate é aprovado e nenhuma issue é fechada pelo dispatcher.
 - [x] Testes de regras, reinício SQLite, migration legada, run idempotente, branches, gate, quota e retomada; 38 testes focados passaram.
-- [x] Relatório categorizado regenerado dos artefatos CI: Regras 2.975 pass; Banco 2.379 pass / 18 skip; Tela 804 pass / 1 todo. Self-check passou; reteste do CI pendente após corrigir a expectativa E2E de `repo.inventory`.
+- [x] Relatório categorizado regenerado dos artefatos oficiais de CI da PR #416 e guardas do relatório aprovadas.
 
 ### M13-F03 — Controles operacionais (`docs/spec/spec-continuo-03-controles-operacionais.md`)
 
@@ -2666,7 +2666,7 @@ Entrega integrada na `main`; a issue #136 foi aceita e fechada pelo PI.
 
 ### M13-F04 — Projeções e gates (`docs/spec/spec-continuo-04-projecoes-gates.md`)
 
-Status: em andamento na issue [#137](https://github.com/RodReis/rrb-jarvisOS/issues/137), `proplan:doing`; SPEC aprovada pelo PI. Protótipo navegável aprovado em 2026-10-08.
+Status: **aceita e finalizada pelo PI em 2026-10-08** — issue [#137](https://github.com/RodReis/rrb-jarvisOS/issues/137) fechada em `proplan:finalizado`; [PR #419](https://github.com/RodReis/rrb-jarvisOS/pull/419) mergeada em `d4aa4372679b1972564ddaad3503fc2a4ab80f56`. SPEC aprovada pelo PI; protótipo navegável aprovado em 2026-10-08.
 
 - [x] Conferir dependência F03 no GitHub: #136 fechada e finalizada pelo PI.
 - [x] Prototipar e obter aprovação do PI para o painel DAG e o pacote do gate.
@@ -2676,4 +2676,17 @@ Status: em andamento na issue [#137](https://github.com/RodReis/rrb-jarvisOS/iss
 - [x] Build, typecheck, lint, formatação e 57 testes direcionados passaram; provas cobrem SHA/branch/PR, preservação do link da issue e ausência de aprovação automática.
 - [x] Regenerar `reports/TESTS.md` a partir dos três JSONs brutos da CI #496 e passar `npm run test:report:check -- --no-run --require-entry`: Regras 2.994 pass; Banco 2.391 pass / 18 ignorados; Tela 805 pass / 1 todo. A primeira guarda da CI detectou o relatório anterior; o relatório gerado com os artefatos oficiais está na atualização seguinte da PR.
 - [x] Revisar diff, fronteira IPC, escopo do snapshot e projeção fail-closed; teste confirmou o link publicado da issue no nó do DAG.
-- [ ] PR [#419](https://github.com/RodReis/rrb-jarvisOS/pull/419), `refs #137`: a execução CI #496 aprovou qualidade, regras, banco, tela, visual e E2E; o agregador falhou pela divergência do relatório anterior. Relatório oficial regenerado e guard local aprovado; aguardar nova CI, integrar e publicar comentário de encerramento. A issue fica aberta até aceite do PI.
+- [x] PR [#419](https://github.com/RodReis/rrb-jarvisOS/pull/419), `refs #137`, mergeada em `d4aa4372679b1972564ddaad3503fc2a4ab80f56`; comentário de encerramento publicado e issue aceita/fechada pelo PI.
+
+### M13-F05 — Jornada multi-MVP (`docs/spec/spec-continuo-05-jornada-multi-mvp.md`)
+
+Status: em implementação pela issue [#138](https://github.com/RodReis/rrb-jarvisOS/issues/138), `proplan:doing`; SPEC aprovada pelo PI em 2026-08-29. F01–F04 foram mergeadas e aceitas; a jornada fecha o MVP-013 e a Pipeline V2.
+
+- [x] Confirmar issue #138, SPEC aprovada, dependência #137 finalizada e `main` no merge #419.
+- [ ] Provar travessia determinística de múltiplas fatias em ao menos dois MVPs já aprovados.
+- [ ] Provar concorrência só entre fatias independentes e serialização de merges.
+- [ ] Injetar reinício e efeitos ambíguos em cada fronteira durável; confirmar ausência de duplicação.
+- [ ] Provar gate pendente bloqueando somente dependentes e permitindo ramo aprovado independente.
+- [ ] Provar pausa, retomada e cancelamento sem apagar trabalho remoto, reverter merge, fechar issue ou executar deploy.
+- [ ] Produzir relatório final reconciliável com decisões, revisões, executores, consumo, checks, SHAs e bloqueios.
+- [ ] Validar E2E, relatório de testes, smokes limitados e entrega da issue #138 para aceite do PI.
