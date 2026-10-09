@@ -8,8 +8,9 @@ Status: **em implementação**, branch `codex/m14-f01-release-core`; fila atuali
 - [x] Migration SQLite com escopo, fila por projeto/ambiente, leases com fencing, ledger de passos, eventos, auditoria e artefatos.
 - [x] Repositório transacional: consolidação de SHA antes de Staging, writer único, recuperação de intenção ambígua e conflito de payload.
 - [x] Orquestrador por ports, PreviewCoordinator e CLI read-only para consulta/retomada.
-- [x] Testes unitários e de integração SQLite direcionados: 37 passaram; `npm run typecheck` passou em 2026-10-09.
-- [ ] Lint, build, suíte e relatório categorizado conforme `docs/TESTING.md`.
+- [x] Guardas do diário por fase/ambiente, falha terminal, fingerprint SHA-256 sem payload livre e auditoria de transição recusada.
+- [x] Testes unitários e de integração SQLite direcionados: 41 passaram; `npm run typecheck`, `npm run lint`, `npm run build` e self-check do relatório passaram em 2026-10-09.
+- [ ] CI remoto e relatório categorizado por artefatos conforme `docs/TESTING.md`.
 - [ ] PR com `refs #150`, CI verde, merge e comentário de encerramento; depois mover #150 a `proplan:done` (sem fechar).
 
 Limite preservado da SPEC: nenhum provider, Docker, build ou deploy real é executado nesta fatia.

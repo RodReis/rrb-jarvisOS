@@ -116,8 +116,8 @@ const TRANSITIONS: Readonly<Record<ReleaseStatus, readonly ReleaseStatus[]>> = {
   stabilizing: ['completed', 'failed', 'degraded'],
   completed: [],
   superseded: [],
-  failed: ['preparing', 'degraded'],
-  degraded: ['preparing', 'failed']
+  failed: [],
+  degraded: []
 }
 
 export function transicionarRelease(
@@ -146,62 +146,6 @@ export function chaveIdempotenciaRelease(
   return `${projectId}:${environment}:${releaseId}:${step}`
 }
 
-export function validarPayloadSemSegredos(value: unknown): boolean {
-  return serializarPayloadSeguro(value) !== null
-}
-
-export function serializarPayloadSeguro(value: unknown): string | null {
-  const forbidden = new Set([
-    'auth',
-    'authorization',
-    'secret',
-    'token',
-    'password',
-    'credential',
-    'privatekey',
-    'apikey',
-    'accesskey',
-    'clientsecret',
-    'refreshtoken',
-    'providerkey',
-    'signingkey',
-    'encryptionkey'
-  ])
-  const visit = (item: unknown): string | null => {
-    if (item === null) return 'null'
-    if (typeof item === 'string' || typeof item === 'boolean') return JSON.stringify(item)
-    if (typeof item === 'number') return Number.isFinite(item) ? JSON.stringify(item) : null
-    if (Array.isArray(item)) {
-      if (Object.keys(item).length !== item.length) return null
-      const entries = Array.from(item, visit)
-      return entries.every((entry) => entry !== null) ? `[${entries.join(',')}]` : null
-    }
-    if (
-      typeof item !== 'object' ||
-      (Object.getPrototypeOf(item) !== Object.prototype && Object.getPrototypeOf(item) !== null)
-    ) {
-      return null
-    }
-    const keys = Reflect.ownKeys(item)
-    if (keys.some((key) => typeof key !== 'string')) return null
-    const sorted = (keys as string[]).sort()
-    const serialized: string[] = []
-    for (const key of sorted) {
-      const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, '')
-      if (
-        forbidden.has(normalized) ||
-        /(secret|token|password|credential|privatekey|apikey|accesskey)$/.test(normalized)
-      ) {
-        return null
-      }
-      const descriptor = Object.getOwnPropertyDescriptor(item, key)
-      if (!descriptor?.enumerable || !('value' in descriptor)) return null
-      const child = visit(descriptor.value)
-      if (child === null) return null
-      serialized.push(`${JSON.stringify(key)}:${child}`)
-    }
-    return `{${serialized.join(',')}}`
-  }
-
-  return visit(value)
+export function validarFingerprintPayload(value: string): boolean {
+  return /^[a-f0-9]{64}$/.test(value)
 }

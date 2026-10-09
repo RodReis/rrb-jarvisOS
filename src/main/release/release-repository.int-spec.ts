@@ -1,4 +1,5 @@
 import { mkdtempSync, rmSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -36,6 +37,38 @@ function newRepo(): void {
   repo = new ReleaseRepository(db, audit)
 }
 
+function fingerprint(value: string): string {
+  return createHash('sha256').update(value).digest('hex')
+}
+
+function confirmStep(
+  query: ReleaseEnvironmentQuery,
+  step: string,
+  lease: ReturnType<ReleaseRepository['acquireLease']>,
+  now = BASE
+): void {
+  const hash = fingerprint(`${query.environment}:${step}`)
+  const started = repo.beginStep(query, step, hash, lease, now)
+  repo.finishStep(query, step, started.record.payloadHash, 'confirmed', lease, now)
+}
+
+function confirmSteps(
+  query: ReleaseEnvironmentQuery,
+  lease: ReturnType<ReleaseRepository['acquireLease']>,
+  steps: readonly string[]
+): void {
+  for (const step of steps) confirmStep(query, step, lease)
+}
+
+function prepareAndEnterStaging(releaseId: string) {
+  const query = envQuery(releaseId)
+  const lease = repo.acquireLease(query, 'writer-1', 60_000, BASE)
+  repo.transition(query, 'preparing', lease, BASE)
+  confirmStep(query, 'prepared', lease)
+  repo.transition(query, 'staging', lease, BASE)
+  return { query, lease }
+}
+
 beforeEach(() => {
   directory = mkdtempSync(join(tmpdir(), 'jarvis-release-'))
   db = openDatabase(join(directory, 'release.db'))
@@ -61,9 +94,7 @@ describe('ReleaseRepository (SPEC-Release-01)', () => {
 
   it('mantém o candidato antigo depois que Staging começou e enfileira o SHA seguinte', () => {
     const first = repo.enqueue(SCOPE, 'c'.repeat(40), BASE).release
-    const lease = repo.acquireLease(envQuery(first.id), 'writer-1', 60_000, BASE)
-    repo.transition(envQuery(first.id), 'preparing', lease, BASE)
-    repo.transition(envQuery(first.id), 'staging', lease, BASE)
+    prepareAndEnterStaging(first.id)
 
     const next = repo.enqueue(SCOPE, 'd'.repeat(40), '2026-10-09T12:01:00.000Z')
 
@@ -76,12 +107,92 @@ describe('ReleaseRepository (SPEC-Release-01)', () => {
     const query = envQuery(current.id)
     const lease = repo.acquireLease(query, 'writer-1', 60_000, BASE)
     repo.transition(query, 'preparing', lease, BASE)
-    repo.beginStep(query, 'build', { sourceSha: current.sha }, lease, BASE)
+    repo.beginStep(query, 'prepared', fingerprint(current.sha), lease, BASE)
 
     expect(() => repo.enqueue(SCOPE, '9'.repeat(40), '2026-10-09T12:00:01.000Z')).toThrow(
       expect.objectContaining({ code: 'reconciliation-required' })
     )
     expect(repo.queue(SCOPE).candidate?.id).toBe(current.id)
+  })
+
+  it('bloqueia efeitos fora da fase e registra transições recusadas na auditoria', () => {
+    const release = repo.enqueue(SCOPE, 'a'.repeat(40), BASE).release
+    const staging = envQuery(release.id)
+    const stagingLease = repo.acquireLease(staging, 'writer-staging', 60_000, BASE)
+    const production = { ...staging, environment: 'production' as const }
+    const productionLease = repo.acquireLease(production, 'writer-production', 60_000, BASE)
+    repo.transition(staging, 'preparing', stagingLease, BASE)
+
+    expect(() =>
+      repo.beginStep(
+        production,
+        'frontend_promoted',
+        fingerprint('deployment'),
+        productionLease,
+        BASE
+      )
+    ).toThrow(expect.objectContaining({ code: 'step-order' }))
+    expect(() => repo.transition(staging, 'staging', stagingLease, BASE)).toThrow(
+      expect.objectContaining({ code: 'release-diary-incomplete' })
+    )
+    expect(repo.timeline(releaseQuery(release.id)).map((item) => item.kind)).toContain(
+      'transition-rejected'
+    )
+    expect(audit.verify(SCOPE.userId).ok).toBe(true)
+  })
+
+  it('exige diário completo em ordem antes de Produção e de estabilizar', () => {
+    const release = repo.enqueue(SCOPE, 'b'.repeat(40), BASE).release
+    const { query: staging, lease: stagingLease } = prepareAndEnterStaging(release.id)
+    const production = { ...staging, environment: 'production' as const }
+    const productionLease = repo.acquireLease(production, 'writer-production', 60_000, BASE)
+
+    expect(() =>
+      repo.beginStep(
+        production,
+        'frontend_promoted',
+        fingerprint('frontend'),
+        productionLease,
+        BASE
+      )
+    ).toThrow(expect.objectContaining({ code: 'step-order' }))
+    expect(() => repo.transition(production, 'production', productionLease, BASE)).toThrow(
+      expect.objectContaining({ code: 'release-diary-incomplete' })
+    )
+    expect(() =>
+      db.prepare("UPDATE release_run SET status='production' WHERE id=?").run(release.id)
+    ).toThrow(/diário de release incompleto/)
+
+    confirmSteps(staging, stagingLease, [
+      'database_migrated',
+      'backend_healthy',
+      'frontend_promoted',
+      'smoke_passed'
+    ])
+    repo.transition(production, 'production', productionLease, BASE)
+    confirmSteps(production, productionLease, [
+      'prepared',
+      'database_migrated',
+      'backend_healthy',
+      'frontend_promoted',
+      'smoke_passed'
+    ])
+    expect(() => repo.transition(production, 'stabilizing', productionLease, BASE)).not.toThrow()
+  })
+
+  it('mantém failed terminal e libera a lane para a próxima release', () => {
+    const release = repo.enqueue(SCOPE, 'c'.repeat(40), BASE).release
+    const query = envQuery(release.id)
+    const lease = repo.acquireLease(query, 'writer-1', 60_000, BASE)
+    repo.transition(query, 'failed', lease, BASE)
+    expect(() =>
+      db.prepare("UPDATE release_run SET status='preparing' WHERE id=?").run(release.id)
+    ).toThrow(/transição de release inválida/)
+    expect(() => repo.transition(query, 'preparing', lease, BASE)).toThrow(
+      expect.objectContaining({ code: 'lease-mismatch' })
+    )
+    const next = repo.enqueue(SCOPE, 'd'.repeat(40), BASE)
+    expect(next.release.status).toBe('queued')
   })
 
   it('concede um único lease por projeto/ambiente e rejeita fencing antigo após expiração', () => {
@@ -123,27 +234,39 @@ describe('ReleaseRepository (SPEC-Release-01)', () => {
   it('exige reconciliação após crash e não repete passo confirmado', () => {
     const release = repo.enqueue(SCOPE, '2'.repeat(40), BASE).release
     const query = envQuery(release.id)
-    const lease = repo.acquireLease(query, 'writer-1', 60_000, BASE)
-    repo.transition(query, 'preparing', lease, BASE)
-    const intended = repo.beginStep(query, 'build', { commit: release.sha }, lease, BASE)
-    repo.finishStep(query, 'build', intended.record.payloadHash, 'confirmed', lease, BASE)
-
-    expect(repo.beginStep(query, 'build', { commit: release.sha }, lease, BASE).state).toBe(
-      'already-confirmed'
+    const { lease } = prepareAndEnterStaging(release.id)
+    const intended = repo.beginStep(
+      query,
+      'database_migrated',
+      fingerprint(release.sha),
+      lease,
+      BASE
     )
-    const uncertain = repo.beginStep(query, 'publish', { digest: 'sha256:123' }, lease, BASE)
+    repo.finishStep(
+      query,
+      'database_migrated',
+      intended.record.payloadHash,
+      'confirmed',
+      lease,
+      BASE
+    )
+
+    expect(
+      repo.beginStep(query, 'database_migrated', fingerprint(release.sha), lease, BASE).state
+    ).toBe('already-confirmed')
+    const uncertain = repo.beginStep(query, 'backend_healthy', fingerprint('backend'), lease, BASE)
     db.close()
     db = openDatabase(join(directory, 'release.db'))
     newRepo()
     const renewed = repo.acquireLease(query, 'writer-2', 60_000, '2026-10-09T12:01:01.000Z')
     expect(renewed.fencingToken).toBe(lease.fencingToken + 1)
     expect(repo.recoverIntended(query, '2026-10-09T12:01:02.000Z')).toBe(1)
-    expect(repo.getStep(query, 'publish')?.state).toBe('ambiguous')
+    expect(repo.getStep(query, 'backend_healthy')?.state).toBe('ambiguous')
     expect(() =>
       repo.beginStep(
         query,
-        'publish',
-        { digest: 'sha256:123' },
+        'backend_healthy',
+        fingerprint('backend'),
         renewed,
         '2026-10-09T12:01:03.000Z'
       )
@@ -151,18 +274,18 @@ describe('ReleaseRepository (SPEC-Release-01)', () => {
     expect(uncertain.record.state).toBe('intended')
   })
 
-  it('rejeita payload diferente para a mesma chave e não aceita campos com segredo', () => {
+  it('rejeita fingerprint diferente para a mesma chave e valores fora do formato hash', () => {
     const release = repo.enqueue(SCOPE, '3'.repeat(40), BASE).release
     const query = envQuery(release.id)
     const lease = repo.acquireLease(query, 'writer-1', 60_000, BASE)
     repo.transition(query, 'preparing', lease, BASE)
-    repo.beginStep(query, 'build', { source: 'sha-a' }, lease, BASE)
-    expect(() => repo.beginStep(query, 'build', { source: 'sha-b' }, lease, BASE)).toThrow(
+    repo.beginStep(query, 'prepared', fingerprint('sha-a'), lease, BASE)
+    expect(() => repo.beginStep(query, 'prepared', fingerprint('sha-b'), lease, BASE)).toThrow(
       expect.objectContaining({ code: 'idempotency-payload-conflict' })
     )
-    expect(() =>
-      repo.beginStep(query, 'upload', { options: { apiKey: 'must-not-persist' } }, lease, BASE)
-    ).toThrow(expect.objectContaining({ code: 'invalid-safe-payload' }))
+    expect(() => repo.beginStep(query, 'prepared', 'provider-secret-value', lease, BASE)).toThrow(
+      expect.objectContaining({ code: 'invalid-safe-payload' })
+    )
     expect(
       db.prepare("SELECT COUNT(*) AS total FROM release_step WHERE state='intended'").get()
     ).toEqual({ total: 1 })
@@ -173,13 +296,13 @@ describe('ReleaseRepository (SPEC-Release-01)', () => {
     const query = envQuery(release.id)
     const lease = repo.acquireLease(query, 'writer-1', 60_000, BASE)
     repo.transition(query, 'preparing', lease, BASE)
-    repo.beginStep(query, 'build', { publicRef: 'only-reference' }, lease, BASE)
+    repo.beginStep(query, 'prepared', fingerprint('public-reference'), lease, BASE)
     const serialized = JSON.stringify({
       timeline: repo.timeline(releaseQuery(release.id)),
       audit: audit.list(SCOPE.userId)
     })
     expect(serialized).toContain('step-intended')
-    expect(serialized).not.toContain('only-reference')
+    expect(serialized).not.toContain('public-reference')
     expect(audit.verify(SCOPE.userId).ok).toBe(true)
   })
 
@@ -210,8 +333,12 @@ describe('ReleaseRepository (SPEC-Release-01)', () => {
     repo.transition(query, 'preparing', lease, BASE)
     let executions = 0
     let reconciliations = 0
+    const requests: unknown[] = []
     const port: ReleasePort = {
-      execute: async () => (++executions === 1 ? 'ambiguous' : 'confirmed'),
+      execute: async (request) => {
+        requests.push(request)
+        return ++executions === 1 ? 'ambiguous' : 'confirmed'
+      },
       reconcile: async () => {
         reconciliations += 1
         return 'not-applied'
@@ -219,21 +346,22 @@ describe('ReleaseRepository (SPEC-Release-01)', () => {
     }
     const orchestrator = new ReleaseOrchestrator(repo, port, () => BASE)
 
-    expect(await orchestrator.runStep(query, 'build', { sourceSha: release.sha }, lease)).toEqual({
+    expect(await orchestrator.runStep(query, 'prepared', fingerprint(release.sha), lease)).toEqual({
       state: 'ambiguous',
       repeated: false
     })
-    expect(await orchestrator.runStep(query, 'build', { sourceSha: release.sha }, lease)).toEqual({
+    expect(await orchestrator.runStep(query, 'prepared', fingerprint(release.sha), lease)).toEqual({
       state: 'confirmed',
       repeated: false
     })
-    expect(await orchestrator.runStep(query, 'build', { sourceSha: release.sha }, lease)).toEqual({
+    expect(await orchestrator.runStep(query, 'prepared', fingerprint(release.sha), lease)).toEqual({
       state: 'confirmed',
       repeated: false
     })
     expect(executions).toBe(2)
+    expect(requests[0]).not.toHaveProperty('payload')
     expect(reconciliations).toBe(1)
-    expect(repo.getStep(query, 'build')?.attempt).toBe(2)
+    expect(repo.getStep(query, 'prepared')?.attempt).toBe(2)
   })
 
   it('CLI read-only reconstrói fila e ação mínima a partir do SQLite', () => {

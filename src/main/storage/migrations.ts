@@ -2257,9 +2257,7 @@ const MIGRATIONS: readonly string[] = [
     (OLD.status='preparing' AND NEW.status IN ('staging','superseded','failed','degraded')) OR
     (OLD.status='staging' AND NEW.status IN ('production','failed','degraded')) OR
     (OLD.status='production' AND NEW.status IN ('stabilizing','failed','degraded')) OR
-    (OLD.status='stabilizing' AND NEW.status IN ('completed','failed','degraded')) OR
-    (OLD.status='failed' AND NEW.status IN ('preparing','degraded')) OR
-    (OLD.status='degraded' AND NEW.status IN ('preparing','failed'))
+    (OLD.status='stabilizing' AND NEW.status IN ('completed','failed','degraded'))
   )
   BEGIN SELECT RAISE(ABORT, 'transição de release inválida'); END;
   CREATE TRIGGER release_run_freeze_after_staging
@@ -2316,6 +2314,29 @@ const MIGRATIONS: readonly string[] = [
     UNIQUE (user_id, workspace_id, project_id, environment, idempotency_key)
   );
   CREATE INDEX idx_release_step_state ON release_step(user_id, workspace_id, project_id, release_id, state);
+  CREATE TRIGGER release_run_diary_gate
+  BEFORE UPDATE OF status ON release_run
+  WHEN
+    (NEW.status='staging' AND NOT EXISTS (
+      SELECT 1 FROM release_step s WHERE s.user_id=OLD.user_id AND s.workspace_id=OLD.workspace_id
+        AND s.project_id=OLD.project_id AND s.release_id=OLD.id AND s.environment='staging'
+        AND s.step='prepared' AND s.state='confirmed'
+    )) OR
+    (NEW.status='production' AND (
+      SELECT COUNT(*) FROM release_step s WHERE s.user_id=OLD.user_id AND s.workspace_id=OLD.workspace_id
+        AND s.project_id=OLD.project_id AND s.release_id=OLD.id AND s.environment='staging'
+        AND s.state='confirmed' AND s.step IN ('prepared','database_migrated','backend_healthy','frontend_promoted','smoke_passed')
+    ) < 5) OR
+    (NEW.status='stabilizing' AND (
+      SELECT COUNT(*) FROM release_step s WHERE s.user_id=OLD.user_id AND s.workspace_id=OLD.workspace_id
+        AND s.project_id=OLD.project_id AND s.release_id=OLD.id AND s.environment='production'
+        AND s.state='confirmed' AND s.step IN ('prepared','database_migrated','backend_healthy','frontend_promoted','smoke_passed')
+    ) < 5) OR
+    (NEW.status IN ('completed','superseded','failed','degraded') AND EXISTS (
+      SELECT 1 FROM release_step s WHERE s.user_id=OLD.user_id AND s.workspace_id=OLD.workspace_id
+        AND s.project_id=OLD.project_id AND s.release_id=OLD.id AND s.state IN ('intended','ambiguous')
+    ))
+  BEGIN SELECT RAISE(ABORT, 'diário de release incompleto ou não reconciliado'); END;
   CREATE TRIGGER release_step_identity_immutable
   BEFORE UPDATE OF user_id,workspace_id,project_id,release_id,environment,step,idempotency_key,payload_hash ON release_step
   WHEN NEW.user_id IS NOT OLD.user_id OR NEW.workspace_id IS NOT OLD.workspace_id OR

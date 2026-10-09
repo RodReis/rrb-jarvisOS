@@ -1,11 +1,10 @@
-import { createHash, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import type { Database } from 'better-sqlite3'
 import type { AuditRepository } from '../storage/audit-repository'
 import {
   chaveIdempotenciaRelease,
-  serializarPayloadSeguro,
   transicionarRelease,
-  validarPayloadSemSegredos,
+  validarFingerprintPayload,
   type PreviewRun,
   type ReleaseEnvironment,
   type ReleaseRun,
@@ -27,6 +26,7 @@ import type {
 export type ReleaseReason =
   | 'candidate-replaced'
   | 'state-transition'
+  | 'transition-rejected'
   | 'step-intended'
   | 'step-confirmed'
   | 'step-ambiguous'
@@ -47,6 +47,8 @@ export class ReleaseConflictError extends Error {
       | 'idempotency-payload-conflict'
       | 'reconciliation-required'
       | 'invalid-safe-payload'
+      | 'step-order'
+      | 'release-diary-incomplete'
       | 'release-not-found',
     message: string
   ) {
@@ -418,7 +420,7 @@ export class ReleaseRepository {
     now = new Date().toISOString()
   ): ReleaseRun {
     ensureScope(query)
-    return this.transaction(() => {
+    const result = this.transaction(() => {
       this.assertLease(query, lease, now)
       const current = this.get(query)
       if (!current)
@@ -426,23 +428,58 @@ export class ReleaseRepository {
           'release-not-found',
           'Release não encontrada no escopo informado.'
         )
-      const decision = transicionarRelease(current.status, next, current.stageStartedAt, now)
-      if (!decision.ok)
-        throw new ReleaseConflictError(
-          decision.reason,
-          'Transição de release inválida ou congelada pelo início de Staging.'
+      const reject = (code: ReleaseConflictError['code'], reason: string) => {
+        this.event(
+          query,
+          current.id,
+          'transition-rejected',
+          now,
+          query.environment,
+          current.status,
+          next,
+          reason
         )
+        return { error: new ReleaseConflictError(code, reason) }
+      }
+      const decision = transicionarRelease(current.status, next, current.stageStartedAt, now)
+      if (!decision.ok) {
+        return reject(decision.reason, 'Transição inválida ou candidata congelada em Staging.')
+      }
       const expectedEnvironment =
         next === 'production' || ['production', 'stabilizing'].includes(current.status)
           ? 'production'
           : 'staging'
+      if (query.environment !== expectedEnvironment) {
+        return reject('invalid-transition', 'Transição solicitada na lane de ambiente incorreta.')
+      }
+      if (next === 'staging' && !this.hasConfirmedSteps(query, ['prepared'])) {
+        return reject('release-diary-incomplete', 'Passo prepared precisa estar confirmado.')
+      }
+      const stagingQuery = { ...query, environment: 'staging' as const }
+      const productionQuery = { ...query, environment: 'production' as const }
+      const completeDiary = [
+        'prepared',
+        'database_migrated',
+        'backend_healthy',
+        'frontend_promoted',
+        'smoke_passed'
+      ]
+      if (next === 'production' && !this.hasConfirmedSteps(stagingQuery, completeDiary)) {
+        return reject('release-diary-incomplete', 'Diário de Staging incompleto ou não confirmado.')
+      }
+      if (next === 'stabilizing' && !this.hasConfirmedSteps(productionQuery, completeDiary)) {
+        return reject(
+          'release-diary-incomplete',
+          'Diário de Produção incompleto ou não confirmado.'
+        )
+      }
       if (
-        !['failed', 'degraded'].includes(current.status) &&
-        query.environment !== expectedEnvironment
+        ['completed', 'superseded', 'failed', 'degraded'].includes(next) &&
+        this.hasUnresolvedSteps(query)
       ) {
-        throw new ReleaseConflictError(
-          'invalid-transition',
-          'A transição foi solicitada na lane de ambiente incorreta.'
+        return reject(
+          'reconciliation-required',
+          'Efeitos intended/ambiguous precisam ser reconciliados antes do estado terminal.'
         )
       }
       const changed = this.db
@@ -472,6 +509,9 @@ export class ReleaseRepository {
           )
           .run(...scopeParams(query), query.releaseId)
       }
+      if (next === 'failed' || next === 'degraded') {
+        this.clearLane(query, query.releaseId, now)
+      }
       this.event(
         query,
         current.id,
@@ -483,14 +523,16 @@ export class ReleaseRepository {
       )
       const updated = this.get(query)
       if (!updated) throw new Error('A release desapareceu durante a transição.')
-      return updated
+      return { release: updated }
     })
+    if ('error' in result) throw result.error
+    return result.release
   }
 
   beginStep(
     query: ReleaseEnvironmentQuery,
     step: string,
-    payload: unknown,
+    payloadHash: string,
     lease: ReleaseLease,
     now = new Date().toISOString()
   ): {
@@ -498,19 +540,12 @@ export class ReleaseRepository {
     readonly record: ReleaseStepRecord
   } {
     ensureScope(query)
-    if (!/^[a-z][a-z0-9._-]{0,63}$/i.test(step) || !validarPayloadSemSegredos(payload)) {
+    if (!/^[a-z][a-z0-9._-]{0,63}$/i.test(step) || !validarFingerprintPayload(payloadHash)) {
       throw new ReleaseConflictError(
         'invalid-safe-payload',
-        'Passo vazio ou payload com campo que pode conter segredo.'
+        'Passo inválido ou fingerprint não-SHA-256.'
       )
     }
-    const serialized = serializarPayloadSeguro(payload)
-    if (serialized === null)
-      throw new ReleaseConflictError(
-        'invalid-safe-payload',
-        'Payload precisa ser serializável e livre de campos sensíveis.'
-      )
-    const payloadHash = createHash('sha256').update(serialized).digest('hex')
     const idempotencyKey = chaveIdempotenciaRelease(
       query.projectId,
       query.environment,
@@ -519,7 +554,8 @@ export class ReleaseRepository {
     )
     return this.transaction(() => {
       this.assertLease(query, lease, now)
-      if (!this.get(query))
+      const release = this.get(query)
+      if (!release)
         throw new ReleaseConflictError(
           'release-not-found',
           'Release não encontrada no escopo informado.'
@@ -541,6 +577,12 @@ export class ReleaseRepository {
         throw new ReleaseConflictError(
           'reconciliation-required',
           'Passo incerto deve ser reconciliado antes de qualquer repetição.'
+        )
+      }
+      if (this.nextExpectedStep(query, release.status) !== step) {
+        throw new ReleaseConflictError(
+          'step-order',
+          'Passo fora da fase, do ambiente ou da ordem definida para a release.'
         )
       }
       const attempt = (old?.attempt ?? 0) + 1
@@ -633,6 +675,13 @@ export class ReleaseRepository {
         throw new ReleaseConflictError(
           'reconciliation-required',
           'O passo não está em estado ambíguo.'
+        )
+      }
+      const release = this.get(query)
+      if (!release || this.nextExpectedStep(query, release.status) !== step) {
+        throw new ReleaseConflictError(
+          'step-order',
+          'Reconciliação fora da fase, ambiente ou ordem definida para a release.'
         )
       }
       this.db
@@ -821,6 +870,24 @@ export class ReleaseRepository {
       )
       .get(...scopeParams(query), query.releaseId, query.environment, step) as StepRow | undefined
     return row ? toStep(row) : null
+  }
+
+  assertStepPhase(
+    query: ReleaseEnvironmentQuery,
+    step: string,
+    lease: ReleaseLease,
+    now = new Date().toISOString()
+  ): void {
+    this.transaction(() => {
+      this.assertLease(query, lease, now)
+      const release = this.get(query)
+      if (!release) throw new ReleaseConflictError('release-not-found', 'Release não encontrada.')
+      if (this.nextExpectedStep(query, release.status) !== step)
+        throw new ReleaseConflictError(
+          'step-order',
+          'Passo fora da fase, do ambiente ou da ordem definida para a release.'
+        )
+    })
   }
 
   queue(query: ReleaseQueueQuery): ReleaseQueueView {
@@ -1030,5 +1097,60 @@ export class ReleaseRepository {
         WHERE user_id=? AND workspace_id=? AND project_id=? AND environment=?`
       )
       .run(now, now, ...scopeParams(query), query.environment)
+  }
+
+  private hasConfirmedSteps(query: ReleaseEnvironmentQuery, steps: readonly string[]): boolean {
+    const confirmed = new Set(
+      (
+        this.db
+          .prepare(
+            `SELECT step FROM release_step WHERE user_id=? AND workspace_id=? AND project_id=?
+            AND release_id=? AND environment=? AND state='confirmed'`
+          )
+          .all(...scopeParams(query), query.releaseId, query.environment) as { step: string }[]
+      ).map((row) => row.step)
+    )
+    return steps.every((step) => confirmed.has(step))
+  }
+
+  private hasUnresolvedSteps(query: ReleaseEnvironmentQuery): boolean {
+    return Boolean(
+      this.db
+        .prepare(
+          `SELECT 1 FROM release_step WHERE user_id=? AND workspace_id=? AND project_id=?
+          AND release_id=? AND state IN ('intended','ambiguous') LIMIT 1`
+        )
+        .get(...scopeParams(query), query.releaseId)
+    )
+  }
+
+  private nextExpectedStep(query: ReleaseEnvironmentQuery, status: ReleaseStatus): string | null {
+    const expectedEnvironment = status === 'production' ? 'production' : 'staging'
+    if (query.environment !== expectedEnvironment) return null
+    const sequence =
+      status === 'preparing'
+        ? ['prepared']
+        : status === 'staging'
+          ? ['database_migrated', 'backend_healthy', 'frontend_promoted', 'smoke_passed']
+          : status === 'production'
+            ? [
+                'prepared',
+                'database_migrated',
+                'backend_healthy',
+                'frontend_promoted',
+                'smoke_passed'
+              ]
+            : []
+    const confirmed = new Set(
+      (
+        this.db
+          .prepare(
+            `SELECT step FROM release_step WHERE user_id=? AND workspace_id=? AND project_id=?
+            AND release_id=? AND environment=? AND state='confirmed'`
+          )
+          .all(...scopeParams(query), query.releaseId, query.environment) as { step: string }[]
+      ).map((row) => row.step)
+    )
+    return sequence.find((step) => !confirmed.has(step)) ?? null
   }
 }

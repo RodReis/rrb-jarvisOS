@@ -14,10 +14,9 @@ export interface ReleaseEffectRequest {
   readonly step: string
   readonly idempotencyKey: string
   readonly payloadHash: string
-  readonly payload: unknown
 }
 
-export type ReleaseReconciliationRequest = Omit<ReleaseEffectRequest, 'payload'>
+export type ReleaseReconciliationRequest = ReleaseEffectRequest
 
 export interface ReleasePort {
   execute(request: ReleaseEffectRequest): Promise<'confirmed' | 'ambiguous' | 'failed'>
@@ -63,12 +62,12 @@ export class ReleaseOrchestrator {
   async runStep(
     query: ReleaseEnvironmentQuery,
     step: string,
-    payload: unknown,
+    payloadHash: string,
     lease: ReleaseLease
   ): Promise<ReleaseStepOutcome> {
     let begun: ReturnType<ReleaseRepository['beginStep']>
     try {
-      begun = this.repository.beginStep(query, step, payload, lease, this.now())
+      begun = this.repository.beginStep(query, step, payloadHash, lease, this.now())
     } catch (error) {
       if (!(error instanceof ReleaseConflictError) || error.code !== 'reconciliation-required')
         throw error
@@ -76,7 +75,7 @@ export class ReleaseOrchestrator {
       if (reconciled.state !== 'failed') {
         return { state: reconciled.state, repeated: false }
       }
-      begun = this.repository.beginStep(query, step, payload, lease, this.now())
+      begun = this.repository.beginStep(query, step, payloadHash, lease, this.now())
     }
 
     if (begun.state === 'already-confirmed') return { state: 'confirmed', repeated: false }
@@ -86,8 +85,7 @@ export class ReleaseOrchestrator {
       environment: query.environment,
       step,
       idempotencyKey: begun.record.idempotencyKey,
-      payloadHash: begun.record.payloadHash,
-      payload
+      payloadHash: begun.record.payloadHash
     }
     let state: 'confirmed' | 'ambiguous' | 'failed'
     try {
@@ -105,6 +103,7 @@ export class ReleaseOrchestrator {
     step: string,
     lease: ReleaseLease
   ): Promise<{ readonly state: 'confirmed' | 'failed' | 'ambiguous'; readonly repeated: false }> {
+    this.repository.assertStepPhase(query, step, lease, this.now())
     const current = this.repository.getStep(query, step)
     if (!current)
       throw new ReleaseConflictError(
