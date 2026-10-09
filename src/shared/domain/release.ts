@@ -51,11 +51,22 @@ export interface ReleaseStepRecord {
   readonly updatedAt: string
 }
 
+export interface ArtifactProvenance {
+  readonly transport: 'docker-cli'
+  readonly buildType: string
+  readonly builderId: string
+  /** Hash do documento SLSA do registry: igual na consulta posterior = mesma provenance. */
+  readonly provenanceDigest: string
+}
+
 export interface Artifact extends ReleaseScope {
   readonly id: string
   readonly releaseId: string
   readonly kind: 'backend-image' | 'frontend-bundle' | 'migration-bundle'
   readonly digest: string
+  /** `repositório@sha256:<digest>`; nulo só em linha anterior à SPEC-Release-02. */
+  readonly uri: string | null
+  readonly provenance: ArtifactProvenance | null
   readonly createdAt: string
 }
 
@@ -88,11 +99,33 @@ export interface GateResult extends ReleaseScope {
   readonly createdAt: string
 }
 
+export type ConfigurationEnvironment = 'local' | 'preview' | 'staging' | 'production'
+export type ConfigurationState = 'configured' | 'missing' | 'divergent'
+
+/** Referência de configuração: nome, ambiente e fingerprint. **Nunca** o valor. */
 export interface ConfigurationReference extends ReleaseScope {
   readonly releaseId: string
-  readonly environment: ReleaseEnvironment
+  readonly environment: ConfigurationEnvironment
   readonly name: string
-  readonly version: string
+  readonly fingerprint: string | null
+  readonly state: ConfigurationState
+}
+
+export type LocalEffectKind = 'compose' | 'migration' | 'artifact' | 'configuration'
+export type LocalEffectPhase = 'intended' | 'confirmed' | 'failed'
+
+/** Diário append-only da preparação local: intenção, referência externa, digest, transporte e evidência. */
+export interface LocalEffect extends ReleaseScope {
+  readonly id: string
+  readonly releaseId: string
+  readonly kind: LocalEffectKind
+  readonly phase: LocalEffectPhase
+  readonly externalRef: string | null
+  readonly digest: string | null
+  readonly transport: string
+  readonly evidenceHash: string | null
+  readonly reason: string | null
+  readonly createdAt: string
 }
 
 export interface CompensationExecution extends ReleaseScope {

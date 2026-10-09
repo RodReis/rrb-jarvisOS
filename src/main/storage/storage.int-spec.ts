@@ -171,7 +171,10 @@ describe('migrations', () => {
     antigo.exec('DROP TABLE pipeline_control_scope_command')
     antigo.exec('DROP TABLE pipeline_control_policy')
     // A 63 cria entidades, lanes, leases, journal de passos, auditoria de releases e previews.
+    // A 64 acrescenta uri/provenance ao artefato, recria a referência de configuração e cria o
+    // diário local (SPEC-Release-02); as duas primeiras se refazem sozinhas ao recriar a 63.
     for (const tabela of [
+      'release_local_effect',
       'preview_event',
       'release_compensation',
       'release_configuration_reference',

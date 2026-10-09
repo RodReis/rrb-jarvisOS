@@ -2476,6 +2476,62 @@ const MIGRATIONS: readonly string[] = [
     state TEXT NOT NULL CHECK (state IN ('intended','confirmed','ambiguous','failed')),
     created_at TEXT NOT NULL
   );
+  `,
+  // SPEC-Release-02: preparação local. As tabelas de artefato e de referência de configuração
+  // da F01 não tinham escritor, então estão vazias: o artefato ganha uri e provenance por
+  // ALTER; a referência é recriada com fingerprint/estado e os quatro ambientes (local e
+  // preview também têm contrato de chaves). O diário é append-only.
+  `
+  ALTER TABLE release_artifact ADD COLUMN uri TEXT;
+  ALTER TABLE release_artifact ADD COLUMN provenance TEXT;
+  -- Um artefato por release e tipo é invariante do banco, não só da aplicação: duas preparações
+  -- simultâneas não gravam dois digests (o segundo INSERT falha e vira artifact-conflict).
+  CREATE UNIQUE INDEX idx_release_artifact_um_por_tipo
+    ON release_artifact(user_id,workspace_id,project_id,release_id,kind);
+
+  CREATE TABLE release_configuration_reference_v2 (
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL CHECK (workspace_id IN ('noa','jarvis')),
+    project_id TEXT NOT NULL,
+    release_id TEXT NOT NULL REFERENCES release_run(id),
+    environment TEXT NOT NULL CHECK (environment IN ('local','preview','staging','production')),
+    name TEXT NOT NULL,
+    fingerprint TEXT CHECK (fingerprint IS NULL
+      OR (length(fingerprint) = 64 AND fingerprint NOT GLOB '*[^0-9a-f]*')),
+    state TEXT NOT NULL CHECK (state IN ('configured','missing','divergent')),
+    PRIMARY KEY (user_id, workspace_id, project_id, release_id, environment, name),
+    CHECK ((state = 'missing') = (fingerprint IS NULL))
+  );
+  -- A coluna antiga "version" era texto livre e nunca teve escritor: não vira fingerprint.
+  INSERT INTO release_configuration_reference_v2
+    SELECT user_id, workspace_id, project_id, release_id, environment, name, NULL, 'missing'
+    FROM release_configuration_reference;
+  DROP TABLE release_configuration_reference;
+  ALTER TABLE release_configuration_reference_v2 RENAME TO release_configuration_reference;
+
+  CREATE TABLE release_local_effect (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL CHECK (workspace_id IN ('noa','jarvis')),
+    project_id TEXT NOT NULL,
+    release_id TEXT NOT NULL REFERENCES release_run(id),
+    kind TEXT NOT NULL CHECK (kind IN ('compose','migration','artifact','configuration')),
+    phase TEXT NOT NULL CHECK (phase IN ('intended','confirmed','failed')),
+    external_ref TEXT,
+    digest TEXT CHECK (digest IS NULL OR (length(digest) = 71 AND digest LIKE 'sha256:%')),
+    transport TEXT NOT NULL CHECK (transport IN ('docker-cli','env-file','git-cli')),
+    evidence_hash TEXT CHECK (evidence_hash IS NULL
+      OR (length(evidence_hash) = 71 AND evidence_hash LIKE 'sha256:%')),
+    reason TEXT CHECK (reason IS NULL
+      OR (length(reason) BETWEEN 1 AND 64 AND reason NOT GLOB '*[^a-z0-9._:-]*')),
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX idx_release_local_effect_timeline
+    ON release_local_effect(user_id,workspace_id,project_id,release_id,created_at,id);
+  CREATE TRIGGER release_local_effect_append_only_update BEFORE UPDATE ON release_local_effect
+  BEGIN SELECT RAISE(ABORT, 'release_local_effect é append-only'); END;
+  CREATE TRIGGER release_local_effect_append_only_delete BEFORE DELETE ON release_local_effect
+  BEGIN SELECT RAISE(ABORT, 'release_local_effect é append-only'); END;
   `
 ]
 
