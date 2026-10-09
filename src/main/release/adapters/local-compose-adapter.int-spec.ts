@@ -86,7 +86,12 @@ beforeAll(async () => {
       'network=host',
       '--bootstrap'
     )
-    if (criado.code !== 0) throw new Error('Não foi possível criar o builder docker-container.')
+    if (criado.code !== 0)
+      // O stderr do `buildx create` não carrega segredo e é o que diferencia limite de pull do
+      // Docker Hub, falta de plugin e rede.
+      throw new Error(
+        `Não foi possível criar o builder docker-container: ${criado.stderr.trim().slice(-400)}`
+      )
     builder = nome
   }
 }, 240_000)
