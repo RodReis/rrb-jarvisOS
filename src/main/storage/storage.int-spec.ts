@@ -170,6 +170,24 @@ describe('migrations', () => {
     // A 62 guarda os controles operacionais e o journal idempotente por escopo.
     antigo.exec('DROP TABLE pipeline_control_scope_command')
     antigo.exec('DROP TABLE pipeline_control_policy')
+    // A 63 cria entidades, lanes, leases, journal de passos, auditoria de releases e previews.
+    for (const tabela of [
+      'preview_event',
+      'release_compensation',
+      'release_configuration_reference',
+      'release_gate_result',
+      'release_migration_execution',
+      'release_deployment',
+      'release_artifact',
+      'preview_run',
+      'release_event',
+      'release_step',
+      'release_lease',
+      'release_environment_lane',
+      'release_candidate',
+      'release_run'
+    ])
+      antigo.exec(`DROP TABLE ${tabela}`)
     antigo.pragma('user_version = 1')
     antigo.close()
 

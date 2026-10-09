@@ -2229,6 +2229,232 @@ const MIGRATIONS: readonly string[] = [
     created_at TEXT NOT NULL,
     PRIMARY KEY (user_id, workspace_id, scope_project_id, idempotency_key)
   );
+  `,
+  // 63 — núcleo persistido de Preview/Release e lanes de ambiente (MVP-014/F01).
+  `
+  CREATE TABLE release_run (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL CHECK (workspace_id IN ('noa','jarvis')),
+    project_id TEXT NOT NULL,
+    sha TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('queued','preparing','staging','production','stabilizing','completed','superseded','failed','degraded')),
+    stage_started_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (user_id, workspace_id, project_id, id)
+  );
+  CREATE INDEX idx_release_run_project ON release_run(user_id, workspace_id, project_id, created_at);
+  CREATE UNIQUE INDEX idx_release_run_sha
+    ON release_run(user_id, workspace_id, project_id, sha);
+  CREATE UNIQUE INDEX idx_release_run_candidate
+    ON release_run(user_id, workspace_id, project_id)
+    WHERE status IN ('queued','preparing') AND stage_started_at IS NULL;
+  CREATE TRIGGER release_run_status_transition
+  BEFORE UPDATE OF status ON release_run
+  WHEN NOT (
+    (OLD.status='queued' AND NEW.status IN ('preparing','superseded','failed')) OR
+    (OLD.status='preparing' AND NEW.status IN ('staging','superseded','failed','degraded')) OR
+    (OLD.status='staging' AND NEW.status IN ('production','failed','degraded')) OR
+    (OLD.status='production' AND NEW.status IN ('stabilizing','failed','degraded')) OR
+    (OLD.status='stabilizing' AND NEW.status IN ('completed','failed','degraded')) OR
+    (OLD.status='failed' AND NEW.status IN ('preparing','degraded')) OR
+    (OLD.status='degraded' AND NEW.status IN ('preparing','failed'))
+  )
+  BEGIN SELECT RAISE(ABORT, 'transição de release inválida'); END;
+  CREATE TRIGGER release_run_freeze_after_staging
+  BEFORE UPDATE OF sha,stage_started_at ON release_run
+  WHEN OLD.stage_started_at IS NOT NULL AND
+    (NEW.sha IS NOT OLD.sha OR NEW.stage_started_at IS NOT OLD.stage_started_at)
+  BEGIN SELECT RAISE(ABORT, 'candidate congelado após início de Staging'); END;
+
+  CREATE TABLE release_candidate (
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL CHECK (workspace_id IN ('noa','jarvis')),
+    project_id TEXT NOT NULL,
+    release_id TEXT NOT NULL REFERENCES release_run(id),
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, workspace_id, project_id)
+  );
+
+  CREATE TABLE release_environment_lane (
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL CHECK (workspace_id IN ('noa','jarvis')),
+    project_id TEXT NOT NULL,
+    environment TEXT NOT NULL CHECK (environment IN ('staging','production')),
+    active_release_id TEXT REFERENCES release_run(id),
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, workspace_id, project_id, environment)
+  );
+
+  CREATE TABLE release_lease (
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL CHECK (workspace_id IN ('noa','jarvis')),
+    project_id TEXT NOT NULL,
+    environment TEXT NOT NULL CHECK (environment IN ('staging','production')),
+    lease_id TEXT NOT NULL,
+    owner_id TEXT NOT NULL,
+    fencing_token INTEGER NOT NULL CHECK (fencing_token > 0),
+    expires_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, workspace_id, project_id, environment)
+  );
+
+  CREATE TABLE release_step (
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL CHECK (workspace_id IN ('noa','jarvis')),
+    project_id TEXT NOT NULL,
+    release_id TEXT NOT NULL REFERENCES release_run(id),
+    environment TEXT NOT NULL CHECK (environment IN ('staging','production')),
+    step TEXT NOT NULL,
+    idempotency_key TEXT NOT NULL,
+    payload_hash TEXT NOT NULL,
+    state TEXT NOT NULL CHECK (state IN ('intended','confirmed','ambiguous','failed')),
+    attempt INTEGER NOT NULL CHECK (attempt > 0),
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, workspace_id, project_id, release_id, environment, step),
+    UNIQUE (user_id, workspace_id, project_id, environment, idempotency_key)
+  );
+  CREATE INDEX idx_release_step_state ON release_step(user_id, workspace_id, project_id, release_id, state);
+  CREATE TRIGGER release_step_identity_immutable
+  BEFORE UPDATE OF user_id,workspace_id,project_id,release_id,environment,step,idempotency_key,payload_hash ON release_step
+  WHEN NEW.user_id IS NOT OLD.user_id OR NEW.workspace_id IS NOT OLD.workspace_id OR
+    NEW.project_id IS NOT OLD.project_id OR NEW.release_id IS NOT OLD.release_id OR
+    NEW.environment IS NOT OLD.environment OR NEW.step IS NOT OLD.step OR
+    NEW.idempotency_key IS NOT OLD.idempotency_key OR NEW.payload_hash IS NOT OLD.payload_hash
+  BEGIN SELECT RAISE(ABORT, 'identidade idempotente do passo é imutável'); END;
+
+  CREATE TABLE release_event (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL CHECK (workspace_id IN ('noa','jarvis')),
+    project_id TEXT NOT NULL,
+    release_id TEXT NOT NULL REFERENCES release_run(id),
+    environment TEXT CHECK (environment IS NULL OR environment IN ('staging','production')),
+    kind TEXT NOT NULL,
+    from_status TEXT,
+    to_status TEXT,
+    reason TEXT,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX idx_release_event_timeline ON release_event(user_id, workspace_id, project_id, release_id, created_at, id);
+  CREATE TRIGGER release_event_append_only_update BEFORE UPDATE ON release_event
+  BEGIN SELECT RAISE(ABORT, 'release_event é append-only'); END;
+  CREATE TRIGGER release_event_append_only_delete BEFORE DELETE ON release_event
+  BEGIN SELECT RAISE(ABORT, 'release_event é append-only'); END;
+
+  CREATE TABLE preview_run (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL CHECK (workspace_id IN ('noa','jarvis')),
+    project_id TEXT NOT NULL,
+    pull_request INTEGER NOT NULL CHECK (pull_request > 0),
+    head_sha TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('queued','preparing','ready','failed','removed')),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (user_id, workspace_id, project_id, pull_request, head_sha)
+  );
+  CREATE TABLE preview_event (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL CHECK (workspace_id IN ('noa','jarvis')),
+    project_id TEXT NOT NULL,
+    preview_id TEXT NOT NULL REFERENCES preview_run(id),
+    kind TEXT NOT NULL,
+    from_status TEXT,
+    to_status TEXT,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX idx_preview_event_timeline
+    ON preview_event(user_id,workspace_id,project_id,preview_id,created_at,id);
+  CREATE TRIGGER preview_event_append_only_update BEFORE UPDATE ON preview_event
+  BEGIN SELECT RAISE(ABORT, 'preview_event é append-only'); END;
+  CREATE TRIGGER preview_event_append_only_delete BEFORE DELETE ON preview_event
+  BEGIN SELECT RAISE(ABORT, 'preview_event é append-only'); END;
+
+  CREATE TABLE release_artifact (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL CHECK (workspace_id IN ('noa','jarvis')),
+    project_id TEXT NOT NULL,
+    release_id TEXT NOT NULL REFERENCES release_run(id),
+    kind TEXT NOT NULL CHECK (kind IN ('backend-image','frontend-bundle','migration-bundle')),
+    digest TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (user_id, workspace_id, project_id, release_id, kind, digest)
+  );
+  CREATE TRIGGER release_artifact_immutable_update BEFORE UPDATE ON release_artifact
+  BEGIN SELECT RAISE(ABORT, 'artifact de release é imutável'); END;
+  CREATE TRIGGER release_artifact_immutable_delete BEFORE DELETE ON release_artifact
+  BEGIN SELECT RAISE(ABORT, 'artifact de release é imutável'); END;
+
+  CREATE TABLE release_deployment (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL CHECK (workspace_id IN ('noa','jarvis')),
+    project_id TEXT NOT NULL,
+    release_id TEXT NOT NULL REFERENCES release_run(id),
+    environment TEXT NOT NULL CHECK (environment IN ('staging','production')),
+    artifact_digest TEXT NOT NULL,
+    external_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (user_id, workspace_id, project_id, environment, external_id)
+  );
+  CREATE TRIGGER release_deployment_immutable_update BEFORE UPDATE ON release_deployment
+  BEGIN SELECT RAISE(ABORT, 'deployment de release é imutável'); END;
+  CREATE TRIGGER release_deployment_immutable_delete BEFORE DELETE ON release_deployment
+  BEGIN SELECT RAISE(ABORT, 'deployment de release é imutável'); END;
+
+  CREATE TABLE release_migration_execution (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL CHECK (workspace_id IN ('noa','jarvis')),
+    project_id TEXT NOT NULL,
+    release_id TEXT NOT NULL REFERENCES release_run(id),
+    environment TEXT NOT NULL CHECK (environment IN ('staging','production')),
+    migration_id TEXT NOT NULL,
+    checksum TEXT NOT NULL,
+    state TEXT NOT NULL CHECK (state IN ('intended','confirmed','ambiguous','failed')),
+    created_at TEXT NOT NULL,
+    UNIQUE (user_id, workspace_id, project_id, release_id, environment, migration_id)
+  );
+
+  CREATE TABLE release_gate_result (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL CHECK (workspace_id IN ('noa','jarvis')),
+    project_id TEXT NOT NULL,
+    release_id TEXT NOT NULL REFERENCES release_run(id),
+    environment TEXT NOT NULL CHECK (environment IN ('staging','production')),
+    gate TEXT NOT NULL,
+    result TEXT NOT NULL CHECK (result IN ('passed','blocked','unknown')),
+    reason TEXT,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE release_configuration_reference (
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL CHECK (workspace_id IN ('noa','jarvis')),
+    project_id TEXT NOT NULL,
+    release_id TEXT NOT NULL REFERENCES release_run(id),
+    environment TEXT NOT NULL CHECK (environment IN ('staging','production')),
+    name TEXT NOT NULL,
+    version TEXT NOT NULL,
+    PRIMARY KEY (user_id, workspace_id, project_id, release_id, environment, name)
+  );
+
+  CREATE TABLE release_compensation (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL CHECK (workspace_id IN ('noa','jarvis')),
+    project_id TEXT NOT NULL,
+    release_id TEXT NOT NULL REFERENCES release_run(id),
+    environment TEXT NOT NULL CHECK (environment IN ('staging','production')),
+    action TEXT NOT NULL,
+    state TEXT NOT NULL CHECK (state IN ('intended','confirmed','ambiguous','failed')),
+    created_at TEXT NOT NULL
+  );
   `
 ]
 

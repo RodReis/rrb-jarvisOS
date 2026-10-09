@@ -597,7 +597,9 @@ export const AUDIT_EVENT_TYPES = [
   // próprio porque é a trilha do critério 3 — *o lock foi confirmado antes da escrita?* — e a do
   // conflito que bloqueou o run perdedor. O payload leva run, projeto, caminhos e os runs que
   // seguravam o lock; nunca o conteúdo do que está sendo escrito.
-  'pool-lock'
+  'pool-lock',
+  // SPEC-Release-01: transições do estado de release. Payload contém somente ids e estados.
+  'release-transition'
 ] as const
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number]

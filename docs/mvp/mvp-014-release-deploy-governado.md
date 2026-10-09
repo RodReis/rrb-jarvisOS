@@ -11,7 +11,7 @@ Transformar merges confirmados da Pipeline V2 em Preview, Staging e Produção v
 
 ## Fatias
 
-- [ ] M14-F01 [#150](https://github.com/RodReis/rrb-jarvisOS/issues/150) — Núcleo de release e fila — `spec-release-01-nucleo-estados-fila.md`.
+- [ ] M14-F01 [#150](https://github.com/RodReis/rrb-jarvisOS/issues/150) — Núcleo de release e fila — `spec-release-01-nucleo-estados-fila.md` (implementação em PR; aguardando CI e merge).
 - [ ] M14-F02 [#151](https://github.com/RodReis/rrb-jarvisOS/issues/151) — Docker, artefatos e configuração — `spec-release-02-compose-artefatos-config.md`.
 - [ ] M14-F03 [#152](https://github.com/RodReis/rrb-jarvisOS/issues/152) — Preview isolado por PR — `spec-release-03-preview-isolado.md`.
 - [ ] M14-F04 [#153](https://github.com/RodReis/rrb-jarvisOS/issues/153) — Staging e Produção automática — `spec-release-04-staging-producao.md`.
