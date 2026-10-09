@@ -20,7 +20,13 @@ import type { CommandResult, CommandRunner } from './command-runner'
  */
 
 export type ArtifactRegistryErrorCode =
-  'auth' | 'timeout' | 'digest-mismatch' | 'partial' | 'not-found' | 'failed'
+  | 'auth'
+  | 'timeout'
+  | 'digest-mismatch'
+  | 'partial'
+  | 'not-found'
+  | 'attestation-unsupported'
+  | 'failed'
 
 export class ArtifactRegistryError extends Error {
   constructor(
@@ -49,11 +55,14 @@ export interface PublishInput {
 const BINARIO = 'docker'
 const PADRAO_AUTH = /unauthorized|denied|authentication required|\b40[13]\b|insufficient_scope/i
 const PADRAO_NAO_ENCONTRADO = /not found|manifest unknown|no such manifest/i
+const PADRAO_SEM_ATTESTATION = /attestation is not supported|provenance.*not supported/i
 
 export class GhcrArtifactAdapter {
   constructor(
     private readonly runner: CommandRunner,
-    private readonly registry = 'ghcr.io'
+    private readonly registry = 'ghcr.io',
+    /** Builder nomeado (`docker buildx create`); o padrão só gera provenance com containerd store. */
+    private readonly builder?: string
   ) {}
 
   async publish(input: PublishInput): Promise<RegistryArtifact> {
@@ -66,6 +75,7 @@ export class GhcrArtifactAdapter {
         'buildx',
         'build',
         '--push',
+        ...(this.builder ? ['--builder', this.builder] : []),
         '--provenance=mode=max',
         '--sbom=false',
         '--label',
@@ -176,6 +186,11 @@ export class GhcrArtifactAdapter {
     const texto = `${resultado.stderr}\n${resultado.stdout}`
     if (PADRAO_AUTH.test(texto))
       throw new ArtifactRegistryError('auth', `Autenticação recusada na etapa ${etapa}.`)
+    if (PADRAO_SEM_ATTESTATION.test(texto))
+      throw new ArtifactRegistryError(
+        'attestation-unsupported',
+        'O builder não gera provenance: ative o containerd image store ou use um builder docker-container.'
+      )
     if (PADRAO_NAO_ENCONTRADO.test(texto))
       throw new ArtifactRegistryError('not-found', `Referência não encontrada na etapa ${etapa}.`)
     throw new ArtifactRegistryError('failed', `A etapa ${etapa} falhou (código ${resultado.code}).`)

@@ -88,6 +88,30 @@ describe('GhcrArtifactAdapter.publish', () => {
     expect(erro.code).toBe('auth')
   })
 
+  it('builder nomeado vai no build; sem builder o argumento não existe', async () => {
+    const com = runnerDe({})
+    await new GhcrArtifactAdapter(com, 'ghcr.io', 'meu-builder').publish(entrada)
+    const build = com.chamadas.find((a) => a[1] === 'build')!
+    expect(build[build.indexOf('--builder') + 1]).toBe('meu-builder')
+    const sem = runnerDe({})
+    await new GhcrArtifactAdapter(sem).publish(entrada)
+    expect(sem.chamadas.find((a) => a[1] === 'build')).not.toContain('--builder')
+  })
+
+  it('driver sem attestation vira erro explícito, nunca build sem provenance', async () => {
+    const runner = runnerDe({
+      build: {
+        code: 1,
+        stdout: '',
+        stderr: 'ERROR: Attestation is not supported for the docker driver',
+        timedOut: false
+      }
+    })
+    await expect(new GhcrArtifactAdapter(runner).publish(entrada)).rejects.toMatchObject({
+      code: 'attestation-unsupported'
+    })
+  })
+
   it('timeout vira erro "timeout"', async () => {
     const runner = runnerDe({ build: { code: null, stdout: '', stderr: '', timedOut: true } })
     await expect(new GhcrArtifactAdapter(runner).publish(entrada)).rejects.toMatchObject({

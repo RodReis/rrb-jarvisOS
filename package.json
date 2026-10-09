@@ -29,6 +29,7 @@
     "test:report:tela": "node scripts/test-report.mjs --project tela",
     "test:report:selfcheck": "node scripts/test-report.mjs --selfcheck",
     "release:inspect": "node scripts/release-cli.mjs",
+    "release:prepare": "node scripts/release-prepare.mjs",
     "build:squad-executor-image": "node scripts/build-squad-executor-image.mjs"
   },
   "devDependencies": {

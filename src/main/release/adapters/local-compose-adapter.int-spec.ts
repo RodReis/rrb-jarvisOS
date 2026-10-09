@@ -37,6 +37,8 @@ const PERFIL: ComposeProfile = {
 }
 
 let dockerNoAr = false
+/** Só existe quando o Docker local não gera provenance sozinho (sem containerd image store). */
+let builder: string | undefined
 const servidoresDeSonda: Server[] = []
 const leasesUsados = new Set<string>([LEASE])
 
@@ -67,11 +69,32 @@ beforeAll(async () => {
   dockerNoAr = (await docker('info', '--format', '{{.ServerVersion}}')).code === 0
   if (!dockerNoAr && process.env.CI)
     throw new Error('Docker não respondeu. No CI o daemon é obrigatório — verifique o runner.')
-}, 60_000)
+  if (!dockerNoAr) return
+  // Provenance exige containerd image store ou um builder docker-container. Sem o primeiro,
+  // cria o segundo (rede do host, para o push em localhost) e o remove no fim.
+  const driver = await docker('info', '--format', '{{.DriverStatus}}')
+  if (!driver.stdout.includes('io.containerd.snapshotter')) {
+    const nome = `jarvisrel-builder-${SUFIXO}`
+    const criado = await docker(
+      'buildx',
+      'create',
+      '--name',
+      nome,
+      '--driver',
+      'docker-container',
+      '--driver-opt',
+      'network=host',
+      '--bootstrap'
+    )
+    if (criado.code !== 0) throw new Error('Não foi possível criar o builder docker-container.')
+    builder = nome
+  }
+}, 240_000)
 
 afterAll(async () => {
   for (const s of servidoresDeSonda) s.close()
   if (!dockerNoAr) return
+  if (builder) await docker('buildx', 'rm', '--force', builder)
   for (const lease of leasesUsados) await novoAdapter().cleanup(lease)
 }, 180_000)
 
@@ -124,7 +147,7 @@ describe('preparação local com Docker real', () => {
     expect(itens.stdout.trim()).toBe('3')
 
     // Critérios 3 e 4: build único, digest persistível, consulta posterior idêntica.
-    const ghcr = new GhcrArtifactAdapter(runner, registry)
+    const ghcr = new GhcrArtifactAdapter(runner, registry, builder)
     const publicado = await ghcr.publish({
       repository: `${registry}/prova/backend`,
       contextDir: PERFIL.backend.context,

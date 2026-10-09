@@ -120,7 +120,7 @@ export class ReleasePreparationService {
   async prepare(
     scope: ReleaseScope,
     releaseId: string,
-    lease: ReleaseLease,
+    lease: Pick<ReleaseLease, 'leaseId'>,
     projeto: PreparationProject
   ): Promise<PreparationOutcome> {
     const bloqueio = this.validarConfiguracao(scope, releaseId, projeto)
