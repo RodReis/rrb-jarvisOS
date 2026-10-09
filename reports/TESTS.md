@@ -13,7 +13,7 @@ Totais da última execução (regenerado, não acumulado):
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
 | — | — | — | Regras de Negócio | 2994 | 2994 | 0 | 81.1 | — | — |
-| — | — | — | Banco | 2409 | 2391 | 0 | 84.5 | — | — |
+| — | — | — | Banco | 2411 | 2393 | 0 | 84.4 | — | — |
 | — | — | — | Tela | 806 | 805 | 0 | 74.5 | — | — |
 
 ## Histórico por entrega
@@ -517,3 +517,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-10-08 | #137 | spec-continuo-04-projecoes-gates | Regras de Negócio | 2994 | 2994 | 0 | 81.1 | #419 | [#419](https://github.com/RodReis/rrb-jarvisOS/pull/419) |
 | 2026-10-08 | #137 | spec-continuo-04-projecoes-gates | Banco | 2409 | 2391 | 0 | 84.5 | #419 | [#419](https://github.com/RodReis/rrb-jarvisOS/pull/419) |
 | 2026-10-08 | #137 | spec-continuo-04-projecoes-gates | Tela | 806 | 805 | 0 | 74.5 | #419 | [#419](https://github.com/RodReis/rrb-jarvisOS/pull/419) |
+| 2026-10-09 | #138 | spec-continuo-05-jornada-multi-mvp | Regras de Negócio | 2994 | 2994 | 0 | 81.1 | #420 | [#420](https://github.com/RodReis/rrb-jarvisOS/pull/420) |
+| 2026-10-09 | #138 | spec-continuo-05-jornada-multi-mvp | Banco | 2411 | 2393 | 0 | 84.4 | #420 | [#420](https://github.com/RodReis/rrb-jarvisOS/pull/420) |
+| 2026-10-09 | #138 | spec-continuo-05-jornada-multi-mvp | Tela | 806 | 805 | 0 | 74.5 | #420 | [#420](https://github.com/RodReis/rrb-jarvisOS/pull/420) |

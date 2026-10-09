@@ -1,6 +1,6 @@
 # Relatório de prova — SPEC-Contínuo-05 / issue #138
 
-**Estado:** em validação local. Este documento é a evidência versionada por SPEC/issue, conforme `docs/TESTING.md` §11.3.
+**Estado:** validação automatizada concluída no CI do SHA `83dd9145b105975a96bfb49f28579923704029c8`; relatório agregado regenerado dos artefatos oficiais. Este documento é a evidência versionada por SPEC/issue, conforme `docs/TESTING.md` §11.3.
 
 ## Escopo da prova
 
@@ -31,7 +31,7 @@ IDs de run, revisão e estados acima pertencem a fixtures; não representam exec
 | 3. Reinício e efeito ambíguo sem duplicação | Efeito local criado antes da confirmação perdida; reabertura SQLite; um único `run-1`. | coberto por integração determinística |
 | 4. Gate pendente interrompe apenas dependentes | Cenário com gate pendente e ramo independente aprovado. | coberto por integração determinística |
 | 5. Cancelamento preserva trabalho remoto e merge confirmado | Coberto pelas provas existentes de `cancelamento-service.int-spec.ts`, incluindo PR convertido para draft, merge em curso não cancelável e run terminal; a suíte focada passou. | coberto por integração simulada de fronteiras |
-| 6. Relatório permite reconstruir decisões, revisões, executor, consumo, checks, SHAs e bloqueios | Este relatório reconstrói as decisões e estados do cenário determinístico. Executor real, consumo, checks e SHAs remotos não existem na fixture; o smoke opt-in não foi possível. | evidência real incompleta; smoke `not_run` |
+| 6. Relatório permite reconstruir decisões, revisões, executor, consumo, checks, SHAs e bloqueios | Esta prova determinística reconstrói decisão, revisão e bloqueio, mas seus runs não invocam executor real nem produzem consumo, checks ou SHAs. O ledger e as projeções de F04 já persistem fatos reais desses domínios, porém não foram correlacionados a uma jornada multi-MVP real nesta entrega. | parcial; requisito de relatório fim a fim não comprovado |
 | 7. Sem deploy ou fechamento automático de issue | Testes executam apenas dispatcher/SQLite com fixtures; nenhum conector externo está habilitado e nenhuma issue é fechada. | sem efeito externo nos testes executados |
 
 ## Comandos e resultados locais
@@ -47,10 +47,11 @@ IDs de run, revisão e estados acima pertencem a fixtures; não representam exec
 - Smoke real do GitHub/CLI — `not_run`: repositório de prova exclusivo inacessível.
 - `npm test` completo — interrompido após vários minutos sem conclusão; houve testes que criam worktrees e a suíte alcança casos dependentes de infraestrutura não acessível neste ambiente. Nenhum resultado agregado foi declarado.
 
-Os totais acima são saídas observadas dos comandos locais, não contagens editadas em `reports/TESTS.md`. O agregado e a cobertura serão regenerados/validados pelos artefatos oficiais da CI desta PR.
+Os totais acima são saídas observadas dos comandos locais, não contagens editadas em `reports/TESTS.md`. O CI run `37873116955` executou as categorias oficiais no SHA indicado: Regras 2994/2994 (81,1%); Banco 2411/2393, sem falhas e 18 ignorados (84,4%); Tela 806/805, sem falhas e 1 `todo` (74,5%). `changes`, `quality`, `test-regras`, `test-banco`, `test-tela` e `visual` passaram; E2E foi pulado pela seleção de caminhos. O agregado falhou apenas pela divergência entre o relatório versionado e o número de testes de Banco; por isso os arquivos agregados foram regenerados a partir dos artefatos oficiais e a guarda local passou. Esta correção requer uma nova execução do CI antes de declarar a PR verde.
 
 ## Evidência ainda pendente
 
-- CI do SHA da PR, relatório oficial e checks remotos.
+- Nova execução do CI após versionar a correção do relatório agregado.
 - Repositório de prova exclusivo e credenciais disponíveis para o smoke real de GitHub/CLI.
 - A prova Playwright executada cobre a ponte real do quadro, não a travessia multi-MVP pela UI; a travessia determinística está coberta no serviço SQLite.
+- O critério 6 permanece parcial: não foi implementada nem aprovada uma superfície que produza um relatório de jornada real correlacionando dispatcher, executor, consumo, ledger, CI e SHAs. A evidência report-only desta SPEC é versionada, mas não supre esse conteúdo operacional.
