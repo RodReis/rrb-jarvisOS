@@ -73,3 +73,15 @@ de texto digitado no workflow.
 - [Checks obrigatórios e jobs pulados](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks).
 - [Cache de dependências](https://docs.github.com/en/actions/concepts/workflows-and-actions/dependency-caching).
 - [Padronização de PRs e templates](https://docs.github.com/en/pull-requests/reference/managing-and-standardizing-pull-requests).
+
+## Autenticação no Docker Hub no `test-banco` (2026-10-09)
+
+**Causa medida.** Na PR #424 o `test-banco` caiu em três rodadas seguidas com os mesmos 16 testes: `toomanyrequests: You have reached your unauthenticated pull rate limit` (Docker Hub), `Rate exceeded` (registry público da AWS) e `context deadline exceeded` em `auth.docker.io`. O primeiro erro aparece no passo "Subir o Supabase local", antes de qualquer teste, e atinge também suítes que já existiam (`pipeline/isolamento-*`, `tests/scheduler/queda-docker`). A quarta rodada passou sozinha (2453 testes, 0 falhas). Pull anônimo divide a cota por IP com todos os runners do GitHub.
+
+**Mudança (decisão do PI, 2026-10-09).** Um passo no `test-banco`, antes do `supabase start`, faz `docker login` com `--password-stdin` (shell, sem action de terceiros) usando o segredo `DOCKERHUB_TOKEN` e o usuário `rodreisb`. Sem o segredo (PR de fork, ou ainda não cadastrado) o passo só emite um `::notice::` e o job segue anônimo, como antes — nada quebra.
+
+**O que isto não resolve.** O `Rate exceeded` do registry da AWS (imagens do Supabase) é outro limite e não depende do login no Docker Hub. A cota autenticada é da conta e maior que a do IP compartilhado, mas não é ilimitada; se o `test-banco` voltar a falhar com `toomanyrequests` mesmo autenticado, o próximo passo é espelhar/cachear as imagens, não repetir o login.
+
+**Para ativar (ação do PI, uma vez).** No Docker Hub: *Account settings → Personal access tokens → Generate new token*, permissão **somente leitura** de repositórios públicos. Depois, no repositório: `gh secret set DOCKERHUB_TOKEN` (cole o token no prompt; ele não deve passar por chat, issue ou PR). Confirmar no log do `test-banco` a linha `Login Succeeded`.
+
+**Custo no CI.** Um passo de ~1 s no `test-banco`; nenhum job novo. Alteração no workflow também exercita o `e2e` (regra do filtro de mudanças), então esta PR roda a suíte completa.
