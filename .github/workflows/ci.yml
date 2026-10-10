@@ -167,6 +167,22 @@ jobs:
       - name: Instalar dependências
         run: npm ci
 
+      # Pulls anônimos dividem a cota por IP com todos os runners do GitHub e estouraram em
+      # 2026-10-09 (`toomanyrequests`, `context deadline exceeded` em auth.docker.io), derrubando
+      # o Supabase CLI e as suítes de Docker antes de qualquer teste. Autenticado, a cota é da
+      # conta. Sem o segredo (PR de fork, ou ainda não cadastrado) segue anônimo, como antes.
+      # Shell + `--password-stdin`: o token não vai em argumento e não entra action de terceiros.
+      - name: Autenticar no Docker Hub (cota da conta, não do IP)
+        env:
+          DOCKERHUB_USERNAME: rodreisb
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          if [ -n "$DOCKERHUB_TOKEN" ]; then
+            printf '%s' "$DOCKERHUB_TOKEN" | docker login --username "$DOCKERHUB_USERNAME" --password-stdin
+          else
+            echo "::notice::DOCKERHUB_TOKEN ausente: pulls anônimos (sujeitos ao limite por IP)."
+          fi
+
       - uses: supabase/setup-cli@v1
         with:
           version: v2.116.0
