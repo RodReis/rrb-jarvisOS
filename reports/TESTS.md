@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 3123 | 3123 | 0 | 79.2 | — | — |
-| — | — | — | Banco | 2472 | 2453 | 0 | 84.4 | — | — |
-| — | — | — | Tela | 806 | 805 | 0 | 74.5 | — | — |
+| — | — | — | Regras de Negócio | 3253 | 3253 | 0 | 80.1 | — | — |
+| — | — | — | Banco | 2522 | 2503 | 0 | 84.5 | — | — |
+| — | — | — | Tela | 806 | 805 | 0 | 74.6 | — | — |
 
 ## Histórico por entrega
 
@@ -526,3 +526,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-10-09 | #151 | spec-release-02-compose-artefatos-config | Regras de Negócio | 3123 | 3123 | 0 | 79.2 | #424 | [#424](https://github.com/RodReis/rrb-jarvisOS/pull/424) |
 | 2026-10-09 | #151 | spec-release-02-compose-artefatos-config | Banco | 2472 | 2453 | 0 | 84.4 | #424 | [#424](https://github.com/RodReis/rrb-jarvisOS/pull/424) |
 | 2026-10-09 | #151 | spec-release-02-compose-artefatos-config | Tela | 806 | 805 | 0 | 74.5 | #424 | [#424](https://github.com/RodReis/rrb-jarvisOS/pull/424) |
+| 2026-10-13 | #152 | spec-release-03-preview-isolado | Regras de Negócio | 3253 | 3253 | 0 | 80.1 | #428 | [#428](https://github.com/RodReis/rrb-jarvisOS/pull/428) |
+| 2026-10-13 | #152 | spec-release-03-preview-isolado | Banco | 2522 | 2503 | 0 | 84.5 | #428 | [#428](https://github.com/RodReis/rrb-jarvisOS/pull/428) |
+| 2026-10-13 | #152 | spec-release-03-preview-isolado | Tela | 806 | 805 | 0 | 74.6 | #428 | [#428](https://github.com/RodReis/rrb-jarvisOS/pull/428) |

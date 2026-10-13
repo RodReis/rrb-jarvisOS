@@ -1,10 +1,9 @@
-import { randomUUID } from 'node:crypto'
 import type {
   ReleaseEnvironmentQuery,
   ReleaseQuery,
   ReleaseQueueQuery
 } from '@shared/contracts/release'
-import type { PreviewRun, ReleaseStatus } from '@shared/domain/release'
+import type { ReleaseStatus } from '@shared/domain/release'
 import { ReleaseConflictError, ReleaseRepository, type ReleaseLease } from './release-repository'
 
 export interface ReleaseEffectRequest {
@@ -26,18 +25,6 @@ export interface ReleasePort {
 export interface ReleaseStepOutcome {
   readonly state: 'confirmed' | 'ambiguous' | 'failed'
   readonly repeated: boolean
-}
-
-export class PreviewCoordinator {
-  constructor(private readonly repository: ReleaseRepository) {}
-
-  register(input: Omit<PreviewRun, 'id' | 'createdAt' | 'updatedAt'>): PreviewRun {
-    return this.repository.upsertPreview({ ...input, id: randomUUID() })
-  }
-
-  update(input: PreviewRun): PreviewRun {
-    return this.repository.upsertPreview(input)
-  }
 }
 
 export class ReleaseOrchestrator {

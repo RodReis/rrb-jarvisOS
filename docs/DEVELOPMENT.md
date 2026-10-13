@@ -1,5 +1,21 @@
 # DEVELOPMENT.md — Ordem de execução e status
 
+## MVP-014 — M14-F03 Preview isolado por PR (`SPEC-Release-03`, issue #152)
+
+Status: **em andamento** — branch `feat/m14-f03-preview-isolado`; dependência #151 conferida (PR #424 mergeada, issue finalizada pelo PI). Decisões de implementação em `docs/spec/spec-release-03-preview-isolado.md`.
+
+- [x] Conferir issue #152 (`proplan:todo` → `doing`), SPEC `aprovada-pi` sem perguntas abertas e a dependência da F02.
+- [x] Domínio puro do Preview (`release-preview.ts`): transições, nome do ambiente por posse, URL publicável, gates por SHA.
+- [x] Migration 65: `PreviewRun` único por projeto + PR + SPEC (SHA mutável), `preview_resource`, `preview_gate` e `preview_event` append-only; cópia do legado preservada. Teste com banco legado.
+- [x] `PreviewRepository` com posse do run (lock com prazo), recursos por geração e gates por SHA; `upsertPreview`/`previews` saíram do `ReleaseRepository`.
+- [x] `PreviewCoordinator` por seis portas: criar/atualizar o mesmo Preview, destruir por posse, limpeza que falha deixa `removing`, evento repetido sem efeito, migration/seed que falha impede `ready`.
+- [x] Adapters CLI-first: GHCR por digest (com `lookup`), Railway (ambiente por PR duplicado do modelo), banco temporário por `psql`, Vercel (deployment marcado), `gh api` (um comentário por PR + SPEC) e verificação HTTP (saúde, identidade, fiação do frontend).
+- [x] Comando `npm run release:preview` (Electron, tokens só pelo ambiente; `sync` lê o estado do PR).
+- [x] Testes: domínio (25), repositório/migration/posse/gates (16), coordenador contra SQLite real com nuvem falsa de estado (31, inclui falha injetada em cada recurso, republicação, limpeza reconfirmada e posse durante etapa lenta), convergência com o PR observado (11), resolução de binário (8), contratos dos adapters Railway/Vercel/GHCR/GitHub e verificador HTTP (~100). Contrafactuais medidos: ambiente compartilhado entre PRs, busca de ambiente por prefixo, posse sem renovação e limpeza sem reconferir a listagem reprovam os testes certos. `typecheck`, `eslint`, `prettier --check` e `electron-vite build` passam; `regras` 3.253, `banco` 2.496 (26 ignorados, já existentes) e `tela` 805.
+- [x] Revisão independente (código e segurança): sem CRITICAL; 4 HIGH e 9 MEDIUM de segurança/código tratados (SPEC, decisão 11); limites e a decisão pendente do PI na decisão 12.
+- [ ] PR com `refs #152`, CI verde, relatório categorizado a partir dos artefatos do CI, merge confirmado e comentário de encerramento.
+- Smoke real em Vercel e Railway: **`not_run`** — sem projeto de prova e sem credenciais nesta máquina; os adapters foram escritos contra a ajuda das CLIs (Railway 5.27, Vercel 54.2) e fixtures de contrato.
+
 ## MVP-014 — M14-F02 Docker, artefatos e configuração (`SPEC-Release-02`, issue #151)
 
 Status: **entregue** pela [PR #424](https://github.com/RodReis/rrb-jarvisOS/pull/424), mergeada na `main` em 2026-10-09 (SHA `48b3af0b8f361705d1d0f778a1250d1296380ab1`); issue #151 aberta em `proplan:done`, aguardando aceite do PI. Decisões de implementação na SPEC (alvo = template por projeto + projeto de prova, PI 2026-10-09).

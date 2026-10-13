@@ -30,6 +30,7 @@
     "test:report:selfcheck": "node scripts/test-report.mjs --selfcheck",
     "release:inspect": "node scripts/release-cli.mjs",
     "release:prepare": "node scripts/release-prepare.mjs",
+    "release:preview": "node scripts/release-preview.mjs",
     "build:squad-executor-image": "node scripts/build-squad-executor-image.mjs"
   },
   "devDependencies": {

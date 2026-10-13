@@ -22,11 +22,19 @@ export interface ReleaseScope {
   readonly projectId: string
 }
 
+/** `removing` = destruição iniciada e ainda não confirmada: pendência reconciliável, nunca `removed`. */
+export type PreviewStatus = 'queued' | 'preparing' | 'ready' | 'failed' | 'removing' | 'removed'
+
+/** Um por projeto + PR + SPEC (SPEC-Release-03). O SHA muda no lugar a cada commit do PR. */
 export interface PreviewRun extends ReleaseScope {
   readonly id: string
   readonly pullRequest: number
+  readonly specId: string
+  readonly specRevision: string
   readonly headSha: string
-  readonly status: 'queued' | 'preparing' | 'ready' | 'failed' | 'removed'
+  /** Sobe a cada reabertura do PR: os recursos de cada geração têm nome próprio. */
+  readonly generation: number
+  readonly status: PreviewStatus
   readonly createdAt: string
   readonly updatedAt: string
 }
