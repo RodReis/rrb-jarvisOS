@@ -2,7 +2,7 @@
 
 - MVP/Fatia: MVP-014 · M14-F03.
 - Issue: [#152](https://github.com/RodReis/rrb-jarvisOS/issues/152).
-- Status: **aprovada-pi** (2026-08-29); issue [#152](https://github.com/RodReis/rrb-jarvisOS/issues/152) em `proplan:doing`; implementada na branch `feat/m14-f03-preview-isolado`.
+- Status: **aprovada-pi** (2026-08-29); issue [#152](https://github.com/RodReis/rrb-jarvisOS/issues/152) em `proplan:done`; **entregue** pela PR [#428](https://github.com/RodReis/rrb-jarvisOS/pull/428) (2026-10-13, `05afd4e`), aguardando o aceite do PI.
 - Depende de: M14-F02 aprovada e entregue.
 - Design: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v3-design.md`.
 

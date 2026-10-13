@@ -2,7 +2,7 @@
 
 ## MVP-014 — M14-F03 Preview isolado por PR (`SPEC-Release-03`, issue #152)
 
-Status: **em andamento** — branch `feat/m14-f03-preview-isolado`; dependência #151 conferida (PR #424 mergeada, issue finalizada pelo PI). Decisões de implementação em `docs/spec/spec-release-03-preview-isolado.md`.
+Status: **entregue** pela [PR #428](https://github.com/RodReis/rrb-jarvisOS/pull/428), squash merge na `main` em 2026-10-13 (SHA `05afd4e77381b091abcd1432ea8381be08f91136`); issue #152 em `proplan:done`, aguardando aceite do PI. Decisões de implementação em `docs/spec/spec-release-03-preview-isolado.md`.
 
 - [x] Conferir issue #152 (`proplan:todo` → `doing`), SPEC `aprovada-pi` sem perguntas abertas e a dependência da F02.
 - [x] Domínio puro do Preview (`release-preview.ts`): transições, nome do ambiente por posse, URL publicável, gates por SHA.
@@ -13,7 +13,7 @@ Status: **em andamento** — branch `feat/m14-f03-preview-isolado`; dependência
 - [x] Comando `npm run release:preview` (Electron, tokens só pelo ambiente; `sync` lê o estado do PR).
 - [x] Testes: domínio (25), repositório/migration/posse/gates (16), coordenador contra SQLite real com nuvem falsa de estado (31, inclui falha injetada em cada recurso, republicação, limpeza reconfirmada e posse durante etapa lenta), convergência com o PR observado (11), resolução de binário (8), contratos dos adapters Railway/Vercel/GHCR/GitHub e verificador HTTP (~100). Contrafactuais medidos: ambiente compartilhado entre PRs, busca de ambiente por prefixo, posse sem renovação e limpeza sem reconferir a listagem reprovam os testes certos. `typecheck`, `eslint`, `prettier --check` e `electron-vite build` passam; `regras` 3.253, `banco` 2.496 (26 ignorados, já existentes) e `tela` 805.
 - [x] Revisão independente (código e segurança): sem CRITICAL; 4 HIGH e 9 MEDIUM de segurança/código tratados (SPEC, decisão 11); limites e a decisão pendente do PI na decisão 12.
-- [ ] PR com `refs #152`, CI verde, relatório categorizado a partir dos artefatos do CI, merge confirmado e comentário de encerramento.
+- [x] PR [#428](https://github.com/RodReis/rrb-jarvisOS/pull/428) com `refs #152`, CI verde ([run 38441858378](https://github.com/RodReis/rrb-jarvisOS/actions/runs/38441858378)), relatório categorizado a partir dos artefatos do run 38440648383 (Regras 3.253 · Banco 2.503 pass / 19 ignorados · Tela 805 pass / 1 todo), merge confirmado e comentário de encerramento publicado na issue.
 - Smoke real em Vercel e Railway: **`not_run`** — sem projeto de prova e sem credenciais nesta máquina; os adapters foram escritos contra a ajuda das CLIs (Railway 5.27, Vercel 54.2) e fixtures de contrato.
 
 ## MVP-014 — M14-F02 Docker, artefatos e configuração (`SPEC-Release-02`, issue #151)
