@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs'
-import { posix, resolve, win32 } from 'node:path'
+import { posix, win32 } from 'node:path'
 
 /**
  * Resolve o executável **só pelo PATH**, nunca pelo diretório de trabalho (SPEC-Release-03, revisão
@@ -89,7 +89,8 @@ export function resolverBinario(
     if (env.existe(shim)) {
       const relativo = SHIM_DO_NPM.exec(env.ler(shim))?.[1]
       if (relativo) {
-        const script = resolve(pasta, relativo.replace(/\\/g, '/'))
+        // Resolve na plataforma simulada, não na do host: assim o teste vale igual no Linux do CI.
+        const script = caminhos.resolve(pasta, relativo.replace(/\\/g, '/'))
         if (env.existe(script)) return { comando: env.execPath, prefixo: [script] }
       }
     }
