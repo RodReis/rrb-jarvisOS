@@ -173,7 +173,10 @@ describe('migrations', () => {
     // A 63 cria entidades, lanes, leases, journal de passos, auditoria de releases e previews.
     // A 64 acrescenta uri/provenance ao artefato, recria a referência de configuração e cria o
     // diário local (SPEC-Release-02); as duas primeiras se refazem sozinhas ao recriar a 63.
+    // A 65 refaz preview_run/preview_event e cria os recursos e gates por SHA (SPEC-Release-03).
     for (const tabela of [
+      'preview_gate',
+      'preview_resource',
       'release_local_effect',
       'preview_event',
       'release_compensation',

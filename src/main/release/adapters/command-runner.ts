@@ -1,5 +1,7 @@
 import { spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
+import { isAbsolute } from 'node:path'
+import { resolverBinario } from './resolve-binary'
 
 /**
  * Porta de execução das CLIs dos adapters (SPEC-Release-02, regra 6: o adaptador declara a CLI
@@ -90,8 +92,13 @@ export function createCommandRunner(config: {
       if (!config.allowed.includes(binary)) {
         return Promise.reject(new Error(`Binário não permitido: ${binary}`))
       }
+      // Caminho absoluto resolvido só pelo PATH: o `cwd` (working tree de PR) não escolhe o binário.
+      const invocacao = isAbsolute(binary)
+        ? { comando: binary, prefixo: [] as readonly string[] }
+        : resolverBinario(binary)
+      if (!invocacao) return Promise.reject(new Error(`Binário não encontrado no PATH: ${binary}`))
       return new Promise<CommandResult>((resolve, reject) => {
-        const filho = spawn(binary, [...args], {
+        const filho = spawn(invocacao.comando, [...invocacao.prefixo, ...args], {
           // No Windows o libuv procura o binário no cwd antes do PATH: um `docker.exe` plantado
           // na pasta de execução seria o escolhido. O cwd padrão é neutro.
           cwd: options.cwd ?? tmpdir(),

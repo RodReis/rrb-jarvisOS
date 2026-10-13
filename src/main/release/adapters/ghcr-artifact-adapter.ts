@@ -97,6 +97,34 @@ export class GhcrArtifactAdapter {
     }
   }
 
+  /**
+   * Procura uma imagem já publicada sob uma tag e a devolve por digest (ou `null`). A tag só
+   * localiza: a identidade que sai daqui é sempre repositório@digest, confirmada no registry.
+   */
+  async lookup(repository: string, tag: string): Promise<RegistryArtifact | null> {
+    this.assertRepositorio(repository)
+    if (!/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/.test(tag)) throw new TypeError('Tag inválida.')
+    const resultado = await this.runner.run(BINARIO, [
+      'buildx',
+      'imagetools',
+      'inspect',
+      `${repository}:${tag}`,
+      '--format',
+      '{{.Manifest.Digest}}'
+    ])
+    if (
+      resultado.code !== 0 &&
+      !resultado.timedOut &&
+      PADRAO_NAO_ENCONTRADO.test(`${resultado.stderr}
+${resultado.stdout}`)
+    )
+      return null
+    const digest = this.assertOk(resultado, 'lookup').stdout.trim()
+    if (!ehDigestOci(digest))
+      throw new ArtifactRegistryError('partial', 'O registry devolveu um digest ilegível.')
+    return this.confirmar(referenciaPorDigest(repository, digest))
+  }
+
   /** Resolve uma referência por digest. Tag é recusada antes de qualquer chamada. */
   async resolve(uri: string): Promise<RegistryArtifact> {
     assertReferenciaImutavel(uri)

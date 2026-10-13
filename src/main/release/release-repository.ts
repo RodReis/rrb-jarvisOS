@@ -5,7 +5,6 @@ import {
   chaveIdempotenciaRelease,
   transicionarRelease,
   validarFingerprintPayload,
-  type PreviewRun,
   type ReleaseEnvironment,
   type ReleaseRun,
   type ReleaseScope,
@@ -14,7 +13,6 @@ import {
   type ReleaseStepState
 } from '@shared/domain/release'
 import type {
-  PreviewQuery,
   ReleaseDetailView,
   ReleaseEnvironmentQuery,
   ReleaseQueueQuery,
@@ -776,82 +774,6 @@ export class ReleaseRepository {
     })
   }
 
-  upsertPreview(
-    input: Omit<PreviewRun, 'createdAt' | 'updatedAt'>,
-    now = new Date().toISOString()
-  ): PreviewRun {
-    ensureScope(input)
-    if (
-      !Number.isSafeInteger(input.pullRequest) ||
-      input.pullRequest < 1 ||
-      !/^[a-f0-9]{7,64}$/i.test(input.headSha)
-    ) {
-      throw new TypeError('Preview exige número de PR positivo e SHA válido.')
-    }
-    const allowed: Readonly<Record<PreviewRun['status'], readonly PreviewRun['status'][]>> = {
-      queued: ['preparing', 'failed', 'removed'],
-      preparing: ['ready', 'failed', 'removed'],
-      ready: ['removed'],
-      failed: ['removed'],
-      removed: []
-    }
-    return this.transaction(() => {
-      const previous = this.db
-        .prepare(
-          `SELECT id,status,created_at FROM preview_run WHERE user_id=? AND workspace_id=? AND project_id=?
-          AND pull_request=? AND head_sha=?`
-        )
-        .get(...scopeParams(input), input.pullRequest, input.headSha) as
-        { id: string; status: PreviewRun['status']; created_at: string } | undefined
-      if (
-        previous &&
-        previous.status !== input.status &&
-        !allowed[previous.status].includes(input.status)
-      ) {
-        throw new TypeError('Transição de Preview inválida.')
-      }
-      const id = previous?.id ?? input.id
-      const createdAt = previous?.created_at ?? now
-      this.db
-        .prepare(
-          `INSERT INTO preview_run (id,user_id,workspace_id,project_id,pull_request,head_sha,status,created_at,updated_at)
-         VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(user_id,workspace_id,project_id,pull_request,head_sha)
-         DO UPDATE SET status=excluded.status,updated_at=excluded.updated_at`
-        )
-        .run(
-          id,
-          ...scopeParams(input),
-          input.pullRequest,
-          input.headSha,
-          input.status,
-          createdAt,
-          now
-        )
-      if (!previous || previous.status !== input.status) {
-        this.db
-          .prepare(
-            `INSERT INTO preview_event (id,user_id,workspace_id,project_id,preview_id,kind,from_status,to_status,created_at)
-           VALUES (?,?,?,?,?,'preview-updated',?,?,?)`
-          )
-          .run(randomUUID(), ...scopeParams(input), id, previous?.status ?? null, input.status, now)
-        this.audit.append({
-          user_id: input.userId,
-          workspace_id: input.workspaceId,
-          type: 'release-transition',
-          payload: {
-            projectId: input.projectId,
-            previewId: id,
-            pullRequest: input.pullRequest,
-            kind: 'preview-updated',
-            ...(previous ? { fromStatus: previous.status } : {}),
-            toStatus: input.status
-          }
-        })
-      }
-      return { ...input, id, createdAt, updatedAt: now }
-    })
-  }
-
   get(query: ReleaseQuery): ReleaseRun | null {
     ensureScope(query)
     const row = this.db
@@ -1013,36 +935,6 @@ export class ReleaseRepository {
       toStatus: row.to_status,
       reason: row.reason,
       createdAt: row.created_at
-    }))
-  }
-
-  previews(query: PreviewQuery): PreviewRun[] {
-    const rows = this.db
-      .prepare(
-        `SELECT id,user_id,workspace_id,project_id,pull_request,head_sha,status,created_at,updated_at FROM preview_run
-        WHERE user_id=? AND workspace_id=? AND project_id=? AND pull_request=? ORDER BY created_at`
-      )
-      .all(...scopeParams(query), query.pullRequest) as {
-      id: string
-      user_id: string
-      workspace_id: string
-      project_id: string
-      pull_request: number
-      head_sha: string
-      status: PreviewRun['status']
-      created_at: string
-      updated_at: string
-    }[]
-    return rows.map((row) => ({
-      id: row.id,
-      userId: row.user_id,
-      workspaceId: row.workspace_id as ReleaseScope['workspaceId'],
-      projectId: row.project_id,
-      pullRequest: row.pull_request,
-      headSha: row.head_sha,
-      status: row.status,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at
     }))
   }
 

@@ -306,26 +306,6 @@ describe('ReleaseRepository (SPEC-Release-01)', () => {
     expect(audit.verify(SCOPE.userId).ok).toBe(true)
   })
 
-  it('atualiza o Preview de forma idempotente e registra cada mudança de estado', () => {
-    const input = {
-      ...SCOPE,
-      id: 'preview-1',
-      pullRequest: 12,
-      headSha: '5'.repeat(40),
-      status: 'queued' as const
-    }
-    repo.upsertPreview(input, BASE)
-    repo.upsertPreview(
-      { ...input, id: 'ignored-id', status: 'preparing' },
-      '2026-10-09T12:01:00.000Z'
-    )
-    expect(repo.previews({ ...SCOPE, pullRequest: 12 })).toMatchObject([
-      { id: 'preview-1', status: 'preparing' }
-    ])
-    expect(db.prepare('SELECT COUNT(*) AS total FROM preview_event').get()).toEqual({ total: 2 })
-    expect(audit.verify(SCOPE.userId).ok).toBe(true)
-  })
-
   it('reconcilia efeito incerto antes de repetir e nunca repete passo confirmado', async () => {
     const release = repo.enqueue(SCOPE, '6'.repeat(40), BASE).release
     const query = envQuery(release.id)

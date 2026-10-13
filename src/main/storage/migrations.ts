@@ -2532,6 +2532,121 @@ const MIGRATIONS: readonly string[] = [
   BEGIN SELECT RAISE(ABORT, 'release_local_effect é append-only'); END;
   CREATE TRIGGER release_local_effect_append_only_delete BEFORE DELETE ON release_local_effect
   BEGIN SELECT RAISE(ABORT, 'release_local_effect é append-only'); END;
+  `,
+  // SPEC-Release-03: Preview isolado por PR. O PreviewRun passa a ser único por projeto + PR +
+  // SPEC (o SHA muda no lugar a cada commit), ganha SPEC/revisão/geração/posse (lock) e o estado
+  // 'removing' da limpeza pendente. Nenhum código gravava preview_run antes desta fatia; a cópia
+  // preserva o que houver (um sobrevivente por PR, eventos religados a ele). Recursos externos e
+  // gates por SHA são tabelas próprias; gates e eventos são append-only. 'reason' é código
+  // curto, nunca texto livre, para que saída de provedor não vire evidência.
+  `
+  CREATE TABLE preview_run_v2 (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL CHECK (workspace_id IN ('noa','jarvis')),
+    project_id TEXT NOT NULL,
+    pull_request INTEGER NOT NULL CHECK (pull_request > 0),
+    spec_id TEXT NOT NULL,
+    spec_revision TEXT NOT NULL,
+    head_sha TEXT NOT NULL,
+    generation INTEGER NOT NULL DEFAULT 1 CHECK (generation > 0),
+    status TEXT NOT NULL
+      CHECK (status IN ('queued','preparing','ready','failed','removing','removed')),
+    lock_owner TEXT,
+    lock_expires_at TEXT,
+    lock_ttl_ms INTEGER,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (user_id, workspace_id, project_id, pull_request, spec_id)
+  );
+  INSERT INTO preview_run_v2
+    (id,user_id,workspace_id,project_id,pull_request,spec_id,spec_revision,head_sha,generation,
+     status,created_at,updated_at)
+  SELECT o.id,o.user_id,o.workspace_id,o.project_id,o.pull_request,'legacy','legacy',o.head_sha,1,
+    o.status,o.created_at,o.updated_at
+  FROM preview_run o
+  WHERE o.id = (
+    SELECT i.id FROM preview_run i
+    WHERE i.user_id=o.user_id AND i.workspace_id=o.workspace_id AND i.project_id=o.project_id
+      AND i.pull_request=o.pull_request
+    ORDER BY i.created_at DESC, i.id DESC LIMIT 1
+  );
+
+  CREATE TABLE preview_event_v2 (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL CHECK (workspace_id IN ('noa','jarvis')),
+    project_id TEXT NOT NULL,
+    preview_id TEXT NOT NULL REFERENCES preview_run_v2(id),
+    kind TEXT NOT NULL,
+    from_status TEXT,
+    to_status TEXT,
+    head_sha TEXT,
+    reason TEXT CHECK (reason IS NULL
+      OR (length(reason) BETWEEN 1 AND 64 AND reason NOT GLOB '*[^a-z0-9._:-]*')),
+    created_at TEXT NOT NULL
+  );
+  INSERT INTO preview_event_v2
+    (id,user_id,workspace_id,project_id,preview_id,kind,from_status,to_status,head_sha,reason,
+     created_at)
+  SELECT e.id,e.user_id,e.workspace_id,e.project_id,
+    (SELECT s.id FROM preview_run o JOIN preview_run_v2 s
+       ON s.user_id=o.user_id AND s.workspace_id=o.workspace_id AND s.project_id=o.project_id
+      AND s.pull_request=o.pull_request
+     WHERE o.id=e.preview_id),
+    e.kind,e.from_status,e.to_status,NULL,NULL,e.created_at
+  FROM preview_event e;
+
+  DROP TABLE preview_event;
+  DROP TABLE preview_run;
+  ALTER TABLE preview_run_v2 RENAME TO preview_run;
+  ALTER TABLE preview_event_v2 RENAME TO preview_event;
+  CREATE INDEX idx_preview_event_timeline
+    ON preview_event(user_id,workspace_id,project_id,preview_id,created_at,id);
+  CREATE TRIGGER preview_event_append_only_update BEFORE UPDATE ON preview_event
+  BEGIN SELECT RAISE(ABORT, 'preview_event é append-only'); END;
+  CREATE TRIGGER preview_event_append_only_delete BEFORE DELETE ON preview_event
+  BEGIN SELECT RAISE(ABORT, 'preview_event é append-only'); END;
+
+  CREATE TABLE preview_resource (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL CHECK (workspace_id IN ('noa','jarvis')),
+    project_id TEXT NOT NULL,
+    preview_id TEXT NOT NULL REFERENCES preview_run(id),
+    generation INTEGER NOT NULL CHECK (generation > 0),
+    kind TEXT NOT NULL CHECK (kind IN ('image','database','backend','frontend')),
+    provider TEXT NOT NULL CHECK (provider IN ('ghcr','railway','vercel')),
+    external_id TEXT NOT NULL,
+    url TEXT,
+    source_sha TEXT NOT NULL,
+    state TEXT NOT NULL CHECK (state IN ('provisioning','ready','failed','destroyed')),
+    reason TEXT CHECK (reason IS NULL
+      OR (length(reason) BETWEEN 1 AND 64 AND reason NOT GLOB '*[^a-z0-9._:-]*')),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (preview_id, generation, kind)
+  );
+
+  CREATE TABLE preview_gate (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL CHECK (workspace_id IN ('noa','jarvis')),
+    project_id TEXT NOT NULL,
+    preview_id TEXT NOT NULL REFERENCES preview_run(id),
+    generation INTEGER NOT NULL DEFAULT 1 CHECK (generation > 0),
+    source_sha TEXT NOT NULL,
+    gate TEXT NOT NULL CHECK (length(gate) BETWEEN 1 AND 32 AND gate NOT GLOB '*[^a-z0-9._-]*'),
+    result TEXT NOT NULL CHECK (result IN ('passed','blocked','unknown')),
+    reason TEXT CHECK (reason IS NULL
+      OR (length(reason) BETWEEN 1 AND 64 AND reason NOT GLOB '*[^a-z0-9._:-]*')),
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX idx_preview_gate_sha ON preview_gate(preview_id,source_sha,created_at,id);
+  CREATE TRIGGER preview_gate_append_only_update BEFORE UPDATE ON preview_gate
+  BEGIN SELECT RAISE(ABORT, 'preview_gate é append-only'); END;
+  CREATE TRIGGER preview_gate_append_only_delete BEFORE DELETE ON preview_gate
+  BEGIN SELECT RAISE(ABORT, 'preview_gate é append-only'); END;
   `
 ]
 
