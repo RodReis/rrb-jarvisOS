@@ -2647,6 +2647,20 @@ const MIGRATIONS: readonly string[] = [
   BEGIN SELECT RAISE(ABORT, 'preview_gate é append-only'); END;
   CREATE TRIGGER preview_gate_append_only_delete BEFORE DELETE ON preview_gate
   BEGIN SELECT RAISE(ABORT, 'preview_gate é append-only'); END;
+  `,
+  // SPEC-Release-04: promoção para Staging e Produção. `release_deployment` (sem escritor até aqui)
+  // passa a distinguir backend de frontend e a guardar o deployment que o novo substituiu — é o
+  // destino da compensação de aplicação. Um deployment por release, ambiente e tipo é invariante do
+  // banco: o candidato é imutável. No frontend, `artifact_digest` é o sha256 da identidade do
+  // deployment (o deployment da Vercel não é um artefato OCI).
+  `
+  ALTER TABLE release_deployment ADD COLUMN kind TEXT NOT NULL DEFAULT 'backend'
+    CHECK (kind IN ('backend','frontend'));
+  ALTER TABLE release_deployment ADD COLUMN replaces_external_id TEXT;
+  -- Referência do backup que precedeu a migration (só Produção): é o que o restore operacional exige.
+  ALTER TABLE release_migration_execution ADD COLUMN backup_ref TEXT;
+  CREATE UNIQUE INDEX idx_release_deployment_um_por_ambiente_e_tipo
+    ON release_deployment(user_id,workspace_id,project_id,release_id,environment,kind);
   `
 ]
 
@@ -2654,13 +2668,15 @@ const MIGRATIONS: readonly string[] = [
 export const SCHEMA_VERSION = MIGRATIONS.length
 
 /**
- * Aplica as migrations pendentes e devolve quantas rodaram.
+ * Aplica as migrations pendentes e devolve quantas rodaram. `target` existe para os testes que
+ * precisam de um banco **exatamente** na versão anterior a uma migration (ex.: o PreviewRun legado);
+ * em produção é sempre `SCHEMA_VERSION`.
  *
  * Cada migration roda dentro de uma transação junto com o bump do `user_version`: se o SQL
  * falhar no meio, o banco volta ao estado anterior em vez de ficar meio-migrado — que é o
  * cenário em que "preserva dado" se perde na prática.
  */
-export function migrate(db: Database): number {
+export function migrate(db: Database, target: number = SCHEMA_VERSION): number {
   const current = db.pragma('user_version', { simple: true }) as number
 
   if (current > SCHEMA_VERSION) {
@@ -2671,7 +2687,7 @@ export function migrate(db: Database): number {
   }
 
   let applied = 0
-  for (let version = current; version < SCHEMA_VERSION; version += 1) {
+  for (let version = current; version < target; version += 1) {
     const sql = MIGRATIONS[version]
     if (!sql) continue
 

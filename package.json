@@ -31,6 +31,7 @@
     "release:inspect": "node scripts/release-cli.mjs",
     "release:prepare": "node scripts/release-prepare.mjs",
     "release:preview": "node scripts/release-preview.mjs",
+    "release:promote": "node scripts/release-promote.mjs",
     "build:squad-executor-image": "node scripts/build-squad-executor-image.mjs"
   },
   "devDependencies": {

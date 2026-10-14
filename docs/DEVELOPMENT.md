@@ -1,5 +1,23 @@
 # DEVELOPMENT.md — Ordem de execução e status
 
+## MVP-014 — M14-F04 Staging e Produção automática (`SPEC-Release-04`, issue #153)
+
+Status: **em andamento** — branch `feat/m14-f04-staging-producao`, card em `proplan:doing` desde 2026-10-14. Decisões de implementação do PI (backup, frontend em runtime, estabilização, divergência proibida) em `docs/spec/spec-release-04-staging-producao.md`.
+
+- [x] Conferir issue #153, SPEC `aprovada-pi`, dependência da F03 (PR #428 mergeada) e `APRENDIZADOS.md` (vazio).
+- [x] Quatro pontos em aberto levados ao PI e registrados na SPEC.
+- [x] Domínio puro (`release-promotion.ts`): gates obrigatórios por ambiente (último resultado vale), decisão de estabilização com um reinício antes de compensar e `isolatedKeys` no validador de configuração (chave de isolamento com o mesmo valor em Staging e Produção bloqueia antes do efeito).
+- [x] Migration 66 (`kind`, `replaces_external_id` e índice por release/ambiente/tipo em `release_deployment`; `backup_ref` nas migrations) e `ReleasePromotionRepository` (deployments, migrations, compensações, releases abertas). `migrate()` ganhou alvo opcional e o teste do PreviewRun legado deixou de assumir que sua migration é a última.
+- [x] Núcleo: `PromotionService` dirige o `ReleaseOrchestrator` (preparing → Staging → Produção → estabilização → `completed`), `PromotionEffects` (efeito de cada passo), `ReleaseGateEngine` e `StabilizationMonitor`; cinco portas; lease liberado ao sair.
+- [x] Testes de integração contra SQLite real com nuvem falsa de estado (16 no caminho feliz, configuração e backup; 28 em falhas, compensação, estabilização, concorrência e retomada): critérios 1–10, contrafactuais da SPEC (rebuild entre ambientes, Produção antes de Staging aprovado, segundo aceite) e retomada. **Vinte e uma mutações no código de produção medidas**, todas reprovam o teste certo; a primeira rodada deixou sobreviver a checagem do motor de gates (M12), que ganhou teste próprio.
+- [x] Adapters CLI-first (contract tests com runner/`fetch` falsos): Railway persistente (deploy por digest, rollback, `current`), banco por `psql` (reuso do `PsqlExecutor` da F03), backup nativo via API GraphQL do Railway, Vercel (build imutável, `alias set`, `promote`), verificador HTTP (identidade do provedor + fiação por config de runtime), leitor de configuração por fingerprint e adapter de build sobre a F02.
+- [x] Perfil de promoção do operador (campos fechados, sem segredo) e comando `npm run release:promote` (Electron; smoke do launcher: sem argumento e com argumento inválido saem com código 2).
+- [x] Docs: SPEC (§ Decisões e limites), `ARCHITECTURE.md`.
+- [x] Revisões independentes (código e segurança): 0 CRITICAL e 1 HIGH — o mesmo, achado pelos dois revisores sem combinar (destino da compensação gravado cedo demais, com releases sobrepostas); tratado com teste de regressão vermelho antes. Mais seis MEDIUM de segurança e quatro de código/LOW tratados (SPEC, decisão 11); os que ficam estão em § Limites declarados.
+- [ ] `STATUS.md`, `reports/TESTS.md` regenerado a partir dos artefatos do CI.
+- [ ] PR com `refs #153`, CI verde, merge confirmado e comentário de encerramento (`fechar-card`).
+- Smoke real em Railway e Vercel: **`not_run`** — sem projeto de prova e sem credenciais nesta máquina; premissas não verificadas na SPEC § Decisões de implementação.
+
 ## MVP-014 — M14-F03 Preview isolado por PR (`SPEC-Release-03`, issue #152)
 
 Status: **entregue** pela [PR #428](https://github.com/RodReis/rrb-jarvisOS/pull/428), squash merge na `main` em 2026-10-13 (SHA `05afd4e77381b091abcd1432ea8381be08f91136`); issue #152 em `proplan:done`, aguardando aceite do PI. Decisões de implementação em `docs/spec/spec-release-03-preview-isolado.md`.

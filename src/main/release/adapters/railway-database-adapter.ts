@@ -7,7 +7,7 @@ import {
   type SqlResult
 } from '../database-migration-runner'
 import { PreviewProviderError, type PreviewDatabasePort } from '../preview-ports'
-import type { CommandRunner } from './command-runner'
+import type { CommandResult, CommandRunner } from './command-runner'
 import { exigirSucesso, lerJson } from './preview-cli-errors'
 import type { RailwayPreviewConfig } from './railway-backend-adapter'
 
@@ -19,9 +19,11 @@ import type { RailwayPreviewConfig } from './railway-backend-adapter'
  */
 
 const TIMEOUT_MS = 10 * 60_000
-const PORTA_DO_POSTGRES = 5432
+export const PORTA_DO_POSTGRES = 5432
+/** Barra invertida: abre meta-comando do `psql`. Em constante para o arquivo não conter o literal. */
+export const BARRA_INVERTIDA = String.fromCharCode(92)
 
-interface Conexao {
+export interface Conexao {
   readonly host: string
   readonly port: string
   readonly user: string
@@ -29,7 +31,7 @@ interface Conexao {
   readonly database: string
 }
 
-class PsqlExecutor implements SqlExecutor {
+export class PsqlExecutor implements SqlExecutor {
   constructor(
     private readonly runner: CommandRunner,
     private readonly conexao: Conexao
@@ -95,7 +97,6 @@ export class RailwayDatabaseAdapter implements PreviewDatabasePort {
       throw new PreviewProviderError('incompatible-state', 'O banco não pertence a um Preview.')
     // O `psql` lê o SQL de stdin e executa meta-comandos (`\! comando` roda no host do operador).
     // O SQL vem da árvore do PR: nenhuma barra invertida entra, nem dentro de literal.
-    const BARRA_INVERTIDA = String.fromCharCode(92)
     if (
       input.seed.includes(BARRA_INVERTIDA) ||
       input.migrations.some((m) => m.sql.includes(BARRA_INVERTIDA))
@@ -112,36 +113,53 @@ export class RailwayDatabaseAdapter implements PreviewDatabasePort {
     })
   }
 
-  private async conectar(ambiente: string): Promise<Conexao> {
-    const base = ['--service', this.config.databaseService, '--environment', ambiente]
-    const proxies = lerJson(
-      await this.cli(['tcp-proxy', 'list', ...base, '--json'], 'listar proxy do banco'),
-      'listar proxy do banco'
+  private conectar(ambiente: string): Promise<Conexao> {
+    return lerConexaoDoBanco(
+      (args, etapa) => this.cli(args, etapa),
+      this.config.databaseService,
+      ambiente
     )
-    if (!Array.isArray(proxies) || proxies.length === 0)
-      await this.cli(
-        ['tcp-proxy', 'create', '--port', String(PORTA_DO_POSTGRES), ...base, '--json'],
-        'abrir proxy do banco'
-      )
-    const bruto = lerJson(
-      await this.cli(['variable', 'list', ...base, '--json'], 'ler variáveis do banco'),
-      'ler variáveis do banco'
-    ) as Record<string, unknown> | null
-    const variavel = (nome: string): string => {
-      const valor = bruto?.[nome]
-      if (typeof valor !== 'string' || !valor)
-        throw new PreviewProviderError(
-          'incompatible-state',
-          `O banco do Preview não expõe ${nome}.`
-        )
-      return valor
-    }
-    return {
-      host: variavel('RAILWAY_TCP_PROXY_DOMAIN'),
-      port: variavel('RAILWAY_TCP_PROXY_PORT'),
-      user: variavel('PGUSER'),
-      password: variavel('PGPASSWORD'),
-      database: variavel('PGDATABASE')
-    }
+  }
+}
+
+/**
+ * Lê a conexão do banco do ambiente pela CLI: abre o TCP proxy se ainda não houver um e lê as
+ * variáveis do serviço. Compartilhada com o banco dos ambientes persistentes (SPEC-Release-04).
+ */
+export async function lerConexaoDoBanco(
+  cli: (args: readonly string[], etapa: string) => Promise<CommandResult>,
+  databaseService: string,
+  ambiente: string,
+  /** Chamado quando ESTA leitura abriu o proxy: quem o abriu é quem deve fechá-lo. */
+  aoAbrirProxy?: () => void
+): Promise<Conexao> {
+  const base = ['--service', databaseService, '--environment', ambiente]
+  const proxies = lerJson(
+    await cli(['tcp-proxy', 'list', ...base, '--json'], 'listar proxy do banco'),
+    'listar proxy do banco'
+  )
+  if (!Array.isArray(proxies) || proxies.length === 0) {
+    await cli(
+      ['tcp-proxy', 'create', '--port', String(PORTA_DO_POSTGRES), ...base, '--json'],
+      'abrir proxy do banco'
+    )
+    aoAbrirProxy?.()
+  }
+  const bruto = lerJson(
+    await cli(['variable', 'list', ...base, '--json'], 'ler variáveis do banco'),
+    'ler variáveis do banco'
+  ) as Record<string, unknown> | null
+  const variavel = (nome: string): string => {
+    const valor = bruto?.[nome]
+    if (typeof valor !== 'string' || !valor)
+      throw new PreviewProviderError('incompatible-state', `O banco do ambiente não expõe ${nome}.`)
+    return valor
+  }
+  return {
+    host: variavel('RAILWAY_TCP_PROXY_DOMAIN'),
+    port: variavel('RAILWAY_TCP_PROXY_PORT'),
+    user: variavel('PGUSER'),
+    password: variavel('PGPASSWORD'),
+    database: variavel('PGDATABASE')
   }
 }

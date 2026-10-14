@@ -49,6 +49,19 @@ describe('DatabaseMigrationRunner', () => {
     expect(aplicadas[1]).toContain(`'002_b'`)
   })
 
+  it('sem impressão do banco não roda pg_dump: o dado do ambiente não é lido (Produção)', async () => {
+    const exec = executor('')
+    const r = await new DatabaseMigrationRunner(exec).apply({
+      database: 'd',
+      migrations: [M1, M2],
+      impressao: false
+    })
+    expect(r).toMatchObject({ state: 'confirmed', applied: ['001_a', '002_b'] })
+    expect(exec.dumps).toEqual([])
+    // A impressão sem banco ainda identifica as migrations aplicadas.
+    expect((r as { fingerprint: string }).fingerprint).toMatch(/^[a-f0-9]{64}$/)
+  })
+
   it('pula a migration já aplicada com o mesmo checksum', async () => {
     const exec = executor('001_a|a1\n')
     const r = await new DatabaseMigrationRunner(exec).apply({ database: 'd', migrations: [M1, M2] })
