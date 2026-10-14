@@ -61,6 +61,8 @@ export class FakePromotionCloud {
   readonly backups: { environment: ReleaseEnvironment; backupRef: string }[] = []
   /** Quantas imagens foram construídas: rebuild entre ambientes seria visto aqui. */
   builds = 0
+  /** Ambientes cujo smoke e E2E essencial falham mesmo com backend e frontend saudáveis. */
+  readonly smokeFails = new Set<ReleaseEnvironment>()
   /** O frontend deste ambiente resolve o backend do OUTRO: defeito de fiação a ser barrado. */
   crossWired: ReleaseEnvironment | null = null
   migrationOutcome: MigrationOutcome | null = null
@@ -184,7 +186,11 @@ export class FakePromotionCloud {
       return checks.map((gate) => {
         if (gate === 'backend_health') return resposta(gate, saudavel, 'health-down')
         if (gate === 'frontend_wiring') return resposta(gate, fiado, 'frontend-wiring')
-        return resposta(gate, saudavel && fiado, `${gate}-failed`)
+        return resposta(
+          gate,
+          saudavel && fiado && !this.smokeFails.has(environment),
+          `${gate}-failed`
+        )
       })
     }
   }

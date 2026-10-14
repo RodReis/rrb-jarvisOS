@@ -167,6 +167,23 @@ export class PromotionService {
       )
         return this.outcome(run, { state: 'waiting', reason: erro.code })
       throw erro
+    } finally {
+      this.releaseLeases(run)
+    }
+  }
+
+  /**
+   * Ao sair (sucesso, espera, bloqueio ou erro) o executor larga os leases que segurava: quem
+   * retoma uma release bloqueada não espera o prazo expirar. Lease já encerrado pela transição
+   * terminal (a lane foi limpa) não é erro.
+   */
+  private releaseLeases(run: Run): void {
+    for (const [environment, lease] of run.leases) {
+      try {
+        this.deps.repository.releaseLease(this.query(run, environment), lease, this.now())
+      } catch {
+        // já expirado ou substituído: nada a liberar
+      }
     }
   }
 

@@ -85,6 +85,11 @@ export interface Harness {
     sleep?: (ms: number) => Promise<void>
     ownerId?: string
   }): PromotionService
+  /**
+   * Serviço de OUTRO projeto: mesmo banco local, nuvem própria. Na produção cada projeto tem seu
+   * Railway/Vercel (os adapters são instanciados por projeto), então a nuvem não é compartilhada.
+   */
+  outroProjeto(): { readonly service: PromotionService; readonly cloud: FakePromotionCloud }
   fechar(): void
 }
 
@@ -97,16 +102,19 @@ export function montarHarness(opcoes: { sleep?: (ms: number) => Promise<void> } 
   const local = new ReleaseLocalRepository(db, audit)
   const clock = new FakeClock()
   const cloud = new FakePromotionCloud()
-  const criar = (o: { sleep?: (ms: number) => Promise<void>; ownerId?: string } = {}) =>
+  const criar = (
+    o: { sleep?: (ms: number) => Promise<void>; ownerId?: string } = {},
+    nuvem: FakePromotionCloud = cloud
+  ) =>
     new PromotionService({
       repository,
       promotion,
       local,
-      build: cloud.buildPort(local),
-      backend: cloud.backend,
-      database: cloud.database,
-      frontend: cloud.frontend,
-      verifier: cloud.verifier,
+      build: nuvem.buildPort(local),
+      backend: nuvem.backend,
+      database: nuvem.database,
+      frontend: nuvem.frontend,
+      verifier: nuvem.verifier,
       now: clock.now,
       nowMs: clock.nowMs,
       sleep: o.sleep ?? opcoes.sleep ?? clock.sleep,
@@ -121,7 +129,12 @@ export function montarHarness(opcoes: { sleep?: (ms: number) => Promise<void> } 
     clock,
     cloud,
     service: criar(),
-    novoServico: criar,
+    novoServico: (o) => criar(o),
+    outroProjeto: () => {
+      const nuvem = new FakePromotionCloud()
+      // O sleep do teste pode estar travado para o projeto 1; o outro projeto anda por conta própria.
+      return { cloud: nuvem, service: criar({ sleep: clock.sleep, ownerId: 'executor-2' }, nuvem) }
+    },
     fechar: () => {
       db.close()
       rmSync(directory, { recursive: true, force: true })
