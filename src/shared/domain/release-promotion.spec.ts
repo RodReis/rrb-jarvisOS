@@ -46,7 +46,10 @@ describe('ambienteAprovadoTecnicamente', () => {
 
   it('gate bloqueado ou desconhecido não aprova', () => {
     for (const result of ['blocked', 'unknown'] as const) {
-      const gates = [...todosPassados('staging'), gate('staging', 'smoke', result, '2026-10-14T11:00:00.000Z')]
+      const gates = [
+        ...todosPassados('staging'),
+        gate('staging', 'smoke', result, '2026-10-14T11:00:00.000Z')
+      ]
       expect(ambienteAprovadoTecnicamente('staging', gates)).toBe(false)
     }
   })

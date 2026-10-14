@@ -95,7 +95,8 @@ export function validarReferencias(entrada: {
         continue
       }
       if (isoladas.has(name)) {
-        if (vistos.has(lido.fingerprint)) bloqueios.push({ name, environment, reason: 'shared-value' })
+        if (vistos.has(lido.fingerprint))
+          bloqueios.push({ name, environment, reason: 'shared-value' })
         vistos.add(lido.fingerprint)
       }
       // O primeiro ambiente configurado é a base; os demais comparam com ele. Valor diferente

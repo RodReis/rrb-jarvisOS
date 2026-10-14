@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 3253 | 3253 | 0 | 80.1 | — | — |
-| — | — | — | Banco | 2522 | 2503 | 0 | 84.5 | — | — |
-| — | — | — | Tela | 806 | 805 | 0 | 74.6 | — | — |
+| — | — | — | Regras de Negócio | 3542 | 3542 | 0 | 80.5 | — | — |
+| — | — | — | Banco | 2593 | 2574 | 0 | 85.0 | — | — |
+| — | — | — | Tela | 806 | 805 | 0 | 74.5 | — | — |
 
 ## Histórico por entrega
 
@@ -529,3 +529,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-10-13 | #152 | spec-release-03-preview-isolado | Regras de Negócio | 3253 | 3253 | 0 | 80.1 | #428 | [#428](https://github.com/RodReis/rrb-jarvisOS/pull/428) |
 | 2026-10-13 | #152 | spec-release-03-preview-isolado | Banco | 2522 | 2503 | 0 | 84.5 | #428 | [#428](https://github.com/RodReis/rrb-jarvisOS/pull/428) |
 | 2026-10-13 | #152 | spec-release-03-preview-isolado | Tela | 806 | 805 | 0 | 74.6 | #428 | [#428](https://github.com/RodReis/rrb-jarvisOS/pull/428) |
+| 2026-10-14 | #153 | spec-release-04-staging-producao | Regras de Negócio | 3542 | 3542 | 0 | 80.5 | #430 | [#430](https://github.com/RodReis/rrb-jarvisOS/pull/430) |
+| 2026-10-14 | #153 | spec-release-04-staging-producao | Banco | 2593 | 2574 | 0 | 85.0 | #430 | [#430](https://github.com/RodReis/rrb-jarvisOS/pull/430) |
+| 2026-10-14 | #153 | spec-release-04-staging-producao | Tela | 806 | 805 | 0 | 74.5 | #430 | [#430](https://github.com/RodReis/rrb-jarvisOS/pull/430) |
