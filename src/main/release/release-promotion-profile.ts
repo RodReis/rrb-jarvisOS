@@ -189,6 +189,15 @@ function lerVerificacao(valor: unknown, base: string): PromotionProfile['verific
   }
 }
 
+function lerVercel(v: Bruto, base: string): PromotionProfile['vercel'] {
+  return {
+    workdir: caminho(base, v.workdir, 'vercel.workdir'),
+    ...(v.scope === undefined ? {} : { scope: texto(v.scope, 'vercel.scope', NOME_DE_SERVICO) }),
+    stagingDomain: texto(v.stagingDomain, 'vercel.stagingDomain', DOMINIO).toLowerCase(),
+    productionDomain: texto(v.productionDomain, 'vercel.productionDomain', DOMINIO).toLowerCase()
+  }
+}
+
 export function carregarPerfilDePromocao(arquivo: string): PromotionProfile {
   let bruto: unknown
   try {
@@ -218,6 +227,14 @@ export function carregarPerfilDePromocao(arquivo: string): PromotionProfile {
       'Staging e Produção não podem compartilhar a mesma URL: ambientes isolados.'
     )
 
+  const vercel = lerVercel(v, base)
+  // O verificador HTTP olha a URL do perfil e a Vercel promove o domínio: se divergirem, o gate
+  // passaria validando um host que não é o que foi promovido.
+  if (new URL(staging.frontendUrl).hostname !== vercel.stagingDomain)
+    throw new TypeError('environments.staging.frontendUrl deve ser o vercel.stagingDomain.')
+  if (new URL(production.frontendUrl).hostname !== vercel.productionDomain)
+    throw new TypeError('environments.production.frontendUrl deve ser o vercel.productionDomain.')
+
   const conf = objeto(raiz.configuration ?? {}, 'configuration', ['isolatedKeys'])
   const isolatedKeys = conf.isolatedKeys === undefined ? [] : conf.isolatedKeys
   if (
@@ -229,12 +246,7 @@ export function carregarPerfilDePromocao(arquivo: string): PromotionProfile {
   const stabilization = lerEstabilizacao(raiz.stabilization)
   return {
     railway: lerRailway(raiz.railway, base),
-    vercel: {
-      workdir: caminho(base, v.workdir, 'vercel.workdir'),
-      ...(v.scope === undefined ? {} : { scope: texto(v.scope, 'vercel.scope', NOME_DE_SERVICO) }),
-      stagingDomain: texto(v.stagingDomain, 'vercel.stagingDomain', DOMINIO).toLowerCase(),
-      productionDomain: texto(v.productionDomain, 'vercel.productionDomain', DOMINIO).toLowerCase()
-    },
+    vercel,
     environments: { staging, production },
     verification: lerVerificacao(raiz.verification, base),
     configuration: { isolatedKeys: isolatedKeys as string[] },

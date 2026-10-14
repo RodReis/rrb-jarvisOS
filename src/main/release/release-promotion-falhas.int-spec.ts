@@ -96,6 +96,7 @@ describe('health e smoke falhos impedem completed (critério 5)', () => {
 
   it('smoke falho em Staging impede qualquer efeito em Produção', async () => {
     h = montarHarness()
+    semearReleaseConcluida(h) // há para onde voltar: o desfecho esperado é failed
     h.cloud.smokeFails.add('staging')
     const r = await h.service.handleMerge(SCOPE, SHA_A, projeto())
 
@@ -105,6 +106,7 @@ describe('health e smoke falhos impedem completed (critério 5)', () => {
 
   it('o motor de gates é a autoridade: gate não registrado barra Produção mesmo com o diário confirmado (regra 1)', async () => {
     h = montarHarness()
+    semearReleaseConcluida(h) // há para onde voltar: o desfecho esperado é failed
     // Todos os passos de Staging confirmam, mas o resultado do E2E essencial não chega ao motor.
     const original = h.repository.recordGate.bind(h.repository)
     h.repository.recordGate = (input, now) => {
@@ -130,6 +132,7 @@ describe('health e smoke falhos impedem completed (critério 5)', () => {
 
   it('frontend fiado ao backend do outro ambiente reprova o gate de fiação', async () => {
     h = montarHarness()
+    semearReleaseConcluida(h) // há para onde voltar: o desfecho esperado é failed
     h.cloud.crossWired = 'production'
     const r = await h.service.handleMerge(SCOPE, SHA_A, projeto())
 
@@ -187,31 +190,81 @@ describe('compensação de aplicação (critério 6)', () => {
     ])
   })
 
-  it('sem release anterior concluída não há para onde voltar: registra e encerra como failed', async () => {
+  it('sem release anterior concluída não há para onde voltar: a versão ruim segue no ar, então degraded', async () => {
     h = montarHarness()
     h.cloud.smokeFails.add('production')
     const r = await h.service.handleMerge(SCOPE, SHA_A, projeto())
 
-    expect(r.state).toBe('failed')
+    expect(r).toMatchObject({ state: 'degraded', status: 'degraded' })
     expect(compensacoes(r.releaseId)).toEqual([
-      'production:frontend:none:no-previous:confirmed',
-      'production:backend:none:no-previous:confirmed'
+      'production:frontend:none:no-previous:failed',
+      'production:backend:none:no-previous:failed'
     ])
   })
 
-  it('o destino da compensação é a última release CONCLUÍDA, não sobra de release que falhou', async () => {
+  it('o destino é a última release CONCLUÍDA, não o que está no ar: resíduo de release degradada fica de fora', async () => {
     h = montarHarness()
     semearReleaseConcluida(h)
-    h.cloud.smokeFails.add('staging')
-    const falha = await h.service.handleMerge(SCOPE, SHA_A, projeto()) // falha em Staging, depois do deploy
-    expect(falha.state).toBe('failed')
-    h.cloud.smokeFails.clear()
+    // R1 falha em Produção e a compensação do backend falha: o resíduo de R1 segue no ar.
     h.cloud.smokeFails.add('production')
-    const r = await h.service.handleMerge(SCOPE, SHA_B, projeto())
+    h.cloud.failOn('backend.rollback:production')
+    const r1 = await h.service.handleMerge(SCOPE, SHA_A, projeto())
+    expect(r1.state).toBe('degraded')
+    const residuo = h.cloud.backends.get('production')!.deploymentId
+    expect(residuo).not.toBe('rw-production-antigo')
 
-    const backend = h.promotion.getDeployment(SCOPE, r.releaseId, 'production', 'backend')
-    expect(backend?.replacesExternalId).toBe('rw-production-antigo')
+    // R2 falha em Produção: volta para a última CONCLUÍDA (R0), não para o resíduo de R1.
+    const r2 = await h.service.handleMerge(SCOPE, SHA_B, projeto())
+    expect(r2.state).toBe('failed')
     expect(h.cloud.backends.get('production')!.deploymentId).toBe('rw-production-antigo')
+    expect(h.cloud.frontendAssigned.get('production')).toBe('dpl_antigo')
+  })
+
+  it('release vizinha que conclui depois de B preparar não deixa o destino velho: Produção volta ao frontend e ao backend de A', async () => {
+    let liberar!: () => void
+    const trava = new Promise<void>((resolve) => (liberar = resolve))
+    let chegou!: () => void
+    const estabilizando = new Promise<void>((resolve) => (chegou = resolve))
+    let primeira = true
+    h = montarHarness({
+      sleep: async (ms) => {
+        if (primeira) {
+          primeira = false
+          chegou()
+          await trava // A fica em estabilização enquanto B prepara e passa por Staging
+        }
+        await h.clock.sleep(ms)
+      }
+    })
+    semearReleaseConcluida(h) // R0 é o estado anterior a A
+    const a = h.service.handleMerge(SCOPE, SHA_A, projeto())
+    await estabilizando
+    const b = await h.service.handleMerge(SCOPE, SHA_B, projeto())
+    expect(b).toMatchObject({ state: 'waiting', status: 'staging' })
+
+    liberar()
+    const resultadoA = await a
+    expect(resultadoA.state).toBe('completed')
+    const frontendDeA = h.promotion.getDeployment(
+      SCOPE,
+      resultadoA.releaseId,
+      'production',
+      'frontend'
+    )!
+    const backendDeA = h.promotion.getDeployment(
+      SCOPE,
+      resultadoA.releaseId,
+      'production',
+      'backend'
+    )!
+
+    h.cloud.smokeFails.add('production')
+    const retomadas = await h.service.resume(SCOPE, projeto())
+    expect(retomadas.map((x) => x.state)).toEqual(['failed'])
+
+    // Antes da correção o frontend voltava ao de R0 (dpl_antigo): o destino foi gravado antes de A concluir.
+    expect(h.cloud.frontendAssigned.get('production')).toBe(frontendDeA.externalId)
+    expect(h.cloud.backends.get('production')!.deploymentId).toBe(backendDeA.externalId)
   })
 })
 
@@ -487,5 +540,93 @@ describe('efeito incerto e retomada', () => {
 
     liberar()
     expect((await a).state).toBe('completed')
+  })
+})
+
+describe('endurecimento pós-revisão', () => {
+  it('migration que lança erro definitivo registra failed nas linhas e bloqueia o gate', async () => {
+    h = montarHarness()
+    h.cloud.failOn('database.migrate:staging', 'failed')
+    const r = await h.service.handleMerge(SCOPE, SHA_A, projeto())
+
+    expect(r.state).toBe('failed')
+    const estados = h.promotion.listMigrations(SCOPE, r.releaseId).map((m) => m.state)
+    expect(estados).toEqual(['failed', 'failed'])
+    expect(
+      gates(r.releaseId).find((g) => g.gate === 'migration' && g.environment === 'staging')
+    ).toMatchObject({ result: 'blocked', reason: 'migration-failed' })
+  })
+
+  it('timeout no backup de Produção não prende a lane: nada foi migrado, então a retomada repete com segurança', async () => {
+    h = montarHarness()
+    h.cloud.failOn('database.backup:production', 'timeout')
+    const r = await h.service.handleMerge(SCOPE, SHA_A, projeto())
+    expect(r).toMatchObject({
+      state: 'blocked',
+      environment: 'production',
+      step: 'database_migrated'
+    })
+    expect(h.cloud.calls).not.toContain('database.migrate:production')
+
+    const retomada = await h.service.promote(SCOPE, r.releaseId, projeto())
+    expect(retomada.state).toBe('completed')
+    expect(h.cloud.databases.get('production')).toEqual(['001_init', '002_users'])
+  })
+
+  it('timeout DEPOIS de a migration começar continua exigindo reconciliação: não repete às cegas', async () => {
+    h = montarHarness()
+    h.cloud.failOn('database.migrate:production', 'timeout')
+    const r = await h.service.handleMerge(SCOPE, SHA_A, projeto())
+    expect(r).toMatchObject({ state: 'blocked', step: 'database_migrated' })
+
+    const retomada = await h.service.promote(SCOPE, r.releaseId, projeto())
+    expect(retomada.state).toBe('blocked')
+    expect(h.cloud.calls.filter((c) => c === 'database.migrate:production')).toHaveLength(1)
+  })
+
+  it('verificação de estabilização que devolve lista vazia não conta como saudável', async () => {
+    h = montarHarness()
+    semearReleaseConcluida(h)
+    const original = h.cloud.verifier.verify
+    h.cloud.verifier.verify = async (input) =>
+      input.environment === 'production' && input.checks.length === 2
+        ? [] // o verificador "esqueceu" de responder os checks da estabilização
+        : original(input)
+    const r = await h.service.handleMerge(SCOPE, SHA_A, projeto())
+    expect(r).toMatchObject({ state: 'failed', reason: 'stabilization-failed' })
+  })
+
+  it('merge que chega com o candidato anterior em passo incerto vira desfecho, não exceção', async () => {
+    h = montarHarness()
+    const candidato = h.repository.enqueue(SCOPE, SHA_A, h.clock.now()).release.id
+    h.db
+      .prepare(
+        `INSERT INTO release_step
+           (user_id,workspace_id,project_id,release_id,environment,step,idempotency_key,payload_hash,state,attempt,updated_at)
+         VALUES (?,?,?,?, 'staging', 'prepared', 'k', ?, 'intended', 1, ?)`
+      )
+      .run(
+        SCOPE.userId,
+        SCOPE.workspaceId,
+        SCOPE.projectId,
+        candidato,
+        'e'.repeat(64),
+        h.clock.now()
+      )
+
+    const r = await h.service.handleMerge(SCOPE, SHA_B, projeto())
+    expect(r).toMatchObject({
+      state: 'blocked',
+      reason: 'reconciliation-required',
+      releaseId: candidato
+    })
+    // O SHA novo não ganhou release: o chamador precisa reentregar o merge depois de reconciliar.
+    expect(h.repository.queue(SCOPE).candidate?.sha).toBe(SHA_A)
+  })
+
+  it('o lease é renovado durante a estabilização: janela maior que o lease ainda conclui', async () => {
+    h = montarHarness({ leaseMs: 2 * 60_000 })
+    const r = await h.service.handleMerge(SCOPE, SHA_A, projeto())
+    expect(r.state).toBe('completed')
   })
 })

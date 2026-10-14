@@ -23,6 +23,8 @@ export interface OpcoesDePromocao {
   readonly registry: string
   readonly namespace: string | null
   readonly builder: string | null
+  /** Branch onde o commit precisa estar mergeado (padrão `origin/main`). */
+  readonly baseRef: string
   readonly autoStartDocker: boolean
   readonly tokens: { readonly railway: string; readonly vercel: string }
 }
@@ -37,10 +39,12 @@ const OBRIGATORIAS = [
   'compose-file',
   'event'
 ] as const
-const OPCIONAIS = ['sha', 'release', 'registry', 'namespace', 'builder'] as const
+const OPCIONAIS = ['sha', 'release', 'registry', 'namespace', 'builder', 'base-ref'] as const
 type Nome = (typeof OBRIGATORIAS)[number] | (typeof OPCIONAIS)[number]
 const NOMES: readonly string[] = [...OBRIGATORIAS, ...OPCIONAIS]
-const SHA_VALIDO = /^[a-f0-9]{7,64}$/i
+/** SHA completo: prefixo curto colide (28 bits) e identifica pouco. */
+const SHA_VALIDO = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i
+const REFERENCIA_VALIDA = /^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$/
 const ID_DE_RELEASE = /^[A-Za-z0-9-]{8,64}$/
 
 export function lerOpcoesDePromocao(
@@ -75,9 +79,12 @@ export function lerOpcoesDePromocao(
   const sha = valores.get('sha') ?? null
   const release = valores.get('release') ?? null
   if (event === 'merge' && (!sha || !SHA_VALIDO.test(sha)))
-    throw new UsoInvalido('--event merge exige --sha hexadecimal (7 a 64 caracteres).')
+    throw new UsoInvalido('--event merge exige --sha completo (40 ou 64 caracteres hexadecimais).')
   if (event === 'resume' && (!release || !ID_DE_RELEASE.test(release)))
     throw new UsoInvalido('--event resume exige --release com o id da release.')
+
+  const baseRef = valores.get('base-ref') ?? 'origin/main'
+  if (!REFERENCIA_VALIDA.test(baseRef)) throw new UsoInvalido('--base-ref inválido.')
 
   const railway = env.RAILWAY_API_TOKEN
   const vercel = env.VERCEL_TOKEN
@@ -96,6 +103,7 @@ export function lerOpcoesDePromocao(
     registry: valores.get('registry') ?? 'ghcr.io',
     namespace: valores.get('namespace') ?? null,
     builder: valores.get('builder') ?? null,
+    baseRef,
     autoStartDocker,
     tokens: { railway, vercel }
   }

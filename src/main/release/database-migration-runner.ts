@@ -89,6 +89,13 @@ export class DatabaseMigrationRunner {
     readonly database: string
     readonly migrations: readonly MigrationFile[]
     readonly seed?: string
+    /**
+     * `false` não lê o banco: nenhum `pg_dump`. Em Produção ninguém usa a impressão e dump de
+     * dados leria o dado do ambiente para a máquina do operador; o fingerprint passa a identificar
+     * só as migrations. Padrão `true` (Preview e preparação local, onde a impressão prova
+     * reprodutibilidade).
+     */
+    readonly impressao?: boolean
   }): Promise<MigrationOutcome> {
     for (const m of entrada.migrations) {
       if (!ID_VALIDO.test(m.id) || !CHECKSUM_VALIDO.test(m.checksum))
@@ -148,7 +155,10 @@ export class DatabaseMigrationRunner {
       applied,
       skipped,
       seedApplied,
-      fingerprint: await this.impressao(database, entrada.migrations, entrada.seed)
+      fingerprint:
+        entrada.impressao === false
+          ? sha256(entrada.migrations.map((m) => `${m.id}:${m.checksum}`).join(','))
+          : await this.impressao(database, entrada.migrations, entrada.seed)
     }
   }
 

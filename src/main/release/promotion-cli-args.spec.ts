@@ -29,6 +29,21 @@ describe('lerOpcoesDePromocao', () => {
     })
   })
 
+  it('o SHA precisa ser completo: prefixo curto é recusado', () => {
+    expect(() =>
+      lerOpcoesDePromocao([...base, '--event', 'merge', '--sha', 'abc1234'], ENV)
+    ).toThrow(UsoInvalido)
+  })
+
+  it('a base do merge tem padrão origin/main e recusa referência com cara de opção', () => {
+    const args = [...base, '--event', 'merge', '--sha', SHA]
+    expect(lerOpcoesDePromocao(args, ENV).baseRef).toBe('origin/main')
+    expect(lerOpcoesDePromocao([...args, '--base-ref', 'origin/release'], ENV).baseRef).toBe(
+      'origin/release'
+    )
+    expect(() => lerOpcoesDePromocao([...args, '--base-ref', '--evil'], ENV)).toThrow(UsoInvalido)
+  })
+
   it('resume exige o id da release', () => {
     const o = lerOpcoesDePromocao(
       [...base, '--event', 'resume', '--release', '0f3a9c1e-77b2-4d5e-9a10-aaaaaaaaaaaa'],

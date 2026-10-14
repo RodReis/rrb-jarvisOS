@@ -106,6 +106,15 @@ describe('carregarPerfilDePromocao', () => {
     expect(() => carregarPerfilDePromocao(gravar(p))).toThrow(/isolad|mesma/i)
   })
 
+  it('recusa URL de frontend que não é o domínio que a Vercel promove', () => {
+    const a = valido()
+    a.environments.production.frontendUrl = 'https://outro.exemplo.com'
+    expect(() => carregarPerfilDePromocao(gravar(a))).toThrow(/productionDomain/)
+    const b = valido()
+    b.environments.staging.frontendUrl = 'https://outro-staging.exemplo.com'
+    expect(() => carregarPerfilDePromocao(gravar(b))).toThrow(/stagingDomain/)
+  })
+
   it('recusa o mesmo ambiente do Railway para Staging e Produção', () => {
     const p = valido()
     p.railway.environments.production = 'staging'

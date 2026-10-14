@@ -111,12 +111,31 @@ export class PromotionService {
   }
 
   /** Evento de merge: cria ou consolida o candidato e o leva adiante. */
-  handleMerge(
+  async handleMerge(
     scope: ReleaseScope,
     sha: string,
     project: PromotionProject
   ): Promise<PromotionOutcome> {
-    const { release } = this.deps.repository.enqueue(scope, sha, this.now())
+    let release: { id: string }
+    try {
+      release = this.deps.repository.enqueue(scope, sha, this.now()).release
+    } catch (erro) {
+      // O candidato anterior ainda tem passo incerto: consolidar agora esconderia o efeito. O SHA
+      // novo não ganha release; o operador reconcilia o anterior e reentrega o merge.
+      const candidato = this.deps.repository.queue(scope).candidate
+      if (
+        erro instanceof ReleaseConflictError &&
+        erro.code === 'reconciliation-required' &&
+        candidato
+      )
+        return {
+          releaseId: candidato.id,
+          state: 'blocked',
+          status: candidato.status,
+          reason: 'reconciliation-required'
+        }
+      throw erro
+    }
     return this.promote(scope, release.id, project)
   }
 
@@ -314,10 +333,17 @@ export class PromotionService {
     const production = this.query(run, 'production')
     const lease = this.lease(run, 'production')
     const identidade = this.identidade(run)
-    const verificar = async (checks: readonly ('backend_health' | 'frontend_wiring' | 'smoke')[]) =>
-      (await this.deps.verifier.verify({ environment: 'production', checks, ...identidade })).every(
-        (r) => r.result === 'passed'
-      )
+    // Um `passed` para CADA check pedido: lista vazia ou check omitido não prova saúde.
+    const verificar = async (
+      checks: readonly ('backend_health' | 'frontend_wiring' | 'smoke')[]
+    ): Promise<boolean> => {
+      const resultados = await this.deps.verifier.verify({
+        environment: 'production',
+        checks,
+        ...identidade
+      })
+      return checks.every((c) => resultados.find((r) => r.gate === c)?.result === 'passed')
+    }
     const monitor = new StabilizationMonitor({
       config: run.project.stabilization ?? ESTABILIZACAO_PADRAO,
       health: () => verificar(['backend_health', 'frontend_wiring']),
@@ -423,8 +449,13 @@ export class PromotionService {
     ]
     for (const alvo of alvos) {
       if (!repository.getStep(query, alvo.passo)) continue
-      const linha = promotion.getDeployment(run.scope, run.releaseId, environment, alvo.kind)
-      const anterior = linha?.replacesExternalId
+      // Resolvido AGORA: uma release vizinha pode ter concluído depois que esta preparou.
+      const anterior = promotion.lastKnownDeployment(
+        run.scope,
+        environment,
+        alvo.kind,
+        run.releaseId
+      )?.externalId
       const acao = anterior ? `${alvo.kind}:restore:${anterior}` : `${alvo.kind}:none:no-previous`
       const id = promotion.beginCompensation(
         run.scope,
@@ -433,7 +464,9 @@ export class PromotionService {
         this.now()
       )
       if (!anterior) {
-        promotion.finishCompensation(run.scope, run.releaseId, id, 'confirmed')
+        // Sem baseline não há como restaurar, e a versão nova segue no ar: não é "compensado".
+        completo = false
+        promotion.finishCompensation(run.scope, run.releaseId, id, 'failed')
         continue
       }
       try {

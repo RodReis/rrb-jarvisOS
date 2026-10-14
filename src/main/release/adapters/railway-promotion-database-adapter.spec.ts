@@ -235,13 +235,71 @@ describe('RailwayPromotionDatabaseAdapter.migrate', () => {
     expect((falha as Error).message).not.toMatch(/Unauthorized|rate limit|estranho/)
   })
 
-  it('o pg_dump que falha vira erro de provedor sem a saída do banco', async () => {
-    const { runner } = banco((c) => (c.binary === 'pg_dump' ? erro(`falhou ${SENHA}`) : ok('')))
+  it('fecha o proxy TCP público que ele mesmo abriu: o banco de Produção não fica exposto', async () => {
+    const { runner, chamadas } = banco(psqlSaudavel)
 
-    const falha = await rodar(new RailwayPromotionDatabaseAdapter(runner, CONFIG).migrate(entrada))
+    await new RailwayPromotionDatabaseAdapter(runner, CONFIG).migrate(entrada)
 
-    expect(falha).toMatchObject({ code: 'failed' })
-    expect((falha as Error).message).not.toContain(SENHA)
+    const cli = chamadas
+      .filter((c) => c.binary === 'railway')
+      .map((c) => c.args.slice(0, 2).join(' '))
+    expect(cli).toContain('tcp-proxy create')
+    expect(cli).toContain('tcp-proxy delete')
+    expect(cli.indexOf('tcp-proxy delete')).toBeGreaterThan(cli.indexOf('tcp-proxy create'))
+    const fechar = chamadas.find(
+      (c) => c.binary === 'railway' && comecaCom(c, 'tcp-proxy', 'delete')
+    )!
+    expect(fechar.args).toEqual(
+      expect.arrayContaining(['5432', '--yes', '--environment', 'production'])
+    )
+  })
+
+  it('fecha o proxy mesmo quando a migration falha', async () => {
+    const { runner, chamadas } = banco((c) =>
+      c.binary === 'psql' && sqlDe(c).includes('CREATE TABLE t') ? erro('boom') : ok('')
+    )
+
+    await rodar(new RailwayPromotionDatabaseAdapter(runner, CONFIG).migrate(entrada))
+
+    expect(
+      chamadas.some((c) => c.binary === 'railway' && comecaCom(c, 'tcp-proxy', 'delete'))
+    ).toBe(true)
+  })
+
+  it('não toca no proxy que já existia: ele é do operador', async () => {
+    const { runner, chamadas } = banco(psqlSaudavel, true)
+
+    await new RailwayPromotionDatabaseAdapter(runner, CONFIG).migrate(entrada)
+
+    expect(
+      chamadas.some((c) => c.binary === 'railway' && comecaCom(c, 'tcp-proxy', 'create'))
+    ).toBe(false)
+    expect(
+      chamadas.some((c) => c.binary === 'railway' && comecaCom(c, 'tcp-proxy', 'delete'))
+    ).toBe(false)
+  })
+
+  it('falha ao fechar o proxy não derruba a migration que já foi aplicada', async () => {
+    const { runner } = runnerDe((c) => {
+      if (c.binary === 'railway' && comecaCom(c, 'tcp-proxy', 'list')) return ok('[]')
+      if (c.binary === 'railway' && comecaCom(c, 'tcp-proxy', 'create')) return ok('{}')
+      if (c.binary === 'railway' && comecaCom(c, 'tcp-proxy', 'delete')) return erro('fora do ar')
+      if (c.binary === 'railway' && comecaCom(c, 'variable', 'list')) return ok(VARIAVEIS)
+      return ok('')
+    })
+
+    const r = await new RailwayPromotionDatabaseAdapter(runner, CONFIG).migrate(entrada)
+
+    expect(r.state).toBe('confirmed')
+  })
+
+  it('nunca roda pg_dump: o dado do ambiente não é lido para a máquina do operador', async () => {
+    const { runner, chamadas } = banco(psqlSaudavel)
+
+    const r = await new RailwayPromotionDatabaseAdapter(runner, CONFIG).migrate(entrada)
+
+    expect(r.state).toBe('confirmed')
+    expect(chamadas.map((c) => c.binary)).not.toContain('pg_dump')
   })
 })
 

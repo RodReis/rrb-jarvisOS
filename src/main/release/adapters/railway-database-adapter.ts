@@ -19,7 +19,7 @@ import type { RailwayPreviewConfig } from './railway-backend-adapter'
  */
 
 const TIMEOUT_MS = 10 * 60_000
-const PORTA_DO_POSTGRES = 5432
+export const PORTA_DO_POSTGRES = 5432
 /** Barra invertida: abre meta-comando do `psql`. Em constante para o arquivo não conter o literal. */
 export const BARRA_INVERTIDA = String.fromCharCode(92)
 
@@ -129,18 +129,22 @@ export class RailwayDatabaseAdapter implements PreviewDatabasePort {
 export async function lerConexaoDoBanco(
   cli: (args: readonly string[], etapa: string) => Promise<CommandResult>,
   databaseService: string,
-  ambiente: string
+  ambiente: string,
+  /** Chamado quando ESTA leitura abriu o proxy: quem o abriu é quem deve fechá-lo. */
+  aoAbrirProxy?: () => void
 ): Promise<Conexao> {
   const base = ['--service', databaseService, '--environment', ambiente]
   const proxies = lerJson(
     await cli(['tcp-proxy', 'list', ...base, '--json'], 'listar proxy do banco'),
     'listar proxy do banco'
   )
-  if (!Array.isArray(proxies) || proxies.length === 0)
+  if (!Array.isArray(proxies) || proxies.length === 0) {
     await cli(
       ['tcp-proxy', 'create', '--port', String(PORTA_DO_POSTGRES), ...base, '--json'],
       'abrir proxy do banco'
     )
+    aoAbrirProxy?.()
+  }
   const bruto = lerJson(
     await cli(['variable', 'list', ...base, '--json'], 'ler variáveis do banco'),
     'ler variáveis do banco'

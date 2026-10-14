@@ -1,5 +1,6 @@
 import { createHmac } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { app } from 'electron'
 import type { PromotionDatabasePort } from './promotion-ports'
@@ -20,6 +21,12 @@ import { VercelPromotionAdapter } from './adapters/vercel-promotion-adapter'
 import { lerMigrations } from './database-migration-runner'
 import { UsoInvalido } from './preview-cli-args'
 import { lerOpcoesDePromocao, type OpcoesDePromocao } from './promotion-cli-args'
+import {
+  ambienteIsoladoDoE2e,
+  estaDentroDe,
+  exigirCommitMergeado,
+  temVercelIgnore
+} from './promotion-guards'
 import { lerNomesDoExemplo } from './configuration-reference-validator'
 import { ReleaseLocalRepository } from './release-local-repository'
 import { ReleasePreparationService } from './release-preparation-service'
@@ -84,23 +91,34 @@ async function exigirArvoreDoCommit(
   }
 }
 
-/** Jornada essencial do projeto: roda o comando do perfil contra o ambiente, sem herdar segredo. */
+/**
+ * Jornada essencial do projeto: roda o comando do perfil contra o ambiente. O código vem de um
+ * commit mergeado mas roda na máquina do operador, então HOME e os diretórios de credencial
+ * (Railway, Vercel, login do GHCR) apontam para uma pasta temporária vazia e nenhum token é
+ * repassado.
+ */
 function jornadaEssencial(runner: CommandRunner, perfil: PromotionProfile) {
   const e2e = perfil.verification.e2e
   if (!e2e) return undefined
   return {
     run: async (environment: 'staging' | 'production'): Promise<boolean> => {
       const urls = perfil.environments[environment]
-      const r = await runner.run(e2e.command, e2e.args, {
-        cwd: e2e.cwd,
-        env: {
-          E2E_ENVIRONMENT: environment,
-          E2E_BASE_URL: urls.frontendUrl,
-          E2E_API_URL: urls.backendUrl
-        },
-        timeoutMs: E2E_TIMEOUT_MS
-      })
-      return r.code === 0 && !r.timedOut
+      const pasta = mkdtempSync(join(tmpdir(), 'jarvis-e2e-'))
+      try {
+        const r = await runner.run(e2e.command, e2e.args, {
+          cwd: e2e.cwd,
+          env: {
+            ...ambienteIsoladoDoE2e(pasta, process.env),
+            E2E_ENVIRONMENT: environment,
+            E2E_BASE_URL: urls.frontendUrl,
+            E2E_API_URL: urls.backendUrl
+          },
+          timeoutMs: E2E_TIMEOUT_MS
+        })
+        return r.code === 0 && !r.timedOut
+      } finally {
+        rmSync(pasta, { recursive: true, force: true })
+      }
     }
   }
 }
@@ -233,12 +251,39 @@ async function principal(): Promise<number> {
     } catch (erro) {
       throw new UsoInvalido(erro instanceof Error ? erro.message : 'Perfil do projeto inválido.')
     }
+    // 1) O commit foi revisado e mergeado (ancestral da base), não é um HEAD local qualquer.
+    const merge = await exigirCommitMergeado(
+      runner,
+      projeto.contextDir,
+      shaDaRelease,
+      opcoes.baseRef
+    )
+    if (merge !== 'ok')
+      throw new UsoInvalido(
+        merge === 'not-merged'
+          ? `O commit ${shaDaRelease} não está em ${opcoes.baseRef}: só se promove o que foi mergeado.`
+          : `Não foi possível provar que o commit está em ${opcoes.baseRef} (git fetch/merge-base falhou).`
+      )
+    // 2) O perfil do operador fica fora do código promovido: o comando de E2E dele roda aqui.
+    const arvores = [projeto.contextDir, projeto.migrationsDir, perfil.vercel.workdir]
+    const perfilDoOperador = resolve(opcoes.promotionProfile)
+    if (arvores.some((arvore) => estaDentroDe(arvore, perfilDoOperador)))
+      throw new UsoInvalido(
+        'O perfil de promoção não pode ficar dentro do código que está sendo promovido.'
+      )
+    // 3) `.vercelignore` faria o `vercel deploy` publicar arquivos que o Git ignora.
+    if (temVercelIgnore(perfil.vercel.workdir))
+      throw new UsoInvalido(
+        'A pasta do frontend tem .vercelignore: remova-o (o .gitignore passa a ser a única regra).'
+      )
+    // 4) A árvore local é exatamente o commit, em tudo que o build, a migration e o deploy leem.
     await exigirArvoreDoCommit(
       runner,
       [
         projeto.contextDir,
         projeto.migrationsDir,
         perfil.vercel.workdir,
+        dirname(projeto.envExampleFile),
         ...(projeto.seedFile ? [dirname(projeto.seedFile)] : [])
       ],
       shaDaRelease

@@ -264,23 +264,39 @@ export class ReleasePromotionRepository {
   }
 
   /**
-   * Deployment do ambiente na última release **concluída** do projeto: o único estado que a
-   * pipeline provou saudável. É o destino da compensação, não "o que estava no ar" (que pode ser
-   * sobra de uma release que falhou).
+   * Último deployment do ambiente que a pipeline **provou saudável**, sem contar `exceto`. É o
+   * destino da compensação e precisa ser resolvido na hora de compensar, nunca gravado antes:
+   * uma release vizinha pode concluir no intervalo e mudar a resposta.
+   *
+   * - Produção: a última release **concluída** (passou a estabilização). Não é "o que estava no
+   *   ar", que pode ser resíduo de uma release degradada.
+   * - Staging: a última release que **confirmou o smoke** de Staging. Staging não é compensado
+   *   quando só a Produção falha, então segue servindo essa release mesmo que ela não conclua.
    */
-  lastCompletedDeployment(
+  lastKnownDeployment(
     scope: ReleaseScope,
     environment: ReleaseEnvironment,
-    kind: DeploymentKind
+    kind: DeploymentKind,
+    exceto: string
   ): PromotionDeployment | null {
+    const prova =
+      environment === 'production'
+        ? { juncao: '', condicao: "r.status='completed'", ordem: 'r.updated_at' }
+        : {
+            juncao: `JOIN release_step s ON s.release_id=d.release_id AND s.user_id=d.user_id
+                       AND s.workspace_id=d.workspace_id AND s.project_id=d.project_id
+                       AND s.environment='staging' AND s.step='smoke_passed' AND s.state='confirmed'`,
+            condicao: '1=1',
+            ordem: 's.updated_at'
+          }
     const row = this.db
       .prepare(
-        `SELECT d.* FROM release_deployment d JOIN release_run r ON r.id=d.release_id
+        `SELECT d.* FROM release_deployment d JOIN release_run r ON r.id=d.release_id ${prova.juncao}
          WHERE d.user_id=? AND d.workspace_id=? AND d.project_id=? AND d.environment=? AND d.kind=?
-           AND r.status='completed'
-         ORDER BY r.updated_at DESC, d.created_at DESC LIMIT 1`
+           AND d.release_id<>? AND ${prova.condicao}
+         ORDER BY ${prova.ordem} DESC, d.created_at DESC LIMIT 1`
       )
-      .get(...paramsDe(scope), environment, kind) as DeploymentRow | undefined
+      .get(...paramsDe(scope), environment, kind, exceto) as DeploymentRow | undefined
     return row ? toDeployment(row) : null
   }
 

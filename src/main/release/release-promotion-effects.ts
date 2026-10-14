@@ -111,7 +111,15 @@ export class PromotionEffects implements ReleasePort {
         ? 'applied'
         : 'not-applied'
     }
-    // prepared / database_migrated: sem consulta barata e segura; fica para o operador (F05).
+    if (request.step === 'database_migrated') {
+      // Sem nenhuma linha de migration neste ambiente, só o backup chegou a rodar (ele precede a
+      // intenção): nada foi migrado e repetir é seguro. Com linhas, o banco pode ter mudado.
+      const linhas = this.deps.promotion
+        .listMigrations(this.deps.scope, this.deps.releaseId)
+        .filter((m) => m.environment === env)
+      return linhas.length === 0 ? 'not-applied' : 'unknown'
+    }
+    // prepared: sem consulta barata e segura; fica para o operador (F05).
     return 'unknown'
   }
 
@@ -175,8 +183,8 @@ export class PromotionEffects implements ReleasePort {
           artifactDigest: digestDoFrontend(frontend.deploymentId),
           externalId: frontend.deploymentId,
           replacesExternalId:
-            this.deps.promotion.lastCompletedDeployment(scope, ambiente, 'frontend')?.externalId ??
-            null
+            this.deps.promotion.lastKnownDeployment(scope, ambiente, 'frontend', releaseId)
+              ?.externalId ?? null
         },
         this.deps.now()
       )
@@ -240,23 +248,19 @@ export class PromotionEffects implements ReleasePort {
         { environment: env, migrationId: m.id, checksum: m.checksum, state: 'intended', backupRef },
         this.deps.now()
       )
-    const resultado = await database.migrate({ environment: env, migrations: project.migrations })
-    if (resultado.state === 'failed') {
-      const aplicadas = new Set(resultado.applied)
-      for (const m of project.migrations) {
-        const estado = aplicadas.has(m.id)
-          ? 'confirmed'
-          : m.id === resultado.failedAt
-            ? 'failed'
-            : null
-        if (estado)
-          promotion.recordMigration(
-            scope,
-            releaseId,
-            { environment: env, migrationId: m.id, checksum: m.checksum, state: estado },
-            this.deps.now()
-          )
+    let resultado: Awaited<ReturnType<PromotionDatabasePort['migrate']>>
+    try {
+      resultado = await database.migrate({ environment: env, migrations: project.migrations })
+    } catch (erro) {
+      // Recusa definitiva: nada ficou "em andamento". Só o efeito incerto mantém a intenção.
+      if (!incerto(erro)) {
+        this.registrarMigrations(env, new Set(), 'failed')
+        this.gate(env, 'migration', false, `migration-${codigoDe(erro)}`)
       }
+      throw erro
+    }
+    if (resultado.state === 'failed') {
+      this.registrarMigrations(env, new Set(resultado.applied), 'failed')
       this.gate(env, 'migration', false, resultado.reason)
       return this.falhar(resultado.reason)
     }
@@ -269,6 +273,27 @@ export class PromotionEffects implements ReleasePort {
       )
     this.gate(env, 'migration', true, '')
     return 'confirmed'
+  }
+
+  /** As aplicadas ficam `confirmed`; o resto da intenção grava o estado informado (nada fica preso). */
+  private registrarMigrations(
+    env: ReleaseEnvironment,
+    aplicadas: ReadonlySet<string>,
+    restante: 'failed'
+  ): void {
+    const { scope, releaseId, promotion, project } = this.deps
+    for (const m of project.migrations)
+      promotion.recordMigration(
+        scope,
+        releaseId,
+        {
+          environment: env,
+          migrationId: m.id,
+          checksum: m.checksum,
+          state: aplicadas.has(m.id) ? 'confirmed' : restante
+        },
+        this.deps.now()
+      )
   }
 
   // --- backend_healthy ---------------------------------------------------------------------
@@ -294,7 +319,7 @@ export class PromotionEffects implements ReleasePort {
         artifactDigest: this.backendDigest(),
         externalId,
         replacesExternalId:
-          promotion.lastCompletedDeployment(scope, env, 'backend')?.externalId ?? null
+          promotion.lastKnownDeployment(scope, env, 'backend', releaseId)?.externalId ?? null
       },
       this.deps.now()
     )

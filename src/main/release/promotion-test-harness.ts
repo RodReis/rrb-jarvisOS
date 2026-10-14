@@ -93,7 +93,9 @@ export interface Harness {
   fechar(): void
 }
 
-export function montarHarness(opcoes: { sleep?: (ms: number) => Promise<void> } = {}): Harness {
+export function montarHarness(
+  opcoes: { sleep?: (ms: number) => Promise<void>; leaseMs?: number } = {}
+): Harness {
   const directory = mkdtempSync(join(tmpdir(), 'release-promotion-svc-'))
   const db = openDatabase(join(directory, 'release.db'))
   const audit = new AuditRepository(db, 'chave-de-auditoria-da-promocao')
@@ -118,7 +120,8 @@ export function montarHarness(opcoes: { sleep?: (ms: number) => Promise<void> } 
       now: clock.now,
       nowMs: clock.nowMs,
       sleep: o.sleep ?? opcoes.sleep ?? clock.sleep,
-      ownerId: o.ownerId ?? 'executor-1'
+      ownerId: o.ownerId ?? 'executor-1',
+      ...(opcoes.leaseMs ? { leaseMs: opcoes.leaseMs } : {})
     })
   return {
     db,

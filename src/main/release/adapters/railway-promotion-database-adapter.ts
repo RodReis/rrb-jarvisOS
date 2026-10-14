@@ -7,7 +7,12 @@ import {
 import { PromotionProviderError, type PromotionDatabasePort } from '../promotion-ports'
 import type { CommandRunner } from './command-runner'
 import { exigirSucesso } from './preview-cli-errors'
-import { BARRA_INVERTIDA, lerConexaoDoBanco, PsqlExecutor } from './railway-database-adapter'
+import {
+  BARRA_INVERTIDA,
+  lerConexaoDoBanco,
+  PORTA_DO_POSTGRES,
+  PsqlExecutor
+} from './railway-database-adapter'
 
 /**
  * Migrations forward-only no PostgreSQL dos ambientes persistentes (SPEC-Release-04). Mesmo
@@ -55,15 +60,48 @@ export class RailwayPromotionDatabaseAdapter implements Pick<PromotionDatabasePo
         'incompatible-state',
         'Migration não pode conter barra invertida (meta-comando do psql).'
       )
+    let abriuProxy = false
     const conexao = await lerConexaoDoBanco(
       (args, etapa) => this.cli(args, etapa),
       this.config.databaseService,
-      ambiente
+      ambiente,
+      () => {
+        abriuProxy = true
+      }
     )
-    return new DatabaseMigrationRunner(new PsqlExecutor(this.runner, conexao)).apply({
-      database: conexao.database,
-      migrations: input.migrations
-    })
+    try {
+      return await new DatabaseMigrationRunner(new PsqlExecutor(this.runner, conexao)).apply({
+        database: conexao.database,
+        migrations: input.migrations,
+        // Produção: nenhum `pg_dump`. A impressão ninguém usa aqui e leria o dado do ambiente.
+        impressao: false
+      })
+    } finally {
+      // O proxy é endereço público do banco: quem o abriu o fecha. O que já existia é do operador.
+      if (abriuProxy) await this.fecharProxy(ambiente)
+    }
+  }
+
+  /** Melhor esforço: falhar aqui não pode desfazer nem mascarar a migration que já foi aplicada. */
+  private async fecharProxy(ambiente: string): Promise<void> {
+    try {
+      await this.cli(
+        [
+          'tcp-proxy',
+          'delete',
+          String(PORTA_DO_POSTGRES),
+          '--yes',
+          '--service',
+          this.config.databaseService,
+          '--environment',
+          ambiente,
+          '--json'
+        ],
+        'fechar proxy do banco'
+      )
+    } catch {
+      // O proxy segue protegido pela senha; o operador o remove pelo painel do Railway.
+    }
   }
 
   /** Lista de permissão: só os dois nomes configurados chegam à CLI. */

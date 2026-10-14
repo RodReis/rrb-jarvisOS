@@ -152,13 +152,46 @@ describe('deployment', () => {
     expect(repo.listDeployments(OUTRO, releaseId)).toEqual([])
   })
 
-  it('o deployment anterior conhecido vem da última release concluída no ambiente', () => {
+  it('Produção: o deployment conhecido vem da última release CONCLUÍDA, sem contar a própria', () => {
     const anterior = new ReleaseRepository(db, audit).enqueue(SCOPE, 'd'.repeat(40), NOW).release.id
     repo.recordDeployment(SCOPE, anterior, backend('production', 'rw-prd-antigo'), NOW)
-    expect(repo.lastCompletedDeployment(SCOPE, 'production', 'backend')).toBeNull()
+    expect(repo.lastKnownDeployment(SCOPE, 'production', 'backend', releaseId)).toBeNull()
     concluir(anterior)
-    expect(repo.lastCompletedDeployment(SCOPE, 'production', 'backend')).toMatchObject({
+    expect(repo.lastKnownDeployment(SCOPE, 'production', 'backend', releaseId)).toMatchObject({
       externalId: 'rw-prd-antigo'
+    })
+    // A própria release nunca é o destino da sua compensação.
+    expect(repo.lastKnownDeployment(SCOPE, 'production', 'backend', anterior)).toBeNull()
+  })
+
+  it('Staging: vale a última release que confirmou o smoke de Staging, mesmo sem concluir', () => {
+    const repoRelease = new ReleaseRepository(db, audit)
+    const passou = repoRelease.enqueue(SCOPE, 'd'.repeat(40), NOW).release.id
+    repo.recordDeployment(SCOPE, passou, backend('staging', 'rw-stg-passou'), NOW)
+    const falhou = repoRelease.enqueue(SCOPE, 'e'.repeat(40), NOW).release.id
+    repo.recordDeployment(SCOPE, falhou, backend('staging', 'rw-stg-falhou'), NOW)
+    const smoke = (id: string, estado: string) =>
+      db
+        .prepare(
+          `INSERT INTO release_step
+             (user_id,workspace_id,project_id,release_id,environment,step,idempotency_key,payload_hash,state,attempt,updated_at)
+           VALUES (?,?,?,?, 'staging', 'smoke_passed', ?, ?, ?, 1, ?)`
+        )
+        .run(
+          SCOPE.userId,
+          SCOPE.workspaceId,
+          SCOPE.projectId,
+          id,
+          `k-${id}`,
+          'e'.repeat(64),
+          estado,
+          NOW
+        )
+    smoke(falhou, 'failed') // smoke não confirmado: Staging foi compensado
+    expect(repo.lastKnownDeployment(SCOPE, 'staging', 'backend', releaseId)).toBeNull()
+    smoke(passou, 'confirmed')
+    expect(repo.lastKnownDeployment(SCOPE, 'staging', 'backend', releaseId)).toMatchObject({
+      externalId: 'rw-stg-passou'
     })
   })
 })
