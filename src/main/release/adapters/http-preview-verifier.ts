@@ -1,3 +1,4 @@
+import { HttpProbe, assertCaminho, lerTexto, type HttpProbeConfig } from './http-probe'
 import {
   PreviewProviderError,
   type PreviewGateOutcome,
@@ -19,51 +20,26 @@ import {
  * injetou; a navegação real com Playwright continua sendo o smoke das URLs de prova.
  */
 
-export interface HttpVerifierConfig {
+export interface HttpVerifierConfig extends HttpProbeConfig {
   readonly healthPath?: string
   readonly identityPath?: string
-  readonly timeoutMs?: number
-  readonly intervalMs?: number
-  readonly requestTimeoutMs?: number
-  readonly fetch?: typeof fetch
-  readonly sleep?: (ms: number) => Promise<void>
-  readonly now?: () => number
 }
 
 const TETO_DO_HTML = 1024 * 1024
 const TETO_DE_ASSET = 2 * 1024 * 1024
 const TETO_DA_IDENTIDADE = 16 * 1024
 const MAXIMO_DE_ASSETS = 12
-const PRAZO_POR_REQUISICAO_MS = 15_000
 const HOST_DO_BACKEND = /^[a-z0-9-]+(?:\.[a-z0-9-]+)*\.up\.railway\.app$/i
 const HOST_DO_FRONTEND = /^[a-z0-9-]+(?:\.[a-z0-9-]+)*\.vercel\.app$/i
 const ORIGEM_DE_BACKEND_DE_PREVIEW = /https:\/\/[a-z0-9-]+\.up\.railway\.app/gi
 const ASSET = /(?:src|href)\s*=\s*["']([^"']+\.(?:js|mjs))["']/gi
-/** `//host` e `/\host` resolvem para outro host; só caminho absoluto de verdade passa. */
-const CAMINHO_VALIDO = /^\/(?![/\\])[^\s]*$/
-
-function assertCaminho(caminho: string, nome: string): string {
-  if (!CAMINHO_VALIDO.test(caminho)) throw new TypeError(`O caminho de ${nome} é inválido.`)
-  return caminho
-}
-
 export class HttpPreviewVerifier implements PreviewVerifierPort {
-  private readonly http: typeof fetch
-  private readonly sleep: (ms: number) => Promise<void>
-  private readonly now: () => number
-  private readonly timeoutMs: number
-  private readonly intervalMs: number
-  private readonly requestTimeoutMs: number
+  private readonly probe: HttpProbe
   private readonly healthPath: string
   private readonly identityPath: string
 
   constructor(config: HttpVerifierConfig = {}) {
-    this.http = config.fetch ?? fetch
-    this.sleep = config.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)))
-    this.now = config.now ?? Date.now
-    this.timeoutMs = config.timeoutMs ?? 120_000
-    this.intervalMs = config.intervalMs ?? 5_000
-    this.requestTimeoutMs = config.requestTimeoutMs ?? PRAZO_POR_REQUISICAO_MS
+    this.probe = new HttpProbe(config)
     this.healthPath = assertCaminho(config.healthPath ?? '/health', 'saúde')
     this.identityPath = assertCaminho(config.identityPath ?? '/preview-identity', 'identidade')
   }
@@ -100,49 +76,10 @@ export class HttpPreviewVerifier implements PreviewVerifierPort {
     return { gate: 'identidade', result: 'unknown', reason: 'health-down' }
   }
 
-  /** Requisição com prazo, sem seguir redirecionamento e só dentro da origem esperada. */
-  private async requisitar(alvo: URL, origem: string): Promise<Response> {
-    if (alvo.origin !== origem) throw new Error('origem inesperada')
-    return this.http(alvo, {
-      redirect: 'error',
-      signal: AbortSignal.timeout(this.requestTimeoutMs)
-    })
-  }
-
-  /** Lê o corpo até o teto; passou do teto é recusa, não leitura parcial. */
-  private async lerTexto(resposta: Response, teto: number): Promise<string | null> {
-    if (!resposta.body) return ''
-    const leitor = resposta.body.getReader()
-    const partes: Uint8Array[] = []
-    let total = 0
-    for (;;) {
-      const { done, value } = await leitor.read()
-      if (done) break
-      total += value.byteLength
-      if (total > teto) {
-        await leitor.cancel().catch(() => undefined)
-        return null
-      }
-      partes.push(value)
-    }
-    return Buffer.concat(partes).toString('utf8')
-  }
-
-  /** Reaguarda o tempo de subida: o serviço recém-criado ou atualizado ainda pode estar iniciando. */
-  private async esperar<T>(tentar: () => Promise<T | null>): Promise<T | null> {
-    const limite = this.now() + this.timeoutMs
-    for (;;) {
-      const valor = await tentar().catch(() => null)
-      if (valor !== null) return valor
-      if (this.now() + this.intervalMs > limite) return null
-      await this.sleep(this.intervalMs)
-    }
-  }
-
   private async saude(backendUrl: string): Promise<PreviewGateOutcome> {
     const origem = new URL(backendUrl).origin
-    const pronto = await this.esperar(async () => {
-      const r = await this.requisitar(new URL(this.healthPath, backendUrl), origem)
+    const pronto = await this.probe.esperar(async () => {
+      const r = await this.probe.requisitar(new URL(this.healthPath, backendUrl), origem)
       await r.body?.cancel().catch(() => undefined)
       return r.ok ? true : null
     })
@@ -163,9 +100,9 @@ export class HttpPreviewVerifier implements PreviewVerifierPort {
   }): Promise<PreviewGateOutcome> {
     const origem = new URL(input.backendUrl).origin
     let motivo: 'identity-unavailable' | 'identity-mismatch' = 'identity-unavailable'
-    const igual = await this.esperar(async () => {
-      const r = await this.requisitar(new URL(this.identityPath, input.backendUrl), origem)
-      const texto = r.ok ? await this.lerTexto(r, TETO_DA_IDENTIDADE) : null
+    const igual = await this.probe.esperar(async () => {
+      const r = await this.probe.requisitar(new URL(this.identityPath, input.backendUrl), origem)
+      const texto = r.ok ? await lerTexto(r, TETO_DA_IDENTIDADE) : null
       if (texto === null) {
         motivo = 'identity-unavailable'
         return null
@@ -183,9 +120,9 @@ export class HttpPreviewVerifier implements PreviewVerifierPort {
 
   private async frontend(frontendUrl: string, backendUrl: string): Promise<PreviewGateOutcome> {
     const origem = new URL(frontendUrl).origin
-    const html = await this.esperar(async () => {
-      const r = await this.requisitar(new URL(frontendUrl), origem)
-      return r.ok ? await this.lerTexto(r, TETO_DO_HTML) : null
+    const html = await this.probe.esperar(async () => {
+      const r = await this.probe.requisitar(new URL(frontendUrl), origem)
+      return r.ok ? await lerTexto(r, TETO_DO_HTML) : null
     })
     if (html === null) return { gate: 'frontend', result: 'blocked', reason: 'frontend-down' }
 
@@ -198,8 +135,8 @@ export class HttpPreviewVerifier implements PreviewVerifierPort {
     }
     for (const href of [...assets].slice(0, MAXIMO_DE_ASSETS)) {
       try {
-        const r = await this.requisitar(new URL(href), origem)
-        const texto = r.ok ? await this.lerTexto(r, TETO_DE_ASSET) : null
+        const r = await this.probe.requisitar(new URL(href), origem)
+        const texto = r.ok ? await lerTexto(r, TETO_DE_ASSET) : null
         if (texto) conteudo += `\n${texto}`
       } catch {
         // Asset que não carrega não prova nada; a ausência da origem abaixo é o que bloqueia.

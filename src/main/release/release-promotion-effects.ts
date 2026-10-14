@@ -34,7 +34,11 @@ export interface PromotionProject {
     readonly names: readonly string[]
     /** Chaves que não podem ter o mesmo valor em Staging e Produção (decisão 4 do PI). */
     readonly isolated: readonly string[]
-    readonly probe: ConfigurationProbe
+    /**
+     * Lê a configuração dos dois ambientes **agora**. É chamada a cada `prepared`: Produção
+     * revalida minutos depois de Staging, e uma rotação nesse intervalo muda o fingerprint.
+     */
+    readonly load: () => Promise<ConfigurationProbe>
   }
   /** Janela, intervalo e reinícios da estabilização; ausente = padrão (5 min, 30 s, 1 reinício). */
   readonly stabilization?: JanelaDeEstabilizacao
@@ -146,7 +150,7 @@ export class PromotionEffects implements ReleasePort {
   // --- prepared -----------------------------------------------------------------------------
 
   private async prepare(env: ReleaseEnvironment): Promise<'confirmed' | 'failed'> {
-    const config = this.validarConfiguracao(env)
+    const config = await this.validarConfiguracao(env)
     if (config) return this.falhar(config)
     // Produção reaproveita o artefato e o frontend já construídos para Staging: nada é refeito.
     if (env === 'production') return 'confirmed'
@@ -184,14 +188,14 @@ export class PromotionEffects implements ReleasePort {
    * porta de build, banco ou deploy é chamada. A validação cobre os dois ambientes porque o
    * isolamento só se prova olhando os dois.
    */
-  private validarConfiguracao(env: ReleaseEnvironment): string | null {
-    const { names, isolated, probe } = this.deps.project.configuration
+  private async validarConfiguracao(env: ReleaseEnvironment): Promise<string | null> {
+    const { names, isolated, load } = this.deps.project.configuration
     let resultado: ReturnType<typeof validarReferencias>
     try {
       resultado = validarReferencias({
         nomes: names,
         ambientes: ['staging', 'production'],
-        probe,
+        probe: await load(),
         isoladas: isolated
       })
     } catch {

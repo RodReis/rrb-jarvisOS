@@ -65,7 +65,7 @@ export function projeto(
     configuration: {
       names: ['DATABASE_URL', 'API_TOKEN'],
       isolated: ['DATABASE_URL'],
-      probe: sonda(valores)
+      load: async () => sonda(valores)
     },
     ...extra
   }
