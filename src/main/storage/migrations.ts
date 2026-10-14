@@ -2657,6 +2657,8 @@ const MIGRATIONS: readonly string[] = [
   ALTER TABLE release_deployment ADD COLUMN kind TEXT NOT NULL DEFAULT 'backend'
     CHECK (kind IN ('backend','frontend'));
   ALTER TABLE release_deployment ADD COLUMN replaces_external_id TEXT;
+  -- Referência do backup que precedeu a migration (só Produção): é o que o restore operacional exige.
+  ALTER TABLE release_migration_execution ADD COLUMN backup_ref TEXT;
   CREATE UNIQUE INDEX idx_release_deployment_um_por_ambiente_e_tipo
     ON release_deployment(user_id,workspace_id,project_id,release_id,environment,kind);
   `

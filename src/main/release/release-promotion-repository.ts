@@ -5,7 +5,8 @@ import type {
   Deployment,
   MigrationExecution,
   ReleaseEnvironment,
-  ReleaseScope
+  ReleaseScope,
+  ReleaseStatus
 } from '@shared/domain/release'
 import type { AuditRepository } from '../storage/audit-repository'
 
@@ -44,11 +45,17 @@ export interface DeploymentInput {
   readonly replacesExternalId: string | null
 }
 
+export interface PromotionMigration extends MigrationExecution {
+  /** Backup que precedeu a migration; só Produção. */
+  readonly backupRef: string | null
+}
+
 export interface MigrationInput {
   readonly environment: ReleaseEnvironment
   readonly migrationId: string
   readonly checksum: string
   readonly state: PromotionEffectState
+  readonly backupRef?: string
 }
 
 export interface CompensationInput {
@@ -93,6 +100,7 @@ interface MigrationRow {
   migration_id: string
   checksum: string
   state: PromotionEffectState
+  backup_ref: string | null
   created_at: string
 }
 
@@ -281,9 +289,11 @@ export class ReleasePromotionRepository {
     releaseId: string,
     input: MigrationInput,
     now = new Date().toISOString()
-  ): MigrationExecution {
+  ): PromotionMigration {
     if (!ID_EXTERNO.test(input.migrationId)) throw new TypeError('Id de migration inválido.')
     if (!/^[a-f0-9]{8,128}$/.test(input.checksum)) throw new TypeError('Checksum inválido.')
+    if (input.backupRef !== undefined && !ID_EXTERNO.test(input.backupRef))
+      throw new TypeError('A referência do backup é um identificador curto, nunca uma URL.')
     return this.escrita(() => {
       this.assertRelease(scope, releaseId)
       const atual = this.db
@@ -306,14 +316,16 @@ export class ReleasePromotionRepository {
         )
       if (atual) {
         this.db
-          .prepare(`UPDATE release_migration_execution SET state=? WHERE id=?`)
-          .run(input.state, atual.id)
+          .prepare(
+            `UPDATE release_migration_execution SET state=?, backup_ref=COALESCE(?, backup_ref) WHERE id=?`
+          )
+          .run(input.state, input.backupRef ?? null, atual.id)
       } else {
         this.db
           .prepare(
             `INSERT INTO release_migration_execution
-               (id,user_id,workspace_id,project_id,release_id,environment,migration_id,checksum,state,created_at)
-             VALUES (?,?,?,?,?,?,?,?,?,?)`
+               (id,user_id,workspace_id,project_id,release_id,environment,migration_id,checksum,state,backup_ref,created_at)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?)`
           )
           .run(
             randomUUID(),
@@ -323,6 +335,7 @@ export class ReleasePromotionRepository {
             input.migrationId,
             input.checksum,
             input.state,
+            input.backupRef ?? null,
             now
           )
       }
@@ -336,7 +349,7 @@ export class ReleasePromotionRepository {
     })
   }
 
-  listMigrations(scope: ReleaseScope, releaseId: string): MigrationExecution[] {
+  listMigrations(scope: ReleaseScope, releaseId: string): PromotionMigration[] {
     const rows = this.db
       .prepare(
         `SELECT * FROM release_migration_execution
@@ -354,8 +367,21 @@ export class ReleasePromotionRepository {
       migrationId: row.migration_id,
       checksum: row.checksum,
       state: row.state,
+      backupRef: row.backup_ref,
       createdAt: row.created_at
     }))
+  }
+
+  /** Releases do projeto que ainda não chegaram a um estado terminal, da mais antiga à mais nova. */
+  openReleases(scope: ReleaseScope): { id: string; sha: string; status: ReleaseStatus }[] {
+    return this.db
+      .prepare(
+        `SELECT id,sha,status FROM release_run
+         WHERE user_id=? AND workspace_id=? AND project_id=?
+           AND status IN ('queued','preparing','staging','production','stabilizing')
+         ORDER BY created_at, rowid`
+      )
+      .all(...paramsDe(scope)) as { id: string; sha: string; status: ReleaseStatus }[]
   }
 
   beginCompensation(

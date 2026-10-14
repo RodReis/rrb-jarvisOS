@@ -203,6 +203,49 @@ describe('migration', () => {
     ).toThrow(ReleasePromotionConflictError)
   })
 
+  it('guarda a referência do backup que precedeu a migration, para o restore operacional', () => {
+    repo.recordMigration(
+      SCOPE,
+      releaseId,
+      {
+        environment: 'production',
+        migrationId: '001_init',
+        checksum: SUM_A,
+        state: 'intended',
+        backupRef: 'bkp-7f3a9c'
+      },
+      NOW
+    )
+    expect(repo.listMigrations(SCOPE, releaseId)[0]).toMatchObject({ backupRef: 'bkp-7f3a9c' })
+  })
+
+  it('migration sem backup (Staging) fica com backupRef nulo', () => {
+    repo.recordMigration(
+      SCOPE,
+      releaseId,
+      { environment: 'staging', migrationId: '001_init', checksum: SUM_A, state: 'confirmed' },
+      NOW
+    )
+    expect(repo.listMigrations(SCOPE, releaseId)[0]?.backupRef).toBeNull()
+  })
+
+  it('recusa referência de backup que não é um identificador curto', () => {
+    expect(() =>
+      repo.recordMigration(
+        SCOPE,
+        releaseId,
+        {
+          environment: 'production',
+          migrationId: '001_init',
+          checksum: SUM_A,
+          state: 'intended',
+          backupRef: 'postgres://user:senha@host/db'
+        },
+        NOW
+      )
+    ).toThrow(TypeError)
+  })
+
   it('migration confirmada não volta para intenção', () => {
     const base = { environment: 'staging', migrationId: '001_init', checksum: SUM_A } as const
     repo.recordMigration(SCOPE, releaseId, { ...base, state: 'confirmed' }, NOW)
@@ -253,6 +296,18 @@ describe('compensação', () => {
         NOW
       )
     ).toThrow(TypeError)
+  })
+})
+
+describe('releases abertas', () => {
+  it('lista as não terminais do projeto em ordem de criação, sem as concluídas nem as de outro escopo', () => {
+    const release = new ReleaseRepository(db, audit)
+    const primeira = releaseId
+    concluir(primeira) // fica terminal: não entra
+    const segunda = release.enqueue(SCOPE, 'd'.repeat(40), '2026-10-14T12:01:00.000Z').release.id
+    release.enqueue(OUTRO, 'e'.repeat(40), '2026-10-14T12:02:00.000Z')
+    expect(repo.openReleases(SCOPE).map((r) => r.id)).toEqual([segunda])
+    expect(repo.openReleases(OUTRO)).toHaveLength(1)
   })
 })
 
