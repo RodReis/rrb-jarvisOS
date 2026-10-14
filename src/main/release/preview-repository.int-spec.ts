@@ -2,10 +2,12 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import SqliteDatabase from 'better-sqlite3'
 import type { Database } from 'better-sqlite3'
 import type { ReleaseScope } from '@shared/domain/release'
 import { AuditRepository } from '../storage/audit-repository'
 import { openDatabase } from '../storage/database'
+import { migrate } from '../storage/migrations'
 import {
   PreviewOwnershipError,
   PreviewRepository,
@@ -20,6 +22,8 @@ const TTL = 5 * 60_000
 const SCOPE: ReleaseScope = { userId: 'user-1', workspaceId: 'jarvis', projectId: 'project-1' }
 const SHA_A = 'a'.repeat(40)
 const SHA_B = 'b'.repeat(40)
+/** Migrations aplicadas antes da que criou preview_resource/preview_gate (SPEC-Release-03). */
+const MIGRATIONS_ANTES_DO_PREVIEW = 64
 
 function entrada(parcial: Partial<PreviewClaimInput> = {}): PreviewClaimInput {
   return {
@@ -318,10 +322,17 @@ describe('gates por geração', () => {
 
 describe('migration do PreviewRun legado', () => {
   it('religa os eventos ao sobrevivente quando havia várias linhas por PR', () => {
-    const legado = openDatabase(join(directory, 'legado.db'))
-    // Simula o schema da F01: refaz preview_run/preview_event como eram e volta a versão.
+    // Banco exatamente na versão anterior à migration do Preview (a 65ª): independe das migrations
+    // que vierem depois, que `openDatabase` aplica na sequência.
+    const legado = new SqliteDatabase(join(directory, 'legado.db'))
+    legado.pragma('foreign_keys = ON')
+    migrate(legado, MIGRATIONS_ANTES_DO_PREVIEW)
+    expect(
+      legado.prepare("SELECT 1 FROM sqlite_master WHERE name='preview_resource'").get()
+    ).toBeUndefined()
+    // Simula o schema da F01: refaz preview_run/preview_event como eram.
     legado.exec(`
-      DROP TABLE preview_gate; DROP TABLE preview_resource; DROP TABLE preview_event; DROP TABLE preview_run;
+      DROP TABLE preview_event; DROP TABLE preview_run;
       CREATE TABLE preview_run (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, workspace_id TEXT NOT NULL,
         project_id TEXT NOT NULL, pull_request INTEGER NOT NULL, head_sha TEXT NOT NULL, status TEXT NOT NULL,
         created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
@@ -333,8 +344,6 @@ describe('migration do PreviewRun legado', () => {
       INSERT INTO preview_run VALUES ('novo','user-1','jarvis','project-1',12,'${SHA_B}','preparing','2026-10-02T00:00:00Z','2026-10-02T00:00:00Z');
       INSERT INTO preview_event VALUES ('e1','user-1','jarvis','project-1','velho','preview-updated',NULL,'ready','2026-10-01T00:00:00Z');
     `)
-    const versaoAntes = (legado.pragma('user_version', { simple: true }) as number) - 1
-    legado.pragma(`user_version = ${versaoAntes}`)
     legado.close()
 
     const migrado = openDatabase(join(directory, 'legado.db'))
