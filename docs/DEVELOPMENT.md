@@ -2,7 +2,7 @@
 
 ## MVP-014 — M14-F04 Staging e Produção automática (`SPEC-Release-04`, issue #153)
 
-Status: **em andamento** — branch `feat/m14-f04-staging-producao`, card em `proplan:doing` desde 2026-10-14. Decisões de implementação do PI (backup, frontend em runtime, estabilização, divergência proibida) em `docs/spec/spec-release-04-staging-producao.md`.
+Status: **entregue** pela [PR #430](https://github.com/RodReis/rrb-jarvisOS/pull/430), squash merge na `main` em 2026-10-14 (SHA `8f6dd35111a9d75ce8dba99493324cf33dbf939f`); issue #153 em `proplan:done`, aguardando aceite do PI. Decisões de implementação do PI (backup, frontend em runtime, estabilização, divergência proibida) e limites em `docs/spec/spec-release-04-staging-producao.md`.
 
 - [x] Conferir issue #153, SPEC `aprovada-pi`, dependência da F03 (PR #428 mergeada) e `APRENDIZADOS.md` (vazio).
 - [x] Quatro pontos em aberto levados ao PI e registrados na SPEC.
@@ -14,8 +14,8 @@ Status: **em andamento** — branch `feat/m14-f04-staging-producao`, card em `pr
 - [x] Perfil de promoção do operador (campos fechados, sem segredo) e comando `npm run release:promote` (Electron; smoke do launcher: sem argumento e com argumento inválido saem com código 2).
 - [x] Docs: SPEC (§ Decisões e limites), `ARCHITECTURE.md`.
 - [x] Revisões independentes (código e segurança): 0 CRITICAL e 1 HIGH — o mesmo, achado pelos dois revisores sem combinar (destino da compensação gravado cedo demais, com releases sobrepostas); tratado com teste de regressão vermelho antes. Mais seis MEDIUM de segurança e quatro de código/LOW tratados (SPEC, decisão 11); os que ficam estão em § Limites declarados.
-- [ ] `STATUS.md`, `reports/TESTS.md` regenerado a partir dos artefatos do CI.
-- [ ] PR com `refs #153`, CI verde, merge confirmado e comentário de encerramento (`fechar-card`).
+- [x] `STATUS.md` e `reports/TESTS.md` regenerado a partir dos artefatos do run 38558166303 (Regras 3.542 · Banco 2.593 pass 2.574 / 19 ignorados · Tela 806 pass 805 / 1 todo), com a guarda do CI reproduzida localmente.
+- [x] PR [#430](https://github.com/RodReis/rrb-jarvisOS/pull/430) com `refs #153`, CI verde no head `5025ade` ([run 38559509991](https://github.com/RodReis/rrb-jarvisOS/actions/runs/38559509991)); o primeiro run reprovou `quality` (prettier em dois arquivos do primeiro commit) e `test` (relatório sem carimbo), ambos corrigidos. Merge confirmado na origem e [comentário de encerramento](https://github.com/RodReis/rrb-jarvisOS/issues/153#issuecomment-6167856384) publicado.
 - Smoke real em Railway e Vercel: **`not_run`** — sem projeto de prova e sem credenciais nesta máquina; premissas não verificadas na SPEC § Decisões de implementação.
 
 ## MVP-014 — M14-F03 Preview isolado por PR (`SPEC-Release-03`, issue #152)
