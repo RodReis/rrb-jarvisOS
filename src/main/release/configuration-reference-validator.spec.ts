@@ -47,7 +47,9 @@ describe('validarReferencias', () => {
       probe: probe({ local: { DATABASE_URL: 'a', API_TOKEN: 'b' }, staging: { DATABASE_URL: 'c' } })
     })
     expect(resultado.ok).toBe(false)
-    expect(resultado.bloqueios).toEqual([{ name: 'API_TOKEN', environment: 'staging' }])
+    expect(resultado.bloqueios).toEqual([
+      { name: 'API_TOKEN', environment: 'staging', reason: 'missing' }
+    ])
   })
 
   it('valor diferente entre ambientes é permitido e não bloqueia', () => {
@@ -101,5 +103,87 @@ describe('validarReferencias', () => {
     expect(fingerprintDeConfiguracao('chave-a', 'X', 'v')).not.toBe(
       fingerprintDeConfiguracao('chave-b', 'X', 'v')
     )
+  })
+})
+
+describe('validarReferencias — chaves de isolamento (SPEC-Release-04, decisão 4)', () => {
+  const ambientes = ['staging', 'production'] as const
+
+  it('mesmo valor de uma chave de isolamento em Staging e Produção bloqueia antes do efeito', () => {
+    const resultado = validarReferencias({
+      nomes: ['DATABASE_URL'],
+      ambientes,
+      isoladas: ['DATABASE_URL'],
+      probe: probe({
+        staging: { DATABASE_URL: 'postgres://mesmo-banco' },
+        production: { DATABASE_URL: 'postgres://mesmo-banco' }
+      })
+    })
+    expect(resultado.ok).toBe(false)
+    expect(resultado.bloqueios).toEqual([
+      { name: 'DATABASE_URL', environment: 'production', reason: 'shared-value' }
+    ])
+  })
+
+  it('valores diferentes na chave de isolamento passam', () => {
+    const resultado = validarReferencias({
+      nomes: ['DATABASE_URL'],
+      ambientes,
+      isoladas: ['DATABASE_URL'],
+      probe: probe({
+        staging: { DATABASE_URL: 'postgres://staging' },
+        production: { DATABASE_URL: 'postgres://producao' }
+      })
+    })
+    expect(resultado.ok).toBe(true)
+  })
+
+  it('chave que NÃO é de isolamento pode ter o mesmo valor nos dois ambientes', () => {
+    const resultado = validarReferencias({
+      nomes: ['REGIAO', 'DATABASE_URL'],
+      ambientes,
+      isoladas: ['DATABASE_URL'],
+      probe: probe({
+        staging: { REGIAO: 'sa-east-1', DATABASE_URL: 'a' },
+        production: { REGIAO: 'sa-east-1', DATABASE_URL: 'b' }
+      })
+    })
+    expect(resultado.ok).toBe(true)
+  })
+
+  it('chave ausente continua bloqueando com motivo missing', () => {
+    const resultado = validarReferencias({
+      nomes: ['API_TOKEN'],
+      ambientes,
+      probe: probe({ staging: { API_TOKEN: 'a' } })
+    })
+    expect(resultado.bloqueios).toEqual([
+      { name: 'API_TOKEN', environment: 'production', reason: 'missing' }
+    ])
+  })
+
+  it('o bloqueio por isolamento não carrega valor nem fingerprint', () => {
+    const resultado = validarReferencias({
+      nomes: ['DATABASE_URL'],
+      ambientes,
+      isoladas: ['DATABASE_URL'],
+      probe: probe({
+        staging: { DATABASE_URL: 'SENTINELA-DO-BANCO' },
+        production: { DATABASE_URL: 'SENTINELA-DO-BANCO' }
+      })
+    })
+    expect(JSON.stringify(resultado.bloqueios)).not.toContain('SENTINELA-DO-BANCO')
+    expect(JSON.stringify(resultado.bloqueios)).not.toMatch(/[a-f0-9]{64}/)
+  })
+
+  it('chave de isolamento que não existe no contrato de nomes é recusada', () => {
+    expect(() =>
+      validarReferencias({
+        nomes: ['A'],
+        ambientes,
+        isoladas: ['NAO_EXISTE'],
+        probe: probe({ staging: { A: '1' }, production: { A: '2' } })
+      })
+    ).toThrow(TypeError)
   })
 })

@@ -19,12 +19,16 @@ export type ConfigurationProbe = (
   name: string
 ) => { readonly present: boolean; readonly fingerprint?: string }
 
+/** `missing`: chave sem valor no ambiente. `shared-value`: chave de isolamento com o mesmo valor em dois ambientes. */
+export type ConfigurationBlockReason = 'missing' | 'shared-value'
+
 export interface ConfigurationValidation {
   readonly ok: boolean
   readonly referencias: readonly ReferenceCheck[]
   readonly bloqueios: readonly {
     readonly name: string
     readonly environment: ConfigurationEnvironment
+    readonly reason: ConfigurationBlockReason
   }[]
 }
 
@@ -64,17 +68,35 @@ export function validarReferencias(entrada: {
   readonly nomes: readonly string[]
   readonly ambientes: readonly ConfigurationEnvironment[]
   readonly probe: ConfigurationProbe
+  /**
+   * Chaves que **não podem** ter o mesmo valor em dois ambientes (SPEC-Release-04): banco ou
+   * credencial compartilhados anulam o isolamento. Para as demais chaves, divergir é permitido.
+   */
+  readonly isoladas?: readonly string[]
 }): ConfigurationValidation {
+  const isoladas = new Set(entrada.isoladas ?? [])
+  for (const nome of isoladas)
+    if (!entrada.nomes.includes(nome))
+      throw new TypeError(`A chave de isolamento ${nome} não faz parte do contrato de chaves.`)
   const referencias: ReferenceCheck[] = []
-  const bloqueios: { name: string; environment: ConfigurationEnvironment }[] = []
+  const bloqueios: {
+    name: string
+    environment: ConfigurationEnvironment
+    reason: ConfigurationBlockReason
+  }[] = []
   for (const name of entrada.nomes) {
     let base: string | undefined
+    const vistos = new Set<string>()
     for (const environment of entrada.ambientes) {
       const lido = entrada.probe(environment, name)
       if (!lido.present || !lido.fingerprint) {
         referencias.push({ name, environment, state: 'missing' })
-        bloqueios.push({ name, environment })
+        bloqueios.push({ name, environment, reason: 'missing' })
         continue
+      }
+      if (isoladas.has(name)) {
+        if (vistos.has(lido.fingerprint)) bloqueios.push({ name, environment, reason: 'shared-value' })
+        vistos.add(lido.fingerprint)
       }
       // O primeiro ambiente configurado é a base; os demais comparam com ele. Valor diferente
       // é permitido (cada ambiente tem o seu), só fica registrado como `divergent`.
