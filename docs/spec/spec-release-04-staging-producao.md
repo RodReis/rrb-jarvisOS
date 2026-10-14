@@ -2,8 +2,8 @@
 
 - MVP/Fatia: MVP-014 · M14-F04.
 - Issue: [#153](https://github.com/RodReis/rrb-jarvisOS/issues/153).
-- Status: **aprovada-pi** (2026-08-29); issue em `proplan:backlog`; implementação depende da fila.
-- Depende de: M14-F03 aprovada e entregue.
+- Status: **aprovada-pi** (2026-08-29); issue #153 em `proplan:doing` desde 2026-10-14; decisões de implementação em § Decisões de implementação.
+- Depende de: M14-F03 aprovada e entregue (PR [#428](https://github.com/RodReis/rrb-jarvisOS/pull/428)).
 - Design: `docs/superpowers/specs/2026-08-29-pipeline-desenvolvimento-ia-v3-design.md`.
 
 ## Objetivo
@@ -97,6 +97,15 @@ npm run test:prova
 - **Consultar a SPEC:** mudar ordem, janela, gates ou compatibilidade de schema.
 - **Nunca:** rebuild, restore automático, deploy concorrente no mesmo ambiente ou alteração direta por agente.
 
+## Decisões de implementação
+
+Quatro pontos que a SPEC deixava em aberto foram levados ao PI antes de codificar (2026-10-14); em todos o PI adotou a recomendação do Code. Opções recusadas ficam registradas.
+
+1. **Backup de Produção = backup nativo do volume via API do Railway.** A CLI do Railway 5.27 não tem comando de backup (`railway volume` só lista, cria, anexa e navega); o adapter chama a API GraphQL, confirma pelo id do backup e grava a referência. O dado de Produção não sai do provedor, e a referência que o restore operacional exige já existe. Sem backup confirmado, a migration não roda (critério 4). *Recusadas:* `pg_dump` pelo app via TCP proxy (copia dado de Produção para o disco local; cifrar e reter viraria escopo) e "backup como pré-requisito declarado" (não gera backup, contrariando o texto da SPEC). *Custo declarado:* depende do plano Pro do Railway e de validar o schema da API num projeto de prova — sem o projeto, o smoke fica `not_run`.
+2. **Mesmo deployment de frontend, backend resolvido em runtime por hostname.** Como Staging e Produção apontam para backends diferentes e a regra 2 proíbe rebuild, a URL do backend não pode estar gravada no build. O frontend lê uma configuração de runtime resolvida pelo domínio em que foi servido; o contrato vai no perfil do projeto e o verificador confere, em cada ambiente, que o frontend fala só com o backend daquele ambiente. *Recusadas:* rewrite/proxy `/api` por ambiente customizado da Vercel (depende de plano pago e de configuração fora do deployment) e rebuild por ambiente (viola a regra 2 e o critério 2).
+3. **Falha na estabilização: uma falha isolada reinicia a janela; a segunda compensa.** No máximo um reinício por release; depois, compensa frontend e backend. O limite de reinícios é configurável por projeto junto com a janela e o intervalo. Retry com backoff completo continua na F05. *Recusadas:* "qualquer falha compensa" (um timeout isolado reverteria uma release saudável) e "reinicia até um teto de tempo" (Produção fica instável por mais tempo antes de reverter).
+4. **"Divergência proibida" = mesmo valor em Staging e Produção para chaves de isolamento.** O perfil do projeto lista `isolatedKeys` (por exemplo, URL e credencial do PostgreSQL); fingerprint idêntico entre os dois ambientes numa dessas chaves bloqueia antes do efeito, porque significaria banco ou credencial compartilhados. Divergência em qualquer outra chave continua permitida. *Recusadas:* só "ausente" bloqueia (não protege contra Staging apontando para o banco de Produção) e "conjunto de chaves diferente" (já é coberto por "ausente").
+
 ## Perguntas abertas ao PI
 
-Nenhuma. Revisão exata aprovada pelo PI em 2026-08-29.
+Nenhuma. Revisão exata aprovada pelo PI em 2026-08-29; decisões de implementação acima aprovadas pelo PI em 2026-10-14.

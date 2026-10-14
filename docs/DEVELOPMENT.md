@@ -1,5 +1,20 @@
 # DEVELOPMENT.md — Ordem de execução e status
 
+## MVP-014 — M14-F04 Staging e Produção automática (`SPEC-Release-04`, issue #153)
+
+Status: **em andamento** — branch `feat/m14-f04-staging-producao`, card em `proplan:doing` desde 2026-10-14. Decisões de implementação do PI (backup, frontend em runtime, estabilização, divergência proibida) em `docs/spec/spec-release-04-staging-producao.md`.
+
+- [x] Conferir issue #153, SPEC `aprovada-pi`, dependência da F03 (PR #428 mergeada) e `APRENDIZADOS.md` (vazio).
+- [x] Quatro pontos em aberto levados ao PI e registrados na SPEC.
+- [ ] Domínio puro: janela de estabilização (`StabilizationMonitor`), gates obrigatórios por ambiente (`ReleaseGateEngine`) e `isolatedKeys` no validador de configuração.
+- [ ] Migration 66 (`kind` e `replaces_external_id` em `release_deployment`) e `ReleasePromotionRepository` (deployments, migrations, compensações).
+- [ ] Portas de promoção + `PromotionService`: candidato → preparing → Staging → Produção → estabilização → `completed`; compensação de aplicação; uma promoção ativa por projeto/ambiente.
+- [ ] Integração contra SQLite real com nuvem falsa: critérios 1–10 e os três contrafactuais da SPEC.
+- [ ] Adapters CLI-first: Railway backend persistente, backup via API Railway, Vercel (deployment imutável, atribuir Staging, promover Produção), verificador HTTP de runtime.
+- [ ] Comando `npm run release:promote` (Electron) e script.
+- [ ] Docs (`ARCHITECTURE`, `TESTING`, `STATUS`) e `reports/TESTS.md` regenerado.
+- [ ] Revisões independentes (código e segurança), PR com `refs #153`, CI verde, merge e comentário de encerramento.
+
 ## MVP-014 — M14-F03 Preview isolado por PR (`SPEC-Release-03`, issue #152)
 
 Status: **entregue** pela [PR #428](https://github.com/RodReis/rrb-jarvisOS/pull/428), squash merge na `main` em 2026-10-13 (SHA `05afd4e77381b091abcd1432ea8381be08f91136`); issue #152 em `proplan:done`, aguardando aceite do PI. Decisões de implementação em `docs/spec/spec-release-03-preview-isolado.md`.
