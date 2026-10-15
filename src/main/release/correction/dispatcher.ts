@@ -1,19 +1,14 @@
-import type {
-  ReleaseEnvironmentQuery,
-  ReleaseQuery,
-  ReleaseQueueQuery
-} from '@shared/contracts/release';
-import type { ReleaseStatus } from '@shared/domain/release';
-import { ReleaseConflictError, ReleaseRepository } from '../release-repository';
-import { ReleaseOrchestrator } from './release-orchestrator';
-import { ReleaseEvidenceWriter } from './evidence-writer';
+import type { ReleaseEnvironmentQuery } from '@shared/contracts/release'
+import { ReleaseConflictError, ReleaseRepository } from '../release-repository'
+import { ReleaseOrchestrator } from '../release-orchestrator'
+import { ReleaseEvidenceWriter } from './evidence-writer'
 
 export interface CompensationResult {
-  releaseId: string;
-  failedStep: string;
-  action: string;
-  state: 'confirmed' | 'ambiguous' | 'failed';
-  externalRef?: string;
+  releaseId: string
+  failedStep: string
+  action: string
+  state: 'confirmed' | 'ambiguous' | 'failed'
+  externalRef?: string
 }
 
 export class ReleaseCorrectionDispatcher {
@@ -38,14 +33,14 @@ export class ReleaseCorrectionDispatcher {
     payloadHash: string,
     maxRetries: number = 3
   ): Promise<CompensationResult> {
-    let retries = 0;
-    let lastError: unknown = null;
+    let retries = 0
+    let lastError: unknown = null
 
     while (retries <= maxRetries) {
       try {
         // Acquire a lease for the step
-        const lease = this.repository.acquireLease(query, 'correction-dispatcher', 5000, this.now());
-        const outcome = await this.orchestrator.runStep(query, step, payloadHash, lease);
+        const lease = this.repository.acquireLease(query, 'correction-dispatcher', 5000, this.now())
+        const outcome = await this.orchestrator.runStep(query, step, payloadHash, lease)
 
         // Write evidence for the runStep outcome
         await this.evidenceWriter.writeStepEvidence({
@@ -54,7 +49,7 @@ export class ReleaseCorrectionDispatcher {
           state: outcome.state,
           timestamp: this.now(),
           details: { repeated: outcome.repeated }
-        });
+        })
 
         // If the step is confirmed or failed, we can return the result
         if (outcome.state === 'confirmed' || outcome.state === 'failed') {
@@ -63,13 +58,13 @@ export class ReleaseCorrectionDispatcher {
             failedStep: step,
             action: outcome.state === 'confirmed' ? 'apply' : 'compensate',
             state: outcome.state
-          };
+          }
         }
 
         // If the state is ambiguous, we need to reconcile before retrying
         if (outcome.state === 'ambiguous') {
           // Reconcile the step
-          const reconciliation = await this.orchestrator.reconcileStep(query, step, lease);
+          const reconciliation = await this.orchestrator.reconcileStep(query, step, lease)
           // Write evidence for the reconciliation
           await this.evidenceWriter.writeStepEvidence({
             releaseId: query.releaseId,
@@ -77,7 +72,7 @@ export class ReleaseCorrectionDispatcher {
             state: reconciliation.state,
             timestamp: this.now(),
             details: { repeated: reconciliation.repeated, reconciled: true }
-          });
+          })
 
           if (reconciliation.state === 'confirmed' || reconciliation.state === 'failed') {
             return {
@@ -85,12 +80,12 @@ export class ReleaseCorrectionDispatcher {
               failedStep: step,
               action: reconciliation.state === 'confirmed' ? 'apply' : 'compensate',
               state: reconciliation.state
-            };
+            }
           }
           // If still ambiguous, we may retry (if retries left)
         }
       } catch (error) {
-        lastError = error;
+        lastError = error
         // If it's a conflict error that requires reconciliation, we handle it above.
         // For other errors, we increment retry and try again.
         if (error instanceof ReleaseConflictError && error.code === 'reconciliation-required') {
@@ -103,10 +98,10 @@ export class ReleaseCorrectionDispatcher {
       }
 
       // If we get here, we need to retry (if retries left)
-      retries++;
+      retries++
       if (retries <= maxRetries) {
         // Wait for a backoff period (simplified: fixed delay)
-        await new Promise(resolve => setTimeout(resolve, 1000 * retries));
+        await new Promise((resolve) => setTimeout(resolve, 1000 * retries))
       }
     }
 
@@ -117,7 +112,7 @@ export class ReleaseCorrectionDispatcher {
       action: 'compensate',
       state: 'failed',
       externalRef: lastError ? String(lastError) : undefined
-    };
+    }
   }
 
   /**
@@ -141,6 +136,6 @@ export class ReleaseCorrectionDispatcher {
       action: compensationAction,
       state: 'compensated',
       timestamp: this.now()
-    });
+    })
   }
 }

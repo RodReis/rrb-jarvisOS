@@ -1,6 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ReleaseCorrectionDispatcher } from './dispatcher';
-import { ReleaseEvidenceWriter } from './evidence-writer';
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { ReleaseCorrectionDispatcher } from './dispatcher'
+import type { ReleaseEnvironmentQuery } from '@shared/contracts/release'
+import type { ReleaseRepository } from '../release-repository'
+import type { ReleaseOrchestrator } from '../release-orchestrator'
+import type { ReleaseEvidenceWriter } from './evidence-writer'
 
 // Mocks
 const mockRepository = {
@@ -14,160 +17,164 @@ const mockRepository = {
   assertStepPhase: vi.fn(),
   queue: vi.fn(),
   detail: vi.fn(),
-  transition: vi.fn(),
-};
+  transition: vi.fn()
+}
 
 const mockOrchestrator = {
   runStep: vi.fn(),
   reconcileStep: vi.fn(),
   enqueue: vi.fn(),
   queue: vi.fn(),
-  detail: vi.fn(),
-};
+  detail: vi.fn()
+}
 
 const mockEvidenceWriter = {
   writeStepEvidence: vi.fn(),
   writeCompensationEvidence: vi.fn(),
-  writeReleaseStabilizationEvidence: vi.fn(),
-};
+  writeReleaseStabilizationEvidence: vi.fn()
+}
 
 describe('ReleaseCorrectionDispatcher', () => {
-  let dispatcher: ReleaseCorrectionDispatcher;
+  let dispatcher: ReleaseCorrectionDispatcher
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.clearAllMocks()
     dispatcher = new ReleaseCorrectionDispatcher(
-      mockRepository as any,
-      mockOrchestrator as any,
-      mockEvidenceWriter as any
-    );
-  });
+      mockRepository as unknown as ReleaseRepository,
+      mockOrchestrator as unknown as ReleaseOrchestrator,
+      mockEvidenceWriter as unknown as ReleaseEvidenceWriter
+    )
+  })
 
   describe('executeStepWithRetry', () => {
-    const query = {
+    const query: ReleaseEnvironmentQuery = {
       releaseId: 'release-1',
       projectId: 'project-1',
-      environment: 'staging',
-    };
-    const step = 'deploy-frontend';
-    const payloadHash = 'hash123';
+      userId: 'user-1',
+      workspaceId: 'jarvis',
+      environment: 'staging'
+    }
+    const step = 'deploy-frontend'
+    const payloadHash = 'hash123'
 
     it('should return confirmed when the step succeeds on first attempt', async () => {
-      mockOrchestrator.runStep.mockResolvedValue({ state: 'confirmed', repeated: false });
+      mockOrchestrator.runStep.mockResolvedValue({ state: 'confirmed', repeated: false })
 
-      const result = await dispatcher.executeStepWithRetry(query, step, payloadHash, 3);
+      const result = await dispatcher.executeStepWithRetry(query, step, payloadHash, 3)
 
       expect(result).toEqual({
         releaseId: 'release-1',
         failedStep: 'deploy-frontend',
         action: 'apply',
-        state: 'confirmed',
-      });
-      expect(mockOrchestrator.runStep).toHaveBeenCalledTimes(1);
+        state: 'confirmed'
+      })
+      expect(mockOrchestrator.runStep).toHaveBeenCalledTimes(1)
       expect(mockEvidenceWriter.writeStepEvidence).toHaveBeenCalledWith({
         releaseId: 'release-1',
         step: 'deploy-frontend',
         state: 'confirmed',
         timestamp: expect.any(String),
-        details: { repeated: false },
-      });
-    });
+        details: { repeated: false }
+      })
+    })
 
     it('should return failed when the step fails on first attempt and retries are exhausted', async () => {
-      mockOrchestrator.runStep.mockResolvedValue({ state: 'failed', repeated: false });
+      mockOrchestrator.runStep.mockResolvedValue({ state: 'failed', repeated: false })
 
-      const result = await dispatcher.executeStepWithRetry(query, step, payloadHash, 1);
+      const result = await dispatcher.executeStepWithRetry(query, step, payloadHash, 1)
 
       expect(result).toEqual({
         releaseId: 'release-1',
         failedStep: 'deploy-frontend',
         action: 'compensate',
-        state: 'failed',
-      });
-      expect(mockOrchestrator.runStep).toHaveBeenCalledTimes(1);
-    });
+        state: 'failed'
+      })
+      expect(mockOrchestrator.runStep).toHaveBeenCalledTimes(1)
+    })
 
     it('should retry on ambiguous state and then succeed', async () => {
       // First call returns ambiguous, reconcile returns ambiguous -> then we retry (because still ambiguous and retries left)
       // Second call (retry) returns confirmed
       mockOrchestrator.runStep
         .mockResolvedValueOnce({ state: 'ambiguous', repeated: false }) // first runStep
-        .mockResolvedValueOnce({ state: 'confirmed', repeated: false }); // second runStep (after retry)
-      mockOrchestrator.reconcileStep.mockResolvedValueOnce({ state: 'ambiguous', repeated: false }); // first reconcile
+        .mockResolvedValueOnce({ state: 'confirmed', repeated: false }) // second runStep (after retry)
+      mockOrchestrator.reconcileStep.mockResolvedValueOnce({ state: 'ambiguous', repeated: false }) // first reconcile
 
-      const result = await dispatcher.executeStepWithRetry(query, step, payloadHash, 3);
+      const result = await dispatcher.executeStepWithRetry(query, step, payloadHash, 3)
 
       expect(result).toEqual({
         releaseId: 'release-1',
         failedStep: 'deploy-frontend',
         action: 'apply',
-        state: 'confirmed',
-      });
+        state: 'confirmed'
+      })
       // runStep called twice (initial attempt and retry)
-      expect(mockOrchestrator.runStep).toHaveBeenCalledTimes(2);
+      expect(mockOrchestrator.runStep).toHaveBeenCalledTimes(2)
       // reconcile called once (after first runStep)
-      expect(mockOrchestrator.reconcileStep).toHaveBeenCalledTimes(1);
+      expect(mockOrchestrator.reconcileStep).toHaveBeenCalledTimes(1)
       // evidence for first runStep (ambiguous) and first reconcile (ambiguous) and second runStep (confirmed)
-      expect(mockEvidenceWriter.writeStepEvidence).toHaveBeenCalledTimes(3);
-    });
+      expect(mockEvidenceWriter.writeStepEvidence).toHaveBeenCalledTimes(3)
+    })
 
     it('should return failed after max retries are exhausted', async () => {
       // Both runStep and reconcileStep always return ambiguous
-      mockOrchestrator.runStep.mockResolvedValue({ state: 'ambiguous', repeated: false });
-      mockOrchestrator.reconcileStep.mockResolvedValue({ state: 'ambiguous', repeated: false });
+      mockOrchestrator.runStep.mockResolvedValue({ state: 'ambiguous', repeated: false })
+      mockOrchestrator.reconcileStep.mockResolvedValue({ state: 'ambiguous', repeated: false })
 
-      const result = await dispatcher.executeStepWithRetry(query, step, payloadHash, 2);
+      const result = await dispatcher.executeStepWithRetry(query, step, payloadHash, 2)
 
       expect(result).toEqual({
         releaseId: 'release-1',
         failedStep: 'deploy-frontend',
         action: 'compensate',
-        state: 'failed',
-      });
+        state: 'failed'
+      })
       // maxRetries=2 means: initial attempt + 2 retries = 3 total attempts
       // Each attempt includes one runStep and one reconcileStep (since ambiguous)
-      expect(mockOrchestrator.runStep).toHaveBeenCalledTimes(3);
-      expect(mockOrchestrator.reconcileStep).toHaveBeenCalledTimes(3);
-    });
+      expect(mockOrchestrator.runStep).toHaveBeenCalledTimes(3)
+      expect(mockOrchestrator.reconcileStep).toHaveBeenCalledTimes(3)
+    })
 
     it('should handle ReleaseConflictError and retry', async () => {
-      const mockError = new Error('ReleaseConflictError');
+      const mockError = new Error('ReleaseConflictError')
       // Mock the orchestrator to throw an error on the first call, then succeed
       mockOrchestrator.runStep
         .mockRejectedValueOnce(mockError)
-        .mockResolvedValueOnce({ state: 'confirmed', repeated: false });
+        .mockResolvedValueOnce({ state: 'confirmed', repeated: false })
 
-      const result = await dispatcher.executeStepWithRetry(query, step, payloadHash, 3);
+      const result = await dispatcher.executeStepWithRetry(query, step, payloadHash, 3)
 
       expect(result).toEqual({
         releaseId: 'release-1',
         failedStep: 'deploy-frontend',
         action: 'apply',
-        state: 'confirmed',
-      });
-      expect(mockOrchestrator.runStep).toHaveBeenCalledTimes(2);
-    });
-  });
+        state: 'confirmed'
+      })
+      expect(mockOrchestrator.runStep).toHaveBeenCalledTimes(2)
+    })
+  })
 
   describe('compensate', () => {
     it('should write compensation evidence', async () => {
-      const query = {
+      const query: ReleaseEnvironmentQuery = {
         releaseId: 'release-1',
         projectId: 'project-1',
-        environment: 'staging',
-      };
-      const failedStep = 'deploy-backend';
-      const compensationAction = 'rollback-to-previous';
+        userId: 'user-1',
+        workspaceId: 'jarvis',
+        environment: 'staging'
+      }
+      const failedStep = 'deploy-backend'
+      const compensationAction = 'rollback-to-previous'
 
-      await dispatcher.compensate(query, failedStep, compensationAction);
+      await dispatcher.compensate(query, failedStep, compensationAction)
 
       expect(mockEvidenceWriter.writeCompensationEvidence).toHaveBeenCalledWith({
         releaseId: 'release-1',
         step: failedStep,
         action: compensationAction,
         state: 'compensated',
-        timestamp: expect.any(String),
-      });
-    });
-  });
-});
+        timestamp: expect.any(String)
+      })
+    })
+  })
+})
