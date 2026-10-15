@@ -12,13 +12,14 @@ export interface ReleaseEvidence {
   state: 'confirmed' | 'ambiguous' | 'failed' | 'compensated';
   timestamp: string;
   details?: Record<string, unknown>;
+  action?: string;
 }
 
 export class ReleaseEvidenceWriter {
   constructor(
     private readonly repository: ReleaseRepository,
     private readonly now: () => string = () => new Date().toISOString()
-  ) {}
+  ) { }
 
   /**
    * Writes evidence for a step execution or reconciliation.

@@ -47,17 +47,17 @@ export class ReleaseCorrectionDispatcher {
         const lease = this.repository.acquireLease(query, 'correction-dispatcher', 5000, this.now());
         const outcome = await this.orchestrator.runStep(query, step, payloadHash, lease);
 
+        // Write evidence for the runStep outcome
+        await this.evidenceWriter.writeStepEvidence({
+          releaseId: query.releaseId,
+          step,
+          state: outcome.state,
+          timestamp: this.now(),
+          details: { repeated: outcome.repeated }
+        });
+
         // If the step is confirmed or failed, we can return the result
         if (outcome.state === 'confirmed' || outcome.state === 'failed') {
-          // Write evidence for the outcome
-          await this.evidenceWriter.writeStepEvidence({
-            releaseId: query.releaseId,
-            step,
-            state: outcome.state,
-            timestamp: this.now(),
-            details: { repeated: outcome.repeated }
-          });
-
           return {
             releaseId: query.releaseId,
             failedStep: step,
@@ -89,13 +89,6 @@ export class ReleaseCorrectionDispatcher {
           }
           // If still ambiguous, we may retry (if retries left)
         }
-
-        // If we get here, the step is still in progress or we need to retry
-        retries++;
-        if (retries <= maxRetries) {
-          // Wait for a backoff period (simplified: fixed delay)
-          await new Promise(resolve => setTimeout(resolve, 1000 * retries));
-        }
       } catch (error) {
         lastError = error;
         // If it's a conflict error that requires reconciliation, we handle it above.
@@ -103,17 +96,17 @@ export class ReleaseCorrectionDispatcher {
         if (error instanceof ReleaseConflictError && error.code === 'reconciliation-required') {
           // This case is handled in the runStep method, but we catch it here for safety.
           // We'll treat it as ambiguous and retry.
-          retries++;
-          if (retries <= maxRetries) {
-            await new Promise(resolve => setTimeout(resolve, 1000 * retries));
-          }
-          continue;
+          // Note: We don't write evidence here because the error is thrown before runStep returns.
+          // We'll rely on the retry loop to try again.
         }
         // For other errors, we retry if we have retries left.
-        retries++;
-        if (retries <= maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, 1000 * retries));
-        }
+      }
+
+      // If we get here, we need to retry (if retries left)
+      retries++;
+      if (retries <= maxRetries) {
+        // Wait for a backoff period (simplified: fixed delay)
+        await new Promise(resolve => setTimeout(resolve, 1000 * retries));
       }
     }
 
@@ -123,7 +116,7 @@ export class ReleaseCorrectionDispatcher {
       failedStep: step,
       action: 'compensate',
       state: 'failed',
-      externalRef: String(lastError)
+      externalRef: lastError ? String(lastError) : undefined
     };
   }
 
@@ -144,7 +137,7 @@ export class ReleaseCorrectionDispatcher {
     // We'll write evidence for the compensation.
     await this.evidenceWriter.writeCompensationEvidence({
       releaseId: query.releaseId,
-      failedStep,
+      step: failedStep,
       action: compensationAction,
       state: 'compensated',
       timestamp: this.now()

@@ -1,40 +1,41 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ReleaseCorrectionDispatcher } from './dispatcher';
 import { ReleaseEvidenceWriter } from './evidence-writer';
 
 // Mocks
 const mockRepository = {
-  acquireLease: jest.fn(),
-  enqueue: jest.fn(),
-  beginStep: jest.fn(),
-  finishStep: jest.fn(),
-  getStep: jest.fn(),
-  resolveAmbiguous: jest.fn(),
-  recoverIntended: jest.fn(),
-  assertStepPhase: jest.fn(),
-  queue: jest.fn(),
-  detail: jest.fn(),
-  transition: jest.fn(),
+  acquireLease: vi.fn(),
+  enqueue: vi.fn(),
+  beginStep: vi.fn(),
+  finishStep: vi.fn(),
+  getStep: vi.fn(),
+  resolveAmbiguous: vi.fn(),
+  recoverIntended: vi.fn(),
+  assertStepPhase: vi.fn(),
+  queue: vi.fn(),
+  detail: vi.fn(),
+  transition: vi.fn(),
 };
 
 const mockOrchestrator = {
-  runStep: jest.fn(),
-  reconcileStep: jest.fn(),
-  enqueue: jest.fn(),
-  queue: jest.fn(),
-  detail: jest.fn(),
+  runStep: vi.fn(),
+  reconcileStep: vi.fn(),
+  enqueue: vi.fn(),
+  queue: vi.fn(),
+  detail: vi.fn(),
 };
 
 const mockEvidenceWriter = {
-  writeStepEvidence: jest.fn(),
-  writeCompensationEvidence: jest.fn(),
-  writeReleaseStabilizationEvidence: jest.fn(),
+  writeStepEvidence: vi.fn(),
+  writeCompensationEvidence: vi.fn(),
+  writeReleaseStabilizationEvidence: vi.fn(),
 };
 
 describe('ReleaseCorrectionDispatcher', () => {
   let dispatcher: ReleaseCorrectionDispatcher;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     dispatcher = new ReleaseCorrectionDispatcher(
       mockRepository as any,
       mockOrchestrator as any,
@@ -87,12 +88,12 @@ describe('ReleaseCorrectionDispatcher', () => {
     });
 
     it('should retry on ambiguous state and then succeed', async () => {
-      // First call returns ambiguous, second call returns confirmed
+      // First call returns ambiguous, reconcile returns ambiguous -> then we retry (because still ambiguous and retries left)
+      // Second call (retry) returns confirmed
       mockOrchestrator.runStep
-        .mockResolvedValueOnce({ state: 'ambiguous', repeated: false }) // First attempt
-        .mockResolvedValueOnce({ state: 'confirmed', repeated: false }); // Second attempt (after retry)
-
-      mockOrchestrator.reconcileStep.mockResolvedValue({ state: 'confirmed', repeated: false });
+        .mockResolvedValueOnce({ state: 'ambiguous', repeated: false }) // first runStep
+        .mockResolvedValueOnce({ state: 'confirmed', repeated: false }); // second runStep (after retry)
+      mockOrchestrator.reconcileStep.mockResolvedValueOnce({ state: 'ambiguous', repeated: false }); // first reconcile
 
       const result = await dispatcher.executeStepWithRetry(query, step, payloadHash, 3);
 
@@ -102,11 +103,16 @@ describe('ReleaseCorrectionDispatcher', () => {
         action: 'apply',
         state: 'confirmed',
       });
+      // runStep called twice (initial attempt and retry)
       expect(mockOrchestrator.runStep).toHaveBeenCalledTimes(2);
+      // reconcile called once (after first runStep)
       expect(mockOrchestrator.reconcileStep).toHaveBeenCalledTimes(1);
+      // evidence for first runStep (ambiguous) and first reconcile (ambiguous) and second runStep (confirmed)
+      expect(mockEvidenceWriter.writeStepEvidence).toHaveBeenCalledTimes(3);
     });
 
     it('should return failed after max retries are exhausted', async () => {
+      // Both runStep and reconcileStep always return ambiguous
       mockOrchestrator.runStep.mockResolvedValue({ state: 'ambiguous', repeated: false });
       mockOrchestrator.reconcileStep.mockResolvedValue({ state: 'ambiguous', repeated: false });
 
@@ -118,9 +124,9 @@ describe('ReleaseCorrectionDispatcher', () => {
         action: 'compensate',
         state: 'failed',
       });
-      // Initial attempt + 2 retries = 3 calls to runStep
+      // maxRetries=2 means: initial attempt + 2 retries = 3 total attempts
+      // Each attempt includes one runStep and one reconcileStep (since ambiguous)
       expect(mockOrchestrator.runStep).toHaveBeenCalledTimes(3);
-      // Each runStep that returns ambiguous leads to a reconcileStep call
       expect(mockOrchestrator.reconcileStep).toHaveBeenCalledTimes(3);
     });
 
@@ -157,8 +163,8 @@ describe('ReleaseCorrectionDispatcher', () => {
 
       expect(mockEvidenceWriter.writeCompensationEvidence).toHaveBeenCalledWith({
         releaseId: 'release-1',
-        step: 'deploy-backend',
-        action: 'rollback-to-previous',
+        step: failedStep,
+        action: compensationAction,
         state: 'compensated',
         timestamp: expect.any(String),
       });
