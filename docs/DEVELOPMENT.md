@@ -1,5 +1,26 @@
 # DEVELOPMENT.md — Ordem de execução e status
 
+## MVP-014 — M14-F05 Compensação, retorno à V2 e E2E (`SPEC-Release-05`, issue #154) — **fecha o MVP-014**
+
+Status: **implementada**, PR [#432](https://github.com/RodReis/rrb-jarvisOS/pull/432) com `refs #154`; issue em `proplan:doing` até o merge. Decisões de implementação, limites e confirmações pedidas ao PI em `docs/spec/spec-release-05-recuperacao-e2e.md`. **Prova real em Vercel/Railway/GHCR/GitHub: `not_run`** (sem projeto de prova nem credenciais) — o MVP-014 só fecha depois dela.
+
+- [x] Conferir issue #154, SPEC `aprovada-pi` sem perguntas abertas, dependência da F04 (PR #430 mergeada) e `APRENDIZADOS.md` (vazio). O primeiro commit da branch era um esboço (despachante e escritor de evidência sem persistência, que nem compilava); foi **substituído**, não estendido.
+- [x] Domínio puro (`release-recovery.ts`, `release-manifest.ts`): classificação de falha, política de três tentativas com backoff, nome da tag em UTC, ação mínima, JSON canônico, classificação de achados (resolvido não volta como novo) e manifesto/changelog determinísticos.
+- [x] Migration 67 (inclusão, evidência append-only, pausa de projeto, cancelamento, manifesto imutável, publicação, correção, rollback) e `ReleaseRecoveryRepository`: só códigos curtos chegam ao banco (regex no repositório e `GLOB` no schema).
+- [x] **Retry e reconciliação** (critérios 1 e 3): o passo reconcilia no provedor antes de repetir; falha transitória repete com backoff, três tentativas totais pelo contador do diário; esgotadas param com causa, evidência e ação mínima. `database_migrated` e `prepared` ganham reconciliação (porta `applied`, só leitura).
+- [x] **Crash em cada fronteira** (critério 2): morte simulada antes e depois de cada gravação do caminho feliz (~160 cenários); o processo seguinte converge sem repetir efeito.
+- [x] **`degraded` pausa o projeto** (critério 4) e `recover` prova na nuvem o estado conhecido antes de liberar; `--acknowledge` quando não há o que provar.
+- [x] **Cancelamento seguro por fase** (critério 5), com limpeza dos temporários do Docker antes de Staging; depois da promoção equivale a rollback.
+- [x] **Rollback por `release_id`** (critério 9), com prova da identidade do alvo, lane de Produção tomada e a revertida fora do papel de destino conhecido.
+- [x] **Retorno à V2** (critério 6): run `PLANNED` na fatia de origem, idempotente; provado contra a `FilaService` real que a aprovação vigente basta e que SPEC alterada volta a exigir aceite.
+- [x] **Identidade da release** (critérios 7 e 8): manifesto, tag, GitHub Release (`gh`) e changelog verificáveis, só depois de `completed`; falha de documento vira pendência.
+- [x] **Proteção de artefatos** (`protectedArtifacts`), **fronteira** de segredo e texto externo (critério 11) por varredura de todas as tabelas, e contrafactuais (tag antes da estabilização, restore do banco, correção direta em Produção).
+- [x] **Jornada** (critério 10): integração Preview → Staging → Produção → falha → correção na V2 → nova release → rollback → limpeza, e jornada Playwright nas três URLs e depois do rollback (prova local no CI; modo real por variável).
+- [x] Comando `release:promote` com `cancel`, `rollback`, `recover`, `publish` e `verify`; perfil de promoção com `github.repository`.
+- [x] **Vinte e quatro mutações** no código de produção medidas: todas reprovam o teste certo.
+- [x] Docs: SPEC (§ Decisões de implementação), `ARCHITECTURE.md` §11.5, `TESTING.md`, `STATUS.md`, `mvp-014`.
+- Pendências conhecidas, todas declaradas na SPEC: roteiro real com projeto de prova; consumo do contexto da correção pelo construtor da V2; ligação do evento de merge ao comando.
+
 ## MVP-014 — M14-F04 Staging e Produção automática (`SPEC-Release-04`, issue #153)
 
 Status: **entregue** pela [PR #430](https://github.com/RodReis/rrb-jarvisOS/pull/430), squash merge na `main` em 2026-10-14 (SHA `8f6dd35111a9d75ce8dba99493324cf33dbf939f`); issue #153 em `proplan:done`, aguardando aceite do PI. Decisões de implementação do PI (backup, frontend em runtime, estabilização, divergência proibida) e limites em `docs/spec/spec-release-04-staging-producao.md`.
