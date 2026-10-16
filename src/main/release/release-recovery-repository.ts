@@ -1,7 +1,43 @@
 import { randomUUID } from 'node:crypto'
 import type { Database } from 'better-sqlite3'
-import type { ReleaseEnvironment, ReleaseScope } from '@shared/domain/release'
+import type { ReleaseScope } from '@shared/domain/release'
 import type { AuditRepository } from '../storage/audit-repository'
+import type {
+  CancellationPhase,
+  CancellationState,
+  CorrectionInput,
+  CorrectionState,
+  EvidenceDetails,
+  EvidenceInput,
+  InclusionInput,
+  ManifestInput,
+  ProjectPause,
+  PublicationState,
+  PublicationTarget,
+  ReleaseCancellation,
+  ReleaseCorrection,
+  ReleaseEvidence,
+  ReleaseInclusion,
+  ReleaseManifest,
+  ReleasePublication,
+  ReleaseRollback,
+  RollbackState
+} from './release-recovery-types'
+
+import {
+  type CancellationRow,
+  type CorrectionRow,
+  type EvidenceRow,
+  type PublicationRow,
+  type RollbackRow,
+  toCancellation,
+  toCorrection,
+  toEvidence,
+  toPublication,
+  toRollback
+} from './release-recovery-rows'
+
+export type * from './release-recovery-types'
 
 /**
  * Persistência da recuperação e da identidade de release (SPEC-Release-05): inclusões, evidência,
@@ -24,132 +60,6 @@ export class ReleaseRecoveryConflictError extends Error {
     super(message)
     this.name = 'ReleaseRecoveryConflictError'
   }
-}
-
-export type EvidenceKind =
-  | 'step'
-  | 'retry'
-  | 'retries-exhausted'
-  | 'compensation'
-  | 'stabilization'
-  | 'cancellation'
-  | 'rollback'
-  | 'correction'
-  | 'publication'
-  | 'recovery'
-export type EvidenceState =
-  'confirmed' | 'ambiguous' | 'failed' | 'compensated' | 'pending' | 'recorded'
-export type EvidenceDetails = Readonly<Record<string, string | number | boolean>>
-
-export interface EvidenceInput {
-  readonly kind: EvidenceKind
-  readonly state: EvidenceState
-  readonly environment?: ReleaseEnvironment
-  readonly step?: string
-  /** Código curto (`backend_healthy-timeout`), nunca a mensagem do provedor. */
-  readonly reason?: string
-  /** Ação mínima como código (`check-provider-status`). */
-  readonly action?: string
-  readonly details?: EvidenceDetails
-}
-
-export interface ReleaseEvidence extends EvidenceInput {
-  readonly id: string
-  readonly releaseId: string
-  readonly createdAt: string
-}
-
-export interface InclusionInput {
-  readonly sha: string
-  readonly pullRequest?: number
-  readonly specId?: string
-  /** Fatia da V2 que originou o trabalho; é por ela que a correção volta à V2. */
-  readonly sliceId?: string
-  readonly issue?: number
-}
-
-export interface ReleaseInclusion extends InclusionInput {
-  readonly releaseId: string
-  readonly createdAt: string
-}
-
-export interface ProjectPause {
-  readonly id: string
-  readonly releaseId: string
-  readonly reason: string
-  readonly createdAt: string
-}
-
-export type CancellationPhase = 'queued' | 'preparing' | 'staging' | 'production' | 'stabilizing'
-export type CancellationState = 'requested' | 'done' | 'blocked'
-
-export interface ReleaseCancellation {
-  readonly id: string
-  readonly releaseId: string
-  readonly phase: CancellationPhase
-  readonly state: CancellationState
-  readonly reason: string | null
-  readonly requestedAt: string
-  readonly updatedAt: string
-}
-
-export interface ManifestInput {
-  readonly tag: string
-  readonly manifestJson: string
-  readonly manifestSha256: string
-  readonly changelog: string
-}
-
-export interface ReleaseManifest extends ManifestInput {
-  readonly releaseId: string
-  readonly createdAt: string
-}
-
-export type PublicationTarget = 'github-release'
-export type PublicationState = 'pending' | 'published' | 'failed'
-
-export interface ReleasePublication {
-  readonly releaseId: string
-  readonly target: PublicationTarget
-  readonly state: PublicationState
-  readonly reason: string | null
-  readonly externalRef: string | null
-  readonly attempts: number
-  readonly updatedAt: string
-}
-
-export type CorrectionClass = 'health_or_test' | 'migration' | 'artifact'
-export type CorrectionState = 'pending' | 'opened' | 'unavailable'
-
-export interface CorrectionInput {
-  readonly failureClass: CorrectionClass
-  readonly environment: ReleaseEnvironment
-  readonly step?: string
-  readonly reason: string
-  readonly dispatchKey: string
-  readonly contextJson: string
-  readonly contextSha256: string
-}
-
-export interface ReleaseCorrection extends CorrectionInput {
-  readonly id: string
-  readonly releaseId: string
-  readonly state: CorrectionState
-  readonly runId: string | null
-  readonly stateReason: string | null
-  readonly createdAt: string
-  readonly updatedAt: string
-}
-
-export type RollbackState = 'intended' | 'confirmed' | 'failed'
-
-export interface ReleaseRollback {
-  readonly id: string
-  readonly fromReleaseId: string
-  readonly toReleaseId: string
-  readonly state: RollbackState
-  readonly createdAt: string
-  readonly updatedAt: string
 }
 
 const CODIGO = /^[a-z0-9][a-z0-9._:-]{0,63}$/
@@ -200,124 +110,6 @@ function serializarDetalhes(detalhes: EvidenceDetails | undefined): string | nul
   }
   return JSON.stringify(detalhes)
 }
-
-interface EvidenceRow {
-  id: string
-  release_id: string
-  environment: ReleaseEnvironment | null
-  kind: EvidenceKind
-  step: string | null
-  state: EvidenceState
-  reason: string | null
-  action: string | null
-  details: string | null
-  created_at: string
-}
-
-interface CancellationRow {
-  id: string
-  release_id: string
-  phase: CancellationPhase
-  state: CancellationState
-  reason: string | null
-  requested_at: string
-  updated_at: string
-}
-
-interface CorrectionRow {
-  id: string
-  release_id: string
-  failure_class: CorrectionClass
-  environment: ReleaseEnvironment
-  step: string | null
-  reason: string
-  state: CorrectionState
-  run_id: string | null
-  state_reason: string | null
-  dispatch_key: string
-  context_json: string
-  context_sha256: string
-  created_at: string
-  updated_at: string
-}
-
-interface PublicationRow {
-  release_id: string
-  target: PublicationTarget
-  state: PublicationState
-  reason: string | null
-  external_ref: string | null
-  attempts: number
-  updated_at: string
-}
-
-interface RollbackRow {
-  id: string
-  from_release_id: string
-  to_release_id: string
-  state: RollbackState
-  created_at: string
-  updated_at: string
-}
-
-const toEvidence = (row: EvidenceRow): ReleaseEvidence => ({
-  id: row.id,
-  releaseId: row.release_id,
-  kind: row.kind,
-  state: row.state,
-  createdAt: row.created_at,
-  ...(row.environment ? { environment: row.environment } : {}),
-  ...(row.step ? { step: row.step } : {}),
-  ...(row.reason ? { reason: row.reason } : {}),
-  ...(row.action ? { action: row.action } : {}),
-  ...(row.details ? { details: JSON.parse(row.details) as EvidenceDetails } : {})
-})
-
-const toCancellation = (row: CancellationRow): ReleaseCancellation => ({
-  id: row.id,
-  releaseId: row.release_id,
-  phase: row.phase,
-  state: row.state,
-  reason: row.reason,
-  requestedAt: row.requested_at,
-  updatedAt: row.updated_at
-})
-
-const toCorrection = (row: CorrectionRow): ReleaseCorrection => ({
-  id: row.id,
-  releaseId: row.release_id,
-  failureClass: row.failure_class,
-  environment: row.environment,
-  reason: row.reason,
-  state: row.state,
-  runId: row.run_id,
-  stateReason: row.state_reason,
-  dispatchKey: row.dispatch_key,
-  contextJson: row.context_json,
-  contextSha256: row.context_sha256,
-  createdAt: row.created_at,
-  updatedAt: row.updated_at,
-  ...(row.step ? { step: row.step } : {})
-})
-
-const toPublication = (row: PublicationRow): ReleasePublication => ({
-  releaseId: row.release_id,
-  target: row.target,
-  state: row.state,
-  reason: row.reason,
-  externalRef: row.external_ref,
-  attempts: row.attempts,
-  updatedAt: row.updated_at
-})
-
-const toRollback = (row: RollbackRow): ReleaseRollback => ({
-  id: row.id,
-  fromReleaseId: row.from_release_id,
-  toReleaseId: row.to_release_id,
-  state: row.state,
-  createdAt: row.created_at,
-  updatedAt: row.updated_at
-})
 
 export class ReleaseRecoveryRepository {
   constructor(

@@ -15,7 +15,11 @@ import type { PromotionProject } from './release-promotion-effects'
 import { ReleaseLocalRepository } from './release-local-repository'
 import { ReleasePromotionRepository } from './release-promotion-repository'
 import { PromotionService } from './release-promotion-service'
-import { ReleaseCorrectionDispatcher, type CorrectionRequest } from './correction/dispatcher'
+import {
+  ReleaseCorrectionDispatcher,
+  type CorrectionRequest,
+  type V2CorrectionPort
+} from './correction/dispatcher'
 import { ReleasePublisher } from './release-publisher'
 import { ReleaseRecoveryRepository } from './release-recovery-repository'
 import { ReleaseRepository } from './release-repository'
@@ -179,6 +183,8 @@ export function montarHarness(
     morte?: ProcessKiller
     /** O serviço não publica a identidade: o teste dirige o `ReleasePublisher` por conta própria. */
     semPublicacao?: boolean
+    /** Porta da V2 de verdade (em vez da falsa), para provar a ligação com o fluxo real da V2. */
+    v2?: V2CorrectionPort
   } = {}
 ): Harness {
   const directory = mkdtempSync(join(tmpdir(), 'release-promotion-svc-'))
@@ -204,7 +210,7 @@ export function montarHarness(
     repository,
     recovery,
     now: clock.now,
-    v2: {
+    v2: opcoes.v2 ?? {
       open: async (pedido) => {
         if (v2.falha) throw v2.falha
         v2.pedidos.push(pedido)
