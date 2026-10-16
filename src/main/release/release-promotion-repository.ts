@@ -281,7 +281,17 @@ export class ReleasePromotionRepository {
   ): PromotionDeployment | null {
     const prova =
       environment === 'production'
-        ? { juncao: '', condicao: "r.status='completed'", ordem: 'r.updated_at' }
+        ? {
+            juncao: '',
+            // Uma release revertida por rollback confirmado deixou de ser o que Produção serve:
+            // compensar para ela devolveria a versão que o operador acabou de retirar.
+            condicao: `r.status='completed' AND NOT EXISTS (
+              SELECT 1 FROM release_rollback rb
+               WHERE rb.from_release_id=d.release_id AND rb.state='confirmed'
+                 AND rb.user_id=d.user_id AND rb.workspace_id=d.workspace_id
+                 AND rb.project_id=d.project_id)`,
+            ordem: 'r.updated_at'
+          }
         : {
             juncao: `JOIN release_step s ON s.release_id=d.release_id AND s.user_id=d.user_id
                        AND s.workspace_id=d.workspace_id AND s.project_id=d.project_id

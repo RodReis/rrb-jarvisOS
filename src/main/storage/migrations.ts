@@ -2661,6 +2661,150 @@ const MIGRATIONS: readonly string[] = [
   ALTER TABLE release_migration_execution ADD COLUMN backup_ref TEXT;
   CREATE UNIQUE INDEX idx_release_deployment_um_por_ambiente_e_tipo
     ON release_deployment(user_id,workspace_id,project_id,release_id,environment,kind);
+  `,
+  // SPEC-Release-05: recuperação, identidade e evidência de release. Nada aqui guarda segredo,
+  // URL, saída de provedor ou texto livre: motivos, ações e chaves de detalhe são códigos curtos
+  // (GLOB fechado) e o repositório recusa o resto antes de chegar ao banco.
+  `
+  -- SHAs, PRs, SPECs e issues que cada release carrega (o candidato consolidado herda os da substituída).
+  CREATE TABLE release_inclusion (
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL CHECK (workspace_id IN ('noa','jarvis')),
+    project_id TEXT NOT NULL,
+    release_id TEXT NOT NULL REFERENCES release_run(id),
+    sha TEXT NOT NULL CHECK (length(sha) BETWEEN 7 AND 64 AND sha NOT GLOB '*[^a-f0-9]*'),
+    pull_request INTEGER CHECK (pull_request IS NULL OR pull_request > 0),
+    spec_id TEXT CHECK (spec_id IS NULL OR (length(spec_id) BETWEEN 1 AND 128 AND spec_id NOT GLOB '*[^A-Za-z0-9._-]*')),
+    slice_id TEXT CHECK (slice_id IS NULL OR (length(slice_id) BETWEEN 1 AND 128 AND slice_id NOT GLOB '*[^A-Za-z0-9._:-]*')),
+    issue INTEGER CHECK (issue IS NULL OR issue > 0),
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, workspace_id, project_id, release_id, sha)
+  );
+
+  -- Evidência de recuperação: o que foi tentado, o que falhou, o que se fez e qual é a ação mínima.
+  CREATE TABLE release_evidence (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL CHECK (workspace_id IN ('noa','jarvis')),
+    project_id TEXT NOT NULL,
+    release_id TEXT NOT NULL REFERENCES release_run(id),
+    environment TEXT CHECK (environment IS NULL OR environment IN ('staging','production')),
+    kind TEXT NOT NULL CHECK (kind IN ('step','retry','retries-exhausted','compensation','stabilization','cancellation','rollback','correction','publication','recovery')),
+    step TEXT CHECK (step IS NULL OR (length(step) BETWEEN 1 AND 64 AND step NOT GLOB '*[^A-Za-z0-9._-]*')),
+    state TEXT NOT NULL CHECK (state IN ('confirmed','ambiguous','failed','compensated','pending','recorded')),
+    reason TEXT CHECK (reason IS NULL OR (length(reason) BETWEEN 1 AND 64 AND reason NOT GLOB '*[^a-z0-9._:-]*')),
+    action TEXT CHECK (action IS NULL OR (length(action) BETWEEN 1 AND 64 AND action NOT GLOB '*[^a-z0-9._:-]*')),
+    details TEXT CHECK (details IS NULL OR length(details) <= 1024),
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX idx_release_evidence_timeline
+    ON release_evidence(user_id, workspace_id, project_id, release_id, created_at, id);
+  CREATE TRIGGER release_evidence_append_only_update BEFORE UPDATE ON release_evidence
+  BEGIN SELECT RAISE(ABORT, 'release_evidence é append-only'); END;
+  CREATE TRIGGER release_evidence_append_only_delete BEFORE DELETE ON release_evidence
+  BEGIN SELECT RAISE(ABORT, 'release_evidence é append-only'); END;
+
+  -- Pausa do projeto: release degradada (compensação incompleta) congela a promoção só dele.
+  CREATE TABLE release_project_pause (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL CHECK (workspace_id IN ('noa','jarvis')),
+    project_id TEXT NOT NULL,
+    release_id TEXT NOT NULL REFERENCES release_run(id),
+    reason TEXT NOT NULL CHECK (length(reason) BETWEEN 1 AND 64 AND reason NOT GLOB '*[^a-z0-9._:-]*'),
+    created_at TEXT NOT NULL,
+    resolved_at TEXT
+  );
+  CREATE UNIQUE INDEX idx_release_project_pause_ativa
+    ON release_project_pause(user_id, workspace_id, project_id) WHERE resolved_at IS NULL;
+
+  -- Pedido de cancelamento: um por release; o executor o honra no próximo ponto seguro.
+  CREATE TABLE release_cancellation (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL CHECK (workspace_id IN ('noa','jarvis')),
+    project_id TEXT NOT NULL,
+    release_id TEXT NOT NULL REFERENCES release_run(id),
+    phase TEXT NOT NULL CHECK (phase IN ('queued','preparing','staging','production','stabilizing')),
+    state TEXT NOT NULL CHECK (state IN ('requested','done','blocked')),
+    reason TEXT CHECK (reason IS NULL OR (length(reason) BETWEEN 1 AND 64 AND reason NOT GLOB '*[^a-z0-9._:-]*')),
+    requested_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (user_id, workspace_id, project_id, release_id)
+  );
+
+  -- Identidade da release estabilizada: manifesto canônico, tag e changelog. Imutável.
+  CREATE TABLE release_manifest (
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL CHECK (workspace_id IN ('noa','jarvis')),
+    project_id TEXT NOT NULL,
+    release_id TEXT NOT NULL REFERENCES release_run(id),
+    tag TEXT NOT NULL CHECK (length(tag) BETWEEN 1 AND 128 AND tag NOT GLOB '*[^A-Za-z0-9._-]*'),
+    manifest_json TEXT NOT NULL,
+    manifest_sha256 TEXT NOT NULL CHECK (length(manifest_sha256) = 64 AND manifest_sha256 NOT GLOB '*[^a-f0-9]*'),
+    changelog TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, workspace_id, project_id, release_id),
+    UNIQUE (user_id, workspace_id, project_id, tag)
+  );
+  CREATE TRIGGER release_manifest_imutavel_update BEFORE UPDATE ON release_manifest
+  BEGIN SELECT RAISE(ABORT, 'manifesto de release é imutável'); END;
+  CREATE TRIGGER release_manifest_imutavel_delete BEFORE DELETE ON release_manifest
+  BEGIN SELECT RAISE(ABORT, 'manifesto de release é imutável'); END;
+
+  -- Publicação externa (tag + GitHub Release). O que não está publicado é pendência de evidência.
+  CREATE TABLE release_publication (
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL CHECK (workspace_id IN ('noa','jarvis')),
+    project_id TEXT NOT NULL,
+    release_id TEXT NOT NULL REFERENCES release_run(id),
+    target TEXT NOT NULL CHECK (target IN ('github-release')),
+    state TEXT NOT NULL CHECK (state IN ('pending','published','failed')),
+    reason TEXT CHECK (reason IS NULL OR (length(reason) BETWEEN 1 AND 64 AND reason NOT GLOB '*[^a-z0-9._:-]*')),
+    external_ref TEXT CHECK (external_ref IS NULL OR (length(external_ref) BETWEEN 1 AND 128 AND external_ref NOT GLOB '*[^A-Za-z0-9._:/-]*')),
+    attempts INTEGER NOT NULL CHECK (attempts >= 0),
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, workspace_id, project_id, release_id, target)
+  );
+
+  -- Falha de código devolvida à V2: uma por release, ligada à mesma SPEC e ao contexto anterior.
+  CREATE TABLE release_correction (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL CHECK (workspace_id IN ('noa','jarvis')),
+    project_id TEXT NOT NULL,
+    release_id TEXT NOT NULL REFERENCES release_run(id),
+    failure_class TEXT NOT NULL CHECK (failure_class IN ('health_or_test','migration','artifact')),
+    environment TEXT NOT NULL CHECK (environment IN ('staging','production')),
+    step TEXT,
+    reason TEXT NOT NULL CHECK (length(reason) BETWEEN 1 AND 64 AND reason NOT GLOB '*[^a-z0-9._:-]*'),
+    state TEXT NOT NULL CHECK (state IN ('pending','opened','unavailable')),
+    run_id TEXT,
+    state_reason TEXT CHECK (state_reason IS NULL OR (length(state_reason) BETWEEN 1 AND 64 AND state_reason NOT GLOB '*[^a-z0-9._:-]*')),
+    dispatch_key TEXT NOT NULL CHECK (length(dispatch_key) BETWEEN 1 AND 160),
+    context_json TEXT NOT NULL,
+    context_sha256 TEXT NOT NULL CHECK (length(context_sha256) = 64 AND context_sha256 NOT GLOB '*[^a-f0-9]*'),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (user_id, workspace_id, project_id, release_id)
+  );
+
+  -- Rollback de Produção para um release_id conhecido. Só o rollback confirmado tira a release
+  -- revertida do papel de destino conhecido das compensações seguintes.
+  CREATE TABLE release_rollback (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL CHECK (workspace_id IN ('noa','jarvis')),
+    project_id TEXT NOT NULL,
+    from_release_id TEXT NOT NULL REFERENCES release_run(id),
+    to_release_id TEXT NOT NULL REFERENCES release_run(id),
+    state TEXT NOT NULL CHECK (state IN ('intended','confirmed','failed')),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    CHECK (from_release_id <> to_release_id)
+  );
+  CREATE INDEX idx_release_rollback_origem
+    ON release_rollback(user_id, workspace_id, project_id, from_release_id, state);
   `
 ]
 
