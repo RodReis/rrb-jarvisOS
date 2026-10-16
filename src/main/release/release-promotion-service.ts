@@ -8,6 +8,7 @@ import {
 } from '@shared/domain/release-recovery'
 import type { ReleaseCorrectionDispatcher } from './correction/dispatcher'
 import { ReleaseEvidenceWriter } from './correction/evidence-writer'
+import type { ReleasePublisher } from './release-publisher'
 import { ReleaseGateEngine, gateStoreFrom } from './release-gate-engine'
 import { ReleaseOrchestrator } from './release-orchestrator'
 import {
@@ -71,6 +72,8 @@ export interface PromotionServiceDeps {
   readonly recovery: ReleaseRecoveryRepository
   /** Devolve à V2 a falha de código; ausente = a correção fica a cargo do operador. */
   readonly correction?: ReleaseCorrectionDispatcher
+  /** Manifesto, tag e GitHub Release da Produção estabilizada; ausente = só o estado técnico. */
+  readonly publisher?: ReleasePublisher
   readonly build: PromotionBuildPort
   readonly backend: PromotionBackendPort
   readonly database: PromotionDatabasePort
@@ -230,7 +233,18 @@ export class PromotionService {
     const resultados: PromotionOutcome[] = []
     for (const aberta of this.deps.promotion.openReleases(scope))
       resultados.push(await this.promote(scope, aberta.id, project))
+    await this.retomarPendencias(scope)
     return resultados
+  }
+
+  /** O que não depende da lane: reabrir correção na V2 e publicar identidade que ficou pendente. */
+  private async retomarPendencias(scope: ReleaseScope): Promise<void> {
+    try {
+      await this.deps.correction?.retryPending(scope)
+      await this.deps.publisher?.retryPending(scope)
+    } catch {
+      // Pendência que continua falhando segue registrada; a próxima retomada tenta de novo.
+    }
   }
 
   async promote(
@@ -477,9 +491,32 @@ export class PromotionService {
       gate: 'stabilization',
       result: 'passed'
     })
-    // `completed` é técnico: tag, manifesto e GitHub Release só nascem na F05.
+    // A intenção de publicar é gravada ANTES de `completed`: uma queda entre os dois deixa a
+    // pendência para a retomada, nunca uma release estabilizada sem rastro de identidade.
+    if (this.deps.publisher)
+      this.deps.recovery.setPublication(
+        run.scope,
+        run.releaseId,
+        'github-release',
+        { state: 'pending' },
+        this.now()
+      )
     run.orchestrator.transition(production, 'completed', lease)
+    await this.publicarIdentidade(run)
     return this.outcome(run, { state: 'completed', reason: null })
+  }
+
+  /**
+   * Manifesto, tag e GitHub Release (regras 7 e 8): só depois de `completed`, e o que falhar aqui
+   * vira pendência de evidência — nunca muda o desfecho nem reverte uma aplicação saudável.
+   */
+  private async publicarIdentidade(run: Run): Promise<void> {
+    if (!this.deps.publisher) return
+    try {
+      await this.deps.publisher.publish(run.scope, run.releaseId)
+    } catch {
+      // A pendência já está gravada; `resume` tenta de novo.
+    }
   }
 
   private identidade(run: Run): { backendDigest: string; frontendDeploymentId: string } {

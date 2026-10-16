@@ -10,6 +10,8 @@ import {
   type PromotionProviderErrorCode,
   type PromotionVerifierPort
 } from './promotion-ports'
+import { createHash } from 'node:crypto'
+import type { ReleaseGitPort } from './release-publisher'
 import type { ReleaseLocalRepository } from './release-local-repository'
 
 /**
@@ -277,5 +279,63 @@ export class FakePromotionCloud {
   /** URL pública do backend de um ambiente, para os testes que conferem a fiação. */
   static backendUrl(environment: ReleaseEnvironment): string {
     return BACKEND_URL[environment]
+  }
+}
+
+/**
+ * GitHub falso com estado: tags e releases existem de verdade (commit e texto), então publicar
+ * duas vezes, publicar numa tag de outro commit ou editar as notas aparece como asserção quebrada.
+ * `failOn` lança antes do efeito e `failAfter` depois dele (a resposta se perdeu).
+ */
+export class FakeGitHubReleases {
+  readonly calls: string[] = []
+  readonly tags = new Map<string, { commitSha: string; notes: string | null; title: string }>()
+  private readonly faults = new Map<
+    string,
+    { code: PromotionProviderErrorCode; remaining: number }
+  >()
+  private readonly faultsAfter = new Map<
+    string,
+    { code: PromotionProviderErrorCode; remaining: number }
+  >()
+
+  failOn(operation: 'find' | 'publish', code: PromotionProviderErrorCode, times = 1): void {
+    this.faults.set(operation, { code, remaining: times })
+  }
+
+  failAfter(operation: 'publish', code: PromotionProviderErrorCode = 'timeout', times = 1): void {
+    this.faultsAfter.set(operation, { code, remaining: times })
+  }
+
+  private disparar(
+    mapa: Map<string, { code: PromotionProviderErrorCode; remaining: number }>,
+    operation: string
+  ): void {
+    const fault = mapa.get(operation)
+    if (fault && fault.remaining > 0) {
+      fault.remaining -= 1
+      throw new PromotionProviderError(fault.code, `falha injetada em ${operation}`)
+    }
+  }
+
+  readonly port: ReleaseGitPort = {
+    find: async (tag) => {
+      this.calls.push(`find:${tag}`)
+      this.disparar(this.faults, 'find')
+      const achada = this.tags.get(tag)
+      return achada
+        ? {
+            commitSha: achada.commitSha,
+            notesSha256:
+              achada.notes === null ? null : createHash('sha256').update(achada.notes).digest('hex')
+          }
+        : null
+    },
+    publish: async ({ tag, sha, title, notes }) => {
+      this.calls.push(`publish:${tag}`)
+      this.disparar(this.faults, 'publish')
+      this.tags.set(tag, { commitSha: this.tags.get(tag)?.commitSha ?? sha, notes, title })
+      this.disparar(this.faultsAfter, 'publish')
+    }
   }
 }

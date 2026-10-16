@@ -10,12 +10,13 @@ import {
   type ConfigurationProbe
 } from './configuration-reference-validator'
 import type { MigrationFile } from './database-migration-runner'
-import { FakeClock, FakePromotionCloud } from './promotion-test-doubles'
+import { FakeClock, FakeGitHubReleases, FakePromotionCloud } from './promotion-test-doubles'
 import type { PromotionProject } from './release-promotion-effects'
 import { ReleaseLocalRepository } from './release-local-repository'
 import { ReleasePromotionRepository } from './release-promotion-repository'
 import { PromotionService } from './release-promotion-service'
 import { ReleaseCorrectionDispatcher, type CorrectionRequest } from './correction/dispatcher'
+import { ReleasePublisher } from './release-publisher'
 import { ReleaseRecoveryRepository } from './release-recovery-repository'
 import { ReleaseRepository } from './release-repository'
 
@@ -151,6 +152,9 @@ export interface Harness {
   /** A V2 falsa: guarda cada pedido de correção e pode ser derrubada com `falha`. */
   readonly v2: { readonly pedidos: CorrectionRequest[]; falha: Error | null }
   readonly dispatcher: ReleaseCorrectionDispatcher
+  /** O GitHub falso e o publicador que o serviço usa ao estabilizar a Produção. */
+  readonly git: FakeGitHubReleases
+  readonly publisher: ReleasePublisher
   readonly clock: FakeClock
   readonly cloud: FakePromotionCloud
   readonly service: PromotionService
@@ -173,6 +177,8 @@ export function montarHarness(
     leaseMs?: number
     /** O serviço principal morre quando o `ProcessKiller` mandar; `novoServico` é o processo seguinte. */
     morte?: ProcessKiller
+    /** O serviço não publica a identidade: o teste dirige o `ReleasePublisher` por conta própria. */
+    semPublicacao?: boolean
   } = {}
 ): Harness {
   const directory = mkdtempSync(join(tmpdir(), 'release-promotion-svc-'))
@@ -184,6 +190,15 @@ export function montarHarness(
   const recovery = new ReleaseRecoveryRepository(db, audit)
   const clock = new FakeClock()
   const cloud = new FakePromotionCloud()
+  const git = new FakeGitHubReleases()
+  const publisher = new ReleasePublisher({
+    repository,
+    promotion,
+    local,
+    recovery,
+    git: git.port,
+    now: clock.now
+  })
   const v2: Harness['v2'] = { pedidos: [], falha: null }
   const dispatcher = new ReleaseCorrectionDispatcher({
     repository,
@@ -209,6 +224,7 @@ export function montarHarness(
       local: m ? m.wrap(local) : local,
       recovery: m ? m.wrap(recovery) : recovery,
       correction: dispatcher,
+      ...(opcoes.semPublicacao ? {} : { publisher }),
       build: m ? m.guard(nuvem.buildPort(local)) : nuvem.buildPort(local),
       backend: m ? m.guard(nuvem.backend) : nuvem.backend,
       database: m ? m.guard(nuvem.database) : nuvem.database,
@@ -230,6 +246,8 @@ export function montarHarness(
     recovery,
     v2,
     dispatcher,
+    git,
+    publisher,
     clock,
     cloud,
     service: criar({}, cloud, opcoes.morte),

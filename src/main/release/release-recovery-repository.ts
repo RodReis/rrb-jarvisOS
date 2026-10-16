@@ -674,6 +674,28 @@ export class ReleaseRecoveryRepository {
       : null
   }
 
+  /**
+   * A release concluída imediatamente antes desta (pelo instante de conclusão) e a tag dela, se
+   * houver: o elo "release anterior" do manifesto. Tag ausente = release anterior à identidade.
+   */
+  previousCompleted(
+    scope: ReleaseScope,
+    releaseId: string
+  ): { releaseId: string; tag: string | null } | null {
+    const row = this.db
+      .prepare(
+        `SELECT r.id AS id, m.tag AS tag FROM release_run r
+           LEFT JOIN release_manifest m ON m.release_id=r.id AND m.user_id=r.user_id
+             AND m.workspace_id=r.workspace_id AND m.project_id=r.project_id
+          WHERE r.user_id=? AND r.workspace_id=? AND r.project_id=? AND r.status='completed'
+            AND r.id<>? AND r.updated_at < (SELECT updated_at FROM release_run WHERE id=?)
+          ORDER BY r.updated_at DESC, r.rowid DESC LIMIT 1`
+      )
+      .get(...paramsDe(scope), releaseId, releaseId) as
+      { id: string; tag: string | null } | undefined
+    return row ? { releaseId: row.id, tag: row.tag } : null
+  }
+
   setPublication(
     scope: ReleaseScope,
     releaseId: string,
