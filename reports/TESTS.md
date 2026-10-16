@@ -12,9 +12,9 @@ Totais da última execução (regenerado, não acumulado):
 
 | Data | Issue | SPEC | Categoria | Testes | Pass | Falha | Cobertura % | PR | Link PR |
 |------|-------|------|-----------|-------:|-----:|------:|------------:|----:|--------|
-| — | — | — | Regras de Negócio | 3548 | 3548 | 0 | 78.9 | — | — |
-| — | — | — | Banco | 2593 | 2574 | 0 | 84.9 | — | — |
-| — | — | — | Tela | 806 | 805 | 0 | 74.6 | — | — |
+| — | — | — | Regras de Negócio | 3660 | 3660 | 0 | 79.9 | — | — |
+| — | — | — | Banco | 2765 | 2746 | 0 | 85.3 | — | — |
+| — | — | — | Tela | 806 | 805 | 0 | 74.5 | — | — |
 
 ## Histórico por entrega
 
@@ -535,3 +535,6 @@ Append-only — linhas de entregas passadas são imutáveis.
 | 2026-10-15 | #154 | spec-release-05-recuperacao-e | Regras de Negócio | 3548 | 3548 | 0 | 78.9 | #432 | [#432](https://github.com/RodReis/rrb-jarvisOS/pull/432) |
 | 2026-10-15 | #154 | spec-release-05-recuperacao-e | Banco | 2593 | 2574 | 0 | 84.9 | #432 | [#432](https://github.com/RodReis/rrb-jarvisOS/pull/432) |
 | 2026-10-15 | #154 | spec-release-05-recuperacao-e | Tela | 806 | 805 | 0 | 74.6 | #432 | [#432](https://github.com/RodReis/rrb-jarvisOS/pull/432) |
+| 2026-10-16 | #154 | spec-release-05-recuperacao-e | Regras de Negócio | 3660 | 3660 | 0 | 79.9 | #432 | [#432](https://github.com/RodReis/rrb-jarvisOS/pull/432) |
+| 2026-10-16 | #154 | spec-release-05-recuperacao-e | Banco | 2765 | 2746 | 0 | 85.3 | #432 | [#432](https://github.com/RodReis/rrb-jarvisOS/pull/432) |
+| 2026-10-16 | #154 | spec-release-05-recuperacao-e | Tela | 806 | 805 | 0 | 74.5 | #432 | [#432](https://github.com/RodReis/rrb-jarvisOS/pull/432) |
