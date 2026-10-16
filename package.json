@@ -22,6 +22,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:prova": "playwright test --config playwright.prova.config.ts",
+    "test:release-journey": "playwright test --config playwright.release.config.ts",
     "test:report": "node scripts/test-report.mjs",
     "test:report:check": "node scripts/test-report.mjs --check",
     "test:report:regras": "node scripts/test-report.mjs --project regras",

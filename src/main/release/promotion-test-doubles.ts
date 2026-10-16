@@ -35,6 +35,8 @@ export class FakeClock {
 interface Fault {
   readonly code: PromotionProviderErrorCode | 'ambiguous'
   remaining: number
+  /** Texto do provedor: a pipeline nunca pode repeti-lo em motivo, evidência ou auditoria. */
+  readonly message?: string
 }
 
 /** Quando a falha acontece em relação ao efeito: antes (não aplicou) ou depois (aplicou e perdeu a resposta). */
@@ -82,8 +84,8 @@ export class FakePromotionCloud {
   private sequence = 0
 
   /** Faz a operação falhar `times` vezes seguidas; `ambiguous` simula timeout (efeito incerto). */
-  failOn(operation: string, code: Fault['code'] = 'failed', times = 1): void {
-    this.faults.set(operation, { code, remaining: times })
+  failOn(operation: string, code: Fault['code'] = 'failed', times = 1, message?: string): void {
+    this.faults.set(operation, { code, remaining: times, ...(message ? { message } : {}) })
   }
 
   /**
@@ -119,8 +121,8 @@ export class FakePromotionCloud {
       const fault = chave ? mapa.get(chave) : undefined
       if (fault && fault.remaining > 0) {
         fault.remaining -= 1
-        if (fault.code === 'ambiguous') throw new Error('timeout sem resposta')
-        throw new PromotionProviderError(fault.code, `falha injetada em ${chave}`)
+        if (fault.code === 'ambiguous') throw new Error(fault.message ?? 'timeout sem resposta')
+        throw new PromotionProviderError(fault.code, fault.message ?? `falha injetada em ${chave}`)
       }
     }
   }
@@ -286,34 +288,39 @@ export class FakePromotionCloud {
  * duas vezes, publicar numa tag de outro commit ou editar as notas aparece como asserção quebrada.
  * `failOn` lança antes do efeito e `failAfter` depois dele (a resposta se perdeu).
  */
+interface GitFault {
+  readonly code: PromotionProviderErrorCode
+  remaining: number
+  readonly message?: string
+}
+
 export class FakeGitHubReleases {
   readonly calls: string[] = []
   readonly tags = new Map<string, { commitSha: string; notes: string | null; title: string }>()
-  private readonly faults = new Map<
-    string,
-    { code: PromotionProviderErrorCode; remaining: number }
-  >()
-  private readonly faultsAfter = new Map<
-    string,
-    { code: PromotionProviderErrorCode; remaining: number }
-  >()
+  private readonly faults = new Map<string, GitFault>()
+  private readonly faultsAfter = new Map<string, GitFault>()
 
-  failOn(operation: 'find' | 'publish', code: PromotionProviderErrorCode, times = 1): void {
-    this.faults.set(operation, { code, remaining: times })
+  failOn(
+    operation: 'find' | 'publish',
+    code: PromotionProviderErrorCode,
+    times = 1,
+    message?: string
+  ): void {
+    this.faults.set(operation, { code, remaining: times, ...(message ? { message } : {}) })
   }
 
   failAfter(operation: 'publish', code: PromotionProviderErrorCode = 'timeout', times = 1): void {
     this.faultsAfter.set(operation, { code, remaining: times })
   }
 
-  private disparar(
-    mapa: Map<string, { code: PromotionProviderErrorCode; remaining: number }>,
-    operation: string
-  ): void {
+  private disparar(mapa: Map<string, GitFault>, operation: string): void {
     const fault = mapa.get(operation)
     if (fault && fault.remaining > 0) {
       fault.remaining -= 1
-      throw new PromotionProviderError(fault.code, `falha injetada em ${operation}`)
+      throw new PromotionProviderError(
+        fault.code,
+        fault.message ?? `falha injetada em ${operation}`
+      )
     }
   }
 
