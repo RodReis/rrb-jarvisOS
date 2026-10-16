@@ -28,6 +28,12 @@ export interface PromotionBuildPort {
     /** Lease do writer: a preparação usa para marcar e limpar o que abriu no Docker. */
     leaseId: string
   }): Promise<PromotionBuildOutcome>
+  /**
+   * Remove o que a preparação deixou de temporário no Docker local (contêineres, redes e volumes
+   * marcados com o lease). Nunca apaga artefato publicado nem evidência. Opcional: um build sem
+   * recurso local não precisa dela.
+   */
+  cleanup?(input: { scope: ReleaseScope; releaseId: string }): Promise<void>
 }
 
 export interface PromotionBackendPort {

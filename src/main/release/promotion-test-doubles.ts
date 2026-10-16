@@ -248,6 +248,9 @@ export class FakePromotionCloud {
 
   buildPort(local: ReleaseLocalRepository): PromotionBuildPort {
     return {
+      cleanup: async () => {
+        this.enter('build.cleanup')
+      },
       build: async ({ scope, releaseId, sourceSha }) => {
         this.enter('build.backend')
         const digest = `sha256:${sourceSha.slice(0, 8).padEnd(64, '0')}`

@@ -16,7 +16,11 @@ import {
   type PromotionProject
 } from './release-promotion-effects'
 import type { ReleasePromotionRepository } from './release-promotion-repository'
-import type { InclusionInput, ReleaseRecoveryRepository } from './release-recovery-repository'
+import type {
+  CancellationPhase,
+  InclusionInput,
+  ReleaseRecoveryRepository
+} from './release-recovery-repository'
 import {
   ReleaseConflictError,
   type ReleaseLease,
@@ -114,10 +118,32 @@ interface AlvoDeRestauracao {
   readonly id: string
 }
 
+export interface CancelOutcome {
+  readonly releaseId: string
+  readonly status: ReleaseStatus
+  /**
+   * `cancelled` = terminou `failed`; `degraded` = a compensação não fechou; `requested` = outro
+   * executor segura a release e cumprirá o pedido; `blocked` = efeito incerto sem resposta do
+   * provedor; `rejected` = nada a cancelar.
+   */
+  readonly state: 'cancelled' | 'degraded' | 'requested' | 'blocked' | 'rejected'
+  readonly reason: string | null
+}
+
 export interface RecoveryOutcome {
   readonly state: 'none' | 'paused' | 'resumed'
   readonly reason: string | null
 }
+
+/** Sinal interno: há pedido de cancelamento e o executor chegou a um ponto seguro. */
+class Cancelar extends Error {}
+
+const CONFLITOS_DE_POSSE: readonly ReleaseConflictError['code'][] = [
+  'lease-mismatch',
+  'lease-expired',
+  'lease-busy',
+  'lane-busy'
+]
 
 class Parar extends Error {
   constructor(readonly outcome: Omit<PromotionOutcome, 'releaseId' | 'status'>) {
@@ -214,6 +240,21 @@ export class PromotionService {
         status: release.status,
         reason: 'project-paused'
       }
+    const run = this.abrirRun(scope, release, project)
+    try {
+      return await this.drive(run)
+    } catch (erro) {
+      return await this.desfecho(run, erro)
+    } finally {
+      this.releaseLeases(run)
+    }
+  }
+
+  private abrirRun(
+    scope: ReleaseScope,
+    release: { readonly id: string; readonly sha: string },
+    project: PromotionProject
+  ): Run {
     const leases = new Map<ReleaseEnvironment, ReleaseLease>()
     const effects = new PromotionEffects(
       this.effectsDeps(
@@ -224,7 +265,7 @@ export class PromotionService {
         () => leases.get('staging')?.leaseId ?? ''
       )
     )
-    const run: Run = {
+    return {
       scope,
       releaseId: release.id,
       project,
@@ -232,23 +273,22 @@ export class PromotionService {
       orchestrator: new ReleaseOrchestrator(this.deps.repository, effects, () => this.now()),
       leases
     }
-    try {
-      return await this.drive(run)
-    } catch (erro) {
-      if (erro instanceof Parar) return this.outcome(run, erro.outcome)
-      // Lease que expirou ou passou a outro writer: este executor sai sem escrever mais nada.
-      if (
-        erro instanceof ReleaseConflictError &&
-        (erro.code === 'lease-mismatch' ||
-          erro.code === 'lease-expired' ||
-          erro.code === 'lease-busy' ||
-          erro.code === 'lane-busy')
-      )
-        return this.outcome(run, { state: 'waiting', reason: erro.code })
-      throw erro
-    } finally {
-      this.releaseLeases(run)
+  }
+
+  /** Traduz o que interrompeu a execução em desfecho; só o inesperado sobe como exceção. */
+  private async desfecho(run: Run, erro: unknown): Promise<PromotionOutcome> {
+    if (erro instanceof Cancelar) {
+      try {
+        return await this.cancelNow(run)
+      } catch (segundo) {
+        return this.desfecho(run, segundo)
+      }
     }
+    if (erro instanceof Parar) return this.outcome(run, erro.outcome)
+    // Lease que expirou ou passou a outro writer: este executor sai sem escrever mais nada.
+    if (erro instanceof ReleaseConflictError && CONFLITOS_DE_POSSE.includes(erro.code))
+      return this.outcome(run, { state: 'waiting', reason: erro.code })
+    throw erro
   }
 
   /**
@@ -332,7 +372,9 @@ export class PromotionService {
 
   private async drive(run: Run): Promise<PromotionOutcome> {
     for (;;) {
-      switch (this.status(run)) {
+      const atual = this.status(run)
+      if (!STATUS_TERMINAIS.includes(atual)) this.checkpoint(run)
+      switch (atual) {
         case 'queued':
         case 'preparing':
           await this.preparing(run)
@@ -408,7 +450,10 @@ export class PromotionService {
       config: run.project.stabilization ?? ESTABILIZACAO_PADRAO,
       health: () => verificar(['backend_health', 'frontend_wiring']),
       smoke: () => verificar(['smoke']),
-      renew: () => this.renew(run, 'production'),
+      renew: () => {
+        this.checkpoint(run)
+        this.renew(run, 'production')
+      },
       nowMs: () => this.nowMs(),
       sleep: this.deps.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms))),
       onRestart: () =>
@@ -457,6 +502,7 @@ export class PromotionService {
     let reconciliacoesSemResposta = 0
     let ultimoMotivo: string | null = null
     for (;;) {
+      this.checkpoint(run)
       this.renew(run, environment)
       const atual = this.deps.repository.getStep(query, step)
       if (atual && (atual.state === 'intended' || atual.state === 'ambiguous')) {
@@ -647,6 +693,145 @@ export class PromotionService {
   ): Promise<void> {
     if (kind === 'frontend') await this.deps.frontend.assign({ environment, deploymentId })
     else await this.deps.backend.rollback({ environment, toDeploymentId: deploymentId })
+  }
+
+  // --- cancelamento --------------------------------------------------------------------------
+
+  /**
+   * Cancelamento seguro (SPEC-Release-05, regra 3). O pedido é gravado e, se ninguém mais escreve
+   * na release, cumprido já; se um executor a segura, ele o cumpre no próximo ponto seguro — depois
+   * de terminar e reconciliar a operação remota corrente. Cancelar nunca mata um efeito às cegas,
+   * nunca apaga evidência e nunca restaura o banco.
+   */
+  async cancel(
+    scope: ReleaseScope,
+    releaseId: string,
+    project: PromotionProject
+  ): Promise<CancelOutcome> {
+    const release = this.deps.repository.get({ ...scope, releaseId })
+    if (!release) throw new ReleaseConflictError('release-not-found', 'Release não encontrada.')
+    if (STATUS_TERMINAIS.includes(release.status))
+      return { releaseId, status: release.status, state: 'rejected', reason: 'already-terminal' }
+    this.deps.recovery.requestCancellation(
+      scope,
+      releaseId,
+      release.status as CancellationPhase,
+      this.now()
+    )
+    const run = this.abrirRun(scope, release, project)
+    try {
+      this.lease(run, this.ambienteDaFase(release.status))
+      return this.paraCancelamento(await this.cancelNow(run))
+    } catch (erro) {
+      if (erro instanceof ReleaseConflictError && CONFLITOS_DE_POSSE.includes(erro.code))
+        return { releaseId, status: this.status(run), state: 'requested', reason: erro.code }
+      throw erro
+    } finally {
+      this.releaseLeases(run)
+    }
+  }
+
+  private paraCancelamento(resultado: PromotionOutcome): CancelOutcome {
+    const { releaseId, status } = resultado
+    if (resultado.state === 'blocked')
+      return { releaseId, status, state: 'blocked', reason: resultado.reason }
+    return {
+      releaseId,
+      status,
+      state: resultado.state === 'failed' ? 'cancelled' : 'degraded',
+      reason: null
+    }
+  }
+
+  private ambienteDaFase(status: ReleaseStatus): ReleaseEnvironment {
+    return status === 'production' || status === 'stabilizing' ? 'production' : 'staging'
+  }
+
+  /** Há pedido de cancelamento a cumprir? O executor olha antes de cada operação e a cada observação. */
+  private checkpoint(run: Run): void {
+    const pedido = this.deps.recovery.cancellation(run.scope, run.releaseId)
+    if (pedido && pedido.state !== 'done') throw new Cancelar()
+  }
+
+  /**
+   * Cumpre o cancelamento com os leases desta execução. A operação remota que estava em voo já
+   * terminou (o executor só chega aqui entre operações); o que ficou incerto é reconciliado antes
+   * de qualquer coisa, e se o provedor não responde o cancelamento fica `blocked` — reconciliável,
+   * sem compensar às cegas. Depois, ambiente volta ao deployment conhecido (depois da promoção,
+   * isso é o rollback para a release anterior) e a release termina `failed`, ou `degraded` se a
+   * compensação não fechou. Cancelar não é falha de código: nada volta à V2.
+   */
+  private async cancelNow(run: Run): Promise<PromotionOutcome> {
+    const { recovery, repository } = this.deps
+    const inicial = this.status(run)
+    const environment = this.ambienteDaFase(inicial)
+    const lease = this.lease(run, environment)
+    const query = this.query(run, environment)
+    for (const passo of PASSOS_PRODUCAO) {
+      const atual = repository.getStep(query, passo)
+      if (!atual || (atual.state !== 'intended' && atual.state !== 'ambiguous')) continue
+      const reconciliado = await run.orchestrator.reconcileStep(query, passo, lease)
+      if (reconciliado.state === 'ambiguous') {
+        recovery.finishCancellation(
+          run.scope,
+          run.releaseId,
+          'blocked',
+          'reconciliation-required',
+          this.now()
+        )
+        this.evidence.record(run.scope, run.releaseId, {
+          kind: 'cancellation',
+          state: 'pending',
+          environment,
+          step: passo,
+          reason: 'reconciliation-required',
+          action: 'check-provider-status'
+        })
+        return this.outcome(run, {
+          state: 'blocked',
+          reason: 'reconciliation-required',
+          environment,
+          step: passo
+        })
+      }
+    }
+    if (inicial === 'queued' || inicial === 'preparing') await this.limparTemporarios(run)
+    const compensacao: Compensacao =
+      inicial === 'queued' || inicial === 'preparing'
+        ? { completo: true, motivo: null }
+        : await this.compensate(run, environment)
+    const terminal: ReleaseStatus = compensacao.completo ? 'failed' : 'degraded'
+    run.orchestrator.transition(query, terminal, lease)
+    if (!compensacao.completo && compensacao.motivo)
+      recovery.pauseProject(run.scope, run.releaseId, compensacao.motivo, this.now())
+    recovery.finishCancellation(run.scope, run.releaseId, 'done', null, this.now())
+    this.evidence.record(run.scope, run.releaseId, {
+      kind: 'cancellation',
+      state: 'confirmed',
+      environment,
+      reason: 'cancelled',
+      details: { phase: inicial }
+    })
+    return this.outcome(run, {
+      state: compensacao.completo ? 'failed' : 'degraded',
+      reason: 'cancelled',
+      environment
+    })
+  }
+
+  /** Limpeza dos recursos temporários da preparação. Falhar vira pendência, não impede cancelar. */
+  private async limparTemporarios(run: Run): Promise<void> {
+    if (!this.deps.build.cleanup) return
+    try {
+      await this.deps.build.cleanup({ scope: run.scope, releaseId: run.releaseId })
+    } catch {
+      this.evidence.record(run.scope, run.releaseId, {
+        kind: 'cancellation',
+        state: 'pending',
+        reason: 'cleanup-failed',
+        action: 'clean-temporary-resources'
+      })
+    }
   }
 
   // --- recuperação do projeto pausado -------------------------------------------------------
