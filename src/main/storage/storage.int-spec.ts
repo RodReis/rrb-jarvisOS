@@ -174,7 +174,17 @@ describe('migrations', () => {
     // A 64 acrescenta uri/provenance ao artefato, recria a referência de configuração e cria o
     // diário local (SPEC-Release-02); as duas primeiras se refazem sozinhas ao recriar a 63.
     // A 65 refaz preview_run/preview_event e cria os recursos e gates por SHA (SPEC-Release-03).
+    // A 67 cria inclusão, evidência, pausa, cancelamento, manifesto, publicação, correção e
+    // rollback da recuperação (SPEC-Release-05); todas apontam para `release_run`.
     for (const tabela of [
+      'release_rollback',
+      'release_correction',
+      'release_publication',
+      'release_manifest',
+      'release_cancellation',
+      'release_project_pause',
+      'release_evidence',
+      'release_inclusion',
       'preview_gate',
       'preview_resource',
       'release_local_effect',

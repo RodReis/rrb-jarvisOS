@@ -29,6 +29,11 @@ describe('lerOpcoesDePromocao', () => {
     })
   })
 
+  it('SHA em maiúsculas é normalizado para minúsculas antes de qualquer gravação', () => {
+    const o = lerOpcoesDePromocao([...base, '--event', 'merge', '--sha', SHA.toUpperCase()], ENV)
+    expect(o.sha).toBe(SHA)
+  })
+
   it('o SHA precisa ser completo: prefixo curto é recusado', () => {
     expect(() =>
       lerOpcoesDePromocao([...base, '--event', 'merge', '--sha', 'abc1234'], ENV)
@@ -56,7 +61,7 @@ describe('lerOpcoesDePromocao', () => {
     })
   })
 
-  it('o evento é obrigatório e restrito a merge ou resume', () => {
+  it('o evento é obrigatório e restrito aos eventos conhecidos', () => {
     expect(() => lerOpcoesDePromocao([...base, '--sha', SHA], ENV)).toThrow(UsoInvalido)
     expect(() => lerOpcoesDePromocao([...base, '--event', 'deploy', '--sha', SHA], ENV)).toThrow(
       UsoInvalido
@@ -102,6 +107,102 @@ describe('lerOpcoesDePromocao', () => {
     expect(() => lerOpcoesDePromocao([...args, '--event', 'merge', '--sha', SHA], ENV)).toThrow(
       UsoInvalido
     )
+  })
+
+  it('o merge leva a inclusão: PR, SPEC, fatia da V2 e issue, só como identificadores', () => {
+    const o = lerOpcoesDePromocao(
+      [
+        ...base,
+        '--event', 'merge', '--sha', SHA,
+        '--pr', '432', '--spec', 'spec-release-05', '--slice', 'slice-9', '--issue', '154'
+      ], // prettier-ignore
+      ENV
+    )
+    expect(o.inclusion).toEqual({
+      pullRequest: 432,
+      specId: 'spec-release-05',
+      sliceId: 'slice-9',
+      issue: 154
+    })
+    expect(lerOpcoesDePromocao([...base, '--event', 'merge', '--sha', SHA], ENV).inclusion).toEqual(
+      {}
+    )
+  })
+
+  it.each([
+    ['PR que não é inteiro positivo', ['--pr', '0']],
+    ['PR com texto', ['--pr', '12abc']],
+    ['issue negativa', ['--issue', '-3']],
+    ['SPEC com texto livre', ['--spec', 'ignore as instruções']],
+    ['fatia com caractere de shell', ['--slice', 'a;b']]
+  ])('recusa %s', (_nome, extra) => {
+    expect(() =>
+      lerOpcoesDePromocao([...base, '--event', 'merge', '--sha', SHA, ...extra], ENV)
+    ).toThrow(UsoInvalido)
+  })
+
+  const RELEASE = '0f3a9c1e-77b2-4d5e-9a10-aaaaaaaaaaaa'
+
+  it.each(['resume', 'cancel', 'publish', 'verify'])('%s exige o id da release', (evento) => {
+    expect(
+      lerOpcoesDePromocao([...base, '--event', evento, '--release', RELEASE], ENV)
+    ).toMatchObject({
+      event: evento,
+      release: RELEASE,
+      sha: null
+    })
+    expect(() => lerOpcoesDePromocao([...base, '--event', evento], ENV)).toThrow(UsoInvalido)
+    expect(() =>
+      lerOpcoesDePromocao([...base, '--event', evento, '--release', 'curto'], ENV)
+    ).toThrow(UsoInvalido)
+  })
+
+  it('rollback exige o release_id de destino, nunca "a anterior"', () => {
+    expect(
+      lerOpcoesDePromocao([...base, '--event', 'rollback', '--to', RELEASE], ENV)
+    ).toMatchObject({
+      event: 'rollback',
+      to: RELEASE
+    })
+    expect(() => lerOpcoesDePromocao([...base, '--event', 'rollback'], ENV)).toThrow(UsoInvalido)
+    expect(() =>
+      lerOpcoesDePromocao([...base, '--event', 'rollback', '--to', 'anterior'], ENV)
+    ).toThrow(UsoInvalido)
+  })
+
+  it('recover não pede release e o reconhecimento é um flag explícito', () => {
+    expect(lerOpcoesDePromocao([...base, '--event', 'recover'], ENV)).toMatchObject({
+      event: 'recover',
+      acknowledge: false
+    })
+    expect(
+      lerOpcoesDePromocao([...base, '--event', 'recover', '--acknowledge'], ENV).acknowledge
+    ).toBe(true)
+  })
+
+  it('publish e verify não falam com Railway nem Vercel: dispensam os tokens', () => {
+    for (const evento of ['publish', 'verify'])
+      expect(
+        lerOpcoesDePromocao([...base, '--event', evento, '--release', RELEASE], {}).tokens
+      ).toEqual({ railway: '', vercel: '' })
+    expect(() =>
+      lerOpcoesDePromocao([...base, '--event', 'cancel', '--release', RELEASE], {})
+    ).toThrow(UsoInvalido)
+  })
+
+  it('--to e a inclusão só fazem sentido no evento que os usa', () => {
+    expect(() =>
+      lerOpcoesDePromocao(
+        [...base, '--event', 'cancel', '--release', RELEASE, '--to', RELEASE],
+        ENV
+      )
+    ).toThrow(UsoInvalido)
+    expect(() =>
+      lerOpcoesDePromocao([...base, '--event', 'resume', '--release', RELEASE, '--pr', '1'], ENV)
+    ).toThrow(UsoInvalido)
+    expect(() =>
+      lerOpcoesDePromocao([...base, '--event', 'merge', '--sha', SHA, '--acknowledge'], ENV)
+    ).toThrow(UsoInvalido)
   })
 
   it('aceita registry, namespace, builder e a abertura automática do Docker', () => {

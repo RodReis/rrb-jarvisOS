@@ -10,6 +10,7 @@ import {
   type PromotionProviderErrorCode,
   type PromotionVerifierPort
 } from './promotion-ports'
+import { hashDasNotas, type ReleaseGitPort } from './release-publisher'
 import type { ReleaseLocalRepository } from './release-local-repository'
 
 /**
@@ -34,11 +35,22 @@ export class FakeClock {
 interface Fault {
   readonly code: PromotionProviderErrorCode | 'ambiguous'
   remaining: number
+  /** Texto do provedor: a pipeline nunca pode repeti-lo em motivo, evidência ou auditoria. */
+  readonly message?: string
 }
+
+/** Quando a falha acontece em relação ao efeito: antes (não aplicou) ou depois (aplicou e perdeu a resposta). */
+type FaultTiming = 'before' | 'after'
 
 interface FakeBackend {
   readonly deploymentId: string
   readonly digest: string
+}
+
+/** Os checksums das migrations do harness: o banco falso os devolve como o banco real faria. */
+const CHECKSUM_DA_MIGRATION: Readonly<Record<string, string>> = {
+  '001_init': '1'.repeat(64),
+  '002_users': '2'.repeat(64)
 }
 
 const BACKEND_URL: Readonly<Record<ReleaseEnvironment, string>> = {
@@ -67,12 +79,21 @@ export class FakePromotionCloud {
   crossWired: ReleaseEnvironment | null = null
   migrationOutcome: MigrationOutcome | null = null
   private readonly faults = new Map<string, Fault>()
+  private readonly faultsAfter = new Map<string, Fault>()
   private readonly healthScript = new Map<ReleaseEnvironment, boolean[]>()
   private sequence = 0
 
   /** Faz a operação falhar `times` vezes seguidas; `ambiguous` simula timeout (efeito incerto). */
-  failOn(operation: string, code: Fault['code'] = 'failed', times = 1): void {
-    this.faults.set(operation, { code, remaining: times })
+  failOn(operation: string, code: Fault['code'] = 'failed', times = 1, message?: string): void {
+    this.faults.set(operation, { code, remaining: times, ...(message ? { message } : {}) })
+  }
+
+  /**
+   * Faz a operação **aplicar o efeito** e só então falhar: o provedor fez o trabalho e a resposta
+   * se perdeu. É o caso que `failOn` não alcança e que o retry não pode duplicar.
+   */
+  failAfter(operation: string, code: Fault['code'] = 'timeout', times = 1): void {
+    this.faultsAfter.set(operation, { code, remaining: times })
   }
 
   /** Respostas de `backend_health` do ambiente, consumidas na ordem; depois disso, saudável. */
@@ -82,12 +103,26 @@ export class FakePromotionCloud {
 
   private enter(operation: string, environment?: ReleaseEnvironment): void {
     this.calls.push(environment ? `${operation}:${environment}` : operation)
+    this.dispararFalha('before', operation, environment)
+  }
+
+  /** Chamada depois do efeito: lança se `failAfter` foi armado para a operação. */
+  private leave(operation: string, environment?: ReleaseEnvironment): void {
+    this.dispararFalha('after', operation, environment)
+  }
+
+  private dispararFalha(
+    quando: FaultTiming,
+    operation: string,
+    environment?: ReleaseEnvironment
+  ): void {
+    const mapa = quando === 'before' ? this.faults : this.faultsAfter
     for (const chave of [environment ? `${operation}:${environment}` : null, operation]) {
-      const fault = chave ? this.faults.get(chave) : undefined
+      const fault = chave ? mapa.get(chave) : undefined
       if (fault && fault.remaining > 0) {
         fault.remaining -= 1
-        if (fault.code === 'ambiguous') throw new Error('timeout sem resposta')
-        throw new PromotionProviderError(fault.code, `falha injetada em ${chave}`)
+        if (fault.code === 'ambiguous') throw new Error(fault.message ?? 'timeout sem resposta')
+        throw new PromotionProviderError(fault.code, fault.message ?? `falha injetada em ${chave}`)
       }
     }
   }
@@ -97,11 +132,15 @@ export class FakePromotionCloud {
       this.enter('backend.deploy', environment)
       const digest = imageUri.slice(imageUri.indexOf('@') + 1)
       const atual = this.backends.get(environment)
-      if (atual?.digest === digest) return { deploymentId: atual.deploymentId }
+      if (atual?.digest === digest) {
+        this.leave('backend.deploy', environment)
+        return { deploymentId: atual.deploymentId }
+      }
       this.sequence += 1
       const deploymentId = `rw-${environment}-${this.sequence}`
       this.backends.set(environment, { deploymentId, digest })
       this.backendHistory.push({ environment, deploymentId, digest })
+      this.leave('backend.deploy', environment)
       return { deploymentId }
     },
     rollback: async ({ environment, toDeploymentId }) => {
@@ -114,6 +153,7 @@ export class FakePromotionCloud {
         deploymentId: anterior.deploymentId,
         digest: anterior.digest
       })
+      this.leave('backend.rollback', environment)
     },
     current: async (environment) => {
       this.enter('backend.current', environment)
@@ -126,7 +166,15 @@ export class FakePromotionCloud {
       this.enter('database.backup', environment)
       const backupRef = `bkp-${environment}-${this.backups.length + 1}`
       this.backups.push({ environment, backupRef })
+      this.leave('database.backup', environment)
       return { backupRef }
+    },
+    applied: async ({ environment }) => {
+      this.enter('database.applied', environment)
+      return (this.databases.get(environment) ?? []).map((id) => ({
+        id,
+        checksum: CHECKSUM_DA_MIGRATION[id] ?? 'f'.repeat(64)
+      }))
     },
     migrate: async ({ environment, migrations }) => {
       this.enter('database.migrate', environment)
@@ -134,6 +182,7 @@ export class FakePromotionCloud {
       const aplicadas = this.databases.get(environment) ?? []
       const novas = migrations.filter((m) => !aplicadas.includes(m.id)).map((m) => m.id)
       this.databases.set(environment, [...aplicadas, ...novas])
+      this.leave('database.migrate', environment)
       return {
         state: 'confirmed',
         applied: novas,
@@ -149,15 +198,20 @@ export class FakePromotionCloud {
       this.enter('frontend.build')
       const chave = `${releaseId}:${sourceSha}`
       const existente = this.frontendBuilds.get(chave)
-      if (existente) return { deploymentId: existente }
+      if (existente) {
+        this.leave('frontend.build')
+        return { deploymentId: existente }
+      }
       this.sequence += 1
       const deploymentId = `dpl_fe${this.sequence}`
       this.frontendBuilds.set(chave, deploymentId)
+      this.leave('frontend.build')
       return { deploymentId }
     },
     assign: async ({ environment, deploymentId }) => {
       this.enter('frontend.assign', environment)
       this.frontendAssigned.set(environment, deploymentId)
+      this.leave('frontend.assign', environment)
     },
     current: async (environment) => {
       this.enter('frontend.current', environment)
@@ -197,6 +251,9 @@ export class FakePromotionCloud {
 
   buildPort(local: ReleaseLocalRepository): PromotionBuildPort {
     return {
+      cleanup: async () => {
+        this.enter('build.cleanup')
+      },
       build: async ({ scope, releaseId, sourceSha }) => {
         this.enter('build.backend')
         const digest = `sha256:${sourceSha.slice(0, 8).padEnd(64, '0')}`
@@ -223,5 +280,67 @@ export class FakePromotionCloud {
   /** URL pública do backend de um ambiente, para os testes que conferem a fiação. */
   static backendUrl(environment: ReleaseEnvironment): string {
     return BACKEND_URL[environment]
+  }
+}
+
+/**
+ * GitHub falso com estado: tags e releases existem de verdade (commit e texto), então publicar
+ * duas vezes, publicar numa tag de outro commit ou editar as notas aparece como asserção quebrada.
+ * `failOn` lança antes do efeito e `failAfter` depois dele (a resposta se perdeu).
+ */
+interface GitFault {
+  readonly code: PromotionProviderErrorCode
+  remaining: number
+  readonly message?: string
+}
+
+export class FakeGitHubReleases {
+  readonly calls: string[] = []
+  readonly tags = new Map<string, { commitSha: string; notes: string | null; title: string }>()
+  private readonly faults = new Map<string, GitFault>()
+  private readonly faultsAfter = new Map<string, GitFault>()
+
+  failOn(
+    operation: 'find' | 'publish',
+    code: PromotionProviderErrorCode,
+    times = 1,
+    message?: string
+  ): void {
+    this.faults.set(operation, { code, remaining: times, ...(message ? { message } : {}) })
+  }
+
+  failAfter(operation: 'publish', code: PromotionProviderErrorCode = 'timeout', times = 1): void {
+    this.faultsAfter.set(operation, { code, remaining: times })
+  }
+
+  private disparar(mapa: Map<string, GitFault>, operation: string): void {
+    const fault = mapa.get(operation)
+    if (fault && fault.remaining > 0) {
+      fault.remaining -= 1
+      throw new PromotionProviderError(
+        fault.code,
+        fault.message ?? `falha injetada em ${operation}`
+      )
+    }
+  }
+
+  readonly port: ReleaseGitPort = {
+    find: async (tag) => {
+      this.calls.push(`find:${tag}`)
+      this.disparar(this.faults, 'find')
+      const achada = this.tags.get(tag)
+      return achada
+        ? {
+            commitSha: achada.commitSha,
+            notesSha256: achada.notes === null ? null : hashDasNotas(achada.notes)
+          }
+        : null
+    },
+    publish: async ({ tag, sha, title, notes }) => {
+      this.calls.push(`publish:${tag}`)
+      this.disparar(this.faults, 'publish')
+      this.tags.set(tag, { commitSha: this.tags.get(tag)?.commitSha ?? sha, notes, title })
+      this.disparar(this.faultsAfter, 'publish')
+    }
   }
 }

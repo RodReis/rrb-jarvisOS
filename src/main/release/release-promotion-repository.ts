@@ -45,6 +45,14 @@ export interface DeploymentInput {
   readonly replacesExternalId: string | null
 }
 
+/** O que um rollback ainda pode precisar: ids de release, deployments, digests e referências de backup. */
+export interface ProtectedArtifacts {
+  readonly releaseIds: string[]
+  readonly deploymentIds: string[]
+  readonly digests: string[]
+  readonly backupRefs: string[]
+}
+
 export interface PromotionMigration extends MigrationExecution {
   /** Backup que precedeu a migration; só Produção. */
   readonly backupRef: string | null
@@ -279,21 +287,41 @@ export class ReleasePromotionRepository {
     kind: DeploymentKind,
     exceto: string
   ): PromotionDeployment | null {
-    const prova =
-      environment === 'production'
-        ? { juncao: '', condicao: "r.status='completed'", ordem: 'r.updated_at' }
-        : {
-            juncao: `JOIN release_step s ON s.release_id=d.release_id AND s.user_id=d.user_id
-                       AND s.workspace_id=d.workspace_id AND s.project_id=d.project_id
-                       AND s.environment='staging' AND s.step='smoke_passed' AND s.state='confirmed'`,
-            condicao: '1=1',
-            ordem: 's.updated_at'
-          }
+    if (environment === 'production') {
+      // O que Produção serve: a última release concluída DEPOIS do rollback confirmado mais
+      // recente; se nenhuma concluiu depois, a release para a qual o rollback voltou. Sem rollback,
+      // a última concluída. Assim um rollback com salto (C → A) tira B de cena, e um rollback para
+      // frente (A → B) vale. A `exceto` é a release que está falhando e nunca conta.
+      const rollback = `SELECT %COL% FROM release_rollback rb
+                         WHERE rb.state='confirmed' AND rb.user_id=d.user_id
+                           AND rb.workspace_id=d.workspace_id AND rb.project_id=d.project_id
+                         ORDER BY rb.updated_at DESC, rb.rowid DESC LIMIT 1`
+      const row = this.db
+        .prepare(
+          `SELECT d.* FROM release_deployment d JOIN release_run r ON r.id=d.release_id
+           WHERE d.user_id=? AND d.workspace_id=? AND d.project_id=? AND d.environment=? AND d.kind=?
+             AND d.release_id<>? AND r.status='completed'
+             AND (NOT EXISTS (SELECT 1 FROM release_rollback x
+                               WHERE x.state='confirmed' AND x.user_id=d.user_id
+                                 AND x.workspace_id=d.workspace_id AND x.project_id=d.project_id)
+                  OR r.updated_at > (${rollback.replace('%COL%', 'rb.updated_at')})
+                  OR r.id = (${rollback.replace('%COL%', 'rb.to_release_id')}))
+           ORDER BY r.updated_at DESC, d.created_at DESC LIMIT 1`
+        )
+        .get(...paramsDe(scope), environment, kind, exceto) as DeploymentRow | undefined
+      return row ? toDeployment(row) : null
+    }
+    const prova = {
+      juncao: `JOIN release_step s ON s.release_id=d.release_id AND s.user_id=d.user_id
+                 AND s.workspace_id=d.workspace_id AND s.project_id=d.project_id
+                 AND s.environment='staging' AND s.step='smoke_passed' AND s.state='confirmed'`,
+      ordem: 's.updated_at'
+    }
     const row = this.db
       .prepare(
         `SELECT d.* FROM release_deployment d JOIN release_run r ON r.id=d.release_id ${prova.juncao}
          WHERE d.user_id=? AND d.workspace_id=? AND d.project_id=? AND d.environment=? AND d.kind=?
-           AND d.release_id<>? AND ${prova.condicao}
+           AND d.release_id<>?
          ORDER BY ${prova.ordem} DESC, d.created_at DESC LIMIT 1`
       )
       .get(...paramsDe(scope), environment, kind, exceto) as DeploymentRow | undefined
@@ -398,6 +426,74 @@ export class ReleasePromotionRepository {
          ORDER BY created_at, rowid`
       )
       .all(...paramsDe(scope)) as { id: string; sha: string; status: ReleaseStatus }[]
+  }
+
+  /**
+   * O que nenhuma limpeza pode remover porque um rollback ainda pode precisar (SPEC-Release-05,
+   * "proteção de artefatos"): tudo de releases não terminais, das `manter` últimas concluídas que
+   * ainda valem (a que Produção serve e o alvo do rollback) e de qualquer rollback em andamento —
+   * origem e destino. A que serve é a que o último rollback confirmado devolveu (ou a última concluída depois dele); a versão retirada não é alvo de nada.
+   * Quem remover artefato, deployment ou backup (hoje ninguém o faz) consulta isto antes.
+   */
+  protectedArtifacts(scope: ReleaseScope, manter = 2): ProtectedArtifacts {
+    const ids = new Set<string>(this.openReleases(scope).map((r) => r.id))
+    // A que serve (descontados rollbacks) e as `manter - 1` concluídas imediatamente anteriores a ela.
+    const servindo = this.lastKnownDeployment(scope, 'production', 'backend', '')
+    if (servindo) {
+      ids.add(servindo.releaseId)
+      const anteriores = this.db
+        .prepare(
+          `SELECT r.id FROM release_run r
+            WHERE r.user_id=? AND r.workspace_id=? AND r.project_id=? AND r.status='completed'
+              AND r.id<>? AND r.updated_at < (SELECT updated_at FROM release_run WHERE id=?)
+            ORDER BY r.updated_at DESC, r.rowid DESC LIMIT ?`
+        )
+        .all(...paramsDe(scope), servindo.releaseId, servindo.releaseId, manter - 1) as {
+        id: string
+      }[]
+      for (const r of anteriores) ids.add(r.id)
+    }
+    // A release que pausou o projeto: o backup dela é a única referência de restore operacional.
+    const pausa = this.db
+      .prepare(
+        `SELECT release_id FROM release_project_pause
+          WHERE user_id=? AND workspace_id=? AND project_id=? AND resolved_at IS NULL`
+      )
+      .get(...paramsDe(scope)) as { release_id: string } | undefined
+    if (pausa) ids.add(pausa.release_id)
+    const emAndamento = this.db
+      .prepare(
+        `SELECT from_release_id, to_release_id FROM release_rollback
+          WHERE user_id=? AND workspace_id=? AND project_id=? AND state='intended'`
+      )
+      .all(...paramsDe(scope)) as { from_release_id: string; to_release_id: string }[]
+    for (const r of emAndamento) {
+      ids.add(r.from_release_id)
+      ids.add(r.to_release_id)
+    }
+    const deploymentIds = new Set<string>()
+    const digests = new Set<string>()
+    const backupRefs = new Set<string>()
+    for (const id of ids) {
+      for (const d of this.listDeployments(scope, id)) {
+        deploymentIds.add(d.externalId)
+        digests.add(d.artifactDigest)
+      }
+      for (const m of this.listMigrations(scope, id)) if (m.backupRef) backupRefs.add(m.backupRef)
+      const artefatos = this.db
+        .prepare(
+          `SELECT digest FROM release_artifact
+            WHERE user_id=? AND workspace_id=? AND project_id=? AND release_id=?`
+        )
+        .all(...paramsDe(scope), id) as { digest: string }[]
+      for (const a of artefatos) digests.add(a.digest)
+    }
+    return {
+      releaseIds: [...ids],
+      deploymentIds: [...deploymentIds],
+      digests: [...digests],
+      backupRefs: [...backupRefs]
+    }
   }
 
   beginCompensation(

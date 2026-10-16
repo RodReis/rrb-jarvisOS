@@ -7,7 +7,9 @@ import type { PromotionDatabasePort } from './promotion-ports'
 import { AuditRepository } from '../storage/audit-repository'
 import { loadOrCreateAuditKey } from '../storage/audit-key'
 import { openDatabase } from '../storage/database'
+import { PipelineRepository } from '../pipeline/pipeline-repository'
 import { createCommandRunner, type CommandRunner } from './adapters/command-runner'
+import { GithubReleaseAdapter } from './adapters/github-release-adapter'
 import { GhcrArtifactAdapter } from './adapters/ghcr-artifact-adapter'
 import { GitSourceVerifier } from './adapters/git-source-verifier'
 import { HttpPromotionVerifier } from './adapters/http-promotion-verifier'
@@ -17,7 +19,9 @@ import { RailwayBackupAdapter } from './adapters/railway-backup-adapter'
 import { RailwayConfigurationReader } from './adapters/railway-configuration-reader'
 import { RailwayPromotionBackendAdapter } from './adapters/railway-promotion-backend-adapter'
 import { RailwayPromotionDatabaseAdapter } from './adapters/railway-promotion-database-adapter'
+import { V2PipelineCorrectionAdapter } from './adapters/v2-pipeline-correction-adapter'
 import { VercelPromotionAdapter } from './adapters/vercel-promotion-adapter'
+import { ReleaseCorrectionDispatcher } from './correction/dispatcher'
 import { lerMigrations } from './database-migration-runner'
 import { UsoInvalido } from './preview-cli-args'
 import { lerOpcoesDePromocao, type OpcoesDePromocao } from './promotion-cli-args'
@@ -34,29 +38,46 @@ import { assertRepositorioPermitido, carregarPerfilDoProjeto } from './release-p
 import type { PromotionProject } from './release-promotion-effects'
 import { carregarPerfilDePromocao, type PromotionProfile } from './release-promotion-profile'
 import { ReleasePromotionRepository } from './release-promotion-repository'
-import { PromotionService, type PromotionOutcome } from './release-promotion-service'
+import { ReleaseRecoveryRepository } from './release-recovery-repository'
+import { codigoDeSaida, type DesfechoDoComando } from './release-promote-saida'
+import { PromotionService } from './release-promotion-service'
+import { ReleasePublisher } from './release-publisher'
 import { ReleaseRepository } from './release-repository'
 
 /**
- * Comando da aplicação que promove uma release mergeada para Staging e Produção (SPEC-Release-04).
- * Roda dentro do runtime do Electron porque a chave da cadeia de auditoria está selada no
- * `safeStorage`. Chamado por `scripts/release-promote.mjs`. Idempotente: repetir retoma do último
- * passo confirmado e nunca repete um passo de efeito incerto antes de reconciliá-lo.
+ * Comando da aplicação que promove e recupera releases (SPEC-Release-04 e 05). Roda dentro do
+ * runtime do Electron porque a chave da cadeia de auditoria está selada no `safeStorage`. Chamado
+ * por `scripts/release-promote.mjs`. Idempotente: repetir retoma do último passo confirmado e
+ * nunca repete um passo de efeito incerto antes de reconciliá-lo.
  *
- * `merge` cria (ou consolida) o candidato do SHA e o leva adiante; `resume` retoma uma release que
- * esperava a lane de Produção ou parou num passo incerto. Nos dois casos a árvore local — contexto
- * de build, migrations e a pasta do frontend — precisa ser exatamente o commit da release: o
- * `vercel deploy` publica o conteúdo da pasta, não o SHA.
+ * - `merge` cria (ou consolida) o candidato do SHA e o leva até a Produção estabilizada, que então
+ *   recebe manifesto, tag e GitHub Release; `resume` retoma uma release e o que ficou pendente.
+ * - `cancel` cancela com segurança (a operação remota em voo termina e é reconciliada antes).
+ * - `rollback --to <release_id>` volta Produção a uma release conhecida; `recover` libera o
+ *   projeto pausado por uma release degradada, depois de provar o estado conhecido na nuvem.
+ * - `publish` e `verify` (só GitHub e banco local) publicam e conferem a identidade da release.
  *
- * Saída: o desfecho como JSON, sem token, URL de credencial ou saída de provedor. Código 0 =
- * concluída; 3 = falhou, degradada ou bloqueada por passo incerto; 5 = aguarda a lane ou outro
- * executor; 2 = uso inválido.
+ * Em `merge`, `resume` e `cancel` a árvore local — contexto de build, migrations e pasta do
+ * frontend — precisa ser exatamente o commit da release: o `vercel deploy` publica o conteúdo da
+ * pasta, não o SHA. Nenhum evento restaura o banco.
+ *
+ * Saída: o desfecho como JSON, sem token, URL de credencial ou saída de provedor. Código 0 = fez
+ * o que foi pedido; 3 = falhou ou exige ação do operador (a evidência diz qual); 5 = aguarda a
+ * lane, outro executor ou o provedor; 2 = uso inválido.
  */
 
-const CODIGO_OK = 0
-const CODIGO_FALHOU = 3
-const CODIGO_AGUARDA = 5
-const BINARIOS = ['docker', 'railway', 'vercel', 'psql', 'pg_dump', 'git', 'npx', 'npm', 'node']
+const BINARIOS = [
+  'docker',
+  'railway',
+  'vercel',
+  'psql',
+  'pg_dump',
+  'git',
+  'gh',
+  'npx',
+  'npm',
+  'node'
+]
 const E2E_TIMEOUT_MS = 15 * 60_000
 
 function argumentosDoLauncher(): readonly string[] {
@@ -67,12 +88,6 @@ function argumentosDoLauncher(): readonly string[] {
     // cai no erro de uso abaixo
   }
   throw new UsoInvalido('Execute pelo comando: npm run release:promote -- <argumentos>.')
-}
-
-function codigoDeSaida(resultado: PromotionOutcome): number {
-  if (resultado.state === 'completed') return CODIGO_OK
-  if (resultado.state === 'waiting') return CODIGO_AGUARDA
-  return CODIGO_FALHOU
 }
 
 /** O contexto de build, as migrations e o frontend saem da árvore local: ela precisa ser o commit. */
@@ -124,16 +139,15 @@ function jornadaEssencial(runner: CommandRunner, perfil: PromotionProfile) {
 }
 
 function montarServico(
-  db: ReturnType<typeof openDatabase>,
-  audit: AuditRepository,
   chaveDeAuditoria: Buffer,
   runner: CommandRunner,
   opcoes: OpcoesDePromocao,
   perfil: PromotionProfile,
-  projetoFor: (sha: string) => ReturnType<typeof carregarPerfilDoProjeto>
+  projetoFor: (sha: string) => ReturnType<typeof carregarPerfilDoProjeto>,
+  nucleo: ReturnType<typeof montarNucleo>
 ) {
   const { railway, vercel } = perfil
-  const local = new ReleaseLocalRepository(db, audit)
+  const { local } = nucleo
   // Separação de domínio: o fingerprint não reutiliza a chave da auditoria diretamente.
   const fingerprintKey = createHmac('sha256', chaveDeAuditoria)
     .update('release-config-fingerprint')
@@ -176,6 +190,7 @@ function montarServico(
   })
   const database: PromotionDatabasePort = {
     backup: (input) => backup.backup(input),
+    applied: (input) => migrate.applied(input),
     migrate: (input) => migrate.migrate(input)
   }
   const verifier = new HttpPromotionVerifier({
@@ -195,9 +210,12 @@ function montarServico(
     fingerprintKey
   })
   const service = new PromotionService({
-    repository: new ReleaseRepository(db, audit),
-    promotion: new ReleasePromotionRepository(db, audit),
+    repository: nucleo.repository,
+    promotion: nucleo.promotion,
     local,
+    recovery: nucleo.recovery,
+    correction: nucleo.correction,
+    publisher: nucleo.publisher,
     build: new PreparationBuildAdapter(preparation, projetoFor),
     backend,
     database,
@@ -205,6 +223,165 @@ function montarServico(
     verifier
   })
   return { service, configuracao }
+}
+
+/** Repositórios e serviços que todo evento usa: o núcleo local, o publicador e a volta à V2. */
+function montarNucleo(
+  db: ReturnType<typeof openDatabase>,
+  audit: AuditRepository,
+  runner: CommandRunner,
+  perfil: PromotionProfile
+) {
+  const repository = new ReleaseRepository(db, audit)
+  const promotion = new ReleasePromotionRepository(db, audit)
+  const local = new ReleaseLocalRepository(db, audit)
+  const recovery = new ReleaseRecoveryRepository(db, audit)
+  const publisher = new ReleasePublisher({
+    repository,
+    promotion,
+    local,
+    recovery,
+    // Sem o repositório no perfil, a identidade existe e a publicação fica pendente (regra 8).
+    ...(perfil.github ? { git: new GithubReleaseAdapter(runner, perfil.github.repository) } : {})
+  })
+  const correction = new ReleaseCorrectionDispatcher({
+    repository,
+    recovery,
+    v2: new V2PipelineCorrectionAdapter(new PipelineRepository(db), audit)
+  })
+  return { repository, promotion, local, recovery, publisher, correction }
+}
+
+/**
+ * Valida o que `merge`, `resume` e `cancel` leem da árvore local (contexto de build, migrations e
+ * frontend) e monta o projeto da promoção. A árvore precisa ser exatamente o commit da release.
+ */
+async function prepararProjeto(
+  runner: CommandRunner,
+  opcoes: OpcoesDePromocao,
+  perfil: PromotionProfile,
+  sha: string
+) {
+  const projetoFor = (alvo: string) => {
+    const projeto = carregarPerfilDoProjeto(resolve(opcoes.profile), alvo)
+    // O destino da publicação é decisão do operador, não do arquivo do projeto.
+    assertRepositorioPermitido(projeto.repository, opcoes.registry, opcoes.namespace ?? undefined)
+    return projeto
+  }
+  let projeto: ReturnType<typeof projetoFor>
+  try {
+    projeto = projetoFor(sha)
+  } catch (erro) {
+    throw new UsoInvalido(erro instanceof Error ? erro.message : 'Perfil do projeto inválido.')
+  }
+  // 1) O commit foi revisado e mergeado (ancestral da base), não é um HEAD local qualquer.
+  const merge = await exigirCommitMergeado(runner, projeto.contextDir, sha, opcoes.baseRef)
+  if (merge !== 'ok')
+    throw new UsoInvalido(
+      merge === 'not-merged'
+        ? `O commit ${sha} não está em ${opcoes.baseRef}: só se promove o que foi mergeado.`
+        : `Não foi possível provar que o commit está em ${opcoes.baseRef} (git fetch/merge-base falhou).`
+    )
+  // 2) O perfil do operador fica fora do código promovido: o comando de E2E dele roda aqui.
+  const arvores = [projeto.contextDir, projeto.migrationsDir, perfil.vercel.workdir]
+  const perfilDoOperador = resolve(opcoes.promotionProfile)
+  if (arvores.some((arvore) => estaDentroDe(arvore, perfilDoOperador)))
+    throw new UsoInvalido(
+      'O perfil de promoção não pode ficar dentro do código que está sendo promovido.'
+    )
+  // 3) `.vercelignore` faria o `vercel deploy` publicar arquivos que o Git ignora.
+  if (temVercelIgnore(perfil.vercel.workdir))
+    throw new UsoInvalido(
+      'A pasta do frontend tem .vercelignore: remova-o (o .gitignore passa a ser a única regra).'
+    )
+  // 4) A árvore local é exatamente o commit, em tudo que o build, a migration e o deploy leem.
+  await exigirArvoreDoCommit(
+    runner,
+    [
+      projeto.contextDir,
+      projeto.migrationsDir,
+      perfil.vercel.workdir,
+      dirname(projeto.envExampleFile),
+      ...(projeto.seedFile ? [dirname(projeto.seedFile)] : [])
+    ],
+    sha
+  )
+  return { projeto, projetoFor }
+}
+
+/** `rollback` e `recover` não constroem nada: o build é recusado se alguém tentar usá-lo. */
+const SEM_PROJETO = (): never => {
+  throw new UsoInvalido('Este evento não usa o perfil do projeto.')
+}
+
+async function executar(
+  db: ReturnType<typeof openDatabase>,
+  audit: AuditRepository,
+  chaveDeAuditoria: Buffer,
+  runner: CommandRunner,
+  opcoes: OpcoesDePromocao,
+  perfil: PromotionProfile
+): Promise<DesfechoDoComando> {
+  const { scope } = opcoes
+  const nucleo = montarNucleo(db, audit, runner, perfil)
+
+  // Só o banco local e o GitHub: nenhuma credencial de Railway ou Vercel entra.
+  if (opcoes.event === 'publish')
+    return { evento: 'publish', resultado: await nucleo.publisher.publish(scope, opcoes.release!) }
+  if (opcoes.event === 'verify')
+    return { evento: 'verify', resultado: await nucleo.publisher.verify(scope, opcoes.release!) }
+
+  // A árvore local só importa quando o evento pode ler migrations ou publicar o frontend.
+  let promocao: PromotionProject | null = null
+  let projetoFor: Parameters<typeof montarServico>[4] = SEM_PROJETO
+  if (opcoes.event === 'merge' || opcoes.event === 'resume' || opcoes.event === 'cancel') {
+    // A release e o SHA que ela carrega: o `merge` informa o SHA; os demais o leem da release.
+    let sha = opcoes.sha
+    if (opcoes.release) {
+      const existente = nucleo.repository.get({ ...scope, releaseId: opcoes.release })
+      if (!existente) throw new UsoInvalido('Release não encontrada no escopo informado.')
+      sha = existente.sha
+    }
+    if (!sha) throw new UsoInvalido('Informe o SHA da release.')
+    const preparado = await prepararProjeto(runner, opcoes, perfil, sha)
+    projetoFor = preparado.projetoFor
+    const { service, configuracao } = montarServico(
+      chaveDeAuditoria,
+      runner,
+      opcoes,
+      perfil,
+      projetoFor,
+      nucleo
+    )
+    promocao = {
+      migrations: lerMigrations(preparado.projeto.migrationsDir),
+      configuration: {
+        names: lerNomesDoExemplo(readFileSync(preparado.projeto.envExampleFile, 'utf8')),
+        isolated: perfil.configuration.isolatedKeys,
+        load: () => configuracao.load()
+      },
+      ...(perfil.stabilization ? { stabilization: perfil.stabilization } : {})
+    }
+    if (opcoes.event === 'cancel')
+      return { evento: 'cancel', resultado: await service.cancel(scope, opcoes.release!, promocao) }
+    if (opcoes.event === 'resume')
+      return {
+        evento: 'resume',
+        resultado: await service.promote(scope, opcoes.release!, promocao)
+      }
+    return {
+      evento: 'merge',
+      resultado: await service.handleMerge(scope, sha, promocao, opcoes.inclusion)
+    }
+  }
+
+  const { service } = montarServico(chaveDeAuditoria, runner, opcoes, perfil, projetoFor, nucleo)
+  if (opcoes.event === 'rollback')
+    return { evento: 'rollback', resultado: await service.rollback(scope, { to: opcoes.to! }) }
+  return {
+    evento: 'recover',
+    resultado: await service.recover(scope, { acknowledge: opcoes.acknowledge })
+  }
 }
 
 async function principal(): Promise<number> {
@@ -220,99 +397,15 @@ async function principal(): Promise<number> {
   try {
     const chaveDeAuditoria = loadOrCreateAuditKey(join(dataDir, 'audit.key'))
     const audit = new AuditRepository(db, chaveDeAuditoria)
-    const repository = new ReleaseRepository(db, audit)
-
     let perfil: PromotionProfile
     try {
       perfil = carregarPerfilDePromocao(resolve(opcoes.promotionProfile))
     } catch (erro) {
       throw new UsoInvalido(erro instanceof Error ? erro.message : 'Perfil de promoção inválido.')
     }
-
-    // A release e o SHA que ela carrega: o `merge` informa o SHA; o `resume` o lê da release.
-    let sha = opcoes.sha
-    if (opcoes.release) {
-      const existente = repository.get({ ...opcoes.scope, releaseId: opcoes.release })
-      if (!existente) throw new UsoInvalido('Release não encontrada no escopo informado.')
-      sha = existente.sha
-    }
-    if (!sha) throw new UsoInvalido('Informe o SHA da release.')
-    const shaDaRelease = sha
-
-    const projetoFor = (alvo: string) => {
-      const projeto = carregarPerfilDoProjeto(resolve(opcoes.profile), alvo)
-      // O destino da publicação é decisão do operador, não do arquivo do projeto.
-      assertRepositorioPermitido(projeto.repository, opcoes.registry, opcoes.namespace ?? undefined)
-      return projeto
-    }
-    let projeto: ReturnType<typeof projetoFor>
-    try {
-      projeto = projetoFor(shaDaRelease)
-    } catch (erro) {
-      throw new UsoInvalido(erro instanceof Error ? erro.message : 'Perfil do projeto inválido.')
-    }
-    // 1) O commit foi revisado e mergeado (ancestral da base), não é um HEAD local qualquer.
-    const merge = await exigirCommitMergeado(
-      runner,
-      projeto.contextDir,
-      shaDaRelease,
-      opcoes.baseRef
-    )
-    if (merge !== 'ok')
-      throw new UsoInvalido(
-        merge === 'not-merged'
-          ? `O commit ${shaDaRelease} não está em ${opcoes.baseRef}: só se promove o que foi mergeado.`
-          : `Não foi possível provar que o commit está em ${opcoes.baseRef} (git fetch/merge-base falhou).`
-      )
-    // 2) O perfil do operador fica fora do código promovido: o comando de E2E dele roda aqui.
-    const arvores = [projeto.contextDir, projeto.migrationsDir, perfil.vercel.workdir]
-    const perfilDoOperador = resolve(opcoes.promotionProfile)
-    if (arvores.some((arvore) => estaDentroDe(arvore, perfilDoOperador)))
-      throw new UsoInvalido(
-        'O perfil de promoção não pode ficar dentro do código que está sendo promovido.'
-      )
-    // 3) `.vercelignore` faria o `vercel deploy` publicar arquivos que o Git ignora.
-    if (temVercelIgnore(perfil.vercel.workdir))
-      throw new UsoInvalido(
-        'A pasta do frontend tem .vercelignore: remova-o (o .gitignore passa a ser a única regra).'
-      )
-    // 4) A árvore local é exatamente o commit, em tudo que o build, a migration e o deploy leem.
-    await exigirArvoreDoCommit(
-      runner,
-      [
-        projeto.contextDir,
-        projeto.migrationsDir,
-        perfil.vercel.workdir,
-        dirname(projeto.envExampleFile),
-        ...(projeto.seedFile ? [dirname(projeto.seedFile)] : [])
-      ],
-      shaDaRelease
-    )
-
-    const { service, configuracao } = montarServico(
-      db,
-      audit,
-      chaveDeAuditoria,
-      runner,
-      opcoes,
-      perfil,
-      projetoFor
-    )
-    const promocao: PromotionProject = {
-      migrations: lerMigrations(projeto.migrationsDir),
-      configuration: {
-        names: lerNomesDoExemplo(readFileSync(projeto.envExampleFile, 'utf8')),
-        isolated: perfil.configuration.isolatedKeys,
-        load: () => configuracao.load()
-      },
-      ...(perfil.stabilization ? { stabilization: perfil.stabilization } : {})
-    }
-
-    const resultado = opcoes.release
-      ? await service.promote(opcoes.scope, opcoes.release, promocao)
-      : await service.handleMerge(opcoes.scope, shaDaRelease, promocao)
-    process.stdout.write(`${JSON.stringify(resultado, null, 2)}\n`)
-    return codigoDeSaida(resultado)
+    const desfecho = await executar(db, audit, chaveDeAuditoria, runner, opcoes, perfil)
+    process.stdout.write(`${JSON.stringify(desfecho.resultado, null, 2)}\n`)
+    return codigoDeSaida(desfecho)
   } finally {
     db.close()
   }

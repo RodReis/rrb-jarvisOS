@@ -50,6 +50,8 @@ export interface PromotionProfile {
   readonly configuration: { readonly isolatedKeys: readonly string[] }
   /** Ausente = padrão do domínio (5 min, 30 s, 1 reinício). */
   readonly stabilization?: JanelaDeEstabilizacao
+  /** Onde a tag e a GitHub Release da Produção estabilizada são publicadas (SPEC-Release-05). */
+  readonly github?: { readonly repository: string }
 }
 
 type Bruto = Record<string, unknown>
@@ -63,6 +65,7 @@ const ID_DE_PROJETO = /^[A-Za-z0-9][A-Za-z0-9-]{3,63}$/
 const DOMINIO = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/i
 /** `//host` e `/\host` resolvem para outro host; só caminho absoluto de verdade passa. */
 const CAMINHO_VALIDO = /^\/(?![/\\])[^\s]*$/
+const REPOSITORIO_DO_GITHUB = /^(?!\.{1,2}\/)(?!.*\/\.{1,2}$)[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/
 const QUALQUER = /^[\s\S]+$/
 
 function objeto(valor: unknown, nome: string, permitidas: readonly string[]): Bruto {
@@ -212,7 +215,8 @@ export function carregarPerfilDePromocao(arquivo: string): PromotionProfile {
     'environments',
     'verification',
     'configuration',
-    'stabilization'
+    'stabilization',
+    'github'
   ])
 
   const v = objeto(raiz.vercel, 'vercel', ['workdir', 'scope', 'stagingDomain', 'productionDomain'])
@@ -244,12 +248,21 @@ export function carregarPerfilDePromocao(arquivo: string): PromotionProfile {
     throw new TypeError('"configuration.isolatedKeys" deve listar nomes de variável válidos.')
 
   const stabilization = lerEstabilizacao(raiz.stabilization)
+  const github = lerGithub(raiz.github)
   return {
     railway: lerRailway(raiz.railway, base),
     vercel,
     environments: { staging, production },
     verification: lerVerificacao(raiz.verification, base),
     configuration: { isolatedKeys: isolatedKeys as string[] },
-    ...(stabilization ? { stabilization } : {})
+    ...(stabilization ? { stabilization } : {}),
+    ...(github ? { github } : {})
   }
+}
+
+/** Só o repositório: a credencial é a do `gh auth login` da máquina e nunca vive neste arquivo. */
+function lerGithub(valor: unknown): { repository: string } | undefined {
+  if (valor === undefined) return undefined
+  const bloco = objeto(valor, 'github', ['repository'])
+  return { repository: texto(bloco.repository, 'github.repository', REPOSITORIO_DO_GITHUB) }
 }

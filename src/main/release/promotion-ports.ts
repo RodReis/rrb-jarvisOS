@@ -28,6 +28,12 @@ export interface PromotionBuildPort {
     /** Lease do writer: a preparação usa para marcar e limpar o que abriu no Docker. */
     leaseId: string
   }): Promise<PromotionBuildOutcome>
+  /**
+   * Remove o que a preparação deixou de temporário no Docker local (contêineres, redes e volumes
+   * marcados com o lease). Nunca apaga artefato publicado nem evidência. Opcional: um build sem
+   * recurso local não precisa dela.
+   */
+  cleanup?(input: { scope: ReleaseScope; releaseId: string }): Promise<void>
 }
 
 export interface PromotionBackendPort {
@@ -47,6 +53,13 @@ export interface PromotionBackendPort {
 export interface PromotionDatabasePort {
   /** Backup do PostgreSQL do ambiente; devolve a referência para o restore operacional. */
   backup(input: { environment: ReleaseEnvironment }): Promise<{ backupRef: string }>
+  /**
+   * O que o PostgreSQL do ambiente já aplicou (só leitura). Reconcilia uma migration de resultado
+   * incerto sem repetir às cegas. Leitura que falha **lança**: nunca vira "nada aplicado".
+   */
+  applied(input: {
+    environment: ReleaseEnvironment
+  }): Promise<readonly { id: string; checksum: string }[]>
   /** Migrations forward-only no PostgreSQL do próprio ambiente. */
   migrate(input: {
     environment: ReleaseEnvironment

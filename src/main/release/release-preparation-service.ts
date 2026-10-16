@@ -203,6 +203,37 @@ export class ReleasePreparationService {
     return { ...resultado, leaseId: lease.leaseId, cleanup: limpeza } as PreparationOutcome
   }
 
+  /**
+   * Limpa o que as preparações desta release deixaram no Docker local — o que o cancelamento antes
+   * de Staging exige (SPEC-Release-05). Cada lease que o diário conhece e ainda não registrou como
+   * limpo é limpo (a limpeza é idempotente) e fica registrado; nada publicado e nada do diário é
+   * apagado. Falha de limpeza lança: quem chama a registra como pendência.
+   */
+  async cleanupLeftovers(scope: ReleaseScope, releaseId: string): Promise<{ leases: number }> {
+    const efeitos = this.repo
+      .listEffects(scope, releaseId)
+      .filter((e) => e.kind === 'compose' && e.externalRef?.startsWith('lease:'))
+    const limpos = new Set(
+      efeitos
+        .filter((e) => e.phase === 'confirmed' && e.reason === 'cleaned')
+        .map((e) => e.externalRef)
+    )
+    const pendentes = [...new Set(efeitos.map((e) => e.externalRef))].filter(
+      (ref): ref is string => ref !== null && !limpos.has(ref)
+    )
+    for (const ref of pendentes) {
+      await this.compose.cleanup(ref.slice('lease:'.length))
+      this.efeito(scope, releaseId, {
+        kind: 'compose',
+        phase: 'confirmed',
+        transport: DOCKER_CLI,
+        externalRef: ref,
+        reason: 'cleaned'
+      })
+    }
+    return { leases: pendentes.length }
+  }
+
   private validarConfiguracao(
     scope: ReleaseScope,
     releaseId: string,

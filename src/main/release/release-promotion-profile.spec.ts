@@ -115,6 +115,26 @@ describe('carregarPerfilDePromocao', () => {
     expect(() => carregarPerfilDePromocao(gravar(b))).toThrow(/stagingDomain/)
   })
 
+  it('o repositório do GitHub é opcional e só aceita dono/nome (SPEC-Release-05)', () => {
+    expect(carregarPerfilDePromocao(gravar(valido())).github).toBeUndefined()
+    const com = carregarPerfilDePromocao(
+      gravar({ ...valido(), github: { repository: 'dono/projeto' } })
+    )
+    expect(com.github).toEqual({ repository: 'dono/projeto' })
+    for (const repository of ['sem-barra', 'a/b; c', 'a/b/c', '', 42, '../..', 'dono/..', './x'])
+      expect(() =>
+        carregarPerfilDePromocao(gravar({ ...valido(), github: { repository } }))
+      ).toThrow(TypeError)
+  })
+
+  it('o bloco do GitHub não tem campo para credencial', () => {
+    expect(() =>
+      carregarPerfilDePromocao(
+        gravar({ ...valido(), github: { repository: 'dono/projeto', token: 'ghp_x' } })
+      )
+    ).toThrow(TypeError)
+  })
+
   it('recusa o mesmo ambiente do Railway para Staging e Produção', () => {
     const p = valido()
     p.railway.environments.production = 'staging'

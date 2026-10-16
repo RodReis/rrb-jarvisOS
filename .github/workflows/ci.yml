@@ -120,6 +120,13 @@ jobs:
       - name: Prova visual dos controles
         run: npm run test:prova
 
+      # Jornada funcional da release (SPEC-Release-05, critério 10): Playwright nas três URLs e
+      # depois do rollback, contra ambientes locais efêmeros. Reaproveita o Chromium acima e leva
+      # poucos segundos. O modo contra o projeto de prova real não roda aqui (sem credencial): ele
+      # é `not_run` por desenho, nunca `pass`. Ver docs/TESTING.md.
+      - name: Jornada funcional da release (prova local)
+        run: npm run test:release-journey
+
   test-regras:
     runs-on: ubuntu-latest
     timeout-minutes: 15

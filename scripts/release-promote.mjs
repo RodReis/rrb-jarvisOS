@@ -1,22 +1,28 @@
 #!/usr/bin/env node
 /**
- * Promove uma release mergeada para Staging e Produção (SPEC-Release-04): build único do backend,
- * Staging (migration, deploy, atribuição do frontend, health, smoke e E2E essencial), Produção
- * (backup, migration, o MESMO digest e o MESMO frontend) e estabilização — compensando as
- * aplicações se algo falhar. Idempotente. É o comando da aplicação: roda dentro do Electron porque
- * a chave da cadeia de auditoria só abre lá (`safeStorage`).
+ * Promove e recupera releases (SPEC-Release-04 e 05). `merge` leva um commit mergeado a Staging e
+ * Produção — build único do backend, migration, o MESMO digest e o MESMO frontend, estabilização —
+ * e, estabilizada, gera manifesto, tag e GitHub Release; compensa as aplicações se algo falhar e
+ * devolve a falha de código à V2. `cancel`, `rollback`, `recover`, `publish` e `verify` cobrem a
+ * recuperação. Idempotente. É o comando da aplicação: roda dentro do Electron porque a chave da
+ * cadeia de auditoria só abre lá (`safeStorage`).
  *
- * Os tokens vêm do ambiente, nunca de argumento: RAILWAY_API_TOKEN e VERCEL_TOKEN.
+ * Os tokens vêm do ambiente, nunca de argumento: RAILWAY_API_TOKEN e VERCEL_TOKEN (dispensados em
+ * `publish` e `verify`). A credencial do GitHub é a do `gh auth login`.
  *
  * Uso:
  *   npm run release:promote -- --data-dir <userData> --user <id> --workspace noa|jarvis \
  *     --project <id> --profile <release-profile.json> --promotion-profile <promotion.json> \
- *     --compose-file <compose.yml> --event merge --sha <sha> \
+ *     --compose-file <compose.yml> --event merge --sha <sha-completo> \
+ *     [--pr <n>] [--spec <id>] [--slice <id-da-fatia-v2>] [--issue <n>] \
  *     [--registry ghcr.io] [--namespace <dono>] [--builder <nome>] [--auto-start-docker]
- *   npm run release:promote -- ... --event resume --release <id>
+ *   ... --event resume|cancel|publish|verify --release <release_id>
+ *   ... --event rollback --to <release_id>
+ *   ... --event recover [--acknowledge]
  *
- * A árvore local precisa ser o commit da release. Sai com 0 (concluída), 3 (falhou, degradada ou
- * bloqueada por passo de efeito incerto), 5 (aguarda a lane ou outro executor) ou 2 (uso inválido).
+ * A árvore local precisa ser o commit da release (merge, resume, cancel). Sai com 0 (fez o pedido),
+ * 3 (falhou ou exige o operador), 5 (aguarda a lane, outro executor ou o provedor) ou 2 (uso
+ * inválido).
  */
 import { spawn } from 'node:child_process'
 import { createRequire } from 'node:module'

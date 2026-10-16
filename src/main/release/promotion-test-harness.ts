@@ -10,11 +10,18 @@ import {
   type ConfigurationProbe
 } from './configuration-reference-validator'
 import type { MigrationFile } from './database-migration-runner'
-import { FakeClock, FakePromotionCloud } from './promotion-test-doubles'
+import { FakeClock, FakeGitHubReleases, FakePromotionCloud } from './promotion-test-doubles'
 import type { PromotionProject } from './release-promotion-effects'
 import { ReleaseLocalRepository } from './release-local-repository'
 import { ReleasePromotionRepository } from './release-promotion-repository'
 import { PromotionService } from './release-promotion-service'
+import {
+  ReleaseCorrectionDispatcher,
+  type CorrectionRequest,
+  type V2CorrectionPort
+} from './correction/dispatcher'
+import { ReleasePublisher } from './release-publisher'
+import { ReleaseRecoveryRepository } from './release-recovery-repository'
 import { ReleaseRepository } from './release-repository'
 
 /**
@@ -71,12 +78,87 @@ export function projeto(
   }
 }
 
+/** O processo morreu: nada do que vier depois acontece. */
+export class SimulatedCrash extends Error {
+  constructor() {
+    super('processo encerrado (morte simulada)')
+    this.name = 'SimulatedCrash'
+  }
+}
+
+const LEITURA =
+  /^(get|list|last|open|assert|find|read|queue$|detail$|timeline$|inclusions$|evidence$|active|cancellation$|manifest$|publication$|pending|correction|rollbacks$|spec|has|is)/
+
+/**
+ * Mata o processo na `at`-ésima gravação (antes ou depois de ela chegar ao banco). Embrulha os
+ * repositórios e as portas de nuvem: depois da morte, qualquer chamada lança — inclusive a
+ * limpeza do `finally`, que num processo morto não rodaria. Leituras não contam.
+ */
+export class ProcessKiller {
+  calls = 0
+  dead = false
+
+  constructor(
+    private readonly at: number,
+    private readonly when: 'before' | 'after'
+  ) {}
+
+  wrap<T extends object>(target: T): T {
+    return new Proxy(target, {
+      get: (alvo, prop, recebedor) => {
+        const valor: unknown = Reflect.get(alvo, prop, recebedor)
+        if (typeof valor !== 'function' || typeof prop !== 'string') return valor
+        const metodo = valor.bind(alvo) as (...args: unknown[]) => unknown
+        const leitura = LEITURA.test(prop)
+        return (...args: unknown[]) => {
+          if (this.dead) throw new SimulatedCrash()
+          if (leitura) return metodo(...args)
+          this.calls += 1
+          const aqui = this.calls === this.at
+          if (aqui && this.when === 'before') {
+            this.dead = true
+            throw new SimulatedCrash()
+          }
+          const resultado = metodo(...args)
+          if (aqui && this.when === 'after') {
+            this.dead = true
+            throw new SimulatedCrash()
+          }
+          return resultado
+        }
+      }
+    })
+  }
+
+  /** Porta de nuvem: não grava nada no contador, mas um processo morto não a chama. */
+  guard<T extends object>(porta: T): T {
+    return new Proxy(porta, {
+      get: (alvo, prop, recebedor) => {
+        const valor: unknown = Reflect.get(alvo, prop, recebedor)
+        if (typeof valor !== 'function') return valor
+        const metodo = valor.bind(alvo) as (...args: unknown[]) => unknown
+        return (...args: unknown[]) => {
+          if (this.dead) throw new SimulatedCrash()
+          return metodo(...args)
+        }
+      }
+    })
+  }
+}
+
 export interface Harness {
   readonly db: Database
   readonly audit: AuditRepository
   readonly repository: ReleaseRepository
   readonly promotion: ReleasePromotionRepository
   readonly local: ReleaseLocalRepository
+  readonly recovery: ReleaseRecoveryRepository
+  /** A V2 falsa: guarda cada pedido de correção e pode ser derrubada com `falha`. */
+  readonly v2: { readonly pedidos: CorrectionRequest[]; falha: Error | null }
+  readonly dispatcher: ReleaseCorrectionDispatcher
+  /** O GitHub falso e o publicador que o serviço usa ao estabilizar a Produção. */
+  readonly git: FakeGitHubReleases
+  readonly publisher: ReleasePublisher
   readonly clock: FakeClock
   readonly cloud: FakePromotionCloud
   readonly service: PromotionService
@@ -94,7 +176,16 @@ export interface Harness {
 }
 
 export function montarHarness(
-  opcoes: { sleep?: (ms: number) => Promise<void>; leaseMs?: number } = {}
+  opcoes: {
+    sleep?: (ms: number) => Promise<void>
+    leaseMs?: number
+    /** O serviço principal morre quando o `ProcessKiller` mandar; `novoServico` é o processo seguinte. */
+    morte?: ProcessKiller
+    /** O serviço não publica a identidade: o teste dirige o `ReleasePublisher` por conta própria. */
+    semPublicacao?: boolean
+    /** Porta da V2 de verdade (em vez da falsa), para provar a ligação com o fluxo real da V2. */
+    v2?: V2CorrectionPort
+  } = {}
 ): Harness {
   const directory = mkdtempSync(join(tmpdir(), 'release-promotion-svc-'))
   const db = openDatabase(join(directory, 'release.db'))
@@ -102,36 +193,70 @@ export function montarHarness(
   const repository = new ReleaseRepository(db, audit)
   const promotion = new ReleasePromotionRepository(db, audit)
   const local = new ReleaseLocalRepository(db, audit)
+  const recovery = new ReleaseRecoveryRepository(db, audit)
   const clock = new FakeClock()
   const cloud = new FakePromotionCloud()
+  const git = new FakeGitHubReleases()
+  const publisher = new ReleasePublisher({
+    repository,
+    promotion,
+    local,
+    recovery,
+    git: git.port,
+    now: clock.now
+  })
+  const v2: Harness['v2'] = { pedidos: [], falha: null }
+  const dispatcher = new ReleaseCorrectionDispatcher({
+    repository,
+    recovery,
+    now: clock.now,
+    v2: opcoes.v2 ?? {
+      open: async (pedido) => {
+        if (v2.falha) throw v2.falha
+        v2.pedidos.push(pedido)
+        return { runId: `run-${v2.pedidos.length}` }
+      }
+    }
+  })
   const criar = (
     o: { sleep?: (ms: number) => Promise<void>; ownerId?: string } = {},
-    nuvem: FakePromotionCloud = cloud
-  ) =>
-    new PromotionService({
-      repository,
-      promotion,
-      local,
-      build: nuvem.buildPort(local),
-      backend: nuvem.backend,
-      database: nuvem.database,
-      frontend: nuvem.frontend,
-      verifier: nuvem.verifier,
+    nuvem: FakePromotionCloud = cloud,
+    morte?: ProcessKiller
+  ) => {
+    const m = morte
+    return new PromotionService({
+      repository: m ? m.wrap(repository) : repository,
+      promotion: m ? m.wrap(promotion) : promotion,
+      local: m ? m.wrap(local) : local,
+      recovery: m ? m.wrap(recovery) : recovery,
+      correction: dispatcher,
+      ...(opcoes.semPublicacao ? {} : { publisher }),
+      build: m ? m.guard(nuvem.buildPort(local)) : nuvem.buildPort(local),
+      backend: m ? m.guard(nuvem.backend) : nuvem.backend,
+      database: m ? m.guard(nuvem.database) : nuvem.database,
+      frontend: m ? m.guard(nuvem.frontend) : nuvem.frontend,
+      verifier: m ? m.guard(nuvem.verifier) : nuvem.verifier,
       now: clock.now,
       nowMs: clock.nowMs,
       sleep: o.sleep ?? opcoes.sleep ?? clock.sleep,
       ownerId: o.ownerId ?? 'executor-1',
       ...(opcoes.leaseMs ? { leaseMs: opcoes.leaseMs } : {})
     })
+  }
   return {
     db,
     audit,
     repository,
     promotion,
     local,
+    recovery,
+    v2,
+    dispatcher,
+    git,
+    publisher,
     clock,
     cloud,
-    service: criar(),
+    service: criar({}, cloud, opcoes.morte),
     novoServico: (o) => criar(o),
     outroProjeto: () => {
       const nuvem = new FakePromotionCloud()

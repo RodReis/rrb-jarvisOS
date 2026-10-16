@@ -34,7 +34,8 @@ function montar(resultado: PreparationOutcome) {
     prepare: async (_scope, releaseId, lease, projeto) => {
       chamadas.push({ releaseId, leaseId: lease.leaseId, sha: projeto.sourceSha })
       return resultado
-    }
+    },
+    cleanupLeftovers: async () => ({ leases: 0 })
   }
   const adapter = new PreparationBuildAdapter(
     preparation,
@@ -82,11 +83,33 @@ describe('PreparationBuildAdapter', () => {
   })
 
   it('perfil que não monta para o SHA bloqueia em vez de lançar', async () => {
-    const adapter = new PreparationBuildAdapter({ prepare: async () => preparada(null) }, () => {
-      throw new TypeError('O perfil do projeto não é um JSON válido.')
-    })
+    const adapter = new PreparationBuildAdapter(
+      { prepare: async () => preparada(null), cleanupLeftovers: async () => ({ leases: 0 }) },
+      () => {
+        throw new TypeError('O perfil do projeto não é um JSON válido.')
+      }
+    )
     expect(
       await adapter.build({ scope: SCOPE, releaseId: 'r1', sourceSha: SHA, leaseId: 'l' })
     ).toEqual({ state: 'blocked', reason: 'profile-invalid' })
+  })
+
+  it('cleanup delega à limpeza dos temporários da release e propaga a falha', async () => {
+    const chamadasDeLimpeza: string[] = []
+    const preparation: PreparationRunner = {
+      prepare: async () => preparada(null),
+      cleanupLeftovers: async (_scope, releaseId) => {
+        chamadasDeLimpeza.push(releaseId)
+        if (releaseId === 'falha') throw new Error('docker fora')
+        return { leases: 2 }
+      }
+    }
+    const adapter = new PreparationBuildAdapter(preparation, () => ({}) as PreparationProject)
+
+    await adapter.cleanup({ scope: SCOPE, releaseId: 'r1' })
+    expect(chamadasDeLimpeza).toEqual(['r1'])
+    await expect(adapter.cleanup({ scope: SCOPE, releaseId: 'falha' })).rejects.toThrow(
+      'docker fora'
+    )
   })
 })
