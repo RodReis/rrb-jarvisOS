@@ -333,6 +333,77 @@ describe('correção devolvida à V2', () => {
   })
 })
 
+describe('artefatos protegidos para rollback (SPEC-Release-05, "Dentro")', () => {
+  const DIGEST_DE = (n: number): string => `sha256:${String(n).repeat(64)}`
+
+  /** Release concluída com backend, frontend, artefato e backup próprios. */
+  function concluidaComArtefatos(n: number): string {
+    const sha = String(n).repeat(40)
+    const id = releases.enqueue(SCOPE, sha, `2026-10-16T12:0${n}:00.000Z`).release.id
+    const promocao = new ReleasePromotionRepository(db, audit)
+    promocao.recordDeployment(SCOPE, id, { environment: 'production', kind: 'backend', artifactDigest: DIGEST_DE(n), externalId: `rw-${n}`, replacesExternalId: null }, NOW) // prettier-ignore
+    promocao.recordDeployment(SCOPE, id, { environment: 'production', kind: 'frontend', artifactDigest: DIGEST_DE(n), externalId: `dpl_${n}`, replacesExternalId: null }, NOW) // prettier-ignore
+    promocao.recordMigration(SCOPE, id, { environment: 'production', migrationId: `00${n}_m`, checksum: String(n).repeat(8), state: 'confirmed', backupRef: `bkp-${n}` }, NOW) // prettier-ignore
+    db.prepare(
+      `INSERT INTO release_artifact (id,user_id,workspace_id,project_id,release_id,kind,digest,created_at,uri)
+       VALUES (?,?,?,?,?,'backend-image',?,?,?)`
+    ).run(`art-${n}`, SCOPE.userId, SCOPE.workspaceId, SCOPE.projectId, id, DIGEST_DE(n), NOW, `ghcr.io/dono/app@${DIGEST_DE(n)}`) // prettier-ignore
+    concluir(id, `2026-10-16T12:0${n}:00.000Z`)
+    return id
+  }
+
+  it('protege a release que serve e a anterior (o alvo do rollback); as mais velhas não', () => {
+    const promocao = new ReleasePromotionRepository(db, audit)
+    const [r1, r2, r3, r4] = [1, 2, 3, 4].map(concluidaComArtefatos)
+    const aberta = releases.enqueue(SCOPE, 'f'.repeat(40), LATER).release.id
+    const p = promocao.protectedArtifacts(SCOPE)
+
+    expect(p.releaseIds).toEqual(expect.arrayContaining([r3, r4, aberta]))
+    expect(p.releaseIds).not.toContain(r1)
+    expect(p.releaseIds).not.toContain(r2)
+    expect(p.deploymentIds).toEqual(expect.arrayContaining(['rw-3', 'dpl_3', 'rw-4', 'dpl_4']))
+    expect(p.deploymentIds).not.toContain('rw-1')
+    expect(p.digests).toEqual(expect.arrayContaining([DIGEST_DE(3), DIGEST_DE(4)]))
+    expect(p.digests).not.toContain(DIGEST_DE(1))
+    expect(p.backupRefs).toEqual(expect.arrayContaining(['bkp-3', 'bkp-4']))
+    expect(p.backupRefs).not.toContain('bkp-2')
+  })
+
+  it('um rollback em andamento protege a origem e o destino, por mais velho que seja o destino', () => {
+    const promocao = new ReleasePromotionRepository(db, audit)
+    const [r1, , , r4] = [1, 2, 3, 4].map(concluidaComArtefatos)
+    repo.beginRollback(SCOPE, r4!, r1!, LATER)
+
+    const p = promocao.protectedArtifacts(SCOPE)
+    expect(p.releaseIds).toEqual(expect.arrayContaining([r1, r4]))
+    expect(p.deploymentIds).toContain('rw-1')
+  })
+
+  it('release revertida não conta como "a que serve": o lugar passa para a anterior', () => {
+    const promocao = new ReleasePromotionRepository(db, audit)
+    const [r1, r2, r3, r4] = [1, 2, 3, 4].map(concluidaComArtefatos)
+    const id = repo.beginRollback(SCOPE, r4!, r3!, LATER)
+    repo.finishRollback(SCOPE, id, 'confirmed', LATER)
+
+    const p = promocao.protectedArtifacts(SCOPE)
+    // Servindo: r3; alvo seguinte do rollback: r2. A revertida r4 (a ruim) não precisa de proteção.
+    expect(p.releaseIds).toEqual(expect.arrayContaining([r3, r2]))
+    expect(p.releaseIds).not.toContain(r4)
+    expect(p.releaseIds).not.toContain(r1)
+  })
+
+  it('isola por escopo', () => {
+    const promocao = new ReleasePromotionRepository(db, audit)
+    concluidaComArtefatos(1)
+    expect(promocao.protectedArtifacts(OUTRO_PROJETO)).toEqual({
+      releaseIds: [],
+      deploymentIds: [],
+      digests: [],
+      backupRefs: []
+    })
+  })
+})
+
 describe('rollback por release_id', () => {
   const DIGEST = `sha256:${'a'.repeat(64)}`
 
