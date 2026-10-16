@@ -16,6 +16,8 @@ export interface PreparationRunner {
     lease: { readonly leaseId: string },
     projeto: PreparationProject
   ): Promise<PreparationOutcome>
+  /** Limpa o que preparações da release deixaram no Docker local (cancelamento antes de Staging). */
+  cleanupLeftovers(scope: ReleaseScope, releaseId: string): Promise<{ leases: number }>
 }
 
 export class PreparationBuildAdapter implements PromotionBuildPort {
@@ -24,6 +26,10 @@ export class PreparationBuildAdapter implements PromotionBuildPort {
     /** O perfil do projeto é lido **para o SHA da release**: o contexto de build é aquele commit. */
     private readonly projectFor: (sourceSha: string) => PreparationProject
   ) {}
+
+  async cleanup(input: { scope: ReleaseScope; releaseId: string }): Promise<void> {
+    await this.preparation.cleanupLeftovers(input.scope, input.releaseId)
+  }
 
   async build(input: {
     scope: ReleaseScope

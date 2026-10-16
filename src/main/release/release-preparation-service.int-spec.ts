@@ -37,6 +37,7 @@ let repo: ReleaseLocalRepository
 let releaseId: string
 let lease: { leaseId: string; ownerId: string; fencingToken: number }
 let chamadas: string[]
+let limpezas: string[]
 let projeto: PreparationProject
 
 function escrever(nome: string, texto: string): string {
@@ -85,8 +86,9 @@ function composeFalso(
       if (opcoes.falhaAoAbrir) throw opcoes.falhaAoAbrir
       return env
     },
-    async cleanup() {
+    async cleanup(leaseId) {
       chamadas.push('cleanup')
+      limpezas.push(leaseId)
       if (opcoes.falhaLimpeza) throw new ComposeBlockedError('cleanup-failed', 'x')
       return { containers: 3, networks: 1, volumes: 1 }
     }
@@ -157,6 +159,7 @@ beforeEach(() => {
   releaseId = new ReleaseRepository(db, audit).enqueue(SCOPE, 'c'.repeat(40), NOW).release.id
   lease = { leaseId: 'lease-0123456789', ownerId: 'dono', fencingToken: 1 }
   chamadas = []
+  limpezas = []
   origem = 'ok'
   publicacoes.length = 0
   const migrations = join(directory, 'migrations')
@@ -414,6 +417,53 @@ describe('build único e limpeza', () => {
     expect(r).toMatchObject({ state: 'prepared', cleanup: 'pending' })
     const falhas = repo.listEffects(SCOPE, releaseId).filter((e) => e.phase === 'failed')
     expect(falhas.map((e) => e.reason)).toContain('cleanup-failed')
+  })
+})
+
+describe('limpeza do que a preparação deixou (cancelamento antes de Staging)', () => {
+  it('limpa o lease de uma preparação cuja limpeza ficou pendente e não repete o que já limpou', async () => {
+    await preparar(servico(composeFalso({ falhaLimpeza: true }), registryFalso()))
+    limpezas.length = 0
+
+    const r = await servico(composeFalso(), registryFalso()).cleanupLeftovers(SCOPE, releaseId)
+
+    expect(limpezas).toEqual([lease.leaseId])
+    expect(r).toEqual({ leases: 1 })
+    expect(repo.listEffects(SCOPE, releaseId).at(-1)).toMatchObject({
+      kind: 'compose',
+      phase: 'confirmed',
+      externalRef: `lease:${lease.leaseId}`
+    })
+    // Segunda chamada: o lease já foi limpo e o diário diz isso.
+    limpezas.length = 0
+    expect(
+      await servico(composeFalso(), registryFalso()).cleanupLeftovers(SCOPE, releaseId)
+    ).toEqual({ leases: 0 })
+    expect(limpezas).toEqual([])
+  })
+
+  it('nunca apaga o artefato publicado nem o diário', async () => {
+    await preparar(servico(composeFalso({ falhaLimpeza: true }), registryFalso()))
+    const antes = repo.listEffects(SCOPE, releaseId).length
+    await servico(composeFalso(), registryFalso()).cleanupLeftovers(SCOPE, releaseId)
+    expect(repo.getArtifact(SCOPE, releaseId, 'backend-image')).not.toBeNull()
+    expect(repo.listEffects(SCOPE, releaseId).length).toBeGreaterThan(antes)
+  })
+
+  it('limpeza que falha lança para o chamador registrar a pendência', async () => {
+    await preparar(servico(composeFalso({ falhaLimpeza: true }), registryFalso()))
+    await expect(
+      servico(composeFalso({ falhaLimpeza: true }), registryFalso()).cleanupLeftovers(
+        SCOPE,
+        releaseId
+      )
+    ).rejects.toBeInstanceOf(ComposeBlockedError)
+  })
+
+  it('release sem preparação não tem o que limpar', async () => {
+    expect(
+      await servico(composeFalso(), registryFalso()).cleanupLeftovers(SCOPE, releaseId)
+    ).toEqual({ leases: 0 })
   })
 })
 

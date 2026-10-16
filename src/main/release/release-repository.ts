@@ -411,6 +411,21 @@ export class ReleaseRepository {
       )
   }
 
+  /**
+   * Larga a lane e o lease de uma release que os tomou **sem transição de estado** — o rollback
+   * de uma release já concluída. Só o dono vigente do lease pode largar.
+   */
+  releaseLane(
+    query: ReleaseEnvironmentQuery,
+    lease: ReleaseLease,
+    now = new Date().toISOString()
+  ): void {
+    this.transaction(() => {
+      this.assertLease(query, lease, now)
+      this.clearLane(query, query.releaseId, now)
+    })
+  }
+
   transition(
     query: ReleaseEnvironmentQuery,
     next: ReleaseStatus,

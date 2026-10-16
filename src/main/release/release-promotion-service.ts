@@ -130,6 +130,14 @@ export interface CancelOutcome {
   readonly reason: string | null
 }
 
+export interface RollbackOutcome {
+  readonly state: 'rolled-back' | 'failed' | 'rejected' | 'waiting'
+  readonly reason: string | null
+  /** A release que Produção servia e a que passa a servir. */
+  readonly from?: string
+  readonly to?: string
+}
+
 export interface RecoveryOutcome {
   readonly state: 'none' | 'paused' | 'resumed'
   readonly reason: string | null
@@ -834,6 +842,107 @@ export class PromotionService {
     }
   }
 
+  // --- rollback por release_id ---------------------------------------------------------------
+
+  /**
+   * Rollback de Produção para um `release_id` conhecido (SPEC-Release-05, critério 9): reaponta
+   * frontend e backend aos deployments dessa release — nunca "a versão anterior" —, prova na
+   * nuvem que Produção voltou a servir exatamente a identidade dela e só então confirma. O banco
+   * não é tocado: a versão alvo precisa ser compatível com o schema expandido (SPEC-Release-04,
+   * regra 5). Tomar a lane de Produção serializa o rollback com qualquer promoção em curso.
+   */
+  async rollback(scope: ReleaseScope, input: { readonly to: string }): Promise<RollbackOutcome> {
+    const { promotion, repository, recovery, local } = this.deps
+    const servindo = promotion.lastKnownDeployment(scope, 'production', 'frontend', '')
+    if (!servindo) return { state: 'rejected', reason: 'nothing-to-roll-back' }
+    const from = servindo.releaseId
+    const to = input.to
+    if (to === from) return { state: 'rejected', reason: 'already-serving', from, to }
+    const alvo = repository.get({ ...scope, releaseId: to })
+    if (!alvo) return { state: 'rejected', reason: 'target-not-found', from }
+    if (alvo.status !== 'completed')
+      return { state: 'rejected', reason: 'target-not-completed', from, to }
+    const backend = promotion.getDeployment(scope, to, 'production', 'backend')
+    const frontend = promotion.getDeployment(scope, to, 'production', 'frontend')
+    const artefato = local.getArtifact(scope, to, 'backend-image')
+    if (!backend || !frontend || !artefato)
+      return { state: 'rejected', reason: 'target-incomplete', from, to }
+
+    const query = { ...scope, releaseId: from, environment: 'production' as const }
+    let lease: ReleaseLease
+    try {
+      lease = repository.acquireLease(
+        query,
+        this.deps.ownerId ?? `rollback-${process.pid}`,
+        this.deps.leaseMs ?? LEASE_PADRAO_MS,
+        this.now()
+      )
+    } catch (erro) {
+      if (erro instanceof ReleaseConflictError && CONFLITOS_DE_POSSE.includes(erro.code))
+        return { state: 'waiting', reason: erro.code, from, to }
+      throw erro
+    }
+    try {
+      const rollbackId = recovery.beginRollback(scope, from, to, this.now())
+      const alvos = [
+        { kind: 'frontend' as const, id: frontend.externalId },
+        { kind: 'backend' as const, id: backend.externalId }
+      ]
+      for (const alvoDeploy of alvos) {
+        const compensacaoId = promotion.beginCompensation(
+          scope,
+          from,
+          { environment: 'production', action: `${alvoDeploy.kind}:rollback:${alvoDeploy.id}` },
+          this.now()
+        )
+        try {
+          await this.restaurar('production', alvoDeploy.kind, alvoDeploy.id)
+          promotion.finishCompensation(scope, from, compensacaoId, 'confirmed')
+        } catch {
+          promotion.finishCompensation(scope, from, compensacaoId, 'failed')
+        }
+      }
+      const provado = await this.provarRollback(artefato.digest, frontend.externalId)
+      recovery.finishRollback(scope, rollbackId, provado ? 'confirmed' : 'failed', this.now())
+      this.evidence.record(scope, from, {
+        kind: 'rollback',
+        state: provado ? 'confirmed' : 'failed',
+        environment: 'production',
+        reason: provado ? 'rolled-back' : 'rollback-not-verified',
+        ...(provado ? {} : { action: 'check-provider-status' }),
+        details: { to }
+      })
+      if (provado) return { state: 'rolled-back', reason: null, from, to }
+      recovery.pauseProject(scope, from, 'rollback-not-verified', this.now())
+      return { state: 'failed', reason: 'rollback-not-verified', from, to }
+    } finally {
+      try {
+        repository.releaseLane(query, lease, this.now())
+      } catch {
+        // lease já expirado: a lane será reaproveitada pelo próximo writer
+      }
+    }
+  }
+
+  /** Produção serve a identidade da release alvo? Falha de verificação é "não provado". */
+  private async provarRollback(
+    backendDigest: string,
+    frontendDeploymentId: string
+  ): Promise<boolean> {
+    const checks = ['backend_health', 'frontend_wiring', 'smoke'] as const
+    try {
+      const resultados = await this.deps.verifier.verify({
+        environment: 'production',
+        checks,
+        backendDigest,
+        frontendDeploymentId
+      })
+      return checks.every((c) => resultados.find((r) => r.gate === c)?.result === 'passed')
+    } catch {
+      return false
+    }
+  }
+
   // --- recuperação do projeto pausado -------------------------------------------------------
 
   /**
@@ -862,7 +971,7 @@ export class PromotionService {
     const alvos = new Map<string, AlvoDeRestauracao>()
     let semDestino = false
     for (const c of promotion.listCompensations(scope, releaseId)) {
-      const restauracao = /^(frontend|backend):restore:(.+)$/.exec(c.action)
+      const restauracao = /^(frontend|backend):(?:restore|rollback):(.+)$/.exec(c.action)
       if (!restauracao) {
         semDestino = true
         continue
