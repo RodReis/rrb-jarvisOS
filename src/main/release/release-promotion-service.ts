@@ -6,6 +6,7 @@ import {
   esperaAntesDaTentativa,
   podeTentarDeNovo
 } from '@shared/domain/release-recovery'
+import type { ReleaseCorrectionDispatcher } from './correction/dispatcher'
 import { ReleaseEvidenceWriter } from './correction/evidence-writer'
 import { ReleaseGateEngine, gateStoreFrom } from './release-gate-engine'
 import { ReleaseOrchestrator } from './release-orchestrator'
@@ -15,7 +16,7 @@ import {
   type PromotionProject
 } from './release-promotion-effects'
 import type { ReleasePromotionRepository } from './release-promotion-repository'
-import type { ReleaseRecoveryRepository } from './release-recovery-repository'
+import type { InclusionInput, ReleaseRecoveryRepository } from './release-recovery-repository'
 import {
   ReleaseConflictError,
   type ReleaseLease,
@@ -64,6 +65,8 @@ export interface PromotionServiceDeps {
   readonly local: ReleaseLocalRepository
   /** Evidência, pausa, cancelamento e identidade da release (SPEC-Release-05). */
   readonly recovery: ReleaseRecoveryRepository
+  /** Devolve à V2 a falha de código; ausente = a correção fica a cargo do operador. */
+  readonly correction?: ReleaseCorrectionDispatcher
   readonly build: PromotionBuildPort
   readonly backend: PromotionBackendPort
   readonly database: PromotionDatabasePort
@@ -78,6 +81,7 @@ export interface PromotionServiceDeps {
 }
 
 const LEASE_PADRAO_MS = 15 * 60_000
+const STATUS_TERMINAIS: readonly ReleaseStatus[] = ['completed', 'superseded', 'failed', 'degraded']
 const PASSOS_STAGING = [
   'database_migrated',
   'backend_healthy',
@@ -96,6 +100,23 @@ interface Run {
   readonly effects: PromotionEffects
   readonly orchestrator: ReleaseOrchestrator
   readonly leases: Map<ReleaseEnvironment, ReleaseLease>
+}
+
+interface Compensacao {
+  readonly completo: boolean
+  /** Por que o projeto para quando a compensação ficou incompleta. */
+  readonly motivo: 'compensation-incomplete' | 'no-previous-release' | null
+}
+
+interface AlvoDeRestauracao {
+  readonly environment: ReleaseEnvironment
+  readonly kind: 'frontend' | 'backend'
+  readonly id: string
+}
+
+export interface RecoveryOutcome {
+  readonly state: 'none' | 'paused' | 'resumed'
+  readonly reason: string | null
 }
 
 class Parar extends Error {
@@ -125,9 +146,11 @@ export class PromotionService {
   async handleMerge(
     scope: ReleaseScope,
     sha: string,
-    project: PromotionProject
+    project: PromotionProject,
+    inclusion: Omit<InclusionInput, 'sha'> = {}
   ): Promise<PromotionOutcome> {
     let release: { id: string }
+    const anterior = this.deps.repository.queue(scope).candidate
     try {
       release = this.deps.repository.enqueue(scope, sha, this.now()).release
     } catch (erro) {
@@ -147,7 +170,25 @@ export class PromotionService {
         }
       throw erro
     }
+    this.registrarInclusao(scope, release.id, anterior, { ...inclusion, sha })
     return this.promote(scope, release.id, project)
+  }
+
+  /**
+   * A release carrega o que o merge trouxe (SHA, PR, SPEC, fatia, issue) e, se consolidou um
+   * candidato anterior, o que ele carregava — é isso que o manifesto, o changelog e a correção
+   * da V2 usam depois. Repetir o mesmo merge não duplica.
+   */
+  private registrarInclusao(
+    scope: ReleaseScope,
+    releaseId: string,
+    anterior: { id: string } | null,
+    inclusao: InclusionInput
+  ): void {
+    const { recovery } = this.deps
+    recovery.recordInclusion(scope, releaseId, inclusao, this.now())
+    if (anterior && anterior.id !== releaseId)
+      recovery.inheritInclusions(scope, anterior.id, releaseId)
   }
 
   /** Retoma, da mais antiga à mais nova, as releases do projeto que ainda não terminaram. */
@@ -165,6 +206,14 @@ export class PromotionService {
   ): Promise<PromotionOutcome> {
     const release = this.deps.repository.get({ ...scope, releaseId })
     if (!release) throw new ReleaseConflictError('release-not-found', 'Release não encontrada.')
+    // Projeto pausado (release degradada): nenhuma release aberta anda; só o relato das terminais.
+    if (!STATUS_TERMINAIS.includes(release.status) && this.deps.recovery.activePause(scope))
+      return {
+        releaseId: release.id,
+        state: 'blocked',
+        status: release.status,
+        reason: 'project-paused'
+      }
     const leases = new Map<ReleaseEnvironment, ReleaseLease>()
     const effects = new PromotionEffects(
       this.effectsDeps(
@@ -495,26 +544,51 @@ export class PromotionService {
    */
   private async fail(run: Run, environment: ReleaseEnvironment, reason: string): Promise<never> {
     const status = this.status(run)
-    const compensado =
-      status === 'queued' || status === 'preparing' ? true : await this.compensate(run, environment)
-    const terminal: ReleaseStatus = compensado ? 'failed' : 'degraded'
+    const compensacao: Compensacao =
+      status === 'queued' || status === 'preparing'
+        ? { completo: true, motivo: null }
+        : await this.compensate(run, environment)
+    const terminal: ReleaseStatus = compensacao.completo ? 'failed' : 'degraded'
     run.orchestrator.transition(
       this.query(run, environment),
       terminal,
       this.lease(run, environment)
     )
-    throw new Parar({ state: compensado ? 'failed' : 'degraded', reason, environment })
+    // Compensação incompleta: o projeto para (e só ele) até o operador recuperar.
+    if (!compensacao.completo && compensacao.motivo)
+      this.deps.recovery.pauseProject(run.scope, run.releaseId, compensacao.motivo, this.now())
+    await this.devolverAV2(run, environment, reason)
+    throw new Parar({ state: compensacao.completo ? 'failed' : 'degraded', reason, environment })
+  }
+
+  /**
+   * Falha de código volta à V2 (regra 5). Nunca pode mascarar a falha original nem tocar a nuvem:
+   * se a V2 não responde, a correção fica pendente e a retomada a reabre.
+   */
+  private async devolverAV2(
+    run: Run,
+    environment: ReleaseEnvironment,
+    reason: string
+  ): Promise<void> {
+    if (!this.deps.correction) return
+    try {
+      await this.deps.correction.dispatch(run.scope, run.releaseId, { environment, reason })
+    } catch {
+      // A correção pendente é reaberta por `retryPending`; a falha da release já está gravada.
+    }
   }
 
   /**
    * Volta frontend e backend do ambiente para os deployments que a pipeline provou saudáveis
    * (última release concluída). Só compensa o que o passo chegou a tentar: migration que falhou
-   * antes da troca de tráfego não gera compensação (regra 6). `false` = compensação incompleta.
+   * antes da troca de tráfego não gera compensação (regra 6). Frontend e backend são independentes:
+   * a falha de um não impede a tentativa do outro. O banco nunca é tocado.
    */
-  private async compensate(run: Run, environment: ReleaseEnvironment): Promise<boolean> {
-    const { promotion, repository, frontend, backend } = this.deps
+  private async compensate(run: Run, environment: ReleaseEnvironment): Promise<Compensacao> {
+    const { promotion, repository } = this.deps
     const query = this.query(run, environment)
-    let completo = true
+    let falhou = false
+    let semBaseline = false
     const alvos = [
       { kind: 'frontend' as const, passo: 'frontend_promoted' },
       { kind: 'backend' as const, passo: 'backend_healthy' }
@@ -535,21 +609,118 @@ export class PromotionService {
         { environment, action: acao },
         this.now()
       )
+      const registrar = (state: 'compensated' | 'failed', reason: string): void =>
+        this.evidence.record(run.scope, run.releaseId, {
+          kind: 'compensation',
+          state,
+          environment,
+          step: alvo.passo,
+          reason
+        })
       if (!anterior) {
         // Sem baseline não há como restaurar, e a versão nova segue no ar: não é "compensado".
-        completo = false
+        semBaseline = true
         promotion.finishCompensation(run.scope, run.releaseId, id, 'failed')
+        registrar('failed', `${alvo.kind}-no-previous`)
         continue
       }
       try {
-        if (alvo.kind === 'frontend') await frontend.assign({ environment, deploymentId: anterior })
-        else await backend.rollback({ environment, toDeploymentId: anterior })
+        await this.restaurar(environment, alvo.kind, anterior)
         promotion.finishCompensation(run.scope, run.releaseId, id, 'confirmed')
+        registrar('compensated', `${alvo.kind}-restored`)
       } catch {
-        completo = false
+        falhou = true
         promotion.finishCompensation(run.scope, run.releaseId, id, 'failed')
+        registrar('failed', `${alvo.kind}-restore-failed`)
       }
     }
-    return completo
+    if (falhou) return { completo: false, motivo: 'compensation-incomplete' }
+    if (semBaseline) return { completo: false, motivo: 'no-previous-release' }
+    return { completo: true, motivo: null }
+  }
+
+  /** Reaponta o ambiente a um deployment que a pipeline já provou saudável. Nunca toca o banco. */
+  private async restaurar(
+    environment: ReleaseEnvironment,
+    kind: 'frontend' | 'backend',
+    deploymentId: string
+  ): Promise<void> {
+    if (kind === 'frontend') await this.deps.frontend.assign({ environment, deploymentId })
+    else await this.deps.backend.rollback({ environment, toDeploymentId: deploymentId })
+  }
+
+  // --- recuperação do projeto pausado -------------------------------------------------------
+
+  /**
+   * Comando do operador depois de uma release degradada: refaz o que a compensação não conseguiu,
+   * **prova na nuvem** que cada ambiente voltou ao deployment conhecido e só então libera o
+   * projeto. Sem estado conhecido para provar (não havia release anterior), só `acknowledge`
+   * — a declaração explícita e auditada do operador — libera. O banco nunca é restaurado.
+   */
+  async recover(
+    scope: ReleaseScope,
+    opcoes: { readonly acknowledge?: boolean } = {}
+  ): Promise<RecoveryOutcome> {
+    const { recovery, promotion } = this.deps
+    const pausa = recovery.activePause(scope)
+    if (!pausa) return { state: 'none', reason: null }
+    const releaseId = pausa.releaseId
+    if (opcoes.acknowledge) {
+      this.evidence.record(scope, releaseId, {
+        kind: 'recovery',
+        state: 'recorded',
+        action: 'operator-acknowledged'
+      })
+      recovery.resolvePause(scope, this.now())
+      return { state: 'resumed', reason: null }
+    }
+    const alvos = new Map<string, AlvoDeRestauracao>()
+    let semDestino = false
+    for (const c of promotion.listCompensations(scope, releaseId)) {
+      const restauracao = /^(frontend|backend):restore:(.+)$/.exec(c.action)
+      if (!restauracao) {
+        semDestino = true
+        continue
+      }
+      const kind = restauracao[1] as AlvoDeRestauracao['kind']
+      alvos.set(`${c.environment}:${kind}`, {
+        environment: c.environment,
+        kind,
+        id: restauracao[2] ?? ''
+      })
+    }
+    let verificado = alvos.size > 0 && !semDestino
+    for (const alvo of alvos.values()) {
+      if (await this.servindo(alvo)) continue
+      try {
+        await this.restaurar(alvo.environment, alvo.kind, alvo.id)
+      } catch {
+        // a prova abaixo decide
+      }
+      if (!(await this.servindo(alvo))) verificado = false
+    }
+    if (!verificado) {
+      this.evidence.record(scope, releaseId, {
+        kind: 'recovery',
+        state: 'failed',
+        reason: 'recovery-not-verified',
+        action: 'check-provider-status'
+      })
+      return { state: 'paused', reason: 'recovery-not-verified' }
+    }
+    this.evidence.record(scope, releaseId, { kind: 'recovery', state: 'confirmed' })
+    recovery.resolvePause(scope, this.now())
+    return { state: 'resumed', reason: null }
+  }
+
+  /** O ambiente serve agora o deployment-alvo? Falha de leitura é "não provado", nunca "provado". */
+  private async servindo(alvo: AlvoDeRestauracao): Promise<boolean> {
+    try {
+      if (alvo.kind === 'frontend')
+        return (await this.deps.frontend.current(alvo.environment)) === alvo.id
+      return (await this.deps.backend.current(alvo.environment))?.deploymentId === alvo.id
+    } catch {
+      return false
+    }
   }
 }

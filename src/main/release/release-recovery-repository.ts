@@ -397,7 +397,7 @@ export class ReleaseRecoveryRepository {
       .prepare(
         `SELECT * FROM release_inclusion
          WHERE user_id=? AND workspace_id=? AND project_id=? AND release_id=?
-         ORDER BY created_at, rowid`
+         ORDER BY created_at, pull_request, sha`
       )
       .all(...paramsDe(scope), releaseId) as {
       release_id: string

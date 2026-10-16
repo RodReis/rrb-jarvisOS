@@ -212,6 +212,8 @@ describe('compensação de aplicação (critério 6)', () => {
     expect(r1.state).toBe('degraded')
     const residuo = h.cloud.backends.get('production')!.deploymentId
     expect(residuo).not.toBe('rw-production-antigo')
+    // Degradada pausa o projeto: o operador reconhece o resíduo antes da próxima release.
+    await h.service.recover(SCOPE, { acknowledge: true })
 
     // R2 falha em Produção: volta para a última CONCLUÍDA (R0), não para o resíduo de R1.
     const r2 = await h.service.handleMerge(SCOPE, SHA_B, projeto())

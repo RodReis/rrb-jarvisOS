@@ -15,6 +15,7 @@ import type { PromotionProject } from './release-promotion-effects'
 import { ReleaseLocalRepository } from './release-local-repository'
 import { ReleasePromotionRepository } from './release-promotion-repository'
 import { PromotionService } from './release-promotion-service'
+import { ReleaseCorrectionDispatcher, type CorrectionRequest } from './correction/dispatcher'
 import { ReleaseRecoveryRepository } from './release-recovery-repository'
 import { ReleaseRepository } from './release-repository'
 
@@ -147,6 +148,9 @@ export interface Harness {
   readonly promotion: ReleasePromotionRepository
   readonly local: ReleaseLocalRepository
   readonly recovery: ReleaseRecoveryRepository
+  /** A V2 falsa: guarda cada pedido de correção e pode ser derrubada com `falha`. */
+  readonly v2: { readonly pedidos: CorrectionRequest[]; falha: Error | null }
+  readonly dispatcher: ReleaseCorrectionDispatcher
   readonly clock: FakeClock
   readonly cloud: FakePromotionCloud
   readonly service: PromotionService
@@ -180,6 +184,19 @@ export function montarHarness(
   const recovery = new ReleaseRecoveryRepository(db, audit)
   const clock = new FakeClock()
   const cloud = new FakePromotionCloud()
+  const v2: Harness['v2'] = { pedidos: [], falha: null }
+  const dispatcher = new ReleaseCorrectionDispatcher({
+    repository,
+    recovery,
+    now: clock.now,
+    v2: {
+      open: async (pedido) => {
+        if (v2.falha) throw v2.falha
+        v2.pedidos.push(pedido)
+        return { runId: `run-${v2.pedidos.length}` }
+      }
+    }
+  })
   const criar = (
     o: { sleep?: (ms: number) => Promise<void>; ownerId?: string } = {},
     nuvem: FakePromotionCloud = cloud,
@@ -191,6 +208,7 @@ export function montarHarness(
       promotion: m ? m.wrap(promotion) : promotion,
       local: m ? m.wrap(local) : local,
       recovery: m ? m.wrap(recovery) : recovery,
+      correction: dispatcher,
       build: m ? m.guard(nuvem.buildPort(local)) : nuvem.buildPort(local),
       backend: m ? m.guard(nuvem.backend) : nuvem.backend,
       database: m ? m.guard(nuvem.database) : nuvem.database,
@@ -210,6 +228,8 @@ export function montarHarness(
     promotion,
     local,
     recovery,
+    v2,
+    dispatcher,
     clock,
     cloud,
     service: criar({}, cloud, opcoes.morte),
