@@ -76,6 +76,32 @@ describe('release degradada pausa o projeto, e só ele', () => {
     expect(h.cloud.calls).toHaveLength(antes)
   })
 
+  it('release em voo em Staging não toma a lane de Produção depois que o projeto foi pausado', async () => {
+    h = montarHarness()
+    // Uma release de outro momento degrada e pausa o projeto no meio do Staging desta.
+    const original = h.cloud.frontend.assign
+    let pausou = false
+    h.cloud.frontend.assign = async (input) => {
+      await original(input)
+      if (input.environment === 'staging' && !pausou) {
+        pausou = true
+        const outra = h.repository.enqueue(SCOPE, SHA_B, h.clock.now()).release.id
+        h.recovery.pauseProject(SCOPE, outra, 'compensation-incomplete', h.clock.now())
+      }
+    }
+
+    const r = await h.service.handleMerge(SCOPE, SHA_A, projeto())
+
+    expect(r).toMatchObject({ state: 'blocked', reason: 'project-paused', status: 'staging' })
+    expect(h.cloud.calls.filter((c) => c.endsWith(':production'))).toEqual([])
+    const lane = h.db
+      .prepare(
+        `SELECT active_release_id FROM release_environment_lane WHERE environment='production'`
+      )
+      .get() as { active_release_id: string | null } | undefined
+    expect(lane?.active_release_id ?? null).toBeNull()
+  })
+
   it('outro projeto segue publicando enquanto este está pausado', async () => {
     h = montarHarness()
     await degradar()
@@ -121,6 +147,43 @@ describe('recuperação do projeto pausado', () => {
     // Liberado: o próximo merge promove normalmente.
     const seguinte = await h.service.handleMerge(SCOPE, SHA_B, projeto())
     expect(seguinte.state).toBe('completed')
+  })
+
+  it('recuperar toma a lane de Produção: com outra escrita em curso, espera sem tocar a nuvem', async () => {
+    h = montarHarness()
+    await degradar()
+    const outra = h.repository.enqueue(SCOPE, SHA_B, h.clock.now()).release.id
+    h.db
+      .prepare(
+        `INSERT INTO release_environment_lane (user_id,workspace_id,project_id,environment,active_release_id,updated_at)
+         VALUES (?,?,?,'production',?,?) ON CONFLICT(user_id,workspace_id,project_id,environment)
+         DO UPDATE SET active_release_id=excluded.active_release_id`
+      )
+      .run(SCOPE.userId, SCOPE.workspaceId, SCOPE.projectId, outra, h.clock.now())
+    h.db.prepare(`UPDATE release_run SET status='preparing' WHERE id=?`).run(outra)
+    const antes = h.cloud.calls.length
+
+    const r = await h.service.recover(SCOPE)
+
+    expect(r).toMatchObject({ state: 'waiting', reason: 'lane-busy' })
+    expect(h.cloud.calls).toHaveLength(antes)
+    expect(h.recovery.activePause(SCOPE)).not.toBeNull()
+  })
+
+  it('o reconhecimento do operador fica marcado na cadeia de auditoria, distinto da recuperação provada', async () => {
+    h = montarHarness()
+    h.cloud.smokeFails.add('production')
+    const degradada = await h.service.handleMerge(SCOPE, SHA_A, projeto())
+    expect(degradada.state).toBe('degraded')
+
+    await h.service.recover(SCOPE, { acknowledge: true })
+
+    const eventos = h.audit
+      .list(SCOPE.userId)
+      .filter((e) => JSON.stringify(e.payload).includes('project-resumed'))
+    expect(eventos).toHaveLength(1)
+    expect(JSON.stringify(eventos[0]!.payload)).toContain('"acknowledged":"true"')
+    expect(JSON.stringify(eventos[0]!.payload)).toContain('no-previous-release')
   })
 
   it('recuperar é idempotente e nunca toca o banco', async () => {

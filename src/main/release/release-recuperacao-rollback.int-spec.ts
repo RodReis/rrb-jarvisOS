@@ -96,6 +96,51 @@ describe('rollback para um release_id conhecido', () => {
     expect(h.cloud.backends.get('production')!.deploymentId).toBe(alvo)
   })
 
+  it('rollback com salto (C → A) tira B de cena: a falha seguinte volta para A, nunca para B', async () => {
+    h = montarHarness()
+    const a = await h.service.handleMerge(SCOPE, SHA_A, projeto())
+    h.clock.sleep(60_000)
+    const b = await h.service.handleMerge(SCOPE, SHA_B, projeto())
+    h.clock.sleep(60_000)
+    const c = await h.service.handleMerge(SCOPE, SHA_C, projeto())
+    expect([a.state, b.state, c.state]).toEqual(['completed', 'completed', 'completed'])
+    const alvo = h.promotion.getDeployment(SCOPE, a.releaseId, 'production', 'backend')!.externalId
+
+    expect(await h.service.rollback(SCOPE, { to: a.releaseId })).toMatchObject({
+      state: 'rolled-back',
+      from: c.releaseId
+    })
+    // Servindo A: um segundo rollback para A já é "já está servindo", e B não é o que serve.
+    expect(await h.service.rollback(SCOPE, { to: a.releaseId })).toMatchObject({
+      state: 'rejected',
+      reason: 'already-serving'
+    })
+    h.clock.sleep(60_000)
+    h.cloud.smokeFails.add('production')
+    const d = await h.service.handleMerge(SCOPE, 'd'.repeat(40), projeto())
+    expect(d.state).toBe('failed')
+    expect(h.cloud.backends.get('production')!.deploymentId).toBe(alvo)
+  })
+
+  it('rollback para frente (A → B) vale: passa a servir B e as compensações voltam para B', async () => {
+    h = montarHarness()
+    const a = await h.service.handleMerge(SCOPE, SHA_A, projeto())
+    h.clock.sleep(60_000)
+    const b = await h.service.handleMerge(SCOPE, SHA_B, projeto())
+    h.clock.sleep(60_000)
+    await h.service.rollback(SCOPE, { to: a.releaseId })
+    h.clock.sleep(60_000)
+    expect(await h.service.rollback(SCOPE, { to: b.releaseId })).toMatchObject({
+      state: 'rolled-back',
+      to: b.releaseId
+    })
+    const esperado = h.promotion.getDeployment(SCOPE, b.releaseId, 'production', 'backend')!
+    expect(h.cloud.backends.get('production')!.deploymentId).toBe(esperado.externalId)
+    expect(h.promotion.lastKnownDeployment(SCOPE, 'production', 'backend', 'x')?.releaseId).toBe(
+      b.releaseId
+    )
+  })
+
   it('rollback repetido para a mesma release é recusado: já está servindo', async () => {
     h = montarHarness()
     const { a } = await duasConcluidas()
@@ -155,6 +200,45 @@ describe('recusas (nada acontece na nuvem)', () => {
 
     expect(r).toMatchObject({ state: 'waiting', reason: 'lane-busy', from: b })
     expect(h.cloud.calls).toHaveLength(antes)
+  })
+})
+
+describe('posse da lane de Produção', () => {
+  it('queda com a lane presa por uma release concluída não trava a próxima promoção', async () => {
+    h = montarHarness()
+    const { b } = await duasConcluidas()
+    // O rollback tomou a lane com a release concluída e o processo morreu antes de largá-la.
+    h.repository.acquireLease(
+      { ...SCOPE, releaseId: b, environment: 'production' },
+      'rollback-morto',
+      60_000,
+      h.clock.now()
+    )
+    h.clock.sleep(20 * 60_000)
+
+    const c = await h.service.handleMerge(SCOPE, SHA_C, projeto())
+
+    expect(c.state).toBe('completed')
+  })
+
+  it('o que Produção serve é relido depois de tomar a lane: se mudou, o rollback espera', async () => {
+    h = montarHarness()
+    const { a, b } = await duasConcluidas()
+    const original = h.promotion.lastKnownDeployment.bind(h.promotion)
+    let leituras = 0
+    h.promotion.lastKnownDeployment = (...args) => {
+      leituras += 1
+      const real = original(...args)
+      // Na segunda leitura (já com a lane), outra promoção concluiu: serve outra release.
+      return leituras >= 2 && real ? { ...real, releaseId: 'outra-release' } : real
+    }
+    const antes = h.cloud.calls.length
+
+    const r = await h.service.rollback(SCOPE, { to: a })
+
+    expect(r).toMatchObject({ state: 'waiting', reason: 'serving-changed', from: b })
+    expect(h.cloud.calls).toHaveLength(antes)
+    expect(h.recovery.rollbacks(SCOPE, b)).toEqual([])
   })
 })
 

@@ -287,31 +287,41 @@ export class ReleasePromotionRepository {
     kind: DeploymentKind,
     exceto: string
   ): PromotionDeployment | null {
-    const prova =
-      environment === 'production'
-        ? {
-            juncao: '',
-            // Uma release revertida por rollback confirmado deixou de ser o que Produção serve:
-            // compensar para ela devolveria a versão que o operador acabou de retirar.
-            condicao: `r.status='completed' AND NOT EXISTS (
-              SELECT 1 FROM release_rollback rb
-               WHERE rb.from_release_id=d.release_id AND rb.state='confirmed'
-                 AND rb.user_id=d.user_id AND rb.workspace_id=d.workspace_id
-                 AND rb.project_id=d.project_id)`,
-            ordem: 'r.updated_at'
-          }
-        : {
-            juncao: `JOIN release_step s ON s.release_id=d.release_id AND s.user_id=d.user_id
-                       AND s.workspace_id=d.workspace_id AND s.project_id=d.project_id
-                       AND s.environment='staging' AND s.step='smoke_passed' AND s.state='confirmed'`,
-            condicao: '1=1',
-            ordem: 's.updated_at'
-          }
+    if (environment === 'production') {
+      // O que Produção serve: a última release concluída DEPOIS do rollback confirmado mais
+      // recente; se nenhuma concluiu depois, a release para a qual o rollback voltou. Sem rollback,
+      // a última concluída. Assim um rollback com salto (C → A) tira B de cena, e um rollback para
+      // frente (A → B) vale. A `exceto` é a release que está falhando e nunca conta.
+      const rollback = `SELECT %COL% FROM release_rollback rb
+                         WHERE rb.state='confirmed' AND rb.user_id=d.user_id
+                           AND rb.workspace_id=d.workspace_id AND rb.project_id=d.project_id
+                         ORDER BY rb.updated_at DESC, rb.rowid DESC LIMIT 1`
+      const row = this.db
+        .prepare(
+          `SELECT d.* FROM release_deployment d JOIN release_run r ON r.id=d.release_id
+           WHERE d.user_id=? AND d.workspace_id=? AND d.project_id=? AND d.environment=? AND d.kind=?
+             AND d.release_id<>? AND r.status='completed'
+             AND (NOT EXISTS (SELECT 1 FROM release_rollback x
+                               WHERE x.state='confirmed' AND x.user_id=d.user_id
+                                 AND x.workspace_id=d.workspace_id AND x.project_id=d.project_id)
+                  OR r.updated_at > (${rollback.replace('%COL%', 'rb.updated_at')})
+                  OR r.id = (${rollback.replace('%COL%', 'rb.to_release_id')}))
+           ORDER BY r.updated_at DESC, d.created_at DESC LIMIT 1`
+        )
+        .get(...paramsDe(scope), environment, kind, exceto) as DeploymentRow | undefined
+      return row ? toDeployment(row) : null
+    }
+    const prova = {
+      juncao: `JOIN release_step s ON s.release_id=d.release_id AND s.user_id=d.user_id
+                 AND s.workspace_id=d.workspace_id AND s.project_id=d.project_id
+                 AND s.environment='staging' AND s.step='smoke_passed' AND s.state='confirmed'`,
+      ordem: 's.updated_at'
+    }
     const row = this.db
       .prepare(
         `SELECT d.* FROM release_deployment d JOIN release_run r ON r.id=d.release_id ${prova.juncao}
          WHERE d.user_id=? AND d.workspace_id=? AND d.project_id=? AND d.environment=? AND d.kind=?
-           AND d.release_id<>? AND ${prova.condicao}
+           AND d.release_id<>?
          ORDER BY ${prova.ordem} DESC, d.created_at DESC LIMIT 1`
       )
       .get(...paramsDe(scope), environment, kind, exceto) as DeploymentRow | undefined
@@ -422,23 +432,35 @@ export class ReleasePromotionRepository {
    * O que nenhuma limpeza pode remover porque um rollback ainda pode precisar (SPEC-Release-05,
    * "proteção de artefatos"): tudo de releases não terminais, das `manter` últimas concluídas que
    * ainda valem (a que Produção serve e o alvo do rollback) e de qualquer rollback em andamento —
-   * origem e destino. Release revertida deixa de contar: a versão retirada não é alvo de nada.
+   * origem e destino. A que serve é a que o último rollback confirmado devolveu (ou a última concluída depois dele); a versão retirada não é alvo de nada.
    * Quem remover artefato, deployment ou backup (hoje ninguém o faz) consulta isto antes.
    */
   protectedArtifacts(scope: ReleaseScope, manter = 2): ProtectedArtifacts {
     const ids = new Set<string>(this.openReleases(scope).map((r) => r.id))
-    const recentes = this.db
+    // A que serve (descontados rollbacks) e as `manter - 1` concluídas imediatamente anteriores a ela.
+    const servindo = this.lastKnownDeployment(scope, 'production', 'backend', '')
+    if (servindo) {
+      ids.add(servindo.releaseId)
+      const anteriores = this.db
+        .prepare(
+          `SELECT r.id FROM release_run r
+            WHERE r.user_id=? AND r.workspace_id=? AND r.project_id=? AND r.status='completed'
+              AND r.id<>? AND r.updated_at < (SELECT updated_at FROM release_run WHERE id=?)
+            ORDER BY r.updated_at DESC, r.rowid DESC LIMIT ?`
+        )
+        .all(...paramsDe(scope), servindo.releaseId, servindo.releaseId, manter - 1) as {
+        id: string
+      }[]
+      for (const r of anteriores) ids.add(r.id)
+    }
+    // A release que pausou o projeto: o backup dela é a única referência de restore operacional.
+    const pausa = this.db
       .prepare(
-        `SELECT r.id FROM release_run r
-          WHERE r.user_id=? AND r.workspace_id=? AND r.project_id=? AND r.status='completed'
-            AND NOT EXISTS (SELECT 1 FROM release_rollback rb
-                             WHERE rb.from_release_id=r.id AND rb.state='confirmed'
-                               AND rb.user_id=r.user_id AND rb.workspace_id=r.workspace_id
-                               AND rb.project_id=r.project_id)
-          ORDER BY r.updated_at DESC, r.rowid DESC LIMIT ?`
+        `SELECT release_id FROM release_project_pause
+          WHERE user_id=? AND workspace_id=? AND project_id=? AND resolved_at IS NULL`
       )
-      .all(...paramsDe(scope), manter) as { id: string }[]
-    for (const r of recentes) ids.add(r.id)
+      .get(...paramsDe(scope)) as { release_id: string } | undefined
+    if (pausa) ids.add(pausa.release_id)
     const emAndamento = this.db
       .prepare(
         `SELECT from_release_id, to_release_id FROM release_rollback

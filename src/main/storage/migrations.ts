@@ -2694,7 +2694,7 @@ const MIGRATIONS: readonly string[] = [
     state TEXT NOT NULL CHECK (state IN ('confirmed','ambiguous','failed','compensated','pending','recorded')),
     reason TEXT CHECK (reason IS NULL OR (length(reason) BETWEEN 1 AND 64 AND reason NOT GLOB '*[^a-z0-9._:-]*')),
     action TEXT CHECK (action IS NULL OR (length(action) BETWEEN 1 AND 64 AND action NOT GLOB '*[^a-z0-9._:-]*')),
-    details TEXT CHECK (details IS NULL OR length(details) <= 1024),
+    details TEXT CHECK (details IS NULL OR length(details) <= 2048),
     created_at TEXT NOT NULL
   );
   CREATE INDEX idx_release_evidence_timeline
@@ -2740,9 +2740,9 @@ const MIGRATIONS: readonly string[] = [
     project_id TEXT NOT NULL,
     release_id TEXT NOT NULL REFERENCES release_run(id),
     tag TEXT NOT NULL CHECK (length(tag) BETWEEN 1 AND 128 AND tag NOT GLOB '*[^A-Za-z0-9._-]*'),
-    manifest_json TEXT NOT NULL,
+    manifest_json TEXT NOT NULL CHECK (length(manifest_json) <= 262144),
     manifest_sha256 TEXT NOT NULL CHECK (length(manifest_sha256) = 64 AND manifest_sha256 NOT GLOB '*[^a-f0-9]*'),
-    changelog TEXT NOT NULL,
+    changelog TEXT NOT NULL CHECK (length(changelog) <= 262144),
     created_at TEXT NOT NULL,
     PRIMARY KEY (user_id, workspace_id, project_id, release_id),
     UNIQUE (user_id, workspace_id, project_id, tag)
@@ -2766,6 +2766,10 @@ const MIGRATIONS: readonly string[] = [
     updated_at TEXT NOT NULL,
     PRIMARY KEY (user_id, workspace_id, project_id, release_id, target)
   );
+  -- Publicada é definitiva: o banco também recusa a volta, não só o repositório.
+  CREATE TRIGGER release_publication_publicada_e_final BEFORE UPDATE ON release_publication
+  WHEN OLD.state = 'published' AND NEW.state <> 'published'
+  BEGIN SELECT RAISE(ABORT, 'publicação confirmada não volta atrás'); END;
 
   -- Falha de código devolvida à V2: uma por release, ligada à mesma SPEC e ao contexto anterior.
   CREATE TABLE release_correction (
@@ -2782,7 +2786,7 @@ const MIGRATIONS: readonly string[] = [
     run_id TEXT,
     state_reason TEXT CHECK (state_reason IS NULL OR (length(state_reason) BETWEEN 1 AND 64 AND state_reason NOT GLOB '*[^a-z0-9._:-]*')),
     dispatch_key TEXT NOT NULL CHECK (length(dispatch_key) BETWEEN 1 AND 160),
-    context_json TEXT NOT NULL,
+    context_json TEXT NOT NULL CHECK (length(context_json) <= 262144),
     context_sha256 TEXT NOT NULL CHECK (length(context_sha256) = 64 AND context_sha256 NOT GLOB '*[^a-f0-9]*'),
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
@@ -2803,6 +2807,10 @@ const MIGRATIONS: readonly string[] = [
     updated_at TEXT NOT NULL,
     CHECK (from_release_id <> to_release_id)
   );
+  -- Rollback fechado (confirmado ou falho) não é reaberto nem reescrito.
+  CREATE TRIGGER release_rollback_fechado_e_final BEFORE UPDATE ON release_rollback
+  WHEN OLD.state <> 'intended'
+  BEGIN SELECT RAISE(ABORT, 'rollback fechado é imutável'); END;
   CREATE INDEX idx_release_rollback_origem
     ON release_rollback(user_id, workspace_id, project_id, from_release_id, state);
   `

@@ -23,6 +23,7 @@ describe('codigoDeSaida: 0 conclui, 3 falha ou exige o operador, 5 aguarda', () 
     [{ evento: 'rollback', resultado: { state: 'rejected', reason: 'target-not-found' } }, 3],
     [{ evento: 'recover', resultado: { state: 'resumed', reason: null } }, 0],
     [{ evento: 'recover', resultado: { state: 'none', reason: null } }, 0],
+    [{ evento: 'recover', resultado: { state: 'waiting', reason: 'lane-busy' } }, 5],
     [{ evento: 'recover', resultado: { state: 'paused', reason: 'recovery-not-verified' } }, 3],
     [{ evento: 'publish', resultado: { state: 'published', tag: 't', manifestSha256: 'h' } }, 0],
     [{ evento: 'publish', resultado: { state: 'pending', tag: 't', reason: 'github-timeout' } }, 5],

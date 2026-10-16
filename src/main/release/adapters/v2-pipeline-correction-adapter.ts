@@ -31,8 +31,11 @@ export class V2PipelineCorrectionAdapter implements V2CorrectionPort {
     const existente = this.runs.buscarPorChaveDispatch(escopo, pedido.dispatchKey)
     if (existente) return { runId: existente.id }
     // A V2 só reabre o que ela conhece: fatia sem nenhum run neste projeto não é fatia da V2.
-    if (this.runs.listarDaFatia(escopo, pedido.sliceId).length === 0)
-      throw new V2CorrectionUnavailable('slice-unknown')
+    // O filtro de workspace é nosso: a listagem da V2 filtra só por usuário e projeto.
+    const daFatia = this.runs
+      .listarDaFatia(escopo, pedido.sliceId)
+      .filter((run) => this.runs.workspaceDoRun(run.id) === escopo.workspaceId)
+    if (daFatia.length === 0) throw new V2CorrectionUnavailable('slice-unknown')
     const run = this.runs.criar(
       escopo,
       { sliceId: pedido.sliceId, estado: 'PLANNED', dispatchKey: pedido.dispatchKey },

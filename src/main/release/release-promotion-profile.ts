@@ -65,7 +65,7 @@ const ID_DE_PROJETO = /^[A-Za-z0-9][A-Za-z0-9-]{3,63}$/
 const DOMINIO = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/i
 /** `//host` e `/\host` resolvem para outro host; só caminho absoluto de verdade passa. */
 const CAMINHO_VALIDO = /^\/(?![/\\])[^\s]*$/
-const REPOSITORIO_DO_GITHUB = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/
+const REPOSITORIO_DO_GITHUB = /^(?!\.{1,2}\/)(?!.*\/\.{1,2}$)[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/
 const QUALQUER = /^[\s\S]+$/
 
 function objeto(valor: unknown, nome: string, permitidas: readonly string[]): Bruto {

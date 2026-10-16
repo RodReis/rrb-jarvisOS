@@ -312,8 +312,15 @@ export class ReleaseRecoveryRepository {
       : null
   }
 
-  /** `true` quando havia pausa ativa a resolver. */
-  resolvePause(scope: ReleaseScope, now = new Date().toISOString()): boolean {
+  /**
+   * `true` quando havia pausa ativa a resolver. A cadeia de auditoria diz **como** foi liberada:
+   * `acknowledged` é a declaração do operador, sem prova na nuvem.
+   */
+  resolvePause(
+    scope: ReleaseScope,
+    now = new Date().toISOString(),
+    como: { readonly acknowledged: boolean } = { acknowledged: false }
+  ): boolean {
     return this.escrita(() => {
       const ativa = this.activePause(scope)
       if (!ativa) return false
@@ -322,7 +329,10 @@ export class ReleaseRecoveryRepository {
           `UPDATE release_project_pause SET resolved_at=? WHERE id=? AND resolved_at IS NULL`
         )
         .run(now, ativa.id)
-      this.auditar(scope, ativa.releaseId, 'project-resumed')
+      this.auditar(scope, ativa.releaseId, 'project-resumed', {
+        acknowledged: String(como.acknowledged),
+        reason: ativa.reason
+      })
       return true
     })
   }

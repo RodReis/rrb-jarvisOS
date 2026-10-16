@@ -34,6 +34,8 @@ const GATES_DE_SAUDE = /^(health-down|frontend-wiring|smoke|e2e_essential|stabil
  */
 export function classificarFalha(codigo: string): FailureClass {
   if (/-(timeout|quota)$/.test(codigo)) return 'transient'
+  // Tentativas esgotadas sem o motivo da última: a causa é desconhecida, não é defeito de código.
+  if (/-retries-exhausted$/.test(codigo)) return 'unknown'
   if (/^config-/.test(codigo) || /-auth$/.test(codigo) || codigo === 'profile-invalid')
     return 'configuration'
   // `staging-<gate>` / `production-<gate>`: o gate obrigatório que bloqueou o ambiente.

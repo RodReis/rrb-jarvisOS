@@ -88,6 +88,15 @@ describe('V2PipelineCorrectionAdapter (correção volta à V2, critério 6)', ()
     await expect(adapter.open(pedido('slice-9'))).rejects.toMatchObject({ code: 'slice-unknown' })
   })
 
+  it('a fatia de outro workspace do mesmo projeto não conta', async () => {
+    runs.criar(
+      { userId: 'user-1', workspaceId: 'noa', projectId: 'project-1' },
+      { sliceId: 'slice-9', estado: 'PLANNED' },
+      NOW
+    )
+    await expect(adapter.open(pedido('slice-9'))).rejects.toMatchObject({ code: 'slice-unknown' })
+  })
+
   it('a criação do run é auditada como transição de pipeline, sem o contexto', async () => {
     runs.criar(ESCOPO_V2, { sliceId: 'slice-9', estado: 'PLANNED' }, NOW)
     const { runId } = await adapter.open(pedido('slice-9', { contextJson: '{"segredo":"x"}' }))

@@ -17,9 +17,10 @@ Status: **implementada**, PR [#432](https://github.com/RodReis/rrb-jarvisOS/pull
 - [x] **Proteção de artefatos** (`protectedArtifacts`), **fronteira** de segredo e texto externo (critério 11) por varredura de todas as tabelas, e contrafactuais (tag antes da estabilização, restore do banco, correção direta em Produção).
 - [x] **Jornada** (critério 10): integração Preview → Staging → Produção → falha → correção na V2 → nova release → rollback → limpeza, e jornada Playwright nas três URLs e depois do rollback (prova local no CI; modo real por variável).
 - [x] Comando `release:promote` com `cancel`, `rollback`, `recover`, `publish` e `verify`; perfil de promoção com `github.repository`.
-- [x] **Vinte e quatro mutações** no código de produção medidas: todas reprovam o teste certo.
+- [x] **Trinta mutações** no código de produção medidas: todas reprovam o teste certo.
 - [x] Docs: SPEC (§ Decisões de implementação), `ARCHITECTURE.md` §11.5, `TESTING.md`, `STATUS.md`, `mvp-014`.
-- Pendências conhecidas, todas declaradas na SPEC: roteiro real com projeto de prova; consumo do contexto da correção pelo construtor da V2; ligação do evento de merge ao comando.
+- **Duas revisões independentes (código e segurança):** 0 CRITICAL; 1 HIGH (a pausa não alcançava uma release já em voo, que tomaria a lane de Produção) e 6 MEDIUM tratados com teste vermelho antes — rollback com salto deixava a release pulada como destino conhecido, o que Produção serve era lido fora da lane, `recover` mexia em Produção sem a lane, o reconhecimento do operador não se distinguia na cadeia de auditoria, lane presa por release concluída depois de queda, testes de fronteira que não provavam o que diziam. Mais oito LOW (SHA em maiúsculas, workspace da fatia, renovação do lease no rollback, `.`/`..` no repositório, triggers do banco, tetos de tamanho, causa da falha de compensação, motivo de esgotamento). Achado dos testes de CI: o teste de migração de schema antigo precisava conhecer as tabelas da migration 67.
+- Pendências conhecidas, todas declaradas na SPEC: roteiro real com projeto de prova; o contexto da correção não chega ao run da V2 (o adaptador só cria o run); ligação do evento de merge ao comando; `release-promotion-service.ts` (~870 linhas) acima do teto de 800.
 
 ## MVP-014 — M14-F04 Staging e Produção automática (`SPEC-Release-04`, issue #153)
 

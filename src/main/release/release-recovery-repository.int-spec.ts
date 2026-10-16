@@ -276,6 +276,13 @@ describe('manifesto e publicação', () => {
     expect(repo.pendingPublications(SCOPE)).toEqual([])
   })
 
+  it('o banco também recusa a volta de uma publicação confirmada', () => {
+    repo.setPublication(SCOPE, releaseId, 'github-release', { state: 'published' }, NOW)
+    expect(() => db.prepare(`UPDATE release_publication SET state='failed'`).run()).toThrow(
+      /não volta atrás/
+    )
+  })
+
   it('publicada é definitivo: não volta a pendente', () => {
     repo.setPublication(SCOPE, releaseId, 'github-release', { state: 'published' }, NOW)
     expect(() =>
@@ -440,6 +447,13 @@ describe('rollback por release_id', () => {
     expect(() => repo.beginRollback(OUTRO_USUARIO, releaseId, releaseId, NOW)).toThrow(
       ReleaseRecoveryConflictError
     )
+  })
+
+  it('o banco recusa reescrever um rollback já fechado', () => {
+    const outra = releases.enqueue(SCOPE, SHA_B, LATER).release.id
+    const id = repo.beginRollback(SCOPE, releaseId, outra, NOW)
+    repo.finishRollback(SCOPE, id, 'confirmed', LATER)
+    expect(() => db.prepare(`UPDATE release_rollback SET state='failed'`).run()).toThrow(/imutável/)
   })
 
   it('o desfecho de um rollback só se registra uma vez', () => {

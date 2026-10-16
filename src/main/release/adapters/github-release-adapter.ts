@@ -10,9 +10,10 @@ import { exigirSucesso, lerJson } from './preview-cli-errors'
  * cria: não edita, não apaga e não move tag (apagar release confirmada é proibido).
  */
 
-const REPOSITORIO = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/
+/** `dono/nome`, sem segmento `.` nem `..`: o valor entra no caminho de `gh api`. */
+const REPOSITORIO = /^(?!\.{1,2}\/)(?!.*\/\.{1,2}$)[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/
 const TAG = /^release-\d{8}-\d{4}-[a-f0-9]{7}$/
-const SHA = /^[a-f0-9]{40}$/
+const SHA = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/
 const TIMEOUT_MS = 60_000
 
 interface ObjetoDeRef {

@@ -13,6 +13,7 @@ import {
   CONFLITOS_DE_POSSE,
   LEASE_PADRAO_MS,
   ReleaseRecoveryService,
+  codigoDoErro,
   restaurarAplicacao,
   type RecoveryOutcome,
   type RollbackOutcome
@@ -222,11 +223,16 @@ export class PromotionService {
 
   /** O que não depende da lane: reabrir correção na V2 e publicar identidade que ficou pendente. */
   private async retomarPendencias(scope: ReleaseScope): Promise<void> {
-    try {
-      await this.deps.correction?.retryPending(scope)
-      await this.deps.publisher?.retryPending(scope)
-    } catch {
-      // Pendência que continua falhando segue registrada; a próxima retomada tenta de novo.
+    // Cada pendência no seu próprio `try`: uma que falha sempre não esconde a outra.
+    for (const retomar of [
+      () => this.deps.correction?.retryPending(scope),
+      () => this.deps.publisher?.retryPending(scope)
+    ]) {
+      try {
+        await retomar()
+      } catch {
+        // Segue registrada como pendente; a próxima retomada tenta de novo.
+      }
     }
   }
 
@@ -420,9 +426,17 @@ export class PromotionService {
     const bloqueio = this.gates.firstBlocker(run.scope, run.releaseId, 'staging')
     if (bloqueio) await this.fail(run, 'staging', `staging-${bloqueio.gate}`)
     // Regra 1: Produção só depois de Staging aprovado. A lane de Produção é tomada antes da
-    // transição; se outra release a ocupa, esta espera em Staging.
+    // transição; se outra release a ocupa, esta espera em Staging. Projeto pausado depois que esta
+    // release começou (outra release degradou) também espera: a pausa vale para quem já está em voo.
+    this.exigirProjetoLivre(run, 'staging')
     const lease = this.lease(run, 'production')
     run.orchestrator.transition(this.query(run, 'production'), 'production', lease)
+  }
+
+  /** A pausa do projeto (release degradada) barra o próximo ambiente de uma release em voo. */
+  private exigirProjetoLivre(run: Run, environment: ReleaseEnvironment): void {
+    if (this.deps.recovery.activePause(run.scope))
+      throw new Parar({ state: 'blocked', reason: 'project-paused', environment })
   }
 
   private async production(run: Run): Promise<void> {
@@ -556,7 +570,8 @@ export class PromotionService {
       }
       const feitas = this.deps.repository.getStep(query, step)?.attempt ?? 0
       if (!podeTentarDeNovo(feitas)) {
-        const motivo = ultimoMotivo ?? `${step}-failed`
+        // Sem o motivo da última tentativa (retomada depois de queda), `unknown`: nunca volta à V2.
+        const motivo = ultimoMotivo ?? `${step}-retries-exhausted`
         this.evidence.retriesExhausted(run.scope, run.releaseId, {
           environment,
           step,
@@ -702,10 +717,12 @@ export class PromotionService {
         await restaurarAplicacao(this.deps, environment, alvo.kind, anterior)
         promotion.finishCompensation(run.scope, run.releaseId, id, 'confirmed')
         registrar('compensated', `${alvo.kind}-restored`)
-      } catch {
+      } catch (erro) {
         falhou = true
         promotion.finishCompensation(run.scope, run.releaseId, id, 'failed')
-        registrar('failed', `${alvo.kind}-restore-failed`)
+        // O código do provedor distingue credencial expirada de deployment que sumiu: a ação do
+        // operador é outra em cada caso.
+        registrar('failed', `${alvo.kind}-restore-${codigoDoErro(erro)}`)
       }
     }
     if (falhou) return { completo: false, motivo: 'compensation-incomplete' }

@@ -305,10 +305,19 @@ export class ReleaseRepository {
         .get(...scopeParams(query), query.environment) as
         { active_release_id: string | null } | undefined
       if (lane?.active_release_id && lane.active_release_id !== query.releaseId) {
-        throw new ReleaseConflictError(
-          'lane-busy',
-          'Já existe outra release ativa neste projeto e ambiente.'
-        )
+        // Lane presa por release que já terminou e cujo lease venceu (o processo morreu antes de
+        // largá-la, ex.: rollback de uma release concluída): ninguém a segura, é reaproveitada.
+        if (!this.laneAbandonada(query, lane.active_release_id, now))
+          throw new ReleaseConflictError(
+            'lane-busy',
+            'Já existe outra release ativa neste projeto e ambiente.'
+          )
+        this.db
+          .prepare(
+            `UPDATE release_environment_lane SET active_release_id=NULL,updated_at=?
+             WHERE user_id=? AND workspace_id=? AND project_id=? AND environment=?`
+          )
+          .run(now, ...scopeParams(query), query.environment)
       }
       this.db
         .prepare(
@@ -882,7 +891,7 @@ export class ReleaseRepository {
     const gates = this.db
       .prepare(
         `SELECT id,user_id,workspace_id,project_id,release_id,environment,gate,result,reason,created_at AS createdAt FROM release_gate_result
-        WHERE user_id=? AND workspace_id=? AND project_id=? AND release_id=? ORDER BY created_at`
+        WHERE user_id=? AND workspace_id=? AND project_id=? AND release_id=? ORDER BY created_at, rowid`
       )
       .all(...scopeParams(query), query.releaseId) as {
       id: string
@@ -973,6 +982,21 @@ export class ReleaseRepository {
         'Escritor não possui lease vigente neste projeto/ambiente.'
       )
     this.assertLane(query)
+  }
+
+  /** Dona terminal e lease vencido (ou inexistente) = ninguém segura a lane. */
+  private laneAbandonada(query: ReleaseEnvironmentQuery, donoId: string, now: string): boolean {
+    const dono = this.db.prepare('SELECT status FROM release_run WHERE id=?').get(donoId) as
+      { status: ReleaseStatus } | undefined
+    if (dono && !['completed', 'superseded', 'failed', 'degraded'].includes(dono.status))
+      return false
+    const lease = this.db
+      .prepare(
+        `SELECT expires_at FROM release_lease
+         WHERE user_id=? AND workspace_id=? AND project_id=? AND environment=?`
+      )
+      .get(...scopeParams(query), query.environment) as { expires_at: string } | undefined
+    return !lease || lease.expires_at <= now
   }
 
   private assertLane(query: ReleaseEnvironmentQuery): void {

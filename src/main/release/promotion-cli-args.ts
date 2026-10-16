@@ -139,7 +139,8 @@ export function lerOpcoesDePromocao(
     throw new UsoInvalido(`--event deve ser um de: ${EVENTOS.join(', ')}.`)
   const event = evento as EventoDePromocao
 
-  const sha = valores.get('sha') ?? null
+  // O SHA é sempre minúsculo: o diário, a inclusão e o GitHub comparam por igualdade.
+  const sha = valores.get('sha')?.toLowerCase() ?? null
   const release = valores.get('release') ?? null
   const to = valores.get('to') ?? null
   const temInclusao = ['pr', 'spec', 'slice', 'issue'].some((n) => valores.has(n as Nome))

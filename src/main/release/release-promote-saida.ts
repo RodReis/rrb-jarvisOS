@@ -40,6 +40,7 @@ export function codigoDeSaida(desfecho: DesfechoDoComando): number {
       if (desfecho.resultado.state === 'rolled-back') return CODIGO_OK
       return desfecho.resultado.state === 'waiting' ? CODIGO_AGUARDA : CODIGO_FALHOU
     case 'recover':
+      if (desfecho.resultado.state === 'waiting') return CODIGO_AGUARDA
       return desfecho.resultado.state === 'paused' ? CODIGO_FALHOU : CODIGO_OK
     case 'publish':
       if (desfecho.resultado.state === 'published') return CODIGO_OK

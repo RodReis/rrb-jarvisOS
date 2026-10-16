@@ -103,8 +103,18 @@ describe('nenhum texto externo vira motivo, evidência, manifesto ou contexto', 
     const cancel = await h.service.cancel(SCOPE, r2.releaseId, projeto())
     const rollback = await h.service.rollback(SCOPE, { to: r2.releaseId })
 
-    // O cenário percorreu falha, retry, compensação, V2, GitHub pendente e identidade.
+    // O cenário percorreu falha, retry, compensação, V2, GitHub pendente e identidade — e o texto
+    // marcado foi mesmo lançado pelos quatro canais (senão a varredura abaixo provaria nada).
     expect(r1.state).toBe('failed')
+    expect(h.recovery.evidence(SCOPE, r1.releaseId)).toContainEqual(
+      expect.objectContaining({ kind: 'retry', reason: 'backend_healthy-quota' })
+    )
+    expect(h.recovery.evidence(SCOPE, r1.releaseId)).toContainEqual(
+      expect.objectContaining({ kind: 'correction', reason: 'v2-unreachable' })
+    )
+    expect(h.recovery.evidence(SCOPE, r2.releaseId)).toContainEqual(
+      expect.objectContaining({ kind: 'publication', reason: 'github-timeout' })
+    )
     expect(['completed', 'failed', 'degraded']).toContain(r2.state)
     varrer({
       r1,
@@ -221,6 +231,10 @@ describe('Preview não carrega dado de Produção', () => {
 
     expect(r.state).toBe('ready')
     expect(h.cloud.calls).toHaveLength(antes)
+    // O que o Preview recebeu e o que ele publicou no PR: nada de Produção.
+    const visto = JSON.stringify([nuvem.calls, nuvem.published])
+    expect(visto).not.toContain('api.up.railway.app')
+    expect(visto).not.toContain('rw-production')
     const ambientes = JSON.stringify([...nuvem.environments.values()])
     expect(ambientes).not.toContain('api.up.railway.app')
     expect(ambientes).not.toContain('rw-production')

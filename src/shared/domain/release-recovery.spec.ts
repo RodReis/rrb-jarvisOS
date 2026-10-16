@@ -41,6 +41,8 @@ describe('classificarFalha (SPEC-Release-05, design §12)', () => {
     ['production-backend_health', 'health_or_test'],
     ['staging-configuration', 'configuration'],
     ['production-backup', 'configuration'],
+    ['backend_healthy-retries-exhausted', 'unknown'],
+    ['smoke_passed-retries-exhausted', 'unknown'],
     ['algo-que-ninguem-previu', 'unknown']
   ] as const)('%s → %s', (codigo, classe) => {
     expect(classificarFalha(codigo)).toBe(classe)

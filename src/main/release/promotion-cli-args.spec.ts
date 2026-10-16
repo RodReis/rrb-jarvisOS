@@ -29,6 +29,11 @@ describe('lerOpcoesDePromocao', () => {
     })
   })
 
+  it('SHA em maiúsculas é normalizado para minúsculas antes de qualquer gravação', () => {
+    const o = lerOpcoesDePromocao([...base, '--event', 'merge', '--sha', SHA.toUpperCase()], ENV)
+    expect(o.sha).toBe(SHA)
+  })
+
   it('o SHA precisa ser completo: prefixo curto é recusado', () => {
     expect(() =>
       lerOpcoesDePromocao([...base, '--event', 'merge', '--sha', 'abc1234'], ENV)

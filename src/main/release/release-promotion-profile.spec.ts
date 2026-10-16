@@ -121,7 +121,7 @@ describe('carregarPerfilDePromocao', () => {
       gravar({ ...valido(), github: { repository: 'dono/projeto' } })
     )
     expect(com.github).toEqual({ repository: 'dono/projeto' })
-    for (const repository of ['sem-barra', 'a/b; c', 'a/b/c', '', 42])
+    for (const repository of ['sem-barra', 'a/b; c', 'a/b/c', '', 42, '../..', 'dono/..', './x'])
       expect(() =>
         carregarPerfilDePromocao(gravar({ ...valido(), github: { repository } }))
       ).toThrow(TypeError)
