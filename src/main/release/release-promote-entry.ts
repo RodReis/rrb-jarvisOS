@@ -34,6 +34,7 @@ import { assertRepositorioPermitido, carregarPerfilDoProjeto } from './release-p
 import type { PromotionProject } from './release-promotion-effects'
 import { carregarPerfilDePromocao, type PromotionProfile } from './release-promotion-profile'
 import { ReleasePromotionRepository } from './release-promotion-repository'
+import { ReleaseRecoveryRepository } from './release-recovery-repository'
 import { PromotionService, type PromotionOutcome } from './release-promotion-service'
 import { ReleaseRepository } from './release-repository'
 
@@ -198,6 +199,7 @@ function montarServico(
     repository: new ReleaseRepository(db, audit),
     promotion: new ReleasePromotionRepository(db, audit),
     local,
+    recovery: new ReleaseRecoveryRepository(db, audit),
     build: new PreparationBuildAdapter(preparation, projetoFor),
     backend,
     database,

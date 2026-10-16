@@ -15,6 +15,7 @@ import type { PromotionProject } from './release-promotion-effects'
 import { ReleaseLocalRepository } from './release-local-repository'
 import { ReleasePromotionRepository } from './release-promotion-repository'
 import { PromotionService } from './release-promotion-service'
+import { ReleaseRecoveryRepository } from './release-recovery-repository'
 import { ReleaseRepository } from './release-repository'
 
 /**
@@ -77,6 +78,7 @@ export interface Harness {
   readonly repository: ReleaseRepository
   readonly promotion: ReleasePromotionRepository
   readonly local: ReleaseLocalRepository
+  readonly recovery: ReleaseRecoveryRepository
   readonly clock: FakeClock
   readonly cloud: FakePromotionCloud
   readonly service: PromotionService
@@ -102,6 +104,7 @@ export function montarHarness(
   const repository = new ReleaseRepository(db, audit)
   const promotion = new ReleasePromotionRepository(db, audit)
   const local = new ReleaseLocalRepository(db, audit)
+  const recovery = new ReleaseRecoveryRepository(db, audit)
   const clock = new FakeClock()
   const cloud = new FakePromotionCloud()
   const criar = (
@@ -112,6 +115,7 @@ export function montarHarness(
       repository,
       promotion,
       local,
+      recovery,
       build: nuvem.buildPort(local),
       backend: nuvem.backend,
       database: nuvem.database,
@@ -129,6 +133,7 @@ export function montarHarness(
     repository,
     promotion,
     local,
+    recovery,
     clock,
     cloud,
     service: criar(),

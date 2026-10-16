@@ -1,6 +1,12 @@
 import { createHash } from 'node:crypto'
 import type { ReleaseEnvironment, ReleaseScope, ReleaseStatus } from '@shared/domain/release'
 import { ESTABILIZACAO_PADRAO } from '@shared/domain/release-promotion'
+import {
+  classificarFalha,
+  esperaAntesDaTentativa,
+  podeTentarDeNovo
+} from '@shared/domain/release-recovery'
+import { ReleaseEvidenceWriter } from './correction/evidence-writer'
 import { ReleaseGateEngine, gateStoreFrom } from './release-gate-engine'
 import { ReleaseOrchestrator } from './release-orchestrator'
 import {
@@ -9,6 +15,7 @@ import {
   type PromotionProject
 } from './release-promotion-effects'
 import type { ReleasePromotionRepository } from './release-promotion-repository'
+import type { ReleaseRecoveryRepository } from './release-recovery-repository'
 import {
   ReleaseConflictError,
   type ReleaseLease,
@@ -55,6 +62,8 @@ export interface PromotionServiceDeps {
   readonly repository: ReleaseRepository
   readonly promotion: ReleasePromotionRepository
   readonly local: ReleaseLocalRepository
+  /** Evidência, pausa, cancelamento e identidade da release (SPEC-Release-05). */
+  readonly recovery: ReleaseRecoveryRepository
   readonly build: PromotionBuildPort
   readonly backend: PromotionBackendPort
   readonly database: PromotionDatabasePort
@@ -97,9 +106,11 @@ class Parar extends Error {
 
 export class PromotionService {
   private readonly gates: ReleaseGateEngine
+  private readonly evidence: ReleaseEvidenceWriter
 
   constructor(private readonly deps: PromotionServiceDeps) {
     this.gates = new ReleaseGateEngine(gateStoreFrom(deps.repository), () => this.now())
+    this.evidence = new ReleaseEvidenceWriter(deps.recovery, () => this.now())
   }
 
   private now(): string {
@@ -381,20 +392,81 @@ export class PromotionService {
     return { backendDigest: backend.digest, frontendDeploymentId: frontend.externalId }
   }
 
-  /** Um passo do diário. Confirmado segue; falha definitiva compensa; incerto para e espera. */
+  private async dormir(ms: number): Promise<void> {
+    await (this.deps.sleep ?? ((espera) => new Promise<void>((r) => setTimeout(r, espera))))(ms)
+  }
+
+  /**
+   * Um passo do diário, com a recuperação da SPEC-Release-05: efeito incerto é reconciliado no
+   * provedor **antes** de qualquer repetição; falha transitória (e só ela) é repetida com backoff,
+   * no máximo três tentativas totais por passo — o número vem do diário, então sobrevive a uma
+   * retomada. Falha definitiva compensa; reconciliação sem resposta para e espera, sem compensar.
+   */
   private async step(run: Run, environment: ReleaseEnvironment, step: string): Promise<void> {
     const lease = this.lease(run, environment)
-    this.renew(run, environment)
-    const resultado = await run.orchestrator.runStep(
-      this.query(run, environment),
-      step,
-      this.payloadHash(run, environment, step),
-      lease
-    )
-    if (resultado.state === 'confirmed') return
-    if (resultado.state === 'ambiguous')
-      throw new Parar({ state: 'blocked', reason: run.effects.reason, environment, step })
-    await this.fail(run, environment, run.effects.reason ?? `${step}-failed`)
+    const query = this.query(run, environment)
+    let reconciliacoesSemResposta = 0
+    let ultimoMotivo: string | null = null
+    for (;;) {
+      this.renew(run, environment)
+      const atual = this.deps.repository.getStep(query, step)
+      if (atual && (atual.state === 'intended' || atual.state === 'ambiguous')) {
+        const reconciliado = await run.orchestrator.reconcileStep(query, step, lease)
+        if (reconciliado.state === 'confirmed') return
+        if (reconciliado.state === 'ambiguous') {
+          reconciliacoesSemResposta += 1
+          if (!podeTentarDeNovo(reconciliacoesSemResposta)) {
+            const motivo = ultimoMotivo ?? `${step}-unreconciled`
+            this.evidence.retriesExhausted(run.scope, run.releaseId, {
+              environment,
+              step,
+              reason: motivo,
+              attempts: atual.attempt,
+              state: 'ambiguous'
+            })
+            throw new Parar({ state: 'blocked', reason: motivo, environment, step })
+          }
+          await this.dormir(esperaAntesDaTentativa(reconciliacoesSemResposta + 1))
+          continue
+        }
+        // `failed`: o provedor provou que o efeito não foi aplicado; repetir é seguro.
+      }
+      const feitas = this.deps.repository.getStep(query, step)?.attempt ?? 0
+      if (!podeTentarDeNovo(feitas)) {
+        const motivo = ultimoMotivo ?? `${step}-failed`
+        this.evidence.retriesExhausted(run.scope, run.releaseId, {
+          environment,
+          step,
+          reason: motivo,
+          attempts: feitas
+        })
+        await this.fail(run, environment, motivo)
+      }
+      if (feitas > 0) {
+        this.evidence.record(run.scope, run.releaseId, {
+          kind: 'retry',
+          state: 'pending',
+          environment,
+          step,
+          reason: ultimoMotivo ?? `${step}-retry`,
+          details: { attempt: feitas + 1 }
+        })
+        await this.dormir(esperaAntesDaTentativa(feitas + 1))
+        this.renew(run, environment)
+      }
+      const resultado = await run.orchestrator.runStep(
+        query,
+        step,
+        this.payloadHash(run, environment, step),
+        lease
+      )
+      if (resultado.state === 'confirmed') return
+      ultimoMotivo = run.effects.reason ?? ultimoMotivo
+      if (resultado.state === 'ambiguous') continue
+      const motivo = run.effects.reason ?? `${step}-failed`
+      if (classificarFalha(motivo) === 'transient') continue
+      await this.fail(run, environment, motivo)
+    }
   }
 
   /**

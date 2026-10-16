@@ -36,6 +36,9 @@ interface Fault {
   remaining: number
 }
 
+/** Quando a falha acontece em relação ao efeito: antes (não aplicou) ou depois (aplicou e perdeu a resposta). */
+type FaultTiming = 'before' | 'after'
+
 interface FakeBackend {
   readonly deploymentId: string
   readonly digest: string
@@ -67,12 +70,21 @@ export class FakePromotionCloud {
   crossWired: ReleaseEnvironment | null = null
   migrationOutcome: MigrationOutcome | null = null
   private readonly faults = new Map<string, Fault>()
+  private readonly faultsAfter = new Map<string, Fault>()
   private readonly healthScript = new Map<ReleaseEnvironment, boolean[]>()
   private sequence = 0
 
   /** Faz a operação falhar `times` vezes seguidas; `ambiguous` simula timeout (efeito incerto). */
   failOn(operation: string, code: Fault['code'] = 'failed', times = 1): void {
     this.faults.set(operation, { code, remaining: times })
+  }
+
+  /**
+   * Faz a operação **aplicar o efeito** e só então falhar: o provedor fez o trabalho e a resposta
+   * se perdeu. É o caso que `failOn` não alcança e que o retry não pode duplicar.
+   */
+  failAfter(operation: string, code: Fault['code'] = 'timeout', times = 1): void {
+    this.faultsAfter.set(operation, { code, remaining: times })
   }
 
   /** Respostas de `backend_health` do ambiente, consumidas na ordem; depois disso, saudável. */
@@ -82,8 +94,22 @@ export class FakePromotionCloud {
 
   private enter(operation: string, environment?: ReleaseEnvironment): void {
     this.calls.push(environment ? `${operation}:${environment}` : operation)
+    this.dispararFalha('before', operation, environment)
+  }
+
+  /** Chamada depois do efeito: lança se `failAfter` foi armado para a operação. */
+  private leave(operation: string, environment?: ReleaseEnvironment): void {
+    this.dispararFalha('after', operation, environment)
+  }
+
+  private dispararFalha(
+    quando: FaultTiming,
+    operation: string,
+    environment?: ReleaseEnvironment
+  ): void {
+    const mapa = quando === 'before' ? this.faults : this.faultsAfter
     for (const chave of [environment ? `${operation}:${environment}` : null, operation]) {
-      const fault = chave ? this.faults.get(chave) : undefined
+      const fault = chave ? mapa.get(chave) : undefined
       if (fault && fault.remaining > 0) {
         fault.remaining -= 1
         if (fault.code === 'ambiguous') throw new Error('timeout sem resposta')
@@ -97,11 +123,15 @@ export class FakePromotionCloud {
       this.enter('backend.deploy', environment)
       const digest = imageUri.slice(imageUri.indexOf('@') + 1)
       const atual = this.backends.get(environment)
-      if (atual?.digest === digest) return { deploymentId: atual.deploymentId }
+      if (atual?.digest === digest) {
+        this.leave('backend.deploy', environment)
+        return { deploymentId: atual.deploymentId }
+      }
       this.sequence += 1
       const deploymentId = `rw-${environment}-${this.sequence}`
       this.backends.set(environment, { deploymentId, digest })
       this.backendHistory.push({ environment, deploymentId, digest })
+      this.leave('backend.deploy', environment)
       return { deploymentId }
     },
     rollback: async ({ environment, toDeploymentId }) => {
@@ -114,6 +144,7 @@ export class FakePromotionCloud {
         deploymentId: anterior.deploymentId,
         digest: anterior.digest
       })
+      this.leave('backend.rollback', environment)
     },
     current: async (environment) => {
       this.enter('backend.current', environment)
@@ -126,6 +157,7 @@ export class FakePromotionCloud {
       this.enter('database.backup', environment)
       const backupRef = `bkp-${environment}-${this.backups.length + 1}`
       this.backups.push({ environment, backupRef })
+      this.leave('database.backup', environment)
       return { backupRef }
     },
     migrate: async ({ environment, migrations }) => {
@@ -134,6 +166,7 @@ export class FakePromotionCloud {
       const aplicadas = this.databases.get(environment) ?? []
       const novas = migrations.filter((m) => !aplicadas.includes(m.id)).map((m) => m.id)
       this.databases.set(environment, [...aplicadas, ...novas])
+      this.leave('database.migrate', environment)
       return {
         state: 'confirmed',
         applied: novas,
@@ -158,6 +191,7 @@ export class FakePromotionCloud {
     assign: async ({ environment, deploymentId }) => {
       this.enter('frontend.assign', environment)
       this.frontendAssigned.set(environment, deploymentId)
+      this.leave('frontend.assign', environment)
     },
     current: async (environment) => {
       this.enter('frontend.current', environment)

@@ -438,14 +438,16 @@ describe('serialização por projeto e ambiente (critério 8)', () => {
 })
 
 describe('efeito incerto e retomada', () => {
-  it('timeout no deploy deixa o passo ambíguo: nada é compensado nem repetido às cegas', async () => {
+  it('timeout no deploy sem que o provedor responda à reconciliação: o passo fica ambíguo, sem compensar nem repetir às cegas', async () => {
     h = montarHarness()
     h.cloud.failOn('backend.deploy:staging', 'timeout')
+    h.cloud.failOn('backend.current:staging', 'timeout', 10)
     const r = await h.service.handleMerge(SCOPE, SHA_A, projeto())
 
     expect(r).toMatchObject({ state: 'blocked', environment: 'staging', step: 'backend_healthy' })
     expect(r.status).toBe('staging')
     expect(compensacoes(r.releaseId)).toEqual([])
+    expect(h.cloud.calls.filter((c) => c === 'backend.deploy:staging')).toHaveLength(1)
     const passo = h.repository.getStep(
       { ...SCOPE, releaseId: r.releaseId, environment: 'staging' },
       'backend_healthy'
@@ -456,6 +458,7 @@ describe('efeito incerto e retomada', () => {
   it('a retomada reconcilia contra o provedor antes de repetir e conclui', async () => {
     h = montarHarness()
     h.cloud.failOn('backend.deploy:staging', 'timeout')
+    h.cloud.failOn('backend.current:staging', 'timeout', 3)
     const r = await h.service.handleMerge(SCOPE, SHA_A, projeto())
     expect(r.state).toBe('blocked')
 
@@ -483,9 +486,12 @@ describe('efeito incerto e retomada', () => {
       }
       return feito
     }
+    // O provedor também não responde à primeira rodada de reconciliação: a release para...
+    h.cloud.failOn('backend.current:staging', 'timeout', 3)
     const r = await h.service.handleMerge(SCOPE, SHA_A, projeto())
     expect(r.state).toBe('blocked')
 
+    // ...e a retomada reconhece o deploy que já existe, em vez de implantar outro.
     const retomada = await h.service.promote(SCOPE, r.releaseId, projeto())
     expect(retomada.state).toBe('completed')
     expect(h.cloud.backendHistory.filter((b) => b.environment === 'staging')).toHaveLength(1)
@@ -557,19 +563,15 @@ describe('endurecimento pós-revisão', () => {
     ).toMatchObject({ result: 'blocked', reason: 'migration-failed' })
   })
 
-  it('timeout no backup de Produção não prende a lane: nada foi migrado, então a retomada repete com segurança', async () => {
+  it('timeout no backup de Produção não prende a lane: nada foi migrado, então a repetição é segura', async () => {
     h = montarHarness()
     h.cloud.failOn('database.backup:production', 'timeout')
     const r = await h.service.handleMerge(SCOPE, SHA_A, projeto())
-    expect(r).toMatchObject({
-      state: 'blocked',
-      environment: 'production',
-      step: 'database_migrated'
-    })
-    expect(h.cloud.calls).not.toContain('database.migrate:production')
 
-    const retomada = await h.service.promote(SCOPE, r.releaseId, projeto())
-    expect(retomada.state).toBe('completed')
+    // O backup é anterior à intenção da migration: sem linha de migration, reconciliar devolve
+    // "não aplicado" e o passo é repetido na mesma execução — a migration roda uma única vez.
+    expect(r.state).toBe('completed')
+    expect(h.cloud.calls.filter((c) => c === 'database.migrate:production')).toHaveLength(1)
     expect(h.cloud.databases.get('production')).toEqual(['001_init', '002_users'])
   })
 

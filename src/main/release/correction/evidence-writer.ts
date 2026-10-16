@@ -27,15 +27,18 @@ export class ReleaseEvidenceWriter {
       readonly step: string
       readonly reason: string
       readonly attempts: number
+      /** `ambiguous` = o provedor não respondeu à reconciliação; o efeito segue desconhecido. */
+      readonly state?: 'failed' | 'ambiguous'
     }
   ): void {
+    const incerto = input.state === 'ambiguous'
     this.record(scope, releaseId, {
       kind: 'retries-exhausted',
-      state: 'failed',
+      state: input.state ?? 'failed',
       environment: input.environment,
       step: input.step,
       reason: input.reason,
-      action: acaoMinima(classificarFalha(input.reason)),
+      action: incerto ? 'check-provider-status' : acaoMinima(classificarFalha(input.reason)),
       details: { attempts: input.attempts }
     })
   }
