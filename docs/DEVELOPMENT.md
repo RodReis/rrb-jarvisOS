@@ -2,7 +2,7 @@
 
 ## MVP-014 — M14-F05 Compensação, retorno à V2 e E2E (`SPEC-Release-05`, issue #154) — **fecha o MVP-014**
 
-Status: **implementada**, PR [#432](https://github.com/RodReis/rrb-jarvisOS/pull/432) com `refs #154`; issue em `proplan:doing` até o merge. Decisões de implementação, limites e confirmações pedidas ao PI em `docs/spec/spec-release-05-recuperacao-e2e.md`. **Prova real em Vercel/Railway/GHCR/GitHub: `not_run`** (sem projeto de prova nem credenciais) — o MVP-014 só fecha depois dela.
+Status: **entregue** pela [PR #432](https://github.com/RodReis/rrb-jarvisOS/pull/432), squash merge na `main` em 2026-10-16 (SHA `f9799392c9ce065203851bbc680d4b45d96f1316`), CI verde em todos os jobs no head `d89cd25`; issue #154 em `proplan:done`, aguardando aceite do PI ([comentário de encerramento](https://github.com/RodReis/rrb-jarvisOS/issues/154#issuecomment-6216308335)). Decisões de implementação, limites e confirmações pedidas ao PI em `docs/spec/spec-release-05-recuperacao-e2e.md`. **Prova real em Vercel/Railway/GHCR/GitHub: `not_run`** (sem projeto de prova nem credenciais) — o MVP-014 só fecha depois dela.
 
 - [x] Conferir issue #154, SPEC `aprovada-pi` sem perguntas abertas, dependência da F04 (PR #430 mergeada) e `APRENDIZADOS.md` (vazio). O primeiro commit da branch era um esboço (despachante e escritor de evidência sem persistência, que nem compilava); foi **substituído**, não estendido.
 - [x] Domínio puro (`release-recovery.ts`, `release-manifest.ts`): classificação de falha, política de três tentativas com backoff, nome da tag em UTC, ação mínima, JSON canônico, classificação de achados (resolvido não volta como novo) e manifesto/changelog determinísticos.
