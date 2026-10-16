@@ -575,9 +575,10 @@ describe('endurecimento pós-revisão', () => {
     expect(h.cloud.databases.get('production')).toEqual(['001_init', '002_users'])
   })
 
-  it('timeout DEPOIS de a migration começar continua exigindo reconciliação: não repete às cegas', async () => {
+  it('timeout DEPOIS de a migration começar continua exigindo reconciliação: sem leitura do banco, não repete às cegas', async () => {
     h = montarHarness()
     h.cloud.failOn('database.migrate:production', 'timeout')
+    h.cloud.failOn('database.applied:production', 'timeout', 20)
     const r = await h.service.handleMerge(SCOPE, SHA_A, projeto())
     expect(r).toMatchObject({ state: 'blocked', step: 'database_migrated' })
 

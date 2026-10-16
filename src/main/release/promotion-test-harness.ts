@@ -72,6 +72,74 @@ export function projeto(
   }
 }
 
+/** O processo morreu: nada do que vier depois acontece. */
+export class SimulatedCrash extends Error {
+  constructor() {
+    super('processo encerrado (morte simulada)')
+    this.name = 'SimulatedCrash'
+  }
+}
+
+const LEITURA =
+  /^(get|list|last|open|assert|find|read|queue$|detail$|timeline$|inclusions$|evidence$|active|cancellation$|manifest$|publication$|pending|correction|rollbacks$|spec|has|is)/
+
+/**
+ * Mata o processo na `at`-ésima gravação (antes ou depois de ela chegar ao banco). Embrulha os
+ * repositórios e as portas de nuvem: depois da morte, qualquer chamada lança — inclusive a
+ * limpeza do `finally`, que num processo morto não rodaria. Leituras não contam.
+ */
+export class ProcessKiller {
+  calls = 0
+  dead = false
+
+  constructor(
+    private readonly at: number,
+    private readonly when: 'before' | 'after'
+  ) {}
+
+  wrap<T extends object>(target: T): T {
+    return new Proxy(target, {
+      get: (alvo, prop, recebedor) => {
+        const valor: unknown = Reflect.get(alvo, prop, recebedor)
+        if (typeof valor !== 'function' || typeof prop !== 'string') return valor
+        const metodo = valor.bind(alvo) as (...args: unknown[]) => unknown
+        const leitura = LEITURA.test(prop)
+        return (...args: unknown[]) => {
+          if (this.dead) throw new SimulatedCrash()
+          if (leitura) return metodo(...args)
+          this.calls += 1
+          const aqui = this.calls === this.at
+          if (aqui && this.when === 'before') {
+            this.dead = true
+            throw new SimulatedCrash()
+          }
+          const resultado = metodo(...args)
+          if (aqui && this.when === 'after') {
+            this.dead = true
+            throw new SimulatedCrash()
+          }
+          return resultado
+        }
+      }
+    })
+  }
+
+  /** Porta de nuvem: não grava nada no contador, mas um processo morto não a chama. */
+  guard<T extends object>(porta: T): T {
+    return new Proxy(porta, {
+      get: (alvo, prop, recebedor) => {
+        const valor: unknown = Reflect.get(alvo, prop, recebedor)
+        if (typeof valor !== 'function') return valor
+        const metodo = valor.bind(alvo) as (...args: unknown[]) => unknown
+        return (...args: unknown[]) => {
+          if (this.dead) throw new SimulatedCrash()
+          return metodo(...args)
+        }
+      }
+    })
+  }
+}
+
 export interface Harness {
   readonly db: Database
   readonly audit: AuditRepository
@@ -96,7 +164,12 @@ export interface Harness {
 }
 
 export function montarHarness(
-  opcoes: { sleep?: (ms: number) => Promise<void>; leaseMs?: number } = {}
+  opcoes: {
+    sleep?: (ms: number) => Promise<void>
+    leaseMs?: number
+    /** O serviço principal morre quando o `ProcessKiller` mandar; `novoServico` é o processo seguinte. */
+    morte?: ProcessKiller
+  } = {}
 ): Harness {
   const directory = mkdtempSync(join(tmpdir(), 'release-promotion-svc-'))
   const db = openDatabase(join(directory, 'release.db'))
@@ -109,24 +182,27 @@ export function montarHarness(
   const cloud = new FakePromotionCloud()
   const criar = (
     o: { sleep?: (ms: number) => Promise<void>; ownerId?: string } = {},
-    nuvem: FakePromotionCloud = cloud
-  ) =>
-    new PromotionService({
-      repository,
-      promotion,
-      local,
-      recovery,
-      build: nuvem.buildPort(local),
-      backend: nuvem.backend,
-      database: nuvem.database,
-      frontend: nuvem.frontend,
-      verifier: nuvem.verifier,
+    nuvem: FakePromotionCloud = cloud,
+    morte?: ProcessKiller
+  ) => {
+    const m = morte
+    return new PromotionService({
+      repository: m ? m.wrap(repository) : repository,
+      promotion: m ? m.wrap(promotion) : promotion,
+      local: m ? m.wrap(local) : local,
+      recovery: m ? m.wrap(recovery) : recovery,
+      build: m ? m.guard(nuvem.buildPort(local)) : nuvem.buildPort(local),
+      backend: m ? m.guard(nuvem.backend) : nuvem.backend,
+      database: m ? m.guard(nuvem.database) : nuvem.database,
+      frontend: m ? m.guard(nuvem.frontend) : nuvem.frontend,
+      verifier: m ? m.guard(nuvem.verifier) : nuvem.verifier,
       now: clock.now,
       nowMs: clock.nowMs,
       sleep: o.sleep ?? opcoes.sleep ?? clock.sleep,
       ownerId: o.ownerId ?? 'executor-1',
       ...(opcoes.leaseMs ? { leaseMs: opcoes.leaseMs } : {})
     })
+  }
   return {
     db,
     audit,
@@ -136,7 +212,7 @@ export function montarHarness(
     recovery,
     clock,
     cloud,
-    service: criar(),
+    service: criar({}, cloud, opcoes.morte),
     novoServico: (o) => criar(o),
     outroProjeto: () => {
       const nuvem = new FakePromotionCloud()

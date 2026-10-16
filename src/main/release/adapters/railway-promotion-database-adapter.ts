@@ -36,7 +36,10 @@ export interface RailwayPromotionDatabaseConfig {
 
 const TIMEOUT_MS = 10 * 60_000
 
-export class RailwayPromotionDatabaseAdapter implements Pick<PromotionDatabasePort, 'migrate'> {
+export class RailwayPromotionDatabaseAdapter implements Pick<
+  PromotionDatabasePort,
+  'migrate' | 'applied'
+> {
   constructor(
     private readonly runner: CommandRunner,
     private readonly config: RailwayPromotionDatabaseConfig
@@ -52,7 +55,6 @@ export class RailwayPromotionDatabaseAdapter implements Pick<PromotionDatabasePo
     environment: ReleaseEnvironment
     migrations: readonly MigrationFile[]
   }): Promise<MigrationOutcome> {
-    const ambiente = this.nomeDoAmbiente(input.environment)
     // O `psql` lê o SQL de stdin e executa meta-comandos (`\! comando` roda no host do operador):
     // nenhuma barra invertida entra, nem dentro de literal.
     if (input.migrations.some((m) => m.sql.includes(BARRA_INVERTIDA)))
@@ -60,6 +62,31 @@ export class RailwayPromotionDatabaseAdapter implements Pick<PromotionDatabasePo
         'incompatible-state',
         'Migration não pode conter barra invertida (meta-comando do psql).'
       )
+    return this.comRunner(input.environment, (runner, database) =>
+      runner.apply({
+        database,
+        migrations: input.migrations,
+        // Produção: nenhum `pg_dump`. A impressão ninguém usa aqui e leria o dado do ambiente.
+        impressao: false
+      })
+    )
+  }
+
+  /**
+   * O que o banco do ambiente já aplicou (SPEC-Release-05): só leitura, pela mesma conexão da
+   * migration. É a prova que a reconciliação de uma migration incerta usa antes de repetir.
+   */
+  async applied(input: {
+    environment: ReleaseEnvironment
+  }): Promise<readonly { id: string; checksum: string }[]> {
+    return this.comRunner(input.environment, (runner, database) => runner.aplicadas(database))
+  }
+
+  private async comRunner<T>(
+    environment: ReleaseEnvironment,
+    usar: (runner: DatabaseMigrationRunner, database: string) => Promise<T>
+  ): Promise<T> {
+    const ambiente = this.nomeDoAmbiente(environment)
     let abriuProxy = false
     const conexao = await lerConexaoDoBanco(
       (args, etapa) => this.cli(args, etapa),
@@ -70,12 +97,10 @@ export class RailwayPromotionDatabaseAdapter implements Pick<PromotionDatabasePo
       }
     )
     try {
-      return await new DatabaseMigrationRunner(new PsqlExecutor(this.runner, conexao)).apply({
-        database: conexao.database,
-        migrations: input.migrations,
-        // Produção: nenhum `pg_dump`. A impressão ninguém usa aqui e leria o dado do ambiente.
-        impressao: false
-      })
+      return await usar(
+        new DatabaseMigrationRunner(new PsqlExecutor(this.runner, conexao)),
+        conexao.database
+      )
     } finally {
       // O proxy é endereço público do banco: quem o abriu o fecha. O que já existia é do operador.
       if (abriuProxy) await this.fecharProxy(ambiente)

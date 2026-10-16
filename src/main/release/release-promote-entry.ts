@@ -177,6 +177,7 @@ function montarServico(
   })
   const database: PromotionDatabasePort = {
     backup: (input) => backup.backup(input),
+    applied: (input) => migrate.applied(input),
     migrate: (input) => migrate.migrate(input)
   }
   const verifier = new HttpPromotionVerifier({

@@ -197,3 +197,48 @@ describe('lerMigrations', () => {
     expect(lerMigrations(dir)[1]!.checksum).toBe(crlf)
   })
 })
+
+describe('DatabaseMigrationRunner.aplicadas (reconciliação, SPEC-Release-05)', () => {
+  /** Executor que responde à presença da tabela e à leitura dos checksums; nunca escreve. */
+  function leitor(
+    presente: string,
+    linhas: string,
+    falhaNaPresenca = false
+  ): SqlExecutor & { scripts: string[] } {
+    const scripts: string[] = []
+    return {
+      scripts,
+      async run(sql) {
+        scripts.push(sql)
+        if (sql.includes('to_regclass')) {
+          return falhaNaPresenca
+            ? { ok: false, stdout: '', stderr: 'ERROR: conexão' }
+            : { ok: true, stdout: presente, stderr: '' }
+        }
+        return { ok: true, stdout: linhas, stderr: '' }
+      },
+      async dump() {
+        throw new Error('leitura não faz dump')
+      }
+    }
+  }
+
+  it('devolve o que o banco já aplicou, sem a marca do seed e sem escrever nada', async () => {
+    const exec = leitor('t', ['001_a|a1', '002_b|a2', '__seed__|ff', ''].join('\n'))
+    expect(await new DatabaseMigrationRunner(exec).aplicadas('d')).toEqual([
+      { id: '001_a', checksum: 'a1' },
+      { id: '002_b', checksum: 'a2' }
+    ])
+    expect(exec.scripts.some((s) => /CREATE|INSERT|UPDATE|DELETE/i.test(s))).toBe(false)
+  })
+
+  it('banco virgem (sem a tabela de controle) não tem migration aplicada', async () => {
+    expect(await new DatabaseMigrationRunner(leitor('f', '')).aplicadas('d')).toEqual([])
+  })
+
+  it('leitura que falha não é "nada aplicado": lança, para a reconciliação ficar sem resposta', async () => {
+    await expect(new DatabaseMigrationRunner(leitor('', '', true)).aplicadas('d')).rejects.toThrow(
+      'migration-state-unreadable'
+    )
+  })
+})

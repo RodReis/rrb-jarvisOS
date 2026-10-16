@@ -162,6 +162,25 @@ export class DatabaseMigrationRunner {
     }
   }
 
+  /**
+   * O que o banco já aplicou, só leitura: é a prova que a reconciliação de um `database_migrated`
+   * incerto usa (SPEC-Release-05). Banco sem a tabela de controle não tem nada aplicado; leitura
+   * que falha **lança** — "não consegui ler" nunca vira "nada aplicado", que autorizaria repetir.
+   */
+  async aplicadas(database: string): Promise<{ id: string; checksum: string }[]> {
+    const presenca = await this.executor.run(
+      `SELECT to_regclass('public.schema_migrations') IS NOT NULL;`,
+      database
+    )
+    if (!presenca.ok) throw new Error('migration-state-unreadable')
+    if (presenca.stdout.trim() !== 't') return []
+    const lidas = await this.lerAplicadas(database)
+    if (!lidas) throw new Error('migration-state-unreadable')
+    return [...lidas.entries()]
+      .filter(([id]) => id !== SEED_ID)
+      .map(([id, checksum]) => ({ id, checksum }))
+  }
+
   private async lerAplicadas(database: string): Promise<Map<string, string> | null> {
     const resultado = await this.executor.run(
       `SELECT id || '|' || checksum FROM schema_migrations ORDER BY id;`,

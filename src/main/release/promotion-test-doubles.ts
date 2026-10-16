@@ -44,6 +44,12 @@ interface FakeBackend {
   readonly digest: string
 }
 
+/** Os checksums das migrations do harness: o banco falso os devolve como o banco real faria. */
+const CHECKSUM_DA_MIGRATION: Readonly<Record<string, string>> = {
+  '001_init': '1'.repeat(64),
+  '002_users': '2'.repeat(64)
+}
+
 const BACKEND_URL: Readonly<Record<ReleaseEnvironment, string>> = {
   staging: 'https://api-staging.up.railway.app',
   production: 'https://api.up.railway.app'
@@ -160,6 +166,13 @@ export class FakePromotionCloud {
       this.leave('database.backup', environment)
       return { backupRef }
     },
+    applied: async ({ environment }) => {
+      this.enter('database.applied', environment)
+      return (this.databases.get(environment) ?? []).map((id) => ({
+        id,
+        checksum: CHECKSUM_DA_MIGRATION[id] ?? 'f'.repeat(64)
+      }))
+    },
     migrate: async ({ environment, migrations }) => {
       this.enter('database.migrate', environment)
       if (this.migrationOutcome) return this.migrationOutcome
@@ -182,10 +195,14 @@ export class FakePromotionCloud {
       this.enter('frontend.build')
       const chave = `${releaseId}:${sourceSha}`
       const existente = this.frontendBuilds.get(chave)
-      if (existente) return { deploymentId: existente }
+      if (existente) {
+        this.leave('frontend.build')
+        return { deploymentId: existente }
+      }
       this.sequence += 1
       const deploymentId = `dpl_fe${this.sequence}`
       this.frontendBuilds.set(chave, deploymentId)
+      this.leave('frontend.build')
       return { deploymentId }
     },
     assign: async ({ environment, deploymentId }) => {

@@ -303,6 +303,47 @@ describe('RailwayPromotionDatabaseAdapter.migrate', () => {
   })
 })
 
+describe('RailwayPromotionDatabaseAdapter.applied (reconciliação)', () => {
+  const lista = (linhas: string[]): string => linhas.join('\n') + '\n'
+
+  it('lê o que o banco do ambiente já aplicou, sem escrever e sem expor a senha', async () => {
+    const { runner, chamadas } = banco((c) =>
+      sqlDe(c).includes('to_regclass') ? ok('t') : ok(lista([`001_base|${'c'.repeat(64)}`]))
+    )
+
+    const r = await new RailwayPromotionDatabaseAdapter(runner, CONFIG).applied({
+      environment: 'production'
+    })
+
+    expect(r).toEqual([{ id: '001_base', checksum: 'c'.repeat(64) }])
+    const doBanco = chamadas.filter((c) => c.binary === 'psql')
+    expect(doBanco.length).toBeGreaterThan(0)
+    for (const c of doBanco) {
+      expect(sqlDe(c)).not.toMatch(/CREATE|INSERT|UPDATE|DELETE|DROP/i)
+      expect(c.args.join(' ')).not.toContain(SENHA)
+      expect(c.options?.redact).toContain(SENHA)
+    }
+    expect(chamadas.map((c) => c.binary)).not.toContain('pg_dump')
+  })
+
+  it('leitura que falha lança com código fechado, sem a saída do banco', async () => {
+    const { runner } = banco(() => erro(`ERRO: ${SENHA}`))
+    const falha = await rodar(
+      new RailwayPromotionDatabaseAdapter(runner, CONFIG).applied({ environment: 'staging' })
+    )
+    expect(falha).toBeInstanceOf(Error)
+    expect(String((falha as Error).message)).not.toContain(SENHA)
+  })
+
+  it('fecha o proxy que abriu, como a migration', async () => {
+    const { runner, chamadas } = banco(() => ok('f'))
+    await new RailwayPromotionDatabaseAdapter(runner, CONFIG).applied({ environment: 'staging' })
+    expect(
+      chamadas.some((c) => c.binary === 'railway' && comecaCom(c, 'tcp-proxy', 'delete'))
+    ).toBe(true)
+  })
+})
+
 describe('RailwayPromotionDatabaseAdapter (configuração)', () => {
   it.each([
     ['ambientes iguais', { staging: 'x', production: 'x' }],

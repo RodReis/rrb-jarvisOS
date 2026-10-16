@@ -47,6 +47,13 @@ export interface PromotionBackendPort {
 export interface PromotionDatabasePort {
   /** Backup do PostgreSQL do ambiente; devolve a referência para o restore operacional. */
   backup(input: { environment: ReleaseEnvironment }): Promise<{ backupRef: string }>
+  /**
+   * O que o PostgreSQL do ambiente já aplicou (só leitura). Reconcilia uma migration de resultado
+   * incerto sem repetir às cegas. Leitura que falha **lança**: nunca vira "nada aplicado".
+   */
+  applied(input: {
+    environment: ReleaseEnvironment
+  }): Promise<readonly { id: string; checksum: string }[]>
   /** Migrations forward-only no PostgreSQL do próprio ambiente. */
   migrate(input: {
     environment: ReleaseEnvironment

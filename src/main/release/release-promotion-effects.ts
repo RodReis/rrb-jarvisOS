@@ -111,16 +111,49 @@ export class PromotionEffects implements ReleasePort {
         ? 'applied'
         : 'not-applied'
     }
-    if (request.step === 'database_migrated') {
-      // Sem nenhuma linha de migration neste ambiente, só o backup chegou a rodar (ele precede a
-      // intenção): nada foi migrado e repetir é seguro. Com linhas, o banco pode ter mudado.
-      const linhas = this.deps.promotion
-        .listMigrations(this.deps.scope, this.deps.releaseId)
-        .filter((m) => m.environment === env)
-      return linhas.length === 0 ? 'not-applied' : 'unknown'
-    }
-    // prepared: sem consulta barata e segura; fica para o operador (F05).
+    if (request.step === 'database_migrated') return this.reconciliarMigration(env)
+    if (request.step === 'prepared') return this.reconciliarPreparacao(env)
     return 'unknown'
+  }
+
+  /**
+   * `prepared` só tem efeito remoto em Staging (build, imagem, deployment do frontend), e todos
+   * são idempotentes por release: o que está gravado prova o que existe. Artefato e os dois
+   * deployments registrados = aplicado; qualquer um faltando = repetir é seguro, porque build e
+   * frontend reconhecem o que já fizeram. Em Produção o passo é só leitura de configuração.
+   */
+  private reconciliarPreparacao(env: ReleaseEnvironment): 'applied' | 'not-applied' {
+    if (env === 'production') return 'not-applied'
+    const { scope, releaseId, local, promotion } = this.deps
+    const artefato = local.getArtifact(scope, releaseId, 'backend-image')
+    const frontends = (['staging', 'production'] as const).every(
+      (ambiente) => promotion.getDeployment(scope, releaseId, ambiente, 'frontend') !== null
+    )
+    return artefato?.uri && frontends ? 'applied' : 'not-applied'
+  }
+
+  /**
+   * Pergunta ao PostgreSQL do ambiente, em vez de presumir: todas as migrations do projeto com o
+   * checksum esperado = aplicado (e o gate que a resposta perdida deixou sem registro é gravado
+   * agora); qualquer ausência ou checksum diferente = não aplicado, e a repetição completa o que
+   * falta ou recusa de forma definitiva. Leitura que falha lança → sem resposta, nunca "repete".
+   */
+  private async reconciliarMigration(env: ReleaseEnvironment): Promise<'applied' | 'not-applied'> {
+    const { scope, releaseId, promotion, database, project } = this.deps
+    const aplicadas = await database.applied({ environment: env })
+    const todas = project.migrations.every((m) =>
+      aplicadas.some((a) => a.id === m.id && a.checksum === m.checksum)
+    )
+    if (!todas) return 'not-applied'
+    for (const m of project.migrations)
+      promotion.recordMigration(
+        scope,
+        releaseId,
+        { environment: env, migrationId: m.id, checksum: m.checksum, state: 'confirmed' },
+        this.deps.now()
+      )
+    this.gate(env, 'migration', true, '')
+    return 'applied'
   }
 
   private async dispatch(env: ReleaseEnvironment, step: string): Promise<'confirmed' | 'failed'> {
