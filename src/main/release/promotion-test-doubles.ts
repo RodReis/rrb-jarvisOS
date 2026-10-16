@@ -10,8 +10,7 @@ import {
   type PromotionProviderErrorCode,
   type PromotionVerifierPort
 } from './promotion-ports'
-import { createHash } from 'node:crypto'
-import type { ReleaseGitPort } from './release-publisher'
+import { hashDasNotas, type ReleaseGitPort } from './release-publisher'
 import type { ReleaseLocalRepository } from './release-local-repository'
 
 /**
@@ -326,8 +325,7 @@ export class FakeGitHubReleases {
       return achada
         ? {
             commitSha: achada.commitSha,
-            notesSha256:
-              achada.notes === null ? null : createHash('sha256').update(achada.notes).digest('hex')
+            notesSha256: achada.notes === null ? null : hashDasNotas(achada.notes)
           }
         : null
     },

@@ -47,6 +47,14 @@ export interface PublisherDeps {
 
 const sha256 = (texto: string): string => createHash('sha256').update(texto).digest('hex')
 
+/**
+ * Hash das notas como o GitHub as guarda: fim de linha e espaço final são normalizados lá, então a
+ * comparação ignora os dois. Quem escreve (publicador) e quem lê (adaptador) usam esta função.
+ */
+export function hashDasNotas(texto: string): string {
+  return sha256(texto.replaceAll('\r\n', '\n').trimEnd())
+}
+
 /** O último resultado de cada gate por ambiente. */
 function gatesVigentes(gates: readonly GateResult[]): GateResult[] {
   const ultimo = new Map<string, GateResult>()
@@ -164,7 +172,8 @@ export class ReleasePublisher {
       else if (!achada) problemas.push('tag-missing')
       else {
         if (achada.commitSha !== release.sha) problemas.push('tag-wrong-commit')
-        else if (achada.notesSha256 !== sha256(guardado.changelog)) problemas.push('notes-diverged')
+        else if (achada.notesSha256 !== hashDasNotas(guardado.changelog))
+          problemas.push('notes-diverged')
       }
     }
     return { ok: problemas.length === 0, problems: problemas }
